@@ -18,7 +18,7 @@ The loopback stub remains a test tool. See [Device digital-human API](/integrati
 `/api/device-platform/v1` is used on two hosts:
 
 - On the OpenBot gateway, `/api/device-platform/v1/admin/*` is mounted for a platform-admin session. Ordinary users and enterprise admins are rejected there. `/api/device-platform/v1/me/*` is mounted for a signed-in member and is the personal-settings device API. It does not return the connector URL or secrets.
-- On the device platform, the same prefix is the frozen control API (`health`, `capabilities`, `pair-challenges`, `devices/.../bind`). OpenBot calls it on the admin-configured origin, not on the OpenBot host.
+- On the device platform, the same prefix is the frozen control API (`health`, `capabilities`, `pair-challenges`, `devices/.../bind`). OpenBot calls it on the admin-configured origin, not on the OpenBot host. A loopback joint uses `http://127.0.0.1:8791`. Pointing the connector at this gateway collides on the prefix. See [Joint staging](/integrations/device-platform/staging).
 
 The control client never calls `/api/integrations/v1` and never sends `pairChallenge` or `pairingCode` to OpenBot. OpenBot revoke stays on the integrations API. Device-platform `stop` and `revoke` are local only.
 
@@ -113,6 +113,6 @@ A wrong, expired, replayed, or mismatched code does not become an active binding
 
 The page reads `GET /api/device-platform/v1/me/digital-humans/{digitalHumanId}/devices`. It does not write a device binding into agent config, and it does not send pairing fields to `/api/integrations/v1`.
 
-## Follow-ups
+## Joint staging
 
-- B5: live joint test with the device-platform HTTP service.
+Loopback steps, env names, and what CI does not prove: [Joint staging](/integrations/device-platform/staging). Cross-host and hardware evidence are still pending. `grayRelease` stays false.

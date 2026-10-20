@@ -4,8 +4,11 @@
  * OpenBot host: `/api/device-platform/v1/admin/*` for a platform-admin session,
  * and `/api/device-platform/v1/me/*` for a signed-in member. The device platform
  * itself is a different process. `HttpDevicePlatformControl` calls that origin.
+ * The loopback joint default is `http://127.0.0.1:8791`, never this gateway:
+ * both hosts use `/api/device-platform/v1`, so the host boundary matters.
  *
- * The loopback `/api/integrations/v1` stub is not mounted.
+ * The loopback `/api/integrations/v1` stub is not mounted and must not be
+ * reverse-proxied onto the public gateway.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";

@@ -726,8 +726,11 @@ export function createGatewayHttpServer(opts: {
             }),
         },
         {
-          // Device-platform admin connector and signed-in member device routes.
-          // Does not mount /api/integrations/v1.
+          // OpenBot management routes only: /admin for a platform-admin session
+          // and /me for a signed-in member. Device-control is a different origin
+          // (loopback joint default http://127.0.0.1:8791). The same path prefix
+          // on this host must not be treated as that process. Does not mount
+          // /api/integrations/v1 and does not reverse-proxy the loopback stub.
           name: "device-platform-admin",
           run: () => handleDevicePlatformHttpRequest(req, res),
         },
