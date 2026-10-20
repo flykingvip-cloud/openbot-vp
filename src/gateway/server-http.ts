@@ -38,6 +38,7 @@ import {
   handleControlUiHttpRequest,
   type ControlUiRootState,
 } from "./control-ui.js";
+import { handleDevicePlatformHttpRequest } from "./device-platform-http.js";
 import { handleFabricV1HttpRequest } from "./fabric-v1-http.js";
 import {
   parseHookJsonPayload,
@@ -723,6 +724,12 @@ export function createGatewayHttpServer(opts: {
               allowRealIpFallback,
               rateLimiter,
             }),
+        },
+        {
+          // Platform-admin device-platform connector. Does not mount
+          // /api/integrations/v1 or the user device routes.
+          name: "device-platform-admin",
+          run: () => handleDevicePlatformHttpRequest(req, res),
         },
         {
           name: "fabric-v1",

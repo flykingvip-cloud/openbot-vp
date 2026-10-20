@@ -1,7 +1,14 @@
 export { handleDevicePlatformRequest } from "./api.js";
 export type { DevicePlatformHttpRequest, DevicePlatformHttpResponse } from "./api.js";
+export { probeDevicePlatformConnection } from "./connection-probe.js";
 export { FakeDevicePlatformControl } from "./control-client.js";
 export type { DevicePlatformControlClient } from "./control-client.js";
+export {
+  assertBodyHasNoPairingFields,
+  deviceControlUrl,
+  HttpDevicePlatformControl,
+} from "./http-control-client.js";
+export type { DeviceControlFetch } from "./http-control-client.js";
 export {
   assertNoForbiddenUserKeys,
   toAdminConnectionDto,

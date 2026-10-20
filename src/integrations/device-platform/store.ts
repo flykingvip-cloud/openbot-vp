@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { normalizeDevicePlatformConnection } from "./dto.js";
 import { assertSafeTenantId, type DevicePlatformPaths } from "./paths.js";
 import { recoverTenantShard } from "./recovery.js";
 import {
@@ -9,6 +10,21 @@ import {
   type ConnectionsFile,
   type TenantShard,
 } from "./types.js";
+
+export type StoredServiceCredential = {
+  serviceUser: string;
+  /** Write-once service Basic password. Never copied onto the connection record. */
+  secret: string;
+};
+
+export type CredentialsFile = {
+  schemaVersion: number;
+  credentials: Record<string, StoredServiceCredential>;
+};
+
+export function emptyCredentials(): CredentialsFile {
+  return { schemaVersion: DEVICE_PLATFORM_SCHEMA_VERSION, credentials: {} };
+}
 
 export function emptyConnections(): ConnectionsFile {
   return { schemaVersion: DEVICE_PLATFORM_SCHEMA_VERSION, connections: {} };
@@ -42,11 +58,30 @@ export class DevicePlatformStore {
   }
 
   loadConnections(): ConnectionsFile {
-    return readJson(this.locations.connectionFile, emptyConnections());
+    const file = readJson(this.locations.connectionFile, emptyConnections());
+    for (const [platformId, connection] of Object.entries(file.connections)) {
+      file.connections[platformId] = normalizeDevicePlatformConnection({
+        ...connection,
+        platformId: connection.platformId || platformId,
+      });
+    }
+    return file;
   }
 
   saveConnections(file: ConnectionsFile): void {
     writeJson(this.locations.connectionFile, file);
+  }
+
+  loadCredentials(): CredentialsFile {
+    return readJson(this.locations.credentialFile, emptyCredentials());
+  }
+
+  saveCredentials(file: CredentialsFile): void {
+    writeJson(this.locations.credentialFile, file, 0o600);
+  }
+
+  loadCredential(platformId: string): StoredServiceCredential | null {
+    return this.loadCredentials().credentials[platformId] ?? null;
   }
 
   loadClaims(): ClaimsFile {
@@ -108,12 +143,18 @@ function readJson<T>(filePath: string, fallback: T): T {
   }
 }
 
-function writeJson(filePath: string, value: unknown): void {
+function writeJson(filePath: string, value: unknown, mode?: number): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const temporary = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   try {
-    fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+    fs.writeFileSync(temporary, `${JSON.stringify(value, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: mode ?? 0o600,
+    });
     fs.renameSync(temporary, filePath);
+    if (mode !== undefined) {
+      fs.chmodSync(filePath, mode);
+    }
   } finally {
     if (fs.existsSync(temporary)) {
       fs.rmSync(temporary, { force: true });

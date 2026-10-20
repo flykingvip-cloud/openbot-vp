@@ -10,6 +10,7 @@ import {
 import { originForPort } from "../../../routing/subdomain-resolver.ts";
 import type { PlatformAuthPanelProps } from "../../../views/platform-auth-panel.ts";
 import { renderPlatformAuthPanel } from "../../../views/platform-auth-panel.ts";
+import { renderDevicePlatformConnectionPanel } from "../device-platform/page.ts";
 import type { PlatformModelsMode } from "../models/snapshot-types.ts";
 import { isPlatformShellPending, renderPlatformSummaryPending } from "../shared/summary-pending.ts";
 import {
@@ -33,6 +34,7 @@ const SYSTEM_SETTINGS_TABS: Array<{ id: SystemSettingsTab; label: string }> = [
   { id: "defaults", label: "默认策略" },
   { id: "security", label: "安全与审计" },
   { id: "api", label: "API Key" },
+  { id: "device-platform", label: "设备平台连接" },
 ];
 
 let activeSystemSettingsTab: SystemSettingsTab = "admins";
@@ -3904,6 +3906,9 @@ export function renderPlatformSystemSettingsSurface(props: PlatformSurfaceProps)
       break;
     case "api":
       body = renderApiKeyTab(props);
+      break;
+    case "device-platform":
+      body = renderDevicePlatformConnectionPanel();
       break;
   }
 

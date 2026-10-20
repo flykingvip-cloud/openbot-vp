@@ -9044,6 +9044,24 @@ tasks:
     since: 2026-10-20
     metadata: {}
 landingStreams:
+  # Parallel companion so the B2 admin mount can land with the device-platform
+  # primary stream. These shared files stay listed here so a connector change
+  # does not mix PHW3, MRR, and platform-admin layout primaries.
+  - id: device-platform-b2-admin-mount:cursor-cloud
+    landingPolicy: parallel
+    paths:
+      - src/gateway/server-http.ts
+      - src/gateway/device-platform-http.ts
+      - src/gateway/device-platform-http.test.ts
+      - ui/src/ui/ports/platform/system-settings/page.ts
+      - ui/src/ui/ports/platform/system-settings/route.ts
+      - ui/src/ui/ports/platform/device-platform/**
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Platform admin device platform connection mount
+      owner: cursor-cloud
+      task: device-platform-b2
   - id: device-digital-human-v1:cursor-cloud
     landingPolicy: serial
     paths:

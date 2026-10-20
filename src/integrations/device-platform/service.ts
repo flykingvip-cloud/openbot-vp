@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { probeDevicePlatformConnection } from "./connection-probe.js";
 import type { DevicePlatformControlClient } from "./control-client.js";
 import {
   toAdminConnectionDto,
@@ -8,6 +9,8 @@ import {
   type UserDeviceDto,
   type UserOperationDto,
 } from "./dto.js";
+import type { DeviceControlFetch } from "./http-control-client.js";
+import { assertBodyHasNoPairingFields } from "./http-control-client.js";
 import { bodyHash, dropInflightIdempotency, hashesEqual, sha256Hex } from "./idempotency.js";
 import {
   assertFormalRuntime,
@@ -26,9 +29,11 @@ import {
 } from "./permissions.js";
 import type { DevicePlatformStore } from "./store.js";
 import {
+  DEVICE_PLATFORM_DISABLED_DISPOSITION,
   DevicePlatformError,
   FOREGROUND_BINDING_STATUSES,
   type DeviceAssociation,
+  type DevicePlatformEnvironment,
   type DeviceBinding,
   type DevicePlatformConnection,
   type GrantReference,
@@ -38,6 +43,11 @@ import {
   type StatusProjection,
   type TenantShard,
 } from "./types.js";
+import {
+  assertSafeCallbackUrl,
+  assertSafeServiceBaseUrl,
+  parseDevicePlatformEnvironment,
+} from "./url-safety.js";
 
 const ALLOWED_SCOPES = new Set(["chat", "camera.capture", "media.read"]);
 const SECRET_FIELDS = [
@@ -150,9 +160,14 @@ export class DevicePlatformService {
     actorIn: TrustedActor,
     platformId: string,
     input: {
+      displayName?: string;
+      environment?: string;
       serviceBaseUrl?: string;
       contractVersion?: string;
       credentialRef?: string;
+      clientIdentity?: string;
+      registrationNotes?: string;
+      callbackAllowlist?: string[];
       serviceClientIds?: string[];
       enabled?: boolean;
     },
@@ -163,30 +178,124 @@ export class DevicePlatformService {
     if (raw) {
       rejectRequestPayload(raw);
     }
-    const serviceBaseUrl = requireUrl(input.serviceBaseUrl);
+    const environment = parseDevicePlatformEnvironment(input.environment);
+    const serviceBaseUrl = assertSafeServiceBaseUrl(input.serviceBaseUrl, environment);
     const credentialRef = requireToken(input.credentialRef, "credentialRef");
     const contractVersion = requireToken(input.contractVersion ?? "1", "contractVersion");
-    const serviceClientIds = input.serviceClientIds ?? [];
-    if (
-      serviceClientIds.length === 0 ||
-      serviceClientIds.some((id) => typeof id !== "string" || id.trim() === "")
-    ) {
-      throw new DevicePlatformError("VALIDATION", "serviceClientIds is required");
-    }
+    const serviceClientIds = normalizeClientIds(input.serviceClientIds);
+    const clientIdentity = normalizeClientIdentity(input.clientIdentity, serviceClientIds);
+    const registrationNotes = normalizeNotes(input.registrationNotes);
+    const callbackAllowlist = normalizeCallbackAllowlist(input.callbackAllowlist, environment);
+    const id = requireToken(platformId, "platformId");
     const file = this.store.loadConnections();
+    const previous = file.connections[id];
     const connection: DevicePlatformConnection = {
-      platformId: requireToken(platformId, "platformId"),
+      platformId: id,
+      displayName: normalizeDisplayName(input.displayName, id),
+      environment,
       serviceBaseUrl,
       contractVersion,
       credentialRef,
-      serviceClientIds: [...serviceClientIds],
+      clientIdentity,
+      registrationNotes,
+      callbackAllowlist,
+      serviceClientIds,
       enabled: input.enabled !== false,
+      disabledDisposition: DEVICE_PLATFORM_DISABLED_DISPOSITION,
+      credentialPresent: Boolean(previous?.credentialPresent),
+      ...(previous?.credentialRotatedAt
+        ? { credentialRotatedAt: previous.credentialRotatedAt }
+        : {}),
       health: "unknown",
       updatedAt: this.iso(),
     };
     file.connections[connection.platformId] = connection;
     this.store.saveConnections(file);
     return toAdminConnectionDto(connection);
+  }
+
+  /**
+   * Store the service Basic password once. The value is not written on the
+   * connection record and is never returned. Pass rotate to replace it.
+   */
+  setConnectionCredential(
+    actorIn: TrustedActor,
+    platformId: string,
+    input: { clientSecret?: string; rotate?: boolean },
+    raw?: Record<string, unknown>,
+  ): AdminConnectionDto {
+    const actor = this.actor(actorIn);
+    assertPlatformAdmin(actor);
+    if (raw) {
+      rejectCredentialPayload(raw);
+    }
+    const id = requireToken(platformId, "platformId");
+    const secret = requireToken(input.clientSecret, "clientSecret");
+    if (secret.length < 16) {
+      throw new DevicePlatformError("VALIDATION", "clientSecret is too short");
+    }
+    const file = this.store.loadConnections();
+    const connection = file.connections[id];
+    if (!connection) {
+      throw new DevicePlatformError("NOT_FOUND", "Platform connection not found");
+    }
+    const credentials = this.store.loadCredentials();
+    const existing = credentials.credentials[id];
+    if (existing && input.rotate !== true) {
+      throw new DevicePlatformError(
+        "CONFLICT",
+        "Service credential is write-once; rotate to replace it",
+      );
+    }
+    credentials.credentials[id] = { serviceUser: connection.clientIdentity, secret };
+    this.store.saveCredentials(credentials);
+    connection.credentialPresent = true;
+    if (input.rotate === true) {
+      connection.credentialRotatedAt = this.iso();
+    }
+    connection.health = "unknown";
+    connection.healthCode = undefined;
+    connection.healthError = undefined;
+    connection.updatedAt = this.iso();
+    this.store.saveConnections(file);
+    return toAdminConnectionDto(connection);
+  }
+
+  /**
+   * Probe the device platform at the configured origin.
+   * Health and capabilities must both succeed or the connector stays unhealthy.
+   */
+  async testConnection(
+    actorIn: TrustedActor,
+    platformId: string,
+    options?: { fetchImpl?: DeviceControlFetch; timeoutMs?: number },
+  ): Promise<{
+    connection: AdminConnectionDto;
+    checks: { health: "ok" | "failed"; capabilities: "ok" | "failed" | "skipped" };
+    partial: boolean;
+  }> {
+    const actor = this.actor(actorIn);
+    assertPlatformAdmin(actor);
+    const id = requireToken(platformId, "platformId");
+    const file = this.store.loadConnections();
+    const connection = file.connections[id];
+    if (!connection) {
+      throw new DevicePlatformError("NOT_FOUND", "Platform connection not found");
+    }
+    const probed = await probeDevicePlatformConnection({
+      connection,
+      credential: this.store.loadCredential(id),
+      now: this.iso(),
+      fetchImpl: options?.fetchImpl,
+      timeoutMs: options?.timeoutMs,
+    });
+    file.connections[id] = probed.connection;
+    this.store.saveConnections(file);
+    return {
+      connection: toAdminConnectionDto(probed.connection),
+      checks: probed.checks,
+      partial: probed.partial,
+    };
   }
 
   listConnections(actorIn: TrustedActor): AdminConnectionDto[] {
@@ -282,6 +391,9 @@ export class DevicePlatformService {
     const connection = association
       ? this.store.loadConnections().connections[association.platformId]
       : undefined;
+    if (!connection?.enabled) {
+      throw new DevicePlatformError("PLATFORM_DISABLED", "Device platform connection is disabled");
+    }
     const authenticated = this.verifyServiceClient(input.serviceClientId, input.serviceSecret);
     const allowed = assertCapabilityAccess({
       actor,
@@ -766,6 +878,10 @@ export class DevicePlatformService {
     binding: DeviceBinding,
     serviceClientId: string,
   ): GrantReference {
+    const connection = this.store.loadConnections().connections[binding.platformId];
+    if (!connection?.enabled) {
+      throw new DevicePlatformError("PLATFORM_DISABLED", "Device platform connection is disabled");
+    }
     const credential = `obgc_${randomBytes(24).toString("hex")}`;
     const grant: GrantReference = {
       authorizationRef: randomId("azr"),
@@ -997,9 +1113,27 @@ function materialOf(input: SubmitOperationInput): OperationMaterial {
 
 function rejectRequestPayload(body: Record<string, unknown>): void {
   rejectIdentityOverrides(body);
+  assertBodyHasNoPairingFields(body);
   for (const field of SECRET_FIELDS) {
     if (body[field] !== undefined) {
       throw new DevicePlatformError("SECRET_REJECTED", "Secrets are not accepted on this API");
+    }
+  }
+}
+
+const CREDENTIAL_FIELDS = new Set(["clientSecret", "rotate"]);
+
+function rejectCredentialPayload(body: Record<string, unknown>): void {
+  rejectIdentityOverrides(body);
+  assertBodyHasNoPairingFields(body);
+  for (const field of SECRET_FIELDS) {
+    if (field !== "clientSecret" && body[field] !== undefined) {
+      throw new DevicePlatformError("SECRET_REJECTED", "Secrets are not accepted on this API");
+    }
+  }
+  for (const key of Object.keys(body)) {
+    if (!CREDENTIAL_FIELDS.has(key)) {
+      throw new DevicePlatformError("VALIDATION", "Credential body is invalid");
     }
   }
 }
@@ -1012,22 +1146,49 @@ function requireToken(value: string | undefined, label: string): string {
   return trimmed;
 }
 
-function requireUrl(value: string | undefined): string {
-  const raw = requireToken(value, "serviceBaseUrl");
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new DevicePlatformError("VALIDATION", "serviceBaseUrl is invalid");
+function normalizeClientIds(value: string[] | undefined): string[] {
+  if (
+    !value ||
+    value.length === 0 ||
+    value.some((id) => typeof id !== "string" || id.trim() === "")
+  ) {
+    throw new DevicePlatformError("VALIDATION", "serviceClientIds is required");
   }
-  if (url.username || url.password) {
-    throw new DevicePlatformError("SECRET_REJECTED", "serviceBaseUrl must not contain credentials");
+  return value.map((id) => id.trim());
+}
+
+function normalizeClientIdentity(value: string | undefined, serviceClientIds: string[]): string {
+  const identity = (value?.trim() || serviceClientIds[0] || "").trim();
+  if (!identity || identity.includes(":") || /\s/.test(identity)) {
+    throw new DevicePlatformError("VALIDATION", "clientIdentity is invalid");
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new DevicePlatformError("VALIDATION", "serviceBaseUrl is invalid");
+  return identity;
+}
+
+function normalizeDisplayName(value: string | undefined, platformId: string): string {
+  const name = value?.trim() || platformId;
+  if (name.length > 80) {
+    throw new DevicePlatformError("VALIDATION", "displayName is too long");
   }
-  const path = url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
-  return `${url.origin}${path}`;
+  return name;
+}
+
+function normalizeNotes(value: string | undefined): string {
+  const notes = value?.trim() ?? "";
+  if (notes.length > 4000) {
+    throw new DevicePlatformError("VALIDATION", "registrationNotes is too long");
+  }
+  return notes;
+}
+
+function normalizeCallbackAllowlist(
+  value: string[] | undefined,
+  environment: DevicePlatformEnvironment,
+): string[] {
+  if (!value) {
+    return [];
+  }
+  return value.map((entry) => assertSafeCallbackUrl(entry, environment));
 }
 
 function retryableCode(error: unknown): boolean {
