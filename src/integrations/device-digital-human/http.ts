@@ -167,12 +167,15 @@ async function dispatch(
 
   const client = service.authenticate(...basicParts(req), "service");
   const credential = headerString(req, "x-openbot-grant-credential");
+  // Grant GET stays readable after revoke so device-control sees status.
   // Tool-result retries are allowed through after revoke so an accepted
   // Idempotency-Key can be replayed. The service still refuses a new result.
+  const grantRead = method === "GET" && /^\/grants\/[^/]+$/.test(relative);
   const allowRevoked =
-    method === "POST" &&
-    (/^\/grants\/[^/]+\/revoke$/.test(relative) ||
-      /^\/device-tool-requests\/[^/]+\/result$/.test(relative));
+    grantRead ||
+    (method === "POST" &&
+      (/^\/grants\/[^/]+\/revoke$/.test(relative) ||
+        /^\/device-tool-requests\/[^/]+\/result$/.test(relative)));
   const grant = service.requireGrant(client, credential, allowRevoked);
 
   const grantId = /^\/grants\/([^/]+)$/.exec(relative);
