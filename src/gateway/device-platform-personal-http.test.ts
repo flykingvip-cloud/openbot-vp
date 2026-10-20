@@ -665,4 +665,107 @@ describe("personal device routes", () => {
       await platform.close();
     }
   });
+
+  it("keeps personal settings and the digital-human list on one store", async () => {
+    const { platform, service } = await harness();
+    try {
+      const preselected = await call(
+        service,
+        session("user-b"),
+        "POST",
+        "/api/device-platform/v1/me/operations",
+        addBody("op-preselect", CODE, DEVICE_ID, "dh-a"),
+      );
+      expect(preselected.status).toBe(403);
+      expect(JSON.stringify(preselected.json)).toContain("USE_DENIED");
+      expect(platform.calls.filter((item) => item.url.includes("/redeem")).length).toBe(0);
+
+      const hiddenHuman = await call(
+        service,
+        session("user-b"),
+        "GET",
+        "/api/device-platform/v1/me/digital-humans/dh-a/devices",
+      );
+      expect(hiddenHuman.status).toBe(403);
+      expect(JSON.stringify(hiddenHuman.json)).toContain("USE_DENIED");
+
+      const added = await call(
+        service,
+        session("user-a"),
+        "POST",
+        "/api/device-platform/v1/me/operations",
+        addBody("op-share"),
+      );
+      expect(added.status).toBe(200);
+      const deviceId = String((added.json.device as Record<string, unknown>).deviceId);
+      const personal = await call(
+        service,
+        session("user-a"),
+        "GET",
+        "/api/device-platform/v1/me/devices",
+      );
+      const onHuman = await call(
+        service,
+        session("user-a"),
+        "GET",
+        "/api/device-platform/v1/me/digital-humans/dh-shared/devices",
+      );
+      expect(onHuman.status).toBe(200);
+      expect(onHuman.json.devices).toEqual(personal.json.devices);
+      expect(onHuman.text).toContain(deviceId);
+      expect(onHuman.text).not.toContain(SECRET);
+      expect(onHuman.text).not.toContain(platform.baseUrl);
+      expect(onHuman.text).not.toContain("raw-diagnostic");
+      expect(onHuman.text).not.toContain("obgc_");
+      expect(onHuman.text).not.toContain("cred://");
+
+      const sharedWithOther = await call(
+        service,
+        session("user-b"),
+        "GET",
+        "/api/device-platform/v1/me/digital-humans/dh-shared/devices",
+      );
+      expect(sharedWithOther.status).toBe(200);
+      expect(sharedWithOther.json.devices).toEqual([]);
+      expect(sharedWithOther.text).not.toContain(deviceId);
+      expect(sharedWithOther.text).not.toContain("门口相机");
+
+      const rebound = await call(
+        service,
+        session("user-a"),
+        "POST",
+        "/api/device-platform/v1/me/operations",
+        {
+          operationId: "op-share-rebind",
+          kind: "rebind",
+          deviceId,
+          digitalHumanId: "dh-a",
+          scopes: ["chat"],
+        },
+      );
+      expect(rebound.status).toBe(200);
+      const left = await call(
+        service,
+        session("user-a"),
+        "GET",
+        "/api/device-platform/v1/me/digital-humans/dh-shared/devices",
+      );
+      expect(left.json.devices).toEqual([]);
+      const moved = await call(
+        service,
+        session("user-a"),
+        "GET",
+        "/api/device-platform/v1/me/digital-humans/dh-a/devices",
+      );
+      const personalAfter = await call(
+        service,
+        session("user-a"),
+        "GET",
+        "/api/device-platform/v1/me/devices",
+      );
+      expect(moved.json.devices).toEqual(personalAfter.json.devices);
+    } finally {
+      await platform.close();
+    }
+  });
 });

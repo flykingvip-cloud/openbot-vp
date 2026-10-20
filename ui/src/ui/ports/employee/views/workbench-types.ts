@@ -195,6 +195,7 @@ export type WorkbenchMyBotDetailTab =
   | "auth"
   | "collaboration"
   | "data"
+  | "devices"
   | "danger";
 
 export type WorkbenchMyBotDetailState = {
