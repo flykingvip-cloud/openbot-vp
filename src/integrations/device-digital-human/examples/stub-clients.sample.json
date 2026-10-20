@@ -1,0 +1,40 @@
+{
+  "clients": [
+    {
+      "clientId": "consent-sim",
+      "secret": "consent-secret-16+",
+      "role": "consent",
+      "allowedDigitalHumanIds": ["agent-demo-1", "agent-demo-2"],
+      "scopes": ["chat", "camera.capture", "media.read"]
+    },
+    {
+      "clientId": "device-platform",
+      "secret": "service-secret-16+",
+      "role": "service",
+      "redirectUris": ["https://device.example/callback"]
+    }
+  ],
+  "digitalHumans": [
+    {
+      "digitalHumanId": "agent-demo-1",
+      "displayName": "Demo Assistant",
+      "avatar": "https://example.invalid/avatar.png",
+      "animationManifestUrl": "https://example.invalid/anim.json",
+      "locale": "zh-CN",
+      "voiceHint": "neutral",
+      "status": "active",
+      "userSubject": "user-demo",
+      "tenantId": "tenant-demo"
+    },
+    {
+      "digitalHumanId": "agent-demo-2",
+      "displayName": "Demo Two",
+      "avatar": "https://example.invalid/avatar-2.png",
+      "locale": "zh-CN",
+      "voiceHint": "calm",
+      "status": "active",
+      "userSubject": "user-demo",
+      "tenantId": "tenant-demo"
+    }
+  ]
+}

@@ -108,6 +108,7 @@ Docs: https://docs.openbot.love
 - Site capability runtime: add read-only `site_list`, `site_describe`, and `site_invoke`. Invoke pins a capability version and checks that version for the server principal and account binding. List and describe return authorized summaries and schemas only. Empty matches stay successful, budget cuts are partial, and an indeterminate read is `unknown` rather than a normal failure. The production browser tool derives the account-browser scope from the server account so the shared serial lock applies.
 - Agents/personal email: every coding or messaging agent keeps `user_operational_identity` under sandbox allow. An active personal-email grant must be used for send/reply. Exec that calls `mail`, `sendmail`, `mutt`, or `OPENBOT_SMTP_*` is rejected. A missing grant is stated as missing.
 - Agents/local computer: bots granted on the active operator seat may run the bounded Desktop path (`host=node`) on that seat's computer while `tools.exec.host` stays `sandbox`. Arbitrary `host=node` stays denied. A computer bound to a vacant seat, or requested by the same operator, is copied onto the active seat. Another employee's occupied seat is left alone.
+- Integrations: add a loopback device digital-human stub (`/api/integrations/v1`) for grant exchange, turns, dual SSE, camera pull, and revoke. It is not mounted on the production gateway. Start with `OPENBOT_DEVICE_DH_STUB=1` on port 8787.
 
 ### Breaking
 
