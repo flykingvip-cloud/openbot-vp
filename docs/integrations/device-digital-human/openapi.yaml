@@ -309,7 +309,7 @@ paths:
               $ref: "#/components/schemas/ToolResult"
       responses:
         "200":
-          description: Result accepted
+          description: "Result accepted, or the recorded response when Idempotency-Key and body match an accepted result (duplicate true)."
         "400":
           $ref: "#/components/responses/Error"
         "409":
@@ -418,7 +418,7 @@ components:
       required: false
       schema:
         type: string
-      description: Required for turns and tool results. Retention is 24 hours in memory.
+      description: Required for turns and tool results. The same key and body replay the accepted response for 24 hours in memory, including a tool result retried after revoke. The same key and a different body returns IDEMPOTENCY_CONFLICT. A duplicate is not LATE_RESULT.
     Cursor:
       name: cursor
       in: query

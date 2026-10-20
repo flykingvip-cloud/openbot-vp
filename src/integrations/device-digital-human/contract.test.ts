@@ -153,10 +153,7 @@ async function exchange(base: string, scopes = ["chat", "camera.capture", "media
   };
 }
 
-const tinyJpeg = Buffer.from([
-  0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff,
-  0xd9,
-]);
+const tinyJpeg = readFileSync(path.join(fixtureDir, "frame.jpg"));
 
 describe("device digital-human integrations v1 stub", () => {
   it("does not mount the stub on the production gateway", () => {
@@ -833,7 +830,9 @@ describe("device digital-human integrations v1 stub", () => {
               (event.payload as Json).runId === lateTurn.json.runId,
           ),
       );
-      const lateRequest = [...lateEvents].toReversed().find((event) => event.type === "tool.request");
+      const lateRequest = [...lateEvents]
+        .toReversed()
+        .find((event) => event.type === "tool.request");
       const lateId = String(payloadOf(lateRequest).requestId);
       await call(
         server.url,
@@ -864,7 +863,7 @@ describe("device digital-human integrations v1 stub", () => {
       expect(lateRun.status).toBe(401);
 
       now += 60;
-       server.service.sweep();
+      server.service.sweep();
     } finally {
       await server.close();
     }

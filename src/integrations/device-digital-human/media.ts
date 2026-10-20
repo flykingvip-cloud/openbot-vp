@@ -1,5 +1,6 @@
 import { DeviceDhError } from "./errors.js";
-import { inspectImage, isLoopbackHost, sha256Hex, type InspectedImage } from "./util.js";
+import { inspectImage, type InspectedImage } from "./image.js";
+import { isLoopbackHost, sha256Hex } from "./util.js";
 
 export type MediaPullOptions = {
   allowOrigins: string[];
@@ -72,22 +73,29 @@ export async function pullMedia(rawUrl: string, options: MediaPullOptions): Prom
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
+  let response: Response | undefined;
+  let consumed = false;
   try {
-    const response = await fetch(parsed, { redirect: "manual", signal: controller.signal });
+    response = await fetch(parsed, { redirect: "manual", signal: controller.signal });
     if (response.status >= 300 && response.status < 400) {
       throw new DeviceDhError("MEDIA_INVALID", "Media redirects are not allowed");
     }
     if (!response.ok) {
       throw new DeviceDhError("MEDIA_INVALID", "Media fetch failed");
     }
-    const declaredLength = Number(response.headers.get("content-length") ?? "0");
-    if (Number.isFinite(declaredLength) && declaredLength > options.maxBytes) {
-      throw new DeviceDhError("MEDIA_INVALID", "Image exceeds size limit");
+    const rawLength = response.headers.get("content-length");
+    if (rawLength !== null) {
+      const declaredLength = Number(rawLength);
+      if (
+        !Number.isFinite(declaredLength) ||
+        declaredLength < 0 ||
+        declaredLength > options.maxBytes
+      ) {
+        throw new DeviceDhError("MEDIA_INVALID", "Image exceeds size limit");
+      }
     }
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length > options.maxBytes) {
-      throw new DeviceDhError("MEDIA_INVALID", "Image exceeds size limit");
-    }
+    const bytes = await readCappedBody(response, options.maxBytes);
+    consumed = true;
     return bytes;
   } catch (error) {
     if (error instanceof DeviceDhError) {
@@ -100,5 +108,44 @@ export async function pullMedia(rawUrl: string, options: MediaPullOptions): Prom
     throw new DeviceDhError("MEDIA_INVALID", "Media fetch failed");
   } finally {
     clearTimeout(timer);
+    if (!consumed) {
+      await response?.body?.cancel().catch(() => undefined);
+    }
   }
+}
+
+async function readCappedBody(response: Response, maxBytes: number): Promise<Buffer> {
+  const body = response.body;
+  if (!body) {
+    throw new DeviceDhError("MEDIA_INVALID", "Media fetch failed");
+  }
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (!value || value.byteLength === 0) {
+        continue;
+      }
+      if (total + value.byteLength > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new DeviceDhError("MEDIA_INVALID", "Image exceeds size limit");
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+    reader.releaseLock();
+  } catch (error) {
+    await reader.cancel().catch(() => undefined);
+    throw error;
+  }
+  const bytes = Buffer.concat(
+    chunks.map((chunk) => Buffer.from(chunk)),
+    total,
+  );
+  return bytes;
 }

@@ -22,10 +22,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const agentSource = readFileSync(path.join(here, "agent-client.ts"), "utf8");
 const serviceSource = readFileSync(path.join(here, "service.ts"), "utf8");
 
-const tinyJpeg = Buffer.from([
-  0xff, 0xd8, 0xff, 0xc0, 0x00, 0x0b, 0x08, 0x00, 0x01, 0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xff,
-  0xd9,
-]);
+const tinyJpeg = readFileSync(path.join(here, "examples", "fixtures", "frame.jpg"));
 
 type Json = Record<string, unknown>;
 
