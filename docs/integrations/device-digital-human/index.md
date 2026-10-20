@@ -84,6 +84,8 @@ A missing object and an object that belongs to another client or grant both retu
 
 `POST /conversations/{id}/turns` requires `Idempotency-Key`. The same key and the same body return the same `runId` with `disposition: "duplicate"`. The same key and a different body return `IDEMPOTENCY_CONFLICT`. Accepted records are kept in memory for 24 hours (`IDEMPOTENCY_TTL_MS`). Restart clears them. A rejected validation does not consume the key. `traceId` is not part of the hash.
 
+`POST /device-tool-requests/{requestId}/result` uses the same key rules, checked after the service client and grant credential match the request and before the pending-state check. The same key and the same body replay the recorded response with `duplicate: true` and do not pull media or call the model again. The same key and a different body return `IDEMPOTENCY_CONFLICT` and do not re-run the tool. Revoke after a successful result does not re-run it: a matching retry still returns that recorded response, a different body for that key returns `IDEMPOTENCY_CONFLICT`, and a different key (or the same key when nothing was accepted) returns `AUTH_REVOKED`. `LATE_RESULT` is not used for a true duplicate of an accepted result.
+
 One conversation runs one turn at a time. A second turn while a run is open returns `SESSION_BUSY` and `Retry-After: 1`.
 
 Run SSE is `GET /runs/{runId}/events`. `cursor` or `Last-Event-ID` is the last seen sequence or `eventId`. Events:
@@ -111,9 +113,9 @@ Cancel reasons from the client: `barge_in`, `user`, `timeout`, `unbind`. The res
 
 `GET .../device-events` is the second SSE stream. It carries `tool.request`, `authorization.revoked`, `binding.updated`, and `run.cancelled` for an open capture. `tool.request` includes `requestId`, `authorizationRef`, `bindingVersion`, `runId`, `turnId`, `toolName`, constrained `params`, `expiresAt`, and `traceId`.
 
-The device platform uploads JPEG or PNG bytes with a short-lived ticket (`PUT /media/uploads/{ticket}`) or places the object on its own HTTPS URL. OpenBot pulls `readUrl`. Pulls allow loopback only, unless `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` lists an origin. Redirects, URL credentials, and non-loopback hosts are `MEDIA_INVALID`. Bytes must match PNG IHDR or JPEG SOF. Declared `contentType`, `width`, `height`, `byteLength`, and `checksum` (`sha256:` hex) must match. The stub does not inflate pixels.
+The device platform uploads JPEG or PNG bytes with a short-lived ticket (`PUT /media/uploads/{ticket}`) or places the object on its own HTTPS URL. OpenBot pulls `readUrl`. Pulls allow loopback only, unless `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` lists an origin. Redirects, URL credentials, and non-loopback hosts are `MEDIA_INVALID`. A declared `Content-Length` over the byte cap is rejected before the body is buffered. A missing `Content-Length` or a chunked body is read incrementally and cancelled as soon as the cap is exceeded. PNG bytes are decoded with a bounded inflater (chunk CRC, inflate, unfilter, pixel cap). A truncated or corrupt PNG is `MEDIA_INVALID`. JPEG bytes must include a start-of-frame marker and a non-empty scan that reaches EOI. Declared `contentType`, `width`, `height`, `byteLength`, and `checksum` (`sha256:` hex) must match the decoded image.
 
-A camera turn stays `waiting_tool` until a result, cancel, revoke, rebind, or timeout (`TOOL_TIMEOUT`). Late results after the run is closed return `LATE_RESULT` and do not resume the run. Results after revoke return `AUTH_REVOKED`.
+A camera turn stays `waiting_tool` until a result, cancel, revoke, rebind, or timeout (`TOOL_TIMEOUT`). If one of those closes the run while a media pull is still in flight, finishing the pull does not mark the run completed and does not emit another `assistant.visible` sentence. That in-flight call returns `LATE_RESULT`, `AUTH_REVOKED`, or `BINDING_MISMATCH` for the close that won. A duplicate of an already accepted result follows the idempotency rules above and is not `LATE_RESULT`.
 
 Camera fulfillment asks the configured model for one speakable sentence. The default process does not call a model: it uses the offline placeholder hatch. Set `OPENBOT_DEVICE_DH_AGENT=1` to call the local OpenBot gateway instead. See [Staging](/integrations/device-digital-human/staging). Either way, this stub does not call an inventory MCP and must not claim that inventory was updated.
 
@@ -123,30 +125,30 @@ Camera fulfillment asks the configured model for one speakable sentence. The def
 
 ## Error codes
 
-| Code                    | HTTP | When                                                          |
-| ----------------------- | ---- | ------------------------------------------------------------- |
-| `AUTH_INVALID`          | 401  | Missing or rejected client auth, bad PKCE, bad approval token |
-| `AUTH_REVOKED`          | 401  | Grant revoked or expired                                      |
-| `OBJECT_NOT_FOUND`      | 404  | Missing and forbidden objects, same body                      |
-| `SCOPE_DENIED`          | 403  | Scope not on the consent client or the grant                  |
-| `BINDING_MISMATCH`      | 409  | `bindingVersion`, device, or human does not match             |
-| `IDEMPOTENCY_CONFLICT`  | 409  | Same key, different accepted body                             |
-| `SESSION_BUSY`          | 409  | Conversation already has an open run                          |
-| `CURSOR_EXPIRED`        | 409  | Event cursor is no longer buffered                            |
-| `TOOL_TIMEOUT`          | 504  | Capture deadline passed                                       |
-| `MEDIA_INVALID`         | 400  | Type, size, checksum, or URL rejected                         |
-| `TIMEOUT`               | 504  | Media pull timed out                                          |
-| `RUN_FAILED`            | 409  | Tool result failed without a more specific code               |
-| `PARAM_UNSUPPORTED`     | 400  | Missing or forbidden field                                    |
-| `DEVICE_OFFLINE`        | 409  | Capabilities missing or `online: false`                       |
-| `CAMERA_BUSY`           | 409  | Device reported busy                                          |
-| `USER_DENIED`           | 403  | Approval denied, or device denied the capture                 |
-| `CANCELLED`             | 409  | Reserved for a cancelled result surfaced as an error          |
-| `UPLOAD_FAILED`         | 400  | Device reported an upload failure                             |
-| `RATE_LIMITED`          | 429  | Per-client request cap                                        |
-| `LATE_RESULT`           | 409  | Result after the run or request closed                        |
-| `UNKNOWN_AFTER_RESTART` | 409  | Device result was unknown; the stub will not rerun the tool   |
-| `INTERNAL`              | 500  | Unexpected stub failure                                       |
+| Code                    | HTTP | When                                                                              |
+| ----------------------- | ---- | --------------------------------------------------------------------------------- |
+| `AUTH_INVALID`          | 401  | Missing or rejected client auth, bad PKCE, bad approval token                     |
+| `AUTH_REVOKED`          | 401  | Grant revoked or expired                                                          |
+| `OBJECT_NOT_FOUND`      | 404  | Missing and forbidden objects, same body                                          |
+| `SCOPE_DENIED`          | 403  | Scope not on the consent client or the grant                                      |
+| `BINDING_MISMATCH`      | 409  | `bindingVersion`, device, or human does not match                                 |
+| `IDEMPOTENCY_CONFLICT`  | 409  | Same key, different accepted body                                                 |
+| `SESSION_BUSY`          | 409  | Conversation already has an open run                                              |
+| `CURSOR_EXPIRED`        | 409  | Event cursor is no longer buffered                                                |
+| `TOOL_TIMEOUT`          | 504  | Capture deadline passed                                                           |
+| `MEDIA_INVALID`         | 400  | Type, size, checksum, or URL rejected                                             |
+| `TIMEOUT`               | 504  | Media pull timed out                                                              |
+| `RUN_FAILED`            | 409  | Tool result failed without a more specific code                                   |
+| `PARAM_UNSUPPORTED`     | 400  | Missing or forbidden field                                                        |
+| `DEVICE_OFFLINE`        | 409  | Capabilities missing or `online: false`                                           |
+| `CAMERA_BUSY`           | 409  | Device reported busy                                                              |
+| `USER_DENIED`           | 403  | Approval denied, or device denied the capture                                     |
+| `CANCELLED`             | 409  | Reserved for a cancelled result surfaced as an error                              |
+| `UPLOAD_FAILED`         | 400  | Device reported an upload failure                                                 |
+| `RATE_LIMITED`          | 429  | Per-client request cap                                                            |
+| `LATE_RESULT`           | 409  | New result after the run or request closed. Not a duplicate of an accepted result |
+| `UNKNOWN_AFTER_RESTART` | 409  | Device result was unknown; the stub will not rerun the tool                       |
+| `INTERNAL`              | 500  | Unexpected stub failure                                                           |
 
 Execution failures after a turn is accepted are also a terminal `run.failed` or `run.cancelled` event. `GET /runs/{id}` then shows the same terminal status.
 
@@ -156,6 +158,7 @@ Execution failures after a turn is accepted are also a terminal `run.failed` or 
 - The stub does not mount on the production gateway. Real replies are a loopback HTTP call to a gateway that is already running beside it.
 - Default model mode is the offline placeholder hatch (`OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1` forces it). `OPENBOT_DEVICE_DH_AGENT=1` calls `POST /v1/chat/completions` on `OPENBOT_DEVICE_DH_AGENT_BASE_URL` (default `http://127.0.0.1:18789`). A failed or empty agent reply is `run.failed` / `INTERNAL`. It does not fall back to the placeholder sentences.
 - No inventory MCP. Vision and chat prompts forbid claiming an inventory write, and a reply that only claims one is `INTERNAL`.
-- Image checks are container-level (magic, IHDR/SOF, declared metadata, size caps), not a full decoder.
+- PNG bytes are inflated and unfiltered under the pixel cap. JPEG checks stop at a complete marker scan through EOI and do not run a Huffman decoder, so a structurally complete but visually corrupt JPEG can still pass.
+- Two simultaneous first submissions of the same tool-result key can both miss the in-memory cache. The record is stored only after that attempt finishes. A retry after the response was produced does not re-run the tool.
 - Approvals are an internal token on loopback, not the OpenBot product approval UI.
-- Idempotency retention is 24 hours and only for accepted turns, exchanges that sent a key, and accepted tool results.
+- Idempotency retention is 24 hours and only for accepted turns, exchanges that sent a key, and accepted tool results. A later revoke does not delete an accepted tool-result record.

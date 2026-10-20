@@ -889,7 +889,6 @@ export class DeviceDhService {
     traceId?: string,
   ) {
     this.sweep();
-    this.assertActive(grant);
     if (!idempotencyKey) {
       throw new DeviceDhError("PARAM_UNSUPPORTED", "Idempotency-Key is required");
     }
@@ -897,51 +896,33 @@ export class DeviceDhService {
     if (!request || request.authorizationRef !== grant.authorizationRef) {
       throw notFound();
     }
+    // Replay an accepted result before pending/terminal checks. A lost-response
+    // retry must not be LATE_RESULT and must not run the tool again. Revoke after
+    // success still replays that record; a different body is IDEMPOTENCY_CONFLICT.
+    const material = idempotencyMaterial(body);
+    const hash = bodyHash(material);
+    const scope = `tool:${grant.clientId}:${grant.authorizationRef}:${requestId}:${idempotencyKey}`;
+    const prior = this.takeIdem(scope, hash);
+    if (prior) {
+      this.audit({
+        action: "tool.result.duplicate",
+        outcome: "ok",
+        authorizationRef: grant.authorizationRef,
+        requestId,
+        runId: request.runId,
+        traceId,
+      });
+      return { ...clone(prior.body), duplicate: true };
+    }
+    this.assertActive(grant);
     if (!grant.scopes.includes("media.read") && readString(body, "status") === "ok") {
       throw new DeviceDhError("SCOPE_DENIED", "media.read scope is required");
     }
     const bindingVersion = readNumber(body, "bindingVersion");
-    if (bindingVersion !== grant.bindingVersion || bindingVersion !== request.bindingVersion) {
-      this.audit({
-        action: "tool.late_result",
-        outcome: "denied",
-        authorizationRef: grant.authorizationRef,
-        requestId,
-        runId: request.runId,
-        code: "BINDING_MISMATCH",
-        traceId,
-      });
-      throw new DeviceDhError(
-        "BINDING_MISMATCH",
-        "bindingVersion does not match the open tool request",
-      );
-    }
-    if (request.state !== "pending") {
-      this.audit({
-        action: "tool.late_result",
-        outcome: "denied",
-        authorizationRef: grant.authorizationRef,
-        requestId,
-        runId: request.runId,
-        code: "LATE_RESULT",
-        traceId,
-      });
-      throw new DeviceDhError("LATE_RESULT", "Tool result arrived after the run was closed");
-    }
-    const material = idempotencyMaterial(body);
-    const scope = `tool:${grant.clientId}:${grant.authorizationRef}:${requestId}:${idempotencyKey}`;
-    const prior = this.takeIdem(scope, bodyHash(material));
-    if (prior) {
-      return { ...clone(prior.body), duplicate: true };
-    }
     const status = readString(body, "status") as ToolResultStatus | undefined;
+    let run = this.assertToolStillOpen(grant, request, bindingVersion, traceId);
     if (!status) {
       throw new DeviceDhError("PARAM_UNSUPPORTED", "status is required");
-    }
-    const run = this.runs.get(request.runId);
-    if (!run || TERMINAL.has(run.status)) {
-      request.state = "closed";
-      throw new DeviceDhError("LATE_RESULT", "Tool result arrived after the run was closed");
     }
     if (status !== "ok") {
       request.state = "closed";
@@ -952,7 +933,7 @@ export class DeviceDhService {
         runId: run.runId,
         runStatus: run.status,
       };
-      this.remember(scope, bodyHash(material), 200, response);
+      this.remember(scope, hash, 200, response);
       this.audit({
         action: "tool.result",
         outcome: "ok",
@@ -966,8 +947,19 @@ export class DeviceDhService {
     }
     const result = isRecord(body.result) ? body.result : {};
     const media = await this.resolveMedia(grant, request, result);
+    // The pull yields. Cancel, revoke, rebind, or timeout may have closed the run.
+    // Claim the success only after this re-check; do not emit a reply otherwise.
+    this.sweep();
+    run = this.assertToolStillOpen(grant, request, bindingVersion, traceId);
     request.state = "fulfilled";
     this.media.set(media.mediaId, { bytes: media.bytes, contentType: media.contentType });
+    this.audit({
+      action: "media.accepted",
+      outcome: "ok",
+      authorizationRef: grant.authorizationRef,
+      requestId: request.requestId,
+      runId: request.runId,
+    });
     const messageId = `msg_${randomId()}`;
     run.messageId = messageId;
     const human = this.humans.get(grant.digitalHumanId);
@@ -1009,7 +1001,7 @@ export class DeviceDhService {
       runStatus: run.status,
       mediaId: media.mediaId,
     };
-    this.remember(scope, bodyHash(material), 200, response);
+    this.remember(scope, hash, 200, response);
     this.audit({
       action: "tool.result",
       outcome: "ok",
@@ -1198,13 +1190,6 @@ export class DeviceDhService {
       maxBytes: this.maxImageBytes,
       maxPixels: this.maxPixels,
     });
-    this.audit({
-      action: "media.accepted",
-      outcome: "ok",
-      authorizationRef: grant.authorizationRef,
-      requestId: request.requestId,
-      runId: request.runId,
-    });
     return {
       mediaId: mediaId ?? `media_${randomId()}`,
       bytes,
@@ -1212,6 +1197,66 @@ export class DeviceDhService {
       width: inspected.width,
       height: inspected.height,
     };
+  }
+
+  /**
+   * Authorization, binding, and terminal state after any await.
+   * A closed run must not be completed from a late media pull.
+   */
+  private assertToolStillOpen(
+    grant: GrantRecord,
+    request: ToolRequest,
+    bindingVersion: number | undefined,
+    traceId?: string,
+  ): RunRecord {
+    const run = this.runs.get(request.runId);
+    if (grant.status !== "active" || grant.expiresAt <= this.now()) {
+      this.audit({
+        action: "tool.late_result",
+        outcome: "denied",
+        authorizationRef: grant.authorizationRef,
+        requestId: request.requestId,
+        runId: request.runId,
+        code: "AUTH_REVOKED",
+        traceId,
+      });
+      throw new DeviceDhError("AUTH_REVOKED", "Authorization is revoked");
+    }
+    if (
+      bindingVersion !== grant.bindingVersion ||
+      bindingVersion !== request.bindingVersion ||
+      (run !== undefined && run.bindingVersion !== grant.bindingVersion)
+    ) {
+      this.audit({
+        action: "tool.late_result",
+        outcome: "denied",
+        authorizationRef: grant.authorizationRef,
+        requestId: request.requestId,
+        runId: request.runId,
+        code: "BINDING_MISMATCH",
+        traceId,
+      });
+      throw new DeviceDhError(
+        "BINDING_MISMATCH",
+        "bindingVersion does not match the open tool request",
+      );
+    }
+    if (request.state !== "pending" || !run || TERMINAL.has(run.status)) {
+      if (request.state === "pending") {
+        request.state = "closed";
+      }
+      this.audit({
+        action: "tool.late_result",
+        outcome: "denied",
+        authorizationRef: grant.authorizationRef,
+        requestId: request.requestId,
+        runId: request.runId,
+        code: "LATE_RESULT",
+        traceId,
+      });
+      throw new DeviceDhError("LATE_RESULT", "Tool result arrived after the run was closed");
+    }
+    return run;
   }
 
   private applyNegativeToolStatus(
