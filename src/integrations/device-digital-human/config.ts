@@ -12,6 +12,8 @@ export type StubClientConfig = {
   redirectUris?: string[];
 };
 
+const GATEWAY_AGENT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
 export type DigitalHumanConfig = {
   digitalHumanId: string;
   displayName: string;
@@ -22,6 +24,13 @@ export type DigitalHumanConfig = {
   status?: "active" | "disabled";
   userSubject: string;
   tenantId: string;
+  /**
+   * Gateway agent this digital human executes. Required when agent mode is on.
+   * Not an HTTP contract field.
+   */
+  gatewayAgentId?: string;
+  /** Defaults to `[gatewayAgentId]` when omitted. */
+  allowedGatewayAgentIds?: string[];
 };
 
 export type StubConfig = {
@@ -90,6 +99,8 @@ function parseHuman(value: unknown): DigitalHumanConfig {
   if (status !== undefined && status !== "active" && status !== "disabled") {
     throw new DeviceDhError("PARAM_UNSUPPORTED", "digital human status is invalid");
   }
+  const gatewayAgentId = parseGatewayAgentId(value.gatewayAgentId);
+  const allowedGatewayAgentIds = parseAllowedGatewayAgentIds(value.allowedGatewayAgentIds);
   return {
     digitalHumanId,
     displayName,
@@ -101,7 +112,32 @@ function parseHuman(value: unknown): DigitalHumanConfig {
     status,
     userSubject,
     tenantId,
+    ...(gatewayAgentId ? { gatewayAgentId } : {}),
+    ...(allowedGatewayAgentIds ? { allowedGatewayAgentIds } : {}),
   };
+}
+
+function parseGatewayAgentId(value: unknown): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "string" || !GATEWAY_AGENT_ID.test(value)) {
+    throw new DeviceDhError("PARAM_UNSUPPORTED", "gatewayAgentId is invalid");
+  }
+  return value;
+}
+
+function parseAllowedGatewayAgentIds(value: unknown): string[] | undefined {
+  const list = asStringArray(value);
+  if (!list) {
+    return undefined;
+  }
+  for (const id of list) {
+    if (!GATEWAY_AGENT_ID.test(id)) {
+      throw new DeviceDhError("PARAM_UNSUPPORTED", "allowedGatewayAgentIds is invalid");
+    }
+  }
+  return list;
 }
 
 export function parseStubConfig(value: unknown): StubConfig {

@@ -24,7 +24,8 @@
       "voiceHint": "neutral",
       "status": "active",
       "userSubject": "user-demo",
-      "tenantId": "tenant-demo"
+      "tenantId": "tenant-demo",
+      "gatewayAgentId": "demo-agent-1"
     },
     {
       "digitalHumanId": "agent-demo-2",
@@ -34,7 +35,8 @@
       "voiceHint": "calm",
       "status": "active",
       "userSubject": "user-demo",
-      "tenantId": "tenant-demo"
+      "tenantId": "tenant-demo",
+      "gatewayAgentId": "demo-agent-2"
     }
   ]
 }

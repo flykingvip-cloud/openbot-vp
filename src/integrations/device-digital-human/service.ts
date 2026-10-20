@@ -5,6 +5,7 @@ import {
   createPlaceholderModelClient,
   DeviceDhModelError,
   type DeviceDhModelClient,
+  type DeviceDhTrustedAgent,
 } from "./model.js";
 import {
   API_VERSION,
@@ -31,7 +32,15 @@ import {
   sha256Hex,
 } from "./util.js";
 
-const IDENTITY_FIELDS = ["userId", "tenantId", "agentId", "sessionKey", "userSubject", "ownerId"];
+const IDENTITY_FIELDS = [
+  "userId",
+  "tenantId",
+  "agentId",
+  "gatewayAgentId",
+  "sessionKey",
+  "userSubject",
+  "ownerId",
+];
 const CLIENT_CANCEL: ReadonlySet<string> = new Set(["barge_in", "user", "timeout", "unbind"]);
 const TERMINAL: ReadonlySet<RunStatus> = new Set([
   "completed",
@@ -119,6 +128,8 @@ type RunRecord = {
   messageId?: string;
   approvalId?: string;
   cancelReason?: CancelReason;
+  /** Aborts the in-flight gateway chat-completions fetch for this run. */
+  modelAbort?: AbortController;
   createdAt: number;
   finishedAt?: number;
   events: EventEnvelope[];
@@ -765,7 +776,6 @@ export class DeviceDhService {
     this.runs.set(run.runId, run);
     conversation.updatedAt = this.now();
     this.beginRun(run);
-    await this.routeTurn(grant, run, text);
     const response: Record<string, unknown> = {
       runId: run.runId,
       turnId,
@@ -774,10 +784,12 @@ export class DeviceDhService {
       bindingVersion: grant.bindingVersion,
       deviceId: grant.deviceId,
       digitalHumanId: grant.digitalHumanId,
-      status: run.status,
+      status: "accepted",
       disposition: "accepted",
     };
-    this.remember(scope, bodyHash(material), 200, response);
+    // Idempotency is recorded before the model call. An in-flight retry with
+    // the same key and body replays this runId instead of SESSION_BUSY.
+    this.remember(scope, bodyHash(material), 202, response);
     this.audit({
       action: "turn.accepted",
       outcome: "ok",
@@ -790,7 +802,15 @@ export class DeviceDhService {
       runId: run.runId,
       traceId,
     });
-    return response;
+    void this.routeTurn(grant, run, text).catch((error) => {
+      if (!TERMINAL.has(run.status)) {
+        this.failModel(run, error);
+      }
+    });
+    return {
+      ...response,
+      status: run.status,
+    };
   }
 
   getRun(grant: GrantRecord, runId: string) {
@@ -963,6 +983,7 @@ export class DeviceDhService {
     const messageId = `msg_${randomId()}`;
     run.messageId = messageId;
     const human = this.humans.get(grant.digitalHumanId);
+    const signal = this.bindModelAbort(run);
     try {
       const vision = await this.models.describeImage({
         userText: run.inputText,
@@ -974,6 +995,8 @@ export class DeviceDhService {
         displayName: human?.displayName ?? grant.digitalHumanId,
         locale: human?.locale,
         conversationId: run.conversationId,
+        trustedAgent: this.trustedAgent(grant),
+        signal,
         onDelta: (delta) => {
           if (!delta || TERMINAL.has(run.status)) {
             return;
@@ -1281,9 +1304,13 @@ export class DeviceDhService {
       this.openCamera(grant, run);
       return;
     }
+    if (TERMINAL.has(run.status)) {
+      return;
+    }
     const messageId = `msg_${randomId()}`;
     run.messageId = messageId;
     const human = this.humans.get(grant.digitalHumanId);
+    const signal = this.bindModelAbort(run);
     try {
       const visible = await this.models.completeTurn({
         text,
@@ -1291,6 +1318,8 @@ export class DeviceDhService {
         displayName: human?.displayName ?? grant.digitalHumanId,
         locale: human?.locale,
         conversationId: run.conversationId,
+        trustedAgent: this.trustedAgent(grant),
+        signal,
         onDelta: (delta) => {
           if (!delta || TERMINAL.has(run.status)) {
             return;
@@ -1471,6 +1500,7 @@ export class DeviceDhService {
     run.status = "cancelled";
     run.cancelReason = reason;
     run.finishedAt = this.now();
+    run.modelAbort?.abort();
     for (const request of this.toolRequests.values()) {
       if (request.runId === run.runId && request.state === "pending") {
         request.state = "cancelled";
@@ -1745,6 +1775,25 @@ export class DeviceDhService {
         throw new DeviceDhError("PARAM_UNSUPPORTED", `Field ${field} cannot be set by the client`);
       }
     }
+  }
+
+  private trustedAgent(grant: GrantRecord): DeviceDhTrustedAgent {
+    const human = this.humans.get(grant.digitalHumanId);
+    return {
+      grantDigitalHumanId: grant.digitalHumanId,
+      humanDigitalHumanId: human?.digitalHumanId,
+      gatewayAgentId: human?.gatewayAgentId,
+      allowedGatewayAgentIds: human?.allowedGatewayAgentIds,
+    };
+  }
+
+  private bindModelAbort(run: RunRecord): AbortSignal {
+    const controller = new AbortController();
+    run.modelAbort = controller;
+    if (TERMINAL.has(run.status)) {
+      controller.abort();
+    }
+    return controller.signal;
   }
 
   private assistant(grant: GrantRecord): AssistantProfile {
