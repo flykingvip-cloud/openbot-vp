@@ -1,0 +1,66 @@
+{
+  "RequestId": "REQ-FIXTURE-O2",
+  "SecurityGroupId": "sg-test-fixture-o2",
+  "RegionId": "cn-hongkong",
+  "Permissions": {
+    "Permission": [
+      {
+        "Direction": "ingress",
+        "IpProtocol": "TCP",
+        "PortRange": "22/22",
+        "SourceCidrIp": "198.51.100.0/24",
+        "Policy": "Accept",
+        "Priority": 1,
+        "NicType": "intranet",
+        "Description": "admin ssh (fixture)"
+      },
+      {
+        "Direction": "ingress",
+        "IpProtocol": "TCP",
+        "PortRange": "5432/5432",
+        "SourceCidrIp": "203.0.113.10/32",
+        "Policy": "Accept",
+        "Priority": 1,
+        "NicType": "intranet",
+        "Description": "pg from app (fixture)"
+      },
+      {
+        "Direction": "ingress",
+        "IpProtocol": "TCP",
+        "PortRange": "5432/5432",
+        "SourceGroupId": "sg-test-peer",
+        "Policy": "Accept",
+        "Priority": 10,
+        "NicType": "intranet"
+      },
+      {
+        "Direction": "ingress",
+        "IpProtocol": "TCP",
+        "PortRange": "443/443",
+        "SourceCidrIp": "0.0.0.0/0",
+        "Policy": "Accept",
+        "Priority": 1,
+        "NicType": "internet"
+      },
+      {
+        "Direction": "ingress",
+        "IpProtocol": "ALL",
+        "PortRange": "-1/-1",
+        "SourceCidrIp": "192.0.2.0/24",
+        "Policy": "Accept",
+        "Priority": 50,
+        "NicType": "intranet",
+        "Description": "broad allow overlapping ssh (fixture)"
+      },
+      {
+        "Direction": "egress",
+        "IpProtocol": "ALL",
+        "PortRange": "-1/-1",
+        "DestCidrIp": "0.0.0.0/0",
+        "Policy": "Accept",
+        "Priority": 100,
+        "NicType": "intranet"
+      }
+    ]
+  }
+}

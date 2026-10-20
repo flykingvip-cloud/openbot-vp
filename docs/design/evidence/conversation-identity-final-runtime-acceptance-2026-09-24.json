@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-23T22:34:10Z",
+  "originMainSha": "6dae88725b0ebfbdeee3c52a501fb5ac39be6028",
+  "liveGatewaySha": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+  "liveUiSha": null,
+  "liveUiShaSource": "ledger-seq-97-same-as-gateway-no-separate-container-file",
+  "imageRevision": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+  "imageTag": "rc-amd64-provenance-f1c7efece9",
+  "imageDigest": "sha256:6d9204dead13eb61b24838f3245c192d9983b46f103aae40d160e0d75940e012",
+  "releaseSeq": 97,
+  "productionProven": false,
+  "closeGateMet": false,
+  "closeGateGaps": [
+    "four named commits are not ancestors of LIVE",
+    "write entry was employee tools invoke, not Control UI webchat",
+    "schedule body did not retain execution id",
+    "provider success code was not retained"
+  ],
+  "ancestryChecks": {
+    "9620f8f986dab7820889c3d699cef4a9c3a70a0f": false,
+    "9dea6316a39168fda942533e3304e47b12c0695f": false,
+    "21cf2c0125d868603902a36b434eec4767c77601": false,
+    "66b886bb88fb2225e6fef9e8e7be81b67742c06e": false
+  },
+  "ancestryExitCodes": {
+    "9620f8f986": 1,
+    "9dea6316a3": 1,
+    "21cf2c0125": 1,
+    "66b886bb88": 1
+  },
+  "webchatIdentitySource": "employee-tools-invoke",
+  "environmentIdentityFallbackUsed": false,
+  "redactionConfirmed": true,
+  "residualMeeting": false,
+  "scheduleReceipt": {
+    "timestamp": "2026-09-23T21:34:45.729Z",
+    "action": "schedule_meeting",
+    "executed": true,
+    "source": "employee",
+    "sourceProvenance": "list on the same employee session immediately before the write",
+    "sessionDomain": "employee",
+    "tenantHash": "sha256:7a3e6b16cb75",
+    "membershipPresent": true,
+    "seatHash": "sha256:5aa016917fc8",
+    "agentHash": "sha256:0d6e4079e367",
+    "meetingIdHash": "sha256:07eaf24edcc7",
+    "meetingIdProvenance": "unique subject match after create, then used for cancel",
+    "executionIdHash": null,
+    "httpStatus": 200,
+    "providerSuccessCode": null,
+    "subjectFingerprint": "sha256:ad1b70fcb0bc",
+    "inviteesRequested": false,
+    "notificationParameterPresent": false
+  },
+  "cancelReceipt": {
+    "timestamp": "2026-09-23T22:13:22.423Z",
+    "action": "cancel_meeting",
+    "executed": true,
+    "source": "employee",
+    "sourceProvenance": "list on the same employee session immediately before the write",
+    "sessionDomain": "employee",
+    "tenantHash": "sha256:7a3e6b16cb75",
+    "membershipPresent": true,
+    "seatHash": "sha256:5aa016917fc8",
+    "agentHash": "sha256:0d6e4079e367",
+    "meetingIdHash": "sha256:07eaf24edcc7",
+    "executionIdHash": null,
+    "httpStatus": 200,
+    "providerSuccessCode": null
+  },
+  "postCancelVerification": {
+    "method": "unwrapped meeting list",
+    "subjectRemaining": 0,
+    "cancelledStateObserved": true
+  }
+}

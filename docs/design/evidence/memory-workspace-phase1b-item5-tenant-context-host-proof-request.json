@@ -1,0 +1,40 @@
+{
+  "schema": "memory-workspace-phase1b-item5-tenant-context-host-proof-request/v1",
+  "item": 5,
+  "preparedBy": "cursor-data-governance",
+  "tenantContextHostProof": "not-authorized",
+  "stamped": false,
+  "chosenOption": "authorize-tenant-context-host-managed-path-proof",
+  "decision": "docs/design/evidence/memory-workspace-phase1b-item5-tenant-context-host-proof-decision.json",
+  "unlock": "issued",
+  "wiredToProductionResolver": false,
+  "deployAuthorized": false,
+  "productionContainerWrite": false,
+  "enablesProduction": false,
+  "note": "Not a stamp. Operator said 授权执行 after the legacy agentId sweep. This packet authorizes mirroring tenant-context.ts managed path 786-798 against the host Catalog. Main asset catalog supplement is not chosen because registry main is archived with no membership binding.",
+  "options": [
+    {
+      "id": "authorize-tenant-context-host-managed-path-proof",
+      "owner": "operator",
+      "does": "Mirror tenant-context managed deny path on the host Catalog: main misses with membership fallback; non-main legacy ids hit and cwd authorizes. Git evidence stays hashed. Do not flip wiredToProductionResolver."
+    },
+    {
+      "id": "authorize-main-catalog-supplement",
+      "owner": "operator",
+      "does": "compareAndPut a user-owned row for registry main asset. Blocked: main is archived and has no membership binding. Not chosen."
+    },
+    {
+      "id": "authorize-production-container-write",
+      "owner": "operator",
+      "does": "Write into the production container Catalog. Requires deployAuthorized=true. Not chosen."
+    }
+  ],
+  "explicitlyForbidden": [
+    "treat this packet as a stamp",
+    "set wiredToProductionResolver=true",
+    "set deployAuthorized=true",
+    "write the production container",
+    "invent membership binding for archived main asset",
+    "score item 5 met from this packet"
+  ]
+}

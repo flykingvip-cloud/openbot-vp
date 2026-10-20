@@ -1,0 +1,27 @@
+=== probe time ===
+2026-09-28T04:05:04Z
+=== which podman/docker ===
+podman: not on PATH
+/usr/local/bin/docker
+=== podman version ===
+(eval):53: command not found: podman
+=== podman ps -a ===
+(eval):55: command not found: podman
+=== docker ps -a ===
+NAMES                                IMAGE                            STATUS                          CONTAINER ID
+buildx_buildkit_openbot-manual0      moby/buildkit:buildx-stable-1    Up 20 hours                     87e82bfcedda
+openbot-evolution-canary-wdna-8184   openbot:evo-canary-wdna-8184     Exited (255) 11 days ago        64b45c59e197
+openbot-evolution-canary-79f2        e6bcb23dcadc                     Exited (0) 13 days ago          ed31478d429a
+ownership-os-db                      postgres:16-alpine               Up 25 hours (healthy)           6f1b80415fcc
+frontend__open-wearables             open-wearables-frontend:dev      Up 25 hours                     a7667d255d37
+backend__open-wearables              open-wearables-platform:latest   Restarting (1) 52 seconds ago   0d65a2825f41
+healthycheck-redis                   redis:7-alpine                   Up 25 hours                     7cf35edd0e91
+knowledge-sdk-ollama                 ollama/ollama:latest             Up 25 hours                     a63a7a5fe4ba
+healthycheck-mysql                   mysql:8.0                        Up 25 hours                     326968d6df8a
+=== podman exec openbot-gateway-rc build-info ===
+(eval):59: command not found: podman
+=== docker exec openbot-gateway-rc build-info ===
+Error response from daemon: No such container: openbot-gateway-rc
+=== named container search ===
+(eval):63: command not found: podman
+docker ps -a --filter name=openbot-gateway-rc returned no rows (or see above). Never invent gateway/UI/ledger SHAs.

@@ -1,0 +1,165 @@
+name: CI Gate
+
+# Minimal merge gate that actually runs.
+#
+# Background: `ci.yml` declares 30 of its 34 jobs on `blacksmith-*` runners, but this
+# repository never subscribed to Blacksmith — the labels were inherited from upstream
+# openclaw in the very first commit (5e1c095933, 2026-03-13). Those jobs sit `queued`
+# with `runner=none` forever, and because pushes arrive faster than the queue drains,
+# `concurrency` cancels each run before a runner is ever assigned. Result: over 200 CI
+# runs, 100% `cancelled`, zero completions, going back to at least early June. The
+# failure is silent by construction — never red, never timed out, just cancelled.
+#
+# This workflow puts the cheap, high-signal gates on GitHub-hosted runners so there is
+# at least one check that can be made required. It deliberately does NOT try to replace
+# `ci.yml`: the heavy matrix (Windows, macOS, Android, Docker, benchmarks) stays on
+# blacksmith labels and stays queued until Blacksmith is connected. Those are not merge
+# gates.
+#
+# Minute budget matters here. GitHub-hosted minutes are metered on private repos, so
+# every job carries `timeout-minutes`, docs-only pushes are skipped, and pull-request
+# runs cancel their predecessors. Widen the scope (for example to the full `pnpm test`)
+# only after a few runs have shown the real per-run cost.
+#
+# When included Actions minutes are exhausted, hosted jobs finish in ~3s with
+# `runner_id=0` and empty steps (see #289). Use the local substitute instead of
+# treating red checks as a PR regression:
+#   docs/reference/ci-local-merge-gate.md
+#   ./scripts/ci-local-merge-gate.sh --base origin/main --candidate HEAD
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "**/*.mdx"
+      - ".agents/**"
+      - "skills/**"
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-gate-${{ github.event.pull_request.number || github.ref }}
+  # Only pull requests cancel their predecessors. Pushes to main must be allowed to
+  # finish: a cancelled push run is indistinguishable from a green one on the dashboard,
+  # which is exactly how the Blacksmith outage hid for two months.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Existing type/lint debt is compared against the exact base SHA. Formatting and
+  # generated host policy remain absolute; structural guards stay visible in shadow.
+  check:
+    name: check (types, lint, format)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+      - name: Resolve fixed diagnostic refs
+        id: diagnostic-refs
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          CANDIDATE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base_sha="$EVENT_BASE_SHA"
+          if [[ "$base_sha" =~ ^0+$ ]]; then
+            base_sha="$CANDIDATE_SHA"
+          fi
+          echo "base=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "candidate=$CANDIDATE_SHA" >> "$GITHUB_OUTPUT"
+          echo "Comparing $base_sha -> $CANDIDATE_SHA for $EVENT_NAME"
+      - name: Ensure diagnostic baseline commit
+        uses: ./.github/actions/ensure-base-commit
+        with:
+          base-sha: ${{ steps.diagnostic-refs.outputs.base }}
+          fetch-ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+          use-sticky-disk: "false"
+      - name: Run CI guard unit tests
+        env:
+          OPENBOT_TEST_PROFILE: low
+        run: >-
+          pnpm vitest run
+          scripts/ci-diagnostic-delta.test.ts
+          scripts/check-knowledge-universe-page-tabs.test.ts
+      - name: Check Knowledge Universe page-tab integrity
+        run: node scripts/check-knowledge-universe-page-tabs.mjs
+      - name: Check generated host policy
+        run: pnpm check:host-env-policy:swift
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Block new tsgo and oxlint diagnostics
+        run: >-
+          node scripts/ci-diagnostic-delta.mjs
+          --base "${{ steps.diagnostic-refs.outputs.base }}"
+          --candidate "${{ steps.diagnostic-refs.outputs.candidate }}"
+      - name: S01 R6 single-SoT machine check
+        run: node scripts/verify-single-sot.mjs
+      - name: S01 R6 evidence unit tests
+        run: node --test docs/design/evidence/memory-workspace-s01-r6-single-sot.test.mjs
+      # Floor Runtime v2.1 §2.2 red line, mechanical checks (a) and (c). CI blocking from
+      # P0.0a on (N4 / I1): never shadow, never allowlisted, never skipped.
+      - name: Collaboration runtime capability red line (Floor v2.1 N4)
+        env:
+          OPENBOT_TEST_PROFILE: low
+        run: pnpm lint:collab:runtime-capabilities && pnpm test:collab:runtime-lifecycle
+      # These guards were previously unreachable because `pnpm check` stopped at
+      # the inherited tsgo debt. Keep their findings visible without replacing one
+      # permanently red gate with another; promote each one after its baseline is clean.
+      - name: Run structural lint guards (shadow)
+        continue-on-error: true
+        run: |
+          status=0
+          pnpm lint:tmp:no-random-messaging || status=$?
+          pnpm lint:tmp:channel-agnostic-boundaries || status=$?
+          pnpm lint:tmp:no-raw-channel-fetch || status=$?
+          pnpm lint:agent:ingress-owner || status=$?
+          pnpm lint:plugins:no-register-http-handler || status=$?
+          pnpm lint:plugins:no-monolithic-plugin-sdk-entry-imports || status=$?
+          pnpm lint:webhook:no-low-level-body-read || status=$?
+          pnpm lint:auth:no-pairing-store-group || status=$?
+          pnpm lint:auth:pairing-account-scope || status=$?
+          pnpm lint:ui:capability-boundaries || status=$?
+          pnpm lint:ui:employee-capability-terminology || status=$?
+          pnpm lint:core:composition-root-loc || status=$?
+          pnpm lint:gateway:method-packs || status=$?
+          pnpm lint:core:architecture-manifest || status=$?
+          pnpm lint:aor:boundaries || status=$?
+          exit "$status"
+
+  # Guards the delivery invariants added during the 2026-07-27 baseline governance pass:
+  # forward-only guard, release ledger, retirement planner. Small and fast on purpose.
+  delivery-guard:
+    name: delivery guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: false
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+          use-sticky-disk: "false"
+      - name: Delivery unit tests
+        env:
+          OPENBOT_TEST_PROFILE: low
+        run: pnpm vitest run scripts/delivery
+      - name: Release ledger audit
+        run: pnpm delivery:ledger:audit

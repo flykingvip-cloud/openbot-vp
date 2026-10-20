@@ -1,0 +1,52 @@
+{
+  "schema": "memory-workspace-phase1b-unlock-decision-issued-superseded/v1",
+  "status": "superseded",
+  "unlock": "issued",
+  "notCanonical": true,
+  "canonicalReplacement": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "supersededBy": "docs/design/evidence/memory-workspace-phase1b-unlock-issued-stamp-revoke.json",
+  "sourceSha256": "6b63602e4ff052625df053490857dacb817ee65b92a0713af4a76423af3d1c03",
+  "sourceKind": "side-worktree-issued-stamp",
+  "note": "Archived unlock-first issued stamp found outside origin/main. It is not the canonical Phase 1B unlock receipt and does not authorize execution.",
+  "stamp": {
+    "schema": "memory-workspace-phase1b-unlock-decision/v1",
+    "item": 1,
+    "unlock": "issued",
+    "path": "unlock-first",
+    "releaseUnit": "memory-schema-v2",
+    "issuedBy": "operator",
+    "recordedBy": "cursor-data-governance",
+    "issuedAt": "2026-08-18T02:17:00.000Z",
+    "request": "docs/design/evidence/memory-workspace-phase1b-unlock-decision-request.json",
+    "phase1bExecutionBlocked": false,
+    "deployAuthorized": false,
+    "wiredToProductionResolver": false,
+    "enablesProduction": false,
+    "attachMissDeny": false,
+    "live": "forbidden",
+    "authorizes": [
+      "resolver write switch dark-true in release unit memory-schema-v2",
+      "memory schema v2 DDL (files_v2 / chunks_v2) in the same release unit",
+      "item 7 B1 sequencing after write switch dark-true and schema v2 DDL"
+    ],
+    "doesNotAuthorize": [
+      "deployAuthorized=true",
+      "LIVE migration",
+      "wiredToProductionResolver=true",
+      "write evidence Catalog into live stateDir",
+      "attach write-path miss=deny",
+      "delete all 38 write-watch sites before item 5 is wired",
+      "I3 before productionWriteWatchIndex=0",
+      "score item 6 met from receipt green"
+    ],
+    "admissionAtIssue": {
+      "2": "met",
+      "3": "met",
+      "4": "not-met-then-land-in-memory-schema-v2",
+      "5": "not-met",
+      "6": "not-met",
+      "7": "not-met"
+    },
+    "note": "Operator selected unlock-first to break the item 4/6/7 chicken-egg. This file is the unlock stamp. Items 5/6/7 stay independently scored. deployAuthorized stays false."
+  }
+}

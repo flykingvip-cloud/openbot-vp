@@ -1,0 +1,100 @@
+{
+  "schema": "task-progress-ledger-bad5f90a1d33-cutover/v1",
+  "recordedAt": "2026-08-23T14:42:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-main-alignment-cutover-bad5f90a1d33-full-dist-overlay-from-clean-archive",
+  "stamp": "20260823T063918Z",
+  "overlayId": "origin-main-bad5f90a1d33-r1",
+  "note": "User authorized Production Main Alignment Cutover of freshly fetched origin/main. Previous LIVE 5a3952679849 was an ancestor, not the trunk tip.",
+  "releaseWorktree": {
+    "path": "/tmp/openbot-progress-release",
+    "lockedOriginMain": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+    "statusPorcelainCount": 0,
+    "fetchHeadWritable": true,
+    "stillTipAtDeploy": true
+  },
+  "candidate": {
+    "ref": "origin/main",
+    "sha": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+    "subject": "Merge pull request #628 from gmood2008/cursor-data-governance/phase1b-item7-retirement-batch9-s29",
+    "equalsOriginMainAtLock": true,
+    "ledgerImplementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91"
+  },
+  "gatesBeforeCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "liveThen": "5a39526798493464ff0a7f29ab65ab66ad7670ed"
+    },
+    "verifyDeliveryAlignmentLiveMatched": {
+      "exit": 0,
+      "summary": "PASS=8 WARN=2 FAIL=0; --prod-sha 5a3952679849 --candidate-sha bad5f90a1d33 --candidate-tag provenance/sha-bad5f90a1d33"
+    }
+  },
+  "gatesAfterCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "live": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "candidate": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13"
+    }
+  },
+  "build": {
+    "source": "git archive bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+    "dir": "/tmp/openbot-progress-build-bad5f90a1d33",
+    "install": "pnpm install --frozen-lockfile",
+    "command": "GIT_COMMIT=bad5f90a1d33082d9fa6b6c6e361044ac7017f13 pnpm build",
+    "commitMatched": true,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "builtAt": "2026-08-23T06:40:11.929Z"
+    },
+    "uiOverlayGate": "OK control-ui overlay gate (tip/full)",
+    "uiEntry": "index-Dpg8P1UR.js",
+    "gatewayTarMd5": "e2fb25190c33caa2ce96e82fd32836bf",
+    "uiTarMd5": "1981097592ef6e3b2ff629cfccdf8492"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+    "previousSha": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPinEnv": "index-Ol92eg1L.js",
+    "uiServedEntry": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisCutover": false
+    },
+    "adminProjection": {
+      "methodRegistered": true,
+      "projectionKind": "canonical",
+      "itemCount": 6,
+      "violationsById": {
+        "I1": 0,
+        "I2": 0,
+        "I3": 0,
+        "I4": 0,
+        "I5": 0,
+        "I6": 0,
+        "I7": 0,
+        "I8": 0
+      }
+    }
+  },
+  "provenanceTag": "provenance/sha-bad5f90a1d33",
+  "backup": "/root/openbot-maintenance-origin-main-bad5f90a1d33-r1-20260823T063918Z",
+  "explicitlyNotDone": [
+    "Did not build from the dirty kiro-loom worktree",
+    "Did not recreate the production container",
+    "Did not change Progress Ledger flag",
+    "Did not start Turn Contract work"
+  ]
+}

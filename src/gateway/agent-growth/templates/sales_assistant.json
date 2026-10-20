@@ -1,0 +1,22 @@
+{
+  "templateId": "sales_assistant",
+  "version": "1.0.0",
+  "displayName": "销售助理机器人",
+  "roleBlueprint": "面向销售团队的助理，需具备 CRM 技能与 CRM 系统授权以跟进客户。",
+  "dimensionWeights": {
+    "identity": 25,
+    "capability": 25,
+    "knowledge": 25,
+    "habits": 25
+  },
+  "requiredCapabilities": [
+    { "key": "crm", "kind": "skill", "label": "CRM 技能", "required": true },
+    { "key": "crm_oauth", "kind": "oauth", "label": "CRM 系统授权", "required": true }
+  ],
+  "knowledgeExpectations": {
+    "minBindings": 1,
+    "preferredTags": ["sales", "crm", "customer"]
+  },
+  "missionReadyThreshold": 78,
+  "minIdentity": 60
+}

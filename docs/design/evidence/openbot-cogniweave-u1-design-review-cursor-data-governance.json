@@ -1,0 +1,44 @@
+{
+  "schema": "openbot-cogniweave-u1-design-review/v1",
+  "kind": "u1-dark-contract-review",
+  "reviewer": "cursor-data-governance",
+  "signedBy": "cursor-data-governance",
+  "signedAt": "2026-08-19T12:20:00.000Z",
+  "focus": "Catalog SoT, Resolver Handle-or-denial, tenant/fencing fail-closed",
+  "scope": "U1-dark-contract-only",
+  "decision": "accepted",
+  "request": "docs/design/evidence/openbot-cogniweave-u1-design-review-request-2026-08-19.json",
+  "item2": "met",
+  "item6": "not-met",
+  "unlock": "not-issued",
+  "u1": "blocked",
+  "authorizes": "none",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "schemaV2Write": "disabled",
+  "catalogWrite": "forbidden",
+  "acceptedContract": {
+    "resolverReturns": "complete MemoryWorkspaceHandle or structured denial",
+    "persistentPrimaryKey": "resourceId only",
+    "stateDir": "storage configuration only; must not mint identity",
+    "cloudTenantId": "Handle.tenantId",
+    "failClosed": ["catalog miss", "tenant mismatch", "stale fencing"],
+    "mode": "dark-integration-only"
+  },
+  "doesNotAuthorize": [
+    "implementation",
+    "Catalog write",
+    "schema-v2-write",
+    "retirement",
+    "LIVE",
+    "unlock"
+  ],
+  "explicitlyForbidden": [
+    "fill coordinator request signedBy slots",
+    "sign another required U1 review as this identity",
+    "self-issue unlock",
+    "start U1 implementation"
+  ],
+  "note": "Data governance accepts the U1 dark contract after official item 2 production Catalog SoT is scored met. Item 6 remains not-met, so unlock stays not-issued. Coordinator request slots stay empty."
+}

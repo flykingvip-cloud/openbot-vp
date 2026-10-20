@@ -1,0 +1,75 @@
+{
+  "schema": "task-progress-ledger-5a3952679849-cutover/v1",
+  "recordedAt": "2026-08-23T11:40:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-cutover-5a3952679849-full-dist-overlay-from-clean-archive",
+  "stamp": "20260823T033629Z",
+  "overlayId": "origin-main-5a3952679849-r1",
+  "note": "Dirty-tree view that Latest/LIVE was still 7cd74d4c was stale. After #631, Latest and LIVE were e6f26e13795a. User required a new cutover of origin/main 5a3952679849.",
+  "releaseWorktree": {
+    "path": "/tmp/openbot-progress-release",
+    "lockedOriginMain": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "statusPorcelainCount": 0,
+    "fetchHeadWritable": true
+  },
+  "candidate": {
+    "ref": "origin/main",
+    "sha": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "subject": "Docs: record e6f26e13795a live overlay Source revision (#631)",
+    "equalsOriginMainAtLock": true,
+    "ledgerImplementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91"
+  },
+  "gatesBeforeCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "liveThen": "e6f26e13795a86084e9f227453ee1d439d25d018"
+    },
+    "verifyDeliveryAlignmentTipEqualsLive": {
+      "exit": 1,
+      "summary": "FAIL=1 before this record: Latest Source revision was still e6f26e13795a; tag provenance/sha-5a3952679849 already on origin"
+    }
+  },
+  "build": {
+    "source": "git archive 5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "dir": "/tmp/openbot-progress-build",
+    "install": "pnpm install --frozen-lockfile",
+    "command": "GIT_COMMIT=5a39526798493464ff0a7f29ab65ab66ad7670ed pnpm build",
+    "commitMatched": true,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+      "builtAt": "2026-08-23T03:38:51.881Z"
+    },
+    "uiOverlayGate": "OK control-ui overlay gate (tip/full)",
+    "uiEntry": "index-Dpg8P1UR.js",
+    "gatewayTarMd5": "9f51a3083423538ab3f0fae812896435",
+    "uiTarMd5": "4879b0c03c753c8258fe8de2983a8d3a"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "previousSha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPin": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisCutover": false
+    }
+  },
+  "provenanceTag": "provenance/sha-5a3952679849",
+  "backup": "/root/openbot-maintenance-origin-main-5a3952679849-r1-20260823T033629Z",
+  "explicitlyNotDone": [
+    "Did not build from the dirty 63-file worktree",
+    "Did not recreate the production container",
+    "Did not change Progress Ledger flag",
+    "Did not start Turn Contract work"
+  ]
+}

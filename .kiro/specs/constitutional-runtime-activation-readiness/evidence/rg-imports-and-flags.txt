@@ -1,0 +1,178 @@
+=== date ===
+2026-09-28T04:10:00Z
+=== HEAD ===
+6628f4bf364bd6d0560847b938b00e74035a8947
+
+===== imports constitutional-contracts / @openbot/constitutional* =====
+packages/constitutional-contracts/src/constitutional-contracts.test.ts:22:describe("@openbot/constitutional-contracts", () => {
+scripts/pre-commit/filter-staged-files.mjs:32:  "packages/constitutional-contracts/",
+packages/constitutional-contracts/package.json:2:  "name": "@openbot/constitutional-contracts",
+packages/constitutional-contracts/README.md:1:# @openbot/constitutional-contracts
+packages/constitutional-contracts/README.md:129:pnpm --dir packages/constitutional-contracts run typecheck
+packages/constitutional-contracts/README.md:130:pnpm --dir packages/constitutional-contracts test
+packages/constitutional-contracts/README.md:131:pnpm --dir packages/constitutional-contracts run build
+packages/constitutional-runtime/src/index.ts:3: * `@openbot/constitutional-contracts`. Not a fifth execution story and not
+packages/constitutional-runtime/src/index.ts:21:} from "@openbot/constitutional-contracts";
+packages/constitutional-runtime/src/scaffold.test.ts:4:import { runRuntimeFacadeShadow as runFromContracts } from "@openbot/constitutional-contracts";
+packages/constitutional-runtime/src/scaffold.test.ts:16:  "@openbot/constitutional-registry",
+packages/constitutional-runtime/src/scaffold.test.ts:17:  "@openbot/constitutional-conformance",
+packages/constitutional-runtime/src/scaffold.test.ts:18:  "@openbot/constitutional-runtime",
+packages/constitutional-runtime/src/scaffold.test.ts:44:describe("@openbot/constitutional-runtime scaffold", () => {
+packages/constitutional-runtime/vitest.config.ts:7:      "@openbot/constitutional-contracts": fileURLToPath(
+packages/constitutional-runtime/vitest.config.ts:8:        new URL("../constitutional-contracts/src/index.ts", import.meta.url),
+packages/constitutional-runtime/tsconfig.json:7:      "@openbot/constitutional-contracts": ["../constitutional-contracts/dist/index.d.ts"]
+packages/constitutional-runtime/package.json:2:  "name": "@openbot/constitutional-runtime",
+packages/constitutional-runtime/package.json:28:    "@openbot/constitutional-contracts": "workspace:*"
+packages/constitutional-runtime/README.md:1:# @openbot/constitutional-runtime
+packages/constitutional-runtime/README.md:5:执行方案把「拆独立产品」标成推迟。本包是用户要求的边界刀：私有 workspace 包，只重新导出 `@openbot/constitutional-contracts` 里默认关闭的 runtime façade shadow。它不是独立可部署产品，也不是第五套执行故事。
+packages/constitutional-runtime/README.md:36:pnpm --dir packages/constitutional-contracts run build
+packages/evolution-core/src/perception-p2.test.ts:809:    expect(source).not.toMatch(/constitutional-contracts|Meta-Schema|FABRIC_DEFAULT/);
+packages/constitutional-registry/src/index.ts:3: * `@openbot/constitutional-contracts`. Source ledger ids stay distinct.
+packages/constitutional-registry/src/index.ts:35:} from "@openbot/constitutional-contracts";
+packages/constitutional-registry/src/scaffold.test.ts:7:} from "@openbot/constitutional-contracts";
+packages/constitutional-registry/src/scaffold.test.ts:21:  "@openbot/constitutional-registry",
+packages/constitutional-registry/src/scaffold.test.ts:22:  "@openbot/constitutional-conformance",
+packages/constitutional-registry/src/scaffold.test.ts:23:  "@openbot/constitutional-runtime",
+packages/constitutional-registry/src/scaffold.test.ts:49:describe("@openbot/constitutional-registry scaffold", () => {
+packages/constitutional-registry/vitest.config.ts:7:      "@openbot/constitutional-contracts": fileURLToPath(
+packages/constitutional-registry/vitest.config.ts:8:        new URL("../constitutional-contracts/src/index.ts", import.meta.url),
+packages/constitutional-registry/tsconfig.json:7:      "@openbot/constitutional-contracts": ["../constitutional-contracts/dist/index.d.ts"]
+packages/constitutional-registry/package.json:2:  "name": "@openbot/constitutional-registry",
+packages/constitutional-registry/package.json:5:  "description": "In-monorepo scaffold for a proposed Registry product boundary. Re-exports constitutional-contracts adapters and the read-model vocabulary. Not independently deployable.",
+packages/constitutional-registry/package.json:28:    "@openbot/constitutional-contracts": "workspace:*"
+packages/constitutional-registry/README.md:1:# @openbot/constitutional-registry
+packages/constitutional-registry/README.md:5:执行方案把「拆独立产品」标成推迟。本包是用户要求的边界刀：私有 workspace 包，只重新导出 `@openbot/constitutional-contracts` 的适配器与只读账本视图。它不是独立可部署产品，也没有自己的发布列车。
+packages/constitutional-registry/README.md:36:pnpm --dir packages/constitutional-contracts run build
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:3:import { CONSTITUTIONAL_SHADOW_ENV } from "../../../packages/constitutional-contracts/src/index.js";
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:37:      expect(source).not.toContain("constitutional-contracts");
+src/agents/execution-preflight/constitutional-runtime-facade.ts:12:} from "../../../packages/constitutional-contracts/src/index.js";
+packages/constitutional-conformance/src/index.ts:3: * path-gap report from `@openbot/constitutional-contracts`.
+packages/constitutional-conformance/src/index.ts:30:} from "@openbot/constitutional-contracts";
+packages/constitutional-conformance/src/scaffold.test.ts:7:} from "@openbot/constitutional-contracts";
+packages/constitutional-conformance/src/scaffold.test.ts:20:  "@openbot/constitutional-registry",
+packages/constitutional-conformance/src/scaffold.test.ts:21:  "@openbot/constitutional-conformance",
+packages/constitutional-conformance/src/scaffold.test.ts:22:  "@openbot/constitutional-runtime",
+packages/constitutional-conformance/src/scaffold.test.ts:48:describe("@openbot/constitutional-conformance scaffold", () => {
+packages/constitutional-conformance/vitest.config.ts:7:      "@openbot/constitutional-contracts": fileURLToPath(
+packages/constitutional-conformance/vitest.config.ts:8:        new URL("../constitutional-contracts/src/index.ts", import.meta.url),
+packages/constitutional-conformance/tsconfig.json:7:      "@openbot/constitutional-contracts": ["../constitutional-contracts/dist/index.d.ts"]
+packages/constitutional-conformance/package.json:2:  "name": "@openbot/constitutional-conformance",
+packages/constitutional-conformance/package.json:28:    "@openbot/constitutional-contracts": "workspace:*"
+packages/constitutional-conformance/README.md:1:# @openbot/constitutional-conformance
+packages/constitutional-conformance/README.md:5:执行方案把「拆独立产品」标成推迟。本包是用户要求的边界刀：私有 workspace 包，只重新导出 `@openbot/constitutional-contracts` 的 shadow 评估器与 P8a 路径缺口报告。它不是独立可部署产品，也没有自己的发布列车。
+packages/constitutional-conformance/README.md:35:pnpm --dir packages/constitutional-contracts run build
+docs/design/openbot-constitutional-gap-and-feasibility-2026-09-23.md:26:| **D / constitutional-contracts / 真实 Path / Gate 收紧** | **当前均不批准**                              |
+docs/design/openbot-constitutional-gap-and-feasibility-2026-09-23.md:74:| **契约包装（可选，当前不批准）** | 若 Phase C 独立裁决 GO：优先单一 `constitutional-contracts` 包；Runtime 门面应复用 orchestration / preflight。**当前不批准**创建 schema/新包。                                               |
+docs/design/openbot-constitutional-gap-and-feasibility-2026-09-23.md:326:4. **有界工程化（当前不批准）**：`constitutional-contracts`、真实 Path、Gate 收紧均待 C 独立 GO 之后另立授权。
+docs/design/openbot-constitutional-gap-and-feasibility-2026-09-23.md:359:                   constitutional-contracts：schemas / adapters / read-model / evaluator
+src/task-orchestration/constitutional-runtime-facade.ts:13:} from "../../packages/constitutional-contracts/src/index.js";
+src/task-orchestration/constitutional-runtime-facade.test.ts:6:} from "../../packages/constitutional-contracts/src/index.js";
+src/task-orchestration/constitutional-runtime-facade.test.ts:17:    expect(dispatch).not.toContain("constitutional-contracts");
+src/task-orchestration/constitutional-runtime-facade.test.ts:19:    expect(hook).not.toContain("constitutional-contracts");
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:606:          "path": "packages/constitutional-contracts/src/flags.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:617:        "packages/constitutional-contracts/src/flags.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:622:      "id": "constitutional-contracts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:624:      "component": "constitutional-contracts package"
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:677:          "path": "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:689:        "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:753:          "path": "packages/constitutional-contracts/src/legal-path/select.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:798:              "path": "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:842:              "path": "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:853:        "packages/constitutional-contracts/src/legal-path/select.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:915:          "path": "packages/constitutional-contracts/src/path-gap/report.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:926:        "packages/constitutional-contracts/src/path-gap/report.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:986:          "path": "packages/constitutional-contracts/src/legal-path/execute.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:997:        "packages/constitutional-contracts/src/legal-path/execute.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1065:          "searchScope": "搜索 git log --grep p8c：只有文档合入 #119。packages/constitutional-contracts/src 的 select.ts、execute.ts、path-gap/report.ts、runtime-facade/shadow.ts 把 shadowCompared 写成字面量 false。实现提交未找到。",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1279:          "searchScope": "packages/constitutional-contracts/src/flags.ts 将 CONSTITUTIONAL_CONTRACTS_FABRIC_DEFAULT_ON 设为 false as const。没有 default-on 实现。",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1285:      "evidenceRefs": ["packages/constitutional-contracts/src/flags.ts"],
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1354:        "packages/constitutional-contracts/src/legal-path/execute.ts",
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1355:        "packages/constitutional-contracts/src/runtime-facade/shadow.ts"
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1399:    "constitutional-contracts",
+docs/design/openbot-evolution-perception-execution-plan-2026-09-25.md:27:5. **不授权**：平行写库、第五执行状态机、跨域统一写权威、Meta-Schema/constitutional-contracts 产品化、真实 Path、Gate 收紧、`ORCHESTRATION_LIVE_INVOKE=true`、Fabric 默认开、影子旗生产启旗、扩大数字人自治默认权限。
+src/gateway/governance/adapters/capability-invoke-adapter.test.ts:177:    expect(imports).not.toMatch(/fabric|constitutional-contracts|aor-core/i);
+docs/design/openbot-constitutional-revision-notes-2026-09-23.md:23:4. 「四个工程产品」降为可选包装（优先 `constitutional-contracts`）；Runtime 门面复用编排/预检。
+docs/design/openbot-constitutional-revision-notes-2026-09-23.md:78:- Phase D / constitutional-contracts / 真实 Path / Gate 收紧已标 **当前均不批准**。
+docs/design/openbot-transformation-execution-plan-2026-09-23.md:17:| **D / constitutional-contracts / 真实 Path / Gate 收紧** | **当前均不批准**                              |
+docs/design/openbot-transformation-execution-plan-2026-09-23.md:48:| 预设四个独立工程产品                                | 仅当 Phase C **独立** GO 后可选单一 `constitutional-contracts`；**当前不批准** |
+docs/design/openbot-transformation-execution-plan-2026-09-23.md:159:            constitutional-contracts / 真实 Path / Gate 收紧：均待 C 独立 GO
+docs/design/openbot-transformation-execution-plan-2026-09-23.md:395:- **停止** Meta-Schema / 四产品 / `constitutional-contracts` 工程化。
+docs/design/openbot-transformation-execution-plan-2026-09-23.md:419:建议包名（可调整）：`constitutional-contracts`
+
+===== OPENBOT_CONSTITUTIONAL_ =====
+packages/constitutional-contracts/src/constitutional-contracts.test.ts:34:    expect(isConstitutionalShadowEnabled({ OPENBOT_CONSTITUTIONAL_SHADOW: "true" })).toBe(true);
+packages/constitutional-contracts/src/flags.ts:16:export const CONSTITUTIONAL_SHADOW_ENV = "OPENBOT_CONSTITUTIONAL_SHADOW";
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-wiring.txt:18:src/task-orchestration/constitutional-runtime-facade.test.ts:20:    expect(dispatch).not.toContain("process.env.OPENBOT_CONSTITUTIONAL_SHADOW");
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-caller-inventory.md:60:A caller can still turn the select bridge on only by placing a truthy `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` in the **env snapshot argument**, and only if shadow is also opted in. Nothing in gateway, dispatch, or the preflight barrel constructs that call.
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-caller-inventory.md:91:`process.env.OPENBOT_CONSTITUTIONAL_*` reads under `src/`, `packages/`, and `extensions/`: **none**. The only hit is the test that asserts `dispatch.ts` does not contain that string (`constitutional-runtime-facade.test.ts:20`).
+packages/constitutional-contracts/src/path-gap/report.ts:32:export const PATH_GAP_REPORT_ENV = "OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT";
+packages/constitutional-contracts/README.md:42:`reportPathGap` 在显式 `report: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT` 快照时，发出 `no_valid_path`。默认不命名。函数不读 `process.env`，不选择 Path，不执行，不收紧。
+packages/constitutional-contracts/README.md:53:`runRuntimeFacadeShadow` 在显式 `shadow: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_SHADOW` 快照时，调用 `evaluateShadowConformance`。默认不调用评估器。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:70:当调用方**同时** opt-in shadow（`shadow: true` 或 `OPENBOT_CONSTITUTIONAL_SHADOW`）**且** legal-path select（`select: true` 或 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT`）时，`runRuntimeFacadeShadow` 可调用 `selectLegalPath` 并在报告结果中表面化非空 `selectedPath` / `legalPathSelectable`。任一旗标关 → 退回 #60 面（不选中）。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:90:`selectLegalPath` 在显式 `select: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` 快照时，可从登记集选取 `constitutional.declared.v1`。默认不选中。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:104:`executeLegalPath` 复用 `selectLegalPath` 做选中；仅当 `selectedPath` 非空 **且** 显式 `execute: true`（或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` 快照）时，`executed=true`。默认不执行。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:120:- `OPENBOT_CONSTITUTIONAL_SHADOW` 默认未设置即为关闭。Runtime 门面只在调用方传入该变量的快照（或 `shadow: true`）时调用评估器，并且不读 `process.env`。聊天热路径没有安装读取它的 hook。删掉变量、不要调用 observe 函数，或把包从依赖图拿掉，即回到今天的行为。
+packages/constitutional-contracts/README.md:121:- `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` 默认未设置即为关闭。`selectLegalPath` 只在调用方传入该变量的快照（或 `select: true`）时允许选中，并且不读 `process.env`。关闭后有效合法集为空、`selectedPath` 为 null、`executed` 为 false。聊天热路径没有安装读取它的 hook。
+packages/constitutional-contracts/README.md:122:- `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` 默认未设置即为关闭。`executeLegalPath` 只在选中已成立且调用方传入该变量的快照（或 `execute: true`）时设 `executed=true`，并且不读 `process.env`。关掉即秒级回滚到「仅选中 / 不执行」。聊天热路径没有安装读取它的 hook。执行 opt-in ≠ Gate 收紧 ≠ 整段 P8b 完成。
+packages/constitutional-contracts/src/legal-path/select.ts:34:export const LEGAL_PATH_SELECT_ENV = "OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT";
+packages/constitutional-contracts/src/legal-path/execute.ts:29:export const LEGAL_PATH_EXECUTE_ENV = "OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE" as const;
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:13: * `OPENBOT_CONSTITUTIONAL_SHADOW` is on. This module does not read
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:19: * `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` on the same caller snapshot).
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:69:   * `OPENBOT_CONSTITUTIONAL_SHADOW` truthy enables the report only.
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:70:   * `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` truthy enables select bridge
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-flag-inventory.md:17:| `OPENBOT_CONSTITUTIONAL_SHADOW` | `flags.ts:16` | `isConstitutionalShadowEnabled` `flags.ts:35-39` | false when the key is absent (`:32-33`) |
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-flag-inventory.md:18:| `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` | `select.ts:34` | `isLegalPathSelectEnabled` `select.ts:119-123` | false; `selectLegalPath` returns mode `inert`, `selectedPath: null`, `executed: false` (`select.ts:216-223`, `:191`) |
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-flag-inventory.md:19:| `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` | `execute.ts:29` | `isLegalPathExecuteEnabled` `execute.ts:84-88` | false; `executed` is true only when `selectedPath !== null` and execute is opted in (`execute.ts:112-114`) |
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-flag-inventory.md:20:| `OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT` | `report.ts:32` | `isPathGapReportEnabled` `report.ts:123-125` | false; `reportPathGap` does not name a gap unless `report: true` or the snapshot is on (`report.ts:197`) |
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-flag-inventory.md:34:`OPENBOT_CONSTITUTIONAL_SHADOW_COMPARE` does not exist in source outside `.kiro/` specs. The scan `rg OPENBOT_CONSTITUTIONAL_SHADOW_COMPARE` excluding `.kiro` returned no hits (`evidence/rg-authority.txt`). The P8c start-order names that variable for a future slice. This SHA does not implement the reader. Compare stays a hard-false field.
+.kiro/specs/constitutional-runtime-activation-readiness/constitutional-flag-inventory.md:86:- Constitutional select, execute, shadow, and path-gap report stay off unless a caller passes `true` or a truthy snapshot. No production module reads `process.env` for `OPENBOT_CONSTITUTIONAL_*`.
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:32:packages/constitutional-contracts/src/constitutional-contracts.test.ts:34:    expect(isConstitutionalShadowEnabled({ OPENBOT_CONSTITUTIONAL_SHADOW: "true" })).toBe(true);
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:60:packages/constitutional-contracts/README.md:42:`reportPathGap` 在显式 `report: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT` 快照时，发出 `no_valid_path`。默认不命名。函数不读 `process.env`，不选择 Path，不执行，不收紧。
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:61:packages/constitutional-contracts/README.md:53:`runRuntimeFacadeShadow` 在显式 `shadow: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_SHADOW` 快照时，调用 `evaluateShadowConformance`。默认不调用评估器。函数不读 `process.env`。
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:64:packages/constitutional-contracts/README.md:70:当调用方**同时** opt-in shadow（`shadow: true` 或 `OPENBOT_CONSTITUTIONAL_SHADOW`）**且** legal-path select（`select: true` 或 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT`）时，`runRuntimeFacadeShadow` 可调用 `selectLegalPath` 并在报告结果中表面化非空 `selectedPath` / `legalPathSelectable`。任一旗标关 → 退回 #60 面（不选中）。函数不读 `process.env`。
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:65:packages/constitutional-contracts/README.md:90:`selectLegalPath` 在显式 `select: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` 快照时，可从登记集选取 `constitutional.declared.v1`。默认不选中。函数不读 `process.env`。
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:67:packages/constitutional-contracts/README.md:104:`executeLegalPath` 复用 `selectLegalPath` 做选中；仅当 `selectedPath` 非空 **且** 显式 `execute: true`（或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` 快照）时，`executed=true`。默认不执行。函数不读 `process.env`。
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:69:packages/constitutional-contracts/README.md:121:- `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` 默认未设置即为关闭。`selectLegalPath` 只在调用方传入该变量的快照（或 `select: true`）时允许选中，并且不读 `process.env`。关闭后有效合法集为空、`selectedPath` 为 null、`executed` 为 false。聊天热路径没有安装读取它的 hook。
+.kiro/specs/constitutional-runtime-activation-readiness/evidence/rg-constitutional-symbols.txt:70:packages/constitutional-contracts/README.md:122:- `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` 默认未设置即为关闭。`executeLegalPath` 只在选中已成立且调用方传入该变量的快照（或 `execute: true`）时设 `executed=true`，并且不读 `process.env`。关掉即秒级回滚到「仅选中 / 不执行」。聊天热路径没有安装读取它的 hook。执行 opt-in ≠ Gate 收紧 ≠ 整段 P8b 完成。
+.kiro/specs/constitutional-runtime-activation-readiness/runtime-wiring-inventory.md:19:`OPENBOT_CONSTITUTIONAL_SHADOW_COMPARE` is not implemented on this SHA.
+.kiro/specs/constitutional-runtime-activation-readiness/runtime-wiring-inventory.md:52:| `OPENBOT_CONVERSATION_TASK_ORCH_SHADOW` | `src/task-orchestration/feature.ts:25` | Not an `OPENBOT_CONSTITUTIONAL_*` flag |
+src/task-orchestration/constitutional-runtime-facade.test.ts:20:    expect(dispatch).not.toContain("process.env.OPENBOT_CONSTITUTIONAL_SHADOW");
+.kiro/specs/constitutional-runtime-activation-readiness/baseline-manifest.yaml:38:  note: "Offline readers under scripts/governance. They do not import constitutional-contracts and do not flip OPENBOT_CONSTITUTIONAL_*."
+docs/design/evidence/constitutional-governance-state-baseline-2026-09-27.json:25:    "OPENBOT_CONSTITUTIONAL_SHADOW": "default-off-caller-snapshot",
+docs/design/evidence/constitutional-governance-state-baseline-2026-09-27.json:26:    "OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT": "default-off-caller-snapshot",
+docs/design/evidence/constitutional-governance-state-baseline-2026-09-27.json:27:    "OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE": "default-off-caller-snapshot",
+docs/design/evidence/constitutional-governance-state-baseline-2026-09-27.json:28:    "OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT": "default-off-caller-snapshot",
+
+===== OPENBOT_CONSTITUTIONAL_SHADOW_COMPARE outside .kiro =====
+
+===== OPENBOT_CONVERSATION_TASK_ in *.ts (excl .kiro) =====
+src/agents/execution-preflight/ctr-close-consult-lock.test.ts:42:const FC02_ENV = "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT";
+src/conversation-task/cancel-path-consult-observe-lock.test.ts:39:const FC02_ENV = "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT";
+src/conversation-task/cross-process-consult-persist.test.ts:142:      "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_PERSIST",
+src/conversation-task/cross-process-consult-persist.test.ts:377:    expect(persistSrc).toContain("OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_PERSIST");
+src/conversation-task/delivery-close-consult-persist.ts:23:  "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT_PERSIST";
+src/conversation-task/feature.ts:25:  detection: "OPENBOT_CONVERSATION_TASK_DETECTION",
+src/conversation-task/feature.ts:26:  qualification: "OPENBOT_CONVERSATION_TASK_QUALIFICATION",
+src/conversation-task/feature.ts:27:  activation: "OPENBOT_CONVERSATION_TASK_ACTIVATION",
+src/conversation-task/feature.ts:28:  projection: "OPENBOT_CONVERSATION_TASK_PROJECTION",
+src/conversation-task/feature.ts:29:  authorization: "OPENBOT_CONVERSATION_TASK_AUTHORIZATION",
+src/conversation-task/runtime-bootstrap.ts:112: * (`OPENBOT_CONVERSATION_TASK_ACTIVATION`) — the config store still cannot
+src/conversation-task/reply-completion.ts:47:  "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT";
+src/conversation-task/reply-completion.ts:120: * Reuses FC-02 ENV (`OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT`).
+src/objective-shadow/feature.ts:3: * Independent from Phase 1b Cron L2 prompt and OPENBOT_CONVERSATION_TASK_ORCH_SHADOW.
+src/task-orchestration/gateway-hook.test.ts:38:const ORCH_SHADOW = "OPENBOT_CONVERSATION_TASK_ORCH_SHADOW";
+src/task-orchestration/gateway-hook.test.ts:39:const ORCH_DISPATCH = "OPENBOT_CONVERSATION_TASK_ORCH_DISPATCH";
+src/task-orchestration/gateway-hook.test.ts:40:const ORCH_NODE = "OPENBOT_CONVERSATION_TASK_ORCH_NODE";
+src/task-orchestration/gateway-hook.test.ts:41:const ORCH_BROWSER = "OPENBOT_CONVERSATION_TASK_ORCH_BROWSER";
+src/task-orchestration/gateway-hook.test.ts:109:  delete process.env.OPENBOT_CONVERSATION_TASK_ACTIVATION;
+src/task-orchestration/gateway-hook.test.ts:173:    process.env.OPENBOT_CONVERSATION_TASK_ACTIVATION = "1";
+src/task-orchestration/gateway-hook.test.ts:184:    process.env.OPENBOT_CONVERSATION_TASK_ACTIVATION = "1";
+src/task-orchestration/feature.ts:25:  shadowEnabled: "OPENBOT_CONVERSATION_TASK_ORCH_SHADOW",
+src/task-orchestration/feature.ts:26:  dispatchEnabled: "OPENBOT_CONVERSATION_TASK_ORCH_DISPATCH",
+src/task-orchestration/feature.ts:27:  nodeEnabled: "OPENBOT_CONVERSATION_TASK_ORCH_NODE",
+src/task-orchestration/feature.ts:28:  browserEnabled: "OPENBOT_CONVERSATION_TASK_ORCH_BROWSER",
+src/task-orchestration/feature.ts:102:export const WEB_READ_SHADOW_ENV = "OPENBOT_CONVERSATION_TASK_WEB_READ_SHADOW" as const;
+src/task-orchestration/dispatch.test.ts:192:  it("does not treat OPENBOT_CONVERSATION_TASK_ACTIVATION as an orch enable", () => {
+
+===== process.env.OPENBOT_CONSTITUTIONAL under src packages extensions =====
+src/task-orchestration/constitutional-runtime-facade.test.ts:20:    expect(dispatch).not.toContain("process.env.OPENBOT_CONSTITUTIONAL_SHADOW");

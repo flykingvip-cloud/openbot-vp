@@ -1,0 +1,103 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch22-s25/v1",
+  "item": 7,
+  "status": "retirement-batch-22",
+  "batch": "S25",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": true,
+  "absorbsUnacceptedBatches": false,
+  "previousAcceptedBaseline": 13,
+  "lastAcceptedRetirementBaseline": 13,
+  "proposedRemaining": 12,
+  "proposedLiveWriteWatchIndex": 12,
+  "targetBindingCapability": {
+    "api": "resolveWorkspaceTargetBinding",
+    "module": "src/gateway/workspace-resolver/strict-locator.ts",
+    "purpose": "Read the unique compatibility/read_only cutover target binding already present in the Catalog SoT for the same resource.",
+    "sharesValidationWith": "resolveWorkspaceLocator (validateWorkspaceLocatorQuery)",
+    "ownershipModelChanged": false,
+    "createsProductionCatalogRow": false,
+    "failClosed": {
+      "targetBindingMissing": "catalog_miss",
+      "targetBindingDuplicate": "multi_binding",
+      "crossTenant": "tenant_mismatch",
+      "missingGrant": "missing_grant",
+      "grantOwnershipMismatch": "auth_failure",
+      "fallbackToCanonicalSource": false,
+      "mutatesCatalog": false
+    }
+  },
+  "sitesRetired": [
+    {
+      "ledgerId": "S25",
+      "pathId": "P5",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir",
+      "lineBefore": 153,
+      "lineAfter": 153,
+      "op": "write",
+      "replacement": "resolveWorkspaceTargetBinding",
+      "replacementLocator": "src/gateway/workspace-resolver/strict-locator.ts",
+      "hostStewardFallbackRemoved": true,
+      "replacementTests": [
+        "src/gateway/workspace-resolver/steward-write-item7-s25.test.ts",
+        "src/gateway/workspace-resolver/steward-write.test.ts"
+      ]
+    }
+  ],
+  "identityChecks": {
+    "tenant": "fail-closed when tenant context is missing or Catalog tenant mismatches; tenantContext + tenantId from server-trusted context",
+    "workspace": "read existing Catalog target binding (compatibility/read_only) only; no host-root, stateDir guess, process.cwd, empty-string, or default-workspace fallback",
+    "agentAsset": "lookup uses steward:builtin; agent_asset_mismatch fail-closed",
+    "grant": "target read requires tenantContext + user grant matching ownerScope; missing/mismatched grant and missing membership SoT fail-closed",
+    "targetUniqueness": "exactly one compatibility/read_only target binding; zero -> catalog_miss, more than one -> multi_binding; never selects first match; never falls back to canonical source binding"
+  },
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 12,
+  "liveWriteWatchIndex": 12,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "liftTombstone": true,
+    "restoreFiles": [
+      "src/gateway/workspace-resolver/steward-write.ts",
+      "src/gateway/workspace-resolver/strict-locator.ts",
+      "src/gateway/workspace-resolver/index.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "restoreDeletedCallSites": "not-applicable-none-deleted",
+    "productionWriteBack": "forbidden",
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "quarantine": {
+    "designOnly": true,
+    "enabled": false,
+    "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+    "quarantineNormalWrites": 0,
+    "rewriteIntoNormalCatalog": false
+  },
+  "startedNextBatches": [],
+  "batch23Started": false,
+  "s26Started": false,
+  "s27Started": false,
+  "originMainSha": "ae7168f7a54a96a23aa77171dce5cce8af160b2e",
+  "note": "Batch 22 retires S25 after batch 21 S24; replayed cleanly onto origin/main ae7168f7 (#669, which added the official Loom batch22-s25 ownership over #665). It reads the existing Catalog D1e target binding (role=compatibility, state=read_only) via the controlled resolveWorkspaceTargetBinding, which shares all identity/authorization checks with resolveWorkspaceLocator (validateWorkspaceLocatorQuery) and selects the target binding instead of the canonical source. Fail-closed on target miss, duplicate, cross-tenant, or unauthorized access; never falls back to the canonical/source binding; no implicit target dir create; no production Catalog row; no Catalog mutation. Do not call resolveEmployeeStewardTargetWorkspaceDir at the writable-dir site. Catalog miss=deny stays off. Source/target ownership model unchanged; resourceId scheme unchanged. S26/S27 stay at 279/280. Item 7 stays not-met. liveWriteWatchIndex not written to 0. Phase 0 freeze baseline stays 38. proposedRemaining=12 becomes the canonical accepted baseline only after Codex accepts Batch 22 (this PR merges to main). Batch 23 / S26 / S27 not started."
+}

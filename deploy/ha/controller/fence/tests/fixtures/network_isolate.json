@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "provider": "mock",
+  "action": "isolate_pg_write_path",
+  "rule_version": 2,
+  "idempotency_key": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:FENCING_NETWORK"
+}

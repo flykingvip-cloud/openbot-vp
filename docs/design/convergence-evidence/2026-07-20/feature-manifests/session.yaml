@@ -1,0 +1,40 @@
+session:
+  feature_id: session_history_fixes
+  decision: ACCEPT_WITH_REWORK
+  target_wave: D3
+  ui_kinds: []
+  rpc_methods:
+    - chat.history
+    - chat.checkpoints.list
+  runtime_modules:
+    - src/gateway/tenant-context.ts
+    - src/auto-reply/reply/session.ts
+    - src/gateway/checkpoint-store.ts
+    - src/gateway/server-methods/chat-checkpoints.ts
+    - src/gateway/employee-steward-session.ts
+  auth_rules: []
+  tenant_scope:
+    - rule: inbound_write_same_store_as_history
+    - rule: promote_global_over_empty_newer_tenant_entry
+    - rule: history_and_checkpoints_use_loadSessionEntryForClient
+  storage:
+    - sessions.json + sessionId.jsonl under tenant L2 when MULTITENANT=1
+  migration: []
+  startup_wiring: []
+  observability: []
+  client_contracts: []
+  deploy_assets: []
+  tests:
+    - src/gateway/tenant-context.test.ts
+    - src/gateway/server-methods/chat.history-d3.test.ts
+    - src/gateway/server-methods/chat-checkpoints.d3.test.ts
+    - src/gateway/server-methods/employee-steward-session.d3.test.ts
+    - src/gateway/session-utils.fs.test.ts
+  rollback_test: []
+  d2_notes: >
+    Phase D2 (2026-07-20): resolveSessionStorePathForInboundMessage +
+    promoteGlobalSessionEntryIfNewer (empty newer tenant entry does not block heal).
+  d3_notes: >
+    Phase D3 (2026-07-20): locked history/checkpoints list read paths with tests;
+    transcript unsafe-sessionFile fallback; steward key preserves agent bot sessions.
+    Restore (chat.restore) deferred as pre-existing. D4 = knowledge import matrix.

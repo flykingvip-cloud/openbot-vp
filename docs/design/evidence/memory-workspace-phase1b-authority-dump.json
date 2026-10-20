@@ -1,0 +1,48 @@
+{
+  "schema": "memory-workspace-phase1b-authority-dump/v1",
+  "live": false,
+  "writable": false,
+  "source": "local-non-live-fixture",
+  "note": "Non-LIVE local authority dump. Not Phase 0 inventory. Not Catalog SoT.",
+  "memberships": [
+    { "userId": "user-1", "enterpriseId": "tenant-1" },
+    { "userId": "user-2", "enterpriseId": "tenant-1" }
+  ],
+  "agentAssets": [
+    {
+      "agentAssetId": "asset-1",
+      "enterpriseId": "tenant-1",
+      "ownerType": "membership",
+      "ownerId": "user-1",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-seat",
+      "enterpriseId": "tenant-1",
+      "ownerType": "seat",
+      "ownerId": "seat-1",
+      "status": "active"
+    },
+    {
+      "agentId": "bot-2",
+      "enterpriseId": "tenant-1",
+      "ownerType": "membership",
+      "ownerId": "user-1"
+    },
+    {
+      "agentAssetId": "asset-orphan",
+      "enterpriseId": "tenant-1",
+      "ownerType": "membership",
+      "ownerId": "user-missing",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-inactive",
+      "enterpriseId": "tenant-1",
+      "ownerType": "membership",
+      "ownerId": "user-1",
+      "status": "retired"
+    }
+  ],
+  "groups": [{ "groupId": "group-1", "enterpriseId": "tenant-1" }]
+}

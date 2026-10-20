@@ -1,0 +1,91 @@
+{
+  "schema": "memory-workspace-phase0-official-review-delegation/v1",
+  "evidenceId": "memory-workspace-phase0-20260816-r26",
+  "reviewSequence": 26,
+  "recordedAt": "2026-08-16T04:30:00.000Z",
+  "updatedAt": "2026-08-16T08:20:00.000Z",
+  "mainSha": "58ce58793cd65bc2212b2446d648e85da5d4a919",
+  "mainCommittedAt": "2026-08-16T08:12:09Z",
+  "previousAnchor": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "reanchorReason": "origin/main@58ce58793c includes merged #425 Phase 1A contracts while sign-off remained review-25. Stale repair @07042e0a91 anchored to d29a1a5be and is forbidden (would clobber #425). v2 repair re-anchors review-26 with fresh live gh verification.",
+  "why": "Review 24 rejected review 23 because an agent self-signed as governance. Candidate fc078574e1 then repeated the same defect by writing signedBy=official-review from an execution-team branch. This record exists so that review 26 cannot be mistaken for either: the signing authority is named, scoped, dated, and separated from the executing identity.",
+  "delegation": {
+    "authority": "official-review",
+    "delegate": "kiro-memory-workspace-remediation",
+    "authorizedBy": "gmood2008",
+    "authorizedVia": "explicit operator instruction in the takeover session, after the delegate refused to self-assert official-review authority",
+    "authorizedAt": "2026-08-16T04:20:00.000Z",
+    "scope": "review-sequence-26-only",
+    "scopeIncludes": [
+      "Phase 0 Mark Accepted decision for review sequence 26 at mainSha 58ce58793cd65bc2212b2446d648e85da5d4a919",
+      "acceptance of the runner minimum-stability caveat",
+      "acceptance of the PR #409 merge-moment freeze failure disposition",
+      "classification of fc078574e1 as an unauthorized candidate sign-off"
+    ],
+    "scopeExcludes": [
+      "section 14.1 sign-off (platform architecture, data governance, resolver, memory, security, SRE each sign individually)",
+      "deployAuthorized=true or any LIVE deploy authorization",
+      "WS-C closure",
+      "Phase 1B execution",
+      "any future review sequence beyond 26"
+    ],
+    "expiresOn": "supersession by review sequence 27 or any advance of origin/main past 58ce58793cd65bc2212b2446d648e85da5d4a919"
+  },
+  "identitySeparation": {
+    "signedBy": "official-review",
+    "signedByDelegate": "kiro-memory-workspace-remediation",
+    "note": "signedBy names the authority; signedByDelegate names who exercised it. Collapsing the two into a single signedBy field is exactly the defect that invalidated fc078574e1, so the fields are kept distinct on purpose."
+  },
+  "gitIdentityCaveat": {
+    "sharedAuthor": "gmood2008 <daniel.hhd@gmail.com>",
+    "note": "Every IDE agent in this repo commits through the same git identity, so git log --author cannot attribute this sign-off. Attribution rests on the Task/Agent commit trailers plus the Loom registry sessions, not on the git author."
+  },
+  "takeover": {
+    "ceremony": "verify-then-take",
+    "reviewedBeforeTaking": [
+      "cursor-fable/review-25-independent-verification commits fc078574e1, 3c98eadae0, 3e2893df27 (diffs and trailers)",
+      "cursor-memory-wsc/503-bypass-offline-governance commits 9d11e4d7df, d4ff193595, 19564bf2ce (diffs, trailers, capture-chain location)",
+      "tasks.md review trail through official-review sequence 24",
+      "local Phase 0 gate results on the BASE tree"
+    ],
+    "loomTasksTakenOver": [
+      {
+        "taskId": "memory-workspace-platform-remediation:cursor-fable",
+        "fromOwner": "cursor-fable",
+        "toOwner": "kiro-memory-workspace-remediation",
+        "reason": "temporary steward for review-26 only; handback to cursor-memory-platform for Phase 1A"
+      }
+    ],
+    "loomTasksNotTakenOver": [
+      {
+        "taskId": "memory-workspace-platform-remediation:cursor-memory-wsc",
+        "owner": "cursor-memory-wsc",
+        "reason": "WS-C decision model outside delegation scope; stays with cursor-memory-wsc"
+      }
+    ]
+  },
+  "verificationChain": {
+    "r24": {
+      "decision": "P0_NO_GO",
+      "mainSha": "1b98b72f95edb21d5214a901bf9b773c5887108c",
+      "blocker": "authorization-service-503-blocked-independent-verification"
+    },
+    "r25": {
+      "mainSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+      "verifiedBy": "execution-team",
+      "verdict": "PASS",
+      "candidateCommit": "fc078574e1",
+      "candidateDisposition": "unauthorized-self-sign"
+    },
+    "r26": {
+      "mainSha": "58ce58793cd65bc2212b2446d648e85da5d4a919",
+      "verifiedBy": "kiro-memory-workspace-remediation",
+      "verificationRole": "official-review-delegate",
+      "verificationMethod": "live-gh-readonly-replay-governance-repair-v2",
+      "verdict": "PASS",
+      "decision": "P0_ACCEPTED",
+      "verifiedAt": "2026-08-16T08:20:00.000Z"
+    }
+  },
+  "note": "Delegation re-anchored for governance-repair-r26-v2 @ 58ce58793c. Voids if main advances further."
+}

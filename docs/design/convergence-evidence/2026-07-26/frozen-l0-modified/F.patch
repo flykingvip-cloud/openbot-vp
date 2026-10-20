@@ -1,0 +1,30 @@
+diff --git a/.kiro/specs/development-supervisor/tasks.md b/.kiro/specs/development-supervisor/tasks.md
+index 39d5c75399..cbec0a7230 100644
+--- a/.kiro/specs/development-supervisor/tasks.md
++++ b/.kiro/specs/development-supervisor/tasks.md
+@@ -13,6 +13,7 @@
+ 
+ - `kiro-fabric` · role: contributor · scope: Fabric Worker Runtime (M0) · paths: `src/fabric/worker/**`, `src/agents/cli-backend-worker.ts` · since: 2026-06-17
+ - `cursor-fable` · role: owner · scope: Development Supervisor M1–M4 · paths: `.kiro/specs/development-supervisor/**`, `src/gateway/supervisor/**`, `src/gateway/server-methods/supervisor.*`, `src/gateway/server-methods.ts`, `src/gateway/server-methods-list.ts`, `src/gateway/method-scopes.ts`, `src/gateway/server.impl.ts`, `src/config/types.gateway.ts`, `src/agents/cli-backend-usage-attribution.ts`, `ui/src/ui/supervisor/**`, `ui/src/ui/ports/platform/advanced/supervisor-panel*`, `ui/src/ui/ports/employee/views/employee-supervisor-center.ts`, `ui/src/ui/app-gateway.ts` · since: 2026-06-17
++- cursor-fable · 本轮 server-methods.ts / server-methods-list.ts / method-scopes.ts 的改动全部属 enterprise-model,已释放给 codex-production-release 随组 1 落地;development-supervisor 本轮无自有 WIP — cursor-fable
+ 
+ ## Overview
+ 
+diff --git a/.kiro/specs/platform-pricing-gateway-instability/tasks.md b/.kiro/specs/platform-pricing-gateway-instability/tasks.md
+index 0cdf69e3bc..f6e240643d 100644
+--- a/.kiro/specs/platform-pricing-gateway-instability/tasks.md
++++ b/.kiro/specs/platform-pricing-gateway-instability/tasks.md
+@@ -7,10 +7,12 @@
+ 
+ ## Agents
+ 
+-- codex-pricing-incident · role: owner · scope: gateway incident backend mitigation and recovery cleanup · paths: `src/daemon/launchd.ts`, `src/daemon/launchd.test.ts`, `src/gateway/server/ws-connection.ts`, `src/gateway/server/ws-connection/message-handler.ts`, `.kiro/specs/platform-pricing-gateway-instability/tasks.md` · since: 2026-06-25
++- codex-pricing-incident · role: owner · scope: gateway incident backend mitigation and recovery cleanup · paths: `src/daemon/launchd.ts`, `src/daemon/launchd.test.ts`, `src/gateway/server/ws-connection.ts`, `src/gateway/server/ws-connection/message-handler.ts` · since: 2026-06-25
++- codex-v112-platform-recovery · role: owner · scope: restore latest verified platform dashboard, tenants, pricing, models, and system-settings UI · paths: ui/src/ui/ports/platform/**, .kiro/specs/platform-pricing-gateway-instability/tasks.md, deploy/production/RELEASE_RECORD.md, .loom/registry.yaml · since: 2026-07-25
+ 
+ ## Tasks
+ 
+ - [x] 1. 将 `ai.openbot.gateway.recovery` 纳入 legacy LaunchAgent 检测与清理路径 — codex-pricing-incident
+ - [x] 2. 为 WebSocket 响应增加 raw send fast-path，避免大 payload 在高频 overview 场景下重复 stringify — codex-pricing-incident
+ - [x] 3. 在 webchat connect 握手阶段复用平台会话，确保登录后客户端数据装载与会话同步链路一致 — codex-pricing-incident
++- [x] 4. 恢复 2026-07-13 至 2026-07-21 已验证的平台 UI 修复；平台测试 197/197、完整构建、生产 health/ready、公网 bundle 与登录重定向验收通过，重启后登录态失效故未绕过认证执行登录后点击复验 — codex-v112-platform-recovery

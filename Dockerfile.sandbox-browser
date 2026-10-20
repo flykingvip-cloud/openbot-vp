@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1.7
+
+# Canonical tag: openbot-sandbox-browser:bookworm-slim
+# scripts/sandbox-browser-setup.sh also tags the previous browser image name.
+
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=openclaw-sandbox-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
+  apt-get update \
+  && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    chromium \
+    curl \
+    fonts-liberation \
+    fonts-noto-color-emoji \
+    fonts-wqy-microhei \
+    git \
+    jq \
+    novnc \
+    openbox \
+    python3 \
+    python3-tk \
+    socat \
+    websockify \
+    wmctrl \
+    x11-utils \
+    x11vnc \
+    xterm \
+    xvfb
+
+# Tip layers. These COPY lines are what Account Computer Files shows under
+# /tmp (openbot-home, openbot-desktop.log, openbot-openbox.log) and the
+# in-container binaries. scripts/sandbox-browser-setup.sh rebuilds this tip
+# and reuses the apt layer above. Recreate the browser container afterward.
+# Not a production cutover. Account-worker flags stay default off.
+COPY --chmod=755 scripts/sandbox-browser-entrypoint.sh /usr/local/bin/openbot-sandbox-browser
+COPY --chmod=755 scripts/sandbox-browser-desktop.py /usr/local/bin/openbot-sandbox-desktop
+COPY ui/public/openbot-logo.png /usr/local/share/openbot/desktop/openbot-logo.png
+COPY scripts/sandbox-browser-start.html /usr/local/share/openbot/desktop/index.html
+
+# Hide the "--disable-setuid-sandbox" infobar. The sandbox user cannot write /etc at runtime.
+RUN mkdir -p /etc/chromium/policies/managed /etc/chromium-browser/policies/managed \
+  && printf '%s\n' '{"CommandLineFlagSecurityWarningsEnabled":false}' > /etc/chromium/policies/managed/openbot-quiet.json \
+  && cp /etc/chromium/policies/managed/openbot-quiet.json /etc/chromium-browser/policies/managed/openbot-quiet.json \
+  && chmod -R a+rX /usr/local/share/openbot
+
+RUN useradd --create-home --shell /bin/bash sandbox
+USER sandbox
+WORKDIR /home/sandbox
+
+EXPOSE 9222 5900 6080
+
+CMD ["openbot-sandbox-browser"]

@@ -1,0 +1,46 @@
+{
+  "probedAt": "2026-09-12T09:56:03+08:00",
+  "host": "root@8.217.93.71",
+  "container": {
+    "name": "openbot-gateway-rc",
+    "created": "2026-09-12 09:46:00.307745711 +0800 CST",
+    "image": "localhost/openbot:rc-amd64-provenance-6bd4569606",
+    "imageId": "7f65ec0c3f1c99bcc3a6767f82cff39c0f8595e5f527fd76d48e72a6ecd7e590",
+    "running": true,
+    "restartCount": "0",
+    "startedAt": "2026-09-12 09:46:00.443847481 +0800 CST"
+  },
+  "build": {
+    "version": "2026.7.12-rc.2",
+    "commit": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "builtAt": "2026-09-12T01:20:34.249Z"
+  },
+  "controlUi": {
+    "servedBundle": "index-iwByD4J0.js",
+    "bundleCount": 1,
+    "appleDoubleCount": 0
+  },
+  "health": {
+    "healthz": "200",
+    "readyz": "{\"ready\":true,\"failing\":[],\"uptimeMs\":581820}"
+  },
+  "port": {
+    "pid": "369992",
+    "ownedByContainer": true
+  },
+  "hardening": {
+    "systemdUnit": "masked",
+    "npmGlobals": "corepack@0.34.6,npm@10.9.7,pm2@7.0.1",
+    "gatewayBinsOnPath": 0
+  },
+  "rollback": {
+    "container": "openbot-gateway-rc-prev-f0dec72227-safety",
+    "image": "localhost/openbot:rc-amd64-provenance-f0dec72227"
+  },
+  "publicHosts": [
+    { "host": "www.openbot.love", "status": 200, "bundle": "index-iwByD4J0.js" },
+    { "host": "biz.openbot.love", "status": 200, "bundle": "index-iwByD4J0.js" },
+    { "host": "admin.openbot.love", "status": 200, "bundle": "index-iwByD4J0.js" },
+    { "host": "gw.openbot.love", "status": 200, "bundle": "index-iwByD4J0.js" }
+  ]
+}

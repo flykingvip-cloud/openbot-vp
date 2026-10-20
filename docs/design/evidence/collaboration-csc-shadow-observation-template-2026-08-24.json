@@ -1,0 +1,128 @@
+{
+  "artifact": "collaboration-csc-shadow-observation",
+  "stage": "SHADOW_ONLY",
+  "status": "TEMPLATE_PENDING_ENABLEMENT",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-24",
+  "revisedAt": "2026-08-24 (post production-owner review)",
+  "productionLive": false,
+  "scope": "internal personal steward chat.send only; NOT space/mission/cron/other channels",
+  "flags": {
+    "enabled_this_stage": ["OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1"],
+    "must_stay_unset": [
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER",
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY",
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY",
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY",
+      "OPENBOT_COLLAB",
+      "CONTEXT_SCOPE"
+    ]
+  },
+  "baseline": {
+    "frozenOriginMain": "582a5f4e329da774ae3518083029478aea2c891a",
+    "frozenOriginMainNote": "current origin/main at re-anchor 2026-08-24; the initial verify baseline 9b1833490424 is now historical. LIVE is 28 commits behind current main but remains a strict ancestor (forward-only intact).",
+    "liveSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "ledgerSeq": 41,
+    "imageTag": "rc-amd64-provenance-a12e4c59e575",
+    "imageDigest": "sha256:f2fcc345923017749ef03a46cc41bb4cd49bbc12758d7cb3ba74710966a25f74",
+    "ancestry_live_ancestor_of_main": "PASS",
+    "flagsBefore": "all unset",
+    "liveTouched": "NO",
+    "identityGap_47d6934c34": "RECORDED",
+    "productionCloseout": "NOT_ACCEPTED",
+    "chatLogicEnablement": "NOT_ACCEPTED"
+  },
+  "observability": {
+    "channel": "gateway in-memory agent-event bus (src/infra/agent-events.ts) -> createAgentEventHandler (src/gateway/server-chat.ts:596) -> broadcast(\"agent\") to WebSocket subscribers",
+    "durableSinkExists": false,
+    "podmanLogsContainsEvents": false,
+    "captureMethod": "authenticated control-plane WS subscriber recording data.event==chat.depth_decided (+ tool/model lifecycle correlated by runId) to JSONL for the window (read-only; no src change)",
+    "redaction": "enforced in code: assertNoSensitiveFields forbids text/body/prompt/token/etc + sha256 sessionKeyHash (src/gateway/chat-inbound-stage-events.ts)",
+    "spaceExclusionMethod": "shadow only emits for employee steward sessions (isInboundDepthEmployeeStewardSession); prove space-exclusion by a controlled space test yielding zero chat.depth_decided for those runIds",
+    "openGap": "no durable sink today; either capture via WS subscriber (in-scope, read-only) or add a persistent listener (src change owned by chat-inbound-depth-router task, out of CSC scope)",
+    "findings": "deploy/production/evidence/COLLAB_CSC_OBSERVABILITY_AND_RECREATE_20260824.md"
+  },
+  "runtime_verification_2026-08-24": {
+    "status": "DONE (read-only pre-enable baseline; verified by kiro-collab-csc over SSH root@8.217.93.71)",
+    "buildInfoCommit": "a12e4c59e5754e0c280b423c68c989c6973ac9b0 (MATCH)",
+    "image": "localhost/openbot:rc-amd64-provenance-a12e4c59e575",
+    "imageId": "f2fcc345923017749ef03a46cc41bb4cd49bbc12758d7cb3ba74710966a25f74 (MATCH ledger digest)",
+    "healthz": "200",
+    "readyz": "ready:true failing:[] (uptimeMs 34209756)",
+    "flagsAtRuntime": "none set — OPENBOT_CHAT_INBOUND_* / OPENBOT_COLLAB / CONTEXT_SCOPE all unset (pre-enable baseline)",
+    "recreateCommandMaterialized": "podman run -d --name openbot-gateway-rc --network host --user 0 --restart always -v /root/openbot-tenants:/root/openbot-tenants:rw -v /root/.openbot:/root/.openbot:rw --env-file /root/.openbot/.env.docker localhost/openbot:rc-amd64-provenance-a12e4c59e575 node openbot.mjs gateway --bind loopback --port 18789",
+    "verifiedAt": "2026-08-24T08:09Z",
+    "postEnableExpectation": "after authorized enable: exactly OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1 set; build-info still a12e4c59e575; healthz 200; readyz ready"
+  },
+  "observationWindow": { "start": "PENDING", "end": "PENDING", "durationHours": null },
+  "sampleCounts": {
+    "total": null,
+    "byCase": {
+      "plain_chat": null,
+      "continuation_unfinished_tool": null,
+      "collaboration_space": null,
+      "shadow_flag_off_control": null,
+      "shadow_flag_on": null
+    }
+  },
+  "shadowClassification": {
+    "perTurnSchema": {
+      "runId": "hash",
+      "clientRunId": "hash",
+      "sessionKeyHash": "hash (sha256, 16 hex)",
+      "sessionType": "personal_steward|space|other",
+      "wouldDepth": "chat|retrieve|act",
+      "routeStrength": "explicit|strong|weak|unknown",
+      "reasons": [],
+      "wouldKnowledgePrefetch": "allow|skip (advisory ceiling only; NOT enforced in shadow)",
+      "actualPrefetchBehavior": "must equal shadow-off baseline (shadow does not touch applyChatLane)",
+      "wouldToolSet": [],
+      "realBehaviorChanged": false
+    },
+    "distribution": { "chat": null, "retrieve": null, "act": null },
+    "manualSpotCheckSampleSize": null,
+    "misclassificationCount": null
+  },
+  "invariants_must_hold": {
+    "shadow_does_not_change_real_behavior": "PENDING (must be true)",
+    "knowledge_prefetch_equals_shadow_off_baseline": "PENDING (must be true; shadow must not skip prefetch)",
+    "chat_zero_tools": "PENDING (must be 0)",
+    "chat_zero_extra_model_calls": "PENDING (must be 0)",
+    "extra_tool_calls_total": "PENDING (must be 0)",
+    "extra_model_calls_total": "PENDING (must be 0)",
+    "space_not_misrouted_by_personal_router": "PENDING (must be true)",
+    "runId_clientRunId_idempotent": "PENDING (must be true)",
+    "no_raw_user_text_or_evidence_body_in_telemetry": "PENDING (must be true)"
+  },
+  "performance": {
+    "chat_ttft_ms": { "p50": null, "p95": null, "p99": null },
+    "baseline_chat_ttft_ms": { "p50": null, "p95": null, "p99": null },
+    "classifier_local_ms": { "p50": null, "p95": null, "p99": null },
+    "knowledgePrefetchSkipRate": "must equal shadow-off baseline (expected unchanged in shadow)",
+    "regressionVsBaseline": "PENDING (chat TTFT p95 must not degrade)"
+  },
+  "advance_gates_all_must_pass": {
+    "LIVE_unchanged_or_explicitly_authorized": "PENDING",
+    "ledger_identity_unchanged": "PENDING",
+    "no_extra_chat_tool_calls": "PENDING",
+    "no_extra_model_calls": "PENDING",
+    "ttft_p95_not_degraded": "PENDING",
+    "shadow_classification_error_zero": "PENDING",
+    "rollback_drill": "PENDING (PASS)",
+    "forward_only": "PENDING (ALLOW)",
+    "delivery_alignment_fail_count": "PENDING (0)"
+  },
+  "rollbackTriggers": [
+    "chat TTFT visibly regresses",
+    "knowledge prefetch behavior differs from shadow-off baseline",
+    "chat triggers any tool",
+    "collaboration space taken over by personal router",
+    "runId/clientRunId idempotency failure",
+    "ledger or LIVE SHA drift"
+  ],
+  "rollbackAction": "set OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=0, recreate gateway from the same LIVE image, verify prior behavior restored; keep any prior passed step; no image rollback unless forward-only or approved intentional-revert",
+  "nextStage": "ROUTER (OPENBOT_CHAT_INBOUND_DEPTH_ROUTER=1) only after all advance_gates pass AND production owner authorizes",
+  "stageOrder": ["PERSIST_EARLY", "SHADOW", "ROUTER", "KNOWLEDGE_POLICY", "TOOL_POLICY"],
+  "ledgerCoordination": "RELEASE_RECORD.md and releases.jsonl owned by task-progress-ledger:cursor-grok; kiro-collab-csc submits preview/PR requests only"
+}

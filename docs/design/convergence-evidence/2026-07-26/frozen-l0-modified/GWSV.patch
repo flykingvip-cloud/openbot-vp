@@ -1,0 +1,321 @@
+diff --git a/src/gateway/server-methods/agent-growth.ts b/src/gateway/server-methods/agent-growth.ts
+index bd273f25c6..ebd3103866 100644
+--- a/src/gateway/server-methods/agent-growth.ts
++++ b/src/gateway/server-methods/agent-growth.ts
+@@ -14,10 +14,14 @@ import { listAgentIds } from "../../agents/agent-scope.js";
+ import { loadConfig } from "../../config/config.js";
+ import { normalizeAgentId } from "../../routing/session-key.js";
+ import { createInitialGrowthStatus, recomputeGrowthStatus } from "../agent-growth/factory.js";
++import { emitGrowthEvents } from "../agent-growth/growth-events.js";
+ import { applyActivationTransition, deriveLifecycleState } from "../agent-growth/lifecycle.js";
+ import { recordMilestone } from "../agent-growth/milestones.js";
+ import { computeOperationalSignals } from "../agent-growth/operational-metrics-store.js";
+-import { computeOperationalScore, detectFalseReady } from "../agent-growth/operational-score.js";
++import {
++  computeAdaptivityAdjustment,
++  computeOperationalScore,
++} from "../agent-growth/operational-score.js";
+ import type { OperationalScoreSignals } from "../agent-growth/operational-score.js";
+ import {
+   computeAlignmentComplete,
+@@ -37,6 +41,16 @@ import type {
+   GrowthMilestones,
+   GrowthStatus,
+ } from "../agent-growth/types.js";
++import {
++  aggregateWorkingStyleEffectiveness,
++  type WorkingStyleEffectivenessInput,
++} from "../agent-growth/working-style-effectiveness.js";
++import {
++  applyOperationalSignalsToWorkingStyle,
++  assessAndMarkWorkingStyleEffect,
++  readWorkingStyleChange,
++  readWorkingStyleEffectStats,
++} from "../agent-growth/working-style-store.js";
+ import { listGatewayCollaborationSpaces } from "../collaboration-learning.js";
+ import {
+   applyBehaviorHintsToDimensions,
+@@ -102,6 +116,7 @@ function recomputeRobot(
+   current: GrowthStatus,
+   agentId: string,
+   operationalSignals?: OperationalScoreSignals,
++  adaptivityAdjustment = 0,
+ ): GrowthStatus {
+   const template = resolveTemplateOrDefault(current.templateId);
+   const installedSkillKeys = collectInstalledSkillKeys(agentId);
+@@ -109,9 +124,12 @@ function recomputeRobot(
+   const dimensions: GrowthDimension = { ...current.dimensions, capability };
+   const signals = collectCapabilityReadinessSignals({ template, installedSkillKeys });
+   // P2：有运营信号时计算 operationalScore（无信号 → undefined，保留原值/ null）。
+-  const operationalScore = operationalSignals
+-    ? computeOperationalScore(operationalSignals)
+-    : undefined;
++  // 三阶自调：把行为改变的有效性作为**有界加减分**并入存储分（原始分仍用于二阶评估）。
++  const rawScore = operationalSignals ? computeOperationalScore(operationalSignals) : undefined;
++  const operationalScore =
++    typeof rawScore === "number"
++      ? Math.max(0, Math.min(100, rawScore + adaptivityAdjustment))
++      : rawScore;
+   return recomputeGrowthStatus(current, { dimensions, signals, operationalScore });
+ }
+ 
+@@ -141,44 +159,6 @@ function applyMilestone(
+   return reDeriveLifecycle({ ...base, milestones });
+ }
+ 
+-/** 最小广播接口（避免依赖具体 context 形态，便于测试注入）。 */
+-type GrowthBroadcast = (event: string, payload: unknown) => void;
+-
+-/**
+- * 在生命周期/激活跨越时广播成长事件（R7.4/7.5）：
+- *  - 进入 mission_ready → `agent_growth.mission_ready`
+- *  - isActivated 首次为 true → `agent_growth.activated`
+- */
+-function emitGrowthEvents(
+-  broadcast: GrowthBroadcast | undefined,
+-  ref: { idKey: "agentId" | "groupId"; id: string },
+-  prev: GrowthStatus | null,
+-  next: GrowthStatus,
+-): void {
+-  if (!broadcast) {
+-    return;
+-  }
+-  const base = { [ref.idKey]: ref.id, lifecycleState: next.lifecycleState, ts: Date.now() };
+-  if (prev?.lifecycleState !== "mission_ready" && next.lifecycleState === "mission_ready") {
+-    broadcast("agent_growth.mission_ready", { ...base, activationScore: next.activationScore });
+-  }
+-  if (!prev?.isActivated && next.isActivated) {
+-    broadcast("agent_growth.activated", { ...base, activatedAtMs: next.activatedAtMs ?? null });
+-  }
+-  // R16 / 12.2：配置满分但实战很差 → 虚假就绪（仅在有 operationalScore 时判定）。
+-  const prevFalseReady = prev
+-    ? detectFalseReady(prev.activationScore, prev.operationalScore)
+-    : false;
+-  const nextFalseReady = detectFalseReady(next.activationScore, next.operationalScore);
+-  if (!prevFalseReady && nextFalseReady) {
+-    broadcast("agent_growth.false_ready_detected", {
+-      ...base,
+-      activationScore: next.activationScore,
+-      operationalScore: next.operationalScore,
+-    });
+-  }
+-}
+-
+ /** 从 RPC 参数解析运营信号（P2：来自任务/工具遥测；缺省返回 undefined → 不改 operationalScore）。 */
+ function parseOperationalSignals(
+   params: Record<string, unknown>,
+@@ -245,16 +225,91 @@ export const agentGrowthHandlers: GatewayRequestHandlers = {
+     // 显式传入优先；否则回落到运营指标累加器（runner 记录的真实信号）。
+     const operationalSignals =
+       parseOperationalSignals(params) ?? (await computeOperationalSignals(cfg, normalized));
++
++    // Working DNA 自调闭环，顺序有讲究：
++    // 1) 先用**原始分**评估上一次行为改变的效果（regressed → 自动回滚 + 抑制），
++    //    原始分不含 adaptivity 调整，避免自指污染；
++    // 2) 再据最新信号派生新的行为改变，并把当时的原始分记为基线；
++    // 3) 最后把有效性统计反哺为有界 adaptivity 调整，只影响存储/展示分。
++    const rawOperationalScore = computeOperationalScore(operationalSignals);
++    const workingStyleEffect = await assessAndMarkWorkingStyleEffect(
++      cfg,
++      normalized,
++      rawOperationalScore,
++    ).catch(() => null);
++    await applyOperationalSignalsToWorkingStyle(
++      cfg,
++      normalized,
++      operationalSignals ?? {},
++      rawOperationalScore,
++    ).catch(() => null);
++    const adaptivityAdjustment = computeAdaptivityAdjustment(
++      (await readWorkingStyleEffectStats(cfg, normalized)) ?? undefined,
++    );
++
+     const next = await updateRobotGrowthStatus(cfg, normalized, (current) => {
+       const base = current ?? createInitialGrowthStatus({ kind: "robot", atMs: Date.now() });
+-      return recomputeRobot(base, normalized, operationalSignals);
++      return recomputeRobot(base, normalized, operationalSignals, adaptivityAdjustment);
+     });
+     if (next) {
+       emitGrowthEvents(context?.broadcast, { idKey: "agentId", id: normalized }, prev, next);
++      if (workingStyleEffect?.newlyAssessed) {
++        context?.broadcast?.("agent_growth.working_style_effect", {
++          agentId: normalized,
++          status: workingStyleEffect.status,
++          deltaScore: workingStyleEffect.deltaScore,
++          rolledBack: workingStyleEffect.rolledBack,
++        });
++      }
+     }
+     respond(true, { agentId: normalized, growthStatus: next }, undefined);
+   },
+ 
++  /** 列出该操作者可见机器人的 Working DNA 变更与二阶评估结果（治理可观测性）。 */
++  "agents.list-working-style-effects": async ({ respond }) => {
++    const cfg = loadConfig();
++    const effects: Array<Record<string, unknown>> = [];
++    for (const agentId of listAgentIds(cfg)) {
++      const change = await readWorkingStyleChange(cfg, agentId).catch(() => null);
++      if (!change) {
++        continue;
++      }
++      effects.push({
++        agentId,
++        changedAtMs: change.changedAtMs,
++        appliedDelta: change.appliedDelta,
++        previousValues: change.previousValues ?? {},
++        baselineOperationalScore: change.baselineOperationalScore,
++        assessedAtMs: change.assessedAtMs,
++        // 字段名与 `WorkingStyleEffectivenessInput` / 治理 UI 保持一致（统一叫 status）。
++        status: change.effectStatus ?? null,
++        deltaScore: change.deltaScore ?? null,
++        rolledBack: change.rolledBack ?? false,
++      });
++    }
++    respond(true, { effects }, undefined);
++  },
++
++  /** 跨机器人聚合 Working DNA 变更有效性（treatment/control 分桶）。 */
++  "agents.working-style-effectiveness": async ({ respond }) => {
++    const cfg = loadConfig();
++    const items: WorkingStyleEffectivenessInput[] = [];
++    for (const agentId of listAgentIds(cfg)) {
++      const change = await readWorkingStyleChange(cfg, agentId).catch(() => null);
++      if (!change) {
++        continue;
++      }
++      items.push({
++        agentId,
++        appliedDelta: change.appliedDelta,
++        status: change.effectStatus ?? null,
++        deltaScore: change.deltaScore ?? null,
++        rolledBack: change.rolledBack ?? false,
++      });
++    }
++    respond(true, { aggregate: aggregateWorkingStyleEffectiveness(items) }, undefined);
++  },
++
+   "agents.record-growth-milestone": async ({ params, respond, context }) => {
+     const agentId = requireString(params, "agentId", respond);
+     if (!agentId) {
+diff --git a/src/gateway/server-methods/chat.mentions.test.ts b/src/gateway/server-methods/chat.mentions.test.ts
+index 49f22f7cf8..78bfd70a6c 100644
+--- a/src/gateway/server-methods/chat.mentions.test.ts
++++ b/src/gateway/server-methods/chat.mentions.test.ts
+@@ -11,10 +11,6 @@ const mockState = vi.hoisted(() => ({
+ const mentionDeliverMock = vi.hoisted(() => vi.fn());
+ const resolveRuntimeOrganizationContextMock = vi.hoisted(() => vi.fn());
+ const dispatchInboundMessageMock = vi.hoisted(() => vi.fn());
+-const listSupportCaseRecordsMock = vi.hoisted(() => vi.fn());
+-const loadStewardMemoryMock = vi.hoisted(() => vi.fn());
+-const buildEmployeeCapabilityRecommendationsMock = vi.hoisted(() => vi.fn());
+-const resolveDaibaiWorkspaceOverviewMock = vi.hoisted(() => vi.fn());
+ 
+ vi.mock("../session-utils.js", async (importOriginal) => {
+   const original = await importOriginal<typeof import("../session-utils.js")>();
+@@ -50,39 +46,6 @@ vi.mock("../../organization/mention-delivery.js", () => ({
+   },
+ }));
+ 
+-vi.mock("../../support-cases/store.js", async (importOriginal) => {
+-  const original = await importOriginal<typeof import("../../support-cases/store.js")>();
+-  return {
+-    ...original,
+-    listSupportCaseRecords: listSupportCaseRecordsMock,
+-  };
+-});
+-
+-vi.mock("../../support-cases/steward-memory-store.js", async (importOriginal) => {
+-  const original =
+-    await importOriginal<typeof import("../../support-cases/steward-memory-store.js")>();
+-  return {
+-    ...original,
+-    loadStewardMemory: loadStewardMemoryMock,
+-  };
+-});
+-
+-vi.mock("./employee-capability.js", async (importOriginal) => {
+-  const original = await importOriginal<typeof import("./employee-capability.js")>();
+-  return {
+-    ...original,
+-    buildEmployeeCapabilityRecommendations: buildEmployeeCapabilityRecommendationsMock,
+-  };
+-});
+-
+-vi.mock("./daibai-workspace-overview.js", async (importOriginal) => {
+-  const original = await importOriginal<typeof import("./daibai-workspace-overview.js")>();
+-  return {
+-    ...original,
+-    resolveDaibaiWorkspaceOverview: resolveDaibaiWorkspaceOverviewMock,
+-  };
+-});
+-
+ const { chatHandlers } = await import("./chat.js");
+ 
+ function createChatContext(): Pick<
+@@ -174,14 +137,6 @@ describe("chat.send mention metadata", () => {
+         return { ok: true };
+       },
+     );
+-    listSupportCaseRecordsMock.mockReset();
+-    listSupportCaseRecordsMock.mockResolvedValue([]);
+-    loadStewardMemoryMock.mockReset();
+-    loadStewardMemoryMock.mockResolvedValue(null);
+-    buildEmployeeCapabilityRecommendationsMock.mockReset();
+-    buildEmployeeCapabilityRecommendationsMock.mockResolvedValue([]);
+-    resolveDaibaiWorkspaceOverviewMock.mockReset();
+-    resolveDaibaiWorkspaceOverviewMock.mockResolvedValue(undefined);
+   });
+ 
+   it("accepts mentions and schedules MentionDelivery after chat.send starts", async () => {
+@@ -278,15 +233,18 @@ describe("chat.send mention metadata", () => {
+     });
+   });
+ 
+-  it("short steward wake messages use the lightweight steward ask path", async () => {
++  // Regression: short employee-steward messages used to be hijacked by a
++  // template-only "steward ask" branch (any message <= 12 chars), which answered
++  // with a canned line instead of reasoning about the request.
++  it("routes short steward messages through the real chat runtime", async () => {
+     const context = createChatContext();
+     const respond = vi.fn();
+ 
+     await chatHandlers["chat.send"]({
+       params: {
+         sessionKey: "agent:main:employee:alice-example-com",
+-        message: "大白",
+-        idempotencyKey: "idem-daibai-light",
++        message: "重新输出excel表格",
++        idempotencyKey: "idem-daibai-short",
+       },
+       respond: respond as unknown as Parameters<(typeof chatHandlers)["chat.send"]>[0]["respond"],
+       req: {} as never,
+@@ -299,21 +257,18 @@ describe("chat.send mention metadata", () => {
+       context: context as GatewayRequestContext,
+     });
+ 
+-    expect(dispatchInboundMessageMock).not.toHaveBeenCalled();
++    await vi.waitFor(() => {
++      expect(dispatchInboundMessageMock).toHaveBeenCalled();
++    });
+     expect(respond).toHaveBeenNthCalledWith(
+       1,
+       true,
+-      { runId: "idem-daibai-light", status: "started" },
++      { runId: "idem-daibai-short", status: "started" },
+       undefined,
+-      { runId: "idem-daibai-light" },
+-    );
+-    expect(context.broadcast).toHaveBeenCalledWith(
+-      "chat",
+-      expect.objectContaining({
+-        runId: "idem-daibai-light",
+-        sessionKey: "agent:main:employee:alice-example-com",
+-        state: "final",
+-      }),
++      { runId: "idem-daibai-short" },
+     );
++    // No fabricated assistant answer may be broadcast in place of the model reply.
++    const broadcasts = (context.broadcast as ReturnType<typeof vi.fn>).mock.calls;
++    expect(JSON.stringify(broadcasts)).not.toContain("我在");
+   });
+ });

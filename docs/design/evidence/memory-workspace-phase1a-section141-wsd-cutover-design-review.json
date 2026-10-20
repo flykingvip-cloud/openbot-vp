@@ -1,0 +1,53 @@
+{
+  "schema": "memory-workspace-phase1a-section141-design-review/v1",
+  "roleId": "storage-cutover",
+  "roleLabel": "存储 / Cutover (WS-D)",
+  "owner": "cursor-fable",
+  "preparedBy": "cursor-memory-workspace-followup",
+  "mainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+  "preparedAt": "2026-08-16T07:35:00.000Z",
+  "decision": "accepted",
+  "signedBy": "cursor-fable",
+  "signedAt": "2026-08-16T15:15:00.000Z",
+  "scope": "WorkspaceBindingRecord reuse; cutover record/guard extension (design only)",
+  "section141Criteria": [
+    "P0 continues WorkspaceBindingRecord (no multi-canonical StorageBinding expansion for workspace data root)",
+    "Extend existing workspace cutover record/guard; no second receipt/state machine"
+  ],
+  "designBasis": {
+    "primary": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+    "sections": ["§5.4", "§8.6", "§14.1 items 6-7"],
+    "phase0Evidence": [
+      "docs/design/evidence/memory-workspace-phase0-20260814.summary.md",
+      "docs/design/evidence/memory-workspace-phase0-20260814.catalog-candidate.json"
+    ]
+  },
+  "frozenDecisions": [
+    {
+      "id": "p0-binding-record",
+      "decision": "Reuse WorkspaceBindingRecord for P0; generic StorageBinding extension is appendix A only"
+    },
+    {
+      "id": "cutover-guard",
+      "decision": "Extend existing workspace cutover record/guard; do not mint parallel receipt/state machine"
+    },
+    {
+      "id": "inventory-input",
+      "decision": "Phase 0 inventory is read-only input; unknown/conflict rows require disposition before cutover"
+    },
+    {
+      "id": "catalog-bootstrap",
+      "decision": "Persistent Catalog bootstrap from phase0 candidate is offline design only until WS-A store exists"
+    }
+  ],
+  "bindingImpactMatrix": {
+    "status": "owner-accepted",
+    "note": "Binding impact matrix accepted for Phase 1A design gate; Phase 1B implementation still blocked"
+  },
+  "explicitlyForbidden": [
+    "live-migration",
+    "catalog-sot-write-from-inventory-alone",
+    "deployAuthorized=true"
+  ],
+  "ownerSignOffAction": "Set decision=accepted in this file and update section141-signoff-matrix.json storage-cutover row"
+}

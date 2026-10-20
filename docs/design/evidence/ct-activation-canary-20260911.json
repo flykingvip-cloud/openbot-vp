@@ -1,0 +1,56 @@
+{
+  "title": "ConversationTask single-tenant activation canary",
+  "actor": "cursor-grok",
+  "utc": "2026-09-11T14:51:02Z",
+  "liveSha": "d5b2ef9c644c0931f24026033ce367082ee9da96",
+  "imageTag": "rc-amd64-provenance-d5b2ef9c64",
+  "imageDigest": "sha256:8b35316de0fc215c91a83e37d19a3b59a39783018f8b9921f9f6b028b5c11f43",
+  "healthz": { "ok": true, "status": "live" },
+  "readyz": { "ready": true, "failing": [] },
+  "hmac": {
+    "keySet": true,
+    "keyBits": 256,
+    "keyId": "ct-2026-09-11-host",
+    "inPodmanConfigEnv": false
+  },
+  "allowlist": {
+    "enabledCount": 1,
+    "fingerprintPrefix": "7a3e6b16cb75f48f",
+    "actor": "cursor-grok",
+    "stateVersion": 1
+  },
+  "flags": {
+    "activation": "env=1",
+    "detection": "store=1",
+    "qualification": "store=1",
+    "projection": "off",
+    "authorization": "off"
+  },
+  "controlPlane": {
+    "forcedOff": false,
+    "reopenActor": "env-activation-flag",
+    "stateVersion": 2
+  },
+  "canary": {
+    "path": "isolated-activation-gate-same-store",
+    "chatSendInvoked": false,
+    "firstStatus": "activated",
+    "replaySameMessageId": "already_active",
+    "activeTasksOnAllowlistedTenant": 1,
+    "activeTasksOnOtherObservedTenantStores": 0,
+    "otherTenantStatus": "skipped_tenant_not_allowed",
+    "negatives": {
+      "ordinaryQa": "not_detected",
+      "shortAction": "not_eligible",
+      "reminder": "not_eligible",
+      "scheduled": "not_detected"
+    },
+    "ledger": {
+      "planSeeded": true,
+      "type": "PLAN_SEEDED",
+      "countForCanary": 1
+    }
+  },
+  "safetyContainer": "openbot-gateway-rc-prev-d5b2ef9c64-prehmac",
+  "notes": "No HMAC value, raw tenant IDs, conversation IDs, message IDs, or user text are recorded. chat.send was not invoked so live channels were not delivered to. Workbench strip was not visually exercised."
+}

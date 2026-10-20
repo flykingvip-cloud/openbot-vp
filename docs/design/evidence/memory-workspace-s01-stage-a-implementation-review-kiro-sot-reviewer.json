@@ -1,0 +1,180 @@
+{
+  "schema": "memory-workspace-s01-stage-a-implementation-review/v1",
+  "reviewer": "kiro-sot-reviewer",
+  "reviewDate": "2026-08-30",
+  "reviewPass": 2,
+  "targetPR": 844,
+  "originMain": "e5134c6ee49db6752b34dbeb699b4bf430390452",
+  "decision": "accepted",
+  "stageAAdapterImplementation": "accepted",
+  "ia1": "closed",
+  "ia2": "closed",
+  "scope": "s01-stage-a-adapter-implementation",
+  "selfAccepted": false,
+  "signedAsKiroSotReviewer": true,
+  "fillsCodexArchitecture": false,
+  "authorizesStageAImplementation": true,
+  "authorizesStageAAccept": false,
+  "authorizesStageB": false,
+  "flipsImplementationGate": false,
+  "implementationFiles": [
+    {
+      "path": "src/gateway/data-governance/s01-steward-workspace-identity.ts",
+      "blob": "90f6d8e5cee7293786982a3af14f53904bc35168",
+      "lines": 222
+    },
+    {
+      "path": "src/gateway/data-governance/s01-authorized-tool-cwd.ts",
+      "blob": "da6e51c111dfd2be7bf5244ae915da67e327a550",
+      "lines": 401
+    },
+    {
+      "path": "src/gateway/data-governance/s01-steward-workspace-identity.test.ts",
+      "blob": "e3b8150c301effb86e0a851960fe0069c9a07424",
+      "lines": 374
+    },
+    {
+      "path": "src/gateway/data-governance/s01-authorized-tool-cwd.test.ts",
+      "blob": "38d78ffc3f89ac438b7c0cd3093ab667e2cf0eac",
+      "lines": 815
+    }
+  ],
+  "verificationChecks": {
+    "targetIdentityNotNull": {
+      "status": "pass",
+      "finding": "targetIdentity is required, non-null, includes all IR1 fields: tenantId, employeeOwnerId, agentAssetId, workspaceResourceId, expectedBindingRole=canonical, expectedBindingState=active, governanceVersion, contentVersion, fencingToken"
+    },
+    "elevenUniqueHandoffErrorCodes": {
+      "status": "pass",
+      "finding": "Uses exactly 11 error codes from unique handoff; no ERR_WORKSPACE_SUSPENDED/ERR_WORKSPACE_RETIRED/ERR_STALE_FENCING/ERR_OWNERSHIP_MISMATCH/ERR_BINDING_AMBIGUOUS introduced",
+      "errorCodes": [
+        "ERR_PRINCIPAL_REQUIRED",
+        "ERR_TENANT_BINDING_REQUIRED",
+        "ERR_WORKSPACE_NOT_FOUND",
+        "ERR_TENANT_MISMATCH",
+        "ERR_CAPABILITY_DENIED",
+        "ERR_WORKSPACE_ARCHIVED",
+        "ERR_BINDING_NOT_CANONICAL",
+        "ERR_PATH_OUTSIDE_WORKSPACE",
+        "ERR_CATALOG_UNAVAILABLE",
+        "ERR_INVALID_PATH",
+        "ERR_WORKSPACE_OWNER_DENIED"
+      ]
+    },
+    "catalogOnlyNoIndependentTables": {
+      "status": "pass",
+      "finding": "Uses WorkspaceResourceCatalog only; no independent workspace_handles/authorized_cwds/tenant_memberships tables created or referenced"
+    },
+    "membershipPortNotArray": {
+      "status": "pass",
+      "finding": "memberships parameter is S01MembershipPort interface, not array; isMembershipPort() validates before use"
+    },
+    "staleFencingMapsErrWorkspaceArchived": {
+      "status": "pass",
+      "finding": "IA1 closed: live Catalog must match targetIdentity.governanceVersion, contentVersion, and fencingToken; mismatch, stale fencing, retired bindings, and revoked handles map to ERR_WORKSPACE_ARCHIVED even without expectedFencing"
+    },
+    "uniqueCanonicalActiveBinding": {
+      "status": "pass",
+      "finding": "IA2 closed: expectedBindingState is the literal active; read_only and forged expectedBindingState=read_only return ERR_BINDING_NOT_CANONICAL for read and write"
+    },
+    "pathEscapeAndSymlinkDenied": {
+      "status": "pass",
+      "finding": "Path traversal (..), sibling-prefix, absolute escape, encoded traversal, unverified symlink follow all denied with ERR_INVALID_PATH or ERR_PATH_OUTSIDE_WORKSPACE"
+    },
+    "getReplyUnwired": {
+      "status": "pass",
+      "finding": "src/auto-reply/reply/get-reply.ts:164 remains resolveEmployeeBuiltinStewardWorkspaceDir; src/auto-reply/ has zero references to Stage A adapters"
+    },
+    "scanRemaining10": {
+      "status": "pass",
+      "finding": "R6 verify-single-sot.mjs reports remaining=10, liveWriteWatchIndex=10 unchanged; violation count=0"
+    }
+  },
+  "testCoverage": {
+    "identityResolverTests": 11,
+    "cwdAdapterTests": 16,
+    "totalTests": 27,
+    "allTestsPassed": true,
+    "coverageAreas": [
+      "targetIdentity full IR1 fields",
+      "wire identity rejection",
+      "registry miss/multi-value fail-closed",
+      "catalog unavailable fail-closed",
+      "duplicate canonical bindings fail-closed",
+      "tenant mismatch fail-closed",
+      "stale targetIdentity governanceVersion archived",
+      "stale targetIdentity contentVersion archived",
+      "stale fencingToken archived without expectedFencing",
+      "retired/revoked handle archived",
+      "missing canonical binding fail-closed",
+      "read_only binding ERR_BINDING_NOT_CANONICAL",
+      "forged expectedBindingState=read_only denied",
+      "path traversal denied",
+      "sibling locator denied",
+      "unverified symlink denied",
+      "forged principal rejected",
+      "membership array rejected",
+      "ownership validation (user/seat/group)"
+    ]
+  },
+  "findings": [
+    "✅ IA1 closed: cwd compares live Catalog governance/content/fencing to targetIdentity; mismatch → ERR_WORKSPACE_ARCHIVED",
+    "✅ IA2 closed: expectedBindingState is active only; read_only cannot authorize read or write",
+    "✅ Stage A Adapter Implementation accepted on #844 blobs",
+    "✅ IR1: targetIdentity non-null with all required fields (expectedBindingRole=canonical, expectedBindingState=active, governanceVersion, contentVersion, fencingToken)",
+    "✅ Error codes: Uses exactly 11 unique handoff codes; no parallel codes introduced",
+    "✅ Catalog SoT: WorkspaceResourceCatalog only; no independent tables",
+    "✅ Membership: Port interface validated; arrays rejected",
+    "✅ Path security: Traversal (..), sibling, absolute escape, encoded, unverified symlink all denied",
+    "✅ Isolation: get-reply.ts unwired; src/auto-reply/ zero adapter references",
+    "✅ Scan: remaining=10, liveWriteWatchIndex=10",
+    "✅ Tests: 27/27 (11 identity + 16 cwd)"
+  ],
+  "blockers": [
+    {
+      "id": "IMPL-2",
+      "severity": "critical",
+      "category": "production-authorization",
+      "finding": "Production deployment not authorized",
+      "evidence": "deployAuthorized=false, liveDeployment=forbidden, i3=not executed, implementationVerified=false",
+      "requiredAction": "Implementation Accept does not automatically authorize production deployment; separate gate required"
+    },
+    {
+      "id": "IMPL-3",
+      "severity": "critical",
+      "category": "stage-sequence",
+      "finding": "Stage B shadow wiring remains locked",
+      "evidence": "Stage B=locked until a later Stage A Adapter Implementation Accept packet and Stage B unlock",
+      "requiredAction": "Do not start Stage B before Stage A Accept and Stage B unlock"
+    },
+    {
+      "id": "IMPL-4",
+      "severity": "critical",
+      "category": "accept-packet",
+      "finding": "This sidecar is not the Stage A Adapter Implementation Accept application",
+      "evidence": "authorizesStageAAccept=false; formal Accept is allowed only after both pass-2 sidecars are on main",
+      "requiredAction": "After both pass-2 sidecars merge, request Stage A Adapter Implementation Accept only"
+    }
+  ],
+  "conclusion": "Stage A adapter implementation reviewed on origin/main=e5134c6ee4 after #844. IA1 closed. IA2 closed. Decision: accepted — Stage A Adapter Implementation accepted. This sidecar does not apply Stage A Adapter Implementation Accept, unlock Stage B, or flip implementationVerified. Stage B locked. Production authorization not issued.",
+  "locks": {
+    "implementationGate": "not-met",
+    "implementationVerified": false,
+    "stageAImplementation": "accepted",
+    "stageB": "locked",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "item7": "not-met",
+    "s01Retirement": "blocked",
+    "phase1b": "blocked",
+    "deployAuthorized": false,
+    "i3": "not executed",
+    "liveDeployment": "forbidden"
+  },
+  "nextSteps": [
+    "Wait for the independent codex-architecture pass-2 sidecar to land if it is not already on main",
+    "After both pass-2 implementation sidecars are on main, request Stage A Adapter Implementation Accept only",
+    "Implementation Accept does not automatically unlock Stage B or authorize deployment",
+    "Separate gates remain for Stage B shadow wiring and production deployment"
+  ]
+}

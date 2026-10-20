@@ -1,0 +1,44 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch4-s18/v1",
+  "item": 7,
+  "status": "retirement-batch-4",
+  "batch": "S18",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S18",
+      "file": "src/gateway/server-methods/skills.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 33,
+  "liveWriteWatchIndex": 33,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/skills.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "affda8bce88939e42c57000896c13fc8a457f536",
+  "note": "Batch 4 retires S18 only. Incomplete locator queries fail closed. Do not pass agentId. S19 stays on line 137. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

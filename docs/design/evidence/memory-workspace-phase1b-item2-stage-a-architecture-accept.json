@@ -1,0 +1,63 @@
+{
+  "schema": "memory-workspace-phase1b-item2-stage-a-accept/v1",
+  "decision": "accepted",
+  "stage": "A",
+  "acceptedBy": "codex-workspace-architecture",
+  "acceptedAt": "2026-08-17T04:50:00.000Z",
+  "baseline": "c7c5fa7961377bdd533a73ab42de36f4fcbe97f3",
+  "measurementPr": 450,
+  "item2": "not-met",
+  "catalogWrite": false,
+  "productionCatalogWrite": "none",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "live": "forbidden",
+  "acceptedRules": {
+    "authoritySources": [
+      "Registry agentAssets with exact agentAssetId",
+      "platform-auth membership proof for membership-owned assets",
+      "seat binding for seat-owned assets",
+      "tenant-scoped group registry rows"
+    ],
+    "persistentKey": "resourceId",
+    "forbiddenIdentitySignals": [
+      "path",
+      "realpath",
+      "agentId",
+      "display name",
+      "Phase 0 inventory candidate rows"
+    ],
+    "quarantineRequired": [
+      "unknown",
+      "conflict",
+      "pending_authority",
+      "employee_private_membership_proven_resource_id_unspecified",
+      "agentId_is_not_agentAssetId",
+      "incomplete_agent_asset",
+      "membership_missing"
+    ],
+    "employeePrivate": "membership proof alone does not mint a classified steward resourceId until the steward contract is defined",
+    "stageB": "not authorized; cursor-data-governance must supply non-LIVE authority dump and co-accept before persist"
+  },
+  "verifiedArtifacts": [
+    "docs/design/evidence/memory-workspace-phase1b-authority-extract.mjs",
+    "docs/design/evidence/memory-workspace-phase1b-authority-extract.test.mjs",
+    "docs/design/evidence/memory-workspace-phase1b-item2-stage-a.mjs",
+    "docs/design/evidence/memory-workspace-phase1b-item2-stage-a.json",
+    "docs/design/evidence/memory-workspace-phase1a-catalog-contract.json"
+  ],
+  "verification": {
+    "testsRun": "node --test memory-workspace-phase1b-authority-extract.test.mjs memory-workspace-phase1b-item2-stage-a.test.mjs",
+    "testsPass": 8,
+    "persistentCatalogCoverage": "0%",
+    "gates": {
+      "employee_private": "fail",
+      "agent_primary": "fail",
+      "group_shared": "fail",
+      "conflict_or_unknown": "fail"
+    }
+  },
+  "pendingCoAcceptance": "cursor-data-governance",
+  "note": "Architecture accepts Stage A rules and offline harness only. Item 2 remains not-met until authority dump + Stage B persist + §5.4 gates pass. No Catalog write authorized by this acceptance."
+}

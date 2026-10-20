@@ -1,0 +1,13 @@
+{
+  "contractVersion": "2026-09-15.rev2",
+  "event": "background.completed",
+  "idempotencyKey": "c1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+  "recordedAt": "2026-09-15T12:01:00Z",
+  "scope": "group_tenant",
+  "serverAttribution": "gateway:subagent-announce",
+  "payload": {
+    "event": "background.completed",
+    "subagentRunId": "run-20260915-002",
+    "source": "gateway.subagent"
+  }
+}

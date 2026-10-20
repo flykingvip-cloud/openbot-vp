@@ -1,0 +1,47 @@
+{
+  "name": "@openclaw/wecom",
+  "version": "2026.7.12-rc.2",
+  "private": true,
+  "description": "OpenClaw WeCom channel plugin",
+  "type": "module",
+  "dependencies": {
+    "ws": "^8.19.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@upbeyond/openbot": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.7"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "channel": {
+      "id": "wecom",
+      "label": "WeCom",
+      "selectionLabel": "WeCom (Enterprise WeChat)",
+      "detailLabel": "WeCom app",
+      "docsPath": "/channels/wecom",
+      "docsLabel": "wecom",
+      "blurb": "Enterprise WeChat via AIBot long connection or corp-app callback webhook.",
+      "aliases": [
+        "enterprise-wechat",
+        "qywx"
+      ],
+      "order": 79,
+      "quickstartAllowFrom": true
+    },
+    "install": {
+      "npmSpec": "@openclaw/wecom",
+      "localPath": "extensions/wecom",
+      "defaultChoice": "npm"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit \u2014 one moderate advisory mitigation",
+  "advisory": "GHSA-q8mj-m7cp-5q26",
+  "cve": null,
+  "package": "qs",
+  "vulnerable_range": ">=6.11.1 <=6.15.1",
+  "affected_version_before": "6.14.2",
+  "dependency_path": ".>@larksuiteoapi/node-sdk>qs",
+  "severity": "moderate",
+  "direct_or_transitive": "transitive",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=6.15.2",
+  "mitigated_version": "6.15.2",
+  "reachable_surface": "querystring serialize via @larksuiteoapi/node-sdk (root direct) \u2192 qs (override)",
+  "mitigation": "Bump pnpm.overrides.qs 6.14.2 \u2192 6.15.2 (transitive; no root dependencies.qs)",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low including qs GHSA-4mjr / GHSA-x5fp needing >=6.16.0). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 25,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-q8mj-m7cp-5q26"
+}

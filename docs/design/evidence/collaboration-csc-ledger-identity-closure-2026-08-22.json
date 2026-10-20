@@ -1,0 +1,130 @@
+{
+  "schema": "collaboration-csc-ledger-identity-closure-receipt/v1",
+  "status": "passed",
+  "recordedAt": "2026-08-22T15:20:06Z",
+  "reobservedAt": "2026-08-22T17:36:00Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Fix Collaboration Runtime / CSC production ledger identity closure",
+  "followUpTask": "Fix seq 28 / seq 29 release identity and re-accept (ledger-only; no LIVE change)",
+  "explicitNonActions": [
+    "did not change LIVE",
+    "did not rebuild",
+    "did not recreate or switch the container",
+    "did not change production flags"
+  ],
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "healthz": { "http": 200, "body": { "ok": true, "status": "live" } },
+    "readyz": { "ready": true, "failing": [] },
+    "baseImage": {
+      "imageName": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+      "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257",
+      "ociRevision": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "created": "2026-08-22T13:01:51.682980961Z"
+    },
+    "overlayArtifact": {
+      "buildInfoCommit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "builtAt": "2026-08-22T15:09:15.742Z",
+      "startedAt": "2026-08-22T15:10:36Z",
+      "stamp": "20260822T150915Z"
+    },
+    "priorOverlayArtifact": {
+      "buildInfoCommit": "affda8bce88939e42c57000896c13fc8a457f536",
+      "builtAt": "2026-08-22T14:51:44.115Z",
+      "stamp": "20260822T145054Z",
+      "backup": "/root/openbot-maintenance-affda8bc-item7-s07-r1-20260822T145054Z"
+    },
+    "controlUi": {
+      "pinEnv": "index-Ol92eg1L.js",
+      "hostServedEntry": "index-Dpg8P1UR.js"
+    },
+    "flags": {
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset",
+      "CONTEXT_SCOPE": "unset",
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "unset"
+    }
+  },
+  "taskTextVsObserved": {
+    "requestedBaseImageCommit": "5c221b9ec38c",
+    "requestedOverlayCommit": "affda8bce889",
+    "observedBaseImageCommit": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "observedOverlayCommit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "note": "Follow-up task again named LIVE overlay affda8bce889. Re-read at 2026-08-22T17:36Z still shows 7cd74d4c5c69 (Item 7 S18). affda8bce889 remains historical seq 34. Base image matches. origin/main tip is the overlay SHA, not the image SHA."
+  },
+  "seq28": {
+    "changed": false,
+    "gatewaySha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "uiSha": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "imageTag": "ws-c-v1-root-guard-r1-20260815",
+    "reason": "Historical overlay on the 2026-08-15 image. imageTag has no provenance- prefix, so identity-mismatch does not apply. Must not be retargeted onto rc-amd64-provenance-5c221b9ec3."
+  },
+  "seq29": {
+    "changed": false,
+    "gatewaySha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "uiSha": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "imageTag": "ws-c-v1-root-guard-r1-20260815",
+    "reason": "Historical inbound-depth overlay on the same 2026-08-15 image. Rewriting this row to 7cd74d4c5c69 + rc-amd64-provenance-5c221b9ec3 would be historically false and would create identity-mismatch."
+  },
+  "rejectedTruncatedLedger": {
+    "reported": "29 releases, 2 errors, seq 28 and seq 29 identity-mismatch, both reusing rc-amd64-provenance-5c221b9ec3",
+    "diagnosis": "A truncated fork that stopped at inbound-depth seq 29 and then wrote overlay SHAs into both gatewaySha and uiSha while keeping the GHCR image tag. Audit rule: if imageTag matches provenance-([0-9a-f]+), gatewaySha or uiSha must start with that prefix.",
+    "correctMapping": {
+      "taskSeq28": "actual seq 34 overlay affda8bce889; uiSha remains 5c221b9ec38c",
+      "taskSeq29": "actual seq 35 overlay 7cd74d4c5c69; uiSha remains 5c221b9ec38c"
+    }
+  },
+  "ledgerFix": {
+    "seq33": {
+      "role": "GHCR full-image recreate",
+      "gatewaySha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "liveTo": "2026-08-22T14:50:54Z"
+    },
+    "seq34": {
+      "role": "gateway overlay on seq 33 image; overlay SHA is not image SHA",
+      "gatewaySha": "affda8bce88939e42c57000896c13fc8a457f536",
+      "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "tag": "provenance/sha-affda8bce889",
+      "liveFrom": "2026-08-22T14:51:44Z",
+      "liveTo": "2026-08-22T15:09:15Z"
+    },
+    "seq35": {
+      "role": "current LIVE overlay on seq 33 image; overlay SHA is not image SHA",
+      "gatewaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "tag": "provenance/sha-7cd74d4c5c69",
+      "liveFrom": "2026-08-22T15:10:36Z"
+    }
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 35,
+      "errors": 0,
+      "identityMismatch": 0,
+      "warnings": 14,
+      "ok": true
+    },
+    "verifyDeliveryAlignment": {
+      "prodSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidateTag": "provenance/sha-7cd74d4c5c69",
+      "pass": 7,
+      "warn": 3,
+      "fail": 0,
+      "warnings": [
+        "L3-local candidate image reports base image short SHA 5c221b9 (expected: image is 5c221b9, overlay is 7cd74d4)",
+        "L3-local prod image hint localhost/openbot:rc-amd64-provenance-5c221b9ec3 not on this machine",
+        "shared tree dirty file count=2 while refreshing the receipt (these files)"
+      ]
+    }
+  },
+  "identityCheck": "passed",
+  "cutoverExecuted": false,
+  "flagsChanged": false
+}

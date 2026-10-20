@@ -1,0 +1,111 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "production-cutover",
+  "capturedAt": "2026-08-20T12:08:00+08:00",
+  "productionLive": true,
+  "cutoverPerformed": true,
+  "cutoverMode": "gateway-dist-keep-ui",
+  "strategy": 4,
+  "stoppedAt": null,
+  "pr": {
+    "url": "https://github.com/gmood2008/openbot/pull/545",
+    "state": "MERGED",
+    "mergedAt": "2026-08-20T02:30:23Z",
+    "mergeSha": "394c9170c6513b0b5512143f3d04a32facd94b94"
+  },
+  "publicationPr": {
+    "url": "https://github.com/gmood2008/openbot/pull/549",
+    "state": "MERGED",
+    "mergedAt": "2026-08-20T03:31:58Z",
+    "mergeSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1"
+  },
+  "docsPr": {
+    "url": "https://github.com/gmood2008/openbot/pull/551",
+    "state": "MERGED",
+    "mergeSha": "aa348b38a14a69683bdc5a715ca48d2564a2542d"
+  },
+  "originMainSha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+  "candidateSha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+  "candidateEqualsOriginMain": true,
+  "aeOnOriginMain": true,
+  "aeOnLive": true,
+  "live": {
+    "before": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "after": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "source": "container /app/dist/build-info.json via SSH root@8.217.93.71 podman exec openbot-gateway-rc",
+    "image": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "imageId": "5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9",
+    "overlay": {
+      "id": "inbound-depth-main-r1",
+      "stamp": "20260820T040620Z",
+      "buildMode": "gateway-dist-keep-ui",
+      "previousLive": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+      "commitsFromPreviousLive": 143
+    },
+    "uiPinEnv": "index-CopvvBkL.js",
+    "uiServedEntry": "index-CYnwD_N8.js",
+    "uiRoot": "/root/.openbot/control-ui"
+  },
+  "tarball": {
+    "path": "/root/openbot-gateway-dist-pkg-inbound-depth-main-r1-20260820T040620Z.tar.gz",
+    "sha256": "30f2047372aee03ee9eefe7d2780817aece1d574259b9acb56abb2d8ddced099",
+    "bytes": 32267126
+  },
+  "backup": {
+    "path": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/container-app-dist.before.tgz",
+    "sha256": "584de339c95654fc05f93c09d3820201b23e9bc4e4ff93cdc5c100536a697913"
+  },
+  "smoke": {
+    "healthz": 200,
+    "readyz": true,
+    "inboundFlags": [],
+    "restart": "/usr/local/bin/openbot-gateway-restart",
+    "stagingUntouched": true
+  },
+  "ghcr": {
+    "used": false,
+    "reason": "owner chose strategy 4 overlay instead of GHCR; docker-release remains billing-blocked"
+  },
+  "stage6Flags": {
+    "OPENBOT_CHAT_INBOUND_PERSIST_EARLY": {
+      "enabled": false,
+      "enabledAt": null,
+      "observation": "not in live container env; A-E code is on LIVE and default-off"
+    },
+    "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW": {
+      "enabled": false,
+      "enabledAt": null,
+      "observation": "not in live container env; A-E code is on LIVE and default-off"
+    },
+    "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER": {
+      "enabled": false,
+      "enabledAt": null,
+      "observation": "not in live container env; A-E code is on LIVE and default-off"
+    },
+    "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY": {
+      "enabled": false,
+      "enabledAt": null,
+      "observation": "not in live container env; A-E code is on LIVE and default-off"
+    },
+    "OPENBOT_CHAT_INBOUND_TOOL_POLICY": {
+      "enabled": false,
+      "enabledAt": null,
+      "observation": "not in live container env; A-E code is on LIVE and default-off"
+    }
+  },
+  "ownerDecision": {
+    "strategy4Overlay": true,
+    "cutLiveFullDist": false,
+    "enableFlags": false,
+    "flagOrderIfLaterApproved": [
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY",
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER",
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY",
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY"
+    ]
+  },
+  "releaseTag": "provenance/sha-aa348b38a14a",
+  "ledgerSeq": 29
+}

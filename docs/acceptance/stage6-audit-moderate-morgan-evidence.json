@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-4vj7-5mj6-jm8m",
+  "cve": "CVE-2026-5078",
+  "package": "morgan",
+  "vulnerable_range": ">=1.2.0 <=1.10.1",
+  "affected_version_before": "1.10.1",
+  "dependency_path": "extensions__matrix>@vector-im/matrix-bot-sdk>morgan",
+  "severity": "moderate",
+  "direct_or_transitive": "transitive",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=1.11.0",
+  "mitigated_version": "1.11.0",
+  "reachable_surface": "Log forging via unneutralized control characters in :remote-user token (matrix-bot-sdk HTTP access log path)",
+  "mitigation": "Root pnpm.overrides.morgan → 1.11.0 (transitive via @vector-im/matrix-bot-sdk; no root dependencies.morgan)",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Sibling morgan moderates GHSA-jxfw-x594-9x9m (>=1.12.0) and GHSA-9f6g-j8ch-79g4 (>=1.12.1) remain; not oversold. Prior yaml / file-type / markdown-it / FXP / hono / node-server / dompurify / mysql2 / qs / music-metadata / ip-address cells remain cleared. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 13,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-4vj7-5mj6-jm8m"
+}

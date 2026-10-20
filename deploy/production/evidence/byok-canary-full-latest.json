@@ -1,0 +1,124 @@
+{
+  "phase": "full",
+  "pass": true,
+  "tenantId": "001",
+  "steps": [
+    {
+      "name": "create",
+      "pass": true,
+      "detail": "connectionId=92e66a76-33cf-42e6-931a-48d17e331545 status=credential_saved"
+    },
+    {
+      "name": "probe",
+      "pass": true,
+      "detail": "discovered=3 code=OK"
+    },
+    {
+      "name": "discover",
+      "pass": true,
+      "detail": "models=3"
+    },
+    {
+      "name": "register",
+      "pass": true,
+      "detail": "assetId=5fa893e6-3b33-4a0e-bcb3-cae9610fc8d2 runtimeModelId=ent/24b2afba8f/deepseek-v4-flash"
+    },
+    {
+      "name": "seats.list",
+      "pass": true,
+      "detail": "seatId=seat-a5b0a839-32bb-42b9-aba9-822768cfcd21 (of 11)"
+    },
+    {
+      "name": "grantBatch",
+      "pass": true,
+      "detail": "runtimeModelId=ent/24b2afba8f/deepseek-v4-flash"
+    },
+    {
+      "name": "credits.before",
+      "pass": true,
+      "detail": "remaining=499850"
+    },
+    {
+      "name": "sessions.patch",
+      "pass": true,
+      "detail": "model=ent/24b2afba8f/deepseek-v4-flash"
+    },
+    {
+      "name": "agent.call",
+      "pass": true,
+      "detail": "agent ok runId=0d27c867-e289-4909-bab5-69924e5bf737"
+    },
+    {
+      "name": "credits.after",
+      "pass": true,
+      "detail": "remaining=499850 delta=0 (expect 0)"
+    },
+    {
+      "name": "budget.set-cap0",
+      "pass": true,
+      "detail": "monthlySpendCapCents=0"
+    },
+    {
+      "name": "budget.block",
+      "pass": true,
+      "detail": "blocked as expected (error: EnterpriseModelError: enterprise model monthly budget exceeded (spend=0¢, cap=0¢)"
+    },
+    {
+      "name": "audit.trail",
+      "pass": true,
+      "detail": "kinds=create,probe,register,grant,invoke,budget-block em=8 grant=3"
+    }
+  ],
+  "connectionId": "92e66a76-33cf-42e6-931a-48d17e331545",
+  "assetId": "5fa893e6-3b33-4a0e-bcb3-cae9610fc8d2",
+  "runtimeModelId": "ent/24b2afba8f/deepseek-v4-flash",
+  "seatId": "seat-a5b0a839-32bb-42b9-aba9-822768cfcd21",
+  "creditsBefore": {
+    "source": "billing.dashboard",
+    "ok": true,
+    "credits": {
+      "creditsRemaining": 499850,
+      "monthlyCredits": 500000,
+      "creditsConsumed": 150
+    }
+  },
+  "creditsAfter": {
+    "source": "billing.dashboard",
+    "ok": true,
+    "credits": {
+      "creditsRemaining": 499850,
+      "monthlyCredits": 500000,
+      "creditsConsumed": 150
+    }
+  },
+  "creditsDeltaOk": true,
+  "agentOk": true,
+  "budgetBlocked": true,
+  "auditHints": [
+    {
+      "kind": "create",
+      "present": true
+    },
+    {
+      "kind": "probe",
+      "present": true
+    },
+    {
+      "kind": "register",
+      "present": true
+    },
+    {
+      "kind": "grant",
+      "present": true
+    },
+    {
+      "kind": "invoke",
+      "present": true
+    },
+    {
+      "kind": "budget-block",
+      "present": true
+    }
+  ],
+  "auditPass": true
+}

@@ -1,0 +1,196 @@
+{
+  "schema": "openbot-cogniweave-u1-admission-readiness/v1",
+  "kind": "u1-admission-readiness-packet",
+  "preparedBy": "cursor-unified-memory-u1-admission",
+  "preparedAt": "2026-08-19T10:10:00.000Z",
+  "baseline": "77b159f601e2e2bbd855bd88f2c721bd438bec85",
+  "u0": "accepted",
+  "u0MergedPrs": [508, 510, 511],
+  "u0LandedTip": "88860668dc2dadf6d7de82f6bf9846ffe4f31ff2",
+  "u0ScopedTests": "23/23",
+  "decision": "changes-required",
+  "unlock": "not-issued",
+  "unlockReceipt": "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json",
+  "phase1bUnlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "schemaV2Write": "disabled",
+  "catalogWrite": "forbidden",
+  "u1": "blocked",
+  "authorizes": "none",
+  "canonicalScorecard": "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+  "item2": {
+    "status": "not-met",
+    "authorityOwner": ["codex-workspace-architecture", "cursor-data-governance"],
+    "cited": [
+      "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+      "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+      "docs/design/evidence/memory-workspace-phase1b-item2-production-catalog-coverage.json",
+      "docs/design/evidence/memory-workspace-phase1b-item2-production-persist.json"
+    ],
+    "measured": {
+      "scorecardStatus": "not-met",
+      "coverageItem2": "not-met",
+      "covered": false,
+      "fourGates100": false,
+      "authorityCatalogGatesPass": false,
+      "uniqueUserOwnedEquivalent": 0,
+      "productionCatalogPresent": false,
+      "productionStateDir": "unconfigured",
+      "evidenceCatalogIsNotProductionSot": true,
+      "productionCatalogWrite": "none",
+      "missDenyEnabled": false,
+      "occupancyReason": "seat_occupancy_mintable_without_unique_user_owned_asset"
+    },
+    "missingAuthority": [
+      "production Catalog is unconfigured and catalogPresent=false",
+      "uniqueUserOwnedEquivalent remains 0; occupancy is mintable without a unique user-owned asset",
+      "§5.4 four gates are not 100% on the production Catalog",
+      "authorityCatalogGatesPass=false",
+      "evidence/host Catalog persist is not runtime SoT",
+      "no production SoT proof that Memory Asset independent resourceId and sourceWorkspaceResourceId are admitted without directory/agentId/stateDir/inventory inference"
+    ]
+  },
+  "item6": {
+    "status": "not-met",
+    "authorityOwner": ["cursor-fable", "cursor-memory-wsc"],
+    "cited": [
+      "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+      "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+      "docs/design/evidence/memory-workspace-phase1b-item6-sre-half.json",
+      "docs/design/evidence/memory-workspace-phase1b-items-3-7.json"
+    ],
+    "measured": {
+      "scorecardStatus": "not-met",
+      "receiptStatus": "green",
+      "receiptItem6": "not-met",
+      "receiptRevoked": false,
+      "authorizedLayoutDrill": true,
+      "productionSqliteSnapshot": false,
+      "srePendingWscWrittenVerification": true,
+      "sreBackupGap": "mkdtemp stateDir plus synthetic SQLite header; not an authorized production sqlite",
+      "v1RootGuardDrilled": false,
+      "live": false
+    },
+    "missingAuthority": [
+      "authorized-layout drill receipt is green but explicitly not a production sqlite snapshot",
+      "cursor-memory-wsc written verification of the SRE half is still pending",
+      "v1-root-guard and sidecar lock were not drilled on production-equivalent data",
+      "no production-equivalent backup that is non-empty, hash-verified, and restore-proven",
+      "no rollback/recovery receipt that is independent of the authorized-layout drill",
+      "items-3-7 package does not accept item 6"
+    ]
+  },
+  "item7": {
+    "status": "not-met",
+    "u1Prerequisite": false,
+    "blocks": ["U3", "U4", "I3"],
+    "authorityOwner": ["cursor-data-governance"],
+    "cited": [
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-ledger.json",
+      "docs/design/evidence/openbot-cogniweave-u0-readonly-inventory-2026-08-19.json"
+    ],
+    "measured": {
+      "productionWriteWatchIndex": 37,
+      "frozenWriteWatchIndex": 38,
+      "liveWriteWatchIndex": 37,
+      "target": 0,
+      "retiredThisChange": 0,
+      "scorecardRemainingStillSays": "38"
+    },
+    "writeSites": {
+      "inventory": "docs/design/evidence/openbot-cogniweave-u0-readonly-inventory-2026-08-19.json",
+      "siteCount": 16,
+      "note": "U0 inventory is the current builtin/QMD/CogniWeave write/read map. U1 must not delete these sites. Retirement remains item 7 after U1/U2."
+    },
+    "forbiddenInU1": [
+      "delete productionWriteWatchIndex call-sites",
+      "treat item 7=0 as a U1 start gate",
+      "open U3/U4/I3 while item 7 is not zero"
+    ]
+  },
+  "u1ReleaseBoundary": {
+    "resolverReturns": "complete MemoryWorkspaceHandle or structured denial",
+    "cogniweaveConsumes": "complete Handle only",
+    "stateDir": "storage configuration only; not an identity source",
+    "scopeWorkspaceId": "resourceId",
+    "cloudTenantId": "Handle.tenantId",
+    "failClosed": ["catalog miss", "tenant mismatch", "stale fencing"],
+    "mode": "dark-integration-only",
+    "schemaV2Write": "disabled",
+    "legacyWriteSites": "keep",
+    "deployAuthorized": false
+  },
+  "ownership": {
+    "status": "clean",
+    "admissionOwner": "cursor-unified-memory-u1-admission",
+    "notU0Owner": true,
+    "u0Owner": "cursor-unified-memory-u0",
+    "claimedPaths": [
+      "docs/design/evidence/openbot-cogniweave-u1-admission-readiness-2026-08-19.json",
+      "docs/design/evidence/openbot-cogniweave-u1-admission-readiness.test.mjs",
+      "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json"
+    ],
+    "doesNotClaim": [
+      "src/gateway/workspace-resolver/**",
+      "src/memory/cogniweave-manager.ts",
+      "src/memory/search-manager.ts",
+      "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+      "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json"
+    ],
+    "futureU1Implementation": [
+      {
+        "role": "item-2-authority",
+        "owner": "cursor-data-governance",
+        "collaborator": "codex-workspace-architecture",
+        "paths": ["src/gateway/data-governance/**"]
+      },
+      {
+        "role": "item-6-authority",
+        "owner": "cursor-memory-wsc",
+        "collaborator": "cursor-fable",
+        "paths": ["src/memory/v1-root-guard.ts", "src/gateway/workspace/cutover.ts"]
+      },
+      {
+        "role": "resolver-handle-interface",
+        "owner": "cursor-data-governance",
+        "paths": ["src/gateway/workspace-resolver/**"]
+      },
+      {
+        "role": "cogniweave-handle-consumer",
+        "owner": "cursor-conversation-lifecycle",
+        "paths": ["src/memory/cogniweave-manager.ts", "src/memory/search-manager.ts"]
+      },
+      {
+        "role": "independent-unlock-reviewer",
+        "owner": "cursor-sot-reviewer",
+        "paths": ["docs/design/evidence/memory-workspace-phase1b-unlock-decision.json"]
+      }
+    ],
+    "overlap": "none-for-this-packet; U1 implementation must stay split across the owners above"
+  },
+  "designReviews": {
+    "status": "pending",
+    "requiredAcceptors": [
+      "cursor-data-governance",
+      "cursor-memory-wsc",
+      "cursor-conversation-lifecycle",
+      "codex-workspace-architecture"
+    ],
+    "independentUnlockReviewer": "cursor-sot-reviewer",
+    "acceptedBy": [],
+    "reason": "No four-party signed acceptance of the U1 Handle publish contract exists on origin/main. This packet records the contract; it is not an acceptance."
+  },
+  "explicitlyForbidden": [
+    "treat this packet as item 2 met",
+    "treat this packet as item 6 met",
+    "treat authorized-layout drill green as item 6 met",
+    "treat evidence Catalog persist as production SoT",
+    "self-issue unlock",
+    "start U1 implementation",
+    "U1+ / LIVE / schema-v2-write / Catalog write",
+    "delete item 7 write sites",
+    "let cursor-unified-memory-u0 become U1 owner"
+  ]
+}

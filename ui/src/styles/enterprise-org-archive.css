@@ -1,0 +1,521 @@
+/* 岗位 AI 电子档案：hero / 完善度 / 危险区 / 操作收敛（独立于 components.css） */
+
+.enterprise-org-archive__hero {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 12px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+}
+
+.enterprise-org-archive__hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-org-archive__phase-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--accent-soft, var(--secondary)) 70%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent, var(--border)) 22%, var(--border));
+}
+
+.enterprise-org-archive__hero-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-org-archive__meter {
+  display: grid;
+  gap: 6px;
+}
+
+.enterprise-org-archive__meter-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.enterprise-org-archive__meter-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-org-archive__meter-value {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+
+.enterprise-org-archive__meter-track {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--secondary) 55%, var(--card));
+}
+
+.enterprise-org-archive__meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 75%, var(--ok, var(--accent))),
+    var(--accent)
+  );
+  transition: width var(--duration-normal) var(--ease-out);
+}
+
+.enterprise-org-archive__hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding-top: 0;
+}
+
+.enterprise-org-archive__hero-actions .enterprise-org-ws__footer-inline-actions {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Meta actions (编辑岗位) sit on the trailing edge of the hero toolbar. */
+.enterprise-org-archive__hero-actions [data-archive-action-group="identity-meta"] {
+  margin-left: auto;
+}
+
+.enterprise-org-archive__section-nav {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0 2px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.enterprise-org-archive__section-nav-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.enterprise-org-archive__section-nav-meta strong {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+}
+
+.enterprise-org-archive__section-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.enterprise-org-archive__section-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.enterprise-org-archive__section-chip:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  color: var(--text-strong);
+}
+
+.enterprise-org-archive__section-chip.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  color: var(--text-strong);
+}
+
+.enterprise-org-archive__section-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.enterprise-org-archive__section-chip.is-filled .enterprise-org-archive__section-chip-dot {
+  background: var(--ok, var(--accent));
+}
+
+.enterprise-org-archive__section-chip.is-gap {
+  color: var(--muted);
+}
+
+.enterprise-org-archive__section-chip.is-gap .enterprise-org-archive__section-chip-dot {
+  background: color-mix(in srgb, var(--warn, #d97706) 70%, transparent);
+}
+
+.enterprise-org-archive__section {
+  scroll-margin-top: 12px;
+  padding: 2px 0 6px;
+}
+
+/* 岗位档案折叠块：办理信息之外的档案分区默认收起，展开后保持扁平（无额外卡片描边）。 */
+.enterprise-org-archive__block {
+  margin: 4px 0 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-org-archive__block-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 2px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.enterprise-org-archive__block-summary::-webkit-details-marker {
+  display: none;
+}
+
+.enterprise-org-archive__block-summary::before {
+  content: "▸";
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 140ms ease;
+}
+
+.enterprise-org-archive__block[open] > .enterprise-org-archive__block-summary::before {
+  transform: rotate(90deg);
+}
+
+.enterprise-org-archive__block-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.enterprise-org-archive__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 0 2px;
+}
+
+.enterprise-org-archive__section-head .enterprise-org-ws__section-title {
+  margin: 0;
+}
+
+.enterprise-org-archive__section-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.enterprise-org-archive__section-badge.is-filled {
+  color: color-mix(in srgb, var(--ok, #15803d) 85%, var(--text-strong));
+  background: color-mix(in srgb, var(--ok, #15803d) 12%, var(--card));
+}
+
+.enterprise-org-archive__section-badge.is-gap {
+  color: color-mix(in srgb, var(--warn, #d97706) 80%, var(--text-strong));
+  background: color-mix(in srgb, var(--warn, #d97706) 12%, var(--card));
+}
+
+.enterprise-org-archive__email-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.enterprise-org-archive__email-row [data-archive-email] {
+  min-width: 0;
+  flex: 1 1 auto;
+  word-break: break-all;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.enterprise-org-archive__email-row [data-archive-email].is-missing {
+  color: var(--muted);
+}
+
+.enterprise-org-archive__email-row [data-archive-email-edit],
+.enterprise-org-archive__email-edit {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--accent);
+  border-color: transparent;
+  background: transparent;
+}
+
+.enterprise-org-archive__email-row [data-archive-email-edit]:hover,
+.enterprise-org-archive__email-edit:hover {
+  color: var(--text-strong);
+  background: color-mix(in srgb, var(--accent-soft, var(--secondary)) 55%, transparent);
+}
+
+.enterprise-org-archive__usage-grid {
+  margin: 4px 0 2px;
+}
+
+.enterprise-org-archive__usage-grid .enterprise-org-ws__kv-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.enterprise-org-archive__usage-grid .enterprise-org-ws__kv {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--secondary) 34%, var(--card));
+  border: none;
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .enterprise-org-archive__usage-grid .enterprise-org-ws__kv-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Keep label column + divider in sync (global flat stack divider assumes 96px). */
+.enterprise-org-archive.enterprise-org-ws--flat .enterprise-org-ws__detail-stack::before,
+.enterprise-org-archive .enterprise-org-ws__detail-stack::before {
+  left: calc(108px + 8px);
+}
+
+.enterprise-org-archive .enterprise-org-ws__detail-stack .enterprise-org-ws__field {
+  gap: 16px;
+  padding-left: 2px;
+  padding-right: 4px;
+}
+
+.enterprise-org-archive .enterprise-org-ws__detail-stack .enterprise-org-ws__field-label {
+  flex: 0 0 108px;
+  flex-basis: 108px;
+  max-width: 108px;
+  color: var(--muted);
+  font-size: 12px;
+  padding-right: 4px;
+  box-sizing: border-box;
+}
+
+.enterprise-org-archive .enterprise-org-ws__detail-stack .enterprise-org-ws__field-control {
+  min-width: 0;
+  padding-left: 2px;
+}
+
+.enterprise-org-archive .enterprise-org-ws__detail-stack .enterprise-org-ws__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: 0.01em;
+}
+
+.enterprise-org-archive__action-group {
+  display: grid;
+  gap: 6px;
+}
+
+.enterprise-org-archive__action-group-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.enterprise-org-archive__action-group--offer {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-soft, var(--secondary)) 55%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent, var(--border)) 18%, var(--border));
+}
+
+.enterprise-org-archive__action-group--ownership {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-org-archive__supervisor {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  display: grid;
+  gap: 8px;
+}
+
+.enterprise-org-archive__supervisor-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.enterprise-org-archive__danger-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid color-mix(in srgb, var(--danger, #c0392b) 75%, transparent);
+  background: color-mix(in srgb, var(--danger, #c0392b) 7%, var(--card));
+}
+
+.enterprise-org-archive__danger-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.enterprise-org-archive__danger-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger, #c0392b);
+}
+
+.enterprise-org-archive__danger-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.enterprise-org-archive__footer {
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.enterprise-org-archive__footer-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
+.enterprise-org-archive__footer-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.enterprise-org-archive__footer-nav {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.enterprise-org-archive__danger-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* 单 tabpanel：随 body 滚动；缩短权限区后仍保证长数字人区可滑到底 */
+.enterprise-org-archive .enterprise-org-ws__detail-stack {
+  min-height: 0;
+}
+
+.enterprise-org-archive__panel {
+  min-width: 0;
+}
+
+.enterprise-org-ws--flat .enterprise-org-ws__footer.enterprise-org-archive__footer {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+/* 组织目录 / 治理队列：批量删除条 */
+.enterprise-org-bulk-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0 0 10px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--secondary) 42%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.enterprise-org-bulk-bar__meta {
+  font-size: 12px;
+  color: var(--text-strong);
+}
+
+.enterprise-org-bulk-bar__hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.enterprise-org-bulk-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-org-tree__node--position .enterprise-org-tree__seat-check {
+  flex: 0 0 auto;
+  margin: 0 2px 0 0;
+  accent-color: var(--accent);
+}

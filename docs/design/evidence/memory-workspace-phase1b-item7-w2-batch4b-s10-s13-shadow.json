@@ -1,0 +1,18 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w2-batch4b-s10-s13-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w2-batch4b-s10-s13-shadow.json",
+  "kind": "item7-w2-batch4b-dark-dual-read-shadow",
+  "wave": "W2-write-callers",
+  "batch": "4b",
+  "sitesWired": [
+    "S10-agents-files-trusted",
+    "S11-agents-files-legacy",
+    "S12-agents-create-avatar",
+    "S13-agents-delete"
+  ],
+  "freezeStrategy": "line-neutral comma hooks; agents.ts in oxfmt ignorePatterns",
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "productionWrite": "legacy-only",
+  "sidecar": "src/gateway/agents-w2-shadow.ts"
+}

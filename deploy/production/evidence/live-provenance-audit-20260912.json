@@ -1,0 +1,64 @@
+{
+  "auditId": "live-provenance-audit-20260912",
+  "auditPhase": "Phase 1 READ-ONLY",
+  "auditedAt": "2026-09-12T09:02:00+08:00",
+  "host": "8.217.93.71",
+  "container": "openbot-gateway-rc",
+  "constraints": "No modify/restart/recreate of openbot-gateway-rc",
+
+  "liveCommit": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+  "liveDigest": "sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f",
+  "liveLabels": {
+    "org.opencontainers.image.base.digest": "sha256:b501c082306a4f528bc4038cbf2fbb58095d583d0419a259b2114b5ac53d12e9",
+    "org.opencontainers.image.base.name": "docker.io/library/node:22-bookworm",
+    "org.opencontainers.image.created": "2026-09-12T01:17:26Z",
+    "org.opencontainers.image.description": "OpenBot gateway and CLI runtime container image",
+    "org.opencontainers.image.documentation": "https://docs.openbot.love/install/docker",
+    "org.opencontainers.image.licenses": "MIT",
+    "org.opencontainers.image.revision": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "org.opencontainers.image.source": "https://github.com/gmood2008/openbot",
+    "org.opencontainers.image.title": "OpenBot",
+    "org.opencontainers.image.url": "https://openbot.love",
+    "org.opencontainers.image.version": "main"
+  },
+
+  "ledgerSeq78Commit": "79f2d5f57b9170877e24e40b76bb8982f63e4bb1",
+  "ledgerSeq78Digest": "sha256:56ae6ad69fda7c2cb215267a811b6935e0680dfeb90af879388150104381366c",
+  "ledgerSeq78Tag": "provenance/sha-79f2d5f57b91",
+
+  "liveProvenanceTag": "provenance/sha-6bd4569606fd",
+  "liveProvenanceTagOnLabels": true,
+  "liveCommitInLedger": false,
+  "ledgerMatchesLive": false,
+
+  "verdict": "unregistered_rolling",
+  "isUnregisteredRolling": true,
+  "governanceEvent": "LIVE container reports commit 6bd4569606 (image rc-amd64-provenance-6bd4569606, digest sha256:cae8337e…) but ledger SoT and RELEASE_RECORD L3 identity still claim seq 78 / 79f2d5f57b. No releases.jsonl row for liveCommit; intermediate hop f0dec72227 also unledgered. OCI revision label matches live commit; host retains f0dec and 6bd456 provenance images; seq78 79f2d5 image absent on host.",
+
+  "rawCommandOutput": {
+    "exitCode": 125,
+    "note": "Script aborted at repo digests due to set -e; podman container inspect has no .RepoDigests field. Image tags section not reached in exact script.",
+    "stdout": "=== build-info ===\n{\n  \"version\": \"2026.7.12-rc.2\",\n  \"commit\": \"6bd4569606fd286b7d8b46fb7d9198fb7a134493\",\n  \"builtAt\": \"2026-09-12T01:20:34.249Z\",\n  \"probeModuleSha\": \"ea6e7337fbf3f1da\"\n}\n=== image id ===\n7f65ec0c3f1c99bcc3a6767f82cff39c0f8595e5f527fd76d48e72a6ecd7e590\n=== labels ===\n{\"org.opencontainers.image.base.digest\":\"sha256:b501c082306a4f528bc4038cbf2fbb58095d583d0419a259b2114b5ac53d12e9\",\"org.opencontainers.image.base.name\":\"docker.io/library/node:22-bookworm\",\"org.opencontainers.image.created\":\"2026-09-12T01:17:26Z\",\"org.opencontainers.image.description\":\"OpenBot gateway and CLI runtime container image\",\"org.opencontainers.image.documentation\":\"https://docs.openbot.love/install/docker\",\"org.opencontainers.image.licenses\":\"MIT\",\"org.opencontainers.image.revision\":\"6bd4569606fd286b7d8b46fb7d9198fb7a134493\",\"org.opencontainers.image.source\":\"https://github.com/gmood2008/openbot\",\"org.opencontainers.image.title\":\"OpenBot\",\"org.opencontainers.image.url\":\"https://openbot.love\",\"org.opencontainers.image.version\":\"main\"}\n=== repo digests ===\nError: template: inspect:1:18: executing \"inspect\" at <.RepoDigests>: can't evaluate field RepoDigests in type interface {}",
+    "supplementalReadOnly": {
+      "containerImageDigest": "sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f",
+      "imageRepoDigests": [
+        "ghcr.io/gmood2008/openbot@sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f",
+        "localhost/openbot@sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f"
+      ],
+      "hostImagesGrep": "localhost/openbot          rc-amd64-provenance-6bd4569606  sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f  7f65ec0c3f1c  8 hours ago   2.7 GB\nlocalhost/openbot          rc-amd64-provenance-f0dec72227  sha256:1767b3578d65e0df7ad7d035fd12f44c76f11a7db27c7cfd012185e0c5068fcd  083f51773da7  11 hours ago  2.69 GB"
+    }
+  },
+
+  "ledgerSource": {
+    "releasesJsonlSeq78": {
+      "seq": 78,
+      "gatewaySha": "79f2d5f57b9170877e24e40b76bb8982f63e4bb1",
+      "artifactDigest": "sha256:56ae6ad69fda7c2cb215267a811b6935e0680dfeb90af879388150104381366c",
+      "tag": "provenance/sha-79f2d5f57b91",
+      "imageTag": "rc-amd64-provenance-79f2d5f57b",
+      "liveFrom": "2026-09-11T10:24:34Z",
+      "liveVerified": true
+    },
+    "releaseRecordL3Identity": "Current LIVE is seq 78 / 79f2d5f57b9170877e24e40b76bb8982f63e4bb1 / image rc-amd64-provenance-79f2d5f57b / digest sha256:56ae6ad69fda7c2cb215267a811b6935e0680dfeb90af879388150104381366c / ledger tag provenance/sha-79f2d5f57b91 as of 2026-09-11T10:24:34Z"
+  }
+}

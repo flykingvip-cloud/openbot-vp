@@ -1,0 +1,18 @@
+{
+  "schema": "memory-workspace-phase1b-item5-mismatch-field-semantics/v1",
+  "item": 5,
+  "status": "not-met",
+  "wiredToProductionResolver": false,
+  "item6": "not-met",
+  "item7": "not-met",
+  "acceptedSubmissionTip": "b8be1dc7395ffe26518645fd389e26927828af28",
+  "packet": "docs/design/evidence/memory-workspace-phase1b-item5-registry-catalog-mismatch.json",
+  "unified": true,
+  "doesNotAuthorize": [
+    "score item 5 met",
+    "unlock item 6",
+    "unlock item 7",
+    "wiredToProductionResolver=true"
+  ],
+  "note": "Unifies the v1.1 field split for the accepted submission packet. Item 5 stays not-met pending an independent close. Items 6 and 7 stay locked."
+}

@@ -1,0 +1,273 @@
+diff --git a/src/gateway/control-ui.http.test.ts b/src/gateway/control-ui.http.test.ts
+index 312aca0de5..12fa243ef1 100755
+--- a/src/gateway/control-ui.http.test.ts
++++ b/src/gateway/control-ui.http.test.ts
+@@ -549,6 +549,24 @@ describe("handleControlUiHttpRequest", () => {
+     });
+   });
+ 
++  it("caches top-level brand images for a week", async () => {
++    await withControlUiRoot({
++      fn: async (tmp) => {
++        await fs.writeFile(path.join(tmp, "openbot-logo.webp"), "logo-bytes\n");
++
++        const { setHeader, handled } = await runControlUiRequest({
++          url: "/openbot-logo.webp",
++          method: "GET",
++          rootPath: tmp,
++        });
++
++        expect(handled).toBe(true);
++        expect(headerValue(setHeader, "Cache-Control")).toBe("public, max-age=604800");
++        expect(headerValue(setHeader, "Content-Type")).toBe("image/webp");
++      },
++    });
++  });
++
+   it("gzip-compresses large text assets when the client accepts gzip", async () => {
+     await withControlUiRoot({
+       fn: async (tmp) => {
+diff --git a/src/gateway/control-ui.ts b/src/gateway/control-ui.ts
+index eb6fd31b20..c6cf4712fa 100755
+--- a/src/gateway/control-ui.ts
++++ b/src/gateway/control-ui.ts
+@@ -57,11 +57,14 @@ const CONTROL_UI_ASSETS_MISSING_MESSAGE =
+   "Control UI assets not found. Build them with `pnpm ui:build` (auto-installs UI deps), or run `pnpm ui:dev` during development.";
+ const CONTROL_UI_TOP_LEVEL_ASSET_FILENAMES = new Set([
+   "apple-touch-icon.png",
++  "cosmic-bg.jpg",
+   "cosmic-bg.png",
++  "cosmic-bg.webp",
+   "favicon-32.png",
+   "favicon.ico",
+   "favicon.svg",
+   "openbot-logo.png",
++  "openbot-logo.webp",
+   "trial-apply-product-ui.jpg",
+ ]);
+ 
+@@ -103,6 +106,8 @@ function contentTypeForExt(ext: string): string {
+       return "image/gif";
+     case ".webp":
+       return "image/webp";
++    case ".avif":
++      return "image/avif";
+     case ".ico":
+       return "image/x-icon";
+     case ".txt":
+@@ -261,10 +266,20 @@ export function handleControlUiAvatarRequest(
+ 
+ // Vite emits content-hashed asset filenames (e.g. `index-BnCxdOS4.js`,
+ // `zh-CN-6uBRhIJX.js`) under `assets/`. Because the hash changes whenever the
+-// file content changes, those URLs are safe to cache indefinitely. Everything
+-// else (index.html, favicons, unhashed top-level assets like cosmic-bg.png)
+-// keeps `no-cache` so UI/config updates land on the next load.
++// file content changes, those URLs are safe to cache indefinitely. index.html
++// stays `no-cache`. Versioned brand/static images use a short public cache so
++// cold loads (LCP logo / cosmic background) are not revalidated every visit;
++// bump the `?v=` query in index.html when replacing those files.
+ const HASHED_ASSET_BASENAME_RE = /-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/;
++const LONG_CACHE_TOP_LEVEL_ASSET_EXT = new Set([
++  ".png",
++  ".jpg",
++  ".jpeg",
++  ".webp",
++  ".avif",
++  ".svg",
++  ".ico",
++]);
+ 
+ // Text assets worth gzipping on the wire. The main UI bundle is several MB
+ // uncompressed, which stalls easily over flaky proxies; gzip cuts it ~4x.
+@@ -288,6 +303,14 @@ function acceptsGzip(acceptEncoding: string | string[] | undefined): boolean {
+   return /(^|,)\s*gzip\b/i.test(header);
+ }
+ 
++function isLongCacheTopLevelAsset(filePath: string): boolean {
++  const basename = path.basename(filePath);
++  if (!CONTROL_UI_TOP_LEVEL_ASSET_FILENAMES.has(basename)) {
++    return false;
++  }
++  return LONG_CACHE_TOP_LEVEL_ASSET_EXT.has(path.extname(basename).toLowerCase());
++}
++
+ function setStaticFileHeaders(res: ServerResponse, filePath: string) {
+   const ext = path.extname(filePath).toLowerCase();
+   res.setHeader("Content-Type", contentTypeForExt(ext));
+@@ -295,6 +318,10 @@ function setStaticFileHeaders(res: ServerResponse, filePath: string) {
+     // Content-hashed filenames never change in place, so cache for a year and
+     // avoid re-downloading the multi-MB bundle on every page load.
+     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
++  } else if (isLongCacheTopLevelAsset(filePath)) {
++    // Brand/static images are updated rarely; cache for a week and rely on
++    // HTML query-string version bumps when assets change.
++    res.setHeader("Cache-Control", "public, max-age=604800");
+   } else {
+     // Unhashed files must revalidate so UI/config updates take effect promptly.
+     res.setHeader("Cache-Control", "no-cache");
+diff --git a/src/gateway/enterprise-seat-assets.ts b/src/gateway/enterprise-seat-assets.ts
+index a85660f675..441003151b 100644
+--- a/src/gateway/enterprise-seat-assets.ts
++++ b/src/gateway/enterprise-seat-assets.ts
+@@ -52,6 +52,7 @@ import {
+   normalizeBoolean,
+   readPlatformAuthSessionContextFromRequest,
+   resolvePlatformAuthConfig,
++  revokePendingEmployeeProvisionsForSeat,
+   savePlatformAuthStore,
+   withPlatformAuthStoreWriteLock,
+   type PlatformAuthStore,
+@@ -698,6 +699,26 @@ export async function handleEnterpriseSeatAssetsHttpRequest(
+         return true;
+       }
+       try {
++        const seatIdForDelete =
++          action === "delete-seat" ? requiredString(body.seatId) || null : null;
++        if (seatIdForDelete) {
++          const revoked = revokePendingEmployeeProvisionsForSeat({
++            store,
++            enterpriseId: route.tenantId,
++            seatId: seatIdForDelete,
++            nowIso,
++            reason: "seat_deleted",
++          });
++          if (revoked > 0) {
++            const seat = seatStore.seats[seatIdForDelete];
++            if (seat && seat.tenantId === route.tenantId && !seat.currentEmployeeId?.trim()) {
++              seat.status = "vacant";
++              seat.updatedAt = nowIso;
++            }
++            // Pending activation does not consume seatUsed (only register does).
++            await savePlatformAuthStore(config, store);
++          }
++        }
+         const result = applyOrganizationDepartmentMutation({
+           store: seatStore,
+           tenantId: route.tenantId,
+diff --git a/src/gateway/platform-auth.test.ts b/src/gateway/platform-auth.test.ts
+index 652ea4ed55..e690e43388 100644
+--- a/src/gateway/platform-auth.test.ts
++++ b/src/gateway/platform-auth.test.ts
+@@ -1498,10 +1498,8 @@ describe("platform auth", () => {
+           };
+         };
+       };
+-      expect(offboardPayload.platformAuth?.members).toEqual(
+-        expect.arrayContaining([
+-          expect.objectContaining({ user: "member@example.com", status: "suspended" }),
+-        ]),
++      expect(offboardPayload.platformAuth?.members ?? []).not.toEqual(
++        expect.arrayContaining([expect.objectContaining({ user: "member@example.com" })]),
+       );
+       expect(offboardPayload.platformAuth?.organization).toMatchObject({
+         seats: [expect.objectContaining({ title: "Sales Lead", status: "handover_pending" })],
+diff --git a/src/gateway/platform-auth.ts b/src/gateway/platform-auth.ts
+index 5f5e1e8dec..df3195f13b 100644
+--- a/src/gateway/platform-auth.ts
++++ b/src/gateway/platform-auth.ts
+@@ -86,6 +86,7 @@ export {
+   DEFAULT_PLATFORM_AUTH_SCOPES,
+   hasPendingAdminProvision,
+   hasPendingEmployeeProvision,
++  revokePendingEmployeeProvisionsForSeat,
+   revokeStalePendingAdminProvisions,
+   slugifyTenant,
+   uniqueSlug,
+diff --git a/src/gateway/platform-auth/auth-helpers.ts b/src/gateway/platform-auth/auth-helpers.ts
+index 40d7145e5f..f1bf9807d6 100644
+--- a/src/gateway/platform-auth/auth-helpers.ts
++++ b/src/gateway/platform-auth/auth-helpers.ts
+@@ -472,6 +472,45 @@ export function hasPendingEmployeeProvision(
+   return Boolean(findPendingEmployeeProvisionByEmail(store, normalizedEmail, enterpriseId));
+ }
+ 
++/**
++ * Revoke pending employee activations for a seat (or orphan seatId) so the
++ * vacant-shell delete path can remove unregistered positions.
++ */
++export function revokePendingEmployeeProvisionsForSeat(params: {
++  store: PlatformAuthStore;
++  enterpriseId: string;
++  seatId: string;
++  nowIso: string;
++  reason?: string;
++}): number {
++  let revoked = 0;
++  const reason = params.reason?.trim() || "seat_deleted";
++  for (const provision of Object.values(params.store.employeeProvisions)) {
++    if (
++      provision.enterpriseId !== params.enterpriseId ||
++      provision.seatId !== params.seatId ||
++      provision.status !== "pending_activation"
++    ) {
++      continue;
++    }
++    provision.status = "revoked";
++    provision.revokedReason = reason;
++    provision.updatedAt = params.nowIso;
++    for (const activation of Object.values(params.store.activationCodes)) {
++      if (
++        activation.provisionId === provision.id &&
++        activation.codeType === "employeeActivation" &&
++        activation.status === "active"
++      ) {
++        activation.status = "revoked";
++        activation.updatedAt = params.nowIso;
++      }
++    }
++    revoked += 1;
++  }
++  return revoked;
++}
++
+ export function enqueueLeadNotification(params: {
+   store: PlatformAuthStore;
+   type: PlatformAuthLeadNotificationType;
+diff --git a/src/gateway/platform-auth/http-handler.ts b/src/gateway/platform-auth/http-handler.ts
+index 239bf98769..9570a1956d 100644
+--- a/src/gateway/platform-auth/http-handler.ts
++++ b/src/gateway/platform-auth/http-handler.ts
+@@ -50,6 +50,7 @@ import {
+   refreshEnterpriseStatuses,
+   resolvePlatformRole,
+   resolveSessionContext,
++  revokePendingEmployeeProvisionsForSeat,
+   revokeStalePendingAdminProvisions,
+   sendPlatformAuthSuccess,
+   toTrustedProxySession,
+@@ -80,6 +81,7 @@ export {
+   refreshEnterpriseStatuses,
+   resolvePlatformRole,
+   resolveSessionContext,
++  revokePendingEmployeeProvisionsForSeat,
+   revokeStalePendingAdminProvisions,
+   sendPlatformAuthSuccess,
+   toTrustedProxySession,
+diff --git a/src/gateway/platform-auth/routes-employee.ts b/src/gateway/platform-auth/routes-employee.ts
+index 9fb3097dad..648cca550e 100644
+--- a/src/gateway/platform-auth/routes-employee.ts
++++ b/src/gateway/platform-auth/routes-employee.ts
+@@ -287,6 +287,23 @@ export async function handleMemberRemoveRoute(
+     enterprise.seatUsed = Math.max(0, enterprise.seatUsed - 1);
+     enterprise.updatedAt = nowIso;
+   }
++  // Drop membership so offboarded users disappear from the org member list
++  // (including activated users whose seat shell was already deleted).
++  delete store.memberships[membership.id];
++  for (const provision of Object.values(store.employeeProvisions)) {
++    if (
++      provision.enterpriseId !== membership.enterpriseId ||
++      (provision.activatedUserId !== targetUser.id &&
++        provision.normalizedEmployeeEmail !== targetUser.normalizedEmail)
++    ) {
++      continue;
++    }
++    if (provision.status === "pending_activation" || provision.status === "activated") {
++      provision.status = "revoked";
++      provision.revokedReason = "member_offboarded";
++      provision.updatedAt = nowIso;
++    }
++  }
+   const seatStore = await loadEnterpriseSeatAssetsStore();
+   startSeatHandoverForEmployee({
+     store: seatStore,

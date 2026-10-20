@@ -1,0 +1,91 @@
+{
+  "schema": "memory-workspace-phase0-official-review-independent-verification/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "reviewSequence": 25,
+  "verifiedAt": "2026-08-16T06:55:00.000Z",
+  "verifiedBy": "cursor-memory-workspace-followup",
+  "verificationMode": "live-gh-cli",
+  "mainSha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+  "mainShaNote": "Post-#420 merge tip; includes 503-bypass verifier on main",
+  "verdict": "PASS",
+  "governance": {
+    "phase0Accepted": true,
+    "deployAuthorized": false,
+    "closesWsC": false,
+    "decision": "SIGNED_REVIEW_25",
+    "note": "Signed by official-review 2026-08-16. Phase 1A unlocked; Phase 1B blocked."
+  },
+  "checks": [
+    {
+      "id": "main-commit",
+      "command": "gh api repos/gmood2008/openbot/commits/main",
+      "result": "PASS",
+      "sha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+      "date": "2026-08-16T06:39:27Z"
+    },
+    {
+      "id": "ruleset-19808307",
+      "command": "gh api repos/gmood2008/openbot/rulesets/19808307",
+      "result": "PASS",
+      "enforcement": "active",
+      "requiredContexts": [
+        "delivery guard",
+        "check (types, lint, format)",
+        "freeze + phase0 evidence tests"
+      ]
+    },
+    {
+      "id": "actions-runners",
+      "command": "gh api repos/gmood2008/openbot/actions/runners",
+      "result": "PASS",
+      "totalCount": 1,
+      "runners": [{ "name": "kiro-temp-runner", "status": "online", "busy": true }]
+    },
+    {
+      "id": "main-ci-gate-post-420",
+      "command": "gh run view 31931940410",
+      "result": "PASS",
+      "runId": 31931940410,
+      "headSha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "check (types, lint, format)",
+          "conclusion": "success",
+          "runnerName": "kiro-temp-runner"
+        },
+        { "name": "delivery guard", "conclusion": "success", "runnerName": "kiro-temp-runner" }
+      ]
+    },
+    {
+      "id": "main-freeze-post-420",
+      "command": "gh run view 31931940281",
+      "result": "PASS",
+      "runId": 31931940281,
+      "headSha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "freeze + phase0 evidence tests",
+          "conclusion": "success",
+          "runnerName": "kiro-temp-runner"
+        }
+      ]
+    }
+  ],
+  "offlineVerifierCrossCheck": {
+    "command": "node docs/design/evidence/memory-workspace-phase0-offline-governance-verify.mjs",
+    "result": "PASS",
+    "mainSha": "c4af5c746242d49145991eecc3d2795682a0f36e"
+  },
+  "companionEvidence": [
+    "docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack-r25.json",
+    "docs/design/evidence/memory-workspace-phase0-runner-stability-r25.json",
+    "docs/design/evidence/memory-workspace-phase0-main-gate-evidence.json"
+  ],
+  "officialReviewSignOffActions": [
+    "Confirm this verification against live GitHub (not execution-team-only)",
+    "Update docs/design/evidence/memory-workspace-phase0-20260814.sign-off.json: phase0Accepted=true, reviewSequence=25",
+    "Mark Phase 0 Accepted in tasks.md"
+  ]
+}

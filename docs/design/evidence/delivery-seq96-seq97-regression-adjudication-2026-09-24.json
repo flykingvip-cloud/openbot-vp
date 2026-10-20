@@ -1,0 +1,516 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-24T06:40:00Z",
+  "repository": "https://github.com/upbeyond/openbot.git",
+  "originMainSha": "09d8573e9c71ee33029e343178586d0bcef19632",
+  "currentContainerSha": "41aac4a4f2ca37d15f2423aeca70f1c6aa2be001",
+  "containerObservedAt": "2026-09-24T03:41:46Z",
+  "containerLedgerAligned": false,
+  "implementationComplete": true,
+  "runtimeWritePathObserved": true,
+  "productionRuntimeVerified": true,
+  "productionProven": false,
+  "closeGateMet": false,
+  "seq96": {
+    "gatewaySha": "1617926868e64b3d65e1b2f37e488ba6e8fb08f0",
+    "uiSha": "1617926868e64b3d65e1b2f37e488ba6e8fb08f0",
+    "parents": ["33900b993db6a11be47bea97e8b932668450ea5b"],
+    "tag": "provenance/sha-1617926868e6",
+    "imageTag": "rc-amd64-provenance-1617926868",
+    "artifactDigest": "sha256:583f153678bef4bc88c4ca4765acc73520a8f10f7d428f5f2e7b7978f4f9ec1b",
+    "liveFrom": "2026-09-22T07:12:37.955Z",
+    "liveTo": "2026-09-22T23:37:05.235Z"
+  },
+  "seq97": {
+    "gatewaySha": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+    "uiSha": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+    "parents": [],
+    "rawHeaderParentLine": "b24adc527a29c29b6c280532994b0d0592437e00",
+    "rawHeaderParentObjectType": "commit",
+    "parsedParentCount": 0,
+    "tag": "provenance/sha-f1c7efece96d",
+    "imageTag": "rc-amd64-provenance-f1c7efece9",
+    "artifactDigest": "sha256:6d9204dead13eb61b24838f3245c192d9983b46f103aae40d160e0d75940e012",
+    "liveFrom": "2026-09-22T23:37:05.235Z"
+  },
+  "parents": {
+    "seq96": ["33900b993db6a11be47bea97e8b932668450ea5b"],
+    "seq97Parsed": [],
+    "seq97RawHeaderParent": "b24adc527a29c29b6c280532994b0d0592437e00"
+  },
+  "mergeBase": null,
+  "seq96AncestorOfSeq97": false,
+  "seq97AncestorOfSeq96": false,
+  "historyRelationship": "unrelated_or_disconnected",
+  "ancestryResult": "seq96_not_ancestor_of_seq97",
+  "ancestryExitCodes": {
+    "mergeBase": 1,
+    "seq96AncestorOfSeq97": 1,
+    "seq97AncestorOfSeq96": 1
+  },
+  "seq97ParentDiagnosis": {
+    "repositoryShallow": true,
+    "replaceRefs": [],
+    "partialClone": false,
+    "rawObjectParent": "b24adc527a29c29b6c280532994b0d0592437e00",
+    "revisionWalkParents": [],
+    "parentParsingExplanation": "The raw commit object records parent b24adc527a29c29b6c280532994b0d0592437e00. git rev-parse --is-shallow-repository is true, and the shallow boundary file lists f1c7efece96d68375bf4b7fb57e77908fedfdd6c. Revision walks therefore omit parents. git replace -l is empty, no refs/replace or refs/grafts exist, core.commitGraph and partial-clone settings are unset, and git --no-replace-objects show and rev-list match the walk.",
+    "confidence": "high",
+    "gitVersion": "2.55.0",
+    "noReplaceObjectsAgrees": true
+  },
+  "provenanceTags": {
+    "seq96": "provenance/sha-1617926868e6",
+    "seq97": "provenance/sha-f1c7efece96d",
+    "bothPresent": true
+  },
+  "diffSummary": {
+    "added": 48,
+    "modified": 60,
+    "deleted": 0,
+    "changedFileCount": 108
+  },
+  "changedFiles": {
+    "added": 48,
+    "modified": 60,
+    "deleted": 0,
+    "insertions": 14148,
+    "deletions": 230
+  },
+  "productionDeletionCount": 28,
+  "productionCodeDeletions": [
+    {
+      "path": "packages/evolution-core/src/application-consumption.ts",
+      "domain": "evolution",
+      "deletedLines": 3,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/agents/pi-embedded-runner/run/attempt.ts",
+      "domain": "other",
+      "deletedLines": 7,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/agents/tools/diagnose-tool.ts",
+      "domain": "diagnosis",
+      "deletedLines": 1,
+      "status": "preserved"
+    },
+    {
+      "path": "src/auto-reply/reply/agent-runner-execution.ts",
+      "domain": "other",
+      "deletedLines": 1,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/conversation-task/focus-switch.ts",
+      "domain": "other",
+      "deletedLines": 8,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/cron/cron-result-template.ts",
+      "domain": "other",
+      "deletedLines": 4,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/diagnosis/diagnose-live-request.ts",
+      "domain": "diagnosis",
+      "deletedLines": 10,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/diagnosis/diagnose-tick.ts",
+      "domain": "diagnosis",
+      "deletedLines": 1,
+      "status": "preserved"
+    },
+    {
+      "path": "src/diagnosis/report-query-gateway.ts",
+      "domain": "diagnosis",
+      "deletedLines": 1,
+      "status": "preserved"
+    },
+    {
+      "path": "src/gateway/evolution-control/adapters/working-dna.ts",
+      "domain": "evolution",
+      "deletedLines": 4,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/evolution-control/control-plane.ts",
+      "domain": "evolution",
+      "deletedLines": 1,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/evolution-control/project-diagnosis-candidate.ts",
+      "domain": "evolution",
+      "deletedLines": 3,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/evolution-control/task-outcome-binding.ts",
+      "domain": "evolution",
+      "deletedLines": 2,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/evolution-governance/application-consumption-shadow.ts",
+      "domain": "evolution",
+      "deletedLines": 52,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/knowledge/deliverables/save-and-archive.ts",
+      "domain": "other",
+      "deletedLines": 4,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/server-methods/chat.ts",
+      "domain": "other",
+      "deletedLines": 1,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/server-methods/employee-capability.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 4,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/server-methods/enterprise-capability.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 2,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/server-methods/evolution-control.ts",
+      "domain": "evolution",
+      "deletedLines": 14,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "src/gateway/server-methods/steward-preview-locator.ts",
+      "domain": "steward",
+      "deletedLines": 14,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/controllers/cron.ts",
+      "domain": "other",
+      "deletedLines": 2,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/ports/enterprise/views/enterprise-capability-center-surface.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 53,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/views/enterprise-asset-library/enterprise-capability-center-page.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 1,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/views/enterprise-asset-library/enterprise-capability-center-skills-tab.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 5,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/views/enterprise-asset-library/enterprise-skill-list-card.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 2,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/views/enterprise-asset-library/enterprise-skill-list.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 4,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/views/enterprise-asset-library/install-to-robot-dialog.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 1,
+      "status": "insufficient_evidence"
+    },
+    {
+      "path": "ui/src/ui/views/enterprise-asset-library/review-queue-page.ts",
+      "domain": "enterprise-capability",
+      "deletedLines": 1,
+      "status": "insufficient_evidence"
+    }
+  ],
+  "changedFilesEvidencePath": "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+  "capabilityInvariantsEvidencePath": "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json",
+  "capabilityInvariants": [
+    {
+      "id": "evo-shadow-read-project",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "evo-operator-approval-identity",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "evo-sot-readback",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "evo-replay-completion",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "evo-receipt-vs-proof",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "evo-default-governance-mode",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "evo-auto-apply-off",
+      "domain": "evolution",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "ent-default-list-selection",
+      "domain": "enterprise-capability",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "ent-source-constraints",
+      "domain": "enterprise-capability",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "ent-grant-vs-install",
+      "domain": "enterprise-capability",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "ent-invoke-fail-closed",
+      "domain": "enterprise-capability",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "ent-ui-entries",
+      "domain": "enterprise-capability",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "stw-preview-locator-path",
+      "domain": "steward",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "stw-workspace-boundary",
+      "domain": "steward",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "stw-no-cross-workspace-fallback",
+      "domain": "steward",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "stw-preview-open-vs-exists",
+      "domain": "steward",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "stw-error-semantics",
+      "domain": "steward",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "dia-live-request-scope",
+      "domain": "diagnosis",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "dia-action-dispatch-scope",
+      "domain": "diagnosis",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "dia-report-read-write",
+      "domain": "diagnosis",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    },
+    {
+      "id": "dia-smoke-and-projection",
+      "domain": "diagnosis",
+      "status": "insufficient_evidence",
+      "ownerDecision": "insufficient_evidence"
+    }
+  ],
+  "domainOwnerReviews": [
+    {
+      "role": "Delivery Owner",
+      "reviewer": "cursor-independent-acceptor",
+      "signatureMode": "operator_authorized_proxy",
+      "decision": "insufficient_evidence",
+      "reviewedAt": "2026-09-25T07:45:00Z",
+      "evidenceRefs": [
+        "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+        "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+      ],
+      "rationale": "账本语义和 7 个 other 生产删除没有足够行为证据。",
+      "restorationRequired": false
+    },
+    {
+      "role": "Evolution Owner",
+      "reviewer": "cursor-independent-acceptor",
+      "signatureMode": "operator_authorized_proxy",
+      "decision": "insufficient_evidence",
+      "reviewedAt": "2026-09-25T07:45:00Z",
+      "evidenceRefs": [
+        "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+        "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+      ],
+      "rationale": "shadow 读取、operator 身份和 e52 开关条件都有可见改动，不能证明与 seq 96 相同。",
+      "restorationRequired": false
+    },
+    {
+      "role": "Enterprise Capability Owner",
+      "reviewer": "cursor-independent-acceptor",
+      "signatureMode": "operator_authorized_proxy",
+      "decision": "insufficient_evidence",
+      "reviewedAt": "2026-09-25T07:45:00Z",
+      "evidenceRefs": [
+        "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+        "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+      ],
+      "rationale": "列表过滤、安装文案和能力中心入口有删改，不能证明入口和 grant 语义未变。",
+      "restorationRequired": false
+    },
+    {
+      "role": "Steward Owner",
+      "reviewer": "cursor-independent-acceptor",
+      "signatureMode": "operator_authorized_proxy",
+      "decision": "insufficient_evidence",
+      "reviewedAt": "2026-09-25T07:45:00Z",
+      "evidenceRefs": [
+        "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+        "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+      ],
+      "rationale": "一层扫描还在，但新增了约定目录下的嵌套扫描，路径解析与 seq 96 不相同。",
+      "restorationRequired": false
+    },
+    {
+      "role": "Diagnosis Owner",
+      "reviewer": "cursor-independent-acceptor",
+      "signatureMode": "operator_authorized_proxy",
+      "decision": "insufficient_evidence",
+      "reviewedAt": "2026-09-25T07:45:00Z",
+      "evidenceRefs": [
+        "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+        "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+      ],
+      "rationale": "三处 import 仍在；live request 的 growthReads 查找被改写，范围是否相同没有证明。",
+      "restorationRequired": false
+    },
+    {
+      "role": "independent acceptor",
+      "reviewer": "cursor-independent-acceptor",
+      "signatureMode": "operator_authorized_proxy",
+      "decision": "insufficient_evidence",
+      "reviewedAt": "2026-09-25T07:45:00Z",
+      "evidenceRefs": [
+        "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+        "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+      ],
+      "rationale": "证据包完整，但关键能力仍是 insufficient_evidence，不能把裁决抬成回归承认或恢复。",
+      "restorationRequired": false
+    }
+  ],
+  "requiredReviewers": [
+    "Delivery Owner",
+    "Evolution Owner",
+    "Enterprise Capability Owner",
+    "Steward Owner",
+    "Diagnosis Owner",
+    "independent acceptor"
+  ],
+  "completedReviewers": [
+    "Delivery Owner",
+    "Evolution Owner",
+    "Enterprise Capability Owner",
+    "Steward Owner",
+    "Diagnosis Owner",
+    "independent acceptor"
+  ],
+  "unresolvedDomains": ["evolution", "enterprise-capability", "steward", "diagnosis", "delivery"],
+  "meeting": {
+    "held": true,
+    "date": "2026-09-25",
+    "signatureMode": "operator_authorized_proxy",
+    "attendees": ["cursor-independent-acceptor"],
+    "minutes": "代理会议维持 insufficient_evidence。3 个 import 删行判定为 preserved。其余 25 个生产删除和 21 条能力命题判定为 insufficient_evidence。不恢复代码，不修改账本。"
+  },
+  "meetingHeld": true,
+  "allRequiredOwnersSigned": true,
+  "deliveryOwnerDecision": "insufficient_evidence",
+  "decision": "insufficient_evidence",
+  "ledgerMutationAuthorized": false,
+  "acknowledgedImpact": null,
+  "restorationCommits": [],
+  "currentMainContainsRestoration": false,
+  "blockerSummary": "Proxy review signed insufficient_evidence. Key capabilities are not shown to be preserved, moved, intentionally removed, or accidentally regressed. Ledger stays locked.",
+  "nextPermittedAction": "Do not mutate the ledger. A later review by the named owners may supersede these proxy signatures.",
+  "forbiddenActions": [
+    "modify releases.jsonl",
+    "modify RELEASE_RECORD release conclusions",
+    "add a regression acknowledgement",
+    "append seq 98",
+    "switch the production container",
+    "build or push a new production image",
+    "create cancel or modify a meeting",
+    "modify identity runtime code",
+    "fix the investigated business code",
+    "use an intentional revert flag",
+    "mark unknown as preserved or regressed without a signature"
+  ],
+  "runningContainerSha": "41aac4a4f2ca37d15f2423aeca70f1c6aa2be001",
+  "evidenceLinks": [
+    "docs/design/evidence/delivery-seq96-seq97-regression-adjudication-2026-09-24.json",
+    "docs/design/evidence/delivery-seq96-seq97-changed-files-2026-09-24.json",
+    "docs/design/evidence/delivery-seq96-seq97-capability-invariants-2026-09-24.json"
+  ],
+  "signatureMode": "operator_authorized_proxy",
+  "proxyReviewer": "cursor-independent-acceptor"
+}

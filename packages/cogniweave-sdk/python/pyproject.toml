@@ -1,0 +1,13 @@
+[project]
+name = "cogniweave-sdk"
+version = "0.1.0"
+description = "Python SDK client for CogniWeave Cognitive Memory Runtime"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["cogniweave_sdk"]

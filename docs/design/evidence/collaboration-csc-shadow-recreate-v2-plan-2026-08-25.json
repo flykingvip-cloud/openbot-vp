@@ -1,0 +1,109 @@
+{
+  "stage": "SHADOW_RECREATE_V2_PLAN",
+  "planOnly": true,
+  "productionRecreate": false,
+  "liveTouched": false,
+  "flagsChanged": false,
+  "shadowEnabled": false,
+  "productionCloseout": "NOT_ACCEPTED",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-25",
+  "frozenMain": "dbfe448e9110ea1bce51377d4803894c6a8ec557",
+  "liveSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+  "liveAncestorOfMain": true,
+  "baseline": {
+    "image": "localhost/openbot:rc-amd64-provenance-a12e4c59e575",
+    "containerStartedAt": "2026-08-24T06:37:47+08:00 (unchanged)",
+    "restartCount": 0,
+    "healthz": 200,
+    "readyz": { "ready": true, "failing": [] },
+    "runtimeInboundFlags": "ALL_UNSET"
+  },
+  "envFilePermissionGate": {
+    "resultBefore": "FAIL",
+    "resultAfter": "PASS",
+    "file": "/root/.openbot/.env.docker",
+    "modeBefore": "644",
+    "modeAfter": "600",
+    "contentSha256Unchanged": "030f738f71f1b51a0d1fb035bb63611753a61d7e79f788a058f2ecd08b5f4a36",
+    "action": "authorized chmod 600 (permission-tightening); content unchanged; running container unaffected (StartedAt unchanged, healthz 200); reversible via chmod 644",
+    "sensitiveKeysPresent": ["OPENBOT_GATEWAY_TOKEN", "OPENCLAW_GATEWAY_TOKEN", "OPENBOT_SMTP_PASS"]
+  },
+  "v2Script": {
+    "name": "csc-shadow-recreate-v2.sh",
+    "location": "embedded in deploy/production/evidence/COLLAB_CSC_SHADOW_RECREATE_V2_PLAN_20260825.md (Appendix A); not committed to scripts/",
+    "sha256": "bf28e11d8b36d91ab5c3427f328d86776296c0149aca8a0b8aae0531fe0a72e6",
+    "modes": ["verify", "plan", "enable", "rollback"],
+    "bashN": "PASS",
+    "shellcheckStyle": "PASS (one explained SC2016 disable for Go-template $p/$c; one explained SC2206 disable for exclude-list split)",
+    "planDerivedFromLiveInspect": true,
+    "onlyShadowFlagAllowed": true,
+    "strictlyShadowOnly": true,
+    "tempEnvExclude": ["OPENBOT_PROGRESS_LEDGER_ENABLED"],
+    "shadowOnlyDiffGuard": "every temp-env variable except the shadow key must already exist in the running container; recreate introduces no new variable other than the shadow flag",
+    "tempEnvMode600": true,
+    "neverEditsEnvDocker": true,
+    "autoRollbackOn": [
+      "recreate failure",
+      "health failure",
+      "identity drift",
+      "flag verify failure"
+    ],
+    "tempEnvCleanup": "on success AND failure (trap on EXIT + explicit)"
+  },
+  "optionAProgressLedger": {
+    "decision": "A (strictly shadow-only)",
+    "before": ".env.docker carried OPENBOT_PROGRESS_LEDGER_ENABLED; running container did not",
+    "resolution": "temp env now also excludes OPENBOT_PROGRESS_LEDGER_ENABLED",
+    "prodPlanConfirmation": "shadow-only diff vs runtime: OK (only OPENBOT_CHAT_INBOUND_DEPTH_SHADOW added); temp-env name list no longer contains OPENBOT_PROGRESS_LEDGER_ENABLED"
+  },
+  "isolatedDrill": {
+    "engine": "engine stand-in (fake podman/docker + curl + mktemp); does NOT touch openbot-gateway-rc",
+    "rationale": "macOS Docker host-networking cannot serve loopback health; deterministic failure injection needs a stand-in",
+    "result": "PASS",
+    "checks": "49/49",
+    "scenarios": {
+      "verifyNormal": "PASS",
+      "planNormalNoMutation": "PASS",
+      "enableNormal": "PASS (ENABLE_OK; safety kept)",
+      "recreateFailRollback": "PASS (restored, healthz 200)",
+      "healthFailRollback": "PASS",
+      "shaDriftRollback": "PASS",
+      "multiFlagRejected": "PASS (no mutation)",
+      "presetShadowRejected": "PASS",
+      "permGateRejected": "PASS",
+      "progressLedgerExcludedStrictlyShadowOnly": "PASS",
+      "nonExcludedExtraVarRejectedAsDrift": "PASS (no mutation)",
+      "safetyMissingFailClosed": "PASS",
+      "tempEnvCleanupSuccessAndFailure": "PASS"
+    }
+  },
+  "wsShadowOffBaseline": {
+    "toolSha256": "c5bd973b15eec22344a9d2f8bc8aebff599661bc5a9cd200d4c235ee5a1d1d6b",
+    "auth": "PASS",
+    "wsConnect": "PASS",
+    "subscriptionAck": "PASS",
+    "nonDepthEventVisible": true,
+    "depthEvents": 0,
+    "rawTextLeaks": 0,
+    "deviceRegistered": false,
+    "liveTouched": false,
+    "flagsChanged": false,
+    "captureExit": 0,
+    "sensitiveFieldScan": "PASS"
+  },
+  "prohibitedThisStage": [
+    "production recreate/restart/swap/stage",
+    "enable OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
+    "modify RELEASE_RECORD.md",
+    "modify releases.jsonl",
+    "append LIVE ledger row"
+  ],
+  "nextStageAdmission": "Permission gate cleared (chmod 600 done) and plan is strictly shadow-only. The actual enable (same-SHA recreate, seconds of chat interruption, auto-rollback, ROUTER/KNOWLEDGE/TOOL/PERSIST_EARLY/COLLAB/CONTEXT_SCOPE kept off) still requires a separate explicit production-owner authorization.",
+  "confidence": {
+    "v2ControlFlow": "HIGH (49/49 isolated drill)",
+    "planFidelity": "HIGH (derives run spec from live inspect; image pinned to LIVE; strictly shadow-only confirmed on the real container)",
+    "productionEnableReadiness": "READY pending explicit enable authorization"
+  }
+}

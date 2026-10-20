@@ -1,0 +1,29 @@
+2026-07-25T23:48:52+08:00
+
+🐲 OpenBot 2026.7.12-rc.2 (127fc54) — Automation with claws: minimal fuss, maximal pinch.
+
+Usage: openbot data [options] [command]
+
+OpenBot Data Space management
+
+Options:
+  -h, --help                  Display help for command
+
+Commands:
+  export                      Export your OpenBot data (L2 Data Space) to a zip;
+                              excludes credentials
+  help                        Display help for command
+  info                        Show current data root location and usage
+  migrate                     Migrate OpenBot data to another folder (shared
+                              Migration Engine)
+  restore                     Restore an OpenBot data export zip into the
+                              current data root
+  verify-migration-readiness  Check the local Data Space is collected before
+                              packaging a tenant-import (SaaS §8)
+│
+◇   ──────────────────────────────────╮
+│                                     │
+│  Data is managed by OpenBot cloud.  │
+│                                     │
+├─────────────────────────────────────╯
+LOG=/root/openbot-data-migrate-probe-20260725T234852.log

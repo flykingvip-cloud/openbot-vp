@@ -1,0 +1,33 @@
+# Path-drift probe for Checkpoint B Architecture REVISE (deps-chain refine)
+# date: 2026-09-28T14:35:00+08:00
+# prior_design_tip: 76a0dbfccc18a06b3519631de2f3fddad43bb3ba
+# design_merge: 677a7aa1f1b0f4c00bde4dce6d2d823a58f26715 (#181)
+# tip:  d22acc6e0ab96df77108024b3e20a4d01ab58875
+# command:
+git diff --name-status 76a0dbfccc18a06b3519631de2f3fddad43bb3ba..d22acc6e0ab96df77108024b3e20a4d01ab58875 -- \
+  packages/constitutional-contracts \
+  packages/constitutional-registry \
+  packages/constitutional-conformance \
+  packages/constitutional-runtime \
+  src/agents/execution-preflight \
+  src/agents/pi-embedded-runner/run.ts \
+  src/agents/pi-embedded-runner/run/types.ts \
+  src/agents/pi-embedded-runner/run/attempt.ts \
+  src/task-orchestration \
+  src/conversation-task \
+  src/gateway/security-profile.ts
+
+# Constitutional runtime / preflight / embedded-runner observe paths
+# (packages/constitutional-*, execution-preflight, run.ts, types.ts, attempt.ts,
+#  task-orchestration, security-profile): **empty**
+
+# Unrelated trunk drift (ConversationTask handoff — do NOT redo Checkpoint A):
+# M	src/conversation-task/conversation-handoff.test.ts
+# M	src/conversation-task/conversation-handoff.ts
+# via: 88941b34f Fix 1:1 robot send to use the tenant session transcript (#184)
+#      d22acc6e0 Fix tenant session owner domain typing (#185)
+
+# redesign_note: Constitutional runtime path drift empty. This refine locks the
+# run.ts → EmbeddedRunAttemptParams deps injection chain, gate-off NOOP nuance,
+# precise Checkpoint C path scope (run.ts + types.ts), and test plan B-01..B-28.
+# ConversationTask handoff on trunk is unrelated.

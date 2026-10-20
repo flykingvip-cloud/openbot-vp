@@ -1,0 +1,36 @@
+{
+  "version": "replay-http-v1",
+  "scope": {
+    "workspaceId": "ws_eval",
+    "projectId": "proj_eval",
+    "agentId": "agent_eval",
+    "visibility": "private"
+  },
+  "stageOrder": ["event", "context", "atoms", "relations"],
+  "cases": [
+    {
+      "id": "http_recorded_all_ok",
+      "rawInput": "External API latency increases and throughput drops during peak hours.",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/bundle-all-ok.json"
+    },
+    {
+      "id": "http_recorded_atoms_missing",
+      "rawInput": "Retry worker keeps blocking when upstream API becomes slow.",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/bundle-atoms-missing.json"
+    },
+    {
+      "id": "http_recorded_context_relations_missing",
+      "rawInput": "Mitigation strategy extraction succeeded but context and relation calls timed out.",
+      "sourceType": "tool_log",
+      "stageSnapshotBundle": "replay-http-recordings/bundle-context-relations-missing.json"
+    },
+    {
+      "id": "http_recorded_event_missing",
+      "rawInput": "Event stage timeout happened but later stages responded successfully.",
+      "sourceType": "agent_run",
+      "stageSnapshotBundle": "replay-http-recordings/bundle-event-missing.json"
+    }
+  ]
+}

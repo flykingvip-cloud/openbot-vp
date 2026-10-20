@@ -1,0 +1,65 @@
+{
+  "contractVersion": "p3e-v1",
+  "evaluatorVersion": "cognitive-evaluator-v1",
+  "zeroDenominatorPolicy": "fail_closed",
+  "fixturePinStatus": "pinned",
+  "fixtures": {
+    "mergeConflictNegative": {
+      "path": "src/gateway/data-governance/fixtures/p3e/merge-conflict-negative.jsonl",
+      "pinStatus": "pinned",
+      "sha256": "cf62cc61f2b5b26f88ea31e2bb932335efe02edf45e24c75307f71a09b76b803"
+    },
+    "mergeEquivPositive": {
+      "path": "src/gateway/data-governance/fixtures/p3e/merge-equiv-positive.jsonl",
+      "pinStatus": "pinned",
+      "sha256": "f9d66f0ffc08bfeaefd9c088b4a71d6afd418d9f53b67240c0fb47cfe82f07a8"
+    },
+    "conflictMustDetect": {
+      "path": "src/gateway/data-governance/fixtures/p3e/conflict-must-detect.jsonl",
+      "pinStatus": "pinned",
+      "sha256": "7211f2543603eae0fe71b5d516529027059d096abe1436b84ef4a8e34d56821b"
+    },
+    "promotionShadowNegative": {
+      "path": "src/gateway/data-governance/fixtures/p3e/promotion-shadow-negative.jsonl",
+      "pinStatus": "pinned",
+      "sha256": "c93bc5cd8b5ce41399b53d93dbcb2b1c8d03a9619727d537d0131538583891ef"
+    },
+    "retiredRecallViolations": {
+      "path": "src/gateway/data-governance/fixtures/p3e/retired-recall-violations.jsonl",
+      "pinStatus": "pinned",
+      "sha256": "a0799136b1bc8a34f563343a2acd9baf85b372448701ce6d5a9dd884aa23022c"
+    }
+  },
+  "minSampleSize": {
+    "falseMergeRate": 50,
+    "missedConflictRate": 50,
+    "falsePromotionRate": 50,
+    "retiredInDefaultRecallMax": 1
+  },
+  "metrics": {
+    "falseMergeRate": {
+      "max": 0,
+      "formula": "false_merges / must_not_merge",
+      "denominator": "must_not_merge",
+      "numerator": "false_merges"
+    },
+    "missedConflictRate": {
+      "max": 0,
+      "formula": "missed / must_detect",
+      "denominator": "must_detect",
+      "numerator": "missed"
+    },
+    "falsePromotionRate": {
+      "max": 0,
+      "formula": "false_promotions / must_not_promote",
+      "denominator": "must_not_promote",
+      "numerator": "false_promotions"
+    },
+    "retiredInDefaultRecallMax": {
+      "max": 0,
+      "formula": "retired_recalled / retired_rows",
+      "denominator": "retired_rows",
+      "numerator": "retired_recalled"
+    }
+  }
+}

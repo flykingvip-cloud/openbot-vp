@@ -1,0 +1,327 @@
+{
+  "schema": "memory-workspace-phase1b-item7-stage-c-memory-index-proposal/v1",
+  "item": 7,
+  "stage": "C",
+  "op": "index",
+  "status": "stage-c-memory-index-technical-slice-proposal",
+  "changeRequest": true,
+  "changeRequestKind": "technical-slice + semantic-gate",
+  "reviewRequest": "item-7-stage-c-technical-slice-review-only",
+  "reviewRequestIsBatchAccept": false,
+
+  "observedAcceptedBaseline": 12,
+  "siteCount": 5,
+  "proposedRetiredThisSlice": 5,
+  "projectedRemainingIfAppliedDirectly": 7,
+  "projectionNote": "projectedRemainingIfAppliedDirectly=7 is a math projection off the observed baseline (12-5), NOT a new accepted baseline. The integration owner recomputes the canonical count by actual merge order.",
+  "canonicalLedgerUpdated": false,
+  "canonicalCountClaimed": false,
+  "stageBDependencyState": "blocked",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "productionIndexSwitch": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "rollbackProof": true,
+  "quarantineProof": true,
+
+  "retiredThisChange": 0,
+  "deleteCallSites": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": false,
+  "scanModified": false,
+  "absorbsUnacceptedBatches": false,
+  "s25AcceptedStatusPreserved": true,
+  "frozenWriteWatchIndex": 38,
+  "liveWriteWatchIndex": 12,
+
+  "narrowInterface": {
+    "module": "src/memory/memory-index-workspace-handle.ts",
+    "api": "resolveMemoryIndexWorkspaceHandle",
+    "guardedStart": "guardedMemoryIndexStart",
+    "namespaceHelper": "deriveManagedMemoryIndexNamespace",
+    "purpose": "authorize-and-return-restricted-handle-only",
+    "createsDirectories": false,
+    "writesCatalog": false,
+    "usesCanonicalResolver": "resolveMemoryWorkspaceHandle (injected port; memory layer never statically imports gateway)",
+    "resolvesOnly": "existing canonical/active binding",
+    "forbiddenFallbacks": [
+      "resolveAgentWorkspaceDir",
+      "cfg-only-resolver",
+      "process.cwd",
+      "empty-string",
+      "default-workspace",
+      "guessed-host-path",
+      "createEmptyWorkspaceCatalog"
+    ],
+    "failClosed": {
+      "missingTenantContext": true,
+      "missingActorGrant": true,
+      "catalogMiss": true,
+      "catalogAmbiguous": true,
+      "crossTenant": true,
+      "grantOwnershipMismatch": true,
+      "tombstoneRevoked": true,
+      "noHostFallback": true,
+      "rejectPathZeroScanReadIndexWrite": true
+    },
+    "trustModel": {
+      "personal_local": "explicit security-profile-gated legacy-compat locator; reachable only when the SERVER-resolved profile is personal_local; never a managed_enterprise fallback",
+      "managed_enterprise": "requires server-trusted tenantId + userId + actor + ownership-bound agentAssetId/resourceId + Catalog; fail-closed with no host fallback"
+    }
+  },
+
+  "sitesInScope": 5,
+  "sitesHonestlyRetirableAsIs": 0,
+  "conclusions": [
+    "All five Stage C sites are op=index (locate/read an existing index root), pathId=P1, symbol=resolveAgentWorkspaceDir; they are NOT asset-creation flows and are NOT circular (unlike Stage B S26).",
+    "None of the five sites has a trusted request-level identity at the call site: they run with cfg+agentId only (background gateway startup loop, config-time resolveMemoryBackendConfig, cache-factory MemoryIndexManager.get, and the CogniWeave/Qmd manager constructors).",
+    "The canonical Resource Resolver resolveMemoryWorkspaceHandle requires tenantId + userId + server-trusted actor + ownership-bound agentAssetId + Catalog; those inputs are not available at these sites as they stand today.",
+    "A cfg-only resolver swap would be a fake retirement and is forbidden by the Stage C mandate; therefore this slice does NOT switch the five production call sites (the shadow module item7-w5-index-last.ts also decides keep-legacy-index).",
+    "The honest remediation is threading server-trusted call-entry identity to these sites with an explicit personal_local compat path vs managed_enterprise fail-closed split; that threading spans callers outside Stage C's fixed file set and must be accepted independently before any production switch.",
+    "This slice ships the controlled narrow interface resolveMemoryIndexWorkspaceHandle (authorize + restricted handle only; no dir creation, no Catalog write) plus full per-site and aggregate fail-closed tests, and a Semantic Gate CR.",
+    "The accepted baseline stays 12 and is NOT decremented; canonicalCountClaimed=false and canonicalLedgerUpdated=false; the retirement scan is untouched.",
+    "S25's accepted (landed) status is not rolled back; Stage B (S01/S02/S26/S27) remains blocked and is not processed here."
+  ],
+  "siteAudit": [
+    {
+      "label": "C1",
+      "ledgerId": "S30",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "resolveMemoryBackendConfig (cogniweave branch)",
+      "lifecycle": "read-existing-index",
+      "createsAsset": false,
+      "circularDependency": false,
+      "trustedIdentityAtCallSite": false,
+      "identityAvailable": ["cfg", "agentId"],
+      "identityMissing": [
+        "tenantContext",
+        "tenantId",
+        "userId",
+        "actor",
+        "ownershipGrant",
+        "resourceId",
+        "agentAssetId",
+        "Catalog",
+        "membershipSoT"
+      ],
+      "backgroundTask": true,
+      "callers": [
+        "src/gateway/server-startup-memory.ts (background startGatewayMemoryBackend loop)",
+        "src/memory/search-manager.ts getMemorySearchManager",
+        "src/commands/doctor-memory-search.ts",
+        "src/conversations/service.ts",
+        "src/agents/tools/memory-tool.ts"
+      ],
+      "honestlyRetirableAsIs": false,
+      "semanticGate": true,
+      "remediation": "thread server-trusted call-entry identity (personal_local compat vs managed_enterprise fail-closed), then route through resolveMemoryIndexWorkspaceHandle"
+    },
+    {
+      "label": "C2",
+      "ledgerId": "S31",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "resolveMemoryBackendConfig (qmd branch)",
+      "lifecycle": "read-existing-index",
+      "createsAsset": false,
+      "circularDependency": false,
+      "trustedIdentityAtCallSite": false,
+      "identityAvailable": ["cfg", "agentId"],
+      "identityMissing": [
+        "tenantContext",
+        "tenantId",
+        "userId",
+        "actor",
+        "ownershipGrant",
+        "resourceId",
+        "agentAssetId",
+        "Catalog",
+        "membershipSoT"
+      ],
+      "backgroundTask": true,
+      "callers": [
+        "src/gateway/server-startup-memory.ts (background startGatewayMemoryBackend loop)",
+        "src/memory/search-manager.ts getMemorySearchManager"
+      ],
+      "honestlyRetirableAsIs": false,
+      "semanticGate": true,
+      "remediation": "thread server-trusted call-entry identity (personal_local compat vs managed_enterprise fail-closed), then route through resolveMemoryIndexWorkspaceHandle"
+    },
+    {
+      "label": "C3",
+      "ledgerId": "S32",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "CogniWeaveMemoryManager private constructor",
+      "lifecycle": "read-existing-index",
+      "createsAsset": false,
+      "circularDependency": false,
+      "trustedIdentityAtCallSite": false,
+      "identityAvailable": ["cfg", "agentId", "optional governance{tenantId,ownershipProof}"],
+      "identityMissing": [
+        "userId",
+        "server-trusted actor",
+        "resourceId",
+        "membershipSoT (for the unconditional workspaceDir line)"
+      ],
+      "backgroundTask": true,
+      "callers": [
+        "src/memory/search-manager.ts getMemorySearchManager -> CogniWeaveMemoryManager.create",
+        "src/gateway/server-startup-memory.ts (managed cogniweave deferred until ownership proof)"
+      ],
+      "honestlyRetirableAsIs": false,
+      "semanticGate": true,
+      "remediation": "the workspaceDir line runs unconditionally regardless of governance and lacks userId+actor; thread full identity then route managed through resolveMemoryIndexWorkspaceHandle, personal_local via the explicit compat path"
+    },
+    {
+      "label": "C4",
+      "ledgerId": "S36",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "MemoryIndexManager.get (static cache factory)",
+      "lifecycle": "read-existing-index",
+      "createsAsset": false,
+      "circularDependency": false,
+      "trustedIdentityAtCallSite": false,
+      "identityAvailable": ["cfg", "agentId", "purpose"],
+      "identityMissing": [
+        "tenantContext",
+        "tenantId",
+        "userId",
+        "actor",
+        "ownershipGrant",
+        "resourceId",
+        "agentAssetId",
+        "Catalog",
+        "membershipSoT"
+      ],
+      "backgroundTask": true,
+      "callers": [
+        "src/memory/search-manager.ts getMemorySearchManager (builtin fallback + qmd fallback factory)"
+      ],
+      "honestlyRetirableAsIs": false,
+      "semanticGate": true,
+      "remediation": "workspaceDir is a cache-key + index-root input with no identity; thread call-entry identity then route through resolveMemoryIndexWorkspaceHandle"
+    },
+    {
+      "label": "C5",
+      "ledgerId": "S37",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "QmdMemoryManager private constructor",
+      "lifecycle": "read-existing-index",
+      "createsAsset": false,
+      "circularDependency": false,
+      "trustedIdentityAtCallSite": false,
+      "identityAvailable": ["cfg", "agentId"],
+      "identityMissing": [
+        "tenantContext",
+        "tenantId",
+        "userId",
+        "actor",
+        "ownershipGrant",
+        "resourceId",
+        "agentAssetId",
+        "Catalog",
+        "membershipSoT"
+      ],
+      "backgroundTask": true,
+      "callers": [
+        "src/memory/search-manager.ts getMemorySearchManager -> QmdMemoryManager.create (no governance plumbed)"
+      ],
+      "honestlyRetirableAsIs": false,
+      "semanticGate": true,
+      "remediation": "QMD path plumbs no governance at all; thread call-entry identity then route through resolveMemoryIndexWorkspaceHandle"
+    }
+  ],
+  "indexLifecycle": {
+    "namespaceBoundToTenantAndResource": true,
+    "sameNamedAgentCrossTenantSharesRoot": false,
+    "indexRebuildBypassesCanonicalBinding": false,
+    "provenanceRetainsResourceAndTenant": true,
+    "tombstoneRevokeBlocksNewIndex": true,
+    "tombstoneRevokeHaltsRunningIndex": true,
+    "recoversFromOldHostPath": false,
+    "indexExistenceImpliesAccess": false
+  },
+  "unlockDesign": {
+    "recommendedNextStep": "Accept this narrow interface as a Technical Slice, then thread server-trusted call-entry identity to the five index sites (personal_local compat vs managed_enterprise fail-closed) before any production index switch.",
+    "interface": "resolveMemoryIndexWorkspaceHandle",
+    "contract": [
+      "Accept a server-resolved security profile (resolveSecurityProfile; never client RPC input).",
+      "personal_local: return an explicit security-profile-gated legacy compat locator; never used as a managed fallback.",
+      "managed_enterprise: require server-trusted tenantId + userId + actor; agentId slug is not ownership proof.",
+      "Resolve only an EXISTING canonical/active binding via the canonical resolver (resolveMemoryWorkspaceHandle), injected as a port.",
+      "Fail closed on catalog miss, ambiguity, cross-tenant, grant/ownership mismatch, missing membership SoT, stale fencing token.",
+      "Bind the index namespace to tenantId + resourceId so same-named agents never share an index root across tenants.",
+      "Halt (do not start/continue) when workspace lifecycle is retired/purged/moving/recovery_required.",
+      "Never create directories, never write the Catalog, never enable schema v2 or LIVE, never fall back to a host path.",
+      "On any denial: return without scanning/reading/writing an index (guardedMemoryIndexStart proves zero side effects)."
+    ],
+    "afterInterfaceAcceptedSeparately": {
+      "C1_S30": "resolveMemoryBackendConfig receives call-entry identity; managed routes through the interface, personal_local via compat",
+      "C2_S31": "same as C1 for the qmd branch",
+      "C3_S32": "CogniWeaveMemoryManager receives full identity (userId+actor), not just optional governance",
+      "C4_S36": "MemoryIndexManager.get receives call-entry identity; cache key derives from the canonical namespace",
+      "C5_S37": "QmdMemoryManager receives call-entry identity (currently none is plumbed)"
+    }
+  },
+  "stageBDependency": {
+    "state": "blocked",
+    "sites": ["S01", "S02", "S26", "S27"],
+    "reason": "The Stage B 4-site atomic gate has not passed (S26 is semantic-gated). Stage C must not request batch Accept and does not process Stage B."
+  },
+  "notProcessed": [
+    "S01",
+    "S02",
+    "S26",
+    "S27",
+    "src/memory/manager-sync-ops.ts (S33/S34/S35 Stage D syncMemoryFiles)",
+    "other locators",
+    "canonical retirement scan (docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json)"
+  ],
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "liftTombstone": false,
+    "restoreFiles": [],
+    "restoreDeletedCallSites": "not-applicable-none-deleted",
+    "productionWriteBack": "forbidden",
+    "rewriteFreezeBaselineToZero": false,
+    "note": "This slice adds only a new narrow interface module + tests + this proposal + its test + a handoff. It changes none of the five legacy source files and does not mutate the retirement scan. Rollback = revert the slice commits; all 12 live sites (including the five Stage C sites) and the scan are untouched."
+  },
+  "quarantineProof": true,
+  "quarantine": {
+    "designOnly": true,
+    "enabled": false,
+    "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+    "quarantineNormalWrites": 0,
+    "rewriteIntoNormalCatalog": false,
+    "note": "guardedMemoryIndexStart halts (quarantines) a running index when a re-resolve returns a tombstoned/revoked handle; no production write, no Catalog rewrite."
+  },
+  "startedNextStages": [],
+  "stageDStarted": false,
+  "originMainSha": "c014b0247e64278e0c60b7d691a31b7ccbaa2f1e",
+  "note": "Item 7 Stage C is a Technical Slice + Semantic Gate CR for the five op=index memory workspace-locator sites C1..C5 (ledger S30/S31/S32/S36/S37: backend-config.ts:417/444, cogniweave-manager.ts:554, manager.ts:152, qmd-manager.ts:196). The mandatory semantic audit finds all five are read-existing index/config-time/constructor/background sites with NO trusted request-level identity at the call site (cfg+agentId only), so the canonical resolveMemoryWorkspaceHandle (tenantId+userId+actor+agentAssetId+Catalog) cannot be honestly invoked there today, and a cfg-only swap is a forbidden fake. This slice therefore ships the controlled narrow interface resolveMemoryIndexWorkspaceHandle (authorize + restricted handle only; no dir creation, no Catalog write; personal_local explicit compat vs managed_enterprise fail-closed) with full per-site + aggregate fail-closed tests, and does NOT switch the five production sites (shadow item7-w5-index-last decides keep-legacy-index). It retires nothing in production, keeps the retirement scan untouched (remaining=12, frozen=38), does not claim the canonical count (canonicalCountClaimed=false, canonicalLedgerUpdated=false), keeps Item 7 not-met, keeps Phase 1B execution blocked, does not roll back S25, and keeps LIVE / production Catalog / schema v2 / production deploy locked. It requests ONLY an Item 7 Stage C Technical Slice Review and explicitly does NOT request a canonical count update, a Stage C Accepted baseline, Item 7 met, Phase 1B unlock, or LIVE/production deployment. projectedRemainingIfAppliedDirectly=7 is a projection off the observed baseline, not a new accepted baseline; the integration owner recomputes by actual merge order."
+}

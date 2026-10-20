@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "objective-shadow-source-manifest/v1",
+  "landedSha": "16cea426e711516629e52c0522c39a7a77628655",
+  "originMainAtReplay": "36c8a3df7f9bc16fa6a8f267430728eefae20eb7",
+  "hmacImplementationSha": "3b40b5ea6d",
+  "splitReportsSha": "4e0f90d470",
+  "hmacHosting": {
+    "kind": "macos-keychain",
+    "service": "openbot.objective-shadow.hmac",
+    "account": "OPENBOT_TASK_FOCUS_OBJECTIVE_SHADOW_HMAC_KEY",
+    "materializedFile": "~/.openbot/secrets/objective-shadow-hmac",
+    "fileMode": "0600",
+    "injectEnv": "OPENBOT_TASK_FOCUS_OBJECTIVE_SHADOW_HMAC_KEY_FILE",
+    "ensureCommand": "scripts/dev/objective-shadow-hmac-inject.sh ensure",
+    "keyDisclosed": false
+  },
+  "corpora": [
+    {
+      "kind": "synthetic_observe_api",
+      "path": "~/.openbot/logs/objective-shadow.synthetic-cycle0.jsonl",
+      "windowPath": "~/.openbot/logs/objective-shadow.synthetic-cycle0.window.json",
+      "sha256": "6d512ab5518d75adeee3baec4ae063ec27f6ae8cca17639901c553b596f7de7c",
+      "records": 12,
+      "firstWriteAt": "2026-09-13T14:37:43.776Z",
+      "note": "Direct maybeObserveObjectiveShadow / ingress-hook calls. Not a production call site."
+    },
+    {
+      "kind": "runtime_callsite_harness",
+      "path": "~/.openbot/logs/objective-shadow-evidence/objective-shadow.runtime-callsite.jsonl",
+      "sha256": "fa8fd96e497a1d6e629a7e53f5a8f400c12ce86aaacbfb1fe27add586033bdee",
+      "records": 6,
+      "firstWriteAt": "2026-09-13T14:50:56.566Z",
+      "functions": [
+        "runPreparedReply",
+        "runCronIsolatedAgentTurn",
+        "executeCollaborationRound",
+        "spawnSubagentDirect"
+      ],
+      "note": "Production functions reached under a stubbed harness. Not launchd gateway traffic. Do not add to synthetic or launchd_gateway."
+    }
+  ],
+  "launchdGateway": {
+    "label": "ai.openbot.gateway",
+    "program": "/Users/daniel/AI项目/openbot/dist/index.js",
+    "buildInfoCommit": "620c767fb1c47fa9e8206eee1b190165ecfeb1ff",
+    "containsPr1107": false,
+    "plistMutated": false,
+    "reason": "Shared-tree dist predates landed SHA; observation did not restart or inject the user gateway."
+  }
+}

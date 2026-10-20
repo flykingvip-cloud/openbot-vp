@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "id": "web-extract-html-pdf",
+  "name": "网页/文本 → 精排 PDF",
+  "version": "1.0.0",
+  "status": "release-candidate",
+  "maturity_tier": "governed",
+  "lifecycle_stage": "production-candidate",
+  "license": "仅供内部使用",
+  "entrypoint": "SKILL.md",
+  "runtime": "none (流程技能；脚本为参考实现，依赖渲染机自带 Chromium/poppler)",
+  "source": {
+    "type": "user-draft",
+    "title": "web-extract-html-pdf",
+    "provided_at": "2026-10-04",
+    "refined_for": "OpenBot 运行时能力面（Chromium 路径 / 依赖探测 / 目录约定 / 不臆造数据）"
+  },
+  "intent": {
+    "job_to_be_done": "把网页正文或已有文本，经模型重建章节层级、重绘 SVG 图、中文化表格后用 HTML+CSS 重排，再由 Chrome headless 打印成一份排版精良的 A4 PDF 交付物。",
+    "inputs": ["source(URL/PDF/文本)", "target(文件名/语言)", "charts(可空)"],
+    "outputs": ["output/pdf/<name>.pdf"],
+    "exclusions": [
+      "1:1 原始版式还原",
+      "纯文字 .txt 导出",
+      "原图截图充作重绘图",
+      "用 LibreOffice 转换",
+      "用 reportlab+TTC 排中文",
+      "臆造/补全表格数值"
+    ]
+  },
+  "capabilities": {
+    "pipeline": [
+      "extract-text",
+      "structure-modules",
+      "redraw-svg",
+      "localize-tables",
+      "html-css-layout",
+      "chrome-headless-print"
+    ],
+    "tools": [
+      "web_fetch",
+      "browser",
+      "exec(pdftotext/pdftoppm/pdfinfo)",
+      "exec(chrome --print-to-pdf)"
+    ],
+    "asset_contract": "交付物固定落在 output/pdf/；工作副本 tmp/ 不进版本库"
+  },
+  "release_gates": [
+    "package validation",
+    "trigger boundary evaluation",
+    "secret scan",
+    "no-fabrication contract (table/figure data verbatim)",
+    "renderer dependency probe (chromium + CJK font)"
+  ],
+  "attribution": {
+    "draft_origin": "用户提供的技能草稿，按 OpenBot 运行时能力面校验后入库",
+    "note": "原稿以 macOS 路径写死 Chrome；本版改为可探测的 Chromium 路径解析，见 references/environment.md"
+  }
+}

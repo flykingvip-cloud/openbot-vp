@@ -1,0 +1,42 @@
+<!--__INLINE_VISUALIZATION_FRAGMENT__-->
+<script>
+(() => {
+  // Minimal tooltip for [data-tooltip] — rewritten for OpenBot templates.
+  const tip = document.createElement("div");
+  tip.className = "tooltip";
+  tip.setAttribute("role", "tooltip");
+  tip.hidden = true;
+  document.body.appendChild(tip);
+
+  let active = null;
+  const show = (el) => {
+    const text = el.getAttribute("data-tooltip");
+    if (!text) return;
+    active = el;
+    tip.textContent = text;
+    tip.hidden = false;
+    const r = el.getBoundingClientRect();
+    const pad = 8;
+    tip.style.left = `${Math.max(pad, Math.min(window.innerWidth - tip.offsetWidth - pad, r.left + r.width / 2 - tip.offsetWidth / 2 + window.scrollX))}px`;
+    tip.style.top = `${Math.max(pad, r.top + window.scrollY - tip.offsetHeight - 6)}px`;
+  };
+  const hide = () => {
+    active = null;
+    tip.hidden = true;
+  };
+
+  document.addEventListener("pointerover", (e) => {
+    const el = e.target.closest?.("[data-tooltip]");
+    if (el) show(el);
+  });
+  document.addEventListener("pointerout", (e) => {
+    const el = e.target.closest?.("[data-tooltip]");
+    if (el && el === active) hide();
+  });
+  document.addEventListener("focusin", (e) => {
+    const el = e.target.closest?.("[data-tooltip]");
+    if (el) show(el);
+  });
+  document.addEventListener("focusout", () => hide());
+})();
+</script>

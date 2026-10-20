@@ -1,0 +1,44 @@
+{
+  "stage": "SHADOW_OBSERVATION_AND_ROLLBACK",
+  "shadowEnabledNow": false,
+  "liveShaUnchanged": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-25",
+  "observationWindow": {
+    "durationSec": 240,
+    "shadowState": "ON (during observation)",
+    "auth": "PASS",
+    "wsConnect": "PASS",
+    "subscriptionAck": "PASS",
+    "nonDepthEventVisible": true,
+    "depthEvents": 0,
+    "depthEventsNote": "no natural inbound chat traffic during the passive window; traffic was not synthetically generated. Shadow enabled and observation link live; chat.depth_decided would populate on real traffic.",
+    "rawTextLeaks": 0,
+    "sensitiveFieldScan": "PASS",
+    "captureExit": 0,
+    "anomaly": "none",
+    "toolSha256": "c5bd973b15eec22344a9d2f8bc8aebff599661bc5a9cd200d4c235ee5a1d1d6b"
+  },
+  "rollback": {
+    "reason": "operator-directed disable of shadow after observation",
+    "tool": "csc-shadow-recreate-v2.sh rollback",
+    "restoredFrom": "openbot-gateway-rc-prev-preshadow-20260825T101207Z (pre-shadow safety container)",
+    "result": "ROLLBACK_OK healthz 200",
+    "firstAttemptNote": "an initial rollback invocation was interrupted by concurrent main-workspace git activity (a rebase conflict in .loom/registry.yaml on another agent's branch) and was killed at the command timeout WITHOUT executing; production stayed safe (shadow container still Up + healthy, safety container intact); the csc worktree was unaffected; the rollback was then re-run cleanly and succeeded"
+  },
+  "postRollbackVerify": {
+    "buildInfoCommit": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "healthz": 200,
+    "readyz": { "ready": true, "failing": [] },
+    "inboundFamilyKeyCount": 0,
+    "shadowFlag": "absent (shadow OFF)",
+    "containerStatus": "running (restored pre-shadow container)",
+    "restartCount": 0,
+    "leftoverSafetyContainers": 0,
+    "rollbackToolingRemoved": true
+  },
+  "notModified": ["RELEASE_RECORD.md", "releases.jsonl", "LIVE ledger (no row)"],
+  "endState": "Production is back to the pre-enable shadow-OFF baseline: LIVE a12e4c59e575, healthz 200, readyz ready, all inbound/CSC/Context flags unset.",
+  "reEnableNote": "Re-enabling shadow later is one authorized step: csc-shadow-recreate-v2.sh enable (strictly shadow-only) under a fresh explicit authorization; .env.docker is now 600 so the permission gate passes."
+}

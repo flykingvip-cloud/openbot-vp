@@ -1,0 +1,147 @@
+{
+  "schema": "memory-workspace-phase1b-unlock-decision-request/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-unlock-decision-request.json",
+  "kind": "unlock-decision-preparation",
+  "operationId": "phase1b-unlock-decision-85f55ee2fa-20260820T031500Z",
+  "baselineSha": "ac6e89185b7fb0451cfe6ff0f17c182fb6ece48b",
+  "reviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+  "reviewSurface": "https://github.com/gmood2008/openbot/pull/538",
+  "handoff": ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-unlock-decision.md",
+  "canonicalUnlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "unlock": "not-issued",
+  "recommendUnlock": "issue-minimal",
+  "decision": "recommend-issue-minimal-pending-independent-review",
+  "signedBy": null,
+  "issuedAt": null,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "cutoverLive": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "items": {
+    "2": "met",
+    "3": "met",
+    "4": "met",
+    "5": "met",
+    "6": "not-met",
+    "7": "not-met"
+  },
+  "item6Unlocked": false,
+  "item7Unlocked": false,
+  "item6Locked": true,
+  "item7Locked": true,
+  "currentStatus": {
+    "item2": {
+      "status": "met",
+      "source": "canonical origin/main scorecard and unlock-decision items.2",
+      "note": "item2 production SoT decision status=accepted. This is not Catalog miss=deny and not a new production dump."
+    },
+    "item3": {
+      "status": "met",
+      "source": "memory-workspace-phase1b-item3-write-switch-acceptance.json",
+      "enablesProduction": false,
+      "note": "Dark write-switch acceptance only."
+    },
+    "item4": {
+      "status": "met",
+      "source": "canonical origin/main scorecard and items-3-7 measured.schemaV2Present",
+      "schemaV2Enabled": false,
+      "note": "Same-release DDL/presence is met. schema v2 production write stays forbidden."
+    },
+    "item5": {
+      "status": "met",
+      "source": "independent Item 5 met decision review of frozen PR #538",
+      "reviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+      "closeoutBinding": "docs/design/evidence/memory-workspace-phase1b-item5-final-closeout-binding.json",
+      "metDecision": "docs/design/evidence/memory-workspace-phase1b-item5-met-decision.json",
+      "closeoutPacketsRemainItem5MetFalse": true,
+      "note": "Item 5 met does not issue Phase 1B unlock and does not flip wiredToProductionResolver."
+    },
+    "item6": {
+      "status": "not-met",
+      "locked": true,
+      "blockers": [
+        "Phase 1B Item 6 remains locked until after an issued unlock and a separate Item 6 handoff",
+        "cutover drill receipt status=revoked and backup=null",
+        "U1 production-equivalent item6Candidate=met is official candidate scoring only and is not Item 6 unlock"
+      ]
+    },
+    "item7": {
+      "status": "not-met",
+      "locked": true,
+      "blockers": [
+        "productionWriteWatchIndex is not 0 (ledger 37 / items-3-7 measured 38)",
+        "Retirement and I3 are forbidden until a separate Item 7 review after unlock",
+        "old write sites must not be deleted in this package"
+      ]
+    }
+  },
+  "item5MetCitations": {
+    "pr": "https://github.com/gmood2008/openbot/pull/538",
+    "tip": "85f55ee2fa76f88dc538180b481a5823631af649",
+    "handoff": ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-final-closeout.md",
+    "binding": "docs/design/evidence/memory-workspace-phase1b-item5-final-closeout-binding.json",
+    "metDecision": "docs/design/evidence/memory-workspace-phase1b-item5-met-decision.json",
+    "notFinalItem5Proof": [
+      ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-runtime-alignment-20260819.md",
+      "dirty I4 or kiro-loom worktree"
+    ]
+  },
+  "scorecardDivergence": {
+    "originMainUnlockDecisionAndScorecardItem6": "met",
+    "thisPackageItem6": "not-met/locked",
+    "reason": "origin/main scorecard item 6=met tracks U1 production-equivalent candidate scoring. Phase 1B Item 6 stays not-met/locked. items-3-7.json item 6 status is not-met."
+  },
+  "allowedIfIssued": [
+    "Item 6 / Item 7 design or limited implementation under each owner and a new handoff",
+    "shadow / read-only / fixture verification",
+    "separately approved write slices after their own review"
+  ],
+  "stillForbiddenIfIssued": [
+    "wiredToProductionResolver=true",
+    "Catalog miss=deny full cutover",
+    "schema v2 production write",
+    "delete old write sites",
+    "Item 7 Retirement / I3",
+    "LIVE cutover",
+    "cross-tenant migration",
+    "unapproved production data mutation",
+    "deployAuthorized=true"
+  ],
+  "rollbackAndRevoke": [
+    "If this request is rejected, canonical receipt stays not-issued and phase1bExecutionBlocked stays true",
+    "If an issued stamp is later found invalid, revoke it and restore not-issued like memory-workspace-phase1b-unlock-issued-stamp-revoke.json",
+    "Item 5 closeout JSON and final binding stay frozen and are not rewritten",
+    "Do not overlay a new production runtime as part of unlock"
+  ],
+  "doesNotAuthorize": [
+    "treat this request as an issued unlock receipt",
+    "start Item 6/7 implementation acceptance",
+    "wiredToProductionResolver=true",
+    "LIVE cutover",
+    "deployAuthorized=true",
+    "score Item 6 met from item6Candidate",
+    "score Item 7 met"
+  ],
+  "references": {
+    "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json": "8c1802dc856bb8f0448b455f5812c73a4dc2ce4da71f87a24e5007f601e05f46",
+    "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json": "6c9d3d46f99d2d2ca212b1336b9ebb8bbdb539c0543b23bbdf22c92b55f9e3a6",
+    "docs/design/evidence/memory-workspace-phase1b-items-3-7.json": "ba7887b322956fc4e5794113e04d657ee4945d46eeb089951e18a5baea546a90",
+    "docs/design/evidence/memory-workspace-phase1b-item3-write-switch-acceptance.json": "59a6214397a469a7104acc6835d5f6efb88ec8556c73d0eae95a2c9cec623511",
+    "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json": "42fa4d97c5349e04053bf584091ac6eca1a16ca07e0da479366553bcdf71122b",
+    "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json": "e0f44dfbc8a3d42d07f10354bf73eb13b47be76735680b124d2f0291bef78b8b",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-ledger.json": "9ea3b30014a4d4770cc3f938402cdffdd0d60ffeac8d6aa9d1a15e6685c8af38",
+    "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json": "32ca3a9d43fb5a18628529da8d84fc91ea848f3d5e86e0bfcd05d89097feccb1",
+    "docs/design/evidence/memory-workspace-phase1b-item5-final-closeout-binding.json": "0d332e0ef1e6f08c40f4edaca7e7d371076bc7d58a6f678366e555a93f1d3f8f",
+    "docs/design/evidence/memory-workspace-phase1b-item5-met-decision.json": "dcdc57987789b8fa4b1c32036b8ceb5b36127755b500058b715ba6fbb321240d",
+    ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-final-closeout.md": "2f6a30037345e7a7b7bf52026e6cecfc0928dd6fb33893105eaf745203501ae0",
+    "docs/design/evidence/memory-workspace-phase1b-item5-production-closeout.json": "c88c12889b53ea5acc234ee7b4577211cf427236ded77e0de832ce7e21cbe9dc",
+    "docs/design/evidence/memory-workspace-phase1b-item5-production-live-caller.json": "31ef555cfadeb0ea3520e64ccf677d6d9660958d1d2d6f469997fb2e355e2045",
+    "docs/design/evidence/memory-workspace-phase1b-item5-production-registry-catalog.json": "20d95517227f864d8e53dc49e2ec73a9ee9f2ac6f627de52e25ce835aba8324d",
+    "docs/design/evidence/memory-workspace-phase1b-item5-production-tenant-context.json": "dd2df071511cc513e331f1576101a55bbc4922bc3df0d9ef5fbe90f0900eb240",
+    "docs/design/evidence/memory-workspace-phase1b-item5-production-evidence-summary.json": "955ae72751b9e485558d8125673dcb523f211207cd626e768929093fc3324953",
+    ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-unlock-decision.md": "ef0336f96e6fbe028c4a69a46437cdaabcd9664da61c11978a19249f51058298"
+  },
+  "note": "Preparation only. Canonical unlock receipt remains not-issued. This file is not an unlock-first stamp."
+}

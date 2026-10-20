@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-53v6-4h7p-p4gj",
+  "cve": "CVE-2026-107387",
+  "package": "music-metadata",
+  "vulnerable_range": "<=11.12.3",
+  "affected_version_before": "11.12.3",
+  "dependency_path": "extensions__matrix>music-metadata",
+  "severity": "moderate",
+  "direct_or_transitive": "direct(extension)",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=11.16.0",
+  "mitigated_version": "11.16.0",
+  "reachable_surface": "APEv2 tag parse via extensions/matrix direct music-metadata (also reached via @whiskeysockets/baileys); attacker-controlled tag size → unbounded alloc",
+  "mitigation": "Bump extensions/matrix dependencies.music-metadata ^11.12.3 → ^11.16.0; root pnpm.overrides.music-metadata 11.12.3 → 11.16.0",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Same pin also clears sibling music-metadata moderates GHSA-jjpr-9cvf-cq55, GHSA-5gfj-9q3v-qfp3, GHSA-f94x-6692-553q, GHSA-8j4c-6x6g-rq3j (all need <=11.16.0 fix floor; not separate cells). Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 18,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-53v6-4h7p-p4gj"
+}

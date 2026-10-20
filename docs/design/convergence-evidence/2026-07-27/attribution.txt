@@ -1,0 +1,128 @@
+Agent Attribution — dirty working tree
+- dirty files: 95
+- attributed: 22
+- conflict (>1 owner): 9
+- unattributed: 64
+
+## codex-v111-recovery (ops-decommission) — 1
+   modified  ui/src/ui/ports/employee/views/workbench-chrome.node.test.ts
+
+## codex-v112-platform-recovery (platform-pricing-gateway-instability:codex-v112-platform-recovery) — 3
+   modified  ui/src/ui/ports/platform/advanced/page.ts
+   untracked ui/src/ui/ports/platform/shared/subscription-contract-reminder.node.test.ts
+   untracked ui/src/ui/ports/platform/shared/subscription-contract-reminder.ts
+
+## cursor-composer (employee-ai-archive:cursor-composer) — 3
+   modified  ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.node.test.ts
+   modified  ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.ts
+   modified  ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts
+
+## cursor-daibai (gateway-plugins-monolith-decomposition) — 1
+   modified  src/gateway/platform-auth.ts
+
+## cursor-fable (development-supervisor) — 2
+   modified  src/gateway/server-methods-list.ts
+   modified  src/gateway/server-methods.ts
+
+## cursor-main-recovery (enterprise-ai-model-governance:codex-production-release) — 6
+   untracked .kiro/specs/enterprise-ai-model-governance/requirements.md
+   untracked src/gateway/enterprise-model/
+   modified  src/gateway/platform-auth/session-domain.ts
+   untracked src/gateway/server-methods/enterprise-model-catalog.ts
+   untracked src/gateway/server-methods/enterprise-model-provider.test.ts
+   untracked src/gateway/server-methods/enterprise-model-provider.ts
+
+## cursor-main-recovery (main-recovery-routing) — 1
+   modified  .kiro/specs/main-recovery-routing/tasks.md
+
+## cursor-user-modeling (cross-session-user-modeling) — 1
+   modified  src/auto-reply/reply/get-reply-run.ts
+
+## kiro-agent-growth (agent-growth-lifecycle) — 1
+   modified  src/gateway/server-methods/agent-growth.ts
+
+## kiro-web-ui (knowledge-workbench-import-ia:kiro-web-ui) — 3
+   modified  .kiro/specs/knowledge-workbench-import-ia/tasks.md
+   modified  ui/src/ui/views/knowledge-universe-space-import.node.test.ts
+   modified  ui/src/ui/views/knowledge-universe-space-import.ts
+
+## CONFLICT (shared hot file, >1 owner) — 9
+   (the file's task-owner lands it; do not commit another agent's WIP — rule 2)
+   modified  .kiro/specs/platform-pricing-gateway-instability/tasks.md  <-  codex-pricing-incident (platform-pricing-gateway-instability) + codex-v112-platform-recovery (platform-pricing-gateway-instability:codex-v112-platform-recovery)
+   modified  src/gateway/method-scopes.ts  <-  cursor-fable (development-supervisor) + cursor-main-recovery (enterprise-ai-model-governance:codex-production-release)
+   modified  ui/src/styles.css  <-  codex-daibai (daibai-super-steward) + cursor-composer (employee-ai-archive:cursor-composer)
+   modified  ui/src/ui/app-gateway.ts  <-  codex-v111-recovery (agent-growth-lifecycle) + codex-daibai (daibai-super-steward) + cursor-fable (development-supervisor)
+   modified  ui/src/ui/app-render.ts  <-  cursor-builder (builder-decommission) + codex-daibai (daibai-super-steward) + cursor-composer (collaboration-deliverable-preview:cursor-composer)
+   modified  ui/src/ui/app-settings.ts  <-  codex-v111-recovery (enterprise-ui-baseline:codex-v111-recovery) + cursor-main-recovery (enterprise-ai-model-governance:codex-production-release)
+   modified  ui/src/ui/app-view-state-shell-slices.ts  <-  codex-v111-recovery (agent-growth-lifecycle) + codex-v111-recovery (ops-decommission)
+   modified  ui/src/ui/app.ts  <-  codex-v111-recovery (agent-growth-lifecycle) + codex-v111-recovery (ops-decommission)
+   modified  ui/src/ui/controllers/chat.ts  <-  codex-v111-recovery (agent-growth-lifecycle) + cursor-composer (collaboration-deliverable-preview:cursor-composer)
+
+## UNATTRIBUTED — 64
+   (no spec's ## Agents block claims these paths; the owning agent
+    must sign in via tasks.md `## Agents` with a matching `paths:`)
+   untracked .kiro/specs/delivery-alignment-guard/requirements.md
+   modified  .kiro/specs/development-supervisor/tasks.md
+   modified  CHANGELOG.md
+   modified  deploy/admin-subdomain/admin.openbot.love.conf
+   modified  deploy/admin-subdomain/README.md
+   modified  packages/collaboration-core/src/types/learning.ts
+   modified  packages/collaboration-runtime/src/contracts/learning-promotion.ts
+   untracked src/auto-reply/reply/__fixtures__/
+   modified  src/auto-reply/reply/agent-runner-execution.ts
+   modified  src/auto-reply/reply/collaboration-learning-backflow.test.ts
+   modified  src/auto-reply/reply/collaboration-learning-store.ts
+   untracked src/auto-reply/reply/experience-capsule-backflow.ts
+   untracked src/auto-reply/reply/learning-evolution.e2e.test.ts
+   untracked src/auto-reply/reply/learning-recall-context.ts
+   untracked src/auto-reply/reply/learning-recall-cross-process.e2e.test.ts
+   untracked src/auto-reply/reply/learning-recall.test.ts
+   untracked src/auto-reply/reply/learning-recall.ts
+   untracked src/auto-reply/reply/learning-skill-curation.ts
+   modified  src/commands/status-all/format.ts
+   untracked src/gateway/agent-growth/experience-capsule.test.ts
+   untracked src/gateway/agent-growth/experience-capsule.ts
+   untracked src/gateway/agent-growth/genome.test.ts
+   untracked src/gateway/agent-growth/genome.ts
+   untracked src/gateway/agent-growth/growth-events.test.ts
+   untracked src/gateway/agent-growth/growth-events.ts
+   modified  src/gateway/agent-growth/operational-metrics-store.ts
+   modified  src/gateway/agent-growth/operational-score.ts
+   untracked src/gateway/agent-growth/skill-draft-curation.ts
+   untracked src/gateway/agent-growth/working-style-effectiveness.test.ts
+   untracked src/gateway/agent-growth/working-style-effectiveness.ts
+   untracked src/gateway/agent-growth/working-style-store.test.ts
+   untracked src/gateway/agent-growth/working-style-store.ts
+   untracked src/gateway/collaboration-learning/capsule-governance.test.ts
+   untracked src/gateway/collaboration-learning/review-rejection-experience.ts
+   modified  src/gateway/collaboration-learning/state-machine.ts
+   modified  src/gateway/control-ui.http.test.ts
+   modified  src/gateway/control-ui.ts
+   untracked src/gateway/enterprise-data/connector-credential-vault-key.ts
+   modified  src/gateway/enterprise-data/connector-credential-vault.ts
+   modified  src/gateway/enterprise-org-departments.test.ts
+   modified  src/gateway/enterprise-seat-assets-store.ts
+   modified  src/gateway/enterprise-seat-assets.ts
+   modified  src/gateway/platform-auth.test.ts
+   modified  src/gateway/platform-auth/auth-helpers.ts
+   modified  src/gateway/platform-auth/http-handler.ts
+   modified  src/gateway/platform-auth/routes-employee.ts
+   modified  src/gateway/protocol/index.ts
+   modified  src/gateway/protocol/schema/collaboration.ts
+   modified  src/gateway/protocol/schema/protocol-schemas.ts
+   modified  src/gateway/server-methods/collaboration-learning.ts
+   modified  ui/index.html
+   modified  ui/src/i18n/lib/registry.ts
+   modified  ui/src/i18n/lib/translate.ts
+   modified  ui/src/styles/auth-home.css
+   modified  ui/src/styles/trial-apply.css
+   modified  ui/src/ui/brand-assets.ts
+   untracked ui/src/ui/capability/ai-workforce-governance/pages/working-style-effects-panel.ts
+   modified  ui/src/ui/capability/ai-workforce-governance/services/governanceApi.ts
+   modified  ui/src/ui/capability/ai-workforce-governance/types/index.ts
+   deleted   ui/src/ui/controllers/knowledge-universe-passive-connector.ts
+   modified  ui/src/ui/controllers/knowledge-universe-workspace.ts
+   modified  ui/src/ui/ports/enterprise/views/enterprise-workforce-governance-surface.ts
+   modified  ui/src/ui/views/auth-home.browser.test.ts
+   modified  ui/src/ui/views/auth-home.ts
+

@@ -1,0 +1,138 @@
+{
+  "schema": "memory-workspace-phase0-phase1a-entry-checklist/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "updatedAt": "2026-08-16T08:00:00.000Z",
+  "updatedBy": "cursor-memory-platform",
+  "prerequisite": {
+    "phase0MarkAccepted": true,
+    "phase0SignOffMergedMainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+    "note": "Phase 0 closed (#422). Phase 1A design/sign-off in progress; Phase 1B blocked until §14.1."
+  },
+  "phase1aAllowedScope": "design-and-owner-signoff-only",
+  "phase1bExecutionBlocked": true,
+  "section141Items": [
+    {
+      "id": "arch-org-resource-tree",
+      "text": "架构评审确认组织树/资源树分离",
+      "status": "pending",
+      "ownerRole": "平台架构"
+    },
+    {
+      "id": "dg-envelope-resourceid",
+      "text": "DataGovernanceEnvelope 唯一 Envelope，持久主键 resourceId",
+      "status": "pending",
+      "ownerRole": "数据治理"
+    },
+    {
+      "id": "dg-catalog-sot",
+      "text": "Data Governance Catalog 唯一 SoT",
+      "status": "pending",
+      "ownerRole": "数据治理 / Catalog"
+    },
+    {
+      "id": "security-cwd-data-root",
+      "text": "tool cwd 与数据根分别授权，Managed fail-closed",
+      "status": "pending",
+      "ownerRole": "多租户 / 安全"
+    },
+    {
+      "id": "memory-asset-boundary",
+      "text": "Workspace memory root/index 与 Memory Asset 分离",
+      "status": "pending",
+      "ownerRole": "记忆检索 Owner"
+    },
+    {
+      "id": "storage-binding-record",
+      "text": "P0 沿用 WorkspaceBindingRecord",
+      "status": "pending",
+      "ownerRole": "存储评审"
+    },
+    {
+      "id": "cutover-record-guard",
+      "text": "扩展现有 workspace cutover record/guard",
+      "status": "pending",
+      "ownerRole": "Cutover Owner"
+    },
+    {
+      "id": "memory-partitioning",
+      "text": "files/chunks/FTS/vector 全链路分区",
+      "status": "pending",
+      "ownerRole": "记忆 Owner"
+    },
+    {
+      "id": "sqlite-backup-fencing",
+      "text": "SQLite backup、重建迁移、fencing 和回滚",
+      "status": "pending",
+      "ownerRole": "DBA/SRE"
+    },
+    {
+      "id": "phase0-2-gates-green",
+      "text": "副本迁移演练和 Phase 0-2 自动化门禁全绿",
+      "status": "partial",
+      "note": "Phase 0 engineering gate pass; Phase 1+ gates not started"
+    },
+    {
+      "id": "canary-change-ticket",
+      "text": "canary 租户变更票、回滚截止时间、值守 owner",
+      "status": "pending",
+      "ownerRole": "SRE / 发布"
+    },
+    {
+      "id": "forward-only-release",
+      "text": "发布候选人基于新鲜 origin/main，forward-only 通过",
+      "status": "pending",
+      "ownerRole": "QA / 发布"
+    }
+  ],
+  "workstreamOwners": {
+    "WS-A": {
+      "owner": "codex-workspace-architecture",
+      "status": "contracts-drafted-awaiting-signoff",
+      "phase1aGate": "awaiting-§14.1-architecture-rows",
+      "contracts": [
+        "docs/design/evidence/memory-workspace-phase1a-catalog-contract.json",
+        "docs/design/evidence/memory-workspace-phase1a-membership-contract.json"
+      ]
+    },
+    "WS-B": {
+      "owner": "cursor-data-governance",
+      "status": "change-request-accepted",
+      "phase1aGate": "accepted on main #429; write switch still forbidden",
+      "dispatch": "docs/design/evidence/memory-workspace-phase0-ws-b-dispatch.json"
+    },
+    "WS-C": {
+      "owner": "cursor-memory-wsc",
+      "status": "boundary-drafted-awaiting-signoff",
+      "phase1aGate": "awaiting-§14.1-memory-row",
+      "contracts": ["docs/design/evidence/memory-workspace-phase1a-memory-boundary.json"]
+    },
+    "WS-D": {
+      "owner": "cursor-fable",
+      "status": "matrix-drafted-awaiting-signoff",
+      "phase1aGate": "awaiting-§14.1-storage-row",
+      "contracts": ["docs/design/evidence/memory-workspace-phase1a-binding-impact-matrix.json"]
+    },
+    "WS-E": {
+      "owner": "cursor-fable",
+      "retirementOwner": "cursor-data-governance",
+      "note": "Freeze merged; Retirement pending and must stay a different owner"
+    }
+  },
+  "firstPhase1aActionsAfterPhase0Close": [
+    "cursor-data-governance accept WS-B resolver change request (design gate only)",
+    "codex-workspace-architecture sign §14.1 architecture + data-governance rows",
+    "cursor-data-governance sign §14.1 security row",
+    "cursor-memory-wsc sign §14.1 memory + SRE rows (design only)",
+    "cursor-fable sign §14.1 storage/cutover row",
+    "Owners sign the drafted §14.1 packets (coordinator does not self-sign)",
+    "Do not merge kiro review-26 sign-off; review-25 (#422) is the effective Phase 0 close"
+  ],
+  "explicitlyForbidden": [
+    "LIVE schema change",
+    "Resolver write switch",
+    "deployAuthorized=true",
+    "Phase 1B write-path convergence",
+    "Catalog SoT write from inventory alone"
+  ]
+}

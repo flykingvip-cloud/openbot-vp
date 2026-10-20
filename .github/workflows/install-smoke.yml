@@ -1,0 +1,147 @@
+name: Install Smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: install-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs-scope:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      docs_only: ${{ steps.check.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          fetch-tags: false
+
+      - name: Ensure docs-scope base commit
+        uses: ./.github/actions/ensure-base-commit
+        with:
+          base-sha: ${{ github.event_name == 'push' && github.event.before || github.event.pull_request.base.sha }}
+          fetch-ref: ${{ github.event_name == 'push' && github.ref_name || github.event.pull_request.base.ref }}
+
+      - name: Detect docs-only changes
+        id: check
+        uses: ./.github/actions/detect-docs-changes
+
+  install-smoke:
+    needs: [docs-scope]
+    if: needs.docs-scope.outputs.docs_only != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Checkout CLI
+        uses: actions/checkout@v7
+      # ~30 GB of preinstalled Android/.NET/Haskell/Swift toolchains that no smoke build
+      # here uses. Reclaimed inline rather than via a third-party action to avoid adding
+      # an unpinned dependency to the supply chain.
+      - name: Free disk space
+        run: |
+          set -euo pipefail
+          echo "before:"; df -h / | tail -1
+          sudo rm -rf \
+            /usr/local/lib/android \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /opt/ghc \
+            /usr/local/.ghcup \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          echo "after:"; df -h / | tail -1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      # Smoke builds stay driver-agnostic: they only `load` locally and never export a
+      # gha cache, so buildx needs no registry or cache backend here.
+      - name: Build root Dockerfile smoke image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          tags: openclaw-dockerfile-smoke:local
+          load: true
+          push: false
+          provenance: false
+
+      - name: Run root Dockerfile CLI smoke
+        run: |
+          docker run --rm --entrypoint sh openclaw-dockerfile-smoke:local -lc 'which openclaw && openclaw --version'
+          docker image rm openclaw-dockerfile-smoke:local
+          df -h / | tail -1
+
+      # This smoke only validates that the build-arg path preinstalls selected
+      # extension deps without breaking image build or basic CLI startup. It
+      # does not exercise runtime loading/registration of diagnostics-otel.
+      - name: Build extension Dockerfile smoke image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ./Dockerfile
+          build-args: |
+            OPENCLAW_EXTENSIONS=diagnostics-otel
+          tags: openclaw-ext-smoke:local
+          load: true
+          push: false
+          provenance: false
+
+      - name: Smoke test Dockerfile with extension build arg
+        run: |
+          docker run --rm --entrypoint sh openclaw-ext-smoke:local -lc 'which openclaw && openclaw --version'
+          docker image rm openclaw-ext-smoke:local
+          df -h / | tail -1
+
+      - name: Build installer smoke image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./scripts/docker
+          file: ./scripts/docker/install-sh-smoke/Dockerfile
+          tags: openbot-install-smoke:local
+          load: true
+          push: false
+          provenance: false
+
+      - name: Build installer non-root image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ./scripts/docker
+          file: ./scripts/docker/install-sh-nonroot/Dockerfile
+          tags: openbot-install-nonroot:local
+          load: true
+          push: false
+          provenance: false
+
+      - name: Verify installer URLs serve a script
+        run: |
+          set -euo pipefail
+          for url in https://openbot.love/install.sh https://openbot.love/install-cli.sh; do
+            type=$(curl -fsSL -o /tmp/installer.body -w '%{content_type}' "$url")
+            head -c 2 /tmp/installer.body > /tmp/installer.magic
+            if [ "$(cat /tmp/installer.magic)" != '#!' ]; then
+              echo "::error::$url returned content-type '$type' and does not start with a shebang."
+              echo "::error::First line: $(head -1 /tmp/installer.body)"
+              echo "::error::Installers are published from the openbot.love repo (public/install*.sh)."
+              exit 1
+            fi
+            echo "$url ok ($type, $(wc -c < /tmp/installer.body) bytes)"
+          done
+      - name: Run installer docker tests
+        env:
+          CLAWDBOT_NO_ONBOARD: "1"
+          CLAWDBOT_INSTALL_SMOKE_SKIP_CLI: "1"
+          CLAWDBOT_INSTALL_SMOKE_SKIP_IMAGE_BUILD: "1"
+          CLAWDBOT_INSTALL_NONROOT_SKIP_IMAGE_BUILD: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+          CLAWDBOT_INSTALL_SMOKE_SKIP_NONROOT: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+          CLAWDBOT_INSTALL_SMOKE_SKIP_PREVIOUS: "1"
+        run: bash scripts/test-install-sh-docker.sh

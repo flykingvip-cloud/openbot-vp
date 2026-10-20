@@ -1,0 +1,103 @@
+{
+  "schema": "task-progress-ledger-7cd74d4c-independent-reverify/v1",
+  "recordedAt": "2026-08-22T23:26:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-release-acceptance-not-passed",
+  "reason": "Live artifact and origin/main tip match 7cd74d4c, but origin/main RELEASE_RECORD Latest is still the GHCR 5c221 recreate and has no Source revision. Unparameterized delivery alignment passes only against 2026-07 fixture SHAs. Live-matched alignment fails. Do not mark this cutover as fully accepted.",
+  "releaseWorktree": {
+    "path": "/tmp/openbot-release-wt",
+    "head": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "statusPorcelainCount": 0,
+    "fetchExit": 0,
+    "nodeModules": "symlink to dirty shared tree; gates used this worktree as the git root"
+  },
+  "tripleShaCheck": {
+    "originMain": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "originMainSubject": "Merge pull request #610 from gmood2008/cursor-data-governance/phase1b-item7-retirement-batch4-s18",
+    "liveBuildInfoCommit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "originMainReleaseRecordLatest": {
+      "heading": "Latest cutover (2026-08-22) — GHCR full-image recreate (`provenance/sha-5c221b9ec38c`)",
+      "sourceField": "origin/main @ 5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "sourceRevisionField": null,
+      "mentions7cd74d4c": false
+    },
+    "localKiroLoomReleaseRecordLatest": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "allThreeEqualOnOriginMain": false
+  },
+  "productionObserved": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "builtAt": "2026-08-22T15:09:15.742Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "healthz": { "ok": true, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "uiPin": "index-Dpg8P1UR.js",
+    "overlayId": "origin-main-7cd74d4c-item7-s18-r1",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "changedThisRound": false
+    }
+  },
+  "gates": {
+    "verifyForwardOnly": {
+      "worktree": "/tmp/openbot-release-wt",
+      "candidate": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "exit": 0,
+      "verdict": "allow",
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "liveSource": "container",
+      "releaseRecordSha": null,
+      "note": "LIVE was read from the running container over SSH, not from RELEASE_RECORD. origin/main Latest has no Source revision so parseLatestCutoverSha returns null."
+    },
+    "verifyDeliveryAlignmentUnparameterized": {
+      "command": "./deploy/production/scripts/verify-delivery-alignment.sh",
+      "exit": 0,
+      "summary": "PASS=9 WARN=1 FAIL=0",
+      "prodShaChecked": "a5c9765ce73b5f04cb1e70b94cea035e82221f22",
+      "candidateTagChecked": "rc-convergence-2026-07-20",
+      "candidateShaChecked": "9aceda7349da2190e00bb2fbb029175a517ecde7",
+      "note": "This is the 2026-07 fixture. Passing it does not prove the 7cd74d4c overlay. Reviewer FAIL (missing tag / missing image) was environment-specific; this clean worktree has the tag and the 9aceda7 image."
+    },
+    "verifyDeliveryAlignmentLiveMatched": {
+      "command": "./deploy/production/scripts/verify-delivery-alignment.sh --prod-sha 7cd74d4c… --candidate-sha 7cd74d4c… --candidate-tag provenance/sha-7cd74d4c5c69",
+      "exit": 1,
+      "summary": "PASS=7 WARN=3 FAIL=1",
+      "blocker": "L3 SoT RELEASE_RECORD missing prod SHA 7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "note": "7cd74d4c Latest exists only on local kiro-loom commits (e5c6960479), not on origin/main."
+    }
+  },
+  "reviewerClaimsChecked": {
+    "forwardOnlyBlockLiveUnresolvable": {
+      "reproducedInThisCleanWorktree": false,
+      "observed": "allow; liveSource=container"
+    },
+    "alignmentFailMissingRcConvergenceTag": {
+      "reproducedInThisCleanWorktree": false,
+      "observed": "unparameterized PASS=9; tag rc-convergence-2026-07-20 present on origin"
+    },
+    "dirtyFileCount58": {
+      "primaryWorkspace": "kiro-loom/phase1a-section141-ownership-v2 still dirty; not used as gate root",
+      "cleanWorktreeDirtyCount": 0
+    }
+  },
+  "explicitlyNotDone": [
+    "Did not mark production release acceptance as passed",
+    "Did not change Progress Ledger flag",
+    "Did not recreate or restart the production container",
+    "Did not land RELEASE_RECORD 7cd74d4c onto origin/main",
+    "Did not build or overlay from the dirty kiro-loom tree"
+  ],
+  "requiredBeforeAcceptancePass": [
+    "Land Latest cutover with Source revision = 7cd74d4c5c69e7492eb6d624531f27592d6c809a onto origin/main",
+    "Re-run live-matched verify-delivery-alignment.sh from a clean worktree and require FAIL=0",
+    "Do not treat unparameterized 2026-07 fixture PASS as proof of the 7cd74d4c overlay"
+  ]
+}

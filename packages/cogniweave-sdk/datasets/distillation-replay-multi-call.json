@@ -1,0 +1,99 @@
+{
+  "version": "replay-v1",
+  "scope": {
+    "workspaceId": "ws_eval",
+    "projectId": "proj_eval",
+    "agentId": "agent_eval",
+    "visibility": "private"
+  },
+  "cases": [
+    {
+      "id": "replay_all_stages_ok",
+      "rawInput": "External API latency is high and queue backlog is rising. Plan mitigation strategy.",
+      "sourceType": "chat",
+      "stagePlan": {
+        "event": true,
+        "context": true,
+        "atoms": true,
+        "relations": true
+      }
+    },
+    {
+      "id": "replay_atoms_timeout",
+      "rawInput": "Sync retry policy under high latency keeps blocking workers.",
+      "sourceType": "chat",
+      "stagePlan": {
+        "event": true,
+        "context": true,
+        "atoms": false,
+        "relations": true
+      }
+    },
+    {
+      "id": "replay_context_timeout",
+      "rawInput": "Investigate throughput drop with mixed tool logs and partial telemetry.",
+      "sourceType": "tool_log",
+      "stagePlan": {
+        "event": true,
+        "context": false,
+        "atoms": true,
+        "relations": true
+      }
+    },
+    {
+      "id": "replay_relations_timeout",
+      "rawInput": "Need strategy recommendation while relation extraction API is unstable.",
+      "sourceType": "chat",
+      "stagePlan": {
+        "event": true,
+        "context": true,
+        "atoms": true,
+        "relations": false
+      }
+    },
+    {
+      "id": "replay_event_timeout",
+      "rawInput": "We only have partial stage outputs and no complete event summary yet.",
+      "sourceType": "chat",
+      "stagePlan": {
+        "event": false,
+        "context": true,
+        "atoms": true,
+        "relations": true
+      }
+    },
+    {
+      "id": "replay_atoms_relations_timeout",
+      "rawInput": "Multiple retries failed during distillation; keep fallback robust.",
+      "sourceType": "chat",
+      "stagePlan": {
+        "event": true,
+        "context": true,
+        "atoms": false,
+        "relations": false
+      }
+    },
+    {
+      "id": "replay_all_stages_ok_2",
+      "rawInput": "Customer preference context is stable; generate strategy suggestions with evidence links.",
+      "sourceType": "document",
+      "stagePlan": {
+        "event": true,
+        "context": true,
+        "atoms": true,
+        "relations": true
+      }
+    },
+    {
+      "id": "replay_context_atoms_timeout",
+      "rawInput": "Pipeline status degraded and extraction stages are intermittently failing.",
+      "sourceType": "agent_run",
+      "stagePlan": {
+        "event": true,
+        "context": false,
+        "atoms": false,
+        "relations": true
+      }
+    }
+  ]
+}

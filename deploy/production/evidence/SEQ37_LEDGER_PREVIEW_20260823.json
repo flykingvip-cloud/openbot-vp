@@ -1,0 +1,24 @@
+{
+  "schema": "ledger-row-preview/v1",
+  "status": "PREVIEW_ONLY_NOT_LIVE",
+  "note": "Do not append to deploy/production/releases.jsonl or cut over until production owner approves.",
+  "proposedSeq": 37,
+  "row": {
+    "seq": 37,
+    "gatewaySha": "2a2f14f6866ce11251281e7e74d6f69a63eaa35b",
+    "uiSha": "2a2f14f6866ce11251281e7e74d6f69a63eaa35b",
+    "imageTag": "localhost/openbot:rc-amd64-provenance-2a2f14f686",
+    "imageDigest": "sha256:b1619b03cd961c960456cd91cdec57ad5f8f7df41cf6198bedbb03e5e0b37cfe",
+    "tag": "provenance/sha-2a2f14f686",
+    "liveFrom": null,
+    "liveTo": null,
+    "evidence": "PREVIEW: full-dist candidate built from clean worktree after shadow-3 fix; build-info.commit=2a2f14f6866ce11251281e7e74d6f69a63eaa35b; tarball sha256 d5c4e4f802fe…; smoke on host :18889; rollback drill to seq36 e6f26 via 5a395 backup before.tgz; NOT cut over",
+    "executor": "cursor-collab-csc",
+    "notes": "Preview only. Requires merge of shadow fix to origin/main tip and owner approval before liveFrom is set."
+  },
+  "closesSeq36": {
+    "seq": 36,
+    "gatewaySha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "liveTo": "TBD_ON_APPROVED_CUTOVER"
+  }
+}

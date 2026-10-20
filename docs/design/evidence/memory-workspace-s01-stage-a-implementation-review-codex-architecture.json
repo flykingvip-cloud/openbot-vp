@@ -1,0 +1,183 @@
+{
+  "schema": "memory-workspace-s01-stage-a-implementation-review/v1",
+  "kind": "s01-stage-a-implementation-architecture-review",
+  "reviewer": "codex-architecture",
+  "signedBy": "codex-architecture",
+  "signedAt": "2026-08-30T11:15:00.000Z",
+  "reviewPass": 2,
+  "scope": "s01-stage-a-implementation-844",
+  "decision": "accepted",
+  "stageAAdapterImplementation": "accepted",
+  "ia1": "closed",
+  "ia2": "closed",
+  "fillsKiroSotReviewer": false,
+  "flipsImplementationGate": false,
+  "packetSelfAccepted": false,
+  "authorizesStageAAccept": false,
+  "authorizesStageB": false,
+  "acceptsUnauthorizedLanding833": false,
+  "mergedBaseline": {
+    "originMain": "e5134c6ee49db6752b34dbeb699b4bf430390452",
+    "implementationFix": {
+      "pr": 844,
+      "mergeSha": "e5134c6ee49db6752b34dbeb699b4bf430390452"
+    },
+    "reviewedBlobs": {
+      "src/gateway/data-governance/s01-steward-workspace-identity.ts": "90f6d8e5cee7293786982a3af14f53904bc35168",
+      "src/gateway/data-governance/s01-authorized-tool-cwd.ts": "da6e51c111dfd2be7bf5244ae915da67e327a550",
+      "src/gateway/data-governance/s01-steward-workspace-identity.test.ts": "e3b8150c301effb86e0a851960fe0069c9a07424",
+      "src/gateway/data-governance/s01-authorized-tool-cwd.test.ts": "38d78ffc3f89ac438b7c0cd3093ab667e2cf0eac"
+    }
+  },
+  "baseline": {
+    "worktree": "/Users/daniel/AI项目/openbot-s01-stage-a-impl-review-pass2",
+    "branch": "cursor-codex-architecture/item7-s01-stage-a-impl-review-pass2",
+    "fetchedOriginMain": true,
+    "head": "e5134c6ee49db6752b34dbeb699b4bf430390452",
+    "originMain": "e5134c6ee49db6752b34dbeb699b4bf430390452",
+    "mergeBaseIsAncestor": true,
+    "didNotModifySharedWorkingTree": true,
+    "didNotModifyProductionBusinessCode": true
+  },
+  "reviewedArtifacts": [
+    "src/gateway/data-governance/s01-steward-workspace-identity.ts",
+    "src/gateway/data-governance/s01-steward-workspace-identity.test.ts",
+    "src/gateway/data-governance/s01-authorized-tool-cwd.ts",
+    "src/gateway/data-governance/s01-authorized-tool-cwd.test.ts",
+    "src/auto-reply/reply/get-reply.ts",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+  ],
+  "verdict": {
+    "targetIdentityCompleteOnSuccess": "pass",
+    "registryMapping": "pass",
+    "errorCodesAreHandoffEleven": "pass",
+    "catalogUniqueSoT": "pass",
+    "membershipPortNotArray": "pass",
+    "uniqueCanonicalActiveBinding": "pass",
+    "governanceContentFencing": "pass",
+    "retiredRevokedStaleAreArchived": "pass",
+    "pathEscapesDenied": "pass",
+    "getReplyUnwired": "pass",
+    "scanTenTen": "pass",
+    "implementationVerifiedFalse": "pass",
+    "stageBLocked": "pass",
+    "liveForbidden": "pass"
+  },
+  "closedFindings": [
+    "IA1",
+    "IA2",
+    "targetIdentityCompleteOnSuccess",
+    "registryMapping",
+    "errorCodesAreHandoffEleven",
+    "catalogUniqueSoT",
+    "membershipPortNotArray",
+    "uniqueCanonicalActiveBinding",
+    "governanceContentFencing",
+    "retiredRevokedStaleAreArchived",
+    "pathEscapesDenied",
+    "getReplyUnwired",
+    "scanTenTen",
+    "implementationVerifiedFalse",
+    "stageBLocked",
+    "liveForbidden"
+  ],
+  "openFindings": [],
+  "handoffErrorCodes": [
+    "ERR_PRINCIPAL_REQUIRED",
+    "ERR_TENANT_BINDING_REQUIRED",
+    "ERR_WORKSPACE_NOT_FOUND",
+    "ERR_TENANT_MISMATCH",
+    "ERR_CAPABILITY_DENIED",
+    "ERR_WORKSPACE_ARCHIVED",
+    "ERR_BINDING_NOT_CANONICAL",
+    "ERR_PATH_OUTSIDE_WORKSPACE",
+    "ERR_CATALOG_UNAVAILABLE",
+    "ERR_INVALID_PATH",
+    "ERR_WORKSPACE_OWNER_DENIED"
+  ],
+  "forbiddenExtraErrorCodes": [
+    "ERR_WORKSPACE_SUSPENDED",
+    "ERR_WORKSPACE_RETIRED",
+    "ERR_STALE_FENCING",
+    "ERR_OWNERSHIP_MISMATCH",
+    "ERR_BINDING_AMBIGUOUS"
+  ],
+  "locks": {
+    "stageAImplementation": "accepted",
+    "stageAAccept": "not-requested-until-both-implementation-sidecars-land",
+    "stageB": "locked",
+    "productionCatalogWrite": "none",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "i3": "not executed",
+    "live": "forbidden",
+    "deployAuthorized": false,
+    "implementationVerified": false,
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10
+  },
+  "doesNotAuthorize": [
+    "Stage A Adapter Implementation Accept packet",
+    "Stage B shadow wiring",
+    "implementationVerified=true",
+    "implementationGate=met",
+    "get-reply wiring",
+    "production Catalog write",
+    "Phase 1B unlock",
+    "I3",
+    "LIVE",
+    "filling kiro-sot-reviewer slot"
+  ],
+  "productionObservation": {
+    "getReplyStillUsesStewardHelper": true,
+    "getReplyLine": "src/auto-reply/reply/get-reply.ts:164",
+    "p1LineUnchanged": "src/auto-reply/reply/get-reply.ts:165",
+    "evaluateS01AuthorizedToolCwdImportedByGetReply": false,
+    "resolveS01StewardWorkspaceIdentityImportedByGetReply": false,
+    "S01_PRODUCTION_WIRED_TO_GET_REPLY": false
+  },
+  "findings": [
+    {
+      "id": "IA1",
+      "status": "closed",
+      "severity": "P1",
+      "title": "cwd now requires live Catalog to match targetIdentity versions and fencingToken",
+      "path": "src/gateway/data-governance/s01-authorized-tool-cwd.ts:351-358",
+      "evidence": "After re-reading Catalog, evaluateS01AuthorizedToolCwd compares resource.governanceVersion, binding.contentVersion, and binding.bindingId/contentVersion to targetIdentity.governanceVersion, contentVersion, and fencingToken. Mismatch returns ERR_WORKSPACE_ARCHIVED without requiring expectedFencing. expectedFencing remains an additional constraint only."
+    },
+    {
+      "id": "IA2",
+      "status": "closed",
+      "severity": "P1",
+      "title": "expectedBindingState is active-only; read_only cannot authorize",
+      "path": "src/gateway/data-governance/s01-steward-workspace-identity.ts:33",
+      "evidence": "S01TargetIdentity.expectedBindingState is the literal active. cwd requires target.expectedBindingState===active and binding.state===active. read_only and a forged expectedBindingState=read_only return ERR_BINDING_NOT_CANONICAL for read and write, not ERR_CAPABILITY_DENIED."
+    }
+  ],
+  "passNotes": {
+    "targetIdentityCompleteOnSuccess": "resolveS01StewardWorkspaceIdentity success returns non-null targetIdentity with tenantId, employeeOwnerId, agentAssetId, workspaceResourceId, expectedBindingRole=canonical, expectedBindingState=active, governanceVersion, contentVersion, and fencingToken.",
+    "registryMapping": "Registry resolveUniqueAgentAssetId(tenantId, slug) → agentAssetId → buildWorkspaceResourceId → Catalog getResource. Slug-as-asset and owner/agentAssetId mismatch fail closed.",
+    "errorCodesAreHandoffEleven": "Production adapters emit only the unique-handoff 11 codes. Identity uses a subset. Forbidden extras are absent.",
+    "catalogUniqueSoT": "Both adapters take WorkspaceResourceCatalog. No independent workspace_handles / authorized_cwds / tenant_memberships tables or CREATE TABLE.",
+    "membershipPortNotArray": "isMembershipPort rejects arrays. Missing membership is ERR_TENANT_BINDING_REQUIRED.",
+    "uniqueCanonicalActiveBinding": "cwd hard-requires canonical+active. Non-active including read_only is ERR_BINDING_NOT_CANONICAL.",
+    "governanceContentFencing": "Stale targetIdentity governance/content/fencing maps to ERR_WORKSPACE_ARCHIVED even when expectedFencing is omitted.",
+    "retiredRevokedStaleAreArchived": "Retired resource, retired/revoked binding, stale targetIdentity, and stale expectedFencing map to ERR_WORKSPACE_ARCHIVED.",
+    "pathEscapesDenied": "Tests deny encoded traversal, sibling prefix, absolute escape, NUL/backslash, and unverified symlinkFollowed.",
+    "getReplyUnwired": "get-reply.ts:164 remains resolveEmployeeBuiltinStewardWorkspaceDir. No Stage A adapter import in src/auto-reply.",
+    "scanTenTen": "retirement scan remaining=10 and liveWriteWatchIndex=10.",
+    "implementationVerifiedFalse": "Unique handoff and S01_IMPLEMENTATION_VERIFIED remain false. S01_PRODUCTION_WIRED_TO_GET_REPLY is false."
+  },
+  "residualConstraints": [
+    "This sidecar accepts Stage A Adapter Implementation on the #844 blobs only.",
+    "It does not apply for Stage A Adapter Implementation Accept. That request is allowed only after both pass-2 sidecars are on main.",
+    "kiro-sot-reviewer must still land its independent pass-2 sidecar. This packet does not fill that slot.",
+    "Stage B remains locked. implementationVerified remains false. LIVE remains forbidden.",
+    "This packet does not modify production adapters, get-reply.ts, src/memory/**, or workspace-resolver/**."
+  ],
+  "note": "codex-architecture pass 2 of Stage A adapters on origin/main e5134c6ee4 (#844). IA1 and IA2 are closed. Stage A Adapter Implementation is accepted. Stage B remains locked. LIVE remains forbidden. Formal Accept is not this packet."
+}

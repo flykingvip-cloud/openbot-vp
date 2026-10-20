@@ -1,0 +1,1441 @@
+/* ==========================================================================
+   Enterprise Capability Usage Management ("能力应用管理")
+   --------------------------------------------------------------------------
+   Concrete styles for the enterprise-usage-* class names emitted from
+   ui/src/ui/views/enterprise-capability-usage-management/shared/styles.css.ts
+
+   The module's `styles.css.ts` previously composed Tailwind utility strings
+   (text-2xl, flex, mb-6, …) on the assumption that Tailwind would be
+   compiled by the UI build, but the `ui/` workspace has no Tailwind
+   pipeline. The result was a fully unstyled module: misaligned sidebar,
+   overlapping headings, missing tab borders, oversized SVG empty state.
+   These rules implement the intended layout using the project's existing
+   CSS conventions ("enterprise-page", "enterprise-section", design tokens
+   from base.css/enterprise-foundation.css).
+   ========================================================================== */
+
+/* ─── Module shell ────────────────────────────────────────────────────────── */
+
+/*
+ * The usage-management page renders: module header → sub-route tabs → active
+ * sub-page. It sits inside `.enterprise-surface` (a grid with `gap: 14px`).
+ * We make this surface a full-height flex column so the active sub-page can
+ * stretch and pin its pagination footer to the bottom, and we collapse the
+ * stacked spacing between the tabs and the sub-page content (the empty band).
+ *
+ * Height chain: `.content` (scroll container, definite height) is turned into
+ * a flex column when it hosts this surface, so the outer surface wrapper and
+ * the page can stretch to fill the viewport and anchor the pagination footer.
+ */
+.content:has(.enterprise-surface--usage-management) {
+  display: flex;
+  flex-direction: column;
+}
+
+.content:has(.enterprise-surface--usage-management) > .enterprise-surface--mesh {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.enterprise-surface--usage-management {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+/* Active sub-page fills remaining height so the pagination footer can sink. */
+.enterprise-surface--usage-management > .enterprise-usage-page-container {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.enterprise-usage-page {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 24px;
+  box-sizing: border-box;
+}
+
+/* ─── Section title (within sub-pages) ────────────────────────────────────── */
+
+.enterprise-usage-section-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+}
+
+[data-theme="dark"] .enterprise-usage-section-title {
+  color: var(--text, #f3f4f6);
+}
+
+/* ─── Tabs (sub-route nav within the module) ─────────────────────────────── */
+
+.enterprise-usage-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 24px;
+  margin-top: 12px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.enterprise-usage-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted, #6b7280);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.enterprise-usage-tab:hover {
+  color: #374151;
+}
+
+.enterprise-usage-tab--active,
+.enterprise-usage-tab[aria-selected="true"] {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+[data-theme="dark"] .enterprise-usage-tab:hover {
+  color: var(--text, #e5e7eb);
+}
+
+[data-theme="dark"] .enterprise-usage-tab--active,
+[data-theme="dark"] .enterprise-usage-tab[aria-selected="true"] {
+  color: var(--accent, #60a5fa);
+  border-bottom-color: var(--accent, #60a5fa);
+}
+
+/* ─── Page container (sub-route content frame) ───────────────────────────── */
+
+.enterprise-usage-page-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 20px 24px 24px;
+  box-sizing: border-box;
+}
+
+/* ─── KPI grid ────────────────────────────────────────────────────────────── */
+
+.enterprise-usage-kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 640px) {
+  .enterprise-usage-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .enterprise-usage-kpi-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* 3-column KPI grid variant (install management summary) */
+.enterprise-usage-kpi-grid--3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (min-width: 640px) {
+  .enterprise-usage-kpi-grid--3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* ─── Filter bar ──────────────────────────────────────────────────────────── */
+
+.enterprise-usage-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* ─── Table container ─────────────────────────────────────────────────────── */
+
+.enterprise-usage-table-container {
+  overflow-x: auto;
+}
+
+/* ─── Pagination ──────────────────────────────────────────────────────────── */
+
+.enterprise-usage-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding: 16px 0 0;
+  border-top: 1px solid var(--border, #e5e7eb);
+  flex-wrap: wrap;
+}
+
+[data-theme="dark"] .enterprise-usage-pagination {
+  border-top-color: var(--border, #2b3645);
+}
+
+.enterprise-usage-pagination__total {
+  font-size: 13px;
+  color: var(--muted, #6b7280);
+}
+
+.enterprise-usage-pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.enterprise-usage-pagination__page {
+  font-size: 13px;
+  color: #374151;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-theme="dark"] .enterprise-usage-pagination__page {
+  color: var(--text, #e5e7eb);
+}
+
+/* ─── Detail dialog (modal) ───────────────────────────────────────────────── */
+
+.enterprise-usage-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: 40;
+  padding: 16px;
+}
+
+.enterprise-usage-detail-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 12px;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 10px 20px -8px rgba(0, 0, 0, 0.18);
+  z-index: 50;
+}
+
+[data-theme="dark"] .enterprise-usage-detail-dialog {
+  background: var(--card, #1f2937);
+  color: var(--text, #f3f4f6);
+}
+
+/* ─── Detail dialog: header ───────────────────────────────────────────────── */
+
+.enterprise-robot-detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px 12px 0 0;
+}
+
+.enterprise-robot-detail-header__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.enterprise-robot-detail-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted, #9ca3af);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.enterprise-robot-detail-close:hover {
+  background: var(--surface-muted, #f3f4f6);
+  color: #374151;
+}
+
+.enterprise-robot-detail-close svg {
+  width: 20px;
+  height: 20px;
+}
+
+[data-theme="dark"] .enterprise-robot-detail-header {
+  background: var(--card, #1f2937);
+  border-bottom-color: var(--border, #374151);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-header__title {
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-close:hover {
+  background: var(--surface-muted, #374151);
+  color: var(--text, #e5e7eb);
+}
+
+/* ─── Detail dialog: sections ─────────────────────────────────────────────── */
+
+.enterprise-robot-detail-section {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border, #f1f3f5);
+}
+
+.enterprise-robot-detail-section:last-child {
+  border-bottom: 0;
+}
+
+.enterprise-robot-detail-section__title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--muted, #6b7280);
+  text-transform: none;
+}
+
+[data-theme="dark"] .enterprise-robot-detail-section {
+  border-bottom-color: var(--border, #2b3645);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-section__title {
+  color: var(--muted, #9ca3af);
+}
+
+/* Basic info: hero name + meta grid */
+.enterprise-robot-detail-hero {
+  margin: 0 0 16px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+[data-theme="dark"] .enterprise-robot-detail-hero {
+  color: var(--text, #f3f4f6);
+}
+
+.enterprise-robot-detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.enterprise-robot-detail-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: var(--surface-muted, #f9fafb);
+  border: 1px solid var(--border, #eef0f2);
+  border-radius: 10px;
+}
+
+.enterprise-robot-detail-meta__label {
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+}
+
+.enterprise-robot-detail-meta__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+[data-theme="dark"] .enterprise-robot-detail-meta {
+  background: var(--surface-muted, #111827);
+  border-color: var(--border, #2b3645);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-meta__value {
+  color: var(--text, #f3f4f6);
+}
+
+/* Capability list */
+.enterprise-robot-detail-cap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.enterprise-robot-detail-cap-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  transition: background 0.12s ease;
+}
+
+.enterprise-robot-detail-cap-row:hover {
+  background: var(--surface-muted, #f9fafb);
+}
+
+.enterprise-robot-detail-cap-row__name {
+  font-weight: 500;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.enterprise-robot-detail-cap-row__metric {
+  color: var(--muted, #6b7280);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.enterprise-robot-detail-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #9ca3af);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-cap-row__name {
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-cap-row:hover {
+  background: var(--surface-muted, #111827);
+}
+
+/* Usage stats */
+.enterprise-robot-detail-stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.enterprise-robot-detail-substat__label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted, #6b7280);
+}
+
+.enterprise-robot-detail-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 88px;
+  padding: 8px 10px;
+  background: var(--surface-muted, #f9fafb);
+  border: 1px solid var(--border, #eef0f2);
+  border-radius: 10px;
+}
+
+.enterprise-robot-detail-trend__bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  background: linear-gradient(to top, #2563eb, #60a5fa);
+  border-radius: 3px 3px 0 0;
+}
+
+.enterprise-robot-detail-trend__empty {
+  margin: auto;
+  font-size: 12px;
+  color: var(--muted, #9ca3af);
+}
+
+.enterprise-robot-detail-coverage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--surface-muted, #f9fafb);
+  border: 1px solid var(--border, #eef0f2);
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.enterprise-robot-detail-coverage__label {
+  color: var(--muted, #6b7280);
+}
+
+.enterprise-robot-detail-coverage__value {
+  font-weight: 700;
+  color: #111827;
+  font-variant-numeric: tabular-nums;
+}
+
+.enterprise-robot-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.enterprise-robot-detail-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+}
+
+[data-theme="dark"] .enterprise-robot-detail-trend,
+[data-theme="dark"] .enterprise-robot-detail-coverage {
+  background: var(--surface-muted, #111827);
+  border-color: var(--border, #2b3645);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-coverage__value {
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-robot-detail-chip {
+  color: #93c5fd;
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+/* Loading skeleton (class name kept for tests; real CSS provided here) */
+.enterprise-robot-detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
+.enterprise-robot-detail-skeleton__bar {
+  height: 16px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef0f2 25%, #e2e6ea 37%, #eef0f2 63%);
+  background-size: 400% 100%;
+  animation: enterprise-robot-detail-shimmer 1.4s ease infinite;
+}
+
+.enterprise-robot-detail-skeleton__bar--lg {
+  height: 28px;
+}
+
+.enterprise-robot-detail-skeleton__bar--block {
+  height: 128px;
+}
+
+@keyframes enterprise-robot-detail-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+[data-theme="dark"] .enterprise-robot-detail-skeleton__bar {
+  background: linear-gradient(90deg, #1f2937 25%, #273244 37%, #1f2937 63%);
+  background-size: 400% 100%;
+}
+
+.enterprise-robot-detail-error {
+  padding: 28px 24px;
+  font-size: 14px;
+  color: var(--muted, #9ca3af);
+  text-align: center;
+}
+
+/* ─── Empty state ─────────────────────────────────────────────────────────── */
+
+.enterprise-usage-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 64px 16px;
+  color: var(--muted, #9ca3af);
+  text-align: center;
+}
+
+.enterprise-usage-empty-state svg {
+  width: 48px;
+  height: 48px;
+  max-width: 48px;
+  max-height: 48px;
+  flex: 0 0 auto;
+  color: #d1d5db;
+  opacity: 0.9;
+}
+
+.enterprise-usage-empty-state__message {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted, #6b7280);
+}
+
+[data-theme="dark"] .enterprise-usage-empty-state svg {
+  color: var(--muted, #4b5563);
+}
+
+/* ==========================================================================
+   Sub-page primitives (shared by 安装关系 / 效果分析 / 应用治理)
+   These replace the dead Tailwind utility strings that previously left the
+   sub-pages unstyled (KPI columns stacked, tables borderless, etc.).
+   ========================================================================== */
+
+/* ─── Secondary tabs (within a sub-page, e.g. 按机器人 / 按能力) ──────────── */
+
+.enterprise-usage-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.enterprise-usage-subtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted, #6b7280);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.enterprise-usage-subtab:hover {
+  color: #374151;
+}
+
+.enterprise-usage-subtab--active {
+  color: #2563eb;
+  border-bottom-color: #2563eb;
+}
+
+[data-theme="dark"] .enterprise-usage-subtab:hover {
+  color: var(--text, #e5e7eb);
+}
+
+[data-theme="dark"] .enterprise-usage-subtab--active {
+  color: var(--accent, #60a5fa);
+  border-bottom-color: var(--accent, #60a5fa);
+}
+
+.enterprise-usage-subtab__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 999px;
+  background: var(--surface-muted, #eef0f2);
+  color: var(--muted, #6b7280);
+}
+
+.enterprise-usage-subtab--active .enterprise-usage-subtab__count {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+[data-theme="dark"] .enterprise-usage-subtab__count {
+  background: var(--surface-muted, #273244);
+  color: var(--muted, #9ca3af);
+}
+
+/* ─── Data table (shared table styling for sub-page tables) ───────────────── */
+
+.enterprise-usage-data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+
+.enterprise-usage-data-table thead th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #6b7280);
+  background: var(--surface-muted, #f9fafb);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  white-space: nowrap;
+}
+
+.enterprise-usage-data-table tbody td {
+  padding: 12px 16px;
+  color: #374151;
+  border-bottom: 1px solid var(--border, #f3f4f6);
+  vertical-align: middle;
+}
+
+.enterprise-usage-data-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.enterprise-usage-data-table tbody tr {
+  transition: background 0.12s ease;
+}
+
+.enterprise-usage-data-table tbody tr:hover {
+  background: var(--surface-muted, #f9fafb);
+}
+
+.enterprise-usage-data-table__name {
+  font-weight: 500;
+  color: #111827;
+}
+
+.enterprise-usage-data-table__link {
+  font-weight: 500;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.enterprise-usage-data-table__row--clickable {
+  cursor: pointer;
+}
+
+[data-theme="dark"] .enterprise-usage-data-table thead th {
+  background: var(--surface-muted, #111827);
+  border-bottom-color: var(--border, #2b3645);
+  color: var(--muted, #9ca3af);
+}
+
+[data-theme="dark"] .enterprise-usage-data-table tbody td {
+  color: var(--text, #e5e7eb);
+  border-bottom-color: var(--border, #2b3645);
+}
+
+[data-theme="dark"] .enterprise-usage-data-table tbody tr:hover {
+  background: var(--surface-muted, #111827);
+}
+
+[data-theme="dark"] .enterprise-usage-data-table__name {
+  color: var(--text, #f3f4f6);
+}
+
+/* ─── Grouped table (install management: per-robot / per-capability groups) ── */
+
+.enterprise-install-group {
+  margin-bottom: 16px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.enterprise-install-group__title {
+  margin: 0;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  background: var(--surface-muted, #f9fafb);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.enterprise-install-group .enterprise-usage-data-table thead th {
+  background: #ffffff;
+}
+
+[data-theme="dark"] .enterprise-install-group {
+  border-color: var(--border, #2b3645);
+}
+
+[data-theme="dark"] .enterprise-install-group__title {
+  background: var(--surface-muted, #111827);
+  border-bottom-color: var(--border, #2b3645);
+  color: var(--text, #e5e7eb);
+}
+
+[data-theme="dark"] .enterprise-install-group .enterprise-usage-data-table thead th {
+  background: var(--card, #1f2937);
+}
+
+/* ─── Badges & pills (status / source / governance count) ────────────────── */
+
+.enterprise-usage-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.enterprise-usage-badge--green {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.enterprise-usage-badge--yellow {
+  background: #fef9c3;
+  color: #a16207;
+}
+
+.enterprise-usage-badge--blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.enterprise-usage-badge--purple {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+
+.enterprise-usage-badge--indigo {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.enterprise-usage-badge--gray {
+  background: var(--surface-muted, #f3f4f6);
+  color: var(--muted, #6b7280);
+}
+
+[data-theme="dark"] .enterprise-usage-badge--green {
+  background: rgba(22, 163, 74, 0.18);
+  color: #4ade80;
+}
+
+[data-theme="dark"] .enterprise-usage-badge--yellow {
+  background: rgba(202, 138, 4, 0.18);
+  color: #facc15;
+}
+
+[data-theme="dark"] .enterprise-usage-badge--blue {
+  background: rgba(37, 99, 235, 0.18);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .enterprise-usage-badge--purple {
+  background: rgba(126, 34, 206, 0.2);
+  color: #d8b4fe;
+}
+
+[data-theme="dark"] .enterprise-usage-badge--indigo {
+  background: rgba(67, 56, 202, 0.22);
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .enterprise-usage-badge--gray {
+  background: var(--surface-muted, #273244);
+  color: var(--muted, #9ca3af);
+}
+
+/* ─── Inline action buttons (table row actions) ──────────────────────────── */
+
+.enterprise-usage-link-btn {
+  min-width: 32px;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.enterprise-usage-link-btn--primary {
+  color: #2563eb;
+}
+
+.enterprise-usage-link-btn--primary:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.enterprise-usage-link-btn--danger {
+  color: #dc2626;
+}
+
+.enterprise-usage-link-btn--danger:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.enterprise-usage-link-btn--muted {
+  color: var(--muted, #9ca3af);
+}
+
+.enterprise-usage-link-btn--muted:hover {
+  background: var(--surface-muted, #f3f4f6);
+  color: #4b5563;
+}
+
+.enterprise-usage-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ─── Error callout ───────────────────────────────────────────────────────── */
+
+.enterprise-usage-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+}
+
+.enterprise-usage-error__retry {
+  flex-shrink: 0;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #dc2626;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.enterprise-usage-error__retry:hover {
+  color: #991b1b;
+}
+
+[data-theme="dark"] .enterprise-usage-error {
+  color: #fca5a5;
+  background: rgba(220, 38, 38, 0.12);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+/* ─── Loading skeleton (shared) ──────────────────────────────────────────── */
+
+.enterprise-usage-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.enterprise-usage-skeleton__block {
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef0f2 25%, #e2e6ea 37%, #eef0f2 63%);
+  background-size: 400% 100%;
+  animation: enterprise-robot-detail-shimmer 1.4s ease infinite;
+}
+
+.enterprise-usage-skeleton__block--sm {
+  height: 32px;
+}
+
+.enterprise-usage-skeleton__block--tall {
+  height: 160px;
+}
+
+.enterprise-usage-skeleton__kpis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .enterprise-usage-skeleton__kpis {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+[data-theme="dark"] .enterprise-usage-skeleton__block {
+  background: linear-gradient(90deg, #1f2937 25%, #273244 37%, #1f2937 63%);
+  background-size: 400% 100%;
+}
+
+/* ─── Trend chart card ────────────────────────────────────────────────────── */
+
+.enterprise-usage-trend-chart {
+  margin-bottom: 24px;
+  padding: 16px 18px;
+  background: #ffffff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+}
+
+.enterprise-usage-trend-chart__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.enterprise-usage-trend-chart__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.enterprise-usage-trend-chart__windows {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-muted, #f3f4f6);
+  border-radius: 8px;
+}
+
+.enterprise-usage-trend-window {
+  min-width: 32px;
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted, #6b7280);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+
+.enterprise-usage-trend-window:hover {
+  color: #374151;
+}
+
+.enterprise-usage-trend-window--active {
+  color: #1d4ed8;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
+.enterprise-usage-trend-chart__plot {
+  width: 100%;
+  height: 160px;
+}
+
+.enterprise-usage-trend-chart__plot svg {
+  width: 100%;
+  height: 100%;
+}
+
+.enterprise-usage-trend-chart__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted, #9ca3af);
+}
+
+.enterprise-usage-trend-chart__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  font-size: 13px;
+  color: var(--muted, #9ca3af);
+}
+
+[data-theme="dark"] .enterprise-usage-trend-chart {
+  background: var(--card, #1f2937);
+  border-color: var(--border, #2b3645);
+}
+
+[data-theme="dark"] .enterprise-usage-trend-chart__title {
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-usage-trend-chart__windows {
+  background: var(--surface-muted, #111827);
+}
+
+[data-theme="dark"] .enterprise-usage-trend-window--active {
+  color: #93c5fd;
+  background: var(--card, #1f2937);
+}
+
+/* ─── Section block (top capabilities, etc.) ─────────────────────────────── */
+
+.enterprise-usage-section {
+  margin-bottom: 24px;
+}
+
+.enterprise-usage-section__title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+[data-theme="dark"] .enterprise-usage-section__title {
+  color: var(--text, #e5e7eb);
+}
+
+/* ─── Platform cross-link (governance footer) ────────────────────────────── */
+
+.enterprise-usage-platform-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  font-size: 13px;
+  color: var(--muted, #6b7280);
+  text-decoration: none;
+  transition: color 0.12s ease;
+}
+
+.enterprise-usage-platform-link:hover {
+  color: #2563eb;
+}
+
+[data-theme="dark"] .enterprise-usage-platform-link {
+  border-top-color: var(--border, #2b3645);
+}
+
+/* ─── Uninstall confirm dialog ───────────────────────────────────────────── */
+
+.enterprise-usage-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.enterprise-usage-confirm-dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.25),
+    0 10px 20px -8px rgba(0, 0, 0, 0.18);
+}
+
+.enterprise-usage-confirm-dialog__title {
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.enterprise-usage-confirm-dialog__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--muted, #6b7280);
+}
+
+.enterprise-usage-confirm-dialog__rows strong {
+  font-weight: 600;
+  color: #111827;
+}
+
+.enterprise-usage-confirm-dialog__error {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.enterprise-usage-confirm-dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.enterprise-usage-btn {
+  min-width: 32px;
+  min-height: 36px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    opacity 0.12s ease;
+}
+
+.enterprise-usage-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.enterprise-usage-btn--ghost {
+  color: #374151;
+  background: #ffffff;
+  border: 1px solid var(--border, #d1d5db);
+}
+
+.enterprise-usage-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-muted, #f9fafb);
+}
+
+.enterprise-usage-btn--danger {
+  color: #ffffff;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+}
+
+.enterprise-usage-btn--danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+[data-theme="dark"] .enterprise-usage-confirm-dialog {
+  background: var(--card, #1f2937);
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-usage-confirm-dialog__title {
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-usage-confirm-dialog__rows strong {
+  color: var(--text, #f3f4f6);
+}
+
+[data-theme="dark"] .enterprise-usage-btn--ghost {
+  color: var(--text, #e5e7eb);
+  background: var(--card, #1f2937);
+  border-color: var(--border, #374151);
+}
+
+[data-theme="dark"] .enterprise-usage-btn--ghost:hover:not(:disabled) {
+  background: var(--surface-muted, #111827);
+}
+
+/* ─── Responsive tweaks ───────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .enterprise-usage-tabs {
+    padding: 0 16px;
+    margin-bottom: 0;
+  }
+
+  .enterprise-usage-page-container,
+  .enterprise-usage-page {
+    padding: 16px;
+  }
+
+  .enterprise-robot-detail-header,
+  .enterprise-robot-detail-section {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .enterprise-robot-detail-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Analytics KPI caption (区分"概况"静态口径与"含环比"运行口径) ───────── */
+
+.enterprise-usage-analytics-kpis {
+  display: grid;
+  gap: 8px;
+}
+
+.enterprise-usage-analytics-kpis__caption {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #6b7280);
+}
+
+/* ─── 应用治理摘要（能力中心 Tab）────────────────────────────────────────── */
+
+.enterprise-capability-center-page__governance-tab {
+  align-content: start;
+}
+
+.enterprise-capability-center-page__governance-tab .enterprise-usage-page-container {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.enterprise-capability-governance {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.enterprise-capability-governance__intro {
+  margin: 0;
+  max-width: 46em;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.enterprise-capability-governance .enterprise-kpi-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.enterprise-capability-governance .enterprise-kpi-card__value {
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.enterprise-capability-governance__sections {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.enterprise-capability-governance__section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px 0;
+  scroll-margin-top: 12px;
+}
+
+.enterprise-capability-governance__section + .enterprise-capability-governance__section {
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-capability-governance__section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.enterprise-capability-governance__section-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.enterprise-capability-governance__count {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.enterprise-capability-governance__list {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-lg, 12px);
+}
+
+.enterprise-capability-governance__empty {
+  display: grid;
+  align-items: start;
+  justify-items: start;
+  min-height: 0;
+  padding: 4px 0 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  gap: 6px;
+}
+
+.enterprise-capability-governance__empty .enterprise-empty__title {
+  margin: 0;
+}
+
+.enterprise-capability-governance__empty .enterprise-empty__description {
+  margin: 0;
+  max-width: 42em;
+}
+
+.enterprise-capability-governance__action {
+  margin-top: 4px;
+}
+
+.enterprise-capability-governance__blocked {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.enterprise-capability-governance__skeleton .enterprise-usage-skeleton__kpis {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .enterprise-capability-governance .enterprise-kpi-grid,
+  .enterprise-capability-governance__skeleton .enterprise-usage-skeleton__kpis {
+    grid-template-columns: 1fr;
+  }
+}

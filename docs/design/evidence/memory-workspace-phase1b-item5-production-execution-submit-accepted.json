@@ -1,0 +1,43 @@
+{
+  "schema": "memory-workspace-phase1b-item5-production-execution-submit-accepted/v1",
+  "item": 5,
+  "decision": "accepted-as-production-execution-submission-packet",
+  "acceptedTip": "b8be1dc7395ffe26518645fd389e26927828af28",
+  "acceptedPr": 509,
+  "sourceCommit": "ce633496e391258d9c031e30de63d3adc741c91c",
+  "recordedBy": "cursor-data-governance",
+  "item5": "not-met",
+  "item6": "not-met",
+  "item7": "not-met",
+  "wiredToProductionResolver": false,
+  "packet": {
+    "deploy": "docs/design/evidence/memory-workspace-phase1b-item5-deploy-execution.json",
+    "decision": "docs/design/evidence/memory-workspace-phase1b-item5-deploy-execution-decision.json",
+    "liveCaller": "docs/design/evidence/memory-workspace-phase1b-item5-host-live-caller.json",
+    "mismatch": "docs/design/evidence/memory-workspace-phase1b-item5-registry-catalog-mismatch.json",
+    "tenantContext": "docs/design/evidence/memory-workspace-phase1b-item5-tenant-context-host-proof.json",
+    "submit": "docs/design/evidence/memory-workspace-phase1b-item5-production-execution-submit.json"
+  },
+  "scope": "Approves b8be1dc739 as the Item 5 production execution submission packet only. Independent close of Item 5 is not granted.",
+  "doesNotAuthorize": [
+    "score item 5 met",
+    "unlock item 6",
+    "unlock item 7",
+    "wiredToProductionResolver=true"
+  ],
+  "fieldSemanticFollowUp": {
+    "path": "docs/design/evidence/memory-workspace-phase1b-item5-registry-catalog-mismatch.json",
+    "blocksItem5Close": true,
+    "summaryCount": {
+      "usersWithRegistryResolvedNotInCatalog": 0,
+      "rootCause": "none"
+    },
+    "perUserRegistryResolvedInCatalog": {
+      "true": 1,
+      "false": 6,
+      "registryResolvedForMainTrueAndInCatalogFalse": 4
+    },
+    "note": "Per-user registryResolvedInCatalog does not match the summary 0-mismatch diagnostic. This does not reopen the submission-packet acceptance. Unify the field semantics before any formal Item 5 close."
+  },
+  "note": "Ruling recorded 2026-08-19. Item 5 stays not-met. Items 6 and 7 stay locked. The wire flag is not approved."
+}

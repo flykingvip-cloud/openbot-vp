@@ -1,0 +1,20 @@
+{
+  "schema": "memory-workspace-phase1b-item2-stage-b-quarantine/v1",
+  "live": false,
+  "catalogWrite": false,
+  "count": 4,
+  "rows": [
+    {
+      "reason": "agentId_is_not_agentAssetId"
+    },
+    {
+      "reason": "membership_missing"
+    },
+    {
+      "reason": "inactive_agent_asset"
+    },
+    {
+      "reason": "agentId_is_not_agentAssetId"
+    }
+  ]
+}

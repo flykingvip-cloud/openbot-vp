@@ -1,0 +1,268 @@
+{
+  "schema": "memory-workspace-s01-d1d5-design-review/v2",
+  "kind": "s01-d1-d5-trusted-principal-handle-security-governance-review",
+  "reviewer": "kiro-sot-reviewer",
+  "signedBy": "kiro-sot-reviewer",
+  "signedAt": "2026-08-29T15:30:00.000Z",
+  "reviewPass": 1,
+  "scope": "d1-d5-design-only-independent-sot-governance",
+  "decision": "accepted",
+  "baseline": {
+    "worktree": "/Users/daniel/AI项目/openbot-s01-sot-review",
+    "branch": "kiro-sot-reviewer/s01-d1d5-review",
+    "fetchedOriginMain": true,
+    "head": "a33868e5408f5a436a980580c8a130737da3586b",
+    "originMain": "a33868e5408f5a436a980580c8a130737da3586b",
+    "mergeBaseIsAncestor": true,
+    "didNotModifySharedWorkingTree": true,
+    "didNotModifyProductionBusinessCode": true
+  },
+  "reviewedArtifacts": [
+    "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+    "docs/design/evidence/memory-workspace-s01-trusted-principal-handle-gate.json",
+    "docs/design/evidence/memory-workspace-s01-trusted-principal-handle-gate.test.mjs",
+    "docs/design/evidence/memory-workspace-s01-d1d5-design-review-codex-architecture.json",
+    "docs/design/evidence/memory-workspace-s01-d1d5-design-review-codex-architecture.test.mjs",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    ".kiro/specs/memory-workspace-platform-remediation/s01-d1-d5-design-package.md",
+    "docs/design/handoff-s01-design-review-guide.md"
+  ],
+  "verdict": {
+    "D1": "pass",
+    "D2": "pass",
+    "D3": "pass",
+    "D4": "pass",
+    "D5": "pass"
+  },
+  "d1TrustedPrincipal": {
+    "status": "pass",
+    "findings": [
+      "principal issued from server-verified session context only",
+      "keyed HMAC attestation with server-owned secrets",
+      "wire identity fields (userId/tenantId/resourceId) rejected",
+      "forged principals rejected via attestation mismatch",
+      "expired principals rejected via resolvedAt + max age check",
+      "unkeyed SHA-256 recomputation rejected",
+      "self-compared HMAC rejected (presented vs server secret required)",
+      "source-proof HMAC validated for session/proxy/device",
+      "audit context includes sessionId/resolvedAt/principalSource/auditRecordId"
+    ],
+    "testCoverage": [
+      "forged principal",
+      "expired principal",
+      "unkeyed attestation",
+      "self-compared HMAC",
+      "wire identity injection",
+      "source-proof HMAC for session/proxy/device"
+    ]
+  },
+  "d2WorkspaceHandle": {
+    "status": "pass",
+    "findings": [
+      "Handle is typed view of WorkspaceResourceRecord (Catalog SoT)",
+      "resourceId is persistent primary key (S01_WORKSPACE_HANDLE_PERSISTENT_PK)",
+      "unique canonical binding enforced (uniqueCanonicalBinding)",
+      "fencing with contentVersion and bindingId",
+      "stale fencing rejected in evaluateS01AuthorizedToolCwd",
+      "Memory Asset resourceId independent (S01_MEMORY_ASSET_RESOURCE_ID_INDEPENDENT_OF_WORKSPACE_HANDLE=true)",
+      "no second MemoryWorkspaceHandle production entry (S01_D1D5_SECOND_MEMORY_WORKSPACE_HANDLE_ENTRY=false)",
+      "tenant/owner/lifecycle/capability derived from Catalog governance records",
+      "unknown owner scope rejected (ownerIdFromScope returns null)"
+    ],
+    "testCoverage": [
+      "unique canonical binding",
+      "duplicate canonical rejected",
+      "compatibility-only binding capability derivation",
+      "retired/revoked handle",
+      "Memory Asset resourceId independence"
+    ]
+  },
+  "d3CatalogSot": {
+    "status": "pass",
+    "findings": [
+      "Data Governance Catalog is unique SoT (S01CatalogViewPort)",
+      "Handle is typed view via projectWorkspaceHandleView",
+      "authorized CWD is typed view of WorkspaceBindingRecord.locator",
+      "membership via S01PlatformAuthMembershipPort (constrained readonly)",
+      "independent tables forbidden (S01_INDEPENDENT_CATALOG_TABLES: workspace_handles/authorized_cwds/tenant_memberships)",
+      "tests use approved non-production adapter (InMemoryWorkspaceResourceCatalog)",
+      "Aliyun RDS forbidden (staticScan confirms no pg/mysql/mongodb imports)",
+      "no Catalog entry synthesis at request time (all from snapshot)",
+      "Catalog miss/duplicate/tenant conflict fail-closed"
+    ],
+    "testCoverage": [
+      "Catalog unavailable",
+      "duplicate canonical binding",
+      "tenant mismatch",
+      "approved adapter P99 SLA"
+    ]
+  },
+  "d4ResolverInterface": {
+    "status": "pass",
+    "findings": [
+      "unique canonical/active binding required",
+      "compatibility/read_only not misused as writable root (deriveCapabilitiesFromBinding)",
+      "cross-tenant rejected with ERR_TENANT_MISMATCH (pathHitsForeignTenant)",
+      "absolute path required (isAbsoluteLocator)",
+      "path traversal rejected (isUnsafePath checks ..)",
+      "path inside authorized root (isInsideRoot)",
+      "membership via S01PlatformAuthMembershipPort (not caller-injected array)",
+      "retired/revoked handle rejected (ERR_WORKSPACE_ARCHIVED)",
+      "stale fencing rejected",
+      "Catalog unavailable rejected (ERR_CATALOG_UNAVAILABLE)",
+      "no host/cwd fallback",
+      "allowAnonymousLocal design parameter voided (not granted)",
+      "not wired to production get-reply (S01_D1D5_WIRED_TO_GET_REPLY=false)"
+    ],
+    "testCoverage": [
+      "injected memberships array rejected",
+      "same-tenant other-owner rejected",
+      "seat/group membership port",
+      "retired/revoked handle",
+      "path traversal",
+      "outside workspace",
+      "production caller freeze"
+    ]
+  },
+  "d5TestsAndRegression": {
+    "status": "pass",
+    "findings": [
+      "21 contract tests covering all D1-D5 requirements",
+      "forged principal, expired principal, unkeyed HMAC tested",
+      "self-compared HMAC, wire identity injection tested",
+      "source-proof HMAC for session/proxy/device tested",
+      "injected membership array, same-tenant other-owner tested",
+      "seat/group membership port tested",
+      "retired/revoked handle, stale fencing tested",
+      "duplicate canonical, compatibility-only binding tested",
+      "path traversal, outside workspace tested",
+      "Catalog unavailable tested",
+      "integration across two workspaces tested",
+      "production callers frozen (src freeze test)",
+      "P99 < 50ms on approved in-memory adapter (not production SLA)"
+    ],
+    "testCoverage": {
+      "forgedPrincipal": true,
+      "expiredPrincipal": true,
+      "unkeyedHmac": true,
+      "selfComparedHmac": true,
+      "wireIdentityInjection": true,
+      "sourceProofHmac": true,
+      "injectedMembership": true,
+      "sameTenantOtherOwner": true,
+      "seatGroupMembership": true,
+      "retiredRevokedHandle": true,
+      "staleFencing": true,
+      "duplicateCanonical": true,
+      "compatibilityOnlyBinding": true,
+      "pathTraversal": true,
+      "outsideWorkspace": true,
+      "catalogUnavailable": true,
+      "twoWorkspaceIntegration": true,
+      "productionCallerFreeze": true,
+      "p99InMemorySla": true
+    },
+    "note": "P99 proves non-production adapter contract performance only. R1/R3/R5 (production security/audit/performance) remain design targets, not verified (implementationVerified=false)."
+  },
+  "checksRun": {
+    "contractTest": {
+      "command": "bun test docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+      "result": "pass",
+      "cases": 21,
+      "allPass": true
+    },
+    "gateEvidenceTest": {
+      "command": "node --test docs/design/evidence/memory-workspace-s01-trusted-principal-handle-gate.test.mjs",
+      "result": "pass",
+      "checks": 8,
+      "allPass": true
+    },
+    "architectureSidecarTest": {
+      "command": "node --test docs/design/evidence/memory-workspace-s01-d1d5-design-review-codex-architecture.test.mjs",
+      "result": "pass"
+    },
+    "r6SingleSotCheck": {
+      "command": "node scripts/verify-single-sot.mjs",
+      "result": "pass",
+      "designComplete": true,
+      "implementationVerified": false,
+      "checksPass": [
+        "requiredPaths",
+        "phantomPathsAbsent",
+        "staticScan",
+        "catalogEncapsulation",
+        "normativeSources"
+      ]
+    },
+    "loomLint": {
+      "command": "pnpm loom lint",
+      "result": "warnings",
+      "warnings": 47,
+      "reason": "ownership-overlap and duplicate-shared-glob from trunk baseline; not introduced by this task"
+    },
+    "attribution": {
+      "command": "bun scripts/agent-attribution.ts --fail-on-conflict --fail-on-unattributed",
+      "result": "fail",
+      "unattributed": 15,
+      "reason": "all unattributed files are extensions/*/node_modules (dependency changes); not D1-D5 design files; trunk baseline issue"
+    }
+  },
+  "locks": {
+    "productionCatalogWrite": "none",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "i3": "not executed",
+    "live": "forbidden",
+    "deployAuthorized": false,
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10
+  },
+  "doesNotAuthorize": [
+    "S01 retirement",
+    "implementation wiring",
+    "production Catalog write",
+    "Phase 1B unlock",
+    "I3",
+    "LIVE",
+    "deployAuthorized=true",
+    "modifying scan remaining/liveWriteWatchIndex",
+    "modifying src/memory/**",
+    "modifying src/gateway/workspace-resolver/**",
+    "modifying src/auto-reply/reply/get-reply.ts"
+  ],
+  "explicitlyForbidden": [
+    "modify src/auto-reply/reply/get-reply.ts",
+    "modify src/memory/**",
+    "modify src/gateway/workspace-resolver/**",
+    "write production Catalog",
+    "wire resolver/Handle/trusted principal production path",
+    "delete or move S01",
+    "modify retirement scan remaining/liveWriteWatchIndex",
+    "execute I3",
+    "issue Phase 1B unlock",
+    "set deployAuthorized=true",
+    "any LIVE or production deployment"
+  ],
+  "productionObservation": {
+    "getReplyStillUsesStewardHelper": true,
+    "getReplyLine": "src/auto-reply/reply/get-reply.ts:164",
+    "evaluateS01AuthorizedToolCwdImportedBySrc": false,
+    "secondMemoryWorkspaceHandleProductionEntry": false,
+    "soleProductionHandle": "src/memory/memory-workspace-handle.ts",
+    "currentProductionExploitability": "none-not-wired",
+    "contractLocation": "docs/design/contracts (non-production directory)",
+    "srcMemoryUntouched": true
+  },
+  "residualConstraints": [
+    "Production issue() must take VerifiedSessionContext from platform-auth, not tool/body JSON.",
+    "Production must inject PlatformAuth membership adapter, not wire-supplied object.",
+    "Implementation wiring requires separate implementation review (not this design review).",
+    "This accept is design-only. It does not wire get-reply or unlock Phase 1B.",
+    "R1/R3/R5 (production security/audit/performance) remain design targets until implementation verified."
+  ],
+  "independentReviewNote": "kiro-sot-reviewer independent review of S01 D1-D5 design on merged baseline a33868e5. D1-D5 design-accepted. All tests pass. All locks unchanged. implementationGate remains not-met. This signature is independent of codex-architecture and does not supersede it. Both reviewers sign design-only; neither authorizes S01 retirement, production Catalog write, I3, Phase 1B, or LIVE.",
+  "note": "kiro-sot-reviewer pass 1 of merged baseline a33868e5 (post PR #816, post PR #820 archive alignment). D1-D5 design-accepted on unique contract and unique handoff. implementationGate remains not-met. Scan remaining/liveWriteWatchIndex remain 10. This signature does not authorize S01 retirement, production Catalog write, I3, Phase 1B, or LIVE."
+}

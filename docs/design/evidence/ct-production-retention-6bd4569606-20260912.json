@@ -1,0 +1,61 @@
+{
+  "title": "ConversationTask seq83 forward ledger retention verify (6bd4569606)",
+  "ledgerSeq": 83,
+  "priorLedgerSeq": 82,
+  "actor": "cursor-composer",
+  "utc": "2026-09-12T04:45:00Z",
+  "candidateSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+  "liveSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+  "priorLiveSha": "f0dec722277770791a939c0a456242ce62d77763",
+  "reconcilesUnledgeredForwardDeploy": true,
+  "imageTag": "rc-amd64-provenance-6bd4569606",
+  "imageDigest": "sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f",
+  "provenanceTag": "provenance/sha-6bd4569606fd",
+  "containerStartedAt": "2026-09-12T03:59:30Z",
+  "controlUiEntry": "index-iwByD4J0.js",
+  "healthz": { "ok": true, "status": "live" },
+  "readyz": { "ready": true, "failing": [] },
+  "hmac": {
+    "keySet": true,
+    "keyBits": 256,
+    "keyId": "ct-2026-09-11-host",
+    "epochUnchangedFromSeq82": true,
+    "inPodmanConfigEnv": false
+  },
+  "allowlist": {
+    "enabledCount": 1,
+    "fingerprintPrefix": "7a3e6b16cb75f48f"
+  },
+  "flags": {
+    "activation": "on",
+    "detection": "on",
+    "qualification": "on",
+    "projection": "off",
+    "authorization": "off"
+  },
+  "retention": {
+    "mode": "read_only",
+    "newCanaryTaskCreated": false,
+    "allowlistStoreActiveCount": 2,
+    "allowlistStoreTotalCount": 2,
+    "nonAllowlistStoreActiveCount": 0,
+    "progressReadable": true,
+    "inheritsSeq82BrowserE2e": "docs/design/evidence/ct-production-sync-f0dec722-20260912.json"
+  },
+  "rpc": {
+    "conversationTaskActiveGet": {
+      "status": "retention_read_only",
+      "summary": "existing active tasks and goals present on allowlisted store; no new dispatch; no ids logged"
+    }
+  },
+  "networkAudit": {
+    "extraChatSendFromProgressPoll": false,
+    "newBrowserActivationAttempted": false
+  },
+  "safetyContainer": "openbot-gateway-rc-prev-f0dec72227-safety",
+  "rollback": {
+    "priorImageTag": "rc-amd64-provenance-f0dec72227",
+    "entrypoint": "/run/ct-shadow/entrypoint.sh"
+  },
+  "notes": "Forward ledger reconciliation only. No HMAC value, raw tenant IDs, conversation IDs, message IDs, or user message text recorded. No second canary task created to preserve replay/idempotency stats from seq82."
+}

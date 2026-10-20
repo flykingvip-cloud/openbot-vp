@@ -1,0 +1,214 @@
+{
+  "schema": "memory-workspace-s01-871-incremental-review/v1",
+  "kind": "s01-871-incremental-review",
+  "taskId": "memory-workspace-platform-remediation:kiro-data-governance-s01-871-incremental-review",
+  "reviewer": "kiro-data-governance",
+  "signedBy": "kiro-data-governance",
+  "role": "independent reviewer",
+  "signedAt": "2026-08-31T11:15:00.000Z",
+  "scope": "s01-871-incremental-review-after-cr3",
+  "decision": "conditions-not-met",
+  "reviewRequested": "S01 #871 incremental security review",
+  "appliesFor": "S01 #871 incremental security review (not deploy auth)",
+  "cr3ReviewDoesNotCoverThisChange": true,
+  "authorizesProductionObservationDeploy": false,
+  "authorizesStageBImplementationAccepted": false,
+  "authorizesStageBShadowWiring": false,
+  "authorizesProductionCutover": false,
+  "authorizesStageC": false,
+  "authorizesStageD": false,
+  "authorizesStageE": false,
+  "implementationVerified": false,
+  "implementationGate": "not-met",
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "packetSelfAccepted": false,
+  "thisPacketModifiesProductionCode": false,
+  "thisPacketModifiesRetirementScan": false,
+  "thisPacketModifiesGetReply": false,
+  "thisPacketModifiesHandlerBridge": false,
+  "thisPacketWiresGetReply": false,
+  "productionReceiptsObserved": 0,
+  "productionReceiptsAcceptanceMet": false,
+  "reviewedTip": "aa44194ac07261763314be345ed9352ee7f05399",
+  "pr871": {
+    "pr": 871,
+    "title": "S01: pass tenant context into Managed workspace locator",
+    "mergeSha": "aa44194ac07261763314be345ed9352ee7f05399",
+    "mergeStyle": "squash",
+    "url": "https://github.com/gmood2008/openbot/pull/871"
+  },
+  "cr3ReviewedGetReplyBlob": "1b5d0fe96fc4ccf877af4086fe4f6f635aad5a45",
+  "currentGetReplyBlob": "118872a485795e2518ad2cf4c7a35682cdf476b1",
+  "cr3ReviewedGetReplyBlobDiffersFromCurrent": true,
+  "cr3Baseline": {
+    "reviewer": "codex-architecture",
+    "sidecar": "docs/design/evidence/memory-workspace-s01-stage-b-shadow-cr3-review-codex-architecture.json",
+    "sidecarBlob": "608073c7af6489cf9a43f2500170034ab60f1df1",
+    "reviewedTip": "d2e23e0e3162018dde9cbbd979b6d222f0a6c788",
+    "pr860MergeSha": "d2e23e0e3162018dde9cbbd979b6d222f0a6c788",
+    "getReplyBlob": "1b5d0fe96fc4ccf877af4086fe4f6f635aad5a45",
+    "note": "CR3 independent Accept (#865 sidecar) pins get-reply blob 1b5d0fe9 at #860 tip d2e23e0e. It explicitly does NOT cover later main. #871 (aa44194) changed get-reply.ts and handler-bridge.ts AFTER that review."
+  },
+  "mergedBaseline": {
+    "originMain": "aa44194ac07261763314be345ed9352ee7f05399",
+    "reviewedTip": "aa44194ac07261763314be345ed9352ee7f05399",
+    "pr871": {
+      "pr": 871,
+      "title": "S01: pass tenant context into Managed workspace locator",
+      "mergeSha": "aa44194ac07261763314be345ed9352ee7f05399",
+      "mergeStyle": "squash",
+      "url": "https://github.com/gmood2008/openbot/pull/871"
+    },
+    "laterMainNotInScope": {
+      "note": "Review pins actual origin/main aa44194. CR3 Accept at d2e23e0e/get-reply@1b5d0fe9 must not automatically cover #871."
+    }
+  },
+  "reviewedBlobs": {
+    "src/auto-reply/reply/get-reply.ts": "118872a485795e2518ad2cf4c7a35682cdf476b1",
+    "src/gateway/workspace/handler-bridge.ts": "21f31e4bd26c5a4fec83f86a16cf7f8dc28932b2",
+    "src/gateway/workspace/handler-bridge-managed-steward-cwd.test.ts": "580eae4367bf1439864bce0ec0df37a46de14b09",
+    "src/auto-reply/reply/get-reply-managed-steward-tenant-context.test.ts": "db6453b9ac0e8d048935a665660385c9a0433f82",
+    "src/auto-reply/reply/get-reply-s01-steward-cwd.test.ts": "562b877200854fdaf294537aa8d5954d5aa2dd99",
+    "docs/design/evidence/memory-workspace-s01-stage-b-shadow-cr3-review-codex-architecture.json": "608073c7af6489cf9a43f2500170034ab60f1df1",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json": "a32b326dbe7538878dcbc810d5dd86ffddc867a5"
+  },
+  "redLines": {
+    "1_managedPathDecidedByControlledHandle": {
+      "id": 1,
+      "requirement": "managed path still decided by controlled Handle",
+      "verdict": "fail",
+      "pass": false,
+      "evidence": [
+        "src/gateway/workspace/handler-bridge.ts:915-928 resolveAuthorizedToolCwd: if (params.stewardException) { const helper = path.resolve(params.stewardWorkspaceDir); if (!helper) return null; locator = helper; } else { locator = await resolveTrustedAgentLocator(...) }. Steward exception SKIPS resolveTrustedAgentLocator and uses the legacy helper path as locator.",
+        "src/auto-reply/reply/get-reply.ts:173-183 stewardHelperCwd = stewardException ? personalFallback() : null; then resolveAuthorizedToolCwd({ ..., stewardException, stewardWorkspaceDir: stewardHelperCwd }). personalFallback() is resolveEmployeeBuiltinStewardWorkspaceDir(employeeOwnerId) at get-reply.ts:164.",
+        "authorizeWorkspaceRootAccess is still invoked on that helper locator (handler-bridge.ts:941-950) and returns root.access.baseReal. The Handle is derived FROM the helper locator; it does not independently decide the managed path."
+      ]
+    },
+    "2_legacyHelperShadowOnlyNotAuthorizationBasis": {
+      "id": 2,
+      "requirement": "legacy helper only for shadow comparison, MUST NOT be authorization basis",
+      "verdict": "fail",
+      "pass": false,
+      "evidence": [
+        "src/auto-reply/reply/get-reply.ts:160 'User-visible cwd remains helper resolveEmployeeBuiltinStewardWorkspaceDir.'",
+        "src/auto-reply/reply/get-reply.ts:182 stewardWorkspaceDir: stewardHelperCwd is passed into resolveAuthorizedToolCwd.",
+        "src/gateway/workspace/handler-bridge.ts:900-904 comment: 'Employee steward helper cwd (user-visible). When set with stewardException, this path is authorized as the tool cwd locator.'",
+        "src/gateway/workspace/handler-bridge.ts:921-928 helper is assigned to locator and then authorizeWorkspaceRootAccess({ locator }). Helper is the authorization basis, not shadow-only.",
+        "Shadow remains separate: get-reply.ts:270-281 runS01GetReplyStewardCwdShadowFromEntry({ helperCwd: workspaceDirRaw }). That shadow path does not make the helper shadow-only for production cwd."
+      ]
+    },
+    "3_missingTenantContextFailClosed": {
+      "id": 3,
+      "requirement": "missing tenant context strictly fail-closed",
+      "verdict": "pass",
+      "pass": true,
+      "evidence": [
+        "src/gateway/workspace/handler-bridge.ts:624-629 authorizeWorkspaceRootAccess: if (profile.profile === 'managed_enterprise' && !tenantCtx?.tenantId) return { ok: false, code: 'missing_tenant', message: 'trusted tenant context required' }.",
+        "src/gateway/workspace/handler-bridge.ts:884-885 resolveWorkspaceDirAfterAuthorization: if (params.profile === 'managed_enterprise') return null when authorizedCwd is empty (no personalFallback on managed).",
+        "src/gateway/workspace/handler-bridge-managed-steward-cwd.test.ts:106-129 'managed steward: true missing tenant still fail-closed' expects authorized=null and after-authorization dir=null.",
+        "Note: get-reply.ts:149 cwdUserId = knowledgeContext.userId ?? (stewardException ? employeeOwnerId : null) substitutes employeeOwnerId for missing knowledge userId. Tenant-id missing still fail-closes in authorizeWorkspaceRootAccess. {cfg}-only locator missing_tenant_context is skipped for stewardException; that skip is red-line 1/2/4, not a tenant-id fail-open."
+      ]
+    },
+    "4_noManagedToPersonalLocalHelperFallback": {
+      "id": 4,
+      "requirement": "NO managed → personal/local helper fallback",
+      "verdict": "fail",
+      "pass": false,
+      "evidence": [
+        "resolveWorkspaceDirAfterAuthorization (handler-bridge.ts:884-885) does NOT invoke personalFallback when profile is managed_enterprise and authorizedCwd is null. That post-auth fallback is closed.",
+        "BUT stewardException uses helper as the authorization locator (handler-bridge.ts:915-928), so the managed production cwd IS the personal/local helper path. Tests encode this: handler-bridge-managed-steward-cwd.test.ts:67-104 'managed steward: does not fail closed solely on locator missing_tenant_context; helper remains cwd' expects authorized === realpath(helper).",
+        "get-reply.ts:161 'Managed steward does not fail closed solely on missing_tenant_context.' This is a managed→helper locator fallback, violating red line 4 even though the later personalFallback() call is skipped on managed."
+      ]
+    }
+  },
+  "checks": {
+    "managedPathDecidedByControlledHandle": "fail",
+    "legacyHelperShadowOnlyNotAuthorizationBasis": "fail",
+    "missingTenantContextFailClosed": "pass",
+    "noManagedToPersonalLocalHelperFallback": "fail"
+  },
+  "vitest": {
+    "command": "./node_modules/.bin/vitest run --maxWorkers=1 src/gateway/workspace/handler-bridge-managed-steward-cwd.test.ts src/auto-reply/reply/get-reply-managed-steward-tenant-context.test.ts src/auto-reply/reply/get-reply-s01-steward-cwd.test.ts",
+    "result": "Test Files  3 passed (3); Tests  18 passed (18)",
+    "files": {
+      "src/gateway/workspace/handler-bridge-managed-steward-cwd.test.ts": "6 passed",
+      "src/auto-reply/reply/get-reply-managed-steward-tenant-context.test.ts": "1 passed",
+      "src/auto-reply/reply/get-reply-s01-steward-cwd.test.ts": "11 passed"
+    },
+    "note": "Tests passing does not satisfy red lines. Several tests encode the helper-as-managed-cwd behavior that fails red lines 1/2/4."
+  },
+  "independentChecks": {
+    "cr3DoesNotCover871": "pass",
+    "getReplyBlobChangedAfterCr3": "pass",
+    "missingTenantFailClosedInAuthorizeWorkspaceRootAccess": "pass",
+    "managedPostAuthPersonalFallbackClosed": "pass",
+    "managedPathDecidedByControlledHandle": "fail",
+    "helperNotAuthorizationBasis": "fail",
+    "noManagedHelperLocatorFallback": "fail"
+  },
+  "locks": {
+    "stageBImplementation": "landed-not-accepted",
+    "stageBCr3Review": "accepted-does-not-cover-871",
+    "pr871IncrementalReview": "conditions-not-met",
+    "implementationVerified": false,
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "item7": "not-met",
+    "s01Retirement": "blocked",
+    "phase1b": "blocked",
+    "deployAuthorized": false,
+    "live": "forbidden",
+    "authorizesProductionObservationDeploy": false,
+    "authorizesStageC": false,
+    "authorizesStageD": false,
+    "authorizesStageE": false
+  },
+  "openFindings": [
+    {
+      "id": "F871-1",
+      "severity": "blocking",
+      "redLines": [1, 2, 4],
+      "title": "Managed steward cwd locator is the legacy helper, skipping Handle/trusted locator",
+      "detail": "On origin/main aa44194 (#871), resolveAuthorizedToolCwd treats stewardException as a special case: it resolves locator from stewardWorkspaceDir (helper path from resolveEmployeeBuiltinStewardWorkspaceDir) and does not call resolveTrustedAgentLocator. authorizeWorkspaceRootAccess then catalogs/authorizes that helper path. User-visible cwd remains the helper. This is not a controlled Handle deciding the managed path, and the helper is an authorization basis rather than shadow-only comparison. Production-observation deploy, Stage C Accept, implementationVerified, LIVE, Stage D/E remain unauthorized."
+    }
+  ],
+  "residualConstraints": [
+    "Independent incremental review of #871 at origin/main aa44194 only. CR3 Accept (#865) at d2e23e0e/get-reply@1b5d0fe9 does not cover this change.",
+    "decision=conditions-not-met because red lines 1, 2, and 4 fail for Managed steward.",
+    "Red line 3 passes: authorizeWorkspaceRootAccess still fail-closes missing tenant on managed_enterprise.",
+    "authorizesProductionObservationDeploy=false. deployAuthorized=false. implementationVerified=false. live=forbidden.",
+    "Do not treat passing vitest as red-line satisfaction. Tests currently assert helper remains managed cwd.",
+    "Do not modify get-reply.ts, handler-bridge.ts, retirement-scan, or manager-sync-ops in this packet.",
+    "remaining=10 liveWriteWatchIndex=10 unchanged. P5 still get-reply.ts:164."
+  ],
+  "doesNotAuthorize": [
+    "production observation deploy",
+    "Stage B Implementation Accepted",
+    "Stage C",
+    "Stage C Accept",
+    "Stage D",
+    "Stage E",
+    "LIVE gateway cutover",
+    "LIVE authorized",
+    "implementationVerified=true",
+    "Phase 1B unlock",
+    "deployAuthorized=true",
+    "treating CR3 Accept as covering #871",
+    "managed steward helper locator as Handle-equivalent"
+  ],
+  "doesNotDeclare": [
+    "Stage B Implementation Accepted",
+    "production cutover authorized",
+    "implementationVerified=true",
+    "Item 7 met",
+    "Phase 1B unlocked",
+    "LIVE authorized",
+    "productionReceiptsObserved>0",
+    "red lines 1/2/4 pass"
+  ],
+  "note": "Independent incremental security review of already-merged #871 after CR3. conditions-not-met. Does NOT authorize observation deploy, Stage C Accept, LIVE, or implementationVerified. Do not merge as cutover."
+}

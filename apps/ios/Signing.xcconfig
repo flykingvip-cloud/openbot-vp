@@ -1,0 +1,22 @@
+// Default signing values for shared/repo builds.
+// Auto-selected local team overrides live in .local-signing.xcconfig (git-ignored).
+// Manual local overrides can go in LocalSigning.xcconfig (git-ignored).
+
+#include "Config/Version.xcconfig"
+
+OPENBOT_CODE_SIGN_STYLE = Manual
+OPENBOT_DEVELOPMENT_TEAM = Y5PE65HELJ
+
+OPENBOT_APP_BUNDLE_ID = ai.openbot.client
+OPENBOT_SHARE_BUNDLE_ID = ai.openbot.client.share
+OPENBOT_WATCH_APP_BUNDLE_ID = ai.openbot.client.watchkitapp
+OPENBOT_WATCH_EXTENSION_BUNDLE_ID = ai.openbot.client.watchkitapp.extension
+OPENBOT_ACTIVITY_WIDGET_BUNDLE_ID = ai.openbot.client.activitywidget
+
+OPENBOT_APP_PROFILE = ai.openbot.client Development
+OPENBOT_SHARE_PROFILE = ai.openbot.client.share Development
+
+// Keep local includes after defaults: xcconfig is evaluated top-to-bottom,
+// so later assignments in local files override the defaults above.
+#include? ".local-signing.xcconfig"
+#include? "LocalSigning.xcconfig"

@@ -1,0 +1,79 @@
+# Observed 2026-09-18 on https://www.openbot.love/ while logged in.
+# Cron list and supervisor checklist were on screen.
+# New-task wizard after the first screen was not re-opened. Do not recite later fields.
+
+scenario:
+  name: employee_tasks
+  title: 我的任务
+  trigger:
+    - 我的任务
+    - 定时任务
+    - 新建任务
+    - 待我处理
+    - 开发监督
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: open
+    title: 打开我的任务
+  - id: cron
+    title: 定时任务
+  - id: other
+    title: 另外两个页签
+
+steps:
+  - id: open_tasks
+    stage: open
+    risk: low
+    instruction: 在左侧栏点「我的任务」。上方三个页签是「定时任务」「待我处理」「开发监督」。默认停在「定时任务」。
+    visual_anchor: 「定时任务」
+    success_signal: 用户看到这三个页签
+
+  - id: read_cron_list
+    stage: cron
+    risk: low
+    instruction: |
+      定时任务页上有这些控件：
+      - 统计：总任务、待执行、执行中、已完成、异常。本次是 3 / 3 / 0 / 0 / 0，以屏幕为准，不要说成零任务
+      - 「任务模板」「批量操作」
+      - 「+ 新建任务」
+      - 列表里有真实任务，例如执行人、重复时间和「待执行」
+      不要把页面源码里的任务元数据念给用户。
+    visual_anchor: 「+ 新建任务」
+    success_signal: 用户能读出统计数字或一行任务
+
+  - id: start_new_task
+    stage: cron
+    risk: medium
+    confirmation: true
+    instruction: 用户要新建时，点「+ 新建任务」。向导后续字段本次没有在已登录页面重新打开。先让用户读出下一屏标题，再按屏幕上的控件继续。不要背未出现的步骤，也不要替用户保存。
+    visual_anchor: 「+ 新建任务」
+    success_signal: 用户说出下一屏上实际看到的标题
+
+  - id: assigned
+    stage: other
+    risk: low
+    instruction: 点「待我处理」。本次是空的，文案是「会议与协作指派给你的任务」以及「暂无指派给你的任务。会议纪要分发后，行动项会出现在这里。」有条目时以屏幕为准，不要说这里永远是空的。
+    visual_anchor: 「待我处理」
+    success_signal: 用户读出空状态，或读出一条真实指派
+
+  - id: supervisor
+    stage: other
+    risk: low
+    instruction: |
+      点「开发监督」。本次不是「尚未生效企业岗位」空页，而是本机环境清单：
+      - 「环境准备」，本次「1/10 就绪」
+      - 「监督子系统」可以是「就绪」
+      - Node、各 CLI 显示「待处理」「待探测」或「待配置」
+      - 按钮「申请连接本机 Node」「刷新状态」
+      - 说明写着打开 Mac OpenBot 并保持 Node 模式在线，无需手动填写租户或席位信息
+      - 「高级信息（排障用）」「本机 CLI 状态」「配置 API KEY」「添加 KEY」
+      不要让用户把 API KEY 发到对话里。未探测到的工具不要说成已经装好。
+    visual_anchor: 「申请连接本机 Node」
+    success_signal: 用户读出环境准备进度，或说出自己看到的按钮
+
+fallback:
+  - check: old_empty
+    instruction: 不要把开发监督说成「operator.write 未开通」或「尚未生效企业岗位」，除非屏幕上确实是这句。

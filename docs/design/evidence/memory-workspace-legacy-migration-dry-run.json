@@ -1,0 +1,121 @@
+{
+  "blockerCounts": {
+    "legal-hold-or-retention-or-tombstone": 2,
+    "missing-catalog-binding": 12,
+    "unknown-ownership": 171
+  },
+  "catalogMinted": false,
+  "catalogMutation": false,
+  "checksums": {
+    "catalogCandidate": "c34732577444b540d197331f5c41260f4e5a7b62689fd239ad2eab25992fcae3",
+    "migrationManifest": "75ce13843496809232b74306ce3eca8aa1f8d8bb415f8873a663b008946e12b5",
+    "quarantineManifest": "d510e351024df4ad596837c85fc28af2d4cc2d6899ed6c7a01522b76cca94bc0",
+    "retirementScan": "d900cd8cad0d2ce26cdf764955cbdea6db0289e20b03db8b97d4779d875d3fb2",
+    "rollbackManifest": "005dc2fa5d499fa6669f8e6b799b0d243d2301bbcfc30c52b22552cf4558909d"
+  },
+  "citedReusableAssets": [
+    "src/gateway/item7-stage-c-identity-shadow.ts",
+    "src/memory/item7-stage-d-readiness.ts",
+    "src/gateway/data-governance/s01-steward-workspace-identity.ts",
+    "src/gateway/data-governance/s01-authorized-tool-cwd.ts",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+    "docs/design/evidence/memory-workspace-phase0-20260814.catalog-candidate.json",
+    "docs/design/evidence/memory-workspace-phase0-live-20260814.summary.json",
+    "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+    "docs/design/evidence/memory-workspace-phase1b-item7-w1-dark-tombstone.json",
+    "docs/design/openbot-item7-a1-canonical-workspace-binding-2026-08-26.md",
+    "docs/design/memory-workspace-identity-remediation-2026-08-14.md"
+  ],
+  "coveredDomains": [
+    "workspace",
+    "agent",
+    "memory",
+    "knowledge",
+    "conversationArchive",
+    "knownLegacyRoot",
+    "compatibilityBinding"
+  ],
+  "cutover": false,
+  "decisionCounts": {
+    "do-not-mint": 12,
+    "preserve": 2,
+    "quarantine": 171
+  },
+  "delete": false,
+  "deployAuthorized": false,
+  "domainCounts": {
+    "agent": 40,
+    "compatibilityBinding": 10,
+    "conversationArchive": 3,
+    "knowledge": 1,
+    "knownLegacyRoot": 1,
+    "memory": 14,
+    "workspace": 116
+  },
+  "guessedOwnership": false,
+  "implementationVerified": false,
+  "inputs": [
+    "docs/design/evidence/memory-workspace-phase0-20260814.catalog-candidate.json",
+    "docs/design/evidence/memory-workspace-phase0-live-20260814.summary.json",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+  ],
+  "item7": "not-met",
+  "kind": "legacy-migration-dry-run",
+  "live": "forbidden",
+  "liveWriteWatchIndex": 10,
+  "locks": {
+    "catalogMutation": false,
+    "cutover": false,
+    "delete": false,
+    "deployAuthorized": false,
+    "i3": "not executed",
+    "implementationVerified": false,
+    "item7": "not-met",
+    "live": "forbidden",
+    "liveWriteWatchIndex": 10,
+    "migrationExecuted": false,
+    "phase1b": "blocked",
+    "productionCatalogWrite": "none",
+    "productionWrite": false,
+    "remaining": 10
+  },
+  "migrationExecuted": false,
+  "notDone": [
+    "did not write Catalog",
+    "did not move, delete, or modify production files",
+    "did not modify get-reply.ts",
+    "did not modify s01-get-reply-steward-cwd-shadow.ts",
+    "did not modify Stage B shadow evidence",
+    "did not modify retirement-scan.json",
+    "did not modify manager-sync-ops.ts",
+    "did not set implementationVerified=true",
+    "did not set deployAuthorized=true",
+    "did not mark Item 7 met",
+    "did not unlock Phase 1B",
+    "did not execute I3",
+    "did not authorize LIVE",
+    "did not mint missing Catalog bindings",
+    "did not guess unknown ownership",
+    "did not merge",
+    "did not self-accept"
+  ],
+  "note": "Inventory + dry-run only. Replayable manifests are checksums of in-memory records. Nothing was migrated.",
+  "originMain": "61c3cb90e4199ee765089631ea5fb70f8ba12652",
+  "owner": "kiro-data-governance",
+  "persistentGovernanceCatalogExists": false,
+  "preparedAt": "2026-08-30T15:20:00.000Z",
+  "productionWrite": false,
+  "recordCount": 185,
+  "remaining": 10,
+  "role": "legacy-migration-inventory-dry-run",
+  "rules": [
+    "unknown ownership → quarantine (do not guess)",
+    "duplicate canonical binding → block",
+    "cross-tenant → block",
+    "missing Catalog binding → do not mint",
+    "preserve legal hold/retention/tombstone"
+  ],
+  "schema": "memory-workspace-legacy-migration-dry-run/v1",
+  "selfAccepted": false,
+  "taskId": "memory-workspace-platform-remediation:kiro-data-governance-legacy-migration-dry-run"
+}

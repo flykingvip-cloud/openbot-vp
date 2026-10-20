@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbot.love/design/schemas/completion-candidate.schema.json",
+  "title": "CompletionCandidate",
+  "description": "P0 contract anchor — see docs/design/completion-contract.md rev2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "candidateId",
+    "taskIdentity",
+    "completionSource",
+    "evidenceReferences",
+    "actor",
+    "recordedAt",
+    "idempotencyKey"
+  ],
+  "properties": {
+    "contractVersion": {
+      "type": "string",
+      "const": "2026-09-15.rev2"
+    },
+    "candidateId": { "type": "string", "format": "uuid" },
+    "taskIdentity": { "$ref": "#/$defs/TaskIdentity" },
+    "completionSource": {
+      "type": "string",
+      "enum": [
+        "supervisor_accepted",
+        "ledger_verified",
+        "ledger_completed",
+        "round_converged",
+        "flow_step_done",
+        "taskcard_done",
+        "autopilot_candidate",
+        "llm_summary"
+      ]
+    },
+    "evidenceReferences": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/EvidenceReference" }
+    },
+    "actor": { "$ref": "#/$defs/Actor" },
+    "recordedAt": { "type": "string", "format": "date-time" },
+    "idempotencyKey": { "type": "string", "minLength": 16 },
+    "supersedes": { "type": "string", "format": "uuid" }
+  },
+  "$defs": {
+    "TaskIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primaryId", "primaryGeneration", "tenantId", "scope"],
+      "properties": {
+        "primaryId": { "type": "string", "minLength": 1 },
+        "primaryGeneration": { "type": "integer", "minimum": 0 },
+        "tenantId": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "enum": ["group_tenant", "personal_local"] },
+        "conversationTaskId": { "type": "string" },
+        "flowStepSeq": { "type": "integer", "minimum": 1 },
+        "ledgerTaskId": { "type": "string" },
+        "bindingId": { "type": "string", "format": "uuid" },
+        "bindingVersion": { "type": "integer", "minimum": 1 },
+        "groupId": { "type": "string" },
+        "sessionId": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "conversationId": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "scope": { "const": "group_tenant" } },
+            "required": ["scope"]
+          },
+          "then": {
+            "required": ["groupId"],
+            "properties": {
+              "groupId": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "EvidenceReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["supervisor_report", "ledger_step", "artifact", "argv_exit", "round_snapshot"]
+        },
+        "ref": { "type": "string", "minLength": 1 },
+        "contentHash": { "type": "string" },
+        "validUntil": { "type": "string", "format": "date-time" },
+        "summary": { "type": "string" }
+      }
+    },
+    "Actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "serverAttribution"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["session", "system", "supervisor", "user"]
+        },
+        "sessionId": { "type": "string" },
+        "serverAttribution": {
+          "type": "string",
+          "pattern": "^(gateway:|mcp-server:)[a-zA-Z0-9._-]+$"
+        }
+      }
+    }
+  }
+}

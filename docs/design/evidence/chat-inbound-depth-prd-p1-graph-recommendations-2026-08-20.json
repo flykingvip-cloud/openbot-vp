@@ -1,0 +1,30 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "pr": "D",
+  "fix": "p1-selected-sources-through-graph-and-recommendations",
+  "capturedAt": "2026-08-20T08:37:00+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "31f1521fb4",
+  "originMainIsAncestor": true,
+  "aheadBehindAtCapture": { "ahead": 22, "behind": 0 },
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/gateway/knowledge/resolve/abort-timeout.test.ts src/gateway/knowledge/resolve/resolve-engine.inbound-policy.test.ts src/gateway/knowledge/resolve/resolve-engine.evidence.test.ts src/gateway/knowledge/resolve/evidence-format.test.ts src/gateway/knowledge/resolve-engine.test.ts src/gateway/knowledge/sources/source-api-runtime.test.ts src/gateway/chat-inbound-flags.test.ts src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts",
+  "note": "P1 fix: source policy now filters relationship graph nodes/edges and recommendation inputs by selectedSources. Empty selected does not fallback to the full bundle graph. relatedGroups uses the same scoped graph/objects. Tests cover enterprise-only, personal-only, and empty selected.",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "10 passed (10)",
+    "tests": "83 passed (83)",
+    "duration": "9.07s"
+  },
+  "assertions": {
+    "selectedEnterpriseDropsPersonalAndDataGraphAndRecommendations": true,
+    "selectedPersonalDropsEnterpriseAndDataGraphAndRecommendations": true,
+    "emptySelectedDoesNotFallbackToFullGraphOrRecommendations": true,
+    "unmappedGraphNodesFailClosed": true,
+    "flagOffStillFallsBackToFullBundleGraph": true,
+    "previousSelectedSourcesEvidenceAndLiveGatesRemainGreen": true
+  },
+  "productionLive": false,
+  "liveFlagEnabled": false
+}

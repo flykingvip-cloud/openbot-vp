@@ -1,0 +1,96 @@
+{
+  "schema": "task-progress-ledger-7cd74d4c-origin-main-reverify/v1",
+  "recordedAt": "2026-08-23T08:15:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "7cd74d4c-record-independently-verifiable-new-tip-gates-open",
+  "reason": "PR #614 landed Latest Source revision 7cd74d4c on origin/main. Live-matched alignment for the running overlay is now PASS=8 FAIL=0 on published origin/main. Production LIVE is unchanged. Current origin/main tip is the #614 squash, not 7cd74d4c, so a new tip cutover is still blocked.",
+  "landedRecord": {
+    "pr": 614,
+    "url": "https://github.com/gmood2008/openbot/pull/614",
+    "mergeCommit": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+    "subject": "Docs: land 7cd74d4c live Source revision on origin/main (#614)"
+  },
+  "releaseWorktree": {
+    "path": "/tmp/openbot-release-wt",
+    "head": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+    "statusPorcelainCount": 0,
+    "fetchExit": 0
+  },
+  "tripleShaCheck": {
+    "originMain": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+    "originMainSubject": "Docs: land 7cd74d4c live Source revision on origin/main (#614)",
+    "liveBuildInfoCommit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "originMainReleaseRecordLatest": {
+      "heading": "Latest cutover (2026-08-22) — gateway overlay `7cd74d4c5c69` on GHCR image `5c221b9ec38c`",
+      "sourceRevisionField": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "mentions7cd74d4c": true
+    },
+    "parseLatestCutoverSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "allThreeEqualOnOriginMain": false,
+    "recordMatchesLive": true
+  },
+  "productionObserved": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "builtAt": "2026-08-22T15:09:15.742Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "healthz": { "ok": true, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "uiPinObserved": "index-Dpg8P1UR.js",
+    "overlayId": "origin-main-7cd74d4c-item7-s18-r1",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisRound": false
+    }
+  },
+  "gates": {
+    "verifyForwardOnly": {
+      "worktree": "/tmp/openbot-release-wt",
+      "candidate": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+      "exit": 0,
+      "verdict": "allow",
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "liveSource": "container",
+      "releaseRecordSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a"
+    },
+    "verifyDeliveryAlignmentLiveMatched": {
+      "command": "./deploy/production/scripts/verify-delivery-alignment.sh --prod-sha 7cd74d4c5c69e7492eb6d624531f27592d6c809a --candidate-sha 7cd74d4c5c69e7492eb6d624531f27592d6c809a --candidate-tag provenance/sha-7cd74d4c5c69",
+      "exit": 0,
+      "summary": "PASS=8 WARN=2 FAIL=0",
+      "note": "Now passes on published origin/main after #614."
+    },
+    "verifyDeliveryAlignmentCurrentTip": {
+      "command": "./deploy/production/scripts/verify-delivery-alignment.sh --prod-sha e1cbc1e804… --candidate-sha e1cbc1e804… --candidate-tag provenance/sha-e1cbc1e80420",
+      "exit": 1,
+      "summary": "PASS=5 WARN=3 FAIL=3",
+      "blockers": [
+        "L1 tag missing: provenance/sha-e1cbc1e80420",
+        "L2 origin missing tag provenance/sha-e1cbc1e80420",
+        "L3 SoT RELEASE_RECORD missing prod SHA e1cbc1e80420782e8d3720a546ebc39d9d06764b"
+      ]
+    },
+    "checkSotUseReleaseRecordLive": {
+      "command": "pnpm delivery:check-sot -- --use-release-record-live",
+      "exit": 20,
+      "candidateRef": "origin/release/baseline-recovery-20260725",
+      "releaseRecordSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "note": "Expected frozen-SoT block. Not treated as a 7cd74d4c overlay-record veto."
+    }
+  },
+  "explicitlyNotDone": [
+    "Did not git archive / build / overlay current origin/main tip e1cbc1e804",
+    "Did not mint provenance/sha-e1cbc1e80420",
+    "Did not change Progress Ledger flag",
+    "Did not recreate or restart the production container",
+    "Did not build from the dirty kiro-loom tree"
+  ]
+}

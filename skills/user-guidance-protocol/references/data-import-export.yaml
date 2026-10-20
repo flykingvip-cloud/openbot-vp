@@ -1,0 +1,107 @@
+scenario:
+  name: data_import_export
+  title: 导入 / 导出数据
+  trigger:
+    - 导入
+    - 导出
+    - CSV
+    - Excel
+    - 模版
+    - 组织架构
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: import_org
+    title: 导入组织架构 CSV
+  - id: export_data
+    title: 导出数据
+
+steps:
+  - id: confirm_csv_ready
+    stage: import_org
+    risk: low
+    instruction: 你手上有 CSV 了吗？第一行应是列名，后面每行一个人。格式需与系统模版一致。
+    visual_anchor: null
+    success_signal: 用户确认文件已就绪
+
+  - id: open_org_admin
+    stage: import_org
+    risk: low
+    instruction: 在 OpenBot 左侧导航找到「组织管理」或「通讯录」（👥 或 📋），点击进入。
+    visual_anchor: 侧栏「组织管理」/「通讯录」
+    success_signal: 进入组织管理页
+
+  - id: open_import
+    stage: import_org
+    risk: low
+    instruction: 看右上角「导入」或「批量导入」（↑ 上传图标），点击它。
+    visual_anchor: 右上角导入 / 批量导入
+    success_signal: 导入弹窗打开
+
+  - id: choose_file
+    stage: import_org
+    risk: medium
+    instruction: 在弹窗里点「选择文件」或「上传」，选中你的 CSV。
+    visual_anchor: 选择文件 / 上传区域
+    success_signal: 文件已选中并出现预览
+
+  - id: map_fields
+    stage: import_org
+    risk: medium
+    instruction: |
+      检查预览里的字段映射是否正确（不对就拖动修正）：
+      姓名→姓名，邮箱→邮箱，部门→所属部门，岗位→职位/岗位，
+      上级部门→上级部门，岗位职责→职责描述。
+    visual_anchor: 字段映射预览表
+    success_signal: 用户确认映射正确
+
+  - id: confirm_import
+    stage: import_org
+    risk: high
+    confirmation: true
+    instruction: 预览无误后点「确认导入」或「开始导入」。这会写入组织数据，确认后再点。完成后看成功/失败条数。
+    visual_anchor: 「确认导入」按钮
+    success_signal: 导入结果已展示
+
+  - id: handle_import_failures
+    stage: import_org
+    risk: low
+    instruction: 若有失败，下载「失败记录」看原因（常见：邮箱格式、部门名不匹配），修正后重新导入。
+    visual_anchor: 失败记录下载链接
+    success_signal: 用户处理完失败或无需处理
+
+  - id: open_export
+    stage: export_data
+    risk: low
+    instruction: 在对应模块（组织管理/数据报表等）找到「导出」（↓ 下载图标），点击。
+    visual_anchor: 「导出」按钮
+    success_signal: 导出选项出现
+
+  - id: choose_export_format
+    stage: export_data
+    risk: low
+    instruction: 选择 CSV 或 Excel，再点「导出」。文件会下载到本机。
+    visual_anchor: 格式选择 + 导出确认
+    success_signal: 用户确认已下载
+
+common_blockers:
+  - match: 邮箱格式错误
+    issue_class: user_misread
+    response: 检查空格、@、中文符号
+  - match: 部门不存在
+    issue_class: permission
+    response: 先在部门管理建好对应部门
+  - match: 上级部门不存在
+    issue_class: user_misread
+    response: 上级部门填部门名不是人名；无上级留空
+  - match: 导入后看不到人
+    issue_class: viewport
+    response: 刷新页面，并确认组织层级正确
+  - match: CSV乱码
+    issue_class: ui_changed
+    response: 用 UTF-8 重新保存 CSV
+
+completion:
+  reusable_pattern: true

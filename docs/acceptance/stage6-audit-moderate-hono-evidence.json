@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-xgm2-5f3f-mvvc",
+  "cve": "CVE-2026-59897",
+  "package": "hono",
+  "vulnerable_range": ">=4.3.3 <4.12.27",
+  "affected_version_before": "4.12.25",
+  "dependency_path": ".>hono",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=4.12.27",
+  "mitigated_version": "4.12.27",
+  "reachable_surface": "AWS API Gateway v1 adapter header de-duplication can drop a distinct repeated header value that is a substring of another (advisory); no in-tree `from 'hono'` import observed — still a direct prod dependency / peer for @buape/carbon and @modelcontextprotocol/sdk",
+  "mitigation": "Bump dependencies.hono to 4.12.27; pnpm.overrides.hono=4.12.27 (same pin also clears GHSA-hvrm-45r6-mjfj and GHSA-w62v-xxxg-mg59 as side effects; not separate cells)",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low including further hono advisories needing >=4.12.34 / >=4.13.5 / >=4.13.7). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 46,
+    "low": 9,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-xgm2-5f3f-mvvc"
+}

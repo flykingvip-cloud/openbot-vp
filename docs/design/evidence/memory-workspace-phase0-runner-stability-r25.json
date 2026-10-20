@@ -1,0 +1,141 @@
+{
+  "schema": "memory-workspace-phase0-runner-stability/v1",
+  "evidenceId": "memory-workspace-phase0-20260816-r25",
+  "capturedAt": "2026-08-16T01:15:00Z",
+  "capturedBy": "cursor-compose",
+  "mainSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+  "requiredChecks": [
+    "delivery guard",
+    "check (types, lint, format)",
+    "freeze + phase0 evidence tests"
+  ],
+  "runnerInventory": {
+    "total_count": 1,
+    "runners": [
+      {
+        "name": "kiro-temp-runner",
+        "status": "online",
+        "os": "macOS",
+        "labels": ["self-hosted", "macOS", "ARM64"],
+        "version": "2.336.0"
+      }
+    ],
+    "launchAgent": "com.github.actions.runner.openbot"
+  },
+  "runnerRestart": {
+    "method": "launchctl kickstart -k gui/$UID/com.github.actions.runner.openbot",
+    "performedAt": "2026-08-16T00:53:00Z",
+    "postRestartRunner": {
+      "name": "kiro-temp-runner",
+      "status": "online",
+      "busy": true
+    }
+  },
+  "cycles": [
+    {
+      "sequence": 1,
+      "label": "post-merge push",
+      "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+      "freezeRunId": 31917642710,
+      "ciGateRunId": 31917642731,
+      "checks": [
+        {
+          "context": "freeze + phase0 evidence tests",
+          "runId": 31917642710,
+          "jobId": 95092216271,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        },
+        {
+          "context": "check (types, lint, format)",
+          "runId": 31917642731,
+          "jobId": 95092605677,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        },
+        {
+          "context": "delivery guard",
+          "runId": 31917642731,
+          "jobId": 95092605681,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        }
+      ],
+      "allRequiredSuccess": true
+    },
+    {
+      "sequence": 2,
+      "label": "workflow_dispatch",
+      "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+      "freezeRunId": 31918084060,
+      "ciGateRunId": 31918085424,
+      "checks": [
+        {
+          "context": "freeze + phase0 evidence tests",
+          "runId": 31918084060,
+          "jobId": 95093249583,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        },
+        {
+          "context": "check (types, lint, format)",
+          "runId": 31918085424,
+          "jobId": 95093252753,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        },
+        {
+          "context": "delivery guard",
+          "runId": 31918085424,
+          "jobId": 95093252723,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        }
+      ],
+      "allRequiredSuccess": true
+    },
+    {
+      "sequence": 3,
+      "label": "workflow_dispatch after runner restart",
+      "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+      "freezeRunId": 31918309890,
+      "ciGateRunId": 31918311191,
+      "checks": [
+        {
+          "context": "freeze + phase0 evidence tests",
+          "runId": 31918309890,
+          "jobId": 95093824535,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        },
+        {
+          "context": "check (types, lint, format)",
+          "runId": 31918311191,
+          "jobId": 95093828055,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        },
+        {
+          "context": "delivery guard",
+          "runId": 31918311191,
+          "jobId": 95093828068,
+          "conclusion": "success",
+          "runner_name": "kiro-temp-runner",
+          "runner_group_name": "Default"
+        }
+      ],
+      "allRequiredSuccess": true
+    }
+  ],
+  "consecutiveSuccessCount": 3,
+  "meetsMinimumBar": true,
+  "note": "Three consecutive main@06d71b9ec2 required-check cycles succeeded on kiro-temp-runner; cycle 3 followed launchctl restart of com.github.actions.runner.openbot. Execution-team capture only — not official-review sign-off."
+}

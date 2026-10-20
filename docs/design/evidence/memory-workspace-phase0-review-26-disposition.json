@@ -1,0 +1,27 @@
+{
+  "schema": "memory-workspace-phase0-review-26-disposition/v1",
+  "preparedBy": "cursor-memory-platform",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "verdict": "not-merged-do-not-land",
+  "reason": [
+    "Kiro commit c57cd45251 exists only on kiro-memory-workspace-remediation/review-26-landing",
+    "No GitHub PR was opened",
+    "Branch is behind origin/main and ancestry fails",
+    "Delegation recorded at 6fdc0ac809 is void because origin/main advanced to d29a1a5be7",
+    "Review-25 official-review sign-off already merged via #422; landing review-26 would create two Accepted sequences"
+  ],
+  "effectivePhase0Close": {
+    "pr": 422,
+    "reviewSequence": 25,
+    "decision": "PHASE0_ACCEPTED",
+    "phase0Accepted": true,
+    "mergeSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+    "signedAtMainSha": "6fdc0ac80968816969e4e1344b13c60941c0f960"
+  },
+  "kiroLocalCommit": "c57cd4525123b24e956f2f45d68db810b30e98eb",
+  "forbidden": [
+    "merge review-25 and review-26 Accepted sign-offs together",
+    "treat execution-team self-sign #419 as official-review",
+    "delete #409 merge-moment freeze FAILURE evidence"
+  ]
+}

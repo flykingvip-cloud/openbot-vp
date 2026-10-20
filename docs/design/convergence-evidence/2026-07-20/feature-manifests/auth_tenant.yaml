@@ -1,0 +1,41 @@
+auth_tenant:
+  feature_id: auth_tenant
+  decision: ACCEPT_WITH_REWORK
+  target_wave: D1
+  ui_kinds: []
+  rpc_methods:
+    - enterprise.organization.snapshot
+  runtime_modules:
+    - src/gateway/server-methods/enterprise-organization.ts
+    - src/gateway/server-methods/billing-helpers.ts
+    - src/gateway/enterprise-data/enterprise-data-seat-context.ts
+    - src/gateway/tenant-context.ts
+    - src/gateway/billing/scope.ts
+  auth_rules:
+    - rule: forged_tenantId_rejected
+      description: >
+        Explicit params.tenantId / params.enterpriseId must match
+        authenticated enterprise scope (canonicalizeTenantId + isScopeAuthorizedForTenant
+        / requireResolvedEnterpriseTenantId).
+    - rule: method_scope_registered
+      description: enterprise.organization.snapshot is listed under operator.read scopes.
+  tenant_scope:
+    - authority: membership_and_billing_scope
+    - hint_not_authority: true
+  storage: []
+  migration: []
+  startup_wiring: []
+  observability: []
+  client_contracts: []
+  deploy_assets: []
+  tests:
+    - src/gateway/server-methods/enterprise-organization.tenant-scope.test.ts
+    - src/gateway/tenant-context.test.ts
+    - src/gateway/enterprise-data/enterprise-data-tenant-scope.test.ts
+  rollback_test: []
+  d1_notes: >
+    Phase D1 thin pack (2026-07-20): organization.snapshot uses
+    requireResolvedEnterpriseTenantId; requireEnterpriseScope rejects
+    mismatched tenantId; method-scopes registers snapshot. Deferred:
+    Control UI login UX, agent roster catalog, full platform-auth control UI,
+    unclassified non-auth RPC holes (platform-capability.*, knowledge.personal.uploadFolder).

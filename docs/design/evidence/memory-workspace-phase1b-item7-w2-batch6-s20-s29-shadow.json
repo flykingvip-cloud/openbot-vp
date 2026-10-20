@@ -1,0 +1,14 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w2-batch6-s20-s29-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w2-batch6-s20-s29-shadow.json",
+  "kind": "item7-w2-batch6-dark-dual-read-shadow",
+  "wave": "W2-write-callers",
+  "batch": 6,
+  "sitesWired": ["S20-tools-catalog-workspace", "S29-trusted-agent-locator"],
+  "w2WriteCallersComplete": true,
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "productionWrite": "legacy-only",
+  "sidecar": "src/gateway/gateway-w2-shadow.ts",
+  "note": "Final W2-write-callers ledger sites from replacement plan."
+}

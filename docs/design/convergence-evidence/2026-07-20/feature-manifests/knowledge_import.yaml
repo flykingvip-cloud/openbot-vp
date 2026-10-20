@@ -1,0 +1,44 @@
+knowledge_import:
+  feature_id: knowledge_import_localfolder
+  decision: ACCEPT_WITH_REWORK
+  target_wave: D4
+  ui_kinds:
+    - localFolder
+  rpc_methods:
+    - knowledge.local-folder.bind
+    - knowledge.local-folder.scan-now
+    - knowledge.local-folder.unbind
+    - knowledge.local-folder.status
+    - knowledge.local-folder.sync.plan
+    - knowledge.local-folder.sync.commit
+    - knowledge.base.create
+    - knowledge.base.search
+    - knowledge.base.sources.list
+    - knowledge.base.documents.list
+  runtime_modules:
+    - src/gateway/knowledge/sources/local-folder-runtime.ts
+    - src/gateway/knowledge/sources/local-folder-binding-store.ts
+    - src/gateway/knowledge/sources/local-folder-path-policy.ts
+    - src/gateway/knowledge/sources/source-document-link-store.ts
+    - src/gateway/server-methods/knowledge.ts
+  auth_rules:
+    - rule: user_context_required_for_bind
+    - rule: authorizedKnowledgeBase_write_for_bind
+  tenant_scope:
+    - rule: cross_tenant_search_empty_or_denied
+  storage:
+    - local-folder bindings under CONFIG_DIR/knowledge
+    - source-document links
+  migration: []
+  startup_wiring: []
+  observability: []
+  client_contracts: []
+  deploy_assets: []
+  tests:
+    - src/gateway/knowledge/sources/local-folder-import.golden-path.test.ts
+    - src/gateway/knowledge/sources/local-folder-path-policy.test.ts
+    - src/gateway/knowledge/sources/local-folder-types.test.ts
+  rollback_test: []
+  d4_notes: >
+    Phase D4 (2026-07-20): localFolder local_index golden matrix K1–K6 automated.
+    Deferred: other SpaceImportKind values and passive connectors.

@@ -1,0 +1,122 @@
+import { describe, expect, it } from "vitest";
+import type { EnterprisePortReadModel } from "../semantic/enterprise-read-model.ts";
+
+function createReadModel(partial: Partial<EnterprisePortReadModel> = {}): EnterprisePortReadModel {
+  return {
+    currentTenantId: "tenant-1",
+    currentTenantLabel: "Tenant",
+    authenticatedUser: "admin@example.com",
+    membershipRole: "enterprise-admin",
+    memberCount: 1,
+    memberUsers: ["zhangfei@example.com"],
+    memberSummaries: [
+      {
+        user: "zhangfei@example.com",
+        displayLabel: "张飞",
+        membershipRole: "member",
+        status: "active",
+        seatTitle: "销售助理",
+        seatStatus: "assigned",
+        seatTeamLabel: "销售部",
+      },
+    ],
+    adminCount: 1,
+    seatCount: 1,
+    occupiedSeatCount: 0,
+    assignedSeatCount: 1,
+    vacantSeatCount: 0,
+    handoverSeatCount: 0,
+    frozenSeatCount: 0,
+    handoverCaseCount: 0,
+    pendingOfferCount: 0,
+    organizationDepartmentPaths: [],
+    seatSummaries: [
+      {
+        seatId: "seat-sales",
+        title: "销售助理",
+        teamLabel: "销售部",
+        status: "assigned",
+        currentEmployeeUser: null,
+        currentEmployeeLabel: null,
+        pendingEmployeeUser: "zhangfei@example.com",
+        pendingEmployeeDisplayName: null,
+        roleCode: "SALES-MGR-001",
+        defaultAgentId: "main",
+        agentIds: ["main"],
+        defaultSpaceIds: [],
+        memoryScopeIds: [],
+        responsibility: null,
+      },
+    ],
+    handoverSummaries: [],
+    offerSummaries: [],
+    latestInviteCode: null,
+    latestInviteExpiresAt: null,
+    agentCount: 1,
+    defaultAgentId: "main",
+    presenceCount: 0,
+    runtimeHosts: [],
+    sessionsCount: 0,
+    nodeCount: 0,
+    groupIds: [],
+    cronJobCount: 0,
+    meshSummary: {
+      userCount: 1,
+      agentCount: 1,
+      groupCount: 0,
+      onlineAgentCount: 0,
+      activeAgentCount: 0,
+      activeGroupCount: 0,
+      activeAgentRate: 0,
+      activeGroupRate: 0,
+      totalCost: 0,
+      totalTokens: 0,
+      costPerSession: 0,
+      sessionCount: 0,
+      inefficientAssetCount: 0,
+      unattributedCostCount: 0,
+      unownedAssetCount: 0,
+      governanceIssueCount: 0,
+    },
+    meshUsers: [],
+    meshAgents: [],
+    meshGroups: [],
+    meshAnomalies: [],
+    channelIds: [],
+    providerIds: [],
+    configuredModelIds: [],
+    configIssueLabels: [],
+    resolverOptions: [],
+    totalCost: 0,
+    totalTokens: 0,
+    identitySummaries: [],
+    identityAlerts: [],
+    ...partial,
+  } as unknown as EnterprisePortReadModel;
+}
+
+describe("enterprise organization member display labels", () => {
+  it("keeps currentEmployeeUser on seat summaries for occupied seats", () => {
+    const model = createReadModel({
+      seatSummaries: [
+        {
+          seatId: "seat-ceo",
+          title: "CEO",
+          teamLabel: "管理层",
+          status: "occupied",
+          currentEmployeeUser: "zhangfei@example.com",
+          currentEmployeeLabel: "张飞",
+          pendingEmployeeUser: null,
+          roleCode: "TEAM-L1-001",
+          defaultAgentId: "main",
+          agentIds: ["main"],
+          defaultSpaceIds: [],
+          memoryScopeIds: [],
+          responsibility: null,
+        },
+      ],
+    });
+    expect(model.seatSummaries[0]?.currentEmployeeUser).toBe("zhangfei@example.com");
+    expect(model.seatSummaries[0]?.currentEmployeeLabel).toBe("张飞");
+  });
+});

@@ -1,0 +1,71 @@
+{
+  "schema": "memory-workspace-phase1a-catalog-contract/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "preparedBy": "cursor-memory-platform",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "phase": "1A-design-only",
+  "owner": "codex-workspace-architecture",
+  "phase1bImplementationOwner": "cursor-data-governance",
+  "status": "design-frozen-pending-owner-signoff",
+  "designBasis": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+  "phase0Candidate": "docs/design/evidence/memory-workspace-phase0-20260814.catalog-candidate.json",
+  "sot": {
+    "uniqueCatalog": "Data Governance Catalog (`src/gateway/data-governance/catalog-store.ts`)",
+    "workspaceAdapter": "WorkspaceResourceCatalog is a read-only projection adapter only",
+    "forbidden": [
+      "WorkspaceResourceCatalog independent durable writes",
+      "second WorkspaceIdentity / workspace lifecycle SoT",
+      "Catalog miss=deny in production before Phase 1B unlock",
+      "writing unknown/conflict/quarantine into the normal Catalog"
+    ]
+  },
+  "persistentIdentity": {
+    "field": "resourceId",
+    "rule": "Single durable identity for disk, RPC, receipt, Catalog, and SQLite partition",
+    "aliases": "WorkspaceId is a TypeScript alias only; path/realpath/agentId/display name are not identity",
+    "envelope": "Workspace is a typed view of DataGovernanceEnvelope with resourceType=workspace"
+  },
+  "coverageHonesty": {
+    "source": "memory-workspace-phase0-20260814.catalog-candidate.json",
+    "persistentGovernanceCatalogExists": false,
+    "persistentCatalogCoverage": "0%",
+    "gates": {
+      "employee_private": "fail",
+      "agent_primary": "fail",
+      "group_shared": "fail",
+      "conflict_or_unknown": "fail"
+    },
+    "note": "Phase 0 candidate is offline inventory only. Coverage=0% must remain reported until a persistent Catalog exists. Do not treat candidate JSON as SoT."
+  },
+  "admissionRules": {
+    "normalCatalog": ["classified resources with tenant-scoped authority proof"],
+    "quarantineOrDisposition": [
+      "unknown",
+      "conflict",
+      "pending_authority",
+      "unproven inventory rows"
+    ],
+    "writable": false,
+    "bootstrap": "offline shadow compare from Phase 0 candidate; no production Catalog write in Phase 1A"
+  },
+  "adapterContract": {
+    "name": "WorkspaceResourceCatalogAdapter",
+    "mode": "read-only",
+    "projects": [
+      "resourceId",
+      "tenantId",
+      "ownerScope",
+      "lifecycleState",
+      "canonical binding locator"
+    ],
+    "mustNot": ["put()", "compareAndPut()", "remove()", "synthesize resourceId from path"]
+  },
+  "explicitlyForbidden": [
+    "LIVE schema change",
+    "Catalog SoT write to production",
+    "Catalog miss=deny",
+    "resolver production write switch",
+    "deployAuthorized=true"
+  ]
+}

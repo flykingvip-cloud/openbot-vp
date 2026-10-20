@@ -1,0 +1,81 @@
+[
+  {
+    "name": "platform-auth-rate-limit-isolation",
+    "from": "src/gateway/platform-auth/!(rate-limit).ts",
+    "denyImportsFrom": ["src/gateway/platform-auth/rate-limit"],
+    "description": "platform-auth: only the rate-limit Sub_Module owns lockout counters; consumers must call exported helpers, not import internals."
+  },
+  {
+    "name": "platform-auth-store-isolation",
+    "from": "src/gateway/platform-auth/!(store|store-types|http-handler|session-context|routes-login-password|routes-enterprise|routes-employee|routes-employee-register|routes-trial|routes-trial-review|routes-auth|auth-helpers|enterprise-provisioning|token-operations|request-helpers).ts",
+    "denyImportsFrom": ["src/gateway/platform-auth/store"],
+    "description": "platform-auth: storeWriteLocks lives in store.ts; other Sub_Modules use withPlatformAuthStoreWriteLock and accessors."
+  },
+  {
+    "name": "platform-auth-facade-direction",
+    "from": "src/gateway/platform-auth.ts",
+    "denyImportsFrom": ["src/gateway/!(platform-auth)/**"],
+    "description": "platform-auth facade: re-exports only; must not pull from sibling gateway modules."
+  },
+  {
+    "name": "collaboration-learning-state-machine-isolation",
+    "from": "src/gateway/collaboration-learning/!(state-machine).ts",
+    "denyImportsFrom": ["src/gateway/collaboration-learning/state-machine"],
+    "description": "collaboration-learning: state-machine internals are private; consumers go through event-entry."
+  },
+  {
+    "name": "collaboration-learning-snapshot-isolation",
+    "from": "src/gateway/collaboration-learning/!(evaluation-aggregation).ts",
+    "denyImportsFrom": ["src/gateway/collaboration-learning/evaluation-aggregation"],
+    "description": "collaboration-learning: snapshot building stays inside evaluation-aggregation."
+  },
+  {
+    "name": "loader-runtime-resolve-isolation",
+    "from": "src/plugins/loader/!(runtime-resolve).ts",
+    "denyImportsFrom": ["src/plugins/loader/runtime-resolve"],
+    "description": "plugins/loader: jiti and plugin-sdk alias setup is owned by runtime-resolve; other Sub_Modules use the exported getJiti()."
+  },
+  {
+    "name": "loader-no-deep-discovery-import",
+    "from": "src/plugins/loader/**",
+    "denyImportsFrom": ["src/plugins/discovery/**/*"],
+    "description": "plugins/loader: must use the discovery facade, not deep-import its internals."
+  },
+  {
+    "name": "hooks-no-import-hook-runner-global",
+    "from": "src/plugins/hooks/**",
+    "denyImportsFrom": ["src/plugins/hook-runner-global"],
+    "description": "plugins/hooks: keeps the boundary one-directional with hook-runner-global to prevent the previously-flagged circular import."
+  },
+  {
+    "name": "channels-no-plugin-sdk-facade",
+    "from": "src/channels/**",
+    "denyImportsFrom": ["src/plugin-sdk/**"],
+    "description": "channels own their implementations. plugin-sdk is a re-export facade and must not be imported by core channel code."
+  },
+  {
+    "name": "shared-package-matrix-no-gateway",
+    "from": "src/shared/package-matrix.ts",
+    "denyImportsFrom": ["src/gateway/**"],
+    "description": "The shared package matrix is a leaf. SeatRole lives in src/shared/seat-role.ts so billing can depend on it."
+  },
+  {
+    "name": "utils-usage-format-no-upper-layers",
+    "from": "src/utils/usage-format.ts",
+    "denyImportsFrom": ["src/agents/**", "src/config/**"],
+    "description": "Usage formatting accepts structural cost and usage shapes and does not import agents or config."
+  },
+  {
+    "name": "hooks-event-family-isolation",
+    "from": "src/plugins/hooks/!(runner|runner-shared|runner-types).ts",
+    "denyImportsFrom": [
+      "src/plugins/hooks/agent-events",
+      "src/plugins/hooks/message-events",
+      "src/plugins/hooks/tool-events",
+      "src/plugins/hooks/session-events",
+      "src/plugins/hooks/subagent-events",
+      "src/plugins/hooks/gateway-lifecycle-events"
+    ],
+    "description": "plugins/hooks: event-family files must not depend on each other; the runner is the only assembler."
+  }
+]

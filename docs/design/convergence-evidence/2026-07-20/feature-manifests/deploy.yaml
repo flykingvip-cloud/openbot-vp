@@ -1,0 +1,22 @@
+deploy:
+  feature_id: deploy_rc_v69
+  decision: ACCEPT_WITH_REWORK
+  target_wave: D0
+  ui_kinds: []
+  rpc_methods: []
+  runtime_modules: []
+  auth_rules: []
+  tenant_scope: []
+  storage: []
+  migration: []
+  startup_wiring: []
+  observability:
+    - healthz
+    - readyz
+  client_contracts: []
+  deploy_assets:
+    - deploy/production/RELEASE_RECORD.md
+    - openbot:rc-amd64-v69
+  tests: []
+  rollback_test:
+    - rollback to rc-amd64-v68 container rename

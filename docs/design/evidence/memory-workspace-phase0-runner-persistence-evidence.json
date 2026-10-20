@@ -1,0 +1,35 @@
+{
+  "schema": "memory-workspace-phase0-runner-persistence/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "capturedAt": "2026-08-16T00:10:30.000Z",
+  "capturedBy": "cursor-memory-wsc",
+  "launchAgent": {
+    "label": "com.github.actions.runner.openbot",
+    "plistPath": "/Users/daniel/Library/LaunchAgents/com.github.actions.runner.openbot.plist",
+    "state": "running",
+    "keepAlive": true,
+    "runAtLoad": true,
+    "program": "/Users/daniel/gh-runner/run.sh",
+    "workingDirectory": "/Users/daniel/gh-runner",
+    "stdoutPath": "/Users/daniel/gh-runner/runner.log",
+    "stderrPath": "/Users/daniel/gh-runner/runner.error.log"
+  },
+  "runnerRegistration": {
+    "name": "kiro-temp-runner",
+    "status": "online",
+    "busy": false,
+    "labels": ["self-hosted", "macOS", "ARM64"],
+    "source": "gh api repos/gmood2008/openbot/actions/runners"
+  },
+  "recentGateExecution": {
+    "mainSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+    "runnerName": "kiro-temp-runner",
+    "runs": [31917642731, 31917642710],
+    "allRequiredJobsUsedRunner": true
+  },
+  "stabilityVerdict": {
+    "launchAgentPersisted": true,
+    "longTermSloProven": false,
+    "note": "LaunchAgent KeepAlive + RunAtLoad configured; runner online and executed main-tip triple gate. 7-day uptime SLO not yet proven — partial acceptance only."
+  }
+}

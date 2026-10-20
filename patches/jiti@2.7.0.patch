@@ -1,0 +1,29 @@
+diff --git a/package.json b/package.json
+index 64fc3f17494f33fc75dca5877f2ffce27ab732df..96f11a1525a907e53a7a3f6d6802d431d880eada 100644
+--- a/package.json
++++ b/package.json
+@@ -18,15 +18,21 @@
+     },
+     "./register": {
+       "types": "./lib/jiti-register.d.mts",
+-      "import": "./lib/jiti-register.mjs"
++      "import": "./lib/jiti-register.mjs",
++      "require": "./lib/jiti-register.mjs",
++      "default": "./lib/jiti-register.mjs"
+     },
+     "./native": {
+       "types": "./lib/jiti.d.mts",
+-      "import": "./lib/jiti-native.mjs"
++      "import": "./lib/jiti-native.mjs",
++      "require": "./lib/jiti-native.mjs",
++      "default": "./lib/jiti-native.mjs"
+     },
+     "./static": {
+       "types": "./lib/jiti.d.mts",
+-      "import": "./lib/jiti-static.mjs"
++      "import": "./lib/jiti-static.mjs",
++      "require": "./lib/jiti-static.mjs",
++      "default": "./lib/jiti-static.mjs"
+     },
+     "./package.json": "./package.json"
+   },

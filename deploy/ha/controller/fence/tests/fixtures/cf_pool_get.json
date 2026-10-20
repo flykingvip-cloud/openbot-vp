@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "result": {
+    "id": "pool-fixture-1",
+    "name": "openbot-writer",
+    "origins": [
+      {
+        "name": "node-a.example",
+        "address": "10.0.0.1",
+        "enabled": true,
+        "description": "epoch=2; execution=11111111-1111-1111-1111-111111111111"
+      }
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "memory-workspace-phase0-main-gate-evidence/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "6fdc0ac80968816969e4e1344b13c60941c0f960",
+  "supersedesMainSha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+  "capturedAt": "2026-08-16T07:10:00.000Z",
+  "capturedBy": "official-review",
+  "trigger": "push-to-main",
+  "rulesetId": "19808307",
+  "mainAncestryNote": "#421 Stage 1 handoff merged; official-review sign-off anchor",
+  "requiredChecks": [
+    "delivery guard",
+    "check (types, lint, format)",
+    "freeze + phase0 evidence tests"
+  ],
+  "runs": [
+    {
+      "workflow": "CI Gate",
+      "runId": 31932917224,
+      "url": "https://github.com/gmood2008/openbot/actions/runs/31932917224",
+      "headSha": "6fdc0ac80968816969e4e1344b13c60941c0f960",
+      "conclusion": "success",
+      "updatedAt": "2026-08-16T07:03:10Z",
+      "jobs": [
+        {
+          "name": "check (types, lint, format)",
+          "conclusion": "success",
+          "runnerName": "kiro-temp-runner",
+          "stepCount": 14
+        },
+        {
+          "name": "delivery guard",
+          "conclusion": "success",
+          "runnerName": "kiro-temp-runner",
+          "stepCount": 8
+        }
+      ]
+    },
+    {
+      "workflow": "Memory Workspace Freeze",
+      "runId": 31932917133,
+      "url": "https://github.com/gmood2008/openbot/actions/runs/31932917133",
+      "headSha": "6fdc0ac80968816969e4e1344b13c60941c0f960",
+      "conclusion": "success",
+      "updatedAt": "2026-08-16T07:03:10Z",
+      "jobs": [
+        {
+          "name": "freeze + phase0 evidence tests",
+          "conclusion": "success",
+          "runnerName": "kiro-temp-runner",
+          "stepCount": 9
+        }
+      ]
+    }
+  ],
+  "governance": {
+    "phase0Accepted": true,
+    "deployAuthorized": false,
+    "closesWsC": false,
+    "note": "Post-#421 main tip triple gate; review sequence 25 signed."
+  }
+}

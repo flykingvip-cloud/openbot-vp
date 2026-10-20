@@ -1,0 +1,63 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch21-s24/v1",
+  "item": 7,
+  "status": "retirement-batch-21",
+  "batch": "S24",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": true,
+  "previousAcceptedBaseline": 14,
+  "lastAcceptedRetirementBaseline": 14,
+  "sitesRetired": [
+    {
+      "ledgerId": "S24",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "symbol": "resolveEmployeeStewardSourceWorkspaceDir",
+      "lineBefore": 152,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator",
+      "replacementLocator": "src/gateway/workspace-resolver/strict-locator.ts",
+      "replacementTests": [
+        "src/gateway/workspace-resolver/strict-locator.test.ts",
+        "src/gateway/workspace-resolver/steward-write-item7-s24.test.ts"
+      ]
+    }
+  ],
+  "identityChecks": {
+    "tenant": "fail-closed when tenant context is missing or Catalog tenant mismatches",
+    "workspace": "read existing Catalog source locator only; no host-root, stateDir guess, or process.cwd fallback",
+    "agentAsset": "lookup uses steward:builtin",
+    "grant": "locator requires tenantContext + user grant; missing grant fail-closed"
+  },
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 13,
+  "liveWriteWatchIndex": 13,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/workspace-resolver/steward-write.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "3447511b071f5538523704831c8d3fb09a4b0943",
+  "note": "Batch 21 retires S24 only after #664 S23. Read existing Catalog source locator via resolveWorkspaceLocator. Do not call resolveEmployeeStewardSourceWorkspaceDir at the writable-dir site. Do not mint a production Catalog row. Catalog miss=deny stays off. S25/S26/S27 stay at 153/279/280. Item 7 stays not-met. Do not write liveWriteWatchIndex=0. Phase 0 freeze baseline stays 38."
+}

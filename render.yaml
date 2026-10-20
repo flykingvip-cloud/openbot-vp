@@ -1,0 +1,37 @@
+# Render sample — treat as a starting point, not a full SaaS topology.
+# Production pack: deploy/production/ (config must set gateway.mode=local; image CMD has no --allow-unconfigured).
+# 1GB disk is too small for real workspaces; raise before anything beyond demos.
+#
+# Security (SECURITY.md "Web Interface Safety", deploy/production/README.md R3-R5):
+# Render terminates TLS and forwards public traffic to $PORT, so the gateway process
+# must listen on a non-loopback address here. That is the minimal working bind for
+# this topology, NOT permission to run a bare Control UI on the public internet.
+# Before real traffic:
+#   - keep gateway auth on (OPENBOT_GATEWAY_TOKEN below is generated; never delete it)
+#   - pin gateway.controlUi.allowedOrigins to your exact https origin(s), no "*"
+#   - set session.maintenance.mode="enforce" with a disk budget
+#     (see deploy/production/openbot.production.example.json5) — with the default
+#     "warn" this 1GB disk fills before any governance action happens.
+services:
+  - type: web
+    name: openbot
+    runtime: docker
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: SETUP_PASSWORD
+        sync: false
+      - key: OPENBOT_STATE_DIR
+        value: /data/.openclaw
+      - key: OPENBOT_WORKSPACE_DIR
+        value: /data/workspace
+      - key: OPENBOT_GATEWAY_TOKEN
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+    disk:
+      name: openbot-data
+      mountPath: /data
+      sizeGB: 1

@@ -1,0 +1,1 @@
+# Keep default obfuscation rules empty for debug-friendly builds.

@@ -1,0 +1,102 @@
+// Production config skeleton — copy to the host state dir (e.g. openclaw.json).
+// Replace every CHANGE_ME. Do not commit real secrets.
+//
+// Semantics:
+// - gateway.mode "local" = this process runs channels + agent runtime (required without --allow-unconfigured)
+// - data.mode "managed" = SaaS-hosted Data Space (Profile B); use "local" for personal self-hosted (Profile A)
+// - Managed production (Gate 0 / R10): one DEDICATED Gateway per tenant. data.mode=managed
+//   derives the managed_enterprise profile, which fails closed at startup unless the
+//   dedicated boundary env is set (see env.production.example + gateway.security below).
+//
+{
+  gateway: {
+    mode: "local",
+    // Prefer loopback + reverse proxy. Use "lan" only with network policy + auth + audit.
+    bind: "loopback",
+    port: 18789,
+    auth: {
+      // Option A — shared operator token (CLI / internal tools)
+      mode: "token",
+      // Prefer env OPENBOT_GATEWAY_TOKEN / OPENCLAW_GATEWAY_TOKEN over embedding here.
+      // token: "CHANGE_ME_use_env_instead",
+
+      // Option B — browser SSO via identity-aware proxy (platform console):
+      // mode: "trusted-proxy",
+      // trustedProxy: {
+      //   userHeader: "x-forwarded-user",
+      //   requiredHeaders: ["x-forwarded-proto", "x-forwarded-host"],
+      //   platformAuth: { enabled: true },
+      // },
+    },
+    // Required when Control UI / admin SPA is served from another origin.
+    controlUi: {
+      enabled: true,
+      allowedOrigins: ["https://admin.CHANGE_ME.example", "https://app.CHANGE_ME.example"],
+    },
+    // Only the reverse proxy addresses (never the public internet).
+    trustedProxies: ["127.0.0.1", "::1"],
+
+    // Gate 0 security profile (src/gateway/security-profile.ts). Prefer env
+    // (OPENBOT_SECURITY_PROFILE / OPENBOT_TENANT_EXECUTION_BOUNDARY /
+    // OPENBOT_TENANTS_ROOT — see env.production.example); config keys exist for
+    // installs that cannot set process env. Personal self-hosted (Profile A):
+    // omit this block entirely.
+    // security: {
+    //   profile: "managed_enterprise",
+    //   // "shared_process" is rejected at startup until shared-process I3
+    //   // isolation is proven (SECURITY_PROFILE_MISSING_EXECUTION_BOUNDARY).
+    //   tenantExecutionBoundary: "dedicated",
+    //   // Only when OPENBOT_TENANTS_ROOT cannot live in process env (e.g. secret
+    //   // mount). Never store the actual tenants-root path in committed config.
+    //   // tenantsRootConfigured: true,
+    // },
+  },
+
+  data: {
+    // Managed SaaS (Profile B): "managed" — requires the dedicated boundary above (R10).
+    // Personal self-hosted (Profile A): use "local" and omit gateway.security.
+    // Never keep mode "managed" while forcing profile personal_local — startup
+    // rejects the combination (SECURITY_PROFILE_CONFLICT).
+    mode: "managed",
+  },
+
+  session: {
+    // Hosted / long-running deployments MUST enforce session-store maintenance.
+    // The code default is "warn" (kept for personal installs): it only logs, so a
+    // managed host grows session transcripts without bound until the data volume
+    // fills — an availability incident, not a governance action.
+    maintenance: {
+      mode: "enforce",
+      // Remove session entries older than this. "enforce" really deletes old
+      // transcripts — pair with your backup policy before shortening it.
+      pruneAfter: "30d",
+      // Cap the number of session entries kept per agent.
+      maxEntries: 500,
+      // Rotate sessions.json when it exceeds this size.
+      rotateBytes: "10mb",
+      // Per-agent sessions-directory disk budget. Size it well below the mounted
+      // data volume (fly/render sample volumes are only a few GB). When exceeded,
+      // enforce mode cleans oldest-first down to highWaterBytes (default: 80%).
+      maxDiskBytes: "2gb",
+    },
+  },
+
+  logging: {
+    // Managed/hosted logs are shipped to aggregation: run the widest redaction
+    // tier so channel/gateway log lines (not just tool summaries) are masked.
+    // Personal self-hosted installs keep the "tools" default.
+    redactSensitive: "all",
+  },
+
+  agents: {
+    defaults: {
+      // Shared / multi-user: prefer "all". Trusted single-operator lab: "off" or "non-main" with written sign-off.
+      sandbox: {
+        mode: "all",
+      },
+    },
+  },
+
+  // Optional: pin plugins allowlist in production
+  // plugins: { allow: ["diagnostics-otel"] },
+}

@@ -1,0 +1,34 @@
+# task-focus-unified-execution
+
+Phase 0–8 planning and execution for unified Objective/Completion contracts,
+Cron L2 focus prompt, and Progress Ledger alignment. See
+`docs/design/openbot-task-focus-unified-execution-review-2026-09-13.md`.
+
+## Agents
+
+- cursor-task-focus-unify · role: owner · scope: design · paths: docs/design/openbot-task-focus-unified-execution-review-2026-09-13.md, docs/design/openbot-task-focus-unify-phase0-deliverables-2026-09-13.md, docs/design/openbot-task-focus-unify-phase2-shared-objective-amendment-2026-09-13.md · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: phase2-docs · paths: docs/design/openbot-task-focus-unify-phase2-shadow-implementation-plan-2026-09-13.md, docs/design/openbot-task-focus-unify-phase2-shadow-observation-2026-09-13.md · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: cycle0-evidence · paths: docs/design/evidence/objective-shadow-observation-cycle-0-2026-09-13.md, docs/design/evidence/objective-shadow-landed-sha-git-verification-2026-09-13.md, docs/design/evidence/objective-shadow-observation-cycle-0-runtime-callsite-2026-09-13.md · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: cycle0-index · paths: docs/design/evidence/objective-shadow-observation-cycle-0-manifest-2026-09-13.json, docs/design/evidence/objective-shadow-cycle0-evidence-tip-2026-09-14.md, docs/design/evidence/objective-shadow-1112-landed-sha-git-verification-2026-09-14.md, docs/design/evidence/objective-shadow-1120-landed-sha-git-verification-2026-09-14.md, docs/design/evidence/objective-shadow-1121-landed-sha-git-verification-2026-09-14.md, docs/design/evidence/objective-shadow-1122-landed-sha-git-verification-2026-09-14.md, docs/design/evidence/objective-shadow-1123-landed-sha-git-verification-2026-09-14.md, docs/design/evidence/objective-shadow-1124-landed-sha-git-verification-2026-09-14.md, docs/design/evidence/objective-shadow-launchd-gateway-writable-git-reverify-2026-09-14.md, docs/design/evidence/objective-shadow-launchd-gateway-running-b07683f99d-2026-09-14.md, docs/design/evidence/objective-shadow-launchd-gateway-window-application-b07683f99d-2026-09-14.md, docs/design/evidence/objective-shadow-launchd-gateway-gate-prep-2026-09-14.md, docs/design/evidence/objective-shadow-launchd-gateway-window-application.template.md, docs/design/evidence/objective-shadow-controlled-build-352e5adac0-2026-09-14.md, docs/design/evidence/objective-shadow-launchd-gateway-window-application-2026-09-14.md · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: shadow-core · paths: src/objective-shadow/feature.ts, src/objective-shadow/feature.test.ts, src/objective-shadow/index.ts, src/objective-shadow/test-env.ts, src/objective-shadow/observe.ts, src/objective-shadow/runtime.ts · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: shadow-rest · paths: src/objective-shadow/allowlist.ts, src/objective-shadow/candidates.ts, src/objective-shadow/cron-objective.ts, src/objective-shadow/ingress-hook.ts, src/objective-shadow/log.ts, src/objective-shadow/redact.ts · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: shadow-more · paths: src/objective-shadow/replay.ts, src/objective-shadow/types.ts, src/objective-shadow/window.ts, src/objective-shadow/write-guard.ts, src/objective-shadow/read-existing-objectives.ts, src/objective-shadow/observation-report.ts · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: shadow-tests · paths: src/objective-shadow/objective-shadow.test.ts, src/objective-shadow/cron-objective.test.ts, src/objective-shadow/import-boundary.test.ts, src/objective-shadow/ingress-wiring.test.ts, src/objective-shadow/observation-report.test.ts, src/objective-shadow/get-reply-run.ingress.test.ts · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: ingress-tests · paths: src/agents/subagent-spawn.objective-shadow.test.ts, src/cron/isolated-agent/run.objective-shadow.test.ts, src/gateway/collaboration-dispatch/round-runtime.objective-shadow.test.ts · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: scripts-spec · paths: scripts/dev/objective-shadow-hmac-inject.sh, scripts/dev/objective-shadow-runtime-ingress-probe.ts, .kiro/specs/task-focus-unified-execution/tasks.md · since: 2026-09-13
+- cursor-task-focus-unify · role: owner · scope: phase1b-cron-prompt · paths: src/cron/task-focus.ts, src/cron/task-focus.test.ts, src/cron/isolated-agent/run.ts, src/cron/isolated-agent/run.task-focus.test.ts · since: 2026-09-14
+
+> Authoritative registry: `.loom/registry.yaml` (`pnpm loom register`, session `b63f0ca1-e3c2-4242-b29f-8e9bca14fcfe`).
+
+## Tasks
+
+- [x] Phase 0: trunk SHA lock, isolated worktree, ingress/allowlist contracts, replay table, gate tests, Git doc commits. — cursor-task-focus-unify
+- [ ] Phase 1b: Cron L2 focus prompt hotfix — **approved, scope frozen, implementing** (prompt only, default OFF, zero alignment; no lease / collab / Ledger). — cursor-task-focus-unify
+- [ ] Phase 2 design amendment v0.4.6: I25 in amendment authority table, verbatim with main scheme — **submitted for final sign-off** (no runtime). — cursor-task-focus-unify
+- [x] Phase 2 shadow implementation plan v0.1 — **signed off**. — cursor-task-focus-unify
+- [x] Phase 2 shadow implementation — **PR #1107 landed** `16cea426e711516629e52c0522c39a7a77628655`. Default OFF; ON writes redacted JSONL only; no Participation / persisted Definition / Lease / Pointer / Contribution / Ledger; no runtime result change. Not Phase 3a/3b/4/5. — cursor-task-focus-unify
+- [x] Phase 2 shadow observation evidence — **PR #1112 landed** `78342a21b149e20d4342066dfd22fb84f2e89068`. **PR #1120 landed** `b03ffa66a8870f42042f4a0f743bd1b7cd1b6926`. Cycle 0 **signed as** `synthetic_observe_api` + `runtime_callsite_harness` only. **Not** `launchd_gateway`. Not Phase 3a/3b/4/5. — cursor-task-focus-unify
+- [x] Phase 2 `launchd_gateway` **gate-prep materials only** — not window authorization; no LaunchAgent rewrite, no production flag, no Gateway restart. — cursor-task-focus-unify
+- [x] Phase 2 controlled build `352e5adac0` + isolated `:18889` deploy proof; `launchd_gateway` window application **filed, not signed**. **PR #1121 landed** `2746d1b28cef9b3873fa8d131bd594a2b88fffc0`. **PR #1122 landed** `c671b8d818c0aecd10a16f1e93db42e07323c1d3`. **PR #1123 landed** `afef8eb7d73c55368e888fa5cc7d9e5698f7cd33`. **PR #1124 landed** `af5768ebf948c786f9027c1446a6f9cee42d6548`. **PR #1125 landed** `e000ecf722116eed036cfbd4b0940230d9d61415`. Writable-git RUNNING re-verify 2026-09-14 later observed LaunchAgent `b07683f99d` (contains #1107+#1120); LIVE still `16cea426e711`. Window application filed, **not signed**. Expert: gate-prep passed, window not authorized. — cursor-task-focus-unify
+- [ ] Phase 3a design — single-chat / Cron / Subagent ingress. **Not approved.**
+- [ ] Phase 3b design — collaboration-group ingress. **Not approved.**

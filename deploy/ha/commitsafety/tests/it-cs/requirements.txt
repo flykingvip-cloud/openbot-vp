@@ -1,0 +1,2 @@
+# Local-only deps for Stage A.2 IT-CS harness (not used by production).
+psycopg[binary]>=3.1

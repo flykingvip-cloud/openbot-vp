@@ -1,0 +1,139 @@
+{
+  "schema": "memory-workspace-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance/v1",
+  "item": 7,
+  "status": "batch-26-s01-s02-personal-local-residual-acceptance",
+  "batch": "26",
+  "sites": ["S01", "S02"],
+  "changeRequest": true,
+  "changeRequestKind": "personal-local-residual-acceptance",
+  "reviewRequest": "s01-s02-personal-local-residual-acceptance-review-only",
+  "reviewRequestIsBatchAccept": false,
+  "operatorDirected": "A2",
+  "operatorDecision": "Accept S01/S02 as personal_local first-materialization residuals; retarget Item 7 closeout at the managed/production sites. Chosen after A1 (build a genuine personal identity thread + provisioning) was scoped and found to require a persistent personal Catalog + onboarding provisioning + migration (a multi-module architectural project, not a batch).",
+  "previousAcceptedBaseline": 10,
+  "retiredThisChange": 0,
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "proposedRemaining": 10,
+  "proposedLiveWriteWatchIndex": 10,
+  "scanModified": false,
+  "getReplySourceModified": false,
+  "frozenWriteWatchIndex": 38,
+  "personalLocalResidualsAccepted": ["S01", "S02"],
+  "productionRetirementRemaining": 8,
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "absorbsUnacceptedBatches": false,
+  "S01Retired": false,
+  "S02Retired": false,
+  "deleteCallSites": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "conclusions": [
+    "S01 (src/auto-reply/reply/get-reply.ts:164, resolveEmployeeBuiltinStewardWorkspaceDir) and S02 (get-reply.ts:165, resolveAgentWorkspaceDir) are the personal_local first-materialization fallbacks; they are formally ACCEPTED as personal_local residuals and are NOT counted toward the Item 7 production retirement target.",
+    "They are NOT reachable in managed_enterprise: resolveWorkspaceDirAfterAuthorization (src/gateway/workspace/handler-bridge.ts:872) returns null (fail-closed) for managed_enterprise when the trusted locator produced no authorizedCwd, and only invokes personalFallback (S01/S02) when the profile is personal_local. So S01/S02 carry no managed/multi-tenant isolation risk.",
+    "They are not honestly retirable in the production read path (two independent walls; see twoWallJustification). Forcing a retirement would either derive ownership from an agentId slug (forbidden) or synthesize a Catalog binding in production (forbidden by the Phase 0 freeze).",
+    "The Item 7 production retirement target is therefore the 8 managed/production live sites (memory index/sync), not the 2 personal_local residuals. Item 7 stays not-met until those 8 reach their honest end-state.",
+    "This change retires nothing, modifies no source, does not modify the retirement scan, keeps remaining/liveWriteWatchIndex=10 and frozenWriteWatchIndex=38, keeps item 7 not-met, and preserves every lock. The honest full-zero path (A1) remains available as a separate future project."
+  ],
+  "s01Evaluation": {
+    "ledgerId": "S01",
+    "pathId": "P5",
+    "file": "src/auto-reply/reply/get-reply.ts",
+    "line": 164,
+    "op": "write",
+    "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+    "classification": "personal_local first-materialization residual (builtin steward)",
+    "acceptedAsResidual": true,
+    "countedTowardProductionTarget": false,
+    "managedFailClosed": true,
+    "honestlyRetirableInProduction": false,
+    "reachableInManagedEnterprise": false
+  },
+  "s02Evaluation": {
+    "ledgerId": "S02",
+    "pathId": "P1",
+    "file": "src/auto-reply/reply/get-reply.ts",
+    "line": 165,
+    "op": "write",
+    "symbol": "resolveAgentWorkspaceDir",
+    "classification": "personal_local first-materialization residual (agent)",
+    "acceptedAsResidual": true,
+    "countedTowardProductionTarget": false,
+    "managedFailClosed": true,
+    "honestlyRetirableInProduction": false,
+    "reachableInManagedEnterprise": false
+  },
+  "twoWallJustification": {
+    "wall1_semanticGate": {
+      "ref": "memory-workspace-phase1b-item7-batch25-s01-s02-semantic-gate (PR #725, accepted + merged)",
+      "finding": "personal_local carries no server-trusted principal at the call site; the only inputs are agentId (S02) / employeeOwnerId (S01) + cfg; LEGACY_LOCATOR_CALLER_MATRIX P1 forbids an agentId-only canonical query (agent_id_slug_query_forbidden); principle #3 forbids deriving ownership from an agentId slug. A resolver swap is circular."
+    },
+    "wall2_freezeSynthesisProhibition": {
+      "empiricallyConfirmed": true,
+      "method": "Implemented resolvePersonalWorkspacePrincipal (deviceId install owner) + provisionPersonalWorkspace (placement + Catalog-first binding + fencing) + wired into get-reply personalFallback, then ran the trusted Phase 0 freeze scanner.",
+      "result": "freeze ok=false: buildUserOwnedWorkspaceCatalogEntry is a watched SYNTHESIS_SYMBOL, so establishing (minting) a Catalog binding in the production get-reply read path is reported as addedCatalogSynthesis (also addedProductionCallSites P4). The Phase 0 freeze forbids added production Catalog synthesis: production must READ a pre-existing canonical binding, not mint one.",
+      "consequence": "personal_local has no pre-existing personal Catalog binding, and production cannot synthesize one. An honest retirement therefore requires a persistent personal Catalog + onboarding/first-run provisioning (mint once, outside the per-message read path) + migration/backfill, then get-reply reads the binding. That is a multi-module architectural project (A1), not a batch. The implementation attempt was reverted; the tree is unchanged.",
+      "wouldNotEvade": "Inlining the binding construction to avoid the watched SYNTHESIS_SYMBOL would evade freeze detection while still synthesizing in production; that violates the governance intent and was explicitly not done."
+    }
+  },
+  "managedFailClosedEvidence": {
+    "function": "resolveWorkspaceDirAfterAuthorization",
+    "file": "src/gateway/workspace/handler-bridge.ts",
+    "line": 872,
+    "behavior": "authorizedCwd (trusted locator) wins; else managed_enterprise -> null (fail-closed, no legacy fallback); else (personal_local) -> personalFallback(). S01/S02 live only inside personalFallback.",
+    "managedReachesS01S02": false
+  },
+  "item7ClosureTargetReframe": {
+    "productionRetirementTarget": 8,
+    "personalLocalResidualsExcluded": ["S01", "S02"],
+    "productionSites": [
+      "backend-config.ts:417 resolveAgentWorkspaceDir (index)",
+      "backend-config.ts:444 resolveAgentWorkspaceDir (index)",
+      "cogniweave-manager.ts:554 resolveAgentWorkspaceDir (index)",
+      "manager-sync-ops.ts:1062 syncMemoryFiles",
+      "manager-sync-ops.ts:1252 syncMemoryFiles",
+      "manager-sync-ops.ts:1343 syncMemoryFiles",
+      "manager.ts:152 resolveAgentWorkspaceDir",
+      "qmd-manager.ts:196 resolveAgentWorkspaceDir"
+    ],
+    "note": "Item 7 = met requires the 8 managed/production memory index/sync sites to reach their honest end-state (Stage C managed identity thread + Stage D persistent sync + shadow/canary). The 2 accepted personal_local residuals are excluded from the reach-zero target because production cannot synthesize their binding and managed never reaches them."
+  },
+  "honestFullRetirementPath": {
+    "label": "A1 (deferred)",
+    "steps": [
+      "Add a persistent personal workspace Catalog (not in-memory, not per-message synthesized).",
+      "Provision the personal workspace binding ONCE at onboarding/first-run (outside the per-message production read path).",
+      "get-reply READS the pre-existing binding (freeze-safe read, no synthesis).",
+      "Migration/backfill for existing installs so the read never fails closed on upgrade."
+    ],
+    "scope": "multi-module architectural project; high blast radius (default personal_local workspace path); separate from this acceptance."
+  },
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [],
+    "note": "Evidence/handoff/attribution only; no code, no scan mutation. Rollback = revert the CR commits; the scan and all 10 live sites (including S01/S02) are untouched."
+  },
+  "quarantineProof": true,
+  "quarantine": {
+    "designOnly": true,
+    "enabled": false
+  },
+  "s26s27StayRetired": true,
+  "stageCStatusPreserved": true,
+  "stageDStatusPreserved": true,
+  "baseCommit": "5ceb199adebf7b5f7aa45c33e37c5e177229af42",
+  "originMainSha": "5ceb199adebf7b5f7aa45c33e37c5e177229af42",
+  "note": "Item 7 Batch 26 formally accepts S01 (src/auto-reply/reply/get-reply.ts:164, resolveEmployeeBuiltinStewardWorkspaceDir) and S02 (get-reply.ts:165, resolveAgentWorkspaceDir) as personal_local first-materialization residuals that are NOT counted toward the Item 7 production retirement target, per operator decision A2. Justification rests on two independent walls: (1) the accepted Batch 25 S01/S02 Semantic Gate (#725) established they are not honestly retirable by a resolver swap (no personal principal at the call site; agentId-only canonical query forbidden); (2) an implementation attempt of the personal provisioning path was empirically shown to violate the Phase 0 freeze (buildUserOwnedWorkspaceCatalogEntry is a watched SYNTHESIS_SYMBOL; minting a Catalog binding in the production read path is added production Catalog synthesis, which the freeze forbids) and personal_local has no pre-existing binding to read; the attempt was reverted with no residue. S01/S02 are unreachable in managed_enterprise (resolveWorkspaceDirAfterAuthorization fail-closes managed to null and only runs personalFallback in personal_local), so they carry no managed/multi-tenant isolation risk. This change retires nothing, modifies no source, does not touch the retirement scan (remaining/liveWriteWatchIndex stay 10, frozenWriteWatchIndex stays 38), keeps item 7 not-met, and preserves every lock (deployAuthorized=false, live=forbidden, phase1bExecutionBlocked=true, productionCatalogWrite=none, schemaV2ProductionWrite=false). It reframes the Item 7 closeout target to the 8 managed/production memory index/sync sites; the honest full-zero path (A1: persistent personal Catalog + onboarding provisioning + migration) remains available as a separate future project. It requests ONLY an S01/S02 Personal-Local Residual Acceptance Review and does NOT request retirement, baseline change, Stage C production wiring, Item 7 met, Phase 1B unlock, or LIVE."
+}

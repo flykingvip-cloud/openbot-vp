@@ -1,0 +1,801 @@
+diff --git a/src/auto-reply/reply/__fixtures__/learning-reuse-worker.mjs b/src/auto-reply/reply/__fixtures__/learning-reuse-worker.mjs
+new file mode 100644
+index 0000000000..0e6f61db31
+--- /dev/null
++++ b/src/auto-reply/reply/__fixtures__/learning-reuse-worker.mjs
+@@ -0,0 +1,24 @@
++/**
++ * 跨进程复用计数测试的子进程 worker。
++ *
++ * 被 `learning-recall-cross-process.e2e.test.ts` 以真实子进程启动：对同一个学习资产
++ * 反复调用 `recordLearningReuse`，用来验证外层文件锁在**不同进程**之间互斥有效。
++ * 环境变量由测试注入（作用域、资产 id、次数、隔离的 state/config 路径）。
++ */
++
++const scopeId = process.env.OPENBOT_XPROC_SCOPE;
++const assetId = process.env.OPENBOT_XPROC_ASSET;
++const count = Number.parseInt(process.env.OPENBOT_XPROC_COUNT ?? "0", 10);
++
++if (!scopeId || !assetId || !Number.isFinite(count) || count <= 0) {
++  console.error("worker-misconfigured");
++  process.exit(2);
++}
++
++const { recordLearningReuse } = await import("../learning-recall.ts");
++
++for (let i = 0; i < count; i += 1) {
++  await recordLearningReuse({ scopeId, assetIds: [assetId] });
++}
++
++console.log("worker-done");
+diff --git a/src/auto-reply/reply/learning-evolution.e2e.test.ts b/src/auto-reply/reply/learning-evolution.e2e.test.ts
+new file mode 100644
+index 0000000000..fe4728c59f
+--- /dev/null
++++ b/src/auto-reply/reply/learning-evolution.e2e.test.ts
+@@ -0,0 +1,443 @@
++/**
++ * 进化闭环端到端验证（真实文件，不打桩存储）。
++ *
++ * 覆盖链路：
++ *   任务失败 → 候选胶囊(candidate) → [不会影响行为] → 审批 → 投影+晋升 → 学习资产(含 lesson)
++ *   → 回流进系统提示词 → 复用计数 → 达阈值 → 技能草稿(draft, 待审核)
++ *
++ * 另覆盖运营信号：工具成功率插桩 + 接管率不再虚高 + 满意度。
++ */
++
++import fs from "node:fs";
++import os from "node:os";
++import path from "node:path";
++import { afterAll, describe, expect, it, vi } from "vitest";
++
++// 必须在动态 import 之前设置：skill-lifecycle-store 的 CONFIG_DIR 在模块加载时求值。
++const STATE_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-evolution-e2e-"));
++process.env.OPENBOT_STATE_DIR = STATE_DIR;
++process.env.OPENCLAW_STATE_DIR = STATE_DIR;
++fs.writeFileSync(path.join(STATE_DIR, "openbot.json"), JSON.stringify({}), "utf-8");
++
++const AGENT_ID = "daibai";
++const SCOPE_ID = `agent:${AGENT_ID}`;
++const ACTOR_ID = "peter";
++
++const { recordExperienceCapsule } = await import("./experience-capsule-backflow.js");
++const { buildLearningRecallSystemPrompt } = await import("./learning-recall-context.js");
++const { readLearningRecall, recordLearningReuse } = await import("./learning-recall.js");
++const { curateLearningSkillDrafts } = await import("./learning-skill-curation.js");
++const { approveCandidateCapsule, listCandidateCapsules, rejectCandidateCapsule } =
++  await import("../../gateway/collaboration-learning/capsule-governance.js");
++const { createWorkspaceCollaborationStores } =
++  await import("../../gateway/collaboration-learning/shared.js");
++const { listPersonalSkillAssets } = await import("../../gateway/skill-lifecycle-store.js");
++const { deriveCandidateCapsule } = await import("../../gateway/agent-growth/experience-capsule.js");
++const { recordInboundFeedback } = await import("../../gateway/agent-growth/record-feedback.js");
++const { isReviewRejection, recordReviewRejectionExperience } =
++  await import("../../gateway/collaboration-learning/review-rejection-experience.js");
++const {
++  deriveOperationalSignals,
++  readOperationalMetrics,
++  recordFeedbackObservation,
++  recordTaskOutcome,
++  recordToolOutcomes,
++} = await import("../../gateway/agent-growth/operational-metrics-store.js");
++const { computeOperationalScore } = await import("../../gateway/agent-growth/operational-score.js");
++const { deriveInboundFeedbackSignals } =
++  await import("../../gateway/agent-growth/feedback-signal.js");
++
++afterAll(() => {
++  fs.rmSync(STATE_DIR, { recursive: true, force: true });
++});
++
++async function readCapsules() {
++  const { learningStorage } = createWorkspaceCollaborationStores();
++  return await learningStorage.readCapsules(SCOPE_ID);
++}
++
++async function readAssets() {
++  const { learningStorage } = createWorkspaceCollaborationStores();
++  return await learningStorage.readLearningAssets(SCOPE_ID);
++}
++
++describe("进化闭环 e2e：失败 → 候选 → 审批 → 回流 → 复用 → 技能草稿", () => {
++  it("1. 任务失败产出候选胶囊（单聊也有作用域，不自审自批）", async () => {
++    const result = await recordExperienceCapsule({
++      trigger: "task_failure",
++      agentId: AGENT_ID,
++      reason: "context_overflow",
++      detail: "prompt 超出模型上下文，应先压缩再继续",
++      sessionKey: "agent:daibai:main",
++    });
++
++    expect(result.skipped).toBeUndefined();
++    expect(result.scopeId).toBe(SCOPE_ID);
++
++    const capsules = await readCapsules();
++    expect(capsules).toHaveLength(1);
++    expect(capsules[0]?.status).toBe("candidate");
++    expect(capsules[0]?.capsuleType).toBe("anti_pattern");
++    expect(capsules[0]?.approvedBy).toBeUndefined();
++    expect(capsules[0]?.approvedAt).toBeUndefined();
++  });
++
++  it("2. 候选胶囊在审批前不会影响行为（不回流进提示词）", async () => {
++    const prompt = await buildLearningRecallSystemPrompt({ agentId: AGENT_ID });
++    expect(prompt).toBeUndefined();
++    expect((await readAssets()).length).toBe(0);
++  });
++
++  it("3. 候选胶囊可被治理列出", async () => {
++    const candidates = await listCandidateCapsules({ groupId: SCOPE_ID });
++    expect(candidates).toHaveLength(1);
++    expect(candidates[0]?.trigger).toBe("task_failure");
++    expect(candidates[0]?.reason).toBe("context_overflow");
++    expect(candidates[0]?.createdBy).toBe(AGENT_ID);
++  });
++
++  it("4. 驳回的候选被 revoke，不再出现在待审列表", async () => {
++    const second = await recordExperienceCapsule({
++      trigger: "review_rejected",
++      agentId: AGENT_ID,
++      reason: "no_regression_test",
++      detail: "评审要求补回归测试",
++    });
++    expect(second.capsuleId).toBeTruthy();
++    expect(await listCandidateCapsules({ groupId: SCOPE_ID })).toHaveLength(2);
++
++    const rejected = await rejectCandidateCapsule({
++      groupId: SCOPE_ID,
++      capsuleId: second.capsuleId!,
++      actorId: ACTOR_ID,
++      reason: "重复经验",
++    });
++    expect(rejected.rejected).toBe(true);
++
++    const remaining = await listCandidateCapsules({ groupId: SCOPE_ID });
++    expect(remaining).toHaveLength(1);
++    expect(remaining[0]?.reason).toBe("context_overflow");
++
++    const revoked = (await readCapsules()).find((c) => c.capsuleId === second.capsuleId);
++    expect(revoked?.status).toBe("revoked");
++    expect(revoked?.rejectedBy).toBe(ACTOR_ID);
++    expect(revoked?.rejectionReason).toBe("重复经验");
++  });
++
++  it("5. 批准后才晋升为学习资产，且资产携带可复述的 lesson 正文", async () => {
++    const [candidate] = await listCandidateCapsules({ groupId: SCOPE_ID });
++    expect(candidate).toBeDefined();
++
++    const result = await approveCandidateCapsule({
++      groupId: SCOPE_ID,
++      capsuleId: candidate.capsuleId,
++      actorId: ACTOR_ID,
++    });
++    expect(result.approved).toBe(true);
++    expect(result.promoted).toBe(true);
++    expect(result.assetId).toBeTruthy();
++
++    const approvedCapsule = (await readCapsules()).find((c) => c.capsuleId === candidate.capsuleId);
++    expect(approvedCapsule?.status).toBe("approved");
++    expect(approvedCapsule?.approvedBy).toBe(ACTOR_ID);
++
++    const assets = await readAssets();
++    expect(assets).toHaveLength(1);
++    // 这是原实现的死胡同所在：晋升出的资产此前没有任何可读回的正文。
++    expect(assets[0]?.abstractedContent?.lesson).toContain("context_overflow");
++    expect(assets[0]?.abstractedContent?.capsuleType).toBe("anti_pattern");
++    expect(assets[0]?.reuseCount).toBe(0);
++    expect(assets[0]?.botId).toBe(AGENT_ID);
++
++    expect(await listCandidateCapsules({ groupId: SCOPE_ID })).toHaveLength(0);
++  });
++
++  it("6. 学习资产真正回流进系统提示词，并被记为一次复用", async () => {
++    const recall = await readLearningRecall({ scopeId: SCOPE_ID, botId: AGENT_ID });
++    expect(recall.lessons).toHaveLength(1);
++
++    const prompt = await buildLearningRecallSystemPrompt({ agentId: AGENT_ID });
++    expect(prompt).toBeTruthy();
++    expect(prompt).toContain("已沉淀的经验");
++    expect(prompt).toContain("负面模式");
++    expect(prompt).toContain("context_overflow");
++
++    // 复用记账是 fire-and-forget，等它落盘。
++    await vi.waitFor(async () => {
++      expect((await readAssets())[0]?.reuseCount).toBe(1);
++    });
++    expect((await readAssets())[0]?.lastReusedAt).toBeGreaterThan(0);
++  });
++
++  it("7. 心跳不注入经验，也不虚增复用次数", async () => {
++    const before = (await readAssets())[0]?.reuseCount ?? 0;
++    // 心跳分支在 get-reply-run 里跳过调用；这里直接验证读回本身不改计数。
++    await readLearningRecall({ scopeId: SCOPE_ID, botId: AGENT_ID });
++    expect((await readAssets())[0]?.reuseCount).toBe(before);
++  });
++
++  it("8. 复用达阈值后自动沉淀为技能草稿（draft，待人工审核）", async () => {
++    const assetId = (await readAssets())[0].assetId;
++    // 再复用两次 → 累计 3 次，达默认阈值。
++    await recordLearningReuse({ scopeId: SCOPE_ID, assetIds: [assetId] });
++    await recordLearningReuse({ scopeId: SCOPE_ID, assetIds: [assetId] });
++    expect((await readAssets())[0]?.reuseCount).toBe(3);
++
++    const drafts = await curateLearningSkillDrafts({ scopeId: SCOPE_ID, botId: AGENT_ID });
++    expect(drafts).toHaveLength(1);
++    expect(drafts[0]?.trigger).toBe("reuse_threshold");
++    expect(drafts[0]?.totalReuse).toBe(3);
++
++    const skills = listPersonalSkillAssets();
++    const curated = skills.find((skill) => skill.id === drafts[0]?.skillId);
++    expect(curated).toBeDefined();
++    expect(curated?.lifecycle).toBe("draft");
++    expect(curated?.profile.name).toContain("经验沉淀");
++    expect(curated?.profile.visibility).toBe("private");
++    expect(curated?.profile.summary).toContain("待人工审核");
++    expect(curated?.sourceRobot?.id).toBe(AGENT_ID);
++
++    // 幂等标记回写，防止重复生成。
++    expect((await readAssets())[0]?.curatedSkillId).toBe(drafts[0]?.skillId);
++  });
++
++  it("9. 策展是幂等的：再跑一次不会重复生成技能", async () => {
++    const before = listPersonalSkillAssets().length;
++    const drafts = await curateLearningSkillDrafts({ scopeId: SCOPE_ID, botId: AGENT_ID });
++    expect(drafts).toEqual([]);
++    expect(listPersonalSkillAssets()).toHaveLength(before);
++  });
++});
++
++describe("三个触发源都有真实调用方（不是只有类型定义）", () => {
++  it("human_takeover：用户表示自己来 → 采集接管信号 + 产出候选胶囊", async () => {
++    const scopeId = "agent:takeover-bot";
++    let capsuleFromCallback: string | undefined;
++
++    await recordInboundFeedback({
++      cfg: { agents: { list: [{ id: "takeover-bot" }] } } as never,
++      agentId: "takeover-bot",
++      text: "算了，我自己来吧",
++      onHumanTakeover: ({ matched }) => {
++        expect(matched).toBeTruthy();
++        capsuleFromCallback = matched;
++      },
++    });
++    expect(capsuleFromCallback, "onHumanTakeover 未被调用").toBeTruthy();
++
++    // 与生产路径一致：回调里落候选胶囊。
++    const result = await recordExperienceCapsule({
++      trigger: "human_takeover",
++      agentId: "takeover-bot",
++      reason: "user_took_over",
++      detail: `用户表示自行接手：${capsuleFromCallback}`,
++    });
++    expect(result.skipped).toBeUndefined();
++
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    const capsules = await learningStorage.readCapsules(scopeId);
++    expect(capsules).toHaveLength(1);
++    expect(capsules[0]?.capsuleType).toBe("lesson");
++    expect(capsules[0]?.status).toBe("candidate");
++  });
++
++  it("review_rejected：交付物被评审退回（in_review → submitted）才算驳回", async () => {
++    expect(isReviewRejection({ fromStatus: "in_review", toStatus: "submitted" })).toBe(true);
++    // 正常的编辑回退不是驳回。
++    expect(isReviewRejection({ fromStatus: "submitted", toStatus: "draft" })).toBe(false);
++    expect(isReviewRejection({ fromStatus: "in_review", toStatus: "approved" })).toBe(false);
++
++    const scopeId = "grp-review-reject";
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    const outcome = await recordReviewRejectionExperience({
++      deliverable: {
++        deliverableId: "deliv-1",
++        groupId: scopeId,
++        title: "上线方案",
++        status: "submitted",
++        version: 1,
++        submittedBy: "bot-author",
++        createdAtMs: 1,
++        updatedAtMs: 2,
++      },
++      fromStatus: "in_review",
++      actor: "peter",
++      learningStorage,
++    });
++    expect(outcome.capsuleId).toBeTruthy();
++
++    const capsules = await learningStorage.readCapsules(scopeId);
++    expect(capsules).toHaveLength(1);
++    expect(capsules[0]?.status).toBe("candidate");
++    expect(capsules[0]?.capsuleType).toBe("anti_pattern");
++    expect(capsules[0]?.createdBy).toBe("bot-author");
++    expect(capsules[0]?.summary).toContain("上线方案");
++  });
++
++  it("review_rejected：同一交付物重复退回只保留最新一条候选", async () => {
++    const scopeId = "grp-review-dedupe";
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    const deliverable = {
++      deliverableId: "deliv-2",
++      groupId: scopeId,
++      title: "重复退回",
++      status: "submitted" as const,
++      version: 1,
++      submittedBy: "bot-author",
++      createdAtMs: 1,
++      updatedAtMs: 2,
++    };
++    const first = await recordReviewRejectionExperience({
++      deliverable,
++      fromStatus: "in_review",
++      learningStorage,
++      atMs: 1000,
++    });
++    const second = await recordReviewRejectionExperience({
++      deliverable,
++      fromStatus: "in_review",
++      learningStorage,
++      atMs: 2000,
++    });
++
++    const capsules = await learningStorage.readCapsules(scopeId);
++    expect(capsules).toHaveLength(1);
++    expect(capsules[0]?.capsuleId).toBe(second.capsuleId);
++    expect(capsules[0]?.capsuleId).not.toBe(first.capsuleId);
++  });
++
++  it("review_rejected：没有归属主体时不写垃圾数据", async () => {
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    const outcome = await recordReviewRejectionExperience({
++      deliverable: {
++        deliverableId: "deliv-3",
++        groupId: "grp-no-owner",
++        title: "无主",
++        status: "submitted",
++        version: 1,
++        createdAtMs: 1,
++        updatedAtMs: 2,
++      },
++      fromStatus: "in_review",
++      learningStorage,
++    });
++    expect(outcome.skipped).toBe("missing_deliverable_owner");
++    expect(await learningStorage.readCapsules("grp-no-owner")).toHaveLength(0);
++  });
++});
++
++describe("保密等级治理 e2e：restricted 需人工批准、secret 不外流为个人资产", () => {
++  const RESTRICTED_SCOPE = "grp-restricted";
++  const SECRET_SCOPE = "grp-secret";
++
++  async function seedCandidate(scopeId: string, tier: "restricted" | "secret") {
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    const capsule = deriveCandidateCapsule({
++      trigger: "task_failure",
++      scopeId,
++      botId: "bot-x",
++      reason: `${tier}_failure`,
++      detail: "边界用例",
++      confidentialityTier: tier,
++    });
++    expect(capsule).not.toBeNull();
++    await learningStorage.appendCapsule(scopeId, capsule!);
++    return capsule!.capsuleId;
++  }
++
++  it("restricted 候选：批准后才晋升（人工批准解除 requiresApproval 门禁）", async () => {
++    const capsuleId = await seedCandidate(RESTRICTED_SCOPE, "restricted");
++    const result = await approveCandidateCapsule({
++      groupId: RESTRICTED_SCOPE,
++      capsuleId,
++      actorId: ACTOR_ID,
++    });
++
++    expect(result.approved).toBe(true);
++    expect(result.promoted).toBe(true);
++
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    const projections = await learningStorage.readProjections(RESTRICTED_SCOPE);
++    expect(projections[0]?.requiresApproval).toBe(true);
++    expect(projections[0]?.approvalStatus).toBe("approved");
++    expect(projections[0]?.approvedBy).toBe(ACTOR_ID);
++    expect(await learningStorage.readLearningAssets(RESTRICTED_SCOPE)).toHaveLength(1);
++  });
++
++  it("secret 候选：可以批准归档，但不会投影成个人资产", async () => {
++    const capsuleId = await seedCandidate(SECRET_SCOPE, "secret");
++    const result = await approveCandidateCapsule({
++      groupId: SECRET_SCOPE,
++      capsuleId,
++      actorId: ACTOR_ID,
++    });
++
++    expect(result.approved).toBe(true);
++    expect(result.promoted).toBe(false);
++    expect(result.reason).toBe("secret_capsule");
++
++    const { learningStorage } = createWorkspaceCollaborationStores();
++    expect(await learningStorage.readLearningAssets(SECRET_SCOPE)).toHaveLength(0);
++    // 未晋升 → 不会被回流进任何提示词。
++    const recall = await readLearningRecall({ scopeId: SECRET_SCOPE, botId: "bot-x" });
++    expect(recall.lessons).toHaveLength(0);
++  });
++
++  it("重复批准同一胶囊被拒绝（已不是候选态）", async () => {
++    const capsuleId = await seedCandidate("grp-double", "internal" as "restricted");
++    await approveCandidateCapsule({ groupId: "grp-double", capsuleId, actorId: ACTOR_ID });
++    const again = await approveCandidateCapsule({
++      groupId: "grp-double",
++      capsuleId,
++      actorId: ACTOR_ID,
++    });
++    expect(again.approved).toBe(false);
++    expect(again.reason).toBe("capsule_not_candidate:approved");
++  });
++
++  it("驳回后不能再批准", async () => {
++    const capsuleId = await seedCandidate("grp-rejected", "restricted");
++    await rejectCandidateCapsule({ groupId: "grp-rejected", capsuleId, actorId: ACTOR_ID });
++    const result = await approveCandidateCapsule({
++      groupId: "grp-rejected",
++      capsuleId,
++      actorId: ACTOR_ID,
++    });
++    expect(result.approved).toBe(false);
++    expect(result.reason).toBe("capsule_not_candidate:revoked");
++  });
++});
++
++describe("运营信号 e2e：四个信号都有真实来源，且接管率不再虚高", () => {
++  const cfg = { agents: { list: [{ id: AGENT_ID }] } } as never;
++
++  it("任务 + 工具 + 反馈信号联合成分，无观测时不产出接管率", async () => {
++    await recordTaskOutcome(cfg, "signals-bot", { success: true });
++    await recordTaskOutcome(cfg, "signals-bot", { success: true });
++    await recordTaskOutcome(cfg, "signals-bot", { success: false });
++    await recordToolOutcomes(cfg, "signals-bot", { total: 10, succeeded: 9 });
++
++    const withoutFeedback = deriveOperationalSignals(
++      await readOperationalMetrics(cfg, "signals-bot"),
++    );
++    expect(withoutFeedback?.taskSuccessRate).toBeCloseTo(2 / 3, 10);
++    expect(withoutFeedback?.toolSuccessRate).toBeCloseTo(0.9, 10);
++    // 关键回归点：没有接管观测源 → 不给该项（旧实现会给 0，等于白送满分）。
++    expect(withoutFeedback?.humanTakeoverRate).toBeUndefined();
++    expect(withoutFeedback?.satisfaction).toBeUndefined();
++
++    // 用户消息驱动的真实观测。
++    for (const text of ["帮我看下日志", "完美，谢谢", "算了我自己来"]) {
++      const signals = deriveInboundFeedbackSignals(text);
++      await recordFeedbackObservation(cfg, "signals-bot", {
++        ...(signals.humanTakeover !== undefined ? { humanTakeover: signals.humanTakeover } : {}),
++        ...(signals.sentiment ? { sentiment: signals.sentiment } : {}),
++      });
++    }
++
++    const withFeedback = deriveOperationalSignals(await readOperationalMetrics(cfg, "signals-bot"));
++    expect(withFeedback?.humanTakeoverRate).toBeCloseTo(1 / 3, 10);
++    expect(withFeedback?.satisfaction).toBeCloseTo(0.5, 10);
++    expect(computeOperationalScore(withFeedback)).toBeGreaterThan(0);
++  });
++});
+diff --git a/src/auto-reply/reply/learning-recall-cross-process.e2e.test.ts b/src/auto-reply/reply/learning-recall-cross-process.e2e.test.ts
+new file mode 100644
+index 0000000000..bf3b75d38b
+--- /dev/null
++++ b/src/auto-reply/reply/learning-recall-cross-process.e2e.test.ts
+@@ -0,0 +1,107 @@
++/**
++ * 跨进程复用计数安全性（真实多进程）。
++ *
++ * 进程内 `createAsyncLock` 只能串行同一 gateway 内的 turn；多个 gateway 实例共享同一
++ * workspace 时仍会丢计数。这里用**两个真实 node 子进程**同时对同一作用域记账，验证
++ * 外层文件锁把它们互斥开：最终计数必须等于总记账次数，不能丢。
++ *
++ * 注意：`withFileLock` 在同一进程内是可重入的（按路径引用计数），所以这个用例只能用
++ * 真子进程来证明跨进程互斥，单进程并发只覆盖到内层锁。
++ */
++
++import { execFile } from "node:child_process";
++import fs from "node:fs";
++import os from "node:os";
++import path from "node:path";
++import { promisify } from "node:util";
++import { afterAll, describe, expect, it } from "vitest";
++
++const execFileAsync = promisify(execFile);
++const REPO_ROOT = path.resolve(import.meta.dirname, "../../..");
++const WORKER = path.join(REPO_ROOT, "src/auto-reply/reply/__fixtures__/learning-reuse-worker.mjs");
++
++const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-xproc-reuse-"));
++
++afterAll(() => {
++  fs.rmSync(stateDir, { recursive: true, force: true });
++});
++
++const SCOPE_ID = "agent:xproc-bot";
++const ASSET_ID = "asset-hot";
++const INCREMENTS_PER_WORKER = 12;
++
++function seedAsset(): string {
++  const groupDir = path.join(
++    stateDir,
++    "workspace",
++    ".openbot",
++    "collaboration",
++    "groups",
++    encodeURIComponent(SCOPE_ID),
++  );
++  fs.mkdirSync(groupDir, { recursive: true });
++  const file = path.join(groupDir, "learning-assets.json");
++  fs.writeFileSync(
++    file,
++    JSON.stringify({
++      assets: [
++        {
++          assetId: ASSET_ID,
++          botId: "xproc-bot",
++          sourceGroupId: SCOPE_ID,
++          sourceCapsuleId: "cap-1",
++          assetType: "lesson",
++          status: "active",
++          reuseCount: 0,
++          abstractedContent: { lesson: "跨进程复用计数" },
++        },
++      ],
++    }),
++    "utf-8",
++  );
++  fs.writeFileSync(
++    path.join(stateDir, "openbot.json"),
++    JSON.stringify({ agents: { defaults: { workspace: path.join(stateDir, "workspace") } } }),
++    "utf-8",
++  );
++  return file;
++}
++
++function readReuseCount(file: string): number {
++  const raw = JSON.parse(fs.readFileSync(file, "utf-8")) as {
++    assets?: Array<{ assetId: string; reuseCount?: number }>;
++  };
++  return raw.assets?.find((a) => a.assetId === ASSET_ID)?.reuseCount ?? -1;
++}
++
++describe("cross-process learning reuse accounting", () => {
++  it("two separate processes do not lose reuse increments", async () => {
++    const file = seedAsset();
++    expect(readReuseCount(file)).toBe(0);
++
++    const env = {
++      ...process.env,
++      OPENBOT_STATE_DIR: stateDir,
++      OPENBOT_CONFIG_PATH: path.join(stateDir, "openbot.json"),
++      OPENCLAW_CONFIG_PATH: path.join(stateDir, "openbot.json"),
++      CLAWDBOT_CONFIG_PATH: path.join(stateDir, "openbot.json"),
++      OPENBOT_XPROC_SCOPE: SCOPE_ID,
++      OPENBOT_XPROC_ASSET: ASSET_ID,
++      OPENBOT_XPROC_COUNT: String(INCREMENTS_PER_WORKER),
++    };
++
++    const run = () =>
++      execFileAsync(process.execPath, ["--import", "tsx", WORKER], {
++        cwd: REPO_ROOT,
++        env,
++        timeout: 120_000,
++      });
++
++    const [a, b] = await Promise.all([run(), run()]);
++    expect(a.stdout).toContain("worker-done");
++    expect(b.stdout).toContain("worker-done");
++
++    // 两个进程各记 N 次，无丢失则总数为 2N。
++    expect(readReuseCount(file)).toBe(INCREMENTS_PER_WORKER * 2);
++  }, 180_000);
++});
+diff --git a/src/auto-reply/reply/learning-recall.test.ts b/src/auto-reply/reply/learning-recall.test.ts
+new file mode 100644
+index 0000000000..8e43cf63a7
+--- /dev/null
++++ b/src/auto-reply/reply/learning-recall.test.ts
+@@ -0,0 +1,203 @@
++import fs from "node:fs";
++import os from "node:os";
++import path from "node:path";
++import type { AgentLearningAsset } from "@openbot/collaboration-core";
++import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
++
++const assetsByScope = new Map<string, AgentLearningAsset[]>();
++const writes: Array<{ scopeId: string; assets: AgentLearningAsset[] }> = [];
++
++// Asset state is mocked, but the lock path is a real temp dir so the cross-process
++// file lock is genuinely exercised (it creates/removes a real `.lock` file).
++const lockRoot = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-learning-lock-"));
++
++vi.mock("../../gateway/collaboration-learning/shared.js", () => ({
++  createWorkspaceCollaborationStores: () => ({
++    groupRootDir: lockRoot,
++    learningStorage: {
++      readLearningAssets: async (groupId: string, botId?: string) => {
++        const all = assetsByScope.get(groupId) ?? [];
++        return botId ? all.filter((asset) => asset.botId === botId) : all;
++      },
++      writeLearningAssets: async (groupId: string, assets: AgentLearningAsset[]) => {
++        assetsByScope.set(groupId, assets);
++        writes.push({ scopeId: groupId, assets });
++      },
++    },
++  }),
++  resolveGroupStoreFilePath: (params: {
++    groupRootDir: string;
++    groupId: string;
++    filename: string;
++  }) => path.join(params.groupRootDir, encodeURIComponent(params.groupId), params.filename),
++}));
++
++afterAll(() => {
++  fs.rmSync(lockRoot, { recursive: true, force: true });
++});
++
++const {
++  buildLearningRecall,
++  extractLessonFromAsset,
++  rankLearningAssets,
++  readLearningRecall,
++  recordLearningReuse,
++  resolvePersonalLearningScopeId,
++} = await import("./learning-recall.js");
++
++function makeAsset(overrides: Partial<AgentLearningAsset> = {}): AgentLearningAsset {
++  return {
++    assetId: "asset-1",
++    botId: "bot-1",
++    sourceGroupId: "grp-1",
++    sourceCapsuleId: "cap-1",
++    assetType: "lesson",
++    status: "active",
++    abstractedContent: { lesson: "部署前先跑迁移脚本" },
++    ...overrides,
++  };
++}
++
++beforeEach(() => {
++  assetsByScope.clear();
++  writes.length = 0;
++});
++
++describe("resolvePersonalLearningScopeId", () => {
++  it("gives single-chat sessions a stable learning scope", () => {
++    expect(resolvePersonalLearningScopeId("daibai")).toBe("agent:daibai");
++  });
++});
++
++describe("extractLessonFromAsset", () => {
++  it("prefers the lesson field", () => {
++    expect(extractLessonFromAsset(makeAsset())).toBe("部署前先跑迁移脚本");
++  });
++
++  it("falls back to title/summary for legacy assets without lesson", () => {
++    const asset = makeAsset({
++      abstractedContent: { title: "迁移失败", summary: "缺少 migrate 步骤" },
++    });
++    expect(extractLessonFromAsset(asset)).toBe("迁移失败 — 缺少 migrate 步骤");
++  });
++
++  it("returns null when there is nothing recallable", () => {
++    expect(extractLessonFromAsset(makeAsset({ abstractedContent: {} }))).toBeNull();
++  });
++});
++
++describe("buildLearningRecall", () => {
++  it("surfaces lesson text, not just capability names", () => {
++    const recall = buildLearningRecall([
++      makeAsset({
++        assetId: "a1",
++        abstractedContent: { lesson: "先跑迁移", capabilities: ["deploy"] },
++      }),
++    ]);
++    expect(recall.lessons).toHaveLength(1);
++    expect(recall.lessons[0]?.lesson).toBe("先跑迁移");
++    expect(recall.capabilities).toEqual(["deploy"]);
++  });
++
++  it("skips non-active assets", () => {
++    const recall = buildLearningRecall([
++      makeAsset({ assetId: "a1", status: "revoked" }),
++      makeAsset({ assetId: "a2", status: "expired" }),
++    ]);
++    expect(recall.lessons).toHaveLength(0);
++  });
++
++  it("marks anti-patterns", () => {
++    const recall = buildLearningRecall([
++      makeAsset({
++        assetId: "a1",
++        assetType: "pattern",
++        abstractedContent: { lesson: "直接改生产库", capsuleType: "anti_pattern" },
++      }),
++    ]);
++    expect(recall.lessons[0]?.isAntiPattern).toBe(true);
++  });
++
++  it("dedupes identical lessons and respects the limit", () => {
++    const recall = buildLearningRecall(
++      [
++        makeAsset({ assetId: "a1", abstractedContent: { lesson: "同一条" } }),
++        makeAsset({ assetId: "a2", abstractedContent: { lesson: "同一条" } }),
++        makeAsset({ assetId: "a3", abstractedContent: { lesson: "另一条" } }),
++      ],
++      1,
++    );
++    expect(recall.lessons).toHaveLength(1);
++  });
++});
++
++describe("rankLearningAssets", () => {
++  it("orders by confidence, then reuse, then recency", () => {
++    const ranked = rankLearningAssets([
++      makeAsset({ assetId: "low", confidence: "low", reuseCount: 9 }),
++      makeAsset({ assetId: "high", confidence: "high", reuseCount: 0 }),
++      makeAsset({ assetId: "mid-reused", confidence: "medium", reuseCount: 5 }),
++      makeAsset({ assetId: "mid", confidence: "medium", reuseCount: 1 }),
++    ]);
++    expect(ranked.map((asset) => asset.assetId)).toEqual(["high", "mid-reused", "mid", "low"]);
++  });
++});
++
++describe("readLearningRecall", () => {
++  it("reads assets scoped to the bot", async () => {
++    assetsByScope.set("grp-1", [
++      makeAsset({ assetId: "mine", botId: "bot-1" }),
++      makeAsset({ assetId: "other", botId: "bot-2", abstractedContent: { lesson: "别人的" } }),
++    ]);
++    const recall = await readLearningRecall({ scopeId: "grp-1", botId: "bot-1" });
++    expect(recall.lessons.map((entry) => entry.assetId)).toEqual(["mine"]);
++  });
++
++  it("returns empty for blank scope or bot", async () => {
++    expect(await readLearningRecall({ scopeId: "", botId: "bot-1" })).toEqual({
++      capabilities: [],
++      lessons: [],
++    });
++  });
++});
++
++describe("recordLearningReuse", () => {
++  it("increments reuse count only for injected assets", async () => {
++    assetsByScope.set("grp-1", [
++      makeAsset({ assetId: "used", reuseCount: 2 }),
++      makeAsset({ assetId: "unused", reuseCount: 7 }),
++    ]);
++
++    await recordLearningReuse({ scopeId: "grp-1", assetIds: ["used"], atMs: 1234 });
++
++    const stored = assetsByScope.get("grp-1") ?? [];
++    expect(stored.find((asset) => asset.assetId === "used")?.reuseCount).toBe(3);
++    expect(stored.find((asset) => asset.assetId === "used")?.lastReusedAt).toBe(1234);
++    expect(stored.find((asset) => asset.assetId === "unused")?.reuseCount).toBe(7);
++  });
++
++  it("does not write when nothing matches", async () => {
++    assetsByScope.set("grp-1", [makeAsset({ assetId: "a1" })]);
++    await recordLearningReuse({ scopeId: "grp-1", assetIds: ["missing"] });
++    expect(writes).toHaveLength(0);
++  });
++
++  it("does not write for an empty id list", async () => {
++    await recordLearningReuse({ scopeId: "grp-1", assetIds: [] });
++    expect(writes).toHaveLength(0);
++  });
++
++  it("does not lose increments when concurrent turns record reuse", async () => {
++    // Read-modify-write over the whole asset file: without serialization two
++    // concurrent turns both read reuseCount=0 and the second write clobbers the first.
++    assetsByScope.set("grp-1", [makeAsset({ assetId: "hot", reuseCount: 0 })]);
++
++    await Promise.all([
++      recordLearningReuse({ scopeId: "grp-1", assetIds: ["hot"] }),
++      recordLearningReuse({ scopeId: "grp-1", assetIds: ["hot"] }),
++      recordLearningReuse({ scopeId: "grp-1", assetIds: ["hot"] }),
++    ]);
++
++    expect(assetsByScope.get("grp-1")?.[0]?.reuseCount).toBe(3);
++  });
++});

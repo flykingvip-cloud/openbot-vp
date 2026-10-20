@@ -1,0 +1,32 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-preflight-matrix/v1",
+  "item": 7,
+  "status": "retirement-preflight-matrix",
+  "item7": "not-met",
+  "itemMet": false,
+  "deleteCallSites": false,
+  "retirementExecuted": false,
+  "retiredThisChange": 0,
+  "liveWriteWatchIndex": 37,
+  "frozenWriteWatchIndex": 38,
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "sharedUserOwnedPassAfterFixture": false,
+  "blockedWorkspaceKinds": ["unknown", "system"],
+  "supportedWorkspaceKinds": ["user_owned", "position_owned", "group_owned", "employee_private"],
+  "siteCount": 37,
+  "executeWorktree": {
+    "path": "/private/tmp/openbot-phase1b-item7-retirement-execute",
+    "status": "superseded",
+    "doNotLand": true,
+    "commitDeletionCode": false,
+    "destructiveReset": false
+  },
+  "note": "PR B only. Classifies the original 37 ledger sites. Does not delete production call-sites or mark Item 7 met."
+}

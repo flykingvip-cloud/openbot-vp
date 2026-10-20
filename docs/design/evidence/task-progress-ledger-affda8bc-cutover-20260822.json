@@ -1,0 +1,76 @@
+{
+  "schema": "task-progress-ledger-affda8bc-cutover/v1",
+  "recordedAt": "2026-08-22T22:54:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-cutover-affda8bc-full-dist-overlay",
+  "stamp": "20260822T145054Z",
+  "overlayId": "affda8bc-item7-s07-r1",
+  "fetched": true,
+  "candidate": {
+    "ref": "origin/main",
+    "sha": "affda8bce88939e42c57000896c13fc8a457f536",
+    "subject": "Merge pull request #607 from gmood2008/cursor-data-governance/phase1b-item7-retirement-batch3-s07",
+    "equalsOriginMain": true,
+    "ledgerImplementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91"
+  },
+  "build": {
+    "source": "git archive affda8bce88939e42c57000896c13fc8a457f536",
+    "command": "GIT_COMMIT=affda8bc pnpm build:docker",
+    "dir": "/tmp/openbot-cutover-affda8bc-20260822T145054Z",
+    "dirtyTreeUsed": false,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "affda8bce88939e42c57000896c13fc8a457f536",
+      "builtAt": "2026-08-22T14:51:44.115Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "gatewayTar": {
+      "name": "openbot-gateway-dist-affda8bc-item7-s07-20260822T145054Z.tar.gz",
+      "md5": "d2e6ba7d6071e2cef1d0a5c54065d2f7"
+    },
+    "uiTar": {
+      "name": "openbot-control-ui-affda8bc-item7-s07-20260822T145054Z.tar.gz",
+      "md5": "a13c050bae4edf63c20e4bc8b79d8f0d"
+    },
+    "uiOverlayGate": "OK control-ui overlay gate (tip/full)",
+    "uiEntry": "index-Dpg8P1UR.js"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "affda8bce88939e42c57000896c13fc8a457f536",
+    "previousSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "startedAt": "2026-08-22 22:54:41 +0800",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPin": "index-Dpg8P1UR.js",
+    "ledgerCopy": true,
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET"
+    }
+  },
+  "provenanceTag": "provenance/sha-affda8bce889",
+  "backup": "/root/openbot-maintenance-affda8bc-item7-s07-r1-20260822T145054Z",
+  "gatesAfterCutover": {
+    "verifyForwardOnly": { "exit": 0, "verdict": "allow", "liveEqualsCandidate": true },
+    "verifyDeliveryAlignment": {
+      "exit": 0,
+      "summary": "PASS=7 WARN=3 FAIL=0",
+      "warnings": [
+        "L3-local candidate GHCR image not present",
+        "L3-local prod image not on this machine",
+        "shared tree dirty"
+      ]
+    }
+  },
+  "explicitlyNotDone": [
+    "Did not build from kiro-loom/phase1a-section141-ownership-v2",
+    "Did not recreate the production container / GHCR image",
+    "Did not change Progress Ledger flag",
+    "Did not land dirty worktree files to origin/main"
+  ]
+}

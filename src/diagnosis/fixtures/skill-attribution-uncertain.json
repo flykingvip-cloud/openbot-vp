@@ -1,0 +1,443 @@
+{
+  "schemaVersion": 1,
+  "graphKind": "DiagnosticRunGraph",
+  "run": {
+    "schemaVersion": 1,
+    "runId": "diag-run-fixture-5",
+    "caseId": "case-fixture-5",
+    "mode": "QUICK",
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-5",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005",
+          "timeRange": {
+            "from": "2026-09-01T14:00:00.000Z",
+            "to": "2026-09-01T14:04:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-5",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005"
+        }
+      }
+    ],
+    "requestedBy": {
+      "schemaVersion": 1,
+      "principalId": "principal-fixture-employee-a",
+      "kind": "user",
+      "tenantId": "tenant-fixture-a"
+    },
+    "mutationPolicy": "READ_ONLY",
+    "budget": {
+      "timeoutMs": 8000,
+      "maxDiagnosers": 3,
+      "modelCalls": 0
+    },
+    "status": "completed",
+    "completion": "PROBABLE",
+    "missingEvidence": [
+      {
+        "evidenceType": "event",
+        "source": "skill_invocation",
+        "targetType": "skill",
+        "fields": ["attributionResolution"],
+        "freshnessMs": 300000,
+        "sensitivity": "internal",
+        "cost": "low",
+        "required": true,
+        "schemaVersion": 1
+      }
+    ],
+    "startedAt": "2026-09-01T14:04:01.000Z",
+    "completedAt": "2026-09-01T14:04:02.000Z",
+    "diagnosedAgentRunId": "agent-run-fixture-5"
+  },
+  "evidences": [
+    {
+      "evidenceId": "ev-fixture-5-unique-owner",
+      "evidenceType": "event",
+      "source": "skill_invocation",
+      "authorityRecordId": "skill-invocation:inv-fixture-5-unique-owner",
+      "observedAt": "2026-09-01T14:00:06.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005"
+        }
+      },
+      "summary": {
+        "skillStarted": true,
+        "outcome": "success",
+        "attributionResolution": "unique_owner"
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-5-unique-owner",
+        "collectorVersion": "skill-invocation-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "complete",
+        "attributionResolution": "unique_owner"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/gateway/skill-invocation/"
+    },
+    {
+      "evidenceId": "ev-fixture-5-prompt-named-use",
+      "evidenceType": "event",
+      "source": "skill_invocation",
+      "authorityRecordId": "skill-invocation:inv-fixture-5-prompt-named-use",
+      "observedAt": "2026-09-01T14:00:07.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-prompt-named",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005"
+        }
+      },
+      "summary": {
+        "skillStarted": true,
+        "outcome": "success",
+        "attributionResolution": "prompt_named_use"
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-5-prompt-named-use",
+        "collectorVersion": "skill-invocation-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "partial",
+        "attributionResolution": "prompt_named_use"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/gateway/skill-invocation/"
+    }
+  ],
+  "observations": [
+    {
+      "observationId": "obs-fixture-5-skill-started",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "skill.started",
+      "value": true,
+      "evidenceIds": ["ev-fixture-5-unique-owner"],
+      "observedAt": "2026-09-01T14:00:06.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-5-unique-owner",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "skill.attributionResolution",
+      "value": "unique_owner",
+      "evidenceIds": ["ev-fixture-5-unique-owner"],
+      "observedAt": "2026-09-01T14:00:06.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-5-prompt-named-use",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-prompt-named",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "skill.attributionResolution",
+      "value": "prompt_named_use",
+      "evidenceIds": ["ev-fixture-5-prompt-named-use"],
+      "observedAt": "2026-09-01T14:00:07.000Z",
+      "schemaVersion": 1
+    }
+  ],
+  "assessments": [
+    {
+      "assessmentId": "asmt-fixture-5-identity-unconfirmed",
+      "observationIds": ["obs-fixture-5-unique-owner", "obs-fixture-5-prompt-named-use"],
+      "code": "skill_identity_unconfirmed",
+      "verdict": "unknown",
+      "ruleId": "rule.skill.attribution.identity.v1",
+      "schemaVersion": 1
+    }
+  ],
+  "attributions": [
+    {
+      "attributionId": "attr-fixture-5-unique-owner",
+      "assessmentId": "asmt-fixture-5-identity-unconfirmed",
+      "suspectedTarget": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "responsibilityDomain": "skill_tool",
+      "state": "suspected",
+      "basis": "ownership_map",
+      "schemaVersion": 1
+    },
+    {
+      "attributionId": "attr-fixture-5-prompt-named-use",
+      "assessmentId": "asmt-fixture-5-identity-unconfirmed",
+      "suspectedTarget": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-prompt-named",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "responsibilityDomain": "skill_tool",
+      "state": "suspected",
+      "basis": "model_suggestion",
+      "schemaVersion": 1
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesisId": "hyp-fixture-5-unique-owner",
+      "code": "skill_owned_by_unique_owner",
+      "state": "supported",
+      "confidence": {
+        "evidence": 0.72,
+        "assessment": 0.55,
+        "rootCause": 0.48,
+        "impact": 0.3
+      },
+      "supportingEvidenceIds": ["ev-fixture-5-unique-owner"],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": ["identity_tool_name"],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    },
+    {
+      "hypothesisId": "hyp-fixture-5-prompt-named-use",
+      "code": "skill_named_in_prompt",
+      "state": "candidate",
+      "confidence": {
+        "evidence": 0.4,
+        "assessment": 0.35,
+        "rootCause": 0.22,
+        "impact": 0
+      },
+      "supportingEvidenceIds": ["ev-fixture-5-prompt-named-use"],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": ["identity_tool_name"],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    }
+  ],
+  "findings": [
+    {
+      "findingId": "find-fixture-5-attribution-uncertain",
+      "code": "skill_attribution_uncertain",
+      "title": "Skill attribution is not identity_tool_name and remains unconfirmed",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "status": "open",
+      "severity": "P3",
+      "primaryDomain": "skill_tool",
+      "observationIds": ["obs-fixture-5-unique-owner", "obs-fixture-5-prompt-named-use"],
+      "assessmentIds": ["asmt-fixture-5-identity-unconfirmed"],
+      "attributionIds": ["attr-fixture-5-unique-owner", "attr-fixture-5-prompt-named-use"],
+      "hypothesisIds": ["hyp-fixture-5-unique-owner", "hyp-fixture-5-prompt-named-use"],
+      "evidenceIds": ["ev-fixture-5-unique-owner", "ev-fixture-5-prompt-named-use"],
+      "confidence": {
+        "evidence": 0.72,
+        "assessment": 0.55,
+        "rootCause": 0.48,
+        "impact": 0.3
+      },
+      "fingerprint": "skill_tool|skill_attribution_uncertain|session:sha256:fixture-session-key-a0000000000000000000000000000005",
+      "firstSeenAt": "2026-09-01T14:00:06.000Z",
+      "lastSeenAt": "2026-09-01T14:00:07.000Z",
+      "schemaVersion": 1,
+      "completion": "PROBABLE"
+    }
+  ],
+  "relations": [
+    {
+      "relationId": "rel-fixture-5-obs-from-unique-owner",
+      "fromId": "obs-fixture-5-unique-owner",
+      "toId": "ev-fixture-5-unique-owner",
+      "relation": "derived_from",
+      "derivation": "EVIDENCE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.72,
+      "evidenceIds": ["ev-fixture-5-unique-owner"],
+      "schemaVersion": 1
+    },
+    {
+      "relationId": "rel-fixture-5-correlated-resolutions",
+      "fromId": "obs-fixture-5-unique-owner",
+      "toId": "obs-fixture-5-prompt-named-use",
+      "relation": "correlated_with",
+      "derivation": "EVIDENCE_DERIVED",
+      "state": "candidate",
+      "confidence": 0.4,
+      "evidenceIds": ["ev-fixture-5-unique-owner", "ev-fixture-5-prompt-named-use"],
+      "schemaVersion": 1
+    }
+  ],
+  "case": {
+    "schemaVersion": 1,
+    "caseId": "case-fixture-5",
+    "tenantId": "tenant-fixture-a",
+    "status": "TRIAGED",
+    "diagnosticRunIds": ["diag-run-fixture-5"],
+    "findingIds": ["find-fixture-5-attribution-uncertain"],
+    "relationIds": ["rel-fixture-5-obs-from-unique-owner", "rel-fixture-5-correlated-resolutions"],
+    "mergeKey": "tenant-fixture-a|sha256:fixture-session-key-a0000000000000000000000000000005|skill_tool|skill_attribution_uncertain",
+    "mergedObservationPredicates": ["skill.attributionResolution"],
+    "impact": {
+      "affectedCount": 1,
+      "code": "case:find-fixture-5-attribution-uncertain"
+    },
+    "timeline": [
+      {
+        "at": "2026-09-01T14:00:06.000Z",
+        "code": "observation:obs-fixture-5-unique-owner"
+      },
+      {
+        "at": "2026-09-01T14:00:07.000Z",
+        "code": "observation:obs-fixture-5-prompt-named-use"
+      }
+    ],
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-5",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005",
+          "timeRange": {
+            "from": "2026-09-01T14:00:00.000Z",
+            "to": "2026-09-01T14:04:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-5",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-unique-owner",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000005"
+        }
+      }
+    ]
+  },
+  "verification": {
+    "schemaVersion": 1,
+    "verificationId": "ver-fixture-5",
+    "caseId": "case-fixture-5",
+    "baselineWindow": {
+      "from": "2026-08-25T00:00:00.000Z",
+      "to": "2026-09-01T00:00:00.000Z"
+    },
+    "observationWindow": {
+      "from": "2026-09-01T15:00:00.000Z",
+      "to": "2026-09-02T15:00:00.000Z"
+    },
+    "expectedOutcome": {
+      "metric": "skill_identity_confirmation_rate",
+      "comparator": "gte",
+      "value": 0.8
+    }
+  }
+}

@@ -1,0 +1,1252 @@
+/* ===========================================
+   Enterprise Page Foundation
+   ===========================================
+   Provides a consistent structural skeleton for all enterprise admin pages.
+
+   Purpose:
+   - Ensures new pages never start from "bare divs"
+   - Provides theme-aware backgrounds (responds to dark/light via CSS vars)
+   - Establishes consistent spacing, card appearance, and section rhythm
+   - Acts as a safety net: even if component-level CSS is missing,
+     the page retains a coherent visual structure
+
+   Usage in Lit templates:
+     <div class="enterprise-page">
+       <div class="enterprise-page__content">
+         <div class="enterprise-page__header">...</div>
+         <div class="enterprise-page__sections">
+           <section class="enterprise-section">...</section>
+         </div>
+       </div>
+     </div>
+
+   These classes complement (not replace) the existing .enterprise-surface
+   system used by enterprise-surfaces.ts. Use .enterprise-page for standalone
+   full-page views (e.g. capability center, asset library, install management).
+   =========================================== */
+
+/* ─── Page Container ──────────────────────────────────────────────────────── */
+
+.enterprise-page {
+  background: var(--card);
+  min-height: 100%;
+  font-family: var(--font-body);
+  color: var(--text);
+}
+
+[data-theme="light"] .enterprise-page {
+  background: #ffffff;
+  color: #1f2937;
+}
+
+/* ─── Content Wrapper ─────────────────────────────────────────────────────── */
+
+.enterprise-page__content {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.enterprise-page__content--wide {
+  max-width: 1440px;
+}
+
+.enterprise-page__content--narrow {
+  max-width: 960px;
+}
+
+/* ─── Page Header ─────────────────────────────────────────────────────────── */
+
+.enterprise-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0 16px;
+  flex-wrap: wrap;
+}
+
+.enterprise-page__title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+button.enterprise-page__title--link {
+  appearance: none;
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+  cursor: pointer;
+  text-align: left;
+}
+
+button.enterprise-page__title--link:hover {
+  color: var(--accent);
+}
+
+button.enterprise-page__title--link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+[data-theme="light"] .enterprise-page__title {
+  color: #111827;
+}
+
+[data-theme="light"] button.enterprise-page__title--link {
+  color: #111827;
+}
+
+[data-theme="light"] button.enterprise-page__title--link:hover {
+  color: var(--accent);
+}
+
+.enterprise-page__subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+
+.enterprise-page__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Standalone form action row (e.g. save/submit below a config form). */
+.enterprise-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* Section heading inside a module body (replaces inline-styled <h3>). */
+.enterprise-section-title {
+  margin: 16px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+}
+
+/* ─── Sections Container ──────────────────────────────────────────────────── */
+
+.enterprise-page__sections {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px 0 48px;
+}
+
+/* ─── Section ─────────────────────────────────────────────────────────────── */
+
+.enterprise-section {
+  display: grid;
+  gap: 16px;
+}
+
+.enterprise-section__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+[data-theme="light"] .enterprise-section__title {
+  color: #111827;
+}
+
+.enterprise-section__description {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ─── Card Foundation ─────────────────────────────────────────────────────── */
+
+/* Base card is STATIC: non-interactive cards must not lift/highlight on hover
+   (fixes P7). The hover lift + focus ring live only on --interactive below.
+   Minimal transition keeps border/shadow changes smooth when a modifier (e.g.
+   is-warn) toggles, without animating transform on the base. */
+.enterprise-card {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--duration-normal) var(--ease-out),
+    box-shadow var(--duration-normal) var(--ease-out);
+}
+
+[data-theme="light"] .enterprise-card {
+  background: #ffffff;
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+/* Interactive modifier: only clickable cards (<a>/<button>/focusable) get the
+   hover lift and keyboard focus ring. Drives motion via --transition-interactive. */
+.enterprise-card--interactive {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  transition: var(--transition-interactive);
+}
+
+.enterprise-card--interactive:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+.enterprise-card--interactive:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.enterprise-card--flat {
+  box-shadow: none;
+}
+
+.enterprise-card--compact {
+  padding: 14px 16px;
+}
+
+/* Resolver / auth gate: one card, theme tokens only (no white gradient). */
+.enterprise-resolver {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.enterprise-resolver__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.enterprise-resolver button.enterprise-card {
+  display: block;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.enterprise-gate-card {
+  border-color: color-mix(in srgb, var(--danger) 32%, var(--border));
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+}
+
+.enterprise-gate-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+/* Semantic status modifiers: dye only the border-color via color-mix against the
+   existing semantic tokens (weakened, ~28-30%) so status reads subtly without a
+   new color token. Matches the status-border convention used elsewhere (e.g.
+   .platform-capabilities__summary-card.is-warn). */
+.enterprise-card.is-ok {
+  border-color: color-mix(in srgb, var(--ok) 28%, var(--border));
+}
+
+.enterprise-card.is-warn {
+  border-color: color-mix(in srgb, var(--warn) 30%, var(--border));
+}
+
+.enterprise-card.is-danger {
+  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+}
+
+/* ─── Stats Grid ──────────────────────────────────────────────────────────── */
+
+.enterprise-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.enterprise-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+}
+
+[data-theme="light"] .enterprise-stat-card {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+.enterprise-stat-card__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.enterprise-stat-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+}
+
+[data-theme="light"] .enterprise-stat-card__value {
+  color: #111827;
+}
+
+.enterprise-stat-card__change {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-stat-card__change--positive {
+  color: var(--ok);
+}
+
+.enterprise-stat-card__change--negative {
+  color: var(--danger);
+}
+
+/* ─── KPI Grid ────────────────────────────────────────────────────────────── */
+
+/* Unified KPI card组件 (renderEnterpriseKpiGrid). See docs/design/enterprise-ui-baseline.md
+   §2.2 / §5.3. Each item is an .enterprise-card (+ --interactive when href), so we only
+   declare the KPI-specific layout here — border/background/padding/shadow come from
+   .enterprise-card. Weights use the two-tier scale only (600 / 700). */
+.enterprise-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.enterprise-kpi-card {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  min-height: 104px;
+  align-content: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.enterprise-kpi-card__icon,
+.enterprise-kpi-card__label,
+.enterprise-kpi-card__value,
+.enterprise-kpi-card__detail,
+.enterprise-kpi-card__trend {
+  grid-column: 1;
+}
+
+/* Icon slot: matches the established enterprise icon-slot convention
+   (.enterprise-org-kpi__icon / .enterprise-settings-card__icon). */
+.enterprise-kpi-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  color: var(--accent);
+}
+
+.enterprise-kpi-card__icon > svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.enterprise-kpi-card__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.enterprise-kpi-card__value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.enterprise-kpi-card__detail {
+  min-height: 1.45em;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* Trend chip: dual-encoded (direction icon + color). Tone color comes from the
+   is-ok/is-warn/is-danger class set directly on the chip span. */
+.enterprise-kpi-card__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.enterprise-kpi-card__trend.is-ok {
+  color: var(--ok);
+}
+
+.enterprise-kpi-card__trend.is-warn {
+  color: var(--warn);
+}
+
+.enterprise-kpi-card__trend.is-danger {
+  color: var(--danger);
+}
+
+.enterprise-kpi-card__trend-icon {
+  display: inline-flex;
+}
+
+.enterprise-kpi-card__trend-icon > svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* Drilldown chevron: muted, vertically centered on the trailing edge. */
+.enterprise-kpi-card__arrow {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: center;
+  color: var(--muted);
+}
+
+.enterprise-kpi-card__arrow > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* Selected state ("KPI 即筛选器"): accent border + light accent wash. Does not
+   conflict with hover lift / focus ring from .enterprise-card--interactive. */
+.enterprise-kpi-card.is-active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: var(--accent-subtle);
+}
+
+.enterprise-kpi-grid--compact .enterprise-kpi-card {
+  position: relative;
+  min-height: 72px;
+  gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.enterprise-kpi-card--compact .enterprise-kpi-card__icon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.enterprise-kpi-card--compact .enterprise-kpi-card__icon > svg {
+  width: 14px;
+  height: 14px;
+}
+
+.enterprise-kpi-card--compact .enterprise-kpi-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  width: 100%;
+  padding: 0 24px;
+  grid-column: 1;
+}
+
+.enterprise-kpi-card--compact .enterprise-kpi-card__label {
+  text-align: center;
+  min-width: 0;
+}
+
+.enterprise-kpi-card--compact .enterprise-kpi-card__value {
+  font-size: 20px;
+  grid-column: 1;
+  width: 100%;
+  text-align: center;
+}
+
+.enterprise-kpi-card--compact .enterprise-kpi-card__arrow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  flex-shrink: 0;
+  margin-left: 0;
+}
+
+/* ─── Segmented Nav (药丸视图切换) ────────────────────────────────────────── */
+
+/* Shared pill segmented control (renderEnterpriseSegmentedNav). See
+   docs/design/enterprise-ui-baseline.md §3.3. Extracted from the org module's
+   .enterprise-org-surface-nav so it's a drop-in replacement. Motion + focus走 token；
+   weights use the two-tier scale only (600 / 700); no new color tokens. */
+.enterprise-segmented-nav {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--secondary);
+}
+
+.enterprise-segmented-nav__tab {
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 18px;
+  cursor: pointer;
+  transition: var(--transition-interactive);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+
+.enterprise-segmented-nav__tab:hover {
+  color: var(--text);
+}
+
+.enterprise-segmented-nav__tab.is-active {
+  background: var(--card);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+.enterprise-segmented-nav__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* ─── Table Foundation ────────────────────────────────────────────────────── */
+
+.enterprise-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+[data-theme="light"] .enterprise-table-wrap {
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+.enterprise-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.enterprise-table th,
+.enterprise-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.enterprise-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--bg-elevated, var(--card));
+}
+
+[data-theme="light"] .enterprise-table th {
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+.enterprise-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.enterprise-table tr:hover td {
+  background: var(--bg-hover);
+}
+
+[data-theme="light"] .enterprise-table tr:hover td {
+  background: #f3f4f6;
+}
+
+/* ─── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.enterprise-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.enterprise-toolbar__search {
+  min-width: 200px;
+  max-width: 320px;
+  flex: 1;
+}
+
+/* ─── Empty State ─────────────────────────────────────────────────────────── */
+
+.enterprise-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.enterprise-empty__icon {
+  width: 48px;
+  height: 48px;
+  opacity: 0.5;
+}
+
+.enterprise-empty__icon > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.enterprise-empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.enterprise-empty__description {
+  font-size: 13px;
+  max-width: 360px;
+  line-height: 1.5;
+}
+
+.enterprise-org-feedback-callout {
+  margin: 0 0 12px;
+}
+
+/* ─── Loading Skeleton ────────────────────────────────────────────────────── */
+
+.enterprise-skeleton {
+  background: linear-gradient(90deg, var(--bg-muted) 25%, var(--bg-hover) 50%, var(--bg-muted) 75%);
+  background-size: 200% 100%;
+  animation: enterprise-shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+[data-theme="light"] .enterprise-skeleton {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes enterprise-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.enterprise-skeleton--text {
+  height: 14px;
+  width: 60%;
+}
+
+.enterprise-skeleton--title {
+  height: 22px;
+  width: 40%;
+}
+
+.enterprise-skeleton--card {
+  height: 120px;
+  width: 100%;
+}
+
+/* ─── Capability Center Page (semantic markers — inline-styled, class for identity) */
+
+.enterprise-capability-center-page {
+  /* Styled via inline constants; class retained for selector targeting */
+}
+
+.enterprise-capability-center-page__content {
+  /* Styled via inline constants; class retained for selector targeting */
+}
+
+.enterprise-capability-center-page__sections {
+  /* Styled via inline constants; class retained for selector targeting */
+}
+
+/* ─── Health Badge (semantic markers + actual styles) ────────────────────── */
+
+.enterprise-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.enterprise-health-badge__main {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.enterprise-health-badge__main--inline {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.enterprise-health-badge__main--detail {
+  padding: 4px 12px;
+  font-size: 14px;
+}
+
+/* Background per business status (light + dark consistent — these colors all
+   meet WCAG contrast on white text). */
+.enterprise-health-badge__main[data-status="效果稳定"] {
+  background: #10b981;
+}
+
+.enterprise-health-badge__main[data-status="偶尔结果不理想"] {
+  background: #f59e0b;
+}
+
+.enterprise-health-badge__main[data-status="建议重新整理"] {
+  background: #ea580c;
+}
+
+.enterprise-health-badge__main[data-status="已不适合继续推广"] {
+  background: #6b7280;
+}
+
+.enterprise-health-badge__label {
+  /* Inherits color/font from parent .__main */
+}
+
+.enterprise-health-badge__annotation {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+[data-theme="light"] .enterprise-health-badge__annotation {
+  color: #6b7280;
+}
+
+.enterprise-health-badge__annotation--inline {
+  font-size: 12px;
+}
+
+.enterprise-health-badge__annotation--detail {
+  font-size: 14px;
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .enterprise-page__content {
+    padding: 0 16px;
+  }
+
+  .enterprise-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 16px 0 12px;
+  }
+
+  .enterprise-page__sections {
+    gap: 24px;
+    padding: 16px 0 32px;
+  }
+
+  .enterprise-stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .enterprise-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ─── Enterprise diagnosis (first-level, flat) ───────────────────────────── */
+
+.enterprise-diagnosis {
+  background: transparent;
+  min-height: 100%;
+}
+
+.enterprise-diagnosis .enterprise-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 24px 4px;
+}
+
+.enterprise-diagnosis .enterprise-module-header__trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.enterprise-diagnosis__target {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.enterprise-diagnosis__target-hint {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__target-label {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.enterprise-diagnosis__target-select {
+  min-width: 180px;
+  max-width: 240px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--text-strong);
+  font-size: 13px;
+  padding: 0 8px;
+}
+
+.enterprise-diagnosis__target-select:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 1px;
+}
+
+.enterprise-diagnosis__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 10px 0 16px;
+}
+
+.enterprise-diagnosis__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-diagnosis__check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis .enterprise-page__content {
+  padding-top: 12px;
+  padding-bottom: 56px;
+}
+
+.enterprise-diagnosis__body.enterprise-org-ws--flat,
+.enterprise-diagnosis .enterprise-org-ws--flat {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.enterprise-diagnosis .enterprise-org-ws--flat .enterprise-org-ws__detail-stack,
+.enterprise-diagnosis .enterprise-org-ws--flat .enterprise-org-ws__detail-stack::before {
+  display: none;
+}
+
+.enterprise-diagnosis__group + .enterprise-diagnosis__group {
+  margin-top: 28px;
+  padding-top: 28px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-diagnosis__group-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+.enterprise-diagnosis__group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.enterprise-diagnosis__block {
+  min-width: 0;
+}
+
+.enterprise-diagnosis__subhead {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 24px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--radius-md);
+  border: 0;
+  border-left: 3px solid color-mix(in srgb, var(--danger) 70%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, var(--card));
+  color: var(--text);
+}
+
+.enterprise-diagnosis__banner strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.enterprise-diagnosis__banner-mark {
+  font-weight: 700;
+  line-height: 1;
+}
+
+.enterprise-diagnosis__banner p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__banner--watch {
+  border-left-color: color-mix(in srgb, var(--warn, var(--accent)) 70%, transparent);
+  background: color-mix(in srgb, var(--warn, var(--accent)) 8%, var(--card));
+}
+
+.enterprise-diagnosis__report {
+  margin: 8px 0 0;
+  max-height: 28rem;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg) 80%, var(--card));
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.enterprise-diagnosis__article {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0 0 24px;
+  max-width: 40rem;
+}
+
+.enterprise-diagnosis__article-title {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+}
+
+.enterprise-diagnosis__article-section + .enterprise-diagnosis__article-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-diagnosis__article-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__article-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.enterprise-diagnosis__article-row {
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.enterprise-diagnosis__article-subhead {
+  margin: 8px 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.enterprise-diagnosis__article-subhead:first-child {
+  margin-top: 0;
+}
+
+.enterprise-diagnosis__article-prose {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.enterprise-diagnosis__article-prose:last-child {
+  margin-bottom: 0;
+}
+
+.enterprise-diagnosis__status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__list,
+.enterprise-diagnosis__timeline,
+.enterprise-diagnosis__stack-rows,
+.enterprise-diagnosis__kv {
+  display: flex;
+  flex-direction: column;
+  max-width: 36rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enterprise-diagnosis__row,
+.enterprise-diagnosis__kv-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-diagnosis__kv-row {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+
+.enterprise-diagnosis__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 0 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.enterprise-diagnosis__row:last-child,
+.enterprise-diagnosis__kv-row:last-child,
+.enterprise-diagnosis__item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.enterprise-diagnosis__label {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__value {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.enterprise-diagnosis__meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__empty {
+  margin: 0;
+  padding: 2px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.enterprise-diagnosis__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-diagnosis__actions--wrap {
+  flex-wrap: wrap;
+}
+
+.enterprise-diagnosis__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Batch-1 overview/settings: keep these rules here so components.css stays untouched.
+   Specificity beats the single-class rules in components.css, which loads later.
+   Settings rows are not links; cancel the accent hover that makes them look clickable. */
+li.enterprise-settings-row {
+  transition:
+    background var(--duration-normal) var(--ease-out),
+    border-color var(--duration-normal) var(--ease-out);
+}
+
+li.enterprise-settings-row:hover {
+  border-color: var(--border);
+  background: var(--card);
+}
+
+li.enterprise-settings-row.enterprise-settings-row--warn:hover {
+  background: color-mix(in srgb, var(--warn) 5%, var(--card));
+}
+
+/* Batch-1 overview/settings: keep these rules here so components.css stays untouched.
+   Specificity beats the single-class rules in components.css, which loads later. */
+.enterprise-overview-section.enterprise-card {
+  padding: 18px;
+}
+
+.enterprise-system-notices-card__list {
+  display: grid;
+}
+
+.enterprise-system-notices-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 9px 6px;
+}
+
+.enterprise-system-notices-card__row + .enterprise-system-notices-card__row {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.enterprise-system-notices-card__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.enterprise-settings-stat__value.is-warn,
+.enterprise-settings-stat__value.is-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.enterprise-settings-stat__value.is-warn::before,
+.enterprise-settings-stat__value.is-ok::before {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.enterprise-settings-stat__value.is-warn::before {
+  content: "▲";
+}
+
+.enterprise-settings-stat__value.is-ok::before {
+  content: "●";
+}
+
+.enterprise-settings-status.is-warn::before {
+  width: 0;
+  height: 0;
+  border-radius: 0;
+  background: transparent;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 7px solid currentColor;
+}
+
+.enterprise-channel-gallery__name.enterprise-channel-gallery__name,
+.enterprise-channel-workspace__section-title.enterprise-channel-workspace__section-title,
+.enterprise-im-curated__section-title.enterprise-im-curated__section-title {
+  font-weight: 600;
+}

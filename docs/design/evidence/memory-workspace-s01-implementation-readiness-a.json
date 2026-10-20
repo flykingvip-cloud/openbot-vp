@@ -1,0 +1,45 @@
+{
+  "schema": "memory-workspace-s01-implementation-readiness-a/v1",
+  "kind": "s01-implementation-readiness-a-nonprod",
+  "taskId": "s01-implementation-readiness-a:cursor",
+  "purpose": "Non-production Trusted Principal / Handle / evaluateS01AuthorizedToolCwd readiness. Does not wire production or flip implementationVerified.",
+  "status": "readiness-a-submitted",
+  "reviewRequested": "S01 Implementation Readiness A Review",
+  "notASecondS01Spec": true,
+  "implementationVerified": false,
+  "productionWired": false,
+  "deployAuthorized": false,
+  "item7": "not-met",
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "errorCodesFollowUniqueHandoff": [
+    "ERR_PRINCIPAL_REQUIRED",
+    "ERR_TENANT_BINDING_REQUIRED",
+    "ERR_WORKSPACE_NOT_FOUND",
+    "ERR_TENANT_MISMATCH",
+    "ERR_CAPABILITY_DENIED",
+    "ERR_WORKSPACE_ARCHIVED",
+    "ERR_BINDING_NOT_CANONICAL",
+    "ERR_PATH_OUTSIDE_WORKSPACE",
+    "ERR_CATALOG_UNAVAILABLE",
+    "ERR_INVALID_PATH",
+    "ERR_WORKSPACE_OWNER_DENIED"
+  ],
+  "rejectedParallelCodes": [
+    "ERR_WORKSPACE_SUSPENDED",
+    "ERR_WORKSPACE_RETIRED",
+    "ERR_BINDING_AMBIGUOUS",
+    "ERR_OWNERSHIP_MISMATCH",
+    "ERR_STALE_FENCING"
+  ],
+  "evaluateRequiresTargetResourceId": true,
+  "symlinkPolicy": "deny-unverified-follow; success is lexical-only-caller-must-lstat",
+  "forbiddenNow": [
+    "Implementation Gate Accepted",
+    "Implementation Unlock",
+    "Item 7 met",
+    "Phase 1B unlock",
+    "production wiring",
+    "LIVE deployment"
+  ]
+}

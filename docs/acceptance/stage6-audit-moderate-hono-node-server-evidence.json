@@ -1,0 +1,28 @@
+{
+  "cell": "Stage 6 production dependency audit — @hono/node-server moderate pin (two advisories, one pin)",
+  "advisory": "GHSA-frvp-7c67-39w9",
+  "cve": null,
+  "sibling_advisory_cleared": "GHSA-92pp-h63x-v22m",
+  "sibling_cve": "CVE-2026-39406",
+  "package": "@hono/node-server",
+  "vulnerable_range": "<1.19.15 (GHSA-frvp); <1.19.13 (GHSA-92pp)",
+  "affected_version_before": "1.19.10",
+  "dependency_path": ".>@buape/carbon>@hono/node-server",
+  "severity": "moderate",
+  "direct_or_transitive": "transitive",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=1.19.15 (clears both on 1.x)",
+  "mitigated_version": "1.19.15",
+  "reachable_surface": "GHSA-frvp: Windows serve-static path traversal via encoded backslash (%5C) bypassing prefix middleware; GHSA-92pp: serveStatic middleware bypass via repeated slashes (//). Transitive via @buape/carbon; override-only pin (not a direct root dependency).",
+  "mitigation": "Bump pnpm.overrides.@hono/node-server 1.19.10→1.19.15. One pin intentionally clears both remaining @hono/node-server moderate GHSAs (frvp needs >=1.19.15; 92pp needs >=1.19.13). Does not touch dompurify or other Stage 6 moderate surface. Prior hono core cells remain cleared under hono@4.13.7.",
+  "acceptance_impact": "Narrow E3 for this @hono/node-server pin (both GHSA-frvp and GHSA-92pp cleared). Stage 6 overall remains not PASS; audit still exits 1 (37 moderate + 8 low remain, including dompurify). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 37,
+    "low": 8,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-frvp-7c67-39w9",
+  "sibling_more_info": "https://github.com/advisories/GHSA-92pp-h63x-v22m"
+}

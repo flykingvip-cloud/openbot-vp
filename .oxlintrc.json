@@ -1,0 +1,111 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["unicorn", "typescript", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "perf": "error",
+    "suspicious": "error"
+  },
+  "rules": {
+    "curly": "error",
+    "eslint-plugin-unicorn/prefer-array-find": "off",
+    "eslint/no-await-in-loop": "off",
+    "eslint/no-new": "off",
+    "eslint/no-shadow": "off",
+    "eslint/no-unmodified-loop-condition": "off",
+    "oxc/no-accumulating-spread": "off",
+    "oxc/no-async-endpoint-handlers": "off",
+    "oxc/no-map-spread": "off",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extraneous-class": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    "unicorn/consistent-function-scoping": "off",
+    "unicorn/require-post-message-target-origin": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/memory/health-probe.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "./manager.js",
+                "message": "health-probe must stay read-only; use health-probe.factory.ts boundary"
+              },
+              {
+                "name": "./index.js",
+                "message": "health-probe must not import getMemorySearchManager entry"
+              },
+              {
+                "name": "./memory-schema.js",
+                "message": "health-probe must not ensure schema"
+              },
+              {
+                "name": "chokidar",
+                "message": "health-probe must not start watchers"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/memory/manager.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "./v1-root-guard.js",
+                "importNames": ["createV1OperationAuth"],
+                "message": "search entry must use acquireSyncAuth; do not construct V1OperationAuth here"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/cli/memory-health-cli.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "../memory/manager.js",
+                "message": "memory health CLI must not import MemoryManager"
+              },
+              {
+                "name": "../memory/index.js",
+                "message": "memory health CLI must not import getMemorySearchManager"
+              },
+              {
+                "name": "chokidar",
+                "message": "memory health CLI must not start watchers"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "assets/",
+    "dist/",
+    "docs/_layouts/",
+    "extensions/",
+    "node_modules/",
+    "packages/",
+    "patches/",
+    "pnpm-lock.yaml",
+    "skills/",
+    "src/auto-reply/reply/export-html/template.js",
+    "src/canvas-host/a2ui/a2ui.bundle.js",
+    "Swabble/",
+    "vendor/"
+  ]
+}

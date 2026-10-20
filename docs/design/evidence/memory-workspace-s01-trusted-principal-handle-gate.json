@@ -1,0 +1,225 @@
+{
+  "taskId": "memory-workspace-platform-remediation:kiro-data-governance-s01-trusted-principal-handle-gate",
+  "unifyTaskId": "cursor-data-governance-item7-s01-handoff-unify",
+  "d1d5TaskId": "cursor-data-governance-item7-s01-d1d5-design",
+  "nonprodContractTaskId": "cursor-data-governance-item7-s01-d1d5-nonprod-contract",
+  "purpose": "S01 trusted principal / Workspace Handle D1-D5 设计交付（非生产 contract 目录；未改 src/memory/**；消化 F1-F6 与 SG1-SG5）",
+  "status": "design-delivered-nonprod-contract",
+  "reviewRemediation": {
+    "fromReviewer": "codex-architecture",
+    "reviewDecision": "accepted",
+    "reviewPass": 3,
+    "reviewSidecar": "docs/design/evidence/memory-workspace-s01-d1d5-design-review-codex-architecture.json",
+    "closedFindings": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "SG1", "SG2", "SG3", "SG4", "SG5"],
+    "mergedPr": 816,
+    "selfAccepted": false,
+    "doesNotFillKiroSotReviewer": true,
+    "awaitingReviewPass3AfterMerge": false
+  },
+  "created": "2026-08-29",
+  "owner": "kiro-data-governance",
+  "unifyLander": "cursor-data-governance",
+  "uniqueHandoff": true,
+  "designOnly": true,
+  "thisPrIsNotS01RetirementAccepted": true,
+  "thisPrIsNotProductionDeploy": true,
+  "canonicalHandoffDoc": ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+  "duplicateDocsDesignHandoff": {
+    "path": "docs/design/handoff-s01-trusted-principal-handle-gate.md",
+    "status": "deprecated-stub",
+    "mustNotBeSecondSpec": true
+  },
+  "catalogSot": {
+    "uniqueSourceOfTruth": "data-governance-catalog",
+    "catalogType": "WorkspaceResourceCatalog",
+    "handle": "typed-view-of-WorkspaceResourceRecord",
+    "membership": "constrained-extension-or-readonly-PlatformAuthMembership",
+    "authorizedCwd": "typed-view-of-WorkspaceBindingRecord.locator",
+    "forbidIndependentCatalogTables": true,
+    "forbiddenIndependentTables": ["workspace_handles", "authorized_cwds", "tenant_memberships"]
+  },
+  "testPolicy": {
+    "approvedNonProductionAdapterOnly": true,
+    "defaultAdapter": "InMemoryWorkspaceResourceCatalog",
+    "forbidDirectAliyunRds": true,
+    "aliyunRdsDdlIsNotADesignGatePrecondition": true
+  },
+  "reviewRequest": {
+    "requested": true,
+    "reviewers": ["kiro-sot-reviewer", "codex-architecture"],
+    "scope": "d1-d5-design-only",
+    "notS01Retirement": true,
+    "notImplementationWiring": true,
+    "notPhase1bUnlock": true,
+    "notLive": true
+  },
+  "srcMemory": {
+    "didNotModifySrcMemory": true,
+    "filesTouched": [],
+    "soleProductionMemoryWorkspaceHandle": "src/memory/memory-workspace-handle.ts",
+    "thisSliceAddsSecondMemoryWorkspaceHandleProductionEntry": false
+  },
+  "nonProductionContract": {
+    "directory": "docs/design/contracts",
+    "notAProductionSrcEntry": true,
+    "notImportedBySrc": true,
+    "removedProductionSrcModules": [
+      "src/gateway/data-governance/s01-trusted-principal-handle-contract.ts",
+      "src/gateway/data-governance/s01-trusted-principal-handle-contract.test.ts"
+    ]
+  },
+  "blockingFactors": [
+    "resolveAuthorizedToolCwd-not-wired-to-s01",
+    "w4-catalogResourceId-null",
+    "independent-design-review-pending"
+  ],
+  "designDeliverables": {
+    "trustedPrincipalContract": {
+      "status": "completed",
+      "location": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+      "requirements": [
+        "identity-source-definition",
+        "verified-session-issuance",
+        "keyed-hmac-attestation",
+        "presented-vs-server-source-proof",
+        "reject-wire-identity-fields",
+        "resolvedAt-expiry",
+        "context-propagation-protocol",
+        "fail-closed-semantics"
+      ]
+    },
+    "workspaceHandleModel": {
+      "status": "completed",
+      "location": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+      "requirements": [
+        "handle-definition",
+        "resourceId-persistent-primary-key",
+        "unique-canonical-binding",
+        "fencing-contentVersion",
+        "memory-asset-resourceId-independent",
+        "tenant-binding-rules",
+        "capability-boundary",
+        "lifecycle-management",
+        "typed-view-of-governance-catalog"
+      ]
+    },
+    "catalogSchema": {
+      "status": "completed",
+      "location": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+      "kind": "constrained-views-on-workspace-resource-catalog",
+      "tables": [],
+      "forbidIndependentTables": ["workspace_handles", "authorized_cwds", "tenant_memberships"]
+    },
+    "resolveAuthorizedToolCwdInterface": {
+      "status": "completed",
+      "location": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+      "requirements": [
+        "typescript-type-definition",
+        "error-codes",
+        "unique-canonical-selection",
+        "tenant-mismatch-on-foreign-locator",
+        "same-tenant-owner-seat-group",
+        "membership-sot-port-not-array",
+        "path-outside-unique-root",
+        "no-host-cwd-fallback"
+      ]
+    },
+    "regressionTestPlan": {
+      "status": "completed",
+      "location": "docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+      "adapter": "approved-non-production-only",
+      "covers": [
+        "forged-principal",
+        "expired-principal",
+        "unkeyed-attestation-rejected",
+        "self-compared-hmac-rejected",
+        "source-proof-hmac-proxy-device",
+        "wire-identity-rejected",
+        "injected-memberships-array-rejected",
+        "same-tenant-other-owner",
+        "group-and-seat-membership-port",
+        "retired-and-revoked-handle",
+        "stale-fencing",
+        "duplicate-canonical-binding",
+        "compatibility-only-binding",
+        "path-traversal",
+        "path-outside-workspace",
+        "catalog-unavailable",
+        "integration-two-workspaces",
+        "production-caller-freeze",
+        "p99-in-memory-sla"
+      ]
+    }
+  },
+  "implementationGate": {
+    "preconditions": [
+      "all-design-deliverables-completed",
+      "catalog-extension-is-typed-view-not-independent-tables",
+      "tests-use-approved-non-production-adapter-only",
+      "no-direct-aliyun-rds",
+      "unique-handoff-no-duplicate-spec",
+      "all-tests-passing",
+      "performance-sla-met",
+      "audit-log-verified",
+      "security-review-passed"
+    ],
+    "status": "not-met",
+    "reviewers": ["kiro-sot-reviewer", "codex-architecture"]
+  },
+  "productionGuardrails": {
+    "strictlyForbidden": [
+      "modify-src/auto-reply/reply/get-reply.ts",
+      "modify-src/memory/**",
+      "add-second-MemoryWorkspaceHandle-production-entry",
+      "modify-src/gateway/workspace-resolver/**",
+      "create-production-catalog-data",
+      "create-independent-workspace_handles-authorized_cwds-tenant_memberships-tables",
+      "direct-aliyun-rds-access",
+      "wire-resolver-handle-principal-production",
+      "modify-scan-remaining-liveWriteWatchIndex",
+      "delete-or-move-s01-callsite",
+      "execute-i3-unlock-phase1b",
+      "set-deployAuthorized-true",
+      "any-live-production-deployment"
+    ]
+  },
+  "failClosedBehavior": {
+    "triggers": [
+      "trusted-principal-missing-or-invalid",
+      "workspace-handle-not-found-or-revoked",
+      "tenant-membership-verification-failed",
+      "path-not-authorized",
+      "catalog-query-failed"
+    ],
+    "response": {
+      "error": "UNAUTHORIZED_TOOL_EXECUTION",
+      "retryable": false,
+      "failClosed": true
+    }
+  },
+  "currentStatus": {
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "retiredThisChange": 0,
+    "productionCatalogWrite": "none",
+    "deployAuthorized": false,
+    "schemaV2Write": "disabled",
+    "i3Executed": false,
+    "liveDeployment": "forbidden"
+  },
+  "references": {
+    "s01Callsite": "src/auto-reply/reply/get-reply.ts:164",
+    "relatedEvidence": [
+      "memory-workspace-phase1b-item7-batch25-s01-s02-semantic-gate.json",
+      "memory-workspace-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance.json",
+      "memory-workspace-phase1b-item7-batch33-s01-next-path-gate.json"
+    ],
+    "handoffDoc": ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "designPackage": ".kiro/specs/memory-workspace-platform-remediation/s01-d1-d5-design-package.md",
+    "contractModule": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+    "contractTest": "docs/design/contracts/s01-trusted-principal-handle-contract.test.ts"
+  }
+}

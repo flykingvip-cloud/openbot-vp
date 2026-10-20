@@ -1,0 +1,158 @@
+diff --git a/src/auto-reply/reply/agent-runner-execution.ts b/src/auto-reply/reply/agent-runner-execution.ts
+index eb1cdee3d7..4b6449ce6d 100755
+--- a/src/auto-reply/reply/agent-runner-execution.ts
++++ b/src/auto-reply/reply/agent-runner-execution.ts
+@@ -30,7 +30,10 @@ import {
+   type SessionEntry,
+   updateSessionStore,
+ } from "../../config/sessions.js";
+-import { recordTaskOutcome } from "../../gateway/agent-growth/operational-metrics-store.js";
++import {
++  recordTaskOutcome,
++  recordToolOutcomes,
++} from "../../gateway/agent-growth/operational-metrics-store.js";
+ import {
+   releaseEnterpriseAgentRun,
+   tryAcquireEnterpriseAgentRun,
+@@ -70,6 +73,7 @@ import {
+   resolveModelFallbackOptions,
+ } from "./agent-runner-utils.js";
+ import { type BlockReplyPipeline } from "./block-reply-pipeline.js";
++import { recordExperienceCapsuleSafely } from "./experience-capsule-backflow.js";
+ import type { FollowupRun } from "./queue.js";
+ import { createBlockReplyDeliveryHandler } from "./reply-delivery.js";
+ import { createReplyMediaPathNormalizer } from "./reply-media-paths.js";
+@@ -129,7 +133,20 @@ export async function runAgentTurnWithFallback(params: {
+   const runId = params.opts?.runId ?? crypto.randomUUID();
+   // Agent Growth OS（P2 12.x）：记录任务结果到运营指标累加器（fire-and-forget，绝不影响回复）。
+   // 心跳不算任务；turn 级成功/失败作为 operationalScore 的 v1 task 信号。
+-  const recordGrowthTaskOutcome = (success: boolean): void => {
++  //
++  // 工具成功率（0.30 权重）在 turn 内内存累加、收尾时一次落盘，避免逐次工具调用写盘。
++  let growthToolTotal = 0;
++  let growthToolSucceeded = 0;
++  const recordGrowthToolResult = (isError: boolean): void => {
++    growthToolTotal += 1;
++    if (!isError) {
++      growthToolSucceeded += 1;
++    }
++  };
++  const recordGrowthTaskOutcome = (
++    success: boolean,
++    failure?: { reason: string; detail?: string },
++  ): void => {
+     if (params.isHeartbeat) {
+       return;
+     }
+@@ -140,6 +157,27 @@ export async function runAgentTurnWithFallback(params: {
+     void recordTaskOutcome(params.followupRun.run.config, growthAgentId, { success }).catch(
+       () => {},
+     );
++    // 经验提炼：失败即复盘，产出**候选**胶囊（需审批，不自动晋升）。
++    if (!success && failure) {
++      recordExperienceCapsuleSafely({
++        trigger: "task_failure",
++        agentId: growthAgentId,
++        sessionEntry: params.getActiveSessionEntry(),
++        reason: failure.reason,
++        ...(failure.detail ? { detail: failure.detail } : {}),
++        ...(params.sessionKey ? { sessionKey: params.sessionKey } : {}),
++      });
++    }
++    if (growthToolTotal > 0) {
++      const total = growthToolTotal;
++      const succeeded = growthToolSucceeded;
++      growthToolTotal = 0;
++      growthToolSucceeded = 0;
++      void recordToolOutcomes(params.followupRun.run.config, growthAgentId, {
++        total,
++        succeeded,
++      }).catch(() => {});
++    }
+   };
+   const normalizeReplyMediaPaths = createReplyMediaPathNormalizer({
+     cfg: params.followupRun.run.config,
+@@ -267,7 +305,10 @@ export async function runAgentTurnWithFallback(params: {
+             modelGateInput,
+           });
+           if (!runSlot.skipped && !runSlot.acquired) {
+-            recordGrowthTaskOutcome(false);
++            recordGrowthTaskOutcome(false, {
++              reason: "run_slot_unavailable",
++              detail: runSlot.message,
++            });
+             return {
+               kind: "final",
+               payload: {
+@@ -544,6 +585,10 @@ export async function runAgentTurnWithFallback(params: {
+                       commercialToolCallCount += 1;
+                       commercialToolClasses.push(name);
+                     }
++                    // Agent Growth OS：工具成功率信号源（此前 recordToolOutcome 无任何调用方）。
++                    if (phase === "result") {
++                      recordGrowthToolResult(evt.data.isError === true);
++                    }
+                   }
+                   // Track auto-compaction completion
+                   if (evt.stream === "compaction") {
+@@ -849,7 +894,14 @@ export async function runAgentTurnWithFallback(params: {
+             ? "⚠️ Message ordering conflict - please try again. If this persists, use /new to start a fresh session."
+             : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
+ 
+-        recordGrowthTaskOutcome(false);
++        recordGrowthTaskOutcome(false, {
++          reason: isContextOverflow
++            ? "context_overflow"
++            : isRoleOrderingError
++              ? "message_ordering_conflict"
++              : "agent_error_before_reply",
++          detail: trimmedMessage,
++        });
+         return {
+           kind: "final",
+           payload: {
+@@ -867,7 +919,10 @@ export async function runAgentTurnWithFallback(params: {
+       isContextOverflowError(finalEmbeddedError.message) &&
+       !hasPayloadText
+     ) {
+-      recordGrowthTaskOutcome(false);
++      recordGrowthTaskOutcome(false, {
++        reason: "context_overflow",
++        detail: finalEmbeddedError.message,
++      });
+       return {
+         kind: "final",
+         payload: {
+diff --git a/src/gateway/platform-auth/session-domain.ts b/src/gateway/platform-auth/session-domain.ts
+index c4f6170920..ccfc663b1d 100644
+--- a/src/gateway/platform-auth/session-domain.ts
++++ b/src/gateway/platform-auth/session-domain.ts
+@@ -123,6 +123,19 @@ const METHOD_REQUIRED_DOMAIN: Record<string, RequiredDomain> = {
+   "enterprise-model-grant.grant": "enterprise",
+   "enterprise-model-grant.revoke": "enterprise",
+   "enterprise-model-grant.list": "enterprise",
++  "enterprise-model-provider.list": "enterprise",
++  "enterprise-model-provider.create": "enterprise",
++  "enterprise-model-provider.update": "enterprise",
++  "enterprise-model-provider.test": "enterprise",
++  "enterprise-model-provider.rotate-credential": "enterprise",
++  "enterprise-model-provider.disable": "enterprise",
++  "enterprise-model-provider.delete": "enterprise",
++  "enterprise-model-catalog.list": "enterprise",
++  "enterprise-model-catalog.discover": "enterprise",
++  "enterprise-model-catalog.register": "enterprise",
++  "enterprise-model-catalog.update": "enterprise",
++  "enterprise-model-catalog.enable": "enterprise",
++  "enterprise-model-catalog.disable": "enterprise",
+   "enterprise-allocation.overview": "enterprise",
+   "enterprise-allocation.apply-profile": "enterprise",
+   "enterprise-allocation.sync-all-seats": "enterprise",
+@@ -156,6 +169,8 @@ const METHOD_REQUIRED_DOMAIN: Record<string, RequiredDomain> = {
+   "user-operational-identity.continuation.get": SELF_SCOPED_IDENTITY_DOMAINS,
+   "user-operational-identity.continuation.list-pending": SELF_SCOPED_IDENTITY_DOMAINS,
+   "user-operational-identity.create": SELF_SCOPED_IDENTITY_DOMAINS,
++  "user-operational-identity.credentials.bind": SELF_SCOPED_IDENTITY_DOMAINS,
++  "user-operational-identity.credentials.verify": SELF_SCOPED_IDENTITY_DOMAINS,
+   "user-operational-identity.revoke": SELF_SCOPED_IDENTITY_DOMAINS,
+   "user-operational-identity.reauthorize": SELF_SCOPED_IDENTITY_DOMAINS,
+   "user-operational-identity.grants.upsert": SELF_SCOPED_IDENTITY_DOMAINS,

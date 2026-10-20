@@ -1,0 +1,4 @@
+{
+  "canonical": "path=/probe/fixture/index.sqlite|present=true|type=file|size=4096|mtimeMs=1234567890000|contentSha256=deadbeef\npath=/probe/fixture/index.sqlite-wal|present=false|type=missing",
+  "sha256": "d57e6925f0bcbf9e16a56220015017f9c144fca3276e8e1f9ab37d0441dfcdb6"
+}

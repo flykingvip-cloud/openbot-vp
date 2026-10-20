@@ -1,0 +1,275 @@
+{
+  "schemaVersion": 1,
+  "graphKind": "DiagnosticRunGraph",
+  "run": {
+    "schemaVersion": 1,
+    "runId": "diag-run-fixture-6",
+    "caseId": "case-fixture-6",
+    "mode": "QUICK",
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-6",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "route",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000006",
+          "timeRange": {
+            "from": "2026-09-01T15:00:00.000Z",
+            "to": "2026-09-01T15:03:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "agent",
+        "targetId": "agent-fixture-main",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "route",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000006"
+        }
+      }
+    ],
+    "requestedBy": {
+      "schemaVersion": 1,
+      "principalId": "principal-fixture-employee-a",
+      "kind": "user",
+      "tenantId": "tenant-fixture-a"
+    },
+    "mutationPolicy": "READ_ONLY",
+    "budget": {
+      "timeoutMs": 8000,
+      "maxDiagnosers": 3,
+      "modelCalls": 0
+    },
+    "status": "completed",
+    "completion": "INCONCLUSIVE",
+    "missingEvidence": [
+      {
+        "evidenceType": "event",
+        "source": "route_resolution",
+        "targetType": "session",
+        "fields": ["matchedBy", "agentId", "accountId", "sessionKeyHash", "redirectedFromAgentId"],
+        "freshnessMs": 300000,
+        "sensitivity": "internal",
+        "cost": "low",
+        "required": true,
+        "schemaVersion": 1
+      },
+      {
+        "evidenceType": "event",
+        "source": "agent_runner",
+        "targetType": "run",
+        "fields": ["agentStarted", "errorClass"],
+        "freshnessMs": 300000,
+        "sensitivity": "internal",
+        "cost": "low",
+        "required": true,
+        "schemaVersion": 1
+      }
+    ],
+    "startedAt": "2026-09-01T15:03:01.000Z",
+    "completedAt": "2026-09-01T15:03:01.800Z",
+    "diagnosedAgentRunId": null
+  },
+  "evidences": [
+    {
+      "evidenceId": "ev-fixture-6-session-meta",
+      "evidenceType": "event",
+      "source": "session_store",
+      "authorityRecordId": "session-jsonl:sha256:fixture-session-key-a0000000000000000000000000000006#rec-1",
+      "observedAt": "2026-09-01T15:00:02.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-6",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "route",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000006"
+        }
+      },
+      "summary": {
+        "messageReceived": true,
+        "retryCount": 0,
+        "agentRunPresent": null
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-6-session-meta",
+        "collectorVersion": "session-adapter.v1"
+      },
+      "collection": {
+        "method": "query",
+        "completeness": "partial",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/sessions/transcript-events.ts"
+    }
+  ],
+  "observations": [
+    {
+      "observationId": "obs-fixture-6-message-received",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-6",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "scope": {
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000006"
+        }
+      },
+      "predicate": "session.message_received",
+      "value": true,
+      "evidenceIds": ["ev-fixture-6-session-meta"],
+      "observedAt": "2026-09-01T15:00:02.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-6-agent-run-unknown",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "agent",
+        "targetId": "agent-fixture-main",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "agent.run.present",
+      "value": null,
+      "evidenceIds": ["ev-fixture-6-session-meta"],
+      "observedAt": "2026-09-01T15:00:02.000Z",
+      "schemaVersion": 1
+    }
+  ],
+  "assessments": [
+    {
+      "assessmentId": "asmt-fixture-6-locus-unknown",
+      "observationIds": ["obs-fixture-6-message-received", "obs-fixture-6-agent-run-unknown"],
+      "code": "session_failure_locus",
+      "verdict": "unknown",
+      "ruleId": "rule.route_resolution.required.v1",
+      "schemaVersion": 1
+    }
+  ],
+  "attributions": [],
+  "hypotheses": [
+    {
+      "hypothesisId": "hyp-fixture-6-not-routed",
+      "code": "agent_not_routed",
+      "state": "unknown",
+      "confidence": {
+        "evidence": 0.2,
+        "assessment": 0.15,
+        "rootCause": 0,
+        "impact": 0
+      },
+      "supportingEvidenceIds": [],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": ["route_resolution"],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    },
+    {
+      "hypothesisId": "hyp-fixture-6-not-started",
+      "code": "agent_not_started",
+      "state": "unknown",
+      "confidence": {
+        "evidence": 0.2,
+        "assessment": 0.15,
+        "rootCause": 0,
+        "impact": 0
+      },
+      "supportingEvidenceIds": [],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": ["route_resolution", "agent_runner"],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    }
+  ],
+  "findings": [],
+  "relations": [
+    {
+      "relationId": "rel-fixture-6-obs-from-session",
+      "fromId": "obs-fixture-6-message-received",
+      "toId": "ev-fixture-6-session-meta",
+      "relation": "derived_from",
+      "derivation": "EVIDENCE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.9,
+      "evidenceIds": ["ev-fixture-6-session-meta"],
+      "schemaVersion": 1
+    }
+  ],
+  "case": {
+    "schemaVersion": 1,
+    "caseId": "case-fixture-6",
+    "tenantId": "tenant-fixture-a",
+    "status": "DIAGNOSING",
+    "diagnosticRunIds": ["diag-run-fixture-6"],
+    "findingIds": [],
+    "relationIds": ["rel-fixture-6-obs-from-session"],
+    "mergeKey": "tenant-fixture-a|sha256:fixture-session-key-a0000000000000000000000000000006|unknown|missing_route_resolution",
+    "mergedObservationPredicates": ["session.message_received", "agent.run.present"],
+    "impact": {
+      "affectedCount": 1,
+      "code": "case:inconclusive"
+    },
+    "timeline": [
+      {
+        "at": "2026-09-01T15:00:02.000Z",
+        "code": "observation:obs-fixture-6-message-received"
+      },
+      {
+        "at": "2026-09-01T15:03:01.800Z",
+        "code": "run_completion:diag-run-fixture-6"
+      }
+    ],
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-6",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "route",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000006",
+          "timeRange": {
+            "from": "2026-09-01T15:00:00.000Z",
+            "to": "2026-09-01T15:03:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "agent",
+        "targetId": "agent-fixture-main",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "route",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000006"
+        }
+      }
+    ]
+  },
+  "verification": null
+}

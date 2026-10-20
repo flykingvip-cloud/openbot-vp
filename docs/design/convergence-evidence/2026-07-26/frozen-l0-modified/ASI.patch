@@ -1,0 +1,73 @@
+diff --git a/ui/src/ui/app-gateway.ts b/ui/src/ui/app-gateway.ts
+index e878772442..8790f3de7c 100755
+--- a/ui/src/ui/app-gateway.ts
++++ b/ui/src/ui/app-gateway.ts
+@@ -38,7 +38,6 @@ import { GatewayBrowserClient, type GatewayEventFrame, type GatewayHelloOk } fro
+ export type { GatewayHost } from "./gateway-host.ts";
+ import { loadCollaborationOrgBotDirectory } from "./ports/employee/collaboration-org-bot-directory.ts";
+ import type { PresenceEntry, HealthSnapshot, UpdateAvailable } from "./types.ts";
+-import { refreshCostBudgetV2AfterGatewayConnect } from "./views/cost-budget-v2/actions/refresh-after-gateway-connect.ts";
+ 
+ export function setAppGatewayTestHooks(
+   hooks: Parameters<typeof setGatewayCapabilityRuntimeTestHooks>[0],
+@@ -195,7 +194,12 @@ export function connectGateway(host: GatewayHost) {
+       void refreshActiveTab(adaptSettingsHost(host));
+       const activeTab = host.tab === "enterpriseBudget" ? "enterpriseUsage" : host.tab;
+       if (activeTab === "enterpriseUsage" && host.client) {
+-        refreshCostBudgetV2AfterGatewayConnect(host.client);
++        const client = host.client;
++        void import("./views/cost-budget-v2/actions/refresh-after-gateway-connect.ts").then(
++          (mod) => {
++            mod.refreshCostBudgetV2AfterGatewayConnect(client);
++          },
++        );
+       }
+     },
+     onClose: ({ code, reason, error }) => {
+diff --git a/ui/src/ui/app.ts b/ui/src/ui/app.ts
+index b47b7df053..a18d0f6990 100755
+--- a/ui/src/ui/app.ts
++++ b/ui/src/ui/app.ts
+@@ -154,7 +154,6 @@ import {
+ } from "./controllers/enterprise-seat-assets.ts";
+ import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
+ import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+-import { loadKnowledgeUniverseHome as loadKnowledgeUniverseHomeInternal } from "./controllers/knowledge-universe.ts";
+ import {
+   acceptPlatformSeatAssignmentOffer,
+   changePlatformAuthPassword,
+@@ -256,7 +255,7 @@ import type { ChatCheckpoint } from "./types/chat-types.ts";
+ import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
+ import { generateUUID } from "./uuid.ts";
+ import type { NostrProfileFormState } from "./views/channels.nostr-profile-form.ts";
+-import { createEmptySpaceConnectorBindDraft } from "./views/knowledge-universe-space-connector-bind.ts";
++import { createEmptyConnectorCredentialDraft } from "./views/enterprise-data-connector-credential-helpers.ts";
+ import { runAppChatSend, type AppChatSendOptions } from "./wiring/chat-send.ts";
+ import {
+   DELIVERABLE_SAVE_TOAST_MS,
+@@ -1433,7 +1432,12 @@ export class OpenBotApp extends LitElement {
+     "all";
+   @state()
+   knowledgeUniverseLibraryWorkspaceConnectorBindDraft: import("./views/knowledge-universe-space-connector-bind.ts").SpaceConnectorBindDraft =
+-    createEmptySpaceConnectorBindDraft();
++    {
++      ...createEmptyConnectorCredentialDraft(),
++      displayName: "",
++      sourceKey: "",
++      passwordVisible: false,
++    };
+   @state()
+   knowledgeUniverseLibraryWorkspaceConnectorCatalog: import("./capability/enterprise-data-capability/types.ts").DataConnectorCatalogEntry[] =
+     [];
+@@ -3684,8 +3688,9 @@ export class OpenBotApp extends LitElement {
+   }
+ 
+   async loadKnowledgeUniverseHome(opts?: { force?: boolean }) {
+-    await loadKnowledgeUniverseHomeInternal(
+-      this as unknown as Parameters<typeof loadKnowledgeUniverseHomeInternal>[0],
++    const { loadKnowledgeUniverseHome } = await import("./controllers/knowledge-universe.ts");
++    await loadKnowledgeUniverseHome(
++      this as unknown as Parameters<typeof loadKnowledgeUniverseHome>[0],
+       opts,
+     );
+   }

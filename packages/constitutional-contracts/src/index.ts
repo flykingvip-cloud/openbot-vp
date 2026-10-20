@@ -1,0 +1,120 @@
+export {
+  CONSTITUTIONAL_CONTRACTS_ENFORCE,
+  CONSTITUTIONAL_CONTRACTS_FABRIC_DEFAULT_ON,
+  CONSTITUTIONAL_CONTRACTS_LIVE_INVOKE,
+  CONSTITUTIONAL_CONTRACTS_PACKAGE,
+  CONSTITUTIONAL_SHADOW_ENV,
+  NON_EQUIVALENCE,
+  PHASE_D_FIRST_KNIFE_SCOPE,
+  isConstitutionalShadowEnabled,
+} from "./flags.js";
+export {
+  CLAIM_LEVELS,
+  CONSTITUTIONAL_SCHEMA_VERSION,
+  CONTRACT_DOMAINS,
+  CONTRACT_PROFILES,
+  ClaimLevelSchema,
+  ConstitutionalContractSchema,
+  ConstitutionalEvidenceSchema,
+  ConstitutionalIdentitySchema,
+  EVIDENCE_GRADES,
+  IDENTITY_KINDS,
+  PROOF_GRADES,
+  type ClaimLevel,
+  type ConstitutionalContract,
+  type ConstitutionalEvidence,
+  type ConstitutionalIdentity,
+  type ContractDomain,
+  type ContractProfile,
+} from "./schemas/index.js";
+export {
+  DOMAIN_WRITE_AUTHORITY_LABELS,
+  EVOLUTION_LEDGER,
+  EVOLUTION_RECEIPT_ONLY_EVENT_TYPES,
+  EXECUTION_TRACE_LEDGER,
+  PLUGIN_REGISTRY_LEDGER,
+  VALIDATION_RECEIPT_LEDGER,
+  adaptCapabilityGrant,
+  adaptDomainContract,
+  adaptEvolutionLedgerEvent,
+  adaptExecutionTrace,
+  adaptPluginInstall,
+  adaptValidationReceipt,
+  type CapabilityGrantSource,
+  type EvolutionLedgerSourceEvent,
+  type ExecutionTraceSource,
+  type PluginInstallSource,
+  type ValidationReceiptSource,
+} from "./adapters/index.js";
+export {
+  projectConstitutionalLedgerView,
+  projectConstitutionalViewFromSources,
+  type ConstitutionalLedgerView,
+  type ConstitutionalSourceSnapshot,
+} from "./read-model/ledger-view.js";
+export {
+  evaluateShadowConformance,
+  type ShadowConformanceReport,
+  type ShadowEvaluateOptions,
+  type ShadowFinding,
+} from "./evaluator/shadow-report.js";
+export {
+  LEGAL_CONSTITUTIONAL_PATHS,
+  NO_VALID_PATH,
+  PATH_GAP_CODES,
+  PATH_GAP_REPORT_ENV,
+  PHASE_D_P8A_SCOPE,
+  isPathGapReportEnabled,
+  isValidConstitutionalPath,
+  reportPathGap,
+  samplePathGapInput,
+  type PathGapCode,
+  type PathGapReport,
+  type PathGapReportOptions,
+  type PathSelectionInput,
+} from "./path-gap/report.js";
+export {
+  PHASE_D_RUNTIME_FACADE_SCOPE,
+  runRuntimeFacadeShadow,
+  type RuntimeFacadeShadowInput,
+  type RuntimeFacadeShadowOptions,
+  type RuntimeFacadeShadowResult,
+} from "./runtime-facade/shadow.js";
+export {
+  PHASE_D_P8C_SHADOW_LEGACY_COMPARE_SCOPE,
+  SHADOW_COMPARE_ENV,
+  compareShadowToLegacy,
+  isConstitutionalShadowCompareEnabled,
+  type ShadowLegacyCompareInput,
+  type ShadowLegacyCompareOptions,
+  type ShadowLegacyCompareResult,
+} from "./runtime-facade/compare.js";
+export { sampleContract, sampleSourceSnapshot } from "./fixtures.js";
+
+export {
+  CONSTITUTIONAL_DECLARED_PATH_V1,
+  DECLARED_LEGAL_PATH_IDS,
+  DECLARED_LEGAL_PATHS,
+  LEGAL_PATH_SELECT_ENV,
+  PHASE_D_P8B_KNIFE1_SCOPE,
+  isDeclaredLegalPath,
+  isLegalPathSelectEnabled,
+  listEffectiveLegalPaths,
+  sampleLegalPathSelectInput,
+  selectLegalPath,
+  type DeclaredLegalPathId,
+  type LegalPathRecord,
+  type LegalPathSelectOptions,
+  type LegalPathSelectResult,
+  type LegalPathSelectionInput,
+} from "./legal-path/select.js";
+
+export {
+  LEGAL_PATH_EXECUTE_ENV,
+  PACKAGE_LOCAL_EXECUTE_ALLOWED,
+  PHASE_D_P8B_EXECUTE_OPT_IN_SCOPE,
+  executeLegalPath,
+  isLegalPathExecuteEnabled,
+  type LegalPathExecuteOptions,
+  type LegalPathExecuteResult,
+} from "./legal-path/execute.js";

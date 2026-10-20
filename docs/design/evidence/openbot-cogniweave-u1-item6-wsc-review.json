@@ -1,0 +1,24 @@
+{
+  "schema": "openbot-cogniweave-u1-item6-wsc-review/v1",
+  "kind": "item6-wsc-review",
+  "role": "wsc-reviewer",
+  "owner": "cursor-memory-wsc",
+  "preparedBy": "cursor-fable",
+  "preparedAt": "2026-08-19T11:05:00.000Z",
+  "decision": "pending",
+  "signedBy": null,
+  "signedAt": null,
+  "scope": "memory-guard-restore-only",
+  "item": 6,
+  "item6Candidate": "not-met",
+  "receipt": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+  "sreReview": "docs/design/evidence/openbot-cogniweave-u1-item6-sre-review.json",
+  "live": "forbidden",
+  "unlock": "not-issued",
+  "note": "Slot only. cursor-fable created the file and must not sign it. cursor-memory-wsc independently confirms memory behavior, v1-root-guard, and restore after an authorized sqlite path exists.",
+  "doesNotAuthorize": ["implementation", "Catalog write", "schema-v2-write", "retirement", "LIVE"],
+  "explicitlyForbidden": [
+    "cursor-fable filling signedBy",
+    "score item 6 met from a pending WSC slot"
+  ]
+}

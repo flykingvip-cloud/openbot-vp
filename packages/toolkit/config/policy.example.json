@@ -1,0 +1,19 @@
+{
+  "default": "deny",
+  "rules": [
+    { "match": { "risk": "low", "sideEffects": false }, "decision": "allow" },
+    {
+      "match": { "toolId": "workspace", "operation": "write", "withinWorkspace": true },
+      "decision": "allow-with-receipt"
+    },
+    { "match": { "risk": "high", "sideEffects": true }, "decision": "require-approval" },
+    { "match": { "destructive": true }, "decision": "require-explicit-approval" },
+    { "match": { "credentialAccess": true }, "decision": "deny-unless-scoped" }
+  ],
+  "limits": {
+    "defaultTimeoutMs": 30000,
+    "maxRetries": 2,
+    "approvalTtlSeconds": 300,
+    "maxParallelCalls": 8
+  }
+}

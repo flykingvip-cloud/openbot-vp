@@ -1,0 +1,490 @@
+{
+  "source": "scan-report-20261005.json (read-only production scan, 2026-10-05 16:58 UTC+8); absolute paths stripped",
+  "summary": {
+    "groups": 27,
+    "nonTerminalRounds": 1,
+    "roundFiles": 125,
+    "ledgerLines": 557,
+    "ledgerFiles": 27,
+    "ledgerParseErrors": 0
+  },
+  "groups": [
+    {
+      "groupId": "grp-daniel-hhd-gmail-com-upbeyond",
+      "location": "backup",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": [],
+        "lines": 0,
+        "kinds": {}
+      }
+    },
+    {
+      "groupId": "grp-daniel-hhd-gmail-com-upbeyond",
+      "location": "backup",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": [],
+        "lines": 0,
+        "kinds": {}
+      }
+    },
+    {
+      "groupId": "aegis",
+      "location": "live",
+      "dirName": "aegis",
+      "tenantHint": null,
+      "rounds": {
+        "files": 2,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 9,
+        "kinds": {
+          "governance": 7,
+          "dispatch": 2
+        }
+      }
+    },
+    {
+      "groupId": "agent:daibai",
+      "location": "live",
+      "dirName": "agent%3Adaibai",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 4,
+        "kinds": {
+          "promotion": 1,
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "agent:main",
+      "location": "live",
+      "dirName": "agent%3Amain",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 3,
+        "kinds": {
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "agent:takeover-bot",
+      "location": "live",
+      "dirName": "agent%3Atakeover-bot",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 3,
+        "kinds": {
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-daniel-hhd-gmail-com-数字人测试",
+      "location": "live",
+      "dirName": "grp-daniel-hhd-gmail-com-%E6%95%B0%E5%AD%97%E4%BA%BA%E6%B5%8B%E8%AF%95",
+      "tenantHint": null,
+      "rounds": {
+        "files": 66,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 219,
+        "kinds": {
+          "governance": 11,
+          "dispatch": 84,
+          "execution": 82,
+          "context_scope": 42
+        }
+      }
+    },
+    {
+      "groupId": "grp-daniel-hhd-gmail-com-upbeyond",
+      "location": "live",
+      "dirName": "grp-daniel-hhd-gmail-com-upbeyond",
+      "tenantHint": null,
+      "rounds": {
+        "files": 25,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl", "collaboration-ledger.jsonl"],
+        "lines": 146,
+        "kinds": {
+          "dispatch": 38,
+          "execution": 92,
+          "context_scope": 6,
+          "governance": 10
+        }
+      }
+    },
+    {
+      "groupId": "grp-double",
+      "location": "live",
+      "dirName": "grp-double",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 4,
+        "kinds": {
+          "promotion": 1,
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-elledecke204-gmail-com-ai",
+      "location": "live",
+      "dirName": "grp-elledecke204-gmail-com-ai",
+      "tenantHint": null,
+      "rounds": {
+        "files": 4,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 16,
+        "kinds": {
+          "dispatch": 6,
+          "execution": 3,
+          "governance": 7
+        }
+      }
+    },
+    {
+      "groupId": "grp-ledger-scope-1787331962766",
+      "location": "live",
+      "dirName": "grp-ledger-scope-1787331962766",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 5,
+        "kinds": {
+          "governance": 4,
+          "context_scope": 1
+        }
+      }
+    },
+    {
+      "groupId": "grp-ledger-scope-1787332282710",
+      "location": "live",
+      "dirName": "grp-ledger-scope-1787332282710",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 5,
+        "kinds": {
+          "governance": 4,
+          "context_scope": 1
+        }
+      }
+    },
+    {
+      "groupId": "grp-ledger-scope-1787332844541",
+      "location": "live",
+      "dirName": "grp-ledger-scope-1787332844541",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 5,
+        "kinds": {
+          "governance": 4,
+          "context_scope": 1
+        }
+      }
+    },
+    {
+      "groupId": "grp-ledger-scope-1787332905674",
+      "location": "live",
+      "dirName": "grp-ledger-scope-1787332905674",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 5,
+        "kinds": {
+          "governance": 4,
+          "context_scope": 1
+        }
+      }
+    },
+    {
+      "groupId": "grp-ledger-test",
+      "location": "live",
+      "dirName": "grp-ledger-test",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 5,
+        "kinds": {
+          "governance": 5
+        }
+      }
+    },
+    {
+      "groupId": "grp-rejected",
+      "location": "live",
+      "dirName": "grp-rejected",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 3,
+        "kinds": {
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-restricted",
+      "location": "live",
+      "dirName": "grp-restricted",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 4,
+        "kinds": {
+          "promotion": 1,
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-review-dedupe",
+      "location": "live",
+      "dirName": "grp-review-dedupe",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 3,
+        "kinds": {
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-review-reject",
+      "location": "live",
+      "dirName": "grp-review-reject",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 3,
+        "kinds": {
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-save",
+      "location": "live",
+      "dirName": "grp-save",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 2,
+        "kinds": {
+          "governance": 2
+        }
+      }
+    },
+    {
+      "groupId": "grp-secret",
+      "location": "live",
+      "dirName": "grp-secret",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 4,
+        "kinds": {
+          "promotion": 1,
+          "governance": 3
+        }
+      }
+    },
+    {
+      "groupId": "grp-shared-tx",
+      "location": "live",
+      "dirName": "grp-shared-tx",
+      "tenantHint": null,
+      "rounds": {
+        "files": 1,
+        "nonTerminalStates": {
+          "PRIMARY_QUEUE": 1
+        }
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 4,
+        "kinds": {
+          "governance": 4
+        }
+      }
+    },
+    {
+      "groupId": "space-540aaa04-e98c-4613-b192-e3cc8438ee1a",
+      "location": "live",
+      "dirName": "space-540aaa04-e98c-4613-b192-e3cc8438ee1a",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 9,
+        "kinds": {
+          "governance": 9
+        }
+      }
+    },
+    {
+      "groupId": "space-b1e30f37-8edb-4860-9646-c8801fef2b49",
+      "location": "live",
+      "dirName": "space-b1e30f37-8edb-4860-9646-c8801fef2b49",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl", "collaboration-ledger.jsonl"],
+        "lines": 12,
+        "kinds": {
+          "governance": 9,
+          "dispatch": 1,
+          "execution": 2
+        }
+      }
+    },
+    {
+      "groupId": "space-c5d1adb4-7477-4ae4-a98e-adcaa75daea5",
+      "location": "live",
+      "dirName": "space-c5d1adb4-7477-4ae4-a98e-adcaa75daea5",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 7,
+        "kinds": {
+          "governance": 7
+        }
+      }
+    },
+    {
+      "groupId": "space-fef40e8a-0958-4c74-b557-069d7c333981",
+      "location": "live",
+      "dirName": "space-fef40e8a-0958-4c74-b557-069d7c333981",
+      "tenantHint": null,
+      "rounds": {
+        "files": 27,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 74,
+        "kinds": {
+          "dispatch": 27,
+          "governance": 8,
+          "execution": 22,
+          "context_scope": 17
+        }
+      }
+    },
+    {
+      "groupId": "upbeyond",
+      "location": "live",
+      "dirName": "upbeyond",
+      "tenantHint": null,
+      "rounds": {
+        "files": 0,
+        "nonTerminalStates": {}
+      },
+      "ledger": {
+        "files": ["ledger/collaboration.jsonl"],
+        "lines": 3,
+        "kinds": {
+          "governance": 3
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit \u2014 one moderate advisory mitigation",
+  "advisory": "GHSA-gqvv-2mrq-wpjv",
+  "cve": "CVE-2026-84365",
+  "package": "hono",
+  "vulnerable_range": "<4.13.5",
+  "affected_version_before": "4.12.34",
+  "dependency_path": ".>hono",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=4.13.5",
+  "mitigated_version": "4.13.5",
+  "reachable_surface": "toSSG() path-traversal incomplete fix (advisory); no in-tree `from 'hono'` import observed \u2014 still a direct prod dependency / override for peers; 4.12\u21924.13 minor bump with no observed in-repo API use",
+  "mitigation": "Bump dependencies.hono to 4.13.5; pnpm.overrides.hono=4.13.5 (same pin also clears GHSA-g6gw-c38x-mqfc and GHSA-crvj-82cr-hjcx as side effects; not separate cells). Leaves GHSA-hxh3-vqpv-xpqv needing >=4.13.7",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low including hono GHSA-hxh3 needing >=4.13.7, @hono/node-server, dompurify, etc.). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 40,
+    "low": 8,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-gqvv-2mrq-wpjv"
+}

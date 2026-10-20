@@ -1,0 +1,59 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch16-s17/v1",
+  "item": 7,
+  "status": "retirement-batch-16-evidence-correction",
+  "batch": "S17",
+  "evidenceCorrectionOnly": true,
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "batch15Accepted": true,
+  "absorbsUnacceptedBatches": false,
+  "previousAcceptedBaseline": 19,
+  "lastAcceptedRetirementBaseline": 19,
+  "sitesRetired": [
+    {
+      "ledgerId": "S17",
+      "file": "src/gateway/server-methods/group-workspace-file.ts",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "lineBefore": 460,
+      "lineAfter": null,
+      "replacement": "InMemoryWorkspaceResourceCatalog"
+    }
+  ],
+  "sitesRemainingHostReads": [],
+  "hostStewardFallbackRetained": false,
+  "groupLocator": "resolveTrustedGroupLocator",
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 18,
+  "liveWriteWatchIndex": 18,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/group-workspace-file.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "6524a8428da62c79ddc4bad5ee1a99927ff4bdea",
+  "candidateSha": "6524a8428da62c79ddc4bad5ee1a99927ff4bdea",
+  "landMergeSha": "6524a8428da62c79ddc4bad5ee1a99927ff4bdea",
+  "note": "Evidence correction only after #651. Batch 15/S09 is Accepted (previousAcceptedBaseline=19). Batch 16/S17 remaining/liveWriteWatchIndex=18. Does not change business implementation. Does not start the next retirement batch. Incomplete tenant/resource queries fail closed. Do not call createEmptyWorkspaceCatalog. Do not mint a production Catalog row. Catalog miss=deny stays off. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

@@ -1,0 +1,69 @@
+diff --git a/src/gateway/protocol/index.ts b/src/gateway/protocol/index.ts
+index a32c4496e5..764812f692 100755
+--- a/src/gateway/protocol/index.ts
++++ b/src/gateway/protocol/index.ts
+@@ -64,6 +64,12 @@ import {
+   type ChatCheckpointsListParams,
+   type CollaborationLearningSnapshotParams,
+   CollaborationLearningSnapshotParamsSchema,
++  type CollaborationCapsuleCandidatesListParams,
++  CollaborationCapsuleCandidatesListParamsSchema,
++  type CollaborationCapsuleApproveParams,
++  CollaborationCapsuleApproveParamsSchema,
++  type CollaborationCapsuleRejectParams,
++  CollaborationCapsuleRejectParamsSchema,
+   type CollaborationSpacesListParams,
+   CollaborationSpacesListParamsSchema,
+   type CollaborationOrgBotDirectoryListParams,
+@@ -491,6 +497,14 @@ export const validateChannelsLogoutParams = ajv.compile<ChannelsLogoutParams>(
+ );
+ export const validateCollaborationLearningSnapshotParams =
+   ajv.compile<CollaborationLearningSnapshotParams>(CollaborationLearningSnapshotParamsSchema);
++export const validateCollaborationCapsuleCandidatesListParams =
++  ajv.compile<CollaborationCapsuleCandidatesListParams>(
++    CollaborationCapsuleCandidatesListParamsSchema,
++  );
++export const validateCollaborationCapsuleApproveParams =
++  ajv.compile<CollaborationCapsuleApproveParams>(CollaborationCapsuleApproveParamsSchema);
++export const validateCollaborationCapsuleRejectParams =
++  ajv.compile<CollaborationCapsuleRejectParams>(CollaborationCapsuleRejectParamsSchema);
+ export const validateCollaborationSpacesListParams = ajv.compile<CollaborationSpacesListParams>(
+   CollaborationSpacesListParamsSchema,
+ );
+diff --git a/src/gateway/protocol/schema/protocol-schemas.ts b/src/gateway/protocol/schema/protocol-schemas.ts
+index f7ac09a6fa..405509e8e8 100755
+--- a/src/gateway/protocol/schema/protocol-schemas.ts
++++ b/src/gateway/protocol/schema/protocol-schemas.ts
+@@ -59,6 +59,9 @@ import {
+   WebLoginWaitParamsSchema,
+ } from "./channels.js";
+ import {
++  CollaborationCapsuleApproveParamsSchema,
++  CollaborationCapsuleCandidatesListParamsSchema,
++  CollaborationCapsuleRejectParamsSchema,
+   CollaborationSpaceMembersUpdateParamsSchema,
+   CollaborationSpaceResetParamsSchema,
+   CollaborationSpaceDissolveParamsSchema,
+@@ -308,6 +311,9 @@ export const ProtocolSchemas = {
+   ChannelsStatusResult: ChannelsStatusResultSchema,
+   ChannelsLogoutParams: ChannelsLogoutParamsSchema,
+   CollaborationLearningSnapshotParams: CollaborationLearningSnapshotParamsSchema,
++  CollaborationCapsuleCandidatesListParams: CollaborationCapsuleCandidatesListParamsSchema,
++  CollaborationCapsuleApproveParams: CollaborationCapsuleApproveParamsSchema,
++  CollaborationCapsuleRejectParams: CollaborationCapsuleRejectParamsSchema,
+   CollaborationSpacesListParams: CollaborationSpacesListParamsSchema,
+   CollaborationSpaceMembersUpdateParams: CollaborationSpaceMembersUpdateParamsSchema,
+   CollaborationSpaceResetParams: CollaborationSpaceResetParamsSchema,
+diff --git a/ui/src/ui/app-view-state-shell-slices.ts b/ui/src/ui/app-view-state-shell-slices.ts
+index 78fb0e941f..0665af5ef1 100644
+--- a/ui/src/ui/app-view-state-shell-slices.ts
++++ b/ui/src/ui/app-view-state-shell-slices.ts
+@@ -780,6 +780,8 @@ export type AppViewDiagnosticsState = {
+ export type AppViewShellActionsState = {
+   connect: () => void;
+   updateComplete: Promise<unknown>;
++  /** Lit host re-render hook used after lazy shell chunks finish loading. */
++  requestUpdate: () => void;
+   setTab: (tab: Tab) => void;
+   setTheme: (theme: ThemeMode, context?: ThemeTransitionContext) => void;
+   applySettings: (next: UiSettings) => void;

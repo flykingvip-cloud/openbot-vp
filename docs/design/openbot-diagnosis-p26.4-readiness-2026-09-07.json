@@ -1,0 +1,23 @@
+{
+  "kind": "human_production_ready_record",
+  "increment": "P26.4",
+  "schemaVersion": 1,
+  "candidateSha": "8b5db08ee149db694a47210d4e65bd0958ffdcd3",
+  "liveSha": "8b5db08ee149db694a47210d4e65bd0958ffdcd3",
+  "approvalRecordsEvaluation": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "confirmHuman": true,
+  "confirmProductionReady": true,
+  "confirmLiveEqualsCandidate": true,
+  "confirmDeliveryAlreadyCut": true,
+  "confirmHistoricalP26_3HoldLifted": true,
+  "confirmAdmissionSloNotLiveTrafficSlo": true,
+  "confirmLiveTrafficSloRemainsEmpty": true,
+  "confirmLiveExecutorUndeployed": true,
+  "confirmNoDoctorFix": true,
+  "confirmNoChannelRestart": true,
+  "confirmNoLedgerRewrite": true,
+  "confirmCanaryTenant": "tenant-fixture-a",
+  "signer": "Daniel / CEO"
+}

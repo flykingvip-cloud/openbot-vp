@@ -1,0 +1,30 @@
+{
+  "schema": "memory-workspace-phase1b-item3-write-switch-acceptance/v1",
+  "decision": "accepted",
+  "scope": "write-switch",
+  "acceptedBy": "cursor-data-governance",
+  "acceptedAt": "2026-08-17T05:10:00.000Z",
+  "enablesProduction": false,
+  "sameReleaseUnit": "memory-schema-v2",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "live": "forbidden",
+  "request": ".kiro/specs/memory-workspace-platform-remediation/phase1b-item3-write-switch-change-request.md",
+  "acceptedFutureChange": [
+    "Stop request-path Catalog synthesis in src/gateway/workspace-resolver/**",
+    "Stop using agentId as agentAssetId",
+    "Use membership + AgentAsset → Catalog resourceId → existing cutover record",
+    "Ship in the same release unit as memory schema v2",
+    "Stay dark until an independent Phase 1B unlock after items 2-7 are met"
+  ],
+  "explicitlyNotAuthorized": [
+    "edit src/gateway/workspace-resolver/** to flip the switch now",
+    "edit src/memory/** to enable schema v2 now",
+    "Catalog SoT write from Phase 0 inventory",
+    "LIVE",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ],
+  "note": "Acceptance is not unlock and not a production write-switch enablement."
+}

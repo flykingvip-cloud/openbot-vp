@@ -1,0 +1,62 @@
+{
+  "increment": "P17",
+  "schemaVersion": 1,
+  "kind": "preproduction_observation_snapshot",
+  "mustNotRenderHealthy": true,
+  "recordedAt": "2026-09-04T06:25:28.750Z",
+  "window": {
+    "from": "2026-09-04T05:55:49Z",
+    "to": "2026-09-04T06:25:28.750Z",
+    "note": "from seq60 liveFrom to this preflight recordedAt"
+  },
+  "source": {
+    "id": "no_live_diagnosis_query_path",
+    "authority": "gates_closed_no_production_diagnosis_traffic",
+    "not": "production metrics backend / invented rehearsal numbers"
+  },
+  "sampling": {
+    "scope": "none",
+    "reason": "DIAGNOSIS_REPORT_API_DEPLOYED=false; no live pack; no real chat bind"
+  },
+  "tenant": {
+    "trustedSource": "server_membership_only",
+    "observedTenantId": null,
+    "nonAuthoritativeRejected": [
+      "url",
+      "query",
+      "body",
+      "header",
+      "sessionTenantId",
+      "connect.tenantId",
+      "claimedTenantId"
+    ]
+  },
+  "requiredMetrics": [
+    "success",
+    "error",
+    "latency",
+    "stale",
+    "authorization_denied",
+    "quota_exhausted"
+  ],
+  "observations": {
+    "success": { "observed": null },
+    "error": { "observed": null },
+    "latency": { "observed": null },
+    "stale": { "observed": null },
+    "authorization_denied": { "observed": null },
+    "quota_exhausted": { "observed": null }
+  },
+  "slo": {
+    "queryLatencyMs": { "target": 300, "observed": null },
+    "inspectionSuccessRate": { "target": 0.99, "observed": null },
+    "deliverySuccessRate": { "target": 0.99, "observed": null },
+    "authorizationWaitMs": { "target": 300000, "observed": null },
+    "verificationSuccessRate": { "target": 0.95, "observed": null },
+    "falsePositiveRate": { "target": 0.05, "observed": null },
+    "completeness": "empty"
+  },
+  "sloHealthy": false,
+  "renderedHealth": "not_ready",
+  "rehearsalNote": "P15 convergence may embed injected rehearsal SLO. Those numbers are not this snapshot and must not be treated as production health."
+}

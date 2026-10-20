@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-253c-mchw-3w2r",
+  "cve": null,
+  "package": "markdown-it",
+  "vulnerable_range": "<14.3.1",
+  "affected_version_before": "14.1.1",
+  "dependency_path": ".>markdown-it",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=14.3.1",
+  "mitigated_version": "14.3.2",
+  "reachable_surface": "Markdown IR parse via createMarkdownIt (src/markdown/ir.ts; default linkify true; direct root dependency)",
+  "mitigation": "Bump dependencies.markdown-it to ^14.3.2; pnpm.overrides.markdown-it=14.3.2",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Side effect: GHSA-6v5v-wf23-fmfq (smartquotes) also cleared by the same pin; not claimed as a second Stage cell. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 51,
+    "low": 9,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-253c-mchw-3w2r"
+}

@@ -1,0 +1,388 @@
+{
+  "event": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_a",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "Recorded: mitigate throughput drop",
+        "context": "Recorded event stage context.",
+        "constraints": ["maintain_correctness"],
+        "decisions": ["recorded_event_stage"],
+        "turningPoints": ["latency_spike_detected"],
+        "outcome": "mitigation_selected",
+        "linkedAtoms": [],
+        "evidenceRefs": ["evd_http_recorded_a"],
+        "eventKey": "event_key_http_recorded_a",
+        "provenance": {
+          "sourceType": "chat",
+          "ingestionChecksum": "ing_http_recorded_a"
+        }
+      },
+      "atoms": [],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_a",
+          "type": "chat",
+          "uri": "record://http/a",
+          "snippet": "Throughput dropped due to external latency.",
+          "trustScore": 0.8,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_a",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_a",
+        "eventKey": "event_key_http_recorded_a",
+        "atomDedupKeys": [],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": ["evt_http_recorded_a", "evd_http_recorded_a"],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_a"]
+      }
+    }
+  },
+  "context": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_a",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "",
+        "context": "",
+        "constraints": [],
+        "decisions": [],
+        "turningPoints": [],
+        "linkedAtoms": [],
+        "evidenceRefs": ["evd_http_recorded_a"],
+        "eventKey": "event_key_http_recorded_a",
+        "provenance": {
+          "sourceType": "chat"
+        }
+      },
+      "atoms": [],
+      "entities": [
+        {
+          "id": "ent_http_recorded_external_api",
+          "entityType": "service",
+          "name": "external_api",
+          "aliases": [],
+          "tags": ["latency"],
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_a"],
+            "evidenceRefs": ["evd_http_recorded_a"]
+          },
+          "entityKey": "entity_key_http_recorded_external_api"
+        }
+      ],
+      "scenarios": [
+        {
+          "id": "scn_http_recorded_latency",
+          "name": "high_latency_environment",
+          "tags": ["latency"],
+          "summary": "External latency remains high.",
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_a"],
+            "evidenceRefs": ["evd_http_recorded_a"]
+          },
+          "scenarioKey": "scenario_key_http_recorded_latency"
+        }
+      ],
+      "problems": [
+        {
+          "id": "prb_http_recorded_throughput",
+          "statement": "throughput drop",
+          "normalizedStatement": "throughput_drop",
+          "tags": ["throughput"],
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_a"],
+            "evidenceRefs": ["evd_http_recorded_a"]
+          },
+          "problemKey": "problem_key_http_recorded_throughput"
+        }
+      ],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_a",
+          "type": "chat",
+          "uri": "record://http/a",
+          "snippet": "Throughput dropped due to external latency.",
+          "trustScore": 0.8,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_a",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_a",
+        "eventKey": "event_key_http_recorded_a",
+        "atomDedupKeys": [],
+        "entityKeys": ["entity_key_http_recorded_external_api"],
+        "scenarioKeys": ["scenario_key_http_recorded_latency"],
+        "problemKeys": ["problem_key_http_recorded_throughput"]
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Entity", "Scenario", "Problem", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": [
+          "evt_http_recorded_a",
+          "ent_http_recorded_external_api",
+          "scn_http_recorded_latency",
+          "prb_http_recorded_throughput",
+          "evd_http_recorded_a"
+        ],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_a", "ent_http_recorded_external_api"]
+      }
+    }
+  },
+  "atoms": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_a",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "",
+        "context": "",
+        "constraints": [],
+        "decisions": [],
+        "turningPoints": [],
+        "linkedAtoms": ["atm_http_recorded_strategy"],
+        "evidenceRefs": ["evd_http_recorded_a"],
+        "eventKey": "event_key_http_recorded_a",
+        "provenance": {
+          "sourceType": "chat"
+        }
+      },
+      "atoms": [
+        {
+          "id": "atm_http_recorded_strategy",
+          "atomType": "strategy",
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "claim": {
+            "type": "procedural",
+            "statement": "Use async buffering to isolate external latency."
+          },
+          "trigger": {
+            "conditions": ["high_latency"],
+            "contextTags": ["throughput_drop"]
+          },
+          "action": {
+            "recommendation": "async_buffering"
+          },
+          "applicability": {
+            "include": ["external_api"],
+            "exclude": []
+          },
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_a"],
+            "evidenceRefs": ["evd_http_recorded_a"]
+          },
+          "versioning": {
+            "version": 1
+          },
+          "state": {
+            "status": "active",
+            "conflictsWith": []
+          },
+          "metrics": {
+            "confidence": 0.82,
+            "reuseCount": 3
+          },
+          "dedupKey": "dedup_http_recorded_strategy"
+        }
+      ],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_a",
+          "type": "chat",
+          "uri": "record://http/a",
+          "snippet": "Throughput dropped due to external latency.",
+          "trustScore": 0.8,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_a",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_a",
+        "eventKey": "event_key_http_recorded_a",
+        "atomDedupKeys": ["dedup_http_recorded_strategy"],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "MemoryAtom", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": [
+          "evt_http_recorded_a",
+          "atm_http_recorded_strategy",
+          "evd_http_recorded_a"
+        ],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_a", "atm_http_recorded_strategy"]
+      }
+    }
+  },
+  "relations": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_a",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "",
+        "context": "",
+        "constraints": [],
+        "decisions": [],
+        "turningPoints": [],
+        "linkedAtoms": ["atm_http_recorded_strategy"],
+        "evidenceRefs": ["evd_http_recorded_a"],
+        "eventKey": "event_key_http_recorded_a",
+        "provenance": {
+          "sourceType": "chat"
+        }
+      },
+      "atoms": [],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [
+        {
+          "id": "rel_http_recorded_applies",
+          "fromId": "atm_http_recorded_strategy",
+          "fromNodeType": "MemoryAtom",
+          "relationType": "APPLIES_TO",
+          "toId": "ent_http_recorded_external_api",
+          "toNodeType": "Entity",
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "confidence": 0.74,
+          "status": "active",
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_a"],
+            "evidenceRefs": ["evd_http_recorded_a"]
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_a",
+          "type": "chat",
+          "uri": "record://http/a",
+          "snippet": "Throughput dropped due to external latency.",
+          "trustScore": 0.8,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_a",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_a",
+        "eventKey": "event_key_http_recorded_a",
+        "atomDedupKeys": [],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Evidence"],
+        "relationIds": ["rel_http_recorded_applies"],
+        "graphNodeIds": ["evt_http_recorded_a", "evd_http_recorded_a"],
+        "graphEdgeIds": ["rel_http_recorded_applies"],
+        "vectorDocumentIds": ["evt_http_recorded_a"]
+      }
+    }
+  }
+}

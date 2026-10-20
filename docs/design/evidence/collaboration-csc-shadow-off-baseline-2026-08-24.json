@@ -1,0 +1,95 @@
+{
+  "stage": "SHADOW_OFF_BASELINE",
+  "status": "PASS",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-24",
+  "baseline": {
+    "liveSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "ledgerSeq": 41,
+    "currentMain": "a7adcfea9d",
+    "flags": "all unset",
+    "shadow": "OFF"
+  },
+  "capture": {
+    "tool": "scripts/capture-chat-depth-events.cjs (Appendix E; self-contained, ws-only, token-only, read-only)",
+    "channel": "gateway agent WebSocket broadcast (ws://127.0.0.1:18789)",
+    "executedBy": "kiro-collab-csc acting as operator over SSH on the production host; operator token resolved from the gateway's own config secret-ref (gateway.auth.token -> {source:env, id:OPENBOT_GATEWAY_TOKEN}), written to a chmod-600 file, never printed to chat/argv/log/JSONL, and removed after the run",
+    "validatedLocally": "mock gateway: happy path AUTH/WS/SUB PASS, NON_DEPTH_EVENT_VISIBLE=YES, depth counted, poisoned-key leak detected, redacted JSONL; wrong-token=token_rejected; missing-file=file_unreadable"
+  },
+  "result": {
+    "authSource": "OPENBOT_OPERATOR_TOKEN_FILE",
+    "auth": "PASS",
+    "wsConnect": "PASS",
+    "subscriptionAck": "PASS",
+    "nonDepthEventVisible": true,
+    "depthEvents": 0,
+    "rawTextLeaks": 0,
+    "deviceRegistered": false,
+    "liveTouched": false,
+    "flagsChanged": false
+  },
+  "execution": {
+    "executedAtUtc": "2026-08-24T23:14:44Z",
+    "executedByAgent": "kiro-collab-csc (acting as operator over SSH; read-only capture)",
+    "host": "production gateway host; loopback ws://127.0.0.1:18789; container openbot-gateway-rc (--network host)",
+    "toolSha256": "c5bd973b15eec22344a9d2f8bc8aebff599661bc5a9cd200d4c235ee5a1d1d6b",
+    "tokenHandling": "resolved from the gateway's own config secret-ref gateway.auth.token={source:env,id:OPENBOT_GATEWAY_TOKEN}; written to a chmod-600 file; never printed to chat/argv/log/JSONL; removed after run",
+    "phase0": {
+      "liveShaBefore": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+      "healthzBefore": 200,
+      "readyzBefore": { "ready": true, "failing": [] },
+      "flagsBefore": "ALL_UNSET"
+    },
+    "capture": {
+      "durationSec": 60,
+      "captureExit": 0,
+      "depthJsonlLines": 0,
+      "sensitiveFieldScan": "PASS"
+    },
+    "phase7": {
+      "liveShaAfter": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+      "healthzAfter": 200,
+      "readyzAfter": { "ready": true, "failing": [] },
+      "flagsAfter": "ALL_UNSET",
+      "containerRestarted": false,
+      "containerStartedAt": "unchanged (not recreated/restarted during the run)"
+    },
+    "cleanup": {
+      "rawCaptureRemoved": true,
+      "tokenFileRemoved": true,
+      "toolingRemoved": true
+    },
+    "productionMutation": "NONE"
+  },
+  "acceptanceCriteria_allMustPass": {
+    "AUTH": "PASS",
+    "WS_CONNECT": "PASS",
+    "SUBSCRIPTION_ACK": "PASS",
+    "NON_DEPTH_EVENT_VISIBLE": "YES (heartbeat/tick or any non-depth agent event; WS 101 alone is NOT sufficient)",
+    "DEPTH_EVENTS": 0,
+    "RAW_TEXT_LEAKS": 0,
+    "DEVICE_REGISTERED": "NO",
+    "LIVE_TOUCHED": "NO",
+    "FLAGS_CHANGED": "NO"
+  },
+  "baselineSemantics": "shadow OFF -> chat.depth_decided == 0 is EXPECTED and does NOT prove shadow works; it only proves the observation link is live while flags are unset. Normal health/agent events must still be visible; no chat.depth_decided; no raw user text; no token/prompt/body/message/attachment fields; no device registration or production write.",
+  "stopConditions": [
+    "AUTH_FAIL",
+    "SUBSCRIPTION_ACK=FAIL",
+    "NON_DEPTH_EVENT_VISIBLE=NO",
+    "RAW_TEXT_LEAKS>0",
+    "DEVICE_REGISTERED=YES",
+    "LIVE_TOUCHED=YES",
+    "FLAGS_CHANGED=YES"
+  ],
+  "prohibitedThisStage": [
+    "enable OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
+    "recreate/restart/swap/stage the container",
+    "modify .env.docker",
+    "append a LIVE ledger row",
+    "modify RELEASE_RECORD.md Latest cutover",
+    "enable ROUTER/KNOWLEDGE/TOOL/COLLAB/CONTEXT_SCOPE"
+  ],
+  "nextStageAdmission": "Only after every acceptanceCriteria PASS may shadow-only enable be requested; then a separate explicit production-owner authorization is required for the same-SHA shadow recreate (auto-rollback), with ROUTER/KNOWLEDGE/TOOL/COLLAB/CONTEXT_SCOPE kept unset."
+}

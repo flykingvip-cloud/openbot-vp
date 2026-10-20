@@ -1,0 +1,191 @@
+{
+  "schema": "task-progress-ledger-b576641a96eb-cutover/v1",
+  "recordedAt": "2026-08-23T16:12:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-main-alignment-cutover-b576641a96eb-full-dist-overlay-from-clean-archive",
+  "candidate": "b576641a96eb49285e8454f30e060de0eabc49a0",
+  "previousLive": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+  "deployedLive": "b576641a96eb49285e8454f30e060de0eabc49a0",
+  "originMainAtFinalFetch": "b576641a96eb49285e8454f30e060de0eabc49a0",
+  "provenanceTag": "provenance/sha-b576641a96eb",
+  "buildInfoCommit": "b576641a96eb49285e8454f30e060de0eabc49a0",
+  "gatewayAndUiSameSource": true,
+  "forwardOnly": "allow",
+  "deliveryAlignment": "FAIL=0",
+  "healthz": "live",
+  "readyz": "ready",
+  "progressLedgerEnabled": true,
+  "uiEntry": "index-Dpg8P1UR.js",
+  "rollbackBackup": "/root/openbot-maintenance-origin-main-b576641a96eb-full-dist-r1-20260823T080458Z",
+  "tests": {
+    "vitest": {
+      "scope": [
+        "src/progress-ledger",
+        "src/gateway/server-methods/progress-ledger.test.ts",
+        "src/gateway/workbench/pending-tasks-read-model.test.ts",
+        "ui/src/ui/ports/employee/views/personal-cron-progress.node.test.ts",
+        "ui/src/ui/ports/employee/views/workbench-capability-contracts.test.ts"
+      ],
+      "passed": 101,
+      "files": 18,
+      "failed": 0
+    },
+    "oxlint": {
+      "scope": [
+        "src/progress-ledger",
+        "src/gateway/server-methods/progress-ledger.ts",
+        "src/gateway/workbench/pending-tasks-read-model.ts"
+      ],
+      "warnings": 0
+    }
+  },
+  "residualRisks": [
+    {
+      "id": "check-sot-exit-20-frozen-baseline",
+      "severity": "known-old-gate",
+      "detail": "pnpm delivery:check-sot -- --use-release-record-live exited 20 because it compares LIVE to frozen origin/release/baseline-recovery-20260725. AGENTS.md: main is the sole trunk; that branch is frozen archive, not an alternate cutover source. Full output: docs/design/evidence/task-progress-ledger-b576641a96eb-check-sot-exit20-20260823.txt",
+      "ownerSignoff": "user authorized the 2026-08-23 origin/main alignment script, including documenting this exit 20 rather than ignoring it"
+    },
+    {
+      "id": "no-live-completed-or-met-events",
+      "severity": "observational-gap",
+      "detail": "Production JSONL has TOOL_SUCCEEDED/TOOL_FAILED only. No STEP_COMPLETED or ACCEPTANCE_MET events exist, so evidence-on-complete is vacuously true. Writer unit tests cover the payload-evidence invariant."
+    },
+    {
+      "id": "no-quiet-production-cron",
+      "severity": "observational-gap",
+      "detail": "None of the 9 long-horizon production crons are quiet; emitToChat/emitNotification were not observed live. human-gate unit tests cover quiet=false emit."
+    },
+    {
+      "id": "record-pr-advances-tip",
+      "severity": "structural",
+      "detail": "Merging this record PR advances origin/main beyond LIVE. Do not treat the squash tip as a new overlay candidate unless a later cutover is authorized."
+    },
+    {
+      "id": "process-env-unset",
+      "severity": "known",
+      "detail": "OPENBOT_PROGRESS_LEDGER_ENABLED is UNSET in the running process. Runtime still enabled via gateway.progressLedger.enabled=true plus .env.docker=1. Process env stays UNSET until an authorized container recreate."
+    },
+    {
+      "id": "stale-pin-overlay-id-label",
+      "severity": "cosmetic",
+      "detail": "pin.env OPENBOT_UI_OVERLAY_ID still says origin-main-7cd74d4c-item7-s18-r1. Served and pinned entry is index-Dpg8P1UR.js. Overlay id label was not rewritten."
+    }
+  ],
+  "stamp": "20260823T080458Z",
+  "overlayId": "origin-main-b576641a96eb-full-dist-r1",
+  "note": "User authorized latest origin/main production alignment. Previous LIVE bad5f90a1d33 was an ancestor, not the trunk tip. Built from git archive in /tmp/openbot-build-b576641a96eb, not the dirty kiro-loom tree.",
+  "releaseWorktree": {
+    "path": "/tmp/openbot-main-alignment",
+    "lockedOriginMain": "b576641a96eb49285e8454f30e060de0eabc49a0",
+    "statusPorcelainCount": 0,
+    "fetchHeadWritable": true,
+    "stillTipAfterBuild": true,
+    "stillTipAtRecord": true
+  },
+  "candidateDetail": {
+    "ref": "origin/main",
+    "sha": "b576641a96eb49285e8454f30e060de0eabc49a0",
+    "subject": "Merge pull request #638 from gmood2008/cursor-data-governance/item7-batch9-12-cr-resolver-wiring",
+    "equalsOriginMainAtLock": true,
+    "equalsOriginMainAfterBuild": true,
+    "ledgerImplementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91"
+  },
+  "gatesBeforeCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "liveThen": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "candidate": "b576641a96eb49285e8454f30e060de0eabc49a0"
+    },
+    "verifyDeliveryAlignmentLiveMatched": {
+      "exit": 0,
+      "summary": "PASS=8 WARN=2 FAIL=0; --prod-sha bad5f90a1d33 --candidate-sha b576641a96eb --candidate-tag provenance/sha-b576641a96eb"
+    },
+    "checkSotUseReleaseRecordLive": {
+      "exit": 20,
+      "verdict": "block",
+      "liveThen": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "candidateRef": "origin/release/baseline-recovery-20260725",
+      "candidate": "948e7cd09353ed585a20c48d4caef4f32f55e1a2",
+      "classification": "known-frozen-baseline-gate",
+      "agentsMd": "main is the sole trunk; release/baseline-recovery-20260725 is frozen",
+      "fullOutput": "docs/design/evidence/task-progress-ledger-b576641a96eb-check-sot-exit20-20260823.txt",
+      "ownerSignoff": "user authorized this cutover script 2026-08-23 including check-sot exit 20 handling"
+    }
+  },
+  "build": {
+    "source": "git archive b576641a96eb49285e8454f30e060de0eabc49a0",
+    "dir": "/tmp/openbot-build-b576641a96eb",
+    "install": "pnpm install --frozen-lockfile",
+    "command": "GIT_COMMIT=b576641a96eb49285e8454f30e060de0eabc49a0 pnpm build",
+    "commitMatched": true,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "b576641a96eb49285e8454f30e060de0eabc49a0",
+      "builtAt": "2026-08-23T08:03:59.516Z"
+    },
+    "uiEntry": "index-Dpg8P1UR.js",
+    "gatewayTarMd5": "d6a2c1e2cb8195272bcedf430acc622f",
+    "uiTarMd5": "00571f7947e4bd076b8a8efd6286e8f9"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "b576641a96eb49285e8454f30e060de0eabc49a0",
+    "previousSha": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+    "startedAt": "2026-08-23T08:06:29Z",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPinEnv": "index-Dpg8P1UR.js",
+    "uiServedEntry": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisCutover": false
+    }
+  },
+  "ledgerSmoke": {
+    "usedExistingLongHorizonCrons": true,
+    "createdNewProductionCron": false,
+    "jobCount": 13,
+    "longHorizonCount": 9,
+    "jsonlCount": 6,
+    "toolSucceededOnlyReachesExecuted": true,
+    "completedOrMetWithoutEvidence": 0,
+    "quietJobsObserved": 0,
+    "adminEqualsCronListProjection": true,
+    "metrics": {
+      "projectionKind": "canonical",
+      "itemCount": 6,
+      "violationsById": {
+        "I1": 0,
+        "I2": 0,
+        "I3": 0,
+        "I4": 0,
+        "I5": 0,
+        "I6": 0,
+        "I7": 0,
+        "I8": 0
+      }
+    }
+  },
+  "backup": {
+    "path": "/root/openbot-maintenance-origin-main-b576641a96eb-full-dist-r1-20260823T080458Z",
+    "filesNonempty": true,
+    "restoresPreviousOverlay": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13"
+  },
+  "explicitlyNotDone": [
+    "Did not build from the dirty kiro-loom worktree",
+    "Did not recreate the production container",
+    "Did not change Progress Ledger flag",
+    "Did not start a host-level gateway",
+    "Did not delete existing backups",
+    "Did not start Turn Contract work",
+    "Did not create a new production cron"
+  ]
+}

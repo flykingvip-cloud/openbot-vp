@@ -1,0 +1,30 @@
+{
+  "name": "@openbot/constitutional-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Phase D §9.1 draft schemas, read-only ledger adapters, constitutional ledger view, a shadow conformance evaluator, a default-off P8a no_valid_path report, a default-off runtime façade shadow hook, and a default-off P8b Knife1 legal Path select API. Does not enforce production chat or live-invoke orchestration.",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.3.6"
+  }
+}

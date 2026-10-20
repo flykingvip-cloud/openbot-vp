@@ -1,0 +1,71 @@
+/* ===========================================
+   Icon Foundation — Global SVG Base Styles
+   ===========================================
+   Provides consistent sizing, stroke, and layout behavior for all SVG icons
+   rendered via renderIcon() / renderEmojiIcon() or any [class*="__icon"] wrapper.
+
+   This eliminates:
+   - SVG black-fill defaults (path elements rendering as solid black)
+   - Uncontrolled SVG expansion (missing width/height)
+   - Inline baseline misalignment
+   - flex-shrink collapsing icon containers
+
+   Previously these rules only applied inside .enterprise-surface / .platform-surface.
+   This foundation makes them global so icons behave correctly everywhere.
+   =========================================== */
+
+/* ─── Icon Container Base ─────────────────────────────────────────────────── */
+
+:where([class*="__icon"], .nav-item__icon, .app-icon) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+/* ─── SVG Element Base ────────────────────────────────────────────────────── */
+
+:where([class*="__icon"], .nav-item__icon, .app-icon) > svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ─── SVG Shape Elements ──────────────────────────────────────────────────── */
+
+:where([class*="__icon"], .nav-item__icon, .app-icon)
+  > svg
+  :where(path, line, polyline, polygon, circle, rect) {
+  fill: none;
+  stroke: currentColor;
+}
+
+/* ─── Size Variants ───────────────────────────────────────────────────────── */
+
+:where(.app-icon--sm) > svg {
+  width: 14px;
+  height: 14px;
+}
+
+:where(.app-icon--md) > svg {
+  width: 20px;
+  height: 20px;
+}
+
+:where(.app-icon--lg) > svg {
+  width: 24px;
+  height: 24px;
+}
+
+:where(.app-icon--xl) > svg {
+  width: 32px;
+  height: 32px;
+}

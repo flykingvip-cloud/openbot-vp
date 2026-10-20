@@ -1,0 +1,32 @@
+{
+  "schema": "memory-workspace-phase1a-section141-design-review/v1",
+  "roleId": "data-governance",
+  "roleLabel": "数据治理 / Catalog",
+  "owner": "codex-workspace-architecture",
+  "preparedBy": "cursor-memory-platform",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "decision": "accepted",
+  "signedAt": "2026-08-16T11:53:33.387Z",
+  "signedBy": "codex-workspace-architecture",
+  "scope": "Catalog SoT + DataGovernanceEnvelope + resourceId persistence",
+  "section141Criteria": [
+    "DataGovernanceEnvelope is the only Envelope; durable primary key is resourceId",
+    "Data Governance Catalog is the only SoT; WorkspaceResourceCatalog is read-only adapter"
+  ],
+  "designBasis": {
+    "primary": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+    "sections": ["§0.3", "§0.5", "§14.1 items 2-3"]
+  },
+  "relatedContracts": [
+    "docs/design/evidence/memory-workspace-phase1a-catalog-contract.json",
+    "docs/design/evidence/memory-workspace-phase1a-membership-contract.json"
+  ],
+  "coverageHonesty": "persistent Catalog coverage remains 0%; Phase 0 candidate is not SoT",
+  "explicitlyForbidden": [
+    "deployAuthorized=true",
+    "catalog-sot-write-from-inventory-alone",
+    "parallel-workspace-identity-sot"
+  ],
+  "ownerSignOffAction": "Set decision=accepted in this file and update section141-signoff-matrix.json data-governance row"
+}

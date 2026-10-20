@@ -1,0 +1,1 @@
+First App Store release of OpenBot for iPhone. Pair with your OpenBot Gateway to use chat, voice, sharing, and device actions from iOS.

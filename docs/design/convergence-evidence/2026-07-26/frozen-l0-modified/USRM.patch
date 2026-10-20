@@ -1,0 +1,104 @@
+diff --git a/src/auto-reply/reply/get-reply-run.ts b/src/auto-reply/reply/get-reply-run.ts
+index ac8abede78..0ef21efa3b 100755
+--- a/src/auto-reply/reply/get-reply-run.ts
++++ b/src/auto-reply/reply/get-reply-run.ts
+@@ -17,6 +17,8 @@ import {
+ } from "../../config/sessions.js";
+ import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
+ import { buildGrowthBirthSystemPrompt } from "../../gateway/agent-growth/birth-context.js";
++import { recordInboundFeedbackSafely } from "../../gateway/agent-growth/record-feedback.js";
++import { resolveWorkingStyleInstructions } from "../../gateway/agent-growth/working-style-store.js";
+ import {
+   openKnowledgeIndex,
+   resolveKnowledgeIndexDbPath,
+@@ -51,9 +53,11 @@ import { applySessionHints } from "./body.js";
+ import { buildCollaborationCapabilitySystemPrompt } from "./collaboration-capability-context.js";
+ import type { buildCommandContext } from "./commands.js";
+ import type { InlineDirectives } from "./directive-handling.js";
++import { recordExperienceCapsuleSafely } from "./experience-capsule-backflow.js";
+ import { buildGroupChatContext, buildGroupIntro } from "./groups.js";
+ import { buildInboundMetaSystemPrompt, buildInboundUserContextPrefix } from "./inbound-meta.js";
+ import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
++import { buildLearningRecallSystemPrompt } from "./learning-recall-context.js";
+ import type { createModelSelectionState } from "./model-selection.js";
+ import { buildOperationalIdentitySystemPrompt } from "./operational-identity-context.js";
+ import { resolveOriginMessageProvider } from "./origin-routing.js";
+@@ -344,6 +348,36 @@ export async function runPreparedReply(
+   if (userModelingKey && !isHeartbeat && inboundMessage) {
+     void recordUserInteractionSignalSafely(cfg, userModelingKey, inboundMessage).catch(() => {});
+   }
++  // Agent Growth OS：接管率 / 满意度的真实信号源（此前两项都没有任何采集点）。
++  // 检测到人工接管时同时产出候选经验胶囊（需审批），因此接管不只是扣分，还会沉淀教训。
++  if (agentId && !isHeartbeat && inboundMessage) {
++    recordInboundFeedbackSafely({
++      cfg,
++      agentId,
++      text: inboundMessage,
++      onHumanTakeover: ({ matched }) => {
++        recordExperienceCapsuleSafely({
++          trigger: "human_takeover",
++          agentId,
++          sessionEntry,
++          reason: "user_took_over",
++          ...(matched ? { detail: `用户表示自行接手：${matched}` } : {}),
++          ...(sessionKey ? { sessionKey } : {}),
++        });
++      },
++    });
++  }
++
++  // Working DNA：该 agent 已学习到的行为风格渲染为提示词指令（仅当真的发生过行为改变）。
++  const workingStyleInstructions = await resolveWorkingStyleInstructions(cfg, agentId);
++  // 经验回流：把已审批晋升的学习资产读回系统提示词（心跳不注入，避免无谓复用计数）。
++  const learningRecallPrompt = isHeartbeat
++    ? undefined
++    : await buildLearningRecallSystemPrompt({
++        agentId,
++        groupId: collaborationGroupId ?? undefined,
++        botId: sessionEntry?.collaborationParticipationOverlay?.botId,
++      });
+ 
+   let extraSystemPromptParts: string[];
+   if (useCollaborationAssembly) {
+@@ -366,7 +400,9 @@ export async function runPreparedReply(
+         gatewayClientUser: ctx.GatewayClientUser,
+         gatewayClientSessionDomain: ctx.GatewayClientSessionDomain,
+       })),
++      workingStyleInstructions,
+       userProfileInstructions,
++      learningRecallPrompt,
+       knowledgeUniversePrompt,
+       growthBirthPrompt,
+       cronReplyPrompt,
+@@ -416,7 +452,9 @@ export async function runPreparedReply(
+       groupIntro,
+       groupSystemPrompt,
+       collaborationCapabilityPrompt,
++      workingStyleInstructions,
+       userProfileInstructions,
++      learningRecallPrompt,
+       sessionContinuityPrompt,
+       knowledgeUniversePrompt,
+       operationalIdentityPrompt,
+diff --git a/src/gateway/server-methods.ts b/src/gateway/server-methods.ts
+index 3ec32cadb7..f5d01567b9 100755
+--- a/src/gateway/server-methods.ts
++++ b/src/gateway/server-methods.ts
+@@ -42,6 +42,8 @@ import { enterpriseAllocationHandlers } from "./server-methods/enterprise-alloca
+ import { enterpriseCapabilityHandlers } from "./server-methods/enterprise-capability.js";
+ import { enterpriseDataHandlers } from "./server-methods/enterprise-data.js";
+ import { enterpriseMemoryGovernanceHandlers } from "./server-methods/enterprise-memory-governance.js";
++import { enterpriseModelCatalogHandlers } from "./server-methods/enterprise-model-catalog.js";
++import { enterpriseModelProviderHandlers } from "./server-methods/enterprise-model-provider.js";
+ import { enterpriseNoticesHandlers } from "./server-methods/enterprise-notices.js";
+ import { enterpriseOperationalIdentityHandlers } from "./server-methods/enterprise-operational-identity.js";
+ import { enterpriseOrganizationHandlers } from "./server-methods/enterprise-organization.js";
+@@ -207,6 +209,8 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
+   ...platformSubscriptionsHandlers,
+   ...platformAllocationHandlers,
+   ...enterpriseModelGrantHandlers,
++  ...enterpriseModelProviderHandlers,
++  ...enterpriseModelCatalogHandlers,
+   ...enterpriseAllocationHandlers,
+   ...employeeModelAccessHandlers,
+   ...configHandlers,

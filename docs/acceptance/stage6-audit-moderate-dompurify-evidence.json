@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-v9jr-rg53-9pgp",
+  "cve": "CVE-2026-41238",
+  "package": "dompurify",
+  "vulnerable_range": ">=3.0.1 <3.4.0",
+  "affected_version_before": "3.3.2",
+  "dependency_path": "ui>dompurify",
+  "severity": "moderate",
+  "direct_or_transitive": "direct (ui workspace)",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=3.4.0",
+  "mitigated_version": "3.4.0",
+  "reachable_surface": "DOMPurify prototype-pollution-to-XSS bypass via CUSTOM_ELEMENT_HANDLING fallback (advisory). UI workspace direct dependency used for HTML sanitization; root pin via pnpm.overrides.",
+  "mitigation": "Bump ui/package.json dependencies.dompurify to ^3.4.0; pnpm.overrides.dompurify=3.4.0. Same pin also clears GHSA-39q2-94rc-95cp, GHSA-crv5-9vww-q3g8, and GHSA-h7mw-gpvr-xq4m as side effects (all share patched >=3.4.0; not separate cells). Remaining dompurify moderate needing higher pins (e.g. >=3.4.6 / >=3.4.7 / >=3.4.11 / >=3.4.13) and lows — not this PR.",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod (plus three same-threshold side-effect clears). Stage 6 overall remains not PASS; audit still exits 1 (33 moderate + 8 low remain, including further dompurify advisories). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 33,
+    "low": 8,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-v9jr-rg53-9pgp"
+}

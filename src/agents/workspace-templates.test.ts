@@ -1,0 +1,81 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  resetWorkspaceTemplateDirCache,
+  resolveWorkspaceTemplateDir,
+} from "./workspace-templates.js";
+
+const tempDirs: string[] = [];
+
+async function makeTempRoot(): Promise<string> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-templates-"));
+  tempDirs.push(root);
+  return root;
+}
+
+describe("resolveWorkspaceTemplateDir", () => {
+  afterEach(async () => {
+    resetWorkspaceTemplateDirCache();
+    await Promise.all(
+      tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })),
+    );
+  });
+
+  it("resolves templates from package root when module url is dist-rooted", async () => {
+    const root = await makeTempRoot();
+    await fs.writeFile(path.join(root, "package.json"), JSON.stringify({ name: "openclaw" }));
+
+    const templatesDir = path.join(root, "docs", "reference", "templates");
+    await fs.mkdir(templatesDir, { recursive: true });
+    await fs.writeFile(path.join(templatesDir, "AGENTS.md"), "# ok\n");
+
+    const distDir = path.join(root, "dist");
+    await fs.mkdir(distDir, { recursive: true });
+    const moduleUrl = pathToFileURL(path.join(distDir, "model-selection.mjs")).toString();
+
+    const resolved = await resolveWorkspaceTemplateDir({ cwd: distDir, moduleUrl });
+    expect(resolved).toBe(templatesDir);
+  });
+
+  it("resolves templates from scoped @upbeyond/openbot package root", async () => {
+    const root = await makeTempRoot();
+    await fs.writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ name: "@upbeyond/openbot" }),
+    );
+
+    const templatesDir = path.join(root, "docs", "reference", "templates");
+    await fs.mkdir(templatesDir, { recursive: true });
+    await fs.writeFile(path.join(templatesDir, "AGENTS.md"), "# ok\n");
+
+    const distDir = path.join(root, "dist");
+    await fs.mkdir(distDir, { recursive: true });
+    const moduleUrl = pathToFileURL(path.join(distDir, "model-selection.mjs")).toString();
+
+    const resolved = await resolveWorkspaceTemplateDir({ cwd: "/", moduleUrl });
+    expect(resolved).toBe(templatesDir);
+  });
+
+  it("does not resolve templates to root cwd when package root is scoped", async () => {
+    const root = await makeTempRoot();
+    await fs.writeFile(
+      path.join(root, "package.json"),
+      JSON.stringify({ name: "@upbeyond/openbot" }),
+    );
+
+    const templatesDir = path.join(root, "docs", "reference", "templates");
+    await fs.mkdir(templatesDir, { recursive: true });
+    await fs.writeFile(path.join(templatesDir, "AGENTS.md"), "# ok\n");
+
+    const distDir = path.join(root, "dist");
+    await fs.mkdir(distDir, { recursive: true });
+    const moduleUrl = pathToFileURL(path.join(distDir, "gateway-cli.js")).toString();
+
+    const resolved = await resolveWorkspaceTemplateDir({ cwd: "/", moduleUrl });
+    expect(resolved).toBe(templatesDir);
+    expect(resolved).not.toBe(path.resolve("/docs/reference/templates"));
+  });
+});

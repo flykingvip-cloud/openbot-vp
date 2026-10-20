@@ -1,0 +1,107 @@
+name: Memory Workspace Freeze
+
+# WS-E scanner + trusted-baseline comparison. Required merge gate on main PRs
+# (ruleset: "freeze + phase0 evidence tests"). Every PR targeting main must run
+# this job so branch protection never waits on a path-filtered skip.
+#
+# push.paths still limits direct pushes to memory-workspace-sensitive trees.
+# pull_request intentionally has no paths filter.
+#
+# Always compares the current tree against TRUSTED_BASELINE_BLOB in this file.
+# Updating only the working-tree JSON cannot hide new call sites.
+#
+# Does not authorize LIVE schema, Resolver write switch, or directory migration.
+
+on:
+  push:
+    paths:
+      - "src/**"
+      - "extensions/**"
+      - "scripts/**"
+      - "docs/design/evidence/memory-workspace-phase0-*"
+      - "docs/design/evidence/memory-workspace-phase1a-*"
+      - ".github/workflows/memory-workspace-freeze.yml"
+      - ".github/CODEOWNERS"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: memory-workspace-freeze-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  freeze:
+    name: freeze + phase0 evidence tests
+    # GitHub-hosted: the self-hosted runner's git HTTPS to github.com:443
+    # times out, which fails this required merge gate before any scan runs.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+          fetch-depth: 0
+      - name: Fetch trusted baseline ref
+        run: git fetch --no-tags --prune origin +refs/heads/main:refs/remotes/origin/main
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+          use-sticky-disk: "false"
+      - name: Phase 0 evidence unit tests
+        run: >-
+          node --test
+          docs/design/evidence/memory-workspace-phase0-live-roots.test.mjs
+          docs/design/evidence/memory-workspace-phase0-inventory.test.mjs
+          docs/design/evidence/memory-workspace-phase0-v1-root-fingerprint.test.mjs
+      - name: Freeze with trusted scanner against the candidate tree
+        env:
+          # Privileged pins live in this CODEOWNERS-protected workflow.
+          # Do not exec the candidate tree's run-trusted-freeze.sh.
+          TRUSTED_INVENTORY_BLOB: 4b012d9cdb41a55e9d352f572ad882565776c3ca
+          TRUSTED_SCAN_BLOB: dad5eae85de25c25493a8bb23545666e39f81733
+          TRUSTED_BASELINE_BLOB: 0c1860caf8c02a2840ccddda0a392f19aeb588a8
+          BASELINE_PATH: docs/design/evidence/memory-workspace-phase0-20260814.call-sites.json
+          INVENTORY_PATH: docs/design/evidence/memory-workspace-phase0-inventory.mjs
+          SCAN_PATH: docs/design/evidence/memory-workspace-phase0-inventory-scan.mjs
+        run: |
+          set -euo pipefail
+          ROOT="$(git rev-parse --show-toplevel)"
+          cd "$ROOT"
+          # Must stay outside node_modules: tsx skips the scanner CLI entry
+          # (isMain) for files under node_modules, which would silently skip Freeze.
+          WORKDIR="${ROOT}/.cache/memory-workspace-trusted-freeze"
+          rm -rf "$WORKDIR"
+          mkdir -p "$WORKDIR"
+          extract() {
+            local dest="$1"
+            local spec="$2"
+            local blob="$3"
+            if git show "$spec" >/dev/null 2>&1; then
+              echo "trusted file ${spec}"
+              git show "$spec" >"$dest"
+            else
+              echo "origin/main lacks ${spec#*:}; using pinned blob ${blob}"
+              git cat-file -e "$blob"
+              git cat-file -p "$blob" >"$dest"
+            fi
+          }
+          extract "$WORKDIR/memory-workspace-phase0-inventory.mjs" "origin/main:${INVENTORY_PATH}" "$TRUSTED_INVENTORY_BLOB"
+          extract "$WORKDIR/memory-workspace-phase0-inventory-scan.mjs" "origin/main:${SCAN_PATH}" "$TRUSTED_SCAN_BLOB"
+          # Baseline source is the CODEOWNERS-protected blob pin, not origin/main
+          # and not the working-tree JSON. Updating only the JSON cannot hide sites.
+          echo "trusted baseline blob ${TRUSTED_BASELINE_BLOB}"
+          git cat-file -e "$TRUSTED_BASELINE_BLOB"
+          if grep -q -- "--baseline-blob" "$WORKDIR/memory-workspace-phase0-inventory.mjs"; then
+            node --import tsx "$WORKDIR/memory-workspace-phase0-inventory.mjs" \
+              --mode freeze --baseline-blob "$TRUSTED_BASELINE_BLOB" --baseline "$BASELINE_PATH"
+          else
+            git cat-file -p "$TRUSTED_BASELINE_BLOB" >"$WORKDIR/baseline.json"
+            node --import tsx "$WORKDIR/memory-workspace-phase0-inventory.mjs" \
+              --mode freeze --baseline "$WORKDIR/baseline.json"
+          fi

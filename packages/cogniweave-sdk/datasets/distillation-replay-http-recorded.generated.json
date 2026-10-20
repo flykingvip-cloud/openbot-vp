@@ -1,0 +1,48 @@
+{
+  "version": "v1-http-recorded",
+  "scope": {
+    "workspaceId": "eval_ws",
+    "projectId": "eval_proj",
+    "agentId": "eval_agent",
+    "visibility": "private"
+  },
+  "stageOrder": ["event", "context", "atoms", "relations"],
+  "cases": [
+    {
+      "id": "dbg_sync_retry_latency",
+      "rawInput": "外部 API 高延迟时，同步重试导致吞吐下降和队列阻塞，应该如何处理？",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/generated/dbg_sync_retry_latency.json"
+    },
+    {
+      "id": "dbg_idempotency_guard",
+      "rawInput": "我们准备把同步调用改成异步批处理，但担心重复执行，需要什么约束？",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/generated/dbg_idempotency_guard.json"
+    },
+    {
+      "id": "plan_release_cutover",
+      "rawInput": "请规划一次灰度发布方案，要求不中断服务并可快速回滚。",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/generated/plan_release_cutover.json"
+    },
+    {
+      "id": "research_failure_patterns",
+      "rawInput": "帮我研究过去一个月出现最多的故障模式，输出可复用结论。",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/generated/research_failure_patterns.json"
+    },
+    {
+      "id": "support_customer_preference",
+      "rawInput": "这个客户偏好先看稳定性数据再看功能，请给出后续沟通策略。",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/generated/support_customer_preference.json"
+    },
+    {
+      "id": "operations_incident_playbook",
+      "rawInput": "值班告警频繁但误报多，如何优化运行手册并减少重复故障？",
+      "sourceType": "chat",
+      "stageSnapshotBundle": "replay-http-recordings/generated/operations_incident_playbook.json"
+    }
+  ]
+}

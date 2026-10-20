@@ -1,0 +1,103 @@
+{
+  "increment": "P21",
+  "schemaVersion": 1,
+  "kind": "isolated_preprod_slo_snapshot",
+  "mustNotTreatAsLiveTraffic": true,
+  "recordedAt": "2026-09-05T04:30:19.085Z",
+  "window": {
+    "from": "2026-09-05T04:20:00.000Z",
+    "to": "2026-09-05T04:30:19.085Z"
+  },
+  "source": {
+    "id": "isolated_preprod_rehearsal",
+    "authority": "in_process_injected_backends",
+    "not": "live diagnosis query path"
+  },
+  "sampling": {
+    "scope": "isolated_preprod_rehearsal_only"
+  },
+  "tenant": {
+    "trustedSource": "server_membership_only",
+    "observedTenantId": "tenant-fixture-a"
+  },
+  "observations": {
+    "success": {
+      "source": "isolated_preprod_rehearsal.dispatchDiagnosisReportApi",
+      "windowFrom": "2026-09-05T04:20:00.000Z",
+      "windowTo": "2026-09-05T04:30:19.085Z",
+      "sampleScope": "isolated_preprod_rehearsal_only",
+      "tenantScope": "trusted:tenant-fixture-a; membership_only",
+      "observed": 12
+    },
+    "error": {
+      "source": "isolated_preprod_rehearsal.dispatchDiagnosisReportApi",
+      "windowFrom": "2026-09-05T04:20:00.000Z",
+      "windowTo": "2026-09-05T04:30:19.085Z",
+      "sampleScope": "isolated_preprod_rehearsal_only",
+      "tenantScope": "trusted:tenant-fixture-a; membership_only",
+      "observed": 2
+    },
+    "latency": {
+      "source": "isolated_preprod_rehearsal.dispatchDiagnosisReportApi",
+      "windowFrom": "2026-09-05T04:20:00.000Z",
+      "windowTo": "2026-09-05T04:30:19.085Z",
+      "sampleScope": "isolated_preprod_rehearsal_only",
+      "tenantScope": "trusted:tenant-fixture-a; membership_only",
+      "observed": 12
+    },
+    "stale": {
+      "source": "isolated_preprod_rehearsal.dispatchDiagnosisReportApi",
+      "windowFrom": "2026-09-05T04:20:00.000Z",
+      "windowTo": "2026-09-05T04:30:19.085Z",
+      "sampleScope": "isolated_preprod_rehearsal_only",
+      "tenantScope": "trusted:tenant-fixture-a; membership_only",
+      "observed": 1
+    },
+    "authorization_denied": {
+      "source": "isolated_preprod_rehearsal.dispatchDiagnosisReportApi",
+      "windowFrom": "2026-09-05T04:20:00.000Z",
+      "windowTo": "2026-09-05T04:30:19.085Z",
+      "sampleScope": "isolated_preprod_rehearsal_only",
+      "tenantScope": "trusted:tenant-fixture-a; membership_only",
+      "observed": 4
+    },
+    "quota_exhausted": {
+      "source": "isolated_preprod_rehearsal.dispatchDiagnosisReportApi",
+      "windowFrom": "2026-09-05T04:20:00.000Z",
+      "windowTo": "2026-09-05T04:30:19.085Z",
+      "sampleScope": "isolated_preprod_rehearsal_only",
+      "tenantScope": "trusted:tenant-fixture-a; membership_only",
+      "observed": 3
+    }
+  },
+  "slo": {
+    "queryLatencyMs": {
+      "target": 300,
+      "observed": 12
+    },
+    "inspectionSuccessRate": {
+      "target": 0.99,
+      "observed": 1
+    },
+    "deliverySuccessRate": {
+      "target": 0.99,
+      "observed": 1
+    },
+    "authorizationWaitMs": {
+      "target": 300000,
+      "observed": 0
+    },
+    "verificationSuccessRate": {
+      "target": 0.95,
+      "observed": 1
+    },
+    "falsePositiveRate": {
+      "target": 0.05,
+      "observed": 0
+    },
+    "completeness": "complete"
+  },
+  "sloHealthy": true,
+  "renderedHealth": "healthy",
+  "readyForIndependentApproval": true
+}

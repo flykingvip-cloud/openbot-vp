@@ -1,0 +1,88 @@
+name: HA CommitSafety SQL
+
+# Stage A.1 smoke + Stage A.2 IT-CS-01..13 on throwaway PostgreSQL
+# (min supported 14, recommended 17). Does not touch any shared database
+# and does not enable Auto Failover.
+#
+# If hosted Actions are dark (org-level startup_failure), run locally:
+#   deploy/ha/commitsafety/scripts/smoke-ephemeral.sh
+#   deploy/ha/commitsafety/tests/it-cs/run-ephemeral.sh
+
+on:
+  pull_request:
+    paths:
+      - "deploy/ha/commitsafety/**"
+      - ".github/workflows/ha-commitsafety-sql.yml"
+  push:
+    branches: [main]
+    paths:
+      - "deploy/ha/commitsafety/**"
+      - ".github/workflows/ha-commitsafety-sql.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ha-commitsafety-sql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: commitsafety smoke (pg ${{ matrix.pg }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["14", "17"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Smoke on ephemeral PostgreSQL ${{ matrix.pg }}
+        env:
+          PG_MAJOR: ${{ matrix.pg }}
+        run: |
+          set -euo pipefail
+          docker run --rm --user postgres \
+            -v "$PWD/deploy/ha/commitsafety:/src:ro" \
+            -e PG_BIN="/usr/lib/postgresql/${PG_MAJOR}/bin" \
+            "postgres:${PG_MAJOR}" \
+            bash /src/scripts/smoke-ephemeral.sh
+
+  it-cs:
+    name: commitsafety IT-CS (pg ${{ matrix.pg }})
+    runs-on: ubuntu-24.04
+    # Fuzz default is short (200 bumps) so PR checks stay bounded.
+    # Full §19.1 IT-CS-10 (10000×64) is a manual / scheduled local run.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["14", "17"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install PostgreSQL ${{ matrix.pg }} + Python venv
+        env:
+          PG_MAJOR: ${{ matrix.pg }}
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-${PG_MAJOR} postgresql-client-${PG_MAJOR} python3-venv python3-pip
+
+      - name: IT-CS-01..13 on ephemeral PostgreSQL ${{ matrix.pg }}
+        env:
+          PG_BIN: /usr/lib/postgresql/${{ matrix.pg }}/bin
+          HA_CS_IT_FUZZ_BUMPS: "200"
+          HA_CS_IT_FUZZ_WRITERS: "16"
+          HA_CS_IT_PERF_SAMPLES: "400"
+        run: |
+          set -euo pipefail
+          deploy/ha/commitsafety/tests/it-cs/run-ephemeral.sh

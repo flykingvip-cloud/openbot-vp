@@ -1,0 +1,130 @@
+{
+  "schema": "memory-workspace-phase1b-item6-evidence/v1",
+  "kind": "item6-evidence-preparation",
+  "item": 6,
+  "status": "evidence-preparation",
+  "item6": "not-met",
+  "item6Met": false,
+  "implementationUnlocked": false,
+  "implementationStarted": false,
+  "preparedBy": "cursor-data-governance",
+  "operationId": "phase1b-item6-evidence-f495f7a6a1-20260820T041500Z",
+  "baselineSha": "f495f7a6a17ea5a1b4bdbfbec83842501b3ef38f",
+  "originMainSha": "f495f7a6a17ea5a1b4bdbfbec83842501b3ef38f",
+  "branchShaAtStart": "f495f7a6a17ea5a1b4bdbfbec83842501b3ef38f",
+  "priorOperationId": "phase1b-item6-evidence-a3305d2767-20260820T021600Z",
+  "priorEvidencePr": "https://github.com/gmood2008/openbot/pull/548",
+  "minimaReceiptTip": "ce6cf5e1702c7f2de20b58f062fd100562b6ee01",
+  "item5ReviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "liveCutover": false,
+  "schemaV2ProductionWrite": false,
+  "productionSqliteWrite": false,
+  "resolverModified": false,
+  "i4DirtyTreeUsed": false,
+  "minimaUnlock": "issued",
+  "fullUnlock": "not-issued",
+  "sqlitePathIdentities": [
+    {
+      "id": "resource-layout",
+      "pattern": "{stateDir}/memory/resource-{resourceId}.sqlite",
+      "identityKeys": ["stateDir", "resourceId"],
+      "authority": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+      "hostSearch": false,
+      "productionWrite": false,
+      "reviewableAsProductionSnapshot": false
+    },
+    {
+      "id": "operator-authorized-env",
+      "pattern": "OPENBOT_AUTHORIZED_SQLITE_PATH",
+      "identityKeys": ["operatorIssuedPathToken"],
+      "authority": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+      "hostSearch": false,
+      "productionWrite": false,
+      "item6CandidateOnCitedReceipt": "met",
+      "phase1bItem6Derivation": "forbidden"
+    }
+  ],
+  "identityRules": {
+    "requireExplicitPath": true,
+    "forbidHostSearch": true,
+    "forbidGuessedStateDir": true,
+    "forbidMkdtempAsProductionSoT": true,
+    "forbidHomeOpenbotAsProductionSoT": true,
+    "forbidEvidenceDirAsProductionSoT": true,
+    "forbidRecordingTenantNamesOrRealTrees": true,
+    "failClosedOnUnknownIdentity": true
+  },
+  "backupDesign": {
+    "mode": "isolated-copy-then-hash",
+    "sourceMustRemainUnwritten": true,
+    "backupMustBeSeparatedFromSource": true,
+    "backupBytesInGit": false,
+    "emptyBackup": "fail-closed",
+    "hashMismatch": "fail-closed",
+    "cutoverRecordSnapshotIsNotSqliteBackup": true
+  },
+  "fencingDesign": {
+    "singleWriter": true,
+    "shadowDoesNotTakeProductionLock": true,
+    "productionWriterEnabled": false,
+    "secondStateMachine": false
+  },
+  "rollbackDesign": {
+    "restoreOnlyOntoIsolatedCopy": true,
+    "restoreRequiresHashAndIntegrityMatch": true,
+    "productionWriteBack": "forbidden",
+    "restoreFailure": "fail-closed"
+  },
+  "shadowMode": {
+    "enabled": true,
+    "readsOnly": true,
+    "writesProductionSqlite": false,
+    "treatsFixtureGreenAsItem6Met": false
+  },
+  "dryRun": {
+    "enabled": true,
+    "modifiesProductionCode": false,
+    "modifiesProductionSqlite": false,
+    "productionWrites": 0
+  },
+  "productionEquivalentReadOnly": {
+    "citedReceipt": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+    "item6CandidateOnCitedReceipt": "met",
+    "phase1bItem6": "not-met",
+    "thisPackageMarksItem6Met": false,
+    "productionWrites": 0,
+    "live": "forbidden"
+  },
+  "negativeProofs": {
+    "missingAuthorizedPath": "deny",
+    "mkdtempFixture": "deny",
+    "homeOpenbotPath": "deny",
+    "evidencePath": "deny",
+    "crossTenantRead": "deny",
+    "restoreHashMismatch": "deny",
+    "attemptedProductionWrite": "deny"
+  },
+  "implementationRequestDraft": {
+    "status": "draft-not-submitted",
+    "requestsImplementationUnlock": false,
+    "requestsItem6Met": false,
+    "requestsLiveCutover": false
+  },
+  "explicitlyForbidden": [
+    "Item 6 implementation",
+    "changing production code or production SQLite",
+    "wiredToProductionResolver=true",
+    "schema v2 production write",
+    "production Catalog new write",
+    "deployAuthorized=true",
+    "LIVE cutover",
+    "deriving Item 6 met from minima or this evidence package",
+    "marking production-equivalent verification as Item 6 met",
+    "modifying PR #538, #542, or #544 frozen evidence",
+    "using the I4 / kiro-loom dirty tree as evidence"
+  ],
+  "reviewRequest": "Item 6 Evidence Preparation Review only"
+}

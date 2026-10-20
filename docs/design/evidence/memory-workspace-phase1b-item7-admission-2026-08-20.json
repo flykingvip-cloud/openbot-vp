@@ -1,0 +1,57 @@
+{
+  "schema": "memory-workspace-phase1b-item7-admission/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-admission-2026-08-20.json",
+  "item": 7,
+  "kind": "phase1b-admission-evidence",
+  "preparedBy": "cursor-data-governance",
+  "preparedAt": "2026-08-20T02:37:00.000Z",
+  "baselineSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "citedUserBaseline": "69e9bf8c63ded61badf59fe0a6c7bc77166b39a1",
+  "usedRealProductionData": false,
+  "productionWrites": 0,
+  "thisPacketWrites": 0,
+  "status": "not-met",
+  "decision": "not-met",
+  "retirementOwner": "cursor-data-governance",
+  "freezeOwner": "cursor-fable",
+  "ownersDistinct": true,
+  "productionWriteWatchIndex": 38,
+  "frozenWriteWatchIndex": 38,
+  "liveWriteWatchIndex": 37,
+  "target": 0,
+  "retiredThisChange": 0,
+  "i3Executed": false,
+  "phase0Rewritten": false,
+  "u1DarkCloseoutDoesNotRetire": true,
+  "inventory": {
+    "source": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+    "livePathCounts": { "P1": 12, "P3": 9, "P4": 7, "P5": 6, "P8": 3 },
+    "remaining": 37
+  },
+  "drain": {
+    "status": "not-started",
+    "requires": "U2 replacement entry taking production write",
+    "forbiddenNow": ["delete live call-sites", "I3", "treat U1 dark closeout as drain"]
+  },
+  "dualRead": {
+    "status": "not-cutover",
+    "productionReadPath": "unchanged"
+  },
+  "rollback": {
+    "status": "not-required-this-packet",
+    "reason": "no retirement executed; freeze baseline 38 kept"
+  },
+  "retirementReceipt": "not-issued",
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "phase1bUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "cited": [
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-ledger.json",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+    "docs/design/evidence/memory-workspace-phase0-20260814.call-sites.json"
+  ],
+  "note": "Item 7 stays not-met. Live production write/index watch is 37 against freeze 38. U1 dark closeout closed Handle dark integration only; it does not retire builtin/QMD/legacy call-sites. No unlock review is submitted while remaining > 0."
+}

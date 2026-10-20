@@ -1,0 +1,63 @@
+{
+  "schema": "item7-a1-cr-m1-w2-managed-seat-mint/v1",
+  "cr": "CR-M1",
+  "preparedBy": "kiro-data-governance",
+  "baseline": "2adc2934b57ed8833463bdf87a2b87ccab1ff8a8",
+  "designDoc": "docs/design/openbot-item7-a1-managed-seat-alignment-2026-08-24.md",
+  "supersedesManagedHalfOf": "docs/design/openbot-item7-a1-canonical-workspace-binding-2026-08-26.md",
+  "mergedDesignPr": 759,
+  "scope": "W2 only",
+  "w2": {
+    "what": "Managed agent create mints a plain-id, seat-owned workspace Catalog row so the already-landed seat projection resolves the managed workspace through loadExistingGovernedWorkspaceIdentity / resolveAuthorizedAgentToolWorkspaceCwd.",
+    "mintFn": "upsertWorkspaceGovernanceRecord",
+    "idBuilder": "buildWorkspaceResourceId (src/gateway/workspace-resolver/builders.ts)",
+    "site": "src/gateway/server-methods/agents.ts",
+    "placement": "inside the create transaction, after activateAgentGovernanceRegistration; gated on tenantId && ownerPositionId && registryAssetId",
+    "idFormatExample": "ws:001:seat:pos-sales:asset:asset-test",
+    "idempotent": true,
+    "orphanSafe": "placed after activate so a failed activation never leaves an orphan row; the agentAssetId-free sha256 begin/activate row is left intact and cannot match the seat regex, so no projection ambiguity"
+  },
+  "w3": {
+    "status": "already-landed-on-main",
+    "landedByCommit": "1048375b22",
+    "file": "src/gateway/data-governance/workspace-catalog-projection.ts",
+    "note": "SEAT_OWNED_ASSET_ID + parseSeatOwnedAsset + position branch in projectActiveWorkspace + seat matching via resolveLegacyAgentId are already present; CR-M1 did not add W3."
+  },
+  "w1": {
+    "status": "deferred-to-CR-M2",
+    "reason": "Switching the access-path producer (resource-resolver.buildWorkspaceResourceId) to the plain id would miss existing sha256 rows and spawn duplicate rows on the file-access hot path (ensureCatalogResource creates-if-missing); unsafe without CR-M2 dual-read/backfill. Not required for the managed-resolve goal, which flows through loadExistingGovernedWorkspaceIdentity (durable list), not the access producer."
+  },
+  "freeze": {
+    "ok": true,
+    "addedProductionCallSites": 0,
+    "addedProductionHelpers": 0,
+    "addedCatalogSynthesis": 0,
+    "baselineBlob": "583c1fc0c93da386289a276b77884d24255440c4",
+    "note": "upsertWorkspaceGovernanceRecord and buildWorkspaceResourceId are not watched synthesis symbols; agents.ts has no watched call sites to shift."
+  },
+  "retirement": {
+    "siteRetiredThisCr": 0,
+    "note": "No memory index/sync site retired; liveWriteWatchIndex unchanged."
+  },
+  "item7": "not-met",
+  "verification": {
+    "tsgoNewErrorsInTouchedFiles": 0,
+    "oxlint": "0 warnings / 0 errors on touched files",
+    "formatCheck": "repo-wide clean",
+    "dynamicImport": "no static+dynamic mix; INEFFECTIVE_DYNAMIC_IMPORT not applicable",
+    "tests": {
+      "agentsMutate": "27 passed including 2 new W2 assertions; 6 pre-existing agents.files.list failures reproduced identically on pristine HEAD (unrelated environment)",
+      "workspaceCatalogProjection": "6/6 passed"
+    }
+  },
+  "filesTouched": [
+    "src/gateway/server-methods/agents.ts",
+    "src/gateway/server-methods/agents-mutate.test.ts",
+    "docs/design/openbot-item7-a1-managed-seat-alignment-2026-08-24.md"
+  ],
+  "sharedHotFiles": {
+    "note": "This CR touches files other agents also claim; isolated PR branch + commit Task/Agent trailers provide attribution; merge coordination flagged to the operator. sharedPaths registration is a human decision and was not self-inferred.",
+    "agents.ts": "registered sharedPaths, designated lander cursor-fable (tenant-context-propagation); also claimed by cursor-data-governance",
+    "agents-mutate.test.ts": "claimed by cursor-data-governance memory-workspace-platform-remediation Item 7 retirement batches"
+  }
+}

@@ -1,0 +1,675 @@
+[
+  {
+    "input": {},
+    "legacy": {
+      "protocolVersion": "1.1",
+      "invariants": {
+        "protocolVersion": "1.1",
+        "maxVisibleRepliesCeiling": 12,
+        "mentionUnmatchedCannotDispatch": true,
+        "nonMemberCannotWrite": true,
+        "observerCannotWrite": true,
+        "archivedCannotDispatch": true,
+        "emptyEnabledSkillsMeansNoGroupRestriction": true,
+        "personalSessionDoesNotInheritGroupSkillAllowlist": true,
+        "groupRoundDoesNotPassInboundDepth": true,
+        "cannotBypassConfidentiality": true,
+        "l2CannotWidenL1": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true
+      },
+      "strategy": {
+        "id": "discussion_driven",
+        "goal": "形成认知",
+        "primaryStrength": "weak",
+        "openParticipation": "high",
+        "deliverableRequired": false,
+        "preserveConflict": false
+      },
+      "participation": {
+        "openDiscussionWithoutMention": false,
+        "maxVisibleBotRepliesPerRound": 5,
+        "mentionBotMustRespond": false,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true,
+        "lowSignalStrategy": "one_reply",
+        "humanStartsNewRound": true
+      },
+      "dispatch": {
+        "primaryThenSupplement": true,
+        "allowEvidenceCollection": false,
+        "coordinatorWrap": false,
+        "supplementEnabled": true,
+        "maxSupplementBots": 3,
+        "allowSecondaryTakeover": true
+      },
+      "governance": {
+        "decisionMode": "human_required",
+        "allowAgentPublishProposal": true,
+        "observer": {
+          "canRead": true,
+          "canMention": false,
+          "canRespond": false,
+          "canExecute": false,
+          "canApprove": false
+        },
+        "entersWaitingForHumanAfterVisibleTurnsExhausted": true,
+        "botMaySelfAdvanceWithoutHuman": false
+      },
+      "guidance": {
+        "systemInstructions": []
+      },
+      "provenance": {
+        "collaborationMode": {
+          "value": "discussion_driven",
+          "source": "l1-default"
+        },
+        "openDiscussionWithoutMention": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "allowSupplementAfterPrimary": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "maxVisibleBotRepliesPerRound": {
+          "value": 5,
+          "source": "l1-default"
+        },
+        "mentionBotMustRespond": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "lowSignalStrategy": {
+          "value": "one_reply",
+          "source": "l1-default"
+        },
+        "coordinatorWrap": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "decisionMode": {
+          "value": "human_required",
+          "source": "l1-default"
+        },
+        "allowAgentPublishProposal": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "allowSecondaryTakeover": {
+          "value": true,
+          "source": "l1-default"
+        }
+      },
+      "clamps": []
+    }
+  },
+  {
+    "input": {
+      "maxVisibleBotRepliesPerRound": 20
+    },
+    "legacy": {
+      "protocolVersion": "1.1",
+      "invariants": {
+        "protocolVersion": "1.1",
+        "maxVisibleRepliesCeiling": 12,
+        "mentionUnmatchedCannotDispatch": true,
+        "nonMemberCannotWrite": true,
+        "observerCannotWrite": true,
+        "archivedCannotDispatch": true,
+        "emptyEnabledSkillsMeansNoGroupRestriction": true,
+        "personalSessionDoesNotInheritGroupSkillAllowlist": true,
+        "groupRoundDoesNotPassInboundDepth": true,
+        "cannotBypassConfidentiality": true,
+        "l2CannotWidenL1": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true
+      },
+      "strategy": {
+        "id": "discussion_driven",
+        "goal": "形成认知",
+        "primaryStrength": "weak",
+        "openParticipation": "high",
+        "deliverableRequired": false,
+        "preserveConflict": false
+      },
+      "participation": {
+        "openDiscussionWithoutMention": false,
+        "maxVisibleBotRepliesPerRound": 12,
+        "mentionBotMustRespond": false,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true,
+        "lowSignalStrategy": "one_reply",
+        "humanStartsNewRound": true
+      },
+      "dispatch": {
+        "primaryThenSupplement": true,
+        "allowEvidenceCollection": false,
+        "coordinatorWrap": false,
+        "supplementEnabled": true,
+        "maxSupplementBots": 3,
+        "allowSecondaryTakeover": true
+      },
+      "governance": {
+        "decisionMode": "human_required",
+        "allowAgentPublishProposal": true,
+        "observer": {
+          "canRead": true,
+          "canMention": false,
+          "canRespond": false,
+          "canExecute": false,
+          "canApprove": false
+        },
+        "entersWaitingForHumanAfterVisibleTurnsExhausted": true,
+        "botMaySelfAdvanceWithoutHuman": false
+      },
+      "guidance": {
+        "systemInstructions": []
+      },
+      "provenance": {
+        "collaborationMode": {
+          "value": "discussion_driven",
+          "source": "l1-default"
+        },
+        "openDiscussionWithoutMention": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "allowSupplementAfterPrimary": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "maxVisibleBotRepliesPerRound": {
+          "value": 12,
+          "source": "l1-hard",
+          "requested": 20,
+          "constrainedBy": "maxVisibleBotRepliesPerRound <= 12"
+        },
+        "mentionBotMustRespond": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "lowSignalStrategy": {
+          "value": "one_reply",
+          "source": "l1-default"
+        },
+        "coordinatorWrap": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "decisionMode": {
+          "value": "human_required",
+          "source": "l1-default"
+        },
+        "allowAgentPublishProposal": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "allowSecondaryTakeover": {
+          "value": true,
+          "source": "l1-default"
+        }
+      },
+      "clamps": [
+        {
+          "field": "maxVisibleBotRepliesPerRound",
+          "requested": 20,
+          "effective": 12,
+          "reason": "l1_resource_ceiling",
+          "source": "l1-hard",
+          "constrainedBy": "maxVisibleBotRepliesPerRound <= 12"
+        }
+      ]
+    }
+  },
+  {
+    "input": {
+      "maxVisibleBotRepliesPerRound": 8,
+      "openDiscussionWithoutMention": true,
+      "mentionBotMustRespond": true
+    },
+    "legacy": {
+      "protocolVersion": "1.1",
+      "invariants": {
+        "protocolVersion": "1.1",
+        "maxVisibleRepliesCeiling": 12,
+        "mentionUnmatchedCannotDispatch": true,
+        "nonMemberCannotWrite": true,
+        "observerCannotWrite": true,
+        "archivedCannotDispatch": true,
+        "emptyEnabledSkillsMeansNoGroupRestriction": true,
+        "personalSessionDoesNotInheritGroupSkillAllowlist": true,
+        "groupRoundDoesNotPassInboundDepth": true,
+        "cannotBypassConfidentiality": true,
+        "l2CannotWidenL1": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true
+      },
+      "strategy": {
+        "id": "discussion_driven",
+        "goal": "形成认知",
+        "primaryStrength": "weak",
+        "openParticipation": "high",
+        "deliverableRequired": false,
+        "preserveConflict": false
+      },
+      "participation": {
+        "openDiscussionWithoutMention": true,
+        "maxVisibleBotRepliesPerRound": 8,
+        "mentionBotMustRespond": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": false,
+        "lowSignalStrategy": "one_reply",
+        "humanStartsNewRound": true
+      },
+      "dispatch": {
+        "primaryThenSupplement": true,
+        "allowEvidenceCollection": false,
+        "coordinatorWrap": false,
+        "supplementEnabled": true,
+        "maxSupplementBots": 3,
+        "allowSecondaryTakeover": true
+      },
+      "governance": {
+        "decisionMode": "human_required",
+        "allowAgentPublishProposal": true,
+        "observer": {
+          "canRead": true,
+          "canMention": false,
+          "canRespond": false,
+          "canExecute": false,
+          "canApprove": false
+        },
+        "entersWaitingForHumanAfterVisibleTurnsExhausted": true,
+        "botMaySelfAdvanceWithoutHuman": false
+      },
+      "guidance": {
+        "systemInstructions": []
+      },
+      "provenance": {
+        "collaborationMode": {
+          "value": "discussion_driven",
+          "source": "l1-default"
+        },
+        "openDiscussionWithoutMention": {
+          "value": true,
+          "source": "l2"
+        },
+        "allowSupplementAfterPrimary": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "maxVisibleBotRepliesPerRound": {
+          "value": 8,
+          "source": "l2",
+          "requested": 8
+        },
+        "mentionBotMustRespond": {
+          "value": true,
+          "source": "l2",
+          "requested": true
+        },
+        "lowSignalStrategy": {
+          "value": "one_reply",
+          "source": "l1-default"
+        },
+        "coordinatorWrap": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "decisionMode": {
+          "value": "human_required",
+          "source": "l1-default"
+        },
+        "allowAgentPublishProposal": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "allowSecondaryTakeover": {
+          "value": true,
+          "source": "l1-default"
+        }
+      },
+      "clamps": []
+    }
+  },
+  {
+    "input": {
+      "collaborationMode": "review_driven",
+      "allowSupplementAfterPrimary": false,
+      "coordinatorSummarizeAfterRound": true
+    },
+    "legacy": {
+      "protocolVersion": "1.1",
+      "invariants": {
+        "protocolVersion": "1.1",
+        "maxVisibleRepliesCeiling": 12,
+        "mentionUnmatchedCannotDispatch": true,
+        "nonMemberCannotWrite": true,
+        "observerCannotWrite": true,
+        "archivedCannotDispatch": true,
+        "emptyEnabledSkillsMeansNoGroupRestriction": true,
+        "personalSessionDoesNotInheritGroupSkillAllowlist": true,
+        "groupRoundDoesNotPassInboundDepth": true,
+        "cannotBypassConfidentiality": true,
+        "l2CannotWidenL1": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true
+      },
+      "strategy": {
+        "id": "review_driven",
+        "goal": "发现问题",
+        "primaryStrength": "reviewer_required",
+        "openParticipation": "constrained",
+        "deliverableRequired": false,
+        "preserveConflict": true
+      },
+      "participation": {
+        "openDiscussionWithoutMention": false,
+        "maxVisibleBotRepliesPerRound": 5,
+        "mentionBotMustRespond": false,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true,
+        "lowSignalStrategy": "one_reply",
+        "humanStartsNewRound": true
+      },
+      "dispatch": {
+        "primaryThenSupplement": true,
+        "allowEvidenceCollection": false,
+        "coordinatorWrap": true,
+        "supplementEnabled": false,
+        "maxSupplementBots": 3,
+        "allowSecondaryTakeover": true
+      },
+      "governance": {
+        "decisionMode": "human_required",
+        "allowAgentPublishProposal": true,
+        "observer": {
+          "canRead": true,
+          "canMention": false,
+          "canRespond": false,
+          "canExecute": false,
+          "canApprove": false
+        },
+        "entersWaitingForHumanAfterVisibleTurnsExhausted": true,
+        "botMaySelfAdvanceWithoutHuman": false
+      },
+      "guidance": {
+        "systemInstructions": []
+      },
+      "provenance": {
+        "collaborationMode": {
+          "value": "review_driven",
+          "source": "l2"
+        },
+        "openDiscussionWithoutMention": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "allowSupplementAfterPrimary": {
+          "value": false,
+          "source": "l2",
+          "requested": false
+        },
+        "maxVisibleBotRepliesPerRound": {
+          "value": 5,
+          "source": "l1-default"
+        },
+        "mentionBotMustRespond": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "lowSignalStrategy": {
+          "value": "one_reply",
+          "source": "l1-default"
+        },
+        "coordinatorWrap": {
+          "value": true,
+          "source": "l2"
+        },
+        "decisionMode": {
+          "value": "human_required",
+          "source": "l1-default"
+        },
+        "allowAgentPublishProposal": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "allowSecondaryTakeover": {
+          "value": true,
+          "source": "l1-default"
+        }
+      },
+      "clamps": []
+    }
+  },
+  {
+    "input": {
+      "collaborationMode": "research",
+      "lowSignalStrategy": "all_named_confirmers",
+      "finalDecisionMode": "delegated_low_risk"
+    },
+    "legacy": {
+      "protocolVersion": "1.1",
+      "invariants": {
+        "protocolVersion": "1.1",
+        "maxVisibleRepliesCeiling": 12,
+        "mentionUnmatchedCannotDispatch": true,
+        "nonMemberCannotWrite": true,
+        "observerCannotWrite": true,
+        "archivedCannotDispatch": true,
+        "emptyEnabledSkillsMeansNoGroupRestriction": true,
+        "personalSessionDoesNotInheritGroupSkillAllowlist": true,
+        "groupRoundDoesNotPassInboundDepth": true,
+        "cannotBypassConfidentiality": true,
+        "l2CannotWidenL1": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true
+      },
+      "strategy": {
+        "id": "discussion_driven",
+        "goal": "形成认知",
+        "primaryStrength": "weak",
+        "openParticipation": "high",
+        "deliverableRequired": false,
+        "preserveConflict": false
+      },
+      "participation": {
+        "openDiscussionWithoutMention": false,
+        "maxVisibleBotRepliesPerRound": 5,
+        "mentionBotMustRespond": false,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true,
+        "lowSignalStrategy": "all_named_confirmers",
+        "humanStartsNewRound": true
+      },
+      "dispatch": {
+        "primaryThenSupplement": true,
+        "allowEvidenceCollection": false,
+        "coordinatorWrap": false,
+        "supplementEnabled": true,
+        "maxSupplementBots": 3,
+        "allowSecondaryTakeover": true
+      },
+      "governance": {
+        "decisionMode": "delegated_low_risk",
+        "allowAgentPublishProposal": true,
+        "observer": {
+          "canRead": true,
+          "canMention": false,
+          "canRespond": false,
+          "canExecute": false,
+          "canApprove": false
+        },
+        "entersWaitingForHumanAfterVisibleTurnsExhausted": true,
+        "botMaySelfAdvanceWithoutHuman": false
+      },
+      "guidance": {
+        "systemInstructions": []
+      },
+      "provenance": {
+        "collaborationMode": {
+          "value": "discussion_driven",
+          "source": "l1-default",
+          "requested": "research",
+          "constrainedBy": "collaborationMode in discussion_driven|task_driven|review_driven"
+        },
+        "openDiscussionWithoutMention": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "allowSupplementAfterPrimary": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "maxVisibleBotRepliesPerRound": {
+          "value": 5,
+          "source": "l1-default"
+        },
+        "mentionBotMustRespond": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "lowSignalStrategy": {
+          "value": "all_named_confirmers",
+          "source": "l2"
+        },
+        "coordinatorWrap": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "decisionMode": {
+          "value": "delegated_low_risk",
+          "source": "l2"
+        },
+        "allowAgentPublishProposal": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "allowSecondaryTakeover": {
+          "value": true,
+          "source": "l1-default"
+        }
+      },
+      "clamps": [
+        {
+          "field": "collaborationMode",
+          "requested": "research",
+          "effective": "discussion_driven",
+          "reason": "unknown_mode_falls_back_to_l1_default",
+          "source": "l1-default",
+          "constrainedBy": "collaborationMode in discussion_driven|task_driven|review_driven"
+        }
+      ]
+    }
+  },
+  {
+    "input": {
+      "systemInstructions": ["重要结论先复述约束", "  "],
+      "humanStartsNewRound": false,
+      "botMaySelfAdvanceWithoutHuman": true
+    },
+    "legacy": {
+      "protocolVersion": "1.1",
+      "invariants": {
+        "protocolVersion": "1.1",
+        "maxVisibleRepliesCeiling": 12,
+        "mentionUnmatchedCannotDispatch": true,
+        "nonMemberCannotWrite": true,
+        "observerCannotWrite": true,
+        "archivedCannotDispatch": true,
+        "emptyEnabledSkillsMeansNoGroupRestriction": true,
+        "personalSessionDoesNotInheritGroupSkillAllowlist": true,
+        "groupRoundDoesNotPassInboundDepth": true,
+        "cannotBypassConfidentiality": true,
+        "l2CannotWidenL1": true,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true
+      },
+      "strategy": {
+        "id": "discussion_driven",
+        "goal": "形成认知",
+        "primaryStrength": "weak",
+        "openParticipation": "high",
+        "deliverableRequired": false,
+        "preserveConflict": false
+      },
+      "participation": {
+        "openDiscussionWithoutMention": false,
+        "maxVisibleBotRepliesPerRound": 5,
+        "mentionBotMustRespond": false,
+        "mentionMustDispatch": true,
+        "mentionMaySilentIfNoIncrement": true,
+        "lowSignalStrategy": "one_reply",
+        "humanStartsNewRound": false
+      },
+      "dispatch": {
+        "primaryThenSupplement": true,
+        "allowEvidenceCollection": false,
+        "coordinatorWrap": false,
+        "supplementEnabled": true,
+        "maxSupplementBots": 3,
+        "allowSecondaryTakeover": true
+      },
+      "governance": {
+        "decisionMode": "human_required",
+        "allowAgentPublishProposal": true,
+        "observer": {
+          "canRead": true,
+          "canMention": false,
+          "canRespond": false,
+          "canExecute": false,
+          "canApprove": false
+        },
+        "entersWaitingForHumanAfterVisibleTurnsExhausted": true,
+        "botMaySelfAdvanceWithoutHuman": true
+      },
+      "guidance": {
+        "systemInstructions": ["重要结论先复述约束"]
+      },
+      "provenance": {
+        "collaborationMode": {
+          "value": "discussion_driven",
+          "source": "l1-default"
+        },
+        "openDiscussionWithoutMention": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "allowSupplementAfterPrimary": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "maxVisibleBotRepliesPerRound": {
+          "value": 5,
+          "source": "l1-default"
+        },
+        "mentionBotMustRespond": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "lowSignalStrategy": {
+          "value": "one_reply",
+          "source": "l1-default"
+        },
+        "coordinatorWrap": {
+          "value": false,
+          "source": "l1-default"
+        },
+        "decisionMode": {
+          "value": "human_required",
+          "source": "l1-default"
+        },
+        "allowAgentPublishProposal": {
+          "value": true,
+          "source": "l1-default"
+        },
+        "allowSecondaryTakeover": {
+          "value": true,
+          "source": "l1-default"
+        }
+      },
+      "clamps": []
+    }
+  }
+]

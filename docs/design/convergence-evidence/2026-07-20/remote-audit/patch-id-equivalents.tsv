@@ -1,0 +1,71 @@
+patch_id	sha_a	sha_b	subject_a	note
+f872ab70e66e32dd	04aa412d489ffad0036c2dda97b85a4ccc9992ac	-	fix(growth): restore tools counters in recordToolOutcome	cherry_mark=- vs_dev
+d2767e588108ad8b	6dcfe111e74c7748540ba6641b0f2a1de3dc0365	-	fix(ui): remove merge artifacts in enterprise identity editor	cherry_mark=- vs_dev
+4a45869b870c0261	81afe037c3d550d6eabdba860c51b77a22770aa1	-	docs(deploy): record rc-amd64-v7 unified-tip production cutover	cherry_mark=+ vs_dev
+ff49b51f2fdb9ff0	25d0d3718117dd67edfefff85214aaf82f3958b3	-	fix(platform-auth): harden seat snapshot and log gateway HTTP 500s	cherry_mark=+ vs_dev
+f886239e3d9fb824	c42270cb8b6aee0f21d3caa464bc28e99b22c116	-	fix(seat-assets): normalize array seat slices and legacy agentId	cherry_mark=+ vs_dev
+cd0e3176d17ccdc4	0c342299f3a27128e826a591f0018fa15b437aec	-	feat(knowledge): localFolder + passive connector gateway (P0–P5)	cherry_mark=+ vs_dev
+6ec042f343683284	248aec26836b3164981a5cb4765aac4a5bf1de1e	-	feat(gateway): register local-folder and passive connector methods	cherry_mark=+ vs_dev
+a3c0cb75a8e5ede4	748feb2718c43c895af547f2dbfaaa8712270a20	-	feat(gateway): resume local-folder watchers on startup	cherry_mark=+ vs_dev
+b8276704f5cfd8f9	d85bc43620c45e54277aa864acb10942586db5e3	-	feat(ui): localFolder and passive connector import funnel	cherry_mark=+ vs_dev
+da50fe68dd9ad55d	63b4ef3e01fe7167eafc56f7cc809d6a237021cc	-	chore: land home-page-contracts.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+5e0e79865507e6eb	b620099f1ae488985a186705e045e53366a4ddcd	-	chore: land workbench-stage-module.knowledge.node.test.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+53defdbf90b4dc6c	a7f64170dfd14620acbea343a96b69e24e27a1ef	-	chore: land render-model.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+0c531fdfef1a71a9	30feb838318f37e34dd8ba7346fe40c859e6547d	-	chore: land app.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+12ba505bfeb0a047	7eeaf572bc07f8eb4056d3e216aa2f312090be27	-	chore: land app-view-state-shell-slices.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+c73cc09687ff09a9	c51cfa09fed8655ac873c8b091e989db47b8bc3a	-	chore: land en.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+d39794754ea30796	3ab9ea85b85056bb00ef671f3eb3642d823f6463	-	chore: land zh-CN.ts for localFolder deploy wiring	cherry_mark=+ vs_dev
+9fb4f14f1e85e5f1	84e4c5212cbed2e2898a4c076d840c3064b89a4e	-	chore: land openbot-localfolder-passive-connector-acceptance-request-2026-07-14.md for localFolder deploy wiring	cherry_mark=+ vs_dev
+510984d05c5280ea	94219a8aae700180b2c536181861c6b35a70b44d	-	Knowledge: canonicalize localFolder root path to block symlink escape	cherry_mark=+ vs_dev
+46faa808b7c0a1ce	96bb9364df184b0c06f7115d31d77d0259e3b34c	-	Knowledge: extract isDirExcluded in localFolder walk	cherry_mark=+ vs_dev
+e54d1e0489c3cfa4	c65a1a0fccaf39985bcd7ba5bf63838f7d80578e	-	Knowledge: skip secret-bearing files on localFolder ingest	cherry_mark=+ vs_dev
+564b777276bb8665	e8195ae7ad6ce99d168a39e5aa749a3f6c478294	-	Knowledge: require outbound privacy ack for localFolder remote index	cherry_mark=+ vs_dev
+ef5ffbb8e3b82275	e8abdf14d7d0265e5854aef4010091f3c1643670	-	Knowledge: wire localFolder privacy fields (home-page-contracts.ts)	cherry_mark=+ vs_dev
+5bd77b57a3dc9055	465b1a282d8378fe3d9508eac9d5c60ef9cf3534	-	Knowledge: wire localFolder privacy fields (knowledge-universe.ts)	cherry_mark=+ vs_dev
+08d599f3030c291e	e7c2926dcc606efb03723c4372496fd64323b482	-	Knowledge: wire localFolder privacy fields (app.ts)	cherry_mark=+ vs_dev
+8706d6a9b711961b	4fa77c2290b46b9a1d422ef0115f7e8de292b695	-	Knowledge: wire localFolder privacy fields (app-view-state-shell-slices.ts)	cherry_mark=+ vs_dev
+79231c874d671f1f	749ccbeca2ed1335b384769096cd70de49e0a8ec	-	Knowledge: wire localFolder privacy fields (en.ts)	cherry_mark=+ vs_dev
+0ce2de9e6b1c3022	213c4c030304b963fb594554db1d1d83dfa7629d	-	Knowledge: wire localFolder privacy fields (zh-CN.ts)	cherry_mark=+ vs_dev
+8b175b99d5ed77d2	dfa3880a209abfb0990cb3a0bbcb243982f13b23	-	Knowledge: wire localFolder privacy fields (render-model.ts)	cherry_mark=+ vs_dev
+4fe9f4f8ffdc5c62	31ff972fc167331288c8b8d229e381801670dea9	-	Knowledge: allow CHANGELOG under EDGSC for localFolder privacy notes	cherry_mark=+ vs_dev
+e8968666ad6e5e04	360394af36bd0502be15d8c2d26fd0198b9cbee7	-	Knowledge: document localFolder outbound privacy notice in changelog	cherry_mark=+ vs_dev
+9b9f7278c37d6d75	e387fdff12b078581eeddbe4f8623f56cc094d9e	-	Changelog: move localFolder privacy note to end of Changes section	cherry_mark=+ vs_dev
+61aeda626287e5ce	d2130db1c67dee071fcb99a6cb5704ee526272b5	-	Knowledge: tighten localFolder secretScan typing for tsgo	cherry_mark=+ vs_dev
+f1208ed21a505c8e	5c9db4a925ca8e4e50f7c7ae0e11378cfb27941d	-	Knowledge: type workspaces.local.choose result in localFolder picker	cherry_mark=+ vs_dev
+	9f097ddbdb23db4b79934e57fc132b236206852f	-	Knowledge: cast workspaces.local.choose result for localFolder picker	cherry_mark=+ vs_dev
+	15fcd807f61325c855aaad3f8bb66746b4c4ea5e	-	Knowledge: cast workspaces.local.choose result for localFolder picker	cherry_mark=+ vs_dev
+59769631ccdd587e	38c5783fa4fa24e4a07a6b7cf9d78939f85c9f02	-	Docs: backfill localFolder remediation SHAs and R6 gate results	cherry_mark=+ vs_dev
+647e7dbd13401a43	80c03a1cb5ea3860e71ae414d9b049c5c2838796	-	Docs: set final tip SHA after acceptance backfill commit	cherry_mark=+ vs_dev
+f9bc4f14cb742641	5ea6cbb636ddbbe2aab36da041216367ed97e1c3	-	localFolder R2: scan pagination and resume cursor on gateway	cherry_mark=+ vs_dev
+0e7bbb66b8245b1d	04f0d0e8634b90e49f524863032d004a7cdcc23a	-	localFolder: server-side outbound privacy ack for bind	cherry_mark=+ vs_dev
+9547805e5bc3b0fd	dca0586993479378182f9f3b1066d478d35099c9	-	localFolder R2/UI: truncated banner, continue scan, send outboundAck	cherry_mark=+ vs_dev
+33e0a08975b9ff96	a1c01567f5ecff5b578eeabb688d95f4d314dfe5	local_ahead_of_origin_fix	chore(loom): claim CURSOR-DAY0-BRIEF under convergence task 	local_unpushed_sample
+800a5ef61cb93ae8	d0377a939f4fb1b2e6d9da78c5d4bb886fa72019	local_ahead_of_origin_fix	docs(spec): add Cursor Day0 brief for repository convergence 	local_unpushed_sample
+a180dc324f85551b	bdb094139f8964120d850813d451f10d0b987e11	local_ahead_of_origin_fix	chore(loom): register repository-wide-branch-convergence ownership 	local_unpushed_sample
+ed32419bcb049aa1	b3379be2272a7e0062a33564425a56691258414f	local_ahead_of_origin_fix	docs(spec): register repository-wide-branch-convergence tasks 	local_unpushed_sample
+afd7ec38f33e2ba6	37be821f59740069ec8995ce315fcee9004b508a	local_ahead_of_origin_fix	docs(design): APPROVED FOR DAY 0 + security L3 routing 	local_unpushed_sample
+6d766213e93c63d7	6b153b6f04175c031f73cb1d288438c5f0d543c0	local_ahead_of_origin_fix	docs(design): revise convergence execution plan for review P0/P1 	local_unpushed_sample
+f2f7f00fa9c14207	717fa9778518ab3df3b1eaf249e9adf1269467c4	local_ahead_of_origin_fix	docs(spec): mark localFolder golden path E2E done 	local_unpushed_sample
+d6ada717c11eadb6	0c38d934d5b905fe52698f43d3be6ae4fd3a22cc	local_ahead_of_origin_fix	test(knowledge): add localFolder import golden path E2E 	local_unpushed_sample
+3f9b31c890dc83e5	35e390762bfd35aa18eef8bbe1e54e49849a9614	local_ahead_of_origin_fix	docs(spec): track knowledge-import-branch-sync merge status 	local_unpushed_sample
+d1be553395fbeb58	15addf53734e3bfebc0422eef603b9b758f1ebb0	local_ahead_of_origin_fix	feat(gateway): register cloud-drive OAuth HTTP callback 	local_unpushed_sample
+3ad899a2cf28ed14	7421efcd7cb187c2815b3b185f6e81c0eb4fda53	local_ahead_of_origin_fix	feat(knowledge): align cloudDrive providers with baidu/aliyun/quark 	local_unpushed_sample
+071cc6497a84f291	6513be67efe1155643ba68179b9ca6a5a133f61a	local_ahead_of_origin_fix	feat(ui): wire localFolder import into app state and render-model 	local_unpushed_sample
+9278656dd26aae57	5c6a63478bef5cfd622698a8917da52585c4e6ad	local_ahead_of_origin_fix	feat(ui): localFolder and passive connector import funnel 	local_unpushed_sample
+a3c0cb75a8e5ede4	87be1721a51cd651d3cb08d1cf129713f5157173	local_ahead_of_origin_fix	feat(gateway): resume local-folder watchers on startup 	local_unpushed_sample
+6ec042f343683284	b4a4783fb6c95a1c87e32accb25e9c0a03924bd4	local_ahead_of_origin_fix	feat(gateway): register local-folder and passive connector methods 	local_unpushed_sample
+d382d02abdb7262c	69b62c2a314980e83e39e8744089f962c87d66cb	local_ahead_of_origin_fix	feat(knowledge): localFolder + passive connector gateway (P0–P5) 	local_unpushed_sample
+9d5c6ece91d97857	b3ad8a9138dcf199a802f5c369801e66eb0b8249	local_ahead_of_origin_fix	fix(session): promote global history over empty newer tenant entries 	local_unpushed_sample
+ef87551f91f7dec4	273232cf704060b76b214b4a3b86218abd5aeed4	local_ahead_of_origin_fix	fix(session): write agent chat turns to tenant session store 	local_unpushed_sample
+e443df2c04556d7e	6dd76e0fc60145c7462579b7d70b3b54db5c7db7	local_ahead_of_origin_fix	fix(tenant-context): promote global transcripts and resolve inbound tenant store path 	local_unpushed_sample
+e962a5b91b771fd5	8c12efd0af7df88da47d20e752a57141172be2de	local_ahead_of_origin_fix	fix(scopes): evolution-governance.attribution-stats requires operator.admin 	local_unpushed_sample
+d0b42053bf0db8e9	8042a4fb12606d2347886c9851feca6d18e6dc7d	local_ahead_of_origin_fix	fix(gateway): platform admin governance path skips membership tenant match 	local_unpushed_sample
+8cec952e99946952	a741f93eb76f7d3f9d5aac901e00c6e90d65bf6a	local_ahead_of_origin_fix	fix(governance): platform admin governs without membership; attribution admin-only 	local_unpushed_sample
+f2d6cff7b04a074c	2df59db9b30fda85f34dc4042afbfcfd080fb963	local_ahead_of_origin_fix	fix(gateway): govern ACL requires unique agent ownership for tenant operators 	local_unpushed_sample
+2cdb3b2d0393ca22	20ee736bbf765d41ee050ee7a214b09c1b06a59c	local_ahead_of_origin_fix	fix(governance): unique-tenant only for global runtime actions on shared agents 	local_unpushed_sample
+b547f1ae831a954c	fdd0a941515bac84e7c7d61326686c13296149aa	local_ahead_of_origin_fix	fix(governance): tenant ACL on evolution write/read RPCs and cancel candidateId 	local_unpushed_sample
+059eef5b6174451c	513700d94a1a201d338daf9eb506e15f4242a3a9	local_ahead_of_origin_fix	fix(gateway): govern-agent ACL helpers and platform admin gate 	local_unpushed_sample
+943d538b035d75e9	de196078532bbe7a02918d491b847b6f6f5c5eb8	local_ahead_of_origin_fix	fix(scopes): platform admin for global evolution governance controls 	local_unpushed_sample
+ecd3a06e07915483	7ba172d196e2896ab1c08777490cbb439dc4e0b3	local_ahead_of_origin_fix	feat(roster): AgentCatalogPort SoT with memory/local-file/remote/http adapters 	local_unpushed_sample
+1e10b2b9598b3ad1	cc2d10464a6c3a13873474fb7dc835f4e7e2c874	local_ahead_of_origin_fix	feat(agents): agents.list employee path awaits CatalogPort roster 	local_unpushed_sample
+9e5a833a2b5c6c84	33248642fb9328c63d930752ffc0ede522ac7aa9	local_ahead_of_origin_fix	chore(loom): register employee roster control-plane paths under GWSV 	local_unpushed_sample

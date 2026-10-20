@@ -1,0 +1,22 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w2-batch4-s14-s15-shadow/v2",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w2-batch4-s10-s15-shadow.json",
+  "kind": "item7-w2-batch4-dark-dual-read-shadow",
+  "wave": "W2-write-callers",
+  "batch": 4,
+  "sitesWired": [
+    "S10-agents-files-trusted",
+    "S11-agents-files-legacy",
+    "S12-agents-create-avatar",
+    "S13-agents-delete",
+    "S14-agents-list-trusted",
+    "S15-agents-list-legacy"
+  ],
+  "sitesDeferred": [],
+  "batch4bRef": "memory-workspace-phase1b-item7-w2-batch4b-s10-s13-shadow.json",
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "productionWrite": "legacy-only",
+  "sidecar": "src/gateway/agents-w2-shadow.ts",
+  "note": "S10-S13 completed in batch-4b via line-neutral hooks + agents.ts oxfmt ignore."
+}

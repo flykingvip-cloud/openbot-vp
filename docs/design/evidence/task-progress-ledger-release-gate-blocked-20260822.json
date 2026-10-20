@@ -1,0 +1,95 @@
+{
+  "schema": "task-progress-ledger-release-gate-blocked/v1",
+  "recordedAt": "2026-08-22T22:04:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "verdict": "block",
+  "decision": "production-release-not-approved-this-round",
+  "reason": "Fresh fetch succeeded in this session, but Latest cutover, live artifact, origin/main tip, and dirty worktree are not aligned. Do not build or cut over from this tree.",
+  "worktree": {
+    "branch": "kiro-loom/phase1a-section141-ownership-v2",
+    "head": "bca29399fbaab105984f515208e9862219933156",
+    "dirtyFileCount": 68,
+    "headIsAncestorOfOriginMain": false,
+    "originMainIsAncestorOfHead": false,
+    "fetchHeadWritable": true,
+    "fetchExit": 0,
+    "note": "Other sandboxes may still fail git fetch with .git/FETCH_HEAD Operation not permitted. This session ran as uid=501 daniel:staff and fetch succeeded."
+  },
+  "refs": {
+    "originMain": "affda8bce88939e42c57000896c13fc8a457f536",
+    "originMainSubject": "Merge pull request #607 from gmood2008/cursor-data-governance/phase1b-item7-retirement-batch3-s07",
+    "liveContainer": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "releaseRecordLatest": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "liveIsAncestorOfOriginMain": true,
+    "originMainCommitsNotInLive": [
+      "affda8bce8 Merge pull request #607",
+      "983dd19d32 Docs: record Item 7 retirement batch 3 in tasks",
+      "755ef92366 Chore: register Item 7 retirement batch 3 loom task",
+      "5b8ebdc68d Docs: add Item 7 batch 3 S07 handoff",
+      "a362040076 Docs: record Item 7 remaining 34 after S07",
+      "f77e00e912 Governance: retire Item 7 S07 checkpoint client lookup"
+    ]
+  },
+  "productionObserved": {
+    "container": "openbot-gateway-rc",
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "builtAt": "2026-08-22T13:00:50.669Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "overlayId": null,
+    "controlUiPin": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET"
+    },
+    "provenanceTagForLive": "provenance/sha-5c221b9ec38c"
+  },
+  "gates": {
+    "verifyForwardOnly": {
+      "candidate": "origin/main",
+      "exit": 0,
+      "verdict": "allow",
+      "warning": "running artifact LIVE 5c221b9ec38c6316b98797342a01fb39ffd80562 differs from release record c393dca8feedd8b9db1a1f7fafc4796ac60b5d06"
+    },
+    "verifyDeliveryAlignmentLiveMatchedTag": {
+      "prodSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "candidateSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "candidateTag": "provenance/sha-5c221b9ec38c",
+      "exit": 1,
+      "summary": "PASS=8 WARN=2 FAIL=1",
+      "blocker": "L3 SoT RELEASE_RECORD missing prod SHA 5c221b9ec38c6316b98797342a01fb39ffd80562"
+    },
+    "verifyDeliveryAlignmentStaleTag": {
+      "candidateTag": "provenance/sha-c393dca8feed",
+      "exit": 1,
+      "summary": "PASS=5 WARN=3 FAIL=3",
+      "note": "Stale tag points at c393dca8fe, not live 5c221b9e. Do not use this tag as the live candidate."
+    },
+    "checkSotUseReleaseRecordLive": {
+      "command": "pnpm delivery:check-sot -- --use-release-record-live",
+      "exit": 20,
+      "liveInjectedFromRecord": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+      "candidateRef": "origin/release/baseline-recovery-20260725",
+      "note": "Frozen SoT branch is behind main. Informational; AGENTS.md cutover source is origin/main. Not a green light and not the Progress Ledger blocker."
+    }
+  },
+  "explicitlyNotDone": [
+    "Did not build from kiro-loom/phase1a-section141-ownership-v2",
+    "Did not build from the dirty worktree",
+    "Did not cut over origin/main affda8bc",
+    "Did not rewrite RELEASE_RECORD Latest onto 5c221b9e from this mixed tree",
+    "Did not recreate the production container"
+  ],
+  "requiredBeforeNextCutover": [
+    "Use a clean worktree with .git write permission; git fetch origin immediately before gates",
+    "Candidate must be the freshly fetched origin/main tip, currently affda8bce88939e42c57000896c13fc8a457f536 until the next fetch",
+    "Mint/verify provenance tag for that tip before claiming L1/L2 alignment",
+    "Rewrite Latest cutover so Source revision equals container build-info commit",
+    "Build full gateway+UI from that clean tip and verify /app/dist/build-info.json commit",
+    "Re-run verify-forward-only.sh, verify-delivery-alignment.sh, and pnpm delivery:check-sot -- --use-release-record-live"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "memory-workspace-phase1b-item6-implementation-start/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-start.json",
+  "kind": "item6-implementation-start",
+  "item6": "not-met",
+  "item6Met": false,
+  "item6ImplementationUnlocked": true,
+  "productionSqliteWrite": false,
+  "authorizedSqliteEnv": "OPENBOT_AUTHORIZED_SQLITE_PATH",
+  "runtime": "src/memory/item6-authorized-sqlite-path.ts",
+  "phase1bUnlock": "not-issued",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "thisPacketMarksItem6Met": false,
+  "note": "Item 6 implementation start: authorized-path gate only. No production sqlite write."
+}

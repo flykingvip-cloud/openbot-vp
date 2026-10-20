@@ -1,0 +1,2 @@
+export const PAIRING_APPROVED_MESSAGE =
+  "✅ OpenBot access approved. Send a message to start chatting.";

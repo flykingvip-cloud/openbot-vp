@@ -1,0 +1,645 @@
+# BaselineManifest — Constitutional runtime activation Checkpoint B (APPROVED, freeze cycle 2)
+# Agent: kiro-constitutional-activation (Loom takeover from network-9aeee1a3)
+# Task: constitutional-runtime-activation-readiness
+# Docs only. runtimeEnabled stays false. productionProven stays unknown.
+# checkpointCImplementationAuthorized is true: allows creation of a new default-off Checkpoint C
+# implementation task only.
+# Do not invent gateway, UI, or ledger SHAs.
+# Checkpoint B = APPROVED. Cycle 1 (PR #183, superseded and closed): Architecture AGREE,
+# Security REVISE, Execution-chain REVISE. Cycle 2 (PR #204, rebase-merged into main at
+# 364c2e813 on 2026-09-29T06:36:09Z): Architecture, Security and Execution-chain
+# AGREE_SHADOW_WIRING (conditions none) against the same digest; final acceptance in
+# checkpoint-b-final-acceptance-cycle2.md; landing record in checkpoint-b-landing-record-cycle2.md.
+# origin/main d36d1a035, b6f83ce98, 8bfecac4d and b9c830ad2 were merged into the cycle-2 source
+# branch by 763780bb3, d2c6ce131, e2a5c0564 and ac004e123; the rebase merge dropped those merges.
+# The only reviewed-path drift (execution-preflight/
+# resolve.ts binding-prompt wording, e4576c9a6..b6f83ce98) was adjudicated NON_IMPACTING by
+# Architecture (main-drift addendum); b6f83ce98..8bfecac4d contains no reviewed-path change.
+# See checkpoint-b-design-digest.md. No src/packages writes. Checkpoint C starts only after the
+# post-merge closeout lands on main (new task constitutional-runtime-shadow-wiring-implementation).
+
+schemaVersion: 1
+checkpoint: B
+checkpointScope: read-only-shadow-wiring-design-revise
+checkpointBDesignOnly: true
+checkpointBStatus: APPROVED
+checkpointBFreezeCycle: 2
+cycle1Reviews:
+  architecture: AGREE_SHADOW_WIRING
+  security: REVISE
+  executionChain: REVISE
+  digestStatus: superseded
+cycle2Reviews:
+  architecture: AGREE_SHADOW_WIRING
+  architectureConditions: none
+  architectureReceiptSha256: 6ff86b774f77a11361e5d318eaaefce7b12bbf0f18e6cd6689a9e83363d66ec1
+  architectureMainDriftDecision: NON_IMPACTING
+  architectureMainDriftAddendumSha256: 97ec470c53281d590457b740796a7a45e162cec2998caa7531256ec784bee73e
+  security: AGREE_SHADOW_WIRING
+  securityConditions: none
+  securityReceiptSha256: ced8906517a1c397444ac54721a1d89c67efb2eb8edcd3639e4d7df48ca5904f
+  executionChain: AGREE_SHADOW_WIRING
+  executionChainConditions: none
+  executionChainReceiptSha256: b6530fc25addfb0047419d41a525b89421ff582d0576e08f760a3cf7002765c2
+  finalAcceptance: checkpoint-b-final-acceptance-cycle2.md
+  finalAcceptanceSha256: 5ff47d139ae7d04831c3859eafb7a643c5fc2303c39ddfecd5b1fe36e1b012fd
+  finalAcceptanceSha256AsLanded: d6d13ffc8c0285ebaa31fbe496e1a98e1be8ff968f1b30fa548c02eeddc68ed9
+  landingRecord: checkpoint-b-landing-record-cycle2.md
+  landingRecordSha256: 6f13dc79bfad85a6a66d3c9825995b9a10338684488ec2135f88d77e6f94e604
+# The request files are kept verbatim as historical records; their "PENDING (this request)"
+# wording records the state at request time and is not rewritten.
+cycle2ReviewRequests:
+  security:
+    status: fulfilled
+    receiptSha256: ced8906517a1c397444ac54721a1d89c67efb2eb8edcd3639e4d7df48ca5904f
+  executionChain:
+    status: fulfilled
+    receiptSha256: b6530fc25addfb0047419d41a525b89421ff582d0576e08f760a3cf7002765c2
+checkpointCImplementationAuthorized: true
+checkpointCImplementationAuthorizationScope: "Allows creation of a new default-off Checkpoint C implementation task only. Does not authorize enabling the flag, production wiring, SELECT, EXECUTE, deployment, or a production-proven claim."
+checkpointCStarted: false
+checkpointCStartCondition: "after the post-merge closeout lands on main"
+checkpointCTask: constitutional-runtime-shadow-wiring-implementation
+checkpointCRequirements:
+  - new branch
+  - new isolated worktree
+  - new Loom task and session
+  - latest origin/main as base
+  - only the exact paths approved in shadow-wiring-scope.md
+  - default-off implementation
+  - tests B-01..B-39
+  - no flag enablement
+  - no deployment
+# PR #204 landing (post-merge closeout; see checkpoint-b-landing-record-cycle2.md):
+postMergeLanding:
+  checkpointBStatus: APPROVED
+  checkpointCImplementationAuthorized: true
+  runtimeEnabled: false
+  productionProven: unknown
+  pr: 204
+  prState: MERGED
+  mergeMethod: rebase
+  mergedAt: "2026-09-29T06:36:09Z"
+  mergeSha: 364c2e8131dc1fccaa292c192a6c54b2dbbc90c5
+  acceptanceCommentUrl: https://github.com/upbeyond/openbot/pull/204#issuecomment-5884967649
+  sourceBranch: kiro-constitutional-activation/checkpoint-b-cycle2-revise
+  sourceBranchPreserve: true
+  sourceHeadSha: ac004e12327e0ad90f73d0e32bee627667f1f33a
+  landedDesignCommitSha: c11e904b84be7566d63077d4313a4c97002d5b3c
+  landedRegistryCommitSha: bc39e33a54c704398fdb735440fa2bb438e2e9ee
+  landedArchitectureReviewedStatusCommitSha: cd721d4468bad0a9d8f84cb716021ba28fead549
+  landedPatchIdsMatchSource: true
+  droppedSourceMergeCommits:
+    - 763780bb345dd4748e20f3eaa24125701430331e
+    - d2c6ce13140a3e72657df98b857c6c82bf6af01f
+    - e2a5c0564317c40084b5ecb4f29b93a2c3aa970d
+    - ac004e12327e0ad90f73d0e32bee627667f1f33a
+  lastMainMergedIntoSourceBranch: b9c830ad214363b933e3eed478fe8b22f61aabf2
+  postMergeMainSha: 52b8bba1087b087b03eca1ad9558a49664735c64
+  postMergeReviewedPathDrift: false
+  combinedDesignDigestAtPostMergeMain: 08a12fe9ce6352ff161d22f01c026b516069b6bf7169be37bb2a68115763ce21
+  finalAcceptanceSha256AsLanded: d6d13ffc8c0285ebaa31fbe496e1a98e1be8ff968f1b30fa548c02eeddc68ed9
+  finalAcceptanceSha256: 5ff47d139ae7d04831c3859eafb7a643c5fc2303c39ddfecd5b1fe36e1b012fd
+  landingRecord: checkpoint-b-landing-record-cycle2.md
+  landingRecordSha256: 6f13dc79bfad85a6a66d3c9825995b9a10338684488ec2135f88d77e6f94e604
+selectedCandidate: A
+rejectedCandidate: B
+proposedFlag: OPENBOT_CONSTITUTIONAL_RUNTIME_SHADOW
+proposedFlagDefault: off
+depsInjectionScheme: run.ts-reads-one-flag-once-and-passes-frozen-boolean-deps-via-EmbeddedRunAttemptParams
+depsShape: "{ runtimeShadowEnabled: boolean, sink, now }"
+depsCarriesEnvMap: false
+depsFieldRequired: true
+envKeysRead:
+  - OPENBOT_CONSTITUTIONAL_RUNTIME_SHADOW
+envReadLocation: src/agents/pi-embedded-runner/run.ts
+attemptCreatesDefaultDeps: false
+attemptAddsProcessEnvReads: false
+attemptPreexistingProcessEnvRefs: 2
+moduleLevelNoopSinkAllowed: true
+attemptLevelSinkInitWhenGateOff: false
+sinkCallsViaSafeWrappers: true
+sinkFailureFallbackChannel: none
+profileCategoryFirstSlice: unspecified
+profileResolutionDependency: false
+directRunEmbeddedAttemptCallers:
+  - src/agents/pi-embedded-runner/run.ts
+  - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
+  - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
+plannedTestCount: 39
+minimumPlannedTestCount: 37
+
+assessedAt: 2026-09-29T17:54:00+0800
+remoteSoT: https://github.com/upbeyond/openbot.git
+worktree: <isolated-worktree>
+primaryWorktree: <primary-openbot-worktree>
+branch: kiro-constitutional-activation/checkpoint-b-cycle2-revise
+agent: kiro-constitutional-activation
+priorAgent: network-9aeee1a3
+
+# Review binding (cycle 2 = current; cycle 1 = superseded history):
+cycle2:
+  pr: 204
+  branch: kiro-constitutional-activation/checkpoint-b-cycle2-revise
+  designHeadSha: 7a87dfdfcd0ff74e069a02df78faaa54f25a4cf9
+  registryCommitSha: 532e995a67c942fec41b790797b05303c747c2b4
+  architectureReviewedStatusHeadSha: 3b1eec593ac8df871b8bf3ecf63e0ba8bd4b59e7
+  mergeCommitSha: 763780bb345dd4748e20f3eaa24125701430331e
+  mergedMainSha: d36d1a035dc94edbaaef2e7ef376af3f6bc59fc3
+  architectureAcceptanceStatusCommitSha: bd4634170fa61a7b65c8520899c15cef58276342
+  secondMergeCommitSha: d2c6ce13140a3e72657df98b857c6c82bf6af01f
+  secondMergedMainSha: b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+  driftStatusCommitSha: 030c2e993d5a5d0dc106d9af42e2d015ced03034
+  thirdMergeCommitSha: e2a5c0564317c40084b5ecb4f29b93a2c3aa970d
+  thirdMergedMainSha: 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+  mergedMainStatusRefreshCommitSha: b74f802c7a7add4e93ff24774a293ae361ee89f6
+  finalReceiptStatusCommitSha: dbc7cc519e9f29843de2bf5e865d1704860c7ddb
+  fourthMergeCommitSha: ac004e12327e0ad90f73d0e32bee627667f1f33a
+  fourthMergedMainSha: b9c830ad214363b933e3eed478fe8b22f61aabf2
+  statusHeadSha: derived-from-git-head
+  statusHeadShaNote: "The latest status commit cannot record its own SHA. The PR #204 final receipt/status commit was dbc7cc519 (landed on main as 364c2e813); the post-merge closeout commit's SHA is recorded in the closeout PR. The cycle-2 Architecture receipt, the Architecture main-drift addendum and both review requests bind statusHeadSha 3b1eec593ac8df871b8bf3ecf63e0ba8bd4b59e7 (landed as cd721d446)."
+  architectureOriginalReviewedMainSha: e4576c9a6ffefd7a07d32f1bf1e638731d1aba2d
+  architectureUpdatedReviewedMainSha: b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+  latestMergedMainSha: 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+  mainDrift:
+    resolvePromptWording:
+      reviewedRange: e4576c9a6..b6f83ce98
+      file: src/agents/execution-preflight/resolve.ts
+      classification: NON_IMPACTING
+      architectureAddendum: reviews/architecture-main-drift-addendum-cycle2.md
+      architectureAddendumSha256: 97ec470c53281d590457b740796a7a45e162cec2998caa7531256ec784bee73e
+      architectureDecision: AGREE_SHADOW_WIRING
+      conditions: none
+    laterMainDrift:
+      range: b6f83ce98..8bfecac4d
+      reviewedPathsChanged: false
+  combinedDesignDigest: 08a12fe9ce6352ff161d22f01c026b516069b6bf7169be37bb2a68115763ce21
+  architectureReceipt: reviews/architecture-review-checkpoint-b-cycle2.md
+  architectureReceiptSha256: 6ff86b774f77a11361e5d318eaaefce7b12bbf0f18e6cd6689a9e83363d66ec1
+  securityReceipt: reviews/security-review-checkpoint-b-cycle2.md
+  securityReceiptSha256: ced8906517a1c397444ac54721a1d89c67efb2eb8edcd3639e4d7df48ca5904f
+  executionChainReceipt: reviews/execution-chain-review-checkpoint-b-cycle2.md
+  executionChainReceiptSha256: b6530fc25addfb0047419d41a525b89421ff582d0576e08f760a3cf7002765c2
+  finalAcceptance: checkpoint-b-final-acceptance-cycle2.md
+  finalAcceptanceSha256: 5ff47d139ae7d04831c3859eafb7a643c5fc2303c39ddfecd5b1fe36e1b012fd
+  finalAcceptanceSha256AsLanded: d6d13ffc8c0285ebaa31fbe496e1a98e1be8ff968f1b30fa548c02eeddc68ed9
+  landingRecord: checkpoint-b-landing-record-cycle2.md
+  landingRecordSha256: 6f13dc79bfad85a6a66d3c9825995b9a10338684488ec2135f88d77e6f94e604
+  dualReviewRequiredBinding:
+    designHeadSha: 7a87dfdfcd0ff74e069a02df78faaa54f25a4cf9
+    combinedDesignDigest: 08a12fe9ce6352ff161d22f01c026b516069b6bf7169be37bb2a68115763ce21
+    architectureReceiptSha256: 6ff86b774f77a11361e5d318eaaefce7b12bbf0f18e6cd6689a9e83363d66ec1
+    updatedReviewedMainSha: b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+    architectureMainDriftAddendumSha256: 97ec470c53281d590457b740796a7a45e162cec2998caa7531256ec784bee73e
+  mainMergePolicyBeforePush:
+    mergeAgainWhenReviewedPathsUnchanged: true
+    statusFilesUpdatedOnSuchMerge: false
+    laterMergeShasRecordedIn: "PR #204 comments"
+    stopForArchitectureDriftAdjudicationOnChangeIn:
+      - packages/constitutional-*
+      - src/agents/execution-preflight/**
+      - src/agents/pi-embedded-runner/run.ts
+      - src/agents/pi-embedded-runner/run/types.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
+      - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
+      - src/task-orchestration/constitutional-runtime-facade.ts
+      - src/gateway/security-profile.ts
+
+cycle1:
+  pr: 183
+  branch: network-9aeee1a3/constitutional-runtime-shadow-wiring-design-revise
+  status: superseded-and-closed
+  remoteHeadPreserved: ff5ca33bd8e9b570f81d8a56cd2a4ba186ba4dc0
+  supersedeCommentUrl: https://github.com/upbeyond/openbot/pull/183#issuecomment-5871576952
+  crossReferenceUrl: https://github.com/upbeyond/openbot/pull/183#issuecomment-5871836621
+
+# Current freeze (cycle 2):
+freezeCycle2:
+  combinedDesignDigest: 08a12fe9ce6352ff161d22f01c026b516069b6bf7169be37bb2a68115763ce21
+  designHeadSha: 7a87dfdfcd0ff74e069a02df78faaa54f25a4cf9
+  registryCommitSha: 532e995a67c942fec41b790797b05303c747c2b4
+  architectureReviewedStatusHeadSha: 3b1eec593ac8df871b8bf3ecf63e0ba8bd4b59e7
+  mergeCommitSha: 763780bb345dd4748e20f3eaa24125701430331e
+  mergedMainSha: d36d1a035dc94edbaaef2e7ef376af3f6bc59fc3
+  architectureAcceptanceStatusCommitSha: bd4634170fa61a7b65c8520899c15cef58276342
+  secondMergeCommitSha: d2c6ce13140a3e72657df98b857c6c82bf6af01f
+  secondMergedMainSha: b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+  driftStatusCommitSha: 030c2e993d5a5d0dc106d9af42e2d015ced03034
+  thirdMergeCommitSha: e2a5c0564317c40084b5ecb4f29b93a2c3aa970d
+  thirdMergedMainSha: 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+  mergedMainStatusRefreshCommitSha: b74f802c7a7add4e93ff24774a293ae361ee89f6
+  finalReceiptStatusCommitSha: dbc7cc519e9f29843de2bf5e865d1704860c7ddb
+  fourthMergeCommitSha: ac004e12327e0ad90f73d0e32bee627667f1f33a
+  fourthMergedMainSha: b9c830ad214363b933e3eed478fe8b22f61aabf2
+  statusHeadSha: derived-from-git-head
+  architectureOriginalReviewedMainSha: e4576c9a6ffefd7a07d32f1bf1e638731d1aba2d
+  architectureUpdatedReviewedMainSha: b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+  latestMergedMainSha: 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+  verificationBaselineSha: fdfec5d2b36448c55e514e58b08fb647235836c9
+  verificationBaselineSubject: "Meeting: deliver notices into the attendee chat. (#199)"
+  designCommitsBaseSha: e4576c9a6ffefd7a07d32f1bf1e638731d1aba2d
+  prBaseSha: b9c830ad214363b933e3eed478fe8b22f61aabf2
+  prBaseShaNote: "merge-base with origin/main at the PR #204 head ac004e123 (before the rebase merge)"
+  prBaseAtFreeze: d22acc6e0ab96df77108024b3e20a4d01ab58875
+  implementationSurfaceDriftPrBaseToBaseline:
+    - path: src/agents/execution-preflight/resolve.ts
+      status: M
+      via: "1e2727a47 Reply: detect language from the user sentence and open nested deliverables."
+      scope: "reviewed path; explicitly out of scope for the first wire (shadow-wiring-scope.md §2)"
+      classification: NON_IMPACTING
+      adjudication: reviews/architecture-main-drift-addendum-cycle2.md
+  reverifiedAt: 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+  reverifiedNote: "run.ts, run/types.ts, run/attempt.ts, run/params.ts and both direct-caller test files are blob-identical at fdfec5d2b, e4576c9a6, d36d1a035, b6f83ce98 and 8bfecac4d; src/agents/pi-embedded-runner has no diff from fdb47dfe4 to 8bfecac4d; direct callers unchanged (3); attempt.ts process.env refs unchanged (2). The only reviewed-path change up to 8bfecac4d is the binding-prompt wording change in execution-preflight/resolve.ts (fixedUserStop; no export line changed), adjudicated NON_IMPACTING by Architecture; b6f83ce98..8bfecac4d contains no reviewed-path change."
+  unchangedFromCycle1:
+    - candidate-comparison.md
+  receipts:
+    architecture:
+      path: reviews/architecture-review-checkpoint-b-cycle2.md
+      decision: AGREE_SHADOW_WIRING
+      conditions: none
+      sha256: 6ff86b774f77a11361e5d318eaaefce7b12bbf0f18e6cd6689a9e83363d66ec1
+    architectureMainDriftAddendum:
+      path: reviews/architecture-main-drift-addendum-cycle2.md
+      driftDecision: NON_IMPACTING
+      decision: AGREE_SHADOW_WIRING
+      conditions: none
+      sha256: 97ec470c53281d590457b740796a7a45e162cec2998caa7531256ec784bee73e
+      formattingOnlyConfirmation: confirmed
+      confirmation: formatting-only / no-semantic-change
+    security:
+      path: reviews/security-review-checkpoint-b-cycle2.md
+      decision: AGREE_SHADOW_WIRING
+      conditions: none
+      sha256: ced8906517a1c397444ac54721a1d89c67efb2eb8edcd3639e4d7df48ca5904f
+      oxfmtChange: none
+      formattingOnlyConfirmation: confirmed
+      confirmation: formatting-only / no-semantic-change
+      request: reviews/security-review-request-checkpoint-b.md
+      requestStatus: fulfilled
+    executionChain:
+      path: reviews/execution-chain-review-checkpoint-b-cycle2.md
+      decision: AGREE_SHADOW_WIRING
+      conditions: none
+      sha256: b6530fc25addfb0047419d41a525b89421ff582d0576e08f760a3cf7002765c2
+      source: "PR #204 comment https://github.com/upbeyond/openbot/pull/204#issuecomment-5883728788 (handoff title line removed)"
+      oxfmtChange: "removed one trailing blank line"
+      formattingOnlyConfirmation: confirmed
+      confirmation: formatting-only / no-semantic-change
+      request: reviews/execution-chain-review-request-checkpoint-b.md
+      requestStatus: fulfilled
+  finalAcceptance:
+    path: checkpoint-b-final-acceptance-cycle2.md
+    sha256: 5ff47d139ae7d04831c3859eafb7a643c5fc2303c39ddfecd5b1fe36e1b012fd
+    sha256AsLanded: d6d13ffc8c0285ebaa31fbe496e1a98e1be8ff968f1b30fa548c02eeddc68ed9
+    status: APPROVED
+    decision: AGREE_SHADOW_WIRING
+  reviewOrder: "Architecture AGREE_SHADOW_WIRING recorded; main drift to b6f83ce98 adjudicated NON_IMPACTING by Architecture (addendum); b6f83ce98..8bfecac4d contains no reviewed-path change; Security and Execution-chain then returned AGREE_SHADOW_WIRING, conditions none, each independently against the same digest, architectureUpdatedReviewedMainSha and the addendum; tripartite acceptance closed (checkpoint-b-final-acceptance-cycle2.md)"
+designDigestPath: checkpoint-b-design-digest.md
+designFreezeRule: "Any byte change to the 11 frozen design files invalidates receipts bound to the current digest."
+
+# Superseded freeze (cycle 1), retained for audit:
+supersededFreezes:
+  - checkpointBFreezeCycle: 1
+    combinedDesignDigest: ebdc3bff1c7e417b1c87397ce319cae9088c18c302147e51c53c6f63034bc987
+    status: superseded
+    reason: Security and Execution-chain REVISE
+    pr: 183
+    designHeadSha: 6779fffcd71d64dade6a07381df4b6a44c60a712
+    designHeadSubject: "Docs: lock Checkpoint B deps injection via EmbeddedRunAttemptParams"
+    reviewedMainSha: fdb47dfe4ef076201d30ae223b8dc6f8c63753ca
+    statusHeadSha: ff5ca33bd8e9b570f81d8a56cd2a4ba186ba4dc0
+    receipts:
+      architecture:
+        path: reviews/architecture-review-checkpoint-b.md
+        decision: AGREE_SHADOW_WIRING
+        conditions: none
+        sha256: 4879cbd4e070a88e238b97f4e898b7871aafe0a2c6efe2881cba433e96e2b287
+      security:
+        path: reviews/security-review-checkpoint-b.md
+        decision: REVISE
+        sha256: 484990a9742b139c772d59352d9d8549a04a657982ec93fd0c9afc18ac857367
+        formattingOnlyConfirmation: confirmed
+        status: superseded-by-cycle-2
+      executionChain:
+        path: reviews/execution-chain-review-checkpoint-b.md
+        decision: REVISE
+        sha256: 7d8d7c6df752615b7699c9fae686a21f247ce838e4c636d07f0f23754bb097a0
+        formattingOnlyConfirmation: confirmed
+        status: superseded-by-cycle-2
+
+# Prior design tip (PR #181 pre-merge head baseline at first design write):
+priorDesignBaselineSha: 76a0dbfccc18a06b3519631de2f3fddad43bb3ba
+priorDesignBaselineSubject: "docs(OBS-3): §8.4 enforced admission checklist (#179)"
+
+# Design merge on trunk:
+designPr: 181
+designMergeSha: 677a7aa1f1b0f4c00bde4dce6d2d823a58f26715
+designMergeSubject: "Docs: Checkpoint B read-only Constitutional shadow wiring design (#181)"
+mergedBeforeArchitectureAcceptance: true
+
+# Original revise branch base (before the cycle-2 rebases):
+reviseBaselineSha: d22acc6e0ab96df77108024b3e20a4d01ab58875
+reviseBaselineSubject: "Fix tenant session owner domain typing (#185)"
+originMainSha: 52b8bba1087b087b03eca1ad9558a49664735c64
+originMainSubject: "Deploy: publish the enterprise intake page and nginx routes"
+ancestryVerified: true
+codeBaselineNote: "Implementation-surface paths are identical across d22acc6e, fdfec5d2b, ca0c3765, b18925456, f00d2d09b, e4576c9a6 and d36d1a035; at b6f83ce98 the only reviewed-path change is the binding-prompt wording change in execution-preflight/resolve.ts (explicitly out of scope for the first wire; adjudicated NON_IMPACTING by Architecture); b6f83ce98..8bfecac4d, 8bfecac4d..b9c830ad2 and b9c830ad2..52b8bba10 contain no reviewed-path change. The caller inventory and attempt.ts env references were verified at fdfec5d2b and re-verified at e4576c9a6, d36d1a035, b6f83ce98, 8bfecac4d, b9c830ad2 and 52b8bba10."
+
+# Rebase history of the cycle-2 branch (PR #183 itself was never rewritten):
+rebase:
+  rebasedOnto: e4576c9a6ffefd7a07d32f1bf1e638731d1aba2d
+  preRebaseHead: ff5ca33bd8e9b570f81d8a56cd2a4ba186ba4dc0
+  preRebaseBase: d22acc6e0ab96df77108024b3e20a4d01ab58875
+  currentCommitsOnPr204:
+    - from: 551b6031c
+      to: dbaf769d4
+      subject: "Docs: revise Constitutional Checkpoint B shadow wiring design"
+    - from: 6779fffcd
+      to: a9614bcec
+      subject: "Docs: lock Checkpoint B deps injection via EmbeddedRunAttemptParams"
+    - from: ff5ca33bd
+      to: a7385822a
+      subject: "Docs: freeze Checkpoint B design digest; Architecture AGREE"
+    - to: 7a87dfdfc
+      subject: "Docs: revise Checkpoint B shadow wiring after dual review"
+      role: cycle-2 designHeadSha
+    - to: 532e995a6
+      subject: "Loom: transfer Constitutional activation readiness owner"
+      role: cycle-2 registryCommitSha
+    - to: 3b1eec593
+      subject: "Docs: align Checkpoint B cycle-2 status metadata"
+      role: cycle-2 statusHeadSha reviewed by Architecture
+    - to: 763780bb3
+      subject: "Merge origin/main into Checkpoint B cycle-2 branch"
+      role: merge of origin/main d36d1a035 (no rewrite)
+    - to: bd4634170
+      subject: "Docs: record Checkpoint B cycle-2 Architecture acceptance"
+      role: status commit recording the cycle-2 Architecture receipt and review requests
+    - to: d2c6ce131
+      subject: "Merge latest origin/main into Checkpoint B cycle-2 branch"
+      role: merge of origin/main b6f83ce98 (no rewrite)
+    - to: 030c2e993
+      subject: "Docs: adjudicate Checkpoint B cycle-2 main drift"
+      role: drift status commit recording the Architecture main-drift addendum
+    - to: e2a5c0564
+      subject: "Merge latest origin/main into Checkpoint B cycle-2 branch"
+      role: merge of origin/main 8bfecac4d (no rewrite)
+    - to: b74f802c7
+      subject: "Docs: refresh Checkpoint B cycle-2 merged-main status"
+      role: merged-main status refresh
+    - to: dbc7cc519
+      subject: "Docs: close Checkpoint B cycle-2 tripartite acceptance"
+      role: final receipt/status commit
+    - to: ac004e123
+      subject: "Merge latest origin/main into Checkpoint B cycle-2 branch"
+      role: "merge of origin/main b9c830ad2 (pre-authorized rule); PR #204 head at merge"
+  landedOnMainBy: "PR #204 rebase merge 364c2e813 (non-merge commits re-created with identical patch-ids; merge commits dropped; see postMergeLanding and checkpoint-b-landing-record-cycle2.md)"
+  historicalPreFinalRebaseShas:
+    note: "Historical pre-final-rebase SHAs only; not current equivalents of any commit."
+    shas:
+      - a2a83918e
+      - 2a0f3bdf7
+      - d8b6a329c
+      - 16ee3565f
+      - 7cc16e480
+      - a3d721e6c
+      - b7d2f0443
+      - a2613a73c
+  rebaseRounds: "3 (onto b18925456, f00d2d09b, then e4576c9a6 as main advanced; spec tree identical after each)"
+  specTreeIdenticalAfterRebase: true
+  note: "PR #183 was not force-pushed, tagged or deleted; its remote branch keeps ff5ca33, so the cycle-1 receipt references (6779fff, ff5ca33) remain reachable. Cycle 2 continues on the new branch and PR #204."
+
+mergeAfterArchitectureReview:
+  mergeCommitSha: 763780bb345dd4748e20f3eaa24125701430331e
+  mergedMainSha: d36d1a035dc94edbaaef2e7ef376af3f6bc59fc3
+  parents:
+    - 3b1eec593ac8df871b8bf3ecf63e0ba8bd4b59e7
+    - d36d1a035dc94edbaaef2e7ef376af3f6bc59fc3
+  note: "Merged (not rebased) after the cycle-2 Architecture review so that 7a87dfdfc and 3b1eec593 keep their SHAs. The merge changes no file under this spec directory and none of the reviewed implementation paths."
+  secondMerge:
+    mergeCommitSha: d2c6ce13140a3e72657df98b857c6c82bf6af01f
+    mergedMainSha: b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+    parents:
+      - bd4634170fa61a7b65c8520899c15cef58276342
+      - b6f83ce98b9d0bbf69f1f3cf8be4fcd3567366a0
+    reviewedPathDrift: src/agents/execution-preflight/resolve.ts
+    reviewedPathDriftClassification: NON_IMPACTING
+    note: "Merged (not rebased) so that 7a87dfdfc, 3b1eec593 and bd4634170 keep their SHAs. The merge changes no file under this spec directory. The only reviewed-path change it brings in is the binding-prompt wording change in execution-preflight/resolve.ts, adjudicated NON_IMPACTING by Architecture (reviews/architecture-main-drift-addendum-cycle2.md)."
+  thirdMerge:
+    mergeCommitSha: e2a5c0564317c40084b5ecb4f29b93a2c3aa970d
+    mergedMainSha: 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+    parents:
+      - 030c2e993d5a5d0dc106d9af42e2d015ced03034
+      - 8bfecac4db4f9746fc9b2d085ed15ca970459fbf
+    reviewedPathsChanged: false
+    note: "Merged (not rebased) so that 7a87dfdfc, 3b1eec593, bd4634170 and 030c2e993 keep their SHAs. The merge changes no file under this spec directory and no reviewed path; b6f83ce98..8bfecac4d touches only paths outside the reviewed set (.loom/registry.yaml, another spec directory, src/auto-reply, src/commands, src/cron and src/gateway/governance)."
+  fourthMerge:
+    mergeCommitSha: ac004e12327e0ad90f73d0e32bee627667f1f33a
+    mergedMainSha: b9c830ad214363b933e3eed478fe8b22f61aabf2
+    parents:
+      - dbc7cc519e9f29843de2bf5e865d1704860c7ddb
+      - b9c830ad214363b933e3eed478fe8b22f61aabf2
+    reviewedPathsChanged: false
+    note: "Merged under the pre-authorized rule before the push of the final receipt/status commit; changes no file under this spec directory and no reviewed path. The rebase merge of PR #204 dropped this and the three earlier merge commits."
+
+priorCheckpointA:
+  reviseMergeSha: c26381cfcb6d06f340843ab31b0465e4159a5229
+  reviseSubject: "Docs: Checkpoint A REVISE — rebase tip + registry lander + path scrub (#176)"
+  freezeShaNote: "Checkpoint A REVISE tip; design started from newer origin/main then #181; ConversationTask handoff on trunk is unrelated — do not redo Checkpoint A"
+
+pathDriftProbe:
+  evidence: evidence/path-drift-probe-revise-20260928.txt
+  range: "76a0dbfccc18a06b3519631de2f3fddad43bb3ba..d22acc6e0ab96df77108024b3e20a4d01ab58875"
+  paths:
+    - packages/constitutional-contracts
+    - packages/constitutional-registry
+    - packages/constitutional-conformance
+    - packages/constitutional-runtime
+    - src/agents/execution-preflight
+    - src/agents/pi-embedded-runner/run.ts
+    - src/agents/pi-embedded-runner/run/types.ts
+    - src/agents/pi-embedded-runner/run/attempt.ts
+    - src/task-orchestration
+    - src/conversation-task
+    - src/gateway/security-profile.ts
+  constitutionalRuntimeNameStatus: []
+  unrelatedTrunkDrift:
+    - path: src/conversation-task/conversation-handoff.ts
+      via: "88941b34f Fix 1:1 robot send to use the tenant session transcript (#184); d22acc6e0 Fix tenant session owner domain typing (#185)"
+      note: "ConversationTask handoff — unrelated to Constitutional runtime design; do not redo Checkpoint A."
+  note: "Constitutional runtime / preflight / embedded-runner observe paths empty at revise probe."
+
+pathDriftProbeCycle2:
+  range: "fdb47dfe4ef076201d30ae223b8dc6f8c63753ca..8bfecac4db4f9746fc9b2d085ed15ca970459fbf"
+  paths:
+    - packages/constitutional-contracts
+    - packages/constitutional-registry
+    - packages/constitutional-conformance
+    - packages/constitutional-runtime
+    - src/agents/execution-preflight
+    - src/agents/pi-embedded-runner/run.ts
+    - src/agents/pi-embedded-runner/run/types.ts
+    - src/agents/pi-embedded-runner/run/attempt.ts
+    - src/agents/pi-embedded-runner/run/attempt.spawn-workspace.test.ts
+    - src/agents/pi-embedded-runner/run/execution-router-shadow.test.ts
+    - src/agents/pi-embedded-runner/run/attempt.test.ts
+    - src/agents/pi-embedded-runner/run.overflow-compaction.test.ts
+    - src/agents/pi-embedded-runner/usage-reporting.test.ts
+    - src/task-orchestration/constitutional-runtime-facade.ts
+    - src/gateway/security-profile.ts
+  nameStatus:
+    - status: M
+      path: src/agents/execution-preflight/resolve.ts
+      via: "1e2727a47 Reply: detect language from the user sentence and open nested deliverables."
+      classification: NON_IMPACTING
+      adjudication: reviews/architecture-main-drift-addendum-cycle2.md
+  unrelatedTrunkCommits:
+    - "3e9855fe7 governance(P3-1): allowlistEnforcement + embedded model explicit mode"
+    - "94eba2b89 governance(P3-2): memory flush inherits parent model set"
+    - "3d323c948 governance(P3-3): contract — no registered-gap in model callers"
+    - "fdfec5d2b Meeting: deliver notices into the attendee chat. (#199)"
+    - "ca0c3765b Reply: keep the outer run id visible inside the agent turn. (#200)"
+    - "b18925456 Employee Decision Surface vertical slice (D2) (#189)"
+    - "f00d2d09b governance(P3-2R): outer runId generator; legacy keeps preexisting filter"
+    - "e4576c9a6 governance(P3-2T): type flushParams as runMemoryFlushIfNeeded params"
+    - "d36d1a035 governance(P4-0): subagent usage attribution shadow only, not billed"
+    - "b61a81dad Docs: record the EDGSC UI copy acceptance"
+    - "b84fd8763 UI: show readable names for seats, people, and digital humans"
+    - "1e2727a47 Reply: detect language from the user sentence and open nested deliverables. (touches execution-preflight/resolve.ts; NON_IMPACTING)"
+    - "5b75cfc1d Reply: copy an opened deliverable onto the preview path."
+    - "63473d39d Reply: state the shared visible-reply contract in the system prompt."
+    - "7d07330e9 Reply: strip Chinese task-cancel notes before they reach the user."
+    - "b6f83ce98 Reply: keep a cancelled task from erasing the last deliverable."
+    - "8bfecac4d governance(P4-1): subagent credit usage against parent authorization, default off"
+  note: "Only src/agents/execution-preflight/resolve.ts changed on these paths (binding-prompt wording via fixedUserStop; no export line changed; adjudicated NON_IMPACTING by Architecture). No other change on these paths, including both direct-caller test files and the whole src/agents/pi-embedded-runner tree."
+
+pathDriftProbePostMerge:
+  range: "8bfecac4db4f9746fc9b2d085ed15ca970459fbf..52b8bba1087b087b03eca1ad9558a49664735c64"
+  pathsFrom: pathDriftProbeCycle2.paths
+  nameStatus: []
+  via:
+    - "b9c830ad2 governance(P3): stamp execution entry on shadow envelopes (merged into the source branch by ac004e123)"
+    - "8a4f49709..364c2e813: the ten PR #204 commits landed by the rebase merge (this spec directory and .loom/registry.yaml only)"
+    - "28 later trunk commits up to 52b8bba10 Deploy: publish the enterprise intake page and nginx routes"
+  note: "No change on the probe paths, including both direct-caller test files and the whole src/agents/pi-embedded-runner and src/agents/execution-preflight trees."
+
+driftFromCheckpointARevise:
+  constitutionalRuntimePaths:
+    range: "c26381cfcb6d06f340843ab31b0465e4159a5229..d22acc6e0ab96df77108024b3e20a4d01ab58875"
+    nameStatus: []
+    note: "Empty on Constitutional runtime paths through revise tip."
+  nonRuntimeNoted:
+    - path: src/gateway/governance/tools-invoke-capability.ts
+      via: "4cb80de57 gov(P5-2): tools/invoke capability policy for shadow allow/deny (#177)"
+      note: "Governance tools/invoke shadow; not Constitutional runtime façade wiring."
+    - path: .kiro/specs (OBS-3 checklist)
+      via: "76a0dbfcc docs(OBS-3): §8.4 enforced admission checklist (#179)"
+      note: "Docs only; does not import constitutional-contracts or flip OPENBOT_CONSTITUTIONAL_*."
+    - path: .kiro/specs/constitutional-runtime-activation-readiness/**
+      via: "677a7aa1f1b0f4c00bde4dce6d2d823a58f26715 Docs: Checkpoint B read-only Constitutional shadow wiring design (#181)"
+      note: "Docs-only design land; C still unauthorized."
+    - path: src/conversation-task/conversation-handoff.ts
+      via: "88941b34f / d22acc6e0 (#184 / #185)"
+      note: "Unrelated ConversationTask handoff; do not redo Checkpoint A."
+
+claimCeiling:
+  checkpointB: APPROVED
+  cycle1Architecture: AGREE_SHADOW_WIRING
+  cycle1Security: REVISE
+  cycle1ExecutionChain: REVISE
+  cycle2Architecture: AGREE_SHADOW_WIRING
+  cycle2ArchitectureConditions: none
+  cycle2MainDrift: NON_IMPACTING
+  cycle2LaterMainDriftReviewedPathsChanged: false
+  cycle2Security: AGREE_SHADOW_WIRING
+  cycle2SecurityConditions: none
+  cycle2ExecutionChain: AGREE_SHADOW_WIRING
+  cycle2ExecutionChainConditions: none
+  runtimeEnabled: false
+  productionProven: unknown
+  checkpointCImplementationAuthorized: true
+  checkpointCImplementationAuthorizationScope: creation-of-new-default-off-implementation-task-only
+  pr204State: MERGED
+  posture:
+    - code-present
+    - default-off
+    - not-wired
+    - not-runtime-enabled
+    - not-production-proven
+    - checkpoint-b-approved
+    - freeze-cycle-2
+    - cycle-2-architecture-agree
+    - cycle-2-main-drift-non-impacting
+    - cycle-2-tripartite-agree
+    - checkpoint-c-authorized-new-default-off-task-only
+    - checkpoint-b-landed-on-main-by-rebase
+    - checkpoint-c-not-started
+    - first-slice-synchronous
+    - production-sink-noop
+    - minimal-boolean-deps-via-embedded-run-attempt-params
+    - profile-category-unspecified
+
+productionProbe:
+  preferredCommand: "podman exec openbot-gateway-rc cat /app/dist/build-info.json"
+  gatewaySha: unknown
+  uiSha: unknown
+  ledgerSeq: unknown
+  note: "Unchanged — productionProven stays unknown. No runtime rollback needed (docs only)."
+
+allowedWritePaths:
+  - .kiro/specs/constitutional-runtime-activation-readiness/**
+
+forbiddenThisCheckpoint:
+  - src/**
+  - packages/**
+  - flag or env default changes
+  - gateway / preflight / CTR wiring
+  - live execute
+  - deploy
+  - productionProven true
+  - treating checkpointCImplementationAuthorized as flag enablement, production wiring, deployment, SELECT, EXECUTE or a production-proven claim
+  - modifying the 11 frozen design files after the cycle-2 digest
+  - deleting or overwriting cycle-1 receipts
+  - .loom/registry.yaml inside a design docs commit (lands separately via kiro-loom)
+  - Checkpoint C implementation / implementation PR
+  - "merging PR #204 or PR #183"
+  - "force-pushing, rewriting or deleting the PR #183 branch"
+  - "deleting, rewriting or force-pushing the PR #204 source branch (sourceBranchPreserve)"
+  - tagging historical commits
+
+cycle1ReviseClosed:
+  - S1: minimal-boolean-deps-no-env-object-or-map
+  - S2: sink-double-fault-fail-open-via-safe-wrappers
+  - S3: profile-category-fixed-unspecified
+  - executionChain: direct-caller-scope-explicit-deps-allowlist-lock
+
+architectureReviseGapsClosed:
+  - A: deps-injection-boundary-via-EmbeddedRunAttemptParams
+  - B: first-slice-fully-synchronous
+  - C: production-sink-noop-with-gate-off-attempt-level-nuance
+  - D: tightened-data-whitelist
+
+notes:
+  loomTaskId: constitutional-runtime-activation-readiness:network-9aeee1a3
+  loomOwner: kiro-constitutional-activation
+  loomTakeoverSession: 9b1b2751-e37e-49cc-b865-c567faba2e56
+  loomPriorSessionPreserved: 9ea13a49-57be-499e-bd7c-b30fd4ef1390
+  registryTakeoverCommit: 532e995a67c942fec41b790797b05303c747c2b4
+  registryTakeoverLanderProxy: "kiro-constitutional-activation, explicitly authorized as kiro-loom lander-proxy for this one diff"
+  registryLander: loom-workspace-orchestrator:kiro-loom
+  noRuntimeSrcEdits: true
+  noFlagEnable: true
+  noDeploy: true
+  docsOnlyPr: true
+  doNotReusePr181: true
+  cycle1ArchitectureAgreeDoesNotCarryOver: true
+  cycle2ArchitectureAgree: true
+  cycle2MainDriftNonImpacting: true
+  cycle2TripartiteAgree: true
+  checkpointBApproved: true
+  pr204MergedByRebase: true
+  sourceBranchPreserve: true
+  postMergeCloseout: true
+  conversationTaskHandoffUnrelated: true
+  doNotRedoCheckpointA: true

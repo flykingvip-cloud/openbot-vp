@@ -1,0 +1,84 @@
+{
+  "schema": "memory-workspace-phase1b-unlock-minima-scorecard/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-unlock-minima-scorecard.json",
+  "kind": "phase1b-unlock-minima-scorecard",
+  "role": "canonical-for-this-minima-review",
+  "operationId": "phase1b-unlock-minima-85f55ee2fa-20260820T001800Z",
+  "baselineSha": "4f14769148dd79559824d9e0229f6af530799851",
+  "originMainSha": "4f14769148dd79559824d9e0229f6af530799851",
+  "reviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "liveCutover": false,
+  "items": {
+    "2": "met",
+    "3": "met",
+    "4": "met",
+    "5": "met",
+    "6": "locked",
+    "7": "locked"
+  },
+  "itemSources": {
+    "2": {
+      "status": "met",
+      "source": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json items.2",
+      "supporting": "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json status=accepted"
+    },
+    "3": {
+      "status": "met",
+      "source": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json items.3",
+      "supporting": "docs/design/evidence/memory-workspace-phase1b-item3-write-switch-acceptance.json decision=accepted enablesProduction=false"
+    },
+    "4": {
+      "status": "met",
+      "source": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json items.4",
+      "supporting": "docs/design/evidence/memory-workspace-phase1b-item4-schema-v2-same-release.json schemaV2Enabled=false",
+      "note": "Official receipt scores same-release presence met. schema v2 production write stays forbidden."
+    },
+    "5": {
+      "status": "met",
+      "source": "independent Item 5 met decision on frozen PR #538",
+      "reviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+      "binding": "docs/design/evidence/memory-workspace-phase1b-item5-final-closeout-binding.json",
+      "metDecision": "docs/design/evidence/memory-workspace-phase1b-item5-met-decision.json",
+      "closeoutPacketsRemainItem5MetFalse": true
+    },
+    "6": {
+      "status": "locked",
+      "phase1bItem6": "not-met/locked",
+      "source": "this minima scorecard",
+      "note": "U1 item6Candidate=met and origin/main items-2-7-scorecard items.6=met are candidate scoring only. They do not unlock Phase 1B Item 6."
+    },
+    "7": {
+      "status": "locked",
+      "phase1bItem7": "not-met/locked",
+      "source": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json items.7=not-met"
+    }
+  },
+  "history": [
+    {
+      "path": "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+      "role": "history",
+      "note": "items.6=met records U1 production-equivalent candidate scoring. Superseded as Phase 1B Item 6 execution SoT."
+    },
+    {
+      "path": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+      "role": "canonical-unlock-receipt",
+      "note": "unlock stays not-issued. items.6=met is not Phase 1B Item 6 implementation unlock."
+    },
+    {
+      "path": "docs/design/evidence/memory-workspace-phase1b-unlock-decision-request.json",
+      "role": "superseded-request",
+      "note": "Prior recommend-issue-minimal packet. This minima package is the independent review surface."
+    }
+  ],
+  "doesNotAuthorize": [
+    "treat this scorecard as an issued unlock",
+    "Item 6/7 implementation unlocked",
+    "wiredToProductionResolver=true",
+    "deployAuthorized=true",
+    "LIVE cutover"
+  ]
+}

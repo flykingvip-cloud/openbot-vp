@@ -1,0 +1,28 @@
+{
+  "schema": "memory-workspace-phase1a-section141-design-review/v1",
+  "roleId": "architecture",
+  "roleLabel": "平台架构",
+  "owner": "codex-workspace-architecture",
+  "preparedBy": "cursor-memory-workspace-followup",
+  "mainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+  "preparedAt": "2026-08-16T07:35:00.000Z",
+  "decision": "accepted",
+  "signedAt": "2026-08-16T11:53:33.387Z",
+  "signedBy": "codex-workspace-architecture",
+  "scope": "Org/resource tree separation; Envelope typed view; single canonical Binding",
+  "section141Criteria": [
+    "Architecture review confirms org tree / resource tree separation",
+    "Envelope typed view frozen; disk/Catalog/RPC/receipt persist resourceId only"
+  ],
+  "designBasis": {
+    "primary": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+    "sections": ["§0.5", "§3", "§14.1 items 1"]
+  },
+  "wsADeliverables": [
+    "Catalog + StorageBinding store design (no production write)",
+    "Employee authority adapter via platform-auth membership store",
+    "No parallel WorkspaceIdentity or membership SoT"
+  ],
+  "ownerSignOffAction": "Set decision=accepted and update section141-signoff-matrix.json architecture row",
+  "explicitlyForbidden": ["deployAuthorized=true", "parallel-workspace-identity-sot"]
+}

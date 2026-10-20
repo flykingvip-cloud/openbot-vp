@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "required": ["claim_id", "claim", "status", "source_ids"],
+  "properties": {
+    "claim_id": { "type": "string" },
+    "claim": { "type": "string" },
+    "status": {
+      "enum": ["verified", "partially_verified", "disputed", "unverified"]
+    },
+    "claim_type": {
+      "enum": ["fact", "opinion", "inference", "uncertainty"]
+    },
+    "source_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "caveats": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

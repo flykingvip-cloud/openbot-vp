@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "boundary": "C8 reads this control-plane snapshot. It does not Promote, Apply, or open E5.2. The A10 chain has verification.completed and no matching promotion.completed.",
+  "realQuery": {
+    "tenantId": "001",
+    "proposalId": "evo:diag:8bee2c37b1f39478",
+    "experimentId": "exp:cmd-a9-exp-down",
+    "applicationId": "app:cmd-a9-active-up"
+  },
+  "closedLoopQuery": {
+    "tenantId": "001",
+    "proposalId": "evo:diag:8bee2c37b1f39478",
+    "experimentId": "exp:cmd-a9-exp-down",
+    "applicationId": "app:c8-closed-loop"
+  },
+  "records": [
+    {
+      "kind": "proposal",
+      "body": {
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "status": "VERIFIED",
+        "tenantScope": "001",
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" }
+      }
+    },
+    {
+      "kind": "experiment",
+      "body": {
+        "experimentId": "exp:cmd-a9-exp-down",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "surfaceId": "agent.working-dna",
+        "tenantScope": "001",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c"
+      }
+    },
+    {
+      "kind": "application",
+      "body": {
+        "applicationId": "app:cmd-a9-active-up",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "status": "applied"
+      }
+    },
+    {
+      "kind": "application",
+      "body": {
+        "applicationId": "app:c8-closed-loop",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "status": "applied"
+      }
+    },
+    {
+      "kind": "verification",
+      "proposalId": "evo:diag:8bee2c37b1f39478",
+      "experimentId": "exp:cmd-a9-exp-down",
+      "body": {
+        "verificationId": "ver:cmd-a9-verify-ok",
+        "applicationId": "app:cmd-a9-active-up",
+        "outcome": "improved",
+        "verifiedAt": "2026-09-22T09:53:14.997Z"
+      }
+    },
+    {
+      "kind": "verification",
+      "proposalId": "evo:diag:8bee2c37b1f39478",
+      "experimentId": "exp:cmd-a9-exp-down",
+      "body": {
+        "verificationId": "ver:c8-closed-loop",
+        "applicationId": "app:c8-closed-loop",
+        "outcome": "improved",
+        "verifiedAt": "2026-09-22T09:53:14.997Z"
+      }
+    },
+    {
+      "kind": "recheck",
+      "tenantId": "001",
+      "recordedAt": "2026-09-22T09:53:14.997Z",
+      "body": {
+        "outcome": "STILL_OPEN",
+        "reasonCode": "sot_unchanged",
+        "findingRefs": ["c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255"],
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "verificationRef": {
+          "schemaVersion": 1,
+          "proposalId": "evo:diag:8bee2c37b1f39478",
+          "experimentId": "exp:cmd-a9-exp-down",
+          "applicationId": "app:cmd-a9-active-up",
+          "verificationId": "ver:cmd-a9-verify-ok"
+        },
+        "observedEvidenceRefs": [
+          "obs:recheck:style:structured:milestone:confirm_first:balanced:neutral",
+          "obs:window:app:cmd-a9-active-up"
+        ]
+      }
+    },
+    {
+      "kind": "recheck",
+      "tenantId": "001",
+      "recordedAt": "2026-09-22T09:53:14.997Z",
+      "body": {
+        "outcome": "RESOLVED",
+        "reasonCode": "sot_confirmed",
+        "findingRefs": ["c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255"],
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "verificationRef": {
+          "schemaVersion": 1,
+          "proposalId": "evo:diag:8bee2c37b1f39478",
+          "experimentId": "exp:cmd-a9-exp-down",
+          "applicationId": "app:c8-closed-loop",
+          "verificationId": "ver:c8-closed-loop"
+        },
+        "observedEvidenceRefs": ["obs:window:app:c8-closed-loop"]
+      }
+    },
+    {
+      "kind": "event",
+      "event": {
+        "eventId": "evt-a10-verification-ok",
+        "type": "verification.completed",
+        "tenantScope": "001",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:cmd-a9-active-up",
+        "verificationId": "ver:cmd-a9-verify-ok",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "timestamp": "2026-09-22T09:53:14.997Z"
+      }
+    },
+    {
+      "kind": "event",
+      "event": {
+        "eventId": "evt-c8-foreign-tenant",
+        "type": "promotion.completed",
+        "tenantScope": "999",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:cmd-a9-active-up",
+        "verificationId": "ver:cmd-a9-verify-ok",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "timestamp": "2026-09-22T10:00:00.000Z"
+      }
+    },
+    {
+      "kind": "event",
+      "event": {
+        "eventId": "evt-c8-foreign-proposal",
+        "type": "promotion.completed",
+        "tenantScope": "001",
+        "proposalId": "evo:other",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:cmd-a9-active-up",
+        "verificationId": "ver:cmd-a9-verify-ok",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "timestamp": "2026-09-22T10:00:00.000Z"
+      }
+    },
+    {
+      "kind": "event",
+      "event": {
+        "eventId": "evt-c8-foreign-application",
+        "type": "promotion.completed",
+        "tenantScope": "001",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:cmd-a9-canary-b-up",
+        "verificationId": "ver:cmd-a9-verify-mismatch",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "timestamp": "2026-09-22T10:00:00.000Z"
+      }
+    },
+    {
+      "kind": "event",
+      "event": {
+        "eventId": "evt-c8-closed-verification",
+        "type": "verification.completed",
+        "tenantScope": "001",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:c8-closed-loop",
+        "verificationId": "ver:c8-closed-loop",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "timestamp": "2026-09-22T09:53:14.997Z"
+      }
+    },
+    {
+      "kind": "event",
+      "event": {
+        "eventId": "evt-c8-closed-promotion",
+        "type": "promotion.completed",
+        "tenantScope": "001",
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:c8-closed-loop",
+        "verificationId": "ver:c8-closed-loop",
+        "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+        "surfaceId": "agent.working-dna",
+        "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+        "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "timestamp": "2026-09-22T10:00:00.000Z"
+      }
+    }
+  ]
+}

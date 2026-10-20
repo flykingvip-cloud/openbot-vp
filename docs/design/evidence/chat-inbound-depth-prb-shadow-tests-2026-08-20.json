@@ -1,0 +1,23 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "pr": "B",
+  "capturedAt": "2026-08-20T02:58:56+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "750163c210",
+  "originMainIsAncestor": true,
+  "aheadBehind": { "ahead": 8, "behind": 0 },
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts",
+  "note": "VITEST_CACHE_DIR is set outside the worktree so Vite temp writes do not depend on node_modules/.vite-temp permissions.",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "2 passed (2)",
+    "tests": "14 passed (14)",
+    "duration": "3.52s"
+  },
+  "files": [
+    "src/auto-reply/reply/inbound-depth.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts"
+  ]
+}

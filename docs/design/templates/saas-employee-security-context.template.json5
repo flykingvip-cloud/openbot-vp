@@ -1,0 +1,59 @@
+# SaaS 员工 Agent — Tool Policy 与 Context Budget 模板
+# 用途：openbot.love Persona S 生产基线（安全方案 P0 + 上下文生命周期 P0）
+# 合并方式：写入 tenant 默认 config 或 platform template
+
+{
+  agents: {
+    defaults: {
+      sandbox: { mode: "off" },
+      contextBudget: {
+        enabled: true,
+        maxTokens: 8000,
+        priority: [
+          "current_task",
+          "session_summary",
+          "constraints",
+          "recent_messages",
+          "memory_retrieval",
+        ],
+        minRecentMessages: 4,
+        maxRecentMessages: 40,
+      },
+      compaction: {
+        mode: "safeguard",
+        recentTurnsPreserve: 4,
+        memoryFlush: { enabled: true },
+      },
+    },
+    list: [
+      {
+        id: "employee-default",
+        tools: {
+          profile: "messaging",
+          deny: [
+            "exec",
+            "gateway",
+            "cron",
+            "nodes",
+            "whatsapp_login",
+            "apply_patch",
+            "canvas",
+          ],
+          elevated: { enabled: false },
+          fs: { workspaceOnly: true },
+        },
+      },
+    ],
+  },
+  tools: {
+    deny: ["exec", "gateway", "cron", "nodes"],
+    fs: { workspaceOnly: true },
+    elevated: { enabled: false },
+  },
+  gateway: {
+    bind: "loopback",
+    nodes: {
+      denyCommands: ["system.run", "system.execApprovals.set", "canvas.eval"],
+    },
+  },
+}

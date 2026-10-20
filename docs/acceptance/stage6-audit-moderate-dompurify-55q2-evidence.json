@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-55q2-fjhq-7xh7",
+  "cve": null,
+  "package": "dompurify",
+  "vulnerable_range": "<=3.4.12",
+  "affected_version_before": "3.4.11",
+  "dependency_path": "ui>dompurify",
+  "severity": "moderate",
+  "direct_or_transitive": "direct (ui workspace)",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=3.4.13",
+  "mitigated_version": "3.4.13",
+  "reachable_surface": "DOMPurify IN_PLACE hook removal leaves a detached subtree executable, causing XSS (advisory). UI workspace direct dependency used for HTML sanitization; root pin via pnpm.overrides.",
+  "mitigation": "Bump ui/package.json dependencies.dompurify to ^3.4.13; pnpm.overrides.dompurify=3.4.13. Same pin also clears low GHSA-c2j3-45gr-mqc4 (patched >=3.4.12) as a side effect (not a separate cell). Remaining dompurify lows needing >=3.4.16 (GHSA-6688-9rhm-gjv2 and GHSA-p98j-92pf-mc4p, the latter applying to 3.4.13–3.4.15) — not this PR.",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod (plus lower-threshold low side-effect clear of GHSA-c2j3). Stage 6 overall remains not PASS; audit still exits 1 (27 moderate + 5 low remain, including further dompurify lows at >=3.4.16). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 27,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-55q2-fjhq-7xh7"
+}

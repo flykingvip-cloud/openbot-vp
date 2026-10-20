@@ -1,0 +1,83 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch9-s10/v1",
+  "item": 7,
+  "status": "retirement-batch-9",
+  "batch": "S10",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S10",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "via": "resolveTrustedAgentLocator",
+      "lineBefore": 142,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 146,
+      "op": "write"
+    },
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1001,
+      "op": "write"
+    },
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1075,
+      "op": "write"
+    },
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1160,
+      "op": "write"
+    }
+  ],
+  "sitesRemainingTrustedWrapper": [
+    {
+      "ledgerId": "S14",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "via": "resolveTrustedAgentLocator",
+      "line": 1159,
+      "op": "write"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 28,
+  "liveWriteWatchIndex": 28,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/agents.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "525ee95547dbd2530f284f69fd67849c6574df23",
+  "note": "Batch 9 retires S10 only. S10 is the Trusted wrapper at agents.ts:142, inventoried as resolveAgentWorkspaceDirForClient. Incomplete locator queries fail closed. Do not pass agentId. Host writes stay on lines 146, 1001, 1075, and 1160. S14 Trusted wrapper stays on line 1159. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

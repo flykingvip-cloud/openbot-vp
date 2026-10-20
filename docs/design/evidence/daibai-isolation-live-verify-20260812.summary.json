@@ -1,0 +1,33 @@
+{
+  "evidenceId": "daibai-isolation-live-verify-20260812",
+  "schema": "daibai-isolation-live-verify/v1",
+  "probeUtc": "2026-08-12T09:39:24.385115Z",
+  "classification": "main-tip-PASS + production-full-dist-ABORTED-rollback",
+  "baseline": {
+    "originMain": "e02cd12b250b1e2190ff96a788139c7aad8ae5bc",
+    "liveCommitAfterRollback": "728dd9fba2c803d25e77e8b2dc1c57d35bc4ae40",
+    "mergebackPr": "#375"
+  },
+  "mainTipGates": {
+    "overallMainTip": "PASS",
+    "note": "#370-#375 on main including LIVE collab merge-back"
+  },
+  "productionCutoverAttempt": {
+    "overlay": "isolation-chat-fanout-r1",
+    "stamp": "20260812T093529Z",
+    "result": "ABORTED",
+    "error": "DG0_MANAGED_SHARED_CREDENTIAL_ROOT",
+    "cause": "OPENBOT_TENANTS_ROOT=/root/.openbot/tenants nested under /root/.openbot",
+    "rollback": "OK healthz/readyz 2026-08-12T09:38Z",
+    "bareBroadcastChatAfterRollback": 5
+  },
+  "nextSteps": [
+    "Move OPENBOT_TENANTS_ROOT outside /root/.openbot then retry full-dist",
+    "OR surgical gateway-cli isolation overlay that does not ship DG0 validators"
+  ],
+  "verdict": {
+    "mainTipIsolation": "PASS",
+    "productionLiveIsolation": "NOT DEPLOYED (rolled back)",
+    "releaseGate": "blocked on DG0 tenants-root layout"
+  }
+}

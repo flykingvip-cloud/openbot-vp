@@ -1,0 +1,15 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w2-batch2-s03-s06-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w2-batch2-s03-s06-shadow.json",
+  "kind": "item7-w2-batch2-dark-dual-read-shadow",
+  "wave": "W2-write-callers",
+  "batch": 2,
+  "sites": ["S03-agent", "S04-status-all-agents"],
+  "deferredSites": ["S05-checkpoint-store-host", "S06-checkpoint-store-steward"],
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "wiredToThisCallSite": false,
+  "deleteCallSites": false,
+  "productionWrite": "legacy-only",
+  "note": "W2 batch-2 dark dual-read shadow on S03-S06. Legacy call-sites unchanged; env-off no-op."
+}

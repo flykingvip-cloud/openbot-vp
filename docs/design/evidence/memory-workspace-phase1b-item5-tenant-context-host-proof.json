@@ -1,0 +1,81 @@
+{
+  "schema": "memory-workspace-phase1b-item5-tenant-context-host-proof/v1",
+  "item": 5,
+  "status": "not-met",
+  "owner": "cursor-data-governance",
+  "path": "authorize-tenant-context-host-managed-path-proof",
+  "live": "host-openbot-and-production",
+  "productionContainerWrite": false,
+  "deployAuthorized": true,
+  "wiredToProductionResolver": false,
+  "identifierPolicy": "hashed",
+  "gitWrite": false,
+  "measured": {
+    "hostCatalogUserOwnedRows": 7,
+    "usersMeasured": 7,
+    "mainPathMisses": 0,
+    "mainPathMembershipFallbacks": 0,
+    "legacyPathHits": 6,
+    "legacyPathCwdOk": 0,
+    "perUser": [
+      {
+        "hashedUserKey": "1dfbd746716cba69",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 0,
+        "legacyPathCwdOk": 0
+      },
+      {
+        "hashedUserKey": "216bb0d87e79017b",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 1,
+        "legacyPathCwdOk": 0
+      },
+      {
+        "hashedUserKey": "3ae6c2c54576652e",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 1,
+        "legacyPathCwdOk": 0
+      },
+      {
+        "hashedUserKey": "508da513e2ad28e6",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 1,
+        "legacyPathCwdOk": 0
+      },
+      {
+        "hashedUserKey": "8f930e70626c04da",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 1,
+        "legacyPathCwdOk": 0
+      },
+      {
+        "hashedUserKey": "9ea6761ec5f118ee",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 1,
+        "legacyPathCwdOk": 0
+      },
+      {
+        "hashedUserKey": "a55af1b63d007c79",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "legacyPathHits": 1,
+        "legacyPathCwdOk": 0
+      }
+    ],
+    "wiredToProductionResolver": false,
+    "productionContainerWrite": false,
+    "item5": "not-met"
+  },
+  "note": "Production post-restart tenant-context managed path: main identity hits 7/7, mainPathMisses=0, membership fallbacks=0. Registry main is active with a membership primary binding. cwd probe was not loaded on the gateway host (legacyPathCwdOk=0). wiredToProductionResolver was not flipped. Item 5 stays not-met.",
+  "explicitlyForbidden": [
+    "set wiredToProductionResolver=true from this proof alone",
+    "write unredacted identifiers into git",
+    "score item 5 met from this proof"
+  ]
+}

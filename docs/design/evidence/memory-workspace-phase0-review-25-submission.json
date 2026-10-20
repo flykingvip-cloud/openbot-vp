@@ -1,0 +1,63 @@
+{
+  "schema": "memory-workspace-phase0-review-25-submission/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+  "submittedAt": "2026-08-16T06:55:00.000Z",
+  "submittedBy": "cursor-memory-workspace-followup",
+  "reviewSequenceRequested": 25,
+  "purpose": "Stage 1 complete handoff: independent verification PASS; official-review sign-off ceremony only",
+  "mergedPrsOnAncestryPath": [
+    {
+      "number": 409,
+      "mergeSha": "d261378ff3d283d134a6ed4088e836842380294d",
+      "title": "WS-E Freeze"
+    },
+    {
+      "number": 401,
+      "mergeSha": "1ab9d33e69ea3803e5d4e0f0be7ece83653fb792",
+      "title": "WS-C v1 root guard"
+    },
+    {
+      "number": 414,
+      "mergeSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+      "title": "WS-C operation boundary"
+    },
+    {
+      "number": 417,
+      "mergeSha": "7949ca1b9bd28df1a76d1274c347ae6183cfd2cf",
+      "title": "review-25 gh evidence"
+    },
+    {
+      "number": 420,
+      "mergeSha": "c4af5c746242d49145991eecc3d2795682a0f36e",
+      "title": "503-bypass verifier"
+    }
+  ],
+  "supersededSubmission": { "pr": 419, "reason": "Closed; execution-team self-sign rejected" },
+  "evidenceIndex": [
+    "docs/design/evidence/memory-workspace-phase0-official-review-25-independent-verification.json",
+    "docs/design/evidence/memory-workspace-phase0-close-readiness.json",
+    "docs/design/evidence/memory-workspace-phase0-main-gate-evidence.json",
+    "docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack-r25.json",
+    "docs/design/evidence/memory-workspace-phase0-runner-stability-r25.json",
+    "docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json",
+    "docs/design/evidence/memory-workspace-phase0-20260814.sign-off.json"
+  ],
+  "mainTipTripleGate": {
+    "ciGateRunId": 31931940410,
+    "freezeRunId": 31931940281,
+    "runnerName": "kiro-temp-runner",
+    "allSuccess": true
+  },
+  "wsAOwner": "codex-workspace-architecture",
+  "wsBChangeRequest": ".kiro/specs/memory-workspace-platform-remediation/ws-b-resolver-change-request.md",
+  "officialReviewActions": [
+    "Confirm memory-workspace-phase0-official-review-25-independent-verification.json against live GitHub",
+    "Update sign-off.json: phase0Accepted=true, reviewSequence=25, mainSha=c4af5c7462",
+    "Mark Phase 0 Accepted in tasks.md"
+  ],
+  "executionTeamAttestation": {
+    "markPhase0Accepted": false,
+    "note": "All execution-team blockers cleared"
+  }
+}

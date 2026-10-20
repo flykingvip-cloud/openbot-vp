@@ -1,0 +1,233 @@
+{
+  "schema": "memory-workspace-s01-stage-a-adapter/v2",
+  "taskId": "memory-workspace-platform-remediation:cursor-data-governance-s01-stage-a-adapter",
+  "purpose": "S01 Stage A adapter contract remediation. Deletes independent-table fields and the simplified cwd signature. Does not authorize Stage A implementation.",
+  "status": "stage-a-contract-resubmitted",
+  "created": "2026-08-30",
+  "owner": "cursor-data-governance",
+  "readinessOwner": "codex-architecture",
+  "stageScope": "adapter-contract-only",
+  "selfAccepted": false,
+  "implementationAuthorized": false,
+  "thisPacketCreatesProductionFiles": false,
+  "thisPacketWiresGetReply": false,
+  "thisPacketModifiesProductionAdapters": false,
+  "previousAcceptance": {
+    "decision": "changes-required",
+    "findings": [
+      "SA1-independent-catalog-tables",
+      "SA2-simplified-cwd-signature",
+      "SA4-targetIdentity-below-ir1"
+    ]
+  },
+  "unauthorizedImplementationLanding": {
+    "pr": 833,
+    "mergeSha": "7cad685fba613fd36b2d5f295ef2472d42f98d58",
+    "authorized": false,
+    "reason": "Production adapters landed before Stage A contract dual-review closed SA1/SA2. This packet does not accept that landing."
+  },
+  "canonicalHandoffDoc": ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+  "stageAHandoffDoc": ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-stage-a-adapter.md",
+  "uniqueContract": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+  "productionFiles": [
+    "src/gateway/data-governance/s01-steward-workspace-identity.ts",
+    "src/gateway/data-governance/s01-steward-workspace-identity.test.ts",
+    "src/gateway/data-governance/s01-authorized-tool-cwd.ts",
+    "src/gateway/data-governance/s01-authorized-tool-cwd.test.ts"
+  ],
+  "catalogSoT": {
+    "uniqueInput": "WorkspaceResourceCatalog typed view",
+    "port": "S01CatalogViewPort",
+    "approvedTestAdapter": "InMemoryWorkspaceResourceCatalog",
+    "forbidCatalogTableField": true,
+    "forbidIndependentTables": ["workspace_handles", "authorized_cwds", "tenant_memberships"],
+    "forbidCreateOnMiss": true,
+    "forbidMemoryAssetResourceIdAsWorkspaceResourceId": true
+  },
+  "adapterContracts": {
+    "resolveStewardWorkspaceIdentity": {
+      "status": "contract-only",
+      "signature": "function(input: { tenantId: string; userId: string; agentId: string; catalog: S01CatalogViewPort; registry: S01StewardRegistryPort; expectedFencing?: { contentVersion: string; bindingId: string } }): S01StewardTargetIdentity",
+      "catalogInput": "S01CatalogViewPort / WorkspaceResourceCatalog typed view",
+      "identitySignatureIncludesCatalogPort": true,
+      "identitySignatureIncludesRegistryPort": true,
+      "targetIdentityCompleteVsIr1": true,
+      "agentIdIsTenantSlugOnly": true,
+      "returnsNullOnMiss": false,
+      "requiredIdentityFields": [
+        "tenantId",
+        "employeeOwnerId",
+        "agentAssetId",
+        "workspaceResourceId",
+        "expectedBindingRole",
+        "expectedBindingState",
+        "governanceVersion",
+        "contentVersion",
+        "fencingToken"
+      ],
+      "failClosedTriggers": [
+        "registry-miss",
+        "registry-multi-value",
+        "catalog-miss",
+        "catalog-unavailable",
+        "tenant-mismatch",
+        "duplicate-canonical-binding",
+        "stale-fencing"
+      ]
+    },
+    "evaluateS01AuthorizedToolCwd": {
+      "status": "contract-only",
+      "forbidsSimplifiedSignature": "async function(handle: WorkspaceHandle, toolName: string): Promise<string>",
+      "requiredInputs": [
+        "principal: TrustedPrincipal",
+        "catalog: S01CatalogViewPort",
+        "memberships: S01PlatformAuthMembershipPort",
+        "targetResourceId: workspaceResourceId",
+        "requestedCwd: authorized locator of that resource",
+        "expectedBindingRole: canonical",
+        "expectedBindingState: active",
+        "expectedFencing / contentVersion",
+        "governanceVersion"
+      ],
+      "catalogInput": "S01CatalogViewPort / WorkspaceResourceCatalog typed view",
+      "failClosedTriggers": [
+        "catalog-miss",
+        "catalog-unavailable",
+        "duplicate-canonical-binding",
+        "tenant-mismatch",
+        "membership-missing",
+        "membership-array",
+        "stale-fencing",
+        "stale-content-version",
+        "principal-missing",
+        "path-traversal-detected"
+      ]
+    }
+  },
+  "targetIdentity": {
+    "required": true,
+    "notNull": true,
+    "tenantId": true,
+    "employeeOwnerId": true,
+    "agentAssetId": true,
+    "workspaceResourceId": true,
+    "expectedBindingRole": "canonical",
+    "expectedBindingState": "active",
+    "governanceVersion": true,
+    "contentVersion": true,
+    "fencingToken": true
+  },
+  "unitTests": {
+    "s01-steward-workspace-identity.test.ts": {
+      "status": "not-authorized",
+      "requiredCases": 8,
+      "categories": [
+        "complete-targetIdentity",
+        "same-employee-multiple-workspaces",
+        "slug-collision-denied",
+        "registry-miss-or-multi",
+        "catalog-miss-fail-closed",
+        "catalog-unavailable-fail-closed",
+        "tenant-mismatch",
+        "agentId-is-not-resourceId"
+      ]
+    },
+    "s01-authorized-tool-cwd.test.ts": {
+      "status": "not-authorized",
+      "requiredCases": 10,
+      "categories": [
+        "authorized-locator-for-target-resourceId",
+        "sibling-workspace-denied",
+        "duplicate-canonical-fail-closed",
+        "catalog-miss-no-create",
+        "membership-array-denied",
+        "principal-required",
+        "stale-fencing",
+        "stale-content-version",
+        "cross-tenant",
+        "path-outside-workspace"
+      ]
+    }
+  },
+  "acceptanceCriteria": {
+    "codeCompleteness": {
+      "status": "not-met",
+      "requirements": [
+        "dual-review-accepted",
+        "this-packet-does-not-create-production-files",
+        "contract-matches-d1-d4-inputs",
+        "unauthorized-833-landing-not-accepted"
+      ]
+    },
+    "testCoverage": {
+      "status": "not-met",
+      "requirements": [
+        "identity-resolver-8-cases",
+        "tool-cwd-adapter-10-cases",
+        "fail-closed-scenarios-covered"
+      ]
+    },
+    "isolationVerification": {
+      "status": "not-verified",
+      "requirements": [
+        "no-s01-callsite-modification",
+        "no-auto-reply-references",
+        "no-memory-module-changes",
+        "no-resolver-production-changes",
+        "canonical-scan-remaining-unchanged",
+        "no-independent-catalog-tables"
+      ]
+    }
+  },
+  "strictlyForbidden": [
+    "modify-src/auto-reply/reply/get-reply.ts",
+    "modify-src/memory/**",
+    "modify-src/gateway/workspace-resolver/**",
+    "create-production-catalog-data",
+    "create-independent-catalog-tables",
+    "catalogTable-workspace_handles",
+    "catalogTable-authorized_cwds",
+    "simplified-cwd-signature",
+    "wire-s01-callsite-to-adapters",
+    "modify-canonical-scan-remaining",
+    "accept-stage-a-implementation-before-dual-review",
+    "start-stage-a-implementation-before-dual-review",
+    "execute-i3-unlock-phase1b",
+    "set-deployAuthorized-true",
+    "any-live-production-deployment"
+  ],
+  "stageSequence": {
+    "current": "Stage A contract remediation",
+    "nextAfterDualAccept": "Stage A adapter implementation review (still no get-reply)",
+    "then": ["B-shadow", "C-cutover-prep", "D-controlled-cutover", "E-independent-scan"],
+    "notCatalogSchemaDeployment": true
+  },
+  "reviewRequest": {
+    "requested": true,
+    "selfAccepted": false,
+    "reviewers": ["codex-architecture", "kiro-sot-reviewer"],
+    "requestedSidecars": [
+      "docs/design/evidence/memory-workspace-s01-stage-a-adapter-review-codex-architecture.json",
+      "docs/design/evidence/memory-workspace-s01-stage-a-adapter-review-kiro-sot-reviewer.json"
+    ]
+  },
+  "currentStatus": {
+    "stageAImplementation": "blocked",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "productionCatalogWrite": "none",
+    "deployAuthorized": false,
+    "i3Executed": false,
+    "liveDeployment": "forbidden",
+    "implementationGate": "not-met"
+  },
+  "references": {
+    "s01Callsite": "src/auto-reply/reply/get-reply.ts:164",
+    "designGateTask": "memory-workspace-platform-remediation:kiro-data-governance-s01-trusted-principal-handle-gate",
+    "readinessTask": "memory-workspace-platform-remediation:codex-architecture-s01-implementation-readiness",
+    "d1d5DesignTask": "cursor-data-governance-item7-s01-d1d5-design"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch6-s20/v1",
+  "item": 7,
+  "status": "retirement-batch-6",
+  "batch": "S20",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S20",
+      "file": "src/gateway/server-methods/tools-catalog.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 31,
+  "liveWriteWatchIndex": 31,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/tools-catalog.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "dbedde8fad75a522d6ef7a67d430893a9747d718",
+  "note": "Batch 6 retires S20 only. Incomplete locator queries fail closed. Do not pass agentId. Host read stays on line 153. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

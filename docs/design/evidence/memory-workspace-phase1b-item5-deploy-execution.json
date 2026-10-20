@@ -1,0 +1,52 @@
+{
+  "schema": "memory-workspace-phase1b-item5-deploy-execution/v2",
+  "item": 5,
+  "status": "not-met",
+  "owner": "cursor-data-governance",
+  "path": "authorize-production-container-write-and-registry-main-rebind",
+  "deployAuthorized": true,
+  "wiredToProductionResolver": false,
+  "identifierPolicy": "hashed",
+  "gitWrite": false,
+  "executed": {
+    "productionContainerWrite": {
+      "status": "executed",
+      "target": "production_state_dir",
+      "stateDir": "/root/.openbot",
+      "registryStorePath": "/root/.openbot/openbot-agent-registry.json",
+      "catalogPath": "/root/.openbot/data-governance/catalog.json",
+      "persisted": 2,
+      "compareAndPutConfirmed": 0,
+      "catalogPresent": true,
+      "registryMainRebind": {
+        "assetReactivated": false,
+        "membershipBindingCreated": true,
+        "proof": "historical_seat_binding_occupancy_membership",
+        "hashedUserId": "63ca570182fa9070",
+        "hashedSeatId": "13ff8567dfa34739"
+      }
+    }
+  },
+  "note": "Production v2 runner ran on the gateway host from origin/main a7b151a707 with the three required env vars. productionContainerWrite.status=executed. persisted=2 compareAndPutConfirmed=0 because the user-owned rows already existed. Catalog checksum unchanged. Gateway was restarted with podman restart openbot-gateway-rc. wiredToProductionResolver was not flipped. Item 5 stays not-met. Item 5 submitted for closeout review.",
+  "explicitlyForbidden": [
+    "set wiredToProductionResolver=true from this execution alone",
+    "score item 5 met from this execution",
+    "write unredacted identifiers into git"
+  ],
+  "productionWindow": {
+    "baselineSha": "a7b151a7078ba5be98ec08de9cbfad1a64639242",
+    "operationId": "item5-closeout-a7b151a707-20260819T133341Z",
+    "backupPath": "/root/openbot-item5-write-pre-20260819T133341Z",
+    "backupAt": "20260819T133341Z",
+    "env": {
+      "OPENBOT_PRODUCTION_STATE_DIR": "/root/.openbot",
+      "OPENBOT_PRODUCTION_EXECUTION_MODE": "production",
+      "OPENBOT_PRODUCTION_ON_GATEWAY_HOST": "1"
+    },
+    "gatewayRestart": "podman restart openbot-gateway-rc",
+    "resolveStateDir": "/root/.openbot",
+    "catalogSha256": "b772ba6d225cd2db2da99a25ddcf21d1bf59bc3ce6ccf84fb6edbc3bb4444718",
+    "persisted": 2,
+    "compareAndPutConfirmed": 0
+  }
+}

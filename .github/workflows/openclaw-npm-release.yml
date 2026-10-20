@@ -1,0 +1,96 @@
+name: OpenClaw NPM Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: openclaw-npm-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22.x"
+  PNPM_VERSION: "10.23.0"
+
+jobs:
+  publish_openclaw_npm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+          install-bun: "false"
+          use-sticky-disk: "false"
+          frozen-lockfile: "true"
+
+      - name: Validate release tag and package metadata
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_MAIN_REF: origin/main
+        run: |
+          set -euo pipefail
+          # Fetch the full main ref so merge-base ancestry checks keep working
+          # for older tagged commits that are still contained in main.
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          pnpm release:openclaw:npm:check
+
+      - name: Ensure version is not already published
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if npm view "@upbeyond/openbot@${PACKAGE_VERSION}" version >/dev/null 2>&1; then
+            echo "@upbeyond/openbot@${PACKAGE_VERSION} is already published on npm."
+            exit 1
+          fi
+
+          echo "Publishing @upbeyond/openbot@${PACKAGE_VERSION}"
+
+      - name: Check
+        run: pnpm check
+
+      - name: Build
+        run: pnpm build
+
+      - name: Verify release contents
+        run: pnpm release:check
+
+      # Publish uses NPM_TOKEN (automation/granular token with Bypass 2FA).
+      # Create at npmjs.com → Access Tokens → Generate Token → Automation (or
+      # granular publish + Bypass 2FA), then: gh secret set NPM_TOKEN --repo gmood2008/openbot
+      - name: Configure npm registry auth
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24.x"
+          registry-url: "https://registry.npmjs.org"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN secret is missing. Add an npm automation token (Bypass 2FA) as repository secret NPM_TOKEN."
+            exit 1
+          fi
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          if [[ "$PACKAGE_VERSION" == *-beta.* ]]; then
+            npm publish --access public --tag beta
+          else
+            npm publish --access public
+          fi

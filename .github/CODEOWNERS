@@ -1,0 +1,9 @@
+# Memory / workspace Freeze baseline and scanner are privileged.
+# Changing these files in the same PR as new production call sites must not
+# become the Freeze comparison source; CI compares origin/main or a git blob.
+docs/design/evidence/memory-workspace-phase0-20260814.call-sites.json @gmood2008 @flykingvip-cloud
+docs/design/evidence/memory-workspace-phase0-inventory.mjs @gmood2008 @flykingvip-cloud
+docs/design/evidence/memory-workspace-phase0-inventory-scan.mjs @gmood2008 @flykingvip-cloud
+docs/design/evidence/memory-workspace-phase0-run-trusted-freeze.sh @gmood2008 @flykingvip-cloud
+docs/design/evidence/memory-workspace-phase0-v1-root-fingerprint.mjs @gmood2008 @flykingvip-cloud
+.github/workflows/memory-workspace-freeze.yml @gmood2008 @flykingvip-cloud

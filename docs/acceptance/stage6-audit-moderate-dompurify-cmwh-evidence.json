@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-cmwh-pvxp-8882",
+  "cve": "CVE-2026-65898",
+  "package": "dompurify",
+  "vulnerable_range": "<=3.4.10",
+  "affected_version_before": "3.4.7",
+  "dependency_path": "ui>dompurify",
+  "severity": "moderate",
+  "direct_or_transitive": "direct (ui workspace)",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=3.4.11",
+  "mitigated_version": "3.4.11",
+  "reachable_surface": "DOMPurify permanent ALLOWED_ATTR pollution via setConfig() bypassing the hook clone-guard (incomplete fix of the 3.4.7 hook-pollution patch; advisory). UI workspace direct dependency used for HTML sanitization; root pin via pnpm.overrides.",
+  "mitigation": "Bump ui/package.json dependencies.dompurify to ^3.4.11; pnpm.overrides.dompurify=3.4.11. Same pin also clears low GHSA-vxr8-fq34-vvx9 (patched >=3.4.9) and low GHSA-gvmj-g25r-r7wr (patched >=3.4.8) as side effects (not separate cells). Remaining dompurify moderate needing >=3.4.13 (GHSA-55q2) and lows needing higher pins — not this PR.",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod (plus lower-threshold low side-effect clears). Stage 6 overall remains not PASS; audit still exits 1 (28 moderate + 5 low remain, including GHSA-55q2 and further dompurify lows). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 28,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-cmwh-pvxp-8882"
+}

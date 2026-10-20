@@ -1,0 +1,69 @@
+{
+  "schema": "memory-workspace-phase1b-item7-batch9-12-cr/v1",
+  "item": 7,
+  "status": "cr-resolver-wiring",
+  "batch9to12Accepted": false,
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "retiredThisChange": 0,
+  "remaining": 22,
+  "liveWriteWatchIndex": 22,
+  "frozenWriteWatchIndex": 38,
+  "nextBatchForbidden": true,
+  "sitesFixed": [
+    {
+      "ledgerId": "S10",
+      "handler": "agents.files.get / resolveAgentWorkspaceFileOrRespondError",
+      "before": "resolveWorkspaceLocator({ cfg }) then null fallback",
+      "after": "complete trusted query; respond error + return on deny"
+    },
+    {
+      "ledgerId": "S11",
+      "handler": "agents.files.set / resolveAgentWorkspaceFileOrRespondError",
+      "before": "resolveWorkspaceLocator({ cfg }) then empty-string fallback",
+      "after": "same trusted query as S10; mkdir/write only after ok"
+    },
+    {
+      "ledgerId": "S12",
+      "handler": "agents.update avatar",
+      "before": "params.workspace ?? resolveWorkspaceLocator({ cfg }) ?? \"\" then mkdir",
+      "after": "trusted query before any config/fs mutation; deny returns immediately"
+    },
+    {
+      "ledgerId": "S13",
+      "handler": "agents.delete",
+      "before": "resolveWorkspaceLocator({ cfg }) ?? \"\" then trash/config mutation",
+      "after": "trusted query before decommission/writeConfig/trash; deny returns immediately"
+    }
+  ],
+  "forbiddenPatternsRemoved": [
+    "resolveWorkspaceLocator({ cfg })",
+    "r.ok ? r.handle.locator : \"\"",
+    "null ?? \"\"",
+    "process.cwd() as denial path",
+    "host workspace fallback on locator deny"
+  ],
+  "trustedQueryFields": [
+    "tenantContext",
+    "tenantId",
+    "authenticated actor",
+    "ownership grant",
+    "resourceId",
+    "agentAssetId",
+    "catalog"
+  ],
+  "originMainSha": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+  "note": "CR only. Batch 9-12 are not Accepted. remaining/liveWriteWatchIndex inherit the post-#628 floor of 22 and are not decremented. Live retirement scan is not rewritten. Item 7 stays not-met. Do not start Batch 13."
+}

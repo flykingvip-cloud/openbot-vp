@@ -1,0 +1,15 @@
+// Copy to LocalSigning.xcconfig for personal local signing overrides.
+// This file is only an example and should stay committed.
+
+OPENBOT_CODE_SIGN_STYLE = Automatic
+OPENBOT_DEVELOPMENT_TEAM = YOUR_TEAM_ID
+
+OPENBOT_APP_BUNDLE_ID = ai.openbot.client
+OPENBOT_SHARE_BUNDLE_ID = ai.openbot.client.share
+OPENBOT_ACTIVITY_WIDGET_BUNDLE_ID = ai.openbot.client.activitywidget
+OPENBOT_WATCH_APP_BUNDLE_ID = ai.openbot.client.watchkitapp
+OPENBOT_WATCH_EXTENSION_BUNDLE_ID = ai.openbot.client.watchkitapp.extension
+
+// Leave empty with automatic signing.
+OPENBOT_APP_PROFILE =
+OPENBOT_SHARE_PROFILE =

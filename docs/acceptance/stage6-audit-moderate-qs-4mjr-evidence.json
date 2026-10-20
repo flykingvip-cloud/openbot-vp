@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-4mjr-xmp4-gh2g",
+  "cve": "CVE-2026-82417",
+  "package": "qs",
+  "vulnerable_range": ">=2.2.5 <6.16.0",
+  "affected_version_before": "6.15.2",
+  "dependency_path": ".>@larksuiteoapi/node-sdk>qs",
+  "severity": "moderate",
+  "direct_or_transitive": "transitive",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=6.16.0",
+  "mitigated_version": "6.16.0",
+  "reachable_surface": "querystring serialize via @larksuiteoapi/node-sdk (root direct) → qs (override); attacker-controlled isBuffer on stringify values",
+  "mitigation": "Bump pnpm.overrides.qs 6.15.2 → 6.16.0 (transitive; no root dependencies.qs)",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Same pin also clears sibling qs moderate GHSA-x5fp-wj9c-mxmx (also needs >=6.16.0; not a second cell). Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 23,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-4mjr-xmp4-gh2g"
+}

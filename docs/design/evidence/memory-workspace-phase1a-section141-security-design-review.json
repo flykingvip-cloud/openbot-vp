@@ -1,0 +1,39 @@
+{
+  "schema": "memory-workspace-phase1a-section141-design-review/v1",
+  "roleId": "security",
+  "roleLabel": "多租户 / 安全",
+  "owner": "cursor-data-governance",
+  "preparedBy": "cursor-memory-platform",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "decision": "accepted",
+  "signedAt": "2026-08-16T08:22:48.000Z",
+  "signedBy": "cursor-data-governance",
+  "scope": "tool cwd vs data root authorization; Managed fail-closed",
+  "section141Criteria": [
+    "tool cwd and data roots are separately authorized",
+    "ManagedEnterprise unknown tenant/context/catalog/binding/authorization fail closed"
+  ],
+  "designBasis": {
+    "primary": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+    "sections": ["§2 W3 W7 W8", "§14.1 item 4"],
+    "runtimeEvidence": "src/gateway/security-profile.ts"
+  },
+  "frozenDecisions": [
+    {
+      "id": "authz-before-path",
+      "decision": "Authorize first; never parse a user path and then backfill authz"
+    },
+    {
+      "id": "cwd-not-memory",
+      "decision": "tool cwd grant is not proof of memory-root ownership"
+    },
+    {
+      "id": "managed-fail-closed",
+      "decision": "ManagedEnterprise must deny on any unknown of tenant/context/catalog/binding/authorization"
+    }
+  ],
+  "relatedContracts": ["docs/design/evidence/memory-workspace-phase1a-membership-contract.json"],
+  "explicitlyForbidden": ["deployAuthorized=true", "managed-fallback-to-canonical-workspace"],
+  "ownerSignOffAction": "Set decision=accepted in this file and update section141-signoff-matrix.json security row"
+}

@@ -1,0 +1,817 @@
+/* =============================================================
+   Trial Apply Page — modern, restrained layout
+   ============================================================= */
+
+.trial-apply-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px clamp(28px, 5vw, 64px) 56px;
+  color: #f4f4f5;
+  background: #0a0c12;
+  overflow-x: hidden;
+}
+
+.trial-apply-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: image-set(
+    url("/cosmic-bg.webp") type("image/webp"),
+    url("/cosmic-bg.jpg") type("image/jpeg"),
+    url("/cosmic-bg.png") type("image/png")
+  );
+  background-size: cover;
+  background-position: center center;
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.trial-apply-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(10, 12, 18, 0) 35%, rgba(10, 12, 18, 0.55) 100%),
+    linear-gradient(180deg, rgba(10, 12, 18, 0) 60%, rgba(10, 12, 18, 0.92) 100%);
+  pointer-events: none;
+}
+
+.trial-apply-page__backdrop {
+  display: none;
+}
+
+/* --------- Header --------- */
+.trial-apply-page__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: clamp(28px, 4vh, 56px);
+}
+
+.trial-apply-page__brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+.trial-apply-page__brand:hover {
+  opacity: 0.85;
+}
+
+.trial-apply-page__brand-logo {
+  display: block;
+  width: clamp(150px, 14vw, 208px);
+  height: auto;
+}
+
+.trial-apply-page__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(247, 239, 231, 0.78);
+  font-size: 0.84rem;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.trial-apply-page__back:hover {
+  border-color: rgba(255, 184, 108, 0.4);
+  color: #fff;
+  background: rgba(255, 138, 61, 0.08);
+}
+
+/* --------- Two-column shell --------- */
+.trial-apply-page__shell {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(440px, 0.95fr);
+  gap: clamp(36px, 4vw, 64px);
+  align-items: start;
+  flex: 1 1 auto;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.trial-apply-page__copy {
+  min-width: 0;
+}
+
+/* --------- Left column: visual panel (clean, no overlapping bubbles) --------- */
+.trial-apply-page__visual-panel {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(20, 22, 30, 0.55);
+  padding: clamp(20px, 2.4vw, 32px);
+  display: grid;
+  gap: 22px;
+  backdrop-filter: blur(8px);
+}
+
+.trial-apply-page__visual-header {
+  display: grid;
+  gap: 10px;
+}
+
+.trial-apply-page__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(255, 184, 108, 0.78);
+}
+
+.trial-apply-page__eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: rgba(255, 184, 108, 0.5);
+  margin-right: 12px;
+}
+
+.trial-apply-page__visual-header h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.trial-apply-page__visual-header p {
+  margin: 0;
+  color: rgba(247, 239, 231, 0.72);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  max-width: 520px;
+}
+
+/* product window — pure screenshot, no overlay clutter */
+.trial-apply-page__visual-canvas {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 138, 61, 0.05);
+}
+
+.trial-apply-page__visual-window {
+  position: relative;
+}
+
+.trial-apply-page__visual-shot {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Hide overlay/dialog/flow that previously sat on top of the screenshot —
+   keeps the visual quiet and modern. They remain in the DOM for
+   accessibility / future use but are visually hidden here. */
+.trial-apply-page__visual-overlay,
+.trial-apply-page__visual-window-bar,
+.trial-apply-page__visual-dialog,
+.trial-apply-page__visual-flow {
+  display: none;
+}
+
+/* --------- Right column: form card --------- */
+.trial-apply-page__card {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 138, 61, 0.06), rgba(255, 138, 61, 0) 65%) padding-box,
+    rgba(20, 22, 30, 0.78) padding-box;
+  padding: clamp(26px, 2.6vw, 36px);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 138, 61, 0.06);
+  backdrop-filter: blur(18px);
+  display: grid;
+  gap: 18px;
+}
+
+.trial-apply-page__form,
+.auth-home__trial-panel,
+.auth-home__trial-panel--page {
+  display: grid;
+  gap: 18px;
+}
+
+/* --------- Stepper top bar --------- */
+.auth-home__trial-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.auth-home__trial-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 138, 61, 0.12);
+  border: 1px solid rgba(255, 138, 61, 0.28);
+  color: #ffd5b0;
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+}
+
+.auth-home__trial-counter {
+  font-size: 0.78rem;
+  color: rgba(247, 239, 231, 0.6);
+  letter-spacing: 0.04em;
+}
+
+/* --------- Step row --------- */
+.auth-home__trial-stepbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.auth-home__trial-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(247, 239, 231, 0.55);
+  flex: 0 0 auto;
+}
+
+.auth-home__trial-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: rgba(247, 239, 231, 0.75);
+}
+
+.auth-home__trial-step.is-active .auth-home__trial-step-dot {
+  background: linear-gradient(135deg, #ff9d4d 0%, #ff7a1a 100%);
+  border-color: rgba(255, 184, 108, 0.5);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 138, 61, 0.32);
+}
+
+.auth-home__trial-step-copy strong {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: rgba(247, 239, 231, 0.82);
+  letter-spacing: 0.01em;
+}
+
+.auth-home__trial-step.is-active .auth-home__trial-step-copy strong {
+  color: #fff;
+}
+
+.auth-home__trial-step-divider {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+  margin: 0 6px;
+}
+
+/* --------- Field grid layout (2-column for company/industry/users etc.) --------- */
+.auth-home__trial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+/* --------- Use-case chips --------- */
+.auth-home__trial-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.auth-home__trial-chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(247, 239, 231, 0.78);
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.auth-home__trial-chip:hover:not(:disabled) {
+  border-color: rgba(255, 184, 108, 0.4);
+  color: #fff;
+}
+.auth-home__trial-chip.is-active {
+  border-color: rgba(255, 138, 61, 0.5);
+  background: linear-gradient(135deg, rgba(255, 138, 61, 0.18), rgba(255, 106, 0, 0.1));
+  color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.1);
+}
+.auth-home__trial-chip:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* --------- Yes/No choice list (needs demo) --------- */
+.auth-home__trial-choice-list {
+  display: grid;
+  gap: 8px;
+}
+.auth-home__trial-choice-list--inline {
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+}
+
+.auth-home__trial-choice {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(247, 239, 231, 0.78);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.auth-home__trial-choice:hover:not(:disabled) {
+  border-color: rgba(255, 184, 108, 0.36);
+  color: #fff;
+}
+.auth-home__trial-choice.is-active {
+  border-color: rgba(255, 138, 61, 0.5);
+  background: linear-gradient(135deg, rgba(255, 138, 61, 0.16), rgba(255, 106, 0, 0.08));
+  color: #fff;
+}
+.auth-home__trial-choice:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* --------- Action row (back / submit) --------- */
+.auth-home__trial-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.auth-home__secondary-action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(247, 239, 231, 0.82);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.auth-home__secondary-action:hover:not(:disabled) {
+  border-color: rgba(255, 184, 108, 0.36);
+  color: #fff;
+  background: rgba(255, 138, 61, 0.06);
+}
+.auth-home__secondary-action:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.auth-home__trial-terms {
+  flex: 1 1 auto;
+  text-align: right;
+  font-size: 0.74rem;
+  color: rgba(247, 239, 231, 0.5);
+  line-height: 1.5;
+}
+
+/* --------- Field overrides for the trial-apply-page --------- */
+.auth-home__trial-panel--page .auth-home__field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+.auth-home__trial-panel--page .auth-home__field span {
+  font-size: 0.78rem;
+  color: rgba(247, 239, 231, 0.78);
+  letter-spacing: 0.02em;
+  text-align: left;
+}
+.auth-home__trial-panel--page .auth-home__field input,
+.auth-home__trial-panel--page .auth-home__field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  font-size: 0.92rem;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.auth-home__trial-panel--page .auth-home__field input:hover,
+.auth-home__trial-panel--page .auth-home__field select:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.auth-home__trial-panel--page .auth-home__field input:focus,
+.auth-home__trial-panel--page .auth-home__field select:focus {
+  outline: none;
+  border-color: rgba(255, 138, 61, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.12);
+}
+
+/* Stacked variant: same as default; explicit for clarity. */
+.auth-home__trial-panel--page .auth-home__field--stacked > span {
+  margin-bottom: 2px;
+}
+
+/* --------- Row variant for step-2 (compact left/right layout) --------- */
+.auth-home__trial-panel--page .auth-home__field--row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.auth-home__trial-panel--page .auth-home__field--row > span {
+  margin: 0;
+  text-align: right;
+  font-size: 0.78rem;
+  color: rgba(247, 239, 231, 0.78);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* Two-column row used for "company size + industry" — keeps 2 selects side
+   by side while still aligning their labels vertically with other rows. */
+.auth-home__trial-row-pair {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 96px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+.auth-home__trial-row-pair > span {
+  margin: 0;
+  text-align: right;
+  font-size: 0.78rem;
+  color: rgba(247, 239, 231, 0.78);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.auth-home__trial-row-pair select {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  font-size: 0.92rem;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.auth-home__trial-row-pair select:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.auth-home__trial-row-pair select:focus {
+  outline: none;
+  border-color: rgba(255, 138, 61, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.12);
+}
+.auth-home__trial-row-pair select option {
+  color: #111;
+  background: #fff;
+}
+
+/* The compact yes/no choice row should not stretch to full width; cap it
+   so the buttons feel like an answer, not a full-width banner. */
+.auth-home__trial-panel--page .auth-home__field--row .auth-home__trial-choice-list {
+  max-width: 320px;
+}
+
+/* --------- Multi-select popover for "main use cases" --------- */
+.auth-home__trial-multiselect {
+  position: relative;
+  width: 100%;
+}
+.auth-home__trial-multiselect-trigger {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  font-size: 0.92rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+  gap: 12px;
+}
+.auth-home__trial-multiselect-trigger:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.auth-home__trial-multiselect-trigger:focus,
+.auth-home__trial-multiselect-trigger.is-open {
+  outline: none;
+  border-color: rgba(255, 138, 61, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.12);
+}
+.auth-home__trial-multiselect-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.auth-home__trial-multiselect-summary {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auth-home__trial-multiselect-summary--placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+.auth-home__trial-multiselect-counter {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 138, 61, 0.18);
+  border: 1px solid rgba(255, 138, 61, 0.32);
+  color: #ffd5b0;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+.auth-home__trial-multiselect-chevron {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(247, 239, 231, 0.5);
+  border-bottom: 2px solid rgba(247, 239, 231, 0.5);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.auth-home__trial-multiselect-trigger.is-open .auth-home__trial-multiselect-chevron {
+  transform: rotate(225deg);
+}
+
+.auth-home__trial-multiselect-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(20, 22, 30, 0.96);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  display: grid;
+  gap: 8px;
+}
+.auth-home__trial-multiselect-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.auth-home__trial-multiselect-hint {
+  font-size: 0.72rem;
+  color: rgba(247, 239, 231, 0.5);
+  letter-spacing: 0.02em;
+}
+
+/* --------- Submit button (overrides the default to fit trial card spacing) --------- */
+.auth-home__trial-panel--page .auth-home__submit {
+  margin-top: 6px;
+}
+
+/* --------- Compact field used on step 1 (still using the existing class names) --------- */
+.trial-apply-page__compact-stack {
+  display: grid;
+  gap: 12px;
+}
+
+.trial-apply-page__compact-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.trial-apply-page__compact-field:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.trial-apply-page__compact-field:focus-within {
+  border-color: rgba(255, 138, 61, 0.5);
+  box-shadow: 0 0 0 3px rgba(255, 138, 61, 0.12);
+}
+
+.trial-apply-page__compact-label {
+  font-size: 0.74rem;
+  color: rgba(247, 239, 231, 0.6);
+  letter-spacing: 0.04em;
+}
+
+/* Legacy display span — hidden so the real input handles all visuals.
+   Keeping the element in the DOM avoids touching the view layer. */
+.trial-apply-page__compact-value {
+  display: none;
+}
+
+.trial-apply-page__compact-control {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  min-height: 22px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+.trial-apply-page__compact-control:focus {
+  outline: none;
+}
+.trial-apply-page__compact-control::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+.trial-apply-page__compact-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Native select on dark background — strip the OS chrome and rely on ::after chevron. */
+.trial-apply-page__compact-field--select .trial-apply-page__compact-control {
+  cursor: pointer;
+  padding-right: 22px;
+  background-image: none;
+}
+.trial-apply-page__compact-field--select .trial-apply-page__compact-control option {
+  color: #111;
+  background: #fff;
+}
+
+.trial-apply-page__compact-field--select::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid rgba(247, 239, 231, 0.45);
+  border-bottom: 2px solid rgba(247, 239, 231, 0.45);
+  transform: translateY(-65%) rotate(45deg);
+  pointer-events: none;
+}
+
+/* --------- Result success state --------- */
+.trial-apply-page__result {
+  display: grid;
+  gap: 14px;
+  text-align: center;
+  padding: 18px 4px;
+}
+.trial-apply-page__result-badge {
+  justify-self: center;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: rgba(103, 208, 145, 0.15);
+  border: 1px solid rgba(103, 208, 145, 0.32);
+  color: #8be0a4;
+  font-size: 0.78rem;
+  letter-spacing: 0.05em;
+}
+.trial-apply-page__result h2 {
+  margin: 6px 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+.trial-apply-page__result p {
+  margin: 4px 0 0;
+  color: rgba(247, 239, 231, 0.78);
+  line-height: 1.6;
+}
+.trial-apply-page__result-actions {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* --------- Mobile --------- */
+@media (max-width: 960px) {
+  .trial-apply-page {
+    padding: 20px clamp(16px, 4vw, 28px) 36px;
+  }
+  .trial-apply-page__shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .trial-apply-page__visual-panel {
+    padding: 18px;
+  }
+  .auth-home__trial-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .auth-home__trial-stepbar {
+    overflow-x: auto;
+  }
+  .auth-home__trial-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .auth-home__trial-terms {
+    text-align: left;
+  }
+  .trial-apply-page__back {
+    padding: 6px 14px;
+  }
+  /* Collapse left/right rows back to stacked layout on narrow screens. */
+  .auth-home__trial-panel--page .auth-home__field--row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .auth-home__trial-panel--page .auth-home__field--row > span {
+    text-align: left;
+  }
+  .auth-home__trial-row-pair {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .auth-home__trial-row-pair > span {
+    text-align: left;
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch15-s09/v1",
+  "item": 7,
+  "status": "retirement-batch-15",
+  "batch": "S09",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S09",
+      "file": "src/gateway/knowledge/knowledge-document-preview.ts",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "lineBefore": 178,
+      "lineAfter": null,
+      "replacement": "InMemoryWorkspaceResourceCatalog"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 19,
+  "liveWriteWatchIndex": 19,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/knowledge/knowledge-document-preview.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "697c65c905c624ec80aba2a3386a00a7d0cc818a",
+  "note": "Batch 15 retires S09 only after #644 S15. Do not call createEmptyWorkspaceCatalog. Do not mint a production Catalog row. Catalog miss=deny stays off. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

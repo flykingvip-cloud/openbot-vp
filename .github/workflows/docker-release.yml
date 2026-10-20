@@ -1,0 +1,447 @@
+name: Docker Release
+
+# Scope boundary: this workflow's responsibility ends at publishing immutable
+# multi-architecture images to GHCR. It must not deploy.
+#
+# The production release chain is `main` -> GHCR -> production host pull -> podman
+# cutover, following the process in `deploy/production/RELEASE_RECORD.md`, whose
+# authoritative release identity is `deploy/production/releases.jsonl` plus the
+# annotated `provenance/sha-*` tags: the forward-only guard, that ledger and those
+# tags, in-container `/app/dist/build-info.json` verification, and merge-back.
+#
+# Do not add a deployment job here (Fly or otherwise). PR #160 added a
+# `deploy-fly-production` job that treated the self-host `fly.toml` template as
+# production configuration and bypassed every gate above; PR #162 removed it.
+# `fly.toml` and `fly.private.toml` are self-host templates documented in
+# `docs/install/fly.md`, not production configuration, so `FLY_API_TOKEN`,
+# `FLY_PRODUCTION_ENABLED`, and any Fly registry mirror have no place in this file.
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+      # Production cutover anchors. Without these, pushing a production tag built
+      # no image, so images were compiled by hand on the 3.5 GB production host
+      # (105 of 118 host images were `localhost/` builds that never reached a
+      # registry, and one live image had no source commit on GitHub at all).
+      - "provenance/sha-*"
+      - "baseline/*"
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "**/*.mdx"
+      - ".agents/**"
+      - "skills/**"
+  # Manual builds for refs that are not `main` or a `v*` tag — in particular the
+  # production SoT release branch. Without this, production images had to be built
+  # on the production host itself, which has 3.5 GB of RAM and has already been
+  # OOM-killed mid-build. Dispatch this workflow on the ref you want and give it the
+  # image tag to publish; the image is then pulled onto the host instead of compiled
+  # there.
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: >-
+          Tag to publish, built from the dispatched ref
+          (e.g. provenance-3624c454fefd). Allowed: A-Z a-z 0-9 . _ -
+        required: true
+        type: string
+
+concurrency:
+  group: docker-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Build amd64 images (default + slim share the build stage cache)
+  build-amd64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      slim-digest: ${{ steps.build-slim.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags (amd64)
+        id: tags
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Passed via env, never interpolated into the script body, so a hostile
+          # input cannot break out of the shell.
+          MANUAL_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          tags=()
+          slim_tags=()
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=("${IMAGE}:main-amd64")
+            slim_tags+=("${IMAGE}:main-slim-amd64")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags+=("${IMAGE}:${version}-amd64")
+            slim_tags+=("${IMAGE}:${version}-slim-amd64")
+          fi
+          # `provenance/sha-*` and `baseline/*` are push triggers above, but an OCI
+          # tag cannot contain "/", so flatten the ref (provenance/sha-x -> provenance-sha-x).
+          # Without this branch these refs resolved zero tags and the job exited 1.
+          if [[ "${GITHUB_REF}" == refs/tags/provenance/* || "${GITHUB_REF}" == refs/tags/baseline/* ]]; then
+            release_tag="${GITHUB_REF#refs/tags/}"
+            release_tag="${release_tag//\//-}"
+            if [[ ! "${release_tag}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::Tag ref ${GITHUB_REF} does not flatten to a valid image tag"
+              exit 1
+            fi
+            tags+=("${IMAGE}:${release_tag}-amd64")
+            slim_tags+=("${IMAGE}:${release_tag}-slim-amd64")
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ ! "${MANUAL_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::image_tag must match ^[A-Za-z0-9._-]+$"
+              exit 1
+            fi
+            tags+=("${IMAGE}:${MANUAL_TAG}-amd64")
+            slim_tags+=("${IMAGE}:${MANUAL_TAG}-slim-amd64")
+          fi
+          if [[ ${#tags[@]} -eq 0 ]]; then
+            echo "::error::No amd64 tags resolved for ref ${GITHUB_REF}"
+            exit 1
+          fi
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "slim<<EOF"
+            printf "%s\n" "${slim_tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve OCI labels (amd64)
+        id: labels
+        shell: bash
+        env:
+          MANUAL_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_SHA}"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            version="main"
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/provenance/* || "${GITHUB_REF}" == refs/tags/baseline/* ]]; then
+            version="${GITHUB_REF#refs/tags/}"
+            version="${version//\//-}"
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${MANUAL_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            version="${MANUAL_TAG}"
+          fi
+          created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          {
+            echo "value<<EOF"
+            echo "org.opencontainers.image.revision=${GITHUB_SHA}"
+            echo "org.opencontainers.image.version=${version}"
+            echo "org.opencontainers.image.created=${created}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push amd64 image
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          # `.dockerignore` excludes `.git`, so build-info.json would record
+          # "commit": null and break the production LIVE gate.
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          tags: ${{ steps.tags.outputs.value }}
+          labels: ${{ steps.labels.outputs.value }}
+          provenance: false
+          push: true
+
+      - name: Build and push amd64 slim image
+        id: build-slim
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          build-args: |
+            OPENCLAW_VARIANT=slim
+            GIT_COMMIT=${{ github.sha }}
+          tags: ${{ steps.tags.outputs.slim }}
+          labels: ${{ steps.labels.outputs.value }}
+          provenance: false
+          push: true
+
+  # Build arm64 images (default + slim share the build stage cache)
+  build-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      slim-digest: ${{ steps.build-slim.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # GitHub-hosted x64 runners emulate arm64 with QEMU for this platform image.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags (arm64)
+        id: tags
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          MANUAL_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          tags=()
+          slim_tags=()
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=("${IMAGE}:main-arm64")
+            slim_tags+=("${IMAGE}:main-slim-arm64")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags+=("${IMAGE}:${version}-arm64")
+            slim_tags+=("${IMAGE}:${version}-slim-arm64")
+          fi
+          # See the amd64 job: flatten `provenance/sha-*` and `baseline/*` refs.
+          if [[ "${GITHUB_REF}" == refs/tags/provenance/* || "${GITHUB_REF}" == refs/tags/baseline/* ]]; then
+            release_tag="${GITHUB_REF#refs/tags/}"
+            release_tag="${release_tag//\//-}"
+            if [[ ! "${release_tag}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::Tag ref ${GITHUB_REF} does not flatten to a valid image tag"
+              exit 1
+            fi
+            tags+=("${IMAGE}:${release_tag}-arm64")
+            slim_tags+=("${IMAGE}:${release_tag}-slim-arm64")
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ ! "${MANUAL_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::image_tag must match ^[A-Za-z0-9._-]+$"
+              exit 1
+            fi
+            tags+=("${IMAGE}:${MANUAL_TAG}-arm64")
+            slim_tags+=("${IMAGE}:${MANUAL_TAG}-slim-arm64")
+          fi
+          if [[ ${#tags[@]} -eq 0 ]]; then
+            echo "::error::No arm64 tags resolved for ref ${GITHUB_REF}"
+            exit 1
+          fi
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "slim<<EOF"
+            printf "%s\n" "${slim_tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve OCI labels (arm64)
+        id: labels
+        shell: bash
+        env:
+          MANUAL_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_SHA}"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            version="main"
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/provenance/* || "${GITHUB_REF}" == refs/tags/baseline/* ]]; then
+            version="${GITHUB_REF#refs/tags/}"
+            version="${version//\//-}"
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && "${MANUAL_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            version="${MANUAL_TAG}"
+          fi
+          created="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          {
+            echo "value<<EOF"
+            echo "org.opencontainers.image.revision=${GITHUB_SHA}"
+            echo "org.opencontainers.image.version=${version}"
+            echo "org.opencontainers.image.created=${created}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push arm64 image
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/arm64
+          # See the amd64 job: pass the commit so build-info.json is not null.
+          build-args: |
+            GIT_COMMIT=${{ github.sha }}
+          tags: ${{ steps.tags.outputs.value }}
+          labels: ${{ steps.labels.outputs.value }}
+          provenance: false
+          push: true
+
+      - name: Build and push arm64 slim image
+        id: build-slim
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/arm64
+          build-args: |
+            OPENCLAW_VARIANT=slim
+            GIT_COMMIT=${{ github.sha }}
+          tags: ${{ steps.tags.outputs.slim }}
+          labels: ${{ steps.labels.outputs.value }}
+          provenance: false
+          push: true
+
+  # Create multi-platform manifests
+  create-manifest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      packages: write
+      contents: read
+    needs: [build-amd64, build-arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve manifest tags
+        id: tags
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          MANUAL_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          tags=()
+          slim_tags=()
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=("${IMAGE}:main")
+            slim_tags+=("${IMAGE}:main-slim")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags+=("${IMAGE}:${version}")
+            slim_tags+=("${IMAGE}:${version}-slim")
+            if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9]+)?$ ]]; then
+              tags+=("${IMAGE}:latest")
+              slim_tags+=("${IMAGE}:slim")
+            fi
+          fi
+          # See the amd64 job: flatten `provenance/sha-*` and `baseline/*` refs.
+          # Never move `latest` from a cutover anchor tag.
+          if [[ "${GITHUB_REF}" == refs/tags/provenance/* || "${GITHUB_REF}" == refs/tags/baseline/* ]]; then
+            release_tag="${GITHUB_REF#refs/tags/}"
+            release_tag="${release_tag//\//-}"
+            if [[ ! "${release_tag}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::Tag ref ${GITHUB_REF} does not flatten to a valid image tag"
+              exit 1
+            fi
+            tags+=("${IMAGE}:${release_tag}")
+            slim_tags+=("${IMAGE}:${release_tag}-slim")
+          fi
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ ! "${MANUAL_TAG}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+              echo "::error::image_tag must match ^[A-Za-z0-9._-]+$"
+              exit 1
+            fi
+            # Never move `latest` from a manual build.
+            tags+=("${IMAGE}:${MANUAL_TAG}")
+            slim_tags+=("${IMAGE}:${MANUAL_TAG}-slim")
+          fi
+          if [[ ${#tags[@]} -eq 0 ]]; then
+            echo "::error::No manifest tags resolved for ref ${GITHUB_REF}"
+            exit 1
+          fi
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "slim<<EOF"
+            printf "%s\n" "${slim_tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create and push default manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t tags <<< "${{ steps.tags.outputs.value }}"
+          args=()
+          for tag in "${tags[@]}"; do
+            [ -z "$tag" ] && continue
+            args+=("-t" "$tag")
+          done
+          docker buildx imagetools create "${args[@]}" \
+            ${{ needs.build-amd64.outputs.digest }} \
+            ${{ needs.build-arm64.outputs.digest }}
+
+      - name: Create and push slim manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t tags <<< "${{ steps.tags.outputs.slim }}"
+          args=()
+          for tag in "${tags[@]}"; do
+            [ -z "$tag" ] && continue
+            args+=("-t" "$tag")
+          done
+          docker buildx imagetools create "${args[@]}" \
+            ${{ needs.build-amd64.outputs.slim-digest }} \
+            ${{ needs.build-arm64.outputs.slim-digest }}

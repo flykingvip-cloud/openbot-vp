@@ -1,0 +1,46 @@
+=== date ===
+2026-09-28T04:10:00Z
+=== HEAD ===
+6628f4bf364bd6d0560847b938b00e74035a8947
+
+===== wiring: dispatch/gateway-hook/preflight barrels =====
+src/task-orchestration/gateway-hook.ts:35:export function observeOrchestrationConsider(input: OrchestrationObserveInput = {}): void {
+src/task-orchestration/dispatch.ts:4: * Wired into chat.send via `observeOrchestrationConsider` (P4.5b choke-point).
+
+===== facade test lock snippets =====
+src/task-orchestration/constitutional-runtime-facade.test.ts:7:import { observeOrchestrationRuntimeFacade } from "./constitutional-runtime-facade.js";
+src/task-orchestration/constitutional-runtime-facade.test.ts:10:import { ORCHESTRATION_LIVE_INVOKE } from "./types.js";
+src/task-orchestration/constitutional-runtime-facade.test.ts:14:    const dispatch = readFileSync(new URL("./dispatch.ts", import.meta.url), "utf8");
+src/task-orchestration/constitutional-runtime-facade.test.ts:15:    const hook = readFileSync(new URL("./gateway-hook.ts", import.meta.url), "utf8");
+src/task-orchestration/constitutional-runtime-facade.test.ts:16:    expect(dispatch).not.toContain("constitutional-runtime-facade");
+src/task-orchestration/constitutional-runtime-facade.test.ts:18:    expect(hook).not.toContain("constitutional-runtime-facade");
+src/task-orchestration/constitutional-runtime-facade.test.ts:20:    expect(dispatch).not.toContain("process.env.OPENBOT_CONSTITUTIONAL_SHADOW");
+src/task-orchestration/constitutional-runtime-facade.test.ts:24:    const previous = process.env[CONSTITUTIONAL_SHADOW_ENV];
+src/task-orchestration/constitutional-runtime-facade.test.ts:25:    process.env[CONSTITUTIONAL_SHADOW_ENV] = "true";
+src/task-orchestration/constitutional-runtime-facade.test.ts:42:      expect(ORCHESTRATION_LIVE_INVOKE).toBe(false);
+src/task-orchestration/constitutional-runtime-facade.test.ts:55:        delete process.env[CONSTITUTIONAL_SHADOW_ENV];
+src/task-orchestration/constitutional-runtime-facade.test.ts:57:        process.env[CONSTITUTIONAL_SHADOW_ENV] = previous;
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:4:import { observePreflightRuntimeFacade } from "./constitutional-runtime-facade.js";
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:32:      new URL("./constitutional-runtime-facade.ts", import.meta.url),
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:36:      expect(source).not.toContain("constitutional-runtime-facade");
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:40:    expect(self).not.toContain("process.env");
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:43:  it("stays inert when process.env is on and the caller did not opt in", () => {
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:44:    const previous = process.env[CONSTITUTIONAL_SHADOW_ENV];
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:45:    process.env[CONSTITUTIONAL_SHADOW_ENV] = "true";
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:56:      expect(result.wroteReceipt).toBe(false);
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:65:        delete process.env[CONSTITUTIONAL_SHADOW_ENV];
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:67:        process.env[CONSTITUTIONAL_SHADOW_ENV] = previous;
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:83:    expect(result.wroteReceipt).toBe(false);
+
+===== façade source force-false fields =====
+src/agents/execution-preflight/constitutional-runtime-facade.ts:24:  wroteReceipt: false;
+src/agents/execution-preflight/constitutional-runtime-facade.ts:25:  wroteTrace: false;
+src/agents/execution-preflight/constitutional-runtime-facade.ts:72:    wroteReceipt: false,
+src/agents/execution-preflight/constitutional-runtime-facade.ts:73:    wroteTrace: false,
+src/task-orchestration/constitutional-runtime-facade.ts:14:import { ORCHESTRATION_LIVE_INVOKE } from "./types.js";
+src/task-orchestration/constitutional-runtime-facade.ts:26:  dispatchInvoked: false;
+src/task-orchestration/constitutional-runtime-facade.ts:27:  enqueued: false;
+src/task-orchestration/constitutional-runtime-facade.ts:32: * `ORCHESTRATION_LIVE_INVOKE` must stay false; this function never dispatches.
+src/task-orchestration/constitutional-runtime-facade.ts:37:  const orchestrationLiveInvoke: false = ORCHESTRATION_LIVE_INVOKE;
+src/task-orchestration/constitutional-runtime-facade.ts:52:    dispatchInvoked: false,
+src/task-orchestration/constitutional-runtime-facade.ts:53:    enqueued: false,

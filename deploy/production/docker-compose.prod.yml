@@ -1,0 +1,84 @@
+# Production-oriented compose (Wave 1).
+# - No --allow-unconfigured
+# - Expects config at ${OPENBOT_CONFIG_DIR} with gateway.mode=local
+# - Default bind is image/config loopback; put a reverse proxy on the host
+#
+# Usage (gateway only — default):
+#   docker compose -f deploy/production/docker-compose.prod.yml --env-file /path/to/.env up -d
+#
+# Opt-in HA Dual Controller sidecar (profile `ha`; mode=manual; Auto FO NOT APPROVED):
+#   docker compose -f deploy/production/docker-compose.prod.yml --env-file /path/to/.env --profile ha up -d
+# Requires DATABASE_URL + HA_CONTROLLER_ID + HA_FAILURE_DOMAIN in the env file.
+# See deploy/ha/controller/README.md and docs/install/docker.md § Production HA controller.
+
+services:
+  openbot-gateway:
+    image: ${OPENBOT_IMAGE:-${OPENCLAW_IMAGE:-openbot:prod}}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      NODE_ENV: production
+      OPENBOT_GATEWAY_TOKEN: ${OPENBOT_GATEWAY_TOKEN:?set OPENBOT_GATEWAY_TOKEN}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENBOT_GATEWAY_TOKEN}
+      OPENBOT_STATE_DIR: ${OPENBOT_STATE_DIR:-/home/node/.openclaw}
+      OPENCLAW_STATE_DIR: ${OPENBOT_STATE_DIR:-/home/node/.openclaw}
+      OPENBOT_PUBLIC_APP_BASE_URL: ${OPENBOT_PUBLIC_APP_BASE_URL:-}
+    volumes:
+      # Host state dir must contain openclaw.json / openbot.json with gateway.mode=local
+      - ${OPENBOT_CONFIG_DIR:?set OPENBOT_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENBOT_WORKSPACE_DIR:?set OPENBOT_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      # Multitenant sandbox / account-worker docker: mount host engine socket so the
+      # gateway can spawn containers even if the image CLI path is broken. Prefer
+      # also baking CLI via OPENCLAW_INSTALL_DOCKER_CLI=1 (Dockerfile default).
+      # Uncomment when the host exposes a docker/podman socket:
+      # - ${OPENBOT_DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+    # Publish only if you intentionally bind lan in config; prefer host reverse proxy + no publish.
+    # ports:
+    #   - "127.0.0.1:18789:18789"
+    init: true
+    restart: unless-stopped
+    # Production: no --allow-unconfigured. Config must exist and gateway.mode=local.
+    command: ["node", "dist/index.js", "gateway", "--port", "18789"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+
+  # Dual Controller sidecar — NOT started by default compose up.
+  # Production Auto Failover remains NOT APPROVED; this service only heartbeats
+  # (lease) and keeps mode=manual. Manual run-once stays an explicit CLI action.
+  openbot-ha-controller:
+    profiles: ["ha"]
+    build:
+      context: ../ha/controller
+      dockerfile: Dockerfile
+    image: ${OPENBOT_HA_CONTROLLER_IMAGE:-openbot-ha-controller:local}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL when enabling profile ha}
+      HA_CONTROLLER_ID: ${HA_CONTROLLER_ID:?set HA_CONTROLLER_ID when enabling profile ha}
+      HA_FAILURE_DOMAIN: ${HA_FAILURE_DOMAIN:?set HA_FAILURE_DOMAIN when enabling profile ha}
+      HA_CONTROLLER_VERSION: ${HA_CONTROLLER_VERSION:-prod}
+      # Must stay manual; CLI refuses --mode auto / HA_CONTROLLER_MODE=auto
+      HA_CONTROLLER_MODE: ${HA_CONTROLLER_MODE:-manual}
+      HA_CONTROLLER_HEARTBEAT_INTERVAL_SEC: ${HA_CONTROLLER_HEARTBEAT_INTERVAL_SEC:-5}
+      HA_CONTROLLER_LOG: ${HA_CONTROLLER_LOG:-INFO}
+    init: true
+    restart: unless-stopped
+    command: ["python", "-m", "controller", "heartbeat-loop"]
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL

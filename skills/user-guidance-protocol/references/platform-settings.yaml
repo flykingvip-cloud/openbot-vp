@@ -1,0 +1,109 @@
+# Replaces the old Control UI script (机器人管理 / 技能管理 / 深色侧栏).
+# Observed 2026-09-18 on https://www.openbot.love/ while logged in.
+# 我的设备, 我的协作小组, AI 模型, 偏好, 安全 were not re-opened this pass.
+# Do not copy their disconnected-local copy into production guidance.
+
+scenario:
+  name: employee_workbench_settings
+  title: 员工工作台系统设置与个人设置
+  trigger:
+    - 系统设置
+    - 个人设置
+    - 我的机器人
+    - 机器人管理
+    - 技能管理
+    - API密钥
+    - Settings
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: identify_page
+    title: 分清两个设置入口
+  - id: system_settings
+    title: 系统设置
+  - id: personal_settings
+    title: 个人设置
+
+steps:
+  - id: reject_old_menu
+    stage: identify_page
+    risk: low
+    instruction: 员工工作台没有「机器人管理」「技能管理」「深色侧栏」「返回控制台」。系统设置在左侧栏底部。个人设置在右上头像菜单里。
+    visual_anchor: 侧栏「系统设置」
+    success_signal: 用户确认自己要进的是系统设置还是个人设置
+
+  - id: open_system
+    stage: system_settings
+    risk: low
+    instruction: 点左侧「系统设置」。页签是「安全与隐私」「我的设备」「我的机器人」「我的协作小组」「AI 模型」。
+    visual_anchor: 「安全与隐私」
+    success_signal: 用户看到这五个页签
+
+  - id: privacy_tab
+    stage: system_settings
+    risk: low
+    instruction: "「安全与隐私」上，数据空间是「就绪 / 云端托管」。说明是「您的数据存储在 OpenBot 云端，由平台加密托管。员工端不提供目录浏览或路径配置。」网关状态可以是「正常」。不要说数据在 ~/OpenBot，也不要说网关未连接，除非屏幕上就是这句。"
+    visual_anchor: 「云端托管」
+    success_signal: 用户读出数据空间和网关状态
+
+  - id: robots_tab
+    stage: system_settings
+    risk: low
+    instruction: 点「我的机器人」。列表可以有多台，每台标「可管理」，并有「进入工作区」。本次看到 6 台，名字以屏幕为准。这一页没有「新建」按钮。
+    visual_anchor: 「进入工作区」
+    success_signal: 用户读出一台机器人的名字
+
+  - id: robot_detail
+    stage: system_settings
+    risk: low
+    instruction: |
+      点进一台机器人后，本次「大白管家」页签是「身份」「能力」「成长」「运营授权」「协作」「数据」。没有看见「危险」页签。
+      - 身份：名称、定位、角色、人格、模型
+      - 能力：已安装 / 探索能力
+      - 成长：能力、表现、建议，以及输出格式、汇报节奏、决策方式
+      - 运营授权：企业身份和个人身份，有「添加身份」
+      - 协作：可以写「尚未参与协作小组。」
+      - 数据：记忆容量、长期记忆、知识库、工作区
+      点「进入工作区」会回到每日概览的对话，不是另一套「概览 / 任务 / 成果」工作台。
+    visual_anchor: 「身份」
+    success_signal: 用户读出当前页签名
+    on_fail: 不要指导用户改模型或删机器人，除非他们明确要求，并且屏幕上有对应按钮。
+
+  - id: open_personal
+    stage: personal_settings
+    risk: low
+    instruction: 点右上头像，再点「个人设置」。页签是「账号」「授权」「偏好」「安全」「数据与备份」。不要点「退出登录」。
+    visual_anchor: 「个人设置」
+    success_signal: 用户看到这五个页签
+
+  - id: account_tab
+    stage: personal_settings
+    risk: low
+    instruction: 点「账号」。可见「账号信息」「个人资料」「显示名称」「个人说明」「企业与岗位」「所属企业」「当前岗位」「岗位状态」「默认机器人」「机器人团队」「默认协作小组」。有绑定企业时状态可以是「正常」「在岗」，不要套「未绑定」。
+    visual_anchor: 「当前岗位」
+    success_signal: 用户读出所属企业或当前岗位
+
+  - id: auth_tab
+    stage: personal_settings
+    risk: medium
+    confirmation: true
+    instruction: |
+      点「授权」。标题是「绑定账户」。本次列表有「微信公众号」「微信个人号」「个人邮箱」「GitHub（个人）」「哔哩哔哩」「抖音」「快手」「微博」「小红书」「知乎」「X」。已配置的会标「已配置」。
+      统计是「身份」「已授权数字人」「待续期」「最近使用」，旁边有「刷新」。
+      说明是「绑定后可在账号详情页把使用权授给旗下数字人。」
+      不要让用户把密钥、AppSecret 或授权码发到对话里。
+    visual_anchor: 「绑定账户」
+    success_signal: 用户读出要绑定的那一项是否已配置
+
+  - id: data_tab
+    stage: personal_settings
+    risk: low
+    instruction: 点「数据与备份」。本次选中后主区域只有标题，没有「导出备份」或「迁移数据位置」。不要指导用户去改本机目录。若屏幕上出现新按钮，先让用户读出按钮名。
+    visual_anchor: 「数据与备份」
+    success_signal: 用户确认这一页上实际有哪些按钮
+
+fallback:
+  - check: skipped_tabs
+    instruction: 「我的设备」「我的协作小组」「AI 模型」以及个人设置的「偏好」「安全」本次没有重新点开。不要用断线时的空列表或「网关未连接」代替它们。先让用户读出页签上的句子。

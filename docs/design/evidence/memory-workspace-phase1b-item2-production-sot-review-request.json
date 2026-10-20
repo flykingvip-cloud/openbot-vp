@@ -1,0 +1,24 @@
+{
+  "schema": "memory-workspace-phase1b-item2-production-sot-review-request/v1",
+  "status": "architecture-accepted",
+  "decisionStatus": "accepted",
+  "mustNotSelfAccept": true,
+  "requestedBy": "cursor-data-governance",
+  "reviewer": "codex-workspace-architecture",
+  "target": "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json",
+  "residualOpaqueReceipt": "docs/design/evidence/memory-workspace-phase1b-item2-residual-opaque-quarantine.json",
+  "item2": "not-met",
+  "item2Official": "not-met",
+  "unlock": "not-issued",
+  "LIVE": "forbidden",
+  "deployAuthorized": false,
+  "productionCatalogWrite": "none",
+  "reviewQuestions": [
+    "Is the Item 2 four-gate population correctly limited to authority-shaped ws: normal records?",
+    "May uniqueUserOwnedEquivalent be the production Catalog count of users with exactly one user-owned agent_primary?",
+    "Are the 9 residual 32-char-hex workspace rows correctly held as residual-not-normal-no-rewrite?",
+    "Is MemoryAsset.resourceId independent, with sourceWorkspaceResourceId binding Workspace.resourceId, and SQLite workspace_id only an isolation key?"
+  ],
+  "acceptedBy": "codex-workspace-architecture",
+  "note": "Architecture accepted the four production-SOT rules. cursor-data-governance must not self-accept. Official item2 stays not-met until coverage/scorecard are retargeted."
+}

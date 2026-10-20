@@ -1,0 +1,288 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-ledger/v1",
+  "item": 7,
+  "status": "not-met",
+  "retirementOwner": "cursor-data-governance",
+  "freezeOwner": "cursor-fable",
+  "ownersDistinct": true,
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "enablesProduction": false,
+  "productionWriteWatchIndex": 37,
+  "frozenWriteWatchIndex": 38,
+  "liveWriteWatchIndex": 37,
+  "target": 0,
+  "retiredThisChange": 0,
+  "i3Executed": false,
+  "phase0Rewritten": false,
+  "scan": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+  "note": "Live retirement scan only. Freeze baseline stays 38. Current production write/index call-sites measure 37 because tool-cwd empty-catalog synthesis is already gone. Remaining sites stay in place until unlock. Deleting them now would break current writes. I3 stays closed.",
+  "sites": [
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 164,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 165,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/commands/agent.ts",
+      "line": 776,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/commands/status-all/agents.ts",
+      "line": 25,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/checkpoint-store.ts",
+      "line": 119,
+      "op": "write"
+    },
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "file": "src/gateway/checkpoint-store.ts",
+      "line": 127,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/checkpoint-store.ts",
+      "line": 158,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "file": "src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts",
+      "line": 86,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "file": "src/gateway/knowledge/knowledge-document-preview.ts",
+      "line": 178,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 142,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 146,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1001,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1075,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1159,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1160,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/server-methods/chat.ts",
+      "line": 1818,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "file": "src/gateway/server-methods/group-workspace-file.ts",
+      "line": 460,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/server-methods/skills.ts",
+      "line": 86,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/server-methods/skills.ts",
+      "line": 137,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/server-methods/tools-catalog.ts",
+      "line": 152,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "file": "src/gateway/workspace-resolver/builders.ts",
+      "line": 105,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "file": "src/gateway/workspace-resolver/steward-read.ts",
+      "line": 104,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 99,
+      "op": "write"
+    },
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeStewardSourceWorkspaceDir",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 152,
+      "op": "write"
+    },
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 153,
+      "op": "write"
+    },
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeStewardSourceWorkspaceDir",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 279,
+      "op": "write"
+    },
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 280,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "file": "src/gateway/workspace-resolver/tool-cwd.ts",
+      "line": 51,
+      "op": "write"
+    },
+    {
+      "pathId": "P4",
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "file": "src/gateway/workspace-resolver/tool-cwd.ts",
+      "line": 52,
+      "op": "write"
+    },
+    {
+      "pathId": "P3",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "file": "src/gateway/workspace/handler-bridge.ts",
+      "line": 592,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "op": "index"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1062,
+      "op": "index"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1252,
+      "op": "index"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1343,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "op": "index"
+    }
+  ]
+}

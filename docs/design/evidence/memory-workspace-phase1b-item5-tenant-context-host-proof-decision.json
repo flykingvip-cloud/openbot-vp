@@ -1,0 +1,33 @@
+{
+  "schema": "memory-workspace-phase1b-item5-tenant-context-host-proof-decision/v1",
+  "item": 5,
+  "tenantContextHostProof": "authorized",
+  "path": "authorize-tenant-context-host-managed-path-proof",
+  "issuedBy": "operator",
+  "recordedBy": "cursor-data-governance",
+  "issuedAt": "2026-08-18T07:35:00.000Z",
+  "request": "docs/design/evidence/memory-workspace-phase1b-item5-tenant-context-host-proof-request.json",
+  "unlock": "issued",
+  "executed": true,
+  "wiredToProductionResolver": false,
+  "deployAuthorized": false,
+  "enablesProduction": false,
+  "attachMissDeny": false,
+  "productionContainerWrite": false,
+  "productionStateDirWrite": false,
+  "live": "host-openbot-only",
+  "identifierPolicy": "hashed-in-git",
+  "authorizes": [
+    "mirror tenant-context.ts managed path 786-798 against the host Catalog",
+    "measure main-path membership fallback and legacy-path cwd authorization",
+    "hashed measurement only in git evidence"
+  ],
+  "doesNotAuthorize": [
+    "wiredToProductionResolver=true",
+    "deployAuthorized=true",
+    "write the production container",
+    "supplement catalog row for archived main asset without membership binding",
+    "score item 5 met from this stamp"
+  ],
+  "note": "Operator said 授权执行. Registry main asset is archived with zero bindings, so catalog supplement is not authorized. This stamp authorizes the tenant-context managed-path proof only."
+}

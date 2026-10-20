@@ -1,0 +1,137 @@
+{
+  "version": "1.0.0",
+  "tools": [
+    {
+      "id": "workspace",
+      "priority": "P0",
+      "purpose": "Search, read, create, update, and compare workspace files.",
+      "operations": ["search", "read", "write", "patch", "diff"],
+      "risk": "medium",
+      "sideEffects": true,
+      "dryRun": true,
+      "idempotency": "operation-dependent",
+      "verification": ["path-scope", "content-diff", "post-write-read"]
+    },
+    {
+      "id": "shell",
+      "priority": "P0",
+      "purpose": "Execute commands and scripts in a controlled environment.",
+      "operations": ["exec", "stream", "cancel"],
+      "risk": "high",
+      "sideEffects": true,
+      "dryRun": false,
+      "idempotency": "caller-declared",
+      "verification": ["exit-code", "stdout-stderr", "timeout", "resource-limits"]
+    },
+    {
+      "id": "web",
+      "priority": "P0",
+      "purpose": "Search and retrieve current public information with citations.",
+      "operations": ["search", "open", "find", "screenshot"],
+      "risk": "low",
+      "sideEffects": false,
+      "dryRun": false,
+      "idempotency": "read-only",
+      "verification": ["source-url", "retrieved-at", "citation", "trust-boundary"]
+    },
+    {
+      "id": "mcp-connectors",
+      "priority": "P0",
+      "purpose": "Discover and call tools exposed by external services.",
+      "operations": ["list-tools", "read-resource", "call-tool"],
+      "risk": "high",
+      "sideEffects": true,
+      "dryRun": "adapter-dependent",
+      "idempotency": "adapter-declared",
+      "verification": ["server-identity", "tool-schema", "annotations", "call-result"]
+    },
+    {
+      "id": "approval",
+      "priority": "P0",
+      "purpose": "Request informed approval immediately before consequential actions.",
+      "operations": ["evaluate", "request", "approve", "deny"],
+      "risk": "control",
+      "sideEffects": false,
+      "dryRun": false,
+      "idempotency": "scoped-decision",
+      "verification": ["actor", "scope", "expiry", "decision"]
+    },
+    {
+      "id": "receipt",
+      "priority": "P0",
+      "purpose": "Record tool inputs, outputs, evidence, errors, and side effects.",
+      "operations": ["start", "append-evidence", "complete", "fail"],
+      "risk": "control",
+      "sideEffects": true,
+      "dryRun": false,
+      "idempotency": "receipt-id",
+      "verification": ["immutable-id", "timestamps", "result-status", "evidence"]
+    },
+    {
+      "id": "browser",
+      "priority": "P1",
+      "purpose": "Navigate and interact with web applications using semantic and visual state.",
+      "operations": ["navigate", "inspect", "click", "type", "screenshot"],
+      "risk": "high",
+      "sideEffects": true,
+      "dryRun": "action-dependent",
+      "idempotency": "action-dependent",
+      "verification": ["url", "page-state", "screenshot", "expected-change"]
+    },
+    {
+      "id": "computer-use",
+      "priority": "P1",
+      "purpose": "Operate desktop applications when no structured interface is available.",
+      "operations": ["inspect-screen", "click", "type", "key", "screenshot"],
+      "risk": "high",
+      "sideEffects": true,
+      "dryRun": false,
+      "idempotency": "not-guaranteed",
+      "verification": ["before-screenshot", "after-screenshot", "target-window", "expected-change"]
+    },
+    {
+      "id": "office-artifacts",
+      "priority": "P1",
+      "purpose": "Create, edit, render, and validate documents, spreadsheets, presentations, and PDFs.",
+      "operations": ["inspect", "create", "edit", "render", "validate"],
+      "risk": "medium",
+      "sideEffects": true,
+      "dryRun": true,
+      "idempotency": "output-path",
+      "verification": ["format-integrity", "render", "visual-review", "formula-check"]
+    },
+    {
+      "id": "automation",
+      "priority": "P1",
+      "purpose": "Schedule and manage recurring or delayed workflows.",
+      "operations": ["create", "view", "update", "pause", "delete", "run-history"],
+      "risk": "high",
+      "sideEffects": true,
+      "dryRun": true,
+      "idempotency": "automation-id",
+      "verification": ["schedule", "status", "next-run", "notification-policy", "history"]
+    },
+    {
+      "id": "visualization",
+      "priority": "P1",
+      "purpose": "Create charts, diagrams, dashboards, and interactive analytical views.",
+      "operations": ["create-chart", "create-diagram", "create-dashboard", "render", "inspect"],
+      "risk": "low",
+      "sideEffects": true,
+      "dryRun": true,
+      "idempotency": "output-path",
+      "verification": ["data-binding", "labels", "responsive-layout", "render"]
+    },
+    {
+      "id": "task-coordination",
+      "priority": "P2",
+      "purpose": "Coordinate long-running, parallel, dependent, or handed-off tasks.",
+      "operations": ["create", "wait", "message", "handoff", "cancel", "status"],
+      "risk": "medium",
+      "sideEffects": true,
+      "dryRun": false,
+      "idempotency": "task-id",
+      "verification": ["owner", "state", "dependencies", "result", "handoff-history"]
+    }
+  ]
+}

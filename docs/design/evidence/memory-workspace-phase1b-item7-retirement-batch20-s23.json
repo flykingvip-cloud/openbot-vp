@@ -1,0 +1,63 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch20-s23/v1",
+  "item": 7,
+  "status": "retirement-batch-20",
+  "batch": "S23",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": true,
+  "previousAcceptedBaseline": 15,
+  "lastAcceptedRetirementBaseline": 15,
+  "sitesRetired": [
+    {
+      "ledgerId": "S23",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "lineBefore": 99,
+      "lineAfter": null,
+      "replacement": "InMemoryWorkspaceResourceCatalog + WorkspaceResourceCatalog.getResource",
+      "replacementLocator": "src/gateway/workspace-resolver/strict-locator.ts",
+      "replacementTests": [
+        "src/gateway/workspace-resolver/strict-locator.test.ts",
+        "src/gateway/workspace-resolver/steward-write-item7-s23.test.ts"
+      ]
+    }
+  ],
+  "identityChecks": {
+    "tenant": "fail-closed when tenantId is missing; getResource miss throws catalog_record_required",
+    "workspace": "existing-shape Catalog seed only; no host-root or process.cwd fallback",
+    "agentAsset": "lookup uses steward:builtin via buildEmployeeStewardCutoverCatalogEntries",
+    "grant": "locator pass-after requires tenantContext + user grant; incomplete query fail-closed"
+  },
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 14,
+  "liveWriteWatchIndex": 14,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/workspace-resolver/steward-write.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "1360e19acde600637183c1118f6e54af9f4b15e7",
+  "note": "Batch 20 retires S23 only after #660 S22. Existing-shape InMemoryWorkspaceResourceCatalog plus getResource. Do not call createEmptyWorkspaceCatalog. Do not mint a production Catalog row. Catalog miss=deny stays off. S24-S27 stay at 152/153/279/280. Item 7 stays not-met. Do not write liveWriteWatchIndex=0. Phase 0 freeze baseline stays 38."
+}

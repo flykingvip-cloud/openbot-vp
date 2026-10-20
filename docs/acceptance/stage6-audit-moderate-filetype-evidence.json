@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit \u2014 one moderate advisory mitigation",
+  "advisory": "GHSA-j47w-4g3g-c36v",
+  "cve": "CVE-2026-32630",
+  "package": "file-type",
+  "vulnerable_range": ">=20.0.0 <=21.3.1",
+  "affected_version_before": "21.3.1",
+  "dependency_path": ".>file-type",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=21.3.2",
+  "mitigated_version": "21.3.2",
+  "reachable_surface": "media MIME sniff via fileTypeFromBuffer (src/media/mime.ts; direct root dependency)",
+  "mitigation": "Bump dependencies.file-type to ^21.3.2; pnpm.overrides.file-type=21.3.2",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 53,
+    "low": 9,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-j47w-4g3g-c36v"
+}

@@ -1,0 +1,18 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 test /private/tmp/openbot-candidate-7ca242cf44
+> node scripts/test-parallel.mjs src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts --reporter=verbose
+
+
+ RUN  v4.0.18 /private/tmp/openbot-candidate-7ca242cf44
+
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts > runPreparedReply inbound depth shadow > does not emit depth_decided when the shadow flag is off 6ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts > runPreparedReply inbound depth shadow > records wouldDepth without skipping knowledge prefetch 3ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts > runPreparedReply inbound depth shadow > does not classify space sessions even when shadow is on 1ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts > runPreparedReply inbound depth shadow > inherits previous act from persisted transcript after a process restart 2ms
+ ✓ src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts > runPreparedReply inbound depth shadow > does not treat an active agent run without unfinished tools as continuation 1ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  20:41:50
+   Duration  4.69s (transform 2.06s, setup 183ms, import 4.42s, tests 13ms, environment 0ms)
+

@@ -1,0 +1,141 @@
+import type { OpenBotConfig } from "../../config/types.openbot.js";
+import { normalizeStringEntries } from "../../shared/string-normalization.js";
+import {
+  deleteAccountFromConfigSection,
+  setAccountEnabledInConfigSection,
+} from "./config-helpers.js";
+import { buildAccountScopedDmSecurityPolicy } from "./helpers.js";
+import type { ChannelConfigAdapter } from "./types.adapters.js";
+
+export function mapAllowFromEntries(
+  allowFrom: Array<string | number> | null | undefined,
+): string[] {
+  return (allowFrom ?? []).map((entry) => String(entry));
+}
+
+export function formatTrimmedAllowFromEntries(allowFrom: Array<string | number>): string[] {
+  return normalizeStringEntries(allowFrom);
+}
+
+export function resolveOptionalConfigString(
+  value: string | number | null | undefined,
+): string | undefined {
+  if (value == null) {
+    return undefined;
+  }
+  const normalized = String(value).trim();
+  return normalized || undefined;
+}
+
+export function createScopedAccountConfigAccessors<ResolvedAccount>(params: {
+  resolveAccount: (params: { cfg: OpenBotConfig; accountId?: string | null }) => ResolvedAccount;
+  resolveAllowFrom: (account: ResolvedAccount) => Array<string | number> | null | undefined;
+  formatAllowFrom: (allowFrom: Array<string | number>) => string[];
+  resolveDefaultTo?: (account: ResolvedAccount) => string | number | null | undefined;
+}): Pick<
+  ChannelConfigAdapter<ResolvedAccount>,
+  "resolveAllowFrom" | "formatAllowFrom" | "resolveDefaultTo"
+> {
+  const base = {
+    resolveAllowFrom: ({ cfg, accountId }: { cfg: OpenBotConfig; accountId?: string | null }) =>
+      mapAllowFromEntries(params.resolveAllowFrom(params.resolveAccount({ cfg, accountId }))),
+    formatAllowFrom: ({ allowFrom }: { allowFrom: Array<string | number> }) =>
+      params.formatAllowFrom(allowFrom),
+  };
+
+  if (!params.resolveDefaultTo) {
+    return base;
+  }
+
+  return {
+    ...base,
+    resolveDefaultTo: ({ cfg, accountId }) =>
+      resolveOptionalConfigString(
+        params.resolveDefaultTo?.(params.resolveAccount({ cfg, accountId })),
+      ),
+  };
+}
+
+export function createScopedChannelConfigBase<
+  ResolvedAccount,
+  Config extends OpenBotConfig = OpenBotConfig,
+>(params: {
+  sectionKey: string;
+  listAccountIds: (cfg: Config) => string[];
+  resolveAccount: (cfg: Config, accountId?: string | null) => ResolvedAccount;
+  defaultAccountId: (cfg: Config) => string;
+  inspectAccount?: (cfg: Config, accountId?: string | null) => unknown;
+  clearBaseFields: string[];
+  allowTopLevel?: boolean;
+}): Pick<
+  ChannelConfigAdapter<ResolvedAccount>,
+  | "listAccountIds"
+  | "resolveAccount"
+  | "inspectAccount"
+  | "defaultAccountId"
+  | "setAccountEnabled"
+  | "deleteAccount"
+> {
+  return {
+    listAccountIds: (cfg) => params.listAccountIds(cfg as Config),
+    resolveAccount: (cfg, accountId) => params.resolveAccount(cfg as Config, accountId),
+    inspectAccount: params.inspectAccount
+      ? (cfg, accountId) => params.inspectAccount?.(cfg as Config, accountId)
+      : undefined,
+    defaultAccountId: (cfg) => params.defaultAccountId(cfg as Config),
+    setAccountEnabled: ({ cfg, accountId, enabled }) =>
+      setAccountEnabledInConfigSection({
+        cfg: cfg as Config,
+        sectionKey: params.sectionKey,
+        accountId,
+        enabled,
+        allowTopLevel: params.allowTopLevel ?? true,
+      }),
+    deleteAccount: ({ cfg, accountId }) =>
+      deleteAccountFromConfigSection({
+        cfg: cfg as Config,
+        sectionKey: params.sectionKey,
+        accountId,
+        clearBaseFields: params.clearBaseFields,
+      }),
+  };
+}
+
+export function createScopedDmSecurityResolver<
+  ResolvedAccount extends { accountId?: string | null },
+>(params: {
+  channelKey: string;
+  resolvePolicy: (account: ResolvedAccount) => string | null | undefined;
+  resolveAllowFrom: (account: ResolvedAccount) => Array<string | number> | null | undefined;
+  resolveFallbackAccountId?: (account: ResolvedAccount) => string | null | undefined;
+  defaultPolicy?: string;
+  allowFromPathSuffix?: string;
+  policyPathSuffix?: string;
+  approveChannelId?: string;
+  approveHint?: string;
+  normalizeEntry?: (raw: string) => string;
+}) {
+  return ({
+    cfg,
+    accountId,
+    account,
+  }: {
+    cfg: OpenBotConfig;
+    accountId?: string | null;
+    account: ResolvedAccount;
+  }) =>
+    buildAccountScopedDmSecurityPolicy({
+      cfg,
+      channelKey: params.channelKey,
+      accountId,
+      fallbackAccountId: params.resolveFallbackAccountId?.(account) ?? account.accountId,
+      policy: params.resolvePolicy(account),
+      allowFrom: params.resolveAllowFrom(account) ?? [],
+      defaultPolicy: params.defaultPolicy,
+      allowFromPathSuffix: params.allowFromPathSuffix,
+      policyPathSuffix: params.policyPathSuffix,
+      approveChannelId: params.approveChannelId,
+      approveHint: params.approveHint,
+      normalizeEntry: params.normalizeEntry,
+    });
+}

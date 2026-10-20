@@ -1,0 +1,23 @@
+{
+  "templateId": "contract_reviewer",
+  "version": "1.0.0",
+  "displayName": "合同审查机器人",
+  "roleBlueprint": "面向法务团队的合同审查助手，需具备合同知识库、审批系统接入与合同库授权。",
+  "dimensionWeights": {
+    "identity": 25,
+    "capability": 25,
+    "knowledge": 25,
+    "habits": 25
+  },
+  "requiredCapabilities": [
+    { "key": "contract_review", "kind": "skill", "label": "合同审查技能", "required": true },
+    { "key": "contract_kb", "kind": "knowledge_binding", "label": "合同知识库", "required": true },
+    { "key": "approval_system", "kind": "oauth", "label": "审批系统授权", "required": true }
+  ],
+  "knowledgeExpectations": {
+    "minBindings": 1,
+    "preferredTags": ["contract", "legal", "compliance"]
+  },
+  "missionReadyThreshold": 78,
+  "minIdentity": 60
+}

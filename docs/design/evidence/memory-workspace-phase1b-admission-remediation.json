@@ -1,0 +1,151 @@
+{
+  "schema": "memory-workspace-phase1b-admission-remediation/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-admission-remediation.json",
+  "kind": "phase1b-admission-remediation",
+  "status": "evidence-preparation",
+  "preparedBy": "cursor-data-governance",
+  "operationId": "phase1b-admission-remediation-b0a3a7350b-20260820T033500Z",
+  "baselineSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "citedUserBaseline": "69e9bf8c63ded61badf59fe0a6c7bc77166b39a1",
+  "canonicalUnlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "historicalItems37": "docs/design/evidence/memory-workspace-phase1b-items-3-7.json",
+  "items37IsCanonicalUnlockSoT": false,
+  "modifiedCanonicalUnlockReceipt": false,
+  "i4DirtyTreeUsed": false,
+  "phase1bUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "liveCutover": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "implementationUnlocked": false,
+  "item6ImplementationUnlocked": false,
+  "item7ImplementationUnlocked": false,
+  "productionWriteWatchIndex": 38,
+  "authoritativeItems": {
+    "2": "met",
+    "3": "met",
+    "4": "met",
+    "5": "met",
+    "6": "met",
+    "7": "not-met"
+  },
+  "item7": "not-met",
+  "item7Met": false,
+  "item7Packets": {
+    "readonlyScan": "docs/design/evidence/memory-workspace-phase1b-item7-readonly-scan-2026-08-20.json",
+    "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+    "retirementDependencyGraph": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-dependency-graph-2026-08-20.json",
+    "rollbackQuarantine": "docs/design/evidence/memory-workspace-phase1b-item7-rollback-quarantine-2026-08-20.json"
+  },
+  "minimaReceipt": {
+    "status": "minima-issued",
+    "fullUnlock": "not-issued",
+    "phase1bExecutionBlocked": true,
+    "item6ImplementationUnlocked": false,
+    "item7ImplementationUnlocked": false,
+    "productionCatalogWrite": "none",
+    "deployAuthorized": false,
+    "live": "forbidden",
+    "doesNotReplaceCanonicalFullUnlock": true,
+    "canonicalFullUnlock": "not-issued",
+    "citedIndependentReview": "https://github.com/gmood2008/openbot/pull/542",
+    "citedIssuedReceiptPr": "https://github.com/gmood2008/openbot/pull/544",
+    "citedIssuedReceiptTip": "ce6cf5e1702c7f2de20b58f062fd100562b6ee01",
+    "note": "Minima-issued only. Ordinary callers must not treat this as Phase 1B full unlock or Item 6/7 implementation unlock."
+  },
+  "item7Allowed": {
+    "productionWriteSiteInventory": true,
+    "readOnlyShadowDryRun": true,
+    "retirementDependencyGraph": true,
+    "rollbackQuarantineDesign": true,
+    "evidencePackagePreparation": true,
+    "deleteProductionWriteWatchIndexCallSites": false,
+    "retireOldMemoryEngine": false
+  },
+  "item7Inventory": {
+    "phase0Path": "docs/design/evidence/memory-workspace-phase0-20260814.call-sites.json",
+    "liveScanPath": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+    "productionWriteWatchIndex": 38,
+    "frozenWriteWatchIndex": 38,
+    "liveWriteWatchIndex": 37,
+    "retiredThisChange": 0,
+    "target": 0,
+    "reproducible": true
+  },
+  "item7RetirementDependencyGraph": {
+    "executed": false,
+    "packet": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-dependency-graph-2026-08-20.json",
+    "dualWriteGuard": "do not delete resolver helpers before remaining callers",
+    "dataLossGuard": "do not delete index sites before write sites have a replacement",
+    "waves": [
+      {
+        "id": "W0",
+        "action": "independent Item 7 implementation unlock required first",
+        "deleteCallSites": false
+      },
+      {
+        "id": "W1",
+        "action": "tombstone and quarantine new writes; Catalog miss=deny stays off",
+        "deleteCallSites": false
+      },
+      {
+        "id": "W2",
+        "action": "retire write callers after replacement is proven",
+        "deleteCallSites": false
+      },
+      {
+        "id": "W3",
+        "action": "retire catalog synthesis after no caller needs empty catalog",
+        "deleteCallSites": false
+      },
+      {
+        "id": "W4",
+        "action": "retire steward helpers after callers are gone",
+        "deleteCallSites": false
+      },
+      {
+        "id": "W5",
+        "action": "retire memory index last so rollback can still locate",
+        "deleteCallSites": false
+      }
+    ]
+  },
+  "item7RollbackQuarantineDesign": {
+    "designOnly": true,
+    "enabled": false,
+    "packet": "docs/design/evidence/memory-workspace-phase1b-item7-rollback-quarantine-2026-08-20.json",
+    "restoreFromGit": true,
+    "liftTombstone": true,
+    "rewriteFreezeBaselineToZero": false,
+    "quarantineNormalWrites": 0
+  },
+  "explicitlyForbidden": [
+    "treat items-3-7 historical files as canonical unlock SoT",
+    "score item 7 met",
+    "Item 7 implementation",
+    "deleting any productionWriteWatchIndex call-site",
+    "retire old memory engines",
+    "schema v2 production write",
+    "resolver production write switch",
+    "production Catalog write",
+    "migration / reindex / LIVE cutover",
+    "Phase 1B full unlock",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false",
+    "using the I4 / kiro-loom dirty tree as evidence",
+    "modify canonical unlock receipt"
+  ],
+  "reviewRequest": "Phase 1B Admission Remediation Evidence Review only",
+  "doesNotRequest": [
+    "Phase 1B full unlock",
+    "Item 6 implementation start",
+    "Item 7 implementation start",
+    "Item 7 met",
+    "Item 7 Retirement",
+    "LIVE cutover"
+  ]
+}

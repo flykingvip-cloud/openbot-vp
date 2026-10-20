@@ -1,0 +1,56 @@
+{
+  "schema": "memory-workspace-phase1b-item2-production-sot-decision/v1",
+  "status": "accepted",
+  "proposedBy": "cursor-data-governance",
+  "reviewer": "codex-workspace-architecture",
+  "signedBy": "codex-workspace-architecture",
+  "signedAt": "2026-08-19T12:00:00.000Z",
+  "item": 2,
+  "unlock": "not-issued",
+  "LIVE": "forbidden",
+  "live": false,
+  "deployAuthorized": false,
+  "productionCatalogWrite": "none",
+  "phase1bExecutionBlocked": true,
+  "doesNotEditUnlockDecision": true,
+  "decisions": {
+    "uniqueUserOwnedEquivalent": {
+      "occupancyDumpMetricApplies": false,
+      "replacement": "production_catalog_users_with_exactly_one_user_owned_agent_primary",
+      "reason": "occupancy dump uniqueUserOwnedEquivalent counted seat-minted assets, not production Catalog SoT rows"
+    },
+    "fourGatePopulation": {
+      "population": "authority-shaped-workspace-resourceId",
+      "resourceIdPattern": "ws:<tenant>:(user|seat|group):...",
+      "reason": "Item 2 normal Catalog identity is the frozen authority resourceId. Pre-scheme 32-char hex rows are residual, not normal Catalog records."
+    },
+    "residualOpaqueWorkspaceRows": {
+      "disposition": "residual-not-normal-no-rewrite",
+      "resourceIdShape": "32-char-hex",
+      "authorityShaped": false,
+      "identityFromPathOrAgentId": "forbidden",
+      "identityFromStateDir": "forbidden",
+      "normalCatalogWrite": "none",
+      "nextAuthorizedWrite": "quarantine-without-minting-ws-identity",
+      "thisPacketWrites": 0,
+      "receipt": "memory-workspace-phase1b-item2-residual-opaque-quarantine.json"
+    },
+    "memoryAssetRelation": {
+      "workspaceResourceIdEqualsMemoryResourceId": false,
+      "memorySourceWorkspaceResourceIdEqualsWorkspaceResourceId": true,
+      "sqliteWorkspaceId": "isolation-partition-key-only",
+      "contract": "Workspace.resourceId != MemoryAsset.resourceId; MemoryAsset.sourceWorkspaceResourceId = Workspace.resourceId; SQLite workspace_id is isolation key only"
+    }
+  },
+  "explicitlyForbidden": [
+    "LIVE migration",
+    "deployAuthorized=true",
+    "edit U1 unlock decision",
+    "invent identity from agentId path stateDir displayName Phase0 or U0",
+    "count evidence or fixture Catalog as production coverage",
+    "write production Catalog from this packet",
+    "treat occupancy uniqueUserOwnedEquivalent as production Catalog SoT",
+    "score item 2 met on coverage/scorecard from this accept alone"
+  ],
+  "note": "Architecture accepted the four production-SOT rules after #518 landed. Official item2 stays not-met until coverage/scorecard cite the accepted production Catalog metric. This file does not write Catalog and does not flip unlock."
+}

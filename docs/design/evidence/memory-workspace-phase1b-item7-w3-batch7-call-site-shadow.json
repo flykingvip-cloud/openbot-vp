@@ -1,0 +1,15 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w3-batch7-call-site-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w3-batch7-call-site-shadow.json",
+  "kind": "item7-w3-batch7-catalog-synthesis-shadow",
+  "wave": "W3-catalog-synthesis",
+  "batch": 7,
+  "sitesWired": ["S08", "S09", "S17", "S21", "S22", "S23", "S28"],
+  "w3CallSiteShadowComplete": true,
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "catalogMissDeny": false,
+  "productionCatalogWrite": false,
+  "productionWrite": "legacy-only",
+  "sidecar": "src/gateway/workspace-resolver/item7-w3-shadow.ts"
+}

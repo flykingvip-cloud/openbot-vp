@@ -1,0 +1,47 @@
+pull_ref	sha	subject	date	note
+refs/pull/1/head	5f5758f95e01	build(deps): bump debian in the docker-images group across 1 directory 	2026-07-13T18:06:51Z	recoverable_pull_head
+refs/pull/10/head	ce12ac01df37	chore(deps): bump actions/create-github-app-token from 1.12.0 to 3.2.0 	2026-06-01T09:48:38Z	recoverable_pull_head
+refs/pull/11/head	c47331f1ffd1	chore(deps): bump gradle/actions from 4 to 6 	2026-06-01T09:49:25Z	recoverable_pull_head
+refs/pull/12/head	31bcca89aa3d	UI: surface handover relationship cues 	2026-06-03T15:37:52+08:00	recoverable_pull_head
+refs/pull/13/head	4cf752183168	Runtime: rename remaining openbot entry markers 	2026-06-04T07:50:13+08:00	recoverable_pull_head
+refs/pull/14/head	5f2cc7b77de8	Runtime: preserve verified openbot salvage set on latest mainline 	2026-06-04T14:27:49+08:00	recoverable_pull_head
+refs/pull/15/head	5f2cc7b77de8	Runtime: preserve verified openbot salvage set on latest mainline 	2026-06-04T14:27:49+08:00	recoverable_pull_head
+refs/pull/16/head	5f2cc7b77de8	Runtime: preserve verified openbot salvage set on latest mainline 	2026-06-04T14:27:49+08:00	recoverable_pull_head
+refs/pull/17/head	da9d84a326b4	Runtime: preserve verified openbot salvage set without legacy entry extras 	2026-06-04T15:16:23+08:00	recoverable_pull_head
+refs/pull/18/head	60b9d5f44bc3	Runtime: preserve verified openbot salvage set on current mainline 	2026-06-04T15:57:53+08:00	recoverable_pull_head
+refs/pull/19/head	7633d98cfe1d	Bump the android-deps group across 1 directory with 24 updates 	2026-06-10T18:11:19Z	recoverable_pull_head
+refs/pull/2/head	bda309db39d6	build(deps): bump github.com/steipete/commander 	2026-07-13T18:08:21Z	recoverable_pull_head
+refs/pull/20/head	a13180bf3186	Models: model-entitlement chain P1-P5 (runtime hard-deny gate, planVersion binding + projection, RPC, AOR selection/feedback, credential convergence, all-bot-runs scope, three-end UI) + gateway legacy client-id compat 	2026-06-09T04:41:05+08:00	recoverable_pull_head
+refs/pull/21/head	495a71ae35e8	Bump the android-deps group across 1 directory with 26 updates 	2026-06-16T18:10:24Z	recoverable_pull_head
+refs/pull/22/head	f99c727c54c1	docs(loom): correct handoff to real topology (no main; Waves 0-5 on trunk) 	2026-06-16T21:09:21+08:00	recoverable_pull_head
+refs/pull/23/head	2a3dfba7d46f	Bump the android-deps group across 1 directory with 25 updates 	2026-06-17T18:10:03Z	recoverable_pull_head
+refs/pull/24/head	5d3d433507d2	Bump the android-deps group across 1 directory with 27 updates 	2026-06-29T18:11:34Z	recoverable_pull_head
+refs/pull/25/head	f3badb8bb277	Bump the android-deps group across 1 directory with 26 updates 	2026-07-01T18:14:43Z	recoverable_pull_head
+refs/pull/26/head	47eacfdb7228	build(deps): bump the android-deps group across 1 directory with 27 updates 	2026-07-13T18:13:30Z	recoverable_pull_head
+refs/pull/27/head	bfd67b5dda32	Tests: cast auth-home compact-field select before reading options 	2026-07-09T00:17:13+08:00	recoverable_pull_head
+refs/pull/28/head	13946c6e4d93	docs(release): document NPM_TOKEN secret setup for CI publish 	2026-07-09T13:46:31+08:00	recoverable_pull_head
+refs/pull/29/head	6932f5ea7c80	fix(format): oxfmt plugin CHANGELOG files for release CI 	2026-07-09T13:59:51+08:00	recoverable_pull_head
+refs/pull/3/head	9a5506514a6a	chore(deps): bump github.com/apple/swift-testing in /Swabble 	2026-06-01T09:33:17Z	recoverable_pull_head
+refs/pull/30/head	db9be4fe4fa6	Gateway: allow operational identity writes on public proxy 	2026-07-09T16:41:40+08:00	recoverable_pull_head
+refs/pull/31/head	e8c8334d58f6	Gateway: use safe collaboration session ids in chat.send 	2026-07-09T18:10:31+08:00	recoverable_pull_head
+refs/pull/32/head	618993c1794e	Tests: cover scoped openbot package root resolution 	2026-07-09T18:30:58+08:00	recoverable_pull_head
+refs/pull/33/head	ca69a9fb42fb	Pricing v3: remove annual discount subline from cards 	2026-07-10T22:26:22+08:00	recoverable_pull_head
+refs/pull/34/head	a915dce0514b	Data directory: format pass, lint fixes, and changelog 	2026-07-10T23:14:36+08:00	recoverable_pull_head
+refs/pull/35/head	fa318731f4c1	Deploy: RELEASE_RECORD pending SHA f63da5aa2a 	2026-07-13T09:10:48+08:00	recoverable_pull_head
+refs/pull/36/head	fef66191b418	WIP: chat checkpoint rollback (session restore + UI) 	2026-07-13T09:01:39+08:00	recoverable_pull_head
+refs/pull/37/head	0ac050781b31	OIG: operational identity providers, OAuth, and execution 	2026-07-13T09:13:04+08:00	recoverable_pull_head
+refs/pull/38/head	8bcf7c28e0f3	EDGSC: knowledge universe insights, governance, relationship runtime 	2026-07-13T09:13:07+08:00	recoverable_pull_head
+refs/pull/39/head	56d6505feecc	GWSV: supervisor local IDE probe, worker health, session seams 	2026-07-13T09:13:10+08:00	recoverable_pull_head
+refs/pull/4/head	8e3d7c7c4709	build(deps): bump the android-deps group across 1 directory with 23 updates 	2026-06-04T18:12:06Z	recoverable_pull_head
+refs/pull/40/head	b1805467e977	build: ship openbot.mjs in runtime image (align with RC) 	2026-07-13T12:07:38+08:00	recoverable_pull_head
+refs/pull/41/head	78eded13a88c	Auth: platform IMAP mail + control-ui session contract 	2026-07-13T09:13:15+08:00	recoverable_pull_head
+refs/pull/42/head	e18a75b23b77	Data: export and memory lifecycle + data RPC seams 	2026-07-13T09:13:18+08:00	recoverable_pull_head
+refs/pull/43/head	184193ac9ba9	Daibai: workspace overview + SaaS tenant design handoff 	2026-07-13T09:13:20+08:00	recoverable_pull_head
+refs/pull/44/head	9d9f13b124b5	UI: workbench, enterprise identity surfaces, i18n 	2026-07-13T12:32:23+08:00	recoverable_pull_head
+refs/pull/45/head	87857e270e0b	HGI: platform CLI tenant-isolation subcommands + dedicatedIsolation entitlement type (F3-F6) Task: hybrid-gateway-isolation Agent: kiro-hybrid-isolation 	2026-07-17T17:33:00+08:00	recoverable_pull_head
+refs/pull/46/head	7638217f4cd3	chore(deploy): cutover openbot-gateway-rc to rc-amd64-v54 	2026-07-17T20:39:09+08:00	recoverable_pull_head
+refs/pull/5/head	2941bec8a675	chore(deps): bump androidx.test.uiautomator:uiautomator in /apps/android 	2026-06-01T09:35:13Z	recoverable_pull_head
+refs/pull/6/head	5accf8df9ab7	build(deps): bump the swift-deps group across 1 directory with 3 updates 	2026-07-13T18:14:10Z	recoverable_pull_head
+refs/pull/7/head	03a4225b3ae1	chore(deps): bump actions/github-script from 7.1.0 to 9.0.0 	2026-06-01T09:46:07Z	recoverable_pull_head
+refs/pull/8/head	4b0a8f3b36e6	chore(deps): bump actions/labeler from 5.0.0 to 6.1.0 	2026-06-01T09:46:12Z	recoverable_pull_head
+refs/pull/9/head	3717175e43be	chore(deps): bump actions/checkout from 4 to 6 	2026-06-01T09:46:19Z	recoverable_pull_head

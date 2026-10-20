@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Human Mentions Acceptance Fixture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --panel: #f7f7f8;
+        --text: #18181b;
+        --muted: #71717a;
+        --border: #e4e4e7;
+        --accent: #2563eb;
+        --online: #16a34a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+        background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 40%, #fff 100%);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      .stage {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 20px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .composer {
+        position: relative;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        background: #fff;
+        padding: 14px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      }
+      .composer textarea {
+        width: 100%;
+        min-height: 88px;
+        border: 0;
+        resize: vertical;
+        font: inherit;
+        outline: none;
+      }
+      .mention-popup {
+        position: absolute;
+        left: 14px;
+        bottom: calc(100% + 8px);
+        width: min(360px, calc(100% - 28px));
+        max-height: 320px;
+        overflow: auto;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+      }
+      .mention-popup__item {
+        display: grid;
+        grid-template-columns: 28px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 10px 12px;
+        border-bottom: 1px solid #f4f4f5;
+      }
+      .mention-popup__item:last-child {
+        border-bottom: 0;
+      }
+      .mention-popup__item.is-active {
+        background: #eff6ff;
+      }
+      .avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 600;
+        color: #fff;
+      }
+      .avatar--human {
+        background: #0f766e;
+      }
+      .avatar--bot {
+        background: #1d4ed8;
+      }
+      .avatar--all {
+        background: #52525b;
+      }
+      .name {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .role {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .status {
+        font-size: 12px;
+        color: var(--online);
+      }
+      .chips {
+        margin-top: 16px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .mention-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 13px;
+        border: 1px solid var(--border);
+        background: #fff;
+      }
+      .mention-chip--human {
+        border-color: #99f6e4;
+        background: #f0fdfa;
+      }
+      .mention-chip--agent {
+        border-color: #bfdbfe;
+        background: #eff6ff;
+      }
+      .mention-chip.is-muted,
+      .mention-chip.is-removed {
+        opacity: 0.55;
+        color: var(--muted);
+      }
+      .viewport-note {
+        margin-top: 24px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      @media (max-width: 480px) {
+        .stage {
+          padding: 20px 12px 48px;
+        }
+        .mention-popup {
+          width: calc(100% - 28px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <h1>协作小组 @提及候选（验收夹具）</h1>
+      <p>应同时出现活跃真人、活跃机器人与「所有人」；不包含本人 / invited / removed / inactive。</p>
+      <div class="composer" id="composer">
+        <div class="mention-popup" role="listbox" aria-label="mention candidates">
+          <div class="mention-popup__item is-active">
+            <div class="avatar avatar--all">全</div>
+            <div>
+              <div class="name">所有人</div>
+              <div class="role">广播</div>
+            </div>
+            <div class="status">-</div>
+          </div>
+          <div class="mention-popup__item">
+            <div class="avatar avatar--human">A</div>
+            <div>
+              <div class="name">Alice</div>
+              <div class="role">成员 · 真人</div>
+            </div>
+            <div class="status">在线</div>
+          </div>
+          <div class="mention-popup__item">
+            <div class="avatar avatar--human">B</div>
+            <div>
+              <div class="name">Bob</div>
+              <div class="role">成员 · 真人</div>
+            </div>
+            <div class="status">在线</div>
+          </div>
+          <div class="mention-popup__item">
+            <div class="avatar avatar--bot">H</div>
+            <div>
+              <div class="name">HelperBot</div>
+              <div class="role">成员 · 机器人</div>
+            </div>
+            <div class="status">在线</div>
+          </div>
+          <div class="mention-popup__item">
+            <div class="avatar avatar--bot">C</div>
+            <div>
+              <div class="name">CoordBot</div>
+              <div class="role">协调者 · 机器人</div>
+            </div>
+            <div class="status">忙碌</div>
+          </div>
+        </div>
+        <textarea>@</textarea>
+      </div>
+      <div class="chips" aria-label="history highlights">
+        <span class="mention-chip mention-chip--human">@Alice</span>
+        <span class="mention-chip mention-chip--agent">@HelperBot</span>
+        <span class="mention-chip mention-chip--human is-removed is-muted" title="成员已移除"
+          >@Old Human</span
+        >
+      </div>
+      <p class="viewport-note">桌面 / 移动宽度下候选弹层应贴合输入区上方，不遮挡标题与正文。</p>
+    </div>
+  </body>
+</html>

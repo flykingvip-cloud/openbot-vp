@@ -1,0 +1,42 @@
+# Vault Sync local smoke stack (Wave J) — Postgres + MinIO
+# Not production. Usage:
+#   docker compose -f src/vault-sync/dev/docker-compose.smoke.yml up -d
+#   ./src/vault-sync/dev/run-smoke.sh
+
+services:
+  vault-sync-pg:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: openbot
+      POSTGRES_PASSWORD: openbot
+      POSTGRES_DB: vault_sync
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openbot -d vault_sync"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  vault-sync-minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    command: server /data --console-address ":19001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "19000:9000"
+      - "19001:19001"
+
+  vault-sync-minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    depends_on:
+      - vault-sync-minio
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 3
+        mc alias set local http://vault-sync-minio:9000 minioadmin minioadmin
+        mc mb -p local/openbot-vault || true
+        mc anonymous set none local/openbot-vault || true
+        exit 0

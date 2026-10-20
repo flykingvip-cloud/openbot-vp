@@ -1,0 +1,40 @@
+{
+  "schema": "memory-workspace-phase0-pr409-freeze-disposition/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "prNumber": 409,
+  "mergeCommit": "d261378ff3d283d134a6ed4088e836842380294d",
+  "capturedAt": "2026-08-16T00:10:30.000Z",
+  "failureOnRecord": {
+    "runId": 31862615601,
+    "jobId": 94980991327,
+    "checkName": "freeze + phase0 evidence tests",
+    "conclusion": "FAILURE",
+    "completedAt": "2026-08-15T07:18:15Z",
+    "url": "https://github.com/gmood2008/openbot/actions/runs/31862615601/job/94980991327"
+  },
+  "successOnSamePr": {
+    "runId": 31862617232,
+    "jobId": 94958499749,
+    "checkName": "freeze + phase0 evidence tests",
+    "conclusion": "SUCCESS",
+    "stepCount": 9,
+    "completedAt": "2026-08-15T05:43:00Z",
+    "url": "https://github.com/gmood2008/openbot/actions/runs/31862617232/job/94958499749"
+  },
+  "disposition": {
+    "classification": "infra-transient-on-merge-window",
+    "rationale": "PR #409 rollup retains a late FAILURE run (31862615601) alongside an earlier SUCCESS run (31862617232) with full 9-step execution. Merge was approved with flykingvip-cloud review after required checks green on merge path. Post-merge ruleset 19808307 enforces freeze as required on all subsequent main merges.",
+    "postMergeValidation": [
+      {
+        "mainSha": "1ab9d33e69ea3803e5d4e0f0be7ece83653fb792",
+        "note": "#401 merge path"
+      },
+      {
+        "mainSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "runs": [31917642731, 31917642710],
+        "note": "current main tip post-#414/#415"
+      }
+    ],
+    "doesNotBlockPhase0CloseIf": "official-review accepts disposition + current main-tip triple gate evidence"
+  }
+}

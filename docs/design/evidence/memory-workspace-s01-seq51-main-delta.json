@@ -1,0 +1,291 @@
+{
+  "schema": "memory-workspace-s01-seq51-main-delta/v1",
+  "kind": "s01-seq51-main-observation-delta",
+  "taskId": "memory-workspace-platform-remediation:kiro-data-governance-seq51-main-observation-delta",
+  "owner": "kiro-data-governance",
+  "role": "seq51-main-observation-delta-read-only",
+  "preparedAt": "2026-08-31T12:34:00.000Z",
+  "originMain": "56a17e7f83338900e6f19fa2bd2d510b37696fe6",
+  "liveSha": "59be50660d8ebacf867211a206c92b4300bec418",
+  "liveSeq": 51,
+  "liveImage": "rc-amd64-provenance-59be50660d",
+  "liveDigest": "sha256:a64adc1f04f116d7dd0e7e434f1d1a00a99601ed8de8ae8523becd2b1a470595",
+  "liveVerified": true,
+  "liveEvidence": ["deploy/production/releases.jsonl", "deploy/production/RELEASE_RECORD.md"],
+  "selfAccepted": false,
+  "reviewRequested": "S01 seq51..main observation delta (not deploy auth)",
+  "authorMustNotSelfMerge": true,
+  "forwardOnly": true,
+  "mergeBaseIsLiveSha": true,
+  "commitCount": 112,
+  "range": "59be50660d8ebacf867211a206c92b4300bec418..56a17e7f83338900e6f19fa2bd2d510b37696fe6",
+  "candidateForFutureObservationDeploy": "freshly-fetched origin/main",
+  "candidateMustNotBeS01OnlyBranch": true,
+  "thisPacketBuildsGhcr": false,
+  "thisPacketPushesGhcr": false,
+  "catalogWrite": false,
+  "catalogMutation": false,
+  "productionWrite": false,
+  "cutover": false,
+  "stageC": "prepared-not-accepted",
+  "authorizesStageCAccept": false,
+  "authorizesStageC": false,
+  "authorizesStageD": false,
+  "authorizesStageBImplementationAccepted": false,
+  "stageBImplementationAccepted": false,
+  "implementationVerified": false,
+  "deployAuthorized": false,
+  "phase1bExecutionBlocked": true,
+  "item7": "not-met",
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "LIVE": "forbidden",
+  "live": "forbidden",
+  "productionReceiptsObserved": 0,
+  "observationBucketsObserved": 0,
+  "acceptanceMet": false,
+  "byosEnabled": false,
+  "locks": {
+    "implementationVerified": false,
+    "deployAuthorized": false,
+    "live": "forbidden",
+    "LIVE": "forbidden",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "productionReceiptsObserved": 0,
+    "authorizesStageC": false,
+    "authorizesStageD": false,
+    "authorizesStageCAccept": false,
+    "acceptanceMet": false,
+    "forwardOnly": true,
+    "productionWrite": false,
+    "catalogWrite": false,
+    "executedAgainstProductionRoots": false,
+    "collectorMissing": true
+  },
+  "liveVsMain": {
+    "cloudLiveIncludesStageA": false,
+    "cloudLiveIncludesStageB": false,
+    "cloudLiveIncludesCr3": false,
+    "cloudLiveIncludesObservationGates": false,
+    "cloudLiveIncludesPr871": false,
+    "liveMissingStageAAdapterPath": "src/gateway/data-governance/s01-authorized-tool-cwd.ts",
+    "liveMissingStageBShadowPath": "src/gateway/data-governance/s01-get-reply-steward-cwd-shadow.ts",
+    "originMainHasStageA": true,
+    "originMainHasStageB": true,
+    "originMainTip": "56a17e7f83338900e6f19fa2bd2d510b37696fe6",
+    "note": "cloud LIVE seq 51 / 59be50660d does not yet include S01 Stage A/B, CR3, observation gates, or #876 (Handle decides managed cwd; helper is shadow-only). Those landed on origin/main after LIVE. Residual S29 {cfg}-only Handle is not a reason to authorize deploy."
+  },
+  "classifiedDelta": {
+    "note": "Classified PR/theme buckets. Not a per-commit dump. Total git rev-list count is 112 including merge commits.",
+    "s01": {
+      "commitCount": 91,
+      "stageA": {
+        "commitCount": 42,
+        "landedOnMain": true,
+        "inLive": false,
+        "representativePrs": [833, 834, 836, 837, 838, 839, 840, 841, 844, 846, 847]
+      },
+      "stageB": {
+        "commitCount": 12,
+        "landedOnMain": true,
+        "implementationAccepted": false,
+        "inLive": false,
+        "cr1": 851,
+        "cr2": 857,
+        "cr3": 860,
+        "cr3Review": 865,
+        "shadowLand": 850,
+        "unlock": 848,
+        "representativePrs": [848, 849, 850, 851, 857, 859, 860, 865]
+      },
+      "stageC": {
+        "commitCount": 3,
+        "preparedNotAccepted": true,
+        "inLive": false,
+        "prep": 855,
+        "cr2Observation": 858,
+        "observationGate": 866,
+        "representativePrs": [855, 858, 866]
+      },
+      "pr871": {
+        "commitCount": 1,
+        "pr": 871,
+        "sha": "aa44194ac07261763314be345ed9352ee7f05399",
+        "landedOnMain": true,
+        "inLive": false,
+        "subject": "S01: pass tenant context into Managed workspace locator"
+      },
+      "incrementalReview": {
+        "commitCount": 1,
+        "pr": 875,
+        "representativePrs": [875],
+        "sha": "3a0ddedbc59efe8f4063f068090158b4090e85da",
+        "landedOnMain": true,
+        "inLive": false,
+        "subject": "S01: #871 incremental security review (not deploy auth)"
+      },
+      "pr876": {
+        "commitCount": 1,
+        "pr": 876,
+        "representativePrs": [876],
+        "sha": "56a17e7f83338900e6f19fa2bd2d510b37696fe6",
+        "landedOnMain": true,
+        "inLive": false,
+        "subject": "S01: Handle decides managed cwd; helper is shadow-only.",
+        "note": "#876 is on origin/main (Handle decides managed cwd; helper is shadow-only) and still not in LIVE. Residual S29 {cfg}-only Handle is not a reason to authorize deploy."
+      },
+      "d1d5AndImplementationReadiness": {
+        "commitCount": 31,
+        "inLive": false,
+        "representativePrs": [815, 816, 819, 820, 821, 823, 825, 826, 827, 828, 829, 830, 831, 832]
+      }
+    },
+    "dataGovernance": {
+      "commitCount": 6,
+      "inLive": false,
+      "representativePrs": [853, 854, 856, 861, 862, 863],
+      "themes": [
+        "Memory C1-C5 cutover PREP (legacy remains)",
+        "Legacy migration inventory and dry-run only",
+        "Sync S33-S35 controlled cutover PREP (legacy remains)",
+        "S01 read-only production object inventory (scanner/fixture)",
+        "thread governanceOwnershipProof through tenant knowledge ingest",
+        "route conversation purge through data-plane memory root"
+      ]
+    },
+    "deployLedger": {
+      "commitCount": 3,
+      "representativePrs": [817, 852, 872],
+      "themes": [
+        "GHCR cutover seq 51 live-verified ledger/docs (does not move LIVE SHA)",
+        "Retarget official production SoT from Fly to Aliyun GHCR",
+        "pin operator LIVE table to seq 51"
+      ],
+      "note": "#817 records seq 51 live-verified after 59be50660d; it does not change the LIVE image SHA."
+    },
+    "unrelated": {
+      "commitCount": 12,
+      "wechat": {
+        "commitCount": 0,
+        "note": "No wechat commits in 59be50660d..origin/main. feat/wechat-personal-qr-bind is a checkout of the primary worktree, not on origin/main."
+      },
+      "knowledge": {
+        "commitCount": 3,
+        "representativePrs": [868, 869, 870]
+      },
+      "docsUiOther": {
+        "commitCount": 9,
+        "representativePrs": [795, 822, 824, 864, 867],
+        "themes": [
+          "android dependabot",
+          "workbench UI polish",
+          "product copy",
+          "install-cli.sh",
+          "archive-tag docs"
+        ]
+      }
+    }
+  },
+  "cPrepInventory": {
+    "role": "read-only-record-of-existing-packets",
+    "scannerFixtureOnly": true,
+    "inventedLiveInventory": false,
+    "executedAgainstProductionRoots": false,
+    "cannotReachProductionRoots": true,
+    "productionWrite": false,
+    "productionScanExecuted": false,
+    "citedPackets": {
+      "productionObjectInventory": "docs/design/evidence/memory-workspace-s01-production-object-inventory.json",
+      "legacyMigrationDryRun": "docs/design/evidence/memory-workspace-legacy-migration-dry-run.json"
+    },
+    "productionObjectInventory": {
+      "schema": "memory-workspace-s01-production-object-inventory/v1",
+      "scannerModule": "src/gateway/data-governance/production-object-inventory.ts",
+      "tests": "src/gateway/data-governance/production-object-inventory.test.ts",
+      "productionScanExecuted": false,
+      "catalogWrite": false,
+      "moved": false,
+      "deleted": false,
+      "productionWrite": false,
+      "treatsRepoTreeDryRunAsProductionInventory": false,
+      "note": "Ships scanner + fixture tests only. Real production controlled roots were NOT executed."
+    },
+    "legacyMigrationDryRun": {
+      "schema": "memory-workspace-legacy-migration-dry-run/v1",
+      "recordCount": 185,
+      "migrate": 0,
+      "quarantine": 171,
+      "doNotMint": 12,
+      "preserve": 2,
+      "productionWrite": false,
+      "catalogMutation": false,
+      "migrationExecuted": false,
+      "cutover": false,
+      "decisionCounts": {
+        "do-not-mint": 12,
+        "preserve": 2,
+        "quarantine": 171
+      }
+    },
+    "reasonExecutedAgainstProductionRootsFalse": "This Mac/session cannot reach Aliyun LIVE / production controlled roots. Do not invent a live inventory. Keep executedAgainstProductionRoots=false."
+  },
+  "receiptCollectorGap": {
+    "shadowModule": "src/gateway/data-governance/s01-get-reply-steward-cwd-shadow.ts",
+    "portsModule": "src/gateway/data-governance/s01-stage-b-shadow-production-ports.ts",
+    "persistence": "log-only",
+    "durableCollector": false,
+    "collectorMissing": true,
+    "aggregated": false,
+    "redacted": false,
+    "exported": false,
+    "howPersisted": "runS01StewardCwdShadowIfEnabled calls log.info('s01_stage_b_steward_cwd_shadow', {receipt,...}) and returns an in-memory S01StewardCwdShadowResult. No jsonl/store/file write, no bucket aggregator, no redaction pipeline, no export.",
+    "stageCGate": {
+      "observationWindowMinHours": 2,
+      "minSampleSize": 100,
+      "minDistinctTenants": 2,
+      "minDistinctEmployeesPerTenant": 2,
+      "zeroCrossTenantTolerance": 0,
+      "maxUnexpectedErrorRate": 0.001,
+      "minObservationBuckets": 4,
+      "bucketDurationMinutes": 30,
+      "consecutiveBucketsRequired": true,
+      "productionReceiptsObserved": 0,
+      "observationBucketsObserved": 0,
+      "acceptanceMet": false,
+      "source": "docs/design/evidence/memory-workspace-s01-stage-c-prep.json"
+    },
+    "thisPacketImplementsCollector": false,
+    "thisPacketEditsGetReply": false,
+    "note": "Log-only receipts cannot satisfy the Stage C composite observation gate. A durable collector is missing. This PR does not implement a production collector (design/evidence only)."
+  },
+  "doesNotAuthorize": [
+    "Stage C Accept",
+    "Stage B Implementation Accepted",
+    "Stage D cutover",
+    "LIVE authorized",
+    "implementationVerified=true",
+    "deployAuthorized=true",
+    "Phase 1B unlock",
+    "GHCR build/push",
+    "Catalog write",
+    "observation deploy",
+    "invented live inventory",
+    "production collector implementation"
+  ],
+  "notDone": [
+    "did not deploy",
+    "did not flip flags",
+    "did not write Catalog",
+    "did not merge",
+    "did not request LIVE",
+    "did not build or push GHCR",
+    "did not execute production object inventory against live roots",
+    "did not invent a live inventory",
+    "did not implement a production receipt collector",
+    "did not edit get-reply.ts",
+    "did not set implementationVerified=true",
+    "did not set deployAuthorized=true"
+  ],
+  "note": "Read-only seq51..origin/main observation delta. Forward-only 112 commits. LIVE remains seq 51 / 59be50660d and does not include S01 Stage A/B, CR3, observation gates, or #876 (Handle decides managed cwd; helper is shadow-only). Residual S29 {cfg}-only Handle is not a reason to authorize deploy. Future observation deploy candidate MUST equal freshly fetched origin/main, not an S01-only branch. deployAuthorized remains false. Author must not self-merge."
+}

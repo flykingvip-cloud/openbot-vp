@@ -1,0 +1,137 @@
+{
+  "schema": "memory-workspace-phase1b-item2-residual-opaque-quarantine/v1",
+  "item": 2,
+  "status": "quarantine-receipt-no-rewrite",
+  "item2": "met",
+  "item2Candidate": "met",
+  "item2Official": "met",
+  "architectureReview": "accepted",
+  "LIVE": "forbidden",
+  "live": false,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "U1": "blocked",
+  "productionCatalogWrite": "none",
+  "normalCatalogWrite": "none",
+  "quarantineNormalWrites": 0,
+  "thisPacketWrites": 0,
+  "residualOpaqueRecords": 9,
+  "resourceIdShape": "32-char-hex",
+  "authorityShaped": false,
+  "inItem2NormalCatalogPopulation": false,
+  "disposition": "residual-not-normal-no-rewrite",
+  "identifierPolicy": "hashed",
+  "identityInvention": "forbidden",
+  "identityFromAgentId": "forbidden",
+  "identityFromPath": "forbidden",
+  "identityFromStateDir": "forbidden",
+  "hashedRecords": [
+    {
+      "hashedResourceId": "2dab2a4f67c3f469",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "user",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "af068cf1b1e6ed38",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "user",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 3,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "93498116280fd0d3",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "user",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 7,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "271ae22fcda808f9",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "position",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "59ff57f0d78c3daa",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "position",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "740da109707a4f36",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "position",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "b8f6c36f89440469",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "user",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "042939dedcf0bb3f",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "group",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    },
+    {
+      "hashedResourceId": "3f1e541b602ca530",
+      "hashedTenantId": "7a3e6b16cb75f48f",
+      "ownerKind": "user",
+      "workspaceKind": null,
+      "lifecycleState": "active",
+      "governanceVersion": 1,
+      "authorityShaped": false
+    }
+  ],
+  "authorizedFuturePath": {
+    "requires": [
+      "architecture-accept of production-SOT decision",
+      "explicit write authorization after unlock"
+    ],
+    "action": "quarantine-without-minting-ws-identity",
+    "forbidden": [
+      "invent resourceId",
+      "backfill from agentId",
+      "backfill from path",
+      "backfill from stateDir",
+      "write residual rows into the Item 2 normal Catalog as ws: identities"
+    ]
+  },
+  "sotDecision": "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json",
+  "closeout": "docs/design/evidence/memory-workspace-phase1b-item2-production-closeout.json",
+  "explicitlyForbidden": [
+    "LIVE migration",
+    "deployAuthorized=true",
+    "edit U1 unlock decision",
+    "invent identity from agentId path stateDir displayName Phase0 or U0",
+    "write production Catalog from this receipt",
+    "treat this receipt as architecture accept",
+    "score item 2 met before origin/main landing"
+  ],
+  "note": "Read-only quarantine/no-rewrite receipt for 9 residual opaque workspace rows. Hashed identifiers only. This packet does not write Catalog and does not mint ws: identities."
+}

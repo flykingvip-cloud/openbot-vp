@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 2,
+  "originMainSha": "1dc7a372673e498293d75820503762b7fbb37d6d",
+  "observedAt": "2026-09-24T01:17:22Z",
+  "historyKind": "squash-replay",
+  "oldCommitsAreAncestors": false,
+  "ancestryGateUsesNewRepoCommits": true,
+  "productionProof": false,
+  "note": "Migration map only. Later gates check the new-repo commit and symbols. They do not require the old SHAs to be ancestors.",
+  "mappings": [
+    {
+      "oldCommit": "9620f8f986dab7820889c3d699cef4a9c3a70a0f",
+      "canonicalNewRepoCommit": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+      "affectedFiles": ["src/agents/pi-embedded-runner/run/params.ts"],
+      "oldBlob": "10ce9cf0be4aaafb8389e5fa98b413056e257bd8",
+      "canonicalBlob": "10ce9cf0be4aaafb8389e5fa98b413056e257bd8",
+      "currentMainBlob": "10ce9cf0be4aaafb8389e5fa98b413056e257bd8",
+      "blobEquivalent": true,
+      "symbolEvidence": "ExecutionIdentityContext is present on origin/main. git log -S finds it only in f1c7efece.",
+      "tests": ["src/auto-reply/reply/execution-identity-propagation.test.ts"],
+      "observedAt": "2026-09-24T01:17:22Z",
+      "originMainSha": "1dc7a372673e498293d75820503762b7fbb37d6d"
+    },
+    {
+      "oldCommit": "9dea6316a39168fda942533e3304e47b12c0695f",
+      "canonicalNewRepoCommit": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+      "affectedFiles": [
+        "src/gateway/enterprise-operational-identity-runtime.identity-context.test.ts"
+      ],
+      "oldBlob": "88d8dd23dc482d376da96e39b3e815092a886057",
+      "canonicalBlob": "88d8dd23dc482d376da96e39b3e815092a886057",
+      "currentMainBlob": "88d8dd23dc482d376da96e39b3e815092a886057",
+      "blobEquivalent": true,
+      "symbolEvidence": "MEMBERSHIP_INVALID fail-closed denial test blob matches f1c7efece and origin/main.",
+      "tests": ["fails closed on suspended membership and does not use enrollment fallback"],
+      "observedAt": "2026-09-24T01:17:22Z",
+      "originMainSha": "1dc7a372673e498293d75820503762b7fbb37d6d"
+    },
+    {
+      "oldCommit": "21cf2c0125d868603902a36b434eec4767c77601",
+      "canonicalNewRepoCommit": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+      "affectedFiles": ["src/agents/pi-embedded-runner/run.ts"],
+      "oldBlob": "67a5337d20caee51a6d05099e11e5685453608e4",
+      "canonicalBlob": "7e88903d3fabf85643977601298897dbae32b709",
+      "currentMainBlob": "61504efa73a375ee36ee79edf38c00093d7d018f",
+      "blobEquivalent": false,
+      "symbolEvidence": "The old run.ts blob was replaced by 66b886bb88, whose run.ts blob equals f1c7efece. origin/main still calls inheritExecutionIdentityRunFields from run.ts. currentMainBlob differs because later delivery edits changed run.ts.",
+      "tests": ["src/agents/pi-embedded-runner/usage-reporting.test.ts"],
+      "observedAt": "2026-09-24T01:17:22Z",
+      "originMainSha": "1dc7a372673e498293d75820503762b7fbb37d6d"
+    },
+    {
+      "oldCommit": "66b886bb88fb2225e6fef9e8e7be81b67742c06e",
+      "canonicalNewRepoCommit": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c",
+      "affectedFiles": ["src/gateway/execution-identity-context.ts"],
+      "oldBlob": "3cf3485cdf07b543241cdd6bc01e8ccf6eb72a94",
+      "canonicalBlob": "3cf3485cdf07b543241cdd6bc01e8ccf6eb72a94",
+      "currentMainBlob": "3cf3485cdf07b543241cdd6bc01e8ccf6eb72a94",
+      "blobEquivalent": true,
+      "symbolEvidence": "inheritExecutionIdentityRunFields and stageSpawnExecutionIdentity live in this blob, identical on the old commit, f1c7efece, and origin/main.",
+      "tests": [
+        "src/gateway/execution-identity-context.test.ts",
+        "src/gateway/execution-identity-handoff.test.ts"
+      ],
+      "observedAt": "2026-09-24T01:17:22Z",
+      "originMainSha": "1dc7a372673e498293d75820503762b7fbb37d6d"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "schema": "chat-inbound-depth-shadow-3-receipt/v1",
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-collab-csc",
+  "capturedAt": "2026-08-23T05:44:03Z",
+  "timezone": "Asia/Shanghai",
+  "worktree": "/tmp/openbot-candidate-673f8dce63",
+  "frozenOriginMainAtFetch": "673f8dce6386a967b0f8a1a29d4e05eae420e81f",
+  "candidateBuildSha": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+  "shadowFixCommit": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+  "pristineTipShadowGate": {
+    "sha": "673f8dce6386a967b0f8a1a29d4e05eae420e81f",
+    "result": "fail",
+    "failedTests": 3,
+    "reason": "willBuildKnowledge incorrectly gated on mayRetrieveOptionalKnowledge(minimal scope); buildKnowledgeUniversePromptContext not invoked"
+  },
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-shadow-vitest TMPDIR=/tmp pnpm test src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts --reporter=verbose",
+  "logPath": "/tmp/openbot-candidate-673f8dce63-artifacts/shadow-test.log",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "1 passed (1)",
+    "tests": "5 passed (5)",
+    "durationMs": 6950
+  },
+  "blockingScenarios": [
+    {
+      "id": "shadow-off-baseline-prefetch",
+      "testName": "does not emit depth_decided when the shadow flag is off",
+      "input": {
+        "env": {},
+        "sessionKey": "agent:main:employee:c7f8e59e-4705-4fe0-a763-5fa62d66e6f2",
+        "message": "晚上好",
+        "channel": "webchat",
+        "runId": "run-shadow-off"
+      },
+      "expected": {
+        "depthDecidedEvents": 0,
+        "inboundDepthDecision": "absent",
+        "buildKnowledgeUniversePromptContextCalls": 1
+      },
+      "actual": {
+        "depthDecidedEvents": 0,
+        "inboundDepthDecision": "absent",
+        "buildKnowledgeUniversePromptContextCalls": 1,
+        "contextScopePlanMode": "minimal"
+      },
+      "sideEffects": {
+        "knowledgePrefetchInvoked": true,
+        "knowledgePromptApplied": false,
+        "chatLaneRouterSkip": false
+      },
+      "latencyMs": 18
+    },
+    {
+      "id": "shadow-on-chat-without-skipping-prefetch",
+      "testName": "records wouldDepth without skipping knowledge prefetch",
+      "input": {
+        "env": { "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW": "1" },
+        "sessionKey": "agent:main:employee:c7f8e59e-4705-4fe0-a763-5fa62d66e6f2",
+        "message": "晚上好",
+        "channel": "webchat",
+        "runId": "run-shadow-on"
+      },
+      "expected": {
+        "wouldDepth": "chat",
+        "mode": "shadow",
+        "reasons": ["default_chat"],
+        "buildKnowledgeUniversePromptContextCalls": 1
+      },
+      "actual": {
+        "wouldDepth": "chat",
+        "mode": "shadow",
+        "reasons": ["default_chat"],
+        "routeStrength": "unknown",
+        "classifierVersion": "inbound-depth-v1",
+        "buildKnowledgeUniversePromptContextCalls": 1,
+        "inboundDepthDecisionDepth": "chat"
+      },
+      "sideEffects": {
+        "knowledgePrefetchInvoked": true,
+        "knowledgePromptApplied": false,
+        "messageRedactedInEvent": true
+      },
+      "latencyMs": 8
+    },
+    {
+      "id": "shadow-on-space-no-classify-still-prefetch",
+      "testName": "does not classify space sessions even when shadow is on",
+      "input": {
+        "env": { "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW": "1" },
+        "sessionKey": "agent:main:space:group-1",
+        "message": "晚上好",
+        "channel": "webchat",
+        "runId": "run-shadow-space"
+      },
+      "expected": {
+        "depthDecidedEvents": 0,
+        "inboundDepthDecision": "absent",
+        "buildKnowledgeUniversePromptContextCalls": 1
+      },
+      "actual": {
+        "depthDecidedEvents": 0,
+        "inboundDepthDecision": "absent",
+        "buildKnowledgeUniversePromptContextCalls": 1
+      },
+      "sideEffects": {
+        "spaceSessionSkippedByStewardGate": true,
+        "knowledgePrefetchInvoked": true
+      },
+      "latencyMs": 2
+    }
+  ],
+  "additionalScenarios": [
+    {
+      "id": "continuation-act-from-transcript",
+      "testName": "inherits previous act from persisted transcript after a process restart",
+      "result": "pass",
+      "wouldDepth": "act",
+      "reasons": ["continuation_unfinished_tool"],
+      "buildKnowledgeUniversePromptContextCalls": 1
+    },
+    {
+      "id": "active-run-without-unfinished-tool",
+      "testName": "does not treat an active agent run without unfinished tools as continuation",
+      "result": "pass",
+      "wouldDepth": "chat",
+      "reasons": ["default_chat"]
+    }
+  ]
+}

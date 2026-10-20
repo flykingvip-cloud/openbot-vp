@@ -1,0 +1,95 @@
+{
+  "id": "media-monitor",
+  "name": "Media Monitor",
+  "description": "Read-only social media monitoring via an external MediaCrawler-compatible sidecar. Not for auto-posting.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "description": "Enable the media-monitor service."
+      },
+      "adapterCommand": {
+        "type": "array",
+        "items": { "type": "string" },
+        "minItems": 1,
+        "description": "External adapter argv prefix, e.g. [\"python3\",\"-m\",\"openbot_media_adapter\"]. Never shell-concatenated."
+      },
+      "adapterCwd": {
+        "type": "string",
+        "description": "Working directory for the sidecar process (must stay under gateway cwd when relative)."
+      },
+      "defaultPlatform": {
+        "type": "string",
+        "enum": ["xhs"],
+        "description": "MVP supports xhs only; adapter interface remains extensible."
+      },
+      "defaultPollIntervalSeconds": {
+        "type": "number",
+        "minimum": 60,
+        "description": "Default poll interval (recommended 1800)."
+      },
+      "timeoutMs": {
+        "type": "number",
+        "minimum": 1000
+      },
+      "maxStdoutBytes": {
+        "type": "number",
+        "minimum": 1024
+      },
+      "tickIntervalMs": {
+        "type": "number",
+        "minimum": 1000,
+        "description": "Internal due-check interval (not a user-facing APScheduler)."
+      },
+      "outboxFlushIntervalMs": {
+        "type": "number",
+        "minimum": 1000
+      },
+      "notifyChannel": {
+        "type": "string",
+        "description": "Existing OpenBot channel id for notifications (e.g. telegram)."
+      },
+      "notifyTo": {
+        "type": "string",
+        "description": "Destination for notifications on the selected channel."
+      },
+      "notifyAccountId": {
+        "type": "string"
+      },
+      "cookieSecret": {
+        "description": "SecretRef or string for cookie material passed to the sidecar via env OPENBOT_MEDIA_COOKIE (never logged).",
+        "anyOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "provider", "id"],
+            "properties": {
+              "source": { "type": "string", "enum": ["env", "file", "exec", "encrypted-local"] },
+              "provider": { "type": "string" },
+              "id": { "type": "string" }
+            }
+          }
+        ]
+      },
+      "staggerMs": {
+        "type": "number",
+        "minimum": 0,
+        "description": "Jitter between account jobs."
+      }
+    }
+  },
+  "uiHints": {
+    "cookieSecret": {
+      "label": "Cookie secret",
+      "sensitive": true,
+      "tags": ["secret"]
+    },
+    "adapterCommand": {
+      "label": "Adapter command",
+      "help": "External bounded process only. Do not vendor MediaCrawler into OpenBot."
+    }
+  }
+}

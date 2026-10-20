@@ -1,0 +1,29 @@
+diff --git a/package.json b/package.json
+index 04158fd1840aa135ec7aa1404e6fd8b93483a2d6..06922686f3dda224e63f4ad20aed324fc0bda363 100644
+--- a/package.json
++++ b/package.json
+@@ -8,15 +8,21 @@
+ 	"exports": {
+ 		".": {
+ 			"types": "./dist/index.d.ts",
+-			"import": "./dist/index.js"
++			"import": "./dist/index.js",
++			"require": "./dist/index.js",
++			"default": "./dist/index.js"
+ 		},
+ 		"./node": {
+ 			"types": "./dist/node.d.ts",
+-			"import": "./dist/node.js"
++			"import": "./dist/node.js",
++			"require": "./dist/node.js",
++			"default": "./dist/node.js"
+ 		},
+ 		"./session/testing": {
+ 			"types": "./dist/harness/session/testing/index.d.ts",
+-			"import": "./dist/harness/session/testing/index.js"
++			"import": "./dist/harness/session/testing/index.js",
++			"require": "./dist/harness/session/testing/index.js",
++			"default": "./dist/harness/session/testing/index.js"
+ 		},
+ 		"./package.json": "./package.json"
+ 	},

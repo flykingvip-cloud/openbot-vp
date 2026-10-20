@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbot.love/schemas/execution-receipt.schema.json",
+  "title": "OpenBot Execution Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receiptId",
+    "toolId",
+    "operation",
+    "status",
+    "startedAt",
+    "sideEffects",
+    "evidence"
+  ],
+  "properties": {
+    "receiptId": { "type": "string", "minLength": 1 },
+    "toolId": { "type": "string", "minLength": 1 },
+    "operation": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["running", "succeeded", "failed", "denied", "cancelled"] },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "approvalId": { "type": "string" },
+    "idempotencyKey": { "type": "string" },
+    "inputDigest": { "type": "string" },
+    "outputDigest": { "type": "string" },
+    "sideEffects": { "type": "array", "items": { "type": "string" } },
+    "evidence": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+    "error": { "type": "object", "additionalProperties": true }
+  }
+}

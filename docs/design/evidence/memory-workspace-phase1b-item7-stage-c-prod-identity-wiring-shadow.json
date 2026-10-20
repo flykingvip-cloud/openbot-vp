@@ -1,0 +1,91 @@
+{
+  "schema": "memory-workspace-phase1b-item7-stage-c-prod-identity-wiring-shadow/v1",
+  "item": 7,
+  "stage": "C",
+  "status": "stage-c-production-identity-wiring-shadow",
+  "changeRequestKind": "stage-c-prod-identity-wiring-shadow",
+  "reviewRequest": "stage-c-production-identity-wiring-shadow-review-only",
+  "reviewRequestIsBatchAccept": false,
+  "dependsOn": "PR #709 (Stage C identity thread), landed",
+  "shadowOnly": true,
+  "productionSwitch": false,
+  "placement": "legacy-local-shadow",
+  "legacyLocatorRetained": true,
+  "gatedOffByDefault": true,
+  "envFlag": "OPENBOT_ITEM7_STAGE_C_IDENTITY_SHADOW",
+  "scanModified": false,
+  "previousAcceptedBaseline": 10,
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "retiredThisChange": 0,
+  "frozenWriteWatchIndex": 38,
+  "c1c5StayInScan": true,
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "freezeSafe": true,
+  "freeze": {
+    "ok": true,
+    "addedProductionCallSites": [],
+    "addedProductionHelpers": [],
+    "addedCatalogSynthesis": [],
+    "why": "The shadow READS an existing canonical binding via resolveMemoryWorkspaceHandle (the replacement symbol; not a frozen legacy resolver and not a Catalog-synthesis symbol). It never mints a binding, so it adds no watched call site (unlike a production synthesis, which the freeze forbids)."
+  },
+  "conclusions": [
+    "Adds a Stage C managed-identity SHADOW that, at a trusted entrypoint with a server-built MemorySearchGovernance, evaluates whether the managed_enterprise canonical-handle path (Stage C #709) would resolve, and records a redacted metric (managed_success / managed_deny / managed_defer). Read-only; builds no manager, creates no directory, writes no Catalog, removes no legacy locator.",
+    "Gated + fail-safe by construction: OFF by default (OPENBOT_ITEM7_STAGE_C_IDENTITY_SHADOW); runStageCManagedIdentityShadowIfEnabled is a no-op when off and never throws into the production path when on (errors swallowed + logged). The live-entrypoint canary wiring (calling it from the memory tool) is a coordinated follow-up: src/agents/tools/memory-tool.ts is a shared hot file owned by codex-runtime-safety, so this CR delivers the ready-to-wire evaluator and defers the one-line entrypoint call to avoid a cross-agent hot-file conflict (or it lands with Phase E).",
+    "Identity is server-trusted only: managed context is derived from MemorySearchGovernance (ownershipProof + tenantId) via deriveManagedAccessContextFromGovernance, with the acting user threaded as authenticatedUserId (from gatewayClientUser) for seat/group-owned proofs; the canonical resolver port is resolveMemoryWorkspaceHandle. No tenantId/userId/resourceId is derived from wire.",
+    "Fail-closed + defer semantics: managed_identity_required / managed_background_deferred / managed_membership_missing are classified as DEFER (no trusted request identity threaded yet -> not a coverage gap); catalog miss / tenant mismatch / grant denied / workspace-not-indexable are DENY. Cross-tenant handles are rejected.",
+    "SHADOW ONLY: the five C1-C5 index sites (backend-config / cogniweave-manager / manager / qmd-manager) stay on the legacy path and remain in the retirement scan; physical placement is labeled legacy-local-shadow; no production placement is claimed. Switching C1-C5 (threading identity into those constructor/config-time sites) is the Phase E cutover, not this change.",
+    "No scan change (remaining/liveWriteWatchIndex=10, frozenWriteWatchIndex=38); item 7 stays not-met; all locks preserved (deployAuthorized=false, live=forbidden, phase1bExecutionBlocked=true, productionCatalogWrite=none, schemaV2ProductionWrite=false). This produces OBSERVABILITY input for the Phase E cutover decision, not Item 7 progress."
+  ],
+  "metricsRecorded": ["managed_success", "managed_deny", "managed_defer"],
+  "deferReasons": [
+    "managed_identity_required",
+    "managed_background_deferred",
+    "managed_membership_missing"
+  ],
+  "denyReasons": [
+    "managed_catalog_miss",
+    "managed_catalog_ambiguous",
+    "managed_tenant_mismatch",
+    "managed_grant_denied",
+    "managed_workspace_not_indexable"
+  ],
+  "entrypointWiring": {
+    "status": "deferred",
+    "reason": "src/agents/tools/memory-tool.ts is a shared hot file owned by codex-runtime-safety (agent-attribution CONFLICT); this CR does not modify it, to avoid a cross-agent hot-file conflict.",
+    "readyToWireCall": "void runStageCManagedIdentityShadowIfEnabled({ governance, agentId, cfg, authenticatedUserId })",
+    "followUp": "coordinated wiring with codex-runtime-safety, or as part of Phase E cutover"
+  },
+  "files": [
+    "src/gateway/item7-stage-c-identity-shadow.ts (new: evaluator + gate + canonical port adapter + redacted metric log)",
+    "src/gateway/item7-stage-c-identity-shadow.test.ts (new: 9 tests)"
+  ],
+  "verification": {
+    "tsgoMyFiles": 0,
+    "oxlint": "0/0",
+    "formatCheck": "clean",
+    "vitestNew": "9 passed",
+    "stageCRegression": "item7-stage-c-identity-thread + memory-index-access-context = 33 passed",
+    "freeze": "ok=true / addedProductionCallSites=[] / addedProductionHelpers=[] / addedCatalogSynthesis=[]",
+    "scanUnchanged": true,
+    "getReplyUnchanged": true
+  },
+  "phaseECutover": {
+    "label": "deferred",
+    "note": "Actual C1-C5 production switch (thread call-entry identity into the constructor/config-time sites + flip to canonical handle) is Phase E, gated on this shadow's coverage metrics + forward-only + canary. Not in this change."
+  },
+  "rollbackProof": true,
+  "quarantineProof": true,
+  "baseCommit": "6722d3ff604f0b0726788b408f02286eda94250d",
+  "originMainSha": "6722d3ff604f0b0726788b408f02286eda94250d",
+  "note": "Item 7 Stage C Phase C: production identity wiring PREPARATION as a gated, read-only SHADOW. It adds src/gateway/item7-stage-c-identity-shadow.ts (evaluate the managed_enterprise canonical-handle path from a server-built MemorySearchGovernance + record managed_success/deny/defer) OFF by default (OPENBOT_ITEM7_STAGE_C_IDENTITY_SHADOW); when on it is read-only observability that never builds the manager, creates a directory, writes the Catalog, or removes the legacy locator. The live-entrypoint canary wiring (calling it from the memory tool) is deferred: src/agents/tools/memory-tool.ts is a shared hot file owned by codex-runtime-safety, so this CR delivers the ready-to-wire evaluator and defers the one-line entrypoint call to a coordinated follow-up / Phase E, to avoid a cross-agent hot-file conflict. It is freeze-safe because it READS an existing canonical binding via resolveMemoryWorkspaceHandle (the replacement symbol, not a frozen legacy resolver and not a Catalog-synthesis symbol) -> freeze ok=true / added*=[]. Identity is server-trusted only (no wire-derived tenantId/userId/resourceId). The five C1-C5 index sites stay on the legacy path and remain in the retirement scan; physical placement stays labeled legacy-local-shadow; no production placement is claimed; switching C1-C5 is the Phase E cutover. No scan change (remaining=10, frozenWriteWatchIndex=38); item 7 stays not-met; all locks preserved. Requests ONLY a Stage C Production Identity Wiring (shadow) Review; does NOT request C1-C5 retirement, baseline change, production switch, Item 7 met, Phase 1B unlock, or LIVE."
+}

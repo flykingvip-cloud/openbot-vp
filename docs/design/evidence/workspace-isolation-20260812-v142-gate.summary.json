@@ -1,0 +1,143 @@
+{
+  "evidenceId": "workspace-isolation-20260812-v142-gate",
+  "schema": "workspace-isolation-evidence-summary/v1",
+  "probeUtc": "2026-08-12T07:00:00Z",
+  "classification": "controlled-audit-desensitized",
+  "environment": {
+    "host": "<production-gateway-host>",
+    "container": "<gateway-container>",
+    "image": "<gateway-image>",
+    "imageId": "<gateway-image-id>",
+    "buildCommit": "<gateway-build-commit>",
+    "buildOverlay": "<gateway-overlay-id>",
+    "dataSource": "host-bind:{stateDir} -> container:{stateDir}",
+    "multitenant": true,
+    "dataMode": "managed"
+  },
+  "sample": {
+    "tenantId": "<sample-tenant>",
+    "userId": "<sample-user>"
+  },
+  "cluster": {
+    "tenantCount": 2,
+    "userDirCount": 2
+  },
+  "probe": {
+    "scriptPath": "scripts/audit/workspace-isolation-probe.mjs",
+    "scriptSha256": "a6fcf2ad9c8ca2983290c2618275be899efc2f9a596df7d3e1205489f087b5dc",
+    "schema": "workspace-isolation-probe/v2",
+    "recentDays": 14,
+    "mode": "summary-redacted",
+    "derivedFrom": "workspace-isolation-probe/v2"
+  },
+  "pathSummary": {
+    "A_employee": {
+      "pathPattern": "{stateDir}/agents/main/employees/<sample-user>/workspace",
+      "exists": false,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "B_flat_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace",
+      "exists": true,
+      "deliverableCount": 1,
+      "recentCount": 1
+    },
+    "C_agent_main": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/agents/main/workspace",
+      "exists": false,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "D_skill_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace-bot-skill",
+      "exists": false,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "E_skill_host": {
+      "pathPattern": "{stateDir}/workspace-bot-skill",
+      "exists": true,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "F_canvas": {
+      "pathPattern": "{stateDir}/canvas",
+      "exists": true,
+      "deliverableCount": 0,
+      "recentCount": 0
+    }
+  },
+  "crossClassDuplicateBasenames": {},
+  "c19Assertions": {
+    "schema": "workspace-isolation-c19-assertions/v1",
+    "roleSource": "binding_manifest",
+    "bindingManifestPath": "{stateDir}/.openbot-c19-bindings.json",
+    "writableCanonicalByOwnerScope": [
+      {
+        "ownerScopeKind": "user_owned",
+        "canonicalClassId": "B_flat_l2",
+        "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace",
+        "recentDeliverableWrites": 1
+      }
+    ],
+    "legacyRootRoles": {
+      "B_flat_l2": "canonical_writable",
+      "A_employee": "retired",
+      "C_agent_main": "retired"
+    },
+    "unknownOwnership": {
+      "count": 0,
+      "isolated": true,
+      "source": "binding_manifest"
+    },
+    "sharedRootRecentWrites": {
+      "D_skill_l2": 0,
+      "E_skill_host": 0,
+      "F_canvas": 0,
+      "total": 0,
+      "pass": true
+    },
+    "crossTenantEnumeration": {
+      "fileContentScanTenantCount": 1,
+      "sampleTenantScoped": true,
+      "clusterTenantCount": 2,
+      "clusterUserDirCount": 2,
+      "pass": true,
+      "note": "Deliverable hashing is limited to SAMPLE_TENANT/SAMPLE_USER class roots; tenant/user counts are name-only readdir metadata."
+    },
+    "probeScriptSha256": "a6fcf2ad9c8ca2983290c2618275be899efc2f9a596df7d3e1205489f087b5dc",
+    "observationalWriters": ["B_flat_l2"],
+    "errorsSampled": 0,
+    "gates": {
+      "uniqueWritableCanonical": true,
+      "legacyRootsClosed": true,
+      "sharedRootWritesZero": true,
+      "unknownOwnershipIsolated": true,
+      "noCrossTenantContentEnumeration": true,
+      "allPass": true,
+      "failures": []
+    }
+  },
+  "limits": {
+    "maxFiles": 20000,
+    "maxDepth": 24,
+    "maxBytesRead": 268435456,
+    "maxFullHashBytes": 2097152,
+    "maxDupBasenames": 200
+  },
+  "stats": {
+    "bytesRead": 10,
+    "errorCount": 0,
+    "truncated": false,
+    "truncationReasons": [],
+    "seenFiles": 1
+  },
+  "controlledRawBundle": {
+    "location": "<controlled-audit-store>",
+    "bundleId": "workspace-isolation-20260812-v142-gate-raw",
+    "note": "Full host/container/user identifiers and absolute paths remain outside the git repository."
+  },
+  "summarySha256Algorithm": "UTF-8 bytes of JSON.stringify(summaryWithoutSha, null, 2) + '\\n' where summaryWithoutSha omits summarySha256; Node/JSON key insertion order as produced by this script.",
+  "summarySha256": "f9953dcc48852d490dcca2d5d2457e336e155948a60c064b5fce50b88b82653b"
+}

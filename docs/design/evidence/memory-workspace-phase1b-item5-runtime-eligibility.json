@@ -1,0 +1,41 @@
+{
+  "schema": "memory-workspace-phase1b-item5-runtime-eligibility/v1",
+  "item": 5,
+  "item5Met": false,
+  "item6Unlocked": false,
+  "item7Unlocked": false,
+  "wiredToProductionResolver": false,
+  "deployAuthorized": false,
+  "cutoverLive": false,
+  "operationId": "item5-closeout-6ac338479a-20260819T163148Z",
+  "runtimeSha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+  "baselineSha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+  "originMainAtPacket": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+  "originMainNow": "222cb8ee3ab45d0b5327104134cf757c73462617",
+  "runtimeAlignedToBaseline": true,
+  "runtimeIsAncestorOfBaseline": true,
+  "runtimeIsAncestorOfOriginMain": true,
+  "i2Anchoring": true,
+  "allowedLiveCandidate": true,
+  "overlayId": "item5-runtime-align-r1",
+  "overlayStamp": "20260819T162800Z",
+  "previousOverlayId": "cq-o0-memory-health-cli",
+  "previousRuntimeSha": "34595862f785c90a4e0e30587db33690c2e139d2",
+  "landedPr": "#531",
+  "plan": "A",
+  "subject": "Plan A gateway dist overlay aligned production runtime commit to closeout baselineSha; Control UI pin retained; not a LIVE image cutover",
+  "proof": [
+    "podman exec openbot-gateway-rc cat /app/dist/build-info.json -> commit=6ac338479a1644d28a6bca1c48e1921c11f9d36f overlay.id=item5-runtime-align-r1",
+    "git merge-base --is-ancestor 6ac338479a1644d28a6bca1c48e1921c11f9d36f 6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "git merge-base --is-ancestor 6ac338479a1644d28a6bca1c48e1921c11f9d36f 222cb8ee3ab45d0b5327104134cf757c73462617"
+  ],
+  "reason": "Production gateway dist overlay item5-runtime-align-r1 set build-info.commit equal to the Item 5 closeout baselineSha and then-current origin/main 6ac338479a. runtimeAlignedToBaseline=true is binary identity, not ancestor-as-identity. Later origin/main merges (#531, #528) are evidence/other-feature only and did not change the running commit. Do not overlay 97d88b38a4 or 222cb8ee3a as a new production runtime. This packet does not cut over LIVE and does not score item 5 met.",
+  "doesNotAuthorize": [
+    "score item 5 met",
+    "unlock item 6",
+    "unlock item 7",
+    "flip wiredToProductionResolver",
+    "LIVE cutover / replace base image",
+    "treat #531 merge commit 97d88b38a4 or later origin/main tip 222cb8ee3a as a new production runtime that must be overlayed"
+  ]
+}

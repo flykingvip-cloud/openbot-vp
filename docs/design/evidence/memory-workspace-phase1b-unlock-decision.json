@@ -1,0 +1,42 @@
+{
+  "schema": "memory-workspace-phase1b-unlock-decision/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "unlock": "not-issued",
+  "decision": "no-valid-issued-receipt",
+  "signedBy": null,
+  "issuedAt": null,
+  "reviewedBy": "cursor-sot-reviewer",
+  "reviewedAt": "2026-08-18T16:01:00.000Z",
+  "baseline": "4daa854e78c1c17279eac48516521809a40e003a",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "wiredToProductionResolver": "unchanged",
+  "items": {
+    "2": "met",
+    "3": "met",
+    "4": "met",
+    "5": "met",
+    "6": "met",
+    "7": "not-met"
+  },
+  "finding": [
+    "Cited unlock-first stamp was missing from origin/main before this record.",
+    "phase1b-unlock-remaining-20260818.md and tasks.md claims of issued unlock are vacated.",
+    "Item 2 production Catalog SoT scored met after #518 closeout and architecture accept; occupancy coverage runner stays not-met and is not SoT.",
+    "Item 6 scored met after operator-issued OPENBOT_AUTHORIZED_SQLITE_PATH plus SRE production-equivalent drill and independent WSC accept. U1 unlock stays not-issued.",
+    "2026-08-19 Item 5 closeout: side-worktree unlock-first issued stamp archived and revoked; canonical receipt remains not-issued. See memory-workspace-phase1b-unlock-issued-stamp-revoke.json."
+  ],
+  "doesNotAuthorize": [
+    "phase1bExecutionBlocked=false",
+    "deployAuthorized=true",
+    "LIVE migration",
+    "Catalog production write",
+    "schema v2 write path",
+    "delete productionWriteWatchIndex call-sites",
+    "score item 7 met",
+    "flip wiredToProductionResolver"
+  ],
+  "note": "This file is the only valid Phase 1B unlock receipt. Decision is not-issued. It is not an unlock-first stamp."
+}

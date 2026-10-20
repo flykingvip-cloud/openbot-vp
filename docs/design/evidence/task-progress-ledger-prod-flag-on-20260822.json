@@ -1,0 +1,34 @@
+{
+  "schema": "task-progress-ledger-prod-flag/v1",
+  "decision": "production-flag-enabled-via-config",
+  "authorizedBy": "user",
+  "recordedAt": "2026-08-22T21:13:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "stamp": "20260822T131345Z",
+  "live": {
+    "sha": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "container": "openbot-gateway-rc",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPin": "index-Dpg8P1UR.js"
+  },
+  "originMainAtEnable": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+  "forwardOnlyVsOriginMain": "allow",
+  "enablement": {
+    "openbotJson": "gateway.progressLedger.enabled=true",
+    "envDocker": "OPENBOT_PROGRESS_LEDGER_ENABLED=1",
+    "processEnv": "UNSET",
+    "runtime": { "envOn": false, "cfgOn": true, "enabled": true },
+    "note": "podman restart does not re-apply --env-file; config is the live source of truth until recreate"
+  },
+  "backups": [
+    "/root/.openbot/.env.docker.bak-pre-ledger-flag-20260822T131345Z",
+    "/root/.openbot/openbot.json.bak-pre-ledger-flag-20260822T131345Z"
+  ],
+  "explicitlyNotDone": [
+    "Did not recreate the container",
+    "Did not deploy origin/main 5c221b9e",
+    "Did not land dirty worktree files"
+  ]
+}

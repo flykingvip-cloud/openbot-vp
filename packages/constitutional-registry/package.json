@@ -1,0 +1,30 @@
+{
+  "name": "@openbot/constitutional-registry",
+  "version": "0.0.0",
+  "private": true,
+  "description": "In-monorepo scaffold for a proposed Registry product boundary. Re-exports constitutional-contracts adapters and the read-model vocabulary. Not independently deployable.",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@openbot/constitutional-contracts": "workspace:*"
+  }
+}

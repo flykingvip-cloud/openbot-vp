@@ -1,0 +1,63 @@
+# Observed 2026-09-18 on https://www.openbot.love/ while logged in.
+# Opened 数字人战队 and its 成员管理 panel.
+# Creator wizard was not re-opened on this logged-in pass. Do not recite its fields.
+
+scenario:
+  name: employee_collaboration
+  title: 协作空间与成员管理
+  trigger:
+    - 协作空间
+    - 成员管理
+    - 添加成员
+    - 添加机器人
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: locate
+    title: 打开一个协作空间
+  - id: members
+    title: 成员管理
+
+steps:
+  - id: open_section
+    stage: locate
+    risk: low
+    instruction: 展开左侧栏，找到「协作空间」。这一组有加号。名单以屏幕为准。本次看到「权变方案组」「数字人战队」「市场研究组」「产品测试组」。不要说列表是空的。
+    visual_anchor: 侧栏「协作空间」
+    success_signal: 用户能读出一个空间名
+
+  - id: open_space
+    stage: locate
+    risk: low
+    instruction: "点用户要进的空间名。打开「数字人战队」后，抬头是「TO: 数字人战队」。主舞台能看到成员，例如在线的人和已加入的机器人。不要编造未出现的页签。"
+    visual_anchor: 空间名
+    success_signal: 抬头变成该空间
+
+  - id: open_member_panel
+    stage: members
+    risk: low
+    instruction: 点「成员管理」。面板标题是「成员管理——」加上空间名。本次「数字人战队」写着「2 位成员 / 4 个机器人」。
+    visual_anchor: 「成员管理」
+    success_signal: 面板打开
+
+  - id: read_member_actions
+    stage: members
+    risk: medium
+    confirmation: true
+    instruction: |
+      面板上实际有这些，一次只做用户确认过的一步：
+      - 顶部按钮「添加成员」「添加机器人」（这里的「添加机器人」是把已有助手拉进本空间，不是侧栏「AI 助手」加号那种新建）
+      - 人类成员旁有「移除」；非群主可以有「移交管理权」
+      - 机器人旁有「移除」
+      - 待处理邀请会写「已发送邀请」和「待主人确认」
+      - 下方有「AI 协助调整（可选）」
+      不要点「移除」或「移交管理权」，除非用户明确要这么做。
+    visual_anchor: 「添加成员」
+    success_signal: 用户确认看到上述按钮，或决定先关掉面板
+    on_fail: 没有看到「概览 / 聊天 / 治理 / 胶囊」这一排页签。不要编造空间内部页签。
+
+fallback:
+  - check: create
+    instruction: 加号在「协作空间」标题旁。点开后的向导字段本次没有重新打开。先确认标题是「新建协作空间」，再按屏幕上的字段往下说，不要背未出现的步骤。

@@ -1,0 +1,9 @@
+{
+  "schema": "memory-workspace-phase1b-item6-implementation-read-only-xinfo/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-read-only-xinfo.json",
+  "kind": "item6-implementation-read-only-xinfo",
+  "item6": "not-met",
+  "productionSqliteWrite": false,
+  "runtime": "src/memory/item6-authorized-sqlite-read.ts",
+  "note": "Item 6 step-8 read-only PRAGMA table_xinfo on authorized sqlite."
+}

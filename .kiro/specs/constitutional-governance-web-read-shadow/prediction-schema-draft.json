@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openbot://phase-b/web-read-shadow-prediction",
+  "title": "WebReadShadowPrediction",
+  "description": "B1 independent production prediction. No annotationCompare / gold fields. Phase B: enqueue/invoke/wroteLedger/invokedTool \u6052 false\uff1bcompletionClaim.claimedComplete \u6052 false\u3002legacyCompared \u6052 false\uff1bagree \u5141\u8bb8 null\u3002",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "caseId",
+    "profile",
+    "tenantId",
+    "decision",
+    "reasonCodes",
+    "gap",
+    "humanGate",
+    "completionClaim",
+    "latencyMs",
+    "shadowVsLegacy",
+    "wroteLedger",
+    "invokedTool"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["A", "B"]
+    },
+    "tenantId": {
+      "type": ["string", "null"],
+      "description": "Echo of runtime input.tenantId as-is (Profile A null; Profile B non-empty). Binding only; NOT auth proof."
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "kind", "enqueue", "invoke"],
+      "properties": {
+        "surface": {
+          "type": ["string", "null"],
+          "enum": ["web_read", "not_web_read", "clarify", null]
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["selected", "clarify", "noop", "reject"]
+        },
+        "enqueue": {
+          "type": "boolean",
+          "const": false
+        },
+        "invoke": {
+          "type": "boolean",
+          "const": false
+        }
+      }
+    },
+    "reasonCodes": {
+      "type": "array",
+      "description": "\u4ec5\u5141\u8bb8 ALL_ORCH_REASON_CODES\uff1b\u6f84\u6e05\u4e14\u672a\u8fdb\u5165 routeStep \u65f6\u4e0d\u5f97\u542b orch_shadow_observe",
+      "items": {
+        "type": "string",
+        "enum": [
+          "orch_dormant",
+          "orch_allowlist_empty",
+          "orch_ctr_shadow_only",
+          "orch_ctr_activation_is_not_orch_enable",
+          "orch_fail_closed",
+          "orch_ladder_memory",
+          "orch_ladder_skill",
+          "orch_ladder_connector",
+          "orch_ladder_web_read",
+          "orch_ladder_browser",
+          "orch_ladder_node_fs",
+          "orch_ladder_node_exec",
+          "orch_skip_ahead_blocked_policy",
+          "orch_connector_preferred_over_browser",
+          "orch_web_read_preferred_over_browser",
+          "orch_sandbox_is_not_node",
+          "orch_node_enabled_off",
+          "orch_browser_enabled_off",
+          "orch_zero_nodes_human_gate",
+          "orch_multiple_unbound_nodes_human_gate",
+          "orch_node_unbound_human_gate",
+          "orch_human_gate",
+          "orch_dispatch_requires_ctr_activation",
+          "orch_no_invoke_when_dormant",
+          "orch_shadow_observe",
+          "orch_live_path_armed_fail_closed",
+          "orch_skill_is_recipe_not_evidence",
+          "orch_ack_is_not_delivery",
+          "orch_personal_subagent_not_mission",
+          "orch_forbidden_evidence"
+        ]
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policyGap": {
+          "type": "boolean"
+        },
+        "evidenceGap": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": ["policyGap", "evidenceGap", "notes"]
+    },
+    "humanGate": {
+      "type": "string",
+      "enum": ["yes", "no", "unknown"]
+    },
+    "completionClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimedComplete", "claimKind"],
+      "properties": {
+        "claimedComplete": {
+          "type": "boolean",
+          "const": false
+        },
+        "claimKind": {
+          "type": "string",
+          "enum": ["none", "suppressed", "claimed"]
+        }
+      }
+    },
+    "latencyMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "shadowVsLegacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "legacyCompared",
+        "legacySurface",
+        "agree",
+        "explanationRequired",
+        "explanation"
+      ],
+      "properties": {
+        "legacyCompared": {
+          "type": "boolean",
+          "const": false,
+          "description": "B1 offline predictor does not execute legacy"
+        },
+        "legacySurface": {
+          "type": ["string", "null"]
+        },
+        "agree": {
+          "type": ["boolean", "null"],
+          "description": "MUST NOT hardcode true when legacyCompared=false"
+        },
+        "explanationRequired": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "wroteLedger": {
+      "type": "boolean",
+      "const": false
+    },
+    "invokedTool": {
+      "type": "boolean",
+      "const": false
+    }
+  }
+}

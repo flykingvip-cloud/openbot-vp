@@ -1,0 +1,2 @@
+# Stage B lab drills (16L–19L)
+psycopg[binary]>=3.1

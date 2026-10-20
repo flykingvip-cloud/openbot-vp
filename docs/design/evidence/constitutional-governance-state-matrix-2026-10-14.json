@@ -1,0 +1,1734 @@
+{
+  "schemaVersion": 2,
+  "observedAt": "2026-10-14T04:10:03Z",
+  "originMainSha": "19549e6629d374308405edc2c0e3036739af2393",
+  "productionBaselineEvidence": "docs/design/evidence/constitutional-governance-production-baseline-2026-09-27.json",
+  "authorityFile": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+  "phaseCCurrentDecision": "no-go-accepted",
+  "profileABMerged": false,
+  "seq98ExtrapolatedToPhaseCOrDPass": false,
+  "receiptTreatedAsProof": false,
+  "pluginInstallTreatedAsCapabilityAuthorized": false,
+  "modules": [
+    {
+      "id": "phase-a-discovery",
+      "phase": "A",
+      "component": "Phase A discovery documents",
+      "codePresent": false,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "approved",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-discovery/tasks.md",
+        ".kiro/specs/constitutional-governance-discovery/terminology-and-non-equivalence.md",
+        "f475db9eb12548c6754e182e9d58bf4de4211c24"
+      ],
+      "conflicts": [
+        "tasks.md checkbox is checked while the same item says the architecture meeting minutes were not held"
+      ],
+      "presenceClass": "docs-only"
+    },
+    {
+      "id": "b1-evaluator",
+      "phase": "B1",
+      "component": "web_read offline shadow evaluator",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "approved",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        "src/task-orchestration/web-read-shadow-eval.ts",
+        "25863bb272489c5994600801f7afec769599e149"
+      ],
+      "conflicts": [],
+      "presenceClass": "code-present-inert"
+    },
+    {
+      "id": "b1-corpus",
+      "phase": "B1",
+      "component": "60-row calibration corpus",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "approved",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-web-read-shadow/corpus/annotated-cases.jsonl"
+      ],
+      "conflicts": [],
+      "presenceClass": "synthetic-fixture",
+      "corpusRows": 60,
+      "classCounts": {
+        "web_read": 20,
+        "not_web_read": 20,
+        "clarify": 20
+      },
+      "profileCounts": {
+        "A": 30,
+        "B": 30
+      },
+      "sourceCounts": {
+        "synthetic": 48,
+        "unit-fixture": 12
+      }
+    },
+    {
+      "id": "b1-holdout",
+      "phase": "B1",
+      "component": "blind holdout",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "approved",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-web-read-shadow/corpus/blind-holdout-cases.jsonl",
+        ".kiro/specs/constitutional-governance-web-read-shadow/tasks.md"
+      ],
+      "conflicts": [],
+      "presenceClass": "synthetic-fixture"
+    },
+    {
+      "id": "b2-runtime-shadow-wiring",
+      "phase": "B2",
+      "component": "web_read shadow observer wiring",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "approved",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        "src/task-orchestration/gateway-hook.ts",
+        "src/auto-reply/reply/dispatch-from-config.ts",
+        "65ffc350d737e747175d64b6daa9b78ac79a55e9"
+      ],
+      "conflicts": [
+        "web-read-shadow tasks.md still contains historical 'do not push / do not open PR' and 'awaiting Codex acceptance' lines"
+      ],
+      "presenceClass": "code-present-shadow-only"
+    },
+    {
+      "id": "b2-production-observation",
+      "phase": "B2",
+      "component": "seq 98 shadow observation note",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": true,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "not-applicable",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        "deploy/production/releases.jsonl",
+        "docs/design/evidence/constitutional-governance-production-baseline-2026-09-27.json"
+      ],
+      "conflicts": [
+        "historical seq 98 shadow observation retained; ledger open LIVE tip is now seq 127 (5ea7e2b7…); runningContainerSha still null — do not fill from ledger"
+      ],
+      "presenceClass": "ledger-note-only",
+      "shadowRows": 10,
+      "corrupt": 0,
+      "liveExecuted": 0,
+      "executedConsumer": 0,
+      "ledgerTipAtRefresh": {
+        "seq": 127,
+        "gatewaySha": "5ea7e2b7bd33e0a9f17e99829757913659db6e9f"
+      }
+    },
+    {
+      "id": "phase-c-decision",
+      "phase": "C",
+      "component": "Phase C NO-GO decision",
+      "codePresent": false,
+      "designAuthorized": true,
+      "implementationAuthorized": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-phase-c-decision/final-acceptance.md",
+        ".kiro/specs/constitutional-governance-phase-c-decision/decision.md",
+        "4bc5566b95f551c71d86a8c70d92ea4df9f10519"
+      ],
+      "conflicts": [],
+      "presenceClass": "docs-only",
+      "historicalConflictResolved": "decision.md REVISE/pending paragraph kept and marked superseded by final-acceptance"
+    },
+    {
+      "id": "phase-c-reviewer-receipts",
+      "phase": "C",
+      "component": "Architecture, Security, Execution-chain receipts",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-phase-c-decision/reviews/architecture-review.md",
+        ".kiro/specs/constitutional-governance-phase-c-decision/reviews/security-review.md",
+        ".kiro/specs/constitutional-governance-phase-c-decision/reviews/execution-chain-review.md"
+      ],
+      "conflicts": [],
+      "presenceClass": "receipt-not-proof",
+      "receiptSha256": {
+        "architecture": "df95c2344e2cf6e8ebfed886526a2e3b84c6c5914c7ab0d0581b5a152cab84b9",
+        "security": "6e8505ab22b394fa50407185e15229d9a3adf981f7e206fa2377a3181838aa39",
+        "executionChain": "d6132d46d25eb427b13df8642edc43dabc8d9004acb86fd8153c6f6b7065a8d3"
+      }
+    },
+    {
+      "id": "orchestration-shadow",
+      "phase": "B2",
+      "component": "task-orchestration shadow plane",
+      "codePresent": true,
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "not-applicable",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        "src/task-orchestration/types.ts",
+        "src/task-orchestration/dispatch.ts"
+      ],
+      "conflicts": [
+        "B2 designAuthorized=true 不得读成 Phase D 整体 GO 或 Phase D 切片授权。"
+      ],
+      "presenceClass": "code-present-shadow-only",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "not-found",
+        "implementationStatus": "not-found",
+        "ceiling": "not-found",
+        "coexistence": "B2 影子接线的 designAuthorized 只描述 B2，不是 Phase D orchestration-shadow 切片，也不构成整段 Phase D 治理授权。Phase D 三件套未找到。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery 与 constitutional-governance-phase-c-decision 下文件名含 orchestrat 的文档。find 结果为空。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "同上。没有 phase-d orchestration-shadow scope。B2 任务书不是本切片的 Phase D scope。",
+          "note": "未找到"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "同上。没有 phase-d orchestration-shadow start-order。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "Phase D orchestration-shadow 实现提交未找到。src/task-orchestration 是更早的 B2 影子平面，不是本切片授权的产物。",
+          "note": "未找到"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "b2PlaneAuthorization": {
+        "designAuthorized": true,
+        "implementationAuthorized": true,
+        "note": "这是 B2 影子接线授权，不是 Phase D 切片授权，也不是整体治理授权。"
+      }
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-inert",
+        "coexistence": "书面范围只授权脚手架与边界常量，§9.2 仍推迟。正文不把 Phase C NO-GO 改成 GO。包在主干上，整段 Phase D 仍是 no-go。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找 product-split-scaffold 的 *-acceptance.md 与 *-start-order.md。phase-d-92-written-scope-acceptance.md 与 phase-d-92-d3-start-order.md 存在，但只接受 D3 部署耦合证据刀，不授权这三个包。脚手架两段门未找到。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md",
+          "commit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "contentCommit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "pullRequest": 62,
+          "searchScope": null,
+          "note": "书面范围 phase_d_product_split_scaffold。只授权脚手架与边界常量。§9.2 产品拆分仍推迟。"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找脚手架开工令。phase-d-92-d3-start-order.md 是 D3 证据刀开工令，不是本切片开工令。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-conformance/src/boundary.ts",
+          "commit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "contentCommit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "pullRequest": 62,
+          "searchScope": null,
+          "note": "同一提交落地 conformance、registry、runtime 三个脚手架。主题含 (#62)。src/ 无这三个包的引用。"
+        },
+        "notThisSlice": [
+          {
+            "path": ".kiro/specs/constitutional-governance-discovery/phase-d-92-written-scope-acceptance.md",
+            "commit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "contentCommit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "pullRequest": 78,
+            "reason": "只接受 D3 部署耦合证据刀，不授权 conformance、registry、runtime 三个包。"
+          },
+          {
+            "path": ".kiro/specs/constitutional-governance-discovery/phase-d-92-d3-start-order.md",
+            "commit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "contentCommit": "705478b9c930380399ae6774978e207b63d9d888",
+            "pullRequest": 78,
+            "reason": "D3 证据开工令。后一提交只回填 PR #78 URL，仍不是脚手架开工令。"
+          }
+        ],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-conformance/src/boundary.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md"
+      ],
+      "conflicts": [
+        "脚手架书面范围不推翻 Phase C NO-GO。phase-d-92 接受记录不是本包的两段门。"
+      ],
+      "presenceClass": "code-present-inert",
+      "id": "constitutional-conformance",
+      "phase": "D",
+      "component": "constitutional-conformance scaffold"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-inert",
+        "coexistence": "与 conformance 同一份脚手架书面范围。Profile A/B 不合并。该切片不构成整段 Phase D 授权。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找 product-split-scaffold 的 *-acceptance.md 与 *-start-order.md。phase-d-92-written-scope-acceptance.md 与 phase-d-92-d3-start-order.md 存在，但只接受 D3 部署耦合证据刀，不授权这三个包。脚手架两段门未找到。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md",
+          "commit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "contentCommit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "pullRequest": 62,
+          "searchScope": null,
+          "note": "书面范围 phase_d_product_split_scaffold。只授权脚手架与边界常量。§9.2 产品拆分仍推迟。"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找脚手架开工令。phase-d-92-d3-start-order.md 是 D3 证据刀开工令，不是本切片开工令。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-registry/src/boundary.ts",
+          "commit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "contentCommit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "pullRequest": 62,
+          "searchScope": null,
+          "note": "同一 #62 提交。边界保持 profileMerge、receiptEqualsProof、pluginInstalledEqualsAuthorized 为 false。"
+        },
+        "notThisSlice": [
+          {
+            "path": ".kiro/specs/constitutional-governance-discovery/phase-d-92-written-scope-acceptance.md",
+            "commit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "contentCommit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "pullRequest": 78,
+            "reason": "只接受 D3 部署耦合证据刀，不授权 conformance、registry、runtime 三个包。"
+          },
+          {
+            "path": ".kiro/specs/constitutional-governance-discovery/phase-d-92-d3-start-order.md",
+            "commit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "contentCommit": "705478b9c930380399ae6774978e207b63d9d888",
+            "pullRequest": 78,
+            "reason": "D3 证据开工令。后一提交只回填 PR #78 URL，仍不是脚手架开工令。"
+          }
+        ],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-registry/src/boundary.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md"
+      ],
+      "conflicts": [
+        "profileMerge 与物理并账仍是 false。脚手架书面范围不是 Registry 产品化许可。"
+      ],
+      "presenceClass": "code-present-inert",
+      "id": "constitutional-registry",
+      "phase": "D",
+      "component": "constitutional-registry scaffold"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-inert",
+        "coexistence": "同一脚手架书面范围覆盖第三个包。它不是 runtime façade，也不是整段 D GO。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找 product-split-scaffold 的 *-acceptance.md 与 *-start-order.md。phase-d-92-written-scope-acceptance.md 与 phase-d-92-d3-start-order.md 存在，但只接受 D3 部署耦合证据刀，不授权这三个包。脚手架两段门未找到。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md",
+          "commit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "contentCommit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "pullRequest": 62,
+          "searchScope": null,
+          "note": "书面范围 phase_d_product_split_scaffold。只授权脚手架与边界常量。§9.2 产品拆分仍推迟。"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找脚手架开工令。phase-d-92-d3-start-order.md 是 D3 证据刀开工令，不是本切片开工令。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-runtime/src/boundary.ts",
+          "commit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "contentCommit": "2236d4807243a0253599cfea3a4b8beb7dbb9a3e",
+          "pullRequest": 62,
+          "searchScope": null,
+          "note": "同一提交落地 conformance、registry、runtime 三个脚手架。主题含 (#62)。src/ 无这三个包的引用。"
+        },
+        "notThisSlice": [
+          {
+            "path": ".kiro/specs/constitutional-governance-discovery/phase-d-92-written-scope-acceptance.md",
+            "commit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "contentCommit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "pullRequest": 78,
+            "reason": "只接受 D3 部署耦合证据刀，不授权 conformance、registry、runtime 三个包。"
+          },
+          {
+            "path": ".kiro/specs/constitutional-governance-discovery/phase-d-92-d3-start-order.md",
+            "commit": "5fcbdf231be8a8bc38547f5d5afccdb15cb1da08",
+            "contentCommit": "705478b9c930380399ae6774978e207b63d9d888",
+            "pullRequest": 78,
+            "reason": "D3 证据开工令。后一提交只回填 PR #78 URL，仍不是脚手架开工令。"
+          }
+        ],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-runtime/src/boundary.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md"
+      ],
+      "conflicts": [
+        "第五套执行故事与跨域写权威在边界常量里仍是 false。"
+      ],
+      "presenceClass": "code-present-inert",
+      "id": "constitutional-runtime",
+      "phase": "D",
+      "component": "constitutional-runtime scaffold"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-inert",
+        "coexistence": "书面范围 phase_d_first_knife_contracts 只覆盖这一刀。执行方案里其余不批准项继续有效。没有独立 acceptance 或 start-order。这不是整段 Phase D 授权。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找 *first-knife*acceptance* 与 *first-knife*start-order*。没有独立文件。书面范围只在 phase-d-first-knife-note.md。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-first-knife-note.md",
+          "commit": "ba3dd5845e34d3dce74c8442cdb11bb7cc704a6d",
+          "contentCommit": "ba3dd5845e34d3dce74c8442cdb11bb7cc704a6d",
+          "pullRequest": 58,
+          "searchScope": null,
+          "note": "书面范围 phase_d_first_knife_contracts。只说明这一刀已按该范围开工，不把 Phase C NO-GO 改成 GO。"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找第一刀独立 start-order。未找到。phase-d-first-knife-note.md 是薄注，不是开工令文件。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-contracts/src/flags.ts",
+          "commit": "ba3dd5845e34d3dce74c8442cdb11bb7cc704a6d",
+          "contentCommit": "ba3dd5845e34d3dce74c8442cdb11bb7cc704a6d",
+          "pullRequest": 58,
+          "searchScope": null,
+          "note": "实现与书面范围同一提交。主题含 (#58)。三个执行常量仍是 false as const。"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/flags.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-first-knife-note.md"
+      ],
+      "conflicts": [
+        "第一刀书面范围不覆盖其后各刀，也不翻转 Phase C NO-GO。"
+      ],
+      "presenceClass": "code-present-inert",
+      "id": "constitutional-contracts",
+      "phase": "D",
+      "component": "constitutional-contracts package"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-shadow-only",
+        "coexistence": "书面范围 phase_d_runtime_facade_shadow_only 只授权影子门面，不改写 Phase C NO-GO。生产调用者不存在。后续 Path-Gate 刀是别的切片。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 文件名含 facade 的 phase-d 文档只有 phase-d-runtime-facade-shadow.md。独立 acceptance 未找到。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-runtime-facade-shadow.md",
+          "commit": "5a1b3f00492f72d1805e8edbc57c9a647f799e33",
+          "contentCommit": "5a1b3f00492f72d1805e8edbc57c9a647f799e33",
+          "pullRequest": 60,
+          "searchScope": null,
+          "note": "书面范围 phase_d_runtime_facade_shadow_only。主题含 (#60)。"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找 façade 独立 start-order。未找到。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+          "commit": "5a1b3f00492f72d1805e8edbc57c9a647f799e33",
+          "contentCommit": "5a1b3f00492f72d1805e8edbc57c9a647f799e33",
+          "pullRequest": 60,
+          "searchScope": null,
+          "note": "原始影子门面与薄注同一提交。observe 函数只被各自测试引用。"
+        },
+        "notThisSlice": [],
+        "additionalSlices": [
+          {
+            "id": "runtime-shadow-wiring-c1c3",
+            "pullRequest": 271,
+            "mergeCommit": "d0a485ebb60050cfa970742ef96129fbe80b7484",
+            "status": "landed-default-off",
+            "ceiling": "code-present + default-off observe wiring; not runtime-enabled (execute); not production-proven",
+            "note": "C1–C3 observeConstitutionalRuntimeShadow beside runner; C4 flag enable / prod deploy still forbidden"
+          },
+          {
+            "id": "h1-hotpath-facade-observe-docs",
+            "pullRequest": 689,
+            "mergeCommit": "43ed4241c068f12798eae1dcca7badf889e2c00a",
+            "status": "docs-only-landed",
+            "ceiling": "written scope / acceptance / start-order only"
+          },
+          {
+            "id": "h1-hotpath-facade-observe-impl",
+            "pullRequest": 694,
+            "status": "open-draft-governance-hold",
+            "merged": false,
+            "ceilingClaimedByPr": "runtime-enabled (observe-only)",
+            "sotRecording": "not-landed; do not treat as authorized runtime-enabled until separate user auth + merge after SoT refresh"
+          }
+        ],
+        "relatedSliceIds": [
+          "path-gate-shadow-select-report",
+          "path-gate-shadow-select-diagnostics"
+        ]
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+        "src/task-orchestration/constitutional-runtime-facade.ts",
+        "src/agents/execution-preflight/constitutional-runtime-facade.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-runtime-facade-shadow.md"
+      ],
+      "conflicts": [
+        "原始门面只有 shadow-only 薄注。其后的报告桥与诊断刀记在 path-select 附加切片，不回溯成门面的整体授权。"
+      ],
+      "presenceClass": "code-present-shadow-only",
+      "id": "runtime-facade",
+      "phase": "D",
+      "component": "runtime facade shadow"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-shadow-only",
+        "coexistence": "接受记录与开工令只授权 1 条可版本化合法 Path 加默认关选中，executed 恒 false。正文写明不等于整段 P8b 或整段 D，也不翻 Phase C NO-GO。",
+        "acceptance": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-written-scope-acceptance.md",
+          "commit": "160f9c47a68aaea1ab95c99d923d7e87fd322224",
+          "contentCommit": "160f9c47a68aaea1ab95c99d923d7e87fd322224",
+          "pullRequest": 77,
+          "searchScope": null,
+          "note": "Knife1-only 工程门。合入 7adf7999d（#77）。宽度不是整段 P8b。"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-knife1-scope.md",
+          "commit": "adb5cc7eade8da1aa2c805054be9d011360662c5",
+          "contentCommit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+          "pullRequest": 74,
+          "searchScope": null,
+          "note": "书面范围 phase_d_p8b_knife1_select_only。随实现 #74 引入。当前正文最后一次改动在执行 opt-in 文档提交，只是交叉引用。"
+        },
+        "startOrder": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-knife1-start-order.md",
+          "commit": "160f9c47a68aaea1ab95c99d923d7e87fd322224",
+          "contentCommit": "160f9c47a68aaea1ab95c99d923d7e87fd322224",
+          "pullRequest": 77,
+          "searchScope": null,
+          "note": "开工令授权默认关选中 API。OUT 包含整段 Phase D GO 与 C NO-GO 翻盘。"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-contracts/src/legal-path/select.ts",
+          "commit": "adb5cc7eade8da1aa2c805054be9d011360662c5",
+          "contentCommit": "adb5cc7eade8da1aa2c805054be9d011360662c5",
+          "pullRequest": 74,
+          "searchScope": null,
+          "note": "实现合入 f9254c7d0（#74）。正式 acceptance 与 start-order 在其后的 #77。"
+        },
+        "notThisSlice": [],
+        "additionalSlices": [
+          {
+            "id": "path-gate-shadow-select-report",
+            "designStatus": "bounded-authorized",
+            "implementationStatus": "landed",
+            "ceiling": "code-present-shadow-only",
+            "constitutesOverallGovernanceAuthorization": false,
+            "coexistence": "接受记录写明这是 dual-opt-in 仅报告桥，executed 恒 false，无热路径，无 Gate 收紧，不是整段 D GO。与 Phase C NO-GO 共存。",
+            "acceptance": {
+              "status": "found",
+              "path": ".kiro/specs/constitutional-governance-discovery/phase-d-path-gate-shadow-select-report-acceptance.md",
+              "commit": "837c1146f8239f2b07002eb6fc3527a4bcfb37bc",
+              "contentCommit": "837c1146f8239f2b07002eb6fc3527a4bcfb37bc",
+              "pullRequest": 103,
+              "searchScope": null,
+              "note": "accepted-for-shadow-select-report-implement-under-start-order。合入 #103。"
+            },
+            "scope": {
+              "status": "found",
+              "path": ".kiro/specs/constitutional-governance-discovery/phase-d-path-gate-shadow-select-report-scope.md",
+              "commit": "837c1146f8239f2b07002eb6fc3527a4bcfb37bc",
+              "contentCommit": "6caca609b6a99d2a60831b49f2ec85f13eb627a6",
+              "pullRequest": 103,
+              "searchScope": null,
+              "note": "书面范围随 #103 引入。当前正文最后一次改动在诊断刀文档提交。"
+            },
+            "startOrder": {
+              "status": "found",
+              "path": ".kiro/specs/constitutional-governance-discovery/phase-d-path-gate-shadow-select-report-start-order.md",
+              "commit": "837c1146f8239f2b07002eb6fc3527a4bcfb37bc",
+              "contentCommit": "837c1146f8239f2b07002eb6fc3527a4bcfb37bc",
+              "pullRequest": 103,
+              "searchScope": null,
+              "note": "开工令授权后续实现 PR 只做报告桥。"
+            },
+            "implementation": {
+              "status": "found",
+              "path": "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+              "commit": "0104e2ee245404b6efe1c8bbe71e131371738542",
+              "contentCommit": "0104e2ee245404b6efe1c8bbe71e131371738542",
+              "pullRequest": 104,
+              "searchScope": null,
+              "note": "实现合入 #104。生产代码不调用 observe 函数。"
+            }
+          },
+          {
+            "id": "path-gate-shadow-select-diagnostics",
+            "designStatus": "bounded-authorized",
+            "implementationStatus": "landed",
+            "ceiling": "code-present-shadow-only",
+            "constitutesOverallGovernanceAuthorization": false,
+            "coexistence": "接受记录授权的是诊断字段表面化。executed 恒 false，无 Gate 收紧，无登记扩展。不是整段 D GO。",
+            "acceptance": {
+              "status": "found",
+              "path": ".kiro/specs/constitutional-governance-discovery/phase-d-path-gate-shadow-select-diagnostics-acceptance.md",
+              "commit": "6caca609b6a99d2a60831b49f2ec85f13eb627a6",
+              "contentCommit": "6caca609b6a99d2a60831b49f2ec85f13eb627a6",
+              "pullRequest": 106,
+              "searchScope": null,
+              "note": "诊断刀接受记录。合入 #106。"
+            },
+            "scope": {
+              "status": "found",
+              "path": ".kiro/specs/constitutional-governance-discovery/phase-d-path-gate-shadow-select-diagnostics-scope.md",
+              "commit": "6caca609b6a99d2a60831b49f2ec85f13eb627a6",
+              "contentCommit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+              "pullRequest": 106,
+              "searchScope": null,
+              "note": "书面范围随 #106 引入。当前正文最后一次改动在 P8c 文档提交。"
+            },
+            "startOrder": {
+              "status": "found",
+              "path": ".kiro/specs/constitutional-governance-discovery/phase-d-path-gate-shadow-select-diagnostics-start-order.md",
+              "commit": "6caca609b6a99d2a60831b49f2ec85f13eb627a6",
+              "contentCommit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+              "pullRequest": 106,
+              "searchScope": null,
+              "note": "路径首次出现在 #103 的文档提交 837c1146f8239f2b07002eb6fc3527a4bcfb37bc。诊断刀授权正文在 #106。当前正文最后一次改动在执行 opt-in 文档提交。"
+            },
+            "implementation": {
+              "status": "found",
+              "path": "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
+              "commit": "2afcc34b032b2af81774f8cfcd220b31479f7c6d",
+              "contentCommit": "2afcc34b032b2af81774f8cfcd220b31479f7c6d",
+              "pullRequest": 107,
+              "searchScope": null,
+              "note": "实现合入 #107。"
+            }
+          }
+        ]
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/legal-path/select.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-written-scope-acceptance.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-knife1-scope.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-knife1-start-order.md"
+      ],
+      "conflicts": [
+        "Knife1 两段门不是整段 P8b 或整段 D。src/ 没有 selectLegalPath 调用者。"
+      ],
+      "presenceClass": "code-present-shadow-only",
+      "id": "path-select",
+      "phase": "D",
+      "component": "legal Path select"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-shadow-only",
+        "coexistence": "书面范围 phase_d_p8a_report_only 只授权缺口报告，不改写 Phase C NO-GO，也不授权选择或执行。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 文件名含 p8a 的只有 phase-d-p8a-no-valid-path.md。独立 acceptance 未找到。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8a-no-valid-path.md",
+          "commit": "fe12f3ba3d696a960d195de619c758f035544e7e",
+          "contentCommit": "fe12f3ba3d696a960d195de619c758f035544e7e",
+          "pullRequest": 59,
+          "searchScope": null,
+          "note": "书面范围 phase_d_p8a_report_only。主题含 (#59)。"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找 P8a 独立 start-order。未找到。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-contracts/src/path-gap/report.ts",
+          "commit": "fe12f3ba3d696a960d195de619c758f035544e7e",
+          "contentCommit": "fe12f3ba3d696a960d195de619c758f035544e7e",
+          "pullRequest": 59,
+          "searchScope": null,
+          "note": "实现与薄注同一提交。src/ 没有 reportPathGap 调用者。"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/path-gap/report.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8a-no-valid-path.md"
+      ],
+      "conflicts": [
+        "报告薄注不授权 Path 选择或执行。"
+      ],
+      "presenceClass": "code-present-shadow-only",
+      "id": "path-report",
+      "phase": "D",
+      "component": "path-gap report"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "code-present-opt-in-default-off",
+        "coexistence": "两段门授权的是包本地、默认关的执行 stub。接受记录写明不是整段 P8b、不是整段 D、不是 C GO、不是 Gate、不是 Fabric-on。因此与 Phase C NO-GO 共存。",
+        "acceptance": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-execute-opt-in-acceptance.md",
+          "commit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+          "contentCommit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+          "pullRequest": 108,
+          "searchScope": null,
+          "note": "本 PR 只接受文档三件套。实现授权在开工令之后，且限于 scope 里的包本地 stub。合入 bab68df9a（#108）。"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-execute-opt-in-scope.md",
+          "commit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+          "contentCommit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "pullRequest": 108,
+          "searchScope": null,
+          "note": "书面范围随 #108 引入。当前正文最后一次改动在 P8c 文档提交。"
+        },
+        "startOrder": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-execute-opt-in-start-order.md",
+          "commit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+          "contentCommit": "8abeafac2dd60b7193955acd7b7441ebd7545cb2",
+          "pullRequest": 108,
+          "searchScope": null,
+          "note": "立即授权文档三件套，继而授权后续默认关实现 PR。不授权本 PR 改 src/ 或 packages/。"
+        },
+        "implementation": {
+          "status": "found",
+          "path": "packages/constitutional-contracts/src/legal-path/execute.ts",
+          "commit": "807cf5c31a6ebb9184d7653e3cf18112bac31453",
+          "contentCommit": "807cf5c31a6ebb9184d7653e3cf18112bac31453",
+          "pullRequest": 111,
+          "searchScope": null,
+          "note": "实现合入 32672466c（#111）。execute 默认关。readyToTighten、liveInvoke、enforce 固定 false。"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/legal-path/execute.ts",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-execute-opt-in-acceptance.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-execute-opt-in-scope.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-execute-opt-in-start-order.md"
+      ],
+      "conflicts": [
+        "包本地默认关 stub 不是网关执行，也不是 Gate 收紧。src/ 没有 executeLegalPath 调用者。"
+      ],
+      "presenceClass": "code-present-opt-in-default-off",
+      "id": "bounded-execute-opt-in",
+      "phase": "D",
+      "component": "bounded execute opt-in stub"
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "authorized-not-landed",
+        "ceiling": "docs-only",
+        "coexistence": "三件套授权的是以后的包本地对照报告，readyToTighten 恒 false，不是整段 P8c 或整段 D。实现未落地，所以不能写成 runtime-enabled。与 Phase C NO-GO 共存。",
+        "acceptance": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8c-shadow-legacy-compare-acceptance.md",
+          "commit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "contentCommit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "pullRequest": 119,
+          "searchScope": null,
+          "note": "文档三件套合入 618fc8eb2（#119）。"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8c-shadow-legacy-compare-scope.md",
+          "commit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "contentCommit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "pullRequest": 119,
+          "searchScope": null,
+          "note": "书面范围与接受记录同一提交。"
+        },
+        "startOrder": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-p8c-shadow-legacy-compare-start-order.md",
+          "commit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "contentCommit": "9f96913ab45fcb43470c18d34562390ec8475d85",
+          "pullRequest": 119,
+          "searchScope": null,
+          "note": "开工令授权后续实现 PR。该实现提交未找到。"
+        },
+        "implementation": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索 git log --grep p8c：只有文档合入 #119。packages/constitutional-contracts/src 的 select.ts、execute.ts、path-gap/report.ts、runtime-facade/shadow.ts 把 shadowCompared 写成字面量 false。实现提交未找到。",
+          "note": "未找到"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8c-shadow-legacy-compare-acceptance.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8c-shadow-legacy-compare-scope.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-p8c-shadow-legacy-compare-start-order.md"
+      ],
+      "conflicts": [
+        "开工令授权后续实现，但 git 日志没有对应实现提交。shadowCompared 仍是字面量 false。"
+      ],
+      "presenceClass": "docs-only",
+      "id": "p8c-shadow-legacy-compare",
+      "phase": "D",
+      "component": "P8c shadow legacy compare"
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "docs-only",
+        "ceiling": "docs-only",
+        "coexistence": "接受记录写明把本页读成整段 D GO、C GO 或 C10 pass 即为 FAIL。每一把后续刀仍要自己的 accept 与 start-order。本开工令不改 src/ 或 packages/。与 Phase C NO-GO 共存。",
+        "acceptance": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-acceptance.md",
+          "commit": "d2b2b117006e8f38260802703a483be682031031",
+          "contentCommit": "d2b2b117006e8f38260802703a483be682031031",
+          "pullRequest": 101,
+          "searchScope": null,
+          "note": "accepted-for-owner-authorized-track-docs-only。合入 c9fdc09a3（#101）。"
+        },
+        "scope": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-scope.md",
+          "commit": "d2b2b117006e8f38260802703a483be682031031",
+          "contentCommit": "d2b2b117006e8f38260802703a483be682031031",
+          "pullRequest": 101,
+          "searchScope": null,
+          "note": "轨道书面范围。live invoke 与 Fabric-on 仍列为不批准。"
+        },
+        "startOrder": {
+          "status": "found",
+          "path": ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-start-order.md",
+          "commit": "d2b2b117006e8f38260802703a483be682031031",
+          "contentCommit": "d2b2b117006e8f38260802703a483be682031031",
+          "pullRequest": 101,
+          "searchScope": null,
+          "note": "只授权本 docs PR。不授权本 PR 改 src/ 或 packages/。"
+        },
+        "implementation": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "开工令写明不授权产品代码。搜索本 track 的 src/ 或 packages/ 实现提交：未找到。文档三件套本身在 d2b2b117006e8f38260802703a483be682031031。",
+          "note": "未找到"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-acceptance.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-scope.md",
+        ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-start-order.md"
+      ],
+      "conflicts": [
+        "Owner track 重新打开的是后续分刀轨道，不是整段 D GO。"
+      ],
+      "presenceClass": "docs-only",
+      "id": "path-gate-owner-track",
+      "phase": "D",
+      "component": "Meta-Schema Path-Gate owner track"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "not-found",
+        "implementationStatus": "not-found",
+        "ceiling": "constant-off",
+        "coexistence": "没有切片授权把该常量设为 true。Owner track 与各刀 OUT 写明 live invoke 仍不批准。常量保持 false，与 Phase C NO-GO 一致，不构成整体授权。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找授权 ORCHESTRATION_LIVE_INVOKE=true 的 acceptance。未找到。各刀把它列在 OUT。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找授权打开 live invoke 的 scope。未找到。phase-d-meta-schema-path-gate-owner-track-scope.md 仍写不批准。",
+          "note": "未找到"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找授权打开 live invoke 的 start-order。未找到。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "src/task-orchestration/types.ts 将 ORCHESTRATION_LIVE_INVOKE 设为 false。没有把它设为 true 的实现提交。",
+          "note": "未找到"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "src/task-orchestration/types.ts"
+      ],
+      "conflicts": [],
+      "presenceClass": "constant-off",
+      "id": "orchestration-live-invoke",
+      "phase": "D",
+      "component": "ORCHESTRATION_LIVE_INVOKE"
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "not-found",
+        "implementationStatus": "not-found",
+        "ceiling": "constant-off",
+        "coexistence": "没有名为 Fabric 的授权文件。各切片把 Fabric-on 列为 OUT。常量 false as const 不能被环境变量打开。与 Phase C NO-GO 一致。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 按文件名 *fabric* 查找。结果为空。各刀 acceptance 写明不是 Fabric-on。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 按文件名 *fabric* 查找 scope。未找到。",
+          "note": "未找到"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 按文件名 *fabric* 查找 start-order。未找到。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "packages/constitutional-contracts/src/flags.ts 将 CONSTITUTIONAL_CONTRACTS_FABRIC_DEFAULT_ON 设为 false as const。没有 default-on 实现。",
+          "note": "未找到"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/flags.ts"
+      ],
+      "conflicts": [],
+      "presenceClass": "constant-off",
+      "id": "fabric",
+      "phase": "D",
+      "component": "Fabric default"
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "not-found",
+        "implementationStatus": "not-found",
+        "ceiling": "absent",
+        "coexistence": "没有授权收紧 Gate 的 acceptance、scope 或 start-order。readyToTighten 在选择、执行桩和门面上固定为 false。与 Phase C NO-GO 一致。",
+        "acceptance": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找文件名含 gate-tighten，或授权 readyToTighten=true 的 acceptance。未找到。",
+          "note": "未找到"
+        },
+        "scope": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找授权 Gate 收紧的 scope。未找到。各刀 OUT 包含 Gate 收紧。",
+          "note": "未找到"
+        },
+        "startOrder": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "搜索范围：.kiro/specs/constitutional-governance-discovery/phase-d*.md 与 .kiro/specs/constitutional-governance-phase-c-decision/**。 查找授权 Gate 收紧的 start-order。未找到。",
+          "note": "未找到"
+        },
+        "implementation": {
+          "status": "not-found",
+          "path": null,
+          "commit": null,
+          "contentCommit": null,
+          "pullRequest": null,
+          "searchScope": "execute.ts、select.ts、path-gap/report.ts、runtime-facade/shadow.ts 将 readyToTighten 写成字面量 false。收紧实现未找到。",
+          "note": "未找到"
+        },
+        "notThisSlice": [],
+        "additionalSlices": []
+      },
+      "evidenceRefs": [
+        "packages/constitutional-contracts/src/legal-path/execute.ts",
+        "packages/constitutional-contracts/src/runtime-facade/shadow.ts"
+      ],
+      "conflicts": [],
+      "presenceClass": "absent",
+      "id": "gate-tightening",
+      "phase": "D",
+      "component": "Gate tightening"
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "bounded-retention-approved",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "conflicts": [],
+      "id": "phase-d-bounded-retention",
+      "phase": "D",
+      "component": "Phase D bounded retention ratification",
+      "designAuthorized": true,
+      "implementationAuthorized": false,
+      "presenceClass": "docs-only",
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "docs-only",
+        "ceiling": "code-present retention of already-merged default-off surfaces; not runtime-enabled; not production-proven",
+        "ownerDecision": "BOUNDED_RETENTION_APPROVED / SUPERSEDE_PHASE_C_BOUNDED",
+        "pullRequest": 170,
+        "mergeCommit": "cdcf9a0a2ef4387ca7c6c57d5ebf43da1f0e030a",
+        "mergedAt": "2026-09-28T02:19:10Z"
+      },
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-phase-d-governance-ratification/**",
+        "https://github.com/upbeyond/openbot/pull/170"
+      ]
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "agree-shadow-wiring",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "conflicts": [],
+      "id": "runtime-activation-checkpoint-b",
+      "phase": "D",
+      "component": "Constitutional runtime activation Checkpoint B cycle-2",
+      "designAuthorized": true,
+      "implementationAuthorized": false,
+      "presenceClass": "docs-only",
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "docs-only",
+        "ceiling": "AGREE_SHADOW_WIRING; checkpointCImplementationAuthorized=true allows new default-off implementation task only",
+        "checkpointCImplementationAuthorized": true,
+        "runtimeEnabled": false,
+        "productionProven": "unknown-as-stated-in-packet-keep-sot-false",
+        "pullRequests": [
+          204,
+          213
+        ],
+        "mergeCommits": [
+          "364c2e8131dc1fccaa292c192a6c54b2dbbc90c5",
+          "966372cc5e7a70c4574ad1bb869b42bfd48aa3d6"
+        ]
+      },
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-runtime-activation-readiness/checkpoint-b-final-acceptance-cycle2.md",
+        "https://github.com/upbeyond/openbot/pull/204",
+        "https://github.com/upbeyond/openbot/pull/213"
+      ]
+    },
+    {
+      "codePresent": true,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "conflicts": [],
+      "id": "runtime-shadow-wiring-c1c3",
+      "phase": "D",
+      "component": "Checkpoint C1–C3 default-off shadow wiring",
+      "designAuthorized": true,
+      "implementationAuthorized": true,
+      "presenceClass": "code-present-shadow-only-default-off",
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "landed",
+        "ceiling": "default-off observe wiring; C4 forbidden",
+        "pullRequest": 271,
+        "mergeCommit": "d0a485ebb60050cfa970742ef96129fbe80b7484",
+        "mergedAt": "2026-10-01T14:40:29Z"
+      },
+      "evidenceRefs": [
+        "https://github.com/upbeyond/openbot/pull/271",
+        "src/agents/execution-preflight/"
+      ]
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "conflicts": [],
+      "id": "h1-hotpath-facade-observe-docs",
+      "phase": "D",
+      "component": "H1 hot-path façade observe one-site written scope",
+      "designAuthorized": true,
+      "implementationAuthorized": false,
+      "presenceClass": "docs-only",
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "bounded-authorized",
+        "implementationStatus": "docs-only",
+        "ceiling": "docs triptych only; no H1 implementation",
+        "pullRequest": 689,
+        "mergeCommit": "43ed4241c068f12798eae1dcca7badf889e2c00a",
+        "mergedAt": "2026-10-14T00:25:26Z"
+      },
+      "evidenceRefs": [
+        ".kiro/specs/constitutional-governance-discovery/phase-d-hotpath-facade-observe-one-site-scope.md",
+        "https://github.com/upbeyond/openbot/pull/689"
+      ]
+    },
+    {
+      "codePresent": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "hold",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "governanceAuthorization": {
+        "scope": "phase-d-as-a-whole",
+        "status": "no-go",
+        "constrainedBy": "phase-c-no-go-accepted",
+        "sliceConstitutesOverall": false
+      },
+      "conflicts": [],
+      "id": "h1-hotpath-facade-observe-impl",
+      "phase": "D",
+      "component": "H1 hot-path façade observe one-site implementation (ACP)",
+      "designAuthorized": false,
+      "implementationAuthorized": false,
+      "presenceClass": "open-pr-not-landed",
+      "sliceAuthorization": {
+        "constitutesOverallGovernanceAuthorization": false,
+        "designStatus": "docs-authorized-via-689",
+        "implementationStatus": "open-draft-not-landed",
+        "ceiling": "PR claims runtime-enabled (observe-only); SoT does not grant that until separate auth + merge",
+        "pullRequest": 694,
+        "draft": true,
+        "state": "open",
+        "merged": false,
+        "governanceHold": true,
+        "headSha": "0bee7b3c3721037aa959a5d68345d02c02e64909"
+      },
+      "evidenceRefs": [
+        "https://github.com/upbeyond/openbot/pull/694"
+      ]
+    },
+    {
+      "id": "cross-domain-finalization-protocol",
+      "phase": "C",
+      "component": "cross-domain finalization protocol",
+      "codePresent": false,
+      "designAuthorized": false,
+      "implementationAuthorized": false,
+      "runtimeEnabled": false,
+      "productionObserved": false,
+      "productionProven": false,
+      "enforcementEnabled": false,
+      "liveInvokeEnabled": false,
+      "defaultOn": false,
+      "decision": "no-go",
+      "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
+      "evidenceRefs": [
+        "src/conversation-task/reply-completion.ts",
+        ".kiro/specs/constitutional-governance-phase-c-decision/reviews/execution-chain-review.md"
+      ],
+      "conflicts": [
+        "reply close still transitions to closed; delivery consult is a separate default-off observe and does not block close"
+      ],
+      "presenceClass": "absent"
+    }
+  ],
+  "phaseDModel": "governance-authorization-separated-from-bounded-slice",
+  "phaseDGovernanceAuthorization": {
+    "scope": "phase-d-as-a-whole",
+    "status": "no-go",
+    "constrainedBy": "phase-c-no-go-accepted",
+    "note": "有界切片授权（含 #170 BOUNDED_RETENTION）不构成 Phase D 整体治理授权。"
+  },
+  "phaseDComponentIds": [
+    "constitutional-conformance",
+    "constitutional-registry",
+    "constitutional-runtime",
+    "constitutional-contracts",
+    "runtime-facade",
+    "path-select",
+    "path-report",
+    "bounded-execute-opt-in",
+    "p8c-shadow-legacy-compare",
+    "path-gate-owner-track",
+    "orchestration-shadow",
+    "orchestration-live-invoke",
+    "fabric",
+    "gate-tightening",
+    "phase-d-bounded-retention",
+    "runtime-activation-checkpoint-b",
+    "runtime-shadow-wiring-c1c3",
+    "h1-hotpath-facade-observe-docs",
+    "h1-hotpath-facade-observe-impl"
+  ],
+  "observedAtAsiaShanghai": "2026-10-14T12:10:03+08:00",
+  "originMainSubject": "docs(deploy): ledger seq127 LIVE tip 5ea7e2b7 (clean DIGEST) (#697)",
+  "priorMatrixFrozen": "docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json",
+  "refreshEvidence": ".kiro/specs/constitutional-governance-state-convergence/evidence/2026-10-14-state-refresh.md",
+  "phaseCDecision": "NO_GO_ACCEPTED",
+  "phaseDOverallGovernanceAuthorization": "no-go",
+  "productionProven": false,
+  "closeGateMet": false,
+  "gateTighteningAuthorized": false,
+  "liveInvokeEnabled": false,
+  "fabricDefaultOn": false,
+  "runningContainerSha": null,
+  "containerLedgerAligned": null,
+  "productionEqualsMain": null,
+  "ledger": {
+    "openLiveSeq": 127,
+    "gatewaySha": "5ea7e2b7bd33e0a9f17e99829757913659db6e9f",
+    "uiSha": "5ea7e2b7bd33e0a9f17e99829757913659db6e9f",
+    "liveFrom": "2026-10-14T03:30:04Z",
+    "liveTo": null,
+    "note": "Ledger LIVE tip is delivery evidence only; not constitutional production-proven. Do not copy into runningContainerSha.",
+    "historicalSeq98ShadowNoteRetained": true
+  },
+  "highRiskFlagsVerifiedAt": "2026-10-14T03:19:18Z",
+  "highRiskFlags": {
+    "CONSTITUTIONAL_CONTRACTS_ENFORCE": false,
+    "CONSTITUTIONAL_CONTRACTS_LIVE_INVOKE": false,
+    "CONSTITUTIONAL_CONTRACTS_FABRIC_DEFAULT_ON": false,
+    "ORCHESTRATION_LIVE_INVOKE": false,
+    "sources": [
+      "packages/constitutional-contracts/src/flags.ts",
+      "src/task-orchestration/types.ts"
+    ]
+  },
+  "post20260927PacketsAbsorbed": [
+    {
+      "pr": 170,
+      "title": "Docs: ratify Phase D bounded retention",
+      "merged": true
+    },
+    {
+      "pr": 204,
+      "title": "Docs: Checkpoint B cycle-2 design revision after dual review",
+      "merged": true
+    },
+    {
+      "pr": 213,
+      "title": "Docs: close Checkpoint B cycle-2 after merge",
+      "merged": true
+    },
+    {
+      "pr": 271,
+      "title": "Constitutional Runtime: C1-C3 implementation (default-off)",
+      "merged": true
+    },
+    {
+      "pr": 689,
+      "title": "docs(phase-d): H1 hot-path façade observe one-site written scope",
+      "merged": true
+    },
+    {
+      "pr": 694,
+      "title": "feat(phase-d): H1 hot-path façade observe one site (ACP)",
+      "merged": false,
+      "draft": true
+    }
+  ]
+}

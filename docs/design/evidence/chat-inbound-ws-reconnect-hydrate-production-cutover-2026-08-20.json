@@ -1,0 +1,64 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "production-cutover",
+  "capturedAt": "2026-08-20T18:08:00+08:00",
+  "recordedAt": "2026-08-20T21:20:00+08:00",
+  "productionLive": false,
+  "supersededBy": "context-compiler-main-r1",
+  "cutoverPerformed": true,
+  "cutoverMode": "gateway-dist-keep-ui",
+  "strategy": 4,
+  "pr": {
+    "url": "https://github.com/gmood2008/openbot/pull/564",
+    "state": "MERGED",
+    "mergedAt": "2026-08-20T10:05:49Z",
+    "mergeSha": "2022bcb0d192b5f99e291d0b50930aa7a6177664"
+  },
+  "originMainSha": "2022bcb0d192b5f99e291d0b50930aa7a6177664",
+  "candidateSha": "2022bcb0d192b5f99e291d0b50930aa7a6177664",
+  "candidateEqualsOriginMain": true,
+  "live": {
+    "before": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "after": "2022bcb0d192b5f99e291d0b50930aa7a6177664",
+    "source": "container /app/dist/build-info.json via SSH root@8.217.93.71 podman exec openbot-gateway-rc",
+    "image": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "imageId": "5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9",
+    "containerCreated": "2026-08-15 22:39:05.29471776 +0800 CST",
+    "overlay": {
+      "id": "ws-reconnect-hydrate-r1",
+      "stamp": "20260820T100640Z",
+      "buildMode": "gateway-dist-keep-ui",
+      "previousLive": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+      "commitsFromPreviousLive": 51,
+      "pr": 564
+    },
+    "uiOverlay": "ws-reconnect-hydrate-r69",
+    "uiPinEnv": "index-Ol92eg1L.js",
+    "uiServedEntry": "index-Ol92eg1L.js",
+    "uiRoot": "/root/.openbot/control-ui"
+  },
+  "tarball": {
+    "gateway": {
+      "path": "/root/openbot-maintenance-ws-reconnect-hydrate-r1-20260820T100640Z/openbot-gateway-dist-pkg-ws-reconnect-hydrate-r1-20260820T100640Z.tar.gz",
+      "sha256": "151800604bedd859d79d37ae9d74b3cf138326331efbc9a72fb69d99a129e8cf"
+    },
+    "controlUi": {
+      "path": "/tmp/openbot-control-ui-ws-reconnect-hydrate-r69-20260820T100640Z.tar.gz",
+      "sha256": "1fe6e863c6e98f297b7c1d4d206fd05f065374c283cf2a9f18e598672a37bf0b"
+    }
+  },
+  "backup": {
+    "path": "/root/openbot-maintenance-ws-reconnect-hydrate-r1-20260820T100640Z/container-app-dist.before.tgz",
+    "sha256": "b34d1587aa3a16a690bca253a0f8767124c7cb15880cd927c20030ef9ff43949"
+  },
+  "smoke": {
+    "healthz": 200,
+    "readyz": true,
+    "inboundFlagsKept": true,
+    "restart": "podman stop -t 25 + start (pin update)",
+    "containerRecreated": false
+  },
+  "releaseTag": "provenance/sha-2022bcb0d192",
+  "ledgerSeq": 30
+}

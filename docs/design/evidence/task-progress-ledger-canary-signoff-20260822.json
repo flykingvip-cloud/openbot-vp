@@ -1,0 +1,104 @@
+{
+  "schema": "task-progress-ledger-canary-signoff/v1",
+  "decision": "canary-signed-off",
+  "signedOffAt": "2026-08-22T08:51:00+08:00",
+  "signedOffBy": "user",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "environment": {
+    "kind": "isolated-single-tenant-canary",
+    "notProduction": true,
+    "container": "openbot-ledger-canary",
+    "listen": "127.0.0.1:18799",
+    "stateDir": "/tmp/openbot-ledger-canary/state",
+    "image": "ghcr.io/gmood2008/openbot:provenance-sha-03b9cd5d8e",
+    "runtimeSha": "03b9cd5d8e89b759546a9998bb3648d31d29392b",
+    "flag": {
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "1",
+      "gateway.progressLedger.enabled": true
+    }
+  },
+  "trunkAtSignoff": {
+    "fetched": true,
+    "originMain": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "originMainSubject": "docs: record Progress Ledger staging canary and cutover gates (#605)",
+    "implementationSha": "25df222f26971854b00f52a611e810c26e2e8b91",
+    "implementationIsAncestorOfOriginMain": true,
+    "canaryImageContainsImplementation": true,
+    "canaryImageEqualsOriginMain": false,
+    "note": "Canary image is 03b9cd5d8e (contains #597, predates #605 docs-only). Cutover must re-fetch and use the then-current origin/main tip, not this snapshot and not 25df222f26 alone."
+  },
+  "jobs": [
+    {
+      "id": "63bbdc4d-b81c-4931-a797-2fa1e8366f12",
+      "name": "ledger-canary-q2",
+      "quiet": true,
+      "headline": "1/2 项验收已满足 · 后台执行中",
+      "acceptanceProgress": { "met": 1, "total": 2 },
+      "executionProgress": { "completed": 1, "total": 2, "inProgress": 0, "remaining": 1 }
+    },
+    {
+      "id": "e6cc11e0-2532-4125-9f78-676bd6de69ee",
+      "name": "ledger-canary-q2-keep",
+      "quiet": true,
+      "headline": "0/2 项验收已满足 · 后台执行中",
+      "acceptanceProgress": { "met": 0, "total": 2 },
+      "executionProgress": { "completed": 0, "total": 2, "inProgress": 0, "remaining": 1 }
+    }
+  ],
+  "checks": {
+    "1_appendOnlyJsonl": {
+      "status": "pass",
+      "detail": "Only two ledger files under cron/progress-ledger. Ordinary chat.send created no third file."
+    },
+    "2_toolSucceededStopsAtExecuted": {
+      "status": "pass",
+      "detail": "Fold through TOOL_SUCCEEDED (excluding later TOOL_FAILED) leaves E1 executed, not verified/completed; acceptance remains unknown."
+    },
+    "3_payloadEvidenceRequired": {
+      "status": "pass",
+      "detail": "STEP_COMPLETED without evidence rejected with I3. VALIDATION_PASSED / STEP_COMPLETED / ACCEPTANCE_MET carried validation_result on that event payload."
+    },
+    "4_humanGateOnly": {
+      "status": "pass-with-residual",
+      "detail": "workbench.pending-tasks.list returned humanGateCount=0 and no execution steps. Positive blocked_user listing was not live-exercised: CLI operator session has no employee actor and canary jobs have no ownership."
+    },
+    "5_quietNoPush": {
+      "status": "pass",
+      "detail": "Both projections mode=quiet, emitToChat=false, emitNotification=false. No announce/notify lines in canary logs."
+    },
+    "6_adminEqualsCronProjection": {
+      "status": "pass",
+      "detail": "cron.list progress and progress-ledger.admin.list progress were byte-equal for both taskIds."
+    },
+    "7_invariants": {
+      "status": "pass",
+      "metrics": {
+        "writesAccepted": 4,
+        "writesRejected": 0,
+        "projectionViolations": 0,
+        "violationsById": {
+          "I1": 0,
+          "I2": 0,
+          "I3": 0,
+          "I4": 0,
+          "I5": 0,
+          "I6": 0,
+          "I7": 0,
+          "I8": 0
+        },
+        "lastViolation": null
+      }
+    }
+  },
+  "unlocks": {
+    "productionCodeCutover": "allowed-after-fresh-fetch",
+    "productionFlagEnable": "not-authorized-by-this-signoff",
+    "turnContractStandaloneModule": "not-required"
+  },
+  "explicitlyNotDone": [
+    "Did not mutate openbot-gateway-rc or /root/.openbot",
+    "Did not set OPENBOT_PROGRESS_LEDGER_ENABLED on production",
+    "Did not treat 25df222f26 as the cutover candidate once origin/main moved to c393dca8fe"
+  ]
+}

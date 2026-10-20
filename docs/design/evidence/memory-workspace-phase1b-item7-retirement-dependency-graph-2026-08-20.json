@@ -1,0 +1,76 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-dependency-graph/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-dependency-graph-2026-08-20.json",
+  "kind": "item7-evidence-preparation",
+  "mode": "retirement-dependency-graph",
+  "preparedBy": "cursor-data-governance",
+  "preparedAt": "2026-08-20T03:35:00.000Z",
+  "baselineSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "citedUserBaseline": "69e9bf8c63ded61badf59fe0a6c7bc77166b39a1",
+  "item": 7,
+  "status": "not-met",
+  "executed": false,
+  "productionWriteWatchIndex": 38,
+  "liveWriteWatchIndex": 37,
+  "retiredThisChange": 0,
+  "guards": {
+    "dualWriteGuard": "do not delete resolver helpers before remaining callers",
+    "dataLossGuard": "do not delete index sites before write sites have a replacement",
+    "freezeGuard": "do not rewrite productionWriteWatchIndex freeze baseline 38 to zero"
+  },
+  "waves": [
+    {
+      "id": "W0",
+      "dependsOn": [],
+      "action": "independent Item 7 implementation unlock required first",
+      "pathIds": [],
+      "deleteCallSites": false
+    },
+    {
+      "id": "W1",
+      "dependsOn": ["W0"],
+      "action": "tombstone and quarantine new writes; Catalog miss=deny stays off",
+      "pathIds": [],
+      "deleteCallSites": false
+    },
+    {
+      "id": "W2",
+      "dependsOn": ["W1"],
+      "action": "retire write callers after replacement is proven",
+      "pathIds": ["P1", "P3"],
+      "liveCount": 21,
+      "deleteCallSites": false
+    },
+    {
+      "id": "W3",
+      "dependsOn": ["W2"],
+      "action": "retire catalog synthesis after no caller needs empty catalog",
+      "pathIds": ["P4"],
+      "liveCount": 7,
+      "deleteCallSites": false
+    },
+    {
+      "id": "W4",
+      "dependsOn": ["W3"],
+      "action": "retire steward helpers after callers are gone",
+      "pathIds": ["P5"],
+      "liveCount": 6,
+      "deleteCallSites": false
+    },
+    {
+      "id": "W5",
+      "dependsOn": ["W4"],
+      "action": "retire memory index last so rollback can still locate",
+      "pathIds": ["P8"],
+      "liveCount": 3,
+      "deleteCallSites": false
+    }
+  ],
+  "phase1bUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "note": "Design-only dependency graph. No wave is executed. U1 dark closeout does not satisfy W0."
+}

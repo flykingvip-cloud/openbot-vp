@@ -1,0 +1,23 @@
+{
+  "bindingId": "660e8400-e29b-41d4-a716-446655440002",
+  "bindingVersion": 1,
+  "idempotencyKey": "f1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+  "tenantId": "tenant-canary-1",
+  "scope": "group_tenant",
+  "primaryId": "ct-abc123",
+  "primaryGeneration": 1,
+  "flowStepSeq": 2,
+  "flowSubStepId": "s2",
+  "subagentRunIds": [
+    {
+      "runId": "run-20260915-001",
+      "status": "active",
+      "spawnedAt": "2026-09-15T12:00:30Z"
+    }
+  ],
+  "conversationTaskId": "ct-abc123",
+  "ledgerTaskId": "ledger-abc123",
+  "status": "active",
+  "createdAt": "2026-09-15T12:00:00Z",
+  "expiresAt": "2026-09-22T12:00:00Z"
+}

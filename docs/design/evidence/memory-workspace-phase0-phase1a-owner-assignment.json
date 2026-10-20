@@ -1,0 +1,78 @@
+{
+  "schema": "memory-workspace-phase0-phase1a-owner-assignment/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+  "assignedAt": "2026-08-16T07:30:00.000Z",
+  "assignedBy": "cursor-memory-workspace-followup",
+  "phase0Closed": true,
+  "phase0SignOffMainSha": "6fdc0ac80968816969e4e1344b13c60941c0f960",
+  "phase0SignOffMergedMainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+  "note": "Phase 1A design gate closed (section141Signed=true). No resolver write switch, no schema v2, no LIVE deploy, no Phase 1B execution.",
+  "assignments": [
+    {
+      "roleId": "architecture",
+      "owner": "codex-workspace-architecture",
+      "scope": "Envelope typed view, org/resource tree separation, Catalog store design",
+      "status": "accepted-design-gate",
+      "evidencePath": "docs/design/memory-workspace-identity-remediation-2026-08-14.md"
+    },
+    {
+      "roleId": "data-governance",
+      "owner": "codex-workspace-architecture",
+      "scope": "Catalog SoT, DataGovernanceEnvelope, resourceId persistence",
+      "status": "accepted-design-gate",
+      "evidencePath": "docs/design/memory-workspace-identity-remediation-2026-08-14.md"
+    },
+    {
+      "roleId": "resolver",
+      "owner": "cursor-data-governance",
+      "scope": "WS-B resolver read-path alignment; change request acceptance before any write switch",
+      "status": "accepted-design-gate",
+      "evidencePath": ".kiro/specs/memory-workspace-platform-remediation/ws-b-resolver-change-request.md"
+    },
+    {
+      "roleId": "memory",
+      "owner": "cursor-memory-wsc",
+      "scope": "Workspace memory root/index vs Memory Asset boundary (design only)",
+      "status": "accepted-design-gate",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase0-20260814.summary.md"
+    },
+    {
+      "roleId": "security",
+      "owner": "cursor-data-governance",
+      "scope": "tool cwd vs data root authorization; Managed fail-closed",
+      "status": "accepted-design-gate",
+      "rationale": "Gate 0 security-profile + tool-fs-policy owner (data-governance-v2-p0)",
+      "evidencePath": "src/gateway/security-profile.ts"
+    },
+    {
+      "roleId": "storage-cutover",
+      "owner": "cursor-fable",
+      "scope": "WorkspaceBindingRecord reuse; cutover record/guard extension design",
+      "status": "accepted-design-gate",
+      "rationale": "Phase 0 inventory/cutover evidence owner",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase0-20260814.summary.md"
+    },
+    {
+      "roleId": "sre",
+      "owner": "cursor-memory-wsc",
+      "scope": "SQLite backup, rebuild migration, fencing, rollback design",
+      "status": "accepted-design-gate",
+      "rationale": "Memory sqlite operational domain; coordinates with WS-D cutover owner",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+    }
+  ],
+  "stillBlocked": [
+    {
+      "id": "phase1b-execution",
+      "until": "explicit Phase 1B unlock; section141Signed=true is not sufficient"
+    }
+  ],
+  "forbidden": [
+    "deployAuthorized=true",
+    "resolver-write-switch",
+    "memory-schema-v2",
+    "live-migration",
+    "phase1b-implementation"
+  ]
+}

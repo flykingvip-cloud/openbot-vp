@@ -1,0 +1,17 @@
+[Unit]
+Description=OpenBot assess leads API (loopback)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /var/www/openbot-pages/assess/api/server.mjs
+WorkingDirectory=/var/lib/openbot-assess
+Environment=ASSESS_HOST=127.0.0.1
+Environment=ASSESS_PORT=18793
+Environment=ASSESS_DATA=/var/lib/openbot-assess/leads.jsonl
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

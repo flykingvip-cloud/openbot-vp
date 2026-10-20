@@ -1,0 +1,2 @@
+# Local Dual Controller runtime + lab harness (Stage C).
+psycopg[binary]>=3.1

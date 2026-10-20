@@ -1,0 +1,138 @@
+{
+  "schema": "task-progress-ledger-33993e52e554-cutover/v1",
+  "recordedAt": "2026-08-23T17:28:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "candidate": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "previousLive": "b576641a96eb49285e8454f30e060de0eabc49a0",
+  "deployedLive": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "originMainAtFinalFetch": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "provenanceTag": "provenance/sha-33993e52e554",
+  "buildInfoCommit": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "gatewayAndUiSameSource": true,
+  "forwardOnly": "allow",
+  "deliveryAlignment": "FAIL=0",
+  "healthz": "live",
+  "readyz": "ready",
+  "progressLedgerEnabled": true,
+  "uiEntry": "index-Dpg8P1UR.js",
+  "rollbackBackup": "/root/openbot-maintenance-origin-main-33993e52e554-full-dist-r1-20260823T092707Z",
+  "stamp": "20260823T092707Z",
+  "overlayId": "origin-main-33993e52e554-full-dist-r1",
+  "candidateSubject": "Merge pull request #643 from gmood2008/cursor-data-governance/item7-batch9-12-cr2-resolver-wiring",
+  "releaseWorktree": {
+    "path": "/tmp/openbot-ledger-release",
+    "lockedOriginMain": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "statusPorcelainCount": 0,
+    "fetchHeadWritable": true,
+    "stillTipAfterBuild": true,
+    "stillTipAtRecord": true
+  },
+  "buildDir": "/tmp/openbot-build-33993e52e554",
+  "buildInfo": {
+    "version": "2026.7.12-rc.2",
+    "commit": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "builtAt": "2026-08-23T09:26:35.518Z"
+  },
+  "startedAt": "2026-08-23T09:28:05Z",
+  "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+  "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+  "progressLedger": {
+    "configEnabled": true,
+    "envDocker": "1",
+    "processEnv": "UNSET",
+    "changedThisCutover": false
+  },
+  "explicitlyNotDone": [
+    "Did not build from the dirty kiro-loom worktree",
+    "Did not recreate the production container",
+    "Did not change Progress Ledger flag",
+    "Did not start a host-level gateway",
+    "Did not delete existing backups",
+    "Did not start Turn Contract work",
+    "Did not create a new production cron"
+  ],
+  "decision": "shortest-safe-path-33993e52e554-full-dist-overlay-from-clean-archive",
+  "note": "User authorized the shortest safe path for latest origin/main. Previous LIVE b576641a96eb was an ancestor, not the trunk tip. Built from git archive in /tmp/openbot-build-33993e52e554, not the dirty kiro-loom tree.",
+  "candidateDetail": {
+    "ref": "origin/main",
+    "sha": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "subject": "Merge pull request #643 from gmood2008/cursor-data-governance/item7-batch9-12-cr2-resolver-wiring",
+    "equalsOriginMainAtLock": true,
+    "equalsOriginMainAfterBuild": true,
+    "ledgerImplementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91"
+  },
+  "gatesBeforeCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "liveThen": "b576641a96eb49285e8454f30e060de0eabc49a0",
+      "candidate": "33993e52e5540f76e57d66ab75d8955420437d3a"
+    },
+    "verifyDeliveryAlignmentLiveMatched": {
+      "exit": 0,
+      "summary": "PASS=8 WARN=2 FAIL=0; --prod-sha b576641a96eb --candidate-sha 33993e52e554 --candidate-tag provenance/sha-33993e52e554"
+    }
+  },
+  "build": {
+    "source": "git archive 33993e52e5540f76e57d66ab75d8955420437d3a",
+    "dir": "/tmp/openbot-build-33993e52e554",
+    "install": "pnpm install --frozen-lockfile",
+    "command": "GIT_COMMIT=33993e52e5540f76e57d66ab75d8955420437d3a pnpm build",
+    "commitMatched": true,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "33993e52e5540f76e57d66ab75d8955420437d3a",
+      "builtAt": "2026-08-23T09:26:35.518Z"
+    },
+    "uiEntry": "index-Dpg8P1UR.js",
+    "gatewayTarMd5": "9e07a387509c42ed8fbc361ea78b449b",
+    "uiTarMd5": "f0cf84a3995d70260a859622e317d46a"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "previousSha": "b576641a96eb49285e8454f30e060de0eabc49a0",
+    "startedAt": "2026-08-23T09:28:05Z",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPinEnv": "index-Dpg8P1UR.js",
+    "uiServedEntry": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisCutover": false
+    }
+  },
+  "backup": {
+    "path": "/root/openbot-maintenance-origin-main-33993e52e554-full-dist-r1-20260823T092707Z",
+    "filesNonempty": true,
+    "restoresPreviousOverlay": "b576641a96eb49285e8454f30e060de0eabc49a0"
+  },
+  "residualRisks": [
+    {
+      "id": "record-pr-advances-tip",
+      "severity": "structural",
+      "detail": "Merging this record PR advances origin/main beyond LIVE. Do not treat the squash tip as a new overlay candidate unless a later cutover is authorized. The shortest-path final test origin/main == CANDIDATE cannot hold after this PR merges."
+    },
+    {
+      "id": "process-env-unset",
+      "severity": "known",
+      "detail": "OPENBOT_PROGRESS_LEDGER_ENABLED is UNSET in the running process. Runtime still enabled via gateway.progressLedger.enabled=true plus .env.docker=1. Process env stays UNSET until an authorized container recreate."
+    },
+    {
+      "id": "stale-pin-overlay-id-label",
+      "severity": "cosmetic",
+      "detail": "pin.env OPENBOT_UI_OVERLAY_ID still says origin-main-7cd74d4c-item7-s18-r1. Served and pinned entry is index-Dpg8P1UR.js. Overlay id label was not rewritten."
+    },
+    {
+      "id": "check-sot-exit-20-frozen-baseline",
+      "severity": "known-old-gate",
+      "detail": "The shortest-path script did not require pnpm delivery:check-sot. That gate still compares LIVE to frozen origin/release/baseline-recovery-20260725 and is expected to exit 20 under AGENTS.md."
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "schema": "openbot-cogniweave-u1-implementation-owner-path-matrix/v1",
+  "path": "docs/design/evidence/openbot-cogniweave-u1-implementation-owner-path-matrix.json",
+  "kind": "u1-implementation-owner-path-matrix",
+  "preparedBy": "cursor-unified-memory-u1-admission",
+  "role": "coordinator",
+  "preparedAt": "2026-08-19T14:25:00.000Z",
+  "dispatch": "docs/design/evidence/openbot-cogniweave-u1-implementation-dispatch-2026-08-19.json",
+  "unlockReceipt": "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json",
+  "authorizes": "U1-dark-integration-only",
+  "implementationStarted": true,
+  "coordinatorDoesNotClaimImplementationPaths": true,
+  "overlap": "forbidden",
+  "workflows": [
+    {
+      "id": "A",
+      "title": "Resolver/governance Handle producer",
+      "designatedOwner": "cursor-data-governance",
+      "status": "accepted",
+      "signedBy": "cursor-data-governance",
+      "signedAt": "2026-08-19T19:44:00.000Z",
+      "sidecar": "docs/design/evidence/openbot-cogniweave-u1-owner-accept-cursor-data-governance.json",
+      "acceptedVia": "operator-authorized-proxy",
+      "landedPr": 528,
+      "paths": ["src/gateway/workspace-resolver/**"],
+      "uses": [
+        "existing Data Governance Catalog adapter",
+        "U0 MemoryWorkspaceHandle construction in src/memory/memory-workspace-handle.ts"
+      ],
+      "doesNotClaim": [
+        "src/memory/cogniweave-manager.ts",
+        "src/memory/search-manager.ts",
+        "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json",
+        "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json"
+      ],
+      "scope": [
+        "upgrade the existing src/gateway/workspace-resolver/**",
+        "read authority records through the Data Governance Catalog adapter",
+        "return a complete MemoryWorkspaceHandle or structured denial",
+        "resourceId is the only durable Workspace identity",
+        "Memory Asset uses an independent resourceId",
+        "sourceWorkspaceResourceId associates Memory Asset to Workspace",
+        "Catalog miss, tenant mismatch, and stale fencing fail closed",
+        "do not synthesize Catalog",
+        "do not add a second Resolver",
+        "do not switch the production write path"
+      ],
+      "existingClaim": "data-governance-v2-p0:cursor-data-governance already owns src/gateway/workspace-resolver/**",
+      "loom": "verify-then-take a U1 producer session without adding a second active claim on workspace-resolver",
+      "separatePr": true
+    },
+    {
+      "id": "B",
+      "title": "CogniWeave Handle consumer",
+      "designatedOwner": "cursor-conversation-lifecycle",
+      "status": "accepted",
+      "signedBy": "cursor-conversation-lifecycle",
+      "signedAt": "2026-08-19T19:45:00.000Z",
+      "sidecar": "docs/design/evidence/openbot-cogniweave-u1-owner-accept-cursor-conversation-lifecycle.json",
+      "acceptedVia": "operator-authorized-proxy",
+      "landedPr": 529,
+      "paths": ["src/memory/cogniweave-manager.ts", "src/memory/search-manager.ts"],
+      "uses": ["complete issued MemoryWorkspaceHandle only"],
+      "doesNotClaim": [
+        "src/gateway/workspace-resolver/**",
+        "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json",
+        "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json"
+      ],
+      "scope": [
+        "accept only a complete issued MemoryWorkspaceHandle",
+        "Scope.workspaceId = Handle.resourceId",
+        "cloud tenantId = Handle.tenantId",
+        "stateDir is physical configuration only",
+        "remove stableId(stateDir) identity minting from new entry points",
+        "keep legacy entry points for dark compare",
+        "do not delete item 7 call-sites",
+        "do not enable schema v2 write",
+        "do not cut production read or write"
+      ],
+      "existingClaim": "cogniweave-memory-engine-v2:codex-cogniweave-v2 is already owned by cursor-conversation-lifecycle for cogniweave-manager.ts and search-manager.ts",
+      "loom": "verify-then-take a U1 consumer session without adding a second active claim on cogniweave-manager.ts",
+      "separatePr": true
+    }
+  ],
+  "coordinator": {
+    "owner": "cursor-unified-memory-u1-admission",
+    "claimedPaths": [
+      "docs/design/evidence/openbot-cogniweave-u1-implementation-dispatch-2026-08-19.json",
+      "docs/design/evidence/openbot-cogniweave-u1-implementation-owner-path-matrix.json",
+      "docs/design/evidence/openbot-cogniweave-u1-implementation-dispatch.test.mjs"
+    ],
+    "doesNotClaim": [
+      "src/gateway/workspace-resolver/**",
+      "src/memory/cogniweave-manager.ts",
+      "src/memory/search-manager.ts"
+    ]
+  }
+}

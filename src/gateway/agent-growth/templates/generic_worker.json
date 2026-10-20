@@ -1,0 +1,15 @@
+{
+  "templateId": "generic_worker",
+  "version": "1.0.0",
+  "displayName": "通用助手",
+  "roleBlueprint": "通用数字员工，可承接基础任务；无行业 required 能力，作为未指定模板时的降级蓝图。",
+  "dimensionWeights": {
+    "identity": 25,
+    "capability": 25,
+    "knowledge": 25,
+    "habits": 25
+  },
+  "requiredCapabilities": [],
+  "missionReadyThreshold": 78,
+  "minIdentity": 60
+}

@@ -1,0 +1,303 @@
+{
+  "schema": "memory-workspace-s01-implementation-readiness-review/v1",
+  "kind": "s01-implementation-readiness-independent-review",
+  "reviewer": "kiro-sot-reviewer",
+  "signedBy": "kiro-sot-reviewer",
+  "signedAt": "2026-08-30T16:00:00.000Z",
+  "reviewPass": 1,
+  "scope": "v1.8-ir1-ir4-implementation-readiness-plan",
+  "decision": "accepted",
+  "baseline": {
+    "worktree": "/Users/daniel/AI项目/openbot-v18-ir-review",
+    "branch": "kiro-sot-reviewer/v18-ir-review",
+    "fetchedOriginMain": true,
+    "head": "e81f2d8fba5d76928c8f1ef70e7dcdb2c7ba4088",
+    "originMain": "e81f2d8fba5d76928c8f1ef70e7dcdb2c7ba4088",
+    "mergeBaseIsAncestor": true,
+    "priorReview": {
+      "pr825": "changes-required",
+      "pr826": "changes-required",
+      "findings": [
+        "IR1-target-identity",
+        "IR2-shadow-vs-cutover",
+        "IR3-scan-counter-model",
+        "IR4-staged-gates"
+      ]
+    }
+  },
+  "reviewedArtifacts": [
+    ".kiro/specs/memory-workspace-platform-remediation/s01-implementation-readiness-review-request.md",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-implementation-readiness.md",
+    "docs/design/evidence/memory-workspace-s01-implementation-readiness.json",
+    "docs/design/evidence/memory-workspace-s01-implementation-readiness.test.mjs",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+    "src/auto-reply/reply/get-reply.ts"
+  ],
+  "verdict": {
+    "IR1": "pass",
+    "IR2": "pass",
+    "IR3": "pass",
+    "IR4": "pass"
+  },
+  "ir1TargetIdentity": {
+    "status": "pass",
+    "findings": [
+      "targetIdentity required and notNull (no path-based identity inference)",
+      "complete fields: tenantId, employeeOwnerId, agentAssetId, workspaceResourceId",
+      "authoritative mapping chain: TenantContext → slug → agentAssetId → workspaceResourceId → binding → locator",
+      "agentId is tenant slug only, not resourceId or agentAssetId",
+      "forbid principal any unique workspace (require specific workspaceResourceId)",
+      "forbid path-based identity inference",
+      "forbid Catalog create on miss",
+      "forbid host/cwd/helper fallback as identity",
+      "forbid Memory Asset resourceId as workspaceResourceId",
+      "fail-closed on missing/multi/tenant-mismatch/version-mismatch/stale-fencing"
+    ],
+    "mappingChain": [
+      "Trusted TenantContext",
+      "builtin steward agentId/slug (tenant-scoped query only)",
+      "authoritative agentAssetId (from Registry)",
+      "Data Governance Catalog workspace resourceId",
+      "unique canonical + active binding",
+      "authorized locator"
+    ],
+    "prohibitions": [
+      "no principal → any unique workspace mapping",
+      "no path-based identity inference",
+      "no Catalog synthesis at request time",
+      "no agentId as resourceId confusion",
+      "no Memory Asset resourceId as workspace resourceId"
+    ]
+  },
+  "ir2ShadowVersusCutover": {
+    "status": "pass",
+    "findings": [
+      "Shadow and Cutover are distinct phases (no observation-period-as-success-path)",
+      "Shadow: production cwd still from legacy helper (not S01)",
+      "Shadow: keeps P5 in scan + remaining=10 + liveWriteWatchIndex=10",
+      "Shadow: flag off keeps legacy helper and P5 in scan",
+      "Shadow: cannot claim S01 retired",
+      "Cutover: requires shadow/canary reviewer accepted first",
+      "Cutover: has no runtime helper fallback (fail-closed)",
+      "Cutover: flag off does not restore helper",
+      "Rollback: requires approved Git revert + scan restoration if P5 removed",
+      "DEPRECATED: flagOffRestoresHelperWithoutScanRewrite (set to false)"
+    ],
+    "shadowPhase": {
+      "productionCwdSource": "legacy-helper",
+      "keepsP5InScan": true,
+      "scanRemaining": 10,
+      "scanLiveWriteWatchIndex": 10,
+      "cannotClaimS01Retired": true,
+      "flagOffBehavior": "keeps-legacy-and-P5"
+    },
+    "cutoverPhase": {
+      "requiresShadowCanaryAccepted": true,
+      "runtimeHelperFallback": "forbidden",
+      "flagOffDoesNotRestoreHelper": true,
+      "rollbackRequiresRevertAndScanRestoration": true
+    }
+  },
+  "ir3ScanCounterModel": {
+    "status": "pass",
+    "findings": [
+      "remaining and liveWriteWatchIndex have independent definitions",
+      "remaining: unretired call-site count in canonical retirement scan (owner: scan reviewer)",
+      "liveWriteWatchIndex: write-watch owner frozen production write-path risk index (owner: write-watch owner)",
+      "current repo has NO independent write-watch site set/receipt/machine-test",
+      "FORBIDDEN: planning remaining=9 with liveWriteWatchIndex=10 (requires independent write-watch definition)",
+      "implementation lander MUST NOT modify remaining",
+      "implementation lander MUST NOT modify liveWriteWatchIndex",
+      "Shadow/Cutover before independent scan accept: keeps 10/10",
+      "After Stage E independent scan accept: remaining=9, liveWriteWatchIndex=write-watch-owner-signed-only"
+    ],
+    "counters": {
+      "remaining": {
+        "definition": "unretired call-site count in the canonical retirement scan",
+        "currentValue": 10,
+        "afterStageE": 9,
+        "owner": "scan-reviewer (kiro-sot-reviewer)",
+        "landerMayModify": false
+      },
+      "liveWriteWatchIndex": {
+        "definition": "write-watch owner frozen production write-path risk index",
+        "currentValue": 10,
+        "afterStageE": "write-watch-owner-signed-only",
+        "owner": "cursor-data-governance (write-watch)",
+        "landerMayModify": false,
+        "independentDefinitionExists": false
+      }
+    },
+    "prohibitions": [
+      "no planning 9/10 without independent write-watch definition",
+      "no implementation lander modification of either counter",
+      "no treating both counters as single merged counter"
+    ]
+  },
+  "ir4StagedGates": {
+    "status": "pass",
+    "findings": [
+      "Stage A–E defined with independent Loom tasks/owners/paths/PRs/evidence/reviewers/gates",
+      "Stage A: adapter + identity ports (no get-reply modification)",
+      "Stage B: shadow wiring (legacy helper still decides cwd, P5 kept, 10/10)",
+      "Stage C: cutover prep (no success-path modification, P5 kept)",
+      "Stage D: controlled cutover (line 164 only, no helper fallback)",
+      "Stage E: independent retirement acceptance (P5 removed, remaining=9, liveWriteWatchIndex owner-signed)",
+      "Each stage has clear entry/exit gates",
+      "Cannot skip stages or combine across trust boundaries",
+      "Stage A entry gate: V1.8 dual review accepted + kiro-loom registered"
+    ],
+    "stages": [
+      {
+        "id": "A",
+        "name": "adapter-and-identity-ports",
+        "owner": "cursor-data-governance",
+        "independentPr": true,
+        "independentEvidence": true,
+        "independentReviewerDecision": true,
+        "entryGate": "v1.8-dual-review-accepted-and-kiro-loom-registered",
+        "exitGate": "adapter-ports-and-security-governance-accepted",
+        "modifiesGetReply": false
+      },
+      {
+        "id": "B",
+        "name": "shadow-wiring",
+        "owner": "cursor-data-governance",
+        "independentPr": true,
+        "independentEvidence": true,
+        "independentReviewerDecision": true,
+        "entryGate": "stage-a-security-governance-accepted",
+        "exitGate": "shadow-canary-accepted-helper-still-decides-cwd",
+        "productionCwdSource": "legacy-helper",
+        "keepsP5InScan": true,
+        "scanRemaining": 10,
+        "scanLiveWriteWatchIndex": 10
+      },
+      {
+        "id": "C",
+        "name": "cutover-prep",
+        "owner": "cursor-data-governance",
+        "independentPr": true,
+        "independentEvidence": true,
+        "independentReviewerDecision": true,
+        "entryGate": "stage-b-shadow-receipts-accepted",
+        "exitGate": "mapping-verified-rollback-drilled-flag-default-off",
+        "modifiesGetReplySuccessPath": false,
+        "retiresP5": false
+      },
+      {
+        "id": "D",
+        "name": "controlled-cutover",
+        "owner": "cursor-data-governance",
+        "independentPr": true,
+        "independentEvidence": true,
+        "independentReviewerDecision": true,
+        "entryGate": "stage-c-accepted-and-shadow-canary-accepted",
+        "exitGate": "authorized-locator-fail-closed-no-helper-fallback",
+        "modifiesGetReplyLine": 164,
+        "forbidsLine165P1Change": true,
+        "runtimeHelperFallback": "forbidden",
+        "scanRemaining": 10,
+        "scanLiveWriteWatchIndex": 10
+      },
+      {
+        "id": "E",
+        "name": "independent-retirement-acceptance",
+        "owner": "cursor-data-governance",
+        "independentPr": true,
+        "independentEvidence": true,
+        "independentReviewerDecision": true,
+        "entryGate": "helper-unreachable-and-freeze-regression-green",
+        "exitGate": "p5-removed-p1-kept-remaining-recomputed-write-watch-owner-signed",
+        "removesP5": true,
+        "keepsP1": true,
+        "remainingAfterAccept": 9,
+        "liveWriteWatchIndexAfterAccept": "write-watch-owner-signed-only",
+        "item7AfterS01Retirement": "not-met"
+      }
+    ]
+  },
+  "checksRun": {
+    "v18EvidenceTest": {
+      "command": "node --test docs/design/evidence/memory-workspace-s01-implementation-readiness.test.mjs",
+      "result": "pass",
+      "summary": "V1.8 closes IR1-IR4; production frozen; scan 10/10"
+    },
+    "contractTest": {
+      "command": "bun test docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+      "result": "pass",
+      "cases": 21,
+      "allPass": true
+    },
+    "r6SingleSot": {
+      "command": "node scripts/verify-single-sot.mjs",
+      "result": "pass",
+      "designComplete": true,
+      "implementationVerified": false
+    },
+    "productionFrozen": {
+      "getReplyLine164": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "getReplyLine165": "resolveAgentWorkspaceDir",
+      "evaluateS01AuthorizedToolCwdWired": false,
+      "srcMemoryUntouched": true
+    }
+  },
+  "currentStatus": {
+    "packetStatus": "implementation-readiness-resubmitted",
+    "planVersion": "V1.8",
+    "selfAccepted": false,
+    "thisPacketStartsProductionImplementation": false,
+    "thisPacketHasNoProductionWiring": true,
+    "implementationGate": "not-met",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "phase1b": "blocked",
+    "productionCatalogWrite": "none",
+    "deployAuthorized": false,
+    "i3Executed": false,
+    "liveDeployment": "forbidden"
+  },
+  "doesNotAuthorize": [
+    "start production implementation before V1.8 dual review accepted",
+    "modify src/auto-reply/reply/get-reply.ts now",
+    "modify src/memory/**",
+    "modify src/gateway/workspace-resolver/**",
+    "modify src/gateway/data-governance/** production paths",
+    "write production Catalog",
+    "delete or rewrite S01 scan",
+    "execute I3",
+    "issue Phase 1B unlock",
+    "set deployAuthorized=true",
+    "any LIVE production deployment",
+    "claim S01 retired during shadow phase",
+    "plan remaining=9 with liveWriteWatchIndex=10",
+    "implementation lander modify scan counters",
+    "flag off restore helper without scan rewrite"
+  ],
+  "explicitlyApproved": [
+    "V1.8 implementation-readiness plan closes IR1-IR4",
+    "targetIdentity complete with workspaceResourceId + agentAssetId",
+    "Shadow vs Cutover clearly separated",
+    "Shadow keeps legacy helper + P5 + 10/10",
+    "Cutover has no runtime helper fallback",
+    "remaining and liveWriteWatchIndex have independent definitions",
+    "Stage A-E have independent gates",
+    "production frozen until V1.8 dual review accepted"
+  ],
+  "residualConstraints": [
+    "Stage A entry requires: V1.8 dual review accepted + kiro-loom registered",
+    "Each Stage requires independent PR/evidence/reviewer/gate",
+    "Shadow phase must keep P5 and 10/10",
+    "Cutover must not have runtime helper fallback",
+    "Stage E remaining=9 only after independent scan acceptance",
+    "liveWriteWatchIndex change requires write-watch owner signature",
+    "Item 7 remains not-met even after S01 retirement"
+  ],
+  "independentReviewNote": "kiro-sot-reviewer independent review of V1.8 implementation-readiness plan on baseline e81f2d8fba. IR1-IR4 closes #825/#826 findings. Plan accepted. Production frozen. implementationGate remains not-met until Stage A begins after dual review accepted.",
+  "note": "kiro-sot-reviewer pass 1 of V1.8 plan (post PR #827). IR1-IR4 plan-accepted. Production wiring not started. implementationGate=not-met. remaining=10, liveWriteWatchIndex=10. This signature does not authorize Stage A start, S01 retirement, production Catalog write, I3, Phase 1B, or LIVE."
+}

@@ -1,0 +1,27 @@
+diff --git a/src/commands/status-all/format.ts b/src/commands/status-all/format.ts
+index be443d563c..fe634f0e2d 100755
+--- a/src/commands/status-all/format.ts
++++ b/src/commands/status-all/format.ts
+@@ -21,16 +21,9 @@ export function formatGatewayAuthUsed(
+   return "none";
+ }
+ 
+-export function redactSecrets(text: string): string {
+-  if (!text) {
+-    return text;
+-  }
+-  let out = text;
+-  out = out.replace(
+-    /(\b(?:access[_-]?token|refresh[_-]?token|token|password|secret|api[_-]?key)\b\s*[:=]\s*)("?)([^"\\s]+)("?)/gi,
+-    "$1$2***$4",
+-  );
+-  out = out.replace(/\bBearer\s+[A-Za-z0-9._-]+\b/g, "Bearer ***");
+-  out = out.replace(/\bsk-[A-Za-z0-9]{10,}\b/g, "sk-***");
+-  return out;
+-}
++/**
++ * Kept as a re-export so existing CLI call sites stay stable; the single
++ * implementation now lives in `src/infra/redact-secret-text.ts` and is shared with
++ * non-CLI callers that persist error text.
++ */
++export { redactSecretText as redactSecrets } from "../../infra/redact-secret-text.js";

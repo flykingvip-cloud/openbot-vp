@@ -1,0 +1,18 @@
+<Window
+    x:Class="OpenBot.EmployeeShell.UI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Employee Workbench">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+    <TextBlock
+        x:Name="StatusText"
+        Grid.Row="0"
+        Margin="12"
+        Text="Employee Workbench / 员工工作台 (Web shell)" />
+    <WebView2 x:Name="ShellWebView" Grid.Row="1" />
+  </Grid>
+</Window>

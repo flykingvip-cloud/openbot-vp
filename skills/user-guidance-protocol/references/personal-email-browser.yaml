@@ -1,0 +1,104 @@
+scenario:
+  name: personal_email_browser_copilot
+  title: 个人邮箱绑定（Path C · 浏览器协驾）
+  trigger:
+    - 网页登录邮箱
+    - 浏览器配邮箱
+    - 不知道怎么拿授权码
+    - 客户端授权码
+    - 126 授权码
+    - 163 授权码
+    - QQ 授权码
+    - path c
+    - personal-email-browser
+  required_context:
+    - browser
+    - logged_in_user
+
+stages:
+  - id: detect_browser
+    title: 确认浏览器与邮箱
+  - id: webmail_login
+    title: 网页登录
+  - id: generate_auth_code
+    title: 生成授权码
+  - id: paste_and_bind
+    title: 粘贴并绑定
+
+steps:
+  - id: choose_path_c
+    stage: detect_browser
+    risk: low
+    instruction: |
+      Path C：你在浏览器登录邮箱，我协驾你在设置里生成「客户端授权码」（不是登录密码）。
+      SMTP/IMAP 主机和端口会由 OpenBot 按邮箱域名自动填好。
+      请告诉我你的发件邮箱（如 name@126.com），或确认已在绑定表单填好邮箱。
+    success_signal: 用户给出邮箱地址或确认表单已填
+
+  - id: open_webmail
+    stage: webmail_login
+    risk: low
+    instruction: |
+      用 browser 工具打开对应邮箱网页（或让用户点表单/聊天里的「打开邮箱网页」）。
+      - 126 → mail.126.com
+      - 163 → mail.163.com
+      - QQ → mail.qq.com
+      验证码、滑块、二次验证必须用户本人完成；不要代填登录密码。
+    visual_anchor: 邮箱登录页
+    success_signal: 用户确认已登录邮箱网页
+
+  - id: navigate_auth_code_settings
+    stage: generate_auth_code
+    risk: medium
+    instruction: |
+      按服务商带路（一步一确认）：
+      - 126/163：设置 → POP3/SMTP/IMAP → 开启 IMAP 与 SMTP → 生成授权码/授权密码
+      - QQ：设置 → 账户 → POP3/IMAP/SMTP → 开启 → 生成授权码
+      - Gmail：Google 账户 → 安全 → 应用专用密码（需已开两步验证）
+      授权码只显示一次，提醒用户先复制。
+    visual_anchor: 「生成授权码 / 客户端授权密码 / 应用专用密码」按钮
+    success_signal: 用户确认已看到并复制授权码
+
+  - id: semi_auto_read_optional
+    stage: generate_auth_code
+    risk: high
+    confirmation: true
+    instruction: |
+      半自动（可选）：若用户已登录且明确同意「允许读取本次生成的授权码页面」，
+      可用 browser snapshot/evaluate 读取刚显示的授权码文本——必须二次确认后再写入绑定。
+      禁止读取登录密码字段；禁止未经确认保存。
+    success_signal: 用户明确同意半自动读取，或选择手动复制
+
+  - id: paste_auth_code
+    stage: paste_and_bind
+    risk: high
+    confirmation: true
+    instruction: |
+      请用户把授权码粘贴到 OpenBot：
+      1. 个人设置 → 个人邮箱表单 →「SMTP 授权码」字段；或
+      2. 聊天区「去绑定」打开同一表单。
+      确认：主机/端口已自动填充，勿勾选「平台 SMTP」（126/163/QQ）。
+      点「添加并认证」——gateway 会探测 IMAP；成功即授权大白。
+    visual_anchor: OpenBot 表单 SMTP 授权码 + 保存按钮
+    success_signal: 用户看到绑定成功提示
+
+  - id: resume_mail_task
+    stage: paste_and_bind
+    risk: low
+    instruction: 绑定完成后说「继续」或点「继续任务」；你再 action=resolve → execute。
+    success_signal: 邮件任务恢复成功
+
+fallback:
+  - check: no_browser
+    instruction: 无法使用 browser 时，退回 Path B（personal-email.yaml）带用户到个人设置表单。
+  - check: captcha
+    instruction: 验证码/滑块只能用户本人完成，完成后告诉我「已登录」。
+  - check: auth_code_vs_password
+    instruction: 126/163/QQ 必须用授权码；登录密码不能用于 SMTP/IMAP。
+
+completion:
+  reusable_pattern: true
+  guidance_event_scenario: personal_email_browser_copilot
+  security:
+    - never_store_login_password
+    - auth_code_requires_user_confirmation

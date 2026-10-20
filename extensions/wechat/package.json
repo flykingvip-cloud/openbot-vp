@@ -1,0 +1,45 @@
+{
+  "name": "@openclaw/wechat",
+  "version": "2026.7.12-rc.2",
+  "private": true,
+  "description": "OpenBot WeChat personal channel plugin",
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@upbeyond/openbot": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.7"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openbot": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "channel": {
+      "id": "wechat",
+      "label": "WeChat",
+      "selectionLabel": "微信 (WeChat)",
+      "detailLabel": "微信个人号",
+      "docsPath": "/channels/wechat",
+      "docsLabel": "wechat",
+      "blurb": "微信个人号接入，支持私聊和群聊，通过代理服务连接。",
+      "aliases": [
+        "weixin"
+      ],
+      "order": 78,
+      "quickstartAllowFrom": true
+    },
+    "install": {
+      "npmSpec": "@openclaw/wechat",
+      "localPath": "extensions/wechat",
+      "defaultChoice": "npm"
+    }
+  }
+}

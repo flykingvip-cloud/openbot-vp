@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-8j4g-w8fx-2239",
+  "cve": "CVE-2026-69207",
+  "package": "hono",
+  "vulnerable_range": "<4.12.34",
+  "affected_version_before": "4.12.27",
+  "dependency_path": ".>hono",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=4.12.34",
+  "mitigated_version": "4.12.34",
+  "reachable_surface": "CORS middleware ReDoS via Access-Control-Request-Headers (advisory); no in-tree `from 'hono'` import observed — still a direct prod dependency / peer for @buape/carbon and @modelcontextprotocol/sdk",
+  "mitigation": "Bump dependencies.hono to 4.12.34; pnpm.overrides.hono=4.12.34 (same pin also clears GHSA-f23p-vx2j-j53r, GHSA-54fx-42gc-7vw4, and low GHSA-79qm-7rj5-m7r9 as side effects; not separate cells)",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low including further hono advisories needing >=4.13.5 / >=4.13.7). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 43,
+    "low": 8,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-8j4g-w8fx-2239"
+}

@@ -1,0 +1,49 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch14-s15/v1",
+  "item": 7,
+  "status": "retirement-batch-14",
+  "batch": "S15",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S15",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "via": "host",
+      "lineBefore": 1160,
+      "lineAfter": null,
+      "replacement": "resolveAgentsHandlerWorkspaceLocatorOrRespond"
+    }
+  ],
+  "sitesRemainingHostReads": [],
+  "sitesRemainingTrustedWrapper": [],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 20,
+  "liveWriteWatchIndex": 20,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/agents.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "2a54a48fc23df7302d6658008c2ced0134bed991",
+  "note": "Batch 14 retires S15 only. S15 is the host write at agents.ts:1160. Replacement is resolveAgentsHandlerWorkspaceLocatorOrRespond (complete trusted query after #638); fail-closed respond+return, no empty-string or cwd fallback. No remaining agents.ts watched write sites. Live remaining is 20 after #637. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

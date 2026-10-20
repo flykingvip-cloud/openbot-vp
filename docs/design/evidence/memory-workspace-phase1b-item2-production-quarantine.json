@@ -1,0 +1,11 @@
+{
+  "schema": "memory-workspace-phase1b-item2-production-quarantine/v1",
+  "live": false,
+  "catalogWrite": false,
+  "count": 1,
+  "rows": [
+    {
+      "reason": "incomplete_agent_asset"
+    }
+  ]
+}

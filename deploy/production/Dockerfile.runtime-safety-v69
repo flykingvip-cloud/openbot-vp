@@ -1,0 +1,18 @@
+# Production gateway exec safety: preserve v68 UI, bundled skills, and ffmpeg;
+# replace only the compiled backend runtime.
+FROM openbot:rc-amd64-v68
+USER root
+WORKDIR /app
+
+COPY dist /tmp/openbot-runtime-safety-dist
+RUN rm -rf /tmp/openbot-runtime-safety-dist/control-ui \
+ && cp -a /tmp/openbot-runtime-safety-dist/. /app/dist/ \
+ && rm -rf /tmp/openbot-runtime-safety-dist \
+ && grep -R -q "agents cannot signal the production gateway process" /app/dist \
+ && node openbot.mjs --version
+
+ARG OPENBOT_VERSION=2026.7.20-rc.12
+ENV OPENBOT_BUNDLED_VERSION=${OPENBOT_VERSION}
+LABEL org.opencontainers.image.version="${OPENBOT_VERSION}"
+LABEL org.opencontainers.image.revision="85eee3e7b987b14b3f83301e3f200b3e1d797cc6"
+LABEL org.opencontainers.image.description="Production gateway exec approval and PID 1 signal guard"

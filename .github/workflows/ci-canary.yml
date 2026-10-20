@@ -1,0 +1,88 @@
+name: CI Canary
+
+# Fails loudly when no CI gate run has completed recently.
+#
+# This exists because the repository spent roughly two months with zero completed CI
+# runs and nobody noticed. The reason it stayed invisible: jobs targeted a runner
+# provider that was never connected, so they queued rather than failed, and each queued
+# run was cancelled by the next push. On the Actions dashboard "never ran" and "all
+# green" look the same — there is no red, no timeout, no notification.
+#
+# A missing signal is not a passing signal. This job turns the absence of CI into an
+# explicit failure.
+
+on:
+  schedule:
+    # 03:17 UTC daily. Off the hour to avoid the scheduling stampede.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  assert-ci-completed:
+    name: assert a CI gate run completed in the last 24h
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check for a completed CI Gate run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          cutoff=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          echo "Looking for CI Gate runs on main completed since $cutoff"
+
+          # `cancelled` deliberately does not count as completed. A cancelled run carries
+          # no verdict, and treating it as one is the bug this canary is here to catch.
+          completed=$(gh api \
+            "/repos/$REPO/actions/workflows/ci-gate.yml/runs?branch=main&per_page=50" \
+            --jq "[.workflow_runs[]
+                   | select(.conclusion == \"success\" or .conclusion == \"failure\")
+                   | select(.updated_at > \"$cutoff\")] | length")
+
+          echo "Completed CI Gate runs on main in window: $completed"
+
+          if [ "$completed" -eq 0 ]; then
+            {
+              echo "::error::No CI Gate run on main reached a verdict in the last 24 hours."
+              echo ""
+              echo "A missing signal is not a passing signal. Check, in order:"
+              echo "  1. are jobs stuck 'queued' with runner=none?  -> the runner provider is not connected"
+              echo "  2. is 'concurrency' cancelling runs before they start?  -> cancelled != green"
+              echo "  3. are Actions minutes exhausted or a spending limit set to 0?"
+              echo "     (2026-08: private included quota 3000/3000 → hosted jobs get"
+              echo "      runner_id=0 and never start; see issue #289)"
+              echo ""
+              echo "While hosted CI is dark, merge with the local substitute gate:"
+              echo "  docs/reference/ci-local-merge-gate.md"
+              echo "  ./scripts/ci-local-merge-gate.sh --base origin/main --candidate HEAD"
+              echo ""
+              echo "History for context: this repository ran 200+ CI runs with a 100% 'cancelled'"
+              echo "rate and zero completions for about two months, because 'ci.yml' targets"
+              echo "blacksmith-* runners that were never subscribed. See the delivery pipeline"
+              echo "standard, section 6.2."
+            } >&2
+            exit 1
+          fi
+
+          echo "OK: $completed completed run(s) on main in the last 24 hours."
+
+      - name: Report queued job backlog
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Informational only, never fails the job: how many runs are sitting unstarted.
+          stuck=$(gh api "/repos/$REPO/actions/runs?per_page=100" \
+            --jq '[.workflow_runs[] | select(.status == "queued" or .status == "pending")] | length')
+          echo "Runs currently queued or pending: $stuck"
+          if [ "$stuck" -gt 20 ]; then
+            echo "::warning::$stuck runs are queued. Jobs on runner labels with no provider will never start."
+          fi

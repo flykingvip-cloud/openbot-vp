@@ -1,0 +1,43 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "experimentalSortImports": {
+    "newlinesBetween": false,
+  },
+  "experimentalSortPackageJson": {
+    "sortScripts": true,
+  },
+  "tabWidth": 2,
+  "useTabs": false,
+  "ignorePatterns": [
+    // Frozen / governance-protected records: must not be rewritten, not even whitespace.
+    ".kiro/specs/constitutional-governance-discovery/",
+    "packages/constitutional-contracts/",
+    // Generated outputs: regenerate via their scripts instead of formatting by hand.
+    ".kiro/specs/gateway-plugins-monolith-decomposition/baseline/",
+    "docs/zh-CN/",
+    "apps/",
+    "assets/",
+    "CLAUDE.md",
+    "docker-compose.yml",
+    "dist/",
+    "docs/_layouts/",
+    "docs/design/templates/",
+    "node_modules/",
+    "patches/",
+    "pnpm-lock.yaml/",
+    "src/commands/agent.ts",
+    "src/gateway/server-methods/CLAUDE.md",
+    "src/gateway/server-methods/agents.ts",
+    "src/gateway/server-methods/skills.ts",
+    "src/gateway/workspace/handler-bridge.ts",
+    "src/gateway/workspace-resolver/steward-write.ts",
+    "src/memory/backend-config.ts",
+    "src/memory/cogniweave-manager.ts",
+    "src/memory/manager-sync-ops.ts",
+    "src/memory/manager.ts",
+    "src/memory/qmd-manager.ts",
+    "src/auto-reply/reply/export-html/",
+    "Swabble/",
+    "vendor/",
+  ],
+}

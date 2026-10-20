@@ -1,0 +1,151 @@
+{
+  "evidenceId": "workspace-isolation-20260810-001",
+  "schema": "workspace-isolation-evidence-summary/v1",
+  "probeUtc": "2026-08-10T00:18:54Z",
+  "classification": "controlled-audit-desensitized",
+  "environment": {
+    "host": "<production-gateway-host>",
+    "container": "<gateway-container>",
+    "image": "<gateway-image>",
+    "imageId": "<gateway-image-id>",
+    "buildCommit": "<gateway-build-commit>",
+    "buildOverlay": "<gateway-overlay-id>",
+    "dataSource": "host-bind:{stateDir} -> container:{stateDir}",
+    "multitenant": true,
+    "dataMode": "managed"
+  },
+  "sample": {
+    "tenantId": "<sample-tenant>",
+    "userId": "<sample-user>"
+  },
+  "cluster": {
+    "tenantCount": 10,
+    "userDirCount": 50
+  },
+  "probe": {
+    "scriptPath": "scripts/audit/workspace-isolation-probe.mjs",
+    "scriptSha256": "c37037f17931d25eff93da2fc69cf6053a7d24560479800546ad3ad127f0bab7",
+    "schema": "workspace-isolation-probe/v2",
+    "recentDays": 14,
+    "mode": "summary-redacted",
+    "derivedFrom": "workspace-isolation-probe/v2",
+    "probeAt": "2026-08-10T00:18:54Z",
+    "note": "Counts/hashes captured at PROBE_AT against controlled snapshot; re-scan of live production validates current state only."
+  },
+  "pathSummary": {
+    "A_employee": {
+      "pathPattern": "{stateDir}/agents/main/employees/<sample-user>/workspace",
+      "exists": true,
+      "deliverableCount": 39,
+      "recentCount": 28
+    },
+    "B_flat_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace",
+      "exists": true,
+      "deliverableCount": 27,
+      "recentCount": 25
+    },
+    "C_agent_main": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/agents/main/workspace",
+      "exists": true,
+      "deliverableCount": 16,
+      "recentCount": 16
+    },
+    "D_skill_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace-bot-skill",
+      "exists": true,
+      "deliverableCount": 506,
+      "recentCount": 499
+    },
+    "E_skill_host": {
+      "pathPattern": "{stateDir}/workspace-bot-skill",
+      "exists": true,
+      "deliverableCount": 35,
+      "recentCount": 35
+    },
+    "F_canvas": {
+      "pathPattern": "{stateDir}/canvas",
+      "exists": true,
+      "deliverableCount": 4,
+      "recentCount": 3
+    }
+  },
+  "crossClassDuplicateBasenames": {
+    "file-8a981a419218.html": [
+      {
+        "classId": "A_employee",
+        "size": 29477,
+        "mtimeUtc": "2026-08-09T12:19:57Z",
+        "sha256": "d6e3d8300759beb4bf3119c809267516b3417404c6e2e578285674ac18a31b5b",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 29477,
+        "mtimeUtc": "2026-08-09T12:19:57Z",
+        "sha256": "d6e3d8300759beb4bf3119c809267516b3417404c6e2e578285674ac18a31b5b",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 29477,
+        "mtimeUtc": "2026-08-09T12:19:57Z",
+        "sha256": "d6e3d8300759beb4bf3119c809267516b3417404c6e2e578285674ac18a31b5b",
+        "hashMode": "full"
+      }
+    ],
+    "file-bde0ac766bf0.md": [
+      {
+        "classId": "B_flat_l2",
+        "size": 1673,
+        "mtimeUtc": "2026-08-09T12:11:47Z",
+        "sha256": "95c467f710183b2c0397c29ec4ef886bb723671a39ee767dc4d59165f723b68f",
+        "hashMode": "full"
+      },
+      {
+        "classId": "D_skill_l2",
+        "size": 414,
+        "mtimeUtc": "2026-08-06T02:21:59Z",
+        "sha256": "1aca52a8eba7c8d6f0dde58181d8008306276606bfd895163e8a2cd2c1557a42",
+        "hashMode": "full"
+      },
+      {
+        "classId": "E_skill_host",
+        "size": 1673,
+        "mtimeUtc": "2026-08-05T17:27:18Z",
+        "sha256": "95c467f710183b2c0397c29ec4ef886bb723671a39ee767dc4d59165f723b68f",
+        "hashMode": "full"
+      }
+    ],
+    "file-a54ff182c7e8.md": [
+      {
+        "classId": "D_skill_l2",
+        "size": 7874,
+        "mtimeUtc": "2026-08-06T02:21:51Z",
+        "sha256": "3ecae6a107899f284728bf1aa406c75d141773f9f380ba39ba378b5e9fa28f4c",
+        "hashMode": "full"
+      },
+      {
+        "classId": "E_skill_host",
+        "size": 9802,
+        "mtimeUtc": "2026-08-06T20:24:09Z",
+        "sha256": "5d5fbef5ea2c9b70a73bf891ded262b61cffe5339eb749c2031ae78974edb603",
+        "hashMode": "full"
+      }
+    ]
+  },
+  "stats": {
+    "bytesRead": null,
+    "errorCount": 0,
+    "truncated": false,
+    "truncationReasons": [],
+    "note": "bytesRead unavailable for pre-v2 capture; subsequent controlled re-runs must populate stats."
+  },
+  "controlledRawBundle": {
+    "location": "<controlled-audit-store>",
+    "bundleId": "workspace-isolation-20260810-001-raw",
+    "note": "Full host/container/user identifiers and absolute paths remain outside the git repository."
+  },
+  "summarySha256Algorithm": "UTF-8 bytes of JSON.stringify(summaryWithoutSha, null, 2) + '\\n' where summaryWithoutSha omits summarySha256; Node/JSON key insertion order as produced by scripts/audit/workspace-isolation-probe.mjs --mode summary-redacted.",
+  "summarySha256": "9eec5eeea17aa0bb71d0b821c2f407964a1f67b6e3204609f89179d0af4af27a"
+}

@@ -1,0 +1,18 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 test /private/tmp/openbot-baseline-recovery-20260725
+> node scripts/test-parallel.mjs src/gateway/enterprise-model/budget-gate.test.ts src/gateway/enterprise-model/ceiling-effective-set.test.ts src/gateway/enterprise-model/store.test.ts src/gateway/enterprise-model/probe.http.test.ts src/gateway/server-methods/enterprise-model-provider.test.ts
+
+
+ RUN  v4.0.18 /private/tmp/openbot-baseline-recovery-20260725
+
+ ✓ src/gateway/enterprise-model/store.test.ts (5 tests) 102ms
+ ✓ src/gateway/enterprise-model/probe.http.test.ts (3 tests) 33ms
+ ✓ src/gateway/server-methods/enterprise-model-provider.test.ts (10 tests) 127ms
+ ✓ src/gateway/enterprise-model/ceiling-effective-set.test.ts (4 tests) 4ms
+ ✓ src/gateway/enterprise-model/budget-gate.test.ts (3 tests) 3ms
+
+ Test Files  5 passed (5)
+      Tests  25 passed (25)
+   Start at  23:48:44
+   Duration  5.66s (transform 5.78s, setup 1.06s, import 9.26s, tests 269ms, environment 0ms)
+

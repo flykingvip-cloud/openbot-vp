@@ -1,0 +1,143 @@
+.pz {
+  display: grid;
+  gap: 16px;
+}
+
+.pz-note,
+.pz-foot,
+.pz-banner {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pz-banner {
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+  color: var(--text);
+}
+
+.pz-toolbar,
+.pz-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.pz-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.pz-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.pz-panel h2,
+.pz-section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pz-kv {
+  display: grid;
+  margin: 0;
+}
+
+.pz-kv div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pz-kv div:last-child {
+  border-bottom: 0;
+}
+
+.pz-kv dt {
+  color: var(--muted);
+}
+
+.pz-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.pz-align {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pz-align h3 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pz-align p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.pz-status--aligned {
+  color: var(--ok);
+}
+
+.pz-status--drift {
+  color: var(--warn);
+}
+
+.pz-status--rejected {
+  color: var(--danger);
+}
+
+tr.pz-row--drift {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+}
+
+.pz-timeline {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pz-timeline li {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  gap: 12px;
+}
+
+.pz-diffs {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text);
+}
+
+@media (max-width: 960px) {
+  .pz-split,
+  .pz-align {
+    grid-template-columns: 1fr;
+  }
+
+  .pz-kv div,
+  .pz-timeline li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

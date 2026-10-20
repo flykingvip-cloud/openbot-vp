@@ -1,0 +1,51 @@
+path	owner	task_or_spec	claim_status	disposition	deadline	notes
+.kiro/specs/employee-account-agent-roster/tasks.md		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	roster spec WIP
+.loom/registry.yaml	cursor-convergence-day0	repository-wide-branch-convergence	claimed	commit-to-stream	2026-07-22T09:44:54Z	loom session register/claim
+apps/android/app/src/main/java/ai/openclaw/app/employeeauth/EmployeeLoginScreen.kt			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/android/app/src/main/res/values-zh-rCN/strings.xml			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/android/app/src/main/res/values/strings.xml			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/ios/Sources/EmployeeShell/EmployeeLoginView.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/ios/Sources/EmployeeShell/EmployeeShellStrings.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/macos/Sources/OpenBot/EmployeeShell/EmployeeLoginView.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/macos/Sources/OpenBot/EmployeeShell/EmployeeShellController.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/macos/Sources/OpenBot/EmployeeShell/EmployeeShellStrings.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/macos/Sources/OpenBot/LegacyShellPolicy.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/macos/Sources/OpenBot/MenuBar.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/shared/OpenClawKit/Sources/OpenBotKit/GenericPasswordKeychainStore.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+apps/shared/OpenClawKit/Sources/OpenBotProtocol/GatewayModels.swift			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+deploy/production/proxy/nginx/admin.openbot.love.conf			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	nginx conf dirty — freeze; release owner
+deploy/production/proxy/nginx/apex.openbot.love.conf			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	nginx conf dirty — freeze; release owner
+deploy/production/proxy/nginx/biz.openbot.love.conf			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	nginx conf dirty — freeze; release owner
+deploy/production/proxy/nginx/gw.openbot.love.conf			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	nginx conf dirty — freeze; release owner
+extensions/acpx/node_modules/.bin/acpx			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+extensions/diffs/node_modules/.bin/playwright-core			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+extensions/matrix/node_modules/.bin/markdown-it			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+extensions/memory-lancedb/node_modules/.bin/openai			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+extensions/tlon/node_modules/.bin/tlon			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+package.json			hotfile	integration-hotfile	2026-07-22T09:44:54Z	hotfile — whole-file commit forbidden in Day0
+src/canvas-host/a2ui/.bundle.hash			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+src/canvas-host/a2ui/a2ui.bundle.js			generated	discard	2026-07-22T09:44:54Z	likely generated; do not land
+src/gateway/control-plane/agent-runtime-bind-registry.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-ui-contract.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	gateway control-plane / roster related dirty
+src/gateway/control-ui.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	gateway control-plane / roster related dirty
+src/gateway/employee-agent-roster.test.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	gateway control-plane / roster related dirty
+src/gateway/server-maintenance.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	gateway control-plane / roster related dirty
+ui/src/ui/ports/employee/employee-workbench-agent-scope.node.test.ts			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee UI / knowledge library WIP — freeze
+ui/src/ui/ports/employee/employee-workbench-agent-scope.ts			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee UI / knowledge library WIP — freeze
+ui/src/ui/ports/employee/views/workbench-home-model.ts			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee UI / knowledge library WIP — freeze
+ui/src/ui/types.ts			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee UI / knowledge library WIP — freeze
+ui/src/ui/views/knowledge-universe-library-workspace-page.ts			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee UI / knowledge library WIP — freeze
+.kiro/specs/employee-account-agent-roster/design.md		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	roster spec WIP
+.kiro/specs/employee-account-agent-roster/requirements.md		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	roster spec WIP
+apps/android/app/src/main/java/ai/openclaw/app/employeeauth/ControlUiBootstrapProbe.kt			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	mobile/desktop shell WIP — freeze until owner claims
+docs/design/convergence-evidence/	cursor-convergence-day0	repository-wide-branch-convergence	claimed	commit-to-stream	2026-07-22T09:44:54Z	Day0 evidence pack
+docs/design/grok-knowledge-import-branch-sync-execution-instruction-2026-07-20.md			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	porcelain=??
+docs/design/repository-wide-branch-convergence-plan-2026-07-20.md			unclaimed	freeze-evidence	2026-07-22T09:44:54Z	porcelain=??
+scripts/__tests__/migrate-local-agents-to-catalog.test.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+scripts/migrate-local-agents-to-catalog.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-plane/agent-runtime-bind-registry.test.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-plane/dual-gateway-catalog-process.test.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-plane/dual-gateway-catalog-worker.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-plane/runtime-bind-health-probe.test.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-plane/runtime-bind-health-probe.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP
+src/gateway/control-plane/runtime-bind-heartbeat.ts		employee-account-agent-roster	unclaimed	freeze-evidence	2026-07-22T09:44:54Z	employee roster / catalog WIP

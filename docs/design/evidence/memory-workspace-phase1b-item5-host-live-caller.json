@@ -1,0 +1,39 @@
+{
+  "schema": "memory-workspace-phase1b-item5-host-live-caller/v1",
+  "item": 5,
+  "status": "not-met",
+  "owner": "cursor-data-governance",
+  "path": "measure-host-live-caller-after-authorized-write",
+  "live": "host-openbot-and-production",
+  "productionContainerWrite": false,
+  "deployAuthorized": true,
+  "wiredToProductionResolver": false,
+  "identifierPolicy": "hashed",
+  "gitWrite": false,
+  "measured": {
+    "hostCatalogUserOwnedRows": 7,
+    "usersWithExactlyOneAsset": 7,
+    "liveCallerHits": 7,
+    "liveCallerMisses": 0,
+    "exactIdHits": 7,
+    "liveHitForwardsCatalogAndAgentAssetId": true,
+    "hashedUserKeys": [
+      "1dfbd746716cba69",
+      "216bb0d87e79017b",
+      "3ae6c2c54576652e",
+      "508da513e2ad28e6",
+      "8f930e70626c04da",
+      "9ea6761ec5f118ee",
+      "a55af1b63d007c79"
+    ],
+    "wiredToProductionResolver": false,
+    "productionContainerWrite": false,
+    "item5": "not-met"
+  },
+  "note": "After the authorized production write and podman restart of openbot-gateway-rc, the live caller was measured against /root/.openbot. 7 user-owned rows, 7 live hits, 0 misses, 7 exact-id hits. wiredToProductionResolver was not flipped. Item 5 stays not-met.",
+  "explicitlyForbidden": [
+    "set wiredToProductionResolver=true from this measurement alone",
+    "write unredacted identifiers into git",
+    "score item 5 met from this measurement"
+  ]
+}

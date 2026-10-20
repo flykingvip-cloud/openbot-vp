@@ -1,0 +1,84 @@
+/* Enterprise message-channels curated form (WeCom / Feishu / DingTalk). */
+
+.enterprise-im-curated {
+  display: grid;
+  gap: 12px;
+}
+
+.enterprise-im-curated__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.enterprise-im-curated__guide-bar {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.enterprise-im-curated__guide-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent, #c23b22);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.enterprise-im-curated__guide-link:hover {
+  text-decoration: underline;
+}
+
+.enterprise-im-curated__guide-meta {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.enterprise-im-curated__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.enterprise-im-curated__fields {
+  display: grid;
+  gap: 10px;
+}
+
+.enterprise-im-curated__field {
+  display: grid;
+  gap: 4px;
+}
+
+.enterprise-im-curated__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.enterprise-im-curated__input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg, var(--card));
+  color: var(--text);
+  font-size: 13px;
+}
+
+.enterprise-im-curated__input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
+.enterprise-im-curated__help {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}

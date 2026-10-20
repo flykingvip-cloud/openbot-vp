@@ -1,0 +1,146 @@
+/* Flat field stack inside the integrations panel. Top divider only. */
+.enterprise-byok-authorize {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.enterprise-private-models {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.enterprise-private-models > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-seat-config {
+  flex-basis: 100%;
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.enterprise-provider-editor {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.enterprise-provider-editor__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.enterprise-provider-editor__wide {
+  grid-column: 1 / -1;
+}
+
+.enterprise-provider-editor .field {
+  display: grid;
+  gap: 6px;
+}
+
+.enterprise-provider-editor input,
+.enterprise-provider-editor select {
+  width: 100%;
+}
+
+.enterprise-model-key-table-wrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.enterprise-model-key-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.enterprise-model-key-table th,
+.enterprise-model-key-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.enterprise-model-key-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.enterprise-model-key-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.enterprise-model-key-table__name {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.enterprise-model-key-table__name:disabled {
+  cursor: default;
+}
+
+.enterprise-model-key-table__config,
+.enterprise-model-key-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.enterprise-model-key-table__detail td {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.enterprise-model-key-table__facts {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.enterprise-model-key-table__facts div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.enterprise-model-key-table__facts dt {
+  color: var(--muted);
+}
+
+.enterprise-model-key-table__facts dd {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .enterprise-provider-editor__grid {
+    grid-template-columns: 1fr;
+  }
+}

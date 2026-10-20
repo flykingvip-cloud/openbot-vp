@@ -1,0 +1,65 @@
+number	state	title	head_sha	merged_at	updated_at	url	labels
+46	OPEN	release: candidate-20260712 → main (includes Path B steward safety)	7638217f4cd3c211809443a2bbcba2327d856f32		2026-07-17T12:39:14Z	https://github.com/gmood2008/openbot/pull/46	
+45	OPEN	Hybrid Gateway Isolation (F0-F6): dedicated topology + lifecycle	87857e270e0b22caaaf58de03b69a99eda95809e		2026-07-17T10:54:07Z	https://github.com/gmood2008/openbot/pull/45	
+33	OPEN	Pricing v3: remove annual discount subline from cards	ca69a9fb42fbd49fd71c57d8c9e17f5d8fb695d1		2026-07-10T14:27:50Z	https://github.com/gmood2008/openbot/pull/33	
+26	OPEN	build(deps): bump the android-deps group across 1 directory with 27 updates	47eacfdb72289149aaff0db0e3ea1bc2dfe1e714		2026-07-17T18:11:42Z	https://github.com/gmood2008/openbot/pull/26	dependencies,java
+22	OPEN	Loom Provisioning M-Prov-1: E4 hardening + handoff (tail)	f99c727c54c1490283f7bc2539212f36b8f536e5		2026-06-16T13:23:16Z	https://github.com/gmood2008/openbot/pull/22	
+11	OPEN	chore(deps): bump gradle/actions from 4 to 6	c47331f1ffd13507b12c6e5f34bea583b4d4831a		2026-07-09T00:25:00Z	https://github.com/gmood2008/openbot/pull/11	dependencies,github_actions
+10	OPEN	chore(deps): bump actions/create-github-app-token from 1.12.0 to 3.2.0	ce12ac01df37706fcc55029a4e64ef07e249307b		2026-07-09T00:24:59Z	https://github.com/gmood2008/openbot/pull/10	dependencies,github_actions
+9	OPEN	chore(deps): bump actions/checkout from 4 to 6	3717175e43be12525be015cc6daa6e3b3f41930e		2026-07-09T00:24:58Z	https://github.com/gmood2008/openbot/pull/9	dependencies,github_actions
+8	OPEN	chore(deps): bump actions/labeler from 5.0.0 to 6.1.0	4b0a8f3b36e67fa799d30cc657f94d175b55fa4e		2026-07-09T00:24:57Z	https://github.com/gmood2008/openbot/pull/8	dependencies,github_actions
+7	OPEN	chore(deps): bump actions/github-script from 7.1.0 to 9.0.0	03a4225b3ae12a81baa1186db622de8380fb8761		2026-07-09T00:24:56Z	https://github.com/gmood2008/openbot/pull/7	dependencies,github_actions
+6	OPEN	build(deps): bump the swift-deps group across 1 directory with 3 updates	5accf8df9ab740345c6ca421fb18b06918875db3		2026-07-17T18:12:37Z	https://github.com/gmood2008/openbot/pull/6	dependencies,swift_package_manager
+5	OPEN	chore(deps): bump androidx.test.uiautomator:uiautomator from 2.4.0-alpha06 to 2.4.0-beta02 in /apps/android	2941bec8a6753822197d75212fbbc9e4f6f54a4c		2026-07-08T22:28:35Z	https://github.com/gmood2008/openbot/pull/5	dependencies,java
+3	OPEN	chore(deps): bump github.com/apple/swift-testing from 0.99.0 to 6.3.2 in /Swabble	9a5506514a6a8f1dcfceb91408775695bb2fbf62		2026-07-05T08:34:20Z	https://github.com/gmood2008/openbot/pull/3	dependencies,swift_package_manager
+2	OPEN	build(deps): bump github.com/steipete/commander from 0.2.1 to 0.2.3 in /Swabble in the swift-deps group across 1 directory	bda309db39d68362e841064b52d63c82c64d384d		2026-07-17T18:06:28Z	https://github.com/gmood2008/openbot/pull/2	dependencies,swift_package_manager
+1	OPEN	build(deps): bump debian from `98f4b71` to `60eac75` in the docker-images group across 1 directory	5f5758f95e01331c99fc59dc5d74da0c0b330d6e		2026-07-13T18:06:53Z	https://github.com/gmood2008/openbot/pull/1	dependencies,docker
+44	MERGED	UI: workbench, enterprise identity surfaces, i18n	9d9f13b124b554ba8d0357ab9c71485c7d6764cb	2026-07-13T04:32:38Z	2026-07-13T04:32:38Z	https://github.com/gmood2008/openbot/pull/44	
+43	MERGED	Daibai: workspace overview + SaaS tenant design handoff	184193ac9ba9b414bf9c961ab1d654ca23cfa157	2026-07-13T04:16:45Z	2026-07-13T04:16:45Z	https://github.com/gmood2008/openbot/pull/43	
+42	MERGED	Data: export and memory lifecycle + data RPC seams	e18a75b23b77960cfbfa37318c34c7859155a8ec	2026-07-13T04:16:48Z	2026-07-13T04:16:49Z	https://github.com/gmood2008/openbot/pull/42	
+41	MERGED	Auth: platform IMAP mail + control-ui session contract	78eded13a88c600fc4bf7020568116e4324c69ba	2026-07-13T04:07:52Z	2026-07-13T04:07:52Z	https://github.com/gmood2008/openbot/pull/41	
+40	MERGED	Deploy: production pack examples and container hygiene docs	b1805467e97752ce722fcfb28ee24f96237cc105	2026-07-13T04:07:49Z	2026-07-13T04:07:49Z	https://github.com/gmood2008/openbot/pull/40	
+39	MERGED	GWSV: supervisor local IDE probe, worker health, session seams	56d6505feeccf9cb1468763ea912680bdb741043	2026-07-13T04:17:01Z	2026-07-13T04:17:01Z	https://github.com/gmood2008/openbot/pull/39	
+38	MERGED	EDGSC: knowledge universe insights, governance, relationship runtime	8bcf7c28e0f3a0ece703bbc5b55ab553d32797e4	2026-07-13T04:25:35Z	2026-07-13T04:25:35Z	https://github.com/gmood2008/openbot/pull/38	
+37	MERGED	OIG: operational identity providers, OAuth, and execution	0ac050781b31522746649f13d20d10dcd3873bbc	2026-07-13T04:31:15Z	2026-07-13T04:31:15Z	https://github.com/gmood2008/openbot/pull/37	
+35	MERGED	B4: tenant-context-propagation P0–P4 → RC (A级开发收口)	fa318731f4c16164c399e801b509e14cfaf4610c	2026-07-13T01:11:33Z	2026-07-13T01:11:33Z	https://github.com/gmood2008/openbot/pull/35	
+34	MERGED	Data directory: Phase 1+2 (Data Space, migration, export, privacy)	a915dce0514b0cfef2b7827ee9a761bddf7a4901	2026-07-13T05:00:13Z	2026-07-13T05:00:13Z	https://github.com/gmood2008/openbot/pull/34	
+32	MERGED	Infra: fix workspace templates for @upbeyond/openbot global install	618993c1794e2e43aa097675a33e35fa0fd1babb	2026-07-09T10:31:16Z	2026-07-09T10:31:16Z	https://github.com/gmood2008/openbot/pull/32	
+31	MERGED	Gateway: fix collaboration transcript path for unicode group ids	e8c8334d58f6cb565a50b8c7c639259c37d282ae	2026-07-09T10:10:48Z	2026-07-09T10:10:49Z	https://github.com/gmood2008/openbot/pull/31	
+30	MERGED	Gateway: open enterprise writes on configured public proxy	db9be4fe4fa6feab07dd2a24bba85adf282e4cfe	2026-07-09T08:42:12Z	2026-07-09T08:42:12Z	https://github.com/gmood2008/openbot/pull/30	
+29	MERGED	fix(format): plugin CHANGELOG oxfmt for v1.0.1 release CI	6932f5ea7c805fccb5c168240a3edffdd65375a6	2026-07-09T06:00:12Z	2026-07-09T06:00:12Z	https://github.com/gmood2008/openbot/pull/29	
+28	MERGED	Release @upbeyond/openbot@1.0.1 (fix workspace deps + NPM_TOKEN CI)	13946c6e4d93086033384c7ecab55a37508c786f	2026-07-09T05:51:38Z	2026-07-09T05:51:38Z	https://github.com/gmood2008/openbot/pull/28	
+27	MERGED	Public home cleanup + subdomain port routing	bfd67b5dda32fb61a78b17d569fb8b61a1254398	2026-07-08T22:27:34Z	2026-07-08T22:27:34Z	https://github.com/gmood2008/openbot/pull/27	
+20	MERGED	Model entitlement chain (P1-P5) + gateway legacy client-id compat	a13180bf3186b3aede29c37e48c4da77d61ab78a	2026-06-10T02:10:27Z	2026-06-10T02:10:27Z	https://github.com/gmood2008/openbot/pull/20	
+18	MERGED	Runtime: preserve verified openbot salvage subset on current mainline	60b9d5f44bc3d9ee931376f538c2f67cce42d752	2026-06-04T10:54:47Z	2026-06-04T10:54:47Z	https://github.com/gmood2008/openbot/pull/18	
+12	MERGED	Enterprise assets: add governed handover and sqlite backend path	31bcca89aa3d207b5028a78a75e7d6d48d2f1798	2026-06-03T08:49:44Z	2026-06-03T08:49:44Z	https://github.com/gmood2008/openbot/pull/12	
+44	MERGED	UI: workbench, enterprise identity surfaces, i18n	9d9f13b124b554ba8d0357ab9c71485c7d6764cb		2026-07-13T04:32:38Z	https://github.com/gmood2008/openbot/pull/44	
+43	MERGED	Daibai: workspace overview + SaaS tenant design handoff	184193ac9ba9b414bf9c961ab1d654ca23cfa157		2026-07-13T04:16:45Z	https://github.com/gmood2008/openbot/pull/43	
+42	MERGED	Data: export and memory lifecycle + data RPC seams	e18a75b23b77960cfbfa37318c34c7859155a8ec		2026-07-13T04:16:49Z	https://github.com/gmood2008/openbot/pull/42	
+41	MERGED	Auth: platform IMAP mail + control-ui session contract	78eded13a88c600fc4bf7020568116e4324c69ba		2026-07-13T04:07:52Z	https://github.com/gmood2008/openbot/pull/41	
+40	MERGED	Deploy: production pack examples and container hygiene docs	b1805467e97752ce722fcfb28ee24f96237cc105		2026-07-13T04:07:49Z	https://github.com/gmood2008/openbot/pull/40	
+39	MERGED	GWSV: supervisor local IDE probe, worker health, session seams	56d6505feeccf9cb1468763ea912680bdb741043		2026-07-13T04:17:01Z	https://github.com/gmood2008/openbot/pull/39	
+38	MERGED	EDGSC: knowledge universe insights, governance, relationship runtime	8bcf7c28e0f3a0ece703bbc5b55ab553d32797e4		2026-07-13T04:25:35Z	https://github.com/gmood2008/openbot/pull/38	
+37	MERGED	OIG: operational identity providers, OAuth, and execution	0ac050781b31522746649f13d20d10dcd3873bbc		2026-07-13T04:31:15Z	https://github.com/gmood2008/openbot/pull/37	
+36	CLOSED	Chat: checkpoint rollback (session restore + workspace snapshot)	fef66191b4182602c2f31b283085387c1b8f59e4		2026-07-13T04:34:02Z	https://github.com/gmood2008/openbot/pull/36	
+35	MERGED	B4: tenant-context-propagation P0–P4 → RC (A级开发收口)	fa318731f4c16164c399e801b509e14cfaf4610c		2026-07-13T01:11:33Z	https://github.com/gmood2008/openbot/pull/35	
+34	MERGED	Data directory: Phase 1+2 (Data Space, migration, export, privacy)	a915dce0514b0cfef2b7827ee9a761bddf7a4901		2026-07-13T05:00:13Z	https://github.com/gmood2008/openbot/pull/34	
+32	MERGED	Infra: fix workspace templates for @upbeyond/openbot global install	618993c1794e2e43aa097675a33e35fa0fd1babb		2026-07-09T10:31:16Z	https://github.com/gmood2008/openbot/pull/32	
+31	MERGED	Gateway: fix collaboration transcript path for unicode group ids	e8c8334d58f6cb565a50b8c7c639259c37d282ae		2026-07-09T10:10:49Z	https://github.com/gmood2008/openbot/pull/31	
+30	MERGED	Gateway: open enterprise writes on configured public proxy	db9be4fe4fa6feab07dd2a24bba85adf282e4cfe		2026-07-09T08:42:12Z	https://github.com/gmood2008/openbot/pull/30	
+29	MERGED	fix(format): plugin CHANGELOG oxfmt for v1.0.1 release CI	6932f5ea7c805fccb5c168240a3edffdd65375a6		2026-07-09T06:00:12Z	https://github.com/gmood2008/openbot/pull/29	
+28	MERGED	Release @upbeyond/openbot@1.0.1 (fix workspace deps + NPM_TOKEN CI)	13946c6e4d93086033384c7ecab55a37508c786f		2026-07-09T05:51:38Z	https://github.com/gmood2008/openbot/pull/28	
+27	MERGED	Public home cleanup + subdomain port routing	bfd67b5dda32fb61a78b17d569fb8b61a1254398		2026-07-08T22:27:34Z	https://github.com/gmood2008/openbot/pull/27	
+25	CLOSED	Bump the android-deps group across 1 directory with 26 updates	f3badb8bb277e20dc3e51f215955308a1ef40486		2026-07-03T18:05:58Z	https://github.com/gmood2008/openbot/pull/25	dependencies,java
+24	CLOSED	Bump the android-deps group across 1 directory with 27 updates	5d3d433507d2b36c987b3aaaaae496d97322f83c		2026-07-01T18:10:51Z	https://github.com/gmood2008/openbot/pull/24	dependencies,java
+23	CLOSED	Bump the android-deps group across 1 directory with 25 updates	2a3dfba7d46f25ce3ecf314e5a5f8f4e4a29355f		2026-06-19T18:06:05Z	https://github.com/gmood2008/openbot/pull/23	dependencies,java
+21	CLOSED	Bump the android-deps group across 1 directory with 26 updates	495a71ae35e8a96677a9449ede9106c7c5c73203		2026-06-17T18:07:16Z	https://github.com/gmood2008/openbot/pull/21	dependencies,java
+20	MERGED	Model entitlement chain (P1-P5) + gateway legacy client-id compat	a13180bf3186b3aede29c37e48c4da77d61ab78a		2026-06-10T02:10:27Z	https://github.com/gmood2008/openbot/pull/20	
+19	CLOSED	Bump the android-deps group across 1 directory with 24 updates	7633d98cfe1d7befafa38069debbb6ee596bbc04		2026-06-11T18:07:49Z	https://github.com/gmood2008/openbot/pull/19	dependencies,java
+18	MERGED	Runtime: preserve verified openbot salvage subset on current mainline	60b9d5f44bc3d9ee931376f538c2f67cce42d752		2026-06-04T10:54:47Z	https://github.com/gmood2008/openbot/pull/18	
+17	CLOSED	Runtime: preserve verified openbot salvage set final candidate	da9d84a326b40e1161d426196ab60d097761663d		2026-06-04T11:09:56Z	https://github.com/gmood2008/openbot/pull/17	
+16	CLOSED	Runtime: preserve verified openbot salvage set without legacy entry extras	5f2cc7b77de85a75708e84e5485fbf43f84fb1c9		2026-06-04T11:09:54Z	https://github.com/gmood2008/openbot/pull/16	
+15	CLOSED	Runtime: preserve verified openbot salvage set without auth-email rollback	5f2cc7b77de85a75708e84e5485fbf43f84fb1c9		2026-06-04T11:09:52Z	https://github.com/gmood2008/openbot/pull/15	
+14	CLOSED	Runtime: preserve verified openbot salvage set on latest mainline	5f2cc7b77de85a75708e84e5485fbf43f84fb1c9		2026-06-04T11:09:49Z	https://github.com/gmood2008/openbot/pull/14	
+13	CLOSED	Runtime: preserve verified openbot salvage set	4cf7521831689b97b51209d7a7acfceda2c3b3e7		2026-06-04T11:09:47Z	https://github.com/gmood2008/openbot/pull/13	
+12	MERGED	Enterprise assets: add governed handover and sqlite backend path	31bcca89aa3d207b5028a78a75e7d6d48d2f1798		2026-06-03T08:49:44Z	https://github.com/gmood2008/openbot/pull/12	

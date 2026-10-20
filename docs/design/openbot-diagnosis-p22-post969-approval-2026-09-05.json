@@ -1,0 +1,487 @@
+{
+  "increment": "P22",
+  "schemaVersion": 1,
+  "kind": "independent_approval_pack",
+  "readyForIndependentApproval": true,
+  "approvedForProductionCutover": false,
+  "gatesOpened": false,
+  "approvalDoesNotOpenGate": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "identityAligned": true,
+  "p20HardConditions": true,
+  "p21HardConditions": true,
+  "repair": {
+    "liveSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "liveSource": "container",
+    "ledgerOpenSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "releaseRecordSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "provenanceTagSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "ledgerAction": "keep",
+    "releaseRecordAction": "keep",
+    "provenanceAction": "keep",
+    "ledgerMutated": false,
+    "releaseRecordMutated": false,
+    "provenanceMinted": false,
+    "evidenceGaps": [],
+    "blockers": [],
+    "aligned": true
+  },
+  "roleApprovals": [
+    {
+      "role": "platform_security",
+      "items": [
+        "approve DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED after reader/audit/quota injection",
+        "approve DIAGNOSIS_REPORT_API_DEPLOYED without self-registering a live pack",
+        "co-approve Da Bai delivery allowlist and delegation guard",
+        "co-approve remediation executor allowlist"
+      ],
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "role",
+        "subjectId": "platform_security",
+        "requiredApprover": "platform_security",
+        "requiredEvidence": [
+          "approve DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED after reader/audit/quota injection",
+          "approve DIAGNOSIS_REPORT_API_DEPLOYED without self-registering a live pack",
+          "co-approve Da Bai delivery allowlist and delegation guard",
+          "co-approve remediation executor allowlist"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    },
+    {
+      "role": "enterprise_admin",
+      "items": [
+        "co-approve DIAGNOSIS_DAIBAI_DELIVERY_ENABLED after P5 contract + allowlist",
+        "co-approve DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED for tenant scope",
+        "confirm trusted tenant comes only from membership"
+      ],
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "role",
+        "subjectId": "enterprise_admin",
+        "requiredApprover": "enterprise_admin",
+        "requiredEvidence": [
+          "co-approve DIAGNOSIS_DAIBAI_DELIVERY_ENABLED after P5 contract + allowlist",
+          "co-approve DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED for tenant scope",
+          "confirm trusted tenant comes only from membership"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    },
+    {
+      "role": "employee",
+      "items": [
+        "approve high-risk remediation actions that touch the granted principal",
+        "confirm personal-scope evidence is not widened by enterprise/platform grants"
+      ],
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "role",
+        "subjectId": "employee",
+        "requiredApprover": "employee",
+        "requiredEvidence": [
+          "approve high-risk remediation actions that touch the granted principal",
+          "confirm personal-scope evidence is not widened by enterprise/platform grants"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    },
+    {
+      "role": "delivery_ledger_owner",
+      "items": [
+        "update Latest cutover to the proven LIVE without rewriting ledger history",
+        "publish provenance only through the normal release path if a future cutover needs it",
+        "do not ask Diagnosis to mint provenance/sha-* or hide the running SHA"
+      ],
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "role",
+        "subjectId": "delivery_ledger_owner",
+        "requiredApprover": "delivery_ledger_owner",
+        "requiredEvidence": [
+          "update Latest cutover to the proven LIVE without rewriting ledger history",
+          "publish provenance only through the normal release path if a future cutover needs it",
+          "do not ask Diagnosis to mint provenance/sha-* or hide the running SHA"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    }
+  ],
+  "gates": [
+    {
+      "id": "adapters",
+      "name": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security",
+      "preconditions": [
+        "reader_injected",
+        "audit_injected",
+        "quota_injected",
+        "slo_observations_complete",
+        "independent_platform_security_approval"
+      ],
+      "auditReceipt": "pending_human_approval",
+      "rollback": "keep_flag_false",
+      "approvalDoesNotOpenGate": true,
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true,
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "gate",
+        "subjectId": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+        "requiredApprover": "platform_security",
+        "requiredEvidence": [
+          "p20_identity_aligned",
+          "p21_isolated_reader_audit_quota_injected",
+          "p21_fault_injection_passed",
+          "p21_isolated_slo_complete",
+          "independent_platform_security_approval"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    },
+    {
+      "id": "reportApi",
+      "name": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security",
+      "preconditions": [
+        "adapters_approved",
+        "live_pack_not_self_registered",
+        "slo_observations_complete",
+        "independent_platform_security_approval"
+      ],
+      "auditReceipt": "pending_human_approval",
+      "rollback": "keep_flag_false_revoke_live_pack",
+      "approvalDoesNotOpenGate": true,
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true,
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "gate",
+        "subjectId": "DIAGNOSIS_REPORT_API_DEPLOYED",
+        "requiredApprover": "platform_security",
+        "requiredEvidence": [
+          "p20_identity_aligned",
+          "adapters_approved_but_not_enabled",
+          "live_pack_not_self_registered",
+          "p21_isolated_slo_complete",
+          "independent_platform_security_approval"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    },
+    {
+      "id": "daibaiDelivery",
+      "name": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security+enterprise_admin",
+      "preconditions": [
+        "p5_contract_signed",
+        "allowlisted_transport",
+        "delegation_guard_bound",
+        "slo_observations_complete",
+        "platform_security_and_enterprise_admin_approval"
+      ],
+      "auditReceipt": "pending_human_approval",
+      "rollback": "disable_gate_stop_delivery_keep_receipts",
+      "approvalDoesNotOpenGate": true,
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true,
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "gate",
+        "subjectId": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+        "requiredApprover": "platform_security+enterprise_admin",
+        "requiredEvidence": [
+          "p20_identity_aligned",
+          "p5_contract_signed",
+          "allowlisted_transport",
+          "delegation_guard_bound",
+          "p21_isolated_slo_complete",
+          "platform_security_and_enterprise_admin_approval"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    },
+    {
+      "id": "remediationExecution",
+      "name": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security+enterprise_admin+employee",
+      "preconditions": [
+        "allowlisted_executor",
+        "human_approval_for_high_risk",
+        "slo_observations_complete",
+        "platform_security_enterprise_admin_and_employee_approval"
+      ],
+      "auditReceipt": "pending_human_approval",
+      "rollback": "disable_gate_stop_tasks_keep_audit",
+      "approvalDoesNotOpenGate": true,
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true,
+      "signature": {
+        "kind": "human_independent_approval_record",
+        "increment": "P22",
+        "schemaVersion": 1,
+        "subject": "gate",
+        "subjectId": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+        "requiredApprover": "platform_security+enterprise_admin+employee",
+        "requiredEvidence": [
+          "p20_identity_aligned",
+          "allowlisted_executor",
+          "human_approval_for_high_risk",
+          "p21_isolated_slo_complete",
+          "platform_security_enterprise_admin_and_employee_approval"
+        ],
+        "acceptsClientParam": false,
+        "acceptsModelOutput": false,
+        "signed": false,
+        "signedBy": null,
+        "signedAt": null,
+        "receipt": "pending_human_approval",
+        "approvalDoesNotOpenGate": true
+      }
+    }
+  ],
+  "signatures": [
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "role",
+      "subjectId": "platform_security",
+      "requiredApprover": "platform_security",
+      "requiredEvidence": [
+        "approve DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED after reader/audit/quota injection",
+        "approve DIAGNOSIS_REPORT_API_DEPLOYED without self-registering a live pack",
+        "co-approve Da Bai delivery allowlist and delegation guard",
+        "co-approve remediation executor allowlist"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "role",
+      "subjectId": "enterprise_admin",
+      "requiredApprover": "enterprise_admin",
+      "requiredEvidence": [
+        "co-approve DIAGNOSIS_DAIBAI_DELIVERY_ENABLED after P5 contract + allowlist",
+        "co-approve DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED for tenant scope",
+        "confirm trusted tenant comes only from membership"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "role",
+      "subjectId": "employee",
+      "requiredApprover": "employee",
+      "requiredEvidence": [
+        "approve high-risk remediation actions that touch the granted principal",
+        "confirm personal-scope evidence is not widened by enterprise/platform grants"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "role",
+      "subjectId": "delivery_ledger_owner",
+      "requiredApprover": "delivery_ledger_owner",
+      "requiredEvidence": [
+        "update Latest cutover to the proven LIVE without rewriting ledger history",
+        "publish provenance only through the normal release path if a future cutover needs it",
+        "do not ask Diagnosis to mint provenance/sha-* or hide the running SHA"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "requiredApprover": "platform_security",
+      "requiredEvidence": [
+        "p20_identity_aligned",
+        "p21_isolated_reader_audit_quota_injected",
+        "p21_fault_injection_passed",
+        "p21_isolated_slo_complete",
+        "independent_platform_security_approval"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "requiredApprover": "platform_security",
+      "requiredEvidence": [
+        "p20_identity_aligned",
+        "adapters_approved_but_not_enabled",
+        "live_pack_not_self_registered",
+        "p21_isolated_slo_complete",
+        "independent_platform_security_approval"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "requiredApprover": "platform_security+enterprise_admin",
+      "requiredEvidence": [
+        "p20_identity_aligned",
+        "p5_contract_signed",
+        "allowlisted_transport",
+        "delegation_guard_bound",
+        "p21_isolated_slo_complete",
+        "platform_security_and_enterprise_admin_approval"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    },
+    {
+      "kind": "human_independent_approval_record",
+      "increment": "P22",
+      "schemaVersion": 1,
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "requiredApprover": "platform_security+enterprise_admin+employee",
+      "requiredEvidence": [
+        "p20_identity_aligned",
+        "allowlisted_executor",
+        "human_approval_for_high_risk",
+        "p21_isolated_slo_complete",
+        "platform_security_enterprise_admin_and_employee_approval"
+      ],
+      "acceptsClientParam": false,
+      "acceptsModelOutput": false,
+      "signed": false,
+      "signedBy": null,
+      "signedAt": null,
+      "receipt": "pending_human_approval",
+      "approvalDoesNotOpenGate": true
+    }
+  ],
+  "pendingApprovers": [
+    "platform_security",
+    "enterprise_admin",
+    "employee",
+    "delivery_ledger_owner"
+  ],
+  "recordedAt": "2026-09-05T05:56:16.340Z"
+}

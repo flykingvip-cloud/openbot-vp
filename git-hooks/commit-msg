@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# 禁止「记录类提交」夹带可执行/脚本改动（混合提交）。
+#
+# 为什么要有这个 hook：收敛时需要区分「纯记录提交」（只入台账，不重放）与
+# 「运行时提交」（必须重放）。2026-07-27 的第三方验收发现，仅凭提交标题分类会
+# 出错 —— `codex/openbot-enterprise-channels-release` 上有 9 条标题为
+# `Deploy: record vNN ...` 的提交同时修改了可执行门禁脚本
+# `deploy/production/scripts/verify-delivery-alignment.sh`。按标题当记录类排除，
+# 就会静默丢掉门禁脚本的变更。
+# 详见 docs/design/convergence-evidence/2026-07-27/acceptance-phase2-2026-07-27.md
+#
+# 规则：提交标题以 `Deploy: record` / `Docs: record` / `Spec: record` 开头时，
+#       暂存区不得包含可执行文件或 scripts/ 下的脚本。请拆成两次提交。
+# 逃生阀：OPENBOT_ALLOW_MIXED_RECORD_COMMIT=1
+set -uo pipefail
+
+msg_file="${1:?commit message file}"
+GIT="${GIT:-/usr/bin/git}"
+command -v "$GIT" >/dev/null 2>&1 || GIT=git
+
+subject=$(sed -n '1p' "$msg_file")
+case "$subject" in
+  "Deploy: record"* | "Docs: record"* | "Spec: record"*) ;;
+  *) exit 0 ;;
+esac
+
+offenders=()
+
+# 暂存区里的可执行文件（mode 100755）与 scripts/ 下脚本
+# `git diff --cached --raw` 每行形如：:100644 100755 <sha> <sha> M<TAB>path
+while read -r line; do
+  [ -z "$line" ] && continue
+  mode=$(printf '%s' "$line" | awk '{print $2}')
+  path=$(printf '%s' "$line" | cut -f2-)
+  case "$mode" in
+    100755) offenders+=("$path (可执行 mode 755)") ; continue ;;
+  esac
+  case "$path" in
+    scripts/*.sh | scripts/*.mjs | scripts/*.ts | deploy/*/scripts/* | */scripts/*.sh)
+      offenders+=("$path (脚本)") ;;
+  esac
+done < <("$GIT" diff --cached --raw --no-renames 2>/dev/null | sed 's/^:/ /')
+
+[ "${#offenders[@]}" -eq 0 ] && exit 0
+
+if [ "${OPENBOT_ALLOW_MIXED_RECORD_COMMIT:-}" = "1" ]; then
+  echo "⚠️  OPENBOT_ALLOW_MIXED_RECORD_COMMIT=1 —— 放行混合的记录类提交" >&2
+  exit 0
+fi
+
+{
+  echo ""
+  echo "✋ commit-msg 拦截：记录类提交夹带了可执行/脚本改动"
+  echo "   标题：$subject"
+  echo "   夹带："
+  for o in "${offenders[@]}"; do echo "     - $o"; done
+  echo ""
+  echo "   为什么拦：收敛/重放按内容判断提交类别。标题是 record 而内容含脚本的"
+  echo "   混合提交，会被归为「只入台账、不重放」，导致脚本变更被静默丢弃。"
+  echo ""
+  echo "   请拆成两次提交："
+  echo "     1. 脚本/运行时改动 —— 用描述实际变更的标题"
+  echo "     2. 记录/台账文档   —— 保留 record 标题"
+  echo ""
+} >&2
+exit 1

@@ -1,0 +1,67 @@
+{
+  "schema": "memory-workspace-phase1b-item6-sre-half/v3",
+  "preparedBy": "cursor-memory-wsc",
+  "role": "sre-half",
+  "item": 6,
+  "status": "authorized-layout-reviewed-item6-not-met",
+  "item6": "not-met",
+  "live": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "cutoverOwner": "cursor-fable",
+  "existingCutover": "src/gateway/workspace/cutover.ts",
+  "secondStateMachine": false,
+  "reviewedPr": 459,
+  "priorReview": "docs/design/evidence/memory-workspace-phase1b-item6-sre-review-456.json",
+  "review": "docs/design/evidence/memory-workspace-phase1b-item6-sre-review-459.json",
+  "memorySide": {
+    "backup": {
+      "status": "authorized-layout-file-copy-reviewed",
+      "action": "File-level copy of the authorized sqlite before any schema v2 rebuild or binding flip",
+      "alignedAs": "offline copyFileSync + sha256 restore on {stateDir}/memory/resource-{resourceId}.sqlite",
+      "source": "docs/design/evidence/memory-workspace-phase1a-section141-sre-design-review.json",
+      "mustNot": ["LIVE copy", "prune as backup", "agentId filename as identity"],
+      "gap": "mkdtemp stateDir plus synthetic SQLite header; not an authorized production sqlite"
+    },
+    "fencing": {
+      "status": "cutover-single-writer-reviewed",
+      "action": "Keep v1-root-guard and sidecar lock until workspace_id partition is proven on the replica",
+      "runtime": "src/memory/v1-root-guard.ts",
+      "alignedAs": "#459 assertSingleWritableCanonical only",
+      "mustNot": ["treat root fingerprint as resourceId", "drop guard before item 4 enablement"],
+      "gap": "v1-root-guard and sidecar lock were not drilled"
+    },
+    "rollback": {
+      "status": "authorized-layout-policy-reviewed",
+      "action": "Restore sqlite snapshot and follow existing cutover rollback",
+      "beforeCommit": "restore_original_writer allowed",
+      "afterCommit": "roll_forward_or_restore_target; allowOldWriter=false",
+      "alignedAs": "layout fixture restore plus pre/post cutover policy checks",
+      "mustNot": [
+        "restore old writer after resolver_write_cutover",
+        "delete another workspace_id partition"
+      ],
+      "gap": "restore is still the synthetic layout fixture, not an authorized production snapshot"
+    }
+  },
+  "drillReceipt": {
+    "owner": "cursor-fable",
+    "path": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+    "fablePr": 459,
+    "fableStatus": "green",
+    "status": "fable-authorized-layout-reviewed",
+    "sreDoesNotWriteGreenReceipt": true,
+    "sreReview": "layout-aligned-not-item6-met"
+  },
+  "explicitlyForbidden": [
+    "second migration state machine",
+    "LIVE drill",
+    "claim item 6 green from this SRE half",
+    "write a green drill receipt as cursor-memory-wsc",
+    "fill receipt.sre",
+    "Retirement / zero call-sites (item 7)",
+    "enable schema v2",
+    "deployAuthorized=true"
+  ]
+}

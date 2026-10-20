@@ -1,0 +1,71 @@
+import path from "node:path";
+
+const PROJECT_DATA_MARKERS =
+  /(?:项目风险|风险清单|本周项目|portfolio|project\s+risk|risk\s+register)/iu;
+
+const DIRECTORY_DATA_MARKERS =
+  /(?:机器人列表|有哪些机器人|bot\s+list|directory\.bots|协作组机器人)/iu;
+
+const SCHEDULE_DATA_MARKERS = /(?:提醒|cron|日程|会议邀请|schedule|reminder|recurring)/iu;
+
+const MEMORY_DATA_MARKERS = /(?:记忆|memory_search|历史对话|上次|continue\s+above|继续上面)/iu;
+
+export type TaskDataPreflightGap =
+  | "project_kb"
+  | "bot_directory"
+  | "schedule_cron"
+  | "memory_history";
+
+export function detectTaskDataPreflightGaps(text: string): TaskDataPreflightGap[] {
+  const normalized = text.trim();
+  if (!normalized) {
+    return [];
+  }
+  const gaps: TaskDataPreflightGap[] = [];
+  if (PROJECT_DATA_MARKERS.test(normalized)) {
+    gaps.push("project_kb");
+  }
+  if (DIRECTORY_DATA_MARKERS.test(normalized)) {
+    gaps.push("bot_directory");
+  }
+  if (SCHEDULE_DATA_MARKERS.test(normalized)) {
+    gaps.push("schedule_cron");
+  }
+  if (MEMORY_DATA_MARKERS.test(normalized)) {
+    gaps.push("memory_history");
+  }
+  return gaps;
+}
+
+const GAP_GUIDANCE: Record<TaskDataPreflightGap, string> = {
+  project_kb:
+    "verify project/KB sources via tools before listing risks; if empty, say what is missing and where to add it",
+  bot_directory:
+    "call collaboration.directory.bots.list (tenant context required) before naming robots; never fabricate a roster",
+  schedule_cron:
+    "confirm user timezone and existing cron/schedule entries before proposing times; show local time, not UTC-only",
+  memory_history:
+    "run memory_search / read recent transcript before claiming prior work is missing; cite what was found or not found",
+};
+
+/**
+ * Read-only preflight for data-dependent long tasks. Injected when activation
+ * patterns or steward intents need real backing data — blocks empty templates.
+ */
+export function buildTaskDataPreflightPrompt(text: string): string | undefined {
+  const gaps = detectTaskDataPreflightGaps(text);
+  if (gaps.length === 0) {
+    return undefined;
+  }
+  const lines = gaps.map((gap) => `- ${GAP_GUIDANCE[gap]}`);
+  return [
+    "Task data preflight (mandatory before replying):",
+    ...lines,
+    "If required data is unavailable after tool checks, state the gap and next user action — do not emit an empty framework or placeholder list.",
+  ].join("\n");
+}
+
+/** Basename-only archive pointer for session reset continuity prompts. */
+export function formatArchivedTranscriptPointer(archivedPath: string): string {
+  return path.basename(archivedPath);
+}

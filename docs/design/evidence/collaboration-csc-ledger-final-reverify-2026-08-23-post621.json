@@ -1,0 +1,63 @@
+{
+  "schema": "collaboration-csc-ledger-final-reverify-receipt/v1",
+  "status": "passed",
+  "productionCloseout": "passed",
+  "recordedAt": "2026-08-23T01:31:05Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Merge approved #621/#623 then reverify on latest origin/main",
+  "authorizedBy": "user",
+  "explicitNonActions": [
+    "did not change LIVE",
+    "did not restart or recreate the container",
+    "did not add an overlay",
+    "did not change inbound or CSC flags",
+    "did not use the dirty inbound-depth workspace"
+  ],
+  "baseline": {
+    "freshOriginMain": "761d42a0ff436a83ec481bc0d14d8b6b7b899607",
+    "freshOriginMainSubject": "Docs: add ledger final-reverify audit receipt (#621)",
+    "worktree": "/tmp/openbot-ledger-final-761d42a0ff",
+    "note": "Verified after #623 then #621 landed. Named task tip e1cbc1e804 is an ancestor."
+  },
+  "mergedPrs": {
+    "pr623": {
+      "url": "https://github.com/gmood2008/openbot/pull/623",
+      "state": "MERGED",
+      "mergeCommit": "fd1e18b94f1b51243b4c0957a88d326cf30b8f33"
+    },
+    "pr621": {
+      "url": "https://github.com/gmood2008/openbot/pull/621",
+      "state": "MERGED",
+      "mergeCommit": "761d42a0ff436a83ec481bc0d14d8b6b7b899607"
+    }
+  },
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "startedAt": "2026-08-22T15:10:36Z",
+    "healthz": { "http": 200, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "buildInfoCommit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "baseImageSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "imageTag": "rc-amd64-provenance-5c221b9ec3",
+    "imageDigest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257"
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 35,
+      "errors": 0,
+      "identityMismatch": 0,
+      "warnings": 14,
+      "ok": true
+    },
+    "verifyForwardOnly": {
+      "verdict": "allow",
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidate": "761d42a0ff436a83ec481bc0d14d8b6b7b899607"
+    },
+    "verifyDeliveryAlignment": { "pass": 8, "warn": 2, "fail": 0 }
+  },
+  "cutoverExecuted": false,
+  "flagsChanged": false
+}

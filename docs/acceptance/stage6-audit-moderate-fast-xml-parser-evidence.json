@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit \u2014 one moderate advisory mitigation",
+  "advisory": "GHSA-jp2q-39xq-3w4g",
+  "cve": "CVE-2026-33349",
+  "package": "fast-xml-parser",
+  "vulnerable_range": ">=5.0.0 <5.5.7",
+  "affected_version_before": "5.5.6",
+  "dependency_path": ".>fast-xml-parser",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=5.5.7",
+  "mitigated_version": "5.5.7",
+  "reachable_surface": "XMLParser via src/media/input-files.ts (direct root dependency; entity expansion limits falsy-zero bypass)",
+  "mitigation": "Bump dependencies.fast-xml-parser to ^5.5.7; pnpm.overrides.fast-xml-parser=5.5.7",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false. Sibling GHSA-gh4j is a separate cell.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 50,
+    "low": 9,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-jp2q-39xq-3w4g"
+}

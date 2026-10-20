@@ -1,0 +1,31 @@
+{
+  "name": "@openclaw/media-monitor",
+  "version": "2026.7.12-rc.2",
+  "private": true,
+  "description": "Read-only social media monitor connector (MediaCrawler sidecar adapter)",
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@upbeyond/openbot": "workspace:*"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.7"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openbot": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

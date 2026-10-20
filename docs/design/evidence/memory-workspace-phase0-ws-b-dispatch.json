@@ -1,0 +1,36 @@
+{
+  "schema": "memory-workspace-phase0-ws-b-dispatch/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+  "dispatchedAt": "2026-08-16T07:30:00.000Z",
+  "from": "cursor-memory-workspace-followup",
+  "to": "cursor-data-governance",
+  "toTask": "data-governance-v2-p0:cursor-data-governance",
+  "changeRequest": ".kiro/specs/memory-workspace-platform-remediation/ws-b-resolver-change-request.md",
+  "phase0Status": {
+    "phase0Accepted": true,
+    "reviewSequence": 25,
+    "signOffMergedAtMainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708"
+  },
+  "requestedActions": [
+    "Acknowledge WS-B change request in .kiro/specs/data-governance-v2-p0/tasks.md",
+    "Review memory-workspace identity remediation §5–§7 for resolver read-path alignment",
+    "Confirm no parallel WorkspaceIdentity or membership SoT from memory-workspace workstreams",
+    "Set WS-B row in section141-signoff-matrix.json to decision=accepted (design gate only)"
+  ],
+  "explicitlyOutOfScope": [
+    "Resolver production write switch",
+    "Edits under src/gateway/workspace-resolver/** from memory-workspace task",
+    "LIVE migration or StorageBinding cutover",
+    "Schema v2 / memory write-path convergence"
+  ],
+  "acceptanceCriteria": [
+    "data-governance-v2-p0/tasks.md contains WS-B acknowledgment row",
+    "section141 matrix resolver row decision moves from pending to accepted",
+    "No resolver code until remaining §14.1 architecture rows signed"
+  ],
+  "status": "accepted",
+  "acceptedBy": "cursor-data-governance",
+  "acceptedAt": "2026-08-16T08:22:48.000Z",
+  "failClosedEvidence": "docs/design/evidence/memory-workspace-phase1a-ws-b-unknown-conflict-failclosed.json"
+}

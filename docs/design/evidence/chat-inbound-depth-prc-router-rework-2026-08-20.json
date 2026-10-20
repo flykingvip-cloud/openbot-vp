@@ -1,0 +1,44 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "pr": "C",
+  "round": "rework-p1-identity-and-toolset",
+  "capturedAt": "2026-08-20T07:23:00+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "8f81330806",
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts src/auto-reply/reply/operational-identity-context.test.ts src/auto-reply/reply/agent-runner-utils.test.ts src/gateway/chat-inbound-flags.test.ts src/auto-reply/reply/followup-runner.test.ts src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts src/agents/openclaw-tools.knowledge-source.test.ts",
+  "note": "VITEST_CACHE_DIR is outside the worktree to avoid node_modules/.vite-temp EPERM. Chat skips resolveKnowledgeGatewayClientForAgentRun with identitySnapshotPolicy=no_cache (no TTL store; hit always false). Tool evidence uses the embedded construction gate: disableTools short-circuits createTools so the final array length is 0 and knowledge_source is absent. retrieve/act still construct createOpenClawTools including knowledge_source.",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "9 passed (9)",
+    "tests": "56 passed (56)",
+    "duration": "11.72s"
+  },
+  "files": [
+    "src/auto-reply/reply/inbound-depth.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts",
+    "src/auto-reply/reply/operational-identity-context.test.ts",
+    "src/auto-reply/reply/agent-runner-utils.test.ts",
+    "src/gateway/chat-inbound-flags.test.ts",
+    "src/auto-reply/reply/followup-runner.test.ts",
+    "src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts",
+    "src/agents/openclaw-tools.knowledge-source.test.ts"
+  ],
+  "assertions": {
+    "flagOffKeepsKnowledgeAndTools": true,
+    "chatSkipsKnowledgeUniverse": true,
+    "chatSkipsResolveKnowledgeGatewayClientForAgentRun": true,
+    "chatDisableTools": true,
+    "chatConstructedToolCount": 0,
+    "chatConstructedToolsOmitKnowledgeSource": true,
+    "retrieveKeepsKnowledgeIdentityAndKnowledgeSource": true,
+    "actKeepsKnowledgeIdentityAndKnowledgeSource": true,
+    "identitySnapshotHit": false,
+    "identitySnapshotPolicy": "no_cache",
+    "knowledgeSkippedReason": "depth_chat",
+    "toolSkippedReason": "depth_chat"
+  },
+  "productionLive": false
+}

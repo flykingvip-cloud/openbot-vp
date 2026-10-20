@@ -1,0 +1,49 @@
+{
+  "title": "ConversationTask full-tenant enablement after closed single-tenant canary",
+  "ledgerSeq": 88,
+  "actor": "cursor-grok",
+  "utc": "2026-09-15T12:51:27Z",
+  "priorCanary": {
+    "acceptedSeq": 83,
+    "liveImageThen": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "scopeThen": "allowlist=1",
+    "projectionThen": "off",
+    "authorizationThen": "off",
+    "fullTenantThen": "NOT APPROVED"
+  },
+  "liveSha": "5fa5ae9341dda9695a2b20f63c72cdef12b60c25",
+  "imageTag": "rc-amd64-provenance-5fa5ae9341",
+  "imageDigest": "sha256:4f36a4e0e682aaac43165ea30aff84002c8cba369cc031468c6be63866f63ce0",
+  "changeKind": "host-config",
+  "containerRecreated": false,
+  "healthz": { "ok": true, "status": "live" },
+  "readyz": { "ready": true, "failing": [] },
+  "hmac": {
+    "keySet": true,
+    "keyId": "ct-2026-09-11-host",
+    "inPodmanConfigEnv": false
+  },
+  "allowlist": {
+    "enabledCountBefore": 1,
+    "enabledCountAfter": 0,
+    "fingerprintPrefix": "7a3e6b16cb75f48f",
+    "actor": "cursor-grok",
+    "stateVersion": 4,
+    "mode": "all-authenticated-tenants"
+  },
+  "flags": {
+    "activation": "env=1",
+    "detection": "store=1",
+    "qualification": "store=1",
+    "projection": "off",
+    "authorization": "off"
+  },
+  "controlPlane": {
+    "forcedOff": false,
+    "reopenActor": "env-activation-flag",
+    "stateVersion": 2
+  },
+  "governance": "assist",
+  "backup": "config-store.db.bak-pre-full-enable-20260915T125127Z",
+  "notes": "No HMAC value, raw tenant IDs, conversation IDs, message IDs, or user text are recorded. chat.send was not invoked. Existing canary tasks remain readable. projection and authorization stay off."
+}

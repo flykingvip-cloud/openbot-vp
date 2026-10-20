@@ -1,0 +1,43 @@
+{
+  "schema": "memory-workspace-phase1b-item2-production-catalog-coverage/v1",
+  "item": 2,
+  "status": "not-production-met",
+  "item2": "not-met",
+  "covered": false,
+  "live": false,
+  "catalogWrite": false,
+  "productionCatalogWrite": "none",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "missDenyEnabled": false,
+  "fourGates100": false,
+  "refusedPhase0": true,
+  "target": {
+    "status": "unconfigured",
+    "catalogPresent": false
+  },
+  "dumpPresent": true,
+  "evidenceCatalogIsNotProductionSot": true,
+  "uniqueUserOwnedEquivalent": 0,
+  "occupancyReason": "seat_occupancy_mintable_without_unique_user_owned_asset",
+  "catalogUserOwned": {
+    "userOwnedRecordCount": 0,
+    "catalogUserCount": 0,
+    "uniqueUserOwnedInCatalog": 0
+  },
+  "authorityCatalogGatesPass": false,
+  "gates": null,
+  "reason": "production_state_dir_unconfigured",
+  "explicitlyForbidden": [
+    "Catalog SoT write from Phase 0 inventory",
+    "treat fixture or evidence Catalog as production SoT",
+    "treat host ~/.openbot Catalog as production SoT",
+    "write Phase 0 inventory",
+    "enable Catalog miss=deny before four gates 100%",
+    "treat this packet as item 2 met",
+    "phase1bExecutionBlocked=false",
+    "LIVE migration"
+  ],
+  "note": "Read-only production Catalog coverage. Fixture/evidence/host catalogs are not production SoT. miss=deny stays off while four gates are not 100% on the production Catalog."
+}

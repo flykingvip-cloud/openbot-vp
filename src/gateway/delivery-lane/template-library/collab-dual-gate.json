@@ -1,0 +1,13 @@
+{
+  "id": "collab-dual-gate",
+  "label": "协作双门禁",
+  "description": "implementSeal ∧ acceptSeal（可跨机 path-1）后 merge_ready；对齐 collab review/final 语义。",
+  "initialMode": "implement",
+  "ciPolicy": {
+    "hostedCiBillingBlocked": true,
+    "mustGreenLocally": true,
+    "strategy": "双钥+match-head 后才 requestMerge；本机 must-green；hosted CI 计费挡不挡本机验收"
+  },
+  "gates": ["implementSeal", "acceptSeal", "match-head"],
+  "cutoverNote": "合入≠切流；handoffContract / delivery-lane flag 默认仍 OFF"
+}

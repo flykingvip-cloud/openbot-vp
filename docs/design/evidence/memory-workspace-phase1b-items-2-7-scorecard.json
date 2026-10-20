@@ -1,0 +1,142 @@
+{
+  "schema": "memory-workspace-phase1b-items-2-7-scorecard/v1",
+  "preparedBy": "cursor-data-governance",
+  "baseline": "e15977532ec0fba3897275226b95ab5fe2885194",
+  "mergedPr": 520,
+  "unlock": "not-issued",
+  "unlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "note": "2026-08-19: item 2 official met cites production Catalog SoT closeout (uniqueUserOwnedEquivalent=7, authority-shaped four gates). Occupancy coverage.json uniqueUserOwnedEquivalent=0 is not production SoT. Item 6 official met cites operator-issued OPENBOT_AUTHORIZED_SQLITE_PATH plus production-equivalent backup/restore/v1-root-guard. Unlock stays not-issued. Item 7 stays not-met. 2026-08-19 Item 5 closeout: side-worktree issued stamp revoked; canonical unlock remains not-issued.",
+  "items": [
+    {
+      "id": 2,
+      "condition": "Persistent workspace records admitted into the existing Data Governance Catalog through governed offline bootstrap, with §5.4 coverage gates satisfied",
+      "status": "met",
+      "stage": "B-persisted",
+      "owner": ["codex-workspace-architecture", "cursor-data-governance"],
+      "evidence": [
+        "docs/design/evidence/memory-workspace-phase1b-item2-stage-a.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-stage-a-architecture-accept.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-stage-a-dump-accept.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-stage-a-governance-accept.json",
+        "docs/design/evidence/memory-workspace-phase1b-authority-dump.json",
+        "docs/design/evidence/memory-workspace-phase1b-production-authority-dump.json",
+        "docs/design/evidence/memory-workspace-phase1b-authority-candidate.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-stage-b.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-persist.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-catalog.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-host-catalog-persist.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-closeout.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-architecture-accept.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-residual-opaque-quarantine.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-catalog-coverage-sot.json",
+        "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-score.json"
+      ],
+      "remaining": [
+        "unlock stays not-issued; U1 stays blocked; miss=deny stays off; residual 9 remain residual-not-normal-no-rewrite"
+      ]
+    },
+    {
+      "id": 3,
+      "condition": "cursor-data-governance accepts a resolver write-switch change",
+      "status": "met",
+      "owner": ["cursor-data-governance"],
+      "evidence": [
+        "docs/design/evidence/memory-workspace-phase1b-item3-write-switch-acceptance.json",
+        "docs/design/evidence/memory-workspace-phase1b-items-3-7.json",
+        ".kiro/specs/memory-workspace-platform-remediation/phase1b-item3-write-switch-change-request.md"
+      ],
+      "requiredEvidence": "Independent acceptance packet for the write-switch change. Design CR #429 is not this evidence.",
+      "remaining": []
+    },
+    {
+      "id": 4,
+      "condition": "Memory schema v2 ships in the same release unit as that write switch",
+      "status": "met",
+      "owner": ["cursor-memory-wsc"],
+      "evidence": [
+        "docs/design/evidence/memory-workspace-phase1b-items-3-7.json",
+        "docs/design/evidence/memory-workspace-phase1b-item4-schema-v2-same-release.json",
+        "src/memory/schema-v2.ts"
+      ],
+      "requiredEvidence": "Schema v2 DDL bound to the same release unit as item 3. Write path stays closed.",
+      "remaining": []
+    },
+    {
+      "id": 5,
+      "condition": "Membership + AgentAsset can fail closed without path inference",
+      "status": "met",
+      "owner": ["cursor-data-governance"],
+      "evidence": [
+        "docs/design/evidence/memory-workspace-phase1b-items-3-7.json",
+        "docs/design/evidence/memory-workspace-phase1b-item5-fail-closed-evidence.json",
+        "docs/design/evidence/memory-workspace-phase1b-item5-live-path-evidence.json",
+        "src/gateway/data-governance/workspace-identity-fail-closed.ts",
+        "src/gateway/workspace-resolver/tool-cwd.ts",
+        "src/gateway/tenant-context.ts"
+      ],
+      "requiredEvidence": "Production fail-closed proof: miss/unknown/conflict do not infer identity from path, realpath, agentId, or display name.",
+      "remaining": []
+    },
+    {
+      "id": 6,
+      "condition": "Cutover extends the existing record/guard; backup / fencing / rollback drill is green",
+      "status": "met",
+      "owner": ["cursor-fable", "cursor-memory-wsc"],
+      "evidence": [
+        "docs/design/evidence/memory-workspace-phase1b-items-3-7.json",
+        "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+        "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+        "docs/design/evidence/openbot-cogniweave-u1-item6-sre-review.json",
+        "docs/design/evidence/openbot-cogniweave-u1-item6-wsc-signed-review.json"
+      ],
+      "requiredEvidence": "Drill receipt on the existing workspace-cutover record/guard. No second state machine.",
+      "remaining": [
+        "authorized-layout drill stays green and not a production snapshot; production-equivalent backup/restore/v1-root-guard now passed on operator-issued sqlite; production still has 0 resource-{id}.sqlite files; unlock stays not-issued"
+      ]
+    },
+    {
+      "id": 7,
+      "condition": "Retirement: production old call-sites are zero before I3",
+      "status": "not-met",
+      "owner": ["cursor-data-governance"],
+      "evidence": [
+        "docs/design/evidence/memory-workspace-phase1b-items-3-7.json",
+        "docs/design/evidence/memory-workspace-phase1b-item7-retirement-ledger.json"
+      ],
+      "requiredEvidence": "Retirement owner distinct from Freeze. Production old call-sites measured at zero before I3.",
+      "remaining": ["productionWriteWatchIndex 38 → 0 before I3; do not retire before unlock"]
+    }
+  ],
+  "standing": [
+    {
+      "id": 8,
+      "condition": "Forward-only release gate still holds",
+      "status": "holding"
+    },
+    {
+      "id": 9,
+      "condition": "deployAuthorized stays false until a separate LIVE authorization",
+      "status": "holding"
+    },
+    {
+      "id": 10,
+      "condition": "No LIVE migration and no Catalog SoT write from Phase 0 inventory",
+      "status": "holding"
+    }
+  ],
+  "explicitlyForbidden": [
+    "treat Stage A measurement as item 2 met",
+    "treat this scorecard as Phase 1B unlock",
+    "treat evidence catalog persist as item 2 met",
+    "Catalog SoT write from Phase 0 inventory",
+    "resolver write switch",
+    "memory schema v2 enablement",
+    "LIVE migration",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ],
+  "unlockRevokeReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-issued-stamp-revoke.json"
+}

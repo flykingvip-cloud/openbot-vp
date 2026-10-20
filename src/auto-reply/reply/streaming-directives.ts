@@ -1,0 +1,159 @@
+import { splitMediaFromOutput } from "../../media/parse.js";
+import {
+  stripAssistantScratchpadFromText,
+  type VisibleReplyLanguage,
+} from "../../shared/text/assistant-scratchpad.js";
+import { parseInlineDirectives } from "../../utils/directive-tags.js";
+import { isSilentReplyPrefixText, isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
+import type { ReplyDirectiveParseResult } from "./reply-directives.js";
+
+type PendingReplyState = {
+  explicitId?: string;
+  sawCurrent: boolean;
+  hasTag: boolean;
+};
+
+type ParsedChunk = ReplyDirectiveParseResult & {
+  replyToExplicitId?: string;
+};
+
+type ConsumeOptions = {
+  final?: boolean;
+  silentToken?: string;
+};
+
+const splitTrailingDirective = (text: string): { text: string; tail: string } => {
+  const openIndex = text.lastIndexOf("[[");
+  if (openIndex < 0) {
+    return { text, tail: "" };
+  }
+  const closeIndex = text.indexOf("]]", openIndex + 2);
+  if (closeIndex >= 0) {
+    return { text, tail: "" };
+  }
+  return {
+    text: text.slice(0, openIndex),
+    tail: text.slice(openIndex),
+  };
+};
+
+const parseChunk = (
+  raw: string,
+  options?: { silentToken?: string; expectedLanguage?: VisibleReplyLanguage | null },
+): ParsedChunk => {
+  const split = splitMediaFromOutput(raw);
+  let text = split.text ?? "";
+
+  const replyParsed = parseInlineDirectives(text, {
+    stripAudioTag: false,
+    stripReplyTags: true,
+  });
+
+  if (replyParsed.hasReplyTag) {
+    text = replyParsed.text;
+  }
+  if (options && "expectedLanguage" in options) {
+    text = stripAssistantScratchpadFromText(text, options.expectedLanguage);
+  }
+
+  const silentToken = options?.silentToken ?? SILENT_REPLY_TOKEN;
+  const isSilent =
+    isSilentReplyText(text, silentToken) || isSilentReplyPrefixText(text, silentToken);
+  if (isSilent) {
+    text = "";
+  }
+
+  return {
+    text,
+    mediaUrls: split.mediaUrls,
+    mediaUrl: split.mediaUrl,
+    replyToId: replyParsed.replyToId,
+    replyToExplicitId: replyParsed.replyToExplicitId,
+    replyToCurrent: replyParsed.replyToCurrent,
+    replyToTag: replyParsed.hasReplyTag,
+    audioAsVoice: split.audioAsVoice,
+    isSilent,
+  };
+};
+
+const hasRenderableContent = (parsed: ReplyDirectiveParseResult): boolean =>
+  Boolean(parsed.text) ||
+  Boolean(parsed.mediaUrl) ||
+  (parsed.mediaUrls?.length ?? 0) > 0 ||
+  Boolean(parsed.audioAsVoice);
+
+export function createStreamingDirectiveAccumulator(options?: {
+  expectedLanguage?: VisibleReplyLanguage | null | (() => VisibleReplyLanguage | null);
+}) {
+  const hasLanguage = Boolean(options && "expectedLanguage" in options);
+  const resolveLanguage = (): VisibleReplyLanguage | null => {
+    const value = options?.expectedLanguage;
+    return typeof value === "function" ? value() : (value ?? null);
+  };
+  let pendingTail = "";
+  let pendingReply: PendingReplyState = { sawCurrent: false, hasTag: false };
+  let activeReply: PendingReplyState = { sawCurrent: false, hasTag: false };
+
+  const reset = () => {
+    pendingTail = "";
+    pendingReply = { sawCurrent: false, hasTag: false };
+    activeReply = { sawCurrent: false, hasTag: false };
+  };
+
+  const consume = (raw: string, options: ConsumeOptions = {}): ReplyDirectiveParseResult | null => {
+    let combined = `${pendingTail}${raw ?? ""}`;
+    pendingTail = "";
+
+    if (!options.final) {
+      const split = splitTrailingDirective(combined);
+      combined = split.text;
+      pendingTail = split.tail;
+    }
+
+    if (!combined) {
+      return null;
+    }
+
+    const parsed = parseChunk(combined, {
+      silentToken: options.silentToken,
+      ...(hasLanguage ? { expectedLanguage: resolveLanguage() } : {}),
+    });
+    const hasTag = activeReply.hasTag || pendingReply.hasTag || parsed.replyToTag;
+    const sawCurrent = activeReply.sawCurrent || pendingReply.sawCurrent || parsed.replyToCurrent;
+    const explicitId =
+      parsed.replyToExplicitId ?? pendingReply.explicitId ?? activeReply.explicitId;
+
+    const combinedResult: ReplyDirectiveParseResult = {
+      ...parsed,
+      replyToId: explicitId,
+      replyToCurrent: sawCurrent,
+      replyToTag: hasTag,
+    };
+
+    if (!hasRenderableContent(combinedResult)) {
+      if (hasTag) {
+        pendingReply = {
+          explicitId,
+          sawCurrent,
+          hasTag,
+        };
+      }
+      return null;
+    }
+
+    // Keep reply context sticky for the full assistant message so split/newline chunks
+    // stay on the same native reply target until reset() is called for the next message.
+    activeReply = {
+      explicitId,
+      sawCurrent,
+      hasTag,
+    };
+    pendingReply = { sawCurrent: false, hasTag: false };
+    return combinedResult;
+  };
+
+  return {
+    consume,
+    reset,
+  };
+}

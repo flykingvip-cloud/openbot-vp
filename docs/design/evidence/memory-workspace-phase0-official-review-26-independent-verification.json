@@ -1,0 +1,175 @@
+{
+  "schema": "memory-workspace-phase0-official-review-independent-verification/v1",
+  "evidenceId": "memory-workspace-phase0-official-review-26",
+  "reviewSequence": 26,
+  "verifiedAt": "2026-08-16T08:20:00.000Z",
+  "verifiedBy": "kiro-memory-workspace-remediation",
+  "verificationRole": "official-review-delegate",
+  "delegationAuthorizedBy": "gmood2008",
+  "delegationScope": "review-sequence-26-only",
+  "delegationRecord": "docs/design/evidence/memory-workspace-phase0-official-review-26-delegation.json",
+  "mainShaAtVerification": "58ce58793cd65bc2212b2446d648e85da5d4a919",
+  "mainCommittedAt": "2026-08-16T08:12:09Z",
+  "verificationMethod": "live-gh-readonly-replay-governance-repair-v2",
+  "verificationEnvironment": "isolated-worktree-fresh-origin-main@58ce58793c",
+  "ghAuthorizationServiceStatus": "restored-503-cleared",
+  "liveGitHubEvidence": {
+    "mainSha": "58ce58793cd65bc2212b2446d648e85da5d4a919",
+    "mainShaVerifiedAt": "2026-08-16T08:20:00.000Z",
+    "rulesetId": "19808307",
+    "rulesetName": "require-pr-on-trunk",
+    "rulesetEnforcement": "active",
+    "rulesetBypassActorCount": 0,
+    "rulesetUpdatedAt": "2026-08-15T16:27:38.243+08:00",
+    "requiredStatusChecks": [
+      "delivery guard",
+      "check (types, lint, format)",
+      "freeze + phase0 evidence tests"
+    ],
+    "requiredChecksAtMainTip": [
+      {
+        "context": "freeze + phase0 evidence tests",
+        "runId": "31935854081",
+        "jobId": "95137533766",
+        "status": "completed",
+        "conclusion": "success",
+        "verifiedAt": "2026-08-16T08:20:00.000Z"
+      }
+    ],
+    "pr409": {
+      "number": 409,
+      "state": "MERGED",
+      "mergedAt": "2026-08-15T08:26:59Z",
+      "mergeCommit": "d261378ff3d283d134a6ed4088e836842380294d",
+      "reviewDecision": "APPROVED",
+      "approvedBy": ["flykingvip-cloud"]
+    },
+    "pr401": {
+      "number": 401,
+      "state": "MERGED",
+      "mergedAt": "2026-08-15T11:35:06Z",
+      "mergeCommit": "1ab9d33e69ea3803e5d4e0f0be7ece83653fb792",
+      "reviewDecision": "APPROVED",
+      "approvedBy": ["flykingvip-cloud"]
+    },
+    "runners": {
+      "total_count": 1,
+      "kiro-temp-runner": {
+        "id": 21,
+        "status": "online",
+        "busy": true,
+        "os": "macOS",
+        "labels": ["self-hosted", "macOS", "ARM64"]
+      }
+    },
+    "tripleGateCaveat": "CI Gate did not trigger on #422/#423/#425 merge pushes; last full triple gate on ancestry @ 6fdc0ac809 (runs 31932917224/31932917133). Repair PR must pass triple gate before merge."
+  },
+  "runnerStabilityR25Replay": {
+    "note": "Re-fetched all 6 runs and 9 jobs from execution-team offline-gh-evidence-pack-r25 to verify they remain success",
+    "runs": [
+      {
+        "runId": "31917642710",
+        "name": "Memory Workspace Freeze",
+        "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "runId": "31917642731",
+        "name": "CI Gate",
+        "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "runId": "31918084060",
+        "name": "Memory Workspace Freeze",
+        "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "runId": "31918085424",
+        "name": "CI Gate",
+        "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "runId": "31918309890",
+        "name": "Memory Workspace Freeze",
+        "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "runId": "31918311191",
+        "name": "CI Gate",
+        "headSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "consecutiveSuccessCount": 3,
+    "verifiedAt": "2026-08-16T08:20:00.000Z"
+  },
+  "localEngineeringGate": {
+    "pass": true,
+    "checkCount": 20,
+    "failedCheckCount": 0,
+    "addedProductionCallSites": [],
+    "addedProductionHelpers": [],
+    "addedCatalogSynthesis": [],
+    "deployAuthorized": false,
+    "closesWsC": false,
+    "verifiedAt": "2026-08-16T08:20:00.000Z"
+  },
+  "localEvidenceTests": {
+    "totalTests": 42,
+    "passedTests": 42,
+    "failedTests": 0,
+    "testFiles": [
+      "docs/design/evidence/memory-workspace-phase0-exit-gate.test.mjs",
+      "docs/design/evidence/memory-workspace-phase0-close-readiness.test.mjs",
+      "docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack-r25.test.mjs",
+      "docs/design/evidence/memory-workspace-phase0-live-roots.test.mjs",
+      "docs/design/evidence/memory-workspace-phase0-inventory.test.mjs",
+      "docs/design/evidence/memory-workspace-phase0-v1-root-fingerprint.test.mjs",
+      "docs/design/evidence/memory-workspace-phase0-sign-off-guard.test.mjs"
+    ],
+    "verifiedAt": "2026-08-16T08:20:00.000Z"
+  },
+  "trustedFreeze": {
+    "ok": true,
+    "addedProductionCallSites": [],
+    "addedProductionHelpers": [],
+    "addedCatalogSynthesis": [],
+    "baselineBlob": "583c1fc0c93da386289a276b77884d24255440c4",
+    "trusted": true,
+    "verifiedAt": "2026-08-16T08:20:00.000Z"
+  },
+  "attribution": {
+    "unattributed": 0,
+    "conflict": 0,
+    "verifiedAt": "2026-08-16T08:20:00.000Z"
+  },
+  "gitDiffCheck": {
+    "whitespaceErrors": 0,
+    "verifiedAt": "2026-08-16T08:20:00.000Z"
+  },
+  "verificationConclusion": "PASS",
+  "acceptedWithCaveats": [
+    "runner-7-day-slo-NOT-proven-minimum-bar-met-4-consecutive-cycles-including-post-restart",
+    "pr-409-merge-moment-freeze-failure-historical-infra-transient-accepted-with-disposition",
+    "main-non-required-jobs-failing-due-to-blacksmith-runner-outage"
+  ],
+  "note": "Review-26 independent verification re-run for governance-repair-r26-v2 @ main@58ce58793c (#425 Phase 1A contracts present). Live gh ruleset/PR/runner replay; freeze green at main tip; CI Gate merge-push gap documented.",
+  "regressionRepair": {
+    "detectedReviewSequence": 25,
+    "detectedDecision": "PHASE0_ACCEPTED",
+    "staleRepairBranch": "official-review/governance-repair-r26",
+    "staleRepairCommit": "07042e0a91",
+    "repairBranch": "official-review/governance-repair-r26-v2",
+    "repairReason": "review-26 SoT reverted by #422/#425 merges; stale repair anchored d29a1a5be and forbidden"
+  }
+}

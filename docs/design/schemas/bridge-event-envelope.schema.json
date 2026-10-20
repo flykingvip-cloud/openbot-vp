@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbot.love/design/schemas/bridge-event-envelope.schema.json",
+  "title": "BridgeEventEnvelope",
+  "description": "All CO-Chat bridge events — see docs/design/event-mapping.md rev2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "event",
+    "idempotencyKey",
+    "recordedAt",
+    "scope",
+    "serverAttribution",
+    "payload"
+  ],
+  "properties": {
+    "contractVersion": {
+      "type": "string",
+      "const": "2026-09-15.rev2"
+    },
+    "event": {
+      "type": "string",
+      "enum": ["background.completed", "background.failed"]
+    },
+    "idempotencyKey": {
+      "type": "string",
+      "minLength": 16
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tenantId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["group_tenant", "personal_local"]
+    },
+    "serverAttribution": {
+      "type": "string",
+      "pattern": "^(gateway:|mcp-server:)[a-zA-Z0-9._-]+$"
+    },
+    "cancelGeneration": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "primaryGeneration": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bindingId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "bindingVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "actorSessionId": {
+      "type": "string",
+      "description": "Informational only; MUST NOT be used for ACL without serverAttribution"
+    },
+    "payload": {
+      "allOf": [
+        { "$ref": "#/$defs/noPiiObject" },
+        {
+          "$ref": "https://openbot.love/design/schemas/background-completion-payload.schema.json"
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "deniedPayloadName": {
+      "type": "string",
+      "description": "Case-insensitive PII/HMAC/raw-identity keys; camelCase and snake/kebab separators.",
+      "pattern": "^([eE][mM][aA][iI][lL]|[eE][mM][pP][lL][oO][yY][eE][eE][_-]*[eE][mM][aA][iI][lL]|[pP][hH][oO][nN][eE]([_-]*[nN][uU][mM][bB][eE][rR])?|[pP][aA][sS][sS][wW][oO][rR][dD]|[tT][oO][kK][eE][nN]|[aA][cC][cC][eE][sS][sS][_-]*[tT][oO][kK][eE][nN]|[rR][eE][fF][rR][eE][sS][hH][_-]*[tT][oO][kK][eE][nN]|[hH][mM][aA][cC]([_-]*[sS][eE][cC][rR][eE][tT])?|[rR][aA][wW][_-]*[iI][dD][eE][nN][tT][iI][tT][yY]|[rR][eE][qQ][uU][eE][sS][tT][eE][rR][_-]*[iI][dD]|[pP][rR][iI][vV][aA][tT][eE][_-]*[kK][eE][yY]|[iI][dD][_-]*[cC][aA][rR][dD]|[sS][sS][nN])$"
+    },
+    "noPiiObject": {
+      "type": "object",
+      "description": "Recursive PII/HMAC/raw-identity denylist for envelope payload.",
+      "propertyNames": {
+        "not": {
+          "$ref": "#/$defs/deniedPayloadName"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/noPiiValue"
+      }
+    },
+    "noPiiValue": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "null" },
+        { "$ref": "#/$defs/noPiiObject" },
+        { "type": "array", "items": { "$ref": "#/$defs/noPiiValue" } }
+      ]
+    }
+  },
+  "dependentRequired": {
+    "bindingId": ["bindingVersion"],
+    "bindingVersion": ["bindingId"]
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "scope": { "const": "personal_local" }
+          },
+          "required": ["scope"]
+        },
+        {
+          "properties": {
+            "scope": { "const": "group_tenant" },
+            "tenantId": { "type": "string", "minLength": 1 }
+          },
+          "required": ["scope", "tenantId"]
+        }
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "event": { "const": "background.completed" },
+            "payload": {
+              "type": "object",
+              "required": ["event"],
+              "properties": {
+                "event": { "const": "background.completed" }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "event": { "const": "background.failed" },
+            "payload": {
+              "type": "object",
+              "required": ["event"],
+              "properties": {
+                "event": { "const": "background.failed" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

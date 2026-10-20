@@ -1,0 +1,113 @@
+{
+  "schema": "memory-workspace-phase0-sign-off/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "phase0Accepted": true,
+  "decision": "P0_ACCEPTED",
+  "reviewSequence": 26,
+  "supersedesReviewSequence": 24,
+  "mainSha": "58ce58793cd65bc2212b2446d648e85da5d4a919",
+  "mainCommittedAt": "2026-08-16T08:12:09Z",
+  "wsCBaselineSha": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+  "signedBy": "official-review",
+  "signedByDelegate": "kiro-memory-workspace-remediation",
+  "delegationAuthorizedBy": "gmood2008",
+  "delegationAuthorizedAt": "2026-08-16T04:20:00.000Z",
+  "delegationScope": "review-sequence-26-only",
+  "delegationRecord": "docs/design/evidence/memory-workspace-phase0-official-review-26-delegation.json",
+  "signedAt": "2026-08-16T08:20:00.000Z",
+  "independentVerification": "docs/design/evidence/memory-workspace-phase0-official-review-26-independent-verification.json",
+  "deployAuthorized": false,
+  "liveDeployAuthorized": false,
+  "closesWsC": false,
+  "phase1bExecutionBlocked": true,
+  "section141Signed": false,
+  "phase1aStatus": "design-and-owner-signoff-only",
+  "supersededUnauthorizedCandidate": {
+    "commit": "fc078574e1f78887f76e7190964b5fb054a395dd",
+    "branch": "cursor-fable/review-25-independent-verification",
+    "claimedReviewSequence": 25,
+    "claimedDecision": "P0_ACCEPTED",
+    "verdict": "unauthorized-candidate-sign-off",
+    "reason": "signedBy=official-review written by the execution team on its own branch, no Task/Agent trailers, not an ancestor of main. Facts were accurate; authority was absent.",
+    "disposition": "superseded-not-deleted"
+  },
+  "blockers": [],
+  "blockersClosedThisReview": [
+    "official-review-sign-off-ceremony-pending",
+    "section141-unsigned-but-phase1a-design-only",
+    "main-tip-triple-gate-incomplete-before-resign",
+    "handoff-sot-internal-contradiction",
+    "review-23-agent-signoff-not-independent-governance",
+    "cross-sha-drift-between-sot-files",
+    "authorization-service-503-blocked-independent-verification",
+    "sign-off-guard-tests-not-in-any-required-check"
+  ],
+  "authorization503Bypass": {
+    "doc": "docs/design/evidence/memory-workspace-phase0-503-bypass.md",
+    "offlineCommand": "node docs/design/evidence/memory-workspace-phase0-offline-governance-verify.mjs",
+    "note": "Review-24 blocked on local gh 503; review-25+ uses committed evidence + offline verifier (no gh). Review-26 performed live gh replay after 503 cleared."
+  },
+  "acceptedWithCaveats": [
+    "runner-7-day-slo-NOT-proven-minimum-bar-met-4-consecutive-cycles-including-post-restart",
+    "pr-409-merge-moment-freeze-failure-historical-infra-transient-accepted",
+    "main-non-required-jobs-failing-due-to-blacksmith-runner-outage"
+  ],
+  "verifiedEvidence": {
+    "liveMainSha": "58ce58793cd65bc2212b2446d648e85da5d4a919",
+    "rulesetId": "19808307",
+    "rulesetEnforcement": "active",
+    "rulesetBypassActorCount": 0,
+    "requiredChecksGreenAtBase": [
+      {
+        "context": "freeze + phase0 evidence tests",
+        "runId": "31935854081",
+        "jobId": "95137533766",
+        "conclusion": "success"
+      }
+    ],
+    "runnerName": "kiro-temp-runner",
+    "runnerStabilityCyclesReplayed": 4,
+    "engineeringGateCheckCount": 20,
+    "engineeringGateFailedCheckCount": 0,
+    "evidenceTestsTotal": 42,
+    "evidenceTestsPassed": 42,
+    "trustedFreezeOk": true,
+    "attributionUnattributed": 0,
+    "attributionConflict": 0,
+    "tripleGateCaveat": "CI Gate did not trigger on #422/#423/#425 merge pushes; last full triple gate on ancestry @ 6fdc0ac809 (runs 31932917224/31932917133). Repair PR must pass triple gate before merge."
+  },
+  "stillForbidden": [
+    "LIVE schema change",
+    "deployAuthorized=true",
+    "bot-2 heal, migration, or reindex",
+    "Resolver production write-path switch",
+    "memory schema v2",
+    "retirement of P1-P8 legacy paths",
+    "Phase 1B write-path convergence",
+    "editing agents.list[].workspace to mask the problem"
+  ],
+  "explicitlyNotAuthorized": [
+    "LIVE deployment",
+    "Phase 1B execution",
+    "deployAuthorized=true",
+    "closesWsC=true",
+    "Resolver production write-path switch",
+    "memory schema v2 production cutover",
+    "Catalog miss=deny enforcement",
+    "P1-P8 legacy path retirement",
+    "reindexing or migration to bot-2",
+    "section 14.1 domain sign-off (outside delegation scope)"
+  ],
+  "note": "Review sequence 26 restored at main@58ce58793c after review-25 regression via #422/#425. Stale repair @07042e0a91 (d29a1a5be anchor) forbidden — would clobber #425 Phase 1A contracts. Live gh replay + local gates re-run for governance-repair-r26-v2. Phase 1A design materials on main; §14.1 sign-off and WS-B acceptance remain blocked until this repair merges.",
+  "supersededReview25Regression": {
+    "mergedPrs": [422, 425],
+    "revertedMainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+    "reason": "Phase 1A merge path restored reviewSequence=25 PHASE0_ACCEPTED; repaired by official-review/governance-repair-r26-v2"
+  },
+  "supersededStaleRepair": {
+    "branch": "official-review/governance-repair-r26",
+    "commit": "07042e0a91",
+    "anchorSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+    "reason": "not ancestor of origin/main@58ce58793c; merge would delete #425 Phase 1A contract files"
+  }
+}

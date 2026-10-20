@@ -1,0 +1,162 @@
+{
+  "schema": "memory-workspace-phase1b-item6-implementation-review/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-review.json",
+  "kind": "item6-implementation-review",
+  "item": 6,
+  "status": "implementation-review-submitted",
+  "reviewRequest": "Item 6 Implementation Review only",
+  "item6": "not-met",
+  "item6Met": false,
+  "implementationUnlocked": false,
+  "implementationStarted": false,
+  "thisPacketUnlocksImplementation": false,
+  "thisPacketMarksItem6Met": false,
+  "preparedBy": "cursor-data-governance",
+  "operationId": "phase1b-item6-implementation-review-d650a3fafa-20260820T051700Z",
+  "baselineSha": "d650a3fafa59192bef7823357d74eeca648e6ecf",
+  "originMainSha": "d650a3fafa59192bef7823357d74eeca648e6ecf",
+  "branchShaAtStart": "d650a3fafa59192bef7823357d74eeca648e6ecf",
+  "citedLedgerMerge": "c925b54ed9e48848a782a66064157cd085059367",
+  "retargetFrom": "c925b54ed9e48848a782a66064157cd085059367",
+  "retargetReason": "origin/main advanced via #556 owner-approval pack; rebase only. Implementation stays locked.",
+  "minimaReceiptTip": "ce6cf5e1702c7f2de20b58f062fd100562b6ee01",
+  "item5ReviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "liveCutover": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "productionSqliteWrite": false,
+  "schemaV2ProductionWrite": false,
+  "resolverModified": false,
+  "i4DirtyTreeUsed": false,
+  "minimaUnlock": "issued",
+  "fullUnlock": "not-issued",
+  "item7Retirement": "forbidden",
+  "thisPacketIsNot": [
+    "Item 6 evidence-preparation",
+    "Item 7 evidence-preparation",
+    "Item 7 call-site ledger",
+    "existing SQLite review",
+    "Retirement inventory"
+  ],
+  "priorPacketsNotSubstitutes": {
+    "item6EvidencePreparation": "docs/design/evidence/memory-workspace-phase1b-item6-evidence.json",
+    "item7EvidencePreparation": "docs/design/evidence/memory-workspace-phase1b-item7-evidence.json",
+    "item7CallsiteLedger": "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.json",
+    "sqliteProductionEquivalent": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+    "cutoverDrill": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+    "retirementInventory": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+  },
+  "sqlitePathIdentities": [
+    {
+      "id": "resource-layout",
+      "pattern": "{stateDir}/memory/resource-{resourceId}.sqlite",
+      "identityKeys": ["stateDir", "resourceId"],
+      "authority": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+      "hostSearch": false,
+      "productionWrite": false,
+      "reviewableAsProductionSnapshot": false
+    },
+    {
+      "id": "operator-authorized-env",
+      "pattern": "OPENBOT_AUTHORIZED_SQLITE_PATH",
+      "identityKeys": ["operatorIssuedPathToken"],
+      "authority": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+      "hostSearch": false,
+      "productionWrite": false,
+      "item6CandidateOnCitedReceipt": "met",
+      "phase1bItem6Derivation": "forbidden"
+    }
+  ],
+  "identityRules": {
+    "requireExplicitPath": true,
+    "forbidHostSearch": true,
+    "forbidGuessedStateDir": true,
+    "forbidMkdtempAsProductionSoT": true,
+    "forbidHomeOpenbotAsProductionSoT": true,
+    "forbidEvidenceDirAsProductionSoT": true,
+    "forbidRecordingTenantNamesOrRealTrees": true,
+    "failClosedOnUnknownIdentity": true
+  },
+  "backupDesign": {
+    "mode": "isolated-copy-then-hash",
+    "sourceMustRemainUnwritten": true,
+    "backupMustBeSeparatedFromSource": true,
+    "backupBytesInGit": false,
+    "emptyBackup": "fail-closed",
+    "hashMismatch": "fail-closed",
+    "cutoverRecordSnapshotIsNotSqliteBackup": true
+  },
+  "fencingDesign": {
+    "singleWriter": true,
+    "shadowDoesNotTakeProductionLock": true,
+    "productionWriterEnabled": false,
+    "secondStateMachine": false
+  },
+  "rollbackDesign": {
+    "restoreOnlyOntoIsolatedCopy": true,
+    "restoreRequiresHashAndIntegrityMatch": true,
+    "productionWriteBack": "forbidden",
+    "restoreFailure": "fail-closed"
+  },
+  "shadowMode": {
+    "enabled": true,
+    "readsOnly": true,
+    "writesProductionSqlite": false,
+    "treatsFixtureGreenAsItem6Met": false
+  },
+  "dryRun": {
+    "enabled": true,
+    "modifiesProductionCode": false,
+    "modifiesProductionSqlite": false,
+    "productionWrites": 0
+  },
+  "productionEquivalentReadOnly": {
+    "citedReceipt": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+    "item6CandidateOnCitedReceipt": "met",
+    "phase1bItem6": "not-met",
+    "thisPackageMarksItem6Met": false,
+    "citedReceiptIsNotThisReview": true,
+    "productionWrites": 0,
+    "live": "forbidden"
+  },
+  "negativeProofs": {
+    "missingAuthorizedPath": "deny",
+    "mkdtempFixture": "deny",
+    "homeOpenbotPath": "deny",
+    "evidencePath": "deny",
+    "crossTenantRead": "deny",
+    "restoreHashMismatch": "deny",
+    "attemptedProductionWrite": "deny",
+    "unlockFromThisPacket": "deny",
+    "markItem6MetFromThisPacket": "deny"
+  },
+  "acceptingThisReviewDoesNot": [
+    "set item6ImplementationUnlocked=true",
+    "set item6=met",
+    "set phase1bExecutionBlocked=false",
+    "set deployAuthorized=true",
+    "set wiredToProductionResolver=true",
+    "authorize LIVE cutover"
+  ],
+  "explicitlyForbidden": [
+    "Item 6 implementation start",
+    "changing production code or production SQLite",
+    "wiredToProductionResolver=true",
+    "schema v2 production write",
+    "production Catalog new write",
+    "deployAuthorized=true",
+    "LIVE cutover",
+    "deriving Item 6 met from minima, evidence-preparation, or this review",
+    "marking production-equivalent verification as Item 6 met",
+    "treating Item 6 evidence-preparation as this implementation review",
+    "treating existing SQLite review as this implementation review",
+    "treating Item 7 call-site ledger as this implementation review",
+    "treating Retirement inventory as this implementation review",
+    "modifying PR #538, #542, or #544 frozen evidence",
+    "using the I4 / kiro-loom dirty tree as evidence"
+  ]
+}

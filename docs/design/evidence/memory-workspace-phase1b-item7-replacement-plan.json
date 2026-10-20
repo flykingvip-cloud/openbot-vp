@@ -1,0 +1,2251 @@
+{
+  "schema": "memory-workspace-phase1b-item7-replacement-plan/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.json",
+  "kind": "item7-replacement-plan",
+  "item": 7,
+  "status": "replacement-plan-submitted",
+  "reviewRequest": "Item 7 Replacement Plan Review only",
+  "item7": "not-met",
+  "item7Met": false,
+  "implementationUnlocked": false,
+  "implementationStarted": false,
+  "retirement": "forbidden",
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "thisPacketUnlocksImplementation": false,
+  "thisPacketMarksItem7Met": false,
+  "thisPacketExecutesRetirement": false,
+  "thisPacketDeletesCallSites": false,
+  "thisPacketRewritesWatchIndexToZero": false,
+  "preparedBy": "cursor-data-governance",
+  "freezeOwner": "cursor-fable",
+  "retirementOwner": "cursor-data-governance",
+  "ownersDistinct": true,
+  "operationId": "phase1b-item7-replacement-plan-5480cefe12-20260820T141800Z",
+  "baselineSha": "5480cefe122f38fdf1064c1672b860e10060a32c",
+  "originMainSha": "5480cefe122f38fdf1064c1672b860e10060a32c",
+  "branchShaAtStart": "5480cefe122f38fdf1064c1672b860e10060a32c",
+  "citedUserBaseline": "7aaa532f6b5a17e39343d7ab03811801fbcf8faa",
+  "citedItem6ReviewMerge": "7aaa532f6b5a17e39343d7ab03811801fbcf8faa",
+  "citedLedgerMerge": "c925b54ed9e48848a782a66064157cd085059367",
+  "citedItem7ImplementationReviewMerge": "daaadd34cc44cce12a832e6f7c3bc355beb5aca6",
+  "retargetFrom": "7aaa532f6b5a17e39343d7ab03811801fbcf8faa",
+  "retargetReason": "origin/main advanced via #565 chat-inbound-context-compiler; rebase only. citedUserBaseline stays 7aaa532f (#557). liveWriteWatchIndex stays 37. Implementation and Retirement stay locked.",
+  "minimaReceiptTip": "ce6cf5e1702c7f2de20b58f062fd100562b6ee01",
+  "item5ReviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "minimaUnlock": "issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "liveCutover": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "catalogMissDeny": false,
+  "resolverModified": false,
+  "phase0Rewritten": false,
+  "i4DirtyTreeUsed": false,
+  "item6ImplementationUnlocked": false,
+  "item6ImplementationReviewWaitsForIndependentReviewer": true,
+  "item7ImplementationUnlocked": false,
+  "productionWriteWatchIndex": 37,
+  "liveWriteWatchIndex": 37,
+  "frozenWriteWatchIndex": 38,
+  "retiredThisChange": 0,
+  "remaining": 37,
+  "target": 0,
+  "mode": "static-scan-read-only-shadow-dry-run-evidence",
+  "allowedNow": [
+    "static audit",
+    "read-only",
+    "shadow",
+    "dry-run",
+    "evidence package",
+    "independent retirement review request"
+  ],
+  "citedLedger": "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.json",
+  "citedScan": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+  "citedEvidence": "docs/design/evidence/memory-workspace-phase1b-item7-evidence.json",
+  "citedDependencyGraph": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-dependency-graph-2026-08-20.json",
+  "citedShadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+  "citedItem6ImplementationReview": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-review.json",
+  "citedItem7ImplementationReview": "docs/design/evidence/memory-workspace-phase1b-item7-implementation-review.json",
+  "staleRetirementPlanIsNotThisPacket": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-plan.json",
+  "thisPacketIsNot": [
+    "Item 6 evidence-preparation",
+    "Item 7 evidence-preparation",
+    "Item 7 call-site ledger",
+    "Item 6 implementation-review",
+    "Item 7 implementation-review",
+    "existing SQLite review",
+    "Retirement inventory",
+    "stale item7-retirement-plan.json",
+    "Item 6/7 implementation start"
+  ],
+  "item7MetGate": {
+    "liveWriteWatchIndexMustBe": 0,
+    "independentRetirementReviewRequired": true,
+    "rollbackProofRequired": true,
+    "quarantineProofRequired": true,
+    "thisPacketMarksItem7Met": false,
+    "note": "Item 7 met may be requested only after actual production old-write call sites drop to 0 and independent retirement review, rollback, and quarantine proofs land. This replacement-plan packet does not satisfy that gate."
+  },
+  "retirementReviewRequest": {
+    "requested": true,
+    "kind": "independent-retirement-review-request",
+    "thisPacketExecutesRetirement": false,
+    "acceptingDoesNotAuthorizeDeletion": true,
+    "acceptingDoesNotRewriteWatchIndexToZero": true,
+    "acceptingDoesNotMarkItem7Met": true,
+    "acceptingDoesNotSetDeployAuthorized": true,
+    "reason": "Replacement plan is submitted for independent retirement review. liveWriteWatchIndex remains 37. Retirement stays forbidden until liveWriteWatchIndex=0 and proofs land."
+  },
+  "dryRun": {
+    "enabled": true,
+    "modifiesProductionCode": false,
+    "deletesCallSites": false,
+    "rewritesPhase0Freeze": false,
+    "rewritesLiveScanSnapshot": false,
+    "enablesSchemaV2": false,
+    "switchesResolverProductionWrite": false,
+    "writesProductionCatalog": false,
+    "migratesDatabase": false,
+    "liveCutover": false,
+    "retiredThisChange": 0
+  },
+  "negativeProofs": {
+    "deleteCallSite": "deny",
+    "rewriteCountToZero": "deny",
+    "markItem7MetWhileLiveIndexNonZero": "deny",
+    "executeRetirement": "deny",
+    "schemaV2Write": "deny",
+    "resolverProductionWrite": "deny",
+    "catalogWrite": "deny",
+    "databaseMigration": "deny",
+    "liveCutover": "deny",
+    "deployAuthorizedTrue": "deny",
+    "unlockFromThisPacket": "deny",
+    "setItem6ImplementationUnlocked": "deny"
+  },
+  "acceptingThisReviewDoesNot": [
+    "set item7ImplementationUnlocked=true",
+    "set item6ImplementationUnlocked=true",
+    "set item7=met",
+    "set phase1bExecutionBlocked=false",
+    "set phase1bUnlock=issued",
+    "set deployAuthorized=true",
+    "set wiredToProductionResolver=true",
+    "authorize Item 7 Retirement",
+    "authorize deleting productionWriteWatchIndex call-sites",
+    "authorize rewriting liveWriteWatchIndex 37 to 0",
+    "authorize schema v2 production write",
+    "authorize Resolver production write switch",
+    "authorize production Catalog write",
+    "authorize database migration",
+    "authorize LIVE cutover"
+  ],
+  "explicitlyForbidden": [
+    "Item 7 implementation start",
+    "Item 6 implementationUnlocked=true from this packet",
+    "Item 7 Retirement execution",
+    "deleting any productionWriteWatchIndex call-site",
+    "rewriting liveWriteWatchIndex 37 to 0 in this packet",
+    "retiring old memory engines",
+    "enabling schema v2",
+    "wiredToProductionResolver=true",
+    "schema v2 production write",
+    "production Catalog write",
+    "Catalog miss=deny",
+    "database migration / reindex",
+    "deployAuthorized=true",
+    "LIVE cutover",
+    "deriving Item 7 met from minima, ledger, implementation-review, or this plan",
+    "treating Item 7 call-site ledger as this replacement plan",
+    "treating stale item7-retirement-plan.json as this packet",
+    "modifying PR #538, #542, or #544 frozen evidence",
+    "using the I4 / kiro-loom dirty tree as evidence"
+  ],
+  "replacementFamilies": {
+    "P1-P3-P5-dir": "resolveWorkspaceResource in src/gateway/workspace-resolver/resolve.ts",
+    "P4-catalog-read": "WorkspaceResourceCatalog.getResource in src/gateway/workspace-resolver/catalog.ts",
+    "P8-memory": "resolveMemoryWorkspaceHandle in src/gateway/workspace-resolver/memory-workspace-resolve.ts"
+  },
+  "sites": [
+    {
+      "ledgerId": "S01",
+      "pathId": "P5",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 164,
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "auto-reply-runtime",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId=steward:builtin)",
+      "doNotUse": ["implicit steward directory create"],
+      "replacementPath": "Steward Catalog identity for (tenantId, userId, agentAssetId=steward:builtin). Fail-closed. No implicit directory create.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W4-steward-and-helpers",
+        "dependsOnWaves": ["W2-write-callers", "W3-catalog-synthesis"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers and W3 catalog synthesis no longer depend on steward helper dirs; steward Catalog identity proven in shadow.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/auto-reply/reply/get-reply.message-hooks.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S02",
+      "pathId": "P1",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 165,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "auto-reply-runtime",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/auto-reply/reply/get-reply.message-hooks.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S03",
+      "pathId": "P3",
+      "file": "src/commands/agent.ts",
+      "line": 776,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cli-commands",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/commands/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S04",
+      "pathId": "P1",
+      "file": "src/commands/status-all/agents.ts",
+      "line": 25,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cli-commands",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/commands/status-all/report-lines.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S05",
+      "pathId": "P1",
+      "file": "src/gateway/checkpoint-store.ts",
+      "line": 119,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-checkpoint",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/checkpoint-store.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S06",
+      "pathId": "P5",
+      "file": "src/gateway/checkpoint-store.ts",
+      "line": 127,
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-checkpoint",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId=steward:builtin)",
+      "doNotUse": ["implicit steward directory create"],
+      "replacementPath": "Steward Catalog identity for (tenantId, userId, agentAssetId=steward:builtin). Fail-closed. No implicit directory create.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W4-steward-and-helpers",
+        "dependsOnWaves": ["W2-write-callers", "W3-catalog-synthesis"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers and W3 catalog synthesis no longer depend on steward helper dirs; steward Catalog identity proven in shadow.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/checkpoint-store.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S07",
+      "pathId": "P3",
+      "file": "src/gateway/checkpoint-store.ts",
+      "line": 158,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-checkpoint",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/checkpoint-store.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S08",
+      "pathId": "P4",
+      "file": "src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts",
+      "line": 86,
+      "symbol": "createEmptyWorkspaceCatalog",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-knowledge",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing Catalog SoT entry. Empty synthesis stays forbidden. Catalog miss=deny stays off until a later independent unlock; this packet does not enable it.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer require an empty Catalog; replacement read-existing-entry proven; Catalog miss=deny still off.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S09",
+      "pathId": "P4",
+      "file": "src/gateway/knowledge/knowledge-document-preview.ts",
+      "line": 178,
+      "symbol": "createEmptyWorkspaceCatalog",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-knowledge",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing Catalog SoT entry. Empty synthesis stays forbidden. Catalog miss=deny stays off until a later independent unlock; this packet does not enable it.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer require an empty Catalog; replacement read-existing-entry proven; Catalog miss=deny still off.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/knowledge/knowledge-document-preview.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S10",
+      "pathId": "P3",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 142,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      },
+      "citedLineWraps": "resolveTrustedAgentLocator",
+      "wrapperStillCalls": "resolveAgentWorkspaceDirForClient"
+    },
+    {
+      "ledgerId": "S11",
+      "pathId": "P1",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 146,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S12",
+      "pathId": "P1",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1001,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S13",
+      "pathId": "P1",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1075,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S14",
+      "pathId": "P3",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1159,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      },
+      "citedLineWraps": "resolveTrustedAgentLocator",
+      "wrapperStillCalls": "resolveAgentWorkspaceDirForClient"
+    },
+    {
+      "ledgerId": "S15",
+      "pathId": "P1",
+      "file": "src/gateway/server-methods/agents.ts",
+      "line": 1160,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, agentAssetId) Catalog lookup; fail-closed on miss",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "mkdir a guessed host path"],
+      "replacementPath": "Catalog-backed workspace identity lookup for (tenantId, agentAssetId). Fail-closed on Catalog miss. Do not call createEmptyWorkspaceCatalog. Do not mkdir a guessed host path.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 independent Item 7 implementation unlock; W1 tombstone/quarantine of new writes; Catalog identity proven in shadow/dry-run; remaining P1-write callers switched to Catalog identity.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/agent.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S16",
+      "pathId": "P3",
+      "file": "src/gateway/server-methods/chat.ts",
+      "line": 1818,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/chat.group-write-acl.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S17",
+      "pathId": "P4",
+      "file": "src/gateway/server-methods/group-workspace-file.ts",
+      "line": 460,
+      "symbol": "createEmptyWorkspaceCatalog",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing Catalog SoT entry. Empty synthesis stays forbidden. Catalog miss=deny stays off until a later independent unlock; this packet does not enable it.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer require an empty Catalog; replacement read-existing-entry proven; Catalog miss=deny still off.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/group-workspace-file.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S18",
+      "pathId": "P3",
+      "file": "src/gateway/server-methods/skills.ts",
+      "line": 86,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/skills.update.normalizes-api-key.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S19",
+      "pathId": "P3",
+      "file": "src/gateway/server-methods/skills.ts",
+      "line": 137,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/skills.update.normalizes-api-key.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S20",
+      "pathId": "P3",
+      "file": "src/gateway/server-methods/tools-catalog.ts",
+      "line": 152,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-server-methods",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/server-methods/tools-catalog.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S21",
+      "pathId": "P4",
+      "file": "src/gateway/workspace-resolver/builders.ts",
+      "line": 105,
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing user-owned Catalog entry. Do not mint a new production Catalog row from this helper. tool-cwd.ts already fail-closes on empty catalog.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer need synthesized entries; remaining builders only wrap existing Catalog rows.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/workspace-resolver.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S22",
+      "pathId": "P4",
+      "file": "src/gateway/workspace-resolver/steward-read.ts",
+      "line": 104,
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing user-owned Catalog entry. Do not mint a new production Catalog row from this helper. tool-cwd.ts already fail-closes on empty catalog.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer need synthesized entries; remaining builders only wrap existing Catalog rows.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/steward-read.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S23",
+      "pathId": "P4",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 99,
+      "symbol": "createEmptyWorkspaceCatalog",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing Catalog SoT entry. Empty synthesis stays forbidden. Catalog miss=deny stays off until a later independent unlock; this packet does not enable it.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer require an empty Catalog; replacement read-existing-entry proven; Catalog miss=deny still off.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/steward-write.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S24",
+      "pathId": "P5",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 152,
+      "symbol": "resolveEmployeeStewardSourceWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "steward source Catalog binding already in SoT",
+      "doNotUse": ["host stateDir guess as production SoT"],
+      "replacementPath": "Steward Catalog source binding already present in Catalog SoT. Fail-closed if missing. No host stateDir guess as production SoT.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W4-steward-and-helpers",
+        "dependsOnWaves": ["W2-write-callers", "W3-catalog-synthesis"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2/W3 callers gone; source Catalog binding exists; independent unlock before any helper deletion.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/steward-write.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S25",
+      "pathId": "P5",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 153,
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "steward target Catalog binding already in SoT",
+      "doNotUse": ["implicit target directory create"],
+      "replacementPath": "Steward Catalog target binding already present in Catalog SoT. Fail-closed if missing. No implicit target dir create.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W4-steward-and-helpers",
+        "dependsOnWaves": ["W2-write-callers", "W3-catalog-synthesis"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2/W3 callers gone; target Catalog binding exists; independent unlock before any helper deletion.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/steward-write.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S26",
+      "pathId": "P5",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 279,
+      "symbol": "resolveEmployeeStewardSourceWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "steward source Catalog binding already in SoT",
+      "doNotUse": ["host stateDir guess as production SoT"],
+      "replacementPath": "Steward Catalog source binding already present in Catalog SoT. Fail-closed if missing. No host stateDir guess as production SoT.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W4-steward-and-helpers",
+        "dependsOnWaves": ["W2-write-callers", "W3-catalog-synthesis"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2/W3 callers gone; source Catalog binding exists; independent unlock before any helper deletion.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/steward-write.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S27",
+      "pathId": "P5",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 280,
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "steward target Catalog binding already in SoT",
+      "doNotUse": ["implicit target directory create"],
+      "replacementPath": "Steward Catalog target binding already present in Catalog SoT. Fail-closed if missing. No implicit target dir create.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W4-steward-and-helpers",
+        "dependsOnWaves": ["W2-write-callers", "W3-catalog-synthesis"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2/W3 callers gone; target Catalog binding exists; independent unlock before any helper deletion.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/steward-write.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S28",
+      "pathId": "P4",
+      "file": "src/gateway/workspace-resolver/tool-cwd.ts",
+      "line": 52,
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "cursor-data-governance",
+      "uniqueOwner": true,
+      "replacementSymbol": "WorkspaceResourceCatalog.getResource",
+      "replacementModule": "src/gateway/workspace-resolver/catalog.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog SoT resourceId",
+      "doNotUse": ["createEmptyWorkspaceCatalog", "minting a new production Catalog row"],
+      "replacementPath": "Read an existing user-owned Catalog entry. Do not mint a new production Catalog row from this helper. tool-cwd.ts already fail-closes on empty catalog.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W3-catalog-synthesis",
+        "dependsOnWaves": ["W2-write-callers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W2 write callers no longer need synthesized entries; remaining builders only wrap existing Catalog rows.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace-resolver/tool-cwd.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S29",
+      "pathId": "P3",
+      "file": "src/gateway/workspace/handler-bridge.ts",
+      "line": 592,
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "op": "write",
+      "citedLinePresent": true,
+      "owner": "gateway-workspace",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveWorkspaceResource",
+      "replacementModule": "src/gateway/workspace-resolver/resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "existing Catalog workspace identity; fail-closed on miss",
+      "doNotUse": [
+        "resolveTrustedAgentLocator (still wraps resolveAgentWorkspaceDirForClient)",
+        "host-dir fallback that creates writes"
+      ],
+      "replacementPath": "Trusted Catalog locator that returns an existing Catalog workspace identity only. Fail-closed on miss. No empty-catalog synthesis and no host-dir fallback that creates writes.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W2-write-callers",
+        "dependsOnWaves": ["W0-item7-implementation-unlock", "W1-tombstone-quarantine"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "W0 Item 7 implementation unlock; W1 tombstone; Catalog locator proven in shadow; host fallback no longer needed for remaining callers.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/gateway/workspace/handler-bridge.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S30",
+      "pathId": "P1",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId) bound to existing Catalog entry",
+      "doNotUse": ["schema v2 production write", "old memory engine retirement"],
+      "replacementPath": "Catalog-keyed memory index bound to an existing user-owned Catalog entry. Do not retire the old memory engine in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "All P1/P3 write callers retired after replacement is proven; independent retirement review, rollback, and quarantine proofs complete; liveWriteWatchIndex already 0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/backend-config.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S31",
+      "pathId": "P1",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId) bound to existing Catalog entry",
+      "doNotUse": ["schema v2 production write", "old memory engine retirement"],
+      "replacementPath": "Catalog-keyed memory index bound to an existing user-owned Catalog entry. Do not retire the old memory engine in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "All P1/P3 write callers retired after replacement is proven; independent retirement review, rollback, and quarantine proofs complete; liveWriteWatchIndex already 0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/backend-config.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S32",
+      "pathId": "P1",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId) bound to existing Catalog entry",
+      "doNotUse": ["schema v2 production write", "old memory engine retirement"],
+      "replacementPath": "Catalog-keyed memory index bound to an existing user-owned Catalog entry. Do not retire the old memory engine in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "All P1/P3 write callers retired after replacement is proven; independent retirement review, rollback, and quarantine proofs complete; liveWriteWatchIndex already 0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/cogniweave-manager.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S33",
+      "pathId": "P8",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1062,
+      "symbol": "syncMemoryFiles",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "Catalog-keyed memory index after write callers are gone",
+      "doNotUse": ["SCHEMA_V2_ENABLED=true", "retiring old memory engines"],
+      "replacementPath": "Catalog-keyed memory index sync after write callers are gone. Do not retire the old memory engine or enable schema v2 in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "Write-site replacement complete; independent retirement review + rollback + quarantine proofs; liveWriteWatchIndex=0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/manager-sync-ops.v1-root-guard.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S34",
+      "pathId": "P8",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1252,
+      "symbol": "syncMemoryFiles",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "Catalog-keyed memory index after write callers are gone",
+      "doNotUse": ["SCHEMA_V2_ENABLED=true", "retiring old memory engines"],
+      "replacementPath": "Catalog-keyed memory index sync after write callers are gone. Do not retire the old memory engine or enable schema v2 in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "Write-site replacement complete; independent retirement review + rollback + quarantine proofs; liveWriteWatchIndex=0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/manager-sync-ops.v1-root-guard.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S35",
+      "pathId": "P8",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1343,
+      "symbol": "syncMemoryFiles",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "Catalog-keyed memory index after write callers are gone",
+      "doNotUse": ["SCHEMA_V2_ENABLED=true", "retiring old memory engines"],
+      "replacementPath": "Catalog-keyed memory index sync after write callers are gone. Do not retire the old memory engine or enable schema v2 in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "Write-site replacement complete; independent retirement review + rollback + quarantine proofs; liveWriteWatchIndex=0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/manager-sync-ops.v1-root-guard.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S36",
+      "pathId": "P1",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId) bound to existing Catalog entry",
+      "doNotUse": ["schema v2 production write", "old memory engine retirement"],
+      "replacementPath": "Catalog-keyed memory index bound to an existing user-owned Catalog entry. Do not retire the old memory engine in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "All P1/P3 write callers retired after replacement is proven; independent retirement review, rollback, and quarantine proofs complete; liveWriteWatchIndex already 0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/u0-boundary-freeze.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    },
+    {
+      "ledgerId": "S37",
+      "pathId": "P1",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "symbol": "resolveAgentWorkspaceDir",
+      "op": "index",
+      "citedLinePresent": true,
+      "owner": "cursor-memory-wsc",
+      "uniqueOwner": true,
+      "replacementSymbol": "resolveMemoryWorkspaceHandle",
+      "replacementModule": "src/gateway/workspace-resolver/memory-workspace-resolve.ts",
+      "replacementExistsInSrc": true,
+      "identityKey": "(tenantId, userId, agentAssetId) bound to existing Catalog entry",
+      "doNotUse": ["schema v2 production write", "old memory engine retirement"],
+      "replacementPath": "Catalog-keyed memory index bound to an existing user-owned Catalog entry. Do not retire the old memory engine in this packet.",
+      "replacementImplemented": false,
+      "wiredToThisCallSite": false,
+      "deleteNow": false,
+      "retiredThisChange": false,
+      "dependency": {
+        "wave": "W5-index-last",
+        "dependsOnWaves": ["W4-steward-and-helpers"],
+        "blockedBy": "item7ImplementationUnlocked=false",
+        "w0Satisfied": false
+      },
+      "rollback": {
+        "restoreFromGit": true,
+        "liftTombstone": true,
+        "rewriteFreezeBaselineToZero": false,
+        "restoreDeletedCallSites": "not-applicable-none-deleted",
+        "productionWriteBack": "forbidden"
+      },
+      "quarantine": {
+        "designOnly": true,
+        "enabled": false,
+        "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+        "quarantineNormalWrites": 0,
+        "rewriteIntoNormalCatalog": false
+      },
+      "retirementPrerequisite": "All P1/P3 write callers retired after replacement is proven; independent retirement review, rollback, and quarantine proofs complete; liveWriteWatchIndex already 0 before Item 7 met.",
+      "verificationTests": {
+        "nowAllowed": [
+          "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-callsite-ledger.test.mjs",
+          "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.test.mjs",
+          "src/memory/qmd-manager.test.ts",
+          "src/memory/schema-v2.test.ts"
+        ],
+        "shadowDryRun": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+        "afterIndependentUnlockOnly": [
+          "caller switch onto replacementSymbol — forbidden until item7ImplementationUnlocked=true",
+          "delete or rewrite this call-site — forbidden while liveWriteWatchIndex=37"
+        ]
+      }
+    }
+  ]
+}

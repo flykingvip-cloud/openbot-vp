@@ -1,0 +1,238 @@
+diff --git a/src/gateway/enterprise-data/connector-credential-vault.ts b/src/gateway/enterprise-data/connector-credential-vault.ts
+index 0c5fb303d7..39be249e4c 100644
+--- a/src/gateway/enterprise-data/connector-credential-vault.ts
++++ b/src/gateway/enterprise-data/connector-credential-vault.ts
+@@ -1,7 +1,12 @@
+-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
++import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+ import path from "node:path";
+ import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
+ import { CONFIG_DIR } from "../../utils.js";
++import {
++  deriveVaultKey,
++  ENTERPRISE_DATA_VAULT_KEY_ENV_VARS,
++  readVaultKeyMaterialFromEnv,
++} from "./connector-credential-vault-key.js";
+ import type { DataConnectorCredentialSecret } from "./types.js";
+ 
+ const VAULT_FILENAME = "openbot-enterprise-data-secrets.json";
+@@ -25,17 +30,6 @@ type CredentialVaultFile = {
+   credentials: Record<string, StoredSecret>;
+ };
+ 
+-/**
+- * Primary env var holding the vault key (any string; it is hashed to 32 bytes).
+- * `OPENCLAW_*` is kept as a back-compat alias per repo env conventions. When set,
+- * the key file is neither read nor written, so enterprises can manage the key in
+- * an external secret manager.
+- */
+-const VAULT_KEY_ENV_VARS = [
+-  "OPENBOT_ENTERPRISE_DATA_VAULT_KEY",
+-  "OPENCLAW_ENTERPRISE_DATA_VAULT_KEY",
+-] as const;
+-
+ const keyLock = createAsyncLock();
+ const keyCache = new Map<string, Buffer>();
+ 
+@@ -48,25 +42,18 @@ function resolveKeyPath(vaultPath: string): string {
+   return `${vaultPath}.key`;
+ }
+ 
+-function readEnvKey(): string | undefined {
+-  for (const name of VAULT_KEY_ENV_VARS) {
+-    const value = process.env[name]?.trim();
+-    if (value) {
+-      return value;
+-    }
+-  }
+-  return undefined;
+-}
+-
+ /**
+  * Resolve the 32-byte AES key. Precedence: env var (hashed to 32 bytes) → local
+  * key file (32 random bytes, created with 0600 on first use). Cached per key path
+  * and guarded by an async lock so concurrent first-use saves can't race two keys.
++ *
++ * Key derivation itself lives in `connector-credential-vault-key.ts` so the model
++ * connection vault shares one implementation.
+  */
+ async function resolveVaultKey(vaultPath: string): Promise<Buffer> {
+-  const envKey = readEnvKey();
+-  if (envKey) {
+-    return createHash("sha256").update(envKey).digest();
++  const envMaterial = readVaultKeyMaterialFromEnv(ENTERPRISE_DATA_VAULT_KEY_ENV_VARS);
++  if (envMaterial) {
++    return deriveVaultKey(envMaterial.material);
+   }
+   const keyPath = resolveKeyPath(vaultPath);
+   const cached = keyCache.get(keyPath);
+diff --git a/src/gateway/server-methods/chat.ts b/src/gateway/server-methods/chat.ts
+index 4ad88713c8..67b46d3d6d 100755
+--- a/src/gateway/server-methods/chat.ts
++++ b/src/gateway/server-methods/chat.ts
+@@ -2,10 +2,6 @@ import fs from "node:fs";
+ import path from "node:path";
+ import { CURRENT_SESSION_VERSION } from "@mariozechner/pi-coding-agent";
+ import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+-import {
+-  extractEmployeeStewardUserIdFromSessionKey,
+-  isEmployeeBuiltinStewardSession,
+-} from "../../agents/builtin-steward/employee-isolation.js";
+ import { resolveThinkingDefault } from "../../agents/model-selection.js";
+ import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
+ import { stripToolMessages } from "../../agents/tools/sessions-helpers.js";
+@@ -43,8 +39,6 @@ import { KeyedAsyncQueue } from "../../plugin-sdk/keyed-async-queue.js";
+ import { normalizeInputProvenance, type InputProvenance } from "../../sessions/input-provenance.js";
+ import { resolveSendPolicy } from "../../sessions/send-policy.js";
+ import { parseAgentSessionKey } from "../../sessions/session-key-utils.js";
+-import { loadStewardMemory } from "../../support-cases/steward-memory-store.js";
+-import { listSupportCaseRecords } from "../../support-cases/store.js";
+ import {
+   stripInlineDirectiveTagsForDisplay,
+   stripInlineDirectiveTagsFromMessageForDisplay,
+@@ -155,9 +149,6 @@ import { injectTimestamp, timestampOptsFromConfig } from "./agent-timestamp.js";
+ import { setGatewayDedupeEntry } from "./agent-wait-dedupe.js";
+ import { normalizeRpcAttachmentsToChatAttachments } from "./attachment-normalize.js";
+ import { appendInjectedAssistantMessageToTranscript } from "./chat-transcript-inject.js";
+-import { resolveDaibaiWorkspaceOverview } from "./daibai-workspace-overview.js";
+-import { buildAskResult } from "./daibai.js";
+-import { buildEmployeeCapabilityRecommendations } from "./employee-capability.js";
+ import type {
+   GatewayRequestContext,
+   GatewayRequestHandlerOptions,
+@@ -181,16 +172,6 @@ type AbortedPartialSnapshot = {
+   abortOrigin: AbortOrigin;
+ };
+ 
+-type ChatRuntimeRoute =
+-  | {
+-      kind: "steward-ask";
+-      userId: string;
+-      tenantId?: string;
+-    }
+-  | {
+-      kind: "chat-runtime";
+-    };
+-
+ const CHAT_HISTORY_TEXT_MAX_CHARS = 12_000;
+ const CHAT_HISTORY_MAX_SINGLE_MESSAGE_BYTES = 128 * 1024;
+ const CHAT_HISTORY_OVERSIZED_PLACEHOLDER = "[chat.history omitted: message too large]";
+@@ -222,42 +203,6 @@ function isSpaceAliasSessionKey(value: string) {
+   return value.trim().startsWith("space:");
+ }
+ 
+-function isLightweightStewardWakeMessage(message: string): boolean {
+-  const normalized = message.trim().toLowerCase();
+-  if (!normalized) {
+-    return false;
+-  }
+-  if (normalized.length <= 12) {
+-    return true;
+-  }
+-  return /^(大白|你好大白|在吗|在么|帮我看下|帮我看看|问你个事)$/i.test(normalized);
+-}
+-
+-async function resolveChatRuntimeRoute(params: {
+-  client: GatewayClient | null | undefined;
+-  resolvedSessionKey: string;
+-  rawSessionKey: string;
+-  rawMessage: string;
+-  scope?: GroupDiscussionScope;
+-  decision?: ParticipationDecision;
+-}): Promise<ChatRuntimeRoute> {
+-  if (
+-    isEmployeeBuiltinStewardSession({ sessionKey: params.resolvedSessionKey }) &&
+-    isLightweightStewardWakeMessage(params.rawMessage)
+-  ) {
+-    const userId = extractEmployeeStewardUserIdFromSessionKey(params.resolvedSessionKey);
+-    if (userId) {
+-      const actor = await resolveEmployeeWorkbenchActor(params.client);
+-      return {
+-        kind: "steward-ask",
+-        userId,
+-        ...(actor?.tenantId ? { tenantId: actor.tenantId } : {}),
+-      };
+-    }
+-  }
+-  return { kind: "chat-runtime" };
+-}
+-
+ function extractSpaceAliasGroupId(value: string) {
+   const normalized = value.trim();
+   if (!normalized.startsWith("space:")) {
+@@ -2254,75 +2199,6 @@ export const chatHandlers: GatewayRequestHandlers = {
+       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, groupWriteDenial));
+       return;
+     }
+-    const runtimeRoute = await resolveChatRuntimeRoute({
+-      client,
+-      resolvedSessionKey,
+-      rawSessionKey,
+-      rawMessage,
+-    });
+-    if (runtimeRoute.kind === "steward-ask") {
+-      let memory = null;
+-      try {
+-        memory = await loadStewardMemory({
+-          userId: runtimeRoute.userId,
+-          tenantId: runtimeRoute.tenantId,
+-        });
+-      } catch {
+-        // Degrade gracefully.
+-      }
+-      let guideRecommendations:
+-        | Array<{ capabilityId: string; name: string; reason: string }>
+-        | undefined;
+-      try {
+-        const full = await buildEmployeeCapabilityRecommendations(
+-          resolveSessionAgentId({ sessionKey: resolvedSessionKey, config: loadConfig() }),
+-          client,
+-        );
+-        if (full.length > 0) {
+-          guideRecommendations = full.map((entry) => ({
+-            capabilityId: entry.capability.id,
+-            name: entry.capability.name,
+-            reason: entry.reason,
+-          }));
+-        }
+-      } catch {
+-        // Degrade gracefully.
+-      }
+-      const supportCases = await listSupportCaseRecords({
+-        userId: runtimeRoute.userId,
+-        tenantId: runtimeRoute.tenantId,
+-      });
+-      const workspaceOverview = await resolveDaibaiWorkspaceOverview({
+-        client,
+-        sessionKey: resolvedSessionKey,
+-      }).catch(() => undefined);
+-      const askResult = buildAskResult({
+-        message: rawMessage,
+-        sessionKey: resolvedSessionKey,
+-        tenantId: runtimeRoute.tenantId,
+-        userId: runtimeRoute.userId,
+-        supportCases,
+-        memory,
+-        guideRecommendations,
+-        workspaceOverview,
+-      });
+-      respond(true, { runId: p.idempotencyKey, status: "started" as const }, undefined, {
+-        runId: p.idempotencyKey,
+-      });
+-      broadcastChatFinal({
+-        context,
+-        runId: p.idempotencyKey,
+-        sessionKey: resolvedSessionKey,
+-        message: {
+-          role: "assistant",
+-          content: [
+-            { type: "text", text: askResult.summary || "我在。你可以继续告诉我想让我做什么。" },
+-          ],
+-          timestamp: Date.now(),
+-        },
+-      });
+-      return;
+-    }
+     if (isSpaceAliasSessionKey(rawSessionKey)) {
+       const clientRunId = p.idempotencyKey;
+       const cached = context.dedupe.get(`chat:${clientRunId}`);

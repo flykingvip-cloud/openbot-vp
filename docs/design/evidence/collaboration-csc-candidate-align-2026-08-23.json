@@ -1,0 +1,156 @@
+{
+  "schema": "collaboration-csc-candidate-align-receipt/v1",
+  "status": "candidate-ready-live-unchanged",
+  "productionCloseout": "not-accepted",
+  "acceptancePhrase": null,
+  "reason": "Full-dist candidate 72b33bead9 is published and gates are green. LIVE overlay remains e6f26e1379 on image 5c221b9ec38c (seq 36 / #631). No swap and no flag change.",
+  "recordedAt": "2026-08-23T03:31:29Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Solve LIVE overlay drift by publishing an auditable origin/main candidate; do not modify LIVE",
+  "explicitNonActions": [
+    "did not recreate openbot-gateway-rc",
+    "did not overlay or swap LIVE",
+    "did not run cutover-from-ghcr --stage",
+    "did not change inbound or CSC or Progress Ledger flags",
+    "did not append a new LIVE ledger row after seq 36",
+    "did not rewrite seq 35 or seq 36",
+    "did not use the dirty inbound-depth workspace as the build tree"
+  ],
+  "baseline": {
+    "taskNamedOriginMain": "72b33bead9d19b99da41612015124344a11d9b23",
+    "freshOriginMainAtBuild": "72b33bead9d19b99da41612015124344a11d9b23",
+    "freshOriginMainAtReceiptLand": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "taskShaIsTip": false,
+    "worktree": "/tmp/openbot-candidate-72b33bead9"
+  },
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "startedAt": "2026-08-23T02:40:47Z",
+    "healthz": { "http": 200, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "builtAt": "2026-08-23T02:39:22.337Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "baseImage": {
+      "sha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257",
+      "ociRevision": "5c221b9ec38c6316b98797342a01fb39ffd80562"
+    },
+    "gatewayOverlaySha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "taskExpectedOverlaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "overlayMatchesTask": false,
+    "expectedOverlayIsAncestor": true,
+    "actualOverlayIsAncestorOfCandidate": true,
+    "hostBackup": "/root/openbot-maintenance-origin-main-e6f26e13795a-r1-20260823T023758Z",
+    "priorOverlayBackup": "/root/openbot-maintenance-origin-main-7cd74d4c-item7-s18-r1-20260822T150915Z",
+    "flags": {
+      "containerPinnedEntry": "index-Ol92eg1L.js",
+      "hostPinEnv": "index-Dpg8P1UR.js",
+      "servedEntry": "assets/index-Dpg8P1UR.js",
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset",
+      "CONTEXT_SCOPE": "unset",
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "unset"
+    }
+  },
+  "candidate": {
+    "sha": "72b33bead9d19b99da41612015124344a11d9b23",
+    "provenanceTag": "provenance/sha-72b33bead9d1",
+    "buildInfoCommit": "72b33bead9d19b99da41612015124344a11d9b23",
+    "builtAt": "2026-08-23T03:26:57.131Z",
+    "uiEntry": "assets/index-Dpg8P1UR.js",
+    "tarball": {
+      "name": "full-dist-72b33bead9d1.tgz",
+      "sha256": "87a24c2200186eaf8a17e24945d055dc026d6df1f3570eb5e5b01ce2b22613a8",
+      "bytes": 35548208
+    },
+    "localImage": {
+      "tag": "localhost/openbot:rc-amd64-provenance-72b33bead9",
+      "imageId": "sha256:e955299d24615110c74b07dae177be8a2f17131cb47d25882f3ae06ad97a33a4"
+    },
+    "ghcr": {
+      "tag": "ghcr.io/gmood2008/openbot:provenance-sha-72b33bead9d1-amd64",
+      "digest": "sha256:ef4822c9a4c03c5206c7311b402a701c958a6b108f349eae3f0be998573c8ac1",
+      "ociRevision": "72b33bead9d19b99da41612015124344a11d9b23"
+    },
+    "derivedFrom": "ghcr.io/gmood2008/openbot:provenance-sha-5c221b9ec38c",
+    "containsAncestors": [
+      "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "5c221b9ec38c6316b98797342a01fb39ffd80562"
+    ]
+  },
+  "ledger": {
+    "releases": 36,
+    "errors": 0,
+    "identityMismatch": 0,
+    "ok": true,
+    "seq35GatewaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "seq35LiveTo": "2026-08-23T02:40:47Z",
+    "seq36GatewaySha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "seq36LiveTo": null,
+    "appendedLiveRow": false
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 36,
+      "errors": 0,
+      "identityMismatch": 0,
+      "ok": true,
+      "warnings": 15
+    },
+    "verifyForwardOnlyNamed": {
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidate": "72b33bead9d19b99da41612015124344a11d9b23",
+      "verdict": "allow"
+    },
+    "verifyForwardOnlyActual": {
+      "live": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "candidate": "72b33bead9d19b99da41612015124344a11d9b23",
+      "verdict": "allow",
+      "warning": null
+    },
+    "verifyDeliveryAlignmentActual": {
+      "prodSha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "candidateTag": "provenance/sha-72b33bead9d1",
+      "candidateSha": "72b33bead9d19b99da41612015124344a11d9b23",
+      "candidateImage": "localhost/openbot:rc-amd64-provenance-72b33bead9",
+      "pass": 8,
+      "warn": 2,
+      "fail": 0
+    },
+    "verifyDeliveryAlignmentNamed": {
+      "prodSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidateTag": "provenance/sha-72b33bead9d1",
+      "candidateSha": "72b33bead9d19b99da41612015124344a11d9b23",
+      "pass": 8,
+      "warn": 2,
+      "fail": 0
+    }
+  },
+  "smoke": {
+    "candidateImageVersion": "OpenBot 2026.7.12-rc.2 (72b33be)",
+    "candidateBuildInfoCommit": "72b33bead9d19b99da41612015124344a11d9b23",
+    "candidateUiEntry": "assets/index-Dpg8P1UR.js",
+    "liveHealthz": { "http": 200, "status": "live" },
+    "liveReadyz": { "ready": true },
+    "liveOverlayUnchanged": "e6f26e13795a86084e9f227453ee1d439d25d018"
+  },
+  "rollback": {
+    "executed": false,
+    "keepImage": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "restoreCurrentOverlay": "/root/openbot-maintenance-origin-main-e6f26e13795a-r1-20260823T023758Z",
+    "restorePriorOverlay": "/root/openbot-maintenance-origin-main-7cd74d4c-item7-s18-r1-20260822T150915Z",
+    "recreateContainer": false,
+    "authorizeRestart": false
+  },
+  "cutoverExecuted": false,
+  "flagsChanged": false
+}

@@ -1,0 +1,69 @@
+name: Memory Workspace Phase0 GH Evidence
+
+# 503-bypass: official-review verifies committed JSON with node --test — no local gh.
+# CI also runs capture on dispatch/schedule to refresh evidence from GitHub API.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/memory-workspace-phase0-gh-evidence.yml"
+      - "scripts/governance/capture-phase0-gh-evidence.mjs"
+      - "docs/design/evidence/memory-workspace-phase0-offline-governance-verify*.mjs"
+      - "docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack*.json"
+      - "docs/design/evidence/memory-workspace-phase0-runner-stability-r25.json"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memory-workspace-phase0-gh-evidence
+  cancel-in-progress: false
+
+jobs:
+  offline-verify:
+    name: offline governance verify (503-bypass)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Verify without gh (503-bypass path)
+        run: |
+          node docs/design/evidence/memory-workspace-phase0-offline-governance-verify.mjs
+          node --test docs/design/evidence/memory-workspace-phase0-offline-governance-verify.test.mjs
+          node --test docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack-r25.test.mjs
+          node --test docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack.test.mjs
+
+  refresh-evidence:
+    name: refresh gh evidence pack
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Capture from GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth status
+          node scripts/governance/capture-phase0-gh-evidence.mjs \
+            --review-sequence 25 \
+            --output docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack-r25-ci.json \
+            --captured-by github-actions \
+            --purpose "CI refresh for 503-bypass offline governance verification"
+
+      - name: Upload CI capture artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase0-gh-evidence-r25-ci
+          path: docs/design/evidence/memory-workspace-phase0-offline-gh-evidence-pack-r25-ci.json
+          retention-days: 90

@@ -1,0 +1,132 @@
+{
+  "stage": "ENVFILE_DIVERGENCE_AUDIT",
+  "status": "P1_READONLY_ROOT_CAUSE_PASS",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-24",
+  "liveTouched": false,
+  "flagsChanged": false,
+  "shadowEnabled": false,
+  "envFiles": {
+    "/root/.openbot/.env": {
+      "sha256": "5560f129bbeb79c54188572885d125772dba4366255d35ad7e46e948870dcd30",
+      "mode": "600",
+      "sizeBytes": 1732,
+      "mtime": "2026-08-20T13:54:15+08:00"
+    },
+    "/root/.openbot/.env.docker": {
+      "sha256": "a3f49149f16bdba99d69f45fbeb557152f5eaa359305cb6cd254a0ad5d40ecdf",
+      "mode": "644",
+      "worldReadable": true,
+      "sizeBytes": 1682,
+      "mtime": "2026-08-22T21:13:45+08:00"
+    }
+  },
+  "residualFlags": {
+    "presentInBothEnvFilesAsOne": [
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY",
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER",
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY",
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY"
+    ],
+    "envDockerExtra": ["OPENBOT_PROGRESS_LEDGER_ENABLED"]
+  },
+  "historicalSnapshots": {
+    "recreateOrBakWithZeroInboundFlags": 11,
+    "range": "2026-07-22 .. 2026-07-25",
+    "recentWithFiveInboundFlags": [
+      ".env.docker",
+      ".env.docker.bak-pre-ledger-flag-20260822T131345Z"
+    ],
+    "aug22EditAddedOnly": "OPENBOT_PROGRESS_LEDGER_ENABLED"
+  },
+  "runningContainer": {
+    "name": "openbot-gateway-rc",
+    "createdAt": "2026-08-24T06:37:47+08:00",
+    "startedAt": "2026-08-24T06:37:47+08:00",
+    "image": "localhost/openbot:rc-amd64-provenance-a12e4c59e575",
+    "imageRevisionLabel": "a12e4c59e575",
+    "buildInfoCommit": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "command": "docker-entrypoint.sh -> node openbot.mjs gateway --bind loopback --port 18789",
+    "healthz": 200,
+    "readyz": { "ready": true, "failing": [] },
+    "runtimeInboundFlags": "ALL_UNSET",
+    "envVarCount": 45
+  },
+  "envSourceJudgment": {
+    "startedFromCurrentEnvFiles": false,
+    "evidence": [
+      "both env-file mtimes predate container creation yet container lacks their five flags",
+      "runningVarSet == envDockerVarSet minus {5 inbound flags + OPENBOT_PROGRESS_LEDGER_ENABLED}",
+      "envDocker names in-common with runtime = 35/41; env names in-common with runtime = 22/33",
+      "managed by podman --restart always; systemd unit masked (historical EnvironmentFile=-/root/.openbot/.env); no compose/quadlet labels",
+      "exact recreate command not found in root shell history"
+    ],
+    "conclusion": "container recreated 2026-08-24 from a flag-stripped snapshot; persistent files are stale/divergent"
+  },
+  "automationCheck": {
+    "activeCron": "verify-ghost-bot-health.sh (every 6h) — health-only; does NOT recreate/restart/env-file the gateway",
+    "otherCron": "disabled/frozen entries only",
+    "systemd": "openbot-gateway.service masked (-> /dev/null), inactive",
+    "quadletOrCompose": "none",
+    "scheduledAutoEnableRisk": false
+  },
+  "rootCause": "legacy CSC experimentation left 5 inbound flags =1 in both persistent env files; live container was recreated from a flag-stripped snapshot so runtime is clean, but persistent config diverges",
+  "impact": "future risk only: any recreate using --env-file .env or .env.docker would enable 4 prohibited flags (PERSIST_EARLY, DEPTH_ROUTER, KNOWLEDGE_POLICY, TOOL_POLICY) + DEPTH_SHADOW instead of shadow-only",
+  "remediation": [
+    "remove the 5 inbound keys from /root/.openbot/.env and /root/.openbot/.env.docker (scoped, reversible, no restart/recreate)",
+    "re-verify runtime unchanged after cleanup",
+    "only then redesign shadow-only enable reproducing the running env + adding only DEPTH_SHADOW=1 with auto-rollback"
+  ],
+  "prohibitedThisStage": [
+    "container restart/recreate",
+    "shadow enable",
+    "P2/P3",
+    "modify RELEASE_RECORD.md",
+    "modify releases.jsonl",
+    "append LIVE ledger row"
+  ],
+  "confidence": {
+    "divergenceAndMisEnableRisk": "HIGH",
+    "noScheduledAutoEnable": "HIGH",
+    "exactCleanRecreateSource": "MEDIUM"
+  },
+  "remediationExecuted": {
+    "authorizedAs": "Authorization 2",
+    "executedAtUtc": "2026-08-25T04:21:12Z",
+    "method": "awk filter removing only the 5 inbound keys; strict per-file diff-guard; no container restart/recreate",
+    "backups": "<file>.before-inbound-cleanup.20260825T042112Z (mode 600)",
+    "files": {
+      "/root/.openbot/.env": {
+        "sha256Before": "5560f129bbeb79c54188572885d125772dba4366255d35ad7e46e948870dcd30",
+        "sha256After": "8241cf425a94eae5b2f99e1de615b3bdb266938c405b26c09a9c8966b50723ea",
+        "inboundFlags": "5->0",
+        "mode": "600 preserved"
+      },
+      "/root/.openbot/.env.docker": {
+        "sha256Before": "a3f49149f16bdba99d69f45fbeb557152f5eaa359305cb6cd254a0ad5d40ecdf",
+        "sha256After": "030f738f71f1b51a0d1fb035bb63611753a61d7e79f788a058f2ecd08b5f4a36",
+        "inboundFlags": "5->0",
+        "progressLedgerRetained": true,
+        "mode": "644 preserved"
+      }
+    },
+    "runtimeUnchangedAfter": {
+      "buildInfoCommit": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+      "healthz": 200,
+      "readyz": { "ready": true, "failing": [] },
+      "runtimeInboundFlags": "ALL_UNSET",
+      "containerStartedAt": "2026-08-24T06:37:47+08:00 (unchanged)",
+      "restartCount": 0
+    },
+    "auditArtifactDisposal": {
+      "inspectReadonlyJson": "shred -u (secret-bearing; sha a8a0894b...)",
+      "envNamesReadonlyTxt": "deleted",
+      "cscShadowRecreateSh": "retained, marked non-executable, pending re-review"
+    },
+    "liveTouched": false,
+    "flagsChangedRuntime": false,
+    "persistentEnvCleaned": true
+  }
+}

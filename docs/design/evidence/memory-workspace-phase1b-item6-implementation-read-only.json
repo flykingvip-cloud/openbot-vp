@@ -1,0 +1,10 @@
+{
+  "schema": "memory-workspace-phase1b-item6-implementation-read-only/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-read-only.json",
+  "kind": "item6-implementation-read-only",
+  "item6": "not-met",
+  "item6ImplementationUnlocked": true,
+  "productionSqliteWrite": false,
+  "runtime": "src/memory/item6-authorized-sqlite-read.ts",
+  "note": "Item 6 step-2 read-only snapshot on OPENBOT_AUTHORIZED_SQLITE_PATH only."
+}

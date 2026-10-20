@@ -1,0 +1,54 @@
+{
+  "schema": "memory-workspace-phase1a-memory-boundary/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "preparedBy": "cursor-memory-platform",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "phase": "1A-design-only",
+  "owner": "cursor-memory-wsc",
+  "status": "design-frozen-pending-owner-signoff",
+  "designBasis": [
+    "docs/design/memory-workspace-identity-remediation-2026-08-14.md §4.3 §5.2",
+    "docs/design/evidence/memory-workspace-phase1a-section141-memory-design-review.json"
+  ],
+  "boundaries": {
+    "workspaceMemoryRole": {
+      "is": "Authorized Workspace Envelope data role (MEMORY.md / memory/*.md root)",
+      "isNot": "A Memory Asset",
+      "identity": "Uses the Workspace Envelope resourceId"
+    },
+    "memoryAsset": {
+      "is": "Independent governance resource with resourceType=memory",
+      "identity": "Own resourceId; must not equal any Workspace resourceId",
+      "relation": "sourceWorkspaceResourceId is association only, never a shared primary key"
+    },
+    "sqlitePartition": {
+      "column": "workspace_id",
+      "stores": "source Workspace Envelope resourceId",
+      "mustNotStore": ["sha256(realpath)", "agentId", "path", "display name"]
+    }
+  },
+  "lifecycle": {
+    "workspaceIndex": "copy/verify/cutover/recovery stay on workspace cutover receipts",
+    "memoryAsset": "promotion/decay/forget/purge owned by Memory Asset governance",
+    "forgetPurge": "Must not delete another workspace_id partition (W9)"
+  },
+  "phase1aAllowed": [
+    "boundary sign-off",
+    "sourceWorkspaceResourceId relation design",
+    "static tests that the production tree does not implement schema v2"
+  ],
+  "phase1aForbidden": [
+    "edit src/memory/** production implementation",
+    "memory schema v2",
+    "files/chunks/FTS/vector migration",
+    "prune/reset/rebuild behavior switch",
+    "reindex",
+    "directory migration"
+  ],
+  "explicitlyForbidden": [
+    "shared identity between Memory Asset and Workspace",
+    "memory-schema-v2 implementation",
+    "deployAuthorized=true"
+  ]
+}

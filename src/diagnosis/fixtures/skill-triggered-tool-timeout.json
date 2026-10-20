@@ -1,0 +1,416 @@
+{
+  "schemaVersion": 1,
+  "graphKind": "DiagnosticRunGraph",
+  "run": {
+    "schemaVersion": 1,
+    "runId": "diag-run-fixture-3",
+    "caseId": "case-fixture-3",
+    "mode": "QUICK",
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-3",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003",
+          "timeRange": {
+            "from": "2026-09-01T12:00:00.000Z",
+            "to": "2026-09-01T12:05:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-web-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003"
+        }
+      }
+    ],
+    "requestedBy": {
+      "schemaVersion": 1,
+      "principalId": "principal-fixture-employee-a",
+      "kind": "user",
+      "tenantId": "tenant-fixture-a"
+    },
+    "mutationPolicy": "READ_ONLY",
+    "budget": {
+      "timeoutMs": 8000,
+      "maxDiagnosers": 3,
+      "modelCalls": 0
+    },
+    "status": "completed",
+    "completion": "CONFIRMED",
+    "missingEvidence": [],
+    "startedAt": "2026-09-01T12:05:01.000Z",
+    "completedAt": "2026-09-01T12:05:02.200Z",
+    "diagnosedAgentRunId": null
+  },
+  "evidences": [
+    {
+      "evidenceId": "ev-fixture-3-skill-started",
+      "evidenceType": "event",
+      "source": "skill_invocation",
+      "authorityRecordId": "skill-invocation:inv-fixture-3",
+      "observedAt": "2026-09-01T12:00:04.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-web-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003"
+        }
+      },
+      "summary": {
+        "skillStarted": true,
+        "outcome": "failure",
+        "failureCategory": "tool_error",
+        "attributionResolution": "identity_tool_name",
+        "latencyMs": 32000
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-3-skill-started",
+        "collectorVersion": "skill-invocation-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "complete",
+        "attributionResolution": "identity_tool_name"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/gateway/skill-invocation/"
+    },
+    {
+      "evidenceId": "ev-fixture-3-tool-timeout",
+      "evidenceType": "event",
+      "source": "tool_runtime",
+      "authorityRecordId": "tool-hook:tool-call-fixture-3",
+      "observedAt": "2026-09-01T12:00:36.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003"
+        }
+      },
+      "summary": {
+        "toolNameClass": "web_fetch",
+        "timeout": true,
+        "errorClass": "tool_timeout",
+        "latencyMs": 30000
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-3-tool-timeout",
+        "collectorVersion": "tool-hook-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "complete",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/agents/tools/"
+    }
+  ],
+  "observations": [
+    {
+      "observationId": "obs-fixture-3-skill-started",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-web-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "skill.started",
+      "value": true,
+      "evidenceIds": ["ev-fixture-3-skill-started"],
+      "observedAt": "2026-09-01T12:00:04.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-3-skill-identity",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-web-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "skill.attributionResolution",
+      "value": "identity_tool_name",
+      "evidenceIds": ["ev-fixture-3-skill-started"],
+      "observedAt": "2026-09-01T12:00:04.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-3-tool-timeout",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "tool.timeout",
+      "value": true,
+      "evidenceIds": ["ev-fixture-3-tool-timeout"],
+      "observedAt": "2026-09-01T12:00:36.000Z",
+      "schemaVersion": 1
+    }
+  ],
+  "assessments": [
+    {
+      "assessmentId": "asmt-fixture-3-tool-timeout",
+      "observationIds": ["obs-fixture-3-tool-timeout", "obs-fixture-3-skill-started"],
+      "code": "tool_invocation_timeout",
+      "verdict": "anomalous",
+      "ruleId": "rule.tool.timeout.v1",
+      "schemaVersion": 1
+    }
+  ],
+  "attributions": [
+    {
+      "attributionId": "attr-fixture-3-tool",
+      "assessmentId": "asmt-fixture-3-tool-timeout",
+      "suspectedTarget": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "responsibilityDomain": "skill_tool",
+      "state": "confirmed",
+      "basis": "runtime_identity",
+      "schemaVersion": 1
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesisId": "hyp-fixture-3-tool-timeout",
+      "code": "tool_timeout",
+      "state": "confirmed",
+      "confidence": {
+        "evidence": 0.99,
+        "assessment": 0.96,
+        "rootCause": 0.93,
+        "impact": 0.5
+      },
+      "supportingEvidenceIds": ["ev-fixture-3-skill-started", "ev-fixture-3-tool-timeout"],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": [],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    },
+    {
+      "hypothesisId": "hyp-fixture-3-skill-logic",
+      "code": "skill_logic_error",
+      "state": "rejected",
+      "confidence": {
+        "evidence": 0.8,
+        "assessment": 0.4,
+        "rootCause": 0.2,
+        "impact": 0
+      },
+      "supportingEvidenceIds": [],
+      "contradictingEvidenceIds": ["ev-fixture-3-tool-timeout"],
+      "missingEvidence": [],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    }
+  ],
+  "findings": [
+    {
+      "findingId": "find-fixture-3-tool-timeout",
+      "code": "tool_timeout",
+      "title": "Skill started but bound tool timed out",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "status": "open",
+      "severity": "P1",
+      "primaryDomain": "skill_tool",
+      "observationIds": ["obs-fixture-3-skill-started", "obs-fixture-3-tool-timeout"],
+      "assessmentIds": ["asmt-fixture-3-tool-timeout"],
+      "attributionIds": ["attr-fixture-3-tool"],
+      "hypothesisIds": ["hyp-fixture-3-tool-timeout"],
+      "evidenceIds": ["ev-fixture-3-skill-started", "ev-fixture-3-tool-timeout"],
+      "confidence": {
+        "evidence": 0.99,
+        "assessment": 0.96,
+        "rootCause": 0.93,
+        "impact": 0.5
+      },
+      "fingerprint": "skill_tool|tool_timeout|tool:tool-fixture-web-fetch|session:sha256:fixture-session-key-a0000000000000000000000000000003",
+      "firstSeenAt": "2026-09-01T12:00:36.000Z",
+      "lastSeenAt": "2026-09-01T12:00:36.000Z",
+      "schemaVersion": 1,
+      "completion": "CONFIRMED"
+    }
+  ],
+  "relations": [
+    {
+      "relationId": "rel-fixture-3-timeout-from-tool",
+      "fromId": "obs-fixture-3-tool-timeout",
+      "toId": "ev-fixture-3-tool-timeout",
+      "relation": "derived_from",
+      "derivation": "EVIDENCE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.99,
+      "evidenceIds": ["ev-fixture-3-tool-timeout"],
+      "schemaVersion": 1
+    },
+    {
+      "relationId": "rel-fixture-3-causes-finding",
+      "fromId": "obs-fixture-3-tool-timeout",
+      "toId": "find-fixture-3-tool-timeout",
+      "relation": "causes",
+      "derivation": "RULE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.93,
+      "evidenceIds": ["ev-fixture-3-tool-timeout"],
+      "schemaVersion": 1
+    }
+  ],
+  "case": {
+    "schemaVersion": 1,
+    "caseId": "case-fixture-3",
+    "tenantId": "tenant-fixture-a",
+    "status": "TRIAGED",
+    "diagnosticRunIds": ["diag-run-fixture-3"],
+    "findingIds": ["find-fixture-3-tool-timeout"],
+    "relationIds": ["rel-fixture-3-timeout-from-tool", "rel-fixture-3-causes-finding"],
+    "mergeKey": "tenant-fixture-a|sha256:fixture-session-key-a0000000000000000000000000000003|skill_tool|tool_timeout|tool:tool-fixture-web-fetch",
+    "mergedObservationPredicates": ["skill.started", "tool.timeout"],
+    "impact": {
+      "affectedCount": 1,
+      "code": "case:find-fixture-3-tool-timeout"
+    },
+    "timeline": [
+      {
+        "at": "2026-09-01T12:00:04.000Z",
+        "code": "observation:obs-fixture-3-skill-started"
+      },
+      {
+        "at": "2026-09-01T12:00:36.000Z",
+        "code": "observation:obs-fixture-3-tool-timeout"
+      }
+    ],
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-3",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003",
+          "timeRange": {
+            "from": "2026-09-01T12:00:00.000Z",
+            "to": "2026-09-01T12:05:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-web-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000003"
+        }
+      }
+    ]
+  },
+  "verification": {
+    "schemaVersion": 1,
+    "verificationId": "ver-fixture-3",
+    "caseId": "case-fixture-3",
+    "baselineWindow": {
+      "from": "2026-08-25T00:00:00.000Z",
+      "to": "2026-09-01T00:00:00.000Z"
+    },
+    "observationWindow": {
+      "from": "2026-09-01T13:00:00.000Z",
+      "to": "2026-09-02T13:00:00.000Z"
+    },
+    "expectedOutcome": {
+      "metric": "tool_timeout_rate",
+      "comparator": "lte",
+      "value": 0.05
+    }
+  }
+}

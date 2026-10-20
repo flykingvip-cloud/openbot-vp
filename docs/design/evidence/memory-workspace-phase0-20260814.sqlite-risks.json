@@ -1,0 +1,118 @@
+{
+  "schema": "memory-workspace-phase0-sqlite-risks/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "generatedAt": "2026-08-14T05:40:07.953Z",
+  "note": "Read-only identification only. No LIVE schema change, no prune disable, no src/memory/** edit.",
+  "runtimeStopLoss": {
+    "implementedOnMain": true,
+    "mergedPr": "https://github.com/gmood2008/openbot/pull/401",
+    "mergedSha": "1ab9d33e69ea3803e5d4e0f0be7ece83653fb792",
+    "reviewed": true,
+    "deployedToLive": false,
+    "blockedReason": "deployAuthorized=false; PR merge does not authorize LIVE deploy"
+  },
+  "v1Shape": {
+    "partitionColumn": null,
+    "key": "agentId filename under {stateDir}/memory/{agentId}.sqlite",
+    "pruneBehavior": "syncMemoryFiles deletes files.path absent from listMemoryFiles(workspaceDir)"
+  },
+  "manyToMany": {
+    "description": "One v1 sqlite can be opened by multiple workspace roots that share an agentId. Roots do not know about each other.",
+    "observed": [
+      {
+        "sqlite": "{stateDir}/memory/bot-2.sqlite",
+        "bytes": 12922880,
+        "mtimeUtc": "2026-08-14T03:11:19.468Z",
+        "roots": [
+          "tenants/<redacted>/users/<redacted>/OpenBot/workspace-bot-2",
+          "{stateDir}/workspace-bot-2"
+        ],
+        "tenantMd": 90,
+        "hostMd": 7,
+        "risk": "confirmed-accident-sample"
+      }
+    ]
+  },
+  "dualTreeSqlite": [
+    {
+      "agentId": "bot-2",
+      "bytes": 12922880,
+      "mtimeUtc": "2026-08-14T03:11:19.468Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "panda",
+      "bytes": 69632,
+      "mtimeUtc": "2026-07-31T23:40:38.240Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "bot--agent",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-09T07:09:26.711Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "bot-skill",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-05T17:27:22.263Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-d855e9277ab0",
+      "bytes": 69632,
+      "mtimeUtc": "2026-07-17T09:45:37.385Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-2216389214f3",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-12T05:39:34.907Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-2d75473131c5",
+      "bytes": 69632,
+      "mtimeUtc": "2026-07-24T08:54:51.689Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-244a764a8ebc",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-07T12:52:51.643Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-f9f502e204b3",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-10T09:07:26.247Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-44fc12d31e44",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-01T10:07:59.441Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "agent-70938575096a",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-12T09:15:18.791Z",
+      "dualTree": true
+    }
+  ],
+  "singleTreeButUnpartitioned": [
+    {
+      "agentId": "main",
+      "bytes": 4796416,
+      "mtimeUtc": "2026-08-14T02:43:58.775Z",
+      "dualTree": false
+    }
+  ],
+  "gate": {
+    "identified": true,
+    "stopLossCodeOnMain": true,
+    "stopLossDeployedToLive": false,
+    "closesWsC": false
+  }
+}

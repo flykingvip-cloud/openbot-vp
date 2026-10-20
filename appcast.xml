@@ -1,0 +1,46 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>OpenBot</title>
+        <item>
+            <title>1.0.4</title>
+            <pubDate>Mon, 03 Aug 2026 09:52:52 +0800</pubDate>
+            <link>https://www.openbot.love/downloads/appcast.xml</link>
+            <sparkle:version>1502</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<h2>OpenBot 1.0.4</h2>
+<p>Latest OpenBot update.</p>
+<p><a href="https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md">View full changelog</a></p>
+]]></description>
+            <enclosure url="https://www.openbot.love/downloads/OpenBot-1.0.4.zip" length="22137272" type="application/octet-stream" sparkle:edSignature="7cC3NY/lKIHl5tqLXmPTNKdr8V3nUHUAL1N0wGRXW1/XRCKZc8noaQ7kugwWTuwCLLT9oPVcAE7IIWiXixbdDg=="/>
+        </item>
+        <item>
+            <title>1.0.3</title>
+            <pubDate>Mon, 03 Aug 2026 01:00:18 +0800</pubDate>
+            <link>https://www.openbot.love/downloads/appcast.xml</link>
+            <sparkle:version>1501</sparkle:version>
+            <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <description><![CDATA[<h2>OpenBot 1.0.3</h2>
+<p>Latest OpenBot update.</p>
+<p><a href="https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md">View full changelog</a></p>
+]]></description>
+            <enclosure url="https://www.openbot.love/downloads/OpenBot-1.0.3.zip" length="21954266" type="application/octet-stream" sparkle:edSignature="jNXj07efQbx7YW4613GXfPhzh/EtXer16XSc52QuzFwi6OZAuVLi7HmeqOXtCYbbjedONAsY7oSdINpNlTpbBw=="/>
+        </item>
+        <item>
+            <title>1.0.2</title>
+            <pubDate>Mon, 03 Aug 2026 00:36:25 +0800</pubDate>
+            <link>https://www.openbot.love/downloads/appcast.xml</link>
+            <sparkle:version>1500</sparkle:version>
+            <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<h2>OpenBot 1.0.2</h2>
+<p>Latest OpenBot update.</p>
+<p><a href="https://github.com/openclaw/openclaw/blob/main/CHANGELOG.md">View full changelog</a></p>
+]]></description>
+            <enclosure url="https://www.openbot.love/downloads/OpenBot-1.0.2.zip" length="14437058" type="application/octet-stream" sparkle:edSignature="HtP8nj5WRSRsa0R9Mm76P8Kwn7cfVtqZFtixseNiIQQyKtXwIzcDfn7nWBowrda13aJTONpvfdcV4EywRzbiCA=="/>
+        </item>
+    </channel>
+</rss>

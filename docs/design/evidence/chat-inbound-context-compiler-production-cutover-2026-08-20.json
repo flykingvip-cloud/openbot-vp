@@ -1,0 +1,65 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "production-cutover",
+  "capturedAt": "2026-08-20T21:17:00+08:00",
+  "productionLive": true,
+  "cutoverPerformed": true,
+  "cutoverMode": "gateway-dist-keep-ui",
+  "strategy": 4,
+  "stoppedAt": null,
+  "pr": {
+    "url": "https://github.com/gmood2008/openbot/pull/565",
+    "state": "MERGED",
+    "mergedAt": "2026-08-20T13:08:49Z",
+    "mergeSha": "5480cefe122f38fdf1064c1672b860e10060a32c"
+  },
+  "originMainSha": "5480cefe122f38fdf1064c1672b860e10060a32c",
+  "candidateSha": "5480cefe122f38fdf1064c1672b860e10060a32c",
+  "candidateEqualsOriginMain": true,
+  "forwardOnly": true,
+  "live": {
+    "before": "2022bcb0d192b5f99e291d0b50930aa7a6177664",
+    "after": "5480cefe122f38fdf1064c1672b860e10060a32c",
+    "source": "container /app/dist/build-info.json via SSH root@8.217.93.71 podman exec openbot-gateway-rc",
+    "image": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "imageId": "5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9",
+    "containerCreated": "2026-08-15 22:39:05.29471776 +0800 CST",
+    "overlay": {
+      "id": "context-compiler-main-r1",
+      "stamp": "20260820T131501Z",
+      "buildMode": "gateway-dist-keep-ui",
+      "previousLive": "2022bcb0d192b5f99e291d0b50930aa7a6177664",
+      "commitsFromPreviousLive": 7,
+      "pr": 565
+    },
+    "uiPinEnv": "index-Ol92eg1L.js",
+    "uiServedEntry": "index-Ol92eg1L.js",
+    "uiRoot": "/root/.openbot/control-ui"
+  },
+  "tarball": {
+    "path": "/root/openbot-gateway-dist-pkg-context-compiler-main-r1-20260820T131501Z.tar.gz",
+    "sha256": "e2bbabff46b8b13b9f94bbd5e505d2ede0b443bc22c926c95ddf65b663f358fa"
+  },
+  "backup": {
+    "path": "/root/openbot-maintenance-context-compiler-main-r1-20260820T131501Z/container-app-dist.before.tgz",
+    "sha256": "9c7b33ab4d46eebf79ea2d5993a7866b0f860a0fac2bea9f1e7f9857a6dc31ad"
+  },
+  "smoke": {
+    "healthz": 200,
+    "readyz": true,
+    "compilerMarker": "/app/dist/reply-Dqqp6vRL.js OPENBOT_CONTEXT_COMPILER",
+    "compilerRuntimeEnv": "default-on",
+    "inboundFlagsKept": true,
+    "restart": "/usr/local/bin/openbot-gateway-restart",
+    "containerRecreated": false
+  },
+  "ownerDecision": {
+    "strategy4Overlay": true,
+    "cutLiveFullDist": false,
+    "enableInboundFlags": "kept-existing",
+    "keepControlUi": true
+  },
+  "releaseTag": "provenance/sha-5480cefe122f",
+  "ledgerSeq": 31
+}

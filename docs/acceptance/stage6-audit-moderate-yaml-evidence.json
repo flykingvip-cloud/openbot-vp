@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-48c2-rrv3-qjmp",
+  "cve": "CVE-2026-33532",
+  "package": "yaml",
+  "vulnerable_range": ">=2.0.0 <2.8.3",
+  "affected_version_before": "2.8.2",
+  "dependency_path": ".>yaml",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=2.8.3",
+  "mitigated_version": "2.8.3",
+  "reachable_surface": "Gateway/config YAML parse (direct root dependency)",
+  "mitigation": "Bump dependencies.yaml to ^2.8.3; pnpm.overrides.yaml=2.8.3",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 49,
+    "low": 9,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-48c2-rrv3-qjmp"
+}

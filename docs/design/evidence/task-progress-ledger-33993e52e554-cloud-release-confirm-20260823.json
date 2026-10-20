@@ -1,0 +1,121 @@
+{
+  "schema": "task-progress-ledger-33993e52e554-cloud-release-confirm/v1",
+  "recordedAt": "2026-08-23T20:02:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "phase": "cloud-release-confirm-observation",
+  "publicStatus": "Progress Ledger cloud production release complete; runtime observation continues",
+  "cutover": false,
+  "flagChanged": false,
+  "turnContractStarted": false,
+  "originMain": "399d075971c94ccc1efb176f3c7fa5fe5f93c3aa",
+  "originMainSubject": "Docs: record Progress Ledger 33993e52e554 observation snapshot (#650)",
+  "didNotDeployTip": true,
+  "live": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "liveEqualsRequiredOverlay": true,
+  "liveIsAncestorOfOriginMain": true,
+  "tipEqualsLive": false,
+  "buildInfo": {
+    "version": "2026.7.12-rc.2",
+    "commit": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "builtAt": "2026-08-23T09:26:35.518Z"
+  },
+  "acceptance": {
+    "buildInfoCommit": true,
+    "healthzLive": true,
+    "readyzReady": true,
+    "progressLedgerEnabled": true,
+    "projectionKindCanonical": true,
+    "projectionViolationsZero": true,
+    "invariantsI1ToI8Zero": true
+  },
+  "healthz": {
+    "ok": true,
+    "status": "live"
+  },
+  "readyz": {
+    "ready": true,
+    "failing": []
+  },
+  "container": {
+    "name": "openbot-gateway-rc",
+    "status": "running",
+    "running": true,
+    "startedAt": "2026-08-23T09:28:05Z",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3"
+  },
+  "progressLedger": {
+    "configEnabled": true,
+    "envDocker": "1",
+    "processEnv": "UNSET",
+    "changedThisPhase": false
+  },
+  "uiEntry": "index-Dpg8P1UR.js",
+  "rollbackBackup": {
+    "path": "/root/openbot-maintenance-origin-main-33993e52e554-full-dist-r1-20260823T092707Z",
+    "exists": true,
+    "deleted": false
+  },
+  "adminList": {
+    "method": "progress-ledger.admin.list",
+    "projectionKind": "canonical",
+    "itemCount": 8,
+    "metrics": {
+      "writesAccepted": 72,
+      "writesRejected": 0,
+      "projectionViolations": 0,
+      "violationsById": {
+        "I1": 0,
+        "I2": 0,
+        "I3": 0,
+        "I4": 0,
+        "I5": 0,
+        "I6": 0,
+        "I7": 0,
+        "I8": 0
+      },
+      "lastViolation": null,
+      "window": "process memory since container start 2026-08-23T09:28:05Z"
+    }
+  },
+  "cronList": {
+    "method": "cron.list",
+    "total": 11,
+    "withProgress": 8,
+    "adminProgressEqualsCronListProgress": true
+  },
+  "logs24h": {
+    "containerLines": 532,
+    "matchedProgressLedgerInvariantErrorException": 32,
+    "progressLedgerInvariantLines": 0,
+    "unresolvedTenantInjectFailures": 10,
+    "note": "Matched error/exception lines are TenantContextError on cron workbench inject and unrelated memory/v1-root-guard. No Ledger invariant or writesRejected lines."
+  },
+  "residualRisks": [
+    {
+      "id": "observation-window-continues",
+      "severity": "expected",
+      "detail": "Cloud release is confirmed on overlay 33993e52e554. 24h watch continues. Do not recutover origin/main tip 399d0759."
+    },
+    {
+      "id": "cron-workbench-unresolved-tenant",
+      "severity": "adjacent",
+      "detail": "Existing cron workbench inject failures (TenantContextError unresolved_tenant) appear in 24h logs. They are not Ledger invariant violations and did not increment writesRejected/projectionViolations."
+    },
+    {
+      "id": "process-env-unset",
+      "severity": "known",
+      "detail": "OPENBOT_PROGRESS_LEDGER_ENABLED is UNSET in the running process. Runtime remains enabled via gateway.progressLedger.enabled=true plus .env.docker=1."
+    }
+  ],
+  "explicitlyNotDone": [
+    "Did not cut over gateway or UI",
+    "Did not deploy origin/main tip 399d075971c94ccc1efb176f3c7fa5fe5f93c3aa",
+    "Did not change Progress Ledger flag",
+    "Did not recreate the container",
+    "Did not start a host-level gateway",
+    "Did not delete the 33993e52e554 rollback backup",
+    "Did not start Turn Contract work"
+  ]
+}

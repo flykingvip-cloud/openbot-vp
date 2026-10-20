@@ -1,0 +1,80 @@
+{
+  "schema": "collaboration-csc-isolated-accept/v1",
+  "isolatedCandidateVerification": "approved",
+  "productionCloseout": "not-accepted",
+  "executed": false,
+  "cutoverExecuted": false,
+  "flagsChanged": false,
+  "liveTouched": false,
+  "recordedAt": "2026-08-23T13:04:30Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "scope": "Approve isolated candidate 7ca242cf44 only. Do not swap, restart LIVE, enable flags, or append LIVE ledger.",
+  "expiredTips": [
+    "697c65c905c624ec80aba2a3386a00a7d0cc818a",
+    "243ead754d6ab839dd2fdb4ac781e9bdd9346022",
+    "0229c93cb9769b96c83d1d8cbe168373a6b0a89d",
+    "dad42c3d8014bbd1a01872777fdadca6b081f182",
+    "399d075971c94ccc1efb176f3c7fa5fe5f93c3aa",
+    "6524a8428da62c79ddc4bad5ee1a99927ff4bdea"
+  ],
+  "candidate": {
+    "sha": "7ca242cf4419b438fe75c42ef159df5bb74d77db",
+    "equalsFrozenMainAtBuild": true,
+    "equalsCurrentOriginMainAtFreeze": true,
+    "image": "localhost/openbot:rc-amd64-provenance-7ca242cf4419",
+    "imageId": "sha256:699a3788052282a702b7f909097ee73ce2ad769285fbbfe11a6d474639ca0f93",
+    "provenanceTag": "provenance/sha-7ca242cf4419",
+    "builtAt": "2026-08-23T12:42:35.799Z"
+  },
+  "actualLiveBaseline": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "ledgerLatest": {
+    "seq": 40,
+    "gatewaySha": "33993e52e5540f76e57d66ab75d8955420437d3a"
+  },
+  "liveLedgerMatch": true,
+  "gates": {
+    "candidateImport": "PASS",
+    "isolatedSmoke": {
+      "verdict": "PASS",
+      "port": 18889,
+      "healthz": 200,
+      "readyz": true,
+      "httpRoot": 200,
+      "websocketUpgrade": "101 Switching Protocols"
+    },
+    "shadow3": {
+      "verdict": "PASS",
+      "boundTo": "7ca242cf4419b438fe75c42ef159df5bb74d77db",
+      "reuseOf0229": false,
+      "tests": "5/5",
+      "receipt": "docs/design/evidence/chat-inbound-depth-shadow-3-tests-7ca242cf44-2026-08-23.json"
+    },
+    "liveLedgerMatch": { "verdict": "PASS" },
+    "forwardOnly": {
+      "verdict": "ALLOW",
+      "live": "33993e52e5540f76e57d66ab75d8955420437d3a",
+      "candidate": "7ca242cf4419b438fe75c42ef159df5bb74d77db",
+      "warnings": []
+    },
+    "deliveryAlignment": {
+      "verdict": "PASS",
+      "summary": "PASS=8 WARN=2 FAIL=0"
+    },
+    "rollbackDrill": {
+      "verdict": "PASS",
+      "target": "33993e52e5540f76e57d66ab75d8955420437d3a",
+      "port": 18890,
+      "touchedLive": false
+    },
+    "ledgerAudit": { "releases": 40, "errors": 0 }
+  },
+  "explicitNonActions": [
+    "did not append LIVE ledger row",
+    "did not modify Latest cutover",
+    "did not swap or restart openbot-gateway-rc",
+    "did not run cutover-from-ghcr --stage",
+    "did not enable inbound / CSC / CONTEXT_SCOPE flags",
+    "did not reuse expired 0229 / dad42 / 399d / 6524 images"
+  ]
+}

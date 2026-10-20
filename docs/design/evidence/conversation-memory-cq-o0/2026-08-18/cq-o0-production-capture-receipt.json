@@ -1,0 +1,42 @@
+{
+  "schema": "conversation-memory-cq-o0-production-capture-receipt/v1",
+  "status": "passed",
+  "nextState": "CQ-O0-complete",
+  "firstFailure": null,
+  "operator": "ceo",
+  "operatorRole": "CEO",
+  "window": "2026-08-19T00:40:00+08:00/2026-08-19T01:10:00+08:00",
+  "timezone": "Asia/Shanghai",
+  "sourceCommit": "34595862f785c90a4e0e30587db33690c2e139d2",
+  "imageDigest": "sha256:952a6c7aa93e17ff3b3eef39116bdf0cc70cac20030cc0e2c4d5d0e51afba037",
+  "archivePath": "docs/design/evidence/conversation-memory-cq-o0/2026-08-18/",
+  "identityCheck": "passed",
+  "tests": "passed",
+  "schemaValidation": "passed",
+  "mutationCheck": "passed",
+  "redactionCheck": "passed",
+  "probeExecuted": true,
+  "redactedReportSha256": "7a0a99e881f54039b627fe04457a53f4aa315c261a6a73c40fa191e47fdc7b1a",
+  "manifestSha256": "97b4d0051ee3b284b197ee809b8793a56945b915383b166984963998fda1ffc9",
+  "capturedAtHost": "2026-08-19T00:40:23+08:00",
+  "recordedAt": "2026-08-19T00:41:30+08:00",
+  "identity": {
+    "authorizedInspect": "podman inspect --format '{{.Id}}' openbot-gateway-rc",
+    "observedContainerId": "952a6c7aa93e17ff3b3eef39116bdf0cc70cac20030cc0e2c4d5d0e51afba037",
+    "observedBuildInfoCommit": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "commitMatch": true,
+    "containerIdMatch": true,
+    "observedImageDigest": "sha256:fc37b6988d63b4d818de72a8b709ad510b875a81e044caa47ae19a223fa88d0a",
+    "probeModuleSha": "ea6e7337fbf3f1da",
+    "note": "Authorized imageDigest matches container .Id from the handoff inspect command, not podman image digest."
+  },
+  "testsDetail": {
+    "unit": "18 passed",
+    "gateway": "25 passed"
+  },
+  "explicitlyNotDone": [
+    "no MemoryManager write/sync/reindex/rebuild/reset/watcher",
+    "no podman cp of worktree scripts",
+    "no raw ops report archived"
+  ]
+}

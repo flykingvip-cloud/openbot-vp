@@ -1,0 +1,11 @@
+{
+  "executed": false,
+  "executedCatalogMutations": [],
+  "executedDeletes": [],
+  "executedMoves": [],
+  "identityRollback": true,
+  "mode": "dry-run",
+  "note": "Dry-run executed nothing; rollback is a no-op identity.",
+  "rollbackActions": [],
+  "schema": "memory-workspace-legacy-migration-rollback/v1"
+}

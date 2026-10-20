@@ -1,0 +1,891 @@
+# Design Document
+
+## Overview
+
+This design carries out the requirements locked in `requirements.md` for the
+`gateway-plugins-monolith-decomposition` spec. The two scope decisions made at
+requirements review are honored throughout:
+
+- **Option A** (Req 1) — all four Target_Modules are in-scope and split in this spec:
+  `src/gateway/platform-auth.ts` (4439 LOC), `src/gateway/collaboration-learning.ts`
+  (3019 LOC), `src/plugins/loader.ts` (828 LOC), and `src/plugins/hooks.ts` (762 LOC).
+- **Out-of-scope** (Req 11) — no `pnpm check:architecture:snapshot` script, no
+  `.artifacts/architecture/` emitter. Cross-reference: follow-up spec
+  `architecture-snapshot-tooling` (TBD).
+
+This is a pure structural refactor (Req 3, Req 13). Public_Export_Surface is preserved
+behind retained Facade_Files (Req 2). The four splits are landed sequentially in the
+order defined under "Implementation Sequencing" so each can be reverted independently
+(Req 8.5).
+
+The document is organized as: Architecture (the layered model and how the four
+Target_Modules fit), Components and Interfaces (per-Target sub-module layouts plus
+cross-cutting procedures), Data Models (the artifacts produced by the procedures),
+Correctness Properties (the round-trip and equality properties), Error Handling
+(how diagnostics surface and rollback works), Testing Strategy (per-Target
+verification matrices and the property tests), and Risks & Open Questions.
+
+## Architecture
+
+### A.1 Layered model
+
+The four Target_Modules sit in two layers of the project:
+
+```
+                ┌──────────────────────────────────────────────┐
+   Gateway      │  src/gateway/platform-auth.ts                │  Facade
+   layer        │  src/gateway/platform-auth/*                 │  Sub_Modules
+                │                                              │
+                │  src/gateway/collaboration-learning.ts       │  Facade
+                │  src/gateway/collaboration-learning/*        │  Sub_Modules
+                └──────────────────────────────────────────────┘
+                                   │
+                                   ▼ (consumed by server-methods/* packs)
+                ┌──────────────────────────────────────────────┐
+   Plugins      │  src/plugins/loader.ts                       │  Facade
+   subsystem    │  src/plugins/loader/*                        │  Sub_Modules
+                │                                              │
+                │  src/plugins/hooks.ts                        │  Facade
+                │  src/plugins/hooks/*                         │  Sub_Modules
+                │                                              │
+                │  src/plugins/hook-runner-global.ts           │  Existing singleton (unchanged)
+                └──────────────────────────────────────────────┘
+```
+
+Each Target_Module is split in place: the original path is retained as a
+Facade_File that re-exports the Public_Export_Surface (Req 2.1), and the new
+sub-domain files live in a sibling directory named after the Target_Module
+without the `.ts` extension. External imports continue to resolve through the
+facade unchanged.
+
+### A.2 Cross-domain dependencies
+
+- **Gateway → Plugins**: `src/gateway/server.impl.ts` and the server-methods
+  packs already import the plugins subsystem through stable entry points
+  (`loadOpenBotPlugins`, `getGlobalHookRunner`, `runGlobalGatewayStopSafely`).
+  Those entry points are preserved verbatim by the facades.
+- **Plugins ↔ Plugins**: `src/plugins/hook-runner-global.ts` imports from
+  `./hooks.js` (the facade after the refactor). This relationship is
+  one-directional and stays one-directional: no file under `src/plugins/hooks/**`
+  imports from `./hook-runner-global.js`. Enforcement: a new
+  architecture-manifest rule (`hooks-no-import-hook-runner-global`).
+- **Build-time aliases**: `scripts/copy-plugin-sdk-root-alias.mjs` runs during
+  `pnpm build` and drops a `root-alias.cjs` file. The post-split
+  `src/plugins/loader/runtime-resolve.ts` looks for that file at the same
+  paths the pre-split loader did. The build script is **not edited**.
+
+### A.3 Sequence of splits
+
+The four splits land in increasing-risk order (lowest first), each as its own
+commit/PR so any one can be reverted independently (Req 8.5):
+
+1. `src/plugins/hooks.ts` — pure factory, lowest risk.
+2. `src/plugins/loader.ts` — touches build-time alias machinery but no
+   on-disk state.
+3. `src/gateway/collaboration-learning.ts` — larger state machine, no auth
+   surface.
+4. `src/gateway/platform-auth.ts` — highest risk; last and gated by the
+   closure-state probe (Req 4.2).
+
+Rationale and per-PR scope are detailed under "Testing Strategy" §T.4.
+
+## Components and Interfaces
+
+### C.1 `src/gateway/platform-auth.ts` decomposition
+
+Implements Req 4.1, Req 4.2, Req 4.7, Req 4.8, Req 7.1.
+
+Pre-refactor: 4439 LOC, single file. Closure-level state observed at module
+scope (full table is generated by the probe described in §C.5):
+
+- `storeWriteLocks: Map<string, Promise<void>>` (line 434) — write-lock
+  coordinator shared across all auth flows.
+- A handful of `const` policy / TTL / lockout values at module scope (lines
+  62–98) — pure constants, safe to move with one consumer each.
+
+Post-refactor file layout:
+
+```
+src/gateway/platform-auth.ts                  Facade (re-exports only)
+src/gateway/platform-auth/
+├── store.ts                                  Read/write of the JSON store; owns storeWriteLocks
+├── store-types.ts                            PlatformAuthStore + member/notification types
+├── config.ts                                 resolvePlatformAuthConfig + ResolvedPlatformAuthConfig
+├── session-context.ts                        readPlatformAuthSessionContextFromRequest, readPlatformAuthSessionFromRequest, resolveControlUiPlatformAuthState, PlatformAuthSessionContext
+├── password-login.ts                         Password verification + lockout state machine
+├── oauth-flows.ts                            OAuth-style sign-in flows (kept iff the closure probe shows no shared state with password-login; otherwise merged into session-context.ts)
+├── token-operations.ts                       Token issuance / refresh / revocation
+├── email-helpers.ts                          enqueuePlatformAuthNotification + email-template helpers
+├── rate-limit.ts                             Password lockout counters + DEFAULT_PASSWORD_LOCK_* constants
+├── memberships.ts                            findUserByEmail, findMembershipByUserId, buildPlatformOrganizationSnapshot, buildPlatformEmployeeAccess
+├── trial-policy.ts                           DEFAULT_TRIAL_* + buildPlatformTrialApplicationsView + TRIAL_APPLICATION_HISTORY_LIMIT
+├── http-handler.ts                           handleControlUiPlatformAuthRequest (the HTTP entrypoint that orchestrates the above)
+└── index.ts                                  Optional internal barrel for sub-module cross-imports (NOT re-exported by the facade)
+```
+
+Sub_Module count: 12 (≥ 3, Req 4.8). Per-file LOC ≤ 500 (Req 4.7).
+Required sub-domain coverage from Req 4.1 is satisfied by the named files.
+
+Facade contents: re-exports the full Public_Export_Surface from per-Sub_Module
+files. The exact `export { ... } from "./platform-auth/<sub>.js"` lines are
+**derived from the pre-refactor export-surface snapshot** under
+`.kiro/specs/gateway-plugins-monolith-decomposition/baseline/platform-auth.md`
+(Req 2.2). The facade contains only re-exports — no logic, no `const`, no
+module-level state.
+
+`storeWriteLocks` ownership: lives in `store.ts` as a non-exported
+module-level Map. Other Sub_Modules access it via the exported
+`withPlatformAuthStoreWriteLock` API. This satisfies Req 3.7 (no new
+`globalThis` Symbol singleton): the lock is a normal module-scoped Map, scoped
+to the runtime that imports `store.ts`.
+
+### C.2 `src/gateway/collaboration-learning.ts` decomposition
+
+Implements Req 4.3, Req 4.4, Req 4.7, Req 4.8.
+
+Pre-refactor: 3019 LOC. Heavy public surface across snapshot/space/transition
+APIs.
+
+Post-refactor file layout:
+
+```
+src/gateway/collaboration-learning.ts          Facade (re-exports only)
+src/gateway/collaboration-learning/
+├── snapshot-types.ts                          GatewayCollaborationLearningSnapshot + member snapshots + space snapshots
+├── operating-state-types.ts                   GatewayCollaborationOperatingPhase + GatewayCollaborationGroupOperatingState
+├── event-entry.ts                             ensureGatewayCollaborationGroupSessions (the public entry point that other server-methods packs call)
+├── state-machine.ts                           transitionCollaborationTask, transitionCollaborationDeliverable, transitionCollaborationReview, transitionCollaborationDecision, updateCollaborationDecisionDraft + resolveCollaborationTransitionError
+├── evaluation-aggregation.ts                  loadGatewayCollaborationLearningSnapshot
+├── space-store.ts                             listGatewayCollaborationSpaces, updateGatewayCollaborationSpaceMembers, resetGatewayCollaborationSpace
+└── index.ts                                   Optional internal barrel
+```
+
+Sub_Module count: 6 + types (≥ 3, Req 4.8). The required sub-domains (event
+entry, state machine, evaluation aggregation, snapshot storage) all have
+dedicated files.
+
+**Req 4.4 verification**: a grep of `src/gateway/server-methods/` for
+`collaboration-learning` imports must be performed and recorded under
+`.kiro/specs/.../baseline/collaboration-learning-consumers.md` before the
+cut. If any direct internal import exists, the Facade_File is retained at
+`src/gateway/collaboration-learning.ts` (which it is — see the layout above).
+
+### C.3 `src/plugins/loader.ts` decomposition
+
+Implements Req 4.5, Req 4.7, Req 4.8, Req 3.4.
+
+Pre-refactor: 828 LOC. Coupled concerns: discovery candidate handling,
+manifest validation, jiti alias resolution, register-call orchestration,
+plugin provenance tracking, plugin-sdk root alias, hook-runner global
+initialization.
+
+Post-refactor file layout:
+
+```
+src/plugins/loader.ts                           Facade — exports loadOpenBotPlugins, PluginLoadOptions, PluginLoadResult, __testing
+src/plugins/loader/
+├── plugin-load-options.ts                     PluginLoadOptions, PluginLoadResult types
+├── runtime-resolve.ts                         Owns jiti construction + plugin-sdk alias map (resolvePluginSdkAlias, listPluginSdkExportedSubpaths, resolvePluginSdkScopedAliasMap, listPluginSdkAliasCandidates) — see §C.6
+├── runtime-proxy.ts                           Lazy PluginRuntime proxy (the Proxy<PluginRuntime> currently inlined in loader.ts)
+├── candidate-validation.ts                    validatePluginConfig + resolvePluginModuleExport
+├── plugin-record.ts                           createPluginRecord, recordPluginError, pushDiagnostics
+├── provenance.ts                              buildProvenanceIndex, isTrackedByProvenance, warnAboutUntrackedLoadedPlugins, warnWhenAllowlistIsOpen, addPathToMatcher, matchesPathMatcher
+├── memory-slot-policy.ts                      Loader-side orchestration of memorySlotMatched / selectedMemoryPluginId tracking (the policy itself stays in src/plugins/config-state.ts)
+├── load-orchestration.ts                      The reduced loadOpenBotPlugins driver (assembles the above and delegates) — kept ≤ 500 LOC
+└── index.ts                                   Optional internal barrel
+```
+
+Sub_Module count: 8 (≥ 3, Req 4.8). Required sub-domains (discovery,
+validation, runtime resolve, load orchestration) are covered (discovery is
+already in `src/plugins/discovery.ts`, an existing sibling; this design does
+not move it).
+
+The `__testing` helper (line 160 of the pre-refactor file) is preserved by the
+facade.
+
+### C.4 `src/plugins/hooks.ts` decomposition
+
+Implements Req 4.6, Req 4.7, Req 4.8, Req 3.5, Req 3.6.
+
+Pre-refactor: 762 LOC. The bulk is the `createHookRunner` factory wiring ~25
+hook event runners. Natural axis is the event family (agent / message / tool /
+session / subagent / gateway-lifecycle / model+prompt).
+
+Post-refactor file layout:
+
+```
+src/plugins/hooks.ts                            Facade — exports createHookRunner, HookRunner, HookRunnerOptions, HookRunnerLogger, all PluginHook* types
+src/plugins/hooks/
+├── runner.ts                                  createHookRunner driver — assembles per-family runners and exposes them
+├── runner-types.ts                            HookRunnerLogger, HookRunnerOptions, HookRunner (typeof export)
+├── runner-shared.ts                           getHooksForName + small merge helpers (mergeBeforeModelResolve, mergeBeforePromptBuild, etc.)
+├── agent-events.ts                            runBeforeAgentStart, runBeforeModelResolve, runBeforePromptBuild, runLlmInput, runLlmOutput, runAgentEnd, runBeforeCompaction, runAfterCompaction, runBeforeReset
+├── message-events.ts                          runMessageReceived, runMessageSending, runMessageSent, runBeforeMessageWrite
+├── tool-events.ts                             runBeforeToolCall, runAfterToolCall, runToolResultPersist
+├── session-events.ts                          runSessionStart, runSessionEnd
+├── subagent-events.ts                         runSubagentSpawning, runSubagentDeliveryTarget, runSubagentSpawned, runSubagentEnded
+├── gateway-lifecycle-events.ts                runGatewayStart, runGatewayStop
+└── index.ts                                   Optional internal barrel
+```
+
+Sub_Module count: 9 (≥ 3, Req 4.8). The required sub-domains (runner, context,
+typed events, legacy bridge) map to: `runner.ts` (runner), `runner-shared.ts`
+plus the per-family files (typed events). There is **no separate
+`legacy-bridge.ts`** unless baseline scanning (§C.5 Step 5) finds legacy
+bridge code in `hooks.ts`. If found, an additional `legacy-bridge.ts` is
+added; if not, the slot is satisfied vacuously.
+
+Type re-exports (lines 56–97 of the current `hooks.ts`) move to the facade
+verbatim.
+
+### C.5 Cross-cutting baseline procedures
+
+Implements Req 2.2, Req 4.2, Req 9 (preparation), Req 10 (preparation).
+
+Run **before** the cut on each Target_Module:
+
+1. **Public-Export Snapshot** (Req 2.2): A small extraction script
+   (`node --import tsx`) uses the TypeScript compiler API to enumerate
+   `(name, kind, signature)` for every `export` declaration of the
+   Target_Module. Output: a Markdown table at
+   `.kiro/specs/gateway-plugins-monolith-decomposition/baseline/<target>.md`.
+2. **Closure-State Probe** (Req 4.2; `platform-auth.ts` only): Walks the
+   module-level scope of the file and emits, for every `const`/`let` declared
+   at top level: symbol, mutability, exportedness, capture sites, proposed
+   owner Sub_Module. Output:
+   `.kiro/specs/gateway-plugins-monolith-decomposition/baseline/platform-auth-closure-probe.md`.
+   Decision rule: any mutable shared symbol with capture sites in 2+ proposed
+   Sub_Modules forces (a) an exported accessor in the owner Sub_Module
+   following the Fallback_Holder_Pattern, or (b) a single owner Sub_Module
+   that hosts the operation and exposes a public function.
+3. **Plugin Registry baseline snapshot** (Req 9; `loader.ts` only): Run
+   `loadOpenBotPlugins` against the plugin set from the test fixture corpus
+   and serialize the resulting `PluginRegistry` shape to canonical JSON at
+   `.kiro/specs/gateway-plugins-monolith-decomposition/baseline/loader-registry-snapshot.json`.
+4. **Hook firing baseline** (Req 10; `hooks.ts` only): Re-run the existing
+   deterministic hook unit scenarios under a recorder that captures
+   `(hookName, pluginId, phase, payloadHash)` quadruples. Persist as JSON
+   under `.kiro/specs/.../baseline/hooks-firing-trace.json`.
+5. **Consumer scan**: For each Target_Module, grep the rest of `src/` for
+   imports against its facade and against any of the proposed Sub_Module
+   paths. Output:
+   `.kiro/specs/.../baseline/<target>-consumers.md`. Required for Req 4.4
+   (`collaboration-learning.ts`) and informational for the other three.
+
+All baseline artifacts are committed in the same commit as (or before) the
+landing PR for the corresponding Target_Module.
+
+### C.6 jiti alias preservation for `loader.ts`
+
+Implements Req 3.4.
+
+Current state in `src/plugins/loader.ts`:
+
+- `resolvePluginSdkAlias()` and `resolvePluginSdkScopedAliasMap()` build the
+  alias map.
+- `getJiti()` lazily constructs the jiti instance with the alias map.
+- `scripts/copy-plugin-sdk-root-alias.mjs` is a build-time script that drops a
+  `root-alias.cjs` file the alias resolution looks for.
+
+After the split:
+
+- `src/plugins/loader/runtime-resolve.ts` owns `resolvePluginSdkAlias`,
+  `resolvePluginSdkScopedAliasMap`, `listPluginSdkExportedSubpaths`,
+  `listPluginSdkAliasCandidates`, and the lazy `getJiti()` factory.
+- `src/plugins/loader/load-orchestration.ts` calls `getJiti()` from
+  `runtime-resolve.ts` exactly as the pre-refactor `loadOpenBotPlugins` does
+  today.
+- `scripts/copy-plugin-sdk-root-alias.mjs` is **not edited** — its file paths
+  (`dist/plugin-sdk/root-alias.cjs`, `src/plugin-sdk/root-alias.cjs`) remain
+  the same and `runtime-resolve.ts` searches for them at the same locations.
+- The `__testing` export of `loader.ts` (currently exposing
+  `listPluginSdkAliasCandidates`, `listPluginSdkExportedSubpaths`,
+  `resolvePluginSdkAliasCandidateOrder`, `resolvePluginSdkAliasFile`) is
+  preserved by the facade re-exporting them from `runtime-resolve.ts`.
+
+The verification matrix (§T.3) includes `pnpm build` to confirm the alias
+machinery still produces a working build (Req 12.2, Req 12.3).
+
+### C.7 Hook-runner-global circular-import strategy
+
+Implements Req 3.6.
+
+Current call graph:
+
+- `src/plugins/hooks.ts` exports `createHookRunner`, `HookRunner` type.
+- `src/plugins/hook-runner-global.ts` imports `createHookRunner, HookRunner`
+  from `hooks.js` and stores a singleton on `globalThis`.
+- `src/plugins/loader.ts` imports `initializeGlobalHookRunner` from
+  `hook-runner-global.js` and calls it after registry construction.
+
+Post-refactor design:
+
+- `src/plugins/hooks/runner.ts` owns `createHookRunner` (the factory).
+- `src/plugins/hooks/runner-types.ts` owns the `HookRunner` type.
+- `src/plugins/hooks.ts` (facade) re-exports both.
+- `src/plugins/hook-runner-global.ts` continues to import from `./hooks.js`
+  (the facade) — **no change to its imports**.
+
+Cycle prevention rule: no file under `src/plugins/hooks/**` imports from
+`./hook-runner-global.js`. The boundary stays one-directional:
+`hook-runner-global → hooks (facade) → hooks/* sub-modules`.
+
+The architecture-manifest gets a new rule
+(`hooks-no-import-hook-runner-global`, see §D.4) to enforce this for future
+maintainers.
+
+## Data Models
+
+### D.1 Baseline artifacts
+
+Stored under
+`.kiro/specs/gateway-plugins-monolith-decomposition/baseline/`. All committed
+before the corresponding Target_Module's PR is opened.
+
+| Path                                      | Producer                                            | Consumer                                 |
+| ----------------------------------------- | --------------------------------------------------- | ---------------------------------------- |
+| `baseline/<target>.md`                    | Public-export snapshot script                       | Public-export snapshot test              |
+| `baseline/platform-auth-closure-probe.md` | Closure-state probe script                          | Cut decisions for `platform-auth.ts`     |
+| `baseline/loader-registry-snapshot.json`  | `loadOpenBotPlugins` driver                         | Plugin Registry round-trip property test |
+| `baseline/hooks-firing-trace.json`        | Hook recorder injected into existing unit scenarios | Hook Firing Trace property test          |
+| `baseline/<target>-consumers.md`          | Grep over `src/`                                    | Facade-retention decisions (Req 4.4)     |
+
+#### D.1.1 Public-export snapshot row schema
+
+```ts
+type PublicExportRow = {
+  exportName: string; // identifier as imported by consumers
+  kind: "function" | "class" | "type" | "interface" | "const" | "namespace";
+  signature: string; // checker.typeToString() output, normalized
+};
+```
+
+Comparison rule: post-refactor module MUST export every `exportName` from the
+snapshot with a structurally compatible TypeScript type (Req 2.3). Equality
+on `kind` is required. Equality on `signature` is required after
+normalization (collapse whitespace, drop import-path qualifiers when the
+underlying type is the same).
+
+#### D.1.2 Plugin Registry shape JSON schema
+
+```ts
+type RegistrySnapshot = {
+  plugins: Array<{ id: string; version: string }>; // sorted by id
+  resourceCounts: {
+    tools: number;
+    hooks: number;
+    typedHooks: number;
+    channels: number;
+    providers: number;
+    httpRoutes: number;
+    cliRegistrars: number;
+    services: number;
+    commands: number;
+    gatewayHandlers: number;
+  };
+  diagnostics: { errorCount: number; warnCount: number };
+};
+```
+
+Round-trip property: `roundTrip(registrySnapshot, postRefactorLoader) ===
+registrySnapshot` (Req 9.1).
+
+#### D.1.3 Hook firing trace JSON schema
+
+```ts
+type HookFiringRecord = {
+  hookName: string;
+  pluginId: string;
+  phase: string; // "before" | "after" | family-specific
+  payloadHash: string; // sha256( canonicalJson(payload) ) truncated to 16 hex chars
+};
+
+type HookFiringTrace = {
+  scenario: string;
+  records: HookFiringRecord[]; // appended in invocation order
+};
+```
+
+`canonicalJson` is `stable-stringify`-style: keys sorted lexicographically,
+`undefined` properties dropped, `Date` instances rendered as ISO 8601.
+Equality property: `trace_post === trace_pre` per scenario (Req 10.1).
+
+### D.2 Architecture_Manifest rule shape
+
+```jsonc
+{
+  "name": "<kebab-case>",
+  "from": "<glob>",
+  "denyImportsFrom": ["<glob>", ...],
+  "description": "<non-empty rationale referencing the Target_Module>",
+  "exemptFiles": []   // empty in the landing commit, per Req 6.4
+}
+```
+
+The full rule set added by this spec is enumerated in §D.4.
+
+### D.3 LOC budget entry shape
+
+```ts
+{
+  path: "<repo-relative path>",
+  maxLines: <number>,                 // facade actual LOC at landing
+  why: "<non-empty architectural rationale>"
+}
+```
+
+Entries to add are listed in §D.5.
+
+### D.4 New Architecture_Manifest rules
+
+Implements Req 6.1, Req 6.2, Req 6.3, Req 6.4.
+
+Each rule is added to `scripts/architecture/manifest.json` as part of the
+respective Target_Module's landing commit. Every rule has a `description`
+field that names the Target_Module being defended (Req 6.2). No `exemptFiles`
+paths are added in the landing commit (Req 6.4).
+
+```jsonc
+[
+  {
+    "name": "platform-auth-rate-limit-isolation",
+    "from": "src/gateway/platform-auth/!(rate-limit).ts",
+    "denyImportsFrom": ["src/gateway/platform-auth/rate-limit"],
+    "description": "platform-auth: only the rate-limit Sub_Module owns lockout counters; consumers must call exported helpers, not import internals.",
+  },
+  {
+    "name": "platform-auth-store-isolation",
+    "from": "src/gateway/platform-auth/!(store|store-types).ts",
+    "denyImportsFrom": ["src/gateway/platform-auth/store"],
+    "description": "platform-auth: storeWriteLocks lives in store.ts; other Sub_Modules use withPlatformAuthStoreWriteLock and accessors.",
+  },
+  {
+    "name": "platform-auth-facade-direction",
+    "from": "src/gateway/platform-auth.ts",
+    "denyImportsFrom": ["src/gateway/!(platform-auth)/**"],
+    "description": "platform-auth facade: re-exports only; must not pull from sibling gateway modules.",
+  },
+
+  {
+    "name": "collaboration-learning-state-machine-isolation",
+    "from": "src/gateway/collaboration-learning/!(state-machine).ts",
+    "denyImportsFrom": ["src/gateway/collaboration-learning/state-machine"],
+    "description": "collaboration-learning: state-machine internals are private; consumers go through event-entry.",
+  },
+  {
+    "name": "collaboration-learning-snapshot-isolation",
+    "from": "src/gateway/collaboration-learning/!(evaluation-aggregation).ts",
+    "denyImportsFrom": ["src/gateway/collaboration-learning/evaluation-aggregation"],
+    "description": "collaboration-learning: snapshot building stays inside evaluation-aggregation.",
+  },
+
+  {
+    "name": "loader-runtime-resolve-isolation",
+    "from": "src/plugins/loader/!(runtime-resolve).ts",
+    "denyImportsFrom": ["src/plugins/loader/runtime-resolve"],
+    "description": "plugins/loader: jiti and plugin-sdk alias setup is owned by runtime-resolve; other Sub_Modules use the exported getJiti().",
+  },
+  {
+    "name": "loader-no-deep-discovery-import",
+    "from": "src/plugins/loader/**",
+    "denyImportsFrom": ["src/plugins/discovery/**/*"],
+    "description": "plugins/loader: must use the discovery facade, not deep-import its internals.",
+  },
+
+  {
+    "name": "hooks-no-import-hook-runner-global",
+    "from": "src/plugins/hooks/**",
+    "denyImportsFrom": ["src/plugins/hook-runner-global"],
+    "description": "plugins/hooks: keeps the boundary one-directional with hook-runner-global to prevent the previously-flagged circular import.",
+  },
+  {
+    "name": "hooks-event-family-isolation",
+    "from": "src/plugins/hooks/!(runner|runner-shared|runner-types).ts",
+    "denyImportsFrom": [
+      "src/plugins/hooks/agent-events",
+      "src/plugins/hooks/message-events",
+      "src/plugins/hooks/tool-events",
+      "src/plugins/hooks/session-events",
+      "src/plugins/hooks/subagent-events",
+      "src/plugins/hooks/gateway-lifecycle-events",
+    ],
+    "description": "plugins/hooks: event-family files must not depend on each other; the runner is the only assembler.",
+  },
+]
+```
+
+Glob handling: `scripts/check-architecture-manifest.ts` already supports `**`
+and `*`. The `!(...)` negation is **not** supported by the existing matcher;
+the final implementation must therefore extend the matcher (preferred) or
+translate every rule into a positive `from` pattern. The matcher extension
+lands in commit 1 (the `hooks.ts` PR) so subsequent commits can use the new
+syntax.
+
+`pnpm check` must pass on every post-refactor commit (Req 6.3).
+
+### D.5 LOC budget updates
+
+Implements Req 7.1, Req 7.2, Req 7.3, Req 7.4.
+
+Add to the `BUDGETS` array in `scripts/check-core-composition-root-loc.ts`:
+
+```ts
+{
+  path: "src/gateway/platform-auth.ts",
+  maxLines: <facade-line-count-at-landing>,
+  why: "platform-auth facade: re-exports only; sub-domain logic lives in src/gateway/platform-auth/*.",
+},
+{
+  path: "src/gateway/collaboration-learning.ts",
+  maxLines: <facade-line-count-at-landing>,
+  why: "collaboration-learning facade: re-exports only; logic in src/gateway/collaboration-learning/*.",
+},
+{
+  path: "src/plugins/loader.ts",
+  maxLines: <facade-line-count-at-landing>,
+  why: "plugin loader facade: keeps loadOpenBotPlugins entry point stable; logic in src/plugins/loader/*.",
+},
+{
+  path: "src/plugins/hooks.ts",
+  maxLines: <facade-line-count-at-landing>,
+  why: "plugin hooks facade: re-exports types + createHookRunner; sub-modules in src/plugins/hooks/*.",
+},
+```
+
+Value-selection rule (Req 7.1): `<facade-line-count-at-landing>` = the actual
+LOC of the facade at the moment the landing PR is opened, as reported by
+`wc -l`. Hard ceiling — locked at landing, may only go down.
+
+For Sub_Modules > 400 LOC at landing (Req 7.3), an entry is added at landing
+time using the same value-selection rule. The exact list cannot be predicted
+pre-implementation; the design commits to surveying every new Sub_Module
+after the cut and adding entries for any > 400 LOC.
+
+No existing entry is raised (Req 7.2). `why` strings are non-empty and
+architectural (Req 7.4).
+
+## Correctness Properties
+
+### Property 1: Public-Export Surface Superset (Req 2.3)
+
+**Validates: Requirements 2.1, 2.2, 2.3, 2.4**
+
+For each Target_Module M and each exportName n in the pre-refactor
+Public_Export_Surface snapshot of M:
+
+```
+post(M).hasExport(n) ∧ post(M).kindOf(n) === pre(M).kindOf(n)
+                     ∧ structurallyCompatible(post(M).typeOf(n), pre(M).typeOf(n))
+```
+
+Implementation: a Vitest test under
+`src/gateway/__tests__/public-export-snapshot.test.ts` and
+`src/plugins/__tests__/public-export-snapshot.test.ts` reads the snapshot
+file and asserts the property over every row.
+
+Renames are forbidden (Req 2.4); the test catches them as missing exports.
+
+### Property 2: Plugin Registry Round-Trip (Req 9)
+
+**Validates: Requirements 3.3, 9.1, 9.2, 9.3, 9.4, 9.5**
+
+For any plugin set P drawn from the fixture corpus:
+
+```
+shape(loader_post(P)) === shape(loader_pre(P))
+```
+
+where `shape` is the canonical JSON in §D.1.2. Implementation:
+
+1. Pre-refactor: capture `shape(loader_pre(P))` for every P in the corpus and
+   commit as `baseline/loader-registry-snapshot.json`.
+2. Post-refactor: a Vitest test re-runs the loader against each P and
+   compares to the snapshot.
+3. Generator coverage: ≥ 50 generated sets if `fast-check` is present
+   (permutations of bundled first-party plus single-`extensions/*` add-ons,
+   plus subsets of size 0, 1, half, all). Fallback (Req 9.4): example-based
+   parameterization covering every shipped first-party plugin and at least 3
+   representative `extensions/*` plugins
+   (`extensions/memory-core`, `extensions/voice-call`, plus the largest
+   channel extension by LOC). The fallback rationale is recorded in
+   `.kiro/specs/.../baseline/loader.md`.
+4. The test runs without network/AWS (Req 9.5).
+5. Listed in the loader Regression_Baseline (Req 9.3).
+
+### Property 3: Hook Firing Trace Equality (Req 10)
+
+**Validates: Requirements 3.5, 10.1, 10.2, 10.3, 10.4**
+
+For each deterministic test scenario S in the existing hooks unit suite:
+
+```
+trace_post(S) === trace_pre(S)
+```
+
+where `trace` is the ordered `HookFiringTrace` from §D.1.3.
+Implementation:
+
+1. Pre-refactor: capture `trace_pre(S)` for every S and persist as
+   `baseline/hooks-firing-trace.json`.
+2. Post-refactor: a Vitest test re-runs each scenario under a recorder that
+   captures the same quadruples and compares.
+3. Coverage: typed-event consumers AND any legacy-bridge consumers
+   (Req 10.2). If §C.4 finds no legacy bridge code, this clause is
+   vacuously satisfied.
+4. Failure message: prints the first differing
+   `(hookName, pluginId, phase)` triple per Req 10.3.
+5. Listed in the hooks Regression_Baseline (Req 10.4).
+
+### Property 4: No new globalThis Symbol singleton (Req 3.7)
+
+**Validates: Requirements 3.7**
+
+For every newly-introduced module-level singleton in any Sub_Module:
+
+```
+¬ usesGlobalThisSymbol(singleton)
+```
+
+Implementation: a static check during code review plus the existing
+architecture-manifest's deny rules. There is no automated test for this
+property; it is a review-time invariant.
+
+### Property 5: No new circular import (Req 3.6)
+
+**Validates: Requirements 3.6**
+
+For every file F under `src/plugins/hooks/**`:
+
+```
+¬ importsTransitively(F, "src/plugins/hook-runner-global")
+```
+
+Implementation: enforced by the architecture-manifest rule
+`hooks-no-import-hook-runner-global` (§D.4). Every PR runs
+`pnpm check:core:architecture-manifest`.
+
+### Property 6: No raised LOC budgets (Req 7.2)
+
+**Validates: Requirements 7.1, 7.2, 7.3, 7.4**
+
+For every entry e in the LOC budget table BEFORE the spec lands:
+
+```
+post.maxLines(e) ≤ pre.maxLines(e)
+```
+
+Implementation: enforced at code review (the BUDGETS diff is small enough to
+read) and tracked by the existing `pnpm check:core:composition-root-loc`
+script.
+
+## Error Handling
+
+### E.1 How diagnostics surface
+
+The four Target_Modules produce three classes of diagnostic that this design
+preserves:
+
+- **Plugin diagnostics** (`PluginDiagnostic`): collected inside the
+  registry; the loader writes `error`/`warn` messages to the configured
+  `PluginLogger` after registry assembly. The split preserves this exact
+  flow: `load-orchestration.ts` continues to emit diagnostics via the
+  passed-in logger after `provenance.ts` and `candidate-validation.ts`
+  populate them.
+- **Auth flow errors** (`platform-auth.ts`): the post-split files preserve
+  the existing error shapes verbatim. `http-handler.ts` continues to throw
+  the same exception types that the gateway handlers catch.
+- **Collaboration transition errors**: `state-machine.ts` continues to
+  emit the same `Error` subclasses; `event-entry.ts` continues to translate
+  them via `resolveCollaborationTransitionError`.
+
+### E.2 Rollback handling
+
+Implements Req 8.
+
+Per Target_Module, a rollback plan lives at
+`.kiro/specs/gateway-plugins-monolith-decomposition/rollback/<target>.md`.
+All plans share the same skeleton:
+
+- **Merge SHA**: filled in at landing time.
+- **Revert command**:
+  `git revert <merge-sha> --no-edit && git push origin <branch>`.
+- **Feature flag**: none. This is a pure refactor; introducing a runtime
+  flag would itself be a behavioral change forbidden by Req 3.
+- **Expected runtime impact during rollback**: identical to pre-split
+  behavior (no schema changes, no on-disk format changes).
+- **Verification steps**: re-run the Target_Module's Regression_Baseline
+  (§T.1).
+- **Rollback test**: a dry-run revert is performed in a worktree before the
+  merge SHA is recorded, to confirm `git revert` produces a clean tree.
+
+#### E.2.1 `platform-auth.ts` SLO carve-out (Req 8.3)
+
+- **On-call signal**: `login_5xx_rate` (HTTP 5xx on
+  `POST /control-ui/auth/*`) > 1% averaged over a rolling 5-minute window.
+  **Recommendation only — must be reviewed by SRE before becoming an alert.**
+- **Same-day revert SLO**: 30 minutes from incident detection to deploy.
+  Steps:
+  1. (≤5 min) On-call confirms the signal exceeded threshold and is
+     correlated with the merge SHA.
+  2. (≤10 min) `git revert <merge-sha> --no-edit && git push origin main`.
+  3. (≤10 min) Deploy revert via the standard release pipeline.
+  4. (≤5 min) Confirm `login_5xx_rate` returns to baseline.
+- **Verification after revert**: re-run the platform-auth
+  Regression_Baseline (§T.2) plus a manual login smoke against staging.
+
+The other three rollback plans (`collaboration-learning`, `loader`, `hooks`)
+do not carry an SLO carve-out — they fall under the standard revert path.
+Req 8.3 applies to `platform-auth.ts` only.
+
+## Testing Strategy
+
+### T.1 Regression Baselines (Req 5)
+
+For each Target_Module, a Regression_Baseline file under
+`.kiro/specs/gateway-plugins-monolith-decomposition/baseline/<target>.md`
+lists every existing unit-test file and at least one e2e test file
+(Req 5.1). Tests in the baseline MUST pass under `pnpm test` on the
+post-refactor commit (Req 5.3). The Pre_Existing_Failure_Allowlist (Discord
+crash-loop counter test, Control UI static-asset SPA test, vault security
+ownership check on `/usr/local/bin/node`,
+`client-callsites.guard.test.ts` allowlist drift) is exempted (Req 5.4); no
+new tests are added to that allowlist as part of this spec.
+
+### T.2 Per-Target verification matrices (Req 12)
+
+Each Target_Module has its own matrix at
+`.kiro/specs/gateway-plugins-monolith-decomposition/verification/<target>.md`.
+Common to all: `pnpm check`, `pnpm tsgo`, `pnpm format:check`.
+
+#### T.2.1 `platform-auth.ts`
+
+| Step                   | Command                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Unit                   | `pnpm exec vitest run --config vitest.gateway.config.ts src/gateway/platform-auth*.test.ts src/gateway/server.auth.*` |
+| E2E                    | `pnpm exec vitest run --config vitest.gateway.config.ts src/gateway/server.auth.modes.test.ts`                        |
+| Lint                   | `pnpm check`                                                                                                          |
+| Typecheck              | `pnpm tsgo`                                                                                                           |
+| Public-export snapshot | `pnpm exec vitest run src/gateway/__tests__/public-export-snapshot.test.ts`                                           |
+
+#### T.2.2 `collaboration-learning.ts`
+
+| Step                   | Command                                                                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit                   | `pnpm exec vitest run --config vitest.gateway.config.ts src/gateway/collaboration-learning.test.ts src/gateway/server-methods/collaboration-learning.test.ts` |
+| E2E                    | `pnpm exec vitest run --config vitest.gateway.config.ts src/gateway/server-methods/collaboration-learning.test.ts`                                            |
+| Lint                   | `pnpm check`                                                                                                                                                  |
+| Typecheck              | `pnpm tsgo`                                                                                                                                                   |
+| Public-export snapshot | `pnpm exec vitest run src/gateway/__tests__/public-export-snapshot.test.ts`                                                                                   |
+
+#### T.2.3 `loader.ts` (Req 12.2, Req 12.3)
+
+| Step                       | Command                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| Unit                       | `pnpm exec vitest run src/plugins/loader.test.ts src/plugins/installs.test.ts`    |
+| E2E                        | `pnpm exec vitest run src/plugins/wired-hooks-*.test.ts`                          |
+| Build                      | `pnpm build`                                                                      |
+| Build-warning grep         | `pnpm build 2>&1 \| grep -F '[INEFFECTIVE_DYNAMIC_IMPORT]' && exit 1 \|\| exit 0` |
+| Lint                       | `pnpm check`                                                                      |
+| Typecheck                  | `pnpm tsgo`                                                                       |
+| Plugin Registry round-trip | `pnpm exec vitest run src/plugins/__tests__/loader-registry-roundtrip.test.ts`    |
+| Public-export snapshot     | `pnpm exec vitest run src/plugins/__tests__/public-export-snapshot.test.ts`       |
+
+#### T.2.4 `hooks.ts`
+
+| Step                       | Command                                                                              |
+| -------------------------- | ------------------------------------------------------------------------------------ |
+| Unit                       | `pnpm exec vitest run src/plugins/hooks.*.test.ts src/plugins/wired-hooks-*.test.ts` |
+| E2E                        | `pnpm exec vitest run src/plugins/wired-hooks-after-tool-call.e2e.test.ts`           |
+| Lint                       | `pnpm check`                                                                         |
+| Typecheck                  | `pnpm tsgo`                                                                          |
+| Hook Firing Trace property | `pnpm exec vitest run src/plugins/__tests__/hook-firing-trace.test.ts`               |
+| Public-export snapshot     | `pnpm exec vitest run src/plugins/__tests__/public-export-snapshot.test.ts`          |
+
+The `[INEFFECTIVE_DYNAMIC_IMPORT]` grep (Req 12.3) is on the loader matrix
+only because it is the build-participating Target_Module (Req 12.2). The
+other three are pure runtime modules and do not affect tsdown's
+dynamic-import analysis.
+
+### T.3 Property tests inventory
+
+- **Property 1** Public-Export Surface Superset → 4 instances, one per
+  Target_Module, reading from the matching `baseline/<target>.md`.
+- **Property 2** Plugin Registry Round-Trip → `loader.ts` only.
+- **Property 3** Hook Firing Trace Equality → `hooks.ts` only.
+
+The two static review-time invariants (Property 4 — no new `globalThis`
+Symbol singleton, Property 6 — no raised LOC budgets) are not automated
+tests; they are review-checklist items. The dynamic guard Property 5 (no
+new circular import) is enforced by the architecture-manifest rule.
+
+### T.4 Implementation sequencing rationale
+
+Implements Req 8.5.
+
+Order: lowest-risk first.
+
+1. **`src/plugins/hooks.ts`** — pure factory; no on-disk state, no network,
+   no auth. Risk: hook ordering regression caught by the Hook Firing Trace
+   property test (Property 3). This PR also lands the architecture-manifest
+   `!(...)` negation extension that the remaining three PRs rely on.
+2. **`src/plugins/loader.ts`** — touches build-time alias machinery, but the
+   alias surface is small and `runtime-resolve.ts` owns it. Risk: jiti alias
+   resolution drift caught by the Plugin Registry round-trip property test
+   (Property 2) plus the `[INEFFECTIVE_DYNAMIC_IMPORT]` grep.
+3. **`src/gateway/collaboration-learning.ts`** — larger LOC and richer state
+   machine, but no auth surface. Risk: state-machine transition reordering
+   caught by `src/gateway/server-methods/collaboration-learning.test.ts`.
+4. **`src/gateway/platform-auth.ts`** — highest risk; last in sequence. The
+   closure-state probe (§C.5 Step 2) must be committed before the cut.
+   Risk: login regression mitigated by the same-day revert SLO (E.2.1).
+
+Each split is its own commit and PR. The architecture-manifest update for
+that Target_Module ships in the same commit (Req 6.1). The LOC budget entry
+for the facade ships in the same commit (Req 7.1). The four PRs are NOT
+bundled — independent revertibility (Req 8.5) requires that any one can be
+reverted without disturbing the others.
+
+## Risks & Open Questions
+
+### R.1 Risks accepted by this design
+
+- **Closure-state surprises in `platform-auth.ts`**: the probe (§C.5 Step 2)
+  is a best-effort scan. If a closure is captured indirectly (e.g. via a
+  callback registered with another module), the probe may miss it.
+  Mitigation: the `platform-auth` PR is last in the sequence, and its
+  rollback SLO is 30 minutes (E.2.1).
+- **Architecture-manifest `!(...)` negation**: the existing matcher does
+  not support `!(...)` exclusions. Mitigation: the matcher extension lands
+  in commit 1 (the `hooks.ts` PR) so subsequent commits can use the new
+  syntax. This is a small, contained change in the same landing commit
+  that introduces the first set of `!(...)` rules.
+- **`fast-check` dependency for property tests**: if `fast-check` is not
+  already in `package.json`, adding it would itself be a dependency
+  change. The fallback example-based path (Req 9.4 / P.2 step 3 fallback)
+  covers the same plugin sets without a generator. The design defaults to
+  the fallback unless `fast-check` is already present.
+
+### R.2 Open questions deferred to implementation
+
+- **Whether `oauth-flows.ts` is a real Sub_Module or merges into
+  `session-context.ts`**: the closure probe (§C.5 Step 2) decides. If no
+  closure-level state is shared between OAuth-style flow code and password
+  login, `oauth-flows.ts` exists as a peer Sub_Module. Otherwise it merges.
+- **Whether a `legacy-bridge.ts` Sub_Module is needed under
+  `src/plugins/hooks/`**: depends on whether any legacy hook-name aliases
+  are currently translated inside `hooks.ts`. The baseline scan during the
+  `hooks.ts` PR records the answer.
+- **Whether the `extensions/*` plugin sample for the loader round-trip
+  property is exactly 3 plugins or larger**: at minimum 3 (Req 9.4), but the
+  larger the sample the stronger the property. Implementation picks the
+  largest set that runs in < 30 seconds locally.
+
+### R.3 Out-of-scope reaffirmed
+
+- No behavioral changes (Req 3, Req 13.1).
+- No public-export renames (Req 2.4, Req 13.1).
+- No `globalThis` Symbol singletons (Req 3.7).
+- No raises to existing LOC budgets (Req 7.2, Req 13.3).
+- No `pnpm check:architecture:snapshot` script or
+  `.artifacts/architecture/` emitter (Req 11; deferred to follow-up spec
+  `architecture-snapshot-tooling`, TBD).

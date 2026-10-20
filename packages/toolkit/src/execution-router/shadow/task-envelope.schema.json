@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openbot.execution-router.task-envelope.v1",
+  "title": "TaskEnvelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "taskClass", "riskClass", "channelKind", "textDigest"],
+  "properties": {
+    "schema": { "const": "openbot.execution-router.task-envelope.v1" },
+    "taskClass": {
+      "type": "string",
+      "enum": [
+        "plain_text_qa",
+        "skill_dense_readonly",
+        "single_readonly_tool",
+        "multi_readonly_tool",
+        "unknown"
+      ]
+    },
+    "riskClass": { "type": "string", "enum": ["read_only", "side_effect", "unknown"] },
+    "channelKind": { "type": "string", "enum": ["internal", "external", "unknown"] },
+    "textDigest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "tagDigests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "maxItems": 16
+    },
+    "requiredSkillDigests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "maxItems": 32
+    },
+    "requiredToolDigests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+      "maxItems": 32
+    }
+  }
+}

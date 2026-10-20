@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbot.love/design/schemas/contract-verdict-record.schema.json",
+  "title": "ContractVerdictRecord",
+  "description": "P0 contract anchor — see docs/design/completion-contract.md rev2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "candidateId",
+    "idempotencyKey",
+    "taskIdentity",
+    "verdict",
+    "reasonCode",
+    "evaluatedAt"
+  ],
+  "properties": {
+    "contractVersion": {
+      "type": "string",
+      "const": "2026-09-15.rev2"
+    },
+    "candidateId": { "type": "string", "format": "uuid" },
+    "idempotencyKey": { "type": "string", "minLength": 16 },
+    "taskIdentity": { "$ref": "completion-candidate.schema.json#/$defs/TaskIdentity" },
+    "verdict": {
+      "type": "string",
+      "enum": ["pending", "accepted", "rejected", "stale", "cancelled", "needs_human"]
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "RC_OK",
+        "RC_PENDING_EVIDENCE",
+        "RC_PENDING_HUMAN",
+        "RC_EVIDENCE_MISSING",
+        "RC_EVIDENCE_NOT_FOUND",
+        "RC_EVIDENCE_EXPIRED",
+        "RC_EVIDENCE_TAMPERED",
+        "RC_SOURCE_NOT_ALLOWED",
+        "RC_SOURCE_CONFLICT",
+        "RC_TENANT_MISMATCH",
+        "RC_BINDING_STALE",
+        "RC_RUN_STALE",
+        "RC_CANCELLED",
+        "RC_FORCE_OFF",
+        "RC_RACE_LOST_TO_CANCEL",
+        "RC_DUPLICATE_REPLAY",
+        "RC_SUPERSEDED",
+        "RC_ROLLBACK",
+        "RC_CONTRACT_VERSION"
+      ]
+    },
+    "winningSource": {
+      "type": "string",
+      "enum": [
+        "supervisor_accepted",
+        "ledger_verified",
+        "ledger_completed",
+        "round_converged",
+        "flow_step_done",
+        "taskcard_done",
+        "autopilot_candidate",
+        "llm_summary"
+      ]
+    },
+    "evaluatedAt": { "type": "string", "format": "date-time" },
+    "replayOf": { "type": "string", "format": "uuid" }
+  },
+  "if": {
+    "properties": { "verdict": { "const": "accepted" } },
+    "required": ["verdict"]
+  },
+  "then": {
+    "required": ["winningSource"]
+  }
+}

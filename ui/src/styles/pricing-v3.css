@@ -1,0 +1,996 @@
+/**
+ * Pricing v3 — 企业向套餐与定价页样式。
+ * 视觉规范：浅灰渐变背景、1440px 容器、五列卡片、Growth 推荐锚点。
+ */
+
+.pricing-v3 {
+  background: linear-gradient(180deg, #fafafa 0%, #f5f7fb 100%);
+  min-height: 100%;
+  padding: 32px 0 48px;
+}
+
+.pricing-v3__container {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-inline: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ── 周期切换（分段按钮组） ── */
+.pricing-v3__cycle-switcher {
+  display: inline-flex;
+  align-self: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.pricing-v3__cycle-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.pricing-v3__cycle-tab:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--border) 35%, #fff);
+}
+
+.pricing-v3__cycle-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pricing-v3__cycle-tab.is-active,
+.pricing-v3__cycle-tab[aria-pressed="true"] {
+  background: #fff;
+  color: var(--text);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 8%),
+    0 2px 8px rgb(15 23 42 / 12%);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, var(--text) 8%);
+}
+
+.pricing-v3__cycle-badge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 16%, transparent);
+  color: var(--ok);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── 卡片 Grid：按组件容器宽度（container query），禁止依赖视口误撑窄宿主 ── */
+.pricing-v3 {
+  container-type: inline-size;
+  container-name: pricing-v3;
+}
+
+.pricing-v3__grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 平板≈2 列：容器 ≥640px */
+@container pricing-v3 (min-width: 640px) {
+  .pricing-v3__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* 普通桌面 3 列：容器 ≥960px */
+@container pricing-v3 (min-width: 960px) {
+  .pricing-v3__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/*
+ * 仅当容器真实够宽才 5 列。
+ * 阈值含 padding（~64px）+ 5×min + gaps；列宽用 minmax(0,1fr)，
+ * 禁止 minmax(260px) 在临界宽度把父容器撑出横向滚动。
+ */
+@container pricing-v3 (min-width: 1480px) {
+  .pricing-v3__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+  }
+}
+
+/* 无 container 支持时的安全回退：最多 3 列，永不因宽视口误强制 5 列 */
+@supports not (container-type: inline-size) {
+  @media (min-width: 640px) {
+    .pricing-v3__grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1024px) {
+    .pricing-v3__grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+}
+
+/*
+ * 明确窄宿主入口覆盖：费用预算「我的套餐」单卡、登录首页栏。
+ * 公共 /pricing（.public-legal__pricing-frame）与费用预算目录
+ * （.cost-budget-v2-catalog-panel）必须走 container query，禁止强制 1 列。
+ */
+.cost-budget-v2-my-plan-panel__card .pricing-v3,
+.cost-budget-v2-my-plan-layout .pricing-v3,
+.auth-home .pricing-v3,
+.pricing-v3--narrow-host {
+  container-type: normal;
+}
+
+.cost-budget-v2-my-plan-panel__card .pricing-v3__grid,
+.cost-budget-v2-my-plan-layout .pricing-v3__grid,
+.auth-home .pricing-v3__grid,
+.pricing-v3--narrow-host .pricing-v3__grid {
+  grid-template-columns: minmax(0, 1fr) !important;
+  display: grid !important;
+  overflow-x: visible;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* 平台管理端：默认按容器 query；中等宽度可横向滚动卡片对比 */
+.platform-pricing__compare-card-shell .pricing-v3 {
+  padding-block: 20px 28px;
+  container-type: inline-size;
+  container-name: pricing-v3;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__container {
+  max-width: none;
+  width: 100%;
+  padding-inline: 24px;
+  gap: 20px;
+  min-width: 0;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__value-strip,
+.platform-pricing__compare-card-shell .pricing-v3__compare-table-wrap,
+.platform-pricing__compare-card-shell .pricing-v3__faq-list {
+  max-width: 1440px;
+  margin-inline: auto;
+  width: 100%;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__grid {
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+/* 平台预览：容器 720–1479px 时横向滚动五卡，避免挤窄或撑破宿主 */
+@container pricing-v3 (min-width: 720px) and (max-width: 1479px) {
+  .platform-pricing__compare-card-shell .pricing-v3__grid {
+    display: flex;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x proximity;
+  }
+
+  .platform-pricing__compare-card-shell .pricing-v3__card {
+    flex: 0 0 280px;
+    max-width: 300px;
+    scroll-snap-align: start;
+  }
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__card {
+  min-width: 0;
+  padding: 16px 14px 14px;
+  gap: 0;
+  --pricing-v3-content-inset: 30px;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__card-name {
+  font-size: 17px;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__price-main {
+  font-size: 24px;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__spec-label {
+  font-size: 12px;
+}
+
+/* 图标尺寸：fixture / 独立页面也可见（不依赖全局 nav-item 样式） */
+.pricing-v3__card-icon svg,
+.pricing-v3__spec-icon svg,
+.pricing-v3__compare-yes svg,
+.pricing-v3__value-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pricing-v3__card-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.pricing-v3__compare-yes svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-inline: auto;
+}
+
+.platform-pricing__compare-card-shell .pricing-v3__card-edit {
+  top: 10px;
+  right: 8px;
+  padding: 2px 8px;
+}
+
+.pricing-v3__card {
+  --pricing-v3-icon-col: 20px;
+  --pricing-v3-icon-gap: 10px;
+  --pricing-v3-content-inset: calc(var(--pricing-v3-icon-col) + var(--pricing-v3-icon-gap));
+  --pricing-v3-accent: var(--primary);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  /* 统一卡片视觉高度下限（与 6 行规格 + 价格区匹配） */
+  min-height: 420px;
+  padding: 18px 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+/* 仅交互卡允许轻微阴影反馈；静态摘要卡无上浮 */
+.pricing-v3__card.is-interactive:hover {
+  box-shadow: 0 6px 18px rgb(15 23 42 / 7%);
+}
+
+.pricing-v3__card.is-static {
+  box-shadow: none;
+}
+
+.pricing-v3__card.is-recommended {
+  border: 2px solid var(--pricing-v3-accent, #2563eb);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--pricing-v3-accent, #2563eb) 12%, transparent);
+}
+
+/* 企业定制：浅色卡 + 局部金色边，避免压过推荐套餐 */
+.pricing-v3__card.is-enterprise {
+  border: 1px solid color-mix(in srgb, #b45309 35%, var(--border));
+  background: linear-gradient(180deg, #fffbeb 0%, #fff 48%);
+  color: var(--text);
+  --pricing-v3-accent: #b45309;
+}
+
+.pricing-v3__card-zone--head {
+  min-height: 72px;
+  padding-right: 48px;
+}
+
+.pricing-v3__card-zone--price {
+  min-height: 58px;
+  margin-top: 4px;
+}
+
+.pricing-v3__card-zone--savings {
+  min-height: 24px;
+  margin-top: 2px;
+}
+
+.pricing-v3__savings-placeholder {
+  display: block;
+  min-height: 20px;
+}
+
+.pricing-v3__card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pricing-v3__card-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pricing-v3__card.is-enterprise .pricing-v3__card-icon {
+  color: #b45309;
+  background: rgb(180 83 9 / 10%);
+}
+
+.pricing-v3__card-edit {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 2px 10px;
+  max-width: calc(100% - 20px);
+}
+
+.platform-pricing__compare-card-shell {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.pricing-v3__slot-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+}
+
+/* 推荐徽标：与推荐边框同一强调色，避免与档位杂色冲突 */
+.pricing-v3__slot-badge.is-recommended-badge {
+  background: color-mix(in srgb, #2563eb 12%, transparent);
+  color: #1d4ed8;
+}
+
+.pricing-v3__card.is-enterprise .pricing-v3__slot-badge {
+  background: rgb(180 83 9 / 10%);
+  color: #b45309;
+}
+
+.pricing-v3__card-icon {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* 图标中性偏主色；CTA 统一主色，避免绿/橙/紫多套强调 */
+.pricing-v3__card.is-slot-trial .pricing-v3__card-icon,
+.pricing-v3__card.is-slot-starter .pricing-v3__card-icon,
+.pricing-v3__card.is-slot-professional .pricing-v3__card-icon,
+.pricing-v3__card.is-slot-business .pricing-v3__card-icon {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.pricing-v3__card-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.pricing-v3__card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pricing-v3__price-main {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.pricing-v3__price-main--quote {
+  font-size: 22px;
+}
+
+.pricing-v3__annual-discounted {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: color-mix(in srgb, var(--primary) 82%, #0f172a);
+}
+
+.pricing-v3__price-unit,
+.pricing-v3__price-sub {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.pricing-v3__price-cycle-total {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pricing-v3__price-savings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.pricing-v3__list-price {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.pricing-v3__save {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+  color: var(--ok);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.pricing-v3__spec-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* 固定 6 行规格区，保证五档卡片高度一致 */
+  min-height: calc(6 * 1.45em + 5 * 10px);
+  flex: 1 1 auto;
+}
+
+.pricing-v3__spec-item {
+  display: grid;
+  grid-template-columns: var(--pricing-v3-icon-col) minmax(0, 1fr);
+  column-gap: var(--pricing-v3-icon-gap);
+  align-items: start;
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 1.45em;
+}
+
+.pricing-v3__spec-icon {
+  display: grid;
+  place-items: center;
+  width: var(--pricing-v3-icon-col);
+  height: 20px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.pricing-v3__spec-copy {
+  display: grid;
+  grid-template-columns: minmax(4.5em, 1fr) minmax(0, 1.2fr);
+  column-gap: 10px;
+  align-items: start;
+  min-width: 0;
+}
+
+.pricing-v3__spec-label {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.pricing-v3__spec-value {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.pricing-v3__card-spacer {
+  flex: 1 1 auto;
+  min-height: 8px;
+}
+
+.pricing-v3__card-actions {
+  margin-top: auto;
+  padding-top: 12px;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.pricing-v3__cta {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.pricing-v3__cta:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.pricing-v3__cta:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pricing-v3__cta:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pricing-v3__cta.is-outline {
+  background: #fff;
+  border-color: #0f172a;
+  color: #0f172a;
+}
+
+.pricing-v3__cta.is-primary,
+.pricing-v3__cta.is-recommended-cta {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.pricing-v3__cta.is-enterprise-cta {
+  background: #fff;
+  border-color: #b45309;
+  color: #b45309;
+}
+
+.pricing-v3__cta.is-enterprise-cta:hover:not(:disabled) {
+  background: color-mix(in srgb, #b45309 8%, #fff);
+}
+
+.pricing-v3__cta.is-current,
+.pricing-v3__cta:disabled {
+  opacity: 1;
+  cursor: default;
+  background: color-mix(in srgb, var(--border) 55%, #fff);
+  border-color: var(--border);
+  color: color-mix(in srgb, var(--text) 55%, var(--muted));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pricing-v3__card,
+  .pricing-v3__cta,
+  .pricing-v3__cycle-tab {
+    transition: none;
+  }
+
+  .pricing-v3__cta:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+.cost-budget-v2-my-plan-panel__card .pricing-v3__card {
+  min-height: auto;
+  box-shadow: none;
+}
+
+.cost-budget-v2-my-plan-panel__card .pricing-v3__card:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.cost-budget-v2-my-plan-panel__card .pricing-v3__card-actions {
+  display: none;
+}
+
+.cost-budget-v2-my-plan-panel__card .pricing-v3__card-spacer {
+  min-height: 0;
+}
+
+/* ── 价值条 ── */
+.pricing-v3__value-strip {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+  padding: 20px 0 8px;
+}
+
+@media (min-width: 900px) {
+  .pricing-v3__value-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.pricing-v3__value-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.pricing-v3__value-icon {
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.pricing-v3__value-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pricing-v3__value-body {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ── 对比矩阵 ── */
+.pricing-v3__section-title {
+  margin: 8px 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+/* Scroll hint: shown only when JS detects overflow (or narrow host). Start hidden. */
+.pricing-v3__compare-scroll-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pricing-v3__compare-scroll-hint[hidden] {
+  display: none !important;
+}
+
+.pricing-v3__compare-row-label {
+  display: block;
+}
+
+.pricing-v3__compare-row-desc {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pricing-v3__compare-footnote {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.pricing-v3__compare-table-wrap {
+  overflow: auto;
+  max-height: min(70vh, 720px);
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+}
+
+.pricing-v3__compare-table-wrap:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pricing-v3__compare-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+}
+
+.pricing-v3__compare-table th,
+.pricing-v3__compare-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  background: #fff;
+}
+
+.pricing-v3__compare-table td {
+  /* 单元格内容（勾选 / 无限 / 文案）水平垂直居中 */
+  text-align: center;
+}
+
+/* Sticky header on vertical scroll */
+.pricing-v3__compare-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f8fafc;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.pricing-v3__compare-table th[scope="row"],
+.pricing-v3__compare-sticky {
+  text-align: left;
+  font-weight: 600;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+  min-width: 7.5rem;
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.pricing-v3__compare-table thead .pricing-v3__compare-sticky {
+  z-index: 4;
+  background: #f8fafc;
+}
+
+.pricing-v3__compare-group-label {
+  text-align: left !important;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--border) 35%, #fff) !important;
+  border-bottom: 1px solid var(--border);
+  padding-top: 10px;
+  padding-bottom: 8px;
+}
+
+.pricing-v3__compare-col--recommended {
+  background: color-mix(in srgb, var(--primary) 6%, #fff) !important;
+}
+
+.pricing-v3__compare-table thead th.pricing-v3__compare-col--recommended {
+  background: color-mix(in srgb, var(--primary) 10%, #f8fafc) !important;
+}
+
+.pricing-v3__compare-rec-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  vertical-align: middle;
+}
+
+.pricing-v3__compare-yes,
+.pricing-v3__compare-no,
+.pricing-v3__compare-custom,
+.pricing-v3__compare-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 1.35rem;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.pricing-v3__compare-yes {
+  color: var(--ok);
+}
+
+.pricing-v3__compare-no,
+.pricing-v3__compare-custom,
+.pricing-v3__compare-empty {
+  color: var(--muted);
+}
+
+.pricing-v3__compare-yes svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.cost-budget-v2-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pricing-v3__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── FAQ ── */
+.pricing-v3__faq-intro {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 52rem;
+}
+
+.pricing-v3__faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pricing-v3__faq-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 0;
+  overflow: hidden;
+}
+
+.pricing-v3__faq-item summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  line-height: 1.45;
+}
+
+.pricing-v3__faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.pricing-v3__faq-item[open] summary {
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--primary) 4%, #fff);
+}
+
+.pricing-v3__faq-q-index {
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.pricing-v3__faq-q-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pricing-v3__faq-body {
+  padding: 14px 16px 16px;
+}
+
+.pricing-v3__faq-lead {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.pricing-v3__faq-points {
+  margin: 12px 0 0;
+  padding-left: 1.25rem;
+  color: var(--text);
+  line-height: 1.65;
+  font-size: 14px;
+}
+
+.pricing-v3__faq-points li {
+  margin: 0.35em 0;
+  padding-left: 0.25rem;
+}
+
+.pricing-v3__faq-points li::marker {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.pricing-v3__faq-examples {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--border) 22%, #fff);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.pricing-v3__faq-examples-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.pricing-v3__faq-examples-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.pricing-v3__faq-examples-list li {
+  margin: 0.4em 0;
+}
+
+.pricing-v3__faq-item p {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.pricing-v3--loading,
+.pricing-v3--error,
+.pricing-v3--empty {
+  padding: 48px 32px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.pricing-v3__footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-right: 16px;
+}

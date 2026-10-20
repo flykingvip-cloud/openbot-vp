@@ -1,0 +1,47 @@
+{
+  "schema": "memory-workspace-phase1b-item6-sre-review-456/v1",
+  "reviewedBy": "cursor-memory-wsc",
+  "reviewedAt": "2026-08-17T06:50:00.000Z",
+  "fablePr": 456,
+  "mergedSha": "6ce7570518bd9adf11266a5ab43a076985f44236",
+  "sreHalf": "docs/design/evidence/memory-workspace-phase1b-item6-sre-half.json",
+  "receipt": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+  "item6": "not-met",
+  "live": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "sreDoesNotWriteGreenReceipt": true,
+  "aligned": {
+    "extendsExistingRecord": true,
+    "secondStateMachine": false,
+    "live": false,
+    "cutoverModule": "src/gateway/workspace/cutover.ts",
+    "sqliteFileCopyRestoreMechanism": true,
+    "recordSnapshotIsNotBackup": true,
+    "preCommitAllowsOldWriter": true,
+    "postCommitForbidsOldWriter": true
+  },
+  "notAligned": {
+    "authorizedSqliteFileLevelCopy": false,
+    "v1RootGuardFencing": false,
+    "sidecarLockFencing": false,
+    "authorizedSqliteSnapshotRestore": false
+  },
+  "findings": [
+    "#456 copyFileSync + sha256 proves the file-level copy/restore mechanism on a temp fixture.",
+    "The fixture is a synthetic 'SQLite format 3' header plus bytes, not an authorized stateDir sqlite.",
+    "Fencing in #456 is cutover single-writable-canonical only. v1-root-guard and sidecar lock were not drilled.",
+    "Rollback policy checks match the SRE half beforeCommit/afterCommit rules. Restore still uses the temp fixture.",
+    "Receipt status=green and sqliteFileBackup=green are fable fixture results. They do not make item 6 met.",
+    "Receipt.sre=cursor-memory-wsc was filled before this written review. This file is the alignment."
+  ],
+  "explicitlyForbidden": [
+    "rewrite the fable receipt to status=green as cursor-memory-wsc",
+    "score item 6 met from this review",
+    "LIVE copy",
+    "enable schema v2",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ]
+}

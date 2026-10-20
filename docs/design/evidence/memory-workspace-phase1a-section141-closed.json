@@ -1,0 +1,36 @@
+{
+  "schema": "memory-workspace-phase1a-section141-closed/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "closedBy": "cursor-memory-platform",
+  "closedAt": "2026-08-16T15:40:18.000Z",
+  "mainSha": "df10c7e60f7f1bedcffd0fb36a19ddcf27bef483",
+  "mergedPr": 442,
+  "section141Signed": true,
+  "signedCount": 7,
+  "totalRoles": 7,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "note": "Phase 1A design gate closed after independent 7/7 sign-off plus coordinator consistency review. This does not unlock Phase 1B, LIVE, resolver write switch, or schema v2.",
+  "rolePrs": {
+    "architecture": 439,
+    "data-governance": 439,
+    "resolver": 429,
+    "security": 429,
+    "memory": 440,
+    "sre": 440,
+    "storage-cutover": 441,
+    "coordinator": 442
+  },
+  "nextDispatch": {
+    "to": "codex-workspace-architecture",
+    "workstream": "WS-A",
+    "instruction": ".kiro/specs/memory-workspace-platform-remediation/phase1a-wsa-design-execution-instruction-2026-08-16.md"
+  },
+  "explicitlyForbidden": [
+    "phase1b-implementation",
+    "resolver-write-switch",
+    "memory-schema-v2",
+    "live-migration",
+    "deployAuthorized=true"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-hpcv-96wg-7vj8",
+  "cve": "CVE-2026-49458",
+  "package": "dompurify",
+  "vulnerable_range": "<=3.4.5",
+  "affected_version_before": "3.4.0",
+  "dependency_path": "ui>dompurify",
+  "severity": "moderate",
+  "direct_or_transitive": "direct (ui workspace)",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=3.4.6",
+  "mitigated_version": "3.4.6",
+  "reachable_surface": "DOMPurify cross-realm IN_PLACE sanitization leaves executable markup intact via realm-bound instanceof checks (advisory). UI workspace direct dependency used for HTML sanitization; root pin via pnpm.overrides.",
+  "mitigation": "Bump ui/package.json dependencies.dompurify to ^3.4.6; pnpm.overrides.dompurify=3.4.6. Same pin also clears GHSA-r47g-fvhr-h676 as a side effect (same patched >=3.4.6; not a separate cell). Remaining dompurify moderate needing higher pins (e.g. >=3.4.7 / >=3.4.11 / >=3.4.13) and lows — not this PR.",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod (plus one same-threshold side-effect clear). Stage 6 overall remains not PASS; audit still exits 1 (31 moderate + 8 low remain, including further dompurify advisories). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 31,
+    "low": 8,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-hpcv-96wg-7vj8"
+}

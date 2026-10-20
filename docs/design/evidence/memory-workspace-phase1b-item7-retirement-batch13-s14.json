@@ -1,0 +1,56 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch13-s14/v1",
+  "item": 7,
+  "status": "retirement-batch-13",
+  "batch": "S14",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S14",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "via": "resolveTrustedAgentLocator",
+      "lineBefore": 1159,
+      "lineAfter": null,
+      "replacement": "resolveAgentsHandlerWorkspaceLocator"
+    }
+  ],
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1160,
+      "op": "write"
+    }
+  ],
+  "sitesRemainingTrustedWrapper": [],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 21,
+  "liveWriteWatchIndex": 21,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/agents.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "b576641a96eb49285e8454f30e060de0eabc49a0",
+  "note": "Batch 13 retires S14 only. S14 is the Trusted wrapper at agents.ts:1159, inventoried as resolveAgentWorkspaceDirForClient. Replacement is resolveAgentsHandlerWorkspaceLocator (complete trusted query after #638); do not use cfg-only resolveWorkspaceLocator. Fail-closed fallback is null so ?? still reaches the S15 host. Host write stays on line 1160. Live remaining is 21 after #638. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

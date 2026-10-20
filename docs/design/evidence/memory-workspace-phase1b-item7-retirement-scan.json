@@ -1,0 +1,103 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-scan/v1",
+  "item": 7,
+  "status": "not-met",
+  "item7": "not-met",
+  "retirementOwner": "cursor-data-governance",
+  "freezeOwner": "cursor-fable",
+  "ownersDistinct": true,
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": false,
+  "enablesProduction": false,
+  "i3Executed": false,
+  "phase0Path": "docs/design/evidence/memory-workspace-phase0-20260814.call-sites.json",
+  "phase0Rewritten": false,
+  "frozenWriteWatchIndex": 38,
+  "liveWriteWatchIndex": 10,
+  "target": 0,
+  "retiredThisChange": 2,
+  "remaining": 10,
+  "sites": [
+    {
+      "pathId": "P5",
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 164,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 165,
+      "op": "write"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "op": "index"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1062,
+      "op": "index"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1252,
+      "op": "index"
+    },
+    {
+      "pathId": "P8",
+      "symbol": "syncMemoryFiles",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1343,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "op": "index"
+    },
+    {
+      "pathId": "P1",
+      "symbol": "resolveAgentWorkspaceDir",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "op": "index"
+    }
+  ],
+  "note": "Live scan only. Phase 0 freeze baseline is unchanged. Existing write/index call-sites stay in place until unlock. I3 is forbidden until the watch index is 0.",
+  "explicitlyForbidden": [
+    "rewrite Phase 0 freeze baseline to fake zero",
+    "delete production write call-sites before unlock",
+    "I3 retirement or delete old branches before watch index is 0",
+    "let cursor-fable perform Retirement",
+    "phase1bExecutionBlocked=false",
+    "LIVE migration"
+  ]
+}

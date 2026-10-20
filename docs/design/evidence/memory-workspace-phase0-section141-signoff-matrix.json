@@ -1,0 +1,135 @@
+{
+  "schema": "memory-workspace-phase0-section141-signoff-matrix/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "updatedAt": "2026-08-16T15:26:00.000Z",
+  "updatedBy": "cursor-memory-platform",
+  "section141Signed": true,
+  "section141SignedAt": "2026-08-16T15:26:00.000Z",
+  "section141SignedBy": "cursor-memory-platform",
+  "signedCount": 7,
+  "totalRoles": 7,
+  "phase0Accepted": true,
+  "phase1aScope": "design-and-owner-signoff-only",
+  "phase1bExecutionBlocked": true,
+  "ownerAssignment": "docs/design/evidence/memory-workspace-phase0-phase1a-owner-assignment.json",
+  "contractIndex": [
+    "docs/design/evidence/memory-workspace-phase1a-catalog-contract.json",
+    "docs/design/evidence/memory-workspace-phase1a-membership-contract.json",
+    "docs/design/evidence/memory-workspace-phase1a-binding-impact-matrix.json",
+    "docs/design/evidence/memory-workspace-phase1a-memory-boundary.json"
+  ],
+  "note": "7/7 §14.1 role rows independently accepted. Coordinator consistency review sets section141Signed=true and closes the Phase 1A design gate only. Phase 1B, LIVE, resolver write switch, schema v2, and deployAuthorized=true remain forbidden until an explicit Phase 1B unlock.",
+  "roles": [
+    {
+      "id": "architecture",
+      "label": "平台架构",
+      "owner": "codex-workspace-architecture",
+      "decision": "accepted",
+      "evidencePath": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+      "designPacket": "docs/design/evidence/memory-workspace-phase1a-section141-architecture-design-review.json",
+      "signedAt": "2026-08-16T11:53:33.387Z",
+      "scope": "组织树 / 资源树分离"
+    },
+    {
+      "id": "data-governance",
+      "label": "数据治理 / Catalog",
+      "owner": "codex-workspace-architecture",
+      "decision": "accepted",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase1a-catalog-contract.json",
+      "designPacket": "docs/design/evidence/memory-workspace-phase1a-section141-data-governance-design-review.json",
+      "signedAt": "2026-08-16T11:53:33.387Z",
+      "scope": "Catalog SoT + DataGovernanceEnvelope + resourceId"
+    },
+    {
+      "id": "resolver",
+      "label": "Resolver (WS-B)",
+      "owner": "cursor-data-governance",
+      "decision": "accepted",
+      "evidencePath": ".kiro/specs/memory-workspace-platform-remediation/ws-b-resolver-change-request.md",
+      "dispatchEvidence": "docs/design/evidence/memory-workspace-phase0-ws-b-dispatch.json",
+      "failClosedEvidence": "docs/design/evidence/memory-workspace-phase1a-ws-b-unknown-conflict-failclosed.json",
+      "signedAt": "2026-08-16T08:22:48.000Z",
+      "scope": "Change request acceptance required before any write switch"
+    },
+    {
+      "id": "memory",
+      "label": "记忆检索 / WS-C",
+      "owner": "cursor-memory-wsc",
+      "decision": "accepted",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase1a-memory-boundary.json",
+      "designPacket": "docs/design/evidence/memory-workspace-phase1a-section141-memory-design-review.json",
+      "signedAt": "2026-08-16T14:55:08.000Z",
+      "scope": "Workspace memory root/index vs Memory Asset boundary (design only)"
+    },
+    {
+      "id": "security",
+      "label": "多租户 / 安全",
+      "owner": "cursor-data-governance",
+      "decision": "accepted",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase1a-membership-contract.json",
+      "designPacket": "docs/design/evidence/memory-workspace-phase1a-section141-security-design-review.json",
+      "signedAt": "2026-08-16T08:22:48.000Z",
+      "scope": "tool cwd vs data root authorization; Managed fail-closed"
+    },
+    {
+      "id": "storage-cutover",
+      "label": "存储 / Cutover (WS-D)",
+      "owner": "cursor-fable",
+      "decision": "accepted",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase1a-binding-impact-matrix.json",
+      "designPacket": "docs/design/evidence/memory-workspace-phase1a-section141-wsd-cutover-design-review.json",
+      "signedAt": "2026-08-16T15:15:00.000Z",
+      "scope": "WorkspaceBindingRecord reuse; cutover record/guard extension"
+    },
+    {
+      "id": "sre",
+      "label": "DBA / SRE",
+      "owner": "cursor-memory-wsc",
+      "decision": "accepted",
+      "evidencePath": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+      "signedAt": "2026-08-16T14:55:08.000Z",
+      "scope": "SQLite backup, rebuild migration, fencing, rollback"
+    }
+  ],
+  "workstreamOwners": {
+    "WS-A": {
+      "owner": "codex-workspace-architecture",
+      "status": "contracts-accepted",
+      "deliverable": "Catalog + membership contracts accepted; Phase 1B still blocked"
+    },
+    "WS-B": {
+      "owner": "cursor-data-governance",
+      "status": "change-request-accepted",
+      "deliverable": "Resolver change request acceptance (design gate only; write switch still forbidden)",
+      "dispatch": "docs/design/evidence/memory-workspace-phase0-ws-b-dispatch.json",
+      "acceptedAtMainSha": "1f7a067643cee12729d14483bc65e3473542e64e",
+      "failClosedEvidence": "docs/design/evidence/memory-workspace-phase1a-ws-b-unknown-conflict-failclosed.json"
+    },
+    "WS-C": {
+      "owner": "cursor-memory-wsc",
+      "status": "boundary-accepted",
+      "deliverable": "Memory + SRE boundary accepted (no schema v2; Phase 1B still blocked)"
+    },
+    "WS-D": {
+      "owner": "cursor-fable",
+      "status": "matrix-accepted",
+      "deliverable": "Binding impact matrix accepted; cutover still uses existing record/guard; Phase 1B blocked",
+      "phase1bImplementationOwner": "cursor-data-governance"
+    },
+    "WS-E": {
+      "owner": "cursor-fable",
+      "freezeOwner": "cursor-fable",
+      "retirementOwner": "cursor-data-governance",
+      "status": "partial",
+      "deliverable": "Freeze merged; Retirement remains cursor-data-governance (must stay distinct from Freeze)"
+    }
+  },
+  "forbiddenUntilComplete": [
+    "resolver-write-switch",
+    "memory-schema-v2",
+    "live-migration",
+    "deployAuthorized=true",
+    "phase1b-implementation"
+  ]
+}

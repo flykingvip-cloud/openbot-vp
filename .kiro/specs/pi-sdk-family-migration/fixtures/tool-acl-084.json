@@ -1,0 +1,45 @@
+{
+  "insideRelative": {
+    "ok": true,
+    "raw": "{\"content\":[{\"type\":\"text\",\"text\":\"alpha-secret\"}]}",
+    "hasAlpha": true,
+    "hasBeta": false,
+    "hasOutside": false
+  },
+  "traversalRelative": {
+    "ok": true,
+    "raw": "{\"content\":[{\"type\":\"text\",\"text\":\"beta-secret\"}]}",
+    "hasAlpha": false,
+    "hasBeta": true,
+    "hasOutside": false
+  },
+  "absOther": {
+    "ok": true,
+    "raw": "{\"content\":[{\"type\":\"text\",\"text\":\"beta-secret\"}]}",
+    "hasAlpha": false,
+    "hasBeta": true,
+    "hasOutside": false
+  },
+  "absOutside": {
+    "ok": true,
+    "raw": "{\"content\":[{\"type\":\"text\",\"text\":\"outside-secret\"}]}",
+    "hasAlpha": false,
+    "hasBeta": false,
+    "hasOutside": true
+  },
+  "emptyCwdAbs": {
+    "ok": true,
+    "raw": "{\"content\":[{\"type\":\"text\",\"text\":\"alpha-secret\"}]}",
+    "hasAlpha": true,
+    "hasBeta": false,
+    "hasOutside": false
+  },
+  "writeTraversal": {
+    "ok": true,
+    "raw": "{\"content\":[{\"type\":\"text\",\"text\":\"Successfully wrote 4 bytes to ../tenant-b/pwned.txt\"}]}",
+    "hasAlpha": false,
+    "hasBeta": false,
+    "hasOutside": false
+  },
+  "pwnedExists": true
+}

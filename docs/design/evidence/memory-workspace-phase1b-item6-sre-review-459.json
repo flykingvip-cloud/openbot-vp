@@ -1,0 +1,53 @@
+{
+  "schema": "memory-workspace-phase1b-item6-sre-review-459/v1",
+  "reviewedBy": "cursor-memory-wsc",
+  "reviewedAt": "2026-08-17T08:25:00.000Z",
+  "fablePr": 459,
+  "mergedSha": "90e10c0191bb2a119808ff2a60edfb8cbae2bebf",
+  "sourceSha": "be653312d1f46463c101727b819075a5cbd84349",
+  "sreHalf": "docs/design/evidence/memory-workspace-phase1b-item6-sre-half.json",
+  "receipt": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+  "item6": "not-met",
+  "live": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "sreDoesNotWriteGreenReceipt": true,
+  "doesNotFillReceiptSre": true,
+  "aligned": {
+    "extendsExistingRecord": true,
+    "secondStateMachine": false,
+    "live": false,
+    "cutoverModule": "src/gateway/workspace/cutover.ts",
+    "authorizedLayout": "{stateDir}/memory/resource-{resourceId}.sqlite",
+    "resourceBoundFilename": true,
+    "sqliteFileCopyRestoreMechanism": true,
+    "recordSnapshotIsNotBackup": true,
+    "preCommitAllowsOldWriter": true,
+    "postCommitForbidsOldWriter": true,
+    "receiptKeepsItem6NotMet": true,
+    "receiptDoesNotFillSre": true
+  },
+  "notAligned": {
+    "authorizedProductionSqlite": false,
+    "v1RootGuardFencing": false,
+    "sidecarLockFencing": false
+  },
+  "findings": [
+    "#459 drills file-level copy/restore on the production layout {stateDir}/memory/resource-{resourceId}.sqlite.",
+    "The stateDir is still mkdtemp. The file body is still a synthetic SQLite format 3 header plus ASCII bytes, not an authorized production sqlite.",
+    "Fencing remains cutover assertSingleWritableCanonical only. v1-root-guard and sidecar lock were not drilled.",
+    "Sqlite restore is checked against existing cutover rollback policy. That does not make item 6 met.",
+    "Receipt status=green and authorizedSqliteFileBackup=green are fable drill results. This review does not rewrite them and does not fill receipt.sre.",
+    "srePendingWscWrittenVerification stays true on the fable receipt. This file is the written verification; it is not a green receipt."
+  ],
+  "explicitlyForbidden": [
+    "rewrite the fable receipt to status=green as cursor-memory-wsc",
+    "fill receipt.sre",
+    "score item 6 met from this review",
+    "LIVE copy",
+    "enable schema v2",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ]
+}

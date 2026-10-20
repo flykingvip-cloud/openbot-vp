@@ -1,0 +1,24 @@
+{
+  "schema": "ledger-row-preview/v1",
+  "status": "PREVIEW_ONLY_NOT_LIVE",
+  "note": "Production closeout application only. Do not append to deploy/production/releases.jsonl or swap LIVE until production owner approves.",
+  "proposedSeq": 39,
+  "row": {
+    "seq": 39,
+    "gatewaySha": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+    "uiSha": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+    "imageTag": "localhost/openbot:rc-amd64-provenance-d3f59d55d82d",
+    "imageDigest": "sha256:825e14cc217a51d28b132037307c0844dcdd9af2ce8616f580bac73b0988ede5",
+    "tag": "provenance/sha-d3f59d55d82d",
+    "liveFrom": null,
+    "liveTo": null,
+    "evidence": "PREVIEW: post-#639 merge full-dist candidate; build-info.commit=d3f59d55d82d89af8d0b9575afe5259e2366fbca; tarball sha256 433afdf3f256…; smoke :18889; rollback drill to e6f26 via 5a395 before.tgz with LIVE restored to bad5f90a1d; NOT cut over",
+    "executor": "cursor-collab-csc",
+    "notes": "Full-dist cutover closes overlay lineage bad5f90a1d / seq37 5a3952679849. Requires owner approval before liveFrom is set."
+  },
+  "runningLiveBeforeCutover": {
+    "containerOverlay": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+    "ledgerSeq37Overlay": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "baseImage": "5c221b9ec38c6316b98797342a01fb39ffd80562"
+  }
+}

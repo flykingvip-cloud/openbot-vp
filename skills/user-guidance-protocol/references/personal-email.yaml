@@ -1,0 +1,116 @@
+scenario:
+  name: personal_email_setup
+  title: 个人邮箱绑定（Path B）
+  trigger:
+    - 配邮箱
+    - 绑定邮箱
+    - 126
+    - 163
+    - QQ邮箱
+    - 授权码
+    - SMTP
+    - IMAP
+    - 发邮件
+    - 查邮件
+    - personal-email
+  required_context:
+    - browser
+    - openbot_ui
+    - logged_in_user
+
+stages:
+  - id: open_settings
+    title: 打开个人设置
+  - id: add_identity
+    title: 添加个人邮箱
+  - id: auth_code
+    title: 获取授权码（126/163/QQ）
+  - id: fill_credentials
+    title: 填写 SMTP / IMAP
+  - id: confirm_bind
+    title: 提交并确认授权
+
+steps:
+  - id: explain_requirements
+    stage: open_settings
+    risk: low
+    instruction: |
+      绑定个人邮箱需要三项信息：SMTP 发信、IMAP 收信、以及邮箱服务商的「授权码」（不是登录密码）。
+      126/163 必须填自定义 SMTP + IMAP，不要用「平台代发 SMTP」。
+      绑定成功后默认授权给「大白管家」，你也可在个人设置里授权给其他机器人。
+      准备好了吗？若聊天区有「去绑定」按钮，也可以直接点它打开表单。
+    visual_anchor: 对话区「去绑定」按钮（若有）
+    success_signal: 用户确认开始配置或已点击去绑定
+
+  - id: navigate_personal_settings
+    stage: open_settings
+    risk: low
+    instruction: |
+      在员工工作台左侧或顶部进入「个人设置」（头像/齿轮入口）。
+      打开后切到「授权」或「运营身份」标签页。
+    visual_anchor: 个人设置 → 授权 / 运营身份
+    success_signal: 用户确认已在运营身份列表页
+    on_fail:
+      issue_class: ui_changed
+      instruction: 若找不到入口，看右上角 ☰ 菜单或左上角返回控制台，再试「个人设置」。
+
+  - id: add_personal_email
+    stage: add_identity
+    risk: low
+    instruction: 在「个人运营身份」区域点「添加」或「+」，选择「个人邮箱」。
+    visual_anchor: 添加按钮 + 服务商列表中的「个人邮箱」
+    success_signal: 用户看到个人邮箱绑定表单（SMTP/IMAP 字段）
+
+  - id: choose_provider_hint
+    stage: auth_code
+    risk: low
+    instruction: |
+      先确认邮箱服务商（126 / 163 / QQ / Gmail 等）。
+      若用户不熟悉授权码或说「网页登录」→ 优先 Path C：加载 personal-email-browser.yaml，用 browser 协驾。
+      - Path C（126/163/QQ）：打开邮箱网页 → 设置里生成授权码 → 粘贴到 OpenBot 表单
+      - Path B：直接在 OpenBot 个人设置表单手填（主机可自动填充）
+      授权码只显示一次，请先复制到安全位置。拿到授权码后告诉我。
+    visual_anchor: 邮箱网页后台的「授权码 / 客户端授权密码」
+    success_signal: 用户确认已取得授权码
+
+  - id: fill_smtp_imap
+    stage: fill_credentials
+    risk: high
+    confirmation: true
+    instruction: |
+      在 OpenBot 个人邮箱表单中填写：
+      1. 发件地址（SMTP 发件人）
+      2. SMTP 主机/端口/用户名/授权码
+      3. IMAP 主机/端口/用户名（通常与 SMTP 用户名相同）
+      126/163 预设可自动填充主机；授权码粘贴到 SMTP 密码字段。
+      勿勾选「使用平台 SMTP」（126/163 不适用）。
+    visual_anchor: 表单中的 SMTP / IMAP 字段与「使用平台 SMTP」开关
+    success_signal: 用户确认字段已填完
+
+  - id: submit_bind
+    stage: confirm_bind
+    risk: medium
+    instruction: 点击「保存」或「绑定」。系统会探测 IMAP 连通性；成功后会提示已授权给「大白管家」。
+    visual_anchor: 表单底部保存/绑定按钮
+    success_signal: 用户看到绑定成功提示
+
+  - id: retry_mail_task
+    stage: confirm_bind
+    risk: low
+    instruction: |
+      绑定完成后回到与大白的对话，说「继续」或重复刚才的请求（查邮件/发邮件）。
+      若之前有待恢复任务，聊天区可能出现「继续任务」——点它即可自动续做。
+    visual_anchor: 聊天区待恢复任务横幅
+    success_signal: 用户确认邮件操作已成功或任务已恢复
+
+fallback:
+  - check: binding_button
+    instruction: 聊天里若有「去绑定」，优先点击它——会直接打开个人邮箱表单。
+  - check: auth_code
+    instruction: 126/163 必须用授权码；登录密码不能用于 SMTP/IMAP。
+  - check: screenshot
+    instruction: 截一张当前个人设置表单或邮箱后台页面，我帮你看缺哪一步。
+
+completion:
+  reusable_pattern: true
+  resume_hint: 绑定完成后调用 user_operational_identity action=resolve 再 execute。

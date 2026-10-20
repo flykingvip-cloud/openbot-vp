@@ -1,0 +1,809 @@
+diff --git a/ui/index.html b/ui/index.html
+index 46b9f1ec20..2179a4cb39 100755
+--- a/ui/index.html
++++ b/ui/index.html
+@@ -1,14 +1,19 @@
+ <!doctype html>
+-<html lang="en">
++<html lang="zh-CN">
+   <head>
+     <meta charset="UTF-8" />
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+     <title>OpenBot Control</title>
++    <meta
++      name="description"
++      content="OpenBot 团队 AI 工作台：注册、登录与企业管理入口，面向人机协作的控制台。"
++    />
+     <meta name="color-scheme" content="dark light" />
+-    <link rel="icon" href="/favicon.ico?v=20260722a" sizes="any" />
+-    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260722a" />
+-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=20260722a" />
+-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260722a" />
++    <link rel="preload" as="image" href="/openbot-logo.webp" fetchpriority="high" />
++    <link rel="icon" href="/favicon.ico?v=20260726a" sizes="any" />
++    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260726a" />
++    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=20260726a" />
++    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=20260726a" />
+   </head>
+ 
+   <body>
+diff --git a/ui/src/i18n/lib/registry.ts b/ui/src/i18n/lib/registry.ts
+index d61911053b..04008922c1 100755
+--- a/ui/src/i18n/lib/registry.ts
++++ b/ui/src/i18n/lib/registry.ts
+@@ -1,18 +1,19 @@
+ import type { Locale, TranslationMap } from "./types.ts";
+ 
+-type LazyLocale = Exclude<Locale, "en">;
+ type LocaleModule = Record<string, TranslationMap>;
+ 
+-type LazyLocaleRegistration = {
++type LocaleRegistration = {
+   exportName: string;
+   loader: () => Promise<LocaleModule>;
+ };
+ 
+ export const DEFAULT_LOCALE: Locale = "en";
+ 
+-const LAZY_LOCALES: readonly LazyLocale[] = ["zh-CN", "zh-TW", "pt-BR", "de", "es"];
+-
+-const LAZY_LOCALE_REGISTRY: Record<LazyLocale, LazyLocaleRegistration> = {
++const LOCALE_REGISTRY: Record<Locale, LocaleRegistration> = {
++  en: {
++    exportName: "en",
++    loader: () => import("../locales/en.ts"),
++  },
+   "zh-CN": {
+     exportName: "zh_CN",
+     loader: () => import("../locales/zh-CN.ts"),
+@@ -35,16 +36,12 @@ const LAZY_LOCALE_REGISTRY: Record<LazyLocale, LazyLocaleRegistration> = {
+   },
+ };
+ 
+-export const SUPPORTED_LOCALES: ReadonlyArray<Locale> = [DEFAULT_LOCALE, ...LAZY_LOCALES];
++export const SUPPORTED_LOCALES: ReadonlyArray<Locale> = Object.keys(LOCALE_REGISTRY) as Locale[];
+ 
+ export function isSupportedLocale(value: string | null | undefined): value is Locale {
+   return value !== null && value !== undefined && SUPPORTED_LOCALES.includes(value as Locale);
+ }
+ 
+-function isLazyLocale(locale: Locale): locale is LazyLocale {
+-  return LAZY_LOCALES.includes(locale as LazyLocale);
+-}
+-
+ export function resolveNavigatorLocale(navLang: string): Locale {
+   if (navLang.startsWith("zh")) {
+     return navLang === "zh-TW" || navLang === "zh-HK" ? "zh-TW" : "zh-CN";
+@@ -62,10 +59,10 @@ export function resolveNavigatorLocale(navLang: string): Locale {
+ }
+ 
+ export async function loadLazyLocaleTranslation(locale: Locale): Promise<TranslationMap | null> {
+-  if (!isLazyLocale(locale)) {
++  const registration = LOCALE_REGISTRY[locale];
++  if (!registration) {
+     return null;
+   }
+-  const registration = LAZY_LOCALE_REGISTRY[locale];
+   const module = await registration.loader();
+   return module[registration.exportName] ?? null;
+ }
+diff --git a/ui/src/i18n/lib/translate.ts b/ui/src/i18n/lib/translate.ts
+index 2ada4d2444..a4409ea6cd 100755
+--- a/ui/src/i18n/lib/translate.ts
++++ b/ui/src/i18n/lib/translate.ts
+@@ -1,4 +1,3 @@
+-import { en } from "../locales/en.ts";
+ import {
+   DEFAULT_LOCALE,
+   SUPPORTED_LOCALES,
+@@ -16,11 +15,12 @@ export { SUPPORTED_LOCALES, isSupportedLocale };
+ 
+ export class I18nManager {
+   private locale: Locale = DEFAULT_LOCALE;
+-  private translations: Partial<Record<Locale, TranslationMap>> = { [DEFAULT_LOCALE]: en };
++  private translations: Partial<Record<Locale, TranslationMap>> = {};
+   private subscribers: Set<Subscriber> = new Set();
++  private localeReady: Promise<void>;
+ 
+   constructor() {
+-    this.loadLocale();
++    this.localeReady = this.loadLocale();
+   }
+ 
+   private resolveInitialLocale(): Locale {
+@@ -39,15 +39,15 @@ export class I18nManager {
+     return resolveNavigatorLocale(navigatorLanguage);
+   }
+ 
+-  private loadLocale() {
++  private async loadLocale() {
+     const initialLocale = this.resolveInitialLocale();
+-    if (initialLocale === DEFAULT_LOCALE) {
+-      this.locale = DEFAULT_LOCALE;
+-      return;
+-    }
+     // Use the normal locale setter so startup locale loading follows the same
+     // translation-loading + notify path as manual locale changes.
+-    void this.setLocale(initialLocale);
++    await this.setLocale(initialLocale);
++  }
++
++  public whenReady(): Promise<void> {
++    return this.localeReady;
+   }
+ 
+   public getLocale(): Locale {
+@@ -55,7 +55,7 @@ export class I18nManager {
+   }
+ 
+   public async setLocale(locale: Locale) {
+-    const needsTranslationLoad = locale !== DEFAULT_LOCALE && !this.translations[locale];
++    const needsTranslationLoad = !this.translations[locale];
+     if (this.locale === locale && !needsTranslationLoad) {
+       return;
+     }
+@@ -79,6 +79,20 @@ export class I18nManager {
+       localStorage.removeItem(LEGACY_LOCALE_STORAGE_KEY);
+     }
+     this.notify();
++
++    // Warm English fallback in the background for non-English locales without
++    // blocking first paint on the active locale chunk.
++    if (locale !== DEFAULT_LOCALE && !this.translations[DEFAULT_LOCALE]) {
++      void loadLazyLocaleTranslation(DEFAULT_LOCALE)
++        .then((translation) => {
++          if (translation) {
++            this.translations[DEFAULT_LOCALE] = translation;
++          }
++        })
++        .catch(() => {
++          /* ignore fallback warm failures */
++        });
++    }
+   }
+ 
+   public registerTranslation(locale: Locale, map: TranslationMap) {
+diff --git a/ui/src/styles/auth-home.css b/ui/src/styles/auth-home.css
+index 1a0da8db40..e9af3b6a70 100644
+--- a/ui/src/styles/auth-home.css
++++ b/ui/src/styles/auth-home.css
+@@ -16,7 +16,10 @@
+   position: fixed;
+   inset: 0;
+   z-index: 0;
+-  background-image: url("/cosmic-bg.png");
++  background-image: image-set(
++    url("/cosmic-bg.webp") type("image/webp"),
++    url("/cosmic-bg.jpg") type("image/jpeg")
++  );
+   background-size: cover;
+   background-position: center center;
+   background-repeat: no-repeat;
+@@ -867,7 +870,7 @@
+     linear-gradient(180deg, rgba(133, 70, 40, 0.48), rgba(57, 28, 22, 0.45));
+ }
+ 
+-.auth-home__feature-card h3 {
++.auth-home__feature-card h2 {
+   margin: 0;
+   font-size: 0.98rem;
+   line-height: 1.2;
+@@ -893,7 +896,7 @@
+ }
+ 
+ .auth-home__footer-meta {
+-  color: rgba(247, 239, 231, 0.4);
++  color: rgba(247, 239, 231, 0.72);
+   font-size: 0.76rem;
+   text-align: center;
+   letter-spacing: 0.01em;
+diff --git a/ui/src/styles/trial-apply.css b/ui/src/styles/trial-apply.css
+index 2ca41c3b9d..305cbb6fb4 100644
+--- a/ui/src/styles/trial-apply.css
++++ b/ui/src/styles/trial-apply.css
+@@ -18,7 +18,10 @@
+   position: absolute;
+   inset: 0;
+   z-index: 0;
+-  background-image: url("/cosmic-bg.png");
++  background-image: image-set(
++    url("/cosmic-bg.webp") type("image/webp"),
++    url("/cosmic-bg.jpg") type("image/jpeg")
++  );
+   background-size: cover;
+   background-position: center center;
+   opacity: 0.78;
+diff --git a/ui/src/ui/brand-assets.ts b/ui/src/ui/brand-assets.ts
+index 02288699a1..a4c77e9db4 100644
+--- a/ui/src/ui/brand-assets.ts
++++ b/ui/src/ui/brand-assets.ts
+@@ -40,7 +40,8 @@ function resolveBundledAsset(basePath: string, filename: string): string {
+ }
+ 
+ export function resolveBundledBrandWordmarkSrc(basePath: string): string {
+-  return resolveBundledAsset(basePath, "openbot-logo.png");
++  // Prefer WebP (~18KB at display size) over the legacy PNG wordmark.
++  return resolveBundledAsset(basePath, "openbot-logo.webp");
+ }
+ 
+ export function resolveBrandLogoSrc(
+diff --git a/ui/src/ui/capability/ai-workforce-governance/services/governanceApi.ts b/ui/src/ui/capability/ai-workforce-governance/services/governanceApi.ts
+index 2f5406c0f8..77e2d1cef0 100644
+--- a/ui/src/ui/capability/ai-workforce-governance/services/governanceApi.ts
++++ b/ui/src/ui/capability/ai-workforce-governance/services/governanceApi.ts
+@@ -20,6 +20,8 @@ import type {
+   ScoreHistoryPoint,
+   GovernanceActionRecord,
+   GovernanceActionStatus,
++  WorkingStyleEffectItem,
++  WorkingStyleEffectivenessAggregate,
+ } from "../types/index.ts";
+ 
+ let governanceClient: GatewayBrowserClient | null = null;
+@@ -560,3 +562,24 @@ function normalizeAssetListItem(item: AssetListItem): AssetListItem {
+ export function hasGovernanceGatewayClient() {
+   return Boolean(governanceClient);
+ }
++
++/**
++ * 拉取各 agent 最近一次 Working DNA 变更的效果评估（企业治理可视化）。
++ * 网关不可用时返回空数组 —— 行为治理不使用 mock 数据。
++ */
++export async function fetchWorkingStyleEffects(): Promise<WorkingStyleEffectItem[]> {
++  const result = await requestGateway<{ effects: WorkingStyleEffectItem[] }>(
++    "agents.list-working-style-effects",
++    {},
++  );
++  return result?.effects ?? [];
++}
++
++/** 跨 agent 行为改变有效性聚合（企业治理分析）。网关不可用 → null。 */
++export async function fetchWorkingStyleEffectiveness(): Promise<WorkingStyleEffectivenessAggregate | null> {
++  const result = await requestGateway<{ aggregate: WorkingStyleEffectivenessAggregate }>(
++    "agents.working-style-effectiveness",
++    {},
++  );
++  return result?.aggregate ?? null;
++}
+diff --git a/ui/src/ui/controllers/chat.ts b/ui/src/ui/controllers/chat.ts
+index f7acd79de0..ec25341922 100755
+--- a/ui/src/ui/controllers/chat.ts
++++ b/ui/src/ui/controllers/chat.ts
+@@ -18,7 +18,6 @@ import type { SessionsListResult } from "../types.ts";
+ import type { ChatAttachment } from "../ui-types.ts";
+ import { generateUUID } from "../uuid.ts";
+ import { isAssetSuggestionDismissed } from "./asset-incubation/suggestion-dismiss.ts";
+-import { openKnowledgeUniverseAssetsPage } from "./knowledge-universe.ts";
+ import type { QuickSaveSkillFormData } from "./skill-lifecycle.ts";
+ 
+ const SILENT_REPLY_PATTERN = /^\s*NO_REPLY\s*$/;
+@@ -313,7 +312,9 @@ async function handleExplicitAssetCommand(
+   state.chatStream = null;
+   state.chatStreamStartedAt = null;
+   state.lastError = null;
+-  openKnowledgeUniverseAssetsPage(state as AppPortState);
++  void import("./knowledge-universe.ts").then((mod) => {
++    mod.openKnowledgeUniverseAssetsPage(state as AppPortState);
++  });
+   state.workbenchAssetSuggestionVisible = false;
+   state.workbenchAssetSuggestionSource = "manual-iteration";
+   state.workbenchAssetSuggestionLabel =
+diff --git a/ui/src/ui/controllers/knowledge-universe-workspace.ts b/ui/src/ui/controllers/knowledge-universe-workspace.ts
+index 860dcaf8d0..cf4249037f 100644
+--- a/ui/src/ui/controllers/knowledge-universe-workspace.ts
++++ b/ui/src/ui/controllers/knowledge-universe-workspace.ts
+@@ -17,7 +17,6 @@ import {
+   writeKnowledgeUniverseUiPrefs,
+ } from "../views/knowledge-universe-ui-prefs.ts";
+ import { createEmptyWebUrlImportState } from "../views/knowledge-universe-url-import.ts";
+-import { resetKnowledgeUniverseFileImportState } from "./knowledge-universe-file-import.ts";
+ import {
+   isDeliverablesUserContextError,
+   resolveWorkspaceLoadError,
+@@ -1356,10 +1355,7 @@ export function setKnowledgeUniverseLibraryWorkspaceImportKind(
+ ) {
+   const runtime = getKnowledgeUniverseRuntime(state);
+   runtime.libraryWorkspaceImportKind = kind;
+-  if (kind === "localFolder" || kind === "vaultSync") {
+-    if (kind === "vaultSync") {
+-      runtime.libraryWorkspaceImportKind = "localFolder";
+-    }
++  if (kind === "localFolder") {
+     syncWorkspaceToAppState(state);
+     requestUpdate(state);
+     void import("./knowledge-universe-local-folder.ts").then((module) =>
+@@ -1391,16 +1387,6 @@ export function setKnowledgeUniverseLibraryWorkspaceImportKind(
+     );
+     return;
+   }
+-  if (kind === "dataset") {
+-    runtime.libraryWorkspaceDatasetImportTab = "file";
+-    runtime.libraryWorkspaceDatasetFileAttachment = null;
+-    runtime.libraryWorkspaceDatasetPreview = null;
+-    runtime.libraryWorkspaceDatasetPreviewError = null;
+-    runtime.personalDatasetText = "";
+-    syncWorkspaceToAppState(state);
+-    requestUpdate(state);
+-    return;
+-  }
+   if (kind === "note") {
+     Object.assign(runtime, createEmptyNoteImportState());
+     runtime.libraryWorkspaceNoteTagHistory = readNoteTagHistory();
+@@ -1411,12 +1397,6 @@ export function setKnowledgeUniverseLibraryWorkspaceImportKind(
+     requestUpdate(state);
+     return;
+   }
+-  if (kind === "file") {
+-    resetKnowledgeUniverseFileImportState(runtime);
+-    syncWorkspaceToAppState(state);
+-    requestUpdate(state);
+-    return;
+-  }
+   if (kind === "url") {
+     Object.assign(runtime, createEmptyWebUrlImportState());
+     syncWorkspaceToAppState(state);
+diff --git a/ui/src/ui/ports/employee/views/home-page-contracts.ts b/ui/src/ui/ports/employee/views/home-page-contracts.ts
+index a9adf0d675..41a1265c87 100644
+--- a/ui/src/ui/ports/employee/views/home-page-contracts.ts
++++ b/ui/src/ui/ports/employee/views/home-page-contracts.ts
+@@ -74,17 +74,7 @@ export type KnowledgeUniverseBrowseSubTab = "personal" | "enterprise" | "capabil
+ 
+ export type KnowledgeUniversePersonalDrawerMode = "collect" | "upload" | "manage";
+ 
+-export type SpaceImportKind =
+-  | "file"
+-  | "note"
+-  | "url"
+-  | "dataset"
+-  | "localFolder"
+-  | "vaultSync"
+-  | "gitRepo"
+-  | "cloudDrive"
+-  | "mailAttachment"
+-  | "active";
++export type SpaceImportKind = "localFolder" | "url" | "note" | "active";
+ 
+ export type ActiveSourceBindKind = "api" | "external" | "capability";
+ 
+@@ -413,11 +403,6 @@ export type WorkbenchKnowledgeSurface = {
+   onBindLocalFolder?: () => Promise<void>;
+   onLoadLocalFolderStatus?: () => Promise<void>;
+   onScanLocalFolderNow?: (bindingId: string) => Promise<void>;
+-  onLibraryWorkspacePassiveConnectorLocatorChange?: (value: string) => void;
+-  onLibraryWorkspacePassiveConnectorLabelChange?: (value: string) => void;
+-  onBindPassiveConnector?: (
+-    kind: Extract<SpaceImportKind, "gitRepo" | "cloudDrive" | "mailAttachment">,
+-  ) => Promise<void>;
+   onVaultSyncRootPathChange?: (value: string) => void;
+   onVaultSyncPasswordChange?: (value: string) => void;
+   onVaultSyncRevisionIdChange?: (value: string) => void;
+diff --git a/ui/src/ui/views/auth-home.browser.test.ts b/ui/src/ui/views/auth-home.browser.test.ts
+index 0e072de9aa..68b1feec7f 100644
+--- a/ui/src/ui/views/auth-home.browser.test.ts
++++ b/ui/src/ui/views/auth-home.browser.test.ts
+@@ -97,7 +97,7 @@ describe("auth home", () => {
+     render(renderAuthHome(baseProps()), container);
+ 
+     const pricingLink = Array.from(container.querySelectorAll("a")).find(
+-      (node) => node.textContent?.trim() === "定价",
++      (node) => node.textContent?.trim() === "套餐定价",
+     );
+     expect(pricingLink?.getAttribute("href")).toBe("/pricing");
+   });
+diff --git a/ui/src/ui/views/auth-home.ts b/ui/src/ui/views/auth-home.ts
+index 0898b41426..1b4e66d002 100644
+--- a/ui/src/ui/views/auth-home.ts
++++ b/ui/src/ui/views/auth-home.ts
+@@ -230,20 +230,46 @@ function submitLabel(
+   }
+ }
+ 
++function resolveAuthFieldName(params: {
++  name?: string;
++  type?: "email" | "password" | "text";
++  autocomplete?: string;
++}): string {
++  if (params.name?.trim()) {
++    return params.name.trim();
++  }
++  const autocomplete = params.autocomplete?.trim();
++  if (autocomplete && autocomplete !== "off") {
++    return autocomplete;
++  }
++  if (params.type === "email") {
++    return "email";
++  }
++  if (params.type === "password") {
++    return "password";
++  }
++  return "text";
++}
++
+ function renderField(params: {
+   label: string;
+   value: string;
+   type?: "email" | "password" | "text";
+   placeholder?: string;
+   autocomplete?: string;
++  name?: string;
+   stacked?: boolean;
+   disabled: boolean;
+   onInput: (value: string) => void;
+ }) {
++  const name = resolveAuthFieldName(params);
++  const id = `auth-home-${name}`;
+   return html`
+-    <label class=${`auth-home__field ${params.stacked ? "auth-home__field--stacked" : ""}`}>
++    <label class=${`auth-home__field ${params.stacked ? "auth-home__field--stacked" : ""}`} for=${id}>
+       <span>${params.label}</span>
+       <input
++        id=${id}
++        name=${name}
+         .value=${params.value}
+         type=${params.type ?? "text"}
+         placeholder=${params.placeholder ?? ""}
+@@ -546,17 +572,22 @@ function renderTrialCompactField(params: {
+   type?: "email" | "text";
+   placeholder?: string;
+   autocomplete?: string;
++  name?: string;
+   disabled: boolean;
+   onInput: (value: string) => void;
+ }) {
+   const hasValue = params.value.trim().length > 0;
++  const name = resolveAuthFieldName(params);
++  const id = `trial-apply-${name}`;
+   return html`
+-    <label class=${`trial-apply-page__compact-field ${hasValue ? "is-filled" : ""}`}>
++    <label class=${`trial-apply-page__compact-field ${hasValue ? "is-filled" : ""}`} for=${id}>
+       <span class="trial-apply-page__compact-label">${params.label}</span>
+       <span class=${`trial-apply-page__compact-value ${hasValue ? "" : "is-placeholder"}`}>
+         ${hasValue ? params.value : (params.placeholder ?? "")}
+       </span>
+       <input
++        id=${id}
++        name=${name}
+         class="trial-apply-page__compact-control"
+         .value=${params.value}
+         type=${params.type ?? "text"}
+@@ -732,9 +763,11 @@ function renderTrialApplyForm(props: AuthHomeProps) {
+   return html`
+     <div class="auth-home__trial-panel auth-home__trial-panel--page">
+       ${renderTrialApplyStepper(props)}
+-      <label class="auth-home__field auth-home__field--row">
++      <label class="auth-home__field auth-home__field--row" for="auth-home-contact-name">
+         <span>${t("authHome.trialApply.fields.contactName")}</span>
+         <input
++          id="auth-home-contact-name"
++          name="name"
+           .value=${props.displayName}
+           type="text"
+           placeholder=${t("authHome.trialApply.placeholders.contactName")}
+@@ -957,6 +990,7 @@ function renderModeFields(props: AuthHomeProps, mode: ControlUiPlatformAuthMode)
+         ${renderField({
+           label: t("authHome.form.inviteCode"),
+           value: props.inviteCode,
++          name: "invite-code",
+           disabled: props.busy,
+           onInput: props.onInviteCodeChange,
+         })}
+@@ -1001,6 +1035,7 @@ function renderModeFields(props: AuthHomeProps, mode: ControlUiPlatformAuthMode)
+         ${renderField({
+           label: t("authHome.form.inviteCode"),
+           value: props.inviteCode,
++          name: "invite-code",
+           placeholder: t("authHome.form.inviteCodePlaceholder"),
+           disabled: props.busy,
+           onInput: props.onInviteCodeChange,
+@@ -1060,6 +1095,7 @@ function renderModeFields(props: AuthHomeProps, mode: ControlUiPlatformAuthMode)
+         ${renderField({
+           label: t("overview.platformAuth.fields.code"),
+           value: props.inviteCode,
++          name: "reset-code",
+           disabled: props.busy,
+           onInput: props.onInviteCodeChange,
+         })}
+@@ -1342,7 +1378,15 @@ function renderPublicSiteHeader(params: {
+   return html`
+     <header class="auth-home__header">
+       <a class="auth-home__brand" href=${params.brandHref} aria-label="OpenBot">
+-        <img class="auth-home__brand-logo" src=${params.logoSrc} alt="OpenBot" />
++        <img
++          class="auth-home__brand-logo"
++          src=${params.logoSrc}
++          alt="OpenBot"
++          width="208"
++          height="139"
++          fetchpriority="high"
++          decoding="sync"
++        />
+       </a>
+       <div class="auth-home__header-actions">
+         <nav class="auth-home__nav" aria-label="OpenBot">
+@@ -1496,7 +1540,7 @@ function renderFeature(params: {
+     <article class="auth-home__feature-card">
+       <div class="auth-home__feature-head">
+         <span class=${`auth-home__icon-chip ${params.iconClass}`}>${params.icon}</span>
+-        <h3>${params.title}</h3>
++        <h2>${params.title}</h2>
+       </div>
+       <p>${params.description}</p>
+     </article>
+@@ -1657,7 +1701,15 @@ export function renderAuthHome(props: AuthHomeProps) {
+ 
+         <header class="auth-home__header">
+           <a class="auth-home__brand" href="#top" aria-label="OpenBot">
+-            <img class="auth-home__brand-logo" src=${logoSrc} alt="OpenBot" />
++            <img
++              class="auth-home__brand-logo"
++              src=${logoSrc}
++              alt="OpenBot"
++              width="208"
++              height="139"
++              fetchpriority="high"
++              decoding="sync"
++            />
+           </a>
+           <div class="auth-home__header-actions">
+             <nav class="auth-home__nav" aria-label="OpenBot">
+@@ -1888,10 +1940,16 @@ export function renderAuthHome(props: AuthHomeProps) {
+                             : entryVariant === "platform" && mode === "platform-admin-login"
+                               ? "平台管理员"
+                               : authTabLabel(mode);
++                        const selected = mode === activeMode;
+                         return html`
+                           <button
+-                            class=${`auth-home__mode-button ${mode === activeMode ? "is-active" : ""}`}
++                            class=${`auth-home__mode-button ${selected ? "is-active" : ""}`}
+                             type="button"
++                            role="tab"
++                            id=${`auth-mode-${mode}`}
++                            aria-selected=${selected ? "true" : "false"}
++                            aria-controls="auth-home-panel"
++                            tabindex=${selected ? 0 : -1}
+                             ?disabled=${props.busy}
+                             @click=${() => props.onModeChange(mode)}
+                           >
+@@ -1919,6 +1977,9 @@ export function renderAuthHome(props: AuthHomeProps) {
+ 
+             <form
+               class=${`auth-home__form ${activeMode === "login" ? "auth-home__form--login" : ""}`}
++              id="auth-home-panel"
++              role="tabpanel"
++              aria-labelledby=${`auth-mode-${activeMode}`}
+               @submit=${(event: Event) => {
+                 event.preventDefault();
+                 if (isSubmitDisabled(effectiveProps, activeMode)) {
+diff --git a/ui/src/ui/views/knowledge-universe-space-import.node.test.ts b/ui/src/ui/views/knowledge-universe-space-import.node.test.ts
+index b6c60bae27..c77173d499 100644
+--- a/ui/src/ui/views/knowledge-universe-space-import.node.test.ts
++++ b/ui/src/ui/views/knowledge-universe-space-import.node.test.ts
+@@ -66,9 +66,6 @@ function surface(overrides: Partial<WorkbenchKnowledgeSurface> = {}): WorkbenchK
+     onBindLocalFolder: vi.fn(async () => undefined),
+     onLoadLocalFolderStatus: vi.fn(async () => undefined),
+     onScanLocalFolderNow: vi.fn(async () => undefined),
+-    onLibraryWorkspacePassiveConnectorLocatorChange: vi.fn(),
+-    onLibraryWorkspacePassiveConnectorLabelChange: vi.fn(),
+-    onBindPassiveConnector: vi.fn(async () => undefined),
+     onPickPersonalUploadFile: vi.fn(async () => undefined),
+     onPersonalUpload: vi.fn(async () => undefined),
+     onPersonalCollectDraftChange: vi.fn(),
+@@ -334,14 +331,14 @@ describe("knowledge-universe-space-import", () => {
+     expect(mock.onLibraryWorkspaceImportOpenChange).not.toHaveBeenCalled();
+   });
+ 
+-  it("renders four channel tabs with no sync-method selector and no Vault form", () => {
++  it("renders only the four supported content-entry tabs", () => {
+     const mock = surface({ libraryWorkspaceImportOpen: true, libraryWorkspaceImportKind: null });
+     const container = document.createElement("div");
+     render(renderKnowledgeUniverseSpaceImportPage(mock), container);
+     for (const kind of ["localFolder", "url", "note", "active"] as const) {
+       expect(container.querySelector(`[data-testid="ku-space-import-tab-${kind}"]`)).toBeTruthy();
+     }
+-    expect(container.querySelector('[data-testid="ku-space-import-tab-vaultSync"]')).toBeFalsy();
++    expect(container.querySelectorAll('[data-testid^="ku-space-import-tab-"]')).toHaveLength(4);
+     expect(
+       container
+         .querySelector('[data-testid="ku-space-import-tab-localFolder"]')
+@@ -351,10 +348,7 @@ describe("knowledge-universe-space-import", () => {
+     expect(
+       container.querySelector('[data-testid="ku-space-import-form-localFolder"]'),
+     ).toBeTruthy();
+-    expect(container.querySelector('[data-testid="ku-space-import-form-vaultSync"]')).toBeFalsy();
+     expect(container.querySelector('[data-testid="ku-space-import-picker"]')).toBeFalsy();
+-    expect(container.querySelector('[data-testid="ku-space-import-tab-cloudDrive"]')).toBeFalsy();
+-    expect(container.querySelector('[data-testid="ku-space-import-tab-file"]')).toBeFalsy();
+   });
+ 
+   it("switches the active channel tab via onLibraryWorkspaceImportKindChange", () => {
+@@ -365,25 +359,6 @@ describe("knowledge-universe-space-import", () => {
+     expect(mock.onLibraryWorkspaceImportKindChange).toHaveBeenCalledWith("note");
+   });
+ 
+-  it("a stale vaultSync importKind falls back to the 本地文件夹 tab folder form (vault not surfaced)", () => {
+-    const mock = surface({
+-      libraryWorkspaceImportOpen: true,
+-      libraryWorkspaceImportKind: "vaultSync",
+-    });
+-    const container = document.createElement("div");
+-    render(renderKnowledgeUniverseSpaceImportPage(mock), container);
+-    expect(
+-      container
+-        .querySelector('[data-testid="ku-space-import-tab-localFolder"]')
+-        ?.getAttribute("aria-selected"),
+-    ).toBe("true");
+-    expect(container.querySelector('[data-testid="ku-space-import-sync-method"]')).toBeFalsy();
+-    expect(container.querySelector('[data-testid="ku-space-import-form-vaultSync"]')).toBeFalsy();
+-    expect(
+-      container.querySelector('[data-testid="ku-space-import-form-localFolder"]'),
+-    ).toBeTruthy();
+-  });
+-
+   it("openPersonalSpaceImportEntry materializes via onEnsurePersonalSpaceForImport when no private space", () => {
+     const onEnsurePersonalSpaceForImport = vi.fn(async () => undefined);
+     const mock = surface({
+@@ -396,23 +371,6 @@ describe("knowledge-universe-space-import", () => {
+     expect(mock.onLibraryWorkspaceImportOpenChange).not.toHaveBeenCalled();
+   });
+ 
+-  it("re-clicking the active 本地文件夹 tab does not fire kind change when vaultSync was remapped", () => {
+-    const mock = surface({
+-      libraryWorkspaceImportOpen: true,
+-      libraryWorkspaceImportKind: "vaultSync",
+-    });
+-    const container = document.createElement("div");
+-    render(renderKnowledgeUniverseSpaceImportPage(mock), container);
+-    container
+-      .querySelector<HTMLButtonElement>('[data-testid="ku-space-import-tab-localFolder"]')
+-      ?.click();
+-    expect(mock.onLibraryWorkspaceImportKindChange).not.toHaveBeenCalled();
+-    expect(container.querySelector('[data-testid="ku-space-import-form-vaultSync"]')).toBeFalsy();
+-    expect(
+-      container.querySelector('[data-testid="ku-space-import-form-localFolder"]'),
+-    ).toBeTruthy();
+-  });
+-
+   it("renders localFolder form without active-source bind controls", () => {
+     const mock = surface({
+       libraryWorkspaceImportOpen: true,
+@@ -725,65 +683,6 @@ describe("knowledge-universe-space-import", () => {
+     expect(container.querySelector('[data-testid="ku-space-import-oauth-simulate"]')).toBeTruthy();
+   });
+ 
+-  it("renders dataset import tabs and manual preview", () => {
+-    const mock = surface({
+-      libraryWorkspaceImportOpen: true,
+-      libraryWorkspaceImportKind: "dataset",
+-      personalDatasetText: "title,content\nRow A,Value A",
+-      libraryWorkspaceDatasetImportTab: "manual",
+-      libraryWorkspaceDatasetPreview: {
+-        headers: ["title", "content"],
+-        rows: [["Row A", "Value A"]],
+-        totalRowCount: 1,
+-        truncated: false,
+-      },
+-    });
+-    const container = document.createElement("div");
+-    render(renderKnowledgeUniverseSpaceImportPage(mock), container);
+-    expect(
+-      container.querySelector('[data-testid="ku-space-import-dataset-tab-file"]'),
+-    ).toBeTruthy();
+-    expect(
+-      container.querySelector('[data-testid="ku-space-import-dataset-tab-manual"]'),
+-    ).toBeTruthy();
+-    expect(container.querySelector('[data-testid="ku-space-import-dataset-preview"]')).toBeTruthy();
+-    expect(
+-      container.querySelector('[data-testid="ku-space-import-dataset-template"]'),
+-    ).toBeTruthy();
+-  });
+-
+-  it("renders drag-drop file import with list, advanced settings, and gated submit", () => {
+-    const mock = surface({
+-      libraryWorkspaceImportOpen: true,
+-      libraryWorkspaceImportKind: "file",
+-      libraryWorkspaceFileImportAdvancedOpen: true,
+-      libraryWorkspaceFileImportItems: [
+-        {
+-          id: "f1",
+-          status: "ready",
+-          attachment: {
+-            fileName: "handbook.pdf",
+-            mimeType: "application/pdf",
+-            size: 2_400_000,
+-            kind: "binary",
+-          },
+-        },
+-      ],
+-    });
+-    const container = document.createElement("div");
+-    render(renderKnowledgeUniverseSpaceImportPage(mock), container);
+-    expect(container.querySelector('[data-testid="ku-space-import-file-dropzone"]')).toBeTruthy();
+-    expect(container.querySelector('[data-testid="ku-space-import-file-list"]')).toBeTruthy();
+-    expect(container.querySelector('[data-testid="ku-space-import-file-advanced"]')).toBeTruthy();
+-    expect(container.querySelector('[data-testid="ku-space-import-file-ocr"]')).toBeTruthy();
+-    const submit = container.querySelector<HTMLButtonElement>(
+-      '[data-testid="ku-space-import-file-submit"]',
+-    );
+-    expect(submit).toBeTruthy();
+-    expect(submit?.disabled).toBe(false);
+-    expect(container.textContent).toMatch(/开始导入|Start import/);
+-  });
+-
+   it("renders AI-enhanced note import with content-first layout", () => {
+     const mock = surface({
+       libraryWorkspaceImportOpen: true,
+diff --git a/ui/src/ui/views/knowledge-universe-space-import.ts b/ui/src/ui/views/knowledge-universe-space-import.ts
+index 1b3b749058..11d88cca5b 100644
+--- a/ui/src/ui/views/knowledge-universe-space-import.ts
++++ b/ui/src/ui/views/knowledge-universe-space-import.ts
+@@ -18,14 +18,11 @@ import type {
+   SpaceImportKind,
+ } from "../ports/employee/views/home-page-contracts.ts";
+ import { renderActiveSourceBindPanel } from "./knowledge-universe-space-connector-bind.ts";
+-import { renderDatasetImportForm } from "./knowledge-universe-space-import-dataset.ts";
+-import { renderFileImportForm } from "./knowledge-universe-space-import-file.ts";
+ import { renderLocalFolderImportForm } from "./knowledge-universe-space-import-local-folder.ts";
+ import {
+   renderNoteImportForm,
+   noteImportFormPropsFromSurface,
+ } from "./knowledge-universe-space-import-note.ts";
+-import { renderPassiveConnectorImportForm } from "./knowledge-universe-space-import-passive-connector.ts";
+ import { renderWebUrlImportForm } from "./knowledge-universe-space-import-url.ts";
+ 
+ /**
+@@ -276,10 +273,6 @@ function renderLocalFolderPanel(surface: WorkbenchKnowledgeSurface) {
+   return renderLocalFolderImportForm(surface);
+ }
+ 
+-function renderFileForm(surface: WorkbenchKnowledgeSurface) {
+-  return renderFileImportForm(surface);
+-}
+-
+ function renderNoteForm(surface: WorkbenchKnowledgeSurface) {
+   return renderNoteImportForm(noteImportFormPropsFromSurface(surface));
+ }
+@@ -288,32 +281,18 @@ function renderUrlForm(surface: WorkbenchKnowledgeSurface) {
+   return renderWebUrlImportForm(surface);
+ }
+ 
+-function renderDatasetForm(surface: WorkbenchKnowledgeSurface) {
+-  return renderDatasetImportForm(surface);
+-}
+-
+ function renderLocalFolderForm(surface: WorkbenchKnowledgeSurface) {
+   return renderLocalFolderImportForm(surface);
+ }
+ 
+ function renderImportForm(surface: WorkbenchKnowledgeSurface, kind: SpaceImportKind) {
+   switch (kind) {
+-    case "file":
+-      return renderFileForm(surface);
+     case "note":
+       return renderNoteForm(surface);
+     case "url":
+       return renderUrlForm(surface);
+-    case "dataset":
+-      return renderDatasetForm(surface);
+     case "localFolder":
+-    case "vaultSync":
+-      // Stale vaultSync kind falls back to the local-folder form (Vault entry TBD).
+       return renderLocalFolderForm(surface);
+-    case "gitRepo":
+-    case "cloudDrive":
+-    case "mailAttachment":
+-      return renderPassiveConnectorImportForm(surface, kind);
+     case "active":
+       return renderActiveSourceBindPanel(surface);
+     default:
+@@ -339,9 +318,7 @@ export function renderKnowledgeUniverseSpaceImportPage(surface: WorkbenchKnowled
+     (surface.libraryWorkspaceImportLockSpace
+       ? t("frontstage.workbench.knowledgeUniverse.libraryWorkspace.treeSectionPersonal")
+       : t("frontstage.workbench.knowledgeUniverse.libraryWorkspace.defaultTitle"));
+-  // Default to the first channel. A stale vaultSync kind falls back to the 本地文件夹 tab.
+-  const activeKind = surface.libraryWorkspaceImportKind ?? SPACE_IMPORT_TAB_KINDS[0];
+-  const activeTab: SpaceImportKind = activeKind === "vaultSync" ? "localFolder" : activeKind;
++  const activeTab = surface.libraryWorkspaceImportKind ?? SPACE_IMPORT_TAB_KINDS[0];
+ 
+   return html`
+     <div class="ku-space-import__page" data-testid="ku-space-import-page">

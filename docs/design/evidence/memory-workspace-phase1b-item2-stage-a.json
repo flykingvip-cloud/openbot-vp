@@ -1,0 +1,1177 @@
+{
+  "schema": "memory-workspace-phase1b-item2-stage-a/v1",
+  "item": 2,
+  "stage": "A",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "productionCatalogWrite": "none",
+  "phase0Candidate": {
+    "path": "docs/design/evidence/memory-workspace-phase0-20260814.catalog-candidate.json",
+    "isCatalogSot": false,
+    "candidateCount": 156
+  },
+  "catalogContract": {
+    "writable": false,
+    "persistentCatalogCoverage": "0%",
+    "persistentGovernanceCatalogExists": false
+  },
+  "authorityExtract": {
+    "status": "present",
+    "path": "docs/design/evidence/memory-workspace-phase1b-authority-candidate.json",
+    "candidateCount": 5,
+    "note": "Authority-sourced candidate is present for shadow-compare only"
+  },
+  "shadowCompare": {
+    "inventoryOnly": 156,
+    "authorityOnly": 5,
+    "matched": 0
+  },
+  "quarantineLedger": {
+    "count": 144,
+    "rows": [
+      {
+        "candidateId": "root-001",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:main",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-002",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-2ee4d26ab9a1",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-003",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-b92962ca395d",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-004",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-6a95675a6697",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-005",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-acfe9790c394",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-006",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-65cfa47ac23f",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-007",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-244a764a8ebc",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-008",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-f9f502e204b3",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-009",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-003f019e11a2",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-010",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-44fc12d31e44",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-011",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-70938575096a",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-012",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:attestations",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-013",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:bot--agent",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-014",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:bot-2",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-015",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:bot-skill",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-016",
+        "resourceId": "ws:host:unknown:host-root-has-no-enterprise:panda",
+        "workspaceKind": "agent_primary",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-017",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-63ca570182fa:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-018",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-5c46df270cf2:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-019",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c22c6e2cea1d:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-020",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-021",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:no-enterprise-match:bot--agent",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-022",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:no-enterprise-match:bot-2",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-023",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:no-enterprise-match:bot-skill",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-025",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-98ecff30601a:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-026",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-100f550bd4c2:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-027",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1784875c93f4:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-028",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1883cf24b221:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-029",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-89a87973e5e1:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-030",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-d9c6cbd0c299:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-031",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e2f6367b3bee:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-032",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ed79a6508258:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-034",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b9619540e55:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-035",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-255003e50109:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-036",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1a39f9f89ce6:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-037",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-3b52291e0bce:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-038",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-76b6b8f4500d:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-039",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-300478609ae9:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-040",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-042",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:no-enterprise-match:bot--agent",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-043",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:no-enterprise-match:bot-2",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-044",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:no-enterprise-match:bot-skill",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-046",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c7ac87fe2a93:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-047",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-6624f6ac8091:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-048",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b1f927892b41:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-049",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ca6ccbc5c086:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-050",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc7a06384635:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-051",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-054",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:unknown:no-enterprise-match:slug-44fc12d31e44",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-056",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-060",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-09ae9eb536fb:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-061",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc0601a3edc7:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-062",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-3b7454f3d27e:unknown:no-enterprise-match:slug-d855e9277ab0",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-063",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-178e7f61a4d6:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-064",
+        "resourceId": "ws:tenant-dfaa674f90d7:user:user-e3bdd1fb7a46:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-065",
+        "resourceId": "ws:tenant-dca394f41bc9:user:user-c399f7e43cf4:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-066",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-067",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:slug-214249b569eb",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-068",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:slug-2d75473131c5",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-069",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:bot-2",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-070",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:pm-mentor",
+        "workspaceKind": "agent_primary",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-071",
+        "resourceId": "ws:tenant-0e66013a0f87:user:user-3a892c890ac3:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-072",
+        "resourceId": "ws:tenant-faea3c1136af:user:user-229e3b011410:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-073",
+        "resourceId": "ws:tenant-179567283d83:user:user-9b7af8fe72d8:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-074",
+        "resourceId": "ws:tenant-179567283d83:user:user-fb2f8208f71f:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-075",
+        "resourceId": "ws:tenant-179567283d83:user:user-27179a700bad:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-076",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-5a42c030930f:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-077",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-34c634ea71c5:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-079",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-2be28b4e397f:unknown:flat-l2-not-asset-scoped:main",
+        "workspaceKind": "employee_private",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-081",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-63ca570182fa:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-082",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-5c46df270cf2:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-083",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c22c6e2cea1d:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-084",
+        "resourceId": "ws:tenant-179567283d83:user:user-9b7af8fe72d8:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-085",
+        "resourceId": "ws:tenant-179567283d83:user:user-fb2f8208f71f:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-086",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-087",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-98ecff30601a:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-088",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-100f550bd4c2:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-089",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1784875c93f4:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-090",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1883cf24b221:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-091",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-89a87973e5e1:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-092",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7d5ba21c6db1:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-093",
+        "resourceId": "ws:host:user:user-6e58b8e43a7a:unknown:employee-steward-missing-tenant",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-094",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-d9c6cbd0c299:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-095",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e2f6367b3bee:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-096",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ed79a6508258:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-097",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b9619540e55:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-098",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-255003e50109:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-099",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-5a42c030930f:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-100",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1a39f9f89ce6:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-101",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-3b52291e0bce:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-102",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-76b6b8f4500d:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-103",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-300478609ae9:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-104",
+        "resourceId": "ws:tenant-0e66013a0f87:user:user-3a892c890ac3:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-105",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-106",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-7f4337913543:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-107",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c7ac87fe2a93:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-108",
+        "resourceId": "ws:tenant-179567283d83:user:user-27179a700bad:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-109",
+        "resourceId": "ws:tenant-dfaa674f90d7:user:user-e3bdd1fb7a46:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-110",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-6624f6ac8091:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-111",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-54dce03df328:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-112",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b1f927892b41:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-113",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ca6ccbc5c086:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-114",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-34c634ea71c5:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-115",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc7a06384635:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-116",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-117",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-118",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-09ae9eb536fb:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-119",
+        "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-120",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-2be28b4e397f:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-121",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-2ac9502ab8ee:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-122",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc0601a3edc7:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-123",
+        "resourceId": "ws:tenant-dca394f41bc9:user:user-c399f7e43cf4:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-124",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-178e7f61a4d6:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-125",
+        "resourceId": "ws:tenant-faea3c1136af:user:user-229e3b011410:pending:unique-user-dir",
+        "workspaceKind": "employee_private",
+        "classification": "unknown",
+        "reason": "pending_authority"
+      },
+      {
+        "candidateId": "root-126",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-787c3944c3bc",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-127",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-f823d5252fb4",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-128",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-7c74307f2976",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-129",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-27ef833b074f",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-130",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-bed7d1a65519",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-131",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-6d22f5049f62",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-132",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-580ab4050624",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-133",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-370ac1b015fa",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-134",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-51ceb72bc1d4",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-135",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-787c3944c3bc",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-136",
+        "resourceId": "ws:host:unknown:group-missing-authoritative-tenant:slug-42934fd018bb",
+        "workspaceKind": "group_shared",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-137",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-e3c43a5a2889",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-138",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-f7613c96fac5",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-139",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-203277a76c89",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-140",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-ce0c8312700b",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-141",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-f823d5252fb4",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-142",
+        "resourceId": "ws:host:unknown:group-missing-authoritative-tenant:slug-7c2d1295fef6",
+        "workspaceKind": "group_shared",
+        "classification": "unknown",
+        "reason": "unknown"
+      },
+      {
+        "candidateId": "root-143",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-7c74307f2976",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-144",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-27ef833b074f",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-145",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-bed7d1a65519",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-146",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-6d22f5049f62",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-147",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-580ab4050624",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-148",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-787c3944c3bc",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-149",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-370ac1b015fa",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-150",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-51ceb72bc1d4",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-151",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-e3c43a5a2889",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-152",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-f7613c96fac5",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-153",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-203277a76c89",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-154",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-ce0c8312700b",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-155",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-f823d5252fb4",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      },
+      {
+        "candidateId": "root-156",
+        "resourceId": "ws:host:unknown:group-root-overlap:slug-7c74307f2976",
+        "workspaceKind": "group_shared",
+        "classification": "conflict",
+        "reason": "conflict"
+      }
+    ]
+  },
+  "classifiedInventoryOnly": {
+    "count": 12,
+    "note": "Inventory classification is not Catalog admission",
+    "rows": [
+      {
+        "candidateId": "root-024",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:asset:asset-c5daccd7846d",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-033",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ed79a6508258:asset:asset-383f60ee24f2",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-041",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:asset:asset-b039fe454fbe",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-045",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:asset:asset-c5daccd7846d",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-052",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:asset:asset-e98e855ffd4d",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-053",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:asset:asset-a680b39926ce",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-055",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:asset:asset-bc1ab6087f5a",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-057",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:asset:asset-b039fe454fbe",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-058",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:asset:asset-8d8ed06aacf2",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-059",
+        "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:asset:asset-9824cd636c02",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-078",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-34c634ea71c5:asset:asset-206870529e5f",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      },
+      {
+        "candidateId": "root-080",
+        "resourceId": "ws:tenant-b3c75f010b2f:user:user-2be28b4e397f:asset:asset-2fcddd078c4f",
+        "workspaceKind": "agent_primary",
+        "classification": "classified",
+        "reason": "classified_inventory_only"
+      }
+    ]
+  },
+  "persistentCatalog": {
+    "exists": false,
+    "path": null,
+    "recordCount": 0,
+    "workspaceRecordCount": 0,
+    "resourceIds": []
+  },
+  "gates": {
+    "employee_private": {
+      "required": "100% Catalog records",
+      "inventoried": 85,
+      "persistentCatalog": 0,
+      "gate": "fail"
+    },
+    "agent_primary": {
+      "required": "100% exact agentAssetId",
+      "inventoried": 40,
+      "classifiedExactInventory": 12,
+      "persistentCatalog": 0,
+      "gate": "fail"
+    },
+    "group_shared": {
+      "required": "100% tenant-scoped group binding",
+      "inventoried": 31,
+      "persistentCatalog": 0,
+      "gate": "fail"
+    },
+    "conflict_or_unknown": {
+      "required": "100% write-blocked and listed",
+      "listed": 144,
+      "blockedInProduction": false,
+      "gate": "fail"
+    }
+  },
+  "item2": "not-met",
+  "explicitlyForbidden": [
+    "Catalog SoT write from Phase 0 inventory",
+    "resolver write switch",
+    "memory schema v2",
+    "Catalog miss=deny",
+    "LIVE migration",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "memory-workspace-phase1b-item7-rollback-quarantine/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-rollback-quarantine-2026-08-20.json",
+  "kind": "item7-evidence-preparation",
+  "mode": "rollback-quarantine-proof",
+  "preparedBy": "cursor-data-governance",
+  "preparedAt": "2026-08-20T03:35:00.000Z",
+  "baselineSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "citedUserBaseline": "69e9bf8c63ded61badf59fe0a6c7bc77166b39a1",
+  "item": 7,
+  "status": "not-met",
+  "designOnly": true,
+  "enabled": false,
+  "executed": false,
+  "productionWriteWatchIndex": 38,
+  "rollback": {
+    "requiredThisPacket": false,
+    "reason": "no retirement executed; freeze baseline 38 kept; live sites kept",
+    "restoreFromGit": true,
+    "liftTombstone": true,
+    "rewriteFreezeBaselineToZero": false,
+    "restoreDeletedCallSites": "not-applicable-none-deleted"
+  },
+  "quarantine": {
+    "unknownConflictQuarantine": "residual-not-normal-no-rewrite",
+    "residualOpaqueRecords": 9,
+    "quarantineNormalWrites": 0,
+    "unresolvedUnknown": false,
+    "unresolvedConflict": false,
+    "unresolvedQuarantineNormalWrites": false
+  },
+  "phase1bUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "note": "Rollback/quarantine proof for evidence-preparation only. Residual opaque records stay hashed quarantine and are not rewritten into the normal Catalog. No rollback was exercised because nothing was retired."
+}

@@ -1,0 +1,74 @@
+# Observed 2026-09-18 on https://www.openbot.love/ after a real employee login.
+# Gateway was connected. Sidebar was already expanded.
+# Do not invent buttons that are not in this file.
+
+scenario:
+  name: employee_workbench_shell
+  title: 员工工作台登录与外壳
+  trigger:
+    - 登录
+    - 工作台
+    - 侧栏
+    - 每日概览
+    - 找不到菜单
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: entry
+    title: 进入员工工作台
+  - id: shell
+    title: 识别已登录外壳
+
+steps:
+  - id: open_entry
+    stage: entry
+    risk: low
+    instruction: "打开 https://www.openbot.love/ 。不要打开企业登录，也不要打开本机 18789 控制台来代替员工工作台。"
+    visual_anchor: 标题「面向团队的 AI 工作台」，或已登录后的「每日概览」
+    success_signal: 用户看到登录卡片，或已经在已登录工作台里
+    branches:
+      - when: 看到注册/登录卡片
+        next: switch_login
+      - when: 已经看到每日概览或左侧菜单
+        next: expand_sidebar
+
+  - id: switch_login
+    stage: entry
+    risk: low
+    instruction: 右侧卡片默认是「注册」。点上方「登录」，或点「去登录 →」。
+    visual_anchor: 卡片上的「登录」
+    success_signal: 出现邮箱和登录密码两个框
+    on_fail: 若仍是「用户名称 / 注册邮箱 / 邀请码核验」，说明还在注册页，再点一次「登录」。
+
+  - id: fill_login
+    stage: entry
+    risk: medium
+    confirmation: true
+    instruction: 在「邮箱」填账号（占位是 name@company.com），在「登录密码」填写密码（提示至少 8 位），再点橙色「登录」。密码不要发到对话里。
+    visual_anchor: 「忘记密码？」和「登录遇到问题？」在登录按钮下方
+    success_signal: 进入已登录工作台，或出现明确报错
+    on_fail: 登录按钮是灰的，说明邮箱或密码还没填。不要猜测验证码；本页登录表单没有验证码框。
+
+  - id: expand_sidebar
+    stage: shell
+    risk: low
+    instruction: 若左侧只有一列图标，点左上「展开侧边栏」。已登录时侧栏常常已经展开。展开后应看到「AI 助手」「协作空间」，以及下面的「我的任务」「知识宇宙」「系统设置」。「AI 助手」标题右侧可以有「+」（添加机器人）；满 4 个自建助手后这个加号会消失。
+    visual_anchor: 「展开侧边栏」或已展开的「AI 助手」
+    success_signal: 用户能读出这五个名字
+    branches:
+      - when: 侧栏已展开
+        next: confirm_home
+
+  - id: confirm_home
+    stage: shell
+    risk: low
+    instruction: "默认主舞台标题是「每日概览」。右上有「语言」「主题」和头像按钮。头像菜单只有「个人设置」和「退出登录」。下面有「日程管理」和「待办事项」，里面可以有真实条目，不要说成空的。对话区抬头随当前对象变化，例如「TO: 大白管家」或某个协作空间名。"
+    visual_anchor: 「每日概览」
+    success_signal: 用户确认看到每日概览，或说明当前其实在别的模块
+    on_fail: "只有横幅写「已断开与网关的连接。」时，才说网关未连接。已登录且网关正常时，输入框可用，不要套用「请先连接网关后再开始聊天…」。"
+
+fallback:
+  - check: old_names
+    instruction: 不要说「深色侧栏」「机器人管理」「技能管理」「返回控制台」。当前员工工作台没有这些入口。

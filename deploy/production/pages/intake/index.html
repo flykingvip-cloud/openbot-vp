@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>企业信息系统接入资料提报 · OpenBot</title>
+    <style>
+      :root {
+        --bg: #f6f8fb;
+        --card: #fff;
+        --ink: #0e1a2b;
+        --sub: #4b5c72;
+        --line: #e3e8f0;
+        --navy: #123a7a;
+        --blue: #2563eb;
+        --fill: #f3f6fa;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+      .page {
+        max-width: 880px;
+        margin: 0 auto;
+        padding: 18px 16px 64px;
+      }
+      header.hero {
+        background: linear-gradient(135deg, #123a7a, #2563eb);
+        color: #fff;
+        border-radius: 18px;
+        padding: 22px;
+        margin-bottom: 16px;
+      }
+      header.hero h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+      }
+      header.hero p {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.92;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+        margin-bottom: 14px;
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--sub);
+      }
+      label.wide {
+        grid-column: 1 / -1;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: var(--fill);
+        border-radius: 10px;
+        padding: 9px 10px;
+        color: var(--ink);
+        font: 14px/1.4 inherit;
+      }
+      textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+      .rules {
+        margin: 8px 0 0;
+        padding-left: 1.2em;
+        font-size: 13px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 4px;
+      }
+      th {
+        background: var(--fill);
+        text-align: left;
+      }
+      td input {
+        padding: 6px;
+      }
+      .btn {
+        border: none;
+        border-radius: 10px;
+        padding: 10px 16px;
+        font-weight: 700;
+        cursor: pointer;
+        color: #fff;
+        background: linear-gradient(135deg, var(--navy), var(--blue));
+      }
+      .btn.ghost {
+        background: #fff;
+        color: var(--navy);
+        border: 1px solid var(--line);
+      }
+      .row-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+        flex-wrap: wrap;
+      }
+      .note {
+        font-size: 13px;
+        color: var(--sub);
+        min-height: 1.2em;
+      }
+      .check {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 8px;
+        color: var(--ink);
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      @media (max-width: 720px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <h1>企业信息系统接入资料提报</h1>
+        <p>
+          填写后直接提交到
+          OpenBot。实施人员在管理页查看。令牌和密码不要写在本页，请经安全渠道另行交付。
+        </p>
+      </header>
+      <section class="card">
+        <h2>可受理的接入方式</h2>
+        <ol class="rules">
+          <li>
+            只读 HTTP：GET，响应为 JSON。鉴权为 Bearer、Basic、自定义请求头、URL
+            查询参数，或无鉴权，并提供返回成功的健康检查路径。
+          </li>
+          <li>只读数据库：PostgreSQL 或 MySQL，只读账号，仅 SELECT。</li>
+          <li>SAP S/4HANA：网关地址，以及技术用户或访问令牌，并确认 API_SALES_ORDER_SRV。</li>
+          <li>Salesforce：实例地址和 OAuth 访问令牌的交付方式。</li>
+        </ol>
+      </section>
+      <form id="intake">
+        <section class="card">
+          <h2>提报方</h2>
+          <div class="grid">
+            <label>企业名称<input name="enterpriseName" required /></label>
+            <label>统一社会信用代码<input name="enterpriseCode" /></label>
+            <label>信息化联系人<input name="enterpriseContact" required /></label>
+            <label>职务<input name="enterpriseTitle" /></label>
+            <label>电话<input name="enterprisePhone" required /></label>
+            <label>邮箱<input name="enterpriseEmail" type="email" required /></label>
+            <label class="wide"
+              >填写人身份
+              <select name="submitterRole">
+                <option value="enterprise">应用企业本人填写</option>
+                <option value="vendor">第三方供应商受企业授权填写</option>
+              </select>
+            </label>
+            <label>供应商名称<input name="vendorName" /></label>
+            <label>供应商联系人<input name="vendorContact" /></label>
+            <label>供应商电话<input name="vendorPhone" /></label>
+            <label>供应商邮箱<input name="vendorEmail" type="email" /></label>
+          </div>
+        </section>
+        <div id="systems"></div>
+        <section class="card">
+          <h2>确认</h2>
+          <label class="check"
+            ><input type="checkbox" name="declareReadonly" required />
+            所提报接口或数据库账号仅用于只读取数。</label
+          >
+          <label class="check"
+            ><input type="checkbox" name="declareNoSecret" required />
+            本页未填写令牌、密码或密钥原文。</label
+          >
+          <label class="check"
+            ><input type="checkbox" name="declareAuthorized" required />
+            填写人已获应用企业授权。</label
+          >
+          <div class="grid" style="margin-top: 12px">
+            <label>填写人签字<input name="signName" required /></label>
+            <label>填写日期<input name="signDate" required /></label>
+          </div>
+          <div class="row-actions">
+            <button class="btn ghost" type="button" id="add-system">增加一个系统</button>
+            <button class="btn" type="submit">提交到 OpenBot</button>
+          </div>
+          <p class="note" id="status"></p>
+        </section>
+      </form>
+    </div>
+    <template id="system-template">
+      <section class="card system">
+        <h2 class="system-title">系统</h2>
+        <div class="grid">
+          <label
+            >系统类别
+            <select data-field="category">
+              <option value="marketing">营销</option>
+              <option value="hr">人力资源</option>
+              <option value="finance">财务</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label
+            >系统名称<input data-field="systemName" required placeholder="例如：门店会员营销平台"
+          /></label>
+          <label>产品与版本<input data-field="productVersion" /></label>
+          <label
+            >部署形态
+            <select data-field="deployment">
+              <option value="saas">公有云</option>
+              <option value="private">私有化</option>
+            </select>
+          </label>
+          <label class="wide"
+            >测试环境根地址<input data-field="testBaseUrl" placeholder="https://test.example.com"
+          /></label>
+          <label class="wide">生产环境根地址<input data-field="prodBaseUrl" /></label>
+          <label class="wide"
+            >访问方式
+            <select data-field="network">
+              <option value="public">公网可直接访问</option>
+              <option value="allowlist">需要 IP 白名单</option>
+              <option value="private-link">需要专线或专有网络</option>
+            </select>
+          </label>
+          <label class="wide">网络对接联系人<input data-field="networkContact" /></label>
+          <label class="wide"
+            >接入方式
+            <select data-field="accessMode">
+              <option value="http">只读 HTTP GET（JSON）</option>
+              <option value="database">只读 PostgreSQL 或 MySQL</option>
+              <option value="sap">SAP S/4HANA</option>
+              <option value="salesforce">Salesforce</option>
+              <option value="unavailable">目前无法按以上方式提供</option>
+            </select>
+          </label>
+        </div>
+        <div class="panel" data-panel="http">
+          <div class="grid" style="margin-top: 12px">
+            <label
+              >鉴权方式
+              <select data-field="authScheme">
+                <option value="bearer">Bearer 令牌</option>
+                <option value="basic">Basic</option>
+                <option value="header">自定义请求头</option>
+                <option value="query">URL 查询参数</option>
+                <option value="none">无鉴权</option>
+              </select>
+            </label>
+            <label>请求头名称或参数名<input data-field="authName" /></label>
+            <label>令牌有效期与更换方式<input data-field="tokenRotation" /></label>
+            <label>健康检查路径<input data-field="probePath" placeholder="/health" /></label>
+            <label class="wide">频率限制、单次条数、超时<input data-field="limits" /></label>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>业务对象</th>
+                <th>GET 路径</th>
+                <th>查询参数</th>
+                <th>主键</th>
+                <th>更新时间</th>
+                <th>敏感字段</th>
+              </tr>
+            </thead>
+            <tbody data-rows="endpoints"></tbody>
+          </table>
+          <div class="row-actions">
+            <button class="btn ghost add-row" type="button">增加一行对象</button>
+          </div>
+          <label>成功响应样例或附件名<textarea data-field="sampleJson"></textarea></label>
+        </div>
+        <div class="panel" data-panel="database">
+          <div class="grid" style="margin-top: 12px">
+            <label
+              >数据库类型
+              <select data-field="dbKind">
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+              </select>
+            </label>
+            <label>主机<input data-field="dbHost" /></label>
+            <label>端口<input data-field="dbPort" /></label>
+            <label>库名<input data-field="dbName" /></label>
+            <label class="wide">只读账号名称（密码另行交付）<input data-field="dbUser" /></label>
+            <label class="wide"
+              >表或视图、主键、更新时间、敏感字段<textarea data-field="dbObjects"></textarea>
+            </label>
+          </div>
+        </div>
+        <div class="panel" data-panel="sap">
+          <div class="grid" style="margin-top: 12px">
+            <label class="wide">网关地址<input data-field="sapGateway" /></label>
+            <label
+              >认证方式
+              <select data-field="sapAuth">
+                <option value="basic">技术用户 Basic</option>
+                <option value="bearer">访问令牌</option>
+              </select>
+            </label>
+            <label
+              >API_SALES_ORDER_SRV
+              <select data-field="sapOrderService">
+                <option value="unknown">待确认</option>
+                <option value="yes">已开放</option>
+                <option value="no">未开放</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="panel" data-panel="salesforce">
+          <div class="grid" style="margin-top: 12px">
+            <label class="wide">实例地址<input data-field="sfInstance" /></label>
+            <label class="wide"
+              >令牌交付方式（不要粘贴令牌）<input data-field="sfTokenDelivery"
+            /></label>
+          </div>
+        </div>
+        <div class="panel" data-panel="unavailable">
+          <label>现有提供方式<textarea data-field="unavailableNote"></textarea></label>
+        </div>
+        <div class="grid" style="margin-top: 12px">
+          <label class="wide"
+            >数据能否离开企业网络
+            <select data-field="egress">
+              <option value="yes">可以</option>
+              <option value="restricted">可以，但有字段或网络限制</option>
+              <option value="no">不可以</option>
+            </select>
+          </label>
+          <label>凭证发放责任人<input data-field="credentialOwner" /></label>
+          <label>故障联系人<input data-field="incidentOwner" /></label>
+          <label class="wide">变更通知方式<input data-field="changeNotice" /></label>
+        </div>
+        <div class="row-actions">
+          <button class="btn ghost remove-system" type="button">删除此系统</button>
+        </div>
+      </section>
+    </template>
+    <script>
+      const systemsEl = document.querySelector("#systems");
+      const template = document.querySelector("#system-template");
+      const statusEl = document.querySelector("#status");
+      const titles = {
+        marketing: "营销系统",
+        hr: "人力资源系统",
+        finance: "财务系统",
+        other: "其他系统",
+      };
+
+      function addEndpointRow(tbody) {
+        const row = document.createElement("tr");
+        for (const field of [
+          "objectName",
+          "path",
+          "query",
+          "primaryKey",
+          "updatedAtField",
+          "sensitiveFields",
+        ]) {
+          const cell = document.createElement("td");
+          const input = document.createElement("input");
+          input.dataset.col = field;
+          cell.append(input);
+          row.append(cell);
+        }
+        tbody.append(row);
+      }
+
+      function syncPanels(block) {
+        const mode = block.querySelector('[data-field="accessMode"]').value;
+        for (const panel of block.querySelectorAll(".panel")) {
+          const active = panel.dataset.panel === mode;
+          panel.hidden = !active;
+          for (const field of panel.querySelectorAll("input, select, textarea"))
+            field.disabled = !active;
+        }
+      }
+
+      function addSystem(category) {
+        const block = template.content.cloneNode(true).querySelector(".system");
+        systemsEl.append(block);
+        const categoryField = block.querySelector('[data-field="category"]');
+        categoryField.value = category;
+        const retitle = () => {
+          block.querySelector(".system-title").textContent = titles[categoryField.value] || "系统";
+        };
+        categoryField.addEventListener("change", retitle);
+        retitle();
+        block
+          .querySelector('[data-field="accessMode"]')
+          .addEventListener("change", () => syncPanels(block));
+        block.querySelector(".add-row").addEventListener("click", () => {
+          addEndpointRow(block.querySelector('[data-rows="endpoints"]'));
+        });
+        block.querySelector(".remove-system").addEventListener("click", () => {
+          if (systemsEl.children.length === 1) {
+            statusEl.textContent = "至少保留一个系统。";
+            return;
+          }
+          block.remove();
+        });
+        addEndpointRow(block.querySelector('[data-rows="endpoints"]'));
+        syncPanels(block);
+      }
+
+      function payload() {
+        const form = document.querySelector("#intake");
+        const data = {};
+        for (const element of form.querySelectorAll("input[name], select[name]")) {
+          if (element.type === "checkbox") continue;
+          data[element.name] = element.value.trim();
+        }
+        data.systems = [...systemsEl.querySelectorAll(".system")].map((block) => {
+          const system = {};
+          for (const field of block.querySelectorAll("[data-field]")) {
+            if (field.disabled) continue;
+            system[field.dataset.field] = field.value.trim();
+          }
+          const panel = block.querySelector('[data-rows="endpoints"]')?.closest(".panel");
+          system.endpoints = panel?.hidden
+            ? []
+            : [...block.querySelectorAll('[data-rows="endpoints"] tr')]
+                .map((row) => {
+                  const endpoint = {};
+                  for (const input of row.querySelectorAll("[data-col]")) {
+                    endpoint[input.dataset.col] = input.value.trim();
+                  }
+                  return endpoint;
+                })
+                .filter((endpoint) => Object.values(endpoint).some(Boolean));
+          return system;
+        });
+        return data;
+      }
+
+      document.querySelector("#add-system").addEventListener("click", () => addSystem("other"));
+      document.querySelector("#intake").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        if (!form.reportValidity()) return;
+        const body = payload();
+        if (body.submitterRole === "vendor" && !body.vendorName) {
+          statusEl.textContent = "供应商填写时，请写明供应商名称。";
+          return;
+        }
+        statusEl.textContent = "正在提交…";
+        try {
+          const res = await fetch("/intake/api/submissions", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "提交失败");
+          statusEl.textContent = "已提交。提报编号 " + data.id + "。凭证请经安全渠道另行交付。";
+          form.querySelector("button[type=submit]").disabled = true;
+        } catch (err) {
+          statusEl.textContent = err.message || "提交失败，请稍后重试。";
+        }
+      });
+      addSystem("marketing");
+      addSystem("hr");
+      addSystem("finance");
+      document.querySelector('[name="signDate"]').value = new Date().toISOString().slice(0, 10);
+    </script>
+  </body>
+</html>

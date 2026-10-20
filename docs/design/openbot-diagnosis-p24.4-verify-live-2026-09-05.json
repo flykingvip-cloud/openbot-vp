@@ -1,0 +1,99 @@
+{
+  "increment": "P24.4",
+  "schemaVersion": 1,
+  "kind": "post_cutover_verify_live",
+  "passed": true,
+  "darkShipVerified": true,
+  "signedOff": false,
+  "diagnosisOnlyCutover": false,
+  "cutoverOwner": "delivery",
+  "gatesOpened": false,
+  "daibaiConnected": false,
+  "liveConversationBound": false,
+  "remediationEnabled": false,
+  "livePackRegistered": false,
+  "coreGatewayHasDiagnosisMethods": false,
+  "p22Reusable": false,
+  "p22Invalidated": true,
+  "p22RequiresResign": true,
+  "p25Started": false,
+  "p26ProductionReady": false,
+  "diagnosisPlatformComplete": false,
+  "publishedWindowSha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+  "originMainTipSha": "08cbb0681f085397a033a6b7746b20d10cbfb212",
+  "forbiddenOldCandidate": "bf81b0ffcb401d26640afc65ee85134812f651ea",
+  "live": {
+    "sha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+    "source": "container",
+    "version": "2026.7.12-rc.2",
+    "builtAt": "2026-09-05T11:59:04.381Z",
+    "image": "localhost/openbot:rc-amd64-provenance-7d3fdf5bfe",
+    "digest": "sha256:db7b64563e591e0887915f2d9bbef2cb8130e77f5940ac7dcbb5dd817ffd044c",
+    "ociRevision": "7d3fdf5bfef57077f7956ccab07c3c960984331b"
+  },
+  "ancestry": {
+    "liveIsAncestorOfPublishedWindow": true,
+    "liveIsAncestorOfOriginMain": true,
+    "doNotCutoverToCurrentTip": true
+  },
+  "checks": {
+    "buildInfoCommit": true,
+    "healthz": true,
+    "readyz": true,
+    "gatewayUiSameIdentity": true,
+    "r9LiveImageIdentity": true,
+    "trunkSotLedgerReleaseProvenanceConsistent": true,
+    "rollbackImagePresent": true,
+    "safetySnapshotPresent": true,
+    "fourGatesFalse": true,
+    "noDiagnosisLivePack": true,
+    "noCoreDiagnosisReportHandlers": true,
+    "daibaiDisconnected": true,
+    "liveConversationDisconnected": true,
+    "remediationDisconnected": true,
+    "noDiagnosisEnvFlags": true,
+    "p22ExactMatchOnly": true
+  },
+  "healthz": { "http": 200, "body": { "ok": true, "status": "live" } },
+  "readyz": { "ready": true, "failing": [] },
+  "controlUiEntry": "index-Ch6EMLgY.js",
+  "gates": {
+    "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED": false,
+    "DIAGNOSIS_REPORT_API_DEPLOYED": false,
+    "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED": false,
+    "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED": false
+  },
+  "p22": {
+    "signedCandidateSha": "2156a529d64cbf04bdbf2ce32f2db9f903d46460",
+    "signedLiveSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "currentCandidateSha": "08cbb0681f085397a033a6b7746b20d10cbfb212",
+    "currentLiveSha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+    "exactMatchRequired": true,
+    "ancestorReuseRejected": true
+  },
+  "ledger": {
+    "source": "origin/main",
+    "openSeq": 64,
+    "closedSeq": 63,
+    "tag": "provenance/sha-7d3fdf5bfef5",
+    "liveVerified": true,
+    "liveFrom": "2026-09-05T12:08:51Z",
+    "gatewaySha": "7d3fdf5bfef57077f7956ccab07c3c960984331b"
+  },
+  "provenancePeeled": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+  "rollback": {
+    "container": "openbot-gateway-rc-prev-04690f8d2e-safety",
+    "status": "exited",
+    "image": "localhost/openbot:rc-amd64-provenance-04690f8d2e",
+    "digest": "sha256:f9775147138b1f8d733c95c2e708ddc00b26d88a74af534b49274526b22da4f1"
+  },
+  "recordedAt": "2026-09-05T12:08:51Z",
+  "reobservedAt": "2026-09-05T14:32:00Z",
+  "gatesRerun": {
+    "forwardOnly": "allow",
+    "deliveryAlignment": "PASS=3 WARN=3 FAIL=0",
+    "productionPreflight": "no-go",
+    "trunkConvergenceIdentityConsistent": true
+  },
+  "note": "P24.4 post-cutover re-eval. Official --verify-live / R9 PASS against published window 7d3fdf5b. origin/main tip 08cbb068 is later paperwork/UI; do not cut over to it. P22 invalidated because candidate and LIVE both changed. Diagnosis dark ship only. Waiting for per-gate independent approval. Do not open gates or start P25."
+}

@@ -1,0 +1,175 @@
+{
+  "schema": "chat-inbound-depth-production-evidence-pack/v1",
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "capturedAt": "2026-08-20T13:21:00+08:00",
+  "worktree": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "originMainSha": "d650a3fafa59192bef7823357d74eeca648e6ecf",
+  "liveSource": "SSH root@8.217.93.71 podman exec openbot-gateway-rc cat /app/dist/build-info.json",
+  "ownerConstraints": {
+    "fullDist": "rejected",
+    "switchLiveAgain": "rejected",
+    "enableAnyProductionFlag": "rejected",
+    "mintProvenanceSha394c9170c651": "rejected"
+  },
+  "auditorBlockersVsFacts": {
+    "deliveryAlignmentNotPassed": {
+      "claimed": "delivery alignment 未通过",
+      "actual": "LIVE↔LIVE allow PASS=8 WARN=2 FAIL=0 against provenance/sha-aa348b38a14a",
+      "wrongTarget": "Do not require provenance/sha-394c9170c651; that SHA is not LIVE and is not approved"
+    },
+    "provenanceReleaseRecordLedgerSeq28Missing": {
+      "claimed": "provenance tag、RELEASE_RECORD、ledger seq 28 未补齐",
+      "actual": {
+        "seq28": "already published as previous LIVE 6ac338479a liveFrom=2026-08-19T16:28:00Z liveTo=2026-08-20T04:06:20Z tag=provenance/sha-6ac338479a16",
+        "seq29": "current LIVE aa348b38a14a liveFrom=2026-08-20T04:06:20Z tag=provenance/sha-aa348b38a14a",
+        "releaseRecord": "Latest cutover inbound-depth-main-r1 on origin/main via #552",
+        "provenance": ["provenance/sha-aa348b38a14a", "provenance/sha-6ac338479a16"]
+      }
+    },
+    "aeNotOnLive": {
+      "claimed": "A-E 尚未进入 LIVE",
+      "actual": "A-E strings present in /app/dist (compact-Bhtmq73u.js pi-embedded-Bh5GuUxN.js pi-embedded-DYYMByEc.js reply-Cbxy-h30.js); flags default-off"
+    },
+    "fiveFlagGrayNotRun": {
+      "claimed": "五阶段 flag 灰度未执行",
+      "actual": "correct; owner rejected canary. NO_INBOUND_FLAGS on LIVE. This is not a missing evidence item for full-dist approval — it is an explicit non-start."
+    },
+    "smokePerfQualityRollbackMergeBackMissing": {
+      "claimed": "smoke、性能/质量门、回滚演练和 merge-back 未完成",
+      "actual": {
+        "smoke": "healthz HTTP 200 {ok:true,status:live}; readyz HTTP 200 {ready:true,failing:[],uptimeMs:4433606} recaptured 2026-08-20T13:21+08:00",
+        "performance": "local classifier p99 0.002ms; production TTFT null — not claimed",
+        "quality": "unit categories covered; double-blind not run — not claimed",
+        "rollback": "backup re-verified present; restore not executed (owner: do not switch LIVE)",
+        "mergeBack": "104c3d5636bfc941998efbc47e641a8045895468 (#552) and d650a3fafa59192bef7823357d74eeca648e6ecf (#556) on origin/main"
+      }
+    }
+  },
+  "verifyDeliveryAlignment": {
+    "command": "./deploy/production/scripts/verify-delivery-alignment.sh --prod-sha aa348b38a14a69683bdc5a715ca48d2564a2542d --candidate-sha aa348b38a14a69683bdc5a715ca48d2564a2542d --candidate-tag provenance/sha-aa348b38a14a --prod-image-hint localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "exitCode": 0,
+    "verdict": "allow",
+    "pass": 8,
+    "warn": 2,
+    "fail": 0,
+    "liveSource": "container",
+    "warnings": [
+      "L3-local candidate image not present: openbot:rc-convergence-20260720",
+      "L3-local prod image not on this machine: localhost/openbot:ws-c-v1-root-guard-r1-20260815"
+    ],
+    "note": "WARN is laptop-local image absence. LIVE is a remote gateway-dist-keep-ui overlay, not a GHCR image. FAIL=0."
+  },
+  "verifyForwardOnly": {
+    "command": "./deploy/production/scripts/verify-forward-only.sh --candidate aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "exitCode": 0,
+    "verdict": "allow",
+    "live": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "liveSource": "container"
+  },
+  "checkSot": {
+    "command": "node --import tsx scripts/delivery/cli.ts check-sot --sot-ref origin/main",
+    "exitCode": 0,
+    "verdict": "allow",
+    "live": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "candidate": "d650a3fafa59192bef7823357d74eeca648e6ecf"
+  },
+  "provenance": {
+    "currentLive": {
+      "tag": "provenance/sha-aa348b38a14a",
+      "sha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+      "onOrigin": true
+    },
+    "previousLive": {
+      "tag": "provenance/sha-6ac338479a16",
+      "sha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+      "onOrigin": true
+    },
+    "rejected": {
+      "tag": "provenance/sha-394c9170c651",
+      "presentOnOrigin": false
+    }
+  },
+  "ledger": {
+    "releases": 29,
+    "errors": 0,
+    "warnings": 10,
+    "seq28": {
+      "gatewaySha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+      "tag": "provenance/sha-6ac338479a16",
+      "liveFrom": "2026-08-19T16:28:00Z",
+      "liveTo": "2026-08-20T04:06:20Z"
+    },
+    "seq29": {
+      "gatewaySha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+      "tag": "provenance/sha-aa348b38a14a",
+      "liveFrom": "2026-08-20T04:06:20Z",
+      "liveTo": null
+    }
+  },
+  "releaseRecord": {
+    "latestCutover": "inbound-depth-main-r1",
+    "path": "deploy/production/RELEASE_RECORD.md",
+    "publicationPr": "https://github.com/gmood2008/openbot/pull/552"
+  },
+  "live": {
+    "before": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "after": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "overlayId": "inbound-depth-main-r1",
+    "stamp": "20260820T040620Z",
+    "buildMode": "gateway-dist-keep-ui",
+    "image": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "aeOnLive": true,
+    "flags": []
+  },
+  "gray": {
+    "executed": false,
+    "reason": "owner rejected production flag enablement",
+    "flags": {
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY": false,
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW": false,
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER": false,
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY": false,
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY": false
+    },
+    "liveEnv": "NO_INBOUND_FLAGS",
+    "file": "docs/design/evidence/chat-inbound-depth-canary-gate-2026-08-20.json"
+  },
+  "rollback": {
+    "restored": false,
+    "reason": "owner: 不能切换 LIVE; restore would switch LIVE back to 6ac338479a",
+    "backupRecheckedAt": "2026-08-20T13:21:00+08:00",
+    "path": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/container-app-dist.before.tgz",
+    "bytes": 37897087,
+    "sha256": "584de339c95654fc05f93c09d3820201b23e9bc4e4ff93cdc5c100536a697913",
+    "beforeCommit": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "restartTool": "/usr/local/bin/openbot-gateway-restart",
+    "file": "docs/design/evidence/chat-inbound-depth-rollback-drill-2026-08-20.json"
+  },
+  "smoke": {
+    "healthz": { "http": 200, "body": { "ok": true, "status": "live" } },
+    "readyz": { "http": 200, "body": { "ready": true, "failing": [], "uptimeMs": 4433606 } }
+  },
+  "mergeBack": {
+    "seq29Publication": {
+      "pr": "https://github.com/gmood2008/openbot/pull/552",
+      "sha": "104c3d5636bfc941998efbc47e641a8045895468"
+    },
+    "ownerPack": {
+      "pr": "https://github.com/gmood2008/openbot/pull/556",
+      "sha": "d650a3fafa59192bef7823357d74eeca648e6ecf"
+    }
+  },
+  "ghcr": {
+    "used": false,
+    "imageForLiveSha": false
+  },
+  "verdict": {
+    "codeAE": "accepted",
+    "fullDist": "rejected",
+    "enableProductionFlags": "rejected",
+    "switchLive": "rejected",
+    "alignmentAgainstLiveTag": "allow"
+  }
+}

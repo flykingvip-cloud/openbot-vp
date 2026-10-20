@@ -1,0 +1,30 @@
+{
+  "name": "@openbot/constitutional-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "description": "In-monorepo scaffold for a proposed Conformance product boundary. Re-exports the shadow evaluator and the P8a path-gap report. Not independently deployable.",
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@openbot/constitutional-contracts": "workspace:*"
+  }
+}

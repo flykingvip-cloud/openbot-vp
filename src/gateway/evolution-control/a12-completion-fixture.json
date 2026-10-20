@@ -1,0 +1,54 @@
+{
+  "evidence": {
+    "tenantId": "001",
+    "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+    "surfaceId": "agent.working-dna",
+    "candidateVersion": "c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255",
+    "proposal": {
+      "proposalId": "evo:diag:8bee2c37b1f39478",
+      "status": "VERIFIED",
+      "tenantScope": "001",
+      "surfaceId": "agent.working-dna",
+      "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+      "target": { "domain": "agent", "agentId": "a8-m1-isolated" }
+    },
+    "experiment": {
+      "experimentId": "exp:cmd-a9-exp-down",
+      "proposalId": "evo:diag:8bee2c37b1f39478",
+      "surfaceId": "agent.working-dna",
+      "tenantScope": "001",
+      "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c"
+    },
+    "application": {
+      "applicationId": "app:cmd-a9-active-up",
+      "proposalId": "evo:diag:8bee2c37b1f39478",
+      "experimentId": "exp:cmd-a9-exp-down",
+      "status": "applied"
+    },
+    "verification": {
+      "verificationId": "ver:cmd-a9-verify-ok",
+      "applicationId": "app:cmd-a9-active-up",
+      "outcome": "improved",
+      "verifiedAt": "2026-09-22T09:00:00.000Z"
+    },
+    "recheck": {
+      "outcome": "RESOLVED",
+      "reasonCode": "sot_confirmed",
+      "findingRefs": ["c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255"],
+      "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+      "verificationRef": {
+        "schemaVersion": 1,
+        "proposalId": "evo:diag:8bee2c37b1f39478",
+        "experimentId": "exp:cmd-a9-exp-down",
+        "applicationId": "app:cmd-a9-active-up",
+        "verificationId": "ver:cmd-a9-verify-ok"
+      },
+      "observedEvidenceRefs": ["obs:recheck:style"]
+    },
+    "recheckRecordedAt": "2026-09-22T09:30:00.000Z",
+    "evaluation": { "action": "promote", "reasonCode": "evaluation_passed" },
+    "promotionEvents": [],
+    "authorityOk": true,
+    "guardrailDegraded": false
+  }
+}

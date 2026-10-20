@@ -1,0 +1,141 @@
+{
+  "CURRENT_SESSION_VERSION": 3,
+  "checks": [
+    {
+      "name": "CURRENT_SESSION_VERSION is 3",
+      "ok": true,
+      "detail": 3
+    },
+    {
+      "name": "header id preserved",
+      "ok": true,
+      "detail": "f8db4331-e7e9-49d5-8e84-6cbb819f89d0"
+    },
+    {
+      "name": "header cwd preserved",
+      "ok": true,
+      "detail": "/tmp/pi-sdk-v3-session/work/workspace-057"
+    },
+    {
+      "name": "header version preserved",
+      "ok": true,
+      "detail": 3
+    },
+    {
+      "name": "entry count 9",
+      "ok": true,
+      "detail": 9
+    },
+    {
+      "name": "entry types unchanged",
+      "ok": true,
+      "detail": "message,message,message,model_change,thinking_level_change,custom,custom_message,session_info,compaction"
+    },
+    {
+      "name": "user text preserved",
+      "ok": true,
+      "detail": "tenant-a secret payload"
+    },
+    {
+      "name": "assistant text preserved",
+      "ok": true,
+      "detail": "ack"
+    },
+    {
+      "name": "tool result preserved",
+      "ok": true,
+      "detail": "tenant-a secret payload"
+    },
+    {
+      "name": "custom tenant preserved",
+      "ok": true,
+      "detail": "{\"tenant\":\"tenant-a\",\"sessionKey\":\"agent:main:tenant-a\"}"
+    },
+    {
+      "name": "custom sessionKey preserved",
+      "ok": true,
+      "detail": "agent:main:tenant-a"
+    },
+    {
+      "name": "custom message preserved",
+      "ok": true,
+      "detail": "\"keep this custom message\""
+    },
+    {
+      "name": "session name preserved",
+      "ok": true,
+      "detail": "phase-a-v3"
+    },
+    {
+      "name": "compaction summary preserved",
+      "ok": true,
+      "detail": "compacted older turns"
+    },
+    {
+      "name": "open() does not rewrite legacy bytes",
+      "ok": true,
+      "detail": "2138 vs 2138"
+    },
+    {
+      "name": "resume context keeps tool result",
+      "ok": true,
+      "detail": "{\"messages\":[{\"role\":\"compactionSummary\",\"summary\":\"compacted older turns\",\"tokensBefore\":128,\"timestamp\":1787994576703},{\"role\":\"user\",\"content\":[{\"type\":\"text\",\"text\":\"tenant-a secret payload\"}],\"timestamp\":1787994576701},{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"ack\"},{\"type\":\"toolCall\",\"id\":\"call_1\",\"name\":\"read\",\"arguments\":{\"path\":\"notes.md\"}}],\"api\":\"openai-responses\",\"provider\""
+    },
+    {
+      "name": "append then reopen sees new user message",
+      "ok": true,
+      "detail": "append-from-084"
+    },
+    {
+      "name": "resume after append still has tool result",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "non-empty file without session header throws",
+      "ok": true,
+      "detail": "Session file is not a valid pi session: /tmp/pi-sdk-v3-session/work/junk/no-header.jsonl"
+    },
+    {
+      "name": "corrupt file without header is not rewritten",
+      "ok": true,
+      "detail": "{\"type\":\"message\",\"id\":\"x\",\"parentId\":null,\"timestamp\":\"2026-08-29T09:09:38.731Z"
+    },
+    {
+      "name": "truncated JSONL after valid header does not throw a partial object",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "future version 99 is readable by SDK",
+      "ok": true,
+      "detail": 99
+    },
+    {
+      "name": "future version does not drop user text",
+      "ok": true,
+      "detail": "future-user"
+    }
+  ],
+  "passed": 23,
+  "failed": 0,
+  "header": {
+    "type": "session",
+    "version": 3,
+    "id": "f8db4331-e7e9-49d5-8e84-6cbb819f89d0",
+    "timestamp": "2026-08-29T09:09:36.700Z",
+    "cwd": "/tmp/pi-sdk-v3-session/work/workspace-057"
+  },
+  "entryCount": 9,
+  "entryTypes": [
+    "message",
+    "message",
+    "message",
+    "model_change",
+    "thinking_level_change",
+    "custom",
+    "custom_message",
+    "session_info",
+    "compaction"
+  ]
+}

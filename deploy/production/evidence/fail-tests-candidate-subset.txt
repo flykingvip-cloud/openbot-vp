@@ -1,0 +1,187 @@
+src/cli/daemon-cli/install.integration.test.ts > runDaemonInstall integration > auto-mints token when no source exists without embedding it into service env
+src/cli/daemon-cli/install.integration.test.ts > runDaemonInstall integration > fails closed when token SecretRef is required but unresolved
+src/cli/nodes-camera.test.ts > nodes camera helpers > builds stable temp paths when id provided
+src/cli/nodes-camera.test.ts > nodes camera helpers > writes camera clip payload from url
+src/cli/nodes-camera.test.ts > nodes camera helpers > writes camera clip payload to temp path
+src/config/config-misc.test.ts > config strict validation > does not mark resolved-only gateway.bind aliases as auto-migratable legacy
+src/config/config-misc.test.ts > config strict validation > flags legacy config entries without auto-migrating
+src/config/config-misc.test.ts > config strict validation > still marks literal gateway.bind host aliases as legacy
+src/config/config.compaction-settings.test.ts > config compaction settings > defaults compaction mode to safeguard
+src/config/config.compaction-settings.test.ts > config compaction settings > preserves memory flush config values
+src/config/config.compaction-settings.test.ts > config compaction settings > preserves oversized quality guard retry values for runtime clamping
+src/config/config.compaction-settings.test.ts > config compaction settings > preserves pi compaction override values
+src/config/config.compaction-settings.test.ts > config compaction settings > preserves recent turn safeguard values through loadConfig()
+src/config/config.discord.test.ts > config discord > loads discord guild map + dm group settings
+src/config/config.identity-defaults.test.ts > config identity defaults > accepts SecretRef values in model provider headers
+src/config/config.identity-defaults.test.ts > config identity defaults > accepts blank model provider apiKey values
+src/config/config.identity-defaults.test.ts > config identity defaults > does not override explicit values
+src/config/config.identity-defaults.test.ts > config identity defaults > respects empty responsePrefix to disable identity defaults
+src/config/config.identity-defaults.test.ts > config identity defaults > supports provider textChunkLimit config
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > does not auto-migrate claude-cli auth profile mode on load
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > flags legacy config in snapshot
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > flags legacy provider sections in snapshot
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > flags routing.allowFrom in snapshot
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > flags top-level heartbeat as legacy in snapshot
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > flags top-level memorySearch as legacy in snapshot
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > rejects bindings[].match.accountID on load
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > rejects bindings[].match.provider on load
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > rejects messages.queue.byProvider on load
+src/config/config.legacy-config-detection.accepts-imessage-dmpolicy.test.ts > legacy config detection > rejects session.sendPolicy.rules[].match.provider on load
+src/config/config.multi-agent-agentdir-validation.test.ts > multi-agent agentDir validation > throws on shared agentDir during loadConfig()
+src/config/config.nix-integration-u3-u5-u9.test.ts > Nix integration (U3, U5, U9) > U5: CONFIG_PATH and STATE_DIR env var overrides > CONFIG_PATH defaults to OPENCLAW_HOME/.openclaw/openclaw.json
+src/config/config.nix-integration-u3-u5-u9.test.ts > Nix integration (U3, U5, U9) > U5: CONFIG_PATH and STATE_DIR env var overrides > CONFIG_PATH defaults to ~/.openclaw/openclaw.json when env not set
+src/config/config.nix-integration-u3-u5-u9.test.ts > Nix integration (U3, U5, U9) > U5: CONFIG_PATH and STATE_DIR env var overrides > CONFIG_PATH uses STATE_DIR when only state dir is overridden
+src/config/config.nix-integration-u3-u5-u9.test.ts > Nix integration (U3, U5, U9) > U5: CONFIG_PATH and STATE_DIR env var overrides > STATE_DIR defaults to ~/.openclaw when env not set
+src/config/config.nix-integration-u3-u5-u9.test.ts > Nix integration (U3, U5, U9) > U5: CONFIG_PATH and STATE_DIR env var overrides > STATE_DIR respects OPENCLAW_HOME when state override is unset
+src/config/config.pruning-defaults.test.ts > config pruning defaults > adds default cacheRetention for Anthropic Claude models on Bedrock
+src/config/config.pruning-defaults.test.ts > config pruning defaults > does not override explicit contextPruning mode
+src/config/config.pruning-defaults.test.ts > config pruning defaults > enables cache-ttl pruning + 1h cache TTL for Anthropic API keys
+src/config/config.pruning-defaults.test.ts > config pruning defaults > enables cache-ttl pruning + 1h heartbeat for Anthropic OAuth
+src/config/config.talk-validation.test.ts > talk config validation fail-closed behavior > rejects boolean talk.silenceTimeoutMs during config load
+src/config/config.talk-validation.test.ts > talk config validation fail-closed behavior > rejects float talk.silenceTimeoutMs during config load
+src/config/config.talk-validation.test.ts > talk config validation fail-closed behavior > rejects multi-provider talk config without talk.provider during config load
+src/config/config.talk-validation.test.ts > talk config validation fail-closed behavior > rejects string talk.silenceTimeoutMs during config load
+src/config/config.talk-validation.test.ts > talk config validation fail-closed behavior > rejects talk.provider when it does not match talk.providers during config load
+src/config/env-preserve-io.test.ts > env snapshot TOCTOU via wrapper APIs > ignores read context when expected config path does not match
+src/config/env-preserve-io.test.ts > env snapshot TOCTOU via wrapper APIs > uses explicit read context even if another read interleaves
+src/config/io.runtime-snapshot-write.test.ts > runtime config snapshot writes > refreshes the runtime snapshot after writes so follow-up reads see persisted changes
+src/config/io.validation-fails-closed.test.ts > config validation fail-closed behavior > still loads valid security settings unchanged
+src/config/io.validation-fails-closed.test.ts > config validation fail-closed behavior > throws INVALID_CONFIG instead of returning an empty config
+src/config/talk-defaults.test.ts > talk silence timeout defaults > matches the Apple and Android runtime constants
+src/conversations/remaining-five.test.ts > remaining five deliverables > 4) real purge adapters delete transcript and index
+src/cron/cron-protocol-conformance.test.ts > cron protocol conformance > cron status shape matches gateway fields in UI + Swift
+src/cron/cron-protocol-conformance.test.ts > cron protocol conformance > ui + swift include all cron delivery modes from gateway schema
+src/cron/isolated-agent/delivery-dispatch.named-agent.test.ts > resolveCronDeliveryBestEffort > returns true for isolated jobs with inferred workbench surfaces
+src/infra/exec-approvals.test.ts > resolve exec approvals defaults > expands home-prefixed default file and socket paths
+src/infra/host-env-security.policy-parity.test.ts > host env security policy parity > keeps generated macOS host env policy in sync with shared JSON policy
+src/infra/provider-usage.auth.normalizes-keys.test.ts > resolveProviderAuths key normalization > keeps all-caps plaintext config keys eligible for provider usage auth resolution
+src/infra/provider-usage.auth.normalizes-keys.test.ts > resolveProviderAuths key normalization > uses config api keys when env and profiles are missing
+src/infra/state-migrations.state-dir.test.ts > legacy state dir auto-migration > follows legacy symlink when it points at another legacy dir (clawdbot -> moltbot)
+src/infra/system-presence.version.test.ts > system-presence version fallback > uses runtime VERSION when OPENCLAW_VERSION and OPENCLAW_SERVICE_VERSION are blank
+src/infra/system-presence.version.test.ts > system-presence version fallback > uses runtime VERSION when OPENCLAW_VERSION is not set
+src/memory/batch-voyage.test.ts > runVoyageEmbeddingBatches > handles empty lines and stream chunks correctly
+src/memory/batch-voyage.test.ts > runVoyageEmbeddingBatches > successfully submits batch, waits, and streams results
+src/memory/index.test.ts [ src/memory/index.test.ts ]
+src/memory/manager.async-search.test.ts [ src/memory/manager.async-search.test.ts ]
+src/memory/manager.batch.test.ts [ src/memory/manager.batch.test.ts ]
+src/memory/manager.embedding-batches.test.ts [ src/memory/manager.embedding-batches.test.ts ]
+src/memory/manager.get-concurrency.test.ts [ src/memory/manager.get-concurrency.test.ts ]
+src/memory/manager.mistral-provider.test.ts [ src/memory/manager.mistral-provider.test.ts ]
+src/memory/manager.readonly-recovery.test.ts [ src/memory/manager.readonly-recovery.test.ts ]
+src/memory/manager.sync-errors-do-not-crash.test.ts [ src/memory/manager.sync-errors-do-not-crash.test.ts ]
+src/memory/manager.vector-dedupe.test.ts [ src/memory/manager.vector-dedupe.test.ts ]
+src/pairing/pairing-messages.test.ts > buildPairingReply > formats pairing reply for discord
+src/pairing/pairing-messages.test.ts > buildPairingReply > formats pairing reply for imessage
+src/pairing/pairing-messages.test.ts > buildPairingReply > formats pairing reply for signal
+src/pairing/pairing-messages.test.ts > buildPairingReply > formats pairing reply for slack
+src/pairing/pairing-messages.test.ts > buildPairingReply > formats pairing reply for telegram
+src/pairing/pairing-messages.test.ts > buildPairingReply > formats pairing reply for whatsapp
+src/plugins/__tests__/loader-registry-roundtrip.test.ts [ src/plugins/__tests__/loader-registry-roundtrip.test.ts ]
+src/scripts/ci-changed-scope.test.ts > detectChangedScope > does not force macOS for generated protocol model-only changes
+src/secrets/runtime.test.ts > secrets runtime snapshot > keeps last-known-good web runtime snapshot when reload introduces unresolved active web refs
+src/secrets/target-registry.test.ts > secret target registry > stays in sync with docs/reference/secretref-user-supplied-credentials-matrix.json
+src/version.test.ts > version resolution > prefers runtime VERSION over service/package markers and ignores blank env values
+test/i18n/knowledge-universe-i18n-keys.test.ts > knowledge-universe i18n key coverage > en has every scanned knowledge-universe key
+test/i18n/knowledge-universe-i18n-keys.test.ts > knowledge-universe i18n key coverage > zh-CN has every scanned knowledge-universe key
+test/worktree-audit.test.ts > worktree-audit > blocks cached mixed primary groups
+test/worktree-audit.test.ts > worktree-audit > isolates openbot cli wrapper and path compatibility separately from release-check metadata, package metadata, cli copy, and state migration
+test/worktree-audit.test.ts > worktree-audit > keeps client-id and device-auth compatibility inside H4
+test/worktree-audit.test.ts > worktree-audit > keeps control-ui client identity and session mutation wiring inside group B
+test/worktree-audit.test.ts > worktree-audit > keeps doctor and operator guidance separate from daemon and state groups
+test/worktree-audit.test.ts > worktree-audit > keeps gateway chat payload compatibility inside group C
+test/worktree-audit.test.ts > worktree-audit > keeps package entry identity separate from shell installer scripts
+test/worktree-audit.test.ts > worktree-audit > keeps shared app compatibility and deep-link security files inside H4
+ui/src/ui/app-gateway.node.test.ts > connectGateway > opens system asset suggestion after repeated stable completions reach L3
+ui/src/ui/app-gateway.node.test.ts > connectGateway > records L2 incubation but does not open system suggestion for a single artifact session
+ui/src/ui/app-settings.employee-embed.browser.test.ts > syncTabWithLocation — employee embed routes > adds the mobile marker class only for the ?shell=mobile phone shell
+ui/src/ui/app-settings.employee-embed.browser.test.ts > syncTabWithLocation — employee embed routes > clears the embed chrome flags when navigating to a normal route
+ui/src/ui/app-settings.employee-embed.browser.test.ts > syncTabWithLocation — employee embed routes > keeps macOS embed at full parity: me does NOT force personal, no mobile class
+ui/src/ui/app-settings.employee-embed.browser.test.ts > syncTabWithLocation — employee embed routes > maps the overview surface to the workbench home module
+ui/src/ui/app-settings.employee-embed.browser.test.ts > syncTabWithLocation — employee embed routes > pins me -> personal settings on the PHONE shell (?shell=mobile)
+ui/src/ui/app-settings.employee-embed.browser.test.ts > syncTabWithLocation — employee embed routes > routes /embed/employee/workspace to the workbench collaboration module, chrome-less
+ui/src/ui/artifact/event-handler.test.ts > Artifact Event Handler > detectArtifactsInMessage > detects multiple files in one message
+ui/src/ui/artifact/registry.test.ts > ArtifactRegistry > Persistence > gets recent artifacts sorted by update time
+ui/src/ui/controllers/enterprise-capability-usage-management/__tests__/route-redirect.property.test.ts > Property 7: route redirect idempotency > resolveLegacyAgentsUrl is idempotent for /agents/* paths
+ui/src/ui/controllers/enterprise-capability-usage-management/__tests__/route-redirect.property.test.ts > Property 7: route redirect idempotency > resolveLegacyAgentsUrl maps /agents (and most subpaths) to /usage-management/robots
+ui/src/ui/controllers/enterprise-capability-usage-management/__tests__/route-redirect.property.test.ts > Property 7: route redirect idempotency > resolveLegacyAgentsUrl maps /agents/templates to /usage-management/installs
+ui/src/ui/controllers/enterprise-capability-usage-management/__tests__/route-redirect.property.test.ts > Property 7: route redirect idempotency > resolveLegacyAgentsUrl returns input unchanged for non-legacy paths
+ui/src/ui/controllers/enterprise-capability-usage-management/__tests__/route-redirect.property.test.ts > Property 7: route redirect idempotency > resolveLegacyInstallManagementUrl maps install-management path to new module
+ui/src/ui/controllers/spaces.node.test.ts > workbench signal cards co-load > co-loads pending tasks and governance notices after collaboration.spaces.list
+ui/src/ui/controllers/spaces.node.test.ts > workbench signal cards co-load > normalizes pending-task and collaboration items into clickable card entries
+ui/src/ui/employee-shell/employee-embed-a11y.browser.test.ts [ ui/src/ui/employee-shell/employee-embed-a11y.browser.test.ts ]
+ui/src/ui/employee-shell/employee-embed-mobile.browser.test.ts [ ui/src/ui/employee-shell/employee-embed-mobile.browser.test.ts ]
+ui/src/ui/employee-shell/employee-embed.browser.test.ts > employee-embed: daily-overview cards (phone-scoped) > does not affect non-embed (web)
+ui/src/ui/employee-shell/employee-embed.browser.test.ts > employee-embed: daily-overview cards (phone-scoped) > hides the signals grid on the PHONE embed (employee-embed--mobile)
+ui/src/ui/employee-shell/employee-embed.browser.test.ts > employee-embed: daily-overview cards (phone-scoped) > keeps the grid on the macOS embed (employee-embed without --mobile) — full parity
+ui/src/ui/navigation.test.ts > subtitleForTab > returns descriptive subtitles
+ui/src/ui/ports/employee/render-model.boundary.node.test.ts > employee render-model boundary > does not directly import outer ui controllers
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge home cockpit linkage (homeFocus) > opens five-channel import when a tree folder leaf is clicked
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > does not delete a source document when the confirmation is dismissed
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > no longer renders duplicate runtime trust badges in the library workspace hero
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > no longer renders the bottom runtime trend cards on the workspace page
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > no longer renders the redundant relation composition card in the workspace sidebar
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > opens the unified space import picker from the library workspace hero action
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > opens unified space import from home upload action
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders a 删除 action that hard-deletes a source document after confirmation
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders agent knowledge as a categorized memory view
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders aggregated source plane and kind columns in the 来源 table
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders dataset runtime columns (records/chunks/trust/refs)
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders datasets tab with format column
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders invite drawer with members and role select
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders kb-scoped sources in library workspace documents tab
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders knowledge workspace on libraryWorkspace secondary page
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders persisted agent_generated_knowledge rows with distinct types
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders recycle tab with restore action
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders snippets tab cards when library workspace tab is snippets
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders the governance-evicted section in the 已移除 tab
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders the knowledge health breakdown card with real score dimensions
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders the recent activity (最近发生) runtime feed in the workspace sidebar
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders the runtime metrics strip with real space telemetry
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders the 证据片段 snippet as a chunk runtime object
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders web tab with external links
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > renders web version and freshness runtime columns
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > shows the runtime boundary (consumption scope) in the workspace hero
+ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts > workbench knowledge module page > switches library workspace content tabs via state
+ui/src/ui/ports/employee/views/workbench-stage.node.test.ts > workbench stage > renders operational identity in personal settings with catalog degradation
+ui/src/ui/ports/employee/views/workbench-stage.node.test.ts > workbench stage > renders personal settings as a real preference surface without legacy signal rows
+ui/src/ui/ports/employee/views/workbench-stage.node.test.ts > workbench stage > shows the capability summary page for legacy detailed collaboration views without learning objects
+ui/src/ui/ports/employee/views/workbench-stage.node.test.ts > workbench stage > treats operational identity as the employee-facing personal channel binding surface
+ui/src/ui/ports/employee/views/workbench-views.boundary.node.test.ts > employee workbench view boundaries > does not import controller modules directly
+ui/src/ui/ports/enterprise/views/enterprise-surfaces.browser.test.ts > enterprise trial restriction surfaces > renders identity policy editor with org picker and readable action labels
+ui/src/ui/ports/enterprise/views/enterprise-surfaces.browser.test.ts > enterprise trial restriction surfaces > renders operational identity relationship summary in identities settings
+ui/src/ui/ports/enterprise/views/enterprise-surfaces.browser.test.ts > enterprise trial restriction surfaces > renders the data capability center as a top-level enterprise surface
+ui/src/ui/ports/platform/models/adapter.node.test.ts > platform models adapter > does not expand gateway discovery catalog into model assets
+ui/src/ui/ports/platform/pricing/plan-form-helpers.node.test.ts > plan-form-helpers > serializes expanded entitlement payload fields
+ui/src/ui/ports/platform/render-actions.node.test.ts > platform render actions > provider apiKey wiring (Phase 1) > sets apiKey on add-model when provided
+ui/src/ui/ports/platform/render-actions.node.test.ts > platform render actions > provider apiKey wiring (Phase 1) > writes a new apiKey when provided on provider update
+ui/src/ui/ports/port-shells.browser.test.ts > port shell integration > renders discovered model assets with import action
+ui/src/ui/ports/port-shells.browser.test.ts > port shell integration > renders enterprise settings as integrations, api keys, and policies workspaces
+ui/src/ui/ports/port-shells.browser.test.ts > port shell integration > renders platform model assets bootstrap when no models exist
+ui/src/ui/vault-sync/client-restore.e2e.browser.test.ts > client-restore Chromium E2E (Wave R scaffold) > restores deleted (tombstone) revision to local FSA and commits anew
+ui/src/ui/vault-sync/client-sync.e2e.browser.test.ts > client-sync Chromium FSA E2E (Wave K scaffold) > exposes FSA picker via polyfill and walks/writes memory handles
+ui/src/ui/vault-sync/client-sync.e2e.browser.test.ts > client-sync Chromium FSA E2E (Wave K scaffold) > syncs encrypted note A→B via memory FSA without plaintext on plane
+ui/src/ui/vault-sync/client-sync.e2e.browser.test.ts > client-sync Chromium FSA E2E (Wave K scaffold) > uploads >1MiB ciphertext via HTTP chunk path in Chromium
+ui/src/ui/vault-sync/client-team.e2e.browser.test.ts > client-team Chromium E2E (Wave O scaffold) > runs team invite → sync → revoke+rotate → large file without plaintext on plane
+ui/src/ui/views/auth-home.browser.test.ts > auth home > prefills enterprise-admin activation fields from the activation deep link
+ui/src/ui/views/capability-health-badge.test.ts > renderCapabilityHealthBadge > does not leak raw telemetry details
+ui/src/ui/views/capability-update-recap-timeline.test.ts > renderCapabilityUpdateRecapTimeline > passes terminology scan and hides version-like text
+ui/src/ui/views/chat.test.ts > chat view > disables the checkpoint restore action when nothing is restorable
+ui/src/ui/views/chat.test.ts > chat view > does not repeat sender labels in one-to-one threads
+ui/src/ui/views/chat.test.ts > chat view > hides checkpoint dividers for the latest turn and when only one exists
+ui/src/ui/views/chat.test.ts > chat view > keeps consecutive user messages from different senders in separate groups
+ui/src/ui/views/chat.test.ts > chat view > places legacy assistant boundaries before the user turn
+ui/src/ui/views/chat.test.ts > chat view > renders a per-turn checkpoint divider with a restore action
+ui/src/ui/views/chat.test.ts > chat view > renders a working strip with cancel while abort is available
+ui/src/ui/views/chat.test.ts > chat view > shows assistant sender labels for group bot replies
+ui/src/ui/views/chat.test.ts > chat view > shows the confirm card (with external-effects warning) for the pending checkpoint
+ui/src/ui/views/chat.test.ts > chat view > treats control-ui sender labels as the local user in group chat
+ui/src/ui/views/cost-budget-v2/shell/cost-budget-v2-shell.browser.test.ts > cost-budget-v2 shell > renders settings page wrapper when route is settings
+ui/src/ui/views/knowledge-universe-space-ingest.node.test.ts > knowledge-universe-space-ingest > opens unified space import when a space is selected
+ui/src/ui/views/knowledge-universe-ui-prefs.node.test.ts > knowledge-universe-ui-prefs > ignores invalid stored values
+ui/src/ui/views/knowledge-universe-ui-prefs.node.test.ts > knowledge-universe-ui-prefs > persists page tab and browse sub tab
+ui/src/ui/views/knowledge-universe-ui-prefs.node.test.ts > knowledge-universe-ui-prefs > persists selected knowledge base id
+ui/src/ui/views/knowledge-universe-vault-sync.browser.test.ts > Vault Sync form Chromium (Wave S / U — no product import entry) > enables create when password is set and fires onCreateVaultSync
+ui/src/ui/views/knowledge-universe-vault-sync.browser.test.ts > Vault Sync form Chromium (Wave S / U — no product import entry) > pick-folder button delegates to onPickVaultSyncFolder
+ui/src/ui/views/knowledge-universe-vault-sync.browser.test.ts > Vault Sync form Chromium (Wave S / U — no product import entry) > renders E2EE vault form with create + pick-folder controls
+ui/src/ui/views/knowledge-universe-vault-sync.browser.test.ts > Vault Sync form Chromium (Wave S / U — no product import entry) > shows sync-now after vault session exists
+ui/src/ui/views/quick-capability-save-modal.test.ts > renderQuickCapabilitySaveModal > passes the employee capability terminology scan

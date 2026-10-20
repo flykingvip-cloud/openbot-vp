@@ -1,0 +1,79 @@
+{
+  "increment": "P20.2",
+  "schemaVersion": 1,
+  "rehearsalOnly": true,
+  "recordedAt": "2026-09-05T03:16:00.000Z",
+  "candidateSha": "a83214ae57cf21f3d57d3551a5efb441d491160b",
+  "originMainSha": "a83214ae57cf21f3d57d3551a5efb441d491160b",
+  "verdict": "no-go",
+  "readyForIndependentApproval": false,
+  "ledgerMutated": false,
+  "releaseRecordMutated": false,
+  "provenanceMinted": false,
+  "items": [
+    {
+      "id": "candidate",
+      "sha": "a83214ae57cf21f3d57d3551a5efb441d491160b",
+      "source": "git rev-parse origin/main after git fetch origin",
+      "evidence": "Merge pull request #965 / current origin/main tip",
+      "conclusion": "equals latest origin/main",
+      "provable": true
+    },
+    {
+      "id": "origin_main",
+      "sha": "a83214ae57cf21f3d57d3551a5efb441d491160b",
+      "source": "git fetch origin && git rev-parse origin/main",
+      "evidence": "#965 recorded prior P20.2; #960 Latest remains on trunk",
+      "conclusion": "sole candidate baseline",
+      "provable": true
+    },
+    {
+      "id": "live",
+      "sha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+      "source": "podman exec openbot-gateway-rc cat /app/dist/build-info.json",
+      "evidence": "commit=04690f8d2ed5; builtAt=2026-09-04T13:29:54.802Z; version=2026.7.12-rc.2",
+      "conclusion": "unique running fact; ancestor of origin/main",
+      "provable": true
+    },
+    {
+      "id": "ledger_open",
+      "sha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+      "source": "deploy/production/releases.jsonl seq 63",
+      "evidence": "liveFrom=2026-09-04T13:39:37Z; liveVerified=true; no liveTo; tag=main; landed by #953",
+      "conclusion": "equals LIVE; keep; do not rewrite seq 61/62/63",
+      "provable": true
+    },
+    {
+      "id": "ledger_closed_seq62",
+      "sha": "81aafe1e218e91656c3a399edb5a9080ad00d448",
+      "source": "deploy/production/releases.jsonl seq 62",
+      "evidence": "liveTo=2026-09-04T13:39:37Z",
+      "conclusion": "historical; do not write as Latest",
+      "provable": true
+    },
+    {
+      "id": "release_record",
+      "sha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+      "source": "RELEASE_RECORD.md first Latest cutover",
+      "evidence": "seq 63; liveFrom=2026-09-04T13:39:37Z; landed by #960; seq 61/59 sections retained",
+      "conclusion": "equals LIVE and open ledger; this increment did not rewrite it",
+      "provable": true
+    },
+    {
+      "id": "provenance_tag_object",
+      "sha": "8efc2eaa052590713dd3edc210b09c748a8c34e5",
+      "source": "annotated tag object provenance/sha-04690f8d2ed5",
+      "evidence": "git rev-parse without peel; must not be compared with LIVE",
+      "conclusion": "not used for liveEqualsProvenance",
+      "provable": true
+    },
+    {
+      "id": "provenance_peeled_target",
+      "sha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+      "source": "annotated tag provenance/sha-04690f8d2ed5^{commit}",
+      "evidence": "peeled commit equals LIVE; ledger tag=main",
+      "conclusion": "liveEqualsProvenance=true; do_not_mint; do not remint",
+      "provable": true
+    }
+  ]
+}

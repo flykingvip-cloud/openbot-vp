@@ -1,0 +1,111 @@
+{
+  "schema": "memory-workspace-phase1b-unlock-minima-request/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-unlock-minima-request.json",
+  "kind": "unlock-minima-decision-package",
+  "decision": "submitted-for-independent-review",
+  "requestedUnlock": "minima",
+  "unlock": "not-issued",
+  "stamped": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "liveCutover": false,
+  "signedBy": null,
+  "issuedAt": null,
+  "operationId": "phase1b-unlock-minima-85f55ee2fa-20260820T001800Z",
+  "reviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+  "baselineSha": "4f14769148dd79559824d9e0229f6af530799851",
+  "originMainSha": "4f14769148dd79559824d9e0229f6af530799851",
+  "branchSha": "4f14769148dd79559824d9e0229f6af530799851",
+  "packageCommitSha": "1432b71855f8006dda4f8e53fb851ddbc166b405",
+  "prUrl": "https://github.com/gmood2008/openbot/pull/542",
+  "reviewSurface": "new PR from cursor-data-governance/phase1b-unlock-minima",
+  "handoff": ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-unlock-minima.md",
+  "canonicalUnlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "canonicalScorecard": "docs/design/evidence/memory-workspace-phase1b-unlock-minima-scorecard.json",
+  "proposedReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-minima-proposed-receipt.json",
+  "item5": {
+    "status": "met",
+    "pr": "https://github.com/gmood2008/openbot/pull/538",
+    "reviewTip": "85f55ee2fa76f88dc538180b481a5823631af649",
+    "binding": "docs/design/evidence/memory-workspace-phase1b-item5-final-closeout-binding.json",
+    "metDecision": "docs/design/evidence/memory-workspace-phase1b-item5-met-decision.json",
+    "closeoutHandoff": ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-final-closeout.md",
+    "notFinalItem5Proof": [
+      ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-runtime-alignment-20260819.md",
+      "dirty I4 or kiro-loom worktree"
+    ]
+  },
+  "items": {
+    "2": "met",
+    "3": "met",
+    "4": "met",
+    "5": "met",
+    "6": "locked",
+    "7": "locked"
+  },
+  "item6Unlocked": false,
+  "item7Unlocked": false,
+  "item6ImplementationUnlocked": false,
+  "item7ImplementationUnlocked": false,
+  "allowedAfterApproval": [
+    "prepare independent Item 6 design, inventory, shadow, and fixture packages",
+    "prepare independent Item 7 design, inventory, shadow, and fixture packages",
+    "run read-only, shadow, dry-run, and production-equivalent verification",
+    "create a separate Item 6 or Item 7 implementation request/handoff",
+    "keep all production writes and switches blocked until a later independent approval"
+  ],
+  "stillForbiddenAfterApproval": [
+    "wiredToProductionResolver=true",
+    "Catalog miss=deny",
+    "schema v2 production write",
+    "delete any productionWriteWatchIndex call-site",
+    "Item 7 Retirement",
+    "production Catalog new write",
+    "LIVE cutover",
+    "deployAuthorized=true",
+    "cross-tenant migration",
+    "BYOS / tenant-cloud / cold archive",
+    "derive Item 6 met or Item 7 met from this minima",
+    "Item 6/7 implementation unlocked"
+  ],
+  "revocationConditions": [
+    "If this request is rejected, canonical receipt stays not-issued and phase1bExecutionBlocked stays true",
+    "If a later issued stamp is invalid, revoke it and restore not-issued",
+    "Frozen Item 5 closeout JSON and final binding stay frozen",
+    "Minima approval never overlays a new production runtime"
+  ],
+  "ifApprovedMeans": "allow Item 6/7 independent preparation and constrained verification",
+  "ifApprovedDoesNotMean": "Item 6/7 implementation unlocked",
+  "doesNotAuthorize": [
+    "treat this request as an issued unlock receipt",
+    "start Item 6/7 implementation",
+    "Phase 1B full unlock",
+    "wiredToProductionResolver=true",
+    "schema v2 production write",
+    "Item 7 Retirement",
+    "LIVE cutover",
+    "deployAuthorized=true"
+  ],
+  "notReviewSurface": [
+    "dirty I4 or kiro-loom worktree",
+    ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-runtime-alignment-20260819.md"
+  ],
+  "references": {
+    "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json": "8c1802dc856bb8f0448b455f5812c73a4dc2ce4da71f87a24e5007f601e05f46",
+    "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json": "6c9d3d46f99d2d2ca212b1336b9ebb8bbdb539c0543b23bbdf22c92b55f9e3a6",
+    "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json": "32ca3a9d43fb5a18628529da8d84fc91ea848f3d5e86e0bfcd05d89097feccb1",
+    "docs/design/evidence/memory-workspace-phase1b-item3-write-switch-acceptance.json": "59a6214397a469a7104acc6835d5f6efb88ec8556c73d0eae95a2c9cec623511",
+    "docs/design/evidence/memory-workspace-phase1b-item4-schema-v2-same-release.json": "52d0e29f0225bdb9a6037c0328ab9f79e64d151393d9b20de0556856860d8796",
+    "docs/design/evidence/memory-workspace-phase1b-item5-final-closeout-binding.json": "0d332e0ef1e6f08c40f4edaca7e7d371076bc7d58a6f678366e555a93f1d3f8f",
+    "docs/design/evidence/memory-workspace-phase1b-item5-met-decision.json": "dcdc57987789b8fa4b1c32036b8ceb5b36127755b500058b715ba6fbb321240d",
+    "docs/design/evidence/memory-workspace-phase1b-item5-production-closeout.json": "c88c12889b53ea5acc234ee7b4577211cf427236ded77e0de832ce7e21cbe9dc",
+    ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-final-closeout.md": "2f6a30037345e7a7b7bf52026e6cecfc0928dd6fb33893105eaf745203501ae0",
+    "docs/design/evidence/memory-workspace-phase1b-unlock-decision-request.json": "2930e82e8f61bbd84ae4674fa10e742ceb3ea8bb4e7176b62885a75bcc0deb39",
+    "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json": "e0f44dfbc8a3d42d07f10354bf73eb13b47be76735680b124d2f0291bef78b8b",
+    "docs/design/evidence/memory-workspace-phase1b-unlock-minima-scorecard.json": "fbfa568044f1ded7c379731bce744db4fa2f5537721045f933158ca9bdc33614",
+    "docs/design/evidence/memory-workspace-phase1b-unlock-minima-proposed-receipt.json": "0f7350f504d04a80b451d2fd129eb78b897a38a7657b392e1af2fceb01c5e897",
+    ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-unlock-minima.md": "51b27aee723b4ef3c1ee4a51fda99368a8976371f5e690b8febc30b6208a3867"
+  },
+  "note": "Preparation only. Does not issue unlock. Does not start Item 6 or Item 7. Does not change the production resolver."
+}

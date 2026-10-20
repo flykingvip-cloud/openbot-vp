@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "revision": 10,
+  "records": {
+    "ws:tenant-1:user:user-1:asset:asset-1": {
+      "envelope": {
+        "resourceId": "ws:tenant-1:user:user-1:asset:asset-1",
+        "resourceType": "workspace",
+        "schemaVersion": 1,
+        "tenantId": "tenant-1",
+        "owner": {
+          "kind": "user",
+          "userId": "user-1"
+        },
+        "scope": {
+          "kind": "user",
+          "userId": "user-1"
+        },
+        "lifecycleState": "active",
+        "classification": "internal",
+        "governanceVersion": 2,
+        "canonicalBindingId": "bind:ws:tenant-1:user:user-1:asset:asset-1",
+        "createdAt": "2026-08-17T00:00:00.000Z",
+        "updatedAt": "2026-08-17T00:00:00.000Z"
+      },
+      "bindings": [
+        {
+          "bindingId": "bind:ws:tenant-1:user:user-1:asset:asset-1",
+          "resourceId": "ws:tenant-1:user:user-1:asset:asset-1",
+          "role": "canonical",
+          "storageKind": "filesystem",
+          "locator": "unplaced://classified/ws:tenant-1:user:user-1:asset:asset-1",
+          "state": "active",
+          "contentVersion": "v1"
+        }
+      ]
+    },
+    "ws:tenant-1:seat:seat-1:asset:asset-seat": {
+      "envelope": {
+        "resourceId": "ws:tenant-1:seat:seat-1:asset:asset-seat",
+        "resourceType": "workspace",
+        "schemaVersion": 1,
+        "tenantId": "tenant-1",
+        "owner": {
+          "kind": "position",
+          "seatId": "seat-1"
+        },
+        "scope": {
+          "kind": "tenant",
+          "tenantId": "tenant-1"
+        },
+        "lifecycleState": "active",
+        "classification": "internal",
+        "governanceVersion": 2,
+        "canonicalBindingId": "bind:ws:tenant-1:seat:seat-1:asset:asset-seat",
+        "createdAt": "2026-08-17T00:00:00.000Z",
+        "updatedAt": "2026-08-17T00:00:00.000Z"
+      },
+      "bindings": [
+        {
+          "bindingId": "bind:ws:tenant-1:seat:seat-1:asset:asset-seat",
+          "resourceId": "ws:tenant-1:seat:seat-1:asset:asset-seat",
+          "role": "canonical",
+          "storageKind": "filesystem",
+          "locator": "unplaced://classified/ws:tenant-1:seat:seat-1:asset:asset-seat",
+          "state": "active",
+          "contentVersion": "v1"
+        }
+      ]
+    },
+    "ws:tenant-1:group:group-1": {
+      "envelope": {
+        "resourceId": "ws:tenant-1:group:group-1",
+        "resourceType": "workspace",
+        "schemaVersion": 1,
+        "tenantId": "tenant-1",
+        "owner": {
+          "kind": "group",
+          "groupId": "group-1"
+        },
+        "scope": {
+          "kind": "group",
+          "groupId": "group-1"
+        },
+        "lifecycleState": "active",
+        "classification": "internal",
+        "governanceVersion": 2,
+        "canonicalBindingId": "bind:ws:tenant-1:group:group-1",
+        "createdAt": "2026-08-17T00:00:00.000Z",
+        "updatedAt": "2026-08-17T00:00:00.000Z"
+      },
+      "bindings": [
+        {
+          "bindingId": "bind:ws:tenant-1:group:group-1",
+          "resourceId": "ws:tenant-1:group:group-1",
+          "role": "canonical",
+          "storageKind": "filesystem",
+          "locator": "unplaced://classified/ws:tenant-1:group:group-1",
+          "state": "active",
+          "contentVersion": "v1"
+        }
+      ]
+    },
+    "ws:tenant-1:user:user-1:steward": {
+      "envelope": {
+        "resourceId": "ws:tenant-1:user:user-1:steward",
+        "resourceType": "workspace",
+        "schemaVersion": 1,
+        "tenantId": "tenant-1",
+        "owner": {
+          "kind": "user",
+          "userId": "user-1"
+        },
+        "scope": {
+          "kind": "user",
+          "userId": "user-1"
+        },
+        "lifecycleState": "active",
+        "classification": "internal",
+        "governanceVersion": 2,
+        "canonicalBindingId": "bind:ws:tenant-1:user:user-1:steward",
+        "createdAt": "2026-08-17T00:00:00.000Z",
+        "updatedAt": "2026-08-17T00:00:00.000Z"
+      },
+      "bindings": [
+        {
+          "bindingId": "bind:ws:tenant-1:user:user-1:steward",
+          "resourceId": "ws:tenant-1:user:user-1:steward",
+          "role": "canonical",
+          "storageKind": "filesystem",
+          "locator": "unplaced://classified/ws:tenant-1:user:user-1:steward",
+          "state": "active",
+          "contentVersion": "v1"
+        }
+      ]
+    },
+    "ws:tenant-1:user:user-2:steward": {
+      "envelope": {
+        "resourceId": "ws:tenant-1:user:user-2:steward",
+        "resourceType": "workspace",
+        "schemaVersion": 1,
+        "tenantId": "tenant-1",
+        "owner": {
+          "kind": "user",
+          "userId": "user-2"
+        },
+        "scope": {
+          "kind": "user",
+          "userId": "user-2"
+        },
+        "lifecycleState": "active",
+        "classification": "internal",
+        "governanceVersion": 2,
+        "canonicalBindingId": "bind:ws:tenant-1:user:user-2:steward",
+        "createdAt": "2026-08-17T00:00:00.000Z",
+        "updatedAt": "2026-08-17T00:00:00.000Z"
+      },
+      "bindings": [
+        {
+          "bindingId": "bind:ws:tenant-1:user:user-2:steward",
+          "resourceId": "ws:tenant-1:user:user-2:steward",
+          "role": "canonical",
+          "storageKind": "filesystem",
+          "locator": "unplaced://classified/ws:tenant-1:user:user-2:steward",
+          "state": "active",
+          "contentVersion": "v1"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,193 @@
+{
+  "evidenceId": "memory-workspace-phase0-live-20260814",
+  "schema": "memory-workspace-phase0-live-roots-summary/v1",
+  "probeUtc": "2026-08-14T10:44:47.764Z",
+  "classification": "controlled-audit-desensitized",
+  "transform": "raw-controlled -> evidence-summary (no unpublished steps)",
+  "probe": {
+    "scriptPath": "docs/design/evidence/memory-workspace-phase0-live-roots.mjs",
+    "scriptSha256": "a555541b2532c199c62429f743e4bae728974e48f9cdf2ee5a24430270418c6d",
+    "schema": "memory-workspace-phase0-live-roots/v1",
+    "truncated": false
+  },
+  "cluster": {
+    "tenantCount": 13,
+    "userDirCount": 56,
+    "rootCount": 156,
+    "groupRootCount": 31,
+    "sqliteCount": 12
+  },
+  "registry": {
+    "available": true,
+    "assetShape": "record",
+    "assetCount": 14,
+    "ownerBindingCount": 14,
+    "enterpriseCount": 2,
+    "slugCount": 14
+  },
+  "agentIndex": {
+    "count": 22,
+    "withOwnerId": 22,
+    "withWorkspaceConfig": 17
+  },
+  "classificationCounts": {
+    "conflict": 85,
+    "unknown": 59,
+    "classified": 12
+  },
+  "resolutionStatusCounts": {
+    "pending_authority": 44
+  },
+  "kindCounts": {
+    "host_canonical": 16,
+    "flat_l2_main": 40,
+    "tenant_workspace": 24,
+    "employee_steward": 45,
+    "group_shared": 18,
+    "group_space_mirror": 13
+  },
+  "sqlite": [
+    {
+      "agentId": "slug-d855e9277ab0",
+      "bytes": 69632,
+      "mtimeUtc": "2026-07-17T09:45:37.385Z",
+      "dualTree": false
+    },
+    {
+      "agentId": "slug-2216389214f3",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-12T05:39:34.907Z",
+      "dualTree": false
+    },
+    {
+      "agentId": "slug-2d75473131c5",
+      "bytes": 69632,
+      "mtimeUtc": "2026-07-24T08:54:51.689Z",
+      "dualTree": false
+    },
+    {
+      "agentId": "slug-244a764a8ebc",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-07T12:52:51.643Z",
+      "dualTree": false
+    },
+    {
+      "agentId": "slug-f9f502e204b3",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-10T09:07:26.247Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "slug-44fc12d31e44",
+      "bytes": 102400,
+      "mtimeUtc": "2026-08-14T09:26:45.158Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "slug-70938575096a",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-12T09:15:18.791Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "bot--agent",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-09T07:09:26.711Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "bot-2",
+      "bytes": 12922880,
+      "mtimeUtc": "2026-08-14T03:11:19.468Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "bot-skill",
+      "bytes": 69632,
+      "mtimeUtc": "2026-08-05T17:27:22.263Z",
+      "dualTree": true
+    },
+    {
+      "agentId": "main",
+      "bytes": 380928,
+      "mtimeUtc": "2026-08-14T09:19:43.522Z",
+      "dualTree": false
+    },
+    {
+      "agentId": "panda",
+      "bytes": 69632,
+      "mtimeUtc": "2026-07-31T23:40:38.240Z",
+      "dualTree": true
+    }
+  ],
+  "dualTree": [
+    {
+      "slug": "bot--agent",
+      "tenantMd": 28,
+      "hostMd": 8
+    },
+    {
+      "slug": "bot-2",
+      "tenantMd": 90,
+      "hostMd": 8
+    },
+    {
+      "slug": "bot-skill",
+      "tenantMd": 7,
+      "hostMd": 6
+    },
+    {
+      "slug": "panda",
+      "tenantMd": 54,
+      "hostMd": 6
+    },
+    {
+      "slug": "slug-65cfa47ac23f",
+      "tenantMd": 0,
+      "hostMd": 7
+    },
+    {
+      "slug": "slug-f9f502e204b3",
+      "tenantMd": 0,
+      "hostMd": 7
+    },
+    {
+      "slug": "slug-003f019e11a2",
+      "tenantMd": 8,
+      "hostMd": 7
+    },
+    {
+      "slug": "slug-44fc12d31e44",
+      "tenantMd": 8,
+      "hostMd": 33
+    },
+    {
+      "slug": "slug-70938575096a",
+      "tenantMd": 7,
+      "hostMd": 9
+    },
+    {
+      "slug": "slug-acfe9790c394",
+      "tenantMd": 7,
+      "hostMd": 7
+    }
+  ],
+  "quarantineOpen": [
+    "16 host canonical workspace trees",
+    "40 flat L2 OpenBot/workspace",
+    "59 tenant/host/employee/group roots without a unique tenant-scoped identity",
+    "44 directory-inferred employee roots pending membership authority",
+    "18 collaboration group roots + 13 space mirrors",
+    "Registry assetShape=record assetCount=14"
+  ],
+  "p0ExitGate": {
+    "unexplainedWritableRoots": "open",
+    "notClassifiedCount": 144,
+    "pendingAuthority": 44,
+    "coveragePassed": false,
+    "freshLiveProbe": true,
+    "registryParsingTrusted": true,
+    "directoryInferenceIsNotAuthority": true,
+    "authoritativeMembership": false
+  }
+}

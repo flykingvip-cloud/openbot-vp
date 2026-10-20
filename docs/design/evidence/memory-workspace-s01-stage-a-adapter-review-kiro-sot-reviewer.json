@@ -1,0 +1,157 @@
+{
+  "schema": "memory-workspace-s01-stage-a-adapter-review/v1",
+  "reviewer": "kiro-sot-reviewer",
+  "reviewDate": "2026-08-30",
+  "prNumber": 834,
+  "targetBranch": "cursor-codex-architecture/item7-s01-stage-a-contract-fix",
+  "baselineSha": "7cad685fba613fd36b2d5f295ef2472d42f98d58",
+  "decision": "accepted",
+  "reviewScope": "SA1-SA3 contract remediation (Catalog SoT + Fail-Closed + #833 unauthorized landing)",
+  "acceptanceFinding": {
+    "SA1": "pass",
+    "SA2": "pass",
+    "SA3": "pass",
+    "catalogSoT": "pass",
+    "failClosed": "pass",
+    "unauthorizedLanding": "pass"
+  },
+  "catalogSoTVerification": {
+    "status": "verified",
+    "uniqueInput": "WorkspaceResourceCatalog typed view",
+    "port": "S01CatalogViewPort",
+    "forbidIndependentTables": true,
+    "independentTablesDeleted": ["workspace_handles", "authorized_cwds", "tenant_memberships"],
+    "forbidCatalogTableField": true,
+    "forbidCreateOnMiss": true,
+    "lockTestPresent": true,
+    "r6ScriptPassed": true,
+    "violationCount": 0
+  },
+  "failClosedVerification": {
+    "status": "verified",
+    "identityResolverTriggers": [
+      "registry-miss",
+      "registry-multi-value",
+      "catalog-miss",
+      "catalog-unavailable",
+      "tenant-mismatch"
+    ],
+    "cwdAdapterTriggers": [
+      "catalog-miss",
+      "catalog-unavailable",
+      "duplicate-canonical-binding",
+      "tenant-mismatch",
+      "membership-missing",
+      "membership-array",
+      "stale-fencing",
+      "stale-content-version",
+      "principal-missing",
+      "path-traversal-detected"
+    ],
+    "returnsNullOnMiss": false,
+    "hasFallbackBehavior": false,
+    "contractTestsPassed": true,
+    "contractTestCount": 30
+  },
+  "unauthorizedLandingVerification": {
+    "status": "verified",
+    "pr833": {
+      "authorized": false,
+      "mergeSha": "7cad685fba613fd36b2d5f295ef2472d42f98d58",
+      "reason": "Production adapters landed before Stage A contract dual-review closed SA1/SA2",
+      "recordedInEvidence": true,
+      "testAssertion": true,
+      "handoffDeclaration": true,
+      "multiLayerProtection": true
+    }
+  },
+  "productionCodeIsolation": {
+    "status": "verified",
+    "noSrcModifications": true,
+    "noGetReplyModifications": true,
+    "noMemoryModifications": true,
+    "noResolverModifications": true,
+    "onlyContractEvidenceTestChanges": true
+  },
+  "testVerification": {
+    "evidenceTest": {
+      "file": "docs/design/evidence/memory-workspace-s01-stage-a-adapter.test.mjs",
+      "status": "passed",
+      "verifies": [
+        "independent-tables-deleted",
+        "simplified-signature-forbidden",
+        "unauthorized-landing-recorded",
+        "scan-10-10"
+      ]
+    },
+    "contractTest": {
+      "file": "docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+      "status": "passed",
+      "testCount": 30,
+      "verifies": [
+        "D1-principal-issue-verify",
+        "D2-D3-catalog-typed-views",
+        "D4-evaluateS01AuthorizedToolCwd-fail-closed",
+        "D5-integration-freeze-sla"
+      ]
+    },
+    "r6SingleSoT": {
+      "script": "scripts/verify-single-sot.mjs",
+      "status": "passed",
+      "violationCount": 0,
+      "checks": [
+        "requiredPaths",
+        "phantomPathsAbsent",
+        "staticScan",
+        "catalogEncapsulation",
+        "normativeSources"
+      ]
+    }
+  },
+  "stateVerification": {
+    "implementationAuthorized": false,
+    "stageAImplementation": "blocked",
+    "scan": {
+      "remaining": 10,
+      "liveWriteWatchIndex": 10,
+      "unchanged": true
+    },
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "productionCatalogWrite": "none",
+    "deployAuthorized": false,
+    "i3Executed": false,
+    "liveDeployment": "forbidden"
+  },
+  "uniqueSoTReference": {
+    "status": "verified",
+    "canonicalHandoffDoc": ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "thisIsNotSecondSpec": true,
+    "uniqueContract": "docs/design/contracts/s01-trusted-principal-handle-contract.ts"
+  },
+  "findings": [
+    "SA1: Independent tables (workspace_handles, authorized_cwds, tenant_memberships) correctly deleted",
+    "SA2: Function signature changed from simplified (handle, toolName) to full D1-D4 inputs (TrustedPrincipal + workspaceResourceId + membership + fencing)",
+    "SA3: All boundary cases fail-closed (catalog miss, duplicate binding, tenant mismatch, membership missing, stale fencing)",
+    "Catalog SoT: Only uses WorkspaceResourceCatalog typed view; no independent SQL tables",
+    "Fail-closed: 15 triggers covered; no null-on-miss, no fallback, no degradation",
+    "#833 unauthorized: Clearly recorded with authorized=false; multi-layer protection",
+    "Production isolation: No src/ modifications; only contract/evidence/test changes",
+    "Lock tests: Prevent independent tables and simplified signature from returning",
+    "All tests passed: Evidence (1/1), Contract (30/30), R6 (0 violations)"
+  ],
+  "recommendations": [
+    "After dual-review (codex-architecture + kiro-sot-reviewer) acceptance and PR merge to main, proceed to Stage A implementation review",
+    "Do not create/modify Stage A production adapters before dual-review acceptance",
+    "Do not wire get-reply.ts before Stage A implementation is authorized",
+    "Do not write Catalog or start Stage B before Stage A complete"
+  ],
+  "blockers": [],
+  "conclusion": "PR #834 correctly remediates SA1/SA2/SA3 acceptance findings. Catalog SoT architecture verified, fail-closed behavior complete, #833 unauthorized landing properly recorded. Contract-only changes, no production code modifications. All tests passed. ACCEPTED for contract remediation. Stage A implementation remains blocked pending dual-review completion.",
+  "nextSteps": [
+    "Wait for codex-architecture independent review",
+    "After both reviews ACCEPTED, merge PR #834 to main",
+    "After merge, request Stage A implementation review",
+    "Stage A implementation must not start before dual-review acceptance"
+  ]
+}

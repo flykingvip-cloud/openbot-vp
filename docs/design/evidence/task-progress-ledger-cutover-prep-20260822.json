@@ -1,0 +1,80 @@
+{
+  "schema": "task-progress-ledger-cutover-prep/v1",
+  "preparedAt": "2026-08-22T16:53:00+08:00",
+  "preparedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "decision": "code-already-live-cutover-not-complete",
+  "canarySignoff": "canary-signed-off",
+  "fetched": true,
+  "candidate": {
+    "ref": "origin/main",
+    "sha": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "subject": "docs: record Progress Ledger staging canary and cutover gates (#605)",
+    "implementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91",
+    "implementationIsAncestor": true
+  },
+  "live": {
+    "source": "container",
+    "host": "production-gateway-host",
+    "container": "openbot-gateway-rc",
+    "sha": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "equalsCandidate": true,
+    "healthz": "live",
+    "overlay": {
+      "id": "origin-main-item6-path-gate-r1",
+      "stamp": "20260822T085042Z",
+      "buildMode": "gateway-dist-keep-ui",
+      "reasonIncludes": "Progress Ledger env off",
+      "uiPin": "index-Ol92eg1L.js",
+      "previousLive": "5480cefe122f38fdf1064c1672b860e10060a32c"
+    }
+  },
+  "gates": {
+    "i1ForwardOnly": {
+      "command": "./deploy/production/scripts/verify-forward-only.sh --candidate c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+      "exit": 0,
+      "verdict": "allow"
+    },
+    "deliveryAlignment": {
+      "exit": 1,
+      "verdict": "fail",
+      "pass": 8,
+      "warn": 2,
+      "fail": 1,
+      "blocker": "L3 SoT RELEASE_RECORD missing prod SHA c393dca8feedd8b9db1a1f7fafc4796ac60b5d06"
+    },
+    "checkSotFrozenReleaseBranch": {
+      "command": "pnpm delivery:check-sot -- --use-release-record-live",
+      "exit": 20,
+      "note": "Compares LIVE against origin/release/baseline-recovery-20260725. That branch is frozen and behind main. Informational only; AGENTS.md cutover source is origin/main."
+    }
+  },
+  "flag": {
+    "OPENBOT_PROGRESS_LEDGER_ENABLED": null,
+    "interpretedAs": "off",
+    "changedThisPrep": false
+  },
+  "runtimePresence": {
+    "gatewayHasProgressLedger": true,
+    "adminMethodPresent": true,
+    "controlUiHasLedgerCopy": false,
+    "controlUiLedgerStringCounts": {
+      "项验收已满足": 0,
+      "progressLedger": 0,
+      "personal-cron-progress": 0,
+      "human-gate": 0
+    }
+  },
+  "explicitlyNotDone": [
+    "Did not set OPENBOT_PROGRESS_LEDGER_ENABLED=1 on production",
+    "Did not rewrite /root/.openbot/.env.docker",
+    "Did not restart openbot-gateway-rc",
+    "Did not replace Control UI pin",
+    "Did not edit RELEASE_RECORD.md"
+  ],
+  "nextRequiredBeforeFlagOn": [
+    "Land Ledger UI into the live Control UI pin or do a full-dist cutover that includes ui/src Ledger views",
+    "Add Latest cutover row for c393dca8fe so verify-delivery-alignment.sh stops failing",
+    "Explicit user instruction to enable the production flag"
+  ]
+}

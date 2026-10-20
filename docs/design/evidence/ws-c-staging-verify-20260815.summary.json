@@ -1,0 +1,19 @@
+{
+  "evidence-id": "ws-c-staging-verify-20260815",
+  "ok": true,
+  "mode": "live-local",
+  "agentId": "bot-2",
+  "sqlitePath": "/Users/daniel/.openbot/memory/bot-2.sqlite",
+  "workspaceDir": "/Users/daniel/.openbot/workspace-bot-2",
+  "knownConflict": true,
+  "guardEnabledNote": "trunk-always-on-post-401",
+  "before": { "files": 0, "chunks": 0 },
+  "after": { "files": 0, "chunks": 0 },
+  "syncRefused": true,
+  "refuseReason": "known-conflict-preset-deny",
+  "maintenanceTokenPresent": false,
+  "errors": [],
+  "reviewer": "cursor-compose",
+  "ts": "2026-08-15T14:12:00.428Z",
+  "note": "Local LIVE probe on developer machine; staging/production must re-run with --out on gateway host after deploy."
+}

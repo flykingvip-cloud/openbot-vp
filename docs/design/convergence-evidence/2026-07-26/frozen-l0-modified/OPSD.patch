@@ -1,0 +1,2515 @@
+diff --git a/ui/src/ui/app-render.ts b/ui/src/ui/app-render.ts
+index eb547655bb..b6cc45448e 100755
+--- a/ui/src/ui/app-render.ts
++++ b/ui/src/ui/app-render.ts
+@@ -37,32 +37,14 @@ import {
+   tabGroupsForPort,
+   titleForTab,
+ } from "./navigation.ts";
+-import { renderWorkbenchGrowthThreadPrelude } from "./ports/employee/growth-prelude-wire.ts";
+-import {
+-  openEmployeeCronTaskDetail,
+-  switchEmployeeWorkbenchSession,
+-} from "./ports/employee/render-actions.ts";
+-import { buildEmployeeWorkbenchProps } from "./ports/employee/render-model.ts";
+-import { renderDaibaiThreadPrelude } from "./ports/employee/views/workbench-stage-assistant.ts";
+-import { renderWorkbench as renderEmployeeWorkbench } from "./ports/employee/views/workbench.ts";
+-import { adaptEnterprisePortActionState } from "./ports/enterprise/action-state.ts";
+-import { adaptEnterprisePortState } from "./ports/enterprise/port-state.ts";
+-import { createEnterprisePortActions } from "./ports/enterprise/render-actions.ts";
+-import { buildEnterprisePortRenderModel } from "./ports/enterprise/render-model.ts";
+-import { resolveEnterpriseTenantId } from "./ports/enterprise/semantic/enterprise-read-model.ts";
+-import { renderEnterprisePortShell } from "./ports/enterprise/views/enterprise-shell.ts";
+-import { adaptPlatformPortActionState } from "./ports/platform/action-state.ts";
+ import {
+   isPlatformAdminAuthenticated,
+   resolveActivePlatformAuthSession,
+   shouldShowPlatformLoginEntry,
+ } from "./ports/platform/platform-auth-session.ts";
+-import { adaptPlatformPortState } from "./ports/platform/port-state.ts";
+-import { createPlatformPortActions } from "./ports/platform/render-actions.ts";
+-import { buildPlatformPortRenderModel } from "./ports/platform/render-model.ts";
+-import { renderPlatformPortShell } from "./ports/platform/views/platform-shell.ts";
+ import { resolvePublicHomepageState } from "./public-home.ts";
+ import { filterTabsByPermission } from "./routing/port-permissions.ts";
++import { loadShellModule } from "./shells/lazy-shell.ts";
+ import { acknowledgeDaibaiGuideForUser, isDaibaiGuideAcknowledgedForUser } from "./storage.ts";
+ import type { ThemeMode } from "./theme.ts";
+ import type {
+@@ -78,17 +60,35 @@ import {
+   renderPublicPricingPage,
+   renderTrialApplyPage,
+ } from "./views/auth-home.ts";
+-import { renderChatCompose, renderChatContent } from "./views/chat.ts";
+ import { renderExecApprovalPrompt } from "./views/exec-approval.ts";
+-import { renderContacts, renderGroups, renderPersonas } from "./views/frontstage.ts";
+ import { renderGatewayUrlConfirmation } from "./views/gateway-url-confirmation.ts";
+-import { renderPlatformAuthPanel } from "./views/platform-auth-panel.ts";
+ import {
+   dismissAssetIncubationFromPreview,
+   openSkillSaveFromPreview,
+   resolveArtifactPreviewIncubationView,
+ } from "./wiring/asset-incubation-preview.ts";
+ 
++type EmployeeShell = typeof import("./shells/employee-shell.ts");
++type PlatformShell = typeof import("./shells/platform-shell.ts");
++type EnterpriseShell = typeof import("./shells/enterprise-shell.ts");
++type ChatShell = typeof import("./shells/chat-shell.ts");
++type FrontstageShell = typeof import("./shells/frontstage-shell.ts");
++
++function shellHost(state: AppViewState): { requestUpdate: () => void } {
++  return state;
++}
++
++function renderShellLoading(label: string) {
++  return html`
++    <div class="shell shell--workspace" style="min-height: 100vh; display: grid; place-items: center;">
++      <div class="card" style="padding: 24px 28px; text-align: center;">
++        <div class="card-title">${label}</div>
++        <div class="card-sub">正在加载界面模块…</div>
++      </div>
++    </div>
++  `;
++}
++
+ const AVATAR_DATA_RE = /^data:/i;
+ const AVATAR_HTTP_RE = /^https?:\/\//i;
+ 
+@@ -389,7 +389,8 @@ async function shareArtifactToCollaborationTarget(
+     throw new Error("Share target is not available");
+   }
+   state.workbenchTeamSelectedKey = sessionKey;
+-  switchEmployeeWorkbenchSession(
++  const employeeShell = await import("./shells/employee-shell.ts");
++  employeeShell.switchEmployeeWorkbenchSession(
+     state,
+     sessionKey,
+     target.targetKind === "space" ? "collaboration" : "assistant",
+@@ -478,10 +479,6 @@ function renderShellThemeIcon(theme: ThemeMode) {
+ export function renderApp(state: AppViewState) {
+   const capabilityState = adaptAppCapabilitySlices(state);
+   const configUpdateState = adaptConfigUpdateCapabilityState(capabilityState.config);
+-  const enterpriseState = adaptEnterprisePortState(state);
+-  const enterpriseActionState = adaptEnterprisePortActionState(state);
+-  const platformState = adaptPlatformPortState(state);
+-  const platformActionState = adaptPlatformPortActionState(state);
+   const portState = adaptAppPortState(state);
+   const availableUpdate =
+     state.updateAvailable &&
+@@ -495,739 +492,238 @@ export function renderApp(state: AppViewState) {
+   const currentLocale: Locale = isSupportedLocale(state.settings.locale)
+     ? state.settings.locale
+     : i18n.getLocale();
+-  const shellTheme = resolveShellTheme(state.theme);
+-  const nextLocaleValue = nextShellLocale(currentLocale);
+-  const nextThemeValue = nextShellTheme(shellTheme);
+-  const bundledBrandWordmarkSrc = resolveBundledBrandWordmarkSrc(basePath);
+-  const activePlatformAuthSession = resolveActivePlatformAuthSession(state);
+-  const topbarAccountEntry =
+-    activePort === "enterprise"
+-      ? {
+-          loggedIn: Boolean(activePlatformAuthSession),
+-          loginHref: pathForTab("enterpriseLogin", basePath),
+-          loginLabel: "企业登录",
+-          settingsHref: pathForTab("enterpriseSettings", basePath, {
+-            tenantId:
+-              state.platformAuthState?.session?.tenantId?.trim() ??
+-              state.bootstrapAuthSession?.tenantId?.trim() ??
+-              undefined,
+-          }),
+-          settingsLabel: "管理员设置",
+-        }
+-      : activePort === "platform"
+-        ? {
+-            loggedIn: isPlatformAdminAuthenticated(state),
+-            loginHref: pathForTab("platformLogin", basePath),
+-            loginLabel: "平台登录",
+-            settingsHref: pathForTab("platformSystemSettings", basePath),
+-            settingsLabel: "管理员设置",
+-          }
+-        : null;
+-  const topbarAccountLabel =
+-    activePort === "enterprise" ? "企业账户" : activePort === "platform" ? "平台账户" : null;
+-  const topbarAccountMonogram = (topbarAccountLabel?.trim()[0] ?? "U").toUpperCase();
+-  const topbarAuthMode =
+-    activePort === "enterprise"
+-      ? state.platformAuthMode === "enterprise-activate"
+-        ? "enterprise-activate"
+-        : "login"
+-      : activePort === "platform"
+-        ? state.platformAuthState?.requiresPlatformBootstrap
+-          ? "platform-bootstrap"
+-          : state.platformAuthMode === "platform-super-admin-login"
+-            ? "platform-super-admin-login"
+-            : "platform-admin-login"
+-        : null;
+-  const topbarAuthModes =
+-    activePort === "enterprise"
+-      ? ([
+-          "login",
+-          ...(state.platformAuthState?.pendingActivation || state.platformAuthInviteCode.trim()
+-            ? (["enterprise-activate"] as const)
+-            : []),
+-        ] as const)
+-      : activePort === "platform"
+-        ? state.platformAuthState?.requiresPlatformBootstrap
+-          ? (["platform-bootstrap"] as const)
+-          : (["platform-admin-login", "platform-super-admin-login"] as const)
+-        : ([] as const);
+-  const topbarFullLoginHref =
+-    activePort === "enterprise"
+-      ? pathForTab("enterpriseLogin", basePath)
+-      : activePort === "platform"
+-        ? pathForTab("platformLogin", basePath)
+-        : null;
+-  const topbarAuthTitle =
+-    activePort === "enterprise"
+-      ? "企业管理员登录"
+-      : activePort === "platform"
+-        ? "平台管理员登录"
+-        : "";
+-  const topbarAuthSubtitle =
+-    activePort === "enterprise"
+-      ? "登录企业控制台，或使用管理员激活码完成首次激活。"
+-      : activePort === "platform"
+-        ? "登录平台控制台；首次部署时可在这里完成超管初始化。"
+-        : "";
+-  const topbarAuthModeLabel = (mode: string) =>
+-    mode === "enterprise-activate"
+-      ? "管理员激活"
+-      : mode === "platform-super-admin-login"
+-        ? "超管登录"
+-        : mode === "platform-bootstrap"
+-          ? "初始化平台"
+-          : "登录";
+-  const topbarAuthSubmitLabel = (mode: string | null) =>
+-    mode === "enterprise-activate"
+-      ? "完成激活"
+-      : mode === "platform-super-admin-login"
+-        ? "超管登录"
+-        : mode === "platform-bootstrap"
+-          ? "初始化平台"
+-          : activePort === "platform"
+-            ? "平台登录"
+-            : "企业登录";
+-  const topbarAuthDisabled =
+-    topbarAuthMode === "enterprise-activate"
+-      ? !state.platformAuthDisplayName.trim() ||
+-        !state.platformAuthEmail.trim() ||
+-        !state.platformAuthInviteCode.trim() ||
+-        !state.platformAuthPassword.trim()
+-      : topbarAuthMode === "platform-bootstrap"
+-        ? !state.platformAuthDisplayName.trim() ||
+-          !state.platformAuthEmail.trim() ||
+-          !state.platformAuthPassword.trim()
+-        : !state.platformAuthEmail.trim() || !state.platformAuthPassword.trim();
+-  const openTopbarHref = (event: MouseEvent, href: string | null) => {
+-    if (!href) {
+-      return;
+-    }
+-    if (
+-      event.defaultPrevented ||
+-      event.button !== 0 ||
+-      event.metaKey ||
+-      event.ctrlKey ||
+-      event.shiftKey ||
+-      event.altKey
+-    ) {
+-      return;
+-    }
+-    event.preventDefault();
+-    if (typeof window !== "undefined") {
+-      window.history.pushState({}, "", href);
+-      window.dispatchEvent(new PopStateEvent("popstate"));
+-    }
+-  };
+-  const topbarAccountMenu =
+-    topbarAccountEntry && topbarAccountEntry.loggedIn
+-      ? html`
+-          <div class="topbar-account">
+-            <button
+-              class="btn btn--sm btn--icon topbar-round-btn topbar-account__trigger topbar-account__trigger--user"
+-              type="button"
+-              title=${topbarAccountLabel ?? "账号"}
+-              aria-label=${topbarAccountLabel ?? "账号"}
+-              aria-haspopup="menu"
+-            >
+-              <span class="topbar-account__status" aria-hidden="true"></span>
+-              <span class="topbar-account__monogram">${topbarAccountMonogram}</span>
+-            </button>
+-            <div class="topbar-account__menu" role="menu" aria-label=${topbarAccountLabel ?? "账号"}>
+-              <a class="topbar-account__item" role="menuitem" href=${topbarAccountEntry.settingsHref}>
+-                <strong>${topbarAccountLabel}</strong>
+-              </a>
+-              <a class="topbar-account__item" role="menuitem" href=${topbarAccountEntry.settingsHref}>
+-                ${topbarAccountEntry.settingsLabel}
+-              </a>
+-              <button class="topbar-account__item is-danger" type="button" role="menuitem" @click=${() => void state.logoutPlatformAuth()}>
+-                退出登录
+-              </button>
+-            </div>
+-          </div>
+-        `
+-      : topbarAccountEntry
+-        ? html`
+-            <div class="topbar-account">
+-              <button
+-                class="btn btn--sm btn--icon topbar-round-btn topbar-account__trigger topbar-account__trigger--user"
+-                type="button"
+-                title=${topbarAccountLabel ?? topbarAccountEntry.loginLabel}
+-                aria-label=${topbarAccountLabel ?? topbarAccountEntry.loginLabel}
+-                aria-haspopup="menu"
+-              >
+-                <span class="statusDot warn"></span>
+-                <span class="topbar-account__monogram">${topbarAccountMonogram}</span>
+-              </button>
+-              <div class="topbar-account__menu topbar-account__menu--auth" role="menu" aria-label=${topbarAccountLabel ?? "登录入口"}>
+-                <div class="topbar-account__heading">
+-                  <strong>${topbarAuthTitle}</strong>
+-                  <span>${topbarAuthSubtitle}</span>
+-                </div>
+-                ${
+-                  topbarAuthModes.length > 1
+-                    ? html`
+-                        <div class="topbar-account__tabs">
+-                          ${topbarAuthModes.map(
+-                            (mode) => html`
+-                              <button
+-                                class="topbar-account__tab ${topbarAuthMode === mode ? "is-active" : ""}"
+-                                type="button"
+-                                @click=${() => {
+-                                  state.platformAuthMode = mode;
+-                                  state.platformAuthNotice = null;
+-                                }}
+-                              >
+-                                ${topbarAuthModeLabel(mode)}
+-                              </button>
+-                            `,
+-                          )}
+-                        </div>
+-                      `
+-                    : nothing
+-                }
+-                <div class="topbar-account__form">
+-                  ${
+-                    topbarAuthMode === "enterprise-activate" ||
+-                    topbarAuthMode === "platform-bootstrap"
+-                      ? html`
+-                          <label class="topbar-account__field">
+-                            <span>姓名</span>
+-                            <input
+-                              class="input"
+-                              .value=${state.platformAuthDisplayName}
+-                              @input=${(event: Event) => {
+-                                state.platformAuthDisplayName = (
+-                                  event.target as HTMLInputElement
+-                                ).value;
+-                                state.platformAuthNotice = null;
+-                              }}
+-                            />
+-                          </label>
+-                        `
+-                      : nothing
+-                  }
+-                  <label class="topbar-account__field">
+-                    <span>邮箱</span>
+-                    <input
+-                      class="input"
+-                      type="email"
+-                      .value=${state.platformAuthEmail}
+-                      @input=${(event: Event) => {
+-                        state.platformAuthEmail = (event.target as HTMLInputElement).value;
+-                        state.platformAuthNotice = null;
+-                      }}
+-                    />
+-                  </label>
+-                  ${
+-                    topbarAuthMode === "enterprise-activate"
+-                      ? html`
+-                          <label class="topbar-account__field">
+-                            <span>激活码</span>
+-                            <input
+-                              class="input"
+-                              .value=${state.platformAuthInviteCode}
+-                              @input=${(event: Event) => {
+-                                state.platformAuthInviteCode = (
+-                                  event.target as HTMLInputElement
+-                                ).value;
+-                                state.platformAuthNotice = null;
+-                              }}
+-                            />
+-                          </label>
+-                        `
+-                      : nothing
+-                  }
+-                  <label class="topbar-account__field">
+-                    <span>密码</span>
+-                    <input
+-                      class="input"
+-                      type="password"
+-                      .value=${state.platformAuthPassword}
+-                      @input=${(event: Event) => {
+-                        state.platformAuthPassword = (event.target as HTMLInputElement).value;
+-                        state.platformAuthNotice = null;
+-                      }}
+-                    />
+-                  </label>
+-                </div>
+-                ${
+-                  state.platformAuthError
+-                    ? html`<div class="topbar-account__notice is-danger">${state.platformAuthError}</div>`
+-                    : state.platformAuthNotice
+-                      ? html`<div class="topbar-account__notice is-success">${state.platformAuthNotice}</div>`
+-                      : nothing
+-                }
+-                <div class="topbar-account__footer">
+-                  <button
+-                    class="btn btn--primary btn--sm"
+-                    type="button"
+-                    ?disabled=${state.platformAuthBusy || topbarAuthDisabled || !topbarAuthMode}
+-                    @click=${() => {
+-                      if (!topbarAuthMode) {
+-                        return;
+-                      }
+-                      state.platformAuthMode = topbarAuthMode;
+-                      void state.submitPlatformAuth();
+-                    }}
+-                  >
+-                    ${state.platformAuthBusy ? "处理中..." : topbarAuthSubmitLabel(topbarAuthMode)}
+-                  </button>
+-                  ${
+-                    topbarFullLoginHref
+-                      ? html`
+-                          <a
+-                            class="topbar-account__item topbar-account__item--link"
+-                            href=${topbarFullLoginHref}
+-                            @click=${(event: MouseEvent) => openTopbarHref(event, topbarFullLoginHref)}
+-                          >
+-                            打开完整登录页
+-                          </a>
+-                        `
+-                      : nothing
+-                  }
+-                </div>
+-              </div>
+-            </div>
+-          `
+-        : nothing;
+-  const enterpriseTenantId = resolveEnterpriseTenantId(enterpriseState);
++  const customBrandLogoSrc = resolveCustomBrandLogoSrc(state.settings);
+   const isPlatformSurface = isPlatformTab(state.tab);
+   const isEnterpriseSurface = isEnterpriseTab(state.tab);
+-  const isEnterpriseResolver = isEnterpriseResolverPath(
+-    typeof window === "undefined"
+-      ? pathForTab(state.tab, state.basePath)
+-      : window.location.pathname,
+-    state.basePath,
+-  );
+-  const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
+-  const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
+-  const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
+-  const configValue =
+-    state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
+-  const platformActions = createPlatformPortActions({
+-    actionState: platformActionState,
+-    capabilityState,
+-  });
+-  const enterpriseActions = createEnterprisePortActions({
+-    actionState: enterpriseActionState,
+-    capabilityState,
++  const useBootstrapAuth = isCurrentControlUiGatewayTarget({
++    gatewayUrl: state.settings.gatewayUrl,
+   });
+-  const customBrandLogoSrc = resolveCustomBrandLogoSrc(state.settings);
+-  const isDaibaiWorkbenchSession = checkDaibaiWorkbenchSession({
+-    tab: state.tab,
+-    workbenchPrimaryModule: state.workbenchPrimaryModule,
+-    workbenchTeamSelectedKey: state.workbenchTeamSelectedKey,
+-    sessionKey: state.sessionKey,
+-    hello: state.hello,
++  const activePlatformSession = resolveActivePlatformSession(state);
++  const workspaceHomepageState = resolveWorkspaceHomepageState({
++    state,
++    activePlatformSession,
++    useBootstrapAuth,
+   });
+-  const daibaiAuthUser =
+-    state.hello?.auth?.user?.trim() ??
+-    state.platformAuthState?.session?.user?.trim() ??
+-    state.bootstrapAuthSession?.user?.trim() ??
+-    null;
+-  const dismissDaibaiGuide = () => {
+-    state.applySettings(acknowledgeDaibaiGuideForUser(state.settings, daibaiAuthUser ?? ""));
+-    state.daibaiLastMessage = null;
+-    state.daibaiAskResult = null;
+-    state.daibaiExecuteResult = null;
+-    state.daibaiError = null;
+-    state.daibaiActionError = null;
+-    state.daibaiPendingConfirmation = null;
+-  };
+-  const openChatSession = (sessionKey: string) => {
+-    state.workbenchPrimaryModule = "assistant";
+-    switchShellChatSession(state, sessionKey, {
+-      targetTab: "me",
+-      syncUrl: true,
+-    });
+-  };
+-  const resolveWorkbenchChatError = () => {
+-    if (!isDaibaiWorkbenchSession) {
+-      return state.lastError;
+-    }
+-    return state.daibaiError ?? state.daibaiActionError ?? state.lastError;
+-  };
+-  const buildChatSurfaceProps = (focusMode: boolean) => {
+-    const collaborationTargets = buildArtifactCollaborationTargets(state);
+-    const mentionCandidates = buildCurrentMentionCandidates(state);
+-    const incubationPreview = resolveArtifactPreviewIncubationView(state);
+-    return {
+-      sessionKey: state.sessionKey,
+-      onSessionKeyChange: (next: string) => {
+-        switchShellChatSession(state, next, {
+-          clearAttachments: true,
+-          clearQueue: true,
++  const showWorkspaceAuthHome = isWorkspaceHome && Boolean(workspaceHomepageState);
++  const platformSurfaceRequiresLogin = isPlatformSurface && shouldShowPlatformLoginEntry(state);
++
++  // Public / auth surfaces must return before employee/platform/enterprise shells
++  // are pulled into the critical path (keeps login LCP from downloading workbench).
++  if (state.tab === "trialApply") {
++    return renderTrialApplyPage({
++      brandLogoSrc: customBrandLogoSrc,
++      basePath,
++      currentLocale,
++      state: workspaceHomepageState ?? state.platformAuthState,
++      mode:
++        state.platformAuthMode === "enterprise-activate"
++          ? "enterprise-activate"
++          : "enterprise-create",
++      busy: state.platformAuthBusy,
++      error: state.platformAuthError,
++      notice: state.platformAuthNotice,
++      email: state.platformAuthEmail,
++      password: state.platformAuthPassword,
++      displayName: state.platformAuthDisplayName,
++      tenantName: state.platformAuthTenantName,
++      expectedUsers: state.platformAuthExpectedUsers,
++      useCase: state.platformAuthUseCase,
++      companySize: state.platformAuthCompanySize,
++      needsDemo: state.platformAuthNeedsDemo,
++      industry: state.platformAuthIndustry,
++      trialStep: state.platformAuthTrialStep,
++      inviteCode: state.platformAuthInviteCode,
++      onModeChange: (next) => {
++        state.platformAuthMode = next;
++        state.platformAuthTrialStep = 1;
++        state.platformAuthNotice = null;
++      },
++      onEmailChange: (next) => {
++        state.platformAuthEmail = next;
++        state.platformAuthNotice = null;
++      },
++      onPasswordChange: (next) => {
++        state.platformAuthPassword = next;
++        state.platformAuthNotice = null;
++      },
++      onDisplayNameChange: (next) => {
++        state.platformAuthDisplayName = next;
++        state.platformAuthNotice = null;
++      },
++      onTenantNameChange: (next) => {
++        state.platformAuthTenantName = next;
++        state.platformAuthNotice = null;
++      },
++      onExpectedUsersChange: (next) => {
++        state.platformAuthExpectedUsers = next;
++        state.platformAuthNotice = null;
++      },
++      onUseCaseChange: (next) => {
++        state.platformAuthUseCase = next;
++        state.platformAuthNotice = null;
++      },
++      onCompanySizeChange: (next) => {
++        state.platformAuthCompanySize = next;
++        state.platformAuthNotice = null;
++      },
++      onNeedsDemoChange: (next) => {
++        state.platformAuthNeedsDemo = next;
++        state.platformAuthNotice = null;
++      },
++      onIndustryChange: (next) => {
++        state.platformAuthIndustry = next;
++        state.platformAuthNotice = null;
++      },
++      onTrialStepChange: (next) => {
++        state.platformAuthTrialStep = next;
++        state.platformAuthNotice = null;
++      },
++      onInviteCodeChange: (next) => {
++        state.platformAuthInviteCode = next;
++        state.platformAuthNotice = null;
++      },
++      onLocaleChange: (next) => {
++        void i18n.setLocale(next);
++        state.applySettings({
++          ...state.settings,
++          locale: next,
++          localePinnedByUser: true,
+         });
+       },
+-      thinkingLevel: state.chatThinkingLevel,
+-      showThinking,
+-      showToolMessages: false,
+-      showToolCards: false,
+-      loading: state.chatLoading,
+-      sending: state.chatSending,
+-      compactionStatus: state.compactionStatus,
+-      fallbackStatus: state.fallbackStatus,
+-      assistantAvatarUrl: chatAvatarUrl,
+-      messages: state.chatMessages,
+-      toolMessages: state.chatToolMessages,
+-      streamSegments: state.chatStreamSegments,
+-      stream: state.chatStream,
+-      streamStartedAt: state.chatStreamStartedAt,
+-      draft: state.chatMessage,
+-      queue: state.chatQueue,
+-      connected: state.connected,
+-      canSend: state.connected,
+-      disabledReason: chatDisabledReason,
+-      error: resolveWorkbenchChatError(),
+-      sessions: state.sessionsResult,
+-      focusMode,
+-      onRefresh: () => refreshShellChat(state as unknown as Parameters<typeof refreshShellChat>[0]),
+-      onToggleFocusMode: () => {
+-        if (state.onboarding) {
+-          return;
+-        }
++      onForgotAccountHelp: () => {
++        state.platformAuthNotice = t("authHome.authLinks.accountHelp");
++      },
++      onSubmit: (mode) => {
++        state.platformAuthMode = mode;
++        void state.submitPlatformTrialApply();
++      },
++    });
++  }
++  if (state.tab === "pricing") {
++    return renderPublicPricingPage({
++      brandLogoSrc: customBrandLogoSrc,
++      basePath,
++      client: state.client,
++      currentLocale,
++      onLocaleChange: (next) => {
++        void i18n.setLocale(next);
+         state.applySettings({
+           ...state.settings,
+-          chatFocusMode: !state.settings.chatFocusMode,
++          locale: next,
++          localePinnedByUser: true,
+         });
+       },
+-      onChatScroll: (event: Event) => state.handleChatScroll(event),
+-      onDraftChange: (next: string) => (state.chatMessage = next),
+-      attachments: state.chatAttachments,
+-      onAttachmentsChange: (next: typeof state.chatAttachments) => (state.chatAttachments = next),
+-      onAttachmentAssetResolve: async (query: {
+-        fileName: string;
+-        sizeBytes?: number;
+-        lastModified?: number;
+-        allowLatestFallback?: boolean;
+-      }): Promise<ChatAttachment | null> => {
+-        if (!state.client || !state.connected) {
+-          return null;
+-        }
+-        const result = await state.client.request<{
+-          asset?: {
+-            assetId: string;
+-            versionId: string;
+-            fileName: string;
+-            mimeType: string;
+-            contentHash: string;
+-            sizeBytes: number;
+-            lastModified: number;
+-            content: string;
+-          } | null;
+-        }>("attachment.assets.resolve", query);
+-        const asset = result.asset;
+-        if (!asset?.content) {
+-          return null;
+-        }
+-        return {
+-          id: `${asset.assetId}-${asset.versionId}`,
+-          dataUrl: `data:${asset.mimeType};base64,${asset.content}`,
+-          mimeType: asset.mimeType,
+-          fileName: asset.fileName,
+-          assetId: asset.assetId,
+-          versionId: asset.versionId,
+-          contentHash: asset.contentHash,
+-          sizeBytes: asset.sizeBytes,
+-          lastModified: asset.lastModified,
+-          status: "ready" as const,
+-          progress: 100,
+-        };
++    });
++  }
++  if (
++    state.tab === "enterpriseLogin" ||
++    state.tab === "platformLogin" ||
++    platformSurfaceRequiresLogin
++  ) {
++    const isPlatformLogin = state.tab === "platformLogin" || platformSurfaceRequiresLogin;
++    return renderAuthHome({
++      brandLogoSrc: customBrandLogoSrc,
++      basePath,
++      client: state.client,
++      currentLocale,
++      state: workspaceHomepageState ?? state.platformAuthState,
++      mode: isPlatformLogin ? "platform-admin-login" : "enterprise-activate",
++      busy: state.platformAuthBusy,
++      error: state.platformAuthError,
++      notice: state.platformAuthNotice,
++      email: state.platformAuthEmail,
++      password: state.platformAuthPassword,
++      displayName: state.platformAuthDisplayName,
++      tenantName: state.platformAuthTenantName,
++      expectedUsers: state.platformAuthExpectedUsers,
++      useCase: state.platformAuthUseCase,
++      companySize: state.platformAuthCompanySize,
++      needsDemo: state.platformAuthNeedsDemo,
++      industry: state.platformAuthIndustry,
++      trialStep: state.platformAuthTrialStep,
++      inviteCode: state.platformAuthInviteCode,
++      mfaCode: state.platformAuthMfaCode,
++      mfaStage: state.platformAuthMfaStage,
++      mfaEnrollment: state.platformAuthMfaEnrollment,
++      onMfaCodeChange: (next) => {
++        state.platformAuthMfaCode = next;
++        state.platformAuthNotice = null;
+       },
+-      onAttachmentAssetUpsert: async (attachment: {
+-        fileName: string;
+-        mimeType: string;
+-        dataUrl: string;
+-        sizeBytes?: number;
+-        lastModified?: number;
+-      }): Promise<Partial<ChatAttachment> | null> => {
+-        if (!state.client || !state.connected) {
+-          return null;
+-        }
+-        const content =
+-          /^data:[^;]+;base64,([\s\S]+)$/.exec(attachment.dataUrl)?.[1] ?? attachment.dataUrl;
+-        const result = await state.client.request<{
+-          status: "created" | "existing" | "new-version";
+-          asset: {
+-            assetId: string;
+-            versionId: string;
+-            contentHash: string;
+-            sizeBytes: number;
+-            lastModified: number;
+-          };
+-        }>("attachment.assets.upsert", {
+-          fileName: attachment.fileName,
+-          mimeType: attachment.mimeType,
+-          content,
+-          sizeBytes: attachment.sizeBytes,
+-          lastModified: attachment.lastModified,
++      onModeChange: (next) => {
++        state.platformAuthMode = next;
++        state.platformAuthNotice = null;
++      },
++      onEmailChange: (next) => {
++        state.platformAuthEmail = next;
++        state.platformAuthNotice = null;
++      },
++      onPasswordChange: (next) => {
++        state.platformAuthPassword = next;
++        state.platformAuthNotice = null;
++      },
++      onDisplayNameChange: (next) => {
++        state.platformAuthDisplayName = next;
++        state.platformAuthNotice = null;
++      },
++      onTenantNameChange: (next) => {
++        state.platformAuthTenantName = next;
++        state.platformAuthNotice = null;
++      },
++      onExpectedUsersChange: (next) => {
++        state.platformAuthExpectedUsers = next;
++        state.platformAuthNotice = null;
++      },
++      onUseCaseChange: (next) => {
++        state.platformAuthUseCase = next;
++        state.platformAuthNotice = null;
++      },
++      onCompanySizeChange: (next) => {
++        state.platformAuthCompanySize = next;
++        state.platformAuthNotice = null;
++      },
++      onNeedsDemoChange: (next) => {
++        state.platformAuthNeedsDemo = next;
++        state.platformAuthNotice = null;
++      },
++      onIndustryChange: (next) => {
++        state.platformAuthIndustry = next;
++        state.platformAuthNotice = null;
++      },
++      onTrialStepChange: (next) => {
++        state.platformAuthTrialStep = next;
++        state.platformAuthNotice = null;
++      },
++      onInviteCodeChange: (next) => {
++        state.platformAuthInviteCode = next;
++        state.platformAuthNotice = null;
++      },
++      onLocaleChange: (next) => {
++        void i18n.setLocale(next);
++        state.applySettings({
++          ...state.settings,
++          locale: next,
++          localePinnedByUser: true,
+         });
+-        return result.asset ?? null;
+       },
+-      onSend: () => state.handleSendChat(),
+-      canAbort: Boolean(state.chatRunId),
+-      canUndo: Boolean(state.chatRunId),
+-      onAbort: () => void state.handleAbortChat(),
+-      onUndo: () => void state.handleSendChat("/undo"),
+-      checkpoints: state.chatCheckpoints,
+-      pendingRestoreCheckpointId: state.pendingRestoreCheckpointId,
+-      restoreInFlightCheckpointId: state.restoreInFlightCheckpointId,
+-      onRequestRestoreCheckpoint: (checkpointId: string) =>
+-        state.requestRestoreCheckpoint(checkpointId),
+-      onCancelRestoreCheckpoint: () => state.cancelRestoreCheckpoint(),
+-      onConfirmRestoreCheckpoint: (checkpointId: string) =>
+-        void state.confirmRestoreCheckpoint(checkpointId),
+-      onQueueRemove: (id: string) => state.removeQueuedMessage(id),
+-      onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
+-      showNewMessages: state.chatNewMessagesBelow && !state.chatManualRefreshInFlight,
+-      onScrollToBottom: () => state.scrollToBottom(),
+-      sidebarOpen: state.sidebarOpen,
+-      sidebarPreviewMode: state.sidebarPreviewMode,
+-      sidebarContent: state.sidebarContent,
+-      sidebarError: state.sidebarError,
+-      artifactWorkspace: state.sidebarArtifactWorkspace,
+-      deliverableSaveState: state.sidebarDeliverableSaveState,
+-      deliverableSaveToast: state.sidebarDeliverableSaveToast,
+-      collaborationTargets,
+-      splitRatio: state.splitRatio,
+-      onOpenSidebar: (content: string) => state.handleOpenSidebar(content),
+-      onOpenArtifact: (artifactId: string) => state.handleOpenArtifact(artifactId),
+-      onCloseSidebar: () => state.handleCloseSidebar(),
+-      onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
+-      onSidebarArtifactEditRequest: (prompt: string) =>
+-        void state.handleSendChat(prompt, { restoreDraft: true }),
+-      onSidebarPptEditRequest: (prompt: string) =>
+-        void state.handleSendChat(prompt, { restoreDraft: true }),
+-      onSaveDeliverable: state.connected
+-        ? () => void state.handleSaveSidebarDeliverable()
+-        : undefined,
+-      onDeliverableInlineEditApplied: (content: string) =>
+-        state.handleDeliverableInlineEditApplied(content),
+-      assetIncubationLevel: incubationPreview.level,
+-      assetIncubationReason: incubationPreview.reason,
+-      showWeakAssetIncubationHint: incubationPreview.showWeakHint,
+-      showSystemAssetIncubationHint: incubationPreview.showSystemSuggest,
+-      showEnterpriseSubmitFromIncubation: incubationPreview.showEnterpriseSubmitAction,
+-      onOpenSkillSaveFromPreview: state.connected
+-        ? (preferEnterprise?: boolean) =>
+-            openSkillSaveFromPreview(state, Boolean(preferEnterprise), () => state.requestUpdate())
+-        : undefined,
+-      onDismissAssetIncubationFromPreview: () =>
+-        dismissAssetIncubationFromPreview(state, () => state.requestUpdate()),
+-      onGrantArtifactToTarget: state.connected
+-        ? (artifactId: string, targetSessionKey?: string) =>
+-            shareArtifactToCollaborationTarget(
+-              state,
+-              artifactId,
+-              targetSessionKey,
+-              collaborationTargets,
+-            )
+-        : undefined,
+-      assistantName: state.assistantName,
+-      assistantAvatar: state.assistantAvatar,
+-      participantAgents: state.agentsList?.agents ?? [],
+-      localUserDisplayName: resolveLocalUserDisplayName(state),
+-      mentionCandidates,
+-      onOpenCronTaskDetail: (jobId: string) => openEmployeeCronTaskDetail(state, jobId),
+-      onOpenCronTaskResult: (message: unknown) => {
+-        const artifact = resolveCronResultArtifactRecord(message);
+-        const artifactId =
+-          artifact && typeof artifact.artifactId === "string" ? artifact.artifactId : null;
+-        if (artifactId) {
+-          state.handleOpenArtifact(artifactId);
+-        }
++      onForgotAccountHelp: () => {
++        state.platformAuthNotice = t("authHome.authLinks.accountHelp");
+       },
+-      implicitCronReplyHint: (() => {
+-        const meta = resolveImplicitCronReplyContext(state.chatMessages);
+-        return meta?.jobName?.trim() || (meta ? "定时任务" : null);
+-      })(),
+-    };
+-  };
+-  const workbenchThreadPrelude = isDaibaiWorkbenchSession
+-    ? renderDaibaiThreadPrelude(
+-        {
+-          daibaiLoading: state.daibaiLoading,
+-          daibaiAskResult: state.daibaiAskResult,
+-          daibaiExecuteResult: state.daibaiExecuteResult,
+-          daibaiActionLoading: state.daibaiActionLoading,
+-          daibaiActionPendingId: state.daibaiActionPendingId,
+-          daibaiActionError: state.daibaiActionError,
+-          daibaiPendingConfirmation: state.daibaiPendingConfirmation,
+-          onAskDaibai: (message?: string) =>
+-            message ? state.handleSendChat(message) : state.handleSendChat(),
+-          onExecuteDaibaiAction: (actionId, payload) =>
+-            state.executeDaibaiAction(actionId, payload),
+-          onConfirmDaibaiPendingAction: () => state.confirmDaibaiPendingAction(),
+-          onCancelDaibaiPendingConfirmation: () => state.cancelDaibaiPendingConfirmation(),
+-          onOpenDaibaiHelp: (params) => state.openDaibaiHelpFromModule(params),
+-        },
+-        {
+-          guideAcknowledged: isDaibaiGuideAcknowledgedForUser(state.settings, daibaiAuthUser),
+-          onDismissGuide: dismissDaibaiGuide,
+-          showStewardFooter: true,
+-        },
+-      )
+-    : renderWorkbenchGrowthThreadPrelude(state);
+-  const workbenchChatProps = {
+-    ...buildChatSurfaceProps(false),
+-    renderMode: "workbench-compact" as const,
+-    threadPrelude: normalizeThreadPrelude(workbenchThreadPrelude),
+-  };
+-  const workbenchChat = renderChatContent(workbenchChatProps);
+-  const workbenchComposer = renderChatCompose(workbenchChatProps);
+-  const useBootstrapAuth = isCurrentControlUiGatewayTarget({
+-    gatewayUrl: state.settings.gatewayUrl,
+-  });
+-  const activePlatformSession = resolveActivePlatformSession(state);
+-  const workspaceHomepageState = resolveWorkspaceHomepageState({
+-    state,
+-    activePlatformSession,
+-    useBootstrapAuth,
+-  });
+-  const workbenchAuthPanel = workspaceHomepageState
+-    ? (() => {
+-        const panel = renderPlatformAuthPanel({
+-          basePath,
+-          state: workspaceHomepageState,
+-          session: activePlatformSession,
+-          mode: state.platformAuthMode,
+-          busy: state.platformAuthBusy,
+-          error: state.platformAuthError,
+-          notice: state.platformAuthNotice,
+-          email: state.platformAuthEmail,
+-          password: state.platformAuthPassword,
+-          displayName: state.platformAuthDisplayName,
+-          platformAdminDisplayName: state.platformAuthPlatformAdminDisplayName,
+-          tenantName: state.platformAuthTenantName,
+-          seatTitle: state.platformAuthSeatTitle,
+-          inviteCode: state.platformAuthInviteCode,
+-          currentPassword: state.platformAuthCurrentPassword,
+-          newPassword: state.platformAuthNewPassword,
+-          policyTrialDays: state.platformAuthPolicyTrialDays,
+-          policySeatCount: state.platformAuthPolicySeatCount,
+-          policyUpgradeUrl: state.platformAuthPolicyUpgradeUrl,
+-          policyContactAdvisorUrl: state.platformAuthPolicyContactAdvisorUrl,
+-          instanceEnterpriseId: state.platformAuthInstanceEnterpriseId,
+-          instanceTrialDays: state.platformAuthInstanceTrialDays,
+-          instanceSeatCount: state.platformAuthInstanceSeatCount,
+-          instanceUpgradeUrl: state.platformAuthInstanceUpgradeUrl,
+-          instanceContactAdvisorUrl: state.platformAuthInstanceContactAdvisorUrl,
+-          platformAdminEmail: state.platformAuthPlatformAdminEmail,
+-          platformAdminPassword: state.platformAuthPlatformAdminPassword,
+-          platformAdminScopes: state.platformAuthPlatformAdminScopes,
+-          compact: true,
+-          onModeChange: (next) => {
+-            state.platformAuthMode = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onEmailChange: (next) => {
+-            state.platformAuthEmail = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPasswordChange: (next) => {
+-            state.platformAuthPassword = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onDisplayNameChange: (next) => {
+-            state.platformAuthDisplayName = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPlatformAdminDisplayNameChange: (next) => {
+-            state.platformAuthPlatformAdminDisplayName = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onTenantNameChange: (next) => {
+-            state.platformAuthTenantName = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onSeatTitleChange: (next) => {
+-            state.platformAuthSeatTitle = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onInviteCodeChange: (next) => {
+-            state.platformAuthInviteCode = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onCurrentPasswordChange: (next) => {
+-            state.platformAuthCurrentPassword = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onNewPasswordChange: (next) => {
+-            state.platformAuthNewPassword = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPolicyTrialDaysChange: (next) => {
+-            state.platformAuthPolicyTrialDays = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPolicySeatCountChange: (next) => {
+-            state.platformAuthPolicySeatCount = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPolicyUpgradeUrlChange: (next) => {
+-            state.platformAuthPolicyUpgradeUrl = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPolicyContactAdvisorUrlChange: (next) => {
+-            state.platformAuthPolicyContactAdvisorUrl = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onInstanceEnterpriseIdChange: (next) => {
+-            state.platformAuthInstanceEnterpriseId = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onInstanceTrialDaysChange: (next) => {
+-            state.platformAuthInstanceTrialDays = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onInstanceSeatCountChange: (next) => {
+-            state.platformAuthInstanceSeatCount = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onInstanceUpgradeUrlChange: (next) => {
+-            state.platformAuthInstanceUpgradeUrl = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onInstanceContactAdvisorUrlChange: (next) => {
+-            state.platformAuthInstanceContactAdvisorUrl = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPlatformAdminEmailChange: (next) => {
+-            state.platformAuthPlatformAdminEmail = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPlatformAdminPasswordChange: (next) => {
+-            state.platformAuthPlatformAdminPassword = next;
+-            state.platformAuthNotice = null;
+-          },
+-          onPlatformAdminScopesChange: (next) => {
+-            state.platformAuthPlatformAdminScopes = [...next];
+-            state.platformAuthNotice = null;
+-          },
+-          onSubmit: () => void state.submitPlatformAuth(),
+-          onCreatePlatformAdmin: () => void state.createPlatformAdmin(),
+-          onLogout: () => void state.logoutPlatformAuth(),
+-          onCreateInvite: () => void state.createPlatformAuthInvite(),
+-          onRevokeInvite: (code) => void state.revokePlatformAuthInvite(code),
+-          onRemoveMember: (user) => void state.removePlatformAuthMember(user),
+-          onChangePassword: () => void state.changePlatformAuthPassword(),
+-          onUpdateTrialPolicy: () => void state.updatePlatformTrialPolicy(),
+-          onUpdateTrialInstance: () => void state.updatePlatformTrialInstance(),
+-        });
+-        return panel === nothing ? null : panel;
+-      })()
+-    : null;
+-  const showWorkspaceAuthHome = isWorkspaceHome && Boolean(workbenchAuthPanel);
+-  if (state.tab === "trialApply") {
+-    return renderTrialApplyPage({
++      entryVariant: isPlatformLogin ? "platform" : "enterprise",
++      onSubmit: (mode) => {
++        state.platformAuthMode = mode;
++        state.platformAuthLoginIntent = isPlatformLogin ? "platform-admin" : "enterprise-admin";
++        void state.submitPlatformAuth();
++      },
++    });
++  }
++  if (showWorkspaceAuthHome) {
++    return renderAuthHome({
+       brandLogoSrc: customBrandLogoSrc,
+       basePath,
++      client: state.client,
+       currentLocale,
+-      state: workspaceHomepageState ?? state.platformAuthState,
+-      mode:
+-        state.platformAuthMode === "enterprise-activate"
+-          ? "enterprise-activate"
+-          : "enterprise-create",
++      state: workspaceHomepageState,
++      mode: state.platformAuthMode,
+       busy: state.platformAuthBusy,
+       error: state.platformAuthError,
+       notice: state.platformAuthNotice,
+@@ -1242,6 +738,13 @@ export function renderApp(state: AppViewState) {
+       industry: state.platformAuthIndustry,
+       trialStep: state.platformAuthTrialStep,
+       inviteCode: state.platformAuthInviteCode,
++      mfaCode: state.platformAuthMfaCode,
++      mfaStage: state.platformAuthMfaStage,
++      mfaEnrollment: state.platformAuthMfaEnrollment,
++      onMfaCodeChange: (next) => {
++        state.platformAuthMfaCode = next;
++        state.platformAuthNotice = null;
++      },
+       onModeChange: (next) => {
+         state.platformAuthMode = next;
+         state.platformAuthTrialStep = 1;
+@@ -1302,271 +805,845 @@ export function renderApp(state: AppViewState) {
+       onForgotAccountHelp: () => {
+         state.platformAuthNotice = t("authHome.authLinks.accountHelp");
+       },
++      entryVariant: "public",
+       onSubmit: (mode) => {
+         state.platformAuthMode = mode;
+-        void state.submitPlatformTrialApply();
++        if (
++          state.platformAuthMode === "enterprise-create" ||
++          state.platformAuthMode === "platform-enterprise-create"
++        ) {
++          const inferredTenantName =
++            state.platformAuthTenantName.trim() ||
++            state.platformAuthDisplayName.trim() ||
++            state.platformAuthEmail.trim().split("@")[0] ||
++            "OpenBot Workspace";
++          state.platformAuthTenantName = inferredTenantName;
++        }
++        if (state.platformAuthMode === "enterprise-create") {
++          void state.submitPlatformTrialApply();
++          return;
++        }
++        void state.submitPlatformAuth();
+       },
+     });
+   }
+-  if (state.tab === "pricing") {
+-    return renderPublicPricingPage({
+-      brandLogoSrc: customBrandLogoSrc,
+-      basePath,
+-      client: state.client,
+-      currentLocale,
+-      onLocaleChange: (next) => {
+-        void i18n.setLocale(next);
+-        state.applySettings({
+-          ...state.settings,
+-          locale: next,
+-          localePinnedByUser: true,
+-        });
+-      },
+-    });
++
++  const employeeShell = loadShellModule<EmployeeShell>(
++    "employee",
++    () => import("./shells/employee-shell.ts"),
++    shellHost(state),
++  );
++  const chatShell = isWorkspaceHome
++    ? loadShellModule<ChatShell>(
++        "chat",
++        () => import("./shells/chat-shell.ts"),
++        shellHost(state),
++      )
++    : null;
++  const platformShell = isPlatformSurface
++    ? loadShellModule<PlatformShell>(
++        "platform",
++        () => import("./shells/platform-shell.ts"),
++        shellHost(state),
++      )
++    : null;
++  const enterpriseShell = isEnterpriseSurface
++    ? loadShellModule<EnterpriseShell>(
++        "enterprise",
++        () => import("./shells/enterprise-shell.ts"),
++        shellHost(state),
++      )
++    : null;
++  const needsFrontstage =
++    state.tab === "personas" || state.tab === "contacts" || state.tab === "groups";
++  const frontstageShell = needsFrontstage
++    ? loadShellModule<FrontstageShell>(
++        "frontstage",
++        () => import("./shells/frontstage-shell.ts"),
++        shellHost(state),
++      )
++    : null;
++
++  if (isWorkspaceHome && (!employeeShell || !chatShell)) {
++    return renderShellLoading("OpenBot 工作台");
+   }
+-  // Platform surfaces (admin.openbot.love) require an authenticated platform-admin
+-  // session. When platform auth is enabled but no admin session is active, render the
+-  // dedicated platform login page instead of leaking the content shell behind a topbar
+-  // popup. Once the visitor authenticates, submitPlatformAuth() lands them on
+-  // platformDashboard with data loaded via connect().
+-  const platformSurfaceRequiresLogin = isPlatformSurface && shouldShowPlatformLoginEntry(state);
+-  if (
+-    state.tab === "enterpriseLogin" ||
+-    state.tab === "platformLogin" ||
+-    platformSurfaceRequiresLogin
+-  ) {
+-    const isPlatformLogin = state.tab === "platformLogin" || platformSurfaceRequiresLogin;
+-    return renderAuthHome({
+-      brandLogoSrc: customBrandLogoSrc,
+-      basePath,
+-      client: state.client,
+-      currentLocale,
+-      state: workspaceHomepageState ?? state.platformAuthState,
+-      mode: isPlatformLogin ? "platform-admin-login" : "enterprise-activate",
+-      busy: state.platformAuthBusy,
+-      error: state.platformAuthError,
+-      notice: state.platformAuthNotice,
+-      email: state.platformAuthEmail,
+-      password: state.platformAuthPassword,
+-      displayName: state.platformAuthDisplayName,
+-      tenantName: state.platformAuthTenantName,
+-      expectedUsers: state.platformAuthExpectedUsers,
+-      useCase: state.platformAuthUseCase,
+-      companySize: state.platformAuthCompanySize,
+-      needsDemo: state.platformAuthNeedsDemo,
+-      industry: state.platformAuthIndustry,
+-      trialStep: state.platformAuthTrialStep,
+-      inviteCode: state.platformAuthInviteCode,
+-      mfaCode: state.platformAuthMfaCode,
+-      mfaStage: state.platformAuthMfaStage,
+-      mfaEnrollment: state.platformAuthMfaEnrollment,
+-      onMfaCodeChange: (next) => {
+-        state.platformAuthMfaCode = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onModeChange: (next) => {
+-        state.platformAuthMode = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onEmailChange: (next) => {
+-        state.platformAuthEmail = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onPasswordChange: (next) => {
+-        state.platformAuthPassword = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onDisplayNameChange: (next) => {
+-        state.platformAuthDisplayName = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onTenantNameChange: (next) => {
+-        state.platformAuthTenantName = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onExpectedUsersChange: (next) => {
+-        state.platformAuthExpectedUsers = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onUseCaseChange: (next) => {
+-        state.platformAuthUseCase = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onCompanySizeChange: (next) => {
+-        state.platformAuthCompanySize = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onNeedsDemoChange: (next) => {
+-        state.platformAuthNeedsDemo = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onIndustryChange: (next) => {
+-        state.platformAuthIndustry = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onTrialStepChange: (next) => {
+-        state.platformAuthTrialStep = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onInviteCodeChange: (next) => {
+-        state.platformAuthInviteCode = next;
+-        state.platformAuthNotice = null;
++  if (isPlatformSurface && !platformShell) {
++    return renderShellLoading("平台控制台");
++  }
++  if (isEnterpriseSurface && !enterpriseShell) {
++    return renderShellLoading("企业控制台");
++  }
++  if (needsFrontstage && !frontstageShell) {
++    return renderShellLoading("通讯录");
++  }
++
++  const enterpriseState = enterpriseShell?.adaptEnterprisePortState(state) ?? null;
++  const enterpriseActionState = enterpriseShell?.adaptEnterprisePortActionState(state) ?? null;
++  const platformState = platformShell?.adaptPlatformPortState(state) ?? null;
++  const platformActionState = platformShell?.adaptPlatformPortActionState(state) ?? null;
++  const shellTheme = resolveShellTheme(state.theme);
++  const nextLocaleValue = nextShellLocale(currentLocale);
++  const nextThemeValue = nextShellTheme(shellTheme);
++  const bundledBrandWordmarkSrc = resolveBundledBrandWordmarkSrc(basePath);
++  const activePlatformAuthSession = resolveActivePlatformAuthSession(state);
++  const topbarAccountEntry =
++    activePort === "enterprise"
++      ? {
++          loggedIn: Boolean(activePlatformAuthSession),
++          loginHref: pathForTab("enterpriseLogin", basePath),
++          loginLabel: "企业登录",
++          settingsHref: pathForTab("enterpriseSettings", basePath, {
++            tenantId:
++              state.platformAuthState?.session?.tenantId?.trim() ??
++              state.bootstrapAuthSession?.tenantId?.trim() ??
++              undefined,
++          }),
++          settingsLabel: "管理员设置",
++        }
++      : activePort === "platform"
++        ? {
++            loggedIn: isPlatformAdminAuthenticated(state),
++            loginHref: pathForTab("platformLogin", basePath),
++            loginLabel: "平台登录",
++            settingsHref: pathForTab("platformSystemSettings", basePath),
++            settingsLabel: "管理员设置",
++          }
++        : null;
++  const topbarAccountLabel =
++    activePort === "enterprise" ? "企业账户" : activePort === "platform" ? "平台账户" : null;
++  const topbarAccountMonogram = (topbarAccountLabel?.trim()[0] ?? "U").toUpperCase();
++  const topbarAuthMode =
++    activePort === "enterprise"
++      ? state.platformAuthMode === "enterprise-activate"
++        ? "enterprise-activate"
++        : "login"
++      : activePort === "platform"
++        ? state.platformAuthState?.requiresPlatformBootstrap
++          ? "platform-bootstrap"
++          : state.platformAuthMode === "platform-super-admin-login"
++            ? "platform-super-admin-login"
++            : "platform-admin-login"
++        : null;
++  const topbarAuthModes =
++    activePort === "enterprise"
++      ? ([
++          "login",
++          ...(state.platformAuthState?.pendingActivation || state.platformAuthInviteCode.trim()
++            ? (["enterprise-activate"] as const)
++            : []),
++        ] as const)
++      : activePort === "platform"
++        ? state.platformAuthState?.requiresPlatformBootstrap
++          ? (["platform-bootstrap"] as const)
++          : (["platform-admin-login", "platform-super-admin-login"] as const)
++        : ([] as const);
++  const topbarFullLoginHref =
++    activePort === "enterprise"
++      ? pathForTab("enterpriseLogin", basePath)
++      : activePort === "platform"
++        ? pathForTab("platformLogin", basePath)
++        : null;
++  const topbarAuthTitle =
++    activePort === "enterprise"
++      ? "企业管理员登录"
++      : activePort === "platform"
++        ? "平台管理员登录"
++        : "";
++  const topbarAuthSubtitle =
++    activePort === "enterprise"
++      ? "登录企业控制台，或使用管理员激活码完成首次激活。"
++      : activePort === "platform"
++        ? "登录平台控制台；首次部署时可在这里完成超管初始化。"
++        : "";
++  const topbarAuthModeLabel = (mode: string) =>
++    mode === "enterprise-activate"
++      ? "管理员激活"
++      : mode === "platform-super-admin-login"
++        ? "超管登录"
++        : mode === "platform-bootstrap"
++          ? "初始化平台"
++          : "登录";
++  const topbarAuthSubmitLabel = (mode: string | null) =>
++    mode === "enterprise-activate"
++      ? "完成激活"
++      : mode === "platform-super-admin-login"
++        ? "超管登录"
++        : mode === "platform-bootstrap"
++          ? "初始化平台"
++          : activePort === "platform"
++            ? "平台登录"
++            : "企业登录";
++  const topbarAuthDisabled =
++    topbarAuthMode === "enterprise-activate"
++      ? !state.platformAuthDisplayName.trim() ||
++        !state.platformAuthEmail.trim() ||
++        !state.platformAuthInviteCode.trim() ||
++        !state.platformAuthPassword.trim()
++      : topbarAuthMode === "platform-bootstrap"
++        ? !state.platformAuthDisplayName.trim() ||
++          !state.platformAuthEmail.trim() ||
++          !state.platformAuthPassword.trim()
++        : !state.platformAuthEmail.trim() || !state.platformAuthPassword.trim();
++  const openTopbarHref = (event: MouseEvent, href: string | null) => {
++    if (!href) {
++      return;
++    }
++    if (
++      event.defaultPrevented ||
++      event.button !== 0 ||
++      event.metaKey ||
++      event.ctrlKey ||
++      event.shiftKey ||
++      event.altKey
++    ) {
++      return;
++    }
++    event.preventDefault();
++    if (typeof window !== "undefined") {
++      window.history.pushState({}, "", href);
++      window.dispatchEvent(new PopStateEvent("popstate"));
++    }
++  };
++  const topbarAccountMenu =
++    topbarAccountEntry && topbarAccountEntry.loggedIn
++      ? html`
++          <div class="topbar-account">
++            <button
++              class="btn btn--sm btn--icon topbar-round-btn topbar-account__trigger topbar-account__trigger--user"
++              type="button"
++              title=${topbarAccountLabel ?? "账号"}
++              aria-label=${topbarAccountLabel ?? "账号"}
++              aria-haspopup="menu"
++            >
++              <span class="topbar-account__status" aria-hidden="true"></span>
++              <span class="topbar-account__monogram">${topbarAccountMonogram}</span>
++            </button>
++            <div class="topbar-account__menu" role="menu" aria-label=${topbarAccountLabel ?? "账号"}>
++              <a class="topbar-account__item" role="menuitem" href=${topbarAccountEntry.settingsHref}>
++                <strong>${topbarAccountLabel}</strong>
++              </a>
++              <a class="topbar-account__item" role="menuitem" href=${topbarAccountEntry.settingsHref}>
++                ${topbarAccountEntry.settingsLabel}
++              </a>
++              <button class="topbar-account__item is-danger" type="button" role="menuitem" @click=${() => void state.logoutPlatformAuth()}>
++                退出登录
++              </button>
++            </div>
++          </div>
++        `
++      : topbarAccountEntry
++        ? html`
++            <div class="topbar-account">
++              <button
++                class="btn btn--sm btn--icon topbar-round-btn topbar-account__trigger topbar-account__trigger--user"
++                type="button"
++                title=${topbarAccountLabel ?? topbarAccountEntry.loginLabel}
++                aria-label=${topbarAccountLabel ?? topbarAccountEntry.loginLabel}
++                aria-haspopup="menu"
++              >
++                <span class="statusDot warn"></span>
++                <span class="topbar-account__monogram">${topbarAccountMonogram}</span>
++              </button>
++              <div class="topbar-account__menu topbar-account__menu--auth" role="menu" aria-label=${topbarAccountLabel ?? "登录入口"}>
++                <div class="topbar-account__heading">
++                  <strong>${topbarAuthTitle}</strong>
++                  <span>${topbarAuthSubtitle}</span>
++                </div>
++                ${
++                  topbarAuthModes.length > 1
++                    ? html`
++                        <div class="topbar-account__tabs">
++                          ${topbarAuthModes.map(
++                            (mode) => html`
++                              <button
++                                class="topbar-account__tab ${topbarAuthMode === mode ? "is-active" : ""}"
++                                type="button"
++                                @click=${() => {
++                                  state.platformAuthMode = mode;
++                                  state.platformAuthNotice = null;
++                                }}
++                              >
++                                ${topbarAuthModeLabel(mode)}
++                              </button>
++                            `,
++                          )}
++                        </div>
++                      `
++                    : nothing
++                }
++                <div class="topbar-account__form">
++                  ${
++                    topbarAuthMode === "enterprise-activate" ||
++                    topbarAuthMode === "platform-bootstrap"
++                      ? html`
++                          <label class="topbar-account__field">
++                            <span>姓名</span>
++                            <input
++                              class="input"
++                              .value=${state.platformAuthDisplayName}
++                              @input=${(event: Event) => {
++                                state.platformAuthDisplayName = (
++                                  event.target as HTMLInputElement
++                                ).value;
++                                state.platformAuthNotice = null;
++                              }}
++                            />
++                          </label>
++                        `
++                      : nothing
++                  }
++                  <label class="topbar-account__field">
++                    <span>邮箱</span>
++                    <input
++                      class="input"
++                      type="email"
++                      .value=${state.platformAuthEmail}
++                      @input=${(event: Event) => {
++                        state.platformAuthEmail = (event.target as HTMLInputElement).value;
++                        state.platformAuthNotice = null;
++                      }}
++                    />
++                  </label>
++                  ${
++                    topbarAuthMode === "enterprise-activate"
++                      ? html`
++                          <label class="topbar-account__field">
++                            <span>激活码</span>
++                            <input
++                              class="input"
++                              .value=${state.platformAuthInviteCode}
++                              @input=${(event: Event) => {
++                                state.platformAuthInviteCode = (
++                                  event.target as HTMLInputElement
++                                ).value;
++                                state.platformAuthNotice = null;
++                              }}
++                            />
++                          </label>
++                        `
++                      : nothing
++                  }
++                  <label class="topbar-account__field">
++                    <span>密码</span>
++                    <input
++                      class="input"
++                      type="password"
++                      .value=${state.platformAuthPassword}
++                      @input=${(event: Event) => {
++                        state.platformAuthPassword = (event.target as HTMLInputElement).value;
++                        state.platformAuthNotice = null;
++                      }}
++                    />
++                  </label>
++                </div>
++                ${
++                  state.platformAuthError
++                    ? html`<div class="topbar-account__notice is-danger">${state.platformAuthError}</div>`
++                    : state.platformAuthNotice
++                      ? html`<div class="topbar-account__notice is-success">${state.platformAuthNotice}</div>`
++                      : nothing
++                }
++                <div class="topbar-account__footer">
++                  <button
++                    class="btn btn--primary btn--sm"
++                    type="button"
++                    ?disabled=${state.platformAuthBusy || topbarAuthDisabled || !topbarAuthMode}
++                    @click=${() => {
++                      if (!topbarAuthMode) {
++                        return;
++                      }
++                      state.platformAuthMode = topbarAuthMode;
++                      void state.submitPlatformAuth();
++                    }}
++                  >
++                    ${state.platformAuthBusy ? "处理中..." : topbarAuthSubmitLabel(topbarAuthMode)}
++                  </button>
++                  ${
++                    topbarFullLoginHref
++                      ? html`
++                          <a
++                            class="topbar-account__item topbar-account__item--link"
++                            href=${topbarFullLoginHref}
++                            @click=${(event: MouseEvent) => openTopbarHref(event, topbarFullLoginHref)}
++                          >
++                            打开完整登录页
++                          </a>
++                        `
++                      : nothing
++                  }
++                </div>
++              </div>
++            </div>
++          `
++        : nothing;
++  const enterpriseTenantId =
++    enterpriseShell && enterpriseState
++      ? enterpriseShell.resolveEnterpriseTenantId(enterpriseState)
++      : null;
++  const isEnterpriseResolver = isEnterpriseResolverPath(
++    typeof window === "undefined"
++      ? pathForTab(state.tab, state.basePath)
++      : window.location.pathname,
++    state.basePath,
++  );
++  const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
++  const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
++  const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
++  const configValue =
++    state.configForm ?? (state.configSnapshot?.config as Record<string, unknown> | null);
++  const platformActions =
++    platformShell && platformActionState
++      ? platformShell.createPlatformPortActions({
++          actionState: platformActionState,
++          capabilityState,
++        })
++      : null;
++  const enterpriseActions =
++    enterpriseShell && enterpriseActionState
++      ? enterpriseShell.createEnterprisePortActions({
++          actionState: enterpriseActionState,
++          capabilityState,
++        })
++      : null;
++  const isDaibaiWorkbenchSession = checkDaibaiWorkbenchSession({
++    tab: state.tab,
++    workbenchPrimaryModule: state.workbenchPrimaryModule,
++    workbenchTeamSelectedKey: state.workbenchTeamSelectedKey,
++    sessionKey: state.sessionKey,
++    hello: state.hello,
++  });
++  const daibaiAuthUser =
++    state.hello?.auth?.user?.trim() ??
++    state.platformAuthState?.session?.user?.trim() ??
++    state.bootstrapAuthSession?.user?.trim() ??
++    null;
++  const dismissDaibaiGuide = () => {
++    state.applySettings(acknowledgeDaibaiGuideForUser(state.settings, daibaiAuthUser ?? ""));
++    state.daibaiLastMessage = null;
++    state.daibaiAskResult = null;
++    state.daibaiExecuteResult = null;
++    state.daibaiError = null;
++    state.daibaiActionError = null;
++    state.daibaiPendingConfirmation = null;
++  };
++  const openChatSession = (sessionKey: string) => {
++    state.workbenchPrimaryModule = "assistant";
++    switchShellChatSession(state, sessionKey, {
++      targetTab: "me",
++      syncUrl: true,
++    });
++  };
++  const resolveWorkbenchChatError = () => {
++    if (!isDaibaiWorkbenchSession) {
++      return state.lastError;
++    }
++    return state.daibaiError ?? state.daibaiActionError ?? state.lastError;
++  };
++  const buildChatSurfaceProps = (focusMode: boolean) => {
++    const collaborationTargets = buildArtifactCollaborationTargets(state);
++    const mentionCandidates = buildCurrentMentionCandidates(state);
++    const incubationPreview = resolveArtifactPreviewIncubationView(state);
++    return {
++      sessionKey: state.sessionKey,
++      onSessionKeyChange: (next: string) => {
++        switchShellChatSession(state, next, {
++          clearAttachments: true,
++          clearQueue: true,
++        });
+       },
+-      onLocaleChange: (next) => {
+-        void i18n.setLocale(next);
++      thinkingLevel: state.chatThinkingLevel,
++      showThinking,
++      showToolMessages: false,
++      showToolCards: false,
++      loading: state.chatLoading,
++      sending: state.chatSending,
++      compactionStatus: state.compactionStatus,
++      fallbackStatus: state.fallbackStatus,
++      assistantAvatarUrl: chatAvatarUrl,
++      messages: state.chatMessages,
++      toolMessages: state.chatToolMessages,
++      streamSegments: state.chatStreamSegments,
++      stream: state.chatStream,
++      streamStartedAt: state.chatStreamStartedAt,
++      draft: state.chatMessage,
++      queue: state.chatQueue,
++      connected: state.connected,
++      canSend: state.connected,
++      disabledReason: chatDisabledReason,
++      error: resolveWorkbenchChatError(),
++      sessions: state.sessionsResult,
++      focusMode,
++      onRefresh: () => refreshShellChat(state as unknown as Parameters<typeof refreshShellChat>[0]),
++      onToggleFocusMode: () => {
++        if (state.onboarding) {
++          return;
++        }
+         state.applySettings({
+           ...state.settings,
+-          locale: next,
+-          localePinnedByUser: true,
++          chatFocusMode: !state.settings.chatFocusMode,
+         });
+       },
+-      onForgotAccountHelp: () => {
+-        state.platformAuthNotice = t("authHome.authLinks.accountHelp");
+-      },
+-      entryVariant: isPlatformLogin ? "platform" : "enterprise",
+-      onSubmit: (mode) => {
+-        state.platformAuthMode = mode;
+-        state.platformAuthLoginIntent = isPlatformLogin ? "platform-admin" : "enterprise-admin";
+-        void state.submitPlatformAuth();
+-      },
+-    });
+-  }
+-  if (showWorkspaceAuthHome) {
+-    return renderAuthHome({
+-      brandLogoSrc: customBrandLogoSrc,
+-      basePath,
+-      client: state.client,
+-      currentLocale,
+-      state: workspaceHomepageState,
+-      mode: state.platformAuthMode,
+-      busy: state.platformAuthBusy,
+-      error: state.platformAuthError,
+-      notice: state.platformAuthNotice,
+-      email: state.platformAuthEmail,
+-      password: state.platformAuthPassword,
+-      displayName: state.platformAuthDisplayName,
+-      tenantName: state.platformAuthTenantName,
+-      expectedUsers: state.platformAuthExpectedUsers,
+-      useCase: state.platformAuthUseCase,
+-      companySize: state.platformAuthCompanySize,
+-      needsDemo: state.platformAuthNeedsDemo,
+-      industry: state.platformAuthIndustry,
+-      trialStep: state.platformAuthTrialStep,
+-      inviteCode: state.platformAuthInviteCode,
+-      mfaCode: state.platformAuthMfaCode,
+-      mfaStage: state.platformAuthMfaStage,
+-      mfaEnrollment: state.platformAuthMfaEnrollment,
+-      onMfaCodeChange: (next) => {
+-        state.platformAuthMfaCode = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onModeChange: (next) => {
+-        state.platformAuthMode = next;
+-        state.platformAuthTrialStep = 1;
+-        state.platformAuthNotice = null;
+-      },
+-      onEmailChange: (next) => {
+-        state.platformAuthEmail = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onPasswordChange: (next) => {
+-        state.platformAuthPassword = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onDisplayNameChange: (next) => {
+-        state.platformAuthDisplayName = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onTenantNameChange: (next) => {
+-        state.platformAuthTenantName = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onExpectedUsersChange: (next) => {
+-        state.platformAuthExpectedUsers = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onUseCaseChange: (next) => {
+-        state.platformAuthUseCase = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onCompanySizeChange: (next) => {
+-        state.platformAuthCompanySize = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onNeedsDemoChange: (next) => {
+-        state.platformAuthNeedsDemo = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onIndustryChange: (next) => {
+-        state.platformAuthIndustry = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onTrialStepChange: (next) => {
+-        state.platformAuthTrialStep = next;
+-        state.platformAuthNotice = null;
+-      },
+-      onInviteCodeChange: (next) => {
+-        state.platformAuthInviteCode = next;
+-        state.platformAuthNotice = null;
++      onChatScroll: (event: Event) => state.handleChatScroll(event),
++      onDraftChange: (next: string) => (state.chatMessage = next),
++      attachments: state.chatAttachments,
++      onAttachmentsChange: (next: typeof state.chatAttachments) => (state.chatAttachments = next),
++      onAttachmentAssetResolve: async (query: {
++        fileName: string;
++        sizeBytes?: number;
++        lastModified?: number;
++        allowLatestFallback?: boolean;
++      }): Promise<ChatAttachment | null> => {
++        if (!state.client || !state.connected) {
++          return null;
++        }
++        const result = await state.client.request<{
++          asset?: {
++            assetId: string;
++            versionId: string;
++            fileName: string;
++            mimeType: string;
++            contentHash: string;
++            sizeBytes: number;
++            lastModified: number;
++            content: string;
++          } | null;
++        }>("attachment.assets.resolve", query);
++        const asset = result.asset;
++        if (!asset?.content) {
++          return null;
++        }
++        return {
++          id: `${asset.assetId}-${asset.versionId}`,
++          dataUrl: `data:${asset.mimeType};base64,${asset.content}`,
++          mimeType: asset.mimeType,
++          fileName: asset.fileName,
++          assetId: asset.assetId,
++          versionId: asset.versionId,
++          contentHash: asset.contentHash,
++          sizeBytes: asset.sizeBytes,
++          lastModified: asset.lastModified,
++          status: "ready" as const,
++          progress: 100,
++        };
+       },
+-      onLocaleChange: (next) => {
+-        void i18n.setLocale(next);
+-        state.applySettings({
+-          ...state.settings,
+-          locale: next,
+-          localePinnedByUser: true,
++      onAttachmentAssetUpsert: async (attachment: {
++        fileName: string;
++        mimeType: string;
++        dataUrl: string;
++        sizeBytes?: number;
++        lastModified?: number;
++      }): Promise<Partial<ChatAttachment> | null> => {
++        if (!state.client || !state.connected) {
++          return null;
++        }
++        const content =
++          /^data:[^;]+;base64,([\s\S]+)$/.exec(attachment.dataUrl)?.[1] ?? attachment.dataUrl;
++        const result = await state.client.request<{
++          status: "created" | "existing" | "new-version";
++          asset: {
++            assetId: string;
++            versionId: string;
++            contentHash: string;
++            sizeBytes: number;
++            lastModified: number;
++          };
++        }>("attachment.assets.upsert", {
++          fileName: attachment.fileName,
++          mimeType: attachment.mimeType,
++          content,
++          sizeBytes: attachment.sizeBytes,
++          lastModified: attachment.lastModified,
+         });
++        return result.asset ?? null;
+       },
+-      onForgotAccountHelp: () => {
+-        state.platformAuthNotice = t("authHome.authLinks.accountHelp");
++      onSend: () => state.handleSendChat(),
++      canAbort: Boolean(state.chatRunId),
++      canUndo: Boolean(state.chatRunId),
++      onAbort: () => void state.handleAbortChat(),
++      onUndo: () => void state.handleSendChat("/undo"),
++      checkpoints: state.chatCheckpoints,
++      pendingRestoreCheckpointId: state.pendingRestoreCheckpointId,
++      restoreInFlightCheckpointId: state.restoreInFlightCheckpointId,
++      onRequestRestoreCheckpoint: (checkpointId: string) =>
++        state.requestRestoreCheckpoint(checkpointId),
++      onCancelRestoreCheckpoint: () => state.cancelRestoreCheckpoint(),
++      onConfirmRestoreCheckpoint: (checkpointId: string) =>
++        void state.confirmRestoreCheckpoint(checkpointId),
++      onQueueRemove: (id: string) => state.removeQueuedMessage(id),
++      onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
++      showNewMessages: state.chatNewMessagesBelow && !state.chatManualRefreshInFlight,
++      onScrollToBottom: () => state.scrollToBottom(),
++      sidebarOpen: state.sidebarOpen,
++      sidebarPreviewMode: state.sidebarPreviewMode,
++      sidebarContent: state.sidebarContent,
++      sidebarError: state.sidebarError,
++      artifactWorkspace: state.sidebarArtifactWorkspace,
++      deliverableSaveState: state.sidebarDeliverableSaveState,
++      deliverableSaveToast: state.sidebarDeliverableSaveToast,
++      collaborationTargets,
++      splitRatio: state.splitRatio,
++      onOpenSidebar: (content: string) => state.handleOpenSidebar(content),
++      onOpenArtifact: (artifactId: string) => state.handleOpenArtifact(artifactId),
++      onCloseSidebar: () => state.handleCloseSidebar(),
++      onSplitRatioChange: (ratio: number) => state.handleSplitRatioChange(ratio),
++      onSidebarArtifactEditRequest: (prompt: string) =>
++        void state.handleSendChat(prompt, { restoreDraft: true }),
++      onSidebarPptEditRequest: (prompt: string) =>
++        void state.handleSendChat(prompt, { restoreDraft: true }),
++      onSaveDeliverable: state.connected
++        ? () => void state.handleSaveSidebarDeliverable()
++        : undefined,
++      onDeliverableInlineEditApplied: (content: string) =>
++        state.handleDeliverableInlineEditApplied(content),
++      assetIncubationLevel: incubationPreview.level,
++      assetIncubationReason: incubationPreview.reason,
++      showWeakAssetIncubationHint: incubationPreview.showWeakHint,
++      showSystemAssetIncubationHint: incubationPreview.showSystemSuggest,
++      showEnterpriseSubmitFromIncubation: incubationPreview.showEnterpriseSubmitAction,
++      onOpenSkillSaveFromPreview: state.connected
++        ? (preferEnterprise?: boolean) =>
++            openSkillSaveFromPreview(state, Boolean(preferEnterprise), () => state.requestUpdate())
++        : undefined,
++      onDismissAssetIncubationFromPreview: () =>
++        dismissAssetIncubationFromPreview(state, () => state.requestUpdate()),
++      onGrantArtifactToTarget: state.connected
++        ? (artifactId: string, targetSessionKey?: string) =>
++            shareArtifactToCollaborationTarget(
++              state,
++              artifactId,
++              targetSessionKey,
++              collaborationTargets,
++            )
++        : undefined,
++      assistantName: state.assistantName,
++      assistantAvatar: state.assistantAvatar,
++      participantAgents: state.agentsList?.agents ?? [],
++      localUserDisplayName: resolveLocalUserDisplayName(state),
++      mentionCandidates,
++      onOpenCronTaskDetail: (jobId: string) => {
++        void import("./shells/employee-shell.ts").then((shell) =>
++          shell.openEmployeeCronTaskDetail(state, jobId),
++        );
+       },
+-      entryVariant: "public",
+-      onSubmit: (mode) => {
+-        state.platformAuthMode = mode;
+-        if (
+-          state.platformAuthMode === "enterprise-create" ||
+-          state.platformAuthMode === "platform-enterprise-create"
+-        ) {
+-          const inferredTenantName =
+-            state.platformAuthTenantName.trim() ||
+-            state.platformAuthDisplayName.trim() ||
+-            state.platformAuthEmail.trim().split("@")[0] ||
+-            "OpenBot Workspace";
+-          state.platformAuthTenantName = inferredTenantName;
+-        }
+-        if (state.platformAuthMode === "enterprise-create") {
+-          void state.submitPlatformTrialApply();
+-          return;
++      onOpenCronTaskResult: (message: unknown) => {
++        const artifact = resolveCronResultArtifactRecord(message);
++        const artifactId =
++          artifact && typeof artifact.artifactId === "string" ? artifact.artifactId : null;
++        if (artifactId) {
++          state.handleOpenArtifact(artifactId);
+         }
+-        void state.submitPlatformAuth();
+       },
+-    });
+-  }
+-  const platformRenderModel = buildPlatformPortRenderModel({
+-    state: platformState,
+-    actions: platformActions,
+-    configValue,
+-  });
+-  const enterpriseRenderModel = buildEnterprisePortRenderModel({
+-    state: enterpriseState,
+-    actions: enterpriseActions,
+-    configValue,
+-    currentTenantId: enterpriseTenantId,
+-    showResolver: isEnterpriseResolver,
+-  });
++      implicitCronReplyHint: (() => {
++        const meta = resolveImplicitCronReplyContext(state.chatMessages);
++        return meta?.jobName?.trim() || (meta ? "定时任务" : null);
++      })(),
++    };
++  };
++  const workbenchThreadPrelude = !employeeShell
++    ? null
++    : isDaibaiWorkbenchSession
++      ? employeeShell.renderDaibaiThreadPrelude(
++          {
++            daibaiLoading: state.daibaiLoading,
++            daibaiAskResult: state.daibaiAskResult,
++            daibaiExecuteResult: state.daibaiExecuteResult,
++            daibaiActionLoading: state.daibaiActionLoading,
++            daibaiActionPendingId: state.daibaiActionPendingId,
++            daibaiActionError: state.daibaiActionError,
++            daibaiPendingConfirmation: state.daibaiPendingConfirmation,
++            onAskDaibai: (message?: string) =>
++              message ? state.handleSendChat(message) : state.handleSendChat(),
++            onExecuteDaibaiAction: (actionId, payload) =>
++              state.executeDaibaiAction(actionId, payload),
++            onConfirmDaibaiPendingAction: () => state.confirmDaibaiPendingAction(),
++            onCancelDaibaiPendingConfirmation: () => state.cancelDaibaiPendingConfirmation(),
++            onOpenDaibaiHelp: (params) => state.openDaibaiHelpFromModule(params),
++          },
++          {
++            guideAcknowledged: isDaibaiGuideAcknowledgedForUser(state.settings, daibaiAuthUser),
++            onDismissGuide: dismissDaibaiGuide,
++            showStewardFooter: true,
++          },
++        )
++      : employeeShell.renderWorkbenchGrowthThreadPrelude(state);
++  const workbenchChatProps = chatShell
++    ? {
++        ...buildChatSurfaceProps(false),
++        renderMode: "workbench-compact" as const,
++        threadPrelude: normalizeThreadPrelude(workbenchThreadPrelude),
++      }
++    : null;
++  const workbenchChat = chatShell && workbenchChatProps
++    ? chatShell.renderChatContent(workbenchChatProps)
++    : nothing;
++  const workbenchComposer = chatShell && workbenchChatProps
++    ? chatShell.renderChatCompose(workbenchChatProps)
++    : nothing;
++  const workbenchAuthPanel = workspaceHomepageState && chatShell
++    ? (() => {
++        const panel = chatShell.renderPlatformAuthPanel({
++          basePath,
++          state: workspaceHomepageState,
++          session: activePlatformSession,
++          mode: state.platformAuthMode,
++          busy: state.platformAuthBusy,
++          error: state.platformAuthError,
++          notice: state.platformAuthNotice,
++          email: state.platformAuthEmail,
++          password: state.platformAuthPassword,
++          displayName: state.platformAuthDisplayName,
++          platformAdminDisplayName: state.platformAuthPlatformAdminDisplayName,
++          tenantName: state.platformAuthTenantName,
++          seatTitle: state.platformAuthSeatTitle,
++          inviteCode: state.platformAuthInviteCode,
++          currentPassword: state.platformAuthCurrentPassword,
++          newPassword: state.platformAuthNewPassword,
++          policyTrialDays: state.platformAuthPolicyTrialDays,
++          policySeatCount: state.platformAuthPolicySeatCount,
++          policyUpgradeUrl: state.platformAuthPolicyUpgradeUrl,
++          policyContactAdvisorUrl: state.platformAuthPolicyContactAdvisorUrl,
++          instanceEnterpriseId: state.platformAuthInstanceEnterpriseId,
++          instanceTrialDays: state.platformAuthInstanceTrialDays,
++          instanceSeatCount: state.platformAuthInstanceSeatCount,
++          instanceUpgradeUrl: state.platformAuthInstanceUpgradeUrl,
++          instanceContactAdvisorUrl: state.platformAuthInstanceContactAdvisorUrl,
++          platformAdminEmail: state.platformAuthPlatformAdminEmail,
++          platformAdminPassword: state.platformAuthPlatformAdminPassword,
++          platformAdminScopes: state.platformAuthPlatformAdminScopes,
++          compact: true,
++          onModeChange: (next) => {
++            state.platformAuthMode = next;
++            state.platformAuthNotice = null;
++          },
++          onEmailChange: (next) => {
++            state.platformAuthEmail = next;
++            state.platformAuthNotice = null;
++          },
++          onPasswordChange: (next) => {
++            state.platformAuthPassword = next;
++            state.platformAuthNotice = null;
++          },
++          onDisplayNameChange: (next) => {
++            state.platformAuthDisplayName = next;
++            state.platformAuthNotice = null;
++          },
++          onPlatformAdminDisplayNameChange: (next) => {
++            state.platformAuthPlatformAdminDisplayName = next;
++            state.platformAuthNotice = null;
++          },
++          onTenantNameChange: (next) => {
++            state.platformAuthTenantName = next;
++            state.platformAuthNotice = null;
++          },
++          onSeatTitleChange: (next) => {
++            state.platformAuthSeatTitle = next;
++            state.platformAuthNotice = null;
++          },
++          onInviteCodeChange: (next) => {
++            state.platformAuthInviteCode = next;
++            state.platformAuthNotice = null;
++          },
++          onCurrentPasswordChange: (next) => {
++            state.platformAuthCurrentPassword = next;
++            state.platformAuthNotice = null;
++          },
++          onNewPasswordChange: (next) => {
++            state.platformAuthNewPassword = next;
++            state.platformAuthNotice = null;
++          },
++          onPolicyTrialDaysChange: (next) => {
++            state.platformAuthPolicyTrialDays = next;
++            state.platformAuthNotice = null;
++          },
++          onPolicySeatCountChange: (next) => {
++            state.platformAuthPolicySeatCount = next;
++            state.platformAuthNotice = null;
++          },
++          onPolicyUpgradeUrlChange: (next) => {
++            state.platformAuthPolicyUpgradeUrl = next;
++            state.platformAuthNotice = null;
++          },
++          onPolicyContactAdvisorUrlChange: (next) => {
++            state.platformAuthPolicyContactAdvisorUrl = next;
++            state.platformAuthNotice = null;
++          },
++          onInstanceEnterpriseIdChange: (next) => {
++            state.platformAuthInstanceEnterpriseId = next;
++            state.platformAuthNotice = null;
++          },
++          onInstanceTrialDaysChange: (next) => {
++            state.platformAuthInstanceTrialDays = next;
++            state.platformAuthNotice = null;
++          },
++          onInstanceSeatCountChange: (next) => {
++            state.platformAuthInstanceSeatCount = next;
++            state.platformAuthNotice = null;
++          },
++          onInstanceUpgradeUrlChange: (next) => {
++            state.platformAuthInstanceUpgradeUrl = next;
++            state.platformAuthNotice = null;
++          },
++          onInstanceContactAdvisorUrlChange: (next) => {
++            state.platformAuthInstanceContactAdvisorUrl = next;
++            state.platformAuthNotice = null;
++          },
++          onPlatformAdminEmailChange: (next) => {
++            state.platformAuthPlatformAdminEmail = next;
++            state.platformAuthNotice = null;
++          },
++          onPlatformAdminPasswordChange: (next) => {
++            state.platformAuthPlatformAdminPassword = next;
++            state.platformAuthNotice = null;
++          },
++          onPlatformAdminScopesChange: (next) => {
++            state.platformAuthPlatformAdminScopes = [...next];
++            state.platformAuthNotice = null;
++          },
++          onSubmit: () => void state.submitPlatformAuth(),
++          onCreatePlatformAdmin: () => void state.createPlatformAdmin(),
++          onLogout: () => void state.logoutPlatformAuth(),
++          onCreateInvite: () => void state.createPlatformAuthInvite(),
++          onRevokeInvite: (code) => void state.revokePlatformAuthInvite(code),
++          onRemoveMember: (user) => void state.removePlatformAuthMember(user),
++          onChangePassword: () => void state.changePlatformAuthPassword(),
++          onUpdateTrialPolicy: () => void state.updatePlatformTrialPolicy(),
++          onUpdateTrialInstance: () => void state.updatePlatformTrialInstance(),
++        });
++        return panel === nothing ? null : panel;
++      })()
++    : null;
++  const platformRenderModel =
++    platformShell && platformState && platformActions
++      ? platformShell.buildPlatformPortRenderModel({
++          state: platformState,
++          actions: platformActions,
++          configValue,
++        })
++      : null;
++  const enterpriseRenderModel =
++    enterpriseShell && enterpriseState && enterpriseActions
++      ? enterpriseShell.buildEnterprisePortRenderModel({
++          state: enterpriseState,
++          actions: enterpriseActions,
++          configValue,
++          currentTenantId: enterpriseTenantId,
++          showResolver: isEnterpriseResolver,
++        })
++      : null;
+   // 员工工作台「我的可用模型」只读区块通过单例获取网关客户端（同 governance 范式）。
+   setModelAuthorizationClient(state.client);
+-  const workbenchContent = renderEmployeeWorkbench({
+-    ...buildEmployeeWorkbenchProps({
+-      state: portState,
+-      chatContent: workbenchChat,
+-      chatComposer: workbenchComposer,
+-      authPanel: workbenchAuthPanel,
+-    }),
+-    bundledBrandLogoSrc: bundledBrandWordmarkSrc,
+-  });
++  const workbenchContent = employeeShell
++    ? employeeShell.renderEmployeeWorkbench({
++        ...employeeShell.buildEmployeeWorkbenchProps({
++          state: portState,
++          chatContent: workbenchChat,
++          chatComposer: workbenchComposer,
++          authPanel: workbenchAuthPanel,
++        }),
++        bundledBrandLogoSrc: bundledBrandWordmarkSrc,
++      })
++    : nothing;
+   if (
+-    !showWorkspaceAuthHome &&
+     shouldAutoAskDaibai({
+       ...state,
+       chatMessages: state.chatMessages as Array<{ role?: string; content?: unknown }>,
+@@ -1577,7 +1654,7 @@ export function renderApp(state: AppViewState) {
+ 
+   const showGlobalUpdateBanner = !isPlatformSurface;
+ 
+-  if (isWorkspaceHome && !showWorkspaceAuthHome) {
++  if (isWorkspaceHome) {
+     return html`
+       <div class="shell shell--workspace shell--workspace-immersive ${state.onboarding ? "shell--onboarding" : ""}">
+         <main class="content content--workspace content--workspace-immersive">
+@@ -1750,8 +1827,8 @@ export function renderApp(state: AppViewState) {
+               `
+         }
+         ${
+-          state.tab === "personas"
+-            ? renderPersonas({
++          state.tab === "personas" && frontstageShell
++            ? frontstageShell.renderPersonas({
+                 connected: state.connected,
+                 agentsList: state.agentsList,
+                 sessionsResult: state.sessionsResult,
+@@ -1765,8 +1842,8 @@ export function renderApp(state: AppViewState) {
+         }
+ 
+         ${
+-          state.tab === "contacts"
+-            ? renderContacts({
++          state.tab === "contacts" && frontstageShell
++            ? frontstageShell.renderContacts({
+                 connected: state.connected,
+                 agentsList: state.agentsList,
+                 sessionsResult: state.sessionsResult,
+@@ -1780,8 +1857,8 @@ export function renderApp(state: AppViewState) {
+         }
+ 
+         ${
+-          state.tab === "groups"
+-            ? renderGroups({
++          state.tab === "groups" && frontstageShell
++            ? frontstageShell.renderGroups({
+                 connected: state.connected,
+                 agentsList: state.agentsList,
+                 sessionsResult: state.sessionsResult,
+@@ -1794,8 +1871,16 @@ export function renderApp(state: AppViewState) {
+             : nothing
+         }
+ 
+-        ${isPlatformSurface ? renderPlatformPortShell(platformRenderModel) : nothing}
+-        ${isEnterpriseSurface ? renderEnterprisePortShell(enterpriseRenderModel) : nothing}
++        ${
++          isPlatformSurface && platformShell && platformRenderModel
++            ? platformShell.renderPlatformPortShell(platformRenderModel)
++            : nothing
++        }
++        ${
++          isEnterpriseSurface && enterpriseShell && enterpriseRenderModel
++            ? enterpriseShell.renderEnterprisePortShell(enterpriseRenderModel)
++            : nothing
++        }
+       </main>
+       ${renderExecApprovalPrompt(state)}
+       ${renderGatewayUrlConfirmation(state)}
+diff --git a/ui/src/ui/app-settings.ts b/ui/src/ui/app-settings.ts
+index a0d5986bd3..86399d4838 100755
+--- a/ui/src/ui/app-settings.ts
++++ b/ui/src/ui/app-settings.ts
+@@ -9,7 +9,6 @@ import {
+ } from "./app-polling.ts";
+ import { syncBrandHeadAssets } from "./brand-assets.ts";
+ import { agentIdentityCapability } from "./capability/agent-identity/index.ts";
+-import { agentRuntimeCapability } from "./capability/agent-runtime/index.ts";
+ import { agentSkillsCapability } from "./capability/agent-skills/index.ts";
+ import { agentsCapability } from "./capability/agents/index.ts";
+ import { channelsCapability } from "./capability/channels/index.ts";
+@@ -68,12 +67,7 @@ import {
+   pathForTab,
+   type Tab,
+ } from "./navigation.ts";
+-import type { EnterprisePortState } from "./ports/enterprise/port-state.ts";
+-import { resolveEnterpriseTenantId as resolveEnterpriseTenantIdFromState } from "./ports/enterprise/semantic/enterprise-read-model.ts";
+-import {
+-  PLATFORM_ADVANCED_HASH_PREFIX,
+-  syncPlatformAdvancedPanelVisibility,
+-} from "./ports/platform/advanced/page.ts";
++import { PLATFORM_ADVANCED_HASH_PREFIX } from "./ports/platform/advanced/constants.ts";
+ import type { CapabilityGovernanceSnapshotHost } from "./ports/platform/capability-governance-gateway.ts";
+ import { refreshCapabilityGovernanceSnapshot } from "./ports/platform/capability-governance-gateway.ts";
+ import { isPlatformAdminAuthenticated } from "./ports/platform/platform-auth-session.ts";
+@@ -146,7 +140,36 @@ function rememberEnterpriseTenant(host: SettingsHost, tenantId: string | undefin
+ }
+ 
+ function resolveEnterpriseTenantId(host: SettingsHost): string | null {
+-  return resolveEnterpriseTenantIdFromState(host as unknown as EnterprisePortState);
++  // Keep this resolver local so app-settings does not pull the full enterprise
++  // read-model (and its dependency tree) into the control-ui entry chunk.
++  const helloTenantId =
++    (host as SettingsHost & { hello?: { auth?: { tenantId?: string | null } } }).hello?.auth
++      ?.tenantId?.trim() ?? "";
++  if (helloTenantId) {
++    return helloTenantId;
++  }
++  const trustedTenantId =
++    (
++      host as SettingsHost & {
++        platformAuthState?: { session?: { tenantId?: string | null } };
++        bootstrapAuthSession?: { tenantId?: string | null };
++      }
++    ).platformAuthState?.session?.tenantId?.trim() ??
++    (
++      host as SettingsHost & {
++        bootstrapAuthSession?: { tenantId?: string | null };
++      }
++    ).bootstrapAuthSession?.tenantId?.trim();
++  if (trustedTenantId) {
++    return trustedTenantId;
++  }
++  return host.settings.recentEnterpriseTenantIds?.[0]?.trim() ?? null;
++}
++
++function syncPlatformAdvancedPanelVisibilityLazy() {
++  void import("./ports/platform/advanced/page.ts").then((mod) => {
++    mod.syncPlatformAdvancedPanelVisibility();
++  });
+ }
+ 
+ async function loadEnterpriseOperationalIdentityOverview(host: SettingsHost) {
+@@ -627,8 +650,8 @@ export function onPopState(host: SettingsHost) {
+   // 同顶层 Tab 内的 query/hash/子路径变更不会更新 @state tab，必须强制重绘。
+   requestOpenBotAppRerender();
+   if (resolved === "platformAdvanced") {
+-    queueMicrotask(() => syncPlatformAdvancedPanelVisibility());
+-    setTimeout(() => syncPlatformAdvancedPanelVisibility(), 0);
++    queueMicrotask(() => syncPlatformAdvancedPanelVisibilityLazy());
++    setTimeout(() => syncPlatformAdvancedPanelVisibilityLazy(), 0);
+   }
+ }
+ 
+@@ -643,8 +666,8 @@ export function onHashChange(host: SettingsHost) {
+   if (!window.location.hash.startsWith(PLATFORM_ADVANCED_HASH_PREFIX)) {
+     return;
+   }
+-  queueMicrotask(() => syncPlatformAdvancedPanelVisibility());
+-  setTimeout(() => syncPlatformAdvancedPanelVisibility(), 0);
++  queueMicrotask(() => syncPlatformAdvancedPanelVisibilityLazy());
++  setTimeout(() => syncPlatformAdvancedPanelVisibilityLazy(), 0);
+ }
+ 
+ export function setTabFromRoute(host: SettingsHost, next: Tab) {
+@@ -771,6 +794,10 @@ export function syncUrlWithSessionKey(host: SettingsHost, sessionKey: string, re
+ }
+ 
+ export async function loadOverview(host: SettingsHost) {
++  const loadAgentRuntimeOverview = async () => {
++    const { agentRuntimeCapability } = await import("./capability/agent-runtime/index.ts");
++    await agentRuntimeCapability.loadOverview(adaptAgentRuntimeOverviewCapabilityState(host));
++  };
+   await Promise.all([
+     channelsCapability.load(adaptChannelsLoadCapabilityState(host), false),
+     presenceCapability.load(adaptPresenceLoadCapabilityState(host)),
+@@ -778,7 +805,7 @@ export async function loadOverview(host: SettingsHost) {
+     skillsCapability.load(adaptSkillsLoadCapabilityState(host)),
+     cronCapability.loadStatus(adaptCronStatusCapabilityState(host)),
+     debugCapability.load(adaptDebugLoadCapabilityState(host)),
+-    agentRuntimeCapability.loadOverview(adaptAgentRuntimeOverviewCapabilityState(host)),
++    loadAgentRuntimeOverview(),
+     refreshCapabilityGovernanceSnapshot(host as CapabilityGovernanceSnapshotHost),
+     // Enterprise / platform overview surfaces derive "model data"
+     // (configuredProviderCount, configuredModelCount, modelMode, providerIds,
+diff --git a/ui/src/ui/ports/employee/views/workbench-chrome.node.test.ts b/ui/src/ui/ports/employee/views/workbench-chrome.node.test.ts
+index 3c7f980982..23001c734e 100644
+--- a/ui/src/ui/ports/employee/views/workbench-chrome.node.test.ts
++++ b/ui/src/ui/ports/employee/views/workbench-chrome.node.test.ts
+@@ -199,7 +199,7 @@ describe("workbench chrome", () => {
+ 
+     render(
+       html`${renderWorkbenchBrand({
+-        bundledBrandLogoSrc: "/openbot-logo.png",
++        bundledBrandLogoSrc: "/openbot-logo.webp",
+         uploadLabel: "Change logo",
+         resetLabel: "Reset logo",
+         logoAlt: "Current navigation logo",
+@@ -212,7 +212,7 @@ describe("workbench chrome", () => {
+     await Promise.resolve();
+ 
+     const logo = container.querySelector<HTMLImageElement>(".employee-workbench__brand-logo");
+-    expect(logo?.getAttribute("src")).toBe("/openbot-logo.png");
++    expect(logo?.getAttribute("src")).toBe("/openbot-logo.webp");
+     expect(container.querySelector(".employee-workbench__brand-title")).toBeNull();
+   });
+ });
+diff --git a/ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts b/ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts
+index 1cbca6d18e..7b0402fe8f 100644
+--- a/ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts
++++ b/ui/src/ui/ports/employee/views/workbench-stage-module.knowledge.node.test.ts
+@@ -457,14 +457,18 @@ describe("workbench knowledge module page", () => {
+     expect(onPageTabChange).toHaveBeenCalledWith("libraryCreate");
+   });
+ 
+-  it("opens the unified space import picker from the library workspace hero action", () => {
++  it("opens the four-tab space import page from the library workspace hero action", () => {
+     const surface = createKnowledgeSurface();
+-    surface.pageTab = "libraryWorkspace";
++    surface.pageTab = "spaceImport";
+     surface.libraryWorkspaceImportOpen = true;
+     surface.libraryWorkspaceImportKind = null;
+     const container = renderKnowledgePage(surface);
+-    expect(container.querySelector('[data-testid="ku-space-import-picker"]')).toBeTruthy();
+-    expect(container.querySelector('[data-testid="ku-space-import-form-file"]')).toBeFalsy();
++    expect(container.querySelector('[data-testid="ku-space-import-page"]')).toBeTruthy();
++    expect(container.querySelectorAll('[data-testid^="ku-space-import-tab-"]')).toHaveLength(4);
++    expect(
++      container.querySelector('[data-testid="ku-space-import-form-localFolder"]'),
++    ).toBeTruthy();
++    expect(container.querySelector('[data-testid="ku-space-import-picker"]')).toBeFalsy();
+   });
+ 
+   it("does not render legacy top-level page tabs", () => {
+@@ -520,7 +524,7 @@ describe("workbench knowledge module page", () => {
+     surface.onLibraryWorkspaceImportOpenChange = onLibraryWorkspaceImportOpenChange;
+     const container = renderKnowledgePage(surface);
+     container.querySelector<HTMLButtonElement>('[data-testid="ku-home-action-upload"]')?.click();
+-    expect(onPageTabChange).toHaveBeenCalledWith("libraryWorkspace");
++    expect(onPageTabChange).toHaveBeenCalledWith("spaceImport");
+     expect(onLibraryWorkspaceImportOpenChange).toHaveBeenCalledWith(true, { lockSpace: false });
+   });
+ 
+diff --git a/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.node.test.ts b/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.node.test.ts
+index bfdf89be8f..fa5dfb68d3 100644
+--- a/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.node.test.ts
++++ b/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.node.test.ts
+@@ -38,17 +38,17 @@ describe("organization-seat-deletion", () => {
+     expect(eligibility.reason).toMatch(/空岗/);
+   });
+ 
+-  it("blocks vacant seats that still have pending activation", () => {
++  it("allows pending-activation seats without a registered member", () => {
+     const eligibility = resolveOrganizationSeatDeleteEligibility({
+       seatId: "s3",
+       name: "待激活岗",
+       teamLabel: "市场部",
+       status: "PENDING_ACTIVATION",
+-      seatStatus: "vacant",
++      seatStatus: "assigned",
+       pendingEmployeeUser: "hire@example.com",
+     });
+-    expect(eligibility.allowed).toBe(false);
+-    expect(eligibility.nextStep).toBe("resolve_offer");
++    expect(eligibility.allowed).toBe(true);
++    expect(eligibility.nextStep).toBe("none");
+   });
+ 
+   it("partitions bulk selection into deletable vs blocked", () => {
+diff --git a/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.ts b/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.ts
+index b92ff67687..3143e97dd0 100644
+--- a/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.ts
++++ b/ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.ts
+@@ -1,6 +1,7 @@
+ /**
+  * 组织岗位删除资格与批量删除选择（只读纯函数）。
+- * 与 gateway `deleteVacantPositionSeat` 对齐：仅空岗且无成员/待确认/交接。
++ * 与 gateway `deleteVacantPositionSeat` 对齐：空岗壳，或未注册待激活岗位
++ *（assigned + pendingEmployeeUser、尚无正式成员）可直接删除。
+  */
+ 
+ export type OrganizationSeatDeletionRow = {
+@@ -39,21 +40,25 @@ export function resolveOrganizationSeatDeleteEligibility(
+       nextStep: "resolve_offer",
+     };
+   }
+-  if (row.seatStatus !== "vacant" || Boolean(row.memberUserId?.trim())) {
++  if (row.memberUserId?.trim()) {
+     return {
+       allowed: false,
+       reason: "在岗岗位不可直接删除。请先更换成员或发起交接，使岗位回到空岗后再删除。",
+       nextStep: "unbind_or_handover",
+     };
+   }
+-  if (row.pendingEmployeeUser?.trim()) {
+-    return {
+-      allowed: false,
+-      reason: "存在待激活对象，请先撤回激活或完成入职后再删除。",
+-      nextStep: "resolve_offer",
+-    };
++  const seatStatus = row.seatStatus.trim().toLowerCase();
++  const pendingOnly =
++    Boolean(row.pendingEmployeeUser?.trim()) &&
++    (seatStatus === "assigned" || seatStatus === "vacant");
++  if (seatStatus === "vacant" || pendingOnly) {
++    return { allowed: true, reason: null, nextStep: "none" };
+   }
+-  return { allowed: true, reason: null, nextStep: "none" };
++  return {
++    allowed: false,
++    reason: "在岗岗位不可直接删除。请先更换成员或发起交接，使岗位回到空岗后再删除。",
++    nextStep: "unbind_or_handover",
++  };
+ }
+ 
+ export function isOrganizationSeatDeletable(row: OrganizationSeatDeletionRow): boolean {
+diff --git a/ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts b/ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts
+index 741a700db7..c841b2a779 100644
+--- a/ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts
++++ b/ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts
+@@ -528,7 +528,9 @@ function renderArchiveDangerZone(params: {
+         <p class="enterprise-org-archive__danger-hint">
+           ${
+             canDelete
+-              ? "删除后岗位与空岗壳不可恢复；关联资产绑定将被撤销。"
++              ? row.pendingEmployeeUser?.trim()
++                ? "将撤回待激活邀请并删除岗位；空岗壳与关联资产绑定不可恢复。"
++                : "删除后岗位与空岗壳不可恢复；关联资产绑定将被撤销。"
+               : (deleteEligibility.reason ?? "当前状态不可删除。")
+           }
+         </p>
+diff --git a/ui/src/ui/ports/enterprise/views/enterprise-workforce-governance-surface.ts b/ui/src/ui/ports/enterprise/views/enterprise-workforce-governance-surface.ts
+index b60eff9e7c..aa98218881 100644
+--- a/ui/src/ui/ports/enterprise/views/enterprise-workforce-governance-surface.ts
++++ b/ui/src/ui/ports/enterprise/views/enterprise-workforce-governance-surface.ts
+@@ -1,5 +1,6 @@
+ import { html } from "lit";
+ import "../../../capability/ai-workforce-governance/pages/assets-page.ts";
++import "../../../capability/ai-workforce-governance/pages/working-style-effects-panel.ts";
+ import { setGovernanceApiClient } from "../../../capability/ai-workforce-governance/services/governanceApi.ts";
+ import type { EnterpriseSurfaceProps } from "./enterprise-surface-types.ts";
+ 
+@@ -11,5 +12,6 @@ export function renderWorkforceGovernanceSurface(props: EnterpriseSurfaceProps)
+       .agentsList=${props.agentsList ?? null}
+       .collaborationSpacesResult=${props.collaborationSpacesResult ?? null}
+     ></governance-assets-page>
++    <working-style-effects-panel></working-style-effects-panel>
+   `;
+ }
+diff --git a/ui/src/ui/ports/platform/advanced/page.ts b/ui/src/ui/ports/platform/advanced/page.ts
+index 7b64fd0c31..2d7751349e 100644
+--- a/ui/src/ui/ports/platform/advanced/page.ts
++++ b/ui/src/ui/ports/platform/advanced/page.ts
+@@ -11,10 +11,13 @@ import { renderSessions } from "../../../views/sessions.ts";
+ import { formatCost, formatTokens } from "../../../views/usage-metrics.ts";
+ import { followPortHref, requestPlatformSurfaceRerender } from "../shared/surface.ts";
+ import type { PlatformSurfaceProps } from "../shared/surface.ts";
++import { PLATFORM_ADVANCED_HASH_PREFIX } from "./constants.ts";
+ import "./fabric-panel.ts";
+ import "./cli-backend-panel.ts";
+ import "./supervisor-panel.ts";
+ 
++export { PLATFORM_ADVANCED_HASH_PREFIX };
++
+ // ---- Types & state -------------------------------------------------------
+ 
+ type AdvancedTab =
+@@ -42,7 +45,6 @@ const ADVANCED_TABS: Array<{ id: AdvancedTab; label: string; icon: string }> = [
+   { id: "supervisor", label: "开发监督", icon: "cpu" },
+ ];
+ 
+-export const PLATFORM_ADVANCED_HASH_PREFIX = "#platform-advanced:";
+ const ADVANCED_HASH_PREFIX = PLATFORM_ADVANCED_HASH_PREFIX;
+ let activeAdvancedTab: AdvancedTab = "channels";
+ 

@@ -1,0 +1,187 @@
+{
+  "schema": "memory-workspace-wsc-v1-bootstrap-receipt/v1",
+  "receiptId": "wsc-v1-bootstrap-20260814",
+  "owner": "cursor-memory-wsc",
+  "workstream": "WS-C",
+  "createdAt": "2026-08-14T13:09:00.000Z",
+  "updatedAt": "2026-08-14T13:47:00.000Z",
+  "deployAuthorized": false,
+  "closesWsC": false,
+  "note": "Stop-loss bootstrap classification only. Not a Catalog SoT. Not a resourceId. Does not authorize schema v2, Resolver write switch, directory migration, or LIVE deploy. Directory/agentId names never promote a row to confirmed_single_root.",
+  "recompute": {
+    "evidenceFile": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+    "evidenceId": "memory-workspace-phase0-20260814",
+    "knownConflictModule": "docs/design/evidence/memory-workspace-phase0-v1-root-fingerprint.mjs",
+    "knownConflictExport": "KNOWN_CONFLICT_SQLITE_BASENAMES",
+    "commands": [
+      "jq -r '.dualTreeSqlite[].agentId' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+      "jq -r '.singleTreeButUnpartitioned[].agentId' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+      "jq -r '.manyToMany.observed[].sqlite' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+    ]
+  },
+  "policy": {
+    "confirmed_single_root": "Only when Phase 0 evidence records exactly one workspace realpath for that sqlite instance. That unique path may be explicitly registered. No first-writer. No directory-name inference.",
+    "known_multi_root": "Preset deny. dualTree=true and/or manyToMany.observed. Signed unexpired grant bound to sha256(realpath(sqlite))+op+exp required to unlock one named op.",
+    "unknown": "Stay unregistered. First destructive op fail-closed until inventory authority classifies a unique realpath. Includes singleTreeButUnpartitioned rows that lack a unique root path."
+  },
+  "classes": {
+    "confirmed_single_root": [],
+    "confirmed_single_root_empty_reason": "Phase 0 sqlite-risks lists main as singleTreeButUnpartitioned with dualTree=false, but records no unique workspace realpath. Promoting main.sqlite from agentId/filename would violate the no-guess rule. Zero LIVE rows are eligible for pre-register.",
+    "known_multi_root": [
+      {
+        "sqliteBasename": "bot-2.sqlite",
+        "agentId": "bot-2",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.manyToMany.observed[0]",
+          "recompute": "jq '.manyToMany.observed[0] | {sqlite,roots,risk}' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "rootsObserved": 2,
+          "risk": "confirmed-accident-sample"
+        }
+      },
+      {
+        "sqliteBasename": "panda.sqlite",
+        "agentId": "panda",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"panda\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"panda\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "bot--agent.sqlite",
+        "agentId": "bot--agent",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"bot--agent\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"bot--agent\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "bot-skill.sqlite",
+        "agentId": "bot-skill",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"bot-skill\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"bot-skill\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-d855e9277ab0.sqlite",
+        "agentId": "agent-d855e9277ab0",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-d855e9277ab0\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-d855e9277ab0\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-2216389214f3.sqlite",
+        "agentId": "agent-2216389214f3",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-2216389214f3\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-2216389214f3\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-2d75473131c5.sqlite",
+        "agentId": "agent-2d75473131c5",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-2d75473131c5\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-2d75473131c5\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-244a764a8ebc.sqlite",
+        "agentId": "agent-244a764a8ebc",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-244a764a8ebc\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-244a764a8ebc\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-f9f502e204b3.sqlite",
+        "agentId": "agent-f9f502e204b3",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-f9f502e204b3\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-f9f502e204b3\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-44fc12d31e44.sqlite",
+        "agentId": "agent-44fc12d31e44",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-44fc12d31e44\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-44fc12d31e44\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      },
+      {
+        "sqliteBasename": "agent-70938575096a.sqlite",
+        "agentId": "agent-70938575096a",
+        "presetDeny": true,
+        "registerEligible": false,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.dualTreeSqlite[?(@.agentId==\"agent-70938575096a\")]",
+          "recompute": "jq '.dualTreeSqlite[] | select(.agentId==\"agent-70938575096a\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+        }
+      }
+    ],
+    "unknown": [
+      {
+        "sqliteBasename": "main.sqlite",
+        "agentId": "main",
+        "registerEligible": false,
+        "presetDeny": false,
+        "stayUnregistered": true,
+        "evidence": {
+          "file": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "jsonPath": "$.singleTreeButUnpartitioned[?(@.agentId==\"main\")]",
+          "recompute": "jq '.singleTreeButUnpartitioned[] | select(.agentId==\"main\")' docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json",
+          "whyNotConfirmed": "dualTree=false only; no unique workspace realpath was recorded. AgentId/filename inference is forbidden."
+        }
+      },
+      {
+        "match": "any other v1 sqlite basename not listed in known_multi_root or confirmed_single_root",
+        "registerEligible": false,
+        "stayUnregistered": true,
+        "disposition": "fail-closed-until-authority-classifies-unique-realpath"
+      }
+    ]
+  },
+  "runtime": {
+    "module": "src/memory/v1-root-guard.ts",
+    "docsRuntimeImportForbidden": true,
+    "gateBefore": ["resetIndex", "stale DELETE", "pruneEmbeddingCacheIfNeeded", "rebuild/reindex"],
+    "failClosed": [
+      "unregistered-v1-fail-closed",
+      "known-conflict-preset-deny",
+      "v1-multi-root-or-root-mismatch"
+    ]
+  }
+}

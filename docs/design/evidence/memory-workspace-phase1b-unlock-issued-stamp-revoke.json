@@ -1,0 +1,38 @@
+{
+  "schema": "memory-workspace-phase1b-unlock-issued-stamp-revoke/v1",
+  "decision": "revoke-issued-stamp",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "item5Met": false,
+  "item5": "not-met",
+  "item6Unlocked": false,
+  "item7Unlocked": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "reviewedBy": "cursor-data-governance",
+  "reviewedAt": "2026-08-19T15:20:00.000Z",
+  "baseline": "4dbc8928f4080882272198f59a9384381d1060cc",
+  "supersedes": {
+    "path": "docs/design/evidence/memory-workspace-phase1b-unlock-decision-issued-superseded.json",
+    "sourceSha256": "6b63602e4ff052625df053490857dacb817ee65b92a0713af4a76423af3d1c03",
+    "priorUnlock": "issued",
+    "priorPath": "unlock-first",
+    "priorIssuedAt": "2026-08-18T02:17:00.000Z",
+    "priorPhase1bExecutionBlocked": false
+  },
+  "replacement": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "doesNotAuthorize": [
+    "treat the archived issued stamp as canonical",
+    "score item 5 met",
+    "unlock item 6",
+    "unlock item 7",
+    "flip wiredToProductionResolver",
+    "deployAuthorized=true",
+    "LIVE cutover",
+    "schema v2 production write",
+    "delete productionWriteWatchIndex call-sites"
+  ],
+  "note": "Revokes the unlock-first issued stamp archived from a side worktree. Canonical receipt remains not-issued. This packet does not score Item 5 met and does not unlock Items 6 or 7."
+}

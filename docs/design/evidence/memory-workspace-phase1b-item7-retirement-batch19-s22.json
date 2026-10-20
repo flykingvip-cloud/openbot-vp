@@ -1,0 +1,63 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch19-s22/v1",
+  "item": 7,
+  "status": "retirement-batch-19",
+  "batch": "S22",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": true,
+  "previousAcceptedBaseline": 16,
+  "lastAcceptedRetirementBaseline": 16,
+  "sitesRetired": [
+    {
+      "ledgerId": "S22",
+      "file": "src/gateway/workspace-resolver/steward-read.ts",
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "lineBefore": 104,
+      "lineAfter": null,
+      "replacement": "WorkspaceResourceCatalog.getResource",
+      "replacementLocator": "src/gateway/workspace-resolver/strict-locator.ts",
+      "replacementTests": [
+        "src/gateway/workspace-resolver/strict-locator.test.ts",
+        "src/gateway/workspace-resolver/steward-read-item7-s22.test.ts"
+      ]
+    }
+  ],
+  "identityChecks": {
+    "tenant": "fail-closed when tenantId is missing; skip roots whose Catalog row tenant mismatches",
+    "workspace": "read existing Catalog SoT resourceId only; no host-root or process.cwd fallback",
+    "agentAsset": "skip roots with empty agentAssetId; lookup uses exact user-owned asset id",
+    "grant": "locator pass-after requires tenantContext + user grant; incomplete query fail-closed"
+  },
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 15,
+  "liveWriteWatchIndex": 15,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/workspace-resolver/steward-read.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+  "note": "Batch 19 retires S22 only after #658 S21. Read existing Catalog SoT via getResource. Do not call buildUserOwnedWorkspaceCatalogEntry. Do not mint a production Catalog row. Catalog miss=deny stays off. Item 7 stays not-met. Do not write liveWriteWatchIndex=0. Phase 0 freeze baseline stays 38."
+}

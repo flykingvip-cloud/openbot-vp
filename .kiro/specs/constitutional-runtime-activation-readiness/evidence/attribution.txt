@@ -1,0 +1,7 @@
+Agent Attribution — dirty working tree
+- dirty files: 0
+- attributed: 0
+- shared (registered, >1 owner): 0
+- conflict (unregistered, >1 owner): 0
+- unattributed: 0
+

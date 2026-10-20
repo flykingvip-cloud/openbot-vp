@@ -1,0 +1,44 @@
+{
+  "schema": "memory-workspace-phase1b-item5-production-execution-submit/v1",
+  "item": 5,
+  "decision": "submitted-for-acceptance",
+  "submittedBy": "cursor-data-governance",
+  "item5": "not-met",
+  "wiredToProductionResolver": false,
+  "item6": "not-met",
+  "item7": "not-met",
+  "deployAuthorized": true,
+  "productionContainerWrite": {
+    "status": "executed",
+    "stateDir": "/root/.openbot"
+  },
+  "packet": {
+    "deploy": "docs/design/evidence/memory-workspace-phase1b-item5-deploy-execution.json",
+    "decision": "docs/design/evidence/memory-workspace-phase1b-item5-deploy-execution-decision.json",
+    "liveCaller": "docs/design/evidence/memory-workspace-phase1b-item5-host-live-caller.json",
+    "mismatch": "docs/design/evidence/memory-workspace-phase1b-item5-registry-catalog-mismatch.json",
+    "tenantContext": "docs/design/evidence/memory-workspace-phase1b-item5-tenant-context-host-proof.json"
+  },
+  "measured": {
+    "liveCallerHits": 7,
+    "liveCallerMisses": 0,
+    "hostCatalogUserOwnedRows": 7,
+    "registryResolvedAssetNotInCatalog": 0,
+    "mainPathMisses": 0
+  },
+  "productionWindow": {
+    "baselineSha": "01b10a1eef10b862a0c81f94e4bd4ec539ca1a5e",
+    "backupPath": "/root/openbot-state-pre-item5-20260819.tar.gz",
+    "backupAt": "2026-08-19T07:09:36Z",
+    "gatewayRestart": "podman restart openbot-gateway-rc",
+    "resolveStateDir": "/root/.openbot"
+  },
+  "doesNotAuthorize": [
+    "wiredToProductionResolver=true",
+    "score item 5 met from this submission",
+    "close item 6",
+    "close item 7",
+    "write unredacted identifiers into git"
+  ],
+  "note": "Data-governance submits the 2026-08-19 production execution packet for re-review. This stamp approves submission only. Item 5 stays not-met. The wire flag was not flipped. Items 6 and 7 stay closed-off."
+}

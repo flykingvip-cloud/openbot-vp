@@ -1,0 +1,62 @@
+# BaselineManifest — Phase C independent decision freeze (LOCAL-ONLY / uncommitted)
+# Regenerated at assessedAt per Phase A authority-evidence-baselines.md §4.
+# Agent: grok-bot
+# Task: constitutional-governance-phase-c-decision
+#
+# Rules:
+# - mainSha = post-fetch origin/main tip (must include PR #23 merge)
+# - b2MergeSha = Phase B B2 merge on main (#20)
+# - b2ManifestMergeSha = PR #23 real merge commit (B2 post-merge convergence docs)
+# - two shadow flags default-off → runtimeEnabled=false
+# - no container probe this round → productionProven must not be true
+
+assessedAt: 2026-09-24T13:02:03+08:00
+productContractRevision: README.md@1f3584d3774237c73cf94471a6ce147a94dad0d9+VISION.md@cc29ae3dfa48699345fd266dada8ad0b9407c372+SECURITY.md@2a86d29045bafe9ffef12b024365aa5fb427b7f6
+mainSha: 2b9776708832d2cd3e533f0bf03a8498b0fc3f4a
+phaseAMergeSha: f475db9eb12548c6754e182e9d58bf4de4211c24
+b1MergeSha: 25863bb272489c5994600801f7afec769599e149
+b2MergeSha: 65ffc350d737e747175d64b6daa9b78ac79a55e9
+b2ManifestMergeSha: 2b9776708832d2cd3e533f0bf03a8498b0fc3f4a
+productionSeq: 98
+productionGatewaySha: 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001
+productionUiSha: 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001
+evidenceSource: "repo ledger only (deploy/production/releases.jsonl last seq=98); no container self-report probe this round; production-proven=unknown"
+runtimeEnabled: false
+productionProven: unknown
+
+notes:
+  worktree: /Users/daniel/AI VP/openbot-phase-c-decision
+  branch: grok-bot/constitutional-governance-phase-c-decision
+  remoteSoT: https://github.com/upbeyond/openbot
+  pr23:
+    title: "Docs: record B2 post-merge convergence"
+    state: MERGED
+    mergedAtUtc: 2026-09-24T04:55:07Z
+    mergeCommit: 2b9776708832d2cd3e533f0bf03a8498b0fc3f4a
+    confirmedOnOriginMain: true
+  b2MergeShaVerifiedAncestorOfMain: true
+  shadowFlagsDefaultOff:
+    OPENBOT_CONVERSATION_TASK_ORCH_SHADOW: unset
+    OPENBOT_CONVERSATION_TASK_WEB_READ_SHADOW: unset
+  ORCHESTRATION_LIVE_INVOKE: false
+  noEnableB2Flags: true
+  noDeploy: true
+  noRuntimeSrcEdits: true
+  noCommitPushPrThisRound: true
+  threeBaselines:
+    productContract: README+VISION+SECURITY blobs frozen above
+    mainTrunk: 2b9776708832d2cd3e533f0bf03a8498b0fc3f4a
+    productionLedgerTip: seq98 @ 41aac4a4f2ca… (≠ main tip; expected drift)
+  b1b2AllowedUsesOnly:
+    - mapping contracts↔code
+    - prediction≠scorer
+    - default-off shadow wiring
+    - safe projection
+    - Profile A/B tenant contracts in eval fixtures
+    - perf budget examples
+  b1b2ForbiddenClaims:
+    - production effect
+    - C5/C10/C11 done
+    - runtime-enabled
+    - production-proven
+    - Meta-Schema must productize

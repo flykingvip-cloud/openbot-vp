@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openbot.execution-router.shadow-event.v1",
+  "title": "ShadowRouteEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "event",
+    "runIdDigest",
+    "reasonCode",
+    "apply",
+    "skillCandidates",
+    "toolCandidates",
+    "confidence",
+    "flags"
+  ],
+  "properties": {
+    "schema": { "const": "openbot.execution-router.shadow-event.v1" },
+    "event": { "const": "chat.execution_router_shadow" },
+    "runIdDigest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "sessionKeyHash": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "reasonCode": { "type": "string" },
+    "apply": { "const": false },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "skillCandidates": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nameDigest", "score", "rank"],
+        "properties": {
+          "nameDigest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "score": { "type": "number" },
+          "rank": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "toolCandidates": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["nameDigest", "score", "rank"],
+        "properties": {
+          "nameDigest": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+          "score": { "type": "number" },
+          "rank": { "type": "integer", "minimum": 1 }
+        }
+      }
+    },
+    "flags": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "SKILL_TOP_K_ENABLED",
+        "TOOL_TOP_K_ENABLED",
+        "SHADOW_ROUTER_RECORD",
+        "SHADOW_ROUTER_APPLY",
+        "DAG_ENABLED",
+        "CONVERSATION_TASK_ENABLED",
+        "ORCHESTRATION_LIVE_INVOKE"
+      ],
+      "properties": {
+        "SKILL_TOP_K_ENABLED": { "const": false },
+        "TOOL_TOP_K_ENABLED": { "const": false },
+        "SHADOW_ROUTER_RECORD": { "const": false },
+        "SHADOW_ROUTER_APPLY": { "const": false },
+        "DAG_ENABLED": { "const": false },
+        "CONVERSATION_TASK_ENABLED": { "const": false },
+        "ORCHESTRATION_LIVE_INVOKE": { "const": false }
+      }
+    }
+  }
+}

@@ -1,0 +1,341 @@
+name: OpenBot
+options:
+  bundleIdPrefix: ai.openbot
+  deploymentTarget:
+    iOS: "18.0"
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_APP_INTENTS_METADATA_GENERATION: NO
+
+packages:
+  OpenBotKit:
+    path: ../shared/OpenBotKit
+  Swabble:
+    path: ../../Swabble
+
+schemes:
+  OpenBot:
+    shared: true
+    build:
+      targets:
+        OpenBot: all
+    run:
+      config: Debug
+      environmentVariables:
+        OPENBOT_ENABLE_LEGACY_UI_SHELL: "1"
+    test:
+      targets:
+        - OpenBotTests
+        - OpenBotLogicTests
+  OpenBotLogicTests:
+    shared: true
+    build:
+      targets:
+        OpenBotLogicTests: all
+    test:
+      targets:
+        - OpenBotLogicTests
+
+targets:
+  OpenBot:
+    type: application
+    platform: iOS
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    sources:
+      - path: Sources
+    dependencies:
+      - target: OpenBotShareExtension
+        embed: true
+      - target: OpenBotActivityWidget
+        embed: true
+      - target: OpenBotWatchApp
+      - package: OpenBotKit
+        product: OpenBotKit
+      - package: OpenBotKit
+        product: OpenBotChatUI
+      - package: OpenBotKit
+        product: OpenBotProtocol
+      - package: Swabble
+        product: SwabbleKit
+      - sdk: AppIntents.framework
+    preBuildScripts:
+      - name: SwiftFormat (lint)
+        basedOnDependencyAnalysis: false
+        inputFileLists:
+          - $(SRCROOT)/SwiftSources.input.xcfilelist
+        script: |
+          set -euo pipefail
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          if ! command -v swiftformat >/dev/null 2>&1; then
+            echo "error: swiftformat not found (brew install swiftformat)" >&2
+            exit 1
+          fi
+          swiftformat --lint --config "$SRCROOT/../../.swiftformat" \
+            --filelist "$SRCROOT/SwiftSources.input.xcfilelist"
+      - name: SwiftLint
+        basedOnDependencyAnalysis: false
+        inputFileLists:
+          - $(SRCROOT)/SwiftSources.input.xcfilelist
+        script: |
+          set -euo pipefail
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            echo "error: swiftlint not found (brew install swiftlint)" >&2
+            exit 1
+          fi
+          swiftlint lint --config "$SRCROOT/.swiftlint.yml" --use-script-input-file-lists
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_ENTITLEMENTS: Sources/OpenBot.entitlements
+        CODE_SIGN_STYLE: "$(OPENBOT_CODE_SIGN_STYLE)"
+        DEVELOPMENT_TEAM: "$(OPENBOT_DEVELOPMENT_TEAM)"
+        PRODUCT_BUNDLE_IDENTIFIER: "$(OPENBOT_APP_BUNDLE_ID)"
+        PROVISIONING_PROFILE_SPECIFIER: "$(OPENBOT_APP_PROFILE)"
+        TARGETED_DEVICE_FAMILY: "1"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        SUPPORTS_LIVE_ACTIVITIES: YES
+        ENABLE_APPINTENTS_METADATA: NO
+        ENABLE_APP_INTENTS_METADATA_GENERATION: NO
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBot
+        CFBundleIconName: AppIcon
+        CFBundleURLTypes:
+          - CFBundleURLName: ai.openbot.ios
+            CFBundleURLSchemes:
+              - openbot
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"
+        UIAppFonts:
+          - manrope_400_regular.ttf
+          - manrope_500_medium.ttf
+          - manrope_600_semibold.ttf
+          - manrope_700_bold.ttf
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes:
+          - audio
+          - remote-notification
+        BGTaskSchedulerPermittedIdentifiers:
+          - ai.openbot.ios.bgrefresh
+        NSLocalNetworkUsageDescription: OpenBot discovers and connects to your OpenBot gateway on the local network.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoadsInWebContent: true
+        NSBonjourServices:
+          - _openbot-gw._tcp
+        NSCameraUsageDescription: OpenBot can capture photos or short video clips when requested via the gateway.
+        NSLocationWhenInUseUsageDescription: OpenBot uses your location when you allow location sharing.
+        NSLocationAlwaysAndWhenInUseUsageDescription: OpenBot can share your location in the background when you enable Always.
+        NSMicrophoneUsageDescription: OpenBot needs microphone access for voice wake.
+        NSMotionUsageDescription: OpenBot may use motion data to support device-aware interactions and automations.
+        NSPhotoLibraryUsageDescription: OpenBot needs photo library access when you choose existing photos to share with your assistant.
+        NSSpeechRecognitionUsageDescription: OpenBot uses on-device speech recognition for voice wake.
+        NSSupportsLiveActivities: true
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+
+  OpenBotShareExtension:
+    type: app-extension
+    platform: iOS
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    sources:
+      - path: ShareExtension
+    dependencies:
+      - package: OpenBotKit
+        product: OpenBotKit
+      - sdk: AppIntents.framework
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: "$(OPENBOT_CODE_SIGN_STYLE)"
+        DEVELOPMENT_TEAM: "$(OPENBOT_DEVELOPMENT_TEAM)"
+        ENABLE_APPINTENTS_METADATA: NO
+        ENABLE_APP_INTENTS_METADATA_GENERATION: NO
+        PRODUCT_BUNDLE_IDENTIFIER: "$(OPENBOT_SHARE_BUNDLE_ID)"
+        PROVISIONING_PROFILE_SPECIFIER: "$(OPENBOT_SHARE_PROFILE)"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBot Share
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsMovieWithMaxCount: 1
+
+  OpenBotActivityWidget:
+    type: app-extension
+    platform: iOS
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    sources:
+      - path: ActivityWidget
+      - path: Sources/LiveActivity/OpenBotActivityAttributes.swift
+    dependencies:
+      - sdk: WidgetKit.framework
+      - sdk: ActivityKit.framework
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: "$(OPENBOT_CODE_SIGN_STYLE)"
+        DEVELOPMENT_TEAM: "$(OPENBOT_DEVELOPMENT_TEAM)"
+        PRODUCT_BUNDLE_IDENTIFIER: "$(OPENBOT_ACTIVITY_WIDGET_BUNDLE_ID)"
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        SUPPORTS_LIVE_ACTIVITIES: YES
+    info:
+      path: ActivityWidget/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBot Activity
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"
+        NSSupportsLiveActivities: true
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  OpenBotWatchApp:
+    type: application.watchapp2
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: WatchApp
+    dependencies:
+      - target: OpenBotWatchExtension
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_APPINTENTS_METADATA: NO
+        ENABLE_APP_INTENTS_METADATA_GENERATION: NO
+        PRODUCT_BUNDLE_IDENTIFIER: "$(OPENBOT_WATCH_APP_BUNDLE_ID)"
+    info:
+      path: WatchApp/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBot
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"
+        WKCompanionAppBundleIdentifier: "$(OPENBOT_APP_BUNDLE_ID)"
+        WKWatchKitApp: true
+
+  OpenBotWatchExtension:
+    type: watchkit2-extension
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: WatchExtension/Sources
+    dependencies:
+      - sdk: AppIntents.framework
+      - sdk: WatchConnectivity.framework
+      - sdk: UserNotifications.framework
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: "$(OPENBOT_WATCH_EXTENSION_BUNDLE_ID)"
+    info:
+      path: WatchExtension/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBot
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"
+        NSExtension:
+          NSExtensionAttributes:
+            WKAppBundleIdentifier: "$(OPENBOT_WATCH_APP_BUNDLE_ID)"
+          NSExtensionPointIdentifier: com.apple.watchkit
+
+  OpenBotTests:
+    type: bundle.unit-test
+    platform: iOS
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    sources:
+      - path: Tests
+        excludes:
+          - Logic
+    dependencies:
+      - target: OpenBot
+      - package: Swabble
+        product: SwabbleKit
+      - sdk: AppIntents.framework
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: "$(OPENBOT_CODE_SIGN_STYLE)"
+        DEVELOPMENT_TEAM: "$(OPENBOT_DEVELOPMENT_TEAM)"
+        PRODUCT_BUNDLE_IDENTIFIER: ai.openbot.ios.tests
+        ENABLE_APP_INTENTS_METADATA_GENERATION: NO
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/OpenBot.app/OpenBot"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+    info:
+      path: Tests/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBotTests
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"
+
+  OpenBotLogicTests:
+    type: bundle.unit-test
+    platform: iOS
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    sources:
+      - path: Tests/Logic
+      - path: Sources/MobileUI/AgentStripNav.swift
+      - path: Sources/MobileUI/ChatKnowledgeCatalog.swift
+      - path: Sources/MobileUI/KnowledgeBrowserModels.swift
+      - path: Sources/MobileUI/MeHubModels.swift
+      - path: Sources/MobileUI/TasksWebModels.swift
+    dependencies:
+      - package: OpenBotKit
+        product: OpenBotKit
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "Apple Development"
+        CODE_SIGN_STYLE: "$(OPENBOT_CODE_SIGN_STYLE)"
+        DEVELOPMENT_TEAM: "$(OPENBOT_DEVELOPMENT_TEAM)"
+        PRODUCT_BUNDLE_IDENTIFIER: ai.openbot.ios.logic-tests
+        ENABLE_APP_INTENTS_METADATA_GENERATION: NO
+        SWIFT_VERSION: "6.0"
+        SWIFT_STRICT_CONCURRENCY: complete
+    info:
+      path: Tests/Info.plist
+      properties:
+        CFBundleDisplayName: OpenBotLogicTests
+        CFBundleShortVersionString: "$(OPENBOT_MARKETING_VERSION)"
+        CFBundleVersion: "$(OPENBOT_BUILD_VERSION)"

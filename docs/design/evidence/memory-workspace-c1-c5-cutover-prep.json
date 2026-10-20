@@ -1,0 +1,218 @@
+{
+  "schema": "memory-workspace-c1-c5-cutover-prep/v1",
+  "item": 7,
+  "stage": "C",
+  "status": "c1-c5-cutover-prep",
+  "changeRequestKind": "c1-c5-cutover-prep",
+  "reviewRequest": "c1-c5-cutover-prep-review-only",
+  "reviewRequestIsBatchAccept": false,
+  "dependsOn": "Stage C identity thread (#709) + Stage C identity SHADOW (item7-stage-c-identity-shadow) + A1 canonical binding design",
+  "shadowOnly": true,
+  "productionSwitch": false,
+  "implementationVerified": false,
+  "c1c5StayLegacy": true,
+  "legacyLocatorRetained": true,
+  "scanModified": false,
+  "canonicalScanPath": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+  "canonicalScanUntouched": true,
+  "previousAcceptedBaseline": 10,
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "retiredThisChange": 0,
+  "frozenWriteWatchIndex": 38,
+  "c1c5StayInScan": true,
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "i3Executed": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "freezeSafe": true,
+  "freeze": {
+    "ok": true,
+    "addedProductionCallSites": [],
+    "addedProductionHelpers": [],
+    "addedCatalogSynthesis": [],
+    "why": "PREP adds a plan module + tests that READ the existing Stage C SHADOW and narrow interface. It never mints a binding, never switches C1-C5, never calls a frozen P1 helper from a new production site."
+  },
+  "reusableStageCAssets": [
+    "src/gateway/item7-stage-c-identity-shadow.ts",
+    "docs/design/evidence/memory-workspace-phase1b-item7-stage-c-prod-identity-wiring-shadow.json",
+    "src/memory/memory-index-workspace-handle.ts",
+    "src/memory/memory-index-access-context.ts",
+    "CogniWeaveMemoryManager.createFromHandle"
+  ],
+  "sites": [
+    {
+      "label": "C1",
+      "ledgerId": "S30",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "resolveMemoryBackendConfig (cogniweave branch)",
+      "callers": [
+        "getMemorySearchManager",
+        "getMemorySearchManagerFromHandle",
+        "startGatewayMemoryBackend"
+      ],
+      "identityAtCallSite": ["cfg", "agentId"],
+      "trustedIdentityAtCallSite": false,
+      "productionSwitch": false
+    },
+    {
+      "label": "C2",
+      "ledgerId": "S31",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "resolveMemoryBackendConfig (qmd branch)",
+      "callers": ["getMemorySearchManager", "startGatewayMemoryBackend"],
+      "identityAtCallSite": ["cfg", "agentId"],
+      "trustedIdentityAtCallSite": false,
+      "productionSwitch": false
+    },
+    {
+      "label": "C3",
+      "ledgerId": "S32",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "CogniWeaveMemoryManager private constructor",
+      "callers": [
+        "CogniWeaveMemoryManager.create",
+        "CogniWeaveMemoryManager.createFromHandle (still hits line 554)"
+      ],
+      "identityAtCallSite": ["cfg", "agentId", "optional governance"],
+      "trustedIdentityAtCallSite": false,
+      "productionSwitch": false,
+      "note": "createFromHandle stores the branded Handle but the constructor still calls resolveAgentWorkspaceDir; that is the residual C3 cutover."
+    },
+    {
+      "label": "C4",
+      "ledgerId": "S36",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "MemoryIndexManager.get",
+      "callers": ["getMemorySearchManager builtin fallback", "QmdMemoryManager fallbackFactory"],
+      "identityAtCallSite": ["cfg", "agentId"],
+      "trustedIdentityAtCallSite": false,
+      "productionSwitch": false,
+      "cacheGap": "INDEX_CACHE key is agentId:workspaceDir:settings — no tenant/resource/epoch isolation today"
+    },
+    {
+      "label": "C5",
+      "ledgerId": "S37",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "op": "index",
+      "symbol": "resolveAgentWorkspaceDir",
+      "enclosing": "QmdMemoryManager private constructor",
+      "callers": ["QmdMemoryManager.create ← getMemorySearchManager qmd branch"],
+      "identityAtCallSite": ["cfg", "agentId"],
+      "trustedIdentityAtCallSite": false,
+      "productionSwitch": false
+    }
+  ],
+  "managedEnterpriseSwitchPlan": {
+    "profile": "managed_enterprise",
+    "locator": "canonical MemoryWorkspaceHandle",
+    "resolver": "resolveMemoryWorkspaceHandle (injected port; memory layer never imports gateway)",
+    "authorization": "deriveManagedAccessContextFromGovernance + resolveMemoryIndexAccess (fail-closed)",
+    "identity": "server-trusted only; never wire-derived tenantId/userId/resourceId",
+    "forbiddenFallbacks": [
+      "resolveAgentWorkspaceDir",
+      "cfg-only resolver",
+      "process.cwd",
+      "empty-string",
+      "personal_local compat locator"
+    ],
+    "executed": false
+  },
+  "personalLocalCompatPlan": {
+    "profile": "personal_local",
+    "mode": "legacy-compat",
+    "keepLegacyBehavior": true,
+    "locator": "explicit security-profile-gated resolveAgentWorkspaceDir",
+    "neverManagedFallback": true,
+    "executed": false
+  },
+  "batchCases": [
+    "catalog_miss",
+    "tenant_mismatch",
+    "ownership_mismatch",
+    "membership_grant_missing",
+    "stale_epoch_fencing",
+    "workspace_not_indexable",
+    "background_identity_defer",
+    "personal_local_regression"
+  ],
+  "cacheIsolation": {
+    "plannedKey": "managed:<tenantId>:<resourceId>:epoch:<governanceEpoch>:fence:<fencingToken>:<agentId>",
+    "wiredIntoProduction": false,
+    "covers": ["tenant", "resource", "epoch", "fencing"]
+  },
+  "retirementScanExpectedChangeDraft": {
+    "status": "draft-only",
+    "canonicalScanModified": false,
+    "applyForbidden": true,
+    "note": "DO NOT modify docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json in this PREP. Projection only: if a future independently-authorized cutover retired C1-C5, remaining/liveWriteWatchIndex would be 5 (S01/S02 + S33/S34/S35). That is NOT a new accepted baseline.",
+    "currentRemaining": 10,
+    "projectedRemainingIfC1C5Retired": 5,
+    "sitesRemovedIfApplied": [
+      "src/memory/backend-config.ts:417",
+      "src/memory/backend-config.ts:444",
+      "src/memory/cogniweave-manager.ts:554",
+      "src/memory/manager.ts:152",
+      "src/memory/qmd-manager.ts:196"
+    ]
+  },
+  "notDone": [
+    "no production cutover of C1-C5",
+    "no mutation of canonical retirement scan",
+    "no wiring of src/agents/tools/memory-tool.ts",
+    "no get-reply.ts / Stage B CR1 / manager-sync-ops.ts changes",
+    "no remaining/liveWriteWatchIndex decrement",
+    "implementationVerified remains false",
+    "deployAuthorized remains false",
+    "LIVE remains forbidden",
+    "Item 7 remains not-met",
+    "Phase 1B remains blocked",
+    "I3 not executed"
+  ],
+  "conclusions": [
+    "C1-C5 remain on resolveAgentWorkspaceDir at the verified lines on origin/main e6dd9c61bc; none has a trusted request-level identity at the call site.",
+    "managed_enterprise cutover must use the canonical Handle (resolveMemoryWorkspaceHandle port + resolveMemoryIndexAccess fail-closed). The landed Stage C SHADOW is reused as observability, NOT flipped into a production switch.",
+    "personal_local keeps today's legacy locator via an explicit security-profile-gated compat path; it is never a managed fallback.",
+    "C4 INDEX_CACHE (agentId:workspaceDir:settings) does not isolate tenant/resource/epoch today; the planned key is documented and tested here and is NOT wired into manager.ts.",
+    "C3 createFromHandle already binds a Handle for CogniWeave but the constructor still executes resolveAgentWorkspaceDir at line 554 — that residual is the C3 cutover, not this PREP.",
+    "Batch fail-closed cases (catalog miss, tenant mismatch, ownership mismatch, membership/grant missing, stale epoch/fencing, workspace not indexable, background identity defer, personal-local regression) are covered by shared foundation tests against the Stage C SHADOW; production cutover stays independently rollbackable and is not executed.",
+    "Retirement-scan expected-change is DRAFT-only in this packet/handoff. Canonical scan remaining=10 / liveWriteWatchIndex=10 is unchanged.",
+    "Locks preserved: implementationVerified=false, deployAuthorized=false, live=forbidden, item7=not-met, productionSwitch=false, Phase 1B blocked, I3 not executed."
+  ],
+  "entrypointWiring": {
+    "status": "deferred",
+    "reason": "src/agents/tools/memory-tool.ts is a shared hot file owned by codex-runtime-safety; this PREP does not modify it."
+  },
+  "files": [
+    "src/gateway/item7-c1-c5-cutover-prep.ts",
+    "src/gateway/item7-c1-c5-cutover-prep.test.ts",
+    "docs/design/evidence/memory-workspace-c1-c5-cutover-prep.json",
+    "docs/design/evidence/memory-workspace-c1-c5-cutover-prep.test.mjs",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-memory-c1-c5-cutover-prep.md"
+  ],
+  "rollbackProof": true,
+  "quarantineProof": true,
+  "baseCommit": "e6dd9c61bc4cc0c3cf014075bfaab7adc86a6c89",
+  "originMainSha": "e6dd9c61bc4cc0c3cf014075bfaab7adc86a6c89",
+  "note": "C1-C5 Memory Index Cutover PREP. Legacy remains. No production switch. Canonical retirement scan is not modified. Item 7 stays not-met. LIVE=forbidden."
+}

@@ -1,0 +1,80 @@
+{
+  "schema": "memory-workspace-phase0-close-readiness/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainSha": "6fdc0ac80968816969e4e1344b13c60941c0f960",
+  "evaluatedAt": "2026-08-16T07:10:00.000Z",
+  "evaluatedBy": "official-review",
+  "engineeringGate": {
+    "pass": true,
+    "source": "docs/design/evidence/memory-workspace-phase0-exit-gate.mjs",
+    "checksSummary": "inventory, disposition, freeze wired, v1-guard beginV1Operation, bootstrap receipt, 503-bypass verifier on main"
+  },
+  "governanceGate": {
+    "pass": true,
+    "signOffFile": "docs/design/evidence/memory-workspace-phase0-20260814.sign-off.json",
+    "currentDecision": "PHASE0_ACCEPTED",
+    "reviewSequence": 25,
+    "signedAt": "2026-08-16T07:10:00.000Z",
+    "independentVerification": "docs/design/evidence/memory-workspace-phase0-official-review-25-independent-verification.json"
+  },
+  "blockers": {
+    "resolved": [
+      {
+        "id": "official-review-sign-off-ceremony",
+        "resolution": "review sequence 25 signed @ main@6fdc0ac809",
+        "evidence": "docs/design/evidence/memory-workspace-phase0-20260814.sign-off.json"
+      },
+      {
+        "id": "independent-gh-verification-missing",
+        "resolution": "five-check live gh PASS + offline verifier PASS",
+        "evidence": "docs/design/evidence/memory-workspace-phase0-official-review-25-independent-verification.json"
+      },
+      {
+        "id": "ws-b-change-request-unaccepted",
+        "resolution": "WS-B + security accepted on main via #429 @ 1f7a067643 (design gate only)",
+        "evidence": "docs/design/evidence/memory-workspace-phase0-ws-b-dispatch.json"
+      }
+    ],
+    "open": [
+      {
+        "id": "section141-unsigned",
+        "owner": "remaining role owners (architecture, data-governance, memory, storage-cutover, sre)",
+        "action": "Complete remaining §14.1 design sign-offs before Phase 1B"
+      }
+    ],
+    "partialAcceptance": [
+      {
+        "id": "runner-long-term-stability-unproven",
+        "note": "3-cycle minimum met at review-25; 7-day SLO not proven"
+      },
+      {
+        "id": "pr-409-merge-moment-freeze-failure-on-record",
+        "note": "Historical infra transient accepted at review-25"
+      }
+    ]
+  },
+  "phase0CloseCriteria": {
+    "engineeringExitGatePass": true,
+    "mainTipTripleGateEvidence": true,
+    "offlineGhEvidencePack": true,
+    "offlineVerifierOnMain": true,
+    "independentGhVerificationPass": true,
+    "sotConsistent": true,
+    "officialReviewSignOff": true,
+    "deployAuthorizedMustRemainFalse": true
+  },
+  "phase1Entry": {
+    "phase1aAfterPhase0Close": "design-and-owner-signoff-only",
+    "phase1bExecutionBlockedUntilSection141": true,
+    "wsAOwner": "codex-workspace-architecture",
+    "checklist": "docs/design/evidence/memory-workspace-phase0-phase1a-entry-checklist.json",
+    "section141Matrix": "docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json",
+    "liveDeployForbidden": true
+  },
+  "officialReviewAttestation": {
+    "markPhase0Accepted": true,
+    "deployAuthorized": false,
+    "closesWsC": false,
+    "note": "Phase 0 closed at review sequence 25. Phase 1B and LIVE remain blocked."
+  }
+}

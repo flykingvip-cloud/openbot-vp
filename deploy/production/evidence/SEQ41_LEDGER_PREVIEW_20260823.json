@@ -1,0 +1,23 @@
+{
+  "schema": "ledger-row-preview/v1",
+  "status": "PREVIEW_ONLY_NOT_LIVE",
+  "note": "Do not append. productionCloseout not-accepted. Current LIVE / Latest remain seq 40 33993e52e554.",
+  "proposedSeq": 41,
+  "row": {
+    "seq": 41,
+    "gatewaySha": "0229c93cb9769b96c83d1d8cbe168373a6b0a89d",
+    "uiSha": "0229c93cb9769b96c83d1d8cbe168373a6b0a89d",
+    "imageTag": "localhost/openbot:rc-amd64-provenance-0229c93cb976",
+    "imageDigest": "sha256:43abcdabfb0e7f6a7876975610c9bfb1cb6a195eeff81910f7cf83fd0a7d7cfa",
+    "tag": "provenance/sha-0229c93cb976",
+    "liveFrom": null,
+    "liveTo": null,
+    "evidence": "PREVIEW only. Frozen origin/main 0229c93cb9. SHA-bound shadow-3 5/5. LIVE/ledger seq 40 33993e52e554 unchanged. NOT cut over.",
+    "executor": "cursor-collab-csc",
+    "notes": "Isolated candidate only. Do not append this row. Do not swap LIVE."
+  },
+  "ledgerLatestUnchanged": {
+    "seq": 40,
+    "gatewaySha": "33993e52e5540f76e57d66ab75d8955420437d3a"
+  }
+}

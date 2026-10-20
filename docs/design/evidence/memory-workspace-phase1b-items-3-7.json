@@ -1,0 +1,121 @@
+{
+  "schema": "memory-workspace-phase1b-items-3-7/v1",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "productionCatalogWrite": "none",
+  "items": [
+    {
+      "id": 3,
+      "status": "met",
+      "owner": ["cursor-data-governance"],
+      "measured": {
+        "designDispatchStatus": "accepted",
+        "designDispatchIsWriteSwitch": false,
+        "writeSwitchAcceptancePresent": true,
+        "writeSwitchAcceptanceDecision": "accepted",
+        "failClosedListsWriteSwitchNotEnabled": true
+      },
+      "remaining": []
+    },
+    {
+      "id": 4,
+      "status": "met",
+      "owner": ["cursor-memory-wsc"],
+      "measured": {
+        "filesV2Present": true,
+        "schemaV2Present": true,
+        "schemaV2Enabled": false,
+        "v1RootGuardPresent": true,
+        "memoryBoundaryForbidsV2": true,
+        "sameReleaseUnitAsItem3": true
+      },
+      "remaining": []
+    },
+    {
+      "id": 5,
+      "status": "met",
+      "owner": ["cursor-data-governance"],
+      "measured": {
+        "designMayInferOwnerFromPath": false,
+        "productionSynthesizesEmptyCatalog": false,
+        "productionUsesAgentIdAsAgentAssetId": false,
+        "productionCallerFallsBackOnUnwiredCatalog": false,
+        "managedCwdThrows": false,
+        "wiredToProductionResolver": true,
+        "productionFile": "src/gateway/workspace-resolver/tool-cwd.ts",
+        "productionCaller": "src/gateway/tenant-context.ts"
+      },
+      "remaining": []
+    },
+    {
+      "id": 6,
+      "status": "not-met",
+      "owner": ["cursor-fable", "cursor-memory-wsc"],
+      "measured": {
+        "existingCutover": "src/gateway/workspace/cutover.ts",
+        "secondStateMachineForbidden": true,
+        "drillReceiptPresent": true,
+        "drillStatus": "green"
+      },
+      "remaining": [
+        "item 6 is owned by cursor-fable / cursor-memory-wsc; this package does not accept it"
+      ]
+    },
+    {
+      "id": 7,
+      "status": "not-met",
+      "owner": ["cursor-data-governance"],
+      "measured": {
+        "productionWriteWatchIndex": 38,
+        "productionCounts": {
+          "P1": {
+            "production": 80,
+            "test": 6
+          },
+          "P2": {
+            "production": 0,
+            "test": 0
+          },
+          "P3": {
+            "production": 11,
+            "test": 4
+          },
+          "P4": {
+            "production": 9,
+            "test": 25
+          },
+          "P5": {
+            "production": 11,
+            "test": 10
+          },
+          "P6": {
+            "production": 4,
+            "test": 4
+          },
+          "P7": {
+            "production": 0,
+            "test": 0
+          },
+          "P8": {
+            "production": 4,
+            "test": 0
+          }
+        },
+        "freezeOwner": "cursor-fable",
+        "retirementOwner": "cursor-data-governance",
+        "ownersDistinct": true
+      },
+      "remaining": ["production old call-sites measured at zero before I3"]
+    }
+  ],
+  "allMet": false,
+  "explicitlyForbidden": [
+    "treat this measurement as Phase 1B unlock",
+    "resolver write switch enablement",
+    "memory schema v2 enablement",
+    "LIVE migration",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ]
+}

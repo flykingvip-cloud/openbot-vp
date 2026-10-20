@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
+    "paths": {
+      "@openbot/aor-core": ["../aor-core/dist/index.d.ts"],
+      "@openbot/aor-backend-openbot": ["../aor-backend-openbot/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

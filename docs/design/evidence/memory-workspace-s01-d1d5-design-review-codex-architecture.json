@@ -1,0 +1,144 @@
+{
+  "schema": "memory-workspace-s01-d1d5-design-review/v2",
+  "kind": "s01-d1-d5-trusted-principal-handle-security-governance-review",
+  "reviewer": "codex-architecture",
+  "signedBy": "codex-architecture",
+  "signedAt": "2026-08-29T14:29:31.000Z",
+  "reviewPass": 3,
+  "previousDecision": "changes-required",
+  "previousSignedAt": "2026-08-29T13:00:39.000Z",
+  "previousReviewPass": 2,
+  "scope": "d1-d5-design-only-security-governance",
+  "decision": "accepted",
+  "mergedBaseline": {
+    "pr": 816,
+    "mergeCommit": "cf8f09a0b2c251ca60392f6e8930091d0946daf1",
+    "featureTip": "b070c2f8eeafb084e9ae92f687e2ff6481595fe2",
+    "originMain": "cf8f09a0b2c251ca60392f6e8930091d0946daf1"
+  },
+  "baseline": {
+    "worktree": "/Users/daniel/AI项目/openbot-s01-d1d5-independent-review",
+    "branch": "cursor-codex-architecture/item7-s01-d1d5-pass3-review",
+    "fetchedOriginMain": true,
+    "head": "cf8f09a0b2c251ca60392f6e8930091d0946daf1",
+    "originMain": "cf8f09a0b2c251ca60392f6e8930091d0946daf1",
+    "mergeBaseIsAncestor": true,
+    "didNotModifySharedWorkingTree": true,
+    "didNotModifyProductionBusinessCode": true
+  },
+  "reviewedArtifacts": [
+    "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+    "docs/design/evidence/memory-workspace-s01-trusted-principal-handle-gate.json",
+    "docs/design/evidence/memory-workspace-s01-trusted-principal-handle-gate.test.mjs",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    ".kiro/specs/memory-workspace-platform-remediation/s01-d1-d5-design-package.md"
+  ],
+  "verdict": {
+    "D1": "pass",
+    "D2": "pass",
+    "D3": "pass",
+    "D4": "pass",
+    "D5": "pass"
+  },
+  "closedFindings": ["SG1", "SG2", "SG3", "SG4", "SG5"],
+  "checksRun": {
+    "evidenceTest": {
+      "command": "node --test docs/design/evidence/memory-workspace-s01-trusted-principal-handle-gate.test.mjs",
+      "result": "pass"
+    },
+    "contractTest": {
+      "command": "bun test docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+      "result": "pass",
+      "cases": 21
+    },
+    "r6MachineCheck": {
+      "command": "node scripts/verify-single-sot.mjs",
+      "result": "pass",
+      "implementationVerified": false
+    }
+  },
+  "locks": {
+    "productionCatalogWrite": "none",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "i3": "not executed",
+    "live": "forbidden",
+    "deployAuthorized": false,
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10
+  },
+  "doesNotAuthorize": [
+    "S01 retirement",
+    "implementation wiring",
+    "production Catalog write",
+    "Phase 1B unlock",
+    "I3",
+    "LIVE",
+    "deployAuthorized=true",
+    "filling kiro-sot-reviewer slot"
+  ],
+  "explicitlyForbidden": [
+    "modify src/auto-reply/reply/get-reply.ts",
+    "modify src/memory/**",
+    "modify src/gateway/workspace-resolver/**",
+    "write production Catalog",
+    "wire resolver/Handle/trusted principal production path",
+    "delete or move S01",
+    "modify retirement scan remaining/liveWriteWatchIndex",
+    "execute I3",
+    "issue Phase 1B unlock",
+    "set deployAuthorized=true",
+    "any LIVE or production deployment",
+    "sign as kiro-sot-reviewer"
+  ],
+  "productionObservation": {
+    "getReplyStillUsesStewardHelper": true,
+    "getReplyLine": "src/auto-reply/reply/get-reply.ts:164",
+    "evaluateS01AuthorizedToolCwdImportedBySrc": false,
+    "secondMemoryWorkspaceHandleProductionEntry": false,
+    "soleProductionHandle": "src/memory/memory-workspace-handle.ts",
+    "currentProductionExploitability": "none-not-wired"
+  },
+  "findings": [
+    {
+      "id": "SG1",
+      "d": "D1",
+      "status": "closed",
+      "evidence": "S01PresentedSourceProof has no expectedHmac/expectedToken/allowlist. verifySourceProof compares presented.hmac to signS01SessionHmac(server.sessionHmacSecret, sessionId)."
+    },
+    {
+      "id": "SG2",
+      "d": "D1",
+      "status": "closed",
+      "evidence": "attestVerifiedSession is keyed HMAC. parseTrustedPrincipal and evaluateS01AuthorizedToolCwd reject unkeyed SHA-256 recomputation."
+    },
+    {
+      "id": "SG3",
+      "d": "D4",
+      "status": "closed",
+      "evidence": "principalMayUseHandle requires ownerId===userId, seat, or group. Same-tenant other-owner returns ERR_WORKSPACE_OWNER_DENIED."
+    },
+    {
+      "id": "SG4",
+      "d": "D4",
+      "status": "closed",
+      "evidence": "evaluateS01AuthorizedToolCwd requires S01PlatformAuthMembershipPort. Caller-injected arrays fail ERR_TENANT_BINDING_REQUIRED."
+    },
+    {
+      "id": "SG5",
+      "d": "D5",
+      "status": "closed",
+      "evidence": "21 contract tests lock self-compared HMAC, unkeyed attestation, array membership, same-tenant lateral access, group/seat port, and src freeze."
+    }
+  ],
+  "residualConstraints": [
+    "Production issue() must take VerifiedSessionContext from platform-auth, not tool/body JSON. Session HMAC currently binds sessionId.",
+    "Production must inject a PlatformAuth membership adapter, not a duck-typed object from the wire.",
+    "kiro-sot-reviewer must sign independently before implementation review.",
+    "This accept is design-only on the merged unique contract/handoff. It does not wire get-reply or unlock Phase 1B."
+  ],
+  "note": "codex-architecture pass 3 of merged PR #816 (cf8f09a0b2). SG1-SG5 are closed on origin/main unique contract and unique handoff. D1-D5 design-accepted. implementationGate remains not-met. Scan remaining/liveWriteWatchIndex remain 10. This signature does not fill kiro-sot-reviewer and does not authorize S01 retirement, production Catalog write, I3, Phase 1B, or LIVE."
+}

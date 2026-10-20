@@ -1,0 +1,111 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch9-s29/v1",
+  "item": 7,
+  "status": "retirement-batch-9",
+  "batch": "S29",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S29",
+      "file": "src/gateway/workspace/handler-bridge.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "lineBefore": 592,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "selection": {
+    "ledger": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json",
+    "plan": "docs/design/evidence/memory-workspace-phase1b-item7-replacement-plan.json",
+    "skipped": [
+      {
+        "ledgerId": "S01",
+        "reason": "W4 steward helper; replacement family is steward Catalog identity, not resolveWorkspaceLocator"
+      },
+      {
+        "ledgerId": "S02",
+        "reason": "cited line drifted; host now sits inside a steward callback and cannot be replaced without moving freeze-watched lines"
+      },
+      {
+        "ledgerId": "S06",
+        "reason": "W4 steward helper; replacement family is steward Catalog identity, not resolveWorkspaceLocator"
+      },
+      {
+        "ledgerId": "S08",
+        "reason": "already retired on origin/main by #612; W3 catalog synthesis site is gone from the live scan"
+      },
+      {
+        "ledgerId": "S09",
+        "reason": "W3 catalog synthesis; replacement is WorkspaceResourceCatalog.getResource"
+      },
+      {
+        "ledgerId": "S10",
+        "reason": "already retired on origin/main by #626; wrapper call in agents.ts is gone"
+      },
+      {
+        "ledgerId": "S11",
+        "reason": "already retired on origin/main by #629; agents.ts:146 is now a locator fallback"
+      },
+      {
+        "ledgerId": "S12",
+        "reason": "already retired on origin/main by #633; agents.ts:1001 host is now a locator fallback"
+      },
+      {
+        "ledgerId": "S13",
+        "reason": "already retired on origin/main by #636; agents.ts:1075 host is now a locator fallback"
+      },
+      {
+        "ledgerId": "S14",
+        "reason": "scan still lists ForClient at agents.ts:1159 but source is resolveTrustedAgentLocator wrapping S29"
+      },
+      {
+        "ledgerId": "S17",
+        "reason": "W3 catalog synthesis; replacement is WorkspaceResourceCatalog.getResource"
+      },
+      {
+        "ledgerId": "S21",
+        "reason": "W3 catalog synthesis; cannot honestly become a locator lookup"
+      }
+    ]
+  },
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1160,
+      "op": "write",
+      "note": "S15 caller fallback after resolveTrustedAgentLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 22,
+  "liveWriteWatchIndex": 22,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/workspace/handler-bridge.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "673f8dce6386a967b0f8a1a29d4e05eae420e81f",
+  "note": "Batch 9 retires S29 only after #608 S06 and #612 S08 on main. Live scan row handler-bridge.ts:592 resolveAgentWorkspaceDirForClient still matches source at baseline. This packet removes S29 only and sets remaining/liveWriteWatchIndex to sites.length=22. Incomplete locator queries fail closed. Do not pass agentId, userId-only, or client. No host fallback is added inside resolveTrustedAgentLocator; caller host read stays on agents.ts:1160. Line 910 trusted-locator call stays. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

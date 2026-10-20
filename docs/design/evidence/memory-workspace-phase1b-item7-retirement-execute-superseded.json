@@ -1,0 +1,16 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-execute-superseded/v1",
+  "item": 7,
+  "status": "superseded",
+  "doNotLand": true,
+  "worktreePath": "/private/tmp/openbot-phase1b-item7-retirement-execute",
+  "branch": "cursor-data-governance/phase1b-item7-retirement-execute",
+  "commitDeletionCode": false,
+  "destructiveReset": false,
+  "overwriteOtherWip": false,
+  "reason": "Grant model and real preflight matrix were not ready. Do not land the uncommitted 37-site deletion/rewire.",
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "retiredThisChange": 0,
+  "deleteCallSites": false
+}

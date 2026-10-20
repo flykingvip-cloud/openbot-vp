@@ -1,0 +1,70 @@
+=== date ===
+2026-09-28T04:10:00Z
+=== HEAD ===
+6628f4bf364bd6d0560847b938b00e74035a8947
+
+===== gateway security-profile =====
+2: * Gate 0 security profiles for Data Governance v2.
+5: * Profile selection is server-controlled (env / gateway config). Client input
+12:export type SecurityProfileKind = "personal_local" | "managed_enterprise";
+17:export type SecurityProfileErrorCode =
+28:export type SecurityProfileError = {
+29:  code: SecurityProfileErrorCode;
+34:export type SecurityProfileResolution = {
+36:  profile: SecurityProfileKind;
+42:  errors: SecurityProfileError[];
+45:export type SecurityProfileStartupAudit = {
+46:  profile: SecurityProfileKind;
+48:  source: SecurityProfileResolution["source"];
+49:  tenantExecutionBoundary: SecurityProfileResolution["tenantExecutionBoundary"];
+51:  errorCodes: SecurityProfileErrorCode[];
+66:function normalizeProfileToken(raw: string | undefined): SecurityProfileKind | null {
+88:): SecurityProfileResolution["tenantExecutionBoundary"] {
+93:  const fromCfg = cfg?.gateway?.security?.tenantExecutionBoundary;
+115: * Resolve and validate the deployment security profile.
+117: * Priority: OPENBOT_SECURITY_PROFILE env → gateway.security.profile config →
+120:export function resolveSecurityProfile(
+125:    clientProfileHint?: string | null;
+127:): SecurityProfileResolution {
+128:  const errors: SecurityProfileError[] = [];
+130:  if (options?.clientProfileHint != null && String(options.clientProfileHint).trim() !== "") {
+133:      message: "Client-supplied security profile hints are ignored and rejected.",
+137:  const envProfile = normalizeProfileToken(firstEnv(env, PROFILE_ENV_KEYS));
+138:  const cfgProfile = normalizeProfileToken(cfg?.gateway?.security?.profile);
+139:  let profile: SecurityProfileKind;
+140:  let source: SecurityProfileResolution["source"];
+142:  if (envProfile) {
+143:    profile = envProfile;
+145:  } else if (cfgProfile) {
+146:    profile = cfgProfile;
+155:  if (rawEnv && !envProfile) {
+163:  const rawCfg = cfg?.gateway?.security?.profile;
+164:  if (!rawEnv && rawCfg && !cfgProfile) {
+167:      message: "gateway.security.profile must be personal_local or managed_enterprise.",
+178:        "personal_local security profile conflicts with managed data mode. Set OPENBOT_SECURITY_PROFILE=managed_enterprise or data.mode=local.",
+202:      cfg?.gateway?.security?.tenantsRootConfigured === true;
+208:          "Managed Enterprise dedicated boundary requires OPENBOT_TENANTS_ROOT (or gateway.security.tenantsRootConfigured=true).",
+214:      cfg?.gateway?.security?.sharedBrowserRoot === true
+225:      cfg?.gateway?.security?.sharedCredentialRoot === true
+238:      cfg?.gateway?.security?.sharedQueueOrCache === true
+251:      cfg?.gateway?.security?.pluginTenantAccess ||
+274:export function toSecurityProfileStartupAudit(
+275:  resolution: SecurityProfileResolution,
+276:): SecurityProfileStartupAudit {
+287:export class SecurityProfileStartupError extends Error {
+288:  readonly codes: SecurityProfileErrorCode[];
+289:  readonly resolution: SecurityProfileResolution;
+291:  constructor(resolution: SecurityProfileResolution) {
+295:      `Gateway startup blocked by security profile validation (${codes.join(", ")}). ${messages}`,
+297:    this.name = "SecurityProfileStartupError";
+307:export function assertSecurityProfileAllowsStartup(
+310:): SecurityProfileResolution {
+311:  const resolution = resolveSecurityProfile(cfg, env);
+313:    throw new SecurityProfileStartupError(resolution);
+
+===== src/gateway hits for constitutional symbols =====
+src/gateway/governance/adapters/capability-invoke-adapter.test.ts:177:    expect(imports).not.toMatch(/fabric|constitutional-contracts|aor-core/i);
+
+===== src/conversation-task hits =====
+
+===== OPENBOT_CONSTITUTIONAL_SHADOW_COMPARE excl .kiro =====

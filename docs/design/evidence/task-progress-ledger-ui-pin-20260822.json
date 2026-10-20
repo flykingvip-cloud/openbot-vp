@@ -1,0 +1,38 @@
+{
+  "schema": "task-progress-ledger-ui-pin/v1",
+  "decision": "ledger-ui-pin-live-flag-still-off",
+  "recordedAt": "2026-08-22T17:02:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "live": {
+    "sha": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "container": "openbot-gateway-rc",
+    "healthz": "live",
+    "flag": null
+  },
+  "ui": {
+    "overlayId": "ledger-ui-pin-r1",
+    "stamp": "20260822T090003Z",
+    "entry": "index-Dpg8P1UR.js",
+    "bytes": 2514145,
+    "tar": "openbot-control-ui-ledger-ui-pin-r1-20260822T090003Z.tar.gz",
+    "md5": "9918e400e0b29a1b7ebb17599ae5c8d1",
+    "source": "git archive origin/main + pnpm ui:build",
+    "ledgerCopyFile": "workbench-CHCFQ1cB.js",
+    "ledgerCopyNeedle": "项验收已满足",
+    "previousPin": "index-Ol92eg1L.js"
+  },
+  "gates": {
+    "overlayScript": "OK control-ui overlay gate (tip/full)",
+    "deliveryAlignment": "PASS (local RELEASE_RECORD names c393dca8fe)",
+    "forwardOnly": "allow",
+    "parsedSourceRevision": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06"
+  },
+  "backups": [
+    "/root/.openbot/control-ui.bak-pre-ledger-ui-pin-r1-20260822T090003Z",
+    "/root/.openbot/pin.env.bak-pre-ledger-ui-pin-r1-20260822T090003Z",
+    "/root/openbot-ui-baselines/v3.0/control-ui.bak-pre-ledger-ui-pin-r1-20260822T090003Z",
+    "/root/openbot-ui-baselines/v3.0/pin.env.bak-pre-ledger-ui-pin-r1-20260822T090003Z"
+  ],
+  "explicitlyNotDone": ["Did not set OPENBOT_PROGRESS_LEDGER_ENABLED=1"]
+}

@@ -1,0 +1,15 @@
+Copyright (c) 2026 OpenBot skill authors (rewritten visualize skill).
+
+This directory contains OpenBot-adapted skill documentation and newly
+authored/rewritten templates. It is provided for use with OpenBot / Grok Bot.
+
+Unless a more specific license is attached later, treat SKILL.md,
+references/, and rewritten assets/ as available under the MIT License
+(permission to use, copy, modify, distribute, with copyright notice retained;
+provided AS IS, without warranty).
+
+scripts/render.py is adapted from an upstream fragment-renderer concept;
+see ATTRIBUTION.md. Redistributors must independently confirm rights for any
+third-party-derived material before shipping outside this workspace.
+
+Not affiliated with OpenAI.

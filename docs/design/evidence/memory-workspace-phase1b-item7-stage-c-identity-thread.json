@@ -1,0 +1,212 @@
+{
+  "schema": "memory-workspace-phase1b-item7-stage-c-identity-thread/v1",
+  "item": 7,
+  "stage": "C",
+  "slice": "identity-thread-managed-wiring",
+  "status": "stage-c-identity-thread-managed-wiring",
+  "changeRequest": true,
+  "reviewRequest": "item-7-stage-c-identity-thread-managed-wiring-review-only",
+  "reviewRequestIsBatchAccept": false,
+
+  "runtimeBehaviorChanged": true,
+  "managedEnterpriseFailClosed": true,
+  "personalLocalLegacyPreserved": true,
+  "productionRetirement": false,
+  "retiredThisChange": 0,
+  "remaining": 10,
+  "liveWriteWatchIndex": 10,
+  "frozenWriteWatchIndex": 38,
+  "canonicalLedgerUpdated": false,
+  "scanModified": false,
+  "stageCAccepted": false,
+  "item7": "not-met",
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "schemaV2ProductionWrite": false,
+  "rollbackProof": true,
+  "quarantineProof": true,
+
+  "managedWiringActivation": "opt-in via a server-built MemoryIndexAccessContext threaded to getMemorySearchManager. managed_enterprise binds ONLY through the canonical CogniWeave handle path (CogniWeaveMemoryManager.createFromHandle); a managed tenant on a non-cogniweave backend fails closed at dispatch (managed_backend_not_cogniweave). Absent / personal_local keeps the legacy resolveAgentWorkspaceDir path unchanged (no regression to existing callers).",
+
+  "frozenFilesUntouched": true,
+  "freezeGreen": true,
+  "managedBackendScope": "cogniweave-only. managed_enterprise resolves the canonical workspace handle and binds via createFromHandle. The qmd/builtin local index roots (backend-config.ts / manager.ts / qmd-manager.ts) are frozen by the Phase 0 retirement scan; a same-line-preserving in-place isolation is not possible without moving the pinned call sites, so managed on those backends fails closed and their tenant/resource local-root isolation is DEFERRED to their retirement (which updates the CODEOWNERS-pinned freeze baseline).",
+
+  "accessContext": {
+    "module": "src/memory/memory-index-access-context.ts",
+    "type": "MemoryIndexAccessContext",
+    "serverBuiltOnly": true,
+    "frozenAndBranded": true,
+    "wireFieldsOverridable": false,
+    "auditableProvenance": true,
+    "forgedOperatorOrSystemAuthRejected": true,
+    "builders": [
+      "personalLocalAccessContext",
+      "managedAccessContext",
+      "deriveManagedAccessContextFromGovernance"
+    ],
+    "managedRequires": [
+      "tenantId",
+      "userId",
+      "actor",
+      "ownershipGrant/proof",
+      "canonicalResolverPort"
+    ],
+    "systemOwnedProofRefused": "managed_grant_denied",
+    "seatOrGroupWithoutAuthenticatedUserId": "managed_membership_missing"
+  },
+
+  "filesModifiedByThisChange": [
+    "src/memory/memory-index-access-context.ts (new module)",
+    "src/memory/search-manager.ts (accessContext param + dispatch-time managed resolve + cogniweave createFromHandle routing + buildCogniWeaveCacheKey tenant/resource isolation)"
+  ],
+  "filesIntentionallyNotModified": [
+    "src/memory/backend-config.ts (C1/C2 frozen)",
+    "src/memory/manager.ts (C4 frozen)",
+    "src/memory/qmd-manager.ts (C5 frozen)",
+    "src/memory/cogniweave-manager.ts (C3: managed uses the pre-existing createFromHandle; constructor unchanged)"
+  ],
+
+  "pipeline": [
+    "getMemorySearchManager (dispatch): resolve managed access ONCE, fail-closed; managed requires the cogniweave backend else managed_backend_not_cogniweave",
+    "managed_enterprise -> CogniWeaveMemoryManager.createFromHandle(canonical handle) (identity + scope + permission gating)",
+    "personal_local / absent -> unchanged legacy path (resolveMemoryBackendConfig / MemoryIndexManager.get / QmdMemoryManager.create keep resolveAgentWorkspaceDir)"
+  ],
+
+  "sites": [
+    {
+      "label": "C1",
+      "ledgerId": "S30",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "op": "index",
+      "enclosing": "resolveMemoryBackendConfig (cogniweave)",
+      "fileModifiedByThisChange": false,
+      "identitySource": "personal_local only; managed_enterprise binds via CogniWeaveMemoryManager.createFromHandle at the getMemorySearchManager dispatch seam and never reaches this locator",
+      "managedBranch": "not threaded here (frozen); managed cogniweave uses createFromHandle; managed non-cogniweave fails closed at dispatch",
+      "personalLocalBranch": "legacy resolveAgentWorkspaceDir (retained, unchanged)",
+      "legacyCallRetained": true
+    },
+    {
+      "label": "C2",
+      "ledgerId": "S31",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "op": "index",
+      "enclosing": "resolveMemoryBackendConfig (qmd)",
+      "fileModifiedByThisChange": false,
+      "identitySource": "personal_local only; a managed tenant on the qmd backend fails closed at dispatch (managed_backend_not_cogniweave)",
+      "managedBranch": "not threaded here (frozen); local-root isolation deferred to retirement",
+      "personalLocalBranch": "legacy resolveAgentWorkspaceDir (retained, unchanged)",
+      "legacyCallRetained": true
+    },
+    {
+      "label": "C3",
+      "ledgerId": "S32",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "op": "index",
+      "enclosing": "CogniWeaveMemoryManager constructor",
+      "fileModifiedByThisChange": false,
+      "identitySource": "managed -> getMemorySearchManager routes to the pre-existing CogniWeaveMemoryManager.createFromHandle(handle) (canonical workspace handle); this is the managed binding path",
+      "managedBranch": "createFromHandle: handle-scoped identity/permissions; session write-back suppressed on the handle path (pre-existing, not modified by this slice)",
+      "personalLocalBranch": "CogniWeaveMemoryManager.create; legacy resolveAgentWorkspaceDir (retained, line 554)",
+      "legacyCallRetained": true
+    },
+    {
+      "label": "C4",
+      "ledgerId": "S36",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "op": "index",
+      "enclosing": "MemoryIndexManager.get (static cache factory)",
+      "fileModifiedByThisChange": false,
+      "identitySource": "personal_local only; a managed tenant on the builtin index backend fails closed at dispatch (managed_backend_not_cogniweave)",
+      "managedBranch": "not threaded here (frozen); local-root isolation + cache-key partition deferred to retirement",
+      "personalLocalBranch": "legacy resolveAgentWorkspaceDir (retained, unchanged)",
+      "legacyCallRetained": true
+    },
+    {
+      "label": "C5",
+      "ledgerId": "S37",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "op": "index",
+      "enclosing": "QmdMemoryManager constructor",
+      "fileModifiedByThisChange": false,
+      "identitySource": "personal_local only; a managed tenant on the qmd backend fails closed at dispatch (managed_backend_not_cogniweave)",
+      "managedBranch": "not threaded here (frozen); local-root isolation deferred to retirement",
+      "personalLocalBranch": "legacy resolveAgentWorkspaceDir (retained, unchanged)",
+      "legacyCallRetained": true
+    }
+  ],
+
+  "failClosedReasons": [
+    "managed_backend_not_cogniweave",
+    "managed_identity_required",
+    "managed_catalog_miss",
+    "managed_catalog_ambiguous",
+    "managed_tenant_mismatch",
+    "managed_grant_denied",
+    "managed_membership_missing",
+    "managed_workspace_not_indexable",
+    "managed_background_deferred"
+  ],
+  "rejectPathZeroSideEffects": {
+    "scan": 0,
+    "fileRead": 0,
+    "indexWrite": 0,
+    "rebuild": 0,
+    "fallback": 0,
+    "directoryCreated": 0,
+    "catalogWrite": 0,
+    "configChanged": 0
+  },
+
+  "cacheIsolation": {
+    "managedKeyIncludesTenantResourceProfile": true,
+    "crossTenantSameAgentDistinctInstance": true,
+    "resourceIdChangeNoReuse": true,
+    "personalVsManagedNeverShared": true,
+    "mechanism": "buildCogniWeaveCacheKey prepends memoryIndexAccessCacheComponent (managed:<tenantId>:<resourceId> | personal_local) ahead of the existing dataRoot/storePath/governance-fingerprint/epoch key, so a same-named agent in another tenant, a changed resourceId, and personal-vs-managed never share a CogniWeave manager instance.",
+    "revokeTombstoneInvalidatesManaged": "the CogniWeave cache key includes getMemoryGovernanceEpoch(); a governance epoch bump (seat transfer / revoke) changes the key, and a tombstoned/revoked handle fails closed on re-resolve (managed_workspace_not_indexable) before any manager is built.",
+    "identityLessRequestCannotHitTenantCache": true
+  },
+
+  "backgroundDefer": "managed access without a valid identity / binding returns a structured {manager:null,error} from getMemorySearchManager (never throws); mirrors the existing startGatewayMemoryBackend managed-defer so the gateway stays up.",
+
+  "boundaryNotes": [
+    "Local index STORAGE is retained (dark handle): the canonical object-store root is not a local FS path. managed_enterprise authorizes via the canonical handle and binds the CogniWeave manager to it (createFromHandle). Object-store-backed managed storage is a separate future concern.",
+    "Managed fail-closed wiring is OPT-IN via a threaded MemoryIndexAccessContext. Existing governance-only callers keep their current behavior until the gateway call entries build a managed access context (a separate, out-of-scope follow-up). This slice wires + tests the memory pipeline; it does not edit gateway RPC entries.",
+    "FREEZE CONSTRAINT: the five op=index locator sites are line-pinned by the CODEOWNERS-protected Phase 0 freeze (docs/design/evidence/memory-workspace-phase0-inventory.mjs freezeKey includes the line number). Isolating the qmd/builtin local roots in place would move those pinned calls and trip the freeze, and the baseline must not be edited. Therefore the qmd/builtin/backend-config sites are left byte-identical (reverted); a managed tenant on those backends fails closed at dispatch and their in-place isolation is deferred to their retirement. Local freeze (--baseline-blob) is green: addedProductionCallSites=[]."
+  ],
+
+  "notProcessed": [
+    "canonical retirement scan (docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json)",
+    "Stage B steward files",
+    "Stage D src/memory/manager-sync-ops.ts (S33/S34/S35)",
+    "canonical unlock decision",
+    "in-place tenant/resource isolation of the qmd/builtin local index roots (deferred to retirement)",
+    "gateway RPC call entries (memory-tool / data / chat / cogniweave-bridge)"
+  ],
+  "legacyCallsDeleted": 0,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreDeletedCallSites": "not-applicable-none-deleted",
+    "productionWriteBack": "forbidden",
+    "rewriteFreezeBaselineToZero": false,
+    "note": "Additive and confined: a new access-context module + 2 test files + evidence + handoff, plus an additive accessContext param + dispatch-time managed routing on src/memory/search-manager.ts only. The five op=index locator files are byte-identical to origin/main (reverted). Revert the slice commits; all live sites, the freeze baseline, and the retirement scan are unaffected."
+  },
+  "quarantine": {
+    "designOnly": true,
+    "enabled": false,
+    "runningTaskRevokeHalts": true,
+    "note": "A managed workspace transitioning to retired/purged/moving/recovery_required fails closed on re-resolve (managed_workspace_not_indexable), halting a new or re-armed index without a production write."
+  },
+
+  "originMainSha": "a54bf8e145d2e5794b97f1720ee5093ccd36a181",
+  "note": "Item 7 Stage C Identity Thread + Managed Fail-Closed Wiring (scope A). A server-built, frozen, auditable MemoryIndexAccessContext is resolved ONCE at the getMemorySearchManager dispatch seam. managed_enterprise resolves an existing canonical/active binding via the accepted resolveMemoryIndexWorkspaceHandle (#687) fail-closed (no resolveAgentWorkspaceDir/host/cwd/empty/default fallback; zero scan/read/index-write on reject; tombstone/revoke halts) and binds the CogniWeave manager to it via createFromHandle, with the manager cache key isolated by tenant+resource+epoch. A managed tenant on a non-cogniweave backend fails closed (managed_backend_not_cogniweave); the qmd/builtin local index roots stay byte-frozen and their in-place isolation is deferred to retirement (the CODEOWNERS-pinned freeze forbids moving those line-pinned calls). personal_local keeps the legacy resolveAgentWorkspaceDir compat, profile-gated, never a managed fallback. Nothing is retired in production by this change (canonical remaining=10 after the merged Batch 24 S26/S27 retirement; this slice does not alter it); the retirement scan and the freeze baseline are untouched by this change; Item 7 stays not-met; Phase 1B stays blocked; no Stage C Accepted claim; no LIVE / production Catalog / schema v2 write. Requests an Item 7 Stage C Identity Thread + Managed Wiring Review only."
+}

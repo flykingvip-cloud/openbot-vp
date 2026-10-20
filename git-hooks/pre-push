@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# 客户端主干保护：拒绝对主干/发布/备份分支的非快进推送与删除。
+#
+# 为什么要有这个 hook：本仓库是私有 + 免费计划，GitHub 的 branch protection 与
+# rulesets 都返回 403（需要 Pro 或公开仓库），服务端护栏开不了。而 2026-07-27
+# 曾发生 `origin/main` 被非快进强推，把 40 个提交（含已合并 PR #90/#91）留在
+# 单一 archive-only 分支上，且 git 里没有任何记录 —— 是逐 ref 反查审计才发现的。
+# 详见 docs/design/convergence-evidence/2026-07-27/acceptance-phase2-2026-07-27.md
+#
+# 覆盖范围：main、release/*、backup/*
+# 逃生阀：确需强推时显式声明意图并留痕
+#   OPENBOT_ALLOW_FORCE_PUSH=1 git push --force-with-lease origin main
+#
+# stdin 格式（git 约定）：<local ref> <local sha> <remote ref> <remote sha>
+set -uo pipefail
+
+remote_name="${1:-origin}"
+remote_url="${2:-}"
+: "$remote_url"
+
+GIT="${GIT:-/usr/bin/git}"
+command -v "$GIT" >/dev/null 2>&1 || GIT=git
+
+ZERO=$(printf '0%.0s' $(seq 1 40))
+
+is_protected() {
+  case "$1" in
+    refs/heads/main | refs/heads/release/* | refs/heads/backup/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+violations=()
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${remote_ref:-}" ] && continue
+  is_protected "$remote_ref" || continue
+
+  # 删除受保护分支
+  if [ "$local_sha" = "$ZERO" ]; then
+    violations+=("删除 $remote_ref")
+    continue
+  fi
+
+  # 远端尚不存在该分支 → 新建，放行
+  [ "$remote_sha" = "$ZERO" ] && continue
+
+  # 非快进：远端 tip 不是本地 tip 的祖先
+  if ! "$GIT" merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    behind=$("$GIT" rev-list --count "$local_sha..$remote_sha" 2>/dev/null || echo "?")
+    violations+=("非快进推送 ${remote_ref}（会丢弃远端 ${behind} 个提交，远端 tip ${remote_sha:0:10}）")
+  fi
+done
+
+[ "${#violations[@]}" -eq 0 ] && exit 0
+
+if [ "${OPENBOT_ALLOW_FORCE_PUSH:-}" = "1" ]; then
+  {
+    echo "⚠️  OPENBOT_ALLOW_FORCE_PUSH=1 —— 放行受保护分支的破坏性推送："
+    for v in "${violations[@]}"; do echo "     - $v"; done
+    echo "    请在 deploy/production/RELEASE_RECORD.md 记录本次操作的前后 SHA 与原因。"
+  } >&2
+  exit 0
+fi
+
+{
+  echo ""
+  echo "✋ pre-push 拦截：对受保护分支的破坏性操作（remote=${remote_name}）"
+  for v in "${violations[@]}"; do echo "   - $v"; done
+  echo ""
+  echo "   受保护范围：main、release/*、backup/*"
+  echo "   非快进推送会让被丢弃的提交只剩 reflog 可达，其他协作者与云端构建无从察觉。"
+  echo ""
+  echo "   若确需执行："
+  echo "     1. 先把要丢弃的提交备份到 backup/<topic>-<YYYYMMDD>"
+  echo "     2. OPENBOT_ALLOW_FORCE_PUSH=1 git push --force-with-lease $remote_name <ref>"
+  echo "     3. 在 deploy/production/RELEASE_RECORD.md 记录前后 SHA 与原因"
+  echo ""
+} >&2
+exit 1

@@ -1,0 +1,231 @@
+.platform-monitor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.platform-monitor__tenant,
+.platform-monitor__task,
+.platform-monitor__edit,
+.platform-monitor__report,
+.platform-monitor__block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 16px;
+}
+
+.platform-monitor__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.platform-monitor__block {
+  background: transparent;
+}
+
+.platform-monitor__label,
+.platform-monitor__readonly,
+.platform-monitor__hint,
+.platform-monitor__footnote,
+.platform-monitor__id {
+  color: var(--muted);
+}
+
+.platform-monitor__id {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.platform-monitor__title {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--text-strong);
+}
+
+.platform-monitor__toolbar,
+.platform-monitor__tenant-row,
+.platform-monitor__actions,
+.platform-monitor__export,
+.platform-monitor__edit-actions,
+.platform-monitor__chips,
+.platform-monitor__radios,
+.platform-monitor__threshold {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.platform-monitor__toolbar,
+.platform-monitor__edit-actions {
+  justify-content: space-between;
+}
+
+.platform-monitor__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.platform-monitor__badge {
+  background: var(--text-strong);
+  color: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.platform-monitor__split {
+  display: grid;
+  grid-template-columns: minmax(180px, 280px) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.platform-monitor__scope,
+.platform-monitor__runs {
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.platform-monitor__scope h3,
+.platform-monitor__runs h3,
+.platform-monitor__block h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.platform-monitor__scope ul,
+.platform-monitor__checks {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.platform-monitor__checks {
+  list-style: none;
+  padding-left: 0;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.platform-monitor__checks label,
+.platform-monitor__option {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+}
+
+.platform-monitor__combo {
+  position: relative;
+  min-width: 220px;
+  flex: 1;
+}
+
+.platform-monitor__search,
+.platform-monitor__select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.platform-monitor__menu {
+  position: absolute;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 220px;
+  overflow: auto;
+}
+
+.platform-monitor__option,
+.platform-monitor__icon-btn,
+.platform-monitor__chip {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.platform-monitor__chip.is-on {
+  background: var(--text-strong);
+  color: var(--card);
+  border-color: var(--text-strong);
+}
+
+.platform-monitor__tenant-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  background: var(--bg);
+}
+
+.platform-monitor__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.platform-monitor__table th,
+.platform-monitor__table td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.platform-monitor__pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.platform-monitor__notice {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warn) 12%, var(--card));
+  border-left: 3px solid var(--warn);
+}
+
+.platform-monitor__footnote {
+  margin: 12px 0 0;
+  font-size: 12px;
+}
+
+.platform-monitor__diagnose {
+  margin-top: 20px;
+}
+
+.platform-monitor button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 800px) {
+  .platform-monitor__split {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "integration",
+  "capturedAt": "2026-08-20T11:36:10+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainIsAncestor": true,
+  "aheadBehindAtCapture": { "ahead": 0, "behind": 0 },
+  "pr": "https://github.com/gmood2008/openbot/pull/549",
+  "command": "OPENBOT_TEST_PROFILE=low OPENBOT_TEST_SERIAL_GATEWAY=1 VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/gateway/chat-inbound-flags.test.ts src/gateway/chat-inbound-stage-events.test.ts src/gateway/chat-inbound-baseline.fixture.test.ts src/gateway/server.chat.gateway-server-chat.test.ts src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts src/auto-reply/reply/operational-identity-context.test.ts src/auto-reply/reply/knowledge-universe-context.test.ts src/auto-reply/reply/agent-runner-utils.test.ts src/auto-reply/reply/followup-runner.test.ts src/agents/inbound-tool-policy.test.ts src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts src/agents/pi-embedded-runner/compact.hooks.test.ts src/gateway/knowledge/resolve/abort-timeout.test.ts src/gateway/knowledge/resolve/resolve-engine.inbound-policy.test.ts src/gateway/knowledge/resolve/resolve-engine.evidence.test.ts src/gateway/knowledge/resolve/evidence-format.test.ts src/gateway/knowledge/resolve/evidence-format.governance.test.ts src/gateway/knowledge/resolve-engine.test.ts src/gateway/knowledge/adapter/cognitive-runtime-adapter.test.ts src/gateway/knowledge/sources/source-api-runtime.test.ts",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "22 passed (22)",
+    "tests": "164 passed (164)",
+    "duration": "18.94s"
+  },
+  "fullRepoChecks": {
+    "note": "Re-run on clean origin/main tip after #549. Full-repo pnpm test/tsgo not repeated; hosted ubuntu jobs still fail on GitHub billing."
+  },
+  "live": {
+    "sha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "source": "container /app/dist/build-info.json",
+    "podmanCli": false,
+    "dockerDaemon": false
+  },
+  "uncovered": [
+    "Full-repo pnpm test was not run: host is memory-constrained; used OPENBOT_TEST_PROFILE=low on the A-E + chat gateway + compact/followup suite.",
+    "Production model TTFT p95/p99 and live canary metrics.",
+    "Double-blind live-model quality scoring.",
+    "A-E not on LIVE, so flag canary is blocked."
+  ],
+  "productionLive": false
+}

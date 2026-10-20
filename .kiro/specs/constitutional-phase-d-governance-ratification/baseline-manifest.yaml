@@ -1,0 +1,142 @@
+# BaselineManifest — Phase D governance ratification (LOCAL / uncommitted)
+# Agent: grok-bot (amanuensis / Material Owner — not governance Owner)
+# Task: constitutional-phase-d-governance-ratification
+# Rules: productionProven MUST remain unknown without container/live probe this round.
+#        Do NOT invent AGREE_BOUNDED_RETENTION receipts.
+
+assessedAt: 2026-09-27T10:31:00+08:00
+remoteSoT: https://github.com/upbeyond/openbot.git
+worktree: /workspace/openbot-gov-ratify
+branch: grok-bot/constitutional-phase-d-governance-ratification
+agentAttribution: grok-bot
+owner: Thomas35 Joshua (human governance Owner; not agent self-auth)
+
+mainSha: d8379ed919424c50d04c3be92cd2ef671f5e4580
+ratificationBranchHead: d8379ed919424c50d04c3be92cd2ef671f5e4580
+ancestryVerified: true # git merge-base --is-ancestor origin/main HEAD → exit 0
+setupTipWas: 618fc8eb2e16cd04910615085b2ce3a1fa0c5694
+mainMovedSinceSetup: true
+mainMoveNote: "origin/main advanced via PR #120 pptx-preview (unrelated to constitutional-contracts); re-verified outside callers=0, flags fail-closed, Phase C digest unchanged"
+mainMoveMergeSha: d8379ed919424c50d04c3be92cd2ef671f5e4580
+
+ownerDecision:
+  choice: SUPERSEDE_PHASE_C_BOUNDED
+  option: A
+  decisionBy: Thomas35 Joshua
+  recordedBy: grok-bot
+  source: Owner widget reply SUPERSEDE_PHASE_C_BOUNDED on 2026-09-27 Asia/Shanghai
+
+phaseC:
+  pr: 26
+  title: "Docs: record Phase C independent NO-GO decision"
+  mergeSha: 4bc5566b95f551c71d86a8c70d92ea4df9f10519
+  mergedAtUtc: 2026-09-24T13:06:51Z
+  ancestorOfMain: true
+  decision: NO-GO
+  independentAcceptance: COMPLETE
+  reviewedMainShaAtDecision: 2b9776708832d2cd3e533f0bf03a8498b0fc3f4a
+  combinedDigest: c5e527340f8d551e0569e62a956d6d615b241e92ebdee4e53d8320eae0c73a20
+  combinedDigestReverifiedAtRatification: true
+  perFileDigestsAuthoritative:
+    failure-cases.md: 55475cd9e3a4c007206f32e411d379a4f418ceb78db8f43772913ce026abb6b9
+    alternatives-matrix.md: 44c75c25fe4b0570adc23ea26a412913ca2d7221b97180e3b6963fbbe0ece4c5
+    metrics-and-evidence.md: 651225d3eff3d03f029dd830760231e621c0e4b8a165de582fb4879f7dcf4b60
+    security-profile-review.md: ce86af449fc8cac1a2aba6170e64f26a0312236e14e1e9bfd72901e404596be7
+    decision.md: bba958653f902f519f9d902b75423e4510c1d8eb025d3732b0149f3cebfd762b
+  receiptsOnMain:
+    architecture:
+      reviewerStableId: codex-architecture
+      decision: AGREE_NO_GO
+      receipt: .kiro/specs/constitutional-governance-phase-c-decision/reviews/architecture-review.md
+      receiptSha256: df95c2344e2cf6e8ebfed886526a2e3b84c6c5914c7ab0d0581b5a152cab84b9
+    security:
+      reviewerStableId: security-reviewer:profile-ab-tenant
+      decision: AGREE_NO_GO
+      receipt: .kiro/specs/constitutional-governance-phase-c-decision/reviews/security-review.md
+      receiptSha256: 6e8505ab22b394fa50407185e15229d9a3adf981f7e206fa2377a3181838aa39
+    executionChain:
+      reviewerStableId: conversation-task-runtime:kiro-conversation-task-runtime
+      decision: AGREE_NO_GO
+      receipt: .kiro/specs/constitutional-governance-phase-c-decision/reviews/execution-chain-review.md
+      receiptSha256: d6132d46d25eb427b13df8642edc43dabc8d9004acb86fd8153c6f6b7065a8d3
+
+priorReconciliationAudit:
+  decision: REVISE
+  runtimeEnabled: false
+  productionProven: unknown
+  reportPath: /workspace/phase-d-governance-reconciliation-report.md
+  specDirReadOnly: /workspace/openbot-gov-recon/.kiro/specs/constitutional-phase-d-governance-reconciliation/
+  auditMainSha: 618fc8eb2e16cd04910615085b2ce3a1fa0c5694
+  loomSessionId: 58cccc56-6524-4300-900e-36423544349a
+
+phaseDOwnerTrack:
+  pr: 101
+  mergeSha: c9fdc09a3b1752186ae5aab79cef428eb25b6b8e
+  mergedAtUtc: 2026-09-26T12:46:33Z
+  flipsPhaseCNoGo: false
+  claimCeiling: code-present
+  c10StillCannotPass: true
+
+phaseDKeyMerges:
+  - { pr: 58, mergeSha: ba3dd5845e34d3dce74c8442cdb11bb7cc704a6d, note: "contracts first knife" }
+  - { pr: 59, mergeSha: fe12f3ba3d696a960d195de619c758f035544e7e, note: "P8a no_valid_path" }
+  - { pr: 60, mergeSha: 5a1b3f00492f72d1805e8edbc57c9a647f799e33, note: "runtime facade shadow" }
+  - {
+      pr: 62,
+      mergeSha: 2236d4807243a0253599cfea3a4b8beb7dbb9a3e,
+      note: "Registry/Conformance/Runtime scaffolds",
+    }
+  - { pr: 74, mergeSha: f9254c7d08f5dde1881c9f67d4861dc7521f3cd3, note: "P8b Knife1 select-only" }
+  - { pr: 104, mergeSha: 1bf1810c882c25ef0cf2e7a3662021736edbf0e6, note: "Path-Gate report code" }
+  - {
+      pr: 107,
+      mergeSha: 1ce3d77e655cd96f1dca87540fd3441e2a45d58d,
+      note: "Path-Gate diagnostics code",
+    }
+  - { pr: 111, mergeSha: 32672466c92a90fd99f72d7f26508a335f4f2b3d, note: "P8b execute opt-in stub" }
+  - {
+      pr: 119,
+      mergeSha: 618fc8eb2e16cd04910615085b2ce3a1fa0c5694,
+      note: "P8c compare docs-only; shadowCompared hard-false",
+    }
+  # tip after #120 (unrelated): d8379ed919424c50d04c3be92cd2ef671f5e4580
+
+reverifyAtRatification:
+  outsideCallersSelectExecute: 0
+  flagDefaultsFailClosed: true
+  runtimeEnabled: false
+  productionProven: unknown
+  productionEvidenceSource: unavailable
+
+claimCeilingFixed:
+  - code-present
+  - default-off
+  - not-wired
+  - not-runtime-enabled
+  - not-production-proven
+
+reviewerSlots:
+  architecture:
+    reviewerStableId: codex-architecture
+    status: PENDING_REAL_REVIEWER
+    verdict: PENDING
+  security:
+    reviewerStableId: security-reviewer:profile-ab-tenant
+    status: PENDING_REAL_REVIEWER
+    verdict: PENDING
+  executionChain:
+    reviewerStableId: conversation-task-runtime:kiro-conversation-task-runtime
+    status: PENDING_REAL_REVIEWER
+    verdict: PENDING
+
+notes:
+  loomRegistered: true
+  loomSessionId: 15ca6529-83a7-4e0e-9838-900ac3758376
+  loomRegistryTouched: .loom/registry.yaml
+  loomPathsDeclared:
+    - .kiro/specs/constitutional-phase-d-governance-ratification/**
+  noRuntimeSrcEdits: true
+  noFlagEnable: true
+  noDeploy: true
+  noCommitPushPrThisRound: true
+  filteredInstall: "pnpm install --filter constitutional-contracts..."

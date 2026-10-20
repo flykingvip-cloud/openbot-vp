@@ -1,0 +1,212 @@
+{
+  "kind": "cloud_diagnosis_o1_controlled_acceptance",
+  "schemaVersion": 1,
+  "date": "2026-09-12",
+  "task": "O1",
+  "verdict": "partial_pass",
+  "headline": "部分通过",
+  "fullPassPhraseAllowed": false,
+  "fullPassPhrase": "云端诊断代码、只读报告 API、诊断 RPC、权限隔离和 UI 投影线上验收通过。",
+  "identity": {
+    "probedAt": "2026-09-12T09:56:03+08:00",
+    "refetchedOriginMainAt": "2026-09-12T09:54:00+08:00",
+    "candidateSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "originMainSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "liveSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "candidateEqualsOriginMain": true,
+    "liveEqualsCandidate": true,
+    "liveIsAncestorOfCandidate": true,
+    "ledgerOpenSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "releaseRecordSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "provenancePeeledTarget": null,
+    "provenanceTag": null,
+    "image": "localhost/openbot:rc-amd64-provenance-6bd4569606",
+    "ociRevision": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+    "buildInfoMatchesOci": true,
+    "r9Exit": 0,
+    "forwardOnlyVerdict": "allow",
+    "forwardOnlyExit": 0,
+    "deliveryAlignmentSummary": "PASS=4 WARN=2 FAIL=0",
+    "deliveryAlignmentExit": 0,
+    "l3CheckExit": 0,
+    "healthz": 200,
+    "readyzReady": true,
+    "port18789OwnedByContainer": true,
+    "rollbackContainer": "openbot-gateway-rc-prev-f0dec72227-safety",
+    "rollbackImage": "localhost/openbot:rc-amd64-provenance-f0dec72227",
+    "publicUiBundle": "index-iwByD4J0.js",
+    "gatewayUiSameBundle": true,
+    "identityDriftDuringAcceptance": false,
+    "identityBlockers": ["provenance_peeled_target_missing_for_live_6bd4569606"]
+  },
+  "gates": {
+    "runtimeEnvDiagnosisFlags": [],
+    "compileTimeArtifactEvaluation": {
+      "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED": true,
+      "DIAGNOSIS_REPORT_API_DEPLOYED": true,
+      "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED": true,
+      "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED": true
+    },
+    "approvedForProductionCutover": false,
+    "humanApprovalRecorded": {
+      "p248EnablementJson": true,
+      "subjectsSigned": 4,
+      "valueAfterApprovalAllTrue": true,
+      "frozenCandidateSha": "0d8a31a2c4e91e13a9acff64ce57511efd694135",
+      "frozenLiveSha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+      "exactIdentityMatchWithCurrentLive": false
+    },
+    "auditReceipt": "pending_human_approval",
+    "p248CliVerdict": "no-go",
+    "p248CliExactIdentityMatch": false,
+    "preflightVerdict": "no-go",
+    "gatesFlippedDuringAcceptance": false,
+    "livePackRegistered": true,
+    "livePackMethodsObserved": ["diagnosis.reports.query", "diagnosis.reports.get"],
+    "diagnoseMethodInDist": true,
+    "securityBlock": {
+      "triggered": true,
+      "reason": "compile_time_gates_true_but_p248_frozen_identity_mismatch_and_auditReceipt_pending"
+    },
+    "liveConnected": false,
+    "productionWrite": false,
+    "p26ProductionReady": false,
+    "liveExecutorDeployed": false,
+    "daibaiTransportConnected": false,
+    "liveConversationBound": false
+  },
+  "rpc": {
+    "authorizedQueryGetSuccess": false,
+    "authorizedDiagnoseSuccess": false,
+    "testIdentity": "container_cli_operator_token_not_membership_diagnosis_admin",
+    "negativeResults": {
+      "invalidGatewayToken": "unauthorized / gateway closed 1008 token mismatch",
+      "unknownMethod_diagnosis.nope": "unknown method",
+      "operator_query": "forbidden",
+      "operator_get_missing_report": "forbidden",
+      "operator_diagnose_empty": "unauthorized",
+      "schemaVersion9_before_auth": "forbidden",
+      "forgedTenantId_before_auth": "forbidden"
+    },
+    "notVerified": [
+      "success_query_body_fields",
+      "success_get_consistency",
+      "success_diagnose_completion_fields",
+      "400_invalid_cursor",
+      "403_cross_tenant_with_two_memberships",
+      "403_principal_spoof",
+      "429_quota_exhausted",
+      "fail_closed_reader_audit_quota_backend_down",
+      "durable_audit_summary_persist"
+    ],
+    "notes": [
+      "Operator gateway token authenticates to gateway but lacks diagnosis.report_admin membership injection.",
+      "Auth denial precedes schema validation; 400 not isolated on operator path.",
+      "No isolation tenant with P24.8 canary tenant-fixture-a on LIVE tenant list."
+    ]
+  },
+  "ui": {
+    "bundle": "index-iwByD4J0.js",
+    "routes": {
+      "www.openbot.love": {
+        "status": 200,
+        "bundle": "index-iwByD4J0.js",
+        "surface": "employee_shell"
+      },
+      "admin.openbot.love/platform/diagnosis": {
+        "status": 200,
+        "bundle": "index-iwByD4J0.js",
+        "observed": "platform_login_gate",
+        "crossTenantDesensitizedSummaryVerified": false
+      },
+      "biz.openbot.love/enterprise/001/diagnosis": {
+        "status": 200,
+        "bundle": "index-iwByD4J0.js",
+        "observed": "enterprise_login_gate_in_automation",
+        "authorizedSessionVerified": false
+      }
+    },
+    "failClosedCopyWhenAuthorized": "not_verified_this_run",
+    "noPayloadLeakWhenAuthorized": "not_verified_this_run"
+  },
+  "realChainBoundaries": {
+    "readonlyReportApi": "not_verified_success_path",
+    "diagnosisDiagnose": "not_verified_rpc_fields",
+    "daibaiDelivery": "not_connected",
+    "liveConversation": "not_bound",
+    "remediationExecutor": "not_deployed",
+    "wecomDefault": "configured_false_running_false",
+    "wecomT001Default": "configured_true_running_true",
+    "liveSlo": "missing_observed_null",
+    "channelBlocker": "default_wecom_not_running_real_dialog_delivery_not_accepted"
+  },
+  "observability": {
+    "sloCompleteness": "empty",
+    "sloHealthy": false,
+    "readerAvailableOnLiveHostPaths": "unknown_in_process_only",
+    "auditDirOnLiveHost": "absent",
+    "projectionsDirOnLiveHost": "absent",
+    "preflightBlockingReaderAuditQuota": true
+  },
+  "sideEffects": {
+    "messageMainChainModified": false,
+    "skillInvocationWritten": false,
+    "doctorFixInvoked": false,
+    "channelRestarted": false,
+    "daibaiMessageSent": false,
+    "remediationExecuted": false,
+    "configOrEnvModified": false,
+    "ledgerEdited": false,
+    "releaseRecordEdited": false,
+    "provenanceEdited": false,
+    "loomRegistryEdited": false
+  },
+  "rollbackCheck": {
+    "unauthorizedWriteObserved": false,
+    "tenantIsolationFailureObserved": false,
+    "rollbackArtifactsPresent": true,
+    "rollbackActionTaken": false,
+    "note": "No incident rollback required; acceptance remained read-only."
+  },
+  "testGates": {
+    "vitest_src_diagnosis": {
+      "exit": 1,
+      "passed": 411,
+      "failed": 1,
+      "failure": "report-query-production-approval.test attribution for prior accept json"
+    },
+    "vitest_ui_diagnosis": {
+      "exit": 1,
+      "passed": 60,
+      "failed": 1,
+      "failure": "navigation.test subtitles.enterpriseDiagnosis missing"
+    },
+    "tsgo_full": { "exit": 0 },
+    "pnpm_format": { "exit": 0 },
+    "git_diff_check": { "exit": 0 },
+    "production_preflight_cli": { "exit": 0, "verdict": "no-go" },
+    "production_trunk_convergence_cli": { "exit": 0, "verdict": "no-go", "provenanceFail": true },
+    "verify_live_image_identity": { "exit": 0 },
+    "verify_forward_only": { "exit": 0, "verdict": "allow" },
+    "verify_delivery_alignment": { "exit": 0, "warn": 2 }
+  },
+  "missingForFullPass": [
+    "authorized_diagnosis_report_admin_query_get",
+    "diagnosis_diagnose_rpc_field_verification",
+    "gate_human_approval_identity_aligned_with_live",
+    "provenance_peeled_target_for_live",
+    "live_slo_observations",
+    "daibai_delivery_live_verification",
+    "live_conversation_binding",
+    "remediation_executor_verification",
+    "platform_admin_ui_cross_tenant_summary",
+    "wecom_default_channel_running_or_explicit_waiver",
+    "negative_matrix_400_403_cross_tenant_429_fail_closed"
+  ],
+  "artifactPaths": {
+    "tmpdir": "/tmp/o1-diagnosis-accept-20260912",
+    "l3Json": "/tmp/o1-diagnosis-accept-20260912/l3-snapshot.json",
+    "preflightJson": "/tmp/o1-diagnosis-accept-20260912/preflight.json",
+    "rpcNegative": "/tmp/o1-diagnosis-accept-20260912/rpc-negative-v2.txt"
+  }
+}

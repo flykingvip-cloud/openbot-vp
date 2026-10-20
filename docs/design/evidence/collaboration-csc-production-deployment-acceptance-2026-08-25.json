@@ -1,0 +1,96 @@
+{
+  "stage": "PRODUCTION_DEPLOYMENT_ACCEPTANCE",
+  "verdict": "NOT_ACCEPTED",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-25",
+  "currentState": {
+    "liveSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "currentRuntime": "SHADOW_OFF",
+    "shadowRecreate": "PASS",
+    "shadowRollback": "PASS",
+    "observationChannel": "PASS",
+    "realDepthEvents": "NOT_OBSERVED",
+    "chatClassification": "NOT_ACCEPTED",
+    "flags": {
+      "ROUTER": "OFF",
+      "KNOWLEDGE_POLICY": "OFF",
+      "TOOL_POLICY": "OFF",
+      "PERSIST_EARLY": "OFF",
+      "COLLAB": "OFF",
+      "CONTEXT_SCOPE": "OFF"
+    },
+    "productionDeployment": "NOT_ACCEPTED"
+  },
+  "passedSafetyGates": [
+    "shadow-only same-SHA recreate flow",
+    "only shadow flag was ever enabled; other inbound/CSC/Context flags stayed off",
+    "healthz / readyz / identity check / temp-env isolation / auto-rollback",
+    "successful rollback to the pre-shadow container after observation",
+    "LIVE remained a12e4c59e575",
+    "all inbound/CSC/Context flags currently unset",
+    "RELEASE_RECORD.md / releases.jsonl / LIVE ledger unmodified",
+    "no leftover safety container or temp rollback tooling"
+  ],
+  "blocker": {
+    "summary": "shadow was enabled but no real inbound chat traffic occurred during the observation windows (DEPTH_EVENTS=0), so router logic quality was never validated",
+    "notValidated": [
+      "real chat.depth_decided > 0",
+      "wouldDepth / routeStrength / reasons correctness",
+      "zero tool calls on real chat",
+      "no extra model calls on real chat",
+      "continuation / unfinished-tool classification",
+      "collaboration space not taken over by personal router",
+      "no sensitive fields under real traffic"
+    ],
+    "note": "DEPTH_EVENTS=0 only proves the window had no traffic; it does not prove router logic quality"
+  },
+  "remainingPreDeploymentTasks": [
+    "in a controlled window with formal operator credentials, re-run shadow-only enable",
+    "arrange real low-risk personal employee steward chat traffic covering: normal chat; continuation/unfinished-tool; a collaboration-space control",
+    "capture and verify: chat.depth_decided>0; wouldDepth/routeStrength/reasons correct; zero tools on chat; no extra model calls; space produces no personal router events; no sensitive fields; healthz/readyz stay healthy",
+    "after the window, same-SHA rollback and confirm: shadow flag absent; LIVE SHA unchanged; StartedAt/RestartCount/rollback state explainable; ledger unchanged",
+    "only if the real-event window is all-green may a separate ROUTER-stage authorization be requested"
+  ],
+  "enhancedCapture": {
+    "name": "capture-chat-lifecycle-v3.cjs",
+    "sha256": "1c62b227932420219c06c8afc2747de01a4219ebb496520622a9a2720e07e9ce",
+    "location": "embedded in deploy/production/evidence/COLLAB_CSC_PRODUCTION_DEPLOYMENT_NOT_ACCEPTED_20260825.md (Appendix A); not committed to scripts/",
+    "purpose": "records the full chat.* lifecycle (depth_decided with wouldDepth/routeStrength/reasons/mode/classifierVersion, plus model/tool events) so the real-traffic window can be judged; token-only, read-only, field-whitelisted, forbidden-key scan",
+    "keyOutputs": [
+      "DEPTH_EVENTS",
+      "DEPTH_MODES",
+      "MODE_ALL_SHADOW",
+      "MODEL_STARTED",
+      "TOOL_EVENTS",
+      "CONTINUATION_SEEN",
+      "RAW_TEXT_LEAKS",
+      "EVENT_HISTOGRAM"
+    ],
+    "mockValidation": {
+      "clean_shadow": "DEPTH_EVENTS=1, MODE_ALL_SHADOW=YES, MODEL_STARTED=1, TOOL_EVENTS=1, CONTINUATION_SEEN=YES, RAW_TEXT_LEAKS=0, exit 0",
+      "router_mode": "MODE_ALL_SHADOW=NO (flags router takeover)",
+      "poison": "RAW_TEXT_LEAKS=1, exit 1 (leak detection)"
+    }
+  },
+  "acceptanceGateForRouter": {
+    "requiredAllGreen": [
+      "chat.depth_decided > 0 (real traffic)",
+      "MODE_ALL_SHADOW=YES",
+      "reasons/routeStrength correct for normal + continuation + space-control",
+      "zero tool calls and no extra model calls on chat",
+      "space produces no personal router events",
+      "RAW_TEXT_LEAKS=0",
+      "healthz/readyz healthy throughout",
+      "clean same-SHA rollback afterward"
+    ],
+    "thenSeparateAuthorization": "ROUTER stage enable requires its own explicit production-owner authorization AFTER the real-event window is all-green"
+  },
+  "prohibitedNow": [
+    "production deployment of ROUTER",
+    "production deployment of KNOWLEDGE_POLICY",
+    "production deployment of TOOL_POLICY",
+    "production deployment of PERSIST_EARLY",
+    "modify RELEASE_RECORD.md / releases.jsonl / LIVE ledger"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w5-batch9-call-site-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w5-batch9-call-site-shadow.json",
+  "kind": "item7-w5-batch9-index-shadow",
+  "wave": "W5-index-last",
+  "batch": 9,
+  "sitesWired": ["S30", "S31", "S32", "S33", "S34", "S35", "S36", "S37"],
+  "w5CallSiteShadowComplete": true,
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "catalogMissDeny": false,
+  "indexSwitch": "denied",
+  "productionWrite": "legacy-only",
+  "sidecar": "src/memory/item7-w5-index-shadow.ts"
+}

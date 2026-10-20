@@ -1,0 +1,224 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch17-deployment-preflight/v1",
+  "item": 7,
+  "status": "deployment-preflight-only",
+  "kind": "production-preflight-receipt",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "cutoverAuthorized": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": true,
+  "absorbsUnacceptedBatches": false,
+  "retiredThisChange": 0,
+  "previousAcceptedBaseline": 13,
+  "lastAcceptedRetirementBaseline": 13,
+  "remaining": 13,
+  "liveWriteWatchIndex": 13,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "quarantineProof": true,
+  "batch17": {
+    "status": "already-accepted-on-origin-main",
+    "pr": "https://github.com/gmood2008/openbot/pull/654",
+    "sourceTip": "0bbdd76f2ec4180a52b7769f0a7f65436bce3f35",
+    "mergeSha": "47d6934c34dced654652f027f2c66fedea35a67f",
+    "ledgerId": "S28",
+    "file": "src/gateway/workspace-resolver/tool-cwd.ts",
+    "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+    "lineBefore": 52,
+    "replacement": "WorkspaceResourceCatalog.getResource",
+    "fallback": "none; missing catalog / tenant / grant fail-closed; no host mkdir or process.cwd",
+    "previousAcceptedBaselineAtBatch17": 18,
+    "retiredThisChange": 1,
+    "remainingAfterBatch17": 17,
+    "liveWriteWatchIndexAfterBatch17": 17
+  },
+  "laterAcceptedBatchesOnMain": [
+    { "batch": 18, "pr": 658, "site": "S21", "remaining": 16 },
+    { "batch": 19, "pr": 660, "site": "S22", "remaining": 15 },
+    { "batch": 20, "pr": 664, "site": "S23", "remaining": 14 },
+    { "batch": 21, "pr": 665, "site": "S24", "remaining": 13 }
+  ],
+  "originMainSha": "9b1833490424a0eaaf99fa6b64268a9254249d37",
+  "candidateSha": "9b1833490424a0eaaf99fa6b64268a9254249d37",
+  "candidateEqualsOriginMain": true,
+  "candidateIsOnOriginMain": true,
+  "liveSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+  "liveSource": "RELEASE_RECORD latest cutover + verify-forward-only --live-sha / --use-release-record-live",
+  "forwardOnly": {
+    "script": "deploy/production/scripts/verify-forward-only.sh",
+    "verdict": "allow",
+    "exit": 0,
+    "reasons": ["candidate contains LIVE history"],
+    "liveContainedInCandidate": true
+  },
+  "deliveryAlignment": {
+    "script": "deploy/production/scripts/verify-delivery-alignment.sh",
+    "scope": "current LIVE provenance only",
+    "prodSha": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "candidateTag": "provenance/sha-a12e4c59e575",
+    "summary": "PASS=10 WARN=0 FAIL=0",
+    "currentMainProvenanceTag": null,
+    "currentMainProvenanceTagMissing": true
+  },
+  "ledgerAudit": {
+    "command": "pnpm delivery:ledger:audit",
+    "releases": 41,
+    "errors": 0,
+    "warnings": 19
+  },
+  "mergeBackPlan": {
+    "dryRun": true,
+    "autoPush": false,
+    "cutoverSha": "9b1833490424a0eaaf99fa6b64268a9254249d37",
+    "sotBranch": "main",
+    "reviewBranch": "merge-back/9b1833490424",
+    "executed": false,
+    "note": "stdout-only dry run. No merge-back branch, push, or PR was created."
+  },
+  "productionImageBuildManifest": {
+    "builtThisPacket": false,
+    "liveImage": "localhost/openbot:rc-amd64-provenance-a12e4c59e575",
+    "liveImageId": "f2fcc345923017749ef03a46cc41bb4cd49bbc12758d7cb3ba74710966a25f74",
+    "liveBuildInfoCommit": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "liveOciRevision": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "currentMainImage": null,
+    "reasonCurrentMainImageMissing": "no provenance/sha-9b18334904 tag and no full-dist image were published for the current origin/main tip"
+  },
+  "rollbackAndRecovery": {
+    "proof": true,
+    "source": "deploy/production/RELEASE_RECORD.md latest cutover rollback block",
+    "preferred": "podman rename/start openbot-gateway-rc-prev-47d693-before-a12e4c",
+    "alternate": "recreate localhost/openbot:rc-amd64-provenance-5c221b9ec3 and restore container-app-dist.before.tgz",
+    "newLiveDrillThisPacket": false
+  },
+  "directedTests": {
+    "batch17Evidence": {
+      "file": "docs/design/evidence/memory-workspace-phase1b-item7-retirement-batch17-s28.test.mjs",
+      "passed": 1,
+      "failed": 0
+    },
+    "s28Runtime": {
+      "files": [
+        "src/gateway/workspace-resolver/tool-cwd-item7-s28.test.ts",
+        "src/gateway/workspace-resolver/tool-cwd.test.ts"
+      ],
+      "passed": 11,
+      "failed": 0
+    }
+  },
+  "remainingSites": [
+    {
+      "ledgerId": "S01",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 164,
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir"
+    },
+    {
+      "ledgerId": "S02",
+      "file": "src/auto-reply/reply/get-reply.ts",
+      "line": 165,
+      "symbol": "resolveAgentWorkspaceDir"
+    },
+    {
+      "ledgerId": "S25",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 153,
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir"
+    },
+    {
+      "ledgerId": "S26",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 279,
+      "symbol": "resolveEmployeeStewardSourceWorkspaceDir"
+    },
+    {
+      "ledgerId": "S27",
+      "file": "src/gateway/workspace-resolver/steward-write.ts",
+      "line": 280,
+      "symbol": "resolveEmployeeStewardTargetWorkspaceDir"
+    },
+    {
+      "ledgerId": "S30",
+      "file": "src/memory/backend-config.ts",
+      "line": 417,
+      "symbol": "resolveAgentWorkspaceDir"
+    },
+    {
+      "ledgerId": "S31",
+      "file": "src/memory/backend-config.ts",
+      "line": 444,
+      "symbol": "resolveAgentWorkspaceDir"
+    },
+    {
+      "ledgerId": "S32",
+      "file": "src/memory/cogniweave-manager.ts",
+      "line": 554,
+      "symbol": "resolveAgentWorkspaceDir"
+    },
+    {
+      "ledgerId": "S33",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1062,
+      "symbol": "syncMemoryFiles"
+    },
+    {
+      "ledgerId": "S34",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1252,
+      "symbol": "syncMemoryFiles"
+    },
+    {
+      "ledgerId": "S35",
+      "file": "src/memory/manager-sync-ops.ts",
+      "line": 1343,
+      "symbol": "syncMemoryFiles"
+    },
+    {
+      "ledgerId": "S36",
+      "file": "src/memory/manager.ts",
+      "line": 152,
+      "symbol": "resolveAgentWorkspaceDir"
+    },
+    {
+      "ledgerId": "S37",
+      "file": "src/memory/qmd-manager.ts",
+      "line": 196,
+      "symbol": "resolveAgentWorkspaceDir"
+    }
+  ],
+  "unlockDecision": {
+    "path": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+    "unlock": "not-issued",
+    "item7": "not-met",
+    "rewrittenThisPacket": false
+  },
+  "explicitlyForbiddenThisPacket": [
+    "redo Batch 17 or rewrite remaining back to 17",
+    "retire S25 or any other remaining site",
+    "write liveWriteWatchIndex=0",
+    "rewrite Phase 0 freeze baseline",
+    "Item 7 met",
+    "Phase 1B unlock issued",
+    "LIVE cutover",
+    "production Catalog write",
+    "schema v2 production write",
+    "delete old workspace/data",
+    "build or deploy from a side branch or dirty worktree",
+    "mint provenance/sha-9b18334904"
+  ],
+  "note": "Batch 17 / S28 already landed on origin/main as #654. This packet is production preflight only against freshly fetched origin/main 9b18334904 after #665. Current remaining/liveWriteWatchIndex stays 13. Cutover stays forbidden: current main has no provenance tag and no published full-dist image. Item 7 stays not-met. Phase 1B unlock stays not-issued."
+}

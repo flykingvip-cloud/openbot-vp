@@ -1,0 +1,48 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch17-s28/v1",
+  "item": 7,
+  "status": "retirement-batch-17",
+  "batch": "S28",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S28",
+      "file": "src/gateway/workspace-resolver/tool-cwd.ts",
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "lineBefore": 52,
+      "lineAfter": null,
+      "replacement": "WorkspaceResourceCatalog.getResource"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 17,
+  "liveWriteWatchIndex": 17,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/workspace-resolver/tool-cwd.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "6524a8428da62c79ddc4bad5ee1a99927ff4bdea",
+  "note": "Batch 17 retires S28 only after #651 S17. Read existing Catalog SoT via getResource. Do not call buildUserOwnedWorkspaceCatalogEntry. Do not mint a production Catalog row. Catalog miss=deny stays off. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

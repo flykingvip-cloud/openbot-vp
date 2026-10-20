@@ -1,0 +1,168 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import test from "node:test";
+
+const DIR = path.dirname(import.meta.filename);
+const REPO = path.resolve(DIR, "../../..");
+const REQUEST = "memory-workspace-phase1b-item7-implementation-unlock-request.json";
+const PROPOSED = "memory-workspace-phase1b-item7-implementation-unlock-proposed-receipt.json";
+const REVIEW = "memory-workspace-phase1b-item7-implementation-review.json";
+const CANONICAL = "memory-workspace-phase1b-unlock-decision.json";
+const MINIMA_ISSUED = "memory-workspace-phase1b-unlock-minima-issued-receipt.json";
+const MINIMA_TIP = "ce6cf5e1702c7f2de20b58f062fd100562b6ee01";
+const ITEM5_TIP = "85f55ee2fa76f88dc538180b481a5823631af649";
+const BASELINE = "83f428c325697801ccd3d34cd1a3730f32c02ead";
+const OP = "phase1b-item7-implementation-unlock-83f428c325-20260820T143200Z";
+const I4 = "openbot-data-governance-p4-later-i4-eval";
+const HANDOFF =
+  "docs/design/evidence/memory-workspace-phase1b-item7-implementation-unlock-handoff.md";
+
+function load(name) {
+  return JSON.parse(fs.readFileSync(path.join(DIR, name), "utf8"));
+}
+
+function readRepo(relPath) {
+  return fs.readFileSync(path.join(REPO, relPath), "utf8");
+}
+
+function gitOk(args) {
+  try {
+    execFileSync("git", args, { cwd: REPO, stdio: ["ignore", "pipe", "ignore"] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function gitOut(args) {
+  return execFileSync("git", args, { cwd: REPO, encoding: "utf8" }).trim();
+}
+
+function evaluateItem7ImplementationUnlock(input) {
+  if (input.selfIssue === true) {
+    return { allow: false, reason: "self-issue-forbidden", failClosed: true };
+  }
+  if (input.markItem7Met === true) {
+    return { allow: false, reason: "item7-met-from-this-packet-forbidden", failClosed: true };
+  }
+  if (input.deleteCallSite === true) {
+    return { allow: false, reason: "delete-call-site-forbidden", failClosed: true };
+  }
+  if (input.executeRetirement === true) {
+    return { allow: false, reason: "retirement-forbidden", failClosed: true };
+  }
+  if (input.liveCutover === true) {
+    return { allow: false, reason: "live-cutover-forbidden", failClosed: true };
+  }
+  if (input.treatProposedAsIssued === true) {
+    return { allow: false, reason: "proposed-is-not-issued", failClosed: true };
+  }
+  return { allow: false, reason: "unlock-not-issued", failClosed: true };
+}
+
+void test("item 7 implementation-unlock request does not issue unlock or mark met", () => {
+  const request = load(REQUEST);
+  const proposed = load(PROPOSED);
+  const review = load(REVIEW);
+  const canonical = load(CANONICAL);
+  const minima = load(MINIMA_ISSUED);
+  const packed = JSON.stringify(request);
+
+  assert.equal(request.schema, "memory-workspace-phase1b-item7-implementation-unlock-request/v1");
+  assert.equal(request.kind, "item7-implementation-unlock-decision-package");
+  assert.equal(request.reviewRequest, "Item 7 Implementation Unlock Decision Review");
+  assert.equal(request.decision, "submitted-for-independent-review");
+  assert.equal(request.unlock, "not-issued");
+  assert.equal(request.stamped, false);
+  assert.equal(request.signedBy, null);
+  assert.equal(request.item7, "not-met");
+  assert.equal(request.item7Met, false);
+  assert.equal(request.item7ImplementationUnlocked, false);
+  assert.equal(request.implementationUnlocked, false);
+  assert.equal(request.retirement, "forbidden");
+  assert.equal(request.thisPacketIssuesUnlock, false);
+  assert.equal(request.thisPacketMarksItem7Met, false);
+  assert.equal(request.thisPacketDeletesCallSites, false);
+  assert.equal(request.phase1bUnlock, "not-issued");
+  assert.equal(request.phase1bExecutionBlocked, true);
+  assert.equal(request.productionCatalogWrite, "none");
+  assert.equal(request.schemaV2Write, "disabled");
+  assert.equal(request.deployAuthorized, false);
+  assert.equal(request.live, "forbidden");
+  assert.equal(request.productionWriteWatchIndex, 38);
+  assert.equal(request.liveWriteWatchIndex, 37);
+  assert.equal(request.retiredThisChange, 0);
+  assert.equal(request.operationId, OP);
+  assert.equal(request.baselineSha, BASELINE);
+  assert.equal(gitOk(["merge-base", "--is-ancestor", BASELINE, "HEAD"]), true);
+  assert.equal(gitOk(["merge-base", "--is-ancestor", "origin/main", "HEAD"]), true);
+  assert.equal(gitOk(["merge-base", "--is-ancestor", MINIMA_TIP, "HEAD"]), true);
+  assert.equal(gitOk(["merge-base", "--is-ancestor", ITEM5_TIP, "HEAD"]), true);
+
+  assert.equal(review.status, "implementation-review-submitted");
+  assert.equal(review.thisPacketUnlocksImplementation, false);
+  assert.equal(canonical.unlock, "not-issued");
+  assert.equal(canonical.items["7"], "not-met");
+  assert.equal(minima.item7ImplementationUnlocked, false);
+  assert.equal(minima.fullUnlock, "not-issued");
+
+  assert.equal(proposed.status, "proposed");
+  assert.equal(proposed.effective, false);
+  assert.equal(proposed.signedBy, null);
+  assert.equal(proposed.unlock, "not-issued");
+  assert.equal(proposed.item7, "not-met");
+  assert.equal(proposed.item7ImplementationUnlocked, true);
+  assert.equal(proposed.retirement, "forbidden");
+  assert.equal(proposed.deleteCallSites, false);
+  assert.notEqual(proposed.status, "issued");
+  assert.ok(
+    request.stillForbiddenAfterApproval.includes("delete any productionWriteWatchIndex call-site"),
+  );
+  assert.ok(request.stillForbiddenAfterApproval.includes("score item 7 met"));
+  assert.doesNotMatch(packed, new RegExp(I4));
+  assert.ok(!REPO.includes(I4), REPO);
+});
+
+void test("item 7 implementation-unlock fail-closed evaluator denies self-issue and retirement", () => {
+  const schema = readRepo("src/memory/schema-v2.ts");
+  assert.match(schema, /export const SCHEMA_V2_ENABLED = false/);
+  assert.doesNotMatch(
+    gitOut(["diff", "--name-only", "origin/main", "--", "src/memory/schema-v2.ts"]),
+    /schema-v2/,
+  );
+  assert.equal(
+    evaluateItem7ImplementationUnlock({ selfIssue: true }).reason,
+    "self-issue-forbidden",
+  );
+  assert.equal(
+    evaluateItem7ImplementationUnlock({ markItem7Met: true }).reason,
+    "item7-met-from-this-packet-forbidden",
+  );
+  assert.equal(
+    evaluateItem7ImplementationUnlock({ deleteCallSite: true }).reason,
+    "delete-call-site-forbidden",
+  );
+  assert.equal(
+    evaluateItem7ImplementationUnlock({ executeRetirement: true }).reason,
+    "retirement-forbidden",
+  );
+  assert.equal(
+    evaluateItem7ImplementationUnlock({ treatProposedAsIssued: true }).reason,
+    "proposed-is-not-issued",
+  );
+  const locked = evaluateItem7ImplementationUnlock({});
+  assert.equal(locked.allow, false);
+  assert.equal(locked.reason, "unlock-not-issued");
+});
+
+void test("item 7 implementation-unlock handoff requests Decision Review only", () => {
+  const handoff = readRepo(HANDOFF);
+  assert.match(handoff, /Item 7 Implementation Unlock Decision Review/);
+  assert.match(handoff, /does not issue Item 7 implementation unlock/);
+  assert.match(handoff, /does not request Item 7 met/);
+  assert.match(handoff, /signedBy=null/);
+  assert.doesNotMatch(handoff, /Item 7 Implementation Review only/);
+  assert.doesNotMatch(handoff, /phase1bExecutionBlocked=false/);
+});

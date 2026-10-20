@@ -1,0 +1,58 @@
+{
+  "globs": ["docs/**/*.md", "docs/**/*.mdx", "README.md"],
+  "ignores": ["docs/zh-CN/**", "docs/.i18n/**", "docs/reference/templates/**", "**/.local/**"],
+  "config": {
+    "default": true,
+
+    "MD013": false,
+    // Same heading text under different parents is intentional in long design/evidence
+    // docs (e.g. per-stage "测试" / per-channel "OpenBot checklist"). Siblings still fail.
+    "MD024": { "siblings_only": true },
+    "MD025": false,
+    "MD029": false,
+
+    "MD033": {
+      "allowed_elements": [
+        "Note",
+        "Info",
+        "Tip",
+        "Warning",
+        "Card",
+        "CardGroup",
+        "Columns",
+        "Steps",
+        "Step",
+        "Tabs",
+        "Tab",
+        "Accordion",
+        "AccordionGroup",
+        "CodeGroup",
+        "Frame",
+        "Callout",
+        "ParamField",
+        "ResponseField",
+        "RequestExample",
+        "ResponseExample",
+        "img",
+        "a",
+        "br",
+        "details",
+        "summary",
+        "p",
+        "strong",
+        "picture",
+        "source",
+        "Tooltip",
+        "Check",
+        "code",
+      ],
+    },
+
+    "MD036": false,
+    "MD040": false,
+    "MD041": false,
+    "MD046": false,
+    // Wide acceptance matrices / inventory tables: cell text length varies by platform.
+    "MD060": false,
+  },
+}

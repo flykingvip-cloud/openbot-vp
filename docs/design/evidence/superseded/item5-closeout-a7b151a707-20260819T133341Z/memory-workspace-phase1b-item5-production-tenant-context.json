@@ -1,0 +1,103 @@
+{
+  "schema": "memory-workspace-phase1b-item5-production-tenant-context/v1",
+  "item": 5,
+  "status": "not-met",
+  "item5Met": false,
+  "wiredToProductionResolver": false,
+  "identifierPolicy": "hashed",
+  "operationId": "item5-closeout-a7b151a707-20260819T133341Z",
+  "evidenceId": "item5-closeout-a7b151a707-20260819T133341Z",
+  "baselineSha": "a7b151a7078ba5be98ec08de9cbfad1a64639242",
+  "productionHostLogical": "production-gateway-host",
+  "stateDir": "/root/.openbot",
+  "gatewayRestart": "podman restart openbot-gateway-rc",
+  "catalogPath": "/root/.openbot/data-governance/catalog.json",
+  "registryStorePath": "/root/.openbot/openbot-agent-registry.json",
+  "measurementAt": "2026-08-19T13:35:38.404Z",
+  "item6": "not-met",
+  "item7": "not-met",
+  "item6Locked": true,
+  "item7Locked": true,
+  "unlock": "not-issued",
+  "deployAuthorized": false,
+  "productionCatalogWrite": "compareAndPut",
+  "catalogWriteThisPacket": "existing-user-owned-rows",
+  "sourceKind": "production-gateway-host",
+  "cwdProbeLoaded": false,
+  "measured": {
+    "usersMeasured": 7,
+    "mainPathMisses": 0,
+    "mainPathMembershipFallbacks": 0,
+    "emptyCatalogSynthesis": 0,
+    "unauthorizedMembershipFallback": 0,
+    "cwdFromCatalogResolver": 7,
+    "perUser": [
+      {
+        "hashedUserKey": "1dfbd746716cba69",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      },
+      {
+        "hashedUserKey": "216bb0d87e79017b",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      },
+      {
+        "hashedUserKey": "3ae6c2c54576652e",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      },
+      {
+        "hashedUserKey": "508da513e2ad28e6",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      },
+      {
+        "hashedUserKey": "8f930e70626c04da",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      },
+      {
+        "hashedUserKey": "9ea6761ec5f118ee",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      },
+      {
+        "hashedUserKey": "a55af1b63d007c79",
+        "mainPathIdentityHit": true,
+        "mainPathUsesMembershipFallback": false,
+        "emptyCatalogSynthesis": false
+      }
+    ],
+    "item5": "not-met",
+    "wiredToProductionResolver": false
+  },
+  "note": "tenant-context managed identity was measured through loadExistingGovernedWorkspaceIdentity with the production stateDir and registry path. tool-cwd was not loaded. An identity miss is recorded as a membership-fallback path because tenant-context.ts returns the membership workspaceDir when authorization fails.",
+  "explicitlyForbidden": [
+    "wiredToProductionResolver=true",
+    "score item 5 met from this closeout",
+    "unlock item 6",
+    "unlock item 7",
+    "treat host laptop ~/.openbot as production",
+    "treat evidence stateDir as production",
+    "treat per-user registryResolvedInCatalog=false as usersWithRegistryResolvedNotInCatalog",
+    "label unique_user_owned_row or membership_fallback as registry resolved hit"
+  ],
+  "unlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "unlockRevokeReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-issued-stamp-revoke.json",
+  "runtimeEligibility": "docs/design/evidence/memory-workspace-phase1b-item5-runtime-eligibility.json",
+  "governanceRevision": "20260819-sot-fixture-hashes",
+  "evidenceDigests": {
+    "memory-workspace-phase1b-item5-production-closeout.json": "756f4e78f5c335892162f519cd32788b8bdcacad66144eee9d1fbb2314c0304c",
+    "memory-workspace-phase1b-item5-production-live-caller.json": "222a48b1a334966ed6448cfc86833eeaf25e111cb0953cc843c7aac7a8cf38b3",
+    "memory-workspace-phase1b-item5-production-registry-catalog.json": "33b85d2d0281deca542ce60384fd96591be82be21f7d6e7325551ca1e58ccb38",
+    "memory-workspace-phase1b-item5-production-tenant-context.json": "15912f56d185dbc7ee3229ff3147db55a37e0261fa8a042b6c27659120887eb2",
+    "memory-workspace-phase1b-item5-production-evidence-summary.json": "36b093bc16e9b965d6fab705e66854793c53c06e1c1e95509c35fbe907920eaf"
+  }
+}

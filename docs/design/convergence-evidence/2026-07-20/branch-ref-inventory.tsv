@@ -1,0 +1,86 @@
+ref	sha	committer_date	subject	upstream	ahead	behind
+codex/openbot/localization-workspace	355e7c7258	2026-07-05 07:19:28 +0800	UI: hide platform login entry after admin session	origin/codex/openbot/localization-workspace	0	0
+codex/openbot/model-entitlement-chain-p1-p5	a13180bf31	2026-06-09 04:41:05 +0800	Models: model-entitlement chain P1-P5 (runtime hard-deny gate, planVersion binding + projection, RPC, AOR selection/feedback, credential convergence, all-bot-runs scope, three-end UI) + gateway legacy client-id compat	-	-	-
+codex/openbot/reconcile-archive-2026-06-03	b8789f7a6e	2026-06-03 19:16:39 +0800	UI: refine workbench runtime and incubation views	-	-	-
+codex/openbot/verified-salvage-2026-06-04	950130d4aa	2026-06-04 07:39:57 +0800	Runtime: preserve verified openbot entrypoint migration	-	-	-
+codex/openbot/verified-salvage-binding-sort-fix-2026-06-04	3967b22b35	2026-06-04 13:59:24 +0800	UI: restore agent runtime binding sorting	-	-	-
+codex/openbot/verified-salvage-current-mainline-2026-06-04	60b9d5f44b	2026-06-04 15:57:53 +0800	Runtime: preserve verified openbot salvage set on current mainline	-	-	-
+codex/openbot/verified-salvage-entry-cleanup-2026-06-04	4cf7521831	2026-06-04 07:50:13 +0800	Runtime: rename remaining openbot entry markers	-	-	-
+codex/openbot/verified-salvage-final-2026-06-04	da9d84a326	2026-06-04 15:16:23 +0800	Runtime: preserve verified openbot salvage set without legacy entry extras	-	-	-
+codex/openbot/verified-salvage-latest-mainline-2026-06-04	5f2cc7b77d	2026-06-04 14:27:49 +0800	Runtime: preserve verified openbot salvage set on latest mainline	-	-	-
+codex/openbot/verified-salvage-no-auth-rollback-2026-06-04	5f2cc7b77d	2026-06-04 14:27:49 +0800	Runtime: preserve verified openbot salvage set on latest mainline	-	-	-
+codex/openbot/verified-salvage-pr15-clean-2026-06-04	5f2cc7b77d	2026-06-04 14:27:49 +0800	Runtime: preserve verified openbot salvage set on latest mainline	-	-	-
+cursor-data-directory/data-directory	a915dce051	2026-07-10 23:14:36 +0800	Data directory: format pass, lint fixes, and changelog	origin/cursor-data-directory/data-directory	0	0
+cursor-data-directory/pricing-semiannual-display	ca69a9fb42	2026-07-10 22:26:22 +0800	Pricing v3: remove annual discount subline from cards	origin/cursor-data-directory/pricing-semiannual-display	0	0
+fix-collaboration-session-id	8070d8412a	2026-07-09 18:10:48 +0800	Merge pull request #31 from gmood2008/fix-collaboration-session-id	origin/fix-collaboration-session-id	1	0
+fix-scoped-package-templates	a1c01567f5	2026-07-20 17:39:21 +0800	chore(loom): claim CURSOR-DAY0-BRIEF under convergence task	origin/fix-scoped-package-templates	342	0
+grok-cogniweave/cw2-integrity-remediation	18098b72e9	2026-07-18 22:47:55 +0800	docs: strip trailing whitespace from CW2 acceptance report	-	-	-
+kiro-daibai/chat-checkpoint-rollback	fef66191b4	2026-07-13 09:01:39 +0800	WIP: chat checkpoint rollback (session restore + UI)	origin/kiro-daibai/chat-checkpoint-rollback	0	0
+kiro-hybrid-isolation/hybrid-gateway-isolation	87857e270e	2026-07-17 17:33:00 +0800	HGI: platform CLI tenant-isolation subcommands + dedicatedIsolation entitlement type (F3-F6) Task: hybrid-gateway-isolation Agent: kiro-hybrid-isolation	origin/kiro-hybrid-isolation/hybrid-gateway-isolation	0	0
+kiro-loom/loom-provisioning-tail	f99c727c54	2026-06-16 21:09:21 +0800	docs(loom): correct handoff to real topology (no main; Waves 0-5 on trunk)	origin/kiro-loom/loom-provisioning-tail	0	0
+kiro/daibai/chat-checkpoint-rollback	fef66191b4	2026-07-13 09:01:39 +0800	WIP: chat checkpoint rollback (session restore + UI)	origin/kiro-daibai/chat-checkpoint-rollback	0	0
+kiro/subdomain-routing	13946c6e4d	2026-07-09 13:46:31 +0800	docs(release): document NPM_TOKEN secret setup for CI publish	origin/kiro/subdomain-routing	0	0
+kiro/tenant-context-propagation	fa318731f4	2026-07-13 09:10:48 +0800	Deploy: RELEASE_RECORD pending SHA f63da5aa2a	origin/kiro/tenant-context-propagation	0	0
+main	592db9b45e	2026-07-05 18:14:25 +0800	Chore: format all source files and land pending feature work - Run oxfmt --write to fix 200+ formatting inconsistencies - Land in-progress platform auth, knowledge, collaboration, and UI changes - Land skills marketplace packages and docs updates - Land pending CSS, i18n, and gateway enhancements	origin/main	0	191
+pr/daibai-and-tenant-docs	184193ac9b	2026-07-13 09:13:20 +0800	Daibai: workspace overview + SaaS tenant design handoff	origin/pr/daibai-and-tenant-docs	0	0
+pr/data-directory-lifecycle	e18a75b23b	2026-07-13 09:13:18 +0800	Data: export and memory lifecycle + data RPC seams	origin/pr/data-directory-lifecycle	0	0
+pr/deploy-production-hygiene	b1805467e9	2026-07-13 12:07:38 +0800	build: ship openbot.mjs in runtime image (align with RC)	origin/pr/deploy-production-hygiene	0	0
+pr/edgsc-knowledge-universe	8bcf7c28e0	2026-07-13 09:13:07 +0800	EDGSC: knowledge universe insights, governance, relationship runtime	origin/pr/edgsc-knowledge-universe	0	0
+pr/gwsv-supervisor-ide	56d6505fee	2026-07-13 09:13:10 +0800	GWSV: supervisor local IDE probe, worker health, session seams	origin/pr/gwsv-supervisor-ide	0	0
+pr/oig-operational-identity	0ac050781b	2026-07-13 09:13:04 +0800	OIG: operational identity providers, OAuth, and execution	origin/pr/oig-operational-identity	0	0
+pr/platform-auth-control-ui	78eded13a8	2026-07-13 09:13:15 +0800	Auth: platform IMAP mail + control-ui session contract	origin/pr/platform-auth-control-ui	0	0
+pr/workbench-enterprise-ui	9d9f13b124	2026-07-13 12:32:23 +0800	UI: workbench, enterprise identity surfaces, i18n	origin/pr/workbench-enterprise-ui	0	0
+public-control-ui-access	4cacb9d423	2026-07-09 16:51:18 +0800	Gateway: use no-cache + ETag for control-ui assets, drop immutable Content-hashed assets were served with Cache-Control: immutable, which pinned copies corrupted mid-transfer over flaky proxies for a year and left the Control UI blank until a manual cache wipe. Serve no-cache + a weak ETag so unchanged assets cost one 304 (body not re-sent) while a bad cache entry self-heals on the next load. Task: B Agent: kiro	origin/public-control-ui-access	2	0
+reconcile/onto-remote-2026-06-02	b8789f7a6e	2026-06-03 19:16:39 +0800	UI: refine workbench runtime and incubation views	origin/reconcile/onto-remote-2026-06-02	17	0
+release-fix-format	6932f5ea7c	2026-07-09 13:59:51 +0800	fix(format): oxfmt plugin CHANGELOG files for release CI	origin/main	0	21
+release/candidate-20260712	6d48918329	2026-07-18 11:10:27 +0800	fix(pricing-v3): slim plan cards — drop marketing, rename specs	origin/release/candidate-20260712	28	0
+supervisor/sup_10274c45-a2f0-479e-b8e4-874f7836a251	5b8c1de18b	2026-07-15 18:57:40 +0800	Deploy: document Fabric + Supervisor enable flags for production	-	-	-
+supervisor/sup_23eeee8a-5f57-45ec-8de2-c72e4cbb06c0	f4b4e3a720	2026-06-26 13:47:41 +0800	UI: deep-link operational-identity hash into personal settings	-	-	-
+supervisor/sup_4885299a-70e8-4b55-a97f-fafb3fcd7420	ae6c78b134	2026-06-29 23:33:18 +0800	Fix: restore kb-index import for knowledge.base.list enrichment	-	-	-
+supervisor/sup_7e99c3c4-cf93-4522-9601-b978fc97f58d	059e84c4e9	2026-07-15 19:16:17 +0800	Android: deep-link employee query-form parity with Swift (1.2-android)	-	-	-
+supervisor/sup_da10551b-ebcb-411e-97be-dac1fb8e4129	f4b4e3a720	2026-06-26 13:47:41 +0800	UI: deep-link operational-identity hash into personal settings	-	-	-
+supervisor/sup_ec4b8e90-4454-4028-847f-8a00a0e0a481	11e8729c28	2026-07-12 18:12:33 +0800	macOS: add grok-cli probe and dispatch on Node Agent	-	-	-
+wip/main-uncommitted-2026-07-13	1d28e908c2	2026-07-13 09:02:52 +0800	WIP: preserve main uncommitted snapshot (2026-07-13)	origin/wip/main-uncommitted-2026-07-13	0	0
+origin/codex/openbot/localization-workspace	355e7c7258	2026-07-05 07:19:28 +0800	UI: hide platform login entry after admin session	-	-	-
+origin/codex/openbot/model-entitlement-chain-p1-p5	a13180bf31	2026-06-09 04:41:05 +0800	Models: model-entitlement chain P1-P5 (runtime hard-deny gate, planVersion binding + projection, RPC, AOR selection/feedback, credential convergence, all-bot-runs scope, three-end UI) + gateway legacy client-id compat	-	-	-
+origin/codex/openbot/verified-salvage-binding-sort-fix-2026-06-04	3967b22b35	2026-06-04 13:59:24 +0800	UI: restore agent runtime binding sorting	-	-	-
+origin/codex/openbot/verified-salvage-current-mainline-2026-06-04	60b9d5f44b	2026-06-04 15:57:53 +0800	Runtime: preserve verified openbot salvage set on current mainline	-	-	-
+origin/codex/openbot/verified-salvage-entry-cleanup-2026-06-04	4cf7521831	2026-06-04 07:50:13 +0800	Runtime: rename remaining openbot entry markers	-	-	-
+origin/codex/openbot/verified-salvage-final-2026-06-04	da9d84a326	2026-06-04 15:16:23 +0800	Runtime: preserve verified openbot salvage set without legacy entry extras	-	-	-
+origin/codex/openbot/verified-salvage-latest-mainline-2026-06-04	5f2cc7b77d	2026-06-04 14:27:49 +0800	Runtime: preserve verified openbot salvage set on latest mainline	-	-	-
+origin/codex/openbot/verified-salvage-no-auth-rollback-2026-06-04	5f2cc7b77d	2026-06-04 14:27:49 +0800	Runtime: preserve verified openbot salvage set on latest mainline	-	-	-
+origin/codex/openbot/verified-salvage-pr15-clean-2026-06-04	5f2cc7b77d	2026-06-04 14:27:49 +0800	Runtime: preserve verified openbot salvage set on latest mainline	-	-	-
+origin/cursor-data-directory/data-directory	a915dce051	2026-07-10 23:14:36 +0800	Data directory: format pass, lint fixes, and changelog	-	-	-
+origin/cursor-data-directory/pricing-semiannual-display	ca69a9fb42	2026-07-10 22:26:22 +0800	Pricing v3: remove annual discount subline from cards	-	-	-
+origin/dependabot/docker/docker-images-c43d3d18a2	5f5758f95e	2026-07-13 18:06:51 +0000	build(deps): bump debian in the docker-images group across 1 directory	-	-	-
+origin/dependabot/github_actions/actions/checkout-6	3717175e43	2026-06-01 09:46:19 +0000	chore(deps): bump actions/checkout from 4 to 6	-	-	-
+origin/dependabot/github_actions/actions/create-github-app-token-3.2.0	ce12ac01df	2026-06-01 09:48:38 +0000	chore(deps): bump actions/create-github-app-token from 1.12.0 to 3.2.0	-	-	-
+origin/dependabot/github_actions/actions/github-script-9.0.0	03a4225b3a	2026-06-01 09:46:07 +0000	chore(deps): bump actions/github-script from 7.1.0 to 9.0.0	-	-	-
+origin/dependabot/github_actions/actions/labeler-6.1.0	4b0a8f3b36	2026-06-01 09:46:12 +0000	chore(deps): bump actions/labeler from 5.0.0 to 6.1.0	-	-	-
+origin/dependabot/github_actions/gradle/actions-6	c47331f1ff	2026-06-01 09:49:25 +0000	chore(deps): bump gradle/actions from 4 to 6	-	-	-
+origin/dependabot/gradle/apps/android/android-deps-735e4885be	47eacfdb72	2026-07-13 18:13:30 +0000	build(deps): bump the android-deps group across 1 directory with 27 updates	-	-	-
+origin/dependabot/gradle/apps/android/androidx.test.uiautomator-uiautomator-2.4.0-beta02	2941bec8a6	2026-06-01 09:35:13 +0000	chore(deps): bump androidx.test.uiautomator:uiautomator in /apps/android	-	-	-
+origin/dependabot/swift/Swabble/github.com/apple/swift-testing-6.3.2	9a5506514a	2026-06-01 09:33:17 +0000	chore(deps): bump github.com/apple/swift-testing in /Swabble	-	-	-
+origin/dependabot/swift/Swabble/swift-deps-4a25ab077d	bda309db39	2026-07-13 18:08:21 +0000	build(deps): bump github.com/steipete/commander	-	-	-
+origin/dependabot/swift/apps/macos/swift-deps-9efee53234	5accf8df9a	2026-07-13 18:14:10 +0000	build(deps): bump the swift-deps group across 1 directory with 3 updates	-	-	-
+origin/fix-collaboration-session-id	e8c8334d58	2026-07-09 18:10:31 +0800	Gateway: use safe collaboration session ids in chat.send	-	-	-
+origin/fix-scoped-package-templates	5fd25a16f9	2026-07-18 21:23:12 +0800	fix(ui): drop duplicate privacy/help links from public homepage footer	-	-	-
+origin/kiro-daibai/chat-checkpoint-rollback	fef66191b4	2026-07-13 09:01:39 +0800	WIP: chat checkpoint rollback (session restore + UI)	-	-	-
+origin/kiro-hybrid-isolation/hybrid-gateway-isolation	87857e270e	2026-07-17 17:33:00 +0800	HGI: platform CLI tenant-isolation subcommands + dedicatedIsolation entitlement type (F3-F6) Task: hybrid-gateway-isolation Agent: kiro-hybrid-isolation	-	-	-
+origin/kiro-loom/loom-provisioning-tail	f99c727c54	2026-06-16 21:09:21 +0800	docs(loom): correct handoff to real topology (no main; Waves 0-5 on trunk)	-	-	-
+origin/kiro/subdomain-routing	13946c6e4d	2026-07-09 13:46:31 +0800	docs(release): document NPM_TOKEN secret setup for CI publish	-	-	-
+origin/kiro/tenant-context-propagation	fa318731f4	2026-07-13 09:10:48 +0800	Deploy: RELEASE_RECORD pending SHA f63da5aa2a	-	-	-
+origin/main	af1d67c9da	2026-07-13 13:00:13 +0800	Merge pull request #34 from gmood2008/cursor-data-directory/data-directory	-	-	-
+origin/pr/daibai-and-tenant-docs	184193ac9b	2026-07-13 09:13:20 +0800	Daibai: workspace overview + SaaS tenant design handoff	-	-	-
+origin/pr/data-directory-lifecycle	e18a75b23b	2026-07-13 09:13:18 +0800	Data: export and memory lifecycle + data RPC seams	-	-	-
+origin/pr/deploy-production-hygiene	b1805467e9	2026-07-13 12:07:38 +0800	build: ship openbot.mjs in runtime image (align with RC)	-	-	-
+origin/pr/edgsc-knowledge-universe	8bcf7c28e0	2026-07-13 09:13:07 +0800	EDGSC: knowledge universe insights, governance, relationship runtime	-	-	-
+origin/pr/gwsv-supervisor-ide	56d6505fee	2026-07-13 09:13:10 +0800	GWSV: supervisor local IDE probe, worker health, session seams	-	-	-
+origin/pr/oig-operational-identity	0ac050781b	2026-07-13 09:13:04 +0800	OIG: operational identity providers, OAuth, and execution	-	-	-
+origin/pr/platform-auth-control-ui	78eded13a8	2026-07-13 09:13:15 +0800	Auth: platform IMAP mail + control-ui session contract	-	-	-
+origin/pr/workbench-enterprise-ui	9d9f13b124	2026-07-13 12:32:23 +0800	UI: workbench, enterprise identity surfaces, i18n	-	-	-
+origin/public-control-ui-access	db9be4fe4f	2026-07-09 16:41:40 +0800	Gateway: allow operational identity writes on public proxy	-	-	-
+origin/reconcile/onto-remote-2026-06-02	31bcca89aa	2026-06-03 15:37:52 +0800	UI: surface handover relationship cues	-	-	-
+origin/release-fix-format	6932f5ea7c	2026-07-09 13:59:51 +0800	fix(format): oxfmt plugin CHANGELOG files for release CI	-	-	-
+origin/release/candidate-20260712	7638217f4c	2026-07-17 20:39:09 +0800	chore(deploy): cutover openbot-gateway-rc to rc-amd64-v54	-	-	-
+origin/wip/main-uncommitted-2026-07-13	1d28e908c2	2026-07-13 09:02:52 +0800	WIP: preserve main uncommitted snapshot (2026-07-13)	-	-	-

@@ -1,0 +1,50 @@
+{
+  "schema": "memory-workspace-phase1b-accepted-governance-production-candidate/v1",
+  "status": "overlay-live",
+  "staleCandidateVoided": "6e7ca8e50436cbe7c818d2ff30f9a838eb57a3ea",
+  "staleCandidateReason": "origin/main advanced by merged #654",
+  "trafficSwitch": "overlay-executed",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "includesUnacceptedBatch17": false,
+  "batch17OnOriginMain": true,
+  "batch17Pr": "https://github.com/gmood2008/openbot/pull/654",
+  "batch17MergeSha": "47d6934c34dced654652f027f2c66fedea35a67f",
+  "lastAcceptedRetirementBaseline": 17,
+  "liveWriteWatchIndex": 17,
+  "oldLiveSha": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "originMainSha": "47d6934c34dced654652f027f2c66fedea35a67f",
+  "candidateSha": "47d6934c34dced654652f027f2c66fedea35a67f",
+  "buildInfoSha": "47d6934c34dced654652f027f2c66fedea35a67f",
+  "forwardOnly": true,
+  "forwardOnlyVerdict": "allow",
+  "provenanceTag": "provenance/sha-47d6934c34",
+  "imageDigest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257",
+  "ledgerReceipt": "pnpm delivery:ledger:audit → 41 releases, 0 errors, 20 warnings (seq 41 overlay-debt)",
+  "checkSotUseReleaseRecordLive": {
+    "exit": 20,
+    "note": "compares frozen release/baseline-recovery-20260725, not origin/main; known old gate"
+  },
+  "directedTests": {
+    "files": 6,
+    "passed": 64,
+    "failed": 0
+  },
+  "smoke": {
+    "healthz": "live",
+    "readyz": "ready",
+    "servedUiEntry": "index-Dpg8P1UR.js",
+    "catalogWrite": "none"
+  },
+  "rollbackTarget": "33993e52e5540f76e57d66ab75d8955420437d3a",
+  "note": "Locked-flag production candidate only. Do not traffic-switch before Codex approve. Do not claim Item 7 met or Phase 1B unlock."
+}

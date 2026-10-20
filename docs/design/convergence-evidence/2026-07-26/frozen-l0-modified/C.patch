@@ -1,0 +1,392 @@
+diff --git a/src/auto-reply/reply/collaboration-learning-backflow.test.ts b/src/auto-reply/reply/collaboration-learning-backflow.test.ts
+index b08aea9c0e..24309451c1 100644
+--- a/src/auto-reply/reply/collaboration-learning-backflow.test.ts
++++ b/src/auto-reply/reply/collaboration-learning-backflow.test.ts
+@@ -2,11 +2,32 @@ import fs from "node:fs/promises";
+ import os from "node:os";
+ import path from "node:path";
+ import { afterEach, describe, expect, it } from "vitest";
++import { captureEnv } from "../../test-utils/env.js";
+ import { runCollaborationLearningBackflow } from "./collaboration-learning-backflow.js";
+ 
+ const cleanupDirs: string[] = [];
+-let previousStateDir: string | undefined;
+-let previousConfigPath: string | undefined;
++
++/**
++ * Config-path env vars, in the precedence order `resolveConfigPath` uses.
++ *
++ * Overriding only the legacy `OPENCLAW_CONFIG_PATH` is NOT enough: the canonical
++ * `OPENBOT_CONFIG_PATH` wins, so on any machine that exports it (common for
++ * maintainers) the override was silently shadowed and this test read the real
++ * user config — resolving the workspace to the real `~/.openclaw/workspace` and
++ * writing collaboration state into the developer's home directory.
++ * All aliases must be pinned together.
++ */
++const CONFIG_PATH_ENV_KEYS = [
++  "OPENBOT_CONFIG_PATH",
++  "OPENCLAW_CONFIG_PATH",
++  "CLAWDBOT_CONFIG_PATH",
++] as const;
++
++const STATE_DIR_ENV_KEYS = [
++  "OPENBOT_STATE_DIR",
++  "OPENCLAW_STATE_DIR",
++  "CLAWDBOT_STATE_DIR",
++] as const;
+ 
+ async function withIsolatedCollaborationStores<T>(
+   workspaceDir: string,
+@@ -14,31 +35,37 @@ async function withIsolatedCollaborationStores<T>(
+ ): Promise<T> {
+   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-collab-backflow-state-"));
+   cleanupDirs.push(stateDir);
+-  previousStateDir = process.env.OPENBOT_STATE_DIR;
+-  previousConfigPath = process.env.OPENCLAW_CONFIG_PATH;
++  const snapshot = captureEnv([...CONFIG_PATH_ENV_KEYS, ...STATE_DIR_ENV_KEYS]);
++  const configPath = path.join(stateDir, "openbot.json");
++  for (const key of STATE_DIR_ENV_KEYS) {
++    delete process.env[key];
++  }
++  for (const key of CONFIG_PATH_ENV_KEYS) {
++    delete process.env[key];
++  }
+   process.env.OPENBOT_STATE_DIR = stateDir;
+-  process.env.OPENCLAW_CONFIG_PATH = path.join(stateDir, "openbot.json");
+-  await fs.mkdir(path.dirname(process.env.OPENCLAW_CONFIG_PATH), { recursive: true });
++  process.env.OPENBOT_CONFIG_PATH = configPath;
++  await fs.mkdir(path.dirname(configPath), { recursive: true });
+   await fs.writeFile(
+-    process.env.OPENCLAW_CONFIG_PATH,
++    configPath,
+     JSON.stringify({
+       agents: { defaults: { workspace: workspaceDir } },
+     }),
+     "utf8",
+   );
+   try {
++    // Fail loudly instead of polluting the real home if env isolation ever breaks again.
++    const { createWorkspaceCollaborationStores } =
++      await import("../../gateway/collaboration-learning/shared.js");
++    const resolvedWorkspace = createWorkspaceCollaborationStores().workspaceDir;
++    if (path.resolve(resolvedWorkspace) !== path.resolve(workspaceDir)) {
++      throw new Error(
++        `collaboration store isolation broken: expected workspace ${workspaceDir}, got ${resolvedWorkspace}`,
++      );
++    }
+     return await run();
+   } finally {
+-    if (previousStateDir === undefined) {
+-      delete process.env.OPENBOT_STATE_DIR;
+-    } else {
+-      process.env.OPENBOT_STATE_DIR = previousStateDir;
+-    }
+-    if (previousConfigPath === undefined) {
+-      delete process.env.OPENCLAW_CONFIG_PATH;
+-    } else {
+-      process.env.OPENCLAW_CONFIG_PATH = previousConfigPath;
+-    }
++    snapshot.restore();
+   }
+ }
+ 
+diff --git a/src/auto-reply/reply/collaboration-learning-store.ts b/src/auto-reply/reply/collaboration-learning-store.ts
+index cd4e0e6d20..f183b337ba 100644
+--- a/src/auto-reply/reply/collaboration-learning-store.ts
++++ b/src/auto-reply/reply/collaboration-learning-store.ts
+@@ -1,12 +1,7 @@
+ import type { AgentLearningAsset } from "@openbot/collaboration-core";
+ import { OpenBotLearningStorage } from "../../../packages/collaboration-openbot-adapter/dist/index.js";
+ import { createWorkspaceCollaborationStores } from "../../gateway/collaboration-learning/shared.js";
+-
+-function readSkills(value: unknown): string[] {
+-  return Array.isArray(value)
+-    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+-    : [];
+-}
++import { extractCapabilitiesFromAsset } from "./learning-recall.js";
+ 
+ function toUnique(values: string[]): string[] {
+   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+@@ -18,10 +13,8 @@ export function createWorkspaceLearningStorage(_workspaceDir: string): OpenBotLe
+ }
+ 
+ export function extractCapabilitiesFromLearningAsset(asset: AgentLearningAsset): string[] {
+-  return toUnique([
+-    ...readSkills(asset.abstractedContent?.capabilities),
+-    ...readSkills(asset.metadata?.skills),
+-  ]);
++  // 单一实现放在 learning-recall.ts（回流侧），这里保留历史导出名以免调用方分叉。
++  return toUnique(extractCapabilitiesFromAsset(asset));
+ }
+ 
+ export async function readPromotedCapabilitiesForBot(params: {
+diff --git a/src/gateway/collaboration-learning/state-machine.ts b/src/gateway/collaboration-learning/state-machine.ts
+index 9ecac2c13c..abb8ff233c 100644
+--- a/src/gateway/collaboration-learning/state-machine.ts
++++ b/src/gateway/collaboration-learning/state-machine.ts
+@@ -15,6 +15,7 @@ import {
+   ReviewStateMachine,
+   TaskStateMachine,
+ } from "../../../packages/collaboration-core/dist/index.js";
++import { recordReviewRejectionExperienceSafely } from "./review-rejection-experience.js";
+ import { createWorkspaceCollaborationStores, syncGroupOperatingState } from "./shared.js";
+ 
+ export function resolveCollaborationTransitionError(error: unknown) {
+@@ -87,6 +88,7 @@ export async function transitionCollaborationDeliverable(params: {
+   }
+   const machine = new DeliverableStateMachine();
+   const status = machine.transition(current.status, params.toStatus, params.actor);
++  const previousStatus = current.status;
+   const now = Date.now();
+   const updated: Deliverable = {
+     ...current,
+@@ -103,6 +105,14 @@ export async function transitionCollaborationDeliverable(params: {
+     updatedAtMs: now,
+   };
+   await objectStorage.writeObject(params.groupId, "deliverable", params.deliverableId, updated);
++  // 经验提炼：被评审退回（in_review → submitted）产出候选胶囊，需审批后才晋升。
++  recordReviewRejectionExperienceSafely({
++    deliverable: updated,
++    fromStatus: previousStatus,
++    ...(params.actor ? { actor: params.actor } : {}),
++    learningStorage,
++    metadataStorage,
++  });
+   await syncGroupOperatingState({
+     fileStore,
+     groupStorage,
+diff --git a/src/gateway/protocol/schema/collaboration.ts b/src/gateway/protocol/schema/collaboration.ts
+index 33b99de2eb..5e74b36a1f 100644
+--- a/src/gateway/protocol/schema/collaboration.ts
++++ b/src/gateway/protocol/schema/collaboration.ts
+@@ -48,6 +48,49 @@ export const CollaborationLearningSnapshotParamsSchema = Type.Object(
+   { additionalProperties: false },
+ );
+ 
++export type CollaborationCapsuleCandidatesListParams = {
++  groupId: string;
++  limit?: number;
++};
++
++export const CollaborationCapsuleCandidatesListParamsSchema = Type.Object(
++  {
++    groupId: NonEmptyString,
++    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })),
++  },
++  { additionalProperties: false },
++);
++
++export type CollaborationCapsuleApproveParams = {
++  groupId: string;
++  capsuleId: string;
++  targetBotId?: string;
++};
++
++export const CollaborationCapsuleApproveParamsSchema = Type.Object(
++  {
++    groupId: NonEmptyString,
++    capsuleId: NonEmptyString,
++    targetBotId: Type.Optional(NonEmptyString),
++  },
++  { additionalProperties: false },
++);
++
++export type CollaborationCapsuleRejectParams = {
++  groupId: string;
++  capsuleId: string;
++  reason?: string;
++};
++
++export const CollaborationCapsuleRejectParamsSchema = Type.Object(
++  {
++    groupId: NonEmptyString,
++    capsuleId: NonEmptyString,
++    reason: Type.Optional(Type.String({ maxLength: 400 })),
++  },
++  { additionalProperties: false },
++);
++
+ export type CollaborationSpacesListParams = Record<string, never>;
+ 
+ export const CollaborationSpacesListParamsSchema = Type.Object({}, { additionalProperties: false });
+diff --git a/src/gateway/server-methods/collaboration-learning.ts b/src/gateway/server-methods/collaboration-learning.ts
+index c661fbb0b3..ba3059456f 100644
+--- a/src/gateway/server-methods/collaboration-learning.ts
++++ b/src/gateway/server-methods/collaboration-learning.ts
+@@ -7,10 +7,18 @@ import {
+   transitionCollaborationTask,
+   updateCollaborationDecisionDraft,
+ } from "../collaboration-learning.js";
++import {
++  approveCandidateCapsule,
++  listCandidateCapsules,
++  rejectCandidateCapsule,
++} from "../collaboration-learning/capsule-governance.js";
+ import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
+ import {
+   ErrorCodes,
+   errorShape,
++  validateCollaborationCapsuleApproveParams,
++  validateCollaborationCapsuleCandidatesListParams,
++  validateCollaborationCapsuleRejectParams,
+   validateCollaborationDecisionDraftUpdateParams,
+   validateCollaborationDecisionTransitionParams,
+   validateCollaborationDeliverableTransitionParams,
+@@ -55,6 +63,74 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
+     const payload = await loadGatewayCollaborationLearningSnapshot(params);
+     respond(true, payload, undefined);
+   },
++  "collaboration.learning.capsule-candidates.list": async ({ params, respond }) => {
++    if (
++      !assertValidParams(
++        params,
++        validateCollaborationCapsuleCandidatesListParams,
++        "collaboration.learning.capsule-candidates.list",
++        respond,
++      )
++    ) {
++      return;
++    }
++    const candidates = await listCandidateCapsules(params);
++    respond(true, { candidates }, undefined);
++  },
++  "collaboration.learning.capsule.approve": async ({ params, respond, client }) => {
++    if (
++      !assertValidParams(
++        params,
++        validateCollaborationCapsuleApproveParams,
++        "collaboration.learning.capsule.approve",
++        respond,
++      )
++    ) {
++      return;
++    }
++    const actorId = resolveClientActorId(client);
++    if (!actorId) {
++      respond(
++        false,
++        undefined,
++        errorShape(ErrorCodes.INVALID_REQUEST, "approving a capsule requires an identified actor"),
++      );
++      return;
++    }
++    const result = await approveCandidateCapsule({ ...params, actorId });
++    if (!result.approved) {
++      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
++      return;
++    }
++    respond(true, result, undefined);
++  },
++  "collaboration.learning.capsule.reject": async ({ params, respond, client }) => {
++    if (
++      !assertValidParams(
++        params,
++        validateCollaborationCapsuleRejectParams,
++        "collaboration.learning.capsule.reject",
++        respond,
++      )
++    ) {
++      return;
++    }
++    const actorId = resolveClientActorId(client);
++    if (!actorId) {
++      respond(
++        false,
++        undefined,
++        errorShape(ErrorCodes.INVALID_REQUEST, "rejecting a capsule requires an identified actor"),
++      );
++      return;
++    }
++    const result = await rejectCandidateCapsule({ ...params, actorId });
++    if (!result.rejected) {
++      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
++      return;
++    }
++    respond(true, result, undefined);
++  },
+   "collaboration.task.transition": async ({ params, respond, client }) => {
+     if (
+       !assertValidParams(
+diff --git a/ui/src/ui/controllers/daibai.test.ts b/ui/src/ui/controllers/daibai.test.ts
+index d32969df04..3817646a8b 100644
+--- a/ui/src/ui/controllers/daibai.test.ts
++++ b/ui/src/ui/controllers/daibai.test.ts
+@@ -6,7 +6,6 @@ import {
+   executeDaibaiAction,
+   resolveDaibaiIdentity,
+   shouldAutoAskDaibai,
+-  shouldRouteWorkbenchSendToDaibai,
+   type DaibaiState,
+ } from "./daibai.ts";
+ 
+@@ -44,24 +43,6 @@ function createHost(overrides: Partial<DaibaiState> = {}) {
+ }
+ 
+ describe("daibai controller", () => {
+-  it("does not route workbench sends to Daibai ask (D2 uses chat.send)", () => {
+-    const state = {
+-      tab: "me" as const,
+-      workbenchPrimaryModule: "assistant",
+-      workbenchTeamSelectedKey: "main",
+-      sessionKey: "main",
+-      hello: null,
+-    };
+-    expect(
+-      shouldRouteWorkbenchSendToDaibai({
+-        state,
+-        message: "用 codex 优化开发监督 Tab",
+-        isStopCommand: (text) => text.trim() === "/stop",
+-        isResetCommand: (text) => text.trim() === "/new",
+-      }),
+-    ).toBe(false);
+-  });
+-
+   it("auto-asks only when Daibai is the active assistant entry and chat is empty", () => {
+     expect(
+       shouldAutoAskDaibai({
+diff --git a/ui/src/ui/controllers/daibai.ts b/ui/src/ui/controllers/daibai.ts
+index deda856a9c..0d3709369f 100644
+--- a/ui/src/ui/controllers/daibai.ts
++++ b/ui/src/ui/controllers/daibai.ts
+@@ -89,36 +89,10 @@ export function isDaibaiWorkbenchSession(
+   });
+ }
+ 
+-/** 大白管家工作台：D2 普通消息走 chat.send；仅 stop/reset 等控制命令例外。 */
+-export function shouldRouteWorkbenchSendToDaibai(_params: {
+-  state: Pick<
+-    DaibaiAutoAskState,
+-    "tab" | "workbenchPrimaryModule" | "workbenchTeamSelectedKey" | "sessionKey" | "hello"
+-  >;
+-  message: string;
+-  isStopCommand?: (message: string) => boolean;
+-  isResetCommand?: (message: string) => boolean;
+-}): boolean {
+-  const message = _params.message.trim();
+-  if (!message) {
+-    return false;
+-  }
+-  if (_params.isStopCommand?.(message) || _params.isResetCommand?.(message)) {
+-    return false;
+-  }
+-  if (!isDaibaiWorkbenchSession(_params.state)) {
+-    return false;
+-  }
+-  // Short wake-up / lightweight intent messages should hit the steward RPC
+-  // instead of the full chat.send -> model runtime chain.
+-  if (message.length <= 12) {
+-    return true;
+-  }
+-  if (/^(大白|你好大白|在吗|在么|帮我看下|帮我看看|问你个事)$/i.test(message)) {
+-    return true;
+-  }
+-  return false;
+-}
++// NOTE: Workbench sends always go through `chat.send` -> the real model runtime.
++// A retired helper here used to divert short messages (<= 12 chars) to the
++// template-only `user.daibai.ask` RPC; that shortcut answered with canned text
++// instead of the agent's reasoning, so it was removed rather than re-wired.
+ 
+ export function shouldAutoAskDaibai(state: DaibaiAutoAskState) {
+   const trustedSession = resolveTrustedSession(state);

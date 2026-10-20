@@ -1,0 +1,207 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const BASELINE_DIR = path.join(
+  REPO_ROOT,
+  ".kiro/specs/gateway-plugins-monolith-decomposition/baseline",
+);
+
+type ClosureRow = {
+  symbol: string;
+  kind: "const" | "let" | "var";
+  mutable: string;
+  exported: boolean;
+  captureSites: string[];
+};
+
+function basenameFromTarget(targetRel: string): string {
+  return path.basename(targetRel, path.extname(targetRel));
+}
+
+function isExported(node: ts.Node): boolean {
+  return (
+    (ts.canHaveModifiers(node) &&
+      ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)) === true
+  );
+}
+
+function isModuleLevel(node: ts.Node, sourceFile: ts.SourceFile): boolean {
+  let current: ts.Node | undefined = node.parent;
+  while (current && current !== sourceFile) {
+    if (
+      ts.isFunctionDeclaration(current) ||
+      ts.isFunctionExpression(current) ||
+      ts.isArrowFunction(current) ||
+      ts.isMethodDeclaration(current) ||
+      ts.isConstructor(current) ||
+      ts.isClassDeclaration(current)
+    ) {
+      return false;
+    }
+    current = current.parent;
+  }
+  return true;
+}
+
+function functionLabel(fn: ts.FunctionLikeDeclaration, sourceFile: ts.SourceFile): string {
+  if (ts.isFunctionDeclaration(fn) && fn.name) {
+    return fn.name.getText(sourceFile);
+  }
+  const parent = fn.parent;
+  if (parent && ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name)) {
+    return parent.name.getText(sourceFile);
+  }
+  if (parent && ts.isPropertyAssignment(parent) && ts.isIdentifier(parent.name)) {
+    return parent.name.getText(sourceFile);
+  }
+  const line = sourceFile.getLineAndCharacterOfPosition(fn.getStart(sourceFile)).line + 1;
+  return `<anonymous>:${line}`;
+}
+
+function collectModuleLevelSymbols(sourceFile: ts.SourceFile): Map<
+  string,
+  {
+    kind: "const" | "let" | "var";
+    mutable: string;
+    exported: boolean;
+    declLine: number;
+  }
+> {
+  const symbols = new Map<
+    string,
+    { kind: "const" | "let" | "var"; mutable: string; exported: boolean; declLine: number }
+  >();
+
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isVariableStatement(stmt)) {
+      continue;
+    }
+    const varKind: "const" | "let" | "var" =
+      stmt.declarationList.flags & ts.NodeFlags.Let
+        ? "let"
+        : stmt.declarationList.flags & ts.NodeFlags.Const
+          ? "const"
+          : "var";
+    const exported = isExported(stmt);
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name)) {
+        continue;
+      }
+      const name = decl.name.text;
+      const mutable =
+        varKind === "const" && decl.initializer && ts.isArrayLiteralExpression(decl.initializer)
+          ? "Yes (container)"
+          : varKind === "const"
+            ? "No"
+            : "Yes";
+      symbols.set(name, {
+        kind: varKind,
+        mutable,
+        exported,
+        declLine: sourceFile.getLineAndCharacterOfPosition(decl.getStart(sourceFile)).line + 1,
+      });
+    }
+  }
+
+  return symbols;
+}
+
+function probeFile(targetAbs: string): ClosureRow[] {
+  const content = fs.readFileSync(targetAbs, "utf8");
+  const sourceFile = ts.createSourceFile(targetAbs, content, ts.ScriptTarget.Latest, true);
+  const moduleSymbols = collectModuleLevelSymbols(sourceFile);
+  const captureSites = new Map<string, Set<string>>();
+
+  function visit(node: ts.Node): void {
+    if (ts.isFunctionLike(node) && !isModuleLevel(node, sourceFile)) {
+      const label = functionLabel(node, sourceFile);
+      const line = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
+      const siteKey = `${label}:${line}`;
+
+      const visitBody = (child: ts.Node): void => {
+        if (ts.isIdentifier(child)) {
+          if (!moduleSymbols.has(child.text)) {
+            return;
+          }
+          if (!captureSites.has(child.text)) {
+            captureSites.set(child.text, new Set());
+          }
+          captureSites.get(child.text)!.add(siteKey);
+        }
+        ts.forEachChild(child, visitBody);
+      };
+      if (node.body) {
+        ts.forEachChild(node.body, visitBody);
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+
+  const rows: ClosureRow[] = [];
+  for (const [symbol, meta] of moduleSymbols
+    .entries()
+    .toArray()
+    .toSorted((a, b) => a[0].localeCompare(b[0]))) {
+    const sites = captureSites.get(symbol);
+    rows.push({
+      symbol,
+      kind: meta.kind,
+      mutable: meta.mutable,
+      exported: meta.exported,
+      captureSites: sites ? [...sites].toSorted() : [],
+    });
+  }
+
+  return rows;
+}
+
+function renderMarkdown(targetRel: string, rows: ClosureRow[]): string {
+  const lines = [
+    `# Closure-state probe: \`${targetRel}\``,
+    "",
+    "Generated by `scripts/architecture/probe-closure-state.ts`.",
+    "",
+    "Module-level `const` / `let` / `var` declarations and the inner functions that capture them.",
+    "`Proposed Owner Sub_Module` is left as `TBD`; fill in by hand against the design's Sub_Module layout.",
+    "",
+    "| Symbol | Kind | Mutable? | Exported? | Capture Sites | Proposed Owner Sub_Module |",
+    "| --- | --- | --- | --- | --- | --- |",
+  ];
+
+  for (const row of rows) {
+    const sites =
+      row.captureSites.length > 0 ? row.captureSites.join(", ") : "(none — top-level only)";
+    lines.push(
+      `| \`${row.symbol}\` | ${row.kind} | ${row.mutable} | ${row.exported ? "Yes" : "No"} | ${sites} | TBD |`,
+    );
+  }
+
+  lines.push("");
+  return lines.join("\n");
+}
+
+function main(): void {
+  const targetArg = process.argv[2];
+  if (!targetArg) {
+    console.error("Usage: pnpm baseline:closure-probe <repo-relative-target.ts>");
+    process.exit(1);
+  }
+
+  const targetRel = targetArg.replace(/\\/g, "/");
+  const targetAbs = path.resolve(REPO_ROOT, targetRel);
+  const rows = probeFile(targetAbs);
+  const outPath = path.join(BASELINE_DIR, `${basenameFromTarget(targetRel)}-closure-probe.md`);
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, renderMarkdown(targetRel, rows), "utf8");
+  console.log(`Wrote ${path.relative(REPO_ROOT, outPath)} (${rows.length} symbols)`);
+}
+
+const scriptPath = fileURLToPath(import.meta.url);
+if (process.argv[1] && path.resolve(process.argv[1]) === scriptPath) {
+  main();
+}

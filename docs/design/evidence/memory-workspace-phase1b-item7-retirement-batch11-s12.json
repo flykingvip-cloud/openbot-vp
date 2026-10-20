@@ -1,0 +1,70 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch11-s12/v1",
+  "item": 7,
+  "status": "retirement-batch-11",
+  "batch": "S12",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S12",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "lineBefore": 1001,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1075,
+      "op": "write"
+    },
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1160,
+      "op": "write"
+    }
+  ],
+  "sitesRemainingTrustedWrapper": [
+    {
+      "ledgerId": "S14",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "via": "resolveTrustedAgentLocator",
+      "line": 1159,
+      "op": "write"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 26,
+  "liveWriteWatchIndex": 26,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/agents.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "e43a5285d314b17e1f05e808913d99533395910a",
+  "note": "Batch 11 retires S12 only. S12 is the host resolveAgentWorkspaceDir at agents.ts:1001. Incomplete locator queries fail closed. Do not pass agentId. Fail-closed fallback is empty string so workspace stays string. Host writes stay on lines 1075 and 1160. S14 Trusted wrapper stays on line 1159. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

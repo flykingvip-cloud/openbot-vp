@@ -1,0 +1,21 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w2-batch3-s05-s09-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w2-batch3-s05-s09-shadow.json",
+  "kind": "item7-w2-batch3-dark-dual-read-shadow",
+  "wave": "W2-write-callers",
+  "batch": 3,
+  "sites": [
+    "S05-checkpoint-store-host",
+    "S06-checkpoint-store-steward",
+    "S07-checkpoint-store-client",
+    "S08-auto-capture-deliverable",
+    "S09-knowledge-doc-preview"
+  ],
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "wiredToThisCallSite": false,
+  "deleteCallSites": false,
+  "productionWrite": "legacy-only",
+  "checkpointStoreStrategy": "sidecar-module-post-resolve-no-sync-line-shift",
+  "note": "W2 batch-3 dark dual-read shadow. S05-S07 via checkpoint-store-w2-shadow sidecar; S08-S09 post catalog call-site."
+}

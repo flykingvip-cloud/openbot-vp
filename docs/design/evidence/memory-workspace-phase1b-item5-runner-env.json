@@ -1,0 +1,31 @@
+{
+  "schema": "memory-workspace-phase1b-item5-runner-env/v1",
+  "item": 5,
+  "status": "not-production-met",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "productionCatalogWrite": "none",
+  "wiredToProductionResolver": "unchanged",
+  "runnerEnvBlock": {
+    "unconfiguredProductionStateDir": "blocked",
+    "dumpFieldAlias": "seatOccupancies-accepted-as-seatOccupants",
+    "identifierPolicyAlias": "in-memory-unredacted-accepted"
+  },
+  "mainStewardPath": {
+    "proved": "fixture-only",
+    "resourceId": "ws:tenant-1:user:user-1:asset:asset-main",
+    "agentAssetId": "asset-main",
+    "productionMeasured": false
+  },
+  "note": "Runner now reads dump.seatOccupancies and in-memory-unredacted dumps. Unconfigured OPENBOT_PRODUCTION_STATE_DIR still blocks writes. Main steward path is fixture-only and is not production met.",
+  "explicitlyForbidden": [
+    "score production met from host or evidence stateDir",
+    "score item 5 production met from this packet",
+    "Catalog production write",
+    "LIVE migration",
+    "phase1bExecutionBlocked=false",
+    "flip wiredToProductionResolver"
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "schema": "memory-workspace-phase1b-item2-production-sot-accept/v1",
+  "kind": "item2-production-sot-architecture-accept",
+  "decision": "accepted",
+  "status": "accepted",
+  "acceptedBy": "codex-workspace-architecture",
+  "signedBy": "codex-workspace-architecture",
+  "signedAt": "2026-08-19T12:00:00.000Z",
+  "reviewer": "codex-workspace-architecture",
+  "proposedBy": "cursor-data-governance",
+  "baseline": "952953a8cf64bae6bce27cd579438cd9be2883d3",
+  "measurementPr": 518,
+  "item": 2,
+  "item2": "not-met",
+  "item2Official": "not-met",
+  "item2RulesAccepted": true,
+  "unlockScoring": "blocked",
+  "unlock": "not-issued",
+  "LIVE": "forbidden",
+  "live": false,
+  "deployAuthorized": false,
+  "productionCatalogWrite": "none",
+  "phase1bExecutionBlocked": true,
+  "doesNotEditUnlockDecision": true,
+  "u1": "blocked",
+  "answers": [
+    {
+      "question": "Is the Item 2 four-gate population correctly limited to authority-shaped ws: normal records?",
+      "answer": "yes",
+      "note": "measureProductionCatalogSotGates(population=authority-shaped) gates only parseWorkspaceResourceId successes. Pre-scheme rows are residual, not the Item 2 normal Catalog."
+    },
+    {
+      "question": "May uniqueUserOwnedEquivalent be the production Catalog count of users with exactly one user-owned agent_primary?",
+      "answer": "yes",
+      "note": "Occupancy dump uniqueUserOwnedEquivalent is not production Catalog SoT. Replacement metric production_catalog_users_with_exactly_one_user_owned_agent_primary is accepted."
+    },
+    {
+      "question": "Are the 9 residual 32-char-hex workspace rows correctly held as residual-not-normal-no-rewrite?",
+      "answer": "yes",
+      "note": "They stay out of the authority-shaped population. This packet writes 0. Next authorized write is quarantine-without-minting-ws-identity. Identity from agentId, path, or stateDir remains forbidden."
+    },
+    {
+      "question": "Is MemoryAsset.resourceId independent, with sourceWorkspaceResourceId binding Workspace.resourceId, and SQLite workspace_id only an isolation key?",
+      "answer": "yes",
+      "note": "Matches the accepted U0 Handle contract. Closeout measured workspaceMemoryIdCollision=false and memorySourceWorkspaceBound=true. sqlite workspace_id is isolation-partition-key-only."
+    }
+  ],
+  "verifiedArtifacts": [
+    "docs/design/evidence/memory-workspace-phase1b-item2-production-closeout.json",
+    "docs/design/evidence/memory-workspace-phase1b-item2-production-closeout-gates.mjs",
+    "docs/design/evidence/memory-workspace-phase1b-item2-production-sot-decision.json",
+    "docs/design/evidence/memory-workspace-phase1b-item2-residual-opaque-quarantine.json",
+    "docs/design/evidence/memory-workspace-phase1b-item2-memory-relation.test.mjs"
+  ],
+  "verification": {
+    "closeoutLandedOnMain": true,
+    "fourGates100AuthorityShaped": true,
+    "uniqueUserOwnedEquivalent": 7,
+    "residualOpaqueWorkspaceRecords": 9,
+    "allWorkspaceFourGates100": false,
+    "productionCatalogWrite": "none",
+    "u1UnlockUntouched": true
+  },
+  "remaining": [
+    "Official item 2 stays not-met until cursor-data-governance retargets production-catalog-coverage SoT and the items-2-7 scorecard to the accepted production Catalog metric.",
+    "coverage.json still publishes uniqueUserOwnedEquivalent=0 and catalogPresent=false; U1 admission still cites that occupancy SoT.",
+    "Residual 9 next authorized write is quarantine-without-minting-ws-identity; not this accept."
+  ],
+  "doesNotAuthorize": [
+    "item 2 met on the scorecard",
+    "U1 implementation",
+    "Catalog write",
+    "schema-v2-write",
+    "retirement",
+    "LIVE",
+    "deployAuthorized=true",
+    "unlock"
+  ],
+  "explicitlyForbidden": [
+    "self-issue unlock",
+    "rewrite coverage.json occupancy runner as production SoT from this accept",
+    "invent identity from agentId path stateDir displayName Phase0 or U0",
+    "quarantine-write the residual 9 in this packet",
+    "fill all four U1 design-review signatures",
+    "start U1 Handle dark integration"
+  ],
+  "note": "Architecture accepts the four production-SOT rules after #518 landed. Official item 2 remains not-met because coverage/scorecard still publish the occupancy unique=0 SoT. This accept does not write Catalog and does not issue unlock."
+}

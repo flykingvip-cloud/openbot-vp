@@ -1,0 +1,48 @@
+{
+  "kind": "human_report_api_enablement_record",
+  "increment": "P24.7",
+  "schemaVersion": 1,
+  "candidateSha": "1a429ce5ac017da7365221c795af6884570933d9",
+  "liveSha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+  "approvalOpensReportApiGate": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "confirmHuman": true,
+  "confirmReportApiOnlyThisIncrement": true,
+  "confirmCanaryTenant": "tenant-fixture-a",
+  "signer": "Daniel / CEO",
+  "subjects": [
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": false
+    }
+  ]
+}

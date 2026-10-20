@@ -1,0 +1,64 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch12-s13/v1",
+  "item": 7,
+  "status": "retirement-batch-12",
+  "batch": "S13",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S13",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "lineBefore": 1075,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1160,
+      "op": "write"
+    }
+  ],
+  "sitesRemainingTrustedWrapper": [
+    {
+      "ledgerId": "S14",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "via": "resolveTrustedAgentLocator",
+      "line": 1159,
+      "op": "write"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 25,
+  "liveWriteWatchIndex": 25,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/agents.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "7df232309134f75751be39fff42f32be8fcfac3c",
+  "note": "Batch 12 retires S13 only. S13 is the host resolveAgentWorkspaceDir at agents.ts:1075. Incomplete locator queries fail closed. Do not pass agentId. Fail-closed fallback is empty string so workspaceDir stays string. Host write stays on line 1160. S14 Trusted wrapper stays on line 1159. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

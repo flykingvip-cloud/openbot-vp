@@ -1,0 +1,61 @@
+import { describe, expect, it } from "vitest";
+import { isWeakNewWorkCueOnly } from "./qualification.js";
+import {
+  classifyTurnRelation,
+  isLanguageAsideMessage,
+  isPriorUtteranceCorrection,
+  shouldTaskParkAbortInFlight,
+} from "./turn-relation.js";
+
+const CURRENT = "生成今日竞品价格检查结果，并验收至少一个竞品价格";
+
+describe("turn relation", () => {
+  it("classifies language, correction, and continuation as non-cutting", () => {
+    expect(classifyTurnRelation("请用中文回复", CURRENT)).toBe("aside");
+    expect(classifyTurnRelation("不对，我说的是国内", CURRENT)).toBe("amend");
+    expect(classifyTurnRelation("补充一节", CURRENT)).toBe("amend");
+    expect(classifyTurnRelation("把标题改成市场稿", CURRENT)).toBe("amend");
+    for (const phrase of ["请用中文回复", "不对，我说的是国内", "补充一节", "把标题改成市场稿"]) {
+      expect(shouldTaskParkAbortInFlight(false)).toBe(false);
+      expect(classifyTurnRelation(phrase, CURRENT)).not.toBe("new_work");
+    }
+  });
+
+  it("classifies explicit new work that does not overlap the current goal", () => {
+    expect(classifyTurnRelation("现在改做供应商合同审查", CURRENT)).toBe("new_work");
+    expect(classifyTurnRelation("新任务：整理本周董事会会议纪要", CURRENT)).toBe("new_work");
+    expect(
+      classifyTurnRelation(
+        "请使用 web-research 做一次标准深度联网调研。调研问题：2026 年开源智能体平台的产品形态。",
+        CURRENT,
+      ),
+    ).toBe("new_work");
+  });
+
+  it("does not treat 输出 / 阅读 / 请先 / 调研 alone as new work", () => {
+    expect(isWeakNewWorkCueOnly("请输出中文版")).toBe(true);
+    expect(isWeakNewWorkCueOnly("请先阅读一下")).toBe(true);
+    expect(isWeakNewWorkCueOnly("调研")).toBe(true);
+    expect(isWeakNewWorkCueOnly("请先把口径改一下")).toBe(true);
+    expect(classifyTurnRelation("请输出中文版", CURRENT)).toBe("aside");
+    expect(classifyTurnRelation("请先阅读一下", CURRENT)).toBe("aside");
+    expect(classifyTurnRelation("调研", CURRENT)).toBe("aside");
+    expect(classifyTurnRelation("请先把口径改一下", CURRENT)).toBe("amend");
+    expect(isWeakNewWorkCueOnly("请使用 web-research 做一次调研")).toBe(false);
+  });
+
+  it("shares the prior-utterance correction judgment and keeps 另外 / 新任务 out", () => {
+    expect(isLanguageAsideMessage("请用中文回复")).toBe(true);
+    expect(isLanguageAsideMessage("请输出中文")).toBe(true);
+    expect(isPriorUtteranceCorrection("不对，我说的是国内")).toBe(true);
+    expect(isPriorUtteranceCorrection("我并没有将任务派发给大白管家，大白管家也不在这个群里")).toBe(
+      true,
+    );
+    expect(isPriorUtteranceCorrection("请分析一下AI办公软件的定价策略")).toBe(false);
+    expect(isPriorUtteranceCorrection("那我们开始新任务：做竞品分析")).toBe(false);
+    expect(isPriorUtteranceCorrection("另外帮我做一份竞品表")).toBe(false);
+    expect(isPriorUtteranceCorrection(`不对，${"很长的补充说明".repeat(20)}`)).toBe(false);
+    expect(classifyTurnRelation("那我们开始新任务：做竞品分析", CURRENT)).toBe("new_work");
+    expect(classifyTurnRelation("另外帮我做一份竞品表", CURRENT)).toBe("new_work");
+  });
+});

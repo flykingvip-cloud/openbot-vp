@@ -1,0 +1,42 @@
+{
+  "schema": "memory-workspace-phase1b-item7-shadow-dry-run/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-shadow-dry-run-2026-08-20.json",
+  "kind": "item7-evidence-preparation",
+  "mode": "shadow-dry-run",
+  "preparedBy": "cursor-data-governance",
+  "preparedAt": "2026-08-20T03:35:00.000Z",
+  "baselineSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "citedUserBaseline": "69e9bf8c63ded61badf59fe0a6c7bc77166b39a1",
+  "item": 7,
+  "status": "not-met",
+  "executed": false,
+  "shadowOnly": true,
+  "dryRun": true,
+  "productionWriteWatchIndex": 38,
+  "liveWriteWatchIndex": 37,
+  "sitesExamined": 37,
+  "sitesKept": 37,
+  "sitesDeleted": 0,
+  "retiredThisChange": 0,
+  "wouldDeleteCallSites": false,
+  "failClosedReasons": [
+    "item7-still-not-met",
+    "delete-call-site-forbidden",
+    "schema-v2-write-forbidden",
+    "resolver-write-forbidden",
+    "catalog-write-forbidden",
+    "retirement-locked"
+  ],
+  "decision": {
+    "allow": false,
+    "reason": "retirement-locked",
+    "failClosed": true
+  },
+  "phase1bUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "note": "Shadow/dry-run only. Every live write/index site is classified keep. No production code, Catalog, schema v2, or Resolver write switch is touched."
+}

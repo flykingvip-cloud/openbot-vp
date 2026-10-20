@@ -1,0 +1,184 @@
+{
+  "diagnostics": {
+    "errorCount": 0,
+    "warnCount": 0
+  },
+  "plugins": [
+    {
+      "id": "acpx",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "bluebubbles",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "copilot-proxy",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "device-pair",
+      "version": ""
+    },
+    {
+      "id": "diagnostics-otel",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "diffs",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "dingtalk",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "discord",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "feishu",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "google-gemini-cli-auth",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "googlechat",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "imessage",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "irc",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "line",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "llm-task",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "lobster",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "matrix",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "mattermost",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "memory-core",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "memory-lancedb",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "minimax-portal-auth",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "msteams",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "nextcloud-talk",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "nostr",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "open-prose",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "phone-control",
+      "version": ""
+    },
+    {
+      "id": "qwen-portal-auth",
+      "version": ""
+    },
+    {
+      "id": "signal",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "slack",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "synology-chat",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "talk-voice",
+      "version": ""
+    },
+    {
+      "id": "telegram",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "thread-ownership",
+      "version": ""
+    },
+    {
+      "id": "tlon",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "twitch",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "voice-call",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "wechat",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "wecom",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "whatsapp",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "zalo",
+      "version": "2026.3.9"
+    },
+    {
+      "id": "zalouser",
+      "version": "2026.3.9"
+    }
+  ],
+  "resourceCounts": {
+    "tools": 0,
+    "hooks": 0,
+    "typedHooks": 0,
+    "channels": 0,
+    "providers": 0,
+    "httpRoutes": 0,
+    "cliRegistrars": 0,
+    "services": 2,
+    "commands": 3,
+    "gatewayHandlers": 0
+  }
+}

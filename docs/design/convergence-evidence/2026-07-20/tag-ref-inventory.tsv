@@ -1,0 +1,95 @@
+tag	sha	tagged_date	subject	release_like	prod_reachable
+backup/codex-openclaw-localization-workspace	c13caced08	2026-03-16 20:22:42 +0800	feat: implement enhanced gateway protocol and authentication	no	reachable_unrelated
+backup/pre-reconcile-2aaa098eb7	2aaa098eb7	2026-06-01 16:37:10 +0800	Enterprise: complete install governance backend flow	no	reachable_unrelated
+backup/zones-openclaw	6adff08780	2026-03-13 18:45:33 +0800	sync: refresh openclaw snapshot	no	reachable_unrelated
+v0.1.0	d62fedda32	2025-11-25 13:10:55 +0100	Release prep: set version to 0.1.0	yes	reachable_unrelated
+v0.1.1	dd55a80430	2025-11-25 14:13:17 +0100	chore: prep 0.1.1 (version bump, lowercase branding, ua update)	yes	reachable_unrelated
+v0.1.2	80d9d288c2	2025-11-25 14:26:55 +0100	chore: bump to 0.1.2 and fix commander typings	yes	reachable_unrelated
+v0.1.3	9c25e15e92	2025-11-25 16:53:30 +0100	Release 0.1.3	yes	reachable_unrelated
+v1.0.0	d4388195fb	2026-07-09 09:50:15 +0800	fix(check): build collaboration packages before tsgo in CI	yes	tag_ancestor_of_prod
+v1.0.1	f5bd059f7f	2026-07-09 14:00:11 +0800	Merge pull request #29 from gmood2008/release-fix-format	yes	tag_ancestor_of_prod
+v1.0.4	f81f432af5	2025-11-25 18:12:44 +0100	Release 1.0.4	yes	reachable_unrelated
+v1.1.0	c194247dab	2025-11-26 03:03:13 +0100	test(auto-reply): cover cwd timeout hint and queue meta	yes	reachable_unrelated
+v1.2.0	6d7e620430	2025-11-27 18:52:26 +0100	Release 1.2.0	yes	reachable_unrelated
+v1.2.1	c11abc1134	2025-11-28 08:11:07 +0100	chore: release 1.2.1	yes	reachable_unrelated
+v1.2.2	5bafe9483d	2025-11-28 08:17:22 +0100	chore: release 1.2.2	yes	reachable_unrelated
+v1.3.0	2b941ccc93	2025-12-02 11:11:50 +0000	Changelog: note multi-agent and batching	yes	reachable_unrelated
+v2.0.0-beta1	5bbf5105f1	2025-12-19 18:24:36 +0100	chore: update appcast for 2.0.0-beta1	yes	reachable_unrelated
+v2.0.0-beta2	7415fdb79b	2025-12-21 03:48:23 +0100	chore: whitelist npm files	yes	reachable_unrelated
+v2.0.0-beta3	5b3c18ab84	2025-12-27 19:02:35 +0100	chore: release 2.0.0-beta3	yes	reachable_unrelated
+v2.0.0-beta4	e5cae2a2e4	2025-12-27 19:43:43 +0100	chore: release 2.0.0-beta4	yes	reachable_unrelated
+v2.0.0-beta5	31b5b45581	2026-01-03 06:04:20 +0100	docs: refresh appcast for notarized beta5	yes	reachable_unrelated
+v2026.1.10	1ead933d3e	2026-01-11 05:01:31 +0000	clawdbot 2026.1.10	yes	reachable_unrelated
+v2026.1.11	b9bd380ed8	2026-01-12 09:38:05 +0000	chore: update appcast for 2026.1.11	yes	reachable_unrelated
+v2026.1.11-1	2a875b486e	2026-01-12 09:54:21 +0000	chore: update appcast for 2026.1.11-1	yes	reachable_unrelated
+v2026.1.11-2	42b43f8c58	2026-01-12 10:26:01 +0000	chore: update appcast for 2026.1.11-2	yes	reachable_unrelated
+v2026.1.11-3	c69abe08eb	2026-01-12 10:40:31 +0000	chore: update appcast for 2026.1.11-3	yes	reachable_unrelated
+v2026.1.12	9eab82b717	2026-01-13 09:25:50 +0000	chore: release 2026.1.12	yes	reachable_unrelated
+v2026.1.12-2	6b587fa411	2026-01-13 09:36:15 +0000	chore: fix npm package contents	yes	reachable_unrelated
+v2026.1.13	93fbd103ba	2026-01-14 00:11:45 +0000	ci: set install smoke previous	yes	reachable_unrelated
+v2026.1.14-1	8daab932a2	2026-01-15 11:15:41 +0000	chore(macos): prep Sparkle release 2026.1.14-1	yes	reachable_unrelated
+v2026.1.15	9c4c9c5edd	2026-01-16 10:37:30 +0000	chore: release 2026.1.15	yes	reachable_unrelated
+v2026.1.16-2	be37b39782	2026-01-17 12:34:37 +0000	docs: clarify build-info release check	yes	reachable_unrelated
+v2026.1.20	9a14267dfa	2026-01-21 08:25:20 +0000	chore: update appcast	yes	reachable_unrelated
+v2026.1.21	80c1edc3ff	2026-01-22 12:24:06 +0000	chore: update appcast for v2026.1.21	yes	reachable_unrelated
+v2026.1.22	c48751a99c	2026-01-23 08:18:55 +0000	chore: sync plugin versions for 2026.1.22	yes	reachable_unrelated
+v2026.1.23	c9e98376b3	2026-01-24 13:03:00 +0000	chore: update appcast for 2026.1.23	yes	reachable_unrelated
+v2026.1.24	bcedeb4e1f	2026-01-24 15:00:00 +0000	chore: bump 2026.1.24	yes	reachable_unrelated
+v2026.1.24-1	a22ac64c47	2026-01-25 14:08:20 +0000	chore: release 2026.1.24-1	yes	reachable_unrelated
+v2026.1.29	77e703c69b	2026-01-30 06:25:45 +0100	chore: update appcast for 2026.1.29	yes	reachable_unrelated
+v2026.1.30	76b5208b11	2026-01-31 21:21:25 +0900	chore: Also format `scripts` and `skills`.	yes	reachable_unrelated
+v2026.1.5	197b8f7c3b	2026-01-05 03:13:14 +0100	chore: update appcast for 2026.1.5	yes	reachable_unrelated
+v2026.1.5-1	3110e37db4	2026-01-05 03:32:53 +0100	chore: update appcast for 2026.1.5-1	yes	reachable_unrelated
+v2026.1.5-2	36b96c2b28	2026-01-05 03:53:09 +0100	chore: update appcast for 2026.1.5-2	yes	reachable_unrelated
+v2026.1.5-3	19affcac90	2026-01-05 04:00:08 +0100	chore: update appcast for 2026.1.5-3	yes	reachable_unrelated
+v2026.1.8	615991a5da	2026-01-08 09:25:11 +0100	chore: include runtime markdown dependency	yes	reachable_unrelated
+v2026.1.9	241bc737cf	2026-01-10 04:43:04 +0100	test(telegram): deflake media groups on windows	yes	reachable_unrelated
+v2026.2.1	d842b28a15	2026-02-02 03:53:21 -0800	docs: update appcast for 2026.2.1	yes	reachable_unrelated
+v2026.2.12	ed0a4cb361	2026-02-13 03:18:32 +0100	v2026.2.12	yes	reachable_unrelated
+v2026.2.13	e91d957d70	2026-02-14 04:31:32 +0100	chore(release): publish 2026.2.13 appcast	yes	reachable_unrelated
+v2026.2.14	b5ab92eef4	2026-02-14 19:10:05 -0800	chore (changelog): note read tool file_path alias warning fix	yes	reachable_unrelated
+v2026.2.15	ea487f05c1	2026-02-16 05:09:58 +0100	chore(release): update appcast for 2026.2.15	yes	reachable_unrelated
+v2026.2.15-beta.1	90800cd23e	2026-02-16 05:10:59 +0100	chore(release): update appcast for 2026.2.15	yes	reachable_unrelated
+v2026.2.17	4134875c31	2026-02-18 02:42:52 +0000	fix: route discord native subagent announce to channel target	yes	reachable_unrelated
+v2026.2.19	2c05cbb43e	2026-02-19 17:07:20 +0100	fix(ci): use versioned actionlint checksum asset	yes	reachable_unrelated
+v2026.2.19-beta.1	2c05cbb43e	2026-02-19 17:07:20 +0100	fix(ci): use versioned actionlint checksum asset	yes	reachable_unrelated
+v2026.2.2	95cd2210f9	2026-02-03 17:04:27 -0800	chore: update appcast for 2026.2.2	yes	reachable_unrelated
+v2026.2.21	5e34eb98fb	2026-02-21 17:56:21 +0100	chore: update appcast for 2026.2.21 mac release	yes	reachable_unrelated
+v2026.2.21-beta.1	d9844c6afa	2026-02-21 10:58:34 -0500	CI: remove docs spellcheck step (#22738)	yes	reachable_unrelated
+v2026.2.22	a54dc7fe80	2026-02-22 20:24:08 -0600	Cron: suppress fallback main summary for delivery-target errors (openclaw#24074) thanks @Takhoffman	yes	reachable_unrelated
+v2026.2.23	b817600533	2026-02-24 05:39:22 +0000	chore(release): cut 2026.2.23	yes	reachable_unrelated
+v2026.2.23-beta.1	936f2449bd	2026-02-24 05:02:40 +0000	chore(release): prep 2026.2.23-beta.1 changelog	yes	reachable_unrelated
+v2026.2.24	819cec3c40	2026-02-25 03:31:02 +0000	openclaw 2026.2.24	yes	reachable_unrelated
+v2026.2.24-beta.1	e34da80e37	2026-02-25 03:01:09 +0000	openclaw 2026.2.24-beta.1	yes	reachable_unrelated
+v2026.2.25	4b5d4a4c66	2026-02-26 05:15:27 +0100	docs: finalize 2026.2.25 release notes and appcast	yes	reachable_unrelated
+v2026.2.25-beta.1	fdea7415cc	2026-02-26 04:39:01 +0100	docs: reorder unreleased changelog by user impact	yes	reachable_unrelated
+v2026.2.26	3593fb5d4c	2026-02-27 00:58:22 +0100	v2026.2.26	yes	reachable_unrelated
+v2026.2.26-beta.1	80d44c983f	2026-02-26 23:10:47 +0100	chore(release): cut 2026.2.26-beta.1	yes	reachable_unrelated
+v2026.2.3	54ddbc4660	2026-02-04 17:55:13 -0800	chore: update 2026.2.3 notes	yes	reachable_unrelated
+v2026.2.6	0dd7033521	2026-02-06 17:56:22 -0800	chore(lockfile): fix pnpm-lock	yes	reachable_unrelated
+v2026.2.6-1	aaddbdae52	2026-02-06 22:48:19 -0800	chore(release): 2026.2.6-1	yes	reachable_unrelated
+v2026.2.6-2	ad4dd0422e	2026-02-07 00:30:43 -0800	chore(release): 2026.2.6-2	yes	reachable_unrelated
+v2026.2.6-3	9f703a44dc	2026-02-07 00:44:32 -0800	chore(release): 2026.2.6-3	yes	reachable_unrelated
+v2026.2.9	33c75cb6bf	2026-02-09 12:59:06 -0600	chore(extensions): mark bundled packages private	yes	reachable_unrelated
+v2026.3.1	d76b224e20	2026-03-02 04:41:39 +0000	docs: update appcast for 2026.3.1	yes	reachable_unrelated
+v2026.3.11	0f8fd88302	2026-03-12 05:01:18 +0000	v2026.3.11	yes	reachable_unrelated
+v2026.3.11-beta.1	44b60a49bd	2026-03-12 04:12:05 +0000	v2026.3.11-beta.1	yes	reachable_unrelated
+v2026.3.12	28d64c48e0	2026-03-13 04:26:34 +0000	v2026.3.12	yes	reachable_unrelated
+v2026.3.13-1	23d5d24b32	2026-03-14 19:03:51 +0100	v2026.3.13-1	yes	reachable_unrelated
+v2026.3.13-beta.1	df1e260e87	2026-03-14 04:56:16 +0000	openclaw 2026.3.13-beta.1	yes	reachable_unrelated
+v2026.3.2	85377a2817	2026-03-03 04:35:46 +0000	chore(release): cut 2026.3.2	yes	reachable_unrelated
+v2026.3.2-beta.1	eb8a8840d6	2026-03-03 03:38:49 +0000	chore(release): prepare 2026.3.2-beta.1	yes	reachable_unrelated
+v2026.3.22	4c016f51fc	2026-03-23 04:08:28 -0700	v2026.3.22	yes	reachable_unrelated
+v2026.3.22-beta.1	f8a12b1413	2026-03-23 02:34:47 -0700	v2026.3.22-beta.1	yes	reachable_unrelated
+v2026.3.23	1e8dc32c5c	2026-03-23 16:14:53 -0700	v2026.3.23	yes	reachable_unrelated
+v2026.3.23-2	3b16578032	2026-03-23 20:06:46 -0700	v2026.3.23-2	yes	reachable_unrelated
+v2026.3.23-beta.1	d152a1be69	2026-03-23 11:55:05 -0700	v2026.3.23-beta.1	yes	reachable_unrelated
+v2026.3.24	6c81728723	2026-03-25 09:35:44 -0700	v2026.3.24	yes	reachable_unrelated
+v2026.3.24-beta.1	3a7a61a21e	2026-03-25 04:54:48 -0700	openclaw 2026.3.24-beta.1	yes	reachable_unrelated
+v2026.3.24-beta.2	9deb51ee2d	2026-03-25 07:11:26 -0700	v2026.3.24-beta.2	yes	reachable_unrelated
+v2026.3.28	4d9a54cc61	2026-03-29 02:34:22 +0100	openclaw 2026.3.28	yes	reachable_unrelated
+v2026.3.28-beta.1	664680318e	2026-03-28 22:33:24 +0000	fix(release): validate built tarballs in workflows	yes	reachable_unrelated
+v2026.3.7	42a1394c5c	2026-03-08 05:42:26 +0000	build: prepare 2026.3.7 release	yes	reachable_unrelated
+v2026.3.7-beta.1	d9670093cb	2026-03-08 04:44:08 +0000	style: format daemon lifecycle test	yes	reachable_unrelated
+v2026.3.8	3caab9260c	2026-03-09 07:42:15 +0000	test: narrow gateway loop signal harness	yes	reachable_unrelated
+v2026.3.8-beta.1	5fca4c0de0	2026-03-09 07:09:37 +0000	chore: prepare 2026.3.8-beta.1 release	yes	reachable_unrelated

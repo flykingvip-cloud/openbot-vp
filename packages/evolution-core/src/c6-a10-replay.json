@@ -1,0 +1,63 @@
+{
+  "source": "A10 001 M1 replay /tmp/openbot-a10-001-m1 evidence.json",
+  "boundary": "A10 completion is not E5.2 and does not open autoApply",
+  "tenantId": "001",
+  "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+  "surfaceId": "agent.working-dna",
+  "candidateVersion": "c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255",
+  "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+  "proposalId": "evo:diag:8bee2c37b1f39478",
+  "proposalStatus": "VERIFIED",
+  "experimentId": "exp:cmd-a9-exp-down",
+  "experimentResult": "improved",
+  "activeApplicationId": "app:cmd-a9-active-up",
+  "activeApplicationStatus": "applied",
+  "canaryApplicationId": "app:cmd-a9-canary-b-up",
+  "verificationId": "ver:cmd-a9-verify-ok",
+  "verificationOutcome": "improved",
+  "mismatchVerificationId": "ver:cmd-a9-verify-mismatch",
+  "commandId": "cmd-a9-verify-ok",
+  "mismatchCommandId": "cmd-a9-verify-mismatch",
+  "observationWindow": {
+    "startedAt": "2026-09-22T09:53:14.997Z",
+    "endedAt": "2026-09-29T09:53:14.979Z",
+    "sampleCount": 20
+  },
+  "ledgerEvents": [
+    {
+      "eventId": "evt-a10-verification-ok",
+      "type": "verification.completed",
+      "tenantScope": "001",
+      "proposalId": "evo:diag:8bee2c37b1f39478",
+      "experimentId": "exp:cmd-a9-exp-down",
+      "applicationId": "app:cmd-a9-active-up",
+      "verificationId": "ver:cmd-a9-verify-ok",
+      "target": { "domain": "agent", "agentId": "a8-m1-isolated" },
+      "surfaceId": "agent.working-dna",
+      "candidateRef": "cand:diag:c5fda4dba439f8c00084c650da491f0c",
+      "principalRef": "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+      "timestamp": "2026-09-22T09:53:14.997Z"
+    }
+  ],
+  "activeRecheck": {
+    "outcome": "STILL_OPEN",
+    "reasonCode": "sot_unchanged",
+    "findingRefs": ["c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255"],
+    "observedEvidenceRefs": [
+      "obs:recheck:style:structured:milestone:confirm_first:balanced:neutral",
+      "obs:window:app:cmd-a9-active-up"
+    ]
+  },
+  "regressedRecheck": {
+    "outcome": "REGRESSED",
+    "reasonCode": "sot_diverged",
+    "applicationId": "app:cmd-a9-canary-b-up",
+    "verificationId": "ver:cmd-a9-verify-mismatch",
+    "commandId": "cmd-a9-verify-mismatch",
+    "findingRefs": ["c5fda4dba439f8c00084c650da491f0c450c7976a9c16a0644d90e1e2aceb255"],
+    "observedEvidenceRefs": [
+      "obs:recheck:style:structured:periodic:confirm_first:balanced:neutral",
+      "obs:window:app:cmd-a9-canary-b-up"
+    ]
+  }
+}

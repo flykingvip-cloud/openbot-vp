@@ -1,0 +1,42 @@
+{
+  "schema": "memory-workspace-phase1b-item5-fail-closed-evidence/v1",
+  "item": 5,
+  "status": "met",
+  "owner": "cursor-data-governance",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "enablesProduction": false,
+  "wiredToProductionResolver": true,
+  "namedAuthorization": "flip-wiredToProductionResolver-20260818",
+  "helperInvokedFromToolCwd": true,
+  "productionCallerPassesExistingCatalogWhenPresent": true,
+  "productionFile": "src/gateway/workspace-resolver/tool-cwd.ts",
+  "productionCaller": "src/gateway/tenant-context.ts",
+  "productionStillSynthesizesEmptyCatalog": false,
+  "productionStillUsesAgentIdAsAgentAssetId": false,
+  "productionCallerFallsBackOnUnwiredCatalog": false,
+  "managedCwdThrows": false,
+  "changeDesign": {
+    "helper": "src/gateway/data-governance/workspace-identity-fail-closed.ts",
+    "projection": "src/gateway/data-governance/workspace-catalog-projection.ts",
+    "tests": "src/gateway/data-governance/workspace-identity-fail-closed.test.ts",
+    "rejects": [
+      "empty Catalog synthesis",
+      "agentId used as agentAssetId",
+      "identity from path",
+      "identity from realpath",
+      "identity from display name"
+    ],
+    "requires": ["non-empty Catalog", "exact agentAssetId"]
+  },
+  "explicitlyNotDone": [
+    "production Catalog still has no guaranteed matching records",
+    "edit src/gateway/workspace-resolver/** to attach write-path miss=deny",
+    "flip the resolver write switch"
+  ],
+  "remaining": [
+    "write-path miss=deny is not attached",
+    "item 2 coverage is still not-met; this flag is not unlock"
+  ],
+  "note": "Named authorization flipped wiredToProductionResolver. Live tenant-context already spreads existing Catalog + exact agentAssetId when the loader hits; miss still returns membership. Item 5 is met. Unlock is not issued. Write-path miss=deny is not attached."
+}

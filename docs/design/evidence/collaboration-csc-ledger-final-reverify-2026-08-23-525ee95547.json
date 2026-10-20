@@ -1,0 +1,120 @@
+{
+  "schema": "collaboration-csc-ledger-final-reverify-receipt/v1",
+  "status": "passed",
+  "productionCloseout": "passed",
+  "recordedAt": "2026-08-23T01:47:38Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Ledger final reverify on latest origin/main",
+  "authorizedBy": "user",
+  "explicitNonActions": [
+    "did not change LIVE",
+    "did not restart or recreate the container",
+    "did not add an overlay",
+    "did not change inbound or CSC flags",
+    "did not use the dirty inbound-depth workspace"
+  ],
+  "baseline": {
+    "taskNamedOriginMain": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+    "freshOriginMain": "525ee95547dbd2530f284f69fd67849c6574df23",
+    "freshOriginMainSubject": "Merge pull request #624 from gmood2008/cursor-data-governance/phase1b-item7-retirement-batch8-s16",
+    "taskShaIsTip": false,
+    "taskShaIsAncestor": true,
+    "worktree": "/tmp/openbot-ledger-final-525ee95547",
+    "worktreeStatusPorcelainCount": 0,
+    "note": "Fail closed on stale tip. Verified against freshly fetched origin/main after #624, not e1cbc1e804."
+  },
+  "pr625": {
+    "url": "https://github.com/gmood2008/openbot/pull/625",
+    "stateAtReverify": "OPEN",
+    "reviewDecision": "APPROVED",
+    "merged": false,
+    "note": "Approved; freeze still queued. This reverify used published origin/main 525ee95547."
+  },
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "startedAt": "2026-08-22T15:10:36Z",
+    "health": "healthy",
+    "healthz": { "http": 200, "body": { "ok": true, "status": "live" } },
+    "readyz": { "ready": true, "failing": [] },
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "builtAt": "2026-08-22T15:09:15.742Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "baseImage": {
+      "sha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "imageName": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+      "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257"
+    },
+    "gatewayOverlaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "provenanceTag": "provenance/sha-7cd74d4c5c69",
+    "baseImageProvenanceTag": "provenance/sha-5c221b9ec38c",
+    "flags": {
+      "OPENBOT_UI_OVERLAY_PINNED_ENTRY": "index-Ol92eg1L.js",
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset",
+      "CONTEXT_SCOPE": "unset",
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "unset"
+    }
+  },
+  "seq34": {
+    "imageTag": "rc-amd64-provenance-5c221b9ec3",
+    "imageDigest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257",
+    "gatewaySha": "affda8bce88939e42c57000896c13fc8a457f536",
+    "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "tag": "provenance/sha-affda8bce889",
+    "matchesReleaseRecord": true
+  },
+  "seq35": {
+    "imageTag": "rc-amd64-provenance-5c221b9ec3",
+    "imageDigest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257",
+    "gatewaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "tag": "provenance/sha-7cd74d4c5c69",
+    "matchesReleaseRecord": true,
+    "matchesLiveBuildInfo": true
+  },
+  "releaseRecord": {
+    "latestHeading": "Latest cutover (2026-08-22) — gateway overlay `7cd74d4c5c69` on GHCR image `5c221b9ec38c`",
+    "sourceRevision": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "previousOverlay": "affda8bce88939e42c57000896c13fc8a457f536",
+    "consistentWithLedger": true
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 35,
+      "parseErrors": 0,
+      "errors": 0,
+      "identityMismatch": 0,
+      "warnings": 14,
+      "ok": true
+    },
+    "verifyForwardOnly": {
+      "verdict": "allow",
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidate": "525ee95547dbd2530f284f69fd67849c6574df23",
+      "forwardOnly": true
+    },
+    "verifyDeliveryAlignment": {
+      "prodSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidateTag": "provenance/sha-7cd74d4c5c69",
+      "pass": 8,
+      "warn": 2,
+      "fail": 0,
+      "warnsExpected": [
+        "L3-local candidate image reports base image 5c221b9, not overlay 7cd74d4",
+        "L3-local prod image hint not on this machine"
+      ]
+    }
+  },
+  "identityCheck": "passed",
+  "alignmentFail": 0,
+  "cutoverExecuted": false,
+  "flagsChanged": false
+}

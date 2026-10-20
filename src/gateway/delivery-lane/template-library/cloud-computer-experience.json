@@ -1,0 +1,12 @@
+{
+  "id": "cloud-computer-experience",
+  "label": "云电脑体验轨",
+  "description": "云电脑 tip → seal → merge_ready；合入≠切流。",
+  "initialMode": "implement",
+  "ciPolicy": {
+    "hostedCiBillingBlocked": true,
+    "mustGreenLocally": true,
+    "strategy": "hosted CI 计费挡 → 本机 must-green 作为合入门禁；勿把付费 hosted check 当唯一绿灯"
+  },
+  "cutoverNote": "merge main ≠ 打开 OPENBOT_DELIVERY_LANE_ENABLED / 生产切流"
+}

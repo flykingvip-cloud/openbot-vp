@@ -1,0 +1,83 @@
+{
+  "name": "openbot-mobile",
+  "version": 1,
+  "description": "Hex and layout twins of the Android and iOS four-tab companion. This file does not invent a third palette. Color literals stay hand-written; scripts/check-mobile-tokens.mjs fails if the JSON hex set or named colors drift from either source, or if the iOS Manrope copies drift from Android.",
+  "sources": {
+    "android": "apps/android/app/src/main/java/ai/openbot/app/ui/MobileUiTokens.kt",
+    "androidTabBar": "apps/android/app/src/main/java/ai/openbot/app/ui/PostOnboardingTabs.kt",
+    "ios": "apps/ios/Sources/MobileUI/OpenBotMobileTokens.swift"
+  },
+  "font": {
+    "family": "Manrope",
+    "weights": [400, 500, 600, 700],
+    "androidDir": "apps/android/app/src/main/res/font",
+    "iosDir": "apps/ios/Sources/Fonts",
+    "files": {
+      "400": { "file": "manrope_400_regular.ttf", "postScript": "Manrope-Regular" },
+      "500": { "file": "manrope_500_medium.ttf", "postScript": "Manrope-Medium" },
+      "600": { "file": "manrope_600_semibold.ttf", "postScript": "Manrope-SemiBold" },
+      "700": { "file": "manrope_700_bold.ttf", "postScript": "Manrope-Bold" }
+    },
+    "note": "One set of Manrope files. Android res/font is the source; apps/ios/Sources/Fonts must stay byte-identical. iOS MobileUI text styles use the PostScript names via UIAppFonts. No third palette."
+  },
+  "layout": {
+    "unit": "dp/pt",
+    "pageGutter": 20,
+    "pageVertical": 16
+  },
+  "palette": {
+    "backgroundTop": "#FFFFFF",
+    "backgroundMid": "#F7F8FA",
+    "backgroundBottom": "#EFF1F5",
+    "surface": "#F6F7FA",
+    "surfaceStrong": "#ECEEF3",
+    "border": "#E5E7EC",
+    "borderStrong": "#D6DAE2",
+    "text": "#17181C",
+    "textSecondary": "#5D6472",
+    "textTertiary": "#99A0AE",
+    "accent": "#2F6BFF",
+    "accentSoft": "#E8F0FF",
+    "success": "#2F8C5A",
+    "successSoft": "#EEF9F3",
+    "warning": "#C8841A",
+    "warningSoft": "#FFF8EC",
+    "danger": "#D04B4B",
+    "dangerSoft": "#FFF2F2",
+    "codeBg": "#15171B",
+    "codeText": "#E8EAEE"
+  },
+  "gradient": {
+    "background": {
+      "direction": "vertical",
+      "stops": ["#FFFFFF", "#F7F8FA", "#EFF1F5"]
+    }
+  },
+  "tabBar": {
+    "cornerRadius": 24,
+    "itemCornerRadius": 16,
+    "minItemHeight": 58,
+    "background": "#FFFFFF",
+    "backgroundOpacity": 0.97,
+    "note": "Android literals live in PostOnboardingTabs.kt (White @ 0.97, top corner 24, item corner 16, min height 58). iOS literals live on OpenBotMobileTokens."
+  },
+  "type": {
+    "title1": { "size": 24, "lineHeight": 30, "weight": 600, "letterSpacing": -0.5 },
+    "title2": { "size": 20, "lineHeight": 26, "weight": 600, "letterSpacing": -0.3 },
+    "headline": { "size": 16, "lineHeight": 22, "weight": 600, "letterSpacing": -0.1 },
+    "body": { "size": 15, "lineHeight": 22, "weight": 500 },
+    "callout": { "size": 14, "lineHeight": 20, "weight": 500 },
+    "caption1": { "size": 12, "lineHeight": 16, "weight": 500, "letterSpacing": 0.2 },
+    "caption2": { "size": 11, "lineHeight": 14, "weight": 500, "letterSpacing": 0.4 },
+    "moduleTitle": {
+      "size": 26,
+      "weight": 700,
+      "platforms": ["ios"],
+      "note": "OpenBotMobileTokens.moduleTitle only. Not declared in MobileUiTokens.kt; do not treat as a shared generated style yet."
+    }
+  },
+  "sotComments": {
+    "accent": "--blue",
+    "accentSoft": "--blue-soft"
+  }
+}

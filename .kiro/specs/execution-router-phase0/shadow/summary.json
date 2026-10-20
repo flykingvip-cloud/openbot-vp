@@ -1,0 +1,2354 @@
+{
+  "schema": "openbot.execution-router.shadow.v1",
+  "version": "1.0.0",
+  "generatorVersion": "phase0-shadow-e2e-0.2.0",
+  "sourceCommit": "08eeec91137205d4a19d7859bdb30f2367537538",
+  "observationFlag": "OPENBOT_EXECUTION_ROUTER_OBSERVATION=1",
+  "artifactSha256": "d97dd0a763ebfe9cf48721db684974bf697da870bc2a33af9f6d8527ae85d550",
+  "productionBlobShas": {
+    "src/gateway/execution-router-observation.ts": "9622a342c244169f437c013e71c12fbd4e3b6c88",
+    "src/gateway/chat-inbound-stage-events.ts": "fbcba7b86d00fea320b4b1fd924e800a049ffa12",
+    "src/agents/pi-embedded-runner/run/attempt.ts": "fbc1dfc450a7a84397c64e6ca91bea5f43fa1bad",
+    "src/agents/pi-embedded-runner/run/execution-router-baselines.ts": "efdf63f9338f02d45d1200451868c7e85ad1ea62"
+  },
+  "collectedAt": "2026-09-06T14:54:54.513Z",
+  "metricsKind": "harness_calculation",
+  "sampleCount": 55,
+  "completeCount": 50,
+  "errorTtlCount": 5,
+  "memoryFinalSize": 0,
+  "metrics": {
+    "requiredSkillRecall": 1,
+    "requiredToolRecall": 1,
+    "ttftMsAvg": 15,
+    "promptTokensAvg": 12,
+    "firstToolSuccessRate": 1
+  },
+  "samples": [
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "run_completed",
+      "runIdDigest": "164e60066001e609",
+      "sessionKeyHash": "9eb9bfae87b69769",
+      "stages": {
+        "inbound_accepted": 2000000,
+        "model_started": 2000010,
+        "skill_snapshot_ready": 2000015,
+        "tool_set_ready": 2000015,
+        "system_prompt_ready": 2000015,
+        "first_token": 2000020,
+        "run_completed": 2000025
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "run_completed",
+      "runIdDigest": "06f1b9263e762a70",
+      "sessionKeyHash": "711cfb6b5a7b3934",
+      "stages": {
+        "inbound_accepted": 2000025,
+        "model_started": 2000035,
+        "skill_snapshot_ready": 2000040,
+        "tool_set_ready": 2000040,
+        "system_prompt_ready": 2000040,
+        "first_token": 2000045,
+        "run_completed": 2000050
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "run_completed",
+      "runIdDigest": "22c5238e4b2aba34",
+      "sessionKeyHash": "0469343372fd1a39",
+      "stages": {
+        "inbound_accepted": 2000050,
+        "model_started": 2000060,
+        "skill_snapshot_ready": 2000065,
+        "tool_set_ready": 2000065,
+        "system_prompt_ready": 2000065,
+        "first_token": 2000070,
+        "run_completed": 2000075
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "run_completed",
+      "runIdDigest": "822aed67429d1f2f",
+      "sessionKeyHash": "151990183ced6c78",
+      "stages": {
+        "inbound_accepted": 2000075,
+        "model_started": 2000085,
+        "skill_snapshot_ready": 2000090,
+        "tool_set_ready": 2000090,
+        "system_prompt_ready": 2000090,
+        "first_token": 2000095,
+        "run_completed": 2000100
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "run_completed",
+      "runIdDigest": "80ec1eb49cf141f3",
+      "sessionKeyHash": "f50c52ff19c9c886",
+      "stages": {
+        "inbound_accepted": 2000100,
+        "model_started": 2000110,
+        "skill_snapshot_ready": 2000115,
+        "tool_set_ready": 2000115,
+        "system_prompt_ready": 2000115,
+        "first_token": 2000120,
+        "run_completed": 2000125
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_dense",
+      "terminalKind": "run_completed",
+      "runIdDigest": "2f7d12eca87726c7",
+      "sessionKeyHash": "79cb257f32fef7f6",
+      "stages": {
+        "inbound_accepted": 2000125,
+        "model_started": 2000135,
+        "skill_snapshot_ready": 2000140,
+        "tool_set_ready": 2000140,
+        "system_prompt_ready": 2000140,
+        "first_token": 2000145,
+        "run_completed": 2000150
+      },
+      "skillEligibleCount": 5,
+      "skillInjectedCount": 5,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_dense",
+      "terminalKind": "run_completed",
+      "runIdDigest": "0a2664780e9a38c8",
+      "sessionKeyHash": "e5f1ad6015a84f61",
+      "stages": {
+        "inbound_accepted": 2000150,
+        "model_started": 2000160,
+        "skill_snapshot_ready": 2000165,
+        "tool_set_ready": 2000165,
+        "system_prompt_ready": 2000165,
+        "first_token": 2000170,
+        "run_completed": 2000175
+      },
+      "skillEligibleCount": 5,
+      "skillInjectedCount": 5,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_dense",
+      "terminalKind": "run_completed",
+      "runIdDigest": "5bcf4de94394f21f",
+      "sessionKeyHash": "041bdb2553efd9dc",
+      "stages": {
+        "inbound_accepted": 2000175,
+        "model_started": 2000185,
+        "skill_snapshot_ready": 2000190,
+        "tool_set_ready": 2000190,
+        "system_prompt_ready": 2000190,
+        "first_token": 2000195,
+        "run_completed": 2000200
+      },
+      "skillEligibleCount": 5,
+      "skillInjectedCount": 5,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_dense",
+      "terminalKind": "run_completed",
+      "runIdDigest": "904d6085f2036dd9",
+      "sessionKeyHash": "fc11f2feb28b3216",
+      "stages": {
+        "inbound_accepted": 2000200,
+        "model_started": 2000210,
+        "skill_snapshot_ready": 2000215,
+        "tool_set_ready": 2000215,
+        "system_prompt_ready": 2000215,
+        "first_token": 2000220,
+        "run_completed": 2000225
+      },
+      "skillEligibleCount": 5,
+      "skillInjectedCount": 5,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_dense",
+      "terminalKind": "run_completed",
+      "runIdDigest": "5183ae7d135dc5ac",
+      "sessionKeyHash": "5ce68ac262233dfc",
+      "stages": {
+        "inbound_accepted": 2000225,
+        "model_started": 2000235,
+        "skill_snapshot_ready": 2000240,
+        "tool_set_ready": 2000240,
+        "system_prompt_ready": 2000240,
+        "first_token": 2000245,
+        "run_completed": 2000250
+      },
+      "skillEligibleCount": 5,
+      "skillInjectedCount": 5,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": [
+        "5bb90e3e9895efe8",
+        "bbbac7913b467766",
+        "4e9b236d8f777209",
+        "45ff0ff96d4415ce",
+        "e7edeb32f7bc9640"
+      ],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "no_tools",
+      "terminalKind": "run_completed",
+      "runIdDigest": "bcdfa78b9abfbdf2",
+      "sessionKeyHash": "7455569b5a708e13",
+      "stages": {
+        "inbound_accepted": 2000250,
+        "model_started": 2000260,
+        "skill_snapshot_ready": 2000265,
+        "tool_set_ready": 2000265,
+        "system_prompt_ready": 2000265,
+        "first_token": 2000270,
+        "run_completed": 2000275
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "no_tools",
+      "terminalKind": "run_completed",
+      "runIdDigest": "cc170ed4c517821b",
+      "sessionKeyHash": "b872c1d73f54c972",
+      "stages": {
+        "inbound_accepted": 2000275,
+        "model_started": 2000285,
+        "skill_snapshot_ready": 2000290,
+        "tool_set_ready": 2000290,
+        "system_prompt_ready": 2000290,
+        "first_token": 2000295,
+        "run_completed": 2000300
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "no_tools",
+      "terminalKind": "run_completed",
+      "runIdDigest": "4261e073c36358d1",
+      "sessionKeyHash": "bb4f5ea58d3d500e",
+      "stages": {
+        "inbound_accepted": 2000300,
+        "model_started": 2000310,
+        "skill_snapshot_ready": 2000315,
+        "tool_set_ready": 2000315,
+        "system_prompt_ready": 2000315,
+        "first_token": 2000320,
+        "run_completed": 2000325
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "no_tools",
+      "terminalKind": "run_completed",
+      "runIdDigest": "0c8bfd6644a44c70",
+      "sessionKeyHash": "1dfef83c983fefaf",
+      "stages": {
+        "inbound_accepted": 2000325,
+        "model_started": 2000335,
+        "skill_snapshot_ready": 2000340,
+        "tool_set_ready": 2000340,
+        "system_prompt_ready": 2000340,
+        "first_token": 2000345,
+        "run_completed": 2000350
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "no_tools",
+      "terminalKind": "run_completed",
+      "runIdDigest": "4f30b2a24c3065af",
+      "sessionKeyHash": "2b08521924ae0224",
+      "stages": {
+        "inbound_accepted": 2000350,
+        "model_started": 2000360,
+        "skill_snapshot_ready": 2000365,
+        "tool_set_ready": 2000365,
+        "system_prompt_ready": 2000365,
+        "first_token": 2000370,
+        "run_completed": 2000375
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 0,
+      "toolAfterPolicyCount": 0,
+      "toolExposedCount": 0,
+      "expectedAllowlistCount": 0,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": [],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "single_readonly_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "46354e3e7df73390",
+      "sessionKeyHash": "09e6a3a822c8db44",
+      "stages": {
+        "inbound_accepted": 2000375,
+        "model_started": 2000385,
+        "skill_snapshot_ready": 2000390,
+        "tool_set_ready": 2000390,
+        "system_prompt_ready": 2000390,
+        "first_token": 2000395,
+        "run_completed": 2000400
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "single_readonly_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "03b565f83f0a7679",
+      "sessionKeyHash": "c24ece1f0ff03ac2",
+      "stages": {
+        "inbound_accepted": 2000400,
+        "model_started": 2000410,
+        "skill_snapshot_ready": 2000415,
+        "tool_set_ready": 2000415,
+        "system_prompt_ready": 2000415,
+        "first_token": 2000420,
+        "run_completed": 2000425
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "single_readonly_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "01aa147e0997c3f1",
+      "sessionKeyHash": "2d039189250d16d3",
+      "stages": {
+        "inbound_accepted": 2000425,
+        "model_started": 2000435,
+        "skill_snapshot_ready": 2000440,
+        "tool_set_ready": 2000440,
+        "system_prompt_ready": 2000440,
+        "first_token": 2000445,
+        "run_completed": 2000450
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "single_readonly_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "f846b7429629a16f",
+      "sessionKeyHash": "634e0ef4294d165e",
+      "stages": {
+        "inbound_accepted": 2000450,
+        "model_started": 2000460,
+        "skill_snapshot_ready": 2000465,
+        "tool_set_ready": 2000465,
+        "system_prompt_ready": 2000465,
+        "first_token": 2000470,
+        "run_completed": 2000475
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "single_readonly_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "5f9910f5b3e3afe3",
+      "sessionKeyHash": "c633fd4b31136c59",
+      "stages": {
+        "inbound_accepted": 2000475,
+        "model_started": 2000485,
+        "skill_snapshot_ready": 2000490,
+        "tool_set_ready": 2000490,
+        "system_prompt_ready": 2000490,
+        "first_token": 2000495,
+        "run_completed": 2000500
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "multi_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "2549a3fc634a37e2",
+      "sessionKeyHash": "ed6cd548c4d8fe89",
+      "stages": {
+        "inbound_accepted": 2000500,
+        "model_started": 2000510,
+        "skill_snapshot_ready": 2000515,
+        "tool_set_ready": 2000515,
+        "system_prompt_ready": 2000515,
+        "first_token": 2000520,
+        "run_completed": 2000525
+      },
+      "skillEligibleCount": 2,
+      "skillInjectedCount": 2,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "injectedSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "multi_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "14120874383e6119",
+      "sessionKeyHash": "260003ad40035953",
+      "stages": {
+        "inbound_accepted": 2000525,
+        "model_started": 2000535,
+        "skill_snapshot_ready": 2000540,
+        "tool_set_ready": 2000540,
+        "system_prompt_ready": 2000540,
+        "first_token": 2000545,
+        "run_completed": 2000550
+      },
+      "skillEligibleCount": 2,
+      "skillInjectedCount": 2,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "injectedSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "multi_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "9f01358cf4a0e731",
+      "sessionKeyHash": "79c75e0e746eb17c",
+      "stages": {
+        "inbound_accepted": 2000550,
+        "model_started": 2000560,
+        "skill_snapshot_ready": 2000565,
+        "tool_set_ready": 2000565,
+        "system_prompt_ready": 2000565,
+        "first_token": 2000570,
+        "run_completed": 2000575
+      },
+      "skillEligibleCount": 2,
+      "skillInjectedCount": 2,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "injectedSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "multi_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "4caedd0e1c78ce25",
+      "sessionKeyHash": "d3ab1468485f20f6",
+      "stages": {
+        "inbound_accepted": 2000575,
+        "model_started": 2000585,
+        "skill_snapshot_ready": 2000590,
+        "tool_set_ready": 2000590,
+        "system_prompt_ready": 2000590,
+        "first_token": 2000595,
+        "run_completed": 2000600
+      },
+      "skillEligibleCount": 2,
+      "skillInjectedCount": 2,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "injectedSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "multi_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "7627a24a78e3f56b",
+      "sessionKeyHash": "773e5399b241699c",
+      "stages": {
+        "inbound_accepted": 2000600,
+        "model_started": 2000610,
+        "skill_snapshot_ready": 2000615,
+        "tool_set_ready": 2000615,
+        "system_prompt_ready": 2000615,
+        "first_token": 2000620,
+        "run_completed": 2000625
+      },
+      "skillEligibleCount": 2,
+      "skillInjectedCount": 2,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "injectedSkillDigests": ["bbbac7913b467766", "e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "client_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "a73636255548d637",
+      "sessionKeyHash": "6a41f61d0d1d0b8c",
+      "stages": {
+        "inbound_accepted": 2000625,
+        "model_started": 2000635,
+        "skill_snapshot_ready": 2000640,
+        "tool_set_ready": 2000640,
+        "system_prompt_ready": 2000640,
+        "first_token": 2000645,
+        "run_completed": 2000650
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 4,
+      "expectedAllowlistCount": 4,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["de71247929670dcf"],
+      "requiredToolDigests": ["93d5237ade815fec", "dcde6ba39712d961"],
+      "injectedSkillDigests": ["de71247929670dcf"],
+      "exposedToolDigests": [
+        "93d5237ade815fec",
+        "4f0466f7c090e038",
+        "b90ab7cc551ad671",
+        "dcde6ba39712d961"
+      ],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "client_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "c86dcec448097d22",
+      "sessionKeyHash": "ae37e5fe1c587852",
+      "stages": {
+        "inbound_accepted": 2000650,
+        "model_started": 2000660,
+        "skill_snapshot_ready": 2000665,
+        "tool_set_ready": 2000665,
+        "system_prompt_ready": 2000665,
+        "first_token": 2000670,
+        "run_completed": 2000675
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 4,
+      "expectedAllowlistCount": 4,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["de71247929670dcf"],
+      "requiredToolDigests": ["93d5237ade815fec", "dcde6ba39712d961"],
+      "injectedSkillDigests": ["de71247929670dcf"],
+      "exposedToolDigests": [
+        "93d5237ade815fec",
+        "4f0466f7c090e038",
+        "b90ab7cc551ad671",
+        "dcde6ba39712d961"
+      ],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "client_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "e368883cefc9aa47",
+      "sessionKeyHash": "ccecd73ad26eb46e",
+      "stages": {
+        "inbound_accepted": 2000675,
+        "model_started": 2000685,
+        "skill_snapshot_ready": 2000690,
+        "tool_set_ready": 2000690,
+        "system_prompt_ready": 2000690,
+        "first_token": 2000695,
+        "run_completed": 2000700
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 4,
+      "expectedAllowlistCount": 4,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["de71247929670dcf"],
+      "requiredToolDigests": ["93d5237ade815fec", "dcde6ba39712d961"],
+      "injectedSkillDigests": ["de71247929670dcf"],
+      "exposedToolDigests": [
+        "93d5237ade815fec",
+        "4f0466f7c090e038",
+        "b90ab7cc551ad671",
+        "dcde6ba39712d961"
+      ],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "client_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "4173bf50b1081607",
+      "sessionKeyHash": "6258c94c40e63e9b",
+      "stages": {
+        "inbound_accepted": 2000700,
+        "model_started": 2000710,
+        "skill_snapshot_ready": 2000715,
+        "tool_set_ready": 2000715,
+        "system_prompt_ready": 2000715,
+        "first_token": 2000720,
+        "run_completed": 2000725
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 4,
+      "expectedAllowlistCount": 4,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["de71247929670dcf"],
+      "requiredToolDigests": ["93d5237ade815fec", "dcde6ba39712d961"],
+      "injectedSkillDigests": ["de71247929670dcf"],
+      "exposedToolDigests": [
+        "93d5237ade815fec",
+        "4f0466f7c090e038",
+        "b90ab7cc551ad671",
+        "dcde6ba39712d961"
+      ],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "client_tool",
+      "terminalKind": "run_completed",
+      "runIdDigest": "e922a069e21fd1af",
+      "sessionKeyHash": "3d13f4145188ebae",
+      "stages": {
+        "inbound_accepted": 2000725,
+        "model_started": 2000735,
+        "skill_snapshot_ready": 2000740,
+        "tool_set_ready": 2000740,
+        "system_prompt_ready": 2000740,
+        "first_token": 2000745,
+        "run_completed": 2000750
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 4,
+      "expectedAllowlistCount": 4,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["de71247929670dcf"],
+      "requiredToolDigests": ["93d5237ade815fec", "dcde6ba39712d961"],
+      "injectedSkillDigests": ["de71247929670dcf"],
+      "exposedToolDigests": [
+        "93d5237ade815fec",
+        "4f0466f7c090e038",
+        "b90ab7cc551ad671",
+        "dcde6ba39712d961"
+      ],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_prompt_truncated",
+      "terminalKind": "run_completed",
+      "runIdDigest": "b713a5da241fda31",
+      "sessionKeyHash": "4261e9b8125d0e60",
+      "stages": {
+        "inbound_accepted": 2000750,
+        "model_started": 2000760,
+        "skill_snapshot_ready": 2000765,
+        "tool_set_ready": 2000765,
+        "system_prompt_ready": 2000765,
+        "first_token": 2000770,
+        "run_completed": 2000775
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["9498309532abc213"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["9498309532abc213"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_prompt_truncated",
+      "terminalKind": "run_completed",
+      "runIdDigest": "1ffb3c05b4c6ed5b",
+      "sessionKeyHash": "cc2f0cf1fd5c3e4c",
+      "stages": {
+        "inbound_accepted": 2000775,
+        "model_started": 2000785,
+        "skill_snapshot_ready": 2000790,
+        "tool_set_ready": 2000790,
+        "system_prompt_ready": 2000790,
+        "first_token": 2000795,
+        "run_completed": 2000800
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["9498309532abc213"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["9498309532abc213"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_prompt_truncated",
+      "terminalKind": "run_completed",
+      "runIdDigest": "58ce4e22a70f55d2",
+      "sessionKeyHash": "01250b26de117075",
+      "stages": {
+        "inbound_accepted": 2000800,
+        "model_started": 2000810,
+        "skill_snapshot_ready": 2000815,
+        "tool_set_ready": 2000815,
+        "system_prompt_ready": 2000815,
+        "first_token": 2000820,
+        "run_completed": 2000825
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["9498309532abc213"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["9498309532abc213"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_prompt_truncated",
+      "terminalKind": "run_completed",
+      "runIdDigest": "62726b0befd763a2",
+      "sessionKeyHash": "b5f3504f3bd68fb3",
+      "stages": {
+        "inbound_accepted": 2000825,
+        "model_started": 2000835,
+        "skill_snapshot_ready": 2000840,
+        "tool_set_ready": 2000840,
+        "system_prompt_ready": 2000840,
+        "first_token": 2000845,
+        "run_completed": 2000850
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["9498309532abc213"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["9498309532abc213"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "skill_prompt_truncated",
+      "terminalKind": "run_completed",
+      "runIdDigest": "82580ee121da650c",
+      "sessionKeyHash": "9c277d8e1196c6a0",
+      "stages": {
+        "inbound_accepted": 2000850,
+        "model_started": 2000860,
+        "skill_snapshot_ready": 2000865,
+        "tool_set_ready": 2000865,
+        "system_prompt_ready": 2000865,
+        "first_token": 2000870,
+        "run_completed": 2000875
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["9498309532abc213"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["9498309532abc213"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_policy_rejected",
+      "terminalKind": "run_completed",
+      "runIdDigest": "02bf675fbf39ddb0",
+      "sessionKeyHash": "9b00fc80f0e91a9a",
+      "stages": {
+        "inbound_accepted": 2000875,
+        "model_started": 2000885,
+        "skill_snapshot_ready": 2000890,
+        "tool_set_ready": 2000890,
+        "system_prompt_ready": 2000890,
+        "first_token": 2000895,
+        "run_completed": 2000900
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 1,
+      "toolExposedCount": 1,
+      "expectedAllowlistCount": 1,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_policy_rejected",
+      "terminalKind": "run_completed",
+      "runIdDigest": "334264a645b39374",
+      "sessionKeyHash": "f942d125ad47fe54",
+      "stages": {
+        "inbound_accepted": 2000900,
+        "model_started": 2000910,
+        "skill_snapshot_ready": 2000915,
+        "tool_set_ready": 2000915,
+        "system_prompt_ready": 2000915,
+        "first_token": 2000920,
+        "run_completed": 2000925
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 1,
+      "toolExposedCount": 1,
+      "expectedAllowlistCount": 1,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_policy_rejected",
+      "terminalKind": "run_completed",
+      "runIdDigest": "4d61df52338bde28",
+      "sessionKeyHash": "2204bf0cec26b36b",
+      "stages": {
+        "inbound_accepted": 2000925,
+        "model_started": 2000935,
+        "skill_snapshot_ready": 2000940,
+        "tool_set_ready": 2000940,
+        "system_prompt_ready": 2000940,
+        "first_token": 2000945,
+        "run_completed": 2000950
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 1,
+      "toolExposedCount": 1,
+      "expectedAllowlistCount": 1,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_policy_rejected",
+      "terminalKind": "run_completed",
+      "runIdDigest": "b183dd5247a7e03c",
+      "sessionKeyHash": "bbc56d15abfb1338",
+      "stages": {
+        "inbound_accepted": 2000950,
+        "model_started": 2000960,
+        "skill_snapshot_ready": 2000965,
+        "tool_set_ready": 2000965,
+        "system_prompt_ready": 2000965,
+        "first_token": 2000970,
+        "run_completed": 2000975
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 1,
+      "toolExposedCount": 1,
+      "expectedAllowlistCount": 1,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_policy_rejected",
+      "terminalKind": "run_completed",
+      "runIdDigest": "0b5ba702fc18e714",
+      "sessionKeyHash": "92bd613d254edb2e",
+      "stages": {
+        "inbound_accepted": 2000975,
+        "model_started": 2000985,
+        "skill_snapshot_ready": 2000990,
+        "tool_set_ready": 2000990,
+        "system_prompt_ready": 2000990,
+        "first_token": 2000995,
+        "run_completed": 2001000
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 1,
+      "toolExposedCount": 1,
+      "expectedAllowlistCount": 1,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_call_loop",
+      "terminalKind": "run_completed",
+      "runIdDigest": "0aa5338eee011fd0",
+      "sessionKeyHash": "60cf3c331be08597",
+      "stages": {
+        "inbound_accepted": 2001000,
+        "model_started": 2001010,
+        "skill_snapshot_ready": 2001015,
+        "tool_set_ready": 2001015,
+        "system_prompt_ready": 2001015,
+        "first_token": 2001020,
+        "run_completed": 2001025
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "firstToolDigest": "93d5237ade815fec",
+      "firstToolSuccess": true,
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_call_loop",
+      "terminalKind": "run_completed",
+      "runIdDigest": "0d7d799e0d726be7",
+      "sessionKeyHash": "b110596cede4b6ba",
+      "stages": {
+        "inbound_accepted": 2001025,
+        "model_started": 2001035,
+        "skill_snapshot_ready": 2001040,
+        "tool_set_ready": 2001040,
+        "system_prompt_ready": 2001040,
+        "first_token": 2001045,
+        "run_completed": 2001050
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "firstToolDigest": "93d5237ade815fec",
+      "firstToolSuccess": true,
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_call_loop",
+      "terminalKind": "run_completed",
+      "runIdDigest": "662d3780f0e7a787",
+      "sessionKeyHash": "369febd08fa22164",
+      "stages": {
+        "inbound_accepted": 2001050,
+        "model_started": 2001060,
+        "skill_snapshot_ready": 2001065,
+        "tool_set_ready": 2001065,
+        "system_prompt_ready": 2001065,
+        "first_token": 2001070,
+        "run_completed": 2001075
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "firstToolDigest": "93d5237ade815fec",
+      "firstToolSuccess": true,
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_call_loop",
+      "terminalKind": "run_completed",
+      "runIdDigest": "cea9071f325dec47",
+      "sessionKeyHash": "6ade3b88f1d9171d",
+      "stages": {
+        "inbound_accepted": 2001075,
+        "model_started": 2001085,
+        "skill_snapshot_ready": 2001090,
+        "tool_set_ready": 2001090,
+        "system_prompt_ready": 2001090,
+        "first_token": 2001095,
+        "run_completed": 2001100
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "firstToolDigest": "93d5237ade815fec",
+      "firstToolSuccess": true,
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "tool_call_loop",
+      "terminalKind": "run_completed",
+      "runIdDigest": "ce415cb64b3dd7d1",
+      "sessionKeyHash": "3582def8fada148b",
+      "stages": {
+        "inbound_accepted": 2001100,
+        "model_started": 2001110,
+        "skill_snapshot_ready": 2001115,
+        "tool_set_ready": 2001115,
+        "system_prompt_ready": 2001115,
+        "first_token": 2001120,
+        "run_completed": 2001125
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15,
+        "ttftMs": 10,
+        "totalMs": 25
+      },
+      "requiredSkillDigests": ["e7edeb32f7bc9640"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["e7edeb32f7bc9640"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "firstToolDigest": "93d5237ade815fec",
+      "firstToolSuccess": true,
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "concurrent_distinct_run_ids",
+      "terminalKind": "run_completed",
+      "runIdDigest": "8e5b16862ed07658",
+      "sessionKeyHash": "d1db6679298b82b6",
+      "stages": {
+        "inbound_accepted": 2001140,
+        "model_started": 2001150,
+        "skill_snapshot_ready": 2001200,
+        "tool_set_ready": 2001200,
+        "system_prompt_ready": 2001200,
+        "first_token": 2001205,
+        "run_completed": 2001210
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 60,
+        "ttftMs": 55,
+        "totalMs": 70
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "concurrent_distinct_run_ids",
+      "terminalKind": "run_completed",
+      "runIdDigest": "3953de3708695a14",
+      "sessionKeyHash": "759da8df587b20fc",
+      "stages": {
+        "inbound_accepted": 2001155,
+        "model_started": 2001165,
+        "skill_snapshot_ready": 2001200,
+        "tool_set_ready": 2001210,
+        "system_prompt_ready": 2001210,
+        "first_token": 2001215,
+        "run_completed": 2001220
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 55,
+        "ttftMs": 50,
+        "totalMs": 65
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "concurrent_distinct_run_ids",
+      "terminalKind": "run_completed",
+      "runIdDigest": "1de3123d4e7f521e",
+      "sessionKeyHash": "e9c729bc3f8efea3",
+      "stages": {
+        "inbound_accepted": 2001125,
+        "model_started": 2001135,
+        "skill_snapshot_ready": 2001200,
+        "tool_set_ready": 2001220,
+        "system_prompt_ready": 2001220,
+        "first_token": 2001225,
+        "run_completed": 2001230
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 95,
+        "ttftMs": 90,
+        "totalMs": 105
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "concurrent_distinct_run_ids",
+      "terminalKind": "run_completed",
+      "runIdDigest": "a10aecba81b993a9",
+      "sessionKeyHash": "e1f6c4034cdf83e3",
+      "stages": {
+        "inbound_accepted": 2001170,
+        "model_started": 2001180,
+        "skill_snapshot_ready": 2001200,
+        "tool_set_ready": 2001230,
+        "system_prompt_ready": 2001230,
+        "first_token": 2001235,
+        "run_completed": 2001240
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 60,
+        "ttftMs": 55,
+        "totalMs": 70
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "concurrent_distinct_run_ids",
+      "terminalKind": "run_completed",
+      "runIdDigest": "9d91051f16a3dcea",
+      "sessionKeyHash": "1318543a98454deb",
+      "stages": {
+        "inbound_accepted": 2001185,
+        "model_started": 2001195,
+        "skill_snapshot_ready": 2001240,
+        "tool_set_ready": 2001240,
+        "system_prompt_ready": 2001240,
+        "first_token": 2001245,
+        "run_completed": 2001250
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 55,
+        "ttftMs": 50,
+        "totalMs": 65
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": ["93d5237ade815fec", "4f0466f7c090e038", "b90ab7cc551ad671"],
+      "promptTokens": 12,
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "error_ttl",
+      "runIdDigest": "a2e9c3344956e0ab",
+      "sessionKeyHash": "07d7b3c51041ecc2",
+      "stages": {
+        "inbound_accepted": 2001250,
+        "model_started": 2001260,
+        "skill_snapshot_ready": 2001265,
+        "tool_set_ready": 2001265,
+        "system_prompt_ready": 2001265
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "error_ttl",
+      "runIdDigest": "1c98b36d0286fe39",
+      "sessionKeyHash": "961c522b41473f88",
+      "stages": {
+        "inbound_accepted": 2001270,
+        "model_started": 2001280,
+        "skill_snapshot_ready": 2001285,
+        "tool_set_ready": 2001285,
+        "system_prompt_ready": 2001285
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "error_ttl",
+      "runIdDigest": "06079bf7ede9a032",
+      "sessionKeyHash": "1e5029f053666e02",
+      "stages": {
+        "inbound_accepted": 2001290,
+        "model_started": 2001300,
+        "skill_snapshot_ready": 2001305,
+        "tool_set_ready": 2001305,
+        "system_prompt_ready": 2001305
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "error_ttl",
+      "runIdDigest": "66a9715ea9e21557",
+      "sessionKeyHash": "f8162e3b86387086",
+      "stages": {
+        "inbound_accepted": 2001310,
+        "model_started": 2001320,
+        "skill_snapshot_ready": 2001325,
+        "tool_set_ready": 2001325,
+        "system_prompt_ready": 2001325
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    },
+    {
+      "category": "plain_text_qa",
+      "terminalKind": "error_ttl",
+      "runIdDigest": "2fd97613efa7b340",
+      "sessionKeyHash": "3bacabe14c5a9bb3",
+      "stages": {
+        "inbound_accepted": 2001330,
+        "model_started": 2001340,
+        "skill_snapshot_ready": 2001345,
+        "tool_set_ready": 2001345,
+        "system_prompt_ready": 2001345
+      },
+      "skillEligibleCount": 1,
+      "skillInjectedCount": 1,
+      "toolConstructedCount": 3,
+      "toolAfterPolicyCount": 3,
+      "toolExposedCount": 3,
+      "expectedAllowlistCount": 3,
+      "latencies": {
+        "routePrepMs": 15
+      },
+      "requiredSkillDigests": ["5bb90e3e9895efe8"],
+      "requiredToolDigests": ["93d5237ade815fec"],
+      "injectedSkillDigests": ["5bb90e3e9895efe8"],
+      "exposedToolDigests": [],
+      "invariants": {
+        "sameRunId": true,
+        "eligibleGteInjected": true,
+        "constructedGteAfterPolicy": true,
+        "exposedMatchesAllowlist": true,
+        "stagesMonotonic": true,
+        "latenciesNonNegative": true,
+        "terminalComplete": true
+      },
+      "privacyHits": []
+    }
+  ]
+}

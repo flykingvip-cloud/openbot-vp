@@ -1,0 +1,23 @@
+diff --git a/src/gateway/enterprise-seat-assets-store.ts b/src/gateway/enterprise-seat-assets-store.ts
+index c7bb6ce452..72c3390ad5 100644
+--- a/src/gateway/enterprise-seat-assets-store.ts
++++ b/src/gateway/enterprise-seat-assets-store.ts
+@@ -992,12 +992,15 @@ export function deleteVacantPositionSeat(params: {
+   if (!seat || seat.tenantId !== params.tenantId) {
+     throw new Error("岗位不存在。");
+   }
+-  if (seat.status !== "vacant") {
+-    throw new Error("仅空岗可删除，请先解除成员绑定或完成交接。");
+-  }
+   if (seat.currentEmployeeId?.trim()) {
+     throw new Error("岗位仍绑定成员，无法删除。");
+   }
++  // Allow deleting vacant shells and pending-activation seats (assigned but no
++  // registered employee yet). Occupied / handover / frozen seats stay blocked.
++  const deletableStatuses = new Set(["vacant", "assigned"]);
++  if (!deletableStatuses.has(seat.status)) {
++    throw new Error("仅空岗或未注册待激活岗位可删除，请先解除成员绑定或完成交接。");
++  }
+   const pendingOffer = Object.values(params.store.offers).find(
+     (offer) =>
+       offer.tenantId === params.tenantId &&

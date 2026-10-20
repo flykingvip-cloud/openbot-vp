@@ -1,0 +1,20 @@
+2026-07-12T21:05:18+08:00 pre-cutover npm+systemd
+active
+OpenBot 1.0.1 (1604655)
+2026-07-12T21:06:37+08:00 rolled back to systemd after arm64 image fail
+2026-07-12T21:40:05+08:00 cutover attempt amd64
+2026-07-12T21:40:16+08:00 CUTOVER_OK amd64 container
+2026-07-13T21:07+08:00 CUTOVER_OK openbot:rc-amd64-v6 cb81f9641624 sha 5dad0b9d4b full FE+BE (hybrid excluded)
+2026-07-18T20:46+08:00 CUTOVER_OK openbot:rc-amd64-v55 4f95eb8269b6 sha 4fac12ee50 billing hardening P1-P5
+2026-07-19T07:23+08:00 CUTOVER_OK openbot:rc-amd64-v58 c4531f3c4b11 sha d53d4916a9 flagship ¥128k pricing
+2026-07-19T07:33+08:00 CUTOVER_OK openbot:rc-amd64-v59 b69c3cd7541d card labels 团队席位/AI员工数/AI授权/月度Credits/并发数/治理SLA摘要
+2026-07-19T07:42+08:00 CUTOVER_OK openbot:rc-amd64-v60 cb33105d21df per-tier AI auth + billing rules restore
+2026-07-19T08:18+08:00 CUTOVER_OK openbot:rc-amd64-v61 d6de2568980f uniform cards; billing rules in FAQ only
+2026-07-19T09:23+08:00 CUTOVER_OK openbot:rc-amd64-v62 5e5b7c62863f enterprise load settle + compare product labels
+2026-07-19T10:12+08:00 CUTOVER_OK openbot:rc-amd64-v63 18912496fdd3 equal cards + FAQ clarity
+2026-07-19T10:52+08:00 CUTOVER_OK openbot:rc-amd64-v64 6196baf184cd cost-budget stuck load fix
+2026-07-19T12:01+08:00 CUTOVER_OK openbot:rc-amd64-v65 b6a163337725 enterprise nav loadOverview TTL
+2026-07-19T12:06+08:00 CUTOVER_OK openbot:rc-amd64-v66 6806dccdf03f enterprise per-module shell loads
+2026-07-19T12:28+08:00 CUTOVER_OK openbot:rc-amd64-v67 9646815f30f8 enterprise catalog compare+FAQ 4-up
+2026-07-19T12:46+08:00 CUTOVER_OK openbot:rc-amd64-v68 2bfb5e9696e9 qiaomu-cut skill + ffmpeg all tenants
+ CUTOVER_OK openbot:rc-amd64-v84 a7bbacbaac78 tip 95c075a605 control-ui layer

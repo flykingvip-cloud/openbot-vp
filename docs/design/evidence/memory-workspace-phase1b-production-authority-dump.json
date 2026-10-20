@@ -1,0 +1,131 @@
+{
+  "schema": "memory-workspace-phase1b-authority-dump/v1",
+  "live": false,
+  "writable": false,
+  "source": "local-platform-auth-and-agent-registry",
+  "identifierPolicy": "opaque-redacted",
+  "note": "Non-LIVE extract from local platform-auth + Agent Registry + enterprise seat-assets occupancy. Identifiers are opaque. Not Phase 0 inventory. Not the Stage A fixture. Not Catalog SoT. Occupancy does not mint user-owned agent resourceIds.",
+  "counts": {
+    "memberships": 3,
+    "agentAssets": 8,
+    "groups": 6,
+    "seatOccupancies": 3,
+    "userScopedGroupsWithoutTenant": 0
+  },
+  "memberships": [
+    {
+      "userId": "user-1",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "userId": "user-2",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "userId": "user-3",
+      "enterpriseId": "ent-1"
+    }
+  ],
+  "agentAssets": [
+    {
+      "agentAssetId": "asset-1",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-3",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-2",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-1",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-3",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-2",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-4",
+      "enterpriseId": "ent-1",
+      "status": "archived"
+    },
+    {
+      "agentAssetId": "asset-5",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-2",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-6",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-1",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-7",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-1",
+      "status": "active"
+    },
+    {
+      "agentAssetId": "asset-8",
+      "enterpriseId": "ent-1",
+      "ownerType": "seat",
+      "ownerId": "seat-1",
+      "status": "active"
+    }
+  ],
+  "groups": [
+    {
+      "groupId": "group-1",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "groupId": "group-2",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "groupId": "group-3",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "groupId": "group-4",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "groupId": "group-5",
+      "enterpriseId": "ent-1"
+    },
+    {
+      "groupId": "group-6",
+      "enterpriseId": "ent-1"
+    }
+  ],
+  "seatOccupancies": [
+    {
+      "userId": "user-1",
+      "seatId": "oseat-1",
+      "enterpriseId": "ent-1",
+      "registrySeatBound": false
+    },
+    {
+      "userId": "user-2",
+      "seatId": "seat-2",
+      "enterpriseId": "ent-1",
+      "registrySeatBound": true
+    },
+    {
+      "userId": "user-3",
+      "seatId": "seat-1",
+      "enterpriseId": "ent-1",
+      "registrySeatBound": true
+    }
+  ]
+}

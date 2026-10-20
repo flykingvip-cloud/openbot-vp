@@ -1,0 +1,175 @@
+{
+  "event": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_c",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "Recorded: event stage succeeded",
+        "context": "Context stage is unavailable in this recording.",
+        "constraints": [],
+        "decisions": ["recorded_event_stage"],
+        "turningPoints": [],
+        "linkedAtoms": [],
+        "evidenceRefs": ["evd_http_recorded_c"],
+        "eventKey": "event_key_http_recorded_c",
+        "provenance": {
+          "sourceType": "chat",
+          "ingestionChecksum": "ing_http_recorded_c"
+        }
+      },
+      "atoms": [],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_c",
+          "type": "chat",
+          "uri": "record://http/c",
+          "snippet": "Recorded stage response C.",
+          "trustScore": 0.7,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_c",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_c",
+        "eventKey": "event_key_http_recorded_c",
+        "atomDedupKeys": [],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": ["evt_http_recorded_c", "evd_http_recorded_c"],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_c"]
+      }
+    }
+  },
+  "context": null,
+  "atoms": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_c",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "",
+        "context": "",
+        "constraints": [],
+        "decisions": [],
+        "turningPoints": [],
+        "linkedAtoms": ["atm_http_recorded_c"],
+        "evidenceRefs": ["evd_http_recorded_c"],
+        "eventKey": "event_key_http_recorded_c",
+        "provenance": {
+          "sourceType": "chat"
+        }
+      },
+      "atoms": [
+        {
+          "id": "atm_http_recorded_c",
+          "atomType": "strategy",
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "claim": {
+            "type": "procedural",
+            "statement": "Prefer async queue buffering under unstable upstream latency."
+          },
+          "trigger": {
+            "conditions": ["high_latency"],
+            "contextTags": ["throughput_drop"]
+          },
+          "action": {
+            "recommendation": "queue_buffering"
+          },
+          "applicability": {
+            "include": ["retry_worker"],
+            "exclude": []
+          },
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_c"],
+            "evidenceRefs": ["evd_http_recorded_c"]
+          },
+          "versioning": {
+            "version": 1
+          },
+          "state": {
+            "status": "active",
+            "conflictsWith": []
+          },
+          "metrics": {
+            "confidence": 0.79,
+            "reuseCount": 1
+          },
+          "dedupKey": "dedup_http_recorded_c"
+        }
+      ],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_c",
+          "type": "chat",
+          "uri": "record://http/c",
+          "snippet": "Recorded stage response C.",
+          "trustScore": 0.7,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_c",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_c",
+        "eventKey": "event_key_http_recorded_c",
+        "atomDedupKeys": ["dedup_http_recorded_c"],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "MemoryAtom", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": ["evt_http_recorded_c", "atm_http_recorded_c", "evd_http_recorded_c"],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_c", "atm_http_recorded_c"]
+      }
+    }
+  },
+  "relations": null
+}

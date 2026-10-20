@@ -1,0 +1,90 @@
+{
+  "schema": "memory-workspace-phase1a-owner-dispatch/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "preparedBy": "cursor-memory-platform",
+  "preparedAt": "2026-08-16T08:10:00.000Z",
+  "phase": "1A-design-only",
+  "section141Signed": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "note": "Coordinator dispatch after contract drafts. Recipients must sign their own rows. cursor-memory-platform must not self-sign.",
+  "dispatches": [
+    {
+      "to": "codex-workspace-architecture",
+      "roles": ["architecture", "data-governance"],
+      "action": "Accept Catalog + Membership contracts; set both §14.1 rows to accepted",
+      "read": [
+        "docs/design/evidence/memory-workspace-phase1a-catalog-contract.json",
+        "docs/design/evidence/memory-workspace-phase1a-membership-contract.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-architecture-design-review.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-data-governance-design-review.json"
+      ],
+      "write": [
+        "docs/design/evidence/memory-workspace-phase1a-section141-architecture-design-review.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-data-governance-design-review.json",
+        "docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json"
+      ],
+      "forbidden": ["src/gateway/workspace-resolver/**", "deployAuthorized=true"]
+    },
+    {
+      "to": "cursor-data-governance",
+      "roles": ["resolver", "security"],
+      "action": "Accept WS-B change request and security packet; set resolver + security rows to accepted",
+      "read": [
+        ".kiro/specs/memory-workspace-platform-remediation/ws-b-resolver-change-request.md",
+        "docs/design/evidence/memory-workspace-phase0-ws-b-dispatch.json",
+        "docs/design/evidence/memory-workspace-phase1a-membership-contract.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-security-design-review.json"
+      ],
+      "write": [
+        ".kiro/specs/data-governance-v2-p0/tasks.md",
+        "docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-security-design-review.json"
+      ],
+      "forbidden": ["resolver production write switch", "src/memory/**", "deployAuthorized=true"]
+    },
+    {
+      "to": "cursor-memory-wsc",
+      "roles": ["memory", "sre"],
+      "action": "Accept Memory boundary + SRE packet; set memory + sre rows to accepted",
+      "read": [
+        "docs/design/evidence/memory-workspace-phase1a-memory-boundary.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-memory-design-review.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-sre-design-review.json"
+      ],
+      "write": [
+        "docs/design/evidence/memory-workspace-phase1a-section141-memory-design-review.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-sre-design-review.json",
+        "docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json"
+      ],
+      "forbidden": [
+        "edit src/memory/** production implementation",
+        "memory schema v2",
+        "deployAuthorized=true"
+      ]
+    },
+    {
+      "to": "cursor-fable",
+      "roles": ["storage-cutover"],
+      "action": "Accept Binding impact matrix; set storage-cutover row to accepted",
+      "read": [
+        "docs/design/evidence/memory-workspace-phase1a-binding-impact-matrix.json",
+        "docs/design/evidence/memory-workspace-phase1a-section141-wsd-cutover-design-review.json"
+      ],
+      "write": [
+        "docs/design/evidence/memory-workspace-phase1a-section141-wsd-cutover-design-review.json",
+        "docs/design/evidence/memory-workspace-phase0-section141-signoff-matrix.json"
+      ],
+      "forbidden": ["second migration state machine", "live-migration", "deployAuthorized=true"]
+    }
+  ],
+  "signOffProtocol": {
+    "perRole": [
+      "Set the role design-review JSON decision=accepted and signedAt (ISO time)",
+      "Set the matching section141-signoff-matrix.json role.decision=accepted",
+      "Keep section141Signed=false until all seven roles are accepted",
+      "Commit with Task: memory-workspace-platform-remediation and Agent: <your id>",
+      "Do not flip deployAuthorized or start Phase 1B"
+    ]
+  }
+}

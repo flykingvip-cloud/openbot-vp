@@ -1,0 +1,64 @@
+# Observed 2026-09-18 on https://www.openbot.love/ while logged in.
+# Home, one space focus, 数字能力, 知识治理, and 我的资产 were opened.
+# Library interior tabs (documents/snippets/recycle) were not on screen.
+
+scenario:
+  name: employee_knowledge
+  title: 知识宇宙
+  trigger:
+    - 知识宇宙
+    - 上传知识
+    - 数字能力
+    - 我的资产
+    - 知识治理
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: home
+    title: 知识宇宙首页
+  - id: pages
+    title: 三个功能页
+
+steps:
+  - id: open_home
+    stage: home
+    risk: low
+    instruction: 在左侧栏点「知识宇宙」。首页操作是「搜索」「上传知识」「数字能力」「我的资产」「知识治理」。左侧有个人空间、团队空间、企业空间，里面有真实空间，不要说成 0 个。首次绘制可能先闪一下空数字，以加载完成后的列表为准。
+    visual_anchor: 「上传知识」
+    success_signal: 用户看到空间分组，而不是只有 0
+    on_fail: 不要把用户的私人文档标题复述进引导。只说「点空间名会聚焦右侧关系面板」。
+
+  - id: focus_space
+    stage: home
+    risk: low
+    instruction: 点一个空间名，例如「个人成果」。右侧出现关系洞察，标题带该空间名。本次「个人成果」写过「该知识空间暂无文档」。没有单独打开「文档 / 片段 / 数据集 / 网页 / 回收站」库页。不要编造这些页签。
+    visual_anchor: 「关系洞察」或空间名
+    success_signal: 右侧标题变成被点的空间
+
+  - id: digital_capabilities
+    stage: pages
+    risk: low
+    instruction: 点「数字能力」。标题区有「数据能力空间」和「已授权能力」。本次「企业知识检索」是「已授权」，说明基于已索引片段做语义检索，按钮有「知识库索引」「预览检索」。另外几项标着「示例」「审批中」，文案是「已提交申请，等待企业管理员审批」。不要把已授权的能力说成还没有。
+    visual_anchor: 「企业知识检索」
+    success_signal: 用户读出至少一条能力的状态
+    on_fail: 若按钮不在当前页，先点「返回知识宇宙」，再点「数字能力」。
+
+  - id: assets
+    stage: pages
+    risk: low
+    instruction: 点「我的资产」。分段是「全部」「草稿」「审核中」「已入企业」「需优化」。本次这些计数是 0，但下面还有「整理建议」，写着「可整理的工作模式」和「3 项建议」，每条有「暂不处理」「整理为草稿」。不要只说这一页是空的。
+    visual_anchor: 「整理建议」
+    success_signal: 用户看到分段或一条整理建议
+
+  - id: governance
+    stage: pages
+    risk: low
+    instruction: 点「知识治理」。说明是「重复与冲突问题流，人工确认后影响检索排序」。有「刷新」。统计范围可以是某一个空间，本次默认「个人成果」时待处理是 0，并有「去沉淀知识」。首页关系图上的冲突数和这个范围不是同一件事，不要互相覆盖。
+    visual_anchor: 「去沉淀知识」
+    success_signal: 用户读出当前统计范围和待处理数字
+
+fallback:
+  - check: upload
+    instruction: 「上传知识」在首页。点开后的表单本次没有重新打开。先确认标题，再按屏幕上的字段说，不要背未出现的新建步骤。

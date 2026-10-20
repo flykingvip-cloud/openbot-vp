@@ -1,0 +1,98 @@
+{
+  "increment": "P17",
+  "schemaVersion": 1,
+  "rehearsalOnly": true,
+  "recordedAt": "2026-09-04T06:25:28.750Z",
+  "candidateSha": "330d92207478850800284b39c5f89852d77ca324",
+  "originMainSha": "330d92207478850800284b39c5f89852d77ca324",
+  "verdict": "no-go",
+  "readyForIndependentApproval": false,
+  "ledgerMutated": false,
+  "releaseRecordMutated": false,
+  "provenanceMinted": false,
+  "items": [
+    {
+      "id": "candidate",
+      "sha": "330d92207478850800284b39c5f89852d77ca324",
+      "source": "git rev-parse origin/main after git fetch origin",
+      "evidence": "Merge pull request #940 from gmood2008/cursor-grok/delivery-seq60-457057ba2a",
+      "conclusion": "equals latest origin/main",
+      "provable": true
+    },
+    {
+      "id": "origin_main",
+      "sha": "330d92207478850800284b39c5f89852d77ca324",
+      "source": "git fetch origin && git rev-parse origin/main",
+      "evidence": "#940 on trunk after #938/#939",
+      "conclusion": "sole candidate baseline",
+      "provable": true
+    },
+    {
+      "id": "live",
+      "sha": "457057ba2adbdb6958fe092d211f75108d866f42",
+      "source": "podman exec openbot-gateway-rc cat /app/dist/build-info.json",
+      "evidence": "commit=457057ba2adb; builtAt=2026-09-04T05:23:54.951Z; version=2026.7.12-rc.2",
+      "conclusion": "unique running fact; ancestor of origin/main",
+      "provable": true
+    },
+    {
+      "id": "ledger_open",
+      "sha": "457057ba2adbdb6958fe092d211f75108d866f42",
+      "source": "deploy/production/releases.jsonl seq 60",
+      "evidence": "liveFrom=2026-09-04T05:55:49Z; liveVerified=true; no liveTo; landed by #940 / d48aff7310; notes no provenance-sha-*",
+      "conclusion": "equals LIVE; keep; do not rewrite seq 59 or 60",
+      "provable": true
+    },
+    {
+      "id": "ledger_closed_seq59",
+      "sha": "3d03d3b4df91ab0bfaa33900eba95287c1ab30d2",
+      "source": "deploy/production/releases.jsonl seq 59",
+      "evidence": "liveTo=2026-09-04T05:55:49Z; historical after seq 60",
+      "conclusion": "keep historical; do not write as Latest cutover",
+      "provable": true
+    },
+    {
+      "id": "release_record",
+      "sha": "37cc40e51f468404baf3077307e347f32f636cb1",
+      "source": "deploy/production/RELEASE_RECORD.md Latest cutover Source revision",
+      "evidence": "Latest cutover (2026-09-02) — seq 54 / 37cc40e51f; liveFrom=2026-09-02T09:50:59Z",
+      "conclusion": "lags LIVE/ledger; diagnosis must not edit; defer_to_delivery_owner",
+      "provable": true,
+      "repairableOnThisBranch": false
+    },
+    {
+      "id": "provenance",
+      "sha": null,
+      "source": "git tag / git ls-remote origin refs/tags/provenance/sha-457057ba*",
+      "evidence": "only provenance/sha-37cc40e51f46 exists; seq60 notes say GHCR main digest without provenance-sha-*",
+      "conclusion": "do_not_mint; published=false; proposedTag=provenance/sha-457057ba2adb",
+      "provable": false
+    }
+  ],
+  "forwardOnly": {
+    "liveIsAncestorOfCandidate": true,
+    "liveIsAncestorOfOriginMain": true,
+    "verdict": "allow"
+  },
+  "remintPlan": {
+    "action": "do_not_mint",
+    "proposedTag": "provenance/sha-457057ba2adb",
+    "published": false,
+    "reason": "cutover pulled GHCR main without a provenance-sha tag; minting now would fabricate publication",
+    "requiredApprover": "delivery_ledger_owner"
+  },
+  "releaseRecordRepair": {
+    "attempted": false,
+    "blocker": "cursor-grok-diagnosis is not delivery_ledger_owner and must not edit RELEASE_RECORD.md on a feature branch",
+    "honestLatestWouldBe": {
+      "seq": 60,
+      "sha": "457057ba2adbdb6958fe092d211f75108d866f42",
+      "liveFrom": "2026-09-04T05:55:49Z"
+    },
+    "forbiddenLatest": [
+      "37cc40e51f468404baf3077307e347f32f636cb1",
+      "3d03d3b4df91ab0bfaa33900eba95287c1ab30d2",
+      "6d9ea1f2d5da2ae46ddfd18ecae12b07692a2a96"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+kind	id_or_sha	title	public_ref	security_tag	notes
+commit	31f74a2b9c	feat(security): Red Line E block platform control-plane mutation	31f74a2b9c	security-sensitive	ref=origin/release/candidate-20260712
+commit	8d36f71e3d	feat(security): add platform safety policy for all agents	8d36f71e3d	security-sensitive	ref=origin/release/candidate-20260712
+commit	14aaf0b490	chore(loom): map security platform and steward shell paths	14aaf0b490	security-sensitive	ref=origin/release/candidate-20260712

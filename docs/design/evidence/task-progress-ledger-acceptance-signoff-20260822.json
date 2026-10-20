@@ -1,0 +1,63 @@
+{
+  "schema": "task-progress-ledger-acceptance-signoff/v1",
+  "decision": "merge-approved-production-flag-denied",
+  "signedOffAt": "2026-08-22T21:08:00+08:00",
+  "signedOffBy": "user",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "approvals": {
+    "p0ThroughP6Implementation": {
+      "status": "approved",
+      "implementationSha": "25df222f26971854b00f52a611e810c26e2e8b91",
+      "pr": 597
+    },
+    "canarySignoff": {
+      "status": "approved",
+      "ref": "canary-signoff-20260822.md",
+      "residual": "human-gate positive path not exercised in CLI session"
+    },
+    "productionCutover": {
+      "status": "not-approved",
+      "reason": "LIVE behind fresh origin/main; RELEASE_RECORD UI pin rows local-only; dirty shared worktree"
+    },
+    "productionFlagEnable": {
+      "status": "explicitly-denied",
+      "requiredAction": "Separate user authorization after clean-tree gate re-run"
+    },
+    "turnContractStandaloneModule": {
+      "status": "not-a-blocker",
+      "note": "Follow-up PR only"
+    }
+  },
+  "freshFetch": {
+    "at": "2026-08-22T21:08:00+08:00",
+    "succeeded": true,
+    "originMain": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "originMainSubject": "Merge pull request #606 from gmood2008/cursor/record-origin-main-item6-path-gate-r1",
+    "live": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "liveIsAncestorOfOriginMain": true
+  },
+  "gatesRerunForLiveSha": {
+    "verifyForwardOnly": { "exit": 0, "verdict": "allow" },
+    "verifyDeliveryAlignment": { "exit": 0, "pass": 9, "warn": 1, "fail": 0 },
+    "releaseRecordParsedSha": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06"
+  },
+  "liveSnapshot": {
+    "container": "openbot-gateway-rc",
+    "commit": "c393dca8feedd8b9db1a1f7fafc4796ac60b5d06",
+    "uiPin": "index-Dpg8P1UR.js",
+    "overlayId": "ledger-ui-pin-r1",
+    "ledgerUiCopyPresent": true,
+    "OPENBOT_PROGRESS_LEDGER_ENABLED": null,
+    "healthz": "live"
+  },
+  "worktree": {
+    "dirtyFileCount": 66,
+    "safeForCutoverBuild": false
+  },
+  "priorEvidence": [
+    "task-progress-ledger-canary-signoff-20260822.json",
+    "task-progress-ledger-cutover-prep-20260822.json",
+    "task-progress-ledger-ui-pin-20260822.json"
+  ]
+}

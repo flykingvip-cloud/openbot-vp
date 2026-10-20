@@ -1,0 +1,75 @@
+{
+  "schema": "conversation-memory-cq-o0-production-image-cutover-receipt/v1",
+  "status": "passed",
+  "nextState": "CQ-O0-blocked",
+  "firstFailure": "capture_window_unspecified",
+  "operator": "ceo",
+  "operatorRole": "CEO",
+  "timezone": "Asia/Shanghai",
+  "requestedAt": "2026-08-19T00:21:00+08:00",
+  "recordedAt": "2026-08-19T00:27:57+08:00",
+  "requestedActions": [
+    "build CLI into a new production image without podman cp of worktree scripts",
+    "operator-authorized new capture window",
+    "run `openbot memory health --json --redact` inside the window and archive hashes/receipt"
+  ],
+  "requestedWindow": "unspecified_timestamps",
+  "windowNote": "Cutover completed. Capture was not started: operator has not specified a new window start/end.",
+  "live": {
+    "hostNow": "2026-08-19T00:27:57+08:00",
+    "containerId": "952a6c7aa93e17ff3b3eef39116bdf0cc70cac20030cc0e2c4d5d0e51afba037",
+    "buildInfoCommit": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "probeModuleSha": "ea6e7337fbf3f1da",
+    "observedImageDigest": "sha256:fc37b6988d63b4d818de72a8b709ad510b875a81e044caa47ae19a223fa88d0a",
+    "imageName": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "overlayId": "cq-o0-memory-health-cli",
+    "overlayStamp": "20260818T162554Z",
+    "buildMode": "gateway-dist-keep-ui",
+    "controlUiPin": "assets/index-CYnwD_N8.js",
+    "healthz": 200,
+    "readyz": { "ready": true, "failing": [] }
+  },
+  "delivery": {
+    "originMain": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "candidate": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "previousLiveCommit": "92c3f93029d4edfc0b722d4f21e50975332c15a3",
+    "liveIsAncestorOfOriginMain": true,
+    "forwardOnly": "allow",
+    "memoryHealthCliOnOriginMain": true,
+    "ghcrDockerRelease": "failure_billing",
+    "tarball": "openbot-gateway-dist-pkg-cq-o0-memory-health-cli-20260818T162554Z.tar.gz",
+    "tarballSha256": "8202c2a7941f0feb7e91ed0019f36b78235341730e7e93ba40afa93296337b93",
+    "hostBackup": "/root/openbot-maintenance-cq-o0-memory-health-cli-20260818T162554Z"
+  },
+  "identityCheck": "passed",
+  "tests": "passed",
+  "testsDetail": {
+    "unit": "18 passed",
+    "gateway": "24 passed",
+    "distSmoke": "1 passed"
+  },
+  "schemaValidation": "not_run",
+  "mutationCheck": "not_run",
+  "redactionCheck": "not_run",
+  "imageBuilt": true,
+  "cutoverExecuted": true,
+  "probeExecuted": false,
+  "cliHelpListsHealth": true,
+  "redactedReportSha256": null,
+  "manifestSha256": null,
+  "firstFailureDetail": "Production gateway dist now carries `memory health` from origin/main 34595862f785. Capture remains blocked until the operator specifies a new window start and end.",
+  "explicitlyNotDone": [
+    "no podman cp of worktree scripts",
+    "no full container recreate",
+    "no Control UI replacement",
+    "no production health probe",
+    "no MemoryManager write/sync/reindex/rebuild/reset/watcher",
+    "CQ-O0 not complete"
+  ],
+  "requiredBeforeRetry": [
+    "operator specifies new window start/end timestamps",
+    "identity check against build-info.commit 34595862f785c90a4e0e30587db33690c2e139d2",
+    "inside the window run `node /app/openbot.mjs memory health --json --redact`",
+    "archive redacted JSON, manifest, sha256, capture receipt"
+  ]
+}

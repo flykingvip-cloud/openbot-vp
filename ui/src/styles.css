@@ -1,0 +1,12 @@
+/* Cold-boot / shared chrome only.
+ * Heavy port sheets load with their JS shells (see cross-port-shell-lazy /
+ * enterprise-surface-lazy). Keep this list short for biz.* first paint. */
+@import "./styles/base.css";
+@import "./styles/icon-foundation.css";
+@import "./styles/enterprise-foundation.css";
+@import "./styles/enterprise-components.css";
+@import "./styles/layout.css";
+@import "./styles/layout.mobile.css";
+@import "./styles/components.css";
+@import "./styles/auth-home.css";
+@import "./styles/trial-apply.css";

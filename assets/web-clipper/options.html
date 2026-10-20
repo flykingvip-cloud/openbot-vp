@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenBot Web Clipper</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header>
+        <h1>OpenBot Web Clipper</h1>
+        <p class="sub">将当前网页或选区保存到知识空间（复用 <code>knowledge.personal.collectWeb</code>）。</p>
+      </header>
+      <form id="options-form" class="card">
+        <label>
+          <span>Gateway WebSocket</span>
+          <input id="gateway-ws" type="url" placeholder="ws://127.0.0.1:18789" />
+        </label>
+        <label>
+          <span>Gateway Token</span>
+          <input id="gateway-token" type="password" placeholder="gateway.auth.token" autocomplete="off" />
+        </label>
+        <label>
+          <span>默认知识空间</span>
+          <select id="knowledge-base">
+            <option value="">（自动 / 个人收件箱）</option>
+          </select>
+          <button type="button" id="refresh-kbs" class="secondary">刷新列表</button>
+        </label>
+        <label>
+          <span>默认标签（逗号分隔）</span>
+          <input id="tags" type="text" placeholder="web, clip" />
+        </label>
+        <div class="actions">
+          <button type="submit">保存</button>
+        </div>
+        <p id="status" class="status" role="status"></p>
+      </form>
+      <section class="card help">
+        <h2>安装提示</h2>
+        <ol>
+          <li>运行 <code>openbot web-clipper extension install</code></li>
+          <li>Chrome → 扩展程序 → 加载已解压的扩展程序</li>
+          <li>在本页填入 Gateway Token（与本地 Gateway 配置一致）</li>
+        </ol>
+      </section>
+    </main>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

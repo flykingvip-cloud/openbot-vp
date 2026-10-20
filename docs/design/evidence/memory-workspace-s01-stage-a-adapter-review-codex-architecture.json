@@ -1,0 +1,150 @@
+{
+  "schema": "memory-workspace-s01-stage-a-adapter-review/v1",
+  "kind": "s01-stage-a-adapter-architecture-review",
+  "reviewer": "codex-architecture",
+  "signedBy": "codex-architecture",
+  "signedAt": "2026-08-30T06:56:00.000Z",
+  "reviewPass": 2,
+  "scope": "s01-stage-a-sa1-sa3",
+  "decision": "accepted",
+  "fillsKiroSotReviewer": false,
+  "flipsImplementationGate": false,
+  "packetSelfAccepted": false,
+  "authorizesStageA": false,
+  "acceptsUnauthorizedLanding833": false,
+  "supersedes": {
+    "pr": 835,
+    "reason": "Pass 1 reviewed open #834 as changes-required on SA4. Pass 2 accepts only SA1–SA3 on merged #834."
+  },
+  "mergedBaseline": {
+    "pr": 834,
+    "mergeCommit": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c",
+    "originMain": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c"
+  },
+  "baseline": {
+    "worktree": "/Users/daniel/AI项目/openbot-s01-stage-a-sa123-review",
+    "branch": "cursor-codex-architecture/item7-s01-stage-a-sa123-review",
+    "fetchedOriginMain": true,
+    "head": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c",
+    "originMain": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c",
+    "mergeBaseIsAncestor": true,
+    "didNotModifySharedWorkingTree": true,
+    "didNotModifyProductionBusinessCode": true
+  },
+  "reviewedArtifacts": [
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-stage-a-adapter.md",
+    ".kiro/specs/memory-workspace-platform-remediation/s01-stage-a-adapter-review-request.md",
+    "docs/design/evidence/memory-workspace-s01-stage-a-adapter.json",
+    "docs/design/evidence/memory-workspace-s01-stage-a-adapter.test.mjs",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.ts"
+  ],
+  "verdict": {
+    "SA1": "pass",
+    "SA2": "pass",
+    "SA3": "pass"
+  },
+  "closedFindings": ["SA1", "SA2", "SA3"],
+  "outOfScope": ["SA4"],
+  "checksRun": {
+    "packetEvidence": {
+      "command": "node --test docs/design/evidence/memory-workspace-s01-stage-a-adapter.test.mjs",
+      "result": "pass"
+    },
+    "r6MachineCheck": {
+      "command": "node scripts/verify-single-sot.mjs",
+      "result": "pass",
+      "implementationVerified": false
+    }
+  },
+  "architectureReview": {
+    "independentCatalogTablesRemoved": true,
+    "catalogInputIsTypedView": true,
+    "cwdHasTrustedPrincipal": true,
+    "cwdHasWorkspaceResourceId": true,
+    "cwdHasMembershipPort": true,
+    "cwdHasCanonicalActiveBinding": true,
+    "cwdHasFencing": true,
+    "failClosedDocumented": true,
+    "implementationAuthorized": false,
+    "packetHasNoSrcDiff": true
+  },
+  "locks": {
+    "stageAImplementation": "blocked",
+    "productionCatalogWrite": "none",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "i3": "not executed",
+    "live": "forbidden",
+    "deployAuthorized": false,
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10
+  },
+  "doesNotAuthorize": [
+    "S01 retirement",
+    "implementation wiring",
+    "Stage A accept",
+    "Stage A start",
+    "accepting #833",
+    "production Catalog write",
+    "Phase 1B unlock",
+    "I3",
+    "LIVE",
+    "deployAuthorized=true",
+    "filling kiro-sot-reviewer slot",
+    "flipping implementationGate",
+    "packet selfAccepted=true",
+    "closing SA4"
+  ],
+  "explicitlyForbidden": [
+    "modify src/auto-reply/reply/get-reply.ts",
+    "modify src/memory/**",
+    "modify src/gateway/workspace-resolver/**",
+    "write production Catalog",
+    "delete or rewrite S01 scan",
+    "execute I3",
+    "issue Phase 1B unlock",
+    "set deployAuthorized=true",
+    "any LIVE or production deployment",
+    "accept Stage A implementation before remaining dual-review items are closed",
+    "sign as kiro-sot-reviewer"
+  ],
+  "productionObservation": {
+    "getReplyStillUsesStewardHelper": true,
+    "getReplyLine": "src/auto-reply/reply/get-reply.ts:164",
+    "p1LineUnchanged": "src/auto-reply/reply/get-reply.ts:165",
+    "evaluateS01AuthorizedToolCwdImportedByGetReply": false,
+    "unauthorizedLanding833": {
+      "pr": 833,
+      "mergeSha": "7cad685fba613fd36b2d5f295ef2472d42f98d58",
+      "authorized": false
+    }
+  },
+  "findings": [
+    {
+      "id": "SA1",
+      "status": "closed",
+      "evidence": "Merged #834 removes catalogTable and independent-table SQL from the Stage A packet. Unique Catalog input is WorkspaceResourceCatalog typed view / S01CatalogViewPort. Evidence JSON has no catalogTable key. Lock test forbids FROM workspace_handles / authorized_cwds and catalogTable live fields. Unique contract still lists S01_INDEPENDENT_CATALOG_TABLES as forbidden."
+    },
+    {
+      "id": "SA2",
+      "status": "closed",
+      "evidence": "cwd contract is evaluateS01AuthorizedToolCwd with issued TrustedPrincipal, S01CatalogViewPort, S01PlatformAuthMembershipPort, authoritative targetResourceId/workspaceResourceId, canonical/active binding, and expectedFencing/contentVersion. The simplified (handle, toolName): Promise<string> export is forbidden. adapterContracts.resolveAuthorizedToolCwd is absent."
+    },
+    {
+      "id": "SA3",
+      "status": "closed",
+      "evidence": "Handoff §5 and evidence failClosedTriggers require Catalog miss, duplicate canonical binding, tenant mismatch, membership miss/array, and stale fencing/contentVersion to fail closed. Null-as-success and first-of-many authorization are forbidden. resolveStewardWorkspaceIdentity.returnsNullOnMiss is false."
+    }
+  ],
+  "residualConstraints": [
+    "This accept covers SA1–SA3 only. SA4 (handoff targetIdentity smaller than V1.8 IR1) remains residual and out of scope.",
+    "#833 production adapters remain unauthorized. This sidecar does not accept that landing.",
+    "kiro-sot-reviewer must sign independently. This sidecar does not fill that slot.",
+    "implementationGate remains not-met. Stage A implementation remains blocked.",
+    "get-reply.ts:164 remains resolveEmployeeBuiltinStewardWorkspaceDir. Scan remains 10/10."
+  ],
+  "note": "codex-architecture pass 2 of merged PR #834 (74ca45c144). SA1-SA3 are accepted. This signature does not close SA4, fill kiro-sot-reviewer, accept #833, or authorize Stage A, S01 retirement, production Catalog write, I3, Phase 1B, or LIVE."
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "配置外部 API 知识源"
+  short_description: "发现、验证并绑定外部 API 到 OpenBot 知识库"
+  default_prompt: "Use $configure-external-api-source to validate and bind this external API into the selected OpenBot knowledge base."

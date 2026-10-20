@@ -1,0 +1,10 @@
+local_ref	remote_or_anchor	local_sha	remote_sha	ahead	behind	notes
+HEAD	origin/main	a1c01567f5ec	af1d67c9da34	765	4	
+HEAD	origin/fix-scoped-package-templates	a1c01567f5ec	5fd25a16f92b	342	0	
+HEAD	origin/release/candidate-20260712	a1c01567f5ec	7638217f4cd3	437	282	
+HEAD	85eee3e7b987b14b3f83301e3f200b3e1d797cc6	a1c01567f5ec	85eee3e7b987	113	0	prod_anchor_v69
+origin/main	85eee3e7b987b14b3f83301e3f200b3e1d797cc6	af1d67c9da34	85eee3e7b987	4	652	prod_anchor_v69
+origin/fix-scoped-package-templates	85eee3e7b987b14b3f83301e3f200b3e1d797cc6	5fd25a16f92b	85eee3e7b987	0	229	prod_anchor_v69
+origin/release/candidate-20260712	85eee3e7b987b14b3f83301e3f200b3e1d797cc6	7638217f4cd3	85eee3e7b987	282	324	prod_anchor_v69
+origin/main	origin/fix-scoped-package-templates	af1d67c9da34	5fd25a16f92b	4	423	
+origin/main	origin/release/candidate-20260712	af1d67c9da34	7638217f4cd3	4	610	

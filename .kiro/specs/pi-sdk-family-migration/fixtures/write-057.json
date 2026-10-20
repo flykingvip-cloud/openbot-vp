@@ -1,0 +1,38 @@
+{
+  "CURRENT_SESSION_VERSION": 3,
+  "sessionFile": "/tmp/pi-sdk-v3-session/work/sessions-057/2026-08-29T09-09-36-700Z_f8db4331-e7e9-49d5-8e84-6cbb819f89d0.jsonl",
+  "sessionId": "f8db4331-e7e9-49d5-8e84-6cbb819f89d0",
+  "cwd": "/tmp/pi-sdk-v3-session/work/workspace-057",
+  "header": {
+    "type": "session",
+    "version": 3,
+    "id": "f8db4331-e7e9-49d5-8e84-6cbb819f89d0",
+    "timestamp": "2026-08-29T09:09:36.700Z",
+    "cwd": "/tmp/pi-sdk-v3-session/work/workspace-057"
+  },
+  "entryCount": 9,
+  "entryTypes": [
+    "message",
+    "message",
+    "message",
+    "model_change",
+    "thinking_level_change",
+    "custom",
+    "custom_message",
+    "session_info",
+    "compaction"
+  ],
+  "entryIds": {
+    "userId": "2f3062d4",
+    "assistantId": "76b09a9b",
+    "toolId": "59db817a",
+    "modelId": "7981e10f",
+    "thinkId": "5f2b027d",
+    "customId": "bb042f1f",
+    "customMsgId": "ac06cd93",
+    "infoId": "287737a0",
+    "compactionId": "90df90f4"
+  },
+  "sessionName": "phase-a-v3",
+  "secret": "tenant-a secret payload"
+}

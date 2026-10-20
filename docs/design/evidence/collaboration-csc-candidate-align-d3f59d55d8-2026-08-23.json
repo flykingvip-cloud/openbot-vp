@@ -1,0 +1,102 @@
+{
+  "schema": "collaboration-csc-candidate-align-receipt/v1",
+  "status": "production-closeout-requested",
+  "productionCloseout": "requested",
+  "acceptancePhrase": "post-639-six-gates-green-apply-seq39-full-dist",
+  "executed": false,
+  "cutoverExecuted": false,
+  "flagsChanged": false,
+  "reason": "PR #639 merged to origin/main at d3f59d55d82d89af8d0b9575afe5259e2366fbca. Full-dist candidate rebuilt from merge tip (not pre-rebase 551fa3e570 / 2a2f14f686 artifacts). Six gates re-run green; LIVE remains overlay bad5f90a1d on base 5c221b9ec38c. Requesting production closeout (seq39 preview); no swap until owner approves.",
+  "recordedAt": "2026-08-23T08:05:00Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Post-#639 production closeout acceptance package",
+  "explicitNonActions": [
+    "did not recreate openbot-gateway-rc for candidate",
+    "did not swap LIVE to d3f59d55d82d",
+    "did not append seq 39 to deploy/production/releases.jsonl",
+    "did not enable inbound or CSC flags",
+    "did not set seq39 liveFrom"
+  ],
+  "baseline": {
+    "mergePr": "https://github.com/gmood2008/openbot/pull/639",
+    "mergeCommit": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+    "frozenOriginMainAtFetch": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+    "candidateEqualsFrozenTip": true,
+    "worktree": "/tmp/openbot-post639-d3f59d55d8"
+  },
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "buildInfo": {
+      "commit": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "builtAt": "2026-08-23T06:40:11.929Z"
+    },
+    "ledgerSeq37Overlay": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+    "baseImage": {
+      "sha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257"
+    },
+    "flags": {
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset"
+    }
+  },
+  "candidate": {
+    "sha": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+    "provenanceTag": "provenance/sha-d3f59d55d82d",
+    "buildInfoCommit": "d3f59d55d82d89af8d0b9575afe5259e2366fbca",
+    "builtAt": "2026-08-23T07:10:51.441Z",
+    "buildMode": "full-dist (host build:docker + runtime pack; docker-in-docker OOM avoided)",
+    "tarball": {
+      "name": "full-dist-d3f59d55d82d.tgz",
+      "sha256": "433afdf3f2566a9aa2ae7509862d217627434886163a56fc06f749c3b6959e13",
+      "bytes": 881394208
+    },
+    "localImage": {
+      "tag": "localhost/openbot:rc-amd64-provenance-d3f59d55d82d",
+      "imageId": "sha256:825e14cc217a51d28b132037307c0844dcdd9af2ce8616f580bac73b0988ede5",
+      "ociRevision": "d3f59d55d82d89af8d0b9575afe5259e2366fbca"
+    },
+    "stagedOnProductionHost": true
+  },
+  "gates": {
+    "shadow3": {
+      "tests": "5/5 pass",
+      "log": "/tmp/openbot-post639-d3f59d55d8-artifacts/shadow3.log"
+    },
+    "ledgerAudit": {
+      "releases": 37,
+      "errors": 0,
+      "log": "/tmp/openbot-post639-d3f59d55d8-artifacts/ledger-audit.log"
+    },
+    "forwardOnly": {
+      "verdict": "allow",
+      "live": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "log": "/tmp/openbot-post639-d3f59d55d8-artifacts/forward-only.log"
+    },
+    "deliveryAlignment": {
+      "status": "pass-with-warnings",
+      "summary": "PASS=9 WARN=1 FAIL=0",
+      "log": "/tmp/openbot-post639-d3f59d55d8-artifacts/verify-delivery-alignment-rerun.log"
+    },
+    "smoke": {
+      "port": 18889,
+      "healthz": 200,
+      "readyz": "ready:true",
+      "log": "/tmp/openbot-post639-d3f59d55d8-artifacts/remote-smoke-rollback-final.log"
+    },
+    "rollbackDrill": {
+      "tarballCommit": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "liveRestored": "bad5f90a1d33082d9fa6b6c6e361044ac7017f13",
+      "log": "/tmp/openbot-post639-d3f59d55d8-artifacts/rollback-drill-final.log"
+    }
+  },
+  "supersedes": [
+    "docs/design/evidence/collaboration-csc-candidate-align-673f8dce63-2026-08-23.json",
+    "provenance/sha-551fa3e570",
+    "provenance/sha-2a2f14f686"
+  ],
+  "ledgerPreview": "deploy/production/evidence/SEQ39_LEDGER_PREVIEW_20260823.json"
+}

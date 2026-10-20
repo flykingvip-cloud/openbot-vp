@@ -1,0 +1,142 @@
+.ka {
+  display: grid;
+  gap: 16px;
+}
+
+.ka-note,
+.ka-foot,
+.ka-banner {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ka-banner {
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+  color: var(--text);
+}
+
+.ka-toolbar,
+.ka-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.ka-section {
+  display: grid;
+  gap: 10px;
+}
+
+.ka-section h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ka-kv {
+  display: grid;
+  margin: 0;
+}
+
+.ka-kv div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ka-kv div:last-child {
+  border-bottom: 0;
+}
+
+.ka-kv dt {
+  color: var(--muted);
+}
+
+.ka-kv dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ka-text-link {
+  color: var(--accent, var(--text));
+  text-decoration: underline;
+}
+
+.ka-preview {
+  display: grid;
+  gap: 8px;
+  max-width: 28rem;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.ka-preview__splash,
+.ka-preview__about {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 16px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--ka-accent, var(--bg));
+  color: var(--ka-primary, var(--text));
+}
+
+.ka-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(16rem, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ka-entry-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ka-entry {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
+}
+
+.ka-entry strong {
+  font-size: 15px;
+}
+
+.ka-entry span,
+.ka-denied p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.ka-denied {
+  display: grid;
+  gap: 8px;
+}
+
+.ka-denied h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+@media (max-width: 960px) {
+  .ka-split,
+  .ka-entry-row,
+  .ka-kv div {
+    grid-template-columns: 1fr;
+  }
+}

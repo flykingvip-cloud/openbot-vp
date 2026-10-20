@@ -1,0 +1,2511 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pricing v3 visual capture</title>
+    <style>
+      :root {
+        --border: #e2e8f0;
+        --text: #0f172a;
+        --muted: #64748b;
+        --primary: #2563eb;
+        --ok: #16a34a;
+        --radius-md: 10px;
+        --radius-lg: 14px;
+        --duration-fast: 120ms;
+        --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        color: var(--text);
+        background: #f5f7fb;
+      }
+      .btn {
+        font: inherit;
+      }
+
+      /**
+ * Pricing v3 — 企业向套餐与定价页样式。
+ * 视觉规范：浅灰渐变背景、1440px 容器、五列卡片、Growth 推荐锚点。
+ */
+
+      .pricing-v3 {
+        background: linear-gradient(180deg, #fafafa 0%, #f5f7fb 100%);
+        min-height: 100%;
+        padding: 32px 0 48px;
+      }
+
+      .pricing-v3__container {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding-inline: 32px;
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+      }
+
+      /* ── 周期切换（分段按钮组） ── */
+      .pricing-v3__cycle-switcher {
+        display: inline-flex;
+        align-self: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: 100%;
+        gap: 4px;
+        padding: 4px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: #fff;
+      }
+
+      .pricing-v3__cycle-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 14px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-md);
+        background: transparent;
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background var(--duration-fast) var(--ease-out),
+          color var(--duration-fast) var(--ease-out),
+          box-shadow var(--duration-fast) var(--ease-out);
+      }
+
+      .pricing-v3__cycle-tab:hover {
+        color: var(--text);
+        background: color-mix(in srgb, var(--border) 35%, #fff);
+      }
+
+      .pricing-v3__cycle-tab:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      .pricing-v3__cycle-tab.is-active,
+      .pricing-v3__cycle-tab[aria-pressed="true"] {
+        background: #fff;
+        color: var(--text);
+        box-shadow:
+          0 1px 2px rgb(15 23 42 / 8%),
+          0 2px 8px rgb(15 23 42 / 12%);
+        border: 1px solid color-mix(in srgb, var(--border) 75%, var(--text) 8%);
+      }
+
+      .pricing-v3__cycle-badge {
+        padding: 2px 6px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--ok) 16%, transparent);
+        color: var(--ok);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      /* ── 卡片 Grid：按组件容器宽度（container query），禁止依赖视口误撑窄宿主 ── */
+      .pricing-v3 {
+        container-type: inline-size;
+        container-name: pricing-v3;
+      }
+
+      .pricing-v3__grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr);
+        align-items: stretch;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      /* 平板≈2 列：容器 ≥640px */
+      @container pricing-v3 (min-width: 640px) {
+        .pricing-v3__grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      /* 普通桌面 3 列：容器 ≥960px */
+      @container pricing-v3 (min-width: 960px) {
+        .pricing-v3__grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      /*
+ * 仅当容器真实够宽才 5 列。
+ * 阈值含 padding（~64px）+ 5×min + gaps；列宽用 minmax(0,1fr)，
+ * 禁止 minmax(260px) 在临界宽度把父容器撑出横向滚动。
+ */
+      @container pricing-v3 (min-width: 1480px) {
+        .pricing-v3__grid {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 14px;
+        }
+      }
+
+      /* 无 container 支持时的安全回退：最多 3 列，永不因宽视口误强制 5 列 */
+      @supports not (container-type: inline-size) {
+        @media (min-width: 640px) {
+          .pricing-v3__grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+        @media (min-width: 1024px) {
+          .pricing-v3__grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+        }
+      }
+
+      /*
+ * 明确窄宿主入口覆盖：费用预算「我的套餐」单卡、登录首页栏。
+ * 公共 /pricing（.public-legal__pricing-frame）与费用预算目录
+ * （.cost-budget-v2-catalog-panel）必须走 container query，禁止强制 1 列。
+ */
+      .cost-budget-v2-my-plan-panel__card .pricing-v3,
+      .cost-budget-v2-my-plan-layout .pricing-v3,
+      .auth-home .pricing-v3,
+      .pricing-v3--narrow-host {
+        container-type: normal;
+      }
+
+      .cost-budget-v2-my-plan-panel__card .pricing-v3__grid,
+      .cost-budget-v2-my-plan-layout .pricing-v3__grid,
+      .auth-home .pricing-v3__grid,
+      .pricing-v3--narrow-host .pricing-v3__grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+        display: grid !important;
+        overflow-x: visible;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      /* 平台管理端：默认按容器 query；中等宽度可横向滚动卡片对比 */
+      .platform-pricing__compare-card-shell .pricing-v3 {
+        padding-block: 20px 28px;
+        container-type: inline-size;
+        container-name: pricing-v3;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__container {
+        max-width: none;
+        width: 100%;
+        padding-inline: 24px;
+        gap: 20px;
+        min-width: 0;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__value-strip,
+      .platform-pricing__compare-card-shell .pricing-v3__compare-table-wrap,
+      .platform-pricing__compare-card-shell .pricing-v3__faq-list {
+        max-width: 1440px;
+        margin-inline: auto;
+        width: 100%;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__grid {
+        gap: 12px;
+        width: 100%;
+        min-width: 0;
+      }
+
+      /* 平台预览：容器 720–1479px 时横向滚动五卡，避免挤窄或撑破宿主 */
+      @container pricing-v3 (min-width: 720px) and (max-width: 1479px) {
+        .platform-pricing__compare-card-shell .pricing-v3__grid {
+          display: flex;
+          overflow-x: auto;
+          padding-bottom: 8px;
+          scroll-snap-type: x proximity;
+        }
+
+        .platform-pricing__compare-card-shell .pricing-v3__card {
+          flex: 0 0 280px;
+          max-width: 300px;
+          scroll-snap-align: start;
+        }
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__card {
+        min-width: 0;
+        padding: 16px 14px 14px;
+        gap: 0;
+        --pricing-v3-content-inset: 30px;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__card-name {
+        font-size: 17px;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__price-main {
+        font-size: 24px;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__spec-label {
+        font-size: 12px;
+      }
+
+      /* 图标尺寸：fixture / 独立页面也可见（不依赖全局 nav-item 样式） */
+      .pricing-v3__card-icon svg,
+      .pricing-v3__spec-icon svg,
+      .pricing-v3__compare-yes svg,
+      .pricing-v3__value-icon svg {
+        width: 1.25rem;
+        height: 1.25rem;
+        display: block;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+
+      .pricing-v3__card-icon svg {
+        width: 1.35rem;
+        height: 1.35rem;
+      }
+
+      .pricing-v3__compare-yes svg {
+        width: 1.1rem;
+        height: 1.1rem;
+        margin-inline: auto;
+      }
+
+      .platform-pricing__compare-card-shell .pricing-v3__card-edit {
+        top: 10px;
+        right: 8px;
+        padding: 2px 8px;
+      }
+
+      .pricing-v3__card {
+        --pricing-v3-icon-col: 20px;
+        --pricing-v3-icon-gap: 10px;
+        --pricing-v3-content-inset: calc(var(--pricing-v3-icon-col) + var(--pricing-v3-icon-gap));
+        --pricing-v3-accent: var(--primary);
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 100%;
+        min-width: 0;
+        padding: 18px 16px 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: #fff;
+        color: var(--text);
+        box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+        transition:
+          box-shadow var(--duration-fast) var(--ease-out),
+          border-color var(--duration-fast) var(--ease-out);
+        overflow: visible;
+      }
+
+      /* 仅交互卡允许轻微阴影反馈；静态摘要卡无上浮 */
+      .pricing-v3__card.is-interactive:hover {
+        box-shadow: 0 6px 18px rgb(15 23 42 / 7%);
+      }
+
+      .pricing-v3__card.is-static {
+        box-shadow: none;
+      }
+
+      .pricing-v3__card.is-recommended {
+        border: 2px solid var(--pricing-v3-accent, #2563eb);
+        box-shadow: 0 4px 16px
+          color-mix(in srgb, var(--pricing-v3-accent, #2563eb) 12%, transparent);
+      }
+
+      /* 企业定制：浅色卡 + 局部金色边，避免压过推荐套餐 */
+      .pricing-v3__card.is-enterprise {
+        border: 1px solid color-mix(in srgb, #b45309 35%, var(--border));
+        background: linear-gradient(180deg, #fffbeb 0%, #fff 48%);
+        color: var(--text);
+        --pricing-v3-accent: #b45309;
+      }
+
+      .pricing-v3__card-zone--head {
+        min-height: 72px;
+        padding-right: 48px;
+      }
+
+      .pricing-v3__card-zone--price {
+        min-height: 58px;
+        margin-top: 4px;
+      }
+
+      .pricing-v3__card-zone--savings {
+        min-height: 24px;
+        margin-top: 2px;
+      }
+
+      .pricing-v3__savings-placeholder {
+        display: block;
+        min-height: 20px;
+      }
+
+      .pricing-v3__card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .pricing-v3__card-title-block {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+      }
+
+      .pricing-v3__card.is-enterprise .pricing-v3__card-icon {
+        color: #b45309;
+        background: rgb(180 83 9 / 10%);
+      }
+
+      .pricing-v3__card-edit {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 2;
+        flex-shrink: 0;
+        font-size: 12px;
+        padding: 2px 10px;
+        max-width: calc(100% - 20px);
+      }
+
+      .platform-pricing__compare-card-shell {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+        position: relative;
+        z-index: 1;
+      }
+
+      .pricing-v3__slot-badge {
+        display: inline-flex;
+        align-self: flex-start;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.4;
+        background: color-mix(in srgb, var(--muted) 14%, transparent);
+        color: var(--muted);
+      }
+
+      /* 推荐徽标：与推荐边框同一强调色，避免与档位杂色冲突 */
+      .pricing-v3__slot-badge.is-recommended-badge {
+        background: color-mix(in srgb, #2563eb 12%, transparent);
+        color: #1d4ed8;
+      }
+
+      .pricing-v3__card.is-enterprise .pricing-v3__slot-badge {
+        background: rgb(180 83 9 / 10%);
+        color: #b45309;
+      }
+
+      .pricing-v3__card-icon {
+        width: 40px;
+        height: 40px;
+        display: grid;
+        place-items: center;
+        border-radius: var(--radius-md);
+        background: color-mix(in srgb, var(--primary) 10%, transparent);
+        color: var(--primary);
+        flex-shrink: 0;
+      }
+
+      /* 图标中性偏主色；CTA 统一主色，避免绿/橙/紫多套强调 */
+      .pricing-v3__card.is-slot-trial .pricing-v3__card-icon,
+      .pricing-v3__card.is-slot-starter .pricing-v3__card-icon,
+      .pricing-v3__card.is-slot-professional .pricing-v3__card-icon,
+      .pricing-v3__card.is-slot-business .pricing-v3__card-icon {
+        color: var(--primary);
+        background: color-mix(in srgb, var(--primary) 10%, transparent);
+      }
+
+      .pricing-v3__card-name {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 700;
+        line-height: 1.2;
+      }
+
+      .pricing-v3__card-price {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+
+      .pricing-v3__price-main {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.1;
+      }
+
+      .pricing-v3__price-main--quote {
+        font-size: 22px;
+      }
+
+      .pricing-v3__annual-discounted {
+        margin-top: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: color-mix(in srgb, var(--primary) 82%, #0f172a);
+      }
+
+      .pricing-v3__price-unit,
+      .pricing-v3__price-sub {
+        font-size: 13px;
+        color: var(--muted);
+        font-weight: 500;
+      }
+
+      .pricing-v3__price-cycle-total {
+        margin-top: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      .pricing-v3__price-savings {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+
+      .pricing-v3__list-price {
+        text-decoration: line-through;
+        color: var(--muted);
+      }
+
+      .pricing-v3__save {
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: color-mix(in srgb, var(--ok) 12%, transparent);
+        color: var(--ok);
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      .pricing-v3__spec-list {
+        list-style: none;
+        margin: 12px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .pricing-v3__spec-item {
+        display: grid;
+        grid-template-columns: var(--pricing-v3-icon-col) minmax(0, 1fr);
+        column-gap: var(--pricing-v3-icon-gap);
+        align-items: start;
+        font-size: 13px;
+        line-height: 1.45;
+      }
+
+      .pricing-v3__spec-icon {
+        display: grid;
+        place-items: center;
+        width: var(--pricing-v3-icon-col);
+        height: 20px;
+        color: var(--muted);
+        flex-shrink: 0;
+      }
+
+      .pricing-v3__spec-copy {
+        display: grid;
+        grid-template-columns: minmax(4.5em, 1fr) minmax(0, 1.2fr);
+        column-gap: 10px;
+        align-items: start;
+        min-width: 0;
+      }
+
+      .pricing-v3__spec-label {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+
+      .pricing-v3__spec-value {
+        min-width: 0;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 700;
+        text-align: right;
+        line-height: 1.4;
+        overflow-wrap: break-word;
+        word-break: normal;
+      }
+
+      .pricing-v3__card-spacer {
+        flex: 1 1 auto;
+        min-height: 8px;
+      }
+
+      .pricing-v3__card-actions {
+        margin-top: auto;
+        padding-top: 12px;
+        min-height: 44px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+      }
+
+      .pricing-v3__cta {
+        width: 100%;
+        min-height: 42px;
+        padding: 10px 14px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--border);
+        background: #fff;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition:
+          background var(--duration-fast) var(--ease-out),
+          border-color var(--duration-fast) var(--ease-out),
+          box-shadow var(--duration-fast) var(--ease-out);
+      }
+
+      .pricing-v3__cta:hover:not(:disabled) {
+        filter: brightness(0.97);
+      }
+
+      .pricing-v3__cta:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+
+      .pricing-v3__cta:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      .pricing-v3__cta.is-outline {
+        background: #fff;
+        border-color: #0f172a;
+        color: #0f172a;
+      }
+
+      .pricing-v3__cta.is-primary,
+      .pricing-v3__cta.is-recommended-cta {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+      }
+
+      .pricing-v3__cta.is-enterprise-cta {
+        background: #fff;
+        border-color: #b45309;
+        color: #b45309;
+      }
+
+      .pricing-v3__cta.is-enterprise-cta:hover:not(:disabled) {
+        background: color-mix(in srgb, #b45309 8%, #fff);
+      }
+
+      .pricing-v3__cta.is-current,
+      .pricing-v3__cta:disabled {
+        opacity: 1;
+        cursor: default;
+        background: color-mix(in srgb, var(--border) 55%, #fff);
+        border-color: var(--border);
+        color: color-mix(in srgb, var(--text) 55%, var(--muted));
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .pricing-v3__card,
+        .pricing-v3__cta,
+        .pricing-v3__cycle-tab {
+          transition: none;
+        }
+
+        .pricing-v3__cta:active:not(:disabled) {
+          transform: none;
+        }
+      }
+
+      .cost-budget-v2-my-plan-panel__card .pricing-v3__card {
+        min-height: auto;
+        box-shadow: none;
+      }
+
+      .cost-budget-v2-my-plan-panel__card .pricing-v3__card:hover {
+        transform: none;
+        box-shadow: none;
+      }
+
+      .cost-budget-v2-my-plan-panel__card .pricing-v3__card-actions {
+        display: none;
+      }
+
+      .cost-budget-v2-my-plan-panel__card .pricing-v3__card-spacer {
+        min-height: 0;
+      }
+
+      /* ── 价值条 ── */
+      .pricing-v3__value-strip {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: 1fr;
+        padding: 20px 0 8px;
+      }
+
+      @media (min-width: 900px) {
+        .pricing-v3__value-strip {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+      }
+
+      .pricing-v3__value-item {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .pricing-v3__value-icon {
+        color: var(--primary);
+        flex-shrink: 0;
+      }
+
+      .pricing-v3__value-title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .pricing-v3__value-body {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      /* ── 对比矩阵 ── */
+      .pricing-v3__section-title {
+        margin: 8px 0 8px;
+        font-size: 22px;
+        font-weight: 700;
+      }
+
+      .pricing-v3__compare-scroll-hint {
+        margin: 0 0 12px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .pricing-v3__compare-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: #fff;
+      }
+
+      .pricing-v3__compare-table-wrap:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      .pricing-v3__compare-table {
+        width: 100%;
+        min-width: 640px;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      .pricing-v3__compare-table th,
+      .pricing-v3__compare-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        text-align: center;
+        white-space: normal;
+        overflow-wrap: anywhere;
+      }
+
+      .pricing-v3__compare-table th[scope="row"],
+      .pricing-v3__compare-sticky {
+        text-align: left;
+        font-weight: 600;
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: #fff;
+        min-width: 7.5rem;
+        box-shadow: 1px 0 0 var(--border);
+      }
+
+      .pricing-v3__compare-table thead .pricing-v3__compare-sticky {
+        z-index: 2;
+      }
+
+      .pricing-v3__compare-yes {
+        color: var(--ok);
+      }
+
+      .pricing-v3__compare-no,
+      .pricing-v3__compare-custom {
+        color: var(--muted);
+      }
+
+      .pricing-v3__sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      /* ── FAQ ── */
+      .pricing-v3__faq-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .pricing-v3__faq-item {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        background: #fff;
+        padding: 12px 16px;
+      }
+
+      .pricing-v3__faq-item summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .pricing-v3__faq-item p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+        font-size: 14px;
+      }
+
+      .pricing-v3--loading,
+      .pricing-v3--error,
+      .pricing-v3--empty {
+        padding: 48px 32px;
+        text-align: center;
+        color: var(--muted);
+      }
+
+      .pricing-v3__footer-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 12px;
+        padding-right: 16px;
+      }
+
+      .public-legal {
+        --public-legal-gutter: 16px;
+        --public-legal-max-width: 960px;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f6f7f9;
+        color: #1a1d24;
+      }
+
+      .public-legal--wide {
+        --public-legal-gutter: clamp(20px, 3vw, 48px);
+        --public-legal-max-width: none;
+      }
+
+      .public-legal__header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: #fff;
+        border-bottom: 1px solid #e4e7ec;
+      }
+
+      .public-legal__header-inner {
+        width: calc(100vw - (var(--public-legal-gutter) * 2));
+        max-width: var(--public-legal-max-width);
+        margin: 0 auto;
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .public-legal__brand {
+        display: inline-flex;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .public-legal__brand-logo {
+        height: 28px;
+        width: auto;
+      }
+
+      .public-legal__nav {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+        flex-wrap: wrap;
+      }
+
+      .public-legal__nav-link {
+        color: #4b5563;
+        text-decoration: none;
+        font-size: 0.88rem;
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+
+      .public-legal__nav-link:hover {
+        color: #111827;
+        background: #f3f4f6;
+      }
+
+      .public-legal__nav-link.is-active {
+        color: #111827;
+        font-weight: 600;
+        background: #eef2ff;
+      }
+
+      .public-legal__nav-group-label {
+        color: #9ca3af;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 8px 8px 8px 4px;
+      }
+
+      .public-legal__article--pricing {
+        padding: clamp(24px, 2.5vw, 36px) clamp(20px, 2.5vw, 40px) clamp(20px, 2vw, 32px);
+      }
+
+      .public-legal__article--pricing .public-legal__article-head {
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+      }
+
+      .public-legal__pricing-frame {
+        margin: 0;
+        overflow: visible;
+        border-radius: 0;
+      }
+
+      .public-legal__pricing-frame .pricing-v3 {
+        min-height: unset;
+        padding: 4px 0 0;
+        background: transparent;
+      }
+
+      .public-legal__pricing-frame .pricing-v3__container {
+        max-width: none;
+        width: 100%;
+        padding-inline: 0;
+        gap: clamp(16px, 2vw, 24px);
+      }
+
+      .public-legal__pricing-frame .pricing-v3__cycle-switcher {
+        margin-inline: auto;
+      }
+
+      /*
+ * Grid columns are owned exclusively by pricing-v3 container queries.
+ * Do not re-force 3/5 columns with viewport media here — that overrides
+ * container queries when /pricing is nested in .public-legal__pricing-frame
+ * and reintroduces wide-viewport / narrow-content overflow.
+ */
+      .public-legal__pricing-frame .pricing-v3 {
+        /* keep container-type from pricing-v3.css so @container pricing-v3 applies */
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+
+      .public-legal__pricing-frame .pricing-v3__grid {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        gap: clamp(12px, 1.2vw, 16px);
+      }
+
+      .public-legal__pricing-frame .pricing-v3__card {
+        min-width: 0;
+      }
+
+      .public-legal__pricing-frame .pricing-v3__value-strip,
+      .public-legal__pricing-frame .pricing-v3__compare-table-wrap,
+      .public-legal__pricing-frame .pricing-v3__faq {
+        display: none;
+      }
+
+      .public-legal__article--features {
+        padding: clamp(28px, 3vw, 40px) clamp(24px, 3vw, 48px) clamp(24px, 2.5vw, 36px);
+      }
+
+      .public-legal__intro {
+        margin: 0 0 12px;
+        font-size: 0.98rem;
+        line-height: 1.75;
+        color: #374151;
+      }
+
+      .public-legal__section--feature {
+        padding-top: 8px;
+      }
+
+      .public-legal__section-tagline {
+        margin: -4px 0 14px;
+        font-size: 1.02rem;
+        font-weight: 600;
+        color: #2563eb;
+        line-height: 1.5;
+      }
+
+      .public-legal__subsection {
+        margin-top: 18px;
+      }
+
+      .public-legal__subsection h3 {
+        margin: 0 0 10px;
+        font-size: 0.98rem;
+        line-height: 1.4;
+        color: #111827;
+      }
+
+      .public-legal__subsection p {
+        margin: 0 0 10px;
+        font-size: 0.94rem;
+        line-height: 1.7;
+        color: #374151;
+      }
+
+      .public-legal__asset-grid {
+        display: grid;
+        gap: clamp(12px, 1.5vw, 16px);
+        margin: 14px 0 4px;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+      }
+
+      .public-legal__asset-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: #f9fafb;
+        padding: 14px 16px;
+      }
+
+      .public-legal__asset-title {
+        margin: 0 0 4px;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #111827;
+        letter-spacing: 0.02em;
+      }
+
+      .public-legal__asset-subtitle {
+        margin: 0 0 8px;
+        font-size: 0.82rem;
+        color: #6b7280;
+      }
+
+      .public-legal__list--compact {
+        gap: 4px;
+        font-size: 0.88rem;
+      }
+
+      .public-legal__value-box {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid #dbeafe;
+        background: #eff6ff;
+      }
+
+      .public-legal__value-label {
+        margin: 0 0 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+      }
+
+      .public-legal__value-text {
+        margin: 0;
+        font-size: 0.94rem;
+        line-height: 1.65;
+        color: #1e3a8a;
+      }
+
+      .public-legal__closing {
+        margin: 8px 0 0;
+        padding-top: 20px;
+        border-top: 1px solid #eef0f3;
+        font-size: 1.02rem;
+        font-weight: 600;
+        line-height: 1.6;
+        color: #111827;
+        text-align: center;
+      }
+
+      .public-legal__locale {
+        border: 1px solid #d1d5db;
+        background: #fff;
+        color: #374151;
+        border-radius: 8px;
+        min-width: 40px;
+        height: 34px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .public-legal__main {
+        flex: 1;
+        width: calc(100vw - (var(--public-legal-gutter) * 2));
+        max-width: var(--public-legal-max-width);
+        margin: 0 auto;
+        padding: clamp(24px, 3vw, 40px) 0 clamp(32px, 4vw, 56px);
+      }
+
+      .public-legal__article {
+        background: #fff;
+        border: 1px solid #e4e7ec;
+        border-radius: 16px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+        padding: 40px 44px;
+      }
+
+      .public-legal__article-head {
+        margin-bottom: 28px;
+        padding-bottom: 24px;
+        border-bottom: 1px solid #eef0f3;
+      }
+
+      .public-legal__kicker {
+        margin: 0 0 8px;
+        font-size: 0.76rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #6b7280;
+        font-weight: 600;
+      }
+
+      .public-legal__article-head h1 {
+        margin: 0 0 10px;
+        font-size: clamp(1.75rem, 3vw, 2.2rem);
+        line-height: 1.15;
+        letter-spacing: -0.03em;
+        color: #111827;
+      }
+
+      .public-legal__lead {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.6;
+        color: #4b5563;
+      }
+
+      .public-legal__meta {
+        margin: 12px 0 0;
+        font-size: 0.84rem;
+        color: #6b7280;
+      }
+
+      .public-legal__body {
+        display: grid;
+        gap: 28px;
+      }
+
+      .public-legal__section h2 {
+        margin: 0 0 12px;
+        font-size: 1.08rem;
+        line-height: 1.35;
+        color: #111827;
+      }
+
+      .public-legal__section p {
+        margin: 0 0 10px;
+        font-size: 0.95rem;
+        line-height: 1.75;
+        color: #374151;
+      }
+
+      .public-legal__list {
+        margin: 8px 0 0;
+        padding-left: 1.25rem;
+        display: grid;
+        gap: 8px;
+        font-size: 0.95rem;
+        line-height: 1.7;
+        color: #374151;
+      }
+
+      .public-legal__table-wrap {
+        overflow-x: auto;
+        margin: 12px 0 4px;
+      }
+
+      .public-legal__table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+
+      .public-legal__table th,
+      .public-legal__table td {
+        border: 1px solid #e5e7eb;
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .public-legal__table th {
+        background: #f9fafb;
+        color: #111827;
+        font-weight: 600;
+      }
+
+      .public-legal__faq {
+        margin: 0;
+        display: grid;
+        gap: 16px;
+      }
+
+      .public-legal__faq-item dt {
+        margin: 0 0 4px;
+        font-weight: 600;
+        color: #111827;
+        font-size: 0.95rem;
+      }
+
+      .public-legal__faq-item dd {
+        margin: 0;
+        font-size: 0.94rem;
+        line-height: 1.7;
+        color: #4b5563;
+      }
+
+      .public-legal__mailto {
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: 500;
+      }
+
+      .public-legal__mailto:hover {
+        text-decoration: underline;
+      }
+
+      .public-legal__footer {
+        border-top: 1px solid #e4e7ec;
+        background: #fff;
+        padding: 18px 0 22px;
+      }
+
+      .public-legal__footer-links {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+      }
+
+      .public-legal__footer-link {
+        color: #6b7280;
+        font-size: 0.82rem;
+        text-decoration: none;
+      }
+
+      .public-legal__footer-link:hover {
+        color: #111827;
+      }
+
+      .public-legal__footer-sep {
+        color: #d1d5db;
+        font-size: 0.82rem;
+      }
+
+      .public-legal__footer-meta {
+        color: #9ca3af;
+        font-size: 0.78rem;
+        text-align: center;
+      }
+
+      @media (max-width: 720px) {
+        .public-legal__header-inner {
+          flex-wrap: wrap;
+          padding: 12px 0;
+        }
+
+        .public-legal__article {
+          padding: 24px 18px;
+        }
+
+        .public-legal__main {
+          padding-top: 24px;
+        }
+      }
+
+      @media (prefers-color-scheme: dark) {
+        .public-legal {
+          background: #0f1115;
+          color: #e5e7eb;
+        }
+
+        .public-legal__header,
+        .public-legal__footer {
+          background: #151821;
+          border-color: #2a3140;
+        }
+
+        .public-legal__article {
+          background: #151821;
+          border-color: #2a3140;
+          box-shadow: none;
+        }
+
+        .public-legal__article-head {
+          border-color: #2a3140;
+        }
+
+        .public-legal__article-head h1,
+        .public-legal__section h2,
+        .public-legal__faq-item dt {
+          color: #f3f4f6;
+        }
+
+        .public-legal__lead,
+        .public-legal__section p,
+        .public-legal__list,
+        .public-legal__faq-item dd {
+          color: #cbd5e1;
+        }
+
+        .public-legal__kicker,
+        .public-legal__meta,
+        .public-legal__footer-link,
+        .public-legal__footer-meta {
+          color: #94a3b8;
+        }
+
+        .public-legal__nav-link {
+          color: #cbd5e1;
+        }
+
+        .public-legal__nav-link:hover {
+          color: #f8fafc;
+          background: #1f2430;
+        }
+
+        .public-legal__nav-link.is-active {
+          color: #f8fafc;
+          background: #1e293b;
+        }
+
+        .public-legal__locale {
+          background: #151821;
+          border-color: #334155;
+          color: #e2e8f0;
+        }
+
+        .public-legal__table th {
+          background: #1f2430;
+          color: #f3f4f6;
+        }
+
+        .public-legal__table th,
+        .public-legal__table td {
+          border-color: #334155;
+          color: #cbd5e1;
+        }
+
+        .public-legal__mailto {
+          color: #93c5fd;
+        }
+
+        .public-legal__intro,
+        .public-legal__subsection p {
+          color: #cbd5e1;
+        }
+
+        .public-legal__section-tagline {
+          color: #93c5fd;
+        }
+
+        .public-legal__asset-card {
+          background: #1f2430;
+          border-color: #334155;
+        }
+
+        .public-legal__asset-title,
+        .public-legal__closing {
+          color: #f3f4f6;
+        }
+
+        .public-legal__asset-subtitle {
+          color: #94a3b8;
+        }
+
+        .public-legal__value-box {
+          background: #1e293b;
+          border-color: #334155;
+        }
+
+        .public-legal__value-label {
+          color: #93c5fd;
+        }
+
+        .public-legal__value-text {
+          color: #cbd5e1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="public-legal public-legal--wide">
+      <div class="public-legal__pricing-frame">
+        <!---->
+        <div class="pricing-v3" data-testid="pricing-v3-page">
+          <div class="pricing-v3__container">
+            <!--?lit$519540599$-->
+            <!--?lit$519540599$-->
+            <div
+              class="pricing-v3__cycle-switcher"
+              role="group"
+              data-testid="pricing-v3-cycle-switcher"
+              aria-label="Billing cycle"
+            >
+              <!--?lit$519540599$--><!---->
+              <button
+                type="button"
+                aria-pressed="true"
+                class="pricing-v3__cycle-tab is-active"
+                data-cycle="monthly"
+                data-testid="pricing-v3-cycle-monthly"
+              >
+                <!--?lit$519540599$-->Monthly
+                <!--?lit$519540599$-->
+              </button>
+              <!----><!---->
+              <button
+                type="button"
+                aria-pressed="false"
+                class="pricing-v3__cycle-tab"
+                data-cycle="quarterly"
+                data-testid="pricing-v3-cycle-quarterly"
+              >
+                <!--?lit$519540599$-->Quarterly
+                <!--?lit$519540599$-->
+              </button>
+              <!----><!---->
+              <button
+                type="button"
+                aria-pressed="false"
+                class="pricing-v3__cycle-tab"
+                data-cycle="annual"
+                data-testid="pricing-v3-cycle-annual"
+              >
+                <!--?lit$519540599$-->Annual
+                <!--?lit$519540599$--><span class="pricing-v3__cycle-badge"
+                  ><!--?lit$519540599$-->Save 15%</span
+                >
+              </button>
+              <!---->
+            </div>
+
+            <!--?lit$519540599$-->
+            <div class="pricing-v3__grid" data-testid="pricing-v3-grid">
+              <!--?lit$519540599$--><!---->
+              <article
+                data-testid="pricing-v3-card"
+                class="pricing-v3__card is-slot-trial is-interactive"
+                data-plan-id="trial"
+              >
+                <!--?lit$519540599$-->
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--head">
+                  <div class="pricing-v3__card-header">
+                    <div class="pricing-v3__card-icon" aria-hidden="true">
+                      <!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"
+                          ></path>
+                          <path
+                            d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+                          ></path>
+                          <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
+                          <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="pricing-v3__card-title-block">
+                      <h3 class="pricing-v3__card-name"><!--?lit$519540599$-->试用版</h3>
+                      <!--?lit$519540599$-->
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--price">
+                  <div class="pricing-v3__card-price">
+                    <span class="pricing-v3__price-main"><!--?lit$519540599$-->免费</span>
+                    <!--?lit$519540599$-->
+                  </div>
+                  <!--?lit$519540599$-->
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--savings">
+                  <!--?lit$519540599$-->
+                  <span class="pricing-v3__savings-placeholder" aria-hidden="true"></span>
+                </div>
+
+                <!--?lit$519540599$-->
+                <ul class="pricing-v3__spec-list" data-testid="pricing-v3-spec-list">
+                  <!--?lit$519540599$--><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M16 21a5 5 0 0 0-10 0"></path>
+                          <circle cx="11" cy="8" r="4"></circle>
+                          <path d="M22 21a5 5 0 0 0-4-4.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->团队席位</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->3 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="m12 3-1.9 4.6L5.5 9.5l4.6 1.9L12 16l1.9-4.6 4.6-1.9-4.6-1.9L12 3Z"
+                          ></path>
+                          <path
+                            d="M19 14l-.95 2.05L16 17l2.05.95L19 20l.95-2.05L22 17l-2.05-.95L19 14Z"
+                          ></path>
+                          <path d="M5 15l-.7 1.3L3 17l1.3.7L5 19l.7-1.3L7 17l-1.3-.7L5 15Z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 员工数</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->15 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                          <polyline points="2 17 12 22 22 17"></polyline>
+                          <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 授权</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->基础 AI</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <line x1="12" x2="12" y1="20" y2="10"></line>
+                          <line x1="18" x2="18" y1="20" y2="4"></line>
+                          <line x1="6" x2="6" y1="20" y2="16"></line>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->月度 Credits</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->500 Credits</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->最大并发</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->2 路</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->治理 / SLA</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->无 · 无</span
+                      >
+                    </span>
+                  </li>
+                  <!---->
+                </ul>
+
+                <div class="pricing-v3__card-spacer" aria-hidden="true"></div>
+
+                <div class="pricing-v3__card-actions">
+                  <!--?lit$519540599$-->
+                  <button
+                    type="button"
+                    data-testid="pricing-v3-cta"
+                    class="pricing-v3__cta is-outline"
+                  >
+                    <!--?lit$519540599$-->免费试用
+                  </button>
+                </div>
+              </article>
+              <!----><!---->
+              <article
+                data-testid="pricing-v3-card"
+                class="pricing-v3__card is-slot-starter is-interactive"
+                data-plan-id="starter"
+              >
+                <!--?lit$519540599$-->
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--head">
+                  <div class="pricing-v3__card-header">
+                    <div class="pricing-v3__card-icon" aria-hidden="true">
+                      <!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M16 21a5 5 0 0 0-10 0"></path>
+                          <circle cx="11" cy="8" r="4"></circle>
+                          <path d="M22 21a5 5 0 0 0-4-4.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="pricing-v3__card-title-block">
+                      <h3 class="pricing-v3__card-name"><!--?lit$519540599$-->基础版</h3>
+                      <!--?lit$519540599$-->
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--price">
+                  <div class="pricing-v3__card-price">
+                    <span class="pricing-v3__price-main"><!--?lit$519540599$-->¥499</span>
+                    <!--?lit$519540599$--><span class="pricing-v3__price-unit"
+                      ><!--?lit$519540599$-->/mo</span
+                    >
+                  </div>
+                  <!--?lit$519540599$-->
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--savings">
+                  <!--?lit$519540599$-->
+                  <span class="pricing-v3__savings-placeholder" aria-hidden="true"></span>
+                </div>
+
+                <!--?lit$519540599$-->
+                <ul class="pricing-v3__spec-list" data-testid="pricing-v3-spec-list">
+                  <!--?lit$519540599$--><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M16 21a5 5 0 0 0-10 0"></path>
+                          <circle cx="11" cy="8" r="4"></circle>
+                          <path d="M22 21a5 5 0 0 0-4-4.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->团队席位</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->5 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="m12 3-1.9 4.6L5.5 9.5l4.6 1.9L12 16l1.9-4.6 4.6-1.9-4.6-1.9L12 3Z"
+                          ></path>
+                          <path
+                            d="M19 14l-.95 2.05L16 17l2.05.95L19 20l.95-2.05L22 17l-2.05-.95L19 14Z"
+                          ></path>
+                          <path d="M5 15l-.7 1.3L3 17l1.3.7L5 19l.7-1.3L7 17l-1.3-.7L5 15Z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 员工数</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->25 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                          <polyline points="2 17 12 22 22 17"></polyline>
+                          <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 授权</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->基础 AI · 专业 AI</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <line x1="12" x2="12" y1="20" y2="10"></line>
+                          <line x1="18" x2="18" y1="20" y2="4"></line>
+                          <line x1="6" x2="6" y1="20" y2="16"></line>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->月度 Credits</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->5,000 Credits</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->最大并发</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->5 路</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->治理 / SLA</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->高级治理 · 99.5%</span
+                      >
+                    </span>
+                  </li>
+                  <!---->
+                </ul>
+
+                <div class="pricing-v3__card-spacer" aria-hidden="true"></div>
+
+                <div class="pricing-v3__card-actions">
+                  <!--?lit$519540599$-->
+                  <button
+                    type="button"
+                    data-testid="pricing-v3-cta"
+                    class="pricing-v3__cta is-primary"
+                  >
+                    <!--?lit$519540599$-->立即升级
+                  </button>
+                </div>
+              </article>
+              <!----><!---->
+              <article
+                data-testid="pricing-v3-card"
+                class="pricing-v3__card is-recommended is-slot-professional is-interactive"
+                data-plan-id="pro"
+              >
+                <!--?lit$519540599$-->
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--head">
+                  <div class="pricing-v3__card-header">
+                    <div class="pricing-v3__card-icon" aria-hidden="true">
+                      <!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                          <polyline points="16 7 22 7 22 13"></polyline>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="pricing-v3__card-title-block">
+                      <h3 class="pricing-v3__card-name"><!--?lit$519540599$-->专业版</h3>
+                      <!--?lit$519540599$--><span
+                        class="pricing-v3__slot-badge is-recommended-badge"
+                        ><!--?lit$519540599$-->推荐</span
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--price">
+                  <div class="pricing-v3__card-price">
+                    <span class="pricing-v3__price-main"><!--?lit$519540599$-->¥999</span>
+                    <!--?lit$519540599$--><span class="pricing-v3__price-unit"
+                      ><!--?lit$519540599$-->/mo</span
+                    >
+                  </div>
+                  <!--?lit$519540599$-->
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--savings">
+                  <!--?lit$519540599$-->
+                  <span class="pricing-v3__savings-placeholder" aria-hidden="true"></span>
+                </div>
+
+                <!--?lit$519540599$-->
+                <ul class="pricing-v3__spec-list" data-testid="pricing-v3-spec-list">
+                  <!--?lit$519540599$--><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M16 21a5 5 0 0 0-10 0"></path>
+                          <circle cx="11" cy="8" r="4"></circle>
+                          <path d="M22 21a5 5 0 0 0-4-4.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->团队席位</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->20 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="m12 3-1.9 4.6L5.5 9.5l4.6 1.9L12 16l1.9-4.6 4.6-1.9-4.6-1.9L12 3Z"
+                          ></path>
+                          <path
+                            d="M19 14l-.95 2.05L16 17l2.05.95L19 20l.95-2.05L22 17l-2.05-.95L19 14Z"
+                          ></path>
+                          <path d="M5 15l-.7 1.3L3 17l1.3.7L5 19l.7-1.3L7 17l-1.3-.7L5 15Z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 员工数</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->100 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                          <polyline points="2 17 12 22 22 17"></polyline>
+                          <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 授权</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->基础 AI · 专业 AI</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <line x1="12" x2="12" y1="20" y2="10"></line>
+                          <line x1="18" x2="18" y1="20" y2="4"></line>
+                          <line x1="6" x2="6" y1="20" y2="16"></line>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->月度 Credits</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->120,000 Credits</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->最大并发</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->40 路</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->治理 / SLA</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->高级治理 · 99.5%</span
+                      >
+                    </span>
+                  </li>
+                  <!---->
+                </ul>
+
+                <div class="pricing-v3__card-spacer" aria-hidden="true"></div>
+
+                <div class="pricing-v3__card-actions">
+                  <!--?lit$519540599$-->
+                  <button
+                    type="button"
+                    data-testid="pricing-v3-cta"
+                    class="pricing-v3__cta is-primary is-recommended-cta"
+                  >
+                    <!--?lit$519540599$-->立即升级
+                  </button>
+                </div>
+              </article>
+              <!----><!---->
+              <article
+                data-testid="pricing-v3-card"
+                class="pricing-v3__card is-slot-business is-interactive"
+                data-plan-id="biz"
+              >
+                <!--?lit$519540599$-->
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--head">
+                  <div class="pricing-v3__card-header">
+                    <div class="pricing-v3__card-icon" aria-hidden="true">
+                      <!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"></path>
+                          <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"></path>
+                          <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"></path>
+                          <path d="M10 6h4"></path>
+                          <path d="M10 10h4"></path>
+                          <path d="M10 14h4"></path>
+                          <path d="M10 18h4"></path>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="pricing-v3__card-title-block">
+                      <h3 class="pricing-v3__card-name"><!--?lit$519540599$-->旗舰版</h3>
+                      <!--?lit$519540599$-->
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--price">
+                  <div class="pricing-v3__card-price">
+                    <span class="pricing-v3__price-main"><!--?lit$519540599$-->¥2999</span>
+                    <!--?lit$519540599$--><span class="pricing-v3__price-unit"
+                      ><!--?lit$519540599$-->/mo</span
+                    >
+                  </div>
+                  <!--?lit$519540599$-->
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--savings">
+                  <!--?lit$519540599$-->
+                  <span class="pricing-v3__savings-placeholder" aria-hidden="true"></span>
+                </div>
+
+                <!--?lit$519540599$-->
+                <ul class="pricing-v3__spec-list" data-testid="pricing-v3-spec-list">
+                  <!--?lit$519540599$--><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M16 21a5 5 0 0 0-10 0"></path>
+                          <circle cx="11" cy="8" r="4"></circle>
+                          <path d="M22 21a5 5 0 0 0-4-4.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->团队席位</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->100 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="m12 3-1.9 4.6L5.5 9.5l4.6 1.9L12 16l1.9-4.6 4.6-1.9-4.6-1.9L12 3Z"
+                          ></path>
+                          <path
+                            d="M19 14l-.95 2.05L16 17l2.05.95L19 20l.95-2.05L22 17l-2.05-.95L19 14Z"
+                          ></path>
+                          <path d="M5 15l-.7 1.3L3 17l1.3.7L5 19l.7-1.3L7 17l-1.3-.7L5 15Z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 员工数</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->500 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                          <polyline points="2 17 12 22 22 17"></polyline>
+                          <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 授权</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->基础 AI · 专业 AI · 高级 AI</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <line x1="12" x2="12" y1="20" y2="10"></line>
+                          <line x1="18" x2="18" y1="20" y2="4"></line>
+                          <line x1="6" x2="6" y1="20" y2="16"></line>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->月度 Credits</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->500,000 Credits</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->最大并发</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->250 路</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->治理 / SLA</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->企业级治理 · 99.9%</span
+                      >
+                    </span>
+                  </li>
+                  <!---->
+                </ul>
+
+                <div class="pricing-v3__card-spacer" aria-hidden="true"></div>
+
+                <div class="pricing-v3__card-actions">
+                  <!--?lit$519540599$-->
+                  <button
+                    type="button"
+                    data-testid="pricing-v3-cta"
+                    class="pricing-v3__cta is-primary"
+                  >
+                    <!--?lit$519540599$-->立即升级
+                  </button>
+                </div>
+              </article>
+              <!----><!---->
+              <article
+                data-testid="pricing-v3-card"
+                class="pricing-v3__card is-enterprise is-slot-enterprise is-interactive"
+                data-plan-id="ent"
+              >
+                <!--?lit$519540599$-->
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--head">
+                  <div class="pricing-v3__card-header">
+                    <div class="pricing-v3__card-icon" aria-hidden="true">
+                      <!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="m12 3-1.9 4.6L5.5 9.5l4.6 1.9L12 16l1.9-4.6 4.6-1.9-4.6-1.9L12 3Z"
+                          ></path>
+                          <path
+                            d="M19 14l-.95 2.05L16 17l2.05.95L19 20l.95-2.05L22 17l-2.05-.95L19 14Z"
+                          ></path>
+                          <path d="M5 15l-.7 1.3L3 17l1.3.7L5 19l.7-1.3L7 17l-1.3-.7L5 15Z"></path>
+                        </svg>
+                      </span>
+                    </div>
+                    <div class="pricing-v3__card-title-block">
+                      <h3 class="pricing-v3__card-name"><!--?lit$519540599$-->卓越版</h3>
+                      <!--?lit$519540599$-->
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--price">
+                  <div class="pricing-v3__card-price">
+                    <span class="pricing-v3__price-main pricing-v3__price-main--quote"
+                      ><!--?lit$519540599$-->定制报价</span
+                    >
+                    <!--?lit$519540599$-->
+                  </div>
+                  <!--?lit$519540599$-->
+                </div>
+
+                <div class="pricing-v3__card-zone pricing-v3__card-zone--savings">
+                  <!--?lit$519540599$-->
+                  <span class="pricing-v3__savings-placeholder" aria-hidden="true"></span>
+                </div>
+
+                <!--?lit$519540599$-->
+                <ul class="pricing-v3__spec-list" data-testid="pricing-v3-spec-list">
+                  <!--?lit$519540599$--><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M16 21a5 5 0 0 0-10 0"></path>
+                          <circle cx="11" cy="8" r="4"></circle>
+                          <path d="M22 21a5 5 0 0 0-4-4.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->团队席位</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->定制 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="m12 3-1.9 4.6L5.5 9.5l4.6 1.9L12 16l1.9-4.6 4.6-1.9-4.6-1.9L12 3Z"
+                          ></path>
+                          <path
+                            d="M19 14l-.95 2.05L16 17l2.05.95L19 20l.95-2.05L22 17l-2.05-.95L19 14Z"
+                          ></path>
+                          <path d="M5 15l-.7 1.3L3 17l1.3.7L5 19l.7-1.3L7 17l-1.3-.7L5 15Z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 员工数</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->定制 个</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                          <polyline points="2 17 12 22 22 17"></polyline>
+                          <polyline points="2 12 12 17 22 12"></polyline>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->AI 授权</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->按需配置</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->最大并发</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->定制 路</span
+                      >
+                    </span>
+                  </li>
+                  <!----><!---->
+                  <li class="pricing-v3__spec-item">
+                    <span class="pricing-v3__spec-icon" aria-hidden="true"
+                      ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                        ><!--?lit$519540599$-->
+                        <svg viewBox="0 0 24 24">
+                          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg> </span
+                    ></span>
+                    <span class="pricing-v3__spec-copy">
+                      <span class="pricing-v3__spec-label"><!--?lit$519540599$-->治理 / SLA</span>
+                      <!--?lit$519540599$--><span class="pricing-v3__spec-value"
+                        ><!--?lit$519540599$-->集团治理 · 定制 SLA</span
+                      >
+                    </span>
+                  </li>
+                  <!---->
+                </ul>
+
+                <div class="pricing-v3__card-spacer" aria-hidden="true"></div>
+
+                <div class="pricing-v3__card-actions">
+                  <!--?lit$519540599$-->
+                  <button
+                    type="button"
+                    data-testid="pricing-v3-cta"
+                    class="pricing-v3__cta is-enterprise-cta"
+                  >
+                    <!--?lit$519540599$-->联系销售
+                  </button>
+                </div>
+              </article>
+              <!---->
+            </div>
+
+            <!--?lit$519540599$-->
+            <!--?lit$519540599$-->
+            <section class="pricing-v3__value-strip" aria-label="平台价值">
+              <!--?lit$519540599$--><!---->
+              <div class="pricing-v3__value-item">
+                <span class="pricing-v3__value-icon" aria-hidden="true"
+                  ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                    ><!--?lit$519540599$-->
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"
+                      ></path>
+                      <path
+                        d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+                      ></path>
+                      <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"></path>
+                      <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"></path>
+                    </svg> </span
+                ></span>
+                <div>
+                  <div class="pricing-v3__value-title"><!--?lit$519540599$-->快速上线</div>
+                  <div class="pricing-v3__value-body">
+                    <!--?lit$519540599$-->分钟级创建 AI 员工，快速部署企业 AI 团队
+                  </div>
+                </div>
+              </div>
+              <!----><!---->
+              <div class="pricing-v3__value-item">
+                <span class="pricing-v3__value-icon" aria-hidden="true"
+                  ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                    ><!--?lit$519540599$-->
+                    <svg viewBox="0 0 24 24">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg> </span
+                ></span>
+                <div>
+                  <div class="pricing-v3__value-title"><!--?lit$519540599$-->安全可靠</div>
+                  <div class="pricing-v3__value-body">
+                    <!--?lit$519540599$-->企业级安全与合规，保障数据安全与隐私
+                  </div>
+                </div>
+              </div>
+              <!----><!---->
+              <div class="pricing-v3__value-item">
+                <span class="pricing-v3__value-icon" aria-hidden="true"
+                  ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                    ><!--?lit$519540599$-->
+                    <svg viewBox="0 0 24 24">
+                      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
+                      <polyline points="16 7 22 7 22 13"></polyline>
+                    </svg> </span
+                ></span>
+                <div>
+                  <div class="pricing-v3__value-title"><!--?lit$519540599$-->持续进化</div>
+                  <div class="pricing-v3__value-body">
+                    <!--?lit$519540599$-->持续更新的 AI 能力与行业最佳实践
+                  </div>
+                </div>
+              </div>
+              <!----><!---->
+              <div class="pricing-v3__value-item">
+                <span class="pricing-v3__value-icon" aria-hidden="true"
+                  ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                    ><!--?lit$519540599$-->
+                    <svg viewBox="0 0 24 24">
+                      <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                      <polyline points="2 17 12 22 22 17"></polyline>
+                      <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg> </span
+                ></span>
+                <div>
+                  <div class="pricing-v3__value-title"><!--?lit$519540599$-->灵活扩展</div>
+                  <div class="pricing-v3__value-body">
+                    <!--?lit$519540599$-->随时升级或降级，按需扩展组织能力
+                  </div>
+                </div>
+              </div>
+              <!----><!---->
+              <div class="pricing-v3__value-item">
+                <span class="pricing-v3__value-icon" aria-hidden="true"
+                  ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                    ><!--?lit$519540599$-->
+                    <svg viewBox="0 0 24 24">
+                      <line x1="12" x2="12" y1="20" y2="10"></line>
+                      <line x1="18" x2="18" y1="20" y2="4"></line>
+                      <line x1="6" x2="6" y1="20" y2="16"></line>
+                    </svg> </span
+                ></span>
+                <div>
+                  <div class="pricing-v3__value-title"><!--?lit$519540599$-->成本可控</div>
+                  <div class="pricing-v3__value-body">
+                    <!--?lit$519540599$-->清晰透明的计费，无隐藏成本
+                  </div>
+                </div>
+              </div>
+              <!---->
+            </section>
+
+            <!--?lit$519540599$-->
+            <section class="pricing-v3__compare-section" data-testid="pricing-v3-compare">
+              <h2 class="pricing-v3__section-title"><!--?lit$519540599$-->付费套餐功能对比</h2>
+              <p
+                class="pricing-v3__compare-scroll-hint"
+                data-testid="pricing-v3-compare-scroll-hint"
+              >
+                窄屏可左右滑动查看完整对比
+              </p>
+              <div
+                class="pricing-v3__compare-table-wrap"
+                tabindex="0"
+                role="region"
+                aria-label="付费套餐功能对比"
+              >
+                <table class="pricing-v3__compare-table">
+                  <thead>
+                    <tr>
+                      <th scope="col" class="pricing-v3__compare-sticky">能力</th>
+                      <!--?lit$519540599$--><!---->
+                      <th scope="col"><!--?lit$519540599$-->基础版</th>
+                      <!----><!---->
+                      <th scope="col"><!--?lit$519540599$-->专业版</th>
+                      <!----><!---->
+                      <th scope="col"><!--?lit$519540599$-->旗舰版</th>
+                      <!----><!---->
+                      <th scope="col"><!--?lit$519540599$-->卓越版</th>
+                      <!---->
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!--?lit$519540599$--><!---->
+                    <tr>
+                      <th scope="row" class="pricing-v3__compare-sticky">
+                        <!--?lit$519540599$-->AI 员工
+                      </th>
+                      <!--?lit$519540599$--><!---->
+                      <td>
+                        <!--?lit$519540599$--><span><!--?lit$519540599$-->25</span>
+                      </td>
+                      <!----><!---->
+                      <td>
+                        <!--?lit$519540599$--><span><!--?lit$519540599$-->100</span>
+                      </td>
+                      <!----><!---->
+                      <td>
+                        <!--?lit$519540599$--><span><!--?lit$519540599$-->500</span>
+                      </td>
+                      <!----><!---->
+                      <td>
+                        <!--?lit$519540599$-->
+                        <span class="pricing-v3__compare-custom" aria-label="定制">定制</span>
+                      </td>
+                      <!---->
+                    </tr>
+                    <!----><!---->
+                    <tr>
+                      <th scope="row" class="pricing-v3__compare-sticky">
+                        <!--?lit$519540599$-->审计日志
+                      </th>
+                      <!--?lit$519540599$--><!---->
+                      <td>
+                        <!--?lit$519540599$-->
+                        <span class="pricing-v3__compare-no" aria-label="不支持"
+                          >—<span class="pricing-v3__sr-only">不支持</span></span
+                        >
+                      </td>
+                      <!----><!---->
+                      <td>
+                        <!--?lit$519540599$--><span
+                          class="pricing-v3__compare-yes"
+                          aria-label="支持"
+                          ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                            ><!--?lit$519540599$-->
+                            <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg> </span
+                          ><span class="pricing-v3__sr-only">支持</span></span
+                        >
+                      </td>
+                      <!----><!---->
+                      <td>
+                        <!--?lit$519540599$--><span
+                          class="pricing-v3__compare-yes"
+                          aria-label="支持"
+                          ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                            ><!--?lit$519540599$-->
+                            <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg> </span
+                          ><span class="pricing-v3__sr-only">支持</span></span
+                        >
+                      </td>
+                      <!----><!---->
+                      <td>
+                        <!--?lit$519540599$--><span
+                          class="pricing-v3__compare-yes"
+                          aria-label="支持"
+                          ><!--?lit$519540599$--><span aria-hidden="true" class="nav-item__icon"
+                            ><!--?lit$519540599$-->
+                            <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"></path></svg> </span
+                          ><span class="pricing-v3__sr-only">支持</span></span
+                        >
+                      </td>
+                      <!---->
+                    </tr>
+                    <!---->
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <!--?lit$519540599$-->
+            <section class="pricing-v3__faq" data-testid="pricing-v3-faq">
+              <h2 class="pricing-v3__section-title">常见问题</h2>
+              <div class="pricing-v3__faq-list">
+                <!--?lit$519540599$--><!---->
+                <details class="pricing-v3__faq-item">
+                  <summary><!--?lit$519540599$-->如何升级？</summary>
+                  <p><!--?lit$519540599$-->在企业端选择套餐并确认。</p>
+                </details>
+                <!---->
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

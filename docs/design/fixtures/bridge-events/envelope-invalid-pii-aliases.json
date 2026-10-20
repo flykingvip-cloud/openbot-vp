@@ -1,0 +1,20 @@
+{
+  "contractVersion": "2026-09-15.rev2",
+  "event": "background.completed",
+  "idempotencyKey": "d3d4e5f6789012345678901234567890abcdef1234567890abcdef1234567890",
+  "recordedAt": "2026-09-15T12:01:00Z",
+  "tenantId": "tenant-canary-1",
+  "scope": "group_tenant",
+  "serverAttribution": "gateway:subagent-announce",
+  "payload": {
+    "event": "background.completed",
+    "source": "gateway.subagent",
+    "auth": {
+      "AccessToken": "redacted",
+      "requester_id": "user-9",
+      "access_token": "redacted",
+      "hmac_secret": "redacted",
+      "private_key": "redacted"
+    }
+  }
+}

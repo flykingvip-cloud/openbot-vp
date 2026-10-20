@@ -1,0 +1,46 @@
+{
+  "schema": "openbot-cogniweave-u1-design-review/v1",
+  "kind": "u1-dark-contract-review",
+  "reviewer": "cursor-memory-wsc",
+  "signedBy": "cursor-memory-wsc",
+  "signedAt": "2026-08-19T12:20:00.000Z",
+  "focus": "schema v2 stays closed, item 7 sites kept, dark-only boundary",
+  "scope": "U1-dark-contract-only",
+  "decision": "accepted",
+  "request": "docs/design/evidence/openbot-cogniweave-u1-design-review-request-2026-08-19.json",
+  "item2": "met",
+  "item6": "not-met",
+  "unlock": "not-issued",
+  "u1": "blocked",
+  "authorizes": "none",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "schemaV2Write": "disabled",
+  "catalogWrite": "forbidden",
+  "verified": {
+    "SCHEMA_V2_ENABLED": false,
+    "schemaV2File": "src/memory/schema-v2.ts",
+    "item7ProductionWriteWatchIndex": 37,
+    "item7FrozenWriteWatchIndex": 38,
+    "item7RetiredThisChange": 0,
+    "item7RetirementInU1": "forbidden"
+  },
+  "doesNotAuthorize": [
+    "implementation",
+    "Catalog write",
+    "schema-v2-write",
+    "retirement",
+    "LIVE",
+    "unlock",
+    "item 6 met"
+  ],
+  "explicitlyForbidden": [
+    "fill coordinator request signedBy slots",
+    "sign another required U1 review as this identity",
+    "enable SCHEMA_V2_ENABLED",
+    "delete item 7 production write sites",
+    "self-issue unlock"
+  ],
+  "note": "WSC accepts the U1 dark contract only. SCHEMA_V2_ENABLED remains false. Item 7 production write sites stay in place. Item 6 production-equivalent sqlite is still not-met, so unlock stays not-issued."
+}

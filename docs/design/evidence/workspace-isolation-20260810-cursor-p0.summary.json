@@ -1,0 +1,102 @@
+{
+  "evidenceId": "workspace-isolation-20260810-cursor-p0",
+  "schema": "workspace-isolation-evidence-summary/v1",
+  "probeUtc": "2026-08-10T00:18:54Z",
+  "classification": "controlled-audit-desensitized",
+  "environment": {
+    "host": "<production-gateway-host>",
+    "container": "<gateway-container>",
+    "image": "<gateway-image>",
+    "imageId": "<gateway-image-id>",
+    "buildCommit": "<gateway-build-commit>",
+    "buildOverlay": "<gateway-overlay-id>",
+    "dataSource": "host-bind:{stateDir} -> container:{stateDir}",
+    "multitenant": true,
+    "dataMode": "managed"
+  },
+  "sample": {
+    "tenantId": "<sample-tenant>",
+    "userId": "<sample-user>"
+  },
+  "cluster": {
+    "tenantCount": 1,
+    "userDirCount": 1
+  },
+  "probe": {
+    "scriptPath": "scripts/audit/workspace-isolation-probe.mjs",
+    "scriptSha256": "90166dfe221ff38934d263e9bc4cc1f38dd0751db0596c2b3644b2889e9a6af1",
+    "schema": "workspace-isolation-probe/v2",
+    "recentDays": 14,
+    "mode": "summary-redacted",
+    "derivedFrom": "workspace-isolation-probe/v2"
+  },
+  "pathSummary": {
+    "A_employee": {
+      "pathPattern": "{stateDir}/agents/main/employees/<sample-user>/workspace",
+      "exists": true,
+      "deliverableCount": 1,
+      "recentCount": 1
+    },
+    "B_flat_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace",
+      "exists": true,
+      "deliverableCount": 1,
+      "recentCount": 1
+    },
+    "C_agent_main": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/agents/main/workspace",
+      "exists": false,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "D_skill_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace-bot-skill",
+      "exists": false,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "E_skill_host": {
+      "pathPattern": "{stateDir}/workspace-bot-skill",
+      "exists": true,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "F_canvas": {
+      "pathPattern": "{stateDir}/canvas",
+      "exists": true,
+      "deliverableCount": 1,
+      "recentCount": 1
+    }
+  },
+  "crossClassDuplicateBasenames": {
+    "file-1188c3be7879.md": [
+      {
+        "classId": "A_employee",
+        "size": 14,
+        "mtimeUtc": "2026-08-10T09:34:58.202Z",
+        "sha256": "399d7331834afc5c30bd2b169c83aa17566c8ce4d51ccbe210094bb1a7de1c67",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 21,
+        "mtimeUtc": "2026-08-10T09:34:58.202Z",
+        "sha256": "a7411db220271de2c2fafc95afdda4e234adbb4f620fe6eac961225d912f041e",
+        "hashMode": "full"
+      }
+    ]
+  },
+  "stats": {
+    "bytesRead": 49,
+    "errorCount": 0,
+    "truncated": false,
+    "truncationReasons": []
+  },
+  "controlledRawBundle": {
+    "location": "<controlled-audit-store>",
+    "bundleId": "workspace-isolation-20260810-cursor-p0-raw",
+    "note": "Full host/container/user identifiers and absolute paths remain outside the git repository."
+  },
+  "summarySha256Algorithm": "UTF-8 bytes of JSON.stringify(summaryWithoutSha, null, 2) + '\\n' where summaryWithoutSha omits summarySha256; Node/JSON key insertion order as produced by this script.",
+  "summarySha256": "601d28f9b2524394d914ab6638390916034684dafca041f54168e6494a7c6ca8"
+}

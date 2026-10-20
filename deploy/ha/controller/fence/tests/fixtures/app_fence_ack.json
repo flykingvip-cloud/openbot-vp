@@ -1,0 +1,6 @@
+{
+  "acked": true,
+  "role": "FENCED",
+  "healthz": 503,
+  "idempotency_key": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:FENCING_APP"
+}

@@ -1,0 +1,43 @@
+name: Delivery SoT alignment
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - deploy/production/RELEASE_RECORD.md
+      - deploy/production/releases.jsonl
+      - scripts/delivery/**
+
+permissions:
+  contents: read
+
+jobs:
+  forward-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Anchor LIVE on immutable artifacts (open releases.jsonl row + provenance tag +
+      # RELEASE_RECORD) and require it to be contained in the sole trunk (origin/main).
+      # The frozen release/baseline-recovery branch is never consulted, so its lag can no
+      # longer produce a false failure.
+      - name: Ensure trunk ref is available
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+      - name: Assert production LIVE is anchored to the trunk
+        run: >-
+          pnpm delivery:check-sot --
+          --use-release-record-live
+          --trunk-ref origin/main

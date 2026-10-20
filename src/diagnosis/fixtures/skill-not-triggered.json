@@ -1,0 +1,462 @@
+{
+  "schemaVersion": 1,
+  "graphKind": "DiagnosticRunGraph",
+  "run": {
+    "schemaVersion": 1,
+    "runId": "diag-run-fixture-2",
+    "caseId": "case-fixture-2",
+    "mode": "QUICK",
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002",
+          "timeRange": {
+            "from": "2026-09-01T11:00:00.000Z",
+            "to": "2026-09-01T11:06:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      }
+    ],
+    "requestedBy": {
+      "schemaVersion": 1,
+      "principalId": "principal-fixture-employee-a",
+      "kind": "user",
+      "tenantId": "tenant-fixture-a"
+    },
+    "mutationPolicy": "READ_ONLY",
+    "budget": {
+      "timeoutMs": 8000,
+      "maxDiagnosers": 3,
+      "modelCalls": 0
+    },
+    "status": "completed",
+    "completion": "CONFIRMED",
+    "missingEvidence": [
+      {
+        "evidenceType": "event",
+        "source": "skill_invocation",
+        "targetType": "skill",
+        "fields": ["selectedSkillId", "decisionCode"],
+        "sensitivity": "internal",
+        "cost": "low",
+        "required": false,
+        "schemaVersion": 1
+      }
+    ],
+    "startedAt": "2026-09-01T11:06:01.000Z",
+    "completedAt": "2026-09-01T11:06:02.100Z",
+    "diagnosedAgentRunId": "agent-run-fixture-2"
+  },
+  "evidences": [
+    {
+      "evidenceId": "ev-fixture-2-session-meta",
+      "evidenceType": "event",
+      "source": "session_store",
+      "authorityRecordId": "session-jsonl:sha256:fixture-session-key-a0000000000000000000000000000002#rec-1",
+      "observedAt": "2026-09-01T11:00:02.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      },
+      "summary": {
+        "messageReceived": true,
+        "retryCount": 0
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-2-session-meta",
+        "collectorVersion": "session-adapter.v1"
+      },
+      "collection": {
+        "method": "query",
+        "completeness": "complete",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/sessions/transcript-events.ts"
+    },
+    {
+      "evidenceId": "ev-fixture-2-agent-run",
+      "evidenceType": "event",
+      "source": "agent_runner",
+      "authorityRecordId": "agent-hook:agent-run-fixture-2#completed",
+      "observedAt": "2026-09-01T11:00:08.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      },
+      "summary": {
+        "agentStarted": true,
+        "agentCompleted": true,
+        "errorClass": null,
+        "agentRunId": "agent-run-fixture-2"
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-2-agent-run",
+        "collectorVersion": "agent-hook-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "complete",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/agents/agent-runner.ts"
+    },
+    {
+      "evidenceId": "ev-fixture-2-skill-absent",
+      "evidenceType": "event",
+      "source": "skill_invocation",
+      "authorityRecordId": "skill-invocation:agent-run-fixture-2#empty",
+      "observedAt": "2026-09-01T11:00:08.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      },
+      "summary": {
+        "skillStarted": false,
+        "invocationCount": 0,
+        "attributionResolution": "none"
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-2-skill-absent",
+        "collectorVersion": "skill-invocation-adapter.v1"
+      },
+      "collection": {
+        "method": "query",
+        "completeness": "complete",
+        "attributionResolution": "none"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/gateway/skill-invocation/"
+    }
+  ],
+  "observations": [
+    {
+      "observationId": "obs-fixture-2-agent-started",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "agent.run.started",
+      "value": true,
+      "evidenceIds": ["ev-fixture-2-agent-run"],
+      "observedAt": "2026-09-01T11:00:03.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-2-agent-completed",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "agent.run.completed",
+      "value": true,
+      "evidenceIds": ["ev-fixture-2-agent-run"],
+      "observedAt": "2026-09-01T11:00:08.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-2-skill-not-started",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "skill.started",
+      "value": false,
+      "evidenceIds": ["ev-fixture-2-skill-absent"],
+      "observedAt": "2026-09-01T11:00:08.000Z",
+      "schemaVersion": 1
+    }
+  ],
+  "assessments": [
+    {
+      "assessmentId": "asmt-fixture-2-skill-not-started",
+      "observationIds": ["obs-fixture-2-agent-completed", "obs-fixture-2-skill-not-started"],
+      "code": "expected_skill_not_started",
+      "verdict": "anomalous",
+      "ruleId": "rule.skill.started.v1",
+      "schemaVersion": 1
+    }
+  ],
+  "attributions": [
+    {
+      "attributionId": "attr-fixture-2-skill-selection",
+      "assessmentId": "asmt-fixture-2-skill-not-started",
+      "suspectedTarget": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "responsibilityDomain": "skill_tool",
+      "state": "supported",
+      "basis": "rule",
+      "schemaVersion": 1
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesisId": "hyp-fixture-2-skill-not-triggered",
+      "code": "skill_not_triggered",
+      "state": "confirmed",
+      "confidence": {
+        "evidence": 0.98,
+        "assessment": 0.94,
+        "rootCause": 0.88,
+        "impact": 0.45
+      },
+      "supportingEvidenceIds": ["ev-fixture-2-agent-run", "ev-fixture-2-skill-absent"],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": [],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    },
+    {
+      "hypothesisId": "hyp-fixture-2-router-miss",
+      "code": "skill_router_miss",
+      "state": "candidate",
+      "confidence": {
+        "evidence": 0.2,
+        "assessment": 0.4,
+        "rootCause": 0.31,
+        "impact": 0
+      },
+      "supportingEvidenceIds": [],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": ["skill_router_decision"],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    }
+  ],
+  "findings": [
+    {
+      "findingId": "find-fixture-2-skill-not-triggered",
+      "code": "skill_not_triggered",
+      "title": "Expected skill was not invoked after agent run completed",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "status": "open",
+      "severity": "P2",
+      "primaryDomain": "skill_tool",
+      "observationIds": ["obs-fixture-2-agent-completed", "obs-fixture-2-skill-not-started"],
+      "assessmentIds": ["asmt-fixture-2-skill-not-started"],
+      "attributionIds": ["attr-fixture-2-skill-selection"],
+      "hypothesisIds": ["hyp-fixture-2-skill-not-triggered"],
+      "evidenceIds": ["ev-fixture-2-agent-run", "ev-fixture-2-skill-absent"],
+      "confidence": {
+        "evidence": 0.98,
+        "assessment": 0.94,
+        "rootCause": 0.88,
+        "impact": 0.45
+      },
+      "fingerprint": "skill_tool|skill_not_triggered|skill:skill-fixture-lookup|session:sha256:fixture-session-key-a0000000000000000000000000000002",
+      "firstSeenAt": "2026-09-01T11:00:08.000Z",
+      "lastSeenAt": "2026-09-01T11:00:08.000Z",
+      "schemaVersion": 1,
+      "completion": "CONFIRMED"
+    }
+  ],
+  "relations": [
+    {
+      "relationId": "rel-fixture-2-skill-from-store",
+      "fromId": "obs-fixture-2-skill-not-started",
+      "toId": "ev-fixture-2-skill-absent",
+      "relation": "derived_from",
+      "derivation": "EVIDENCE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.98,
+      "evidenceIds": ["ev-fixture-2-skill-absent"],
+      "schemaVersion": 1
+    },
+    {
+      "relationId": "rel-fixture-2-causes-finding",
+      "fromId": "obs-fixture-2-skill-not-started",
+      "toId": "find-fixture-2-skill-not-triggered",
+      "relation": "causes",
+      "derivation": "RULE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.88,
+      "evidenceIds": ["ev-fixture-2-skill-absent"],
+      "schemaVersion": 1
+    }
+  ],
+  "case": {
+    "schemaVersion": 1,
+    "caseId": "case-fixture-2",
+    "tenantId": "tenant-fixture-a",
+    "status": "TRIAGED",
+    "diagnosticRunIds": ["diag-run-fixture-2"],
+    "findingIds": ["find-fixture-2-skill-not-triggered"],
+    "relationIds": ["rel-fixture-2-skill-from-store", "rel-fixture-2-causes-finding"],
+    "mergeKey": "tenant-fixture-a|sha256:fixture-session-key-a0000000000000000000000000000002|skill_tool|skill_not_triggered|skill:skill-fixture-lookup",
+    "mergedObservationPredicates": ["agent.run.completed", "skill.started"],
+    "impact": {
+      "affectedCount": 1,
+      "code": "case:find-fixture-2-skill-not-triggered"
+    },
+    "timeline": [
+      {
+        "at": "2026-09-01T11:00:03.000Z",
+        "code": "observation:obs-fixture-2-agent-started"
+      },
+      {
+        "at": "2026-09-01T11:00:08.000Z",
+        "code": "observation:obs-fixture-2-skill-not-started"
+      }
+    ],
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002",
+          "timeRange": {
+            "from": "2026-09-01T11:00:00.000Z",
+            "to": "2026-09-01T11:06:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-2",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "skill",
+        "targetId": "skill-fixture-lookup",
+        "tenantId": "tenant-fixture-a",
+        "authority": "skill_invocation",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000002"
+        }
+      }
+    ]
+  },
+  "verification": {
+    "schemaVersion": 1,
+    "verificationId": "ver-fixture-2",
+    "caseId": "case-fixture-2",
+    "baselineWindow": {
+      "from": "2026-08-25T00:00:00.000Z",
+      "to": "2026-09-01T00:00:00.000Z"
+    },
+    "observationWindow": {
+      "from": "2026-09-01T12:00:00.000Z",
+      "to": "2026-09-02T12:00:00.000Z"
+    },
+    "expectedOutcome": {
+      "metric": "expected_skill_trigger_rate",
+      "comparator": "gte",
+      "value": 0.9
+    }
+  }
+}

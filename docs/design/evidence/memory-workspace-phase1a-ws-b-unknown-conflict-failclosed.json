@@ -1,0 +1,66 @@
+{
+  "schema": "memory-workspace-phase1a-ws-b-unknown-conflict-failclosed/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "preparedBy": "cursor-data-governance",
+  "preparedAt": "2026-08-16T13:12:00.000Z",
+  "mainSha": "5328922bb96a4fa3f6c717725ae2fcb5050065f1",
+  "phase": "1A-design-only",
+  "changeRequest": ".kiro/specs/memory-workspace-platform-remediation/ws-b-resolver-change-request.md",
+  "acceptedOnMain": "1f7a067643cee12729d14483bc65e3473542e64e",
+  "designBasis": [
+    "docs/design/memory-workspace-identity-remediation-2026-08-14.md §5.2 §5.4 §7.4",
+    "W3 authorize-before-path",
+    "W8 ManagedEnterprise fail-closed"
+  ],
+  "inventoryRows": {
+    "unknown": {
+      "write": "deny",
+      "disposition": "quarantine",
+      "reasonCode": "inventory_unknown",
+      "mayAutoClassify": false,
+      "mayAutoRepair": false,
+      "mayInferOwnerFromPath": false
+    },
+    "conflict": {
+      "write": "deny",
+      "disposition": "quarantine",
+      "reasonCode": "inventory_conflict",
+      "mayAutoClassify": false,
+      "mayAutoRepair": false,
+      "mayInferOwnerFromPath": false
+    },
+    "classified": {
+      "write": "unchanged-until-phase1b-write-switch",
+      "note": "Phase 1A does not change the production write path"
+    }
+  },
+  "classificationOutputs": ["classified", "conflict", "unknown"],
+  "forbiddenOwnershipSignals": [
+    "agentId",
+    "filename",
+    "directory-age",
+    "mtime",
+    "content-similarity"
+  ],
+  "requestPathCatalogWrite": false,
+  "untilAuthoritiesExist": [
+    "tenant-scoped membership via platform-auth (no new employee/group membership SoT)",
+    "AgentAsset authority (agentAssetId, not agentId slug)"
+  ],
+  "notYetEnabled": [
+    "Catalog miss=deny",
+    "resolver production write switch",
+    "LIVE StorageBinding cutover"
+  ],
+  "forbiddenParallelSot": [
+    "second memory resolver",
+    "Workspace Catalog as independent SoT",
+    "WorkspaceIdentity owner/scope store",
+    "employee or group membership SoT inside memory-workspace"
+  ],
+  "catalogSot": "Data Governance Catalog",
+  "resolverSurface": "src/gateway/workspace-resolver/** (upgrade in place after Phase 1B unlock only)",
+  "section141Signed": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false
+}

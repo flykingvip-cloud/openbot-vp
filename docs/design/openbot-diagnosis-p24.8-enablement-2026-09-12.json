@@ -1,0 +1,51 @@
+{
+  "kind": "human_remediation_enablement_record",
+  "increment": "P24.8",
+  "schemaVersion": 1,
+  "candidateSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+  "liveSha": "6bd4569606fd286b7d8b46fb7d9198fb7a134493",
+  "approvalOpensRemediationGate": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "confirmHuman": true,
+  "confirmRemediationOnlyThisIncrement": true,
+  "confirmLiveExecutorUndeployed": true,
+  "confirmP25NotStarted": true,
+  "confirmCanaryTenant": "tenant-fixture-a",
+  "signer": "Daniel / CEO",
+  "subjects": [
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": true
+    }
+  ],
+  "o11Note": "Identity re-bound to LIVE 6bd4569606. O1.1 opens adapters+reportApi only until phased Da Bai/remediation verification."
+}

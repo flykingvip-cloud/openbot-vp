@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-09-27T03:12:47Z",
+  "repository": "https://github.com/upbeyond/openbot",
+  "originMainSha": "30fde26fdf8531259c18c4e2610c93df37206387",
+  "originMainSubject": "Organization: allow default meeting reconciliation clock (#125)",
+  "runningContainerSha": null,
+  "runningContainerStatus": "unavailable",
+  "runningContainerReason": "This VM has no podman binary. `podman exec openbot-gateway-rc cat /app/dist/build-info.json` was not executed. The ledger SHA was not copied into runningContainerSha.",
+  "releaseSeq": 98,
+  "ledgerGatewaySha": "41aac4a4f2ca37d15f2423aeca70f1c6aa2be001",
+  "ledgerUiSha": "41aac4a4f2ca37d15f2423aeca70f1c6aa2be001",
+  "ledgerLiveFrom": "2026-09-24T02:49:48.208Z",
+  "ledgerLiveTo": null,
+  "ledgerOpenLive": true,
+  "ledgerEvidence": "verify-live PASS: build-info=41aac4a4f2ca; OCI revision matched; healthz=200; readyz ready:true failing:[]; governance mode assist; shadow rows=10 corrupt=0 liveExecuted=0 executedConsumer=0",
+  "containerLedgerAligned": null,
+  "productionEqualsMain": false,
+  "ledgerGatewayIsAncestorOfOriginMain": true,
+  "commitsOriginMainAheadOfLedgerGateway": 206,
+  "phaseCReviewedMainSha": "2b9776708832d2cd3e533f0bf03a8498b0fc3f4a",
+  "phaseCReviewedMainIsAncestorOfOriginMain": true,
+  "runtimeFlags": {
+    "OPENBOT_CONVERSATION_TASK_WEB_READ_SHADOW": "default-off",
+    "OPENBOT_CONSTITUTIONAL_SHADOW": "default-off-caller-snapshot",
+    "OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT": "default-off-caller-snapshot",
+    "OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE": "default-off-caller-snapshot",
+    "OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT": "default-off-caller-snapshot",
+    "OPENBOT_HTTP_TOOLS_INVOKE_PREFLIGHT_OBSERVE": "default-off",
+    "OPENBOT_CONVERSATION_TASK_DELIVERY_CLOSE_CONSULT": "default-off"
+  },
+  "constitutionalFlags": {
+    "CONSTITUTIONAL_CONTRACTS_ENFORCE": false,
+    "CONSTITUTIONAL_CONTRACTS_LIVE_INVOKE": false,
+    "CONSTITUTIONAL_CONTRACTS_FABRIC_DEFAULT_ON": false
+  },
+  "orchestrationFlags": {
+    "ORCHESTRATION_LIVE_INVOKE": false
+  },
+  "hardStopTriggered": false,
+  "evidenceSource": {
+    "originMain": "git fetch origin && git rev-parse origin/main on 2026-09-27; HEAD was already that commit and git merge-base --is-ancestor origin/main HEAD exited 0",
+    "ledger": "read-only tail of deploy/production/releases.jsonl; file not modified",
+    "container": "unavailable; podman not installed; no build-info.json read from openbot-gateway-rc",
+    "flags": "static TypeScript constants and default-off env readers; not a live process environment",
+    "ancestry": "git merge-base --is-ancestor 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001 origin/main; git rev-list --count between those SHAs"
+  }
+}

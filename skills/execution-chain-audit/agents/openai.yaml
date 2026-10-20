@@ -1,0 +1,4 @@
+interface:
+  display_name: Execution Chain Audit
+  short_description: Audit OpenBot execution paths and control-plane drift
+  default_prompt: Audit the relevant OpenBot user-to-tool execution path, identify duplicated decision owners, and produce an evidence-backed remediation report.

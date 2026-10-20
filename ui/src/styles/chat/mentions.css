@@ -1,0 +1,10 @@
+.mention-chip--human {
+  color: var(--color-accent, #2563eb);
+}
+
+.mention-chip.is-removed,
+.mention-chip.is-muted {
+  opacity: 0.55;
+  text-decoration: line-through;
+  filter: grayscale(0.35);
+}

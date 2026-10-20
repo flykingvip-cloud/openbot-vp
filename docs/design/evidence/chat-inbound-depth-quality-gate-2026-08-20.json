@@ -1,0 +1,71 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "quality",
+  "capturedAt": "2026-08-20T11:36:10+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainIsAncestor": true,
+  "productionLive": false,
+  "doubleBlindHumanEval": false,
+  "method": "fixed classifier and policy unit cases mapped to the required blind-set categories. No live-model answer comparison.",
+  "cases": {
+    "greetingChat": { "covered": true, "test": "inbound-depth.test.ts zh/en greeting -> chat" },
+    "explainRewriteChat": {
+      "covered": true,
+      "test": "inbound-depth.test.ts explain/rewrite -> chat"
+    },
+    "fuzzyChat": { "covered": true, "test": "inbound-depth.test.ts fuzzy request -> chat" },
+    "explicitKnowledgeRetrieve": {
+      "covered": true,
+      "test": "inbound-depth.test.ts knowledge minutes/base -> retrieve"
+    },
+    "writePublishAct": {
+      "covered": true,
+      "test": "inbound-depth.test.ts workspace write and publish NL -> act"
+    },
+    "attachmentWithoutVerbChat": {
+      "covered": true,
+      "test": "inbound-depth.test.ts attachment no verb -> chat"
+    },
+    "linkOnlyChat": { "covered": true, "test": "inbound-depth.test.ts link only -> chat" },
+    "continuation": {
+      "covered": true,
+      "test": "inbound-depth.test.ts 然后呢 without unfinished tools -> chat"
+    },
+    "explicitLiveSource": {
+      "covered": true,
+      "test": "inbound-depth.test.ts detectExplicitLiveIntent; resolve-engine.inbound-policy.test.ts live ACL/policy invoke"
+    },
+    "aclTenantExpiry": {
+      "covered": true,
+      "test": "resolve-engine.inbound-policy.test.ts ACL deny, expired, cross-tenant, policy mismatch"
+    },
+    "promptInjectionEvidence": {
+      "covered": true,
+      "test": "evidence-format.governance.test.ts plus inbound-policy evidence filtering"
+    },
+    "toolCeilingAndRestoredSession": {
+      "covered": true,
+      "test": "inbound-tool-policy.test.ts stale write tools cannot execute; retrieve allowlist"
+    },
+    "chatZeroTools": {
+      "covered": true,
+      "test": "get-reply-run.inbound-depth-router.test.ts disableTools"
+    },
+    "persistEarlyIdempotencyAbort": {
+      "covered": true,
+      "test": "server.chat.gateway-server-chat.test.ts persist-before-ACK, clientRunId retry, chat.abort"
+    }
+  },
+  "liveModelQuality": {
+    "chatQualityNotRegressed": null,
+    "retrieveHitRate": null,
+    "retrieveCitationAccuracy": null,
+    "actSuccessRate": null,
+    "reason": "Double-blind live-model scoring was not run. Unit tests lock routing/policy behavior only."
+  },
+  "verdict": "routing and policy categories are covered by tests; live answer quality gate is not claimed"
+}

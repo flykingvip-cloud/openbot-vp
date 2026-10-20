@@ -1,0 +1,95 @@
+{
+  "schema": "openbot-cogniweave-u1-design-review-request/v1",
+  "kind": "u1-dark-contract-review-request",
+  "preparedBy": "cursor-unified-memory-u1-admission",
+  "role": "coordinator",
+  "preparedAt": "2026-08-19T10:40:00.000Z",
+  "baseline": "9c2306bfcca646e07b9ead6f2b9bb23eae4f933b",
+  "scope": "U1-dark-contract-only",
+  "status": "pending",
+  "unlock": "not-issued",
+  "u1": "blocked",
+  "authorizes": "none",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "schemaV2Write": "disabled",
+  "catalogWrite": "forbidden",
+  "contract": {
+    "resolverReturns": "complete MemoryWorkspaceHandle or structured denial",
+    "persistentPrimaryKey": "resourceId only",
+    "memoryAssetResourceId": "independent of Workspace.resourceId",
+    "memoryAssetSourceWorkspaceResourceId": "Workspace.resourceId",
+    "stateDir": "storage configuration only; must not mint identity",
+    "scopeWorkspaceId": "resourceId",
+    "cloudTenantId": "Handle.tenantId",
+    "failClosed": ["catalog miss", "tenant mismatch", "stale fencing"],
+    "cogniweaveConsumes": "complete Handle only",
+    "mode": "dark-integration-only",
+    "schemaV2Write": "disabled",
+    "legacyWriteSites": "keep",
+    "item7": {
+      "u1Prerequisite": false,
+      "retirementInU1": "forbidden",
+      "blocksWhileNonZero": ["U3", "U4", "I3"]
+    },
+    "deployAuthorized": false
+  },
+  "doesNotAuthorize": ["implementation", "Catalog write", "schema-v2-write", "retirement", "LIVE"],
+  "requiredIndependentReviews": [
+    {
+      "reviewer": "codex-workspace-architecture",
+      "focus": "identity SoT, resourceId, Memory Asset relation, fail-closed",
+      "decision": "pending",
+      "signedBy": null,
+      "signedAt": null,
+      "scope": "U1-dark-contract-only"
+    },
+    {
+      "reviewer": "cursor-data-governance",
+      "focus": "Catalog SoT, Resolver Handle-or-denial, tenant/fencing fail-closed",
+      "decision": "pending",
+      "signedBy": null,
+      "signedAt": null,
+      "scope": "U1-dark-contract-only"
+    },
+    {
+      "reviewer": "cursor-memory-wsc",
+      "focus": "schema v2 stays closed, item 7 sites kept, dark-only boundary",
+      "decision": "pending",
+      "signedBy": null,
+      "signedAt": null,
+      "scope": "U1-dark-contract-only"
+    },
+    {
+      "reviewer": "cursor-conversation-lifecycle",
+      "focus": "CogniWeave manager consumes complete Handle only",
+      "decision": "pending",
+      "signedBy": null,
+      "signedAt": null,
+      "scope": "U1-dark-contract-only"
+    }
+  ],
+  "independentUnlockReviewer": "cursor-sot-reviewer",
+  "notifyUnlockReviewerOnlyWhen": [
+    "item2=met",
+    "item6=met",
+    "all four reviews accepted with distinct signedBy",
+    "ownership clean",
+    "evidence tests green",
+    "origin/main ancestry pass",
+    "contract remains dark-only"
+  ],
+  "signingRules": [
+    "each reviewer writes their own decision, signedBy, and signedAt",
+    "coordinator must not fill any signedBy",
+    "one identity must not sign more than one required review",
+    "accepted without item 2 met and item 6 met still does not issue unlock"
+  ],
+  "explicitlyForbidden": [
+    "coordinator one-shot four signatures",
+    "treat this request as four-party accepted",
+    "self-issue unlock",
+    "start U1 implementation"
+  ]
+}

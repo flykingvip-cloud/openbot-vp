@@ -1,0 +1,147 @@
+{
+  "schema": "openbot-cogniweave-u1-closeout-dispatch/v1",
+  "kind": "u1-closeout-dispatch",
+  "preparedBy": "cursor-unified-memory-u1-admission",
+  "role": "coordinator",
+  "preparedAt": "2026-08-19T10:40:00.000Z",
+  "baseline": "9c2306bfcca646e07b9ead6f2b9bb23eae4f933b",
+  "readinessPacket": "docs/design/evidence/openbot-cogniweave-u1-admission-readiness-2026-08-19.json",
+  "readinessPacketPr": 514,
+  "readinessPacketStatus": "accepted-on-main",
+  "unlockReceipt": "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json",
+  "phase1bUnlockReceipt": "docs/design/evidence/memory-workspace-phase1b-unlock-decision.json",
+  "canonicalScorecard": "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+  "designReviewRequest": "docs/design/evidence/openbot-cogniweave-u1-design-review-request-2026-08-19.json",
+  "decision": "changes-required",
+  "unlock": "not-issued",
+  "u1": "blocked",
+  "authorizes": "none",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "schemaV2Write": "disabled",
+  "catalogWrite": "forbidden",
+  "productionWrites": 0,
+  "item7RetiredThisChange": 0,
+  "coordinatorDoesNotSign": true,
+  "coordinatorDoesNotImplementU1": true,
+  "u0": "accepted",
+  "item2": {
+    "status": "not-met",
+    "candidate": "not-met",
+    "owner": "cursor-data-governance",
+    "architectureReviewer": "codex-workspace-architecture",
+    "productionCatalogPresent": false,
+    "covered": false,
+    "fourGates100": false,
+    "authorityCatalogGatesPass": false,
+    "uniqueUserOwnedEquivalent": 0,
+    "quarantineNormalWrites": 0,
+    "productionCatalogWrite": "none",
+    "authorizedProductionStateDirIssued": false,
+    "cited": [
+      "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+      "docs/design/evidence/memory-workspace-phase1b-item2-production-catalog-coverage.json",
+      "docs/design/evidence/memory-workspace-phase1b-item2-production-persist.json"
+    ],
+    "blocker": "OPENBOT_PRODUCTION_STATE_DIR was not issued in this closeout. Coordinator must not search the host, guess a path, or count evidence/host Catalog as production SoT.",
+    "requiredDeliverables": [
+      "production Catalog existence proof on an issued stateDir",
+      "runtime read of that Catalog",
+      "authority-sourced records with resourceId, tenantId, kind, owner/grant, StorageBinding, lifecycle/version, agentAsset association",
+      "Memory Asset independent resourceId plus sourceWorkspaceResourceId",
+      "fourGates100 and authorityCatalogGatesPass on the production Catalog",
+      "uniqueUserOwnedEquivalent > 0 or a signed architecture replacement metric"
+    ],
+    "forbidden": [
+      "treat evidence Catalog persist as production SoT",
+      "infer identity from agentId, path/realpath, stateDir, display name, or inventory",
+      "write production Catalog",
+      "coordinator scoring item 2 met"
+    ]
+  },
+  "item6": {
+    "status": "not-met",
+    "candidate": "not-met",
+    "owner": "cursor-memory-wsc",
+    "sreReviewer": "cursor-fable",
+    "productionEquivalentSnapshot": false,
+    "backupNonEmpty": false,
+    "backupHashVerified": false,
+    "restoreProven": false,
+    "v1RootGuardDrilled": false,
+    "productionWrites": 0,
+    "wscReview": "pending",
+    "sreReview": "pending",
+    "authorizedSqlitePathIssued": false,
+    "cited": [
+      "docs/design/evidence/memory-workspace-phase1b-items-2-7-scorecard.json",
+      "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill-receipt.json",
+      "docs/design/evidence/memory-workspace-phase1b-item6-sre-half.json"
+    ],
+    "blocker": "No authorized production-equivalent SQLite path was issued. Coordinator must not search the host, guess a path, or treat the mkdtemp authorized-layout drill as production-equivalent.",
+    "requiredDeliverables": [
+      "issued SQLite path before any drill",
+      "redacted read-only snapshot receipt",
+      "non-empty hash-verified backup kept out of git",
+      "restore drill on an isolated replica with zero production writes",
+      "v1 root-guard drill on that replica",
+      "independent cursor-memory-wsc and cursor-fable signatures"
+    ],
+    "forbidden": [
+      "search the whole host",
+      "guess sqlite paths",
+      "use unauthorized production files",
+      "record tenant names, user ids, or real directory trees",
+      "commit backup bytes to git",
+      "one identity signing both WSC and SRE reviews",
+      "coordinator scoring item 6 met"
+    ]
+  },
+  "item7": {
+    "status": "not-met",
+    "u1Prerequisite": false,
+    "productionWriteWatchIndex": 37,
+    "frozenWriteWatchIndex": 38,
+    "retiredThisChange": 0,
+    "blocks": ["U3", "U4", "I3"]
+  },
+  "designReviews": {
+    "status": "pending",
+    "request": "docs/design/evidence/openbot-cogniweave-u1-design-review-request-2026-08-19.json",
+    "requiredAcceptors": [
+      "codex-workspace-architecture",
+      "cursor-data-governance",
+      "cursor-memory-wsc",
+      "cursor-conversation-lifecycle"
+    ],
+    "acceptedBy": [],
+    "coordinatorFilledSignatures": false,
+    "note": "Coordinator only distributes the contract. Each acceptor must write an independent signed review. Empty signedBy slots are intentional."
+  },
+  "ownership": {
+    "status": "clean",
+    "admissionOwner": "cursor-unified-memory-u1-admission",
+    "doesNotClaim": [
+      "src/gateway/workspace-resolver/**",
+      "src/memory/cogniweave-manager.ts",
+      "src/memory/search-manager.ts",
+      "src/memory/v1-root-guard.ts",
+      "src/gateway/data-governance/**",
+      "docs/design/evidence/openbot-cogniweave-u1-unlock-decision.json"
+    ]
+  },
+  "explicitlyForbidden": [
+    "self-issue unlock",
+    "score item 2/6 met from this dispatch",
+    "fill four design-review signatures",
+    "start U1 Handle wiring",
+    "modify CogniWeave manager",
+    "modify production Resolver",
+    "enable schema v2 write",
+    "delete item 7 call-sites",
+    "LIVE",
+    "deployAuthorized=true",
+    "reopen or resign U0"
+  ]
+}

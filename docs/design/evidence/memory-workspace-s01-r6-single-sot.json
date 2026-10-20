@@ -1,0 +1,49 @@
+{
+  "taskId": "cursor-s01-r6-replay-v2",
+  "purpose": "S01 R6 single-SoT machine check against the current Catalog architecture",
+  "status": "passed",
+  "classification": {
+    "designComplete": true,
+    "implementationVerified": false,
+    "r6MachineCheck": "passed",
+    "p99": "design-target-not-verified",
+    "r1r3SecurityTests": "design-target-not-verified",
+    "r5AuditFailureBehavior": "design-target-not-verified"
+  },
+  "architecture": {
+    "catalogPort": "src/gateway/workspace-resolver/catalog.ts",
+    "catalogProjection": "src/gateway/data-governance/workspace-catalog-projection.ts",
+    "nonProductionContract": "docs/design/contracts/s01-trusted-principal-handle-contract.ts",
+    "phantomPathsMustNotExist": [
+      "src/gateway/workspace-catalog",
+      "src/gateway/workspace-catalog/migrations"
+    ],
+    "forbiddenIndependentTables": ["workspace_handles", "authorized_cwds", "tenant_memberships"]
+  },
+  "normativeSources": {
+    "uniqueHandoff": ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "designPackage": ".kiro/specs/memory-workspace-platform-remediation/s01-d1-d5-design-package.md",
+    "reviewGuide": "docs/design/handoff-s01-design-review-guide.md",
+    "branchOnlySupersededAsSecondSpec": [
+      "docs/design/handoff-s01-d1-convergence-patch.md",
+      "docs/design/handoff-s01-d2-d4-d5-convergence-patches.md",
+      "docs/design/handoff-s01-revision-r1-anonymous-local-security.md",
+      "docs/design/handoff-s01-revision-r3-trusted-proxy-threat-model.md",
+      "docs/design/handoff-s01-revision-r4-performance-benchmark.md",
+      "docs/design/handoff-s01-revision-r5-audit-failure-semantics.md",
+      "docs/design/handoff-s01-revision-r6-single-sot-verification.md"
+    ]
+  },
+  "command": "node scripts/verify-single-sot.mjs",
+  "pnpmScript": "pnpm verify:single-sot",
+  "ciGate": ".github/workflows/ci-gate.yml job check step S01 R6 single-SoT machine check",
+  "gitSha": "59be50660d8ebacf867211a206c92b4300bec418",
+  "checks": {
+    "requiredPaths": true,
+    "phantomPathsAbsent": true,
+    "staticScan": true,
+    "catalogEncapsulation": true,
+    "normativeSources": true
+  },
+  "violations": []
+}

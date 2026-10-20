@@ -1,0 +1,109 @@
+{
+  "schema": "collaboration-csc-ledger-identity-realign-receipt/v1",
+  "status": "passed",
+  "recordedAt": "2026-08-23T00:19:00Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Release Ledger identity fix and trunk realign",
+  "explicitNonActions": [
+    "did not change LIVE",
+    "did not restart the container",
+    "did not add an overlay",
+    "did not change production flags",
+    "did not rewrite seq 28 or seq 29"
+  ],
+  "baseline": {
+    "taskNamedOriginMain": "dbedde8fad75a522d6ef7a67d430893a9747d718",
+    "freshOriginMain": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+    "taskShaIsTip": false,
+    "taskShaIsAncestor": true,
+    "worktree": "/tmp/openbot-ledger-realign-e1cbc1e804",
+    "note": "Fail closed on stale tip. Verified against freshly fetched origin/main after #613 and #614, not dbedde8fad."
+  },
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "startedAt": "2026-08-22T15:10:36Z",
+    "healthz": { "http": 200 },
+    "readyz": { "ready": true, "failing": [] },
+    "baseImage": {
+      "sha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257"
+    },
+    "gatewayOverlaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+    "provenanceTag": "provenance/sha-7cd74d4c5c69",
+    "baseImageProvenanceTag": "provenance/sha-5c221b9ec38c",
+    "rollbackArtifact": "/root/openbot-maintenance-origin-main-7cd74d4c-item7-s18-r1-20260822T150915Z/",
+    "rollbackReturnsOverlay": "affda8bce88939e42c57000896c13fc8a457f536",
+    "flags": {
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset",
+      "CONTEXT_SCOPE": "unset",
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "unset"
+    }
+  },
+  "seq28": {
+    "changed": false,
+    "imageTag": "ws-c-v1-root-guard-r1-20260815",
+    "gatewaySha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "uiSha": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "tag": "provenance/sha-6ac338479a16",
+    "reason": "Historical identity on the 2026-08-15 image. Rewriting onto rc-amd64-provenance-5c221b9ec3 would forge history and create identity-mismatch."
+  },
+  "seq29": {
+    "changed": false,
+    "imageTag": "ws-c-v1-root-guard-r1-20260815",
+    "gatewaySha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "uiSha": "34595862f785c90a4e0e30587db33690c2e139d2",
+    "tag": "provenance/sha-aa348b38a14a",
+    "reason": "Historical inbound-depth overlay on the same 2026-08-15 image. Superseding GHCR overlays already exist as seq 34/35."
+  },
+  "currentRows": {
+    "seq33": {
+      "role": "GHCR base image",
+      "gatewaySha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3"
+    },
+    "seq34": {
+      "role": "closed overlay on seq 33 image",
+      "gatewaySha": "affda8bce88939e42c57000896c13fc8a457f536",
+      "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3"
+    },
+    "seq35": {
+      "role": "current LIVE overlay on seq 33 image",
+      "gatewaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "uiSha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3"
+    }
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 35,
+      "errors": 0,
+      "identityMismatch": 0,
+      "warnings": 14,
+      "ok": true
+    },
+    "verifyForwardOnly": {
+      "verdict": "allow",
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidate": "e1cbc1e80420782e8d3720a546ebc39d9d06764b",
+      "forwardOnly": true
+    },
+    "verifyDeliveryAlignment": {
+      "prodSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidateTag": "provenance/sha-7cd74d4c5c69",
+      "pass": 8,
+      "warn": 2,
+      "fail": 0
+    }
+  },
+  "identityCheck": "passed",
+  "cutoverExecuted": false,
+  "flagsChanged": false
+}

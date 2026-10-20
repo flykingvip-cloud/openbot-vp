@@ -1,0 +1,65 @@
+{
+  "name": "@cogniweave/sdk",
+  "version": "0.1.0",
+  "description": "Cognitive memory runtime SDK scaffold for CogniWeave",
+  "bin": {
+    "cogniweave": "./bin/cogniweave.mjs"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "datasets",
+    "scripts",
+    "docs",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.js",
+      "default": "./dist/*.js"
+    },
+    "./cli-entry": "./bin/cogniweave.mjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "benchmark:longrun": "tsx scripts/benchmark-mvp.ts --profile longrun --dataset datasets/mvp-core-eval.json --output .runtime/cogniweave-benchmark-longrun.json",
+    "benchmark:longrun:baseline:candidate": "node scripts/refresh-benchmark-baseline.mjs --report .runtime/cogniweave-benchmark-longrun.json --output .runtime/benchmark-longrun-baseline.candidate.json --package-root .",
+    "benchmark:longrun:baseline:validate": "node scripts/validate-benchmark-baseline-candidate.mjs --candidate .runtime/benchmark-longrun-baseline.candidate.json --diff .runtime/cogniweave-benchmark-longrun-diff.json",
+    "benchmark:longrun:diff": "node scripts/benchmark-diff.mjs --report .runtime/cogniweave-benchmark-longrun.json --baseline datasets/benchmark-longrun-baseline.json --output .runtime/cogniweave-benchmark-longrun-diff.json",
+    "benchmark:longrun:diff:gate": "node scripts/benchmark-diff.mjs --report .runtime/cogniweave-benchmark-longrun.json --baseline datasets/benchmark-longrun-baseline.json --output .runtime/cogniweave-benchmark-longrun-diff.json --enforce-thresholds",
+    "benchmark:longrun:gate": "tsx scripts/benchmark-mvp.ts --profile longrun --dataset datasets/mvp-core-eval.json --output .runtime/cogniweave-benchmark-longrun.json --enforce-thresholds",
+    "benchmark:mvp": "tsx scripts/benchmark-mvp.ts --dataset datasets/mvp-core-eval.json",
+    "benchmark:mvp:gate": "tsx scripts/benchmark-mvp.ts --dataset datasets/mvp-core-eval.json --enforce-thresholds",
+    "bootstrap:schema": "tsx src/cli.ts bootstrap-schema",
+    "build": "tsc -p tsconfig.build.json",
+    "cli": "tsx src/cli.ts",
+    "eval:distill:replay": "tsx scripts/eval-distillation-replay.ts --dataset datasets/distillation-replay-multi-call.json --output .runtime/cogniweave-eval-distill-replay.json",
+    "eval:distill:replay:gate": "tsx scripts/eval-distillation-replay.ts --dataset datasets/distillation-replay-multi-call.json --output .runtime/cogniweave-eval-distill-replay.json --enforce-thresholds",
+    "eval:distill:replay:http": "tsx scripts/eval-distillation-replay.ts --dataset datasets/distillation-replay-http-recorded.json --output .runtime/cogniweave-eval-distill-replay-http.json",
+    "eval:distill:replay:http:gate": "tsx scripts/eval-distillation-replay.ts --dataset datasets/distillation-replay-http-recorded.json --output .runtime/cogniweave-eval-distill-replay-http.json --enforce-thresholds",
+    "eval:mvp": "tsx scripts/eval-mvp.ts --dataset datasets/mvp-core-eval.json --output .runtime/cogniweave-eval-mvp.json",
+    "eval:mvp:gate": "tsx scripts/eval-mvp.ts --dataset datasets/mvp-core-eval.json --output .runtime/cogniweave-eval-mvp.json --enforce-thresholds",
+    "integration:rollback": "node scripts/integration-rollback.mjs",
+    "prepack": "npm run build",
+    "record:distill:http": "tsx scripts/record-distillation-http.ts --dataset datasets/mvp-core-eval.json --output-dir datasets/replay-http-recordings/generated --output-dataset datasets/distillation-replay-http-recorded.generated.json",
+    "record:distill:http:dry-run": "tsx scripts/record-distillation-http.ts --dataset datasets/mvp-core-eval.json --output-dir datasets/replay-http-recordings/generated --output-dataset datasets/distillation-replay-http-recorded.generated.json --dry-run",
+    "serve": "tsx src/cli.ts serve",
+    "smoke:install": "node scripts/install-smoke.mjs",
+    "smoke:serve": "tsx src/cli.ts serve --dry-run",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

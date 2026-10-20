@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-rp9w-3fw7-7cwq",
+  "cve": "CVE-2026-49978",
+  "package": "dompurify",
+  "vulnerable_range": "<=3.4.6",
+  "affected_version_before": "3.4.6",
+  "dependency_path": "ui>dompurify",
+  "severity": "moderate",
+  "direct_or_transitive": "direct (ui workspace)",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=3.4.7",
+  "mitigated_version": "3.4.7",
+  "reachable_surface": "DOMPurify IN_PLACE skips shadow DOM contents nested under <template>.content, leaving executable markup (advisory). UI workspace direct dependency used for HTML sanitization; root pin via pnpm.overrides.",
+  "mitigation": "Bump ui/package.json dependencies.dompurify to ^3.4.7; pnpm.overrides.dompurify=3.4.7. Same pin also clears GHSA-76mc-f452-cxcm (moderate, patched >=3.4.7) and low GHSA-x4vx-rjvf-j5p4 (vulnerable <=3.4.6) as side effects (not separate cells). Remaining dompurify moderate needing higher pins (e.g. >=3.4.11 / >=3.4.13) and lows — not this PR.",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod (plus same-threshold side-effect clears). Stage 6 overall remains not PASS; audit still exits 1 (29 moderate + 7 low remain, including further dompurify advisories). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 29,
+    "low": 7,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-rp9w-3fw7-7cwq"
+}

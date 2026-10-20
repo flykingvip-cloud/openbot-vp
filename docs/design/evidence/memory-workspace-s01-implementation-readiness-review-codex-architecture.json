@@ -1,0 +1,146 @@
+{
+  "schema": "memory-workspace-s01-implementation-readiness-review/v1",
+  "kind": "s01-implementation-readiness-architecture-review",
+  "reviewer": "codex-architecture",
+  "signedBy": "codex-architecture",
+  "signedAt": "2026-08-30T01:31:02.000Z",
+  "reviewPass": 1,
+  "scope": "s01-implementation-readiness-v1.8-ir1-ir4",
+  "decision": "accepted",
+  "fillsKiroSotReviewer": false,
+  "flipsImplementationGate": false,
+  "packetSelfAccepted": false,
+  "authorizesStageA": false,
+  "mergedBaseline": {
+    "pr": 827,
+    "mergeCommit": "e81f2d8fba5d76928c8f1ef70e7dcdb2c7ba4088",
+    "originMain": "e81f2d8fba5d76928c8f1ef70e7dcdb2c7ba4088"
+  },
+  "baseline": {
+    "worktree": "/Users/daniel/AI项目/openbot-s01-readiness-review",
+    "branch": "cursor-codex-architecture/item7-s01-implementation-readiness-review",
+    "fetchedOriginMain": true,
+    "head": "e81f2d8fba5d76928c8f1ef70e7dcdb2c7ba4088",
+    "originMain": "e81f2d8fba5d76928c8f1ef70e7dcdb2c7ba4088",
+    "mergeBaseIsAncestor": true,
+    "didNotModifySharedWorkingTree": true,
+    "didNotModifyProductionBusinessCode": true
+  },
+  "reviewedArtifacts": [
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-implementation-readiness.md",
+    ".kiro/specs/memory-workspace-platform-remediation/s01-implementation-readiness-review-request.md",
+    "docs/design/evidence/memory-workspace-s01-implementation-readiness.json",
+    "docs/design/evidence/memory-workspace-s01-implementation-readiness.test.mjs",
+    ".kiro/specs/memory-workspace-platform-remediation/handoff-s01-trusted-principal-handle-gate.md",
+    "docs/design/contracts/s01-trusted-principal-handle-contract.ts"
+  ],
+  "verdict": {
+    "IR1": "pass",
+    "IR2": "pass",
+    "IR3": "pass",
+    "IR4": "pass"
+  },
+  "closedFindings": ["IR1", "IR2", "IR3", "IR4"],
+  "checksRun": {
+    "readinessEvidence": {
+      "command": "node --test docs/design/evidence/memory-workspace-s01-implementation-readiness.test.mjs",
+      "result": "pass"
+    },
+    "contractTest": {
+      "command": "bun test docs/design/contracts/s01-trusted-principal-handle-contract.test.ts",
+      "result": "pass",
+      "cases": 21
+    },
+    "r6MachineCheck": {
+      "command": "node scripts/verify-single-sot.mjs",
+      "result": "pass",
+      "implementationVerified": false
+    }
+  },
+  "architectureReview": {
+    "mappingChainDefined": true,
+    "targetIdentityRequiredNotNull": true,
+    "agentIdIsTenantSlugOnly": true,
+    "shadowDistinctFromCutover": true,
+    "shadowProductionCwdIsLegacyHelper": true,
+    "cutoverHasNoRuntimeHelperFallback": true,
+    "rollbackRequiresRevertAndScanRestoration": true,
+    "stagesAEIndependentGates": true,
+    "doesNotPlanNineOverTen": true
+  },
+  "locks": {
+    "productionCatalogWrite": "none",
+    "s01Retirement": "blocked",
+    "item7": "not-met",
+    "phase1b": "blocked",
+    "i3": "not executed",
+    "live": "forbidden",
+    "deployAuthorized": false,
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10
+  },
+  "doesNotAuthorize": [
+    "S01 retirement",
+    "implementation wiring",
+    "Stage A start",
+    "production Catalog write",
+    "Phase 1B unlock",
+    "I3",
+    "LIVE",
+    "deployAuthorized=true",
+    "filling kiro-sot-reviewer slot",
+    "flipping implementationGate",
+    "packet selfAccepted=true"
+  ],
+  "explicitlyForbidden": [
+    "modify src/auto-reply/reply/get-reply.ts",
+    "modify src/memory/**",
+    "modify src/gateway/workspace-resolver/**",
+    "write production Catalog",
+    "delete or rewrite S01 scan",
+    "execute I3",
+    "issue Phase 1B unlock",
+    "set deployAuthorized=true",
+    "any LIVE or production deployment",
+    "start Stage A before kiro-sot-reviewer accepted",
+    "sign as kiro-sot-reviewer"
+  ],
+  "productionObservation": {
+    "getReplyStillUsesStewardHelper": true,
+    "getReplyLine": "src/auto-reply/reply/get-reply.ts:164",
+    "p1LineUnchanged": "src/auto-reply/reply/get-reply.ts:165",
+    "evaluateS01AuthorizedToolCwdImportedBySrc": false,
+    "currentProductionExploitability": "none-not-wired"
+  },
+  "findings": [
+    {
+      "id": "IR1",
+      "status": "closed",
+      "evidence": "V1.8 targetIdentity is required and not null, with tenantId, employeeOwnerId, agentAssetId, workspaceResourceId, canonical/active binding, versions, and fencing. Mapping chain is TenantContext → slug → agentAssetId → Catalog workspaceResourceId → unique canonical+active binding → locator. agentId is slug-only. Path inference, principal-any-unique-workspace, Catalog create-on-miss, helper identity, and Memory Asset id confusion are forbidden."
+    },
+    {
+      "id": "IR2",
+      "status": "closed",
+      "evidence": "Shadow keeps legacy helper as the production cwd, keeps P5, and stays 10/10. Cutover requires prior shadow/canary accept, forbids runtime helper fallback, and forbids flag-off helper restore. Rollback is approved git revert or recorded release rollback plus P5 scan restoration. flagOffRestoresHelperWithoutScanRewrite is false."
+    },
+    {
+      "id": "IR3",
+      "status": "closed",
+      "evidence": "remaining and liveWriteWatchIndex have separate definitions. Current repo has no independent write-watch site set, so the plan does not project 9/10. Shadow/cutover stay 10/10. After independent scan accept remaining=9; liveWriteWatchIndex is write-watch-owner-signed-only. Lander must not modify either counter."
+    },
+    {
+      "id": "IR4",
+      "status": "closed",
+      "evidence": "Stages A–E each have reserved Loom id, owner, paths, independent PR/evidence/reviewer, and entry/exit gates. A does not touch get-reply. B is shadow-only. D is line 164 only. E is an independent scan PR. Item 7 stays not-met after S01 retirement."
+    }
+  ],
+  "residualConstraints": [
+    "The locked V1.6 evaluateS01AuthorizedToolCwd still selects by requestedCwd path containment. Stage A must implement targetIdentity in the production adapter and must not lift that path-unique evaluator into get-reply.",
+    "The reserved production-wiring Loom task still lists get-reply plus adapter as monolithic futurePaths. kiro-loom must split Stage A–E and keep that task blocked before any claim.",
+    "Running retirement-scan.mjs would set liveWriteWatchIndex=sites.length. Stage E may recompute remaining/sites after P5 removal; liveWriteWatchIndex still requires an independent write-watch owner receipt.",
+    "kiro-sot-reviewer must sign independently. This sidecar does not fill that slot and does not flip implementationGate.",
+    "This accept reviews the merged V1.8 plan only. The readiness packet remains selfAccepted=false and implementation-readiness-resubmitted."
+  ],
+  "note": "codex-architecture pass 1 of merged PR #827 (e81f2d8fba). IR1-IR4 are closed on the V1.8 implementation-readiness plan. implementationGate remains not-met. Scan remains 10/10. This signature does not fill kiro-sot-reviewer and does not authorize Stage A, S01 retirement, production Catalog write, I3, Phase 1B, or LIVE."
+}

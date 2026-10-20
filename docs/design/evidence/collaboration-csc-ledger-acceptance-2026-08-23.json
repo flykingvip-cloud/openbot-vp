@@ -1,0 +1,105 @@
+{
+  "schema": "collaboration-csc-ledger-acceptance-receipt/v1",
+  "status": "blocked",
+  "productionCloseout": "not-accepted",
+  "acceptancePhrase": null,
+  "reason": "LIVE overlay is e6f26e1379, not the checklist overlay 7cd74d4c5c69. RELEASE_RECORD Latest and seq 35 still name 7cd74d4c5c69.",
+  "recordedAt": "2026-08-23T02:52:01Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Read-only ledger acceptance on origin/main e6f26e1379",
+  "explicitNonActions": [
+    "did not rebuild",
+    "did not restart or recreate the container",
+    "did not switch LIVE",
+    "did not change inbound or CSC flags",
+    "did not rewrite seq 35",
+    "did not use the dirty inbound-depth workspace"
+  ],
+  "baseline": {
+    "taskNamedOriginMain": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "freshOriginMain": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "taskShaIsTip": true,
+    "worktree": "/tmp/openbot-ledger-accept-e6f26e1379"
+  },
+  "trunkReceiptsReviewed": [
+    "deploy/production/evidence/COLLAB_CSC_LEDGER_FINAL_REVERIFY_20260823.md",
+    "deploy/production/evidence/COLLAB_CSC_LEDGER_FINAL_REVERIFY_20260823_POST619.md",
+    "deploy/production/evidence/COLLAB_CSC_LEDGER_FINAL_REVERIFY_20260823_POST621.md",
+    "deploy/production/evidence/COLLAB_CSC_LEDGER_FINAL_REVERIFY_20260823_ON_525EE95547.md"
+  ],
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "startedAt": "2026-08-23T02:40:47Z",
+    "previousStartedAt": "2026-08-22T15:10:36Z",
+    "healthz": { "http": 200, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "builtAt": "2026-08-23T02:39:22.337Z",
+      "probeModuleSha": "ea6e7337fbf3f1da"
+    },
+    "baseImage": {
+      "sha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "matchesTask": true,
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257"
+    },
+    "gatewayOverlaySha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "taskExpectedOverlaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "overlayMatchesTask": false,
+    "expectedOverlayIsAncestor": true,
+    "hostBackup": "/root/openbot-maintenance-origin-main-e6f26e13795a-r1-20260823T023758Z",
+    "flags": {
+      "OPENBOT_UI_OVERLAY_PINNED_ENTRY": "index-Ol92eg1L.js",
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset",
+      "CONTEXT_SCOPE": "unset",
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "unset"
+    }
+  },
+  "ledger": {
+    "seq35GatewaySha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "seq35LiveTo": null,
+    "releaseRecordSourceRevision": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "matchesRunningOverlay": false
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 35,
+      "errors": 0,
+      "identityMismatch": 0,
+      "warnings": 14,
+      "ok": true
+    },
+    "verifyForwardOnlyNamed": {
+      "live": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "verdict": "allow"
+    },
+    "verifyForwardOnlyActual": {
+      "live": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "verdict": "allow",
+      "warning": "running LIVE differs from release record 7cd74d4c5c69"
+    },
+    "verifyDeliveryAlignmentNamed": {
+      "prodSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "candidateTag": "provenance/sha-7cd74d4c5c69",
+      "pass": 8,
+      "warn": 2,
+      "fail": 0
+    },
+    "verifyDeliveryAlignmentActual": {
+      "prodSha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "candidateTag": "provenance/sha-e6f26e13795a",
+      "pass": 7,
+      "warn": 3,
+      "fail": 1,
+      "failReason": "RELEASE_RECORD missing prod SHA e6f26e1379"
+    }
+  },
+  "cutoverExecuted": false,
+  "flagsChanged": false
+}

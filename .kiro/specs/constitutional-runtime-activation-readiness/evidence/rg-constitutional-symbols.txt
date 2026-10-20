@@ -1,0 +1,136 @@
+=== date ===
+2026-09-28T04:10:00Z
+=== HEAD ===
+6628f4bf364bd6d0560847b938b00e74035a8947
+=== origin/main ===
+6628f4bf364bd6d0560847b938b00e74035a8947
+
+===== selectLegalPath / executeLegalPath / runRuntimeFacadeShadow / reportPathGap definitions and callers =====
+packages/constitutional-runtime/src/index.ts:17:  runRuntimeFacadeShadow,
+packages/constitutional-contracts/src/index.ts:9:  isConstitutionalShadowEnabled,
+packages/constitutional-contracts/src/index.ts:67:  isPathGapReportEnabled,
+packages/constitutional-contracts/src/index.ts:69:  reportPathGap,
+packages/constitutional-contracts/src/index.ts:78:  runRuntimeFacadeShadow,
+packages/constitutional-contracts/src/index.ts:92:  isLegalPathSelectEnabled,
+packages/constitutional-contracts/src/index.ts:95:  selectLegalPath,
+packages/constitutional-contracts/src/index.ts:107:  executeLegalPath,
+packages/constitutional-contracts/src/index.ts:108:  isLegalPathExecuteEnabled,
+packages/constitutional-conformance/src/index.ts:19:  isPathGapReportEnabled,
+packages/constitutional-conformance/src/index.ts:21:  reportPathGap,
+packages/constitutional-runtime/src/scaffold.test.ts:4:import { runRuntimeFacadeShadow as runFromContracts } from "@openbot/constitutional-contracts";
+packages/constitutional-runtime/src/scaffold.test.ts:12:  runRuntimeFacadeShadow,
+packages/constitutional-runtime/src/scaffold.test.ts:46:    expect(runRuntimeFacadeShadow).toBe(runFromContracts);
+packages/constitutional-runtime/src/scaffold.test.ts:71:    const inert = runRuntimeFacadeShadow();
+packages/constitutional-runtime/src/scaffold.test.ts:81:    const shadow = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/constitutional-contracts.test.ts:16:  isConstitutionalShadowEnabled,
+packages/constitutional-contracts/src/constitutional-contracts.test.ts:33:    expect(isConstitutionalShadowEnabled({})).toBe(false);
+packages/constitutional-contracts/src/constitutional-contracts.test.ts:34:    expect(isConstitutionalShadowEnabled({ OPENBOT_CONSTITUTIONAL_SHADOW: "true" })).toBe(true);
+packages/constitutional-conformance/src/scaffold.test.ts:6:  reportPathGap as reportPathGapFromContracts,
+packages/constitutional-conformance/src/scaffold.test.ts:15:  reportPathGap,
+packages/constitutional-conformance/src/scaffold.test.ts:51:    expect(reportPathGap).toBe(reportPathGapFromContracts);
+packages/constitutional-conformance/src/scaffold.test.ts:97:    const inert = reportPathGap(samplePathGapInput);
+packages/constitutional-conformance/src/scaffold.test.ts:103:    const named = reportPathGap(samplePathGapInput, { report: true });
+packages/constitutional-contracts/src/flags.ts:35:export function isConstitutionalShadowEnabled(
+src/agents/execution-preflight/constitutional-runtime-facade.ts:9:  runRuntimeFacadeShadow,
+src/agents/execution-preflight/constitutional-runtime-facade.ts:51:export function observePreflightRuntimeFacade(
+src/agents/execution-preflight/constitutional-runtime-facade.ts:54:  const shadow = runRuntimeFacadeShadow(
+src/task-orchestration/constitutional-runtime-facade.ts:9:  runRuntimeFacadeShadow,
+src/task-orchestration/constitutional-runtime-facade.ts:34:export function observeOrchestrationRuntimeFacade(
+src/task-orchestration/constitutional-runtime-facade.ts:38:  const shadow = runRuntimeFacadeShadow(
+packages/constitutional-runtime/README.md:13:| `runRuntimeFacadeShadow`            | `runtime-facade`            |
+packages/constitutional-conformance/README.md:14:| `reportPathGap` 与 `no_valid_path` | `path-gap`  |
+packages/constitutional-contracts/README.md:42:`reportPathGap` 在显式 `report: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_PATH_GAP_REPORT` 快照时，发出 `no_valid_path`。默认不命名。函数不读 `process.env`，不选择 Path，不执行，不收紧。
+packages/constitutional-contracts/README.md:53:`runRuntimeFacadeShadow` 在显式 `shadow: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_SHADOW` 快照时，调用 `evaluateShadowConformance`。默认不调用评估器。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:57:- `observeOrchestrationRuntimeFacade`（`src/task-orchestration/constitutional-runtime-facade.ts`）
+packages/constitutional-contracts/README.md:58:- `observePreflightRuntimeFacade`（`src/agents/execution-preflight/constitutional-runtime-facade.ts`）
+packages/constitutional-contracts/README.md:70:当调用方**同时** opt-in shadow（`shadow: true` 或 `OPENBOT_CONSTITUTIONAL_SHADOW`）**且** legal-path select（`select: true` 或 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT`）时，`runRuntimeFacadeShadow` 可调用 `selectLegalPath` 并在报告结果中表面化非空 `selectedPath` / `legalPathSelectable`。任一旗标关 → 退回 #60 面（不选中）。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:90:`selectLegalPath` 在显式 `select: true`，或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` 快照时，可从登记集选取 `constitutional.declared.v1`。默认不选中。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:96:- P8a 的 `LEGAL_CONSTITUTIONAL_PATHS = []` 与 `reportPathGap` 保持不动。
+packages/constitutional-contracts/README.md:104:`executeLegalPath` 复用 `selectLegalPath` 做选中；仅当 `selectedPath` 非空 **且** 显式 `execute: true`（或调用方传入已打开的 `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` 快照）时，`executed=true`。默认不执行。函数不读 `process.env`。
+packages/constitutional-contracts/README.md:110:- Knife1 `selectLegalPath` 的 `executed` 仍恒 false；执行是独立 API。
+packages/constitutional-contracts/README.md:121:- `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_SELECT` 默认未设置即为关闭。`selectLegalPath` 只在调用方传入该变量的快照（或 `select: true`）时允许选中，并且不读 `process.env`。关闭后有效合法集为空、`selectedPath` 为 null、`executed` 为 false。聊天热路径没有安装读取它的 hook。
+packages/constitutional-contracts/README.md:122:- `OPENBOT_CONSTITUTIONAL_LEGAL_PATH_EXECUTE` 默认未设置即为关闭。`executeLegalPath` 只在选中已成立且调用方传入该变量的快照（或 `execute: true`）时设 `executed=true`，并且不读 `process.env`。关掉即秒级回滚到「仅选中 / 不执行」。聊天热路径没有安装读取它的 hook。执行 opt-in ≠ Gate 收紧 ≠ 整段 P8b 完成。
+packages/constitutional-contracts/src/path-gap/report.test.ts:7:  isPathGapReportEnabled,
+packages/constitutional-contracts/src/path-gap/report.test.ts:9:  reportPathGap,
+packages/constitutional-contracts/src/path-gap/report.test.ts:20:      const report = reportPathGap(input);
+packages/constitutional-contracts/src/path-gap/report.test.ts:47:    const report = reportPathGap(input, { report: true });
+packages/constitutional-contracts/src/path-gap/report.test.ts:82:    const report = reportPathGap(input, { report: true });
+packages/constitutional-contracts/src/path-gap/report.test.ts:97:    const report = reportPathGap({ selectedPath: "   " }, { report: true });
+packages/constitutional-contracts/src/path-gap/report.test.ts:106:    expect(isPathGapReportEnabled({})).toBe(false);
+packages/constitutional-contracts/src/path-gap/report.test.ts:107:    expect(isPathGapReportEnabled({ [PATH_GAP_REPORT_ENV]: "true" })).toBe(true);
+packages/constitutional-contracts/src/path-gap/report.test.ts:108:    expect(isPathGapReportEnabled({ [PATH_GAP_REPORT_ENV]: "off" })).toBe(false);
+packages/constitutional-contracts/src/path-gap/report.test.ts:110:    const named = reportPathGap(samplePathGapInput, {
+packages/constitutional-contracts/src/path-gap/report.test.ts:122:    const quiet = reportPathGap(samplePathGapInput, {
+packages/constitutional-contracts/src/legal-path/execute.test.ts:9:  executeLegalPath,
+packages/constitutional-contracts/src/legal-path/execute.test.ts:10:  isLegalPathExecuteEnabled,
+packages/constitutional-contracts/src/legal-path/execute.test.ts:12:  selectLegalPath,
+packages/constitutional-contracts/src/legal-path/execute.test.ts:19:    const result = executeLegalPath(input);
+packages/constitutional-contracts/src/legal-path/execute.test.ts:44:    const result = executeLegalPath(input, { select: true });
+packages/constitutional-contracts/src/legal-path/execute.test.ts:62:    const result = executeLegalPath(input, { select: true, execute: true });
+packages/constitutional-contracts/src/legal-path/execute.test.ts:82:    const result = executeLegalPath(
+packages/constitutional-contracts/src/legal-path/execute.test.ts:99:    const succeeded = executeLegalPath(input, { select: true, execute: true });
+packages/constitutional-contracts/src/legal-path/execute.test.ts:102:    const rolledBack = executeLegalPath(input, {
+packages/constitutional-contracts/src/legal-path/execute.test.ts:115:    const noCandidate = executeLegalPath(
+packages/constitutional-contracts/src/legal-path/execute.test.ts:125:    const executeOnlyNoSelect = executeLegalPath(
+packages/constitutional-contracts/src/legal-path/execute.test.ts:147:      const result = executeLegalPath(
+packages/constitutional-contracts/src/legal-path/execute.test.ts:160:    expect(isLegalPathExecuteEnabled({})).toBe(false);
+packages/constitutional-contracts/src/legal-path/execute.test.ts:161:    expect(isLegalPathExecuteEnabled({ [LEGAL_PATH_EXECUTE_ENV]: "true" })).toBe(true);
+packages/constitutional-contracts/src/legal-path/execute.test.ts:162:    expect(isLegalPathExecuteEnabled({ [LEGAL_PATH_EXECUTE_ENV]: "off" })).toBe(false);
+packages/constitutional-contracts/src/legal-path/execute.test.ts:170:      const result = executeLegalPath({
+packages/constitutional-contracts/src/legal-path/execute.test.ts:191:  it("does not change selectLegalPath — Knife1 executed stays false", () => {
+packages/constitutional-contracts/src/legal-path/execute.test.ts:192:    const selectOnly = selectLegalPath(
+packages/constitutional-contracts/src/legal-path/select.ts:119:export function isLegalPathSelectEnabled(
+packages/constitutional-contracts/src/legal-path/select.ts:147:  if (!(options.select === true || isLegalPathSelectEnabled(options.env ?? {}))) {
+packages/constitutional-contracts/src/legal-path/select.ts:209:export function selectLegalPath(
+packages/constitutional-contracts/src/legal-path/select.ts:214:  const selectEnabled = options.select === true || isLegalPathSelectEnabled(options.env ?? {});
+packages/constitutional-contracts/src/path-gap/report.ts:123:export function isPathGapReportEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
+packages/constitutional-contracts/src/path-gap/report.ts:192:export function reportPathGap(
+packages/constitutional-contracts/src/path-gap/report.ts:197:  const namingEnabled = options.report === true || isPathGapReportEnabled(options.env ?? {});
+packages/constitutional-contracts/src/legal-path/select.test.ts:8:  isLegalPathSelectEnabled,
+packages/constitutional-contracts/src/legal-path/select.test.ts:11:  selectLegalPath,
+packages/constitutional-contracts/src/legal-path/select.test.ts:32:      const result = selectLegalPath(input);
+packages/constitutional-contracts/src/legal-path/select.test.ts:64:    const result = selectLegalPath(input, { select: true });
+packages/constitutional-contracts/src/legal-path/select.test.ts:101:      const result = selectLegalPath(
+packages/constitutional-contracts/src/legal-path/select.test.ts:117:    const result = selectLegalPath(
+packages/constitutional-contracts/src/legal-path/select.test.ts:128:    expect(isLegalPathSelectEnabled({})).toBe(false);
+packages/constitutional-contracts/src/legal-path/select.test.ts:129:    expect(isLegalPathSelectEnabled({ [LEGAL_PATH_SELECT_ENV]: "true" })).toBe(true);
+packages/constitutional-contracts/src/legal-path/select.test.ts:130:    expect(isLegalPathSelectEnabled({ [LEGAL_PATH_SELECT_ENV]: "off" })).toBe(false);
+packages/constitutional-contracts/src/legal-path/select.test.ts:132:    const selected = selectLegalPath(
+packages/constitutional-contracts/src/legal-path/select.test.ts:143:    const quiet = selectLegalPath(
+packages/constitutional-contracts/src/legal-path/execute.ts:7: * Reuses Knife1 `selectLegalPath` for selection. `executed` becomes true only
+packages/constitutional-contracts/src/legal-path/execute.ts:17:  selectLegalPath,
+packages/constitutional-contracts/src/legal-path/execute.ts:84:export function isLegalPathExecuteEnabled(
+packages/constitutional-contracts/src/legal-path/execute.ts:102:export function executeLegalPath(
+packages/constitutional-contracts/src/legal-path/execute.ts:111:  const select = selectLegalPath(input, selectOptions);
+packages/constitutional-contracts/src/legal-path/execute.ts:112:  const executeEnabled = options.execute === true || isLegalPathExecuteEnabled(options.env ?? {});
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:8:  runRuntimeFacadeShadow,
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:19:function expectInertDiagnostics(result: ReturnType<typeof runRuntimeFacadeShadow>): void {
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:36:      const result = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:96:    const result = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:127:    const enabled = runRuntimeFacadeShadow({ sources: sampleSourceSnapshot }, { env: SHADOW_ENV });
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:136:    const disabled = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:146:    const result = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:165:    const result = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:200:    const result = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:220:    const painted = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:241:    const undeclared = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:260:    const result = runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.test.ts:280:    const result = runRuntimeFacadeShadow(
+src/task-orchestration/constitutional-runtime-facade.test.ts:7:import { observeOrchestrationRuntimeFacade } from "./constitutional-runtime-facade.js";
+src/task-orchestration/constitutional-runtime-facade.test.ts:37:      const inert = observeOrchestrationRuntimeFacade({
+src/task-orchestration/constitutional-runtime-facade.test.ts:63:    const result = observeOrchestrationRuntimeFacade({
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:21: * `selectLegalPath` and surface a non-null `selectedPath` plus Knife1
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:32:import { isConstitutionalShadowEnabled } from "../flags.js";
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:34:  isLegalPathSelectEnabled,
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:35:  selectLegalPath,
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:81:   * `selectLegalPath` for report-only selection. Otherwise discarded.
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:136:  return options.shadow === true || isConstitutionalShadowEnabled(options.env ?? {});
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:140:  return options.select === true || isLegalPathSelectEnabled(options.env ?? {});
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:193:export function runRuntimeFacadeShadow(
+packages/constitutional-contracts/src/runtime-facade/shadow.ts:220:  const selection = selectLegalPath(
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:4:import { observePreflightRuntimeFacade } from "./constitutional-runtime-facade.js";
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:47:      const result = observePreflightRuntimeFacade({
+src/agents/execution-preflight/constitutional-runtime-facade.test.ts:73:    const result = observePreflightRuntimeFacade({
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:858:      "conflicts": ["Knife1 两段门不是整段 P8b 或整段 D。src/ 没有 selectLegalPath 调用者。"],
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:920:          "note": "实现与薄注同一提交。src/ 没有 reportPathGap 调用者。"
+docs/design/evidence/constitutional-governance-state-matrix-2026-09-27.json:1003:        "包本地默认关 stub 不是网关执行，也不是 Gate 收紧。src/ 没有 executeLegalPath 调用者。"

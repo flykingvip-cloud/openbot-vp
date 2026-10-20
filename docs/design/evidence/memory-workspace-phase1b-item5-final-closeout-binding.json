@@ -1,0 +1,55 @@
+{
+  "schema": "memory-workspace-phase1b-item5-final-closeout-binding/v1",
+  "item": 5,
+  "decision": "submitted-for-final-closeout-review",
+  "item5": "not-met",
+  "item5Met": false,
+  "item6Unlocked": false,
+  "item7Unlocked": false,
+  "wiredToProductionResolver": false,
+  "deployAuthorized": false,
+  "cutoverLive": false,
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "operationId": "item5-closeout-6ac338479a-20260819T163148Z",
+  "evidenceId": "item5-closeout-6ac338479a-20260819T163148Z",
+  "baselineSha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+  "originMainSha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+  "runtimeSha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+  "runtimeAlignedToBaseline": true,
+  "handoff": ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-final-closeout.md",
+  "reviewSurface": "https://github.com/gmood2008/openbot/pull/538",
+  "notReviewSurface": [
+    "dirty I4 or kiro-loom worktree",
+    ".kiro/specs/memory-workspace-platform-remediation/codex-handoff-item5-runtime-alignment-20260819.md",
+    "origin/main before this package lands"
+  ],
+  "files": {
+    "memory-workspace-phase1b-item5-production-closeout.json": {
+      "fileSha256": "c88c12889b53ea5acc234ee7b4577211cf427236ded77e0de832ce7e21cbe9dc",
+      "canonicalSha256": "d0c55f593ae3adf73fbf99513992c1077ff133bff752333d0162ed8f88ebc97a",
+      "gitBlobSha1": "739512a6e4f6ac1fd8499bef17d301b494da3a9e"
+    },
+    "memory-workspace-phase1b-item5-production-live-caller.json": {
+      "fileSha256": "31ef555cfadeb0ea3520e64ccf677d6d9660958d1d2d6f469997fb2e355e2045",
+      "canonicalSha256": "a3b2bcca2ece30f6d6720c8226eadbfaf49d98347987bf555b9479035e789f53",
+      "gitBlobSha1": "9435b8140c6ea04860b0f845da26292540ffc86a"
+    },
+    "memory-workspace-phase1b-item5-production-registry-catalog.json": {
+      "fileSha256": "20d95517227f864d8e53dc49e2ec73a9ee9f2ac6f627de52e25ce835aba8324d",
+      "canonicalSha256": "3cdb8021cbea5dc2bd995f60074704b89e2f281e18e0257e6378b8bffbc79b81",
+      "gitBlobSha1": "d5930e5bdd2ed93071d1977511e065c7658a1c24"
+    },
+    "memory-workspace-phase1b-item5-production-tenant-context.json": {
+      "fileSha256": "dd2df071511cc513e331f1576101a55bbc4922bc3df0d9ef5fbe90f0900eb240",
+      "canonicalSha256": "fda84b9a561a17fbfc42b768a7549b3b5a38b50251383517c7d752edd1c20dba",
+      "gitBlobSha1": "db50ecab2636b4d7d7654ff91edebd911825b8e3"
+    },
+    "memory-workspace-phase1b-item5-production-evidence-summary.json": {
+      "fileSha256": "955ae72751b9e485558d8125673dcb523f211207cd626e768929093fc3324953",
+      "canonicalSha256": "8654dc299e6fc9fcae702483fe65c3a045f6cf4d7b6d1c69162d626b6c8ffc46",
+      "gitBlobSha1": "cc1ae20ea8ec79d6630d57fed90c2d8d4f1e05fa"
+    }
+  },
+  "note": "This binding is the final closeout SHA SoT. The runtime-alignment handoff SHA table is superseded and must not be used to bind these five files. Item 5 stays not-met until independent Final Closeout Review scores it. This file does not unlock Item 6 or Item 7."
+}

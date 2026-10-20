@@ -1,0 +1,108 @@
+[
+  {
+    "scenario": "before_agent_start_empty_registry",
+    "records": []
+  },
+  {
+    "scenario": "before_model_resolve_priority_override",
+    "records": [
+      {
+        "hookName": "before_model_resolve",
+        "pluginId": "high-priority",
+        "phase": "before",
+        "payloadHash": "8a32be0a40c99747"
+      },
+      {
+        "hookName": "before_model_resolve",
+        "pluginId": "low-priority",
+        "phase": "before",
+        "payloadHash": "8a32be0a40c99747"
+      }
+    ]
+  },
+  {
+    "scenario": "before_prompt_build_prepend_concat",
+    "records": [
+      {
+        "hookName": "before_prompt_build",
+        "pluginId": "high",
+        "phase": "before",
+        "payloadHash": "1dece69b426377cb"
+      },
+      {
+        "hookName": "before_prompt_build",
+        "pluginId": "low",
+        "phase": "before",
+        "payloadHash": "1dece69b426377cb"
+      }
+    ]
+  },
+  {
+    "scenario": "before_agent_start_legacy_compat_merge",
+    "records": [
+      {
+        "hookName": "before_agent_start",
+        "pluginId": "legacy-router",
+        "phase": "before",
+        "payloadHash": "82835b2061e0c13b"
+      },
+      {
+        "hookName": "before_agent_start",
+        "pluginId": "legacy-context",
+        "phase": "before",
+        "payloadHash": "82835b2061e0c13b"
+      }
+    ]
+  },
+  {
+    "scenario": "message_received_parallel_two_plugins",
+    "records": [
+      {
+        "hookName": "message_received",
+        "pluginId": "audit-plugin",
+        "phase": "message_received",
+        "payloadHash": "2ae7f94763f6aaa2"
+      },
+      {
+        "hookName": "message_received",
+        "pluginId": "metrics-plugin",
+        "phase": "message_received",
+        "payloadHash": "2ae7f94763f6aaa2"
+      }
+    ]
+  },
+  {
+    "scenario": "subagent_spawning_sequential_merge",
+    "records": [
+      {
+        "hookName": "subagent_spawning",
+        "pluginId": "channel-plugin-A",
+        "phase": "subagent_spawning",
+        "payloadHash": "97468c1bb01319d8"
+      },
+      {
+        "hookName": "subagent_spawning",
+        "pluginId": "channel-plugin-B",
+        "phase": "subagent_spawning",
+        "payloadHash": "97468c1bb01319d8"
+      }
+    ]
+  },
+  {
+    "scenario": "before_tool_call_block_takes_priority",
+    "records": [
+      {
+        "hookName": "before_tool_call",
+        "pluginId": "guard-plugin",
+        "phase": "before",
+        "payloadHash": "652d04db9734a4ab"
+      },
+      {
+        "hookName": "before_tool_call",
+        "pluginId": "param-plugin",
+        "phase": "before",
+        "payloadHash": "652d04db9734a4ab"
+      }
+    ]
+  }
+]

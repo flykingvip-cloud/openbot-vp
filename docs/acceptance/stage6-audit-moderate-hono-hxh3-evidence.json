@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-hxh3-vqpv-xpqv",
+  "cve": "CVE-2026-93981",
+  "package": "hono",
+  "vulnerable_range": "<4.13.7",
+  "affected_version_before": "4.13.5",
+  "dependency_path": ".>hono",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=4.13.7",
+  "mitigated_version": "4.13.7",
+  "reachable_surface": "hono/jsx SSR XSS via unescaped plain strings in Suspense/ErrorBoundary/Context.Provider/renderToString (advisory); no in-tree `from 'hono'` import observed — still a direct prod dependency / override for peers; patch bump 4.13.5→4.13.7 within same minor",
+  "mitigation": "Bump dependencies.hono to 4.13.7; pnpm.overrides.hono=4.13.7. Prior cells GHSA-xgm2 / GHSA-8j4g / GHSA-gqvv (and their pin side-effects) stay cleared under this pin. Remaining Stage 6 moderate surface includes @hono/node-server and dompurify — not this PR.",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (39 moderate + 8 low remain, including @hono/node-server and dompurify). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 39,
+    "low": 8,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-hxh3-vqpv-xpqv"
+}

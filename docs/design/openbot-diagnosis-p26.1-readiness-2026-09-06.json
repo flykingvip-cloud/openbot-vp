@@ -1,0 +1,20 @@
+{
+  "kind": "human_postmerge_readiness_record",
+  "increment": "P26.1",
+  "schemaVersion": 1,
+  "candidateSha": "7d75c0bba6ab692f1396cde3d366a10c68ae092d",
+  "liveSha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+  "approvalRecordsEvaluation": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "confirmHuman": true,
+  "confirmPostMergeReeval": true,
+  "confirmHistoricalP26Invalidated": true,
+  "confirmEvaluationOnly": true,
+  "confirmProductionReady": false,
+  "confirmNoLiveCutover": true,
+  "confirmDeliveryOwnsCutover": true,
+  "confirmLiveExecutorUndeployed": true,
+  "confirmCanaryTenant": "tenant-fixture-a",
+  "signer": "Daniel / CEO"
+}

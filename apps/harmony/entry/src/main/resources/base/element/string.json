@@ -1,0 +1,32 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "OpenBot employee web shell"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "OpenBot employee shell entry"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "OpenBot"
+    },
+    {
+      "name": "permission_internet_reason",
+      "value": "Connect to OpenBot Gateway for employee chat and workbench."
+    },
+    {
+      "name": "load_error_title",
+      "value": "无法加载 OpenBot"
+    },
+    {
+      "name": "load_error_hint",
+      "value": "请检查网络，或确认 Gateway 地址是否正确。"
+    },
+    {
+      "name": "action_retry",
+      "value": "重试"
+    }
+  ]
+}

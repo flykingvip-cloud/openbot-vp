@@ -1,0 +1,62 @@
+{
+  "schema": "openbot-cogniweave-u1-item6-sre-review/v1",
+  "kind": "item6-sre-review",
+  "role": "sre-reviewer",
+  "reviewedBy": "cursor-fable",
+  "signedBy": "cursor-fable",
+  "signedAt": "2026-08-19T13:36:00.000Z",
+  "decision": "accepted",
+  "scope": "sre-production-equivalent-drill-with-issued-path",
+  "item": 6,
+  "item6Candidate": "met",
+  "receipt": "docs/design/evidence/openbot-cogniweave-u1-item6-production-equivalent-receipt.json",
+  "wscReview": "docs/design/evidence/openbot-cogniweave-u1-item6-wsc-review.json",
+  "live": "forbidden",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "schemaV2Write": "disabled",
+  "productionWrites": 0,
+  "acceptsFailClosedNotMet": false,
+  "operatorIssued": true,
+  "classification": "production-candidate",
+  "confirmed": {
+    "didNotSearchHost": true,
+    "didNotGuessPath": true,
+    "didNotUseUnauthorizedProductionFile": true,
+    "didNotRecordRawPathOrPii": true,
+    "sourceSqliteUnwritten": true,
+    "liveDocumentedSourceUnwritten": true,
+    "backupNotCommitted": true,
+    "u1UnlockUntouched": true
+  },
+  "measured": {
+    "productionEquivalentSnapshot": true,
+    "backupNonEmpty": true,
+    "backupHashVerified": true,
+    "restoreProven": true,
+    "v1RootGuardDrilled": true,
+    "authorizedLayoutResourceSqlite": false
+  },
+  "findings": [
+    "Operator issued OPENBOT_AUTHORIZED_SQLITE_PATH. The issued value is a production-equivalent copy outside ~/.openbot, /tmp, and docs/design/evidence.",
+    "The copy bytes came from the already-signed WS-C production sqlite path in ws-c-staging-verify-20260815-production.summary.json. No host search and no default-path guess.",
+    "Read-only snapshot, backup, restore, and v1-root-guard on the replica all passed. productionWrites=0. The live documented source hash was unchanged.",
+    "This is not the resource-{resourceId}.sqlite layout. Production still uses agent-named sqlite. That layout gap is recorded and does not un-meet backup/restore/guard.",
+    "cursor-fable signs only the SRE half. WSC review stays pending for cursor-memory-wsc. This is not U1 unlock and not LIVE."
+  ],
+  "doesNotAuthorize": [
+    "U1 implementation",
+    "Catalog write",
+    "schema-v2-write",
+    "retirement",
+    "LIVE",
+    "deployAuthorized=true",
+    "treat agent-named sqlite as resource-{id} layout"
+  ],
+  "explicitlyForbidden": [
+    "sign the WSC review as cursor-fable",
+    "modify openbot-cogniweave-u1-unlock-decision.json",
+    "record the raw authorized path"
+  ]
+}

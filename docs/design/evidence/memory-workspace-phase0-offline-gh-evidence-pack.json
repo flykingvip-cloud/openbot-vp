@@ -1,0 +1,678 @@
+{
+  "schema": "memory-workspace-phase0-offline-gh-evidence-pack/v1",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "mainShaAtCapture": "06d71b9ec2f8eb3a1dd7901cc189cbdfff39bad6",
+  "capturedAt": "2026-08-16T00:48:25Z",
+  "capturedBy": "cursor-memory-wsc",
+  "captureHost": "execution-team-local",
+  "purpose": "Review-25 offline governance verification refresh",
+  "commands": [
+    {
+      "id": "pr409-view",
+      "command": "gh pr view 409 ...",
+      "exitCode": 0,
+      "stdout": "{\"mergeCommit\":{\"oid\":\"d261378ff3d283d134a6ed4088e836842380294d\"},\"mergedAt\":\"2026-08-15T08:26:59Z\",\"reviewDecision\":\"APPROVED\",\"reviews\":[{\"id\":\"PRR_kwDOSp5Q5M8AAAABJqWXlw\",\"author\":{\"login\":\"flykingvip-cloud\"},\"authorAssociation\":\"COLLABORATOR\",\"body\":\"\",\"submittedAt\":\"2026-08-15T08:25:30Z\",\"includesCreatedEdit\":false,\"reactionGroups\":[],\"state\":\"APPROVED\",\"commit\":{\"oid\":\"8be8bf30cea223ffb81f47543a40abca27a6e834\"}}],\"state\":\"MERGED\",\"statusCheckRollup\":[{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:47Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498152\",\"name\":\"docs-scope\",\"startedAt\":\"2026-08-15T03:44:43Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:46Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617267/job/94958498805\",\"name\":\"docs-scope\",\"startedAt\":\"2026-08-15T03:44:43Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Install Smoke\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:45Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495974\",\"name\":\"label\",\"startedAt\":\"2026-08-15T03:44:41Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Labeler\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T07:18:15Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862615601/job/94980991327\",\"name\":\"freeze + phase0 evidence tests\",\"startedAt\":\"2026-08-15T07:18:06Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Memory Workspace Freeze\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:46Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617281/job/94958498221\",\"name\":\"no-tabs\",\"startedAt\":\"2026-08-15T03:44:43Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Workflow Sanity\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T05:40:12Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617250/job/94958499435\",\"name\":\"check (types, lint, format)\",\"startedAt\":\"2026-08-15T05:36:02Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI Gate\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T05:43:00Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617232/job/94958499749\",\"name\":\"freeze + phase0 evidence tests\",\"startedAt\":\"2026-08-15T05:41:30Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Memory Workspace Freeze\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:46Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498198\",\"name\":\"secrets\",\"startedAt\":\"2026-08-15T03:44:43Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:46Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617281/job/94958498238\",\"name\":\"actionlint\",\"startedAt\":\"2026-08-15T03:44:43Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Workflow Sanity\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:46Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617267/job/94958506303\",\"name\":\"install-smoke\",\"startedAt\":\"2026-08-15T03:44:47Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Install Smoke\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:41Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495976\",\"name\":\"backfill-pr-labels\",\"startedAt\":\"2026-08-15T03:44:41Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Labeler\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T05:41:26Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617250/job/94958499541\",\"name\":\"delivery guard\",\"startedAt\":\"2026-08-15T05:40:17Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI Gate\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:45Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495681\",\"name\":\"label-issues\",\"startedAt\":\"2026-08-15T03:44:41Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Labeler\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:42Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498544\",\"name\":\"ios\",\"startedAt\":\"2026-08-15T03:44:43Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:47Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508571\",\"name\":\"changed-scope\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:47Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508356\",\"name\":\"check-docs\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508766\",\"name\":\"build-artifacts\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508590\",\"name\":\"checks\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508511\",\"name\":\"check\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958509773\",\"name\":\"cogniweave-sdk-core-gate\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508889\",\"name\":\"skills-python\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508700\",\"name\":\"checks-windows\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508565\",\"name\":\"android\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508810\",\"name\":\"release-check\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508921\",\"name\":\"macos\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T03:44:48Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958509389\",\"name\":\"cogniweave-sdk-integration-rollback\",\"startedAt\":\"2026-08-15T03:44:48Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"}]}",
+      "parsed": {
+        "mergeCommit": {
+          "oid": "d261378ff3d283d134a6ed4088e836842380294d"
+        },
+        "mergedAt": "2026-08-15T08:26:59Z",
+        "reviewDecision": "APPROVED",
+        "reviews": [
+          {
+            "id": "PRR_kwDOSp5Q5M8AAAABJqWXlw",
+            "author": {
+              "login": "flykingvip-cloud"
+            },
+            "authorAssociation": "COLLABORATOR",
+            "body": "",
+            "submittedAt": "2026-08-15T08:25:30Z",
+            "includesCreatedEdit": false,
+            "reactionGroups": [],
+            "state": "APPROVED",
+            "commit": {
+              "oid": "8be8bf30cea223ffb81f47543a40abca27a6e834"
+            }
+          }
+        ],
+        "state": "MERGED",
+        "statusCheckRollup": [
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:47Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498152",
+            "name": "docs-scope",
+            "startedAt": "2026-08-15T03:44:43Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:46Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617267/job/94958498805",
+            "name": "docs-scope",
+            "startedAt": "2026-08-15T03:44:43Z",
+            "status": "COMPLETED",
+            "workflowName": "Install Smoke"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:45Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495974",
+            "name": "label",
+            "startedAt": "2026-08-15T03:44:41Z",
+            "status": "COMPLETED",
+            "workflowName": "Labeler"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T07:18:15Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862615601/job/94980991327",
+            "name": "freeze + phase0 evidence tests",
+            "startedAt": "2026-08-15T07:18:06Z",
+            "status": "COMPLETED",
+            "workflowName": "Memory Workspace Freeze"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:46Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617281/job/94958498221",
+            "name": "no-tabs",
+            "startedAt": "2026-08-15T03:44:43Z",
+            "status": "COMPLETED",
+            "workflowName": "Workflow Sanity"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T05:40:12Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617250/job/94958499435",
+            "name": "check (types, lint, format)",
+            "startedAt": "2026-08-15T05:36:02Z",
+            "status": "COMPLETED",
+            "workflowName": "CI Gate"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T05:43:00Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617232/job/94958499749",
+            "name": "freeze + phase0 evidence tests",
+            "startedAt": "2026-08-15T05:41:30Z",
+            "status": "COMPLETED",
+            "workflowName": "Memory Workspace Freeze"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:46Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498198",
+            "name": "secrets",
+            "startedAt": "2026-08-15T03:44:43Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:46Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617281/job/94958498238",
+            "name": "actionlint",
+            "startedAt": "2026-08-15T03:44:43Z",
+            "status": "COMPLETED",
+            "workflowName": "Workflow Sanity"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:46Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617267/job/94958506303",
+            "name": "install-smoke",
+            "startedAt": "2026-08-15T03:44:47Z",
+            "status": "COMPLETED",
+            "workflowName": "Install Smoke"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:41Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495976",
+            "name": "backfill-pr-labels",
+            "startedAt": "2026-08-15T03:44:41Z",
+            "status": "COMPLETED",
+            "workflowName": "Labeler"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T05:41:26Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617250/job/94958499541",
+            "name": "delivery guard",
+            "startedAt": "2026-08-15T05:40:17Z",
+            "status": "COMPLETED",
+            "workflowName": "CI Gate"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:45Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495681",
+            "name": "label-issues",
+            "startedAt": "2026-08-15T03:44:41Z",
+            "status": "COMPLETED",
+            "workflowName": "Labeler"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:42Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498544",
+            "name": "ios",
+            "startedAt": "2026-08-15T03:44:43Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:47Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508571",
+            "name": "changed-scope",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:47Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508356",
+            "name": "check-docs",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508766",
+            "name": "build-artifacts",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508590",
+            "name": "checks",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508511",
+            "name": "check",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958509773",
+            "name": "cogniweave-sdk-core-gate",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508889",
+            "name": "skills-python",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508700",
+            "name": "checks-windows",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508565",
+            "name": "android",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508810",
+            "name": "release-check",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508921",
+            "name": "macos",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T03:44:48Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958509389",
+            "name": "cogniweave-sdk-integration-rollback",
+            "startedAt": "2026-08-15T03:44:48Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pr409-checks",
+      "command": "gh pr checks 409 ...",
+      "exitCode": 1,
+      "stdout": "actionlint\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31862617281/job/94958498238\t\ndocs-scope\tfail\t4s\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498152\t\ndocs-scope\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31862617267/job/94958498805\t\nfreeze + phase0 evidence tests\tfail\t9s\thttps://github.com/gmood2008/openbot/actions/runs/31862615601/job/94980991327\t\nlabel\tfail\t4s\thttps://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495974\t\nlabel-issues\tfail\t4s\thttps://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495681\t\nno-tabs\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31862617281/job/94958498221\t\nsecrets\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498198\t\nandroid\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508565\t\nbackfill-pr-labels\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862616509/job/94958495976\t\nbuild-artifacts\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508766\t\nchanged-scope\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508571\t\ncheck\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508511\t\ncheck-docs\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508356\t\nchecks\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508590\t\nchecks-windows\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508700\t\ncogniweave-sdk-core-gate\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958509773\t\ncogniweave-sdk-integration-rollback\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958509389\t\ninstall-smoke\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617267/job/94958506303\t\nios\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958498544\t\nmacos\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508921\t\nrelease-check\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508810\t\nskills-python\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31862617231/job/94958508889\t\ncheck (types, lint, format)\tpass\t4m10s\thttps://github.com/gmood2008/openbot/actions/runs/31862617250/job/94958499435\t\ndelivery guard\tpass\t1m9s\thttps://github.com/gmood2008/openbot/actions/runs/31862617250/job/94958499541\t\nfreeze + phase0 evidence tests\tpass\t1m30s\thttps://github.com/gmood2008/openbot/actions/runs/31862617232/job/94958499749\t"
+    },
+    {
+      "id": "pr401-view",
+      "command": "gh pr view 401 ...",
+      "exitCode": 0,
+      "stdout": "{\"baseRefOid\":\"d261378ff3d283d134a6ed4088e836842380294d\",\"headRefOid\":\"bb19e42032890bd22a419aa449c8b5ef63959a52\",\"mergeCommit\":{\"oid\":\"1ab9d33e69ea3803e5d4e0f0be7ece83653fb792\"},\"mergedAt\":\"2026-08-15T11:35:06Z\",\"reviewDecision\":\"APPROVED\",\"reviews\":[{\"id\":\"PRR_kwDOSp5Q5M8AAAABJquV-w\",\"author\":{\"login\":\"flykingvip-cloud\"},\"authorAssociation\":\"COLLABORATOR\",\"body\":\"\",\"submittedAt\":\"2026-08-15T11:33:27Z\",\"includesCreatedEdit\":false,\"reactionGroups\":[],\"state\":\"APPROVED\",\"commit\":{\"oid\":\"bb19e42032890bd22a419aa449c8b5ef63959a52\"}}],\"state\":\"MERGED\",\"statusCheckRollup\":[{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995445915\",\"name\":\"docs-scope\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566334/job/94995445950\",\"name\":\"docs-scope\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Install Smoke\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:02Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443390\",\"name\":\"label\",\"startedAt\":\"2026-08-15T09:39:59Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Labeler\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566315/job/94995445911\",\"name\":\"no-tabs\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Workflow Sanity\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:43:54Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566322/job/94995445842\",\"name\":\"check (types, lint, format)\",\"startedAt\":\"2026-08-15T09:41:47Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI Gate\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:46:40Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566313/job/94995445934\",\"name\":\"freeze + phase0 evidence tests\",\"startedAt\":\"2026-08-15T09:45:08Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Memory Workspace Freeze\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:41:43Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877564261/job/94995440610\",\"name\":\"freeze + phase0 evidence tests\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Memory Workspace Freeze\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995445901\",\"name\":\"secrets\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566315/job/94995445896\",\"name\":\"actionlint\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Workflow Sanity\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566334/job/94995452691\",\"name\":\"install-smoke\",\"startedAt\":\"2026-08-15T09:40:05Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Install Smoke\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:39:59Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443745\",\"name\":\"backfill-pr-labels\",\"startedAt\":\"2026-08-15T09:40:00Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Labeler\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:45:04Z\",\"conclusion\":\"SUCCESS\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566322/job/94995445865\",\"name\":\"delivery guard\",\"startedAt\":\"2026-08-15T09:43:58Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI Gate\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:02Z\",\"conclusion\":\"FAILURE\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443402\",\"name\":\"label-issues\",\"startedAt\":\"2026-08-15T09:39:59Z\",\"status\":\"COMPLETED\",\"workflowName\":\"Labeler\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:01Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995446152\",\"name\":\"ios\",\"startedAt\":\"2026-08-15T09:40:01Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451517\",\"name\":\"changed-scope\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451516\",\"name\":\"check-docs\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451870\",\"name\":\"build-artifacts\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451662\",\"name\":\"checks\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451939\",\"name\":\"check\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451944\",\"name\":\"cogniweave-sdk-core-gate\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451847\",\"name\":\"skills-python\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451971\",\"name\":\"checks-windows\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451996\",\"name\":\"android\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451821\",\"name\":\"release-check\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995452004\",\"name\":\"macos\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"},{\"__typename\":\"CheckRun\",\"completedAt\":\"2026-08-15T09:40:04Z\",\"conclusion\":\"SKIPPED\",\"detailsUrl\":\"https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451908\",\"name\":\"cogniweave-sdk-integration-rollback\",\"startedAt\":\"2026-08-15T09:40:04Z\",\"status\":\"COMPLETED\",\"workflowName\":\"CI\"}]}",
+      "parsed": {
+        "baseRefOid": "d261378ff3d283d134a6ed4088e836842380294d",
+        "headRefOid": "bb19e42032890bd22a419aa449c8b5ef63959a52",
+        "mergeCommit": {
+          "oid": "1ab9d33e69ea3803e5d4e0f0be7ece83653fb792"
+        },
+        "mergedAt": "2026-08-15T11:35:06Z",
+        "reviewDecision": "APPROVED",
+        "reviews": [
+          {
+            "id": "PRR_kwDOSp5Q5M8AAAABJquV-w",
+            "author": {
+              "login": "flykingvip-cloud"
+            },
+            "authorAssociation": "COLLABORATOR",
+            "body": "",
+            "submittedAt": "2026-08-15T11:33:27Z",
+            "includesCreatedEdit": false,
+            "reactionGroups": [],
+            "state": "APPROVED",
+            "commit": {
+              "oid": "bb19e42032890bd22a419aa449c8b5ef63959a52"
+            }
+          }
+        ],
+        "state": "MERGED",
+        "statusCheckRollup": [
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995445915",
+            "name": "docs-scope",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566334/job/94995445950",
+            "name": "docs-scope",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "Install Smoke"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:02Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443390",
+            "name": "label",
+            "startedAt": "2026-08-15T09:39:59Z",
+            "status": "COMPLETED",
+            "workflowName": "Labeler"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566315/job/94995445911",
+            "name": "no-tabs",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "Workflow Sanity"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:43:54Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566322/job/94995445842",
+            "name": "check (types, lint, format)",
+            "startedAt": "2026-08-15T09:41:47Z",
+            "status": "COMPLETED",
+            "workflowName": "CI Gate"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:46:40Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566313/job/94995445934",
+            "name": "freeze + phase0 evidence tests",
+            "startedAt": "2026-08-15T09:45:08Z",
+            "status": "COMPLETED",
+            "workflowName": "Memory Workspace Freeze"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:41:43Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877564261/job/94995440610",
+            "name": "freeze + phase0 evidence tests",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "Memory Workspace Freeze"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995445901",
+            "name": "secrets",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566315/job/94995445896",
+            "name": "actionlint",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "Workflow Sanity"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566334/job/94995452691",
+            "name": "install-smoke",
+            "startedAt": "2026-08-15T09:40:05Z",
+            "status": "COMPLETED",
+            "workflowName": "Install Smoke"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:39:59Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443745",
+            "name": "backfill-pr-labels",
+            "startedAt": "2026-08-15T09:40:00Z",
+            "status": "COMPLETED",
+            "workflowName": "Labeler"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:45:04Z",
+            "conclusion": "SUCCESS",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566322/job/94995445865",
+            "name": "delivery guard",
+            "startedAt": "2026-08-15T09:43:58Z",
+            "status": "COMPLETED",
+            "workflowName": "CI Gate"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:02Z",
+            "conclusion": "FAILURE",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443402",
+            "name": "label-issues",
+            "startedAt": "2026-08-15T09:39:59Z",
+            "status": "COMPLETED",
+            "workflowName": "Labeler"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:01Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995446152",
+            "name": "ios",
+            "startedAt": "2026-08-15T09:40:01Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451517",
+            "name": "changed-scope",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451516",
+            "name": "check-docs",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451870",
+            "name": "build-artifacts",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451662",
+            "name": "checks",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451939",
+            "name": "check",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451944",
+            "name": "cogniweave-sdk-core-gate",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451847",
+            "name": "skills-python",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451971",
+            "name": "checks-windows",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451996",
+            "name": "android",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451821",
+            "name": "release-check",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995452004",
+            "name": "macos",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          },
+          {
+            "__typename": "CheckRun",
+            "completedAt": "2026-08-15T09:40:04Z",
+            "conclusion": "SKIPPED",
+            "detailsUrl": "https://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451908",
+            "name": "cogniweave-sdk-integration-rollback",
+            "startedAt": "2026-08-15T09:40:04Z",
+            "status": "COMPLETED",
+            "workflowName": "CI"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pr401-checks",
+      "command": "gh pr checks 401 ...",
+      "exitCode": 1,
+      "stdout": "actionlint\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877566315/job/94995445896\t\ndocs-scope\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877566334/job/94995445950\t\ndocs-scope\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995445915\t\nlabel\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443390\t\nlabel-issues\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443402\t\nno-tabs\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877566315/job/94995445911\t\nsecrets\tfail\t3s\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995445901\t\nandroid\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451996\t\nfreeze + phase0 evidence tests\tpass\t1m42s\thttps://github.com/gmood2008/openbot/actions/runs/31877564261/job/94995440610\t\nmacos\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995452004\t\ncogniweave-sdk-core-gate\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451944\t\ncogniweave-sdk-integration-rollback\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451908\t\ncheck\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451939\t\nchecks\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451662\t\nchanged-scope\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451517\t\ncheck-docs\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451516\t\nbuild-artifacts\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451870\t\nios\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995446152\t\nchecks-windows\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451971\t\ndelivery guard\tpass\t1m6s\thttps://github.com/gmood2008/openbot/actions/runs/31877566322/job/94995445865\t\nrelease-check\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451821\t\nskills-python\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566346/job/94995451847\t\ninstall-smoke\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877566334/job/94995452691\t\nbackfill-pr-labels\tskipping\t0\thttps://github.com/gmood2008/openbot/actions/runs/31877565306/job/94995443745\t\ncheck (types, lint, format)\tpass\t2m7s\thttps://github.com/gmood2008/openbot/actions/runs/31877566322/job/94995445842\t\nfreeze + phase0 evidence tests\tpass\t1m32s\thttps://github.com/gmood2008/openbot/actions/runs/31877566313/job/94995445934\t"
+    },
+    {
+      "id": "ruleset-19808307",
+      "command": "gh api rulesets/19808307 ...",
+      "exitCode": 0,
+      "stdout": "{\"rules\":[{\"parameters\":{\"allowed_merge_methods\":[\"merge\",\"squash\",\"rebase\"],\"dismiss_stale_reviews_on_push\":false,\"require_code_owner_review\":true,\"require_last_push_approval\":false,\"required_approving_review_count\":1,\"required_review_thread_resolution\":true,\"required_reviewers\":[]},\"type\":\"pull_request\"},{\"parameters\":{\"do_not_enforce_on_create\":false,\"required_status_checks\":[{\"context\":\"delivery guard\",\"integration_id\":15368},{\"context\":\"check (types, lint, format)\",\"integration_id\":15368},{\"context\":\"freeze + phase0 evidence tests\",\"integration_id\":15368}],\"strict_required_status_checks_policy\":false},\"type\":\"required_status_checks\"}],\"updated_at\":\"2026-08-15T16:27:38.243+08:00\"}",
+      "parsed": {
+        "rules": [
+          {
+            "parameters": {
+              "allowed_merge_methods": ["merge", "squash", "rebase"],
+              "dismiss_stale_reviews_on_push": false,
+              "require_code_owner_review": true,
+              "require_last_push_approval": false,
+              "required_approving_review_count": 1,
+              "required_review_thread_resolution": true,
+              "required_reviewers": []
+            },
+            "type": "pull_request"
+          },
+          {
+            "parameters": {
+              "do_not_enforce_on_create": false,
+              "required_status_checks": [
+                {
+                  "context": "delivery guard",
+                  "integration_id": 15368
+                },
+                {
+                  "context": "check (types, lint, format)",
+                  "integration_id": 15368
+                },
+                {
+                  "context": "freeze + phase0 evidence tests",
+                  "integration_id": 15368
+                }
+              ],
+              "strict_required_status_checks_policy": false
+            },
+            "type": "required_status_checks"
+          }
+        ],
+        "updated_at": "2026-08-15T16:27:38.243+08:00"
+      }
+    },
+    {
+      "id": "actions-runners",
+      "command": "gh api actions/runners ...",
+      "exitCode": 0,
+      "stdout": "{\"runners\":[{\"busy\":true,\"labels\":[\"self-hosted\",\"macOS\",\"ARM64\"],\"name\":\"kiro-temp-runner\",\"status\":\"online\"}],\"total_count\":1}",
+      "parsed": {
+        "runners": [
+          {
+            "busy": true,
+            "labels": ["self-hosted", "macOS", "ARM64"],
+            "name": "kiro-temp-runner",
+            "status": "online"
+          }
+        ],
+        "total_count": 1
+      }
+    }
+  ],
+  "governance": {
+    "phase0Accepted": false,
+    "deployAuthorized": false,
+    "closesWsC": false,
+    "decision": "PENDING_REVIEW_25"
+  }
+}

@@ -1,0 +1,26 @@
+# zizmor configuration
+# https://docs.zizmor.sh/configuration/
+
+rules:
+  # Disable unpinned-uses - pinning to SHA hashes is a significant change
+  # that should be done deliberately, not enforced by pre-commit
+  unpinned-uses:
+    disable: true
+
+  # Disable excessive-permissions for now - adding explicit permissions
+  # blocks requires careful review of each workflow's needs
+  excessive-permissions:
+    disable: true
+
+  # Disable artipacked (persist-credentials) - low confidence finding
+  artipacked:
+    disable: true
+  # `pull_request_target` is required for these two to label and auto-respond on fork PRs,
+  # which needs a write token. Reviewed 2026-08-01: neither workflow checks out or executes PR
+  # code (no actions/checkout, no pull_request.head reference), so the escalation path this
+  # audit warns about is absent. Scoped per-file on purpose - a new workflow using
+  # pull_request_target still has to be reviewed.
+  dangerous-triggers:
+    ignore:
+      - auto-response.yml
+      - labeler.yml

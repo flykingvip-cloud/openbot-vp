@@ -1,0 +1,59 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "rollback-drill",
+  "capturedAt": "2026-08-20T13:54:44+08:00",
+  "originMainSha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+  "productionLive": true,
+  "restored": false,
+  "restartedContainer": true,
+  "restartTool": "/usr/local/bin/openbot-gateway-restart",
+  "live": {
+    "sha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "overlay": "inbound-depth-main-r1",
+    "container": "openbot-gateway-rc",
+    "status": "running",
+    "healthz": 200,
+    "readyz": true,
+    "inboundFlags": [
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY",
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER",
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY",
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY"
+    ]
+  },
+  "flagRollback": {
+    "rehearsed": false,
+    "kind": "dotenv-reverse-disable",
+    "reason": "Owner approved overlay LIVE gray at 2026-08-20 13:50+08. Flags are in /root/.openbot/.env and .env.docker. Reverse-disable was not executed (that would turn gray off).",
+    "backupEnv": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/dot-env.before-canary-20260820T055154Z",
+    "orderIfDisableNeeded": [
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY=0",
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY=0",
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER=0",
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=0",
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY=0"
+    ]
+  },
+  "overlayRollback": {
+    "rehearsed": true,
+    "executed": false,
+    "autoRollbackOnFailedSmoke": "wired in apply script; not triggered (healthz 200 / readyz ready)",
+    "distBackup": {
+      "path": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/container-app-dist.before.tgz",
+      "sha256": "584de339c95654fc05f93c09d3820201b23e9bc4e4ff93cdc5c100536a697913",
+      "buildInfoBeforeCommit": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+      "buildInfoAfterCommit": "aa348b38a14a69683bdc5a715ca48d2564a2542d"
+    },
+    "priorItem5BackupKept": {
+      "path": "/root/openbot-maintenance-item5-runtime-align-20260819T162800Z/container-app-dist.before.tgz",
+      "sha256": "bf99cd107f8f16ab03e90210786ed4c8d3d533b3b3c0472f299f50770a1bccc0",
+      "note": "Restores the pre-item5 dist (34595862), not current previousLive 6ac338479a. Use the inbound-depth-main-r1 backup to undo this overlay."
+    },
+    "preserveControlUi": true,
+    "liveUiServedEntry": "index-CYnwD_N8.js",
+    "pinEnv": "index-CopvvBkL.js"
+  },
+  "verdict": "overlay applied; restore not executed; flag canary is ON; reverse-disable documented but not executed"
+}

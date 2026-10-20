@@ -1,0 +1,62 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "pr": "D",
+  "capturedAt": "2026-08-20T08:06:02+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "e9d31d43c8",
+  "originMainIsAncestor": true,
+  "aheadBehindAtCapture": { "ahead": 16, "behind": 0 },
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/gateway/knowledge/resolve/abort-timeout.test.ts src/gateway/knowledge/resolve/resolve-engine.inbound-policy.test.ts src/gateway/knowledge/resolve/resolve-engine.evidence.test.ts src/gateway/knowledge/resolve/evidence-format.test.ts src/gateway/knowledge/resolve/evidence-format.governance.test.ts src/gateway/knowledge/resolve-engine.test.ts src/gateway/knowledge/adapter/cognitive-runtime-adapter.test.ts src/gateway/knowledge/sources/source-api-runtime.test.ts src/gateway/chat-inbound-flags.test.ts src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts src/auto-reply/reply/knowledge-universe-context.test.ts src/auto-reply/reply/followup-runner.test.ts src/auto-reply/reply/operational-identity-context.test.ts src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts",
+  "note": "VITEST_CACHE_DIR is set outside the worktree so Vite temp writes do not depend on node_modules/.vite-temp permissions. Knowledge-stage timings are unit/assembly caps (local 800ms, live 1500ms), not production model p95/p99. PR D is gated on OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY (default off) and depth=retrieve so opening OPENBOT_CHAT_INBOUND_DEPTH_ROUTER alone does not change retrieve.",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "16 passed (16)",
+    "tests": "100 passed (100)",
+    "duration": "12.70s"
+  },
+  "files": [
+    "src/gateway/knowledge/resolve/abort-timeout.test.ts",
+    "src/gateway/knowledge/resolve/resolve-engine.inbound-policy.test.ts",
+    "src/gateway/knowledge/resolve/resolve-engine.evidence.test.ts",
+    "src/gateway/knowledge/resolve/evidence-format.test.ts",
+    "src/gateway/knowledge/resolve/evidence-format.governance.test.ts",
+    "src/gateway/knowledge/resolve-engine.test.ts",
+    "src/gateway/knowledge/adapter/cognitive-runtime-adapter.test.ts",
+    "src/gateway/knowledge/sources/source-api-runtime.test.ts",
+    "src/gateway/chat-inbound-flags.test.ts",
+    "src/auto-reply/reply/inbound-depth.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts",
+    "src/auto-reply/reply/knowledge-universe-context.test.ts",
+    "src/auto-reply/reply/followup-runner.test.ts",
+    "src/auto-reply/reply/operational-identity-context.test.ts",
+    "src/agents/pi-embedded-runner/run/resolve-embedded-tools.test.ts"
+  ],
+  "assertions": {
+    "generalDoesNotGrantThreeSources": true,
+    "hintsShrinkOnly": true,
+    "retrieveDefaultNoLiveInvoke": true,
+    "explicitLiveAclPolicyInvokes": true,
+    "aclDenyDoesNotInvokeLive": true,
+    "expiredCrossTenantPolicyMismatchExcluded": true,
+    "stageTimeoutStillReturnsContext": true,
+    "liveTimeoutKeepsLocalEvidence": true,
+    "abortDoesNotWriteLateResults": true,
+    "bundleLoadedOncePerTurn": true,
+    "flagOffKeepsBaselineLivePath": true,
+    "chatZeroKnowledgeZeroToolsRegression": true,
+    "actKeepsOldKnowledgePath": true,
+    "routerAloneDoesNotApplyRetrievePolicy": true,
+    "knowledgePolicyFlagDefaultOff": true
+  },
+  "timeoutAssemblyMs": {
+    "localStageCapMs": 800,
+    "liveSourceCapMs": 1500,
+    "observedLiveTimeoutTestMs": 1501,
+    "observedStageTimeoutTestMs": 801
+  },
+  "productionLive": false,
+  "liveFlagEnabled": false
+}

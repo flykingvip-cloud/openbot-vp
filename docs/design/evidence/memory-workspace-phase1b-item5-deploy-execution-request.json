@@ -1,0 +1,30 @@
+{
+  "schema": "memory-workspace-phase1b-item5-deploy-execution-request/v1",
+  "item": 5,
+  "preparedBy": "cursor-data-governance",
+  "deployExecution": "not-authorized",
+  "stamped": false,
+  "chosenOption": "authorize-production-container-write-and-registry-main-rebind",
+  "decision": "docs/design/evidence/memory-workspace-phase1b-item5-deploy-execution-decision.json",
+  "unlock": "issued",
+  "deployAuthorized": true,
+  "productionContainerWrite": true,
+  "registryMainRebind": true,
+  "wiredToProductionResolver": false,
+  "enablesProduction": true,
+  "note": "Operator explicitly authorized production container write with deployAuthorized=true and registry main asset membership rebind from real membership + historical seat binding + seat occupancy. Does not authorize inventing owners or flipping wiredToProductionResolver.",
+  "options": [
+    {
+      "id": "authorize-production-container-write-and-registry-main-rebind",
+      "owner": "operator",
+      "does": "Rebind registry main to membership owner derived from ended seat binding + seat occupancy + platform-auth membership; compareAndPut occupancy rows plus main row into production state dir via OPENBOT_PRODUCTION_STATE_DIR or blocked evidence if unreachable. Git evidence stays hashed."
+    }
+  ],
+  "explicitlyForbidden": [
+    "treat this packet as a stamp",
+    "invent membership binding without seat occupancy proof",
+    "set wiredToProductionResolver=true",
+    "score item 5 met from this packet",
+    "write unredacted identifiers into git"
+  ]
+}

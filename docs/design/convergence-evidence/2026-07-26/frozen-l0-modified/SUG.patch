@@ -1,0 +1,659 @@
+diff --git a/.loom/registry.yaml b/.loom/registry.yaml
+index 06eab6fc15..b7c09524b1 100644
+--- a/.loom/registry.yaml
++++ b/.loom/registry.yaml
+@@ -32,7 +32,7 @@ tasks:
+       spec: agent-growth-lifecycle
+       role: owner
+   - id: agent-growth-lifecycle:cursor-p0b-growth
+-    owner: cursor-p0b-growth
++    owner: codex-v111-recovery
+     intent: []
+     paths:
+       - ui/src/ui/ports/employee/
+@@ -42,11 +42,21 @@ tasks:
+       - ui/src/ui/app.ts
+       - ui/src/ui/app-port-state.ts
+       - ui/src/ui/app-view-state-shell-slices.ts
+-      - ui/src/i18n/locales/*.ts
+       - ui/src/styles/workbench.css
+     state: active
+-    sessions: []
+-    ownerHistory: []
++    sessions:
++      - id: AB5EB07B-7DD6-487F-A843-F5C00AE1F718
++        taskId: agent-growth-lifecycle:cursor-p0b-growth
++        ide: codex
++        agent: codex-v111-recovery
++        status: active
++        lastSignalAt: 2026-07-25T03:31:17.478Z
++        metadata: {}
++    ownerHistory:
++      - fromOwner: cursor-p0b-growth
++        toOwner: codex-v111-recovery
++        at: 2026-07-25T03:29:21.539Z
++        via: verified
+     metadata:
+       spec: agent-growth-lifecycle
+       role: owner
+@@ -205,7 +215,18 @@ tasks:
+       - ui/src/ui/ports/employee/views/employee-supervisor-center.ts
+       - ui/src/ui/app-gateway.ts
+     state: active
+-    sessions: []
++    sessions:
++      - id: cdd84107-5653-4c3b-8122-9a3d4b350acd
++        taskId: development-supervisor:cursor-fable
++        ide: cursor
++        agent: cursor-fable
++        status: done
++        lastSignalAt: 2026-07-25T15:34:02.730Z
++        metadata:
++          handoff: release-hot-files-to-codex-production-release
++          note: server-methods.ts/list/method-scopes staged diffs are enterprise-model
++            only; no supervisor WIP this round
++          at: 2026-07-25T15:34:02.729Z
+     ownerHistory: []
+     metadata:
+       spec: development-supervisor
+@@ -245,19 +266,26 @@ tasks:
+       spec: enterprise-budget
+       role: owner
+   - id: enterprise-overview-redesign:cursor-fable
+-    owner: cursor-fable
++    owner: codex-v111-recovery
+     intent: []
+     paths:
+       - ui/src/ui/ports/enterprise/views/enterprise-overview-surface.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-surfaces.browser.test.ts
+       - ui/src/styles/components.css
+-      - ui/src/i18n/locales/zh-CN.ts
+-      - ui/src/i18n/locales/en.ts
+-      - ui/src/ui/navigation.ts
+-      - ui/src/ui/navigation.test.ts
+     state: active
+-    sessions: []
+-    ownerHistory: []
++    sessions:
++      - id: AB5EB07B-7DD6-487F-A843-F5C00AE1F718
++        taskId: enterprise-overview-redesign:cursor-fable
++        ide: codex
++        agent: codex-v111-recovery
++        status: active
++        lastSignalAt: 2026-07-25T03:31:17.991Z
++        metadata: {}
++    ownerHistory:
++      - fromOwner: cursor-fable
++        toOwner: codex-v111-recovery
++        at: 2026-07-25T03:29:22.182Z
++        via: verified
+     metadata:
+       spec: enterprise-overview-redesign
+       role: owner
+@@ -375,7 +403,7 @@ tasks:
+       spec: ops-decommission
+       role: phase-7 owner
+   - id: ops-decommission:cursor-daniel
+-    owner: cursor-daniel
++    owner: codex-v111-recovery
+     intent: []
+     paths:
+       - ui/src/ui/ports/employee/**
+@@ -387,11 +415,20 @@ tasks:
+       - ui/src/ui/app-port-state.ts
+       - ui/src/ui/app-view-state-shell-slices.ts
+       - ui/src/styles/workbench.css
+-      - ui/src/i18n/locales/zh-CN.ts
+-      - ui/src/i18n/locales/en.ts
+     state: active
+-    sessions: []
+-    ownerHistory: []
++    sessions:
++      - id: AB5EB07B-7DD6-487F-A843-F5C00AE1F718
++        taskId: ops-decommission:cursor-daniel
++        ide: codex
++        agent: codex-v111-recovery
++        status: active
++        lastSignalAt: 2026-07-25T03:31:18.585Z
++        metadata: {}
++    ownerHistory:
++      - fromOwner: cursor-daniel
++        toOwner: codex-v111-recovery
++        at: 2026-07-25T03:29:22.966Z
++        via: verified
+     metadata:
+       spec: ops-decommission
+       role: contributor
+@@ -519,23 +556,16 @@ tasks:
+     since: 2026-07-06
+     metadata: {}
+   - id: ops-decommission:kiro-enterprise-tsgo
+-    owner: kiro-enterprise-tsgo
++    owner: codex-v111-recovery
+     intent:
+       - Fix ports/enterprise tsgo contract drift + fixtures
+     paths:
+-      - ui/src/ui/ports/enterprise/port-state.ts
+-      - ui/src/ui/ports/enterprise/render-model.ts
+-      - ui/src/ui/ports/enterprise/view-types.ts
+       - ui/src/ui/ports/enterprise/semantic/enterprise-read-model.ts
+-      - ui/src/ui/ports/enterprise/views/enterprise-organization-surface.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-capability-center-surface.ts
+-      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
+-      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-mesh-governance-surface.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-handover-editor.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-org-import-preview-view.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-org-department-editor.ts
+-      - ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-org-tree-model.node.test.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-handover-org-tree.node.test.ts
+       - ui/src/ui/ports/enterprise/views/enterprise-org-scope.node.test.ts
+@@ -551,9 +581,20 @@ tasks:
+         ide: kiro
+         agent: kiro-enterprise-tsgo
+         status: active
+-        lastSignalAt: 2026-07-06T13:35:02.312Z
++        lastSignalAt: 2026-07-25T03:31:19.363Z
+         metadata: {}
+-    ownerHistory: []
++      - id: AB5EB07B-7DD6-487F-A843-F5C00AE1F718
++        taskId: ops-decommission:kiro-enterprise-tsgo
++        ide: codex
++        agent: codex-v111-recovery
++        status: active
++        lastSignalAt: 2026-07-25T03:31:19.363Z
++        metadata: {}
++    ownerHistory:
++      - fromOwner: kiro-enterprise-tsgo
++        toOwner: codex-v111-recovery
++        at: 2026-07-25T03:29:23.600Z
++        via: verified
+     since: 2026-07-06
+     metadata: {}
+   - id: chat-checkpoint-rollback:kiro-daibai
+@@ -603,8 +644,265 @@ tasks:
+     ownerHistory: []
+     since: 2026-07-07
+     metadata: {}
++  - id: enterprise-ui-baseline:codex-v111-recovery
++    owner: codex-v111-recovery
++    intent: []
++    paths:
++      - ui/src/ui/views/cost-budget-v2/**
++      - ui/src/styles/cost-budget-v2.css
++      - ui/src/ui/app-settings.ts
++      - ui/src/ui/app-settings.test.ts
++      - ui/src/ui/navigation.ts
++      - ui/src/ui/navigation.test.ts
++      - ui/src/ui/ports/enterprise/render-model.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-access-control-surface.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-channel-credentials-surface.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-channel-credentials-surface.browser.test.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-shell.ts
++      - .kiro/specs/enterprise-ui-baseline/tasks.md
++      - .loom/registry.yaml
++      - ui/src/ui/capability/cost-budget-billing/index.ts
++      - ui/src/i18n/locales/en.ts
++      - ui/src/i18n/locales/zh-CN.ts
++      - ui/src/ui/controllers/tenant-channel-config.ts
++      - ui/src/ui/controllers/tenant-channel-config.test.ts
++      - ui/src/ui/ports/enterprise/port-state.ts
++      - ui/src/ui/ports/enterprise/view-types.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-surface-types.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-surfaces-core.ts
++      - deploy/production/RELEASE_RECORD.md
++    state: active
++    sessions:
++      - id: AB5EB07B-7DD6-487F-A843-F5C00AE1F718
++        taskId: enterprise-ui-baseline:codex-v111-recovery
++        ide: codex
++        agent: codex-v111-recovery
++        status: active
++        lastSignalAt: 2026-07-25T03:52:04.160Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-25
++    metadata: {}
++  - id: platform-pricing-gateway-instability:codex-v112-platform-recovery
++    owner: codex-v112-platform-recovery
++    intent: []
++    paths:
++      - ui/src/ui/ports/platform/**
++      - .kiro/specs/platform-pricing-gateway-instability/tasks.md
++      - deploy/production/RELEASE_RECORD.md
++      - .loom/registry.yaml
++    state: active
++    sessions:
++      - id: AB5EB07B-7DD6-487F-A843-F5C00AE1F718
++        taskId: platform-pricing-gateway-instability:codex-v112-platform-recovery
++        ide: codex
++        agent: codex-v112-platform-recovery
++        status: active
++        lastSignalAt: 2026-07-25T04:37:12.310Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-25
++    metadata: {}
++  - id: wecom-bundled-plugin-loading:codex-v113-wecom-integrity
++    owner: codex-v113-wecom-integrity
++    intent: []
++    paths:
++      - extensions/wecom/**
++      - src/plugin-sdk/wecom.ts
++      - src/plugin-sdk/subpaths.test.ts
++      - src/plugins/config-state.ts
++      - src/plugins/config-state.test.ts
++      - src/plugins/loader.test.ts
++      - scripts/release-check.ts
++      - tsconfig.plugin-sdk.dts.json
++      - tsdown.config.ts
++      - vitest.config.ts
++      - package.json
++      - .kiro/specs/wecom-bundled-plugin-loading/tasks.md
++      - deploy/production/RELEASE_RECORD.md
++      - .loom/registry.yaml
++      - scripts/write-plugin-sdk-entry-dts.ts
++    state: active
++    sessions:
++      - id: 3A9195B4-1F4E-4E1F-90FC-6ED15DBDF113
++        taskId: wecom-bundled-plugin-loading:codex-v113-wecom-integrity
++        ide: codex
++        agent: codex-v113-wecom-integrity
++        status: active
++        lastSignalAt: 2026-07-25T06:47:46.765Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-25
++    metadata: {}
++  - id: enterprise-data-capability-ia-redesign:codex-production-v114
++    owner: codex-production-v114
++    intent:
++      - production-baseline
++      - full-ui-build
++      - image-publish
++      - cutover
++    paths:
++      - .kiro/specs/enterprise-data-capability-ia-redesign/**
++      - ui/src/ui/ports/enterprise/views/enterprise-data-capability-home.browser.test.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-data-governance-center-surface.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-data-capability/**
++      - deploy/production/RELEASE_RECORD.md
++    state: active
++    sessions:
++      - id: codex-production-v114-20260725
++        taskId: enterprise-data-capability-ia-redesign:codex-production-v114
++        ide: codex
++        agent: codex-production-v114
++        status: active
++        lastSignalAt: 2026-07-25T12:30:53.132Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-25
++    metadata: {}
++  - id: enterprise-ai-model-governance:codex-production-release
++    owner: cursor-main-recovery
++    intent: []
++    paths:
++      - .kiro/specs/enterprise-ai-model-governance/**
++      - src/gateway/enterprise-model/**
++      - src/gateway/server-methods/enterprise-model-*.ts
++      - src/gateway/server-methods/enterprise-model-*.test.ts
++      - src/gateway/model-entitlement/**
++      - src/gateway/method-scopes.ts
++      - src/gateway/platform-auth/session-domain.ts
++      - src/gateway/billing/**
++      - src/cron/isolated-agent/**
++      - src/auto-reply/reply/followup-runner*
++      - ui/src/ui/capability/enterprise-model-provider/**
++      - ui/src/ui/ports/enterprise/views/enterprise-ai-models*
++      - ui/src/ui/capability/model-authorization/**
++      - ui/src/ui/app-settings.ts
++      - deploy/production/RELEASE_RECORD.md
++    state: active
++    sessions:
++      - id: 020F0F78-0BD7-4170-9C64-6FAE11418A40
++        taskId: enterprise-ai-model-governance:codex-production-release
++        ide: codex
++        agent: codex-production-release
++        status: active
++        lastSignalAt: 2026-07-26T06:48:23.643Z
++        metadata: {}
++      - id: A21B56EC-48DE-457C-8E20-3EA3C9D51B6E
++        taskId: enterprise-ai-model-governance:codex-production-release
++        ide: cursor
++        agent: cursor-main-recovery
++        status: active
++        lastSignalAt: 2026-07-26T06:48:23.643Z
++        metadata: {}
++    ownerHistory:
++      - fromOwner: codex-production-release
++        toOwner: cursor-main-recovery
++        at: 2026-07-26T06:48:23.643Z
++        via: confirmed
++    since: 2026-07-25
++    metadata: {}
++  - id: employee-ai-archive:cursor-composer
++    owner: cursor-composer
++    intent: []
++    paths:
++      - .kiro/specs/employee-ai-archive/**
++      - ui/src/ui/ports/enterprise/semantic/seat-ai-archive.ts
++      - ui/src/ui/ports/enterprise/semantic/seat-ai-archive.node.test.ts
++      - ui/src/ui/ports/enterprise/semantic/seat-ai-archive-skills.ts
++      - ui/src/ui/ports/enterprise/semantic/seat-ai-archive-skills.node.test.ts
++      - ui/src/ui/ports/enterprise/semantic/organization-inactive-activation.ts
++      - ui/src/ui/ports/enterprise/semantic/organization-inactive-activation.node.test.ts
++      - ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.ts
++      - ui/src/ui/ports/enterprise/semantic/organization-seat-deletion.node.test.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-org-position-detail.browser.test.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-organization-surface.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-organization-activation.browser.test.ts
++      - ui/src/ui/ports/enterprise/views/enterprise-org-tree-view.ts
++      - ui/src/styles/enterprise-org-archive.css
++      - ui/src/styles.css
++    state: active
++    sessions:
++      - id: 7a179ce2-c8cc-4139-8544-7ae79f792b23
++        taskId: employee-ai-archive:cursor-composer
++        ide: cursor
++        agent: cursor-composer
++        status: active
++        lastSignalAt: 2026-07-25T17:46:58.477Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-25
++    metadata: {}
++  - id: collaboration-deliverable-preview:cursor-composer
++    owner: cursor-composer
++    intent: []
++    paths:
++      - ui/src/ui/controllers/asset-incubation/suggestion-dismiss.ts
++      - ui/src/ui/controllers/asset-incubation/suggestion-dismiss.test.ts
++      - ui/src/ui/controllers/asset-incubation/index.ts
++      - ui/src/ui/wiring/asset-incubation-preview.ts
++      - ui/src/ui/wiring/asset-incubation-preview.test.ts
++      - ui/src/ui/gateway-subscriptions/chat.ts
++      - ui/src/ui/controllers/chat.ts
++      - ui/src/ui/controllers/chat.test.ts
++      - ui/src/ui/app-gateway.node.test.ts
++      - ui/src/ui/app-render.ts
++      - ui/src/ui/views/artifact-sidebar.ts
++      - ui/src/ui/views/chat.ts
++      - ui/src/ui/ports/employee/views/workbench-stage.ts
++      - ui/src/ui/ports/employee/views/workbench-stage.node.test.ts
++      - ui/src/ui/ports/employee/render-model.ts
++      - ui/src/i18n/locales/zh-CN.ts
++      - ui/src/i18n/locales/en.ts
++    state: active
++    sessions:
++      - id: C19365D9-7F9C-4B1F-9388-D4F87D0AA861
++        taskId: collaboration-deliverable-preview:cursor-composer
++        ide: cursor
++        agent: cursor-composer
++        status: active
++        lastSignalAt: 2026-07-25T20:13:25.884Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-25
++    metadata: {}
++  - id: main-recovery-routing
++    owner: cursor-main-recovery
++    intent: []
++    paths:
++      - src/gateway/tenant-context.ts
++      - .kiro/specs/main-recovery-routing/**
++      - src/gateway/tenant-context.test.ts
++      - src/gateway/tenant-store-paths.ts
++      - src/gateway/tenant-store-paths.test.ts
++    state: active
++    sessions:
++      - id: cursor-main-recovery:main-recovery-routing
++        taskId: main-recovery-routing
++        ide: cli
++        agent: cursor-main-recovery
++        status: active
++        worktree: /Users/daniel/AI项目/openbot-main-recovery-routing
++        lastSignalAt: 2026-07-26T06:48:40.061Z
++        metadata:
++          branch: cursor-main-recovery/main-recovery-routing
++          provisionId: ed0a3a87-8d1a-4c7b-a906-66f425543a3a
++          events:
++            - ts: 2026-07-26T06:48:19.110Z
++              kind: branch_created
++            - ts: 2026-07-26T06:48:19.110Z
++              kind: worktree_created
++      - id: EDBDC9C4-8DAA-4709-B6E1-6D9493D9ED8D
++        taskId: main-recovery-routing
++        ide: cursor
++        agent: cursor-main-recovery
++        status: active
++        lastSignalAt: 2026-07-26T06:48:40.061Z
++        metadata: {}
++    ownerHistory: []
++    since: 2026-07-26
++    metadata: {}
+ landingStreams:
+-  # First-match wins: keep SUG early so the steward user-guidance landing is one primary.
+   - id: SUG
+     landingPolicy: serial
+     paths:
+@@ -631,11 +929,31 @@ landingStreams:
+       legacyRuleId: merge-steward-user-guidance
+       legacyTitle: Steward User Guidance Protocol Skill
+       legacyDisposition: MERGE
++  - id: WPL
++    landingPolicy: exclusive
++    paths:
++      - extensions/wecom/**
++      - src/plugin-sdk/wecom.ts
++      - src/plugin-sdk/subpaths.test.ts
++      - src/plugins/config-state.ts
++      - src/plugins/config-state.test.ts
++      - src/plugins/loader.test.ts
++      - package.json
++      - scripts/release-check.ts
++      - scripts/write-plugin-sdk-entry-dts.ts
++      - vitest.config.ts
++      - tsdown.config.ts
++      - tsconfig.plugin-sdk.dts.json
++      - CHANGELOG.md
++      - .kiro/specs/wecom-bundled-plugin-loading/**
++      - .loom/registry.yaml
++    canLandWith: []
++    metadata:
++      legacyTitle: WeCom Bundled Plugin Loading
++      purpose: Land WeCom plugin-sdk entry and bundled channel loading as one
++        exclusive stream
+   - id: USRM
+     landingPolicy: serial
+-    # Cross-session user modeling. Shared wire-in files (method-scopes / server-methods*
+-    # / get-reply-run) stay claimed by ASI/ME/GWSV; canLandWith ASI for registry + reply
+-    # assembly commits that must touch those hot files together with this module.
+     paths:
+       - src/gateway/user-modeling/**
+       - src/gateway/server-methods/user-modeling.ts
+@@ -661,11 +979,6 @@ landingStreams:
+       legacyTitle: Cross-Session User Modeling
+   - id: CCR
+     landingPolicy: serial
+-    # Owns only the net-new, checkpoint-exclusive artifacts. Shared hot files this
+-    # feature also touched (server-methods/chat.ts, protocol/*, sessions.ts,
+-    # session-continuity.ts, ui chat view/types/actions, layout.css, CHANGELOG.md)
+-    # are co-owned by other streams and were landed in commit f1f21a05fc; they are
+-    # intentionally NOT claimed here so CCR never hijacks another stream's commit.
+     paths:
+       - .kiro/specs/chat-checkpoint-rollback/**
+       - src/infra/workspace-snapshot/**
+@@ -2012,12 +2325,16 @@ landingStreams:
+       - src/gateway/server/ws-connection/auth-messages.test.ts
+       - src/gateway/server/ws-connection/connect-policy.ts
+       - src/gateway/server/ws-connection/connect-policy.test.ts
++      - src/gateway/server/ws-connection.ts
++      - src/gateway/server-ws-runtime.ts
+       - src/gateway/protocol/connect-error-details.ts
+       - src/gateway/protocol/connect-error-details.test.ts
+       - src/gateway/server/ws-types.ts
+       - src/gateway/gateway-misc.test.ts
+       - src/infra/control-ui-assets.test.ts
+       - src/infra/control-ui-assets.ts
++      - src/infra/canvas-host-url.ts
++      - src/infra/canvas-host-url.test.ts
+       - src/auto-reply/reply/inbound-meta.test.ts
+       - src/auto-reply/command-control.test.ts
+       - ui/package.json
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 3b2541dc15..2a94d0b3d2 100755
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -19,6 +19,12 @@ Docs: https://docs.openbot.love
+ - Employee/knowledge relationship network: project the real knowledge base into the 关系网络 graph by aggregating one node per knowledge base space plus archived deliverable (成果) nodes linked to the base they sedimented into, derive cross-space edges from shared content (knowledge bases holding chunks with the same semantic hash), and render knowledge-base and deliverable nodes with distinct colors and labels, so the network reflects actual knowledge instead of only heuristic skill-asset and feed nodes.
+ - Employee/chat checkpoints: add per-turn checkpoint markers in the employee chat with an inline restore confirm card; restoring a checkpoint rolls the agent workspace files back to that point and removes the later messages from the conversation (the removed tail is archived so it stays recoverable), and restoring is blocked while a run is still active.
+ - Data directory: add Data Space workbench panel plus personal settings data directory (migration, export, session archive, memory forget, access grants, agent delete-and-destroy); expose shared `data.*` gateway APIs and CLI migration engine; reject browse in SaaS managed mode; remove the employee workspace file browser.
++- Agents/experience learning: derive a candidate experience capsule when a turn fails (context overflow, agent error, run-slot exhaustion), when a user takes the work over, or when a deliverable is returned from review, instead of only archiving memory before compaction; capsules stay in `candidate` state until a human approves them. Single chats get their own learning scope so failures outside collaboration groups are captured too. Raw provider/runner error text is secret-redacted before it is stored or recalled.
++- Agents/experience learning: approved experience now actually reaches the agent — promoted learning assets carry the lesson text and are injected into the system prompt (anti-patterns labeled as such), where previously only capability name strings were read back so promoted lessons never affected behavior.
++- Agents/experience learning: add capsule governance APIs (`collaboration.learning.capsule-candidates.list`, `collaboration.learning.capsule.approve`, `collaboration.learning.capsule.reject`); approval is what triggers projection and promotion, and rejection revokes the capsule with an audit trail.
++- Agents/capability growth: experience that keeps getting reused, or the same root cause recurring, is curated into a `draft` skill for review; reuse is counted only when a learning asset is genuinely injected into a prompt, and reuse accounting plus curation are serialized so concurrent turns cannot lose a count or duplicate a draft.
++- Agents/operational score: instrument tool call outcomes and add deterministic human-takeover and satisfaction detection on inbound messages, so tool success rate, takeover rate, and satisfaction have real sources instead of being permanently absent. Collaboration lifecycle outcomes (task/deliverable/review terminal states) feed the same satisfaction counters.
++- Agents/Working DNA: restore the behavior self-tuning layer that governance UI and RPC surfaces already referenced but whose implementation was missing. High human takeover now shifts an agent to conservative/confirm-first, sustained low takeover plus high success lets it act more autonomously, and each change is scored against its own baseline; a change that makes results worse is rolled back automatically and the same change is suppressed from recurring. Learned style is rendered into the system prompt only after a real change, and effectiveness is exposed via `agents.list-working-style-effects` / `agents.working-style-effectiveness` plus a governance panel.
+ - Steward/skills: ship bundled `user-guidance-protocol` v2 as a standard 大白管家 skill (context confidence, navigation state, issue classification, action risk, YAML scenarios); sync it into each employee steward workspace for workspaceOnly reads; keep it in skill filters after channel∩agent merge; record lifecycle via agent tool `guidance_event` and gateway `asset-incubation.guidance.record` (after gateway restart / skills snapshot refresh).
+ 
+ ### Breaking
+@@ -103,6 +109,7 @@ Docs: https://docs.openbot.love
+ - Charts/SVG rendering: fix the same lit `html`-vs-`svg` namespace bug in the plan growth-path chart (data-point dots were not painting) and the platform agent telemetry mini-chart (trend line was not painting), so their SVG fragments render as real SVG geometry.
+ - Employee/knowledge relationship network: fix the 展开全景图 button so it opens the standalone relations panorama page instead of the governance center. Two leftover normalizations still aliased the `relations` page tab to `governance`, so expanding the relationship insight landed on the wrong page.
+ - Employee workbench: stop bouncing enterprise/platform admins to their console when they refresh the employee workbench. The root-path role landing now keeps admins on the employee side when an active employee session (`?session=`) is present, while a bare root with no session still routes admins to their console.
++- Employee steward chat: answer short messages for real instead of replying with a fixed line. Any employee steward message of 12 characters or fewer was routed to a template-only path that never called the model, so requests like 「重新输出excel表格」 always came back as 「我在。你可以继续告诉我想让我做什么。」 no matter how often they were resent. Steward chat now always goes through the normal agent runtime, and the canned stand-in reply is gone; the guided-onboarding card and workbench overview panel keep their template content.
+ 
+ ## 2026.3.8
+ 
+diff --git a/scripts/worktree-audit.ts b/scripts/worktree-audit.ts
+index 8b84b20c86..9d5c1f8aee 100644
+--- a/scripts/worktree-audit.ts
++++ b/scripts/worktree-audit.ts
+@@ -253,10 +253,16 @@ const LEGACY_RULES: AuditRule[] = [
+         "ui/src/ui/capability/resource-catalog/",
+         "ui/src/ui/capability/cost-budget-billing/endpoints.ts",
+         ".kiro/specs/model-entitlement-chain/",
++        "src/gateway/enterprise-model/",
++        ".kiro/specs/enterprise-ai-model-governance/",
+       ),
+       exact(
+         // backend new files
+         "src/gateway/server-methods/employee-model-access.ts",
++        "src/gateway/server-methods/enterprise-model-provider.ts",
++        "src/gateway/server-methods/enterprise-model-provider.test.ts",
++        "src/gateway/server-methods/enterprise-model-catalog.ts",
++        "src/gateway/server-methods/enterprise-model-catalog.test.ts",
+         "src/gateway/server-methods/employee-model-access.test.ts",
+         "src/gateway/server-methods/model-entitlement-management.ts",
+         "src/gateway/server-methods/model-entitlement-management.test.ts",
+@@ -1470,6 +1476,10 @@ const LEGACY_RULES: AuditRule[] = [
+         "src/gateway/server-methods/sessions.ts",
+         "src/gateway/server/ws-connection/message-handler.ts",
+         "src/gateway/server/ws-connection/auth-messages.ts",
++        "src/gateway/server/ws-connection.ts",
++        "src/gateway/server-ws-runtime.ts",
++        "src/infra/canvas-host-url.ts",
++        "src/infra/canvas-host-url.test.ts",
+         "src/gateway/server/ws-types.ts",
+         "src/gateway/gateway-misc.test.ts",
+         "src/infra/control-ui-assets.test.ts",
+diff --git a/src/gateway/method-scopes.ts b/src/gateway/method-scopes.ts
+index ebf20d33c5..2a98621a3b 100755
+--- a/src/gateway/method-scopes.ts
++++ b/src/gateway/method-scopes.ts
+@@ -59,7 +59,10 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
+     "logs.tail",
+     "channels.status",
+     "attachment.assets.resolve",
++    "agents.list-working-style-effects",
++    "agents.working-style-effectiveness",
+     "collaboration.learning.snapshot",
++    "collaboration.learning.capsule-candidates.list",
+     "collaboration.ledger.list",
+     "collaboration.promotion.audit.list",
+     "collaboration.spaces.list",
+@@ -102,6 +105,8 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
+     "platform-subscriptions.summary",
+     "platform-allocation.preview-plan",
+     "enterprise-model-grant.list",
++    "enterprise-model-provider.list",
++    "enterprise-model-catalog.list",
+     "enterprise-allocation.overview",
+     "employee-model-access.summary",
+     "tools.catalog",
+@@ -596,6 +601,17 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
+     "sales-leads.submit",
+     "enterprise-model-grant.grant",
+     "enterprise-model-grant.revoke",
++    "enterprise-model-provider.create",
++    "enterprise-model-provider.update",
++    "enterprise-model-provider.test",
++    "enterprise-model-provider.rotate-credential",
++    "enterprise-model-provider.disable",
++    "enterprise-model-provider.delete",
++    "enterprise-model-catalog.discover",
++    "enterprise-model-catalog.register",
++    "enterprise-model-catalog.update",
++    "enterprise-model-catalog.enable",
++    "enterprise-model-catalog.disable",
+     "enterprise-allocation.apply-profile",
+     "enterprise-allocation.sync-all-seats",
+     "seats.assign",
+@@ -627,6 +643,8 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
+     "collaboration.review.transition",
+     "collaboration.decision.transition",
+     "collaboration.decision.updateDraft",
++    "collaboration.learning.capsule.approve",
++    "collaboration.learning.capsule.reject",
+     "collaboration.spaces.members.update",
+     "collaboration.spaces.reset",
+     "collaboration.spaces.dissolve",
+diff --git a/src/gateway/server-methods-list.ts b/src/gateway/server-methods-list.ts
+index 3307ff4e2d..f7cab5b27c 100755
+--- a/src/gateway/server-methods-list.ts
++++ b/src/gateway/server-methods-list.ts
+@@ -11,7 +11,12 @@ const BASE_METHODS = [
+   "channels.logout",
+   "attachment.assets.resolve",
+   "attachment.assets.upsert",
++  "agents.list-working-style-effects",
++  "agents.working-style-effectiveness",
+   "collaboration.learning.snapshot",
++  "collaboration.learning.capsule-candidates.list",
++  "collaboration.learning.capsule.approve",
++  "collaboration.learning.capsule.reject",
+   "collaboration.ledger.list",
+   "collaboration.promotion.audit.list",
+   "collaboration.task.transition",
+@@ -248,6 +253,7 @@ const BASE_METHODS = [
+   "user-operational-identity.credentials.verify",
+   "user-operational-identity.revoke",
+   "user-operational-identity.reauthorize",
++
+   "user-operational-identity.grants.upsert",
+   "user-operational-identity.grants.revoke",
+   "user-operational-identity.access.resolve",
+@@ -606,6 +612,20 @@ const BASE_METHODS = [
+   "cliBackend.credential.scopedSet",
+   "cliBackend.credential.scopedRemove",
+   "cliBackend.credential.scopedVerify",
++  // enterprise-ai-model-governance: tenant BYOK provider + catalog
++  "enterprise-model-provider.list",
++  "enterprise-model-provider.create",
++  "enterprise-model-provider.update",
++  "enterprise-model-provider.test",
++  "enterprise-model-provider.rotate-credential",
++  "enterprise-model-provider.disable",
++  "enterprise-model-provider.delete",
++  "enterprise-model-catalog.list",
++  "enterprise-model-catalog.discover",
++  "enterprise-model-catalog.register",
++  "enterprise-model-catalog.update",
++  "enterprise-model-catalog.enable",
++  "enterprise-model-catalog.disable",
+ ];
+ 
+ export function listGatewayMethods(): string[] {

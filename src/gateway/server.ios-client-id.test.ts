@@ -1,0 +1,56 @@
+import { describe, expect, test } from "vitest";
+import {
+  GATEWAY_CLIENT_IDS,
+  GATEWAY_CLIENT_MODES,
+  normalizeGatewayClientId,
+} from "./protocol/client-info.js";
+import { validateConnectParams } from "./protocol/index.js";
+
+function makeConnectParams(clientId: string) {
+  return {
+    minProtocol: 1,
+    maxProtocol: 1,
+    client: {
+      id: clientId,
+      version: "dev",
+      platform: "ios",
+      mode: GATEWAY_CLIENT_MODES.NODE,
+    },
+    role: "node",
+    scopes: [],
+    caps: ["canvas"],
+    commands: ["system.notify"],
+    permissions: {},
+  };
+}
+
+describe("connect params client id validation", () => {
+  test.each([
+    GATEWAY_CLIENT_IDS.IOS_APP,
+    GATEWAY_CLIENT_IDS.ANDROID_APP,
+    GATEWAY_CLIENT_IDS.MACOS_APP,
+    GATEWAY_CLIENT_IDS.PROBE,
+  ])("accepts %s as a valid gateway client id", (clientId) => {
+    const ok = validateConnectParams(makeConnectParams(clientId));
+    expect(ok).toBe(true);
+    expect(validateConnectParams.errors ?? []).toHaveLength(0);
+  });
+
+  test("rejects unknown client ids", () => {
+    const ok = validateConnectParams(makeConnectParams("openclaw-mobile"));
+    expect(ok).toBe(false);
+  });
+
+  test.each([
+    ["openclaw-control-ui", GATEWAY_CLIENT_IDS.CONTROL_UI],
+    ["openclaw-ios", GATEWAY_CLIENT_IDS.IOS_APP],
+    ["openclaw-android", GATEWAY_CLIENT_IDS.ANDROID_APP],
+    ["openclaw-macos", GATEWAY_CLIENT_IDS.MACOS_APP],
+    ["openclaw-probe", GATEWAY_CLIENT_IDS.PROBE],
+  ] as const)("aliases legacy client id %s → %s", (legacyClientId, canonical) => {
+    // Stale installed apps still connect; aliases normalize to canonical ids.
+    expect(normalizeGatewayClientId(legacyClientId)).toBe(canonical);
+    const ok = validateConnectParams(makeConnectParams(legacyClientId));
+    expect(ok).toBe(true);
+  });
+});

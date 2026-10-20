@@ -1,0 +1,124 @@
+# 用户自己点界面时用本 YAML。
+# 用户说「你打开网页我来扫 / 帮我写白名单」时改读 wechat-official-credential + browser-scan-proxy。
+# 只要 AppID + AppSecret + 出口 IP 白名单，不要向用户要 Token。
+scenario:
+  name: wechat_oa_setup
+  title: 公众号技能配置
+  trigger:
+    - 公众号
+    - AppID
+    - AppSecret
+    - 草稿箱
+    - mp.weixin.qq.com
+  required_context:
+    - browser
+    - login_status
+
+stages:
+  - id: locate_backend
+    title: 定位公众号后台
+  - id: developer_credentials
+    title: 获取开发者凭证
+  - id: draft_box
+    title: 确认草稿箱
+
+steps:
+  - id: confirm_account
+    stage: locate_backend
+    risk: low
+    instruction: 你已经有微信公众号的登录账号和密码了吗？
+    visual_anchor: null
+    success_signal: 用户确认已有账号
+    on_fail:
+      issue_class: permission
+      instruction: 先打开浏览器访问 mp.weixin.qq.com，点右上角「立即注册」。选「订阅号」（个人）或「服务号」（企业），按页面填信息。注册完告诉我。
+
+  - id: login
+    stage: locate_backend
+    risk: low
+    instruction: 在浏览器打开 mp.weixin.qq.com 并登录。登录成功后，页面左侧应有一列功能菜单。告诉我你看到了哪些菜单项？
+    visual_anchor: 左侧功能菜单列
+    success_signal: 用户列出左侧菜单项或确认已登录
+
+  - id: enter_settings
+    stage: locate_backend
+    risk: low
+    allow_batch_with_next: true
+    instruction: 看左侧菜单栏，找到「设置与开发」（通常在中间偏下，齿轮⚙️+扳手🔧），点击它。
+    visual_anchor: 左侧「设置与开发」；若找不到看最下方「…」更多
+    success_signal: 用户确认进入设置与开发
+    on_fail:
+      issue_class: ui_changed
+      instruction: 看左侧最下面有没有「…」更多按钮，点开找「设置与开发」
+
+  - id: open_basic_config
+    stage: developer_credentials
+    risk: low
+    instruction: 页面上方有 Tab：「公众号设置」「微信认证」「基本配置」「安全中心」。点击「基本配置」。
+    visual_anchor: 顶部 Tab 中的「基本配置」
+    success_signal: 用户确认在基本配置页
+
+  - id: enable_app_secret
+    stage: developer_credentials
+    risk: high
+    confirmation: true
+    instruction: 往下翻到「开发者密码(AppSecret)」区域，点「启用」。弹窗提示开启后需保存 AppSecret 时点「确定」。开启后会显示密钥——这是高风险步骤，确认你准备好复制保存再点。
+    visual_anchor: 「开发者密码(AppSecret)」旁的「启用」按钮
+    success_signal: 用户确认已启用并看到密钥区
+
+  - id: save_credentials
+    stage: developer_credentials
+    risk: high
+    confirmation: true
+    instruction: |
+      页面上有两段关键信息：
+      1. AppID — 以 wx 开头
+      2. AppSecret — 字母数字串，关闭后不可再见
+      立刻把 AppSecret 复制到密码管理器/记事本。复制好了告诉我。
+    visual_anchor: AppID / AppSecret 文本区
+    success_signal: 用户确认已保存 AppSecret
+
+  - id: ip_whitelist
+    stage: developer_credentials
+    risk: medium
+    instruction: 同一页往下找到「IP白名单」，点「查看」→「添加」，填入 OpenBot 工作台「出口 IP」里显示的全部地址（不要只填一个），再点「确认修改」。不要填写 Token。若不知道 IP，先回工作台抄出口 IP。
+    visual_anchor: 「IP白名单」→ 查看 / 添加
+    success_signal: 用户确认白名单已添加
+
+  - id: open_draft_box
+    stage: draft_box
+    risk: low
+    instruction: 回到左侧菜单，找到「草稿箱」（在「素材管理」附近），点击进入。
+    visual_anchor: 左侧「草稿箱」
+    success_signal: 用户确认进入草稿箱
+
+  - id: verify_draft_box
+    stage: draft_box
+    risk: low
+    instruction: 确认能看到「新建图文」且页面正常。若提示实名认证或绑定运营者，先完成认证。
+    visual_anchor: 「新建图文」按钮
+    success_signal: 草稿箱可用
+
+completion:
+  collect:
+    - AppID
+    - AppSecret
+    - IP白名单
+    - 草稿箱功能
+    - 公众号名称
+  reusable_pattern: true
+
+common_blockers:
+  - match: 找不到设置与开发
+    issue_class: ui_changed
+    response: 看左侧最下面「…」更多里有没有
+  - match: AppSecret忘记了
+    issue_class: user_misread
+    risk: high
+    response: 回基本配置，点 AppSecret 旁「重置」生成新密钥（须二次确认），这次立刻保存
+  - match: IP白名单要填什么
+    issue_class: permission
+    response: 使用 AI 服务提供方给出的出口 IP
+  - match: 还没认证
+    issue_class: permission
+    response: 引导微信认证，或确认未认证可用的 API 权限范围

@@ -1,0 +1,36 @@
+{
+  "schema": "memory-workspace-phase1b-item7-locator-grant-coverage/v1",
+  "item": 7,
+  "status": "locator-grant-coverage",
+  "item7": "not-met",
+  "itemMet": false,
+  "wiredToProductionResolver": false,
+  "deleteCallSites": false,
+  "retiredThisChange": 1,
+  "liveWriteWatchIndex": 36,
+  "frozenWriteWatchIndex": 38,
+  "phase1bExecutionBlocked": true,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "deployAuthorized": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "grantModel": {
+    "actorUserId": "current employee",
+    "subjectIdByKind": {
+      "user": "userId",
+      "seat": "seatId",
+      "group": "groupId"
+    },
+    "seatAndGroupMembership": "platform-auth membership/grant SoT only",
+    "seatIdEqualsUserId": false,
+    "groupIdEqualsUserId": false,
+    "secondMembershipSot": false
+  },
+  "supportedOwnerScopes": ["user_owned", "position_owned", "group_owned"],
+  "employeePrivate": "expressed as user_owned classification=employee_private",
+  "blockedOwnerScopes": ["unknown"],
+  "baselineSha": "2e09b95e73762d42f925f9d15a9ab73c115d173e",
+  "note": "Locator grant coverage only. S04 retired on baseline; S05+ deletion paused. Does not modify canonical unlock or delete further production call-sites."
+}

@@ -1,0 +1,32 @@
+{
+  "kind": "p4_later_wave_cutover_decision",
+  "decisionId": "p4lw-cutover-d4f432e9-71c3-4cae-9744-c91a787b74ee",
+  "tenantId": "",
+  "adapter": "none",
+  "enablementReady": false,
+  "trunkReady": false,
+  "cutoverAllowed": false,
+  "liveCutoverRequested": false,
+  "findings": [
+    {
+      "check": "enablement",
+      "passed": false,
+      "detail": "enablement_not_ready"
+    },
+    {
+      "check": "trunk",
+      "passed": false,
+      "detail": "trunk_dirty"
+    },
+    {
+      "check": "live_cutover",
+      "passed": false,
+      "detail": "evaluation_only"
+    }
+  ],
+  "originMainSha": "55feabb8cde4819286ea5bdbfeabe2782abb351d",
+  "headSha": "f7e358a8ab68e75bf5275fed48d8c678215f2b3e",
+  "ok": false,
+  "reasonCode": "enablement_not_ready",
+  "note": "I4 enablement is not LIVE cutover. Candidate must be a clean origin/main tip; this command never switches containers."
+}

@@ -1,0 +1,19 @@
+# actionlint configuration
+# https://github.com/rhysd/actionlint/blob/main/docs/config.md
+
+# Custom self-hosted runner labels used in workflows.
+# `blacksmith-16vcpu-ubuntu-2404` is a Blacksmith-hosted runner label referenced
+# by .github/workflows/docker-release.yml; actionlint rejects it as "unknown"
+# unless it is declared here.
+self-hosted-runner:
+  labels:
+    - blacksmith-16vcpu-ubuntu-2404
+
+# Ignore patterns for known issues
+paths:
+  .github/workflows/**/*.yml:
+    ignore:
+      # Ignore shellcheck warnings (we run shellcheck separately)
+      - "shellcheck reported issue.+"
+      # Ignore intentional if: false for disabled jobs
+      - 'constant expression "false" in condition'

@@ -1,0 +1,66 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch8-s16/v1",
+  "item": 7,
+  "status": "retirement-batch-8",
+  "batch": "S16",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S16",
+      "file": "src/gateway/server-methods/chat.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "lineBefore": 1818,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/chat.ts",
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "line": 1001,
+      "op": "read"
+    },
+    {
+      "file": "src/gateway/server-methods/chat.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1005,
+      "op": "read"
+    },
+    {
+      "file": "src/gateway/server-methods/chat.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1819,
+      "op": "read"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 29,
+  "liveWriteWatchIndex": 29,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/chat.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "05c50a4b61fba18e2ac14a4a7499c77e0406718e",
+  "note": "Batch 8 retires S16 only. Incomplete locator queries fail closed. Do not pass agentId. Host/steward reads stay on lines 1001, 1005, and 1819. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

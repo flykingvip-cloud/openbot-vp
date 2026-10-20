@@ -1,0 +1,71 @@
+# BaselineManifest — Phase B B2 design seal + ownership admission（LOCAL-ONLY 材料）
+# 再生规则见 Phase A authority-evidence-baselines.md §4。
+# 本文件在 assessedAt 时刻刷新。
+# Agent: grok-bot
+#
+# 合同（B1 delivery-evidence；不再要求 taskHeadSha 自指 tip）：
+# - mainSha = 最新 origin/main（trunk tip）；不得取功能分支 HEAD 冒充 trunk
+# - b2MergeSha = B2 merge commit on origin/main (65ffc350d… #20)
+# - registryCommitSha = 本分支上 `.loom/registry.yaml` 的 land commit
+# - classifierFrozenSha = B1 classifier freeze commit（post-rebase）
+# - holdoutSealSha = blind holdout 密封 commit
+# - b1ImplementationSha = 引入 independent-prediction evaluator 的 commit（runtime-input-only）
+# - evaluatedTreeAt = 评估时刻树 SHA（pre-doc-edit tip；本 wrap-up 的未提交 docs 不改此值）
+# - 已删除：taskHeadSha 必须等于功能分支 HEAD / 最终自指 tip 的要求
+
+assessedAt: 2026-09-24T11:51:17+08:00
+productContractRevision: README.md@1f3584d3774237c73cf94471a6ce147a94dad0d9+VISION.md@cc29ae3dfa48699345fd266dada8ad0b9407c372+SECURITY.md@2a86d29045bafe9ffef12b024365aa5fb427b7f6
+mainSha: 65ffc350d737e747175d64b6daa9b78ac79a55e9
+b2MergeSha: 65ffc350d737e747175d64b6daa9b78ac79a55e9
+registryCommitSha: 3071ffea0031661d6d61ab8af2162e58e6287fb4 # kiro-loom B2 exact sharedPaths land (regen after rebase --onto origin/main)
+classifierFrozenSha: 533d3263d2de10b7ed0c1c7530b1e0bc774129ad
+holdoutSealSha: faca648c7c7ec658d22c67e02369849f4055aa15
+b1ImplementationSha: fd9a87693164fd56960df4814cad64261d87a7f3
+evaluatedTreeAt: 5ba7b134d1b2635e5a40b786a2809b28379b4a1b
+productionSeq: 97
+productionGatewaySha: f1c7efece96d68375bf4b7fb57e77908fedfdd6c
+productionUiSha: f1c7efece96d68375bf4b7fb57e77908fedfdd6c
+evidenceSource: "repo ledger only; production-proven = unknown"
+
+notes:
+  mainShaIsTrunkTipOriginMain: true
+  mainShaMustNeverBeFeatureBranchHead: true
+  taskHeadShaSelfReferenceRemoved: true
+  worktreeBranch: grok-bot/constitutional-governance-web-read-shadow
+  registryLandCommitB1: bfb0324397d02e40a810b63cbd6494bcce52c67c
+  registryOwnershipCommitB2: 3071ffea0031661d6d61ab8af2162e58e6287fb4
+  registryOwnershipStatusB2: "landed; sole sharedPath lander constitutional-governance-web-read-shadow:grok-bot for five exact files (gateway-hook.ts, gateway-hook.test.ts, feature.ts, dispatch-from-config.ts, dispatch-from-config.test.ts); CTR→grok-bot transfer via OWNER_RELEASE_AND_LANDER_PROXY"
+  registryLandNote: "B1 historical registry land retained on origin/main via #14 (bfb032439…). B2 registryCommitSha=3071ffea0031661d6d61ab8af2162e58e6287fb4 (Agent:kiro-loom Task:loom-workspace-orchestrator; authorized proxy Thomas Joshua OWNER_RELEASE_AND_LANDER_PROXY this session). mainSha=65ffc350d737e747175d64b6daa9b78ac79a55e9 (origin/main tip = B2 merge #20; post-merge convergence). Owner release: conversation-task-runtime:kiro-conversation-task-runtime releases the five exact files to constitutional-governance-web-read-shadow:grok-bot as sole sharedPath lander; authorize grok-bot as kiro-loom lander proxy for this Registry land only. Transfer of prior CTR lander on dispatch-from-config.ts (do not retain competing lander)."
+  b2DesignSeal: "WebReadShadowChatInput {cfg,tenantId,messageId,utterance}; utterance select in dispatch-from-config; fail-closed ONLY FAIL_CLOSED+HUMAN_GATE; sink default internal safe debug; see b2-runtime-shadow-wiring.md"
+  rebaseAncestryNote: "Prior: rebase --abort then --onto origin/main aac812b66; registry land 3071ffea0. B2 FINAL remediation (drop global safe-debug): git fetch + rebase origin/main → ancestry_exit=0; mainSha refreshed to 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001. No .loom/registry.yaml conflict."
+  b1ImplementationShaNote: "requested prefix 0c72bd3d expanded to pre-rebase 0c72bd3d366bcea0e90598877f1ecef18004f6af (same subject; NOT ancestor of HEAD after rebase). Recorded post-rebase equivalent on this branch: fd9a87693164fd56960df4814cad64261d87a7f3 (fix(orchestration): B1 independent web-read shadow prediction (no gold leak))."
+  evaluatedTreeAtNote: "equals HEAD at evaluation time (=5ba7b134d…); subsequent uncommitted Phase B doc wrap-up does not change this field"
+  holdoutIdentity: blind-holdout-owner-signed
+  holdoutOwner: architecture-owner:thomas-joshua
+  holdoutCorpusDigest: "sha256:c12eb16b6ee75c5ac0d0399af489af0dd476dc4b68a539075fc3dc1f2729b586"
+  holdoutRevealedAt: "2026-09-24T07:06:02+08:00"
+  holdoutOwnerAcceptance: "本人确认 blind holdout 语料（digest sha256:c12eb16b6ee75c5ac0d0399af489af0dd476dc4b68a539075fc3dc1f2729b586；revealedAt 2026-09-24T07:06:02+08:00；classifierFrozenSha 533d3263d2de10b7ed0c1c7530b1e0bc774129ad）作为 B1 独立 Owner 证据有效。"
+  ledgerTipFile: deploy/production/releases.jsonl
+  ledgerTipSeq: 97
+  remediationPass: phase-b-b2-drop-global-safe-debug-2026-09-24
+  postMergeAcceptance: "2026-09-24T11:51:17+08:00 Asia/Shanghai; origin/main==b2MergeSha 65ffc350d737e747175d64b6daa9b78ac79a55e9; vitest 103/103; tsgo 0; pnpm check FAIL unrelated diagnosis-reports method-pack duplicate scope (not in B2 diff); runtime-enabled false; production-proven unknown"
+  sourceRemediation: "无真实生产回放证据；原 prod-replay 标签已降级为 synthetic，伪造 restricted evidence 已删除；source mix = synthetic 48 + unit-fixture 12"
+  tags:
+    ORCHESTRATION_LIVE_INVOKE: code-present
+    web_read_surface: code-present
+    shadow_dispatch_enqueue_false: code-present
+    production-proven: unknown
+    runtime-enabled: false
+    completion_eval: option-B-claim-suppression
+    blind_holdout: owner-signed
+  anchorsAtMainSha:
+    types_ORCHESTRATION_LIVE_INVOKE: "src/task-orchestration/types.ts:22"
+    types_web_read_ExecutionSurface: "src/task-orchestration/types.ts:40"
+    types_CAPABILITY_LADDER_web_read: "src/task-orchestration/types.ts:70"
+    surface_binding_web_read: "src/task-orchestration/surface-binding.ts:78-91"
+    dispatch_shadow_enqueue_invoke_false: "src/task-orchestration/dispatch.ts:161-186"
+  noContainerProbe: true
+  runtime-enabled: false
+  b2MergeSha: 65ffc350d737e747175d64b6daa9b78ac79a55e9
+  postMergeConvergence: "B2 merge on origin/main; defaults OFF; no deploy; no Phase C; production-proven unknown (no container probe)"
+  b1GeneralizationRebase: "rebased onto 927ecd37b99578deafcb8c52ded6275b3a4e7464; holdout sealed after classifier freeze; Owner-signed blind holdout; no runtime wiring; no push"

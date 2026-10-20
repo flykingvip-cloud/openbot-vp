@@ -1,0 +1,152 @@
+{
+  "schema": "collaboration-csc-candidate-align-receipt/v1",
+  "status": "candidate-ready-live-unchanged",
+  "productionCloseout": "not-accepted",
+  "acceptancePhrase": null,
+  "executed": false,
+  "cutoverExecuted": false,
+  "flagsChanged": false,
+  "reason": "Full-dist candidate 551fa3e570 published from clean worktree after shadow-3 fix (rebased onto main 58e5291b5d). Ledger LIVE remains seq36 overlay e6f26e13795a on base 5c221b9ec38c. Running container overlay is 5a39526798. PR #639 not approved until CI green. No swap, no flag change, no seq37 append.",
+  "recordedAt": "2026-08-23T05:52:00Z",
+  "timezone": "Asia/Shanghai",
+  "operator": "cursor-collab-csc",
+  "task": "Six-gate candidate package for origin/main 673f8dce63; do not modify LIVE",
+  "explicitNonActions": [
+    "did not recreate openbot-gateway-rc",
+    "did not overlay or swap LIVE",
+    "did not run cutover-from-ghcr --stage",
+    "did not change inbound or CSC or Progress Ledger flags",
+    "did not append seq 37 to deploy/production/releases.jsonl on trunk",
+    "did not write seq 37 as LIVE"
+  ],
+  "baseline": {
+    "freshOriginMainAtFetch": "673f8dce6386a967b0f8a1a29d4e05eae420e81f",
+    "freshOriginMainAtReceipt": "673f8dce6386a967b0f8a1a29d4e05eae420e81f",
+    "candidateEqualsFrozenTip": false,
+    "candidateBuildSha": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+    "shadowFixRequiredOnPristineTip": true,
+    "worktree": "/tmp/openbot-candidate-673f8dce63"
+  },
+  "observedLive": {
+    "host": "root@8.217.93.71",
+    "container": "openbot-gateway-rc",
+    "healthz": { "http": 200, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "buildInfo": {
+      "commit": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+      "builtAt": "2026-08-23T03:38:51.881Z"
+    },
+    "ledgerSeq36GatewayOverlay": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "baseImage": {
+      "sha": "5c221b9ec38c6316b98797342a01fb39ffd80562",
+      "imageTag": "rc-amd64-provenance-5c221b9ec3",
+      "digest": "sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257",
+      "ociRevision": "5c221b9ec38c6316b98797342a01fb39ffd80562"
+    },
+    "flags": {
+      "OPENBOT_CHAT_INBOUND": "unset",
+      "OPENBOT_COLLAB": "unset",
+      "CONTEXT_SCOPE": "unset",
+      "OPENBOT_PROGRESS_LEDGER_ENABLED": "unset"
+    }
+  },
+  "candidate": {
+    "sha": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+    "provenanceTag": "provenance/sha-551fa3e570",
+    "buildInfoCommit": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+    "builtAt": "2026-08-23T05:44:46.036Z",
+    "uiEntry": "assets/index-Dpg8P1UR.js",
+    "tarball": {
+      "name": "full-dist-551fa3e570.tgz",
+      "sha256": "d5c4e4f802fedb45832958c884b2ff1ec06be708a49843f3e83c3cceea10e9d7",
+      "bytes": 37595628
+    },
+    "localImage": {
+      "tag": "localhost/openbot:rc-amd64-provenance-551fa3e570",
+      "imageId": "sha256:b1619b03cd961c960456cd91cdec57ad5f8f7df41cf6198bedbb03e5e0b37cfe",
+      "ociRevision": "551fa3e570e8ae8ff050d2f6d771d4732baba948"
+    },
+    "derivedFrom": "ghcr.io/gmood2008/openbot:provenance-sha-5c221b9ec38c",
+    "containsAncestors": [
+      "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+      "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "5c221b9ec38c6316b98797342a01fb39ffd80562"
+    ]
+  },
+  "shadow3": {
+    "evidence": "docs/design/evidence/chat-inbound-depth-shadow-3-tests-2026-08-23.json",
+    "exitCode": 0,
+    "tests": "5 passed (5)"
+  },
+  "ledger": {
+    "releases": 36,
+    "errors": 0,
+    "identityMismatch": 0,
+    "ok": true,
+    "seq36GatewaySha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "seq36LiveTo": null,
+    "appendedLiveRow": false,
+    "seq37PreviewOnly": true
+  },
+  "gates": {
+    "ledgerAudit": {
+      "releases": 36,
+      "errors": 0,
+      "identityMismatch": 0,
+      "ok": true
+    },
+    "verifyForwardOnlyLedgerLive": {
+      "live": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "candidate": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+      "verdict": "allow"
+    },
+    "verifyForwardOnlyRunningLive": {
+      "live": "5a39526798493464ff0a7f29ab65ab66ad7670ed",
+      "candidate": "551fa3e570e8ae8ff050d2f6d771d4732baba948",
+      "verdict": "allow"
+    },
+    "verifyDeliveryAlignment": {
+      "prodSha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "pass": 7,
+      "warn": 2,
+      "fail": 1,
+      "failReason": "L2 origin missing tag provenance/sha-551fa3e570 until push",
+      "log": "/tmp/openbot-candidate-673f8dce63-artifacts/verify-delivery-alignment.log"
+    }
+  },
+  "smoke": {
+    "executed": true,
+    "liveUntouched": true,
+    "candidatePort": 18889,
+    "healthz": { "ok": true, "status": "live" },
+    "readyz": { "ready": true, "failing": [] },
+    "liveHealthzAfter": { "ok": true, "status": "live" },
+    "log": "/tmp/openbot-candidate-673f8dce63-artifacts/remote-smoke-rollback-final.log",
+    "drillDir": "/tmp/openbot-candidate-drill-551fa3e570-final"
+  },
+  "rollbackDrill": {
+    "executed": true,
+    "touchedLive": false,
+    "targetLedgerOverlay": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "backupTar": "/root/openbot-maintenance-origin-main-5a3952679849-r1-20260823T033629Z/container-app-dist-pkg.before.tgz",
+    "extractedBuildInfoCommit": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "verdict": "ROLLBACK_TO_SEQ36_OK"
+  },
+  "releaseRecordPreview": "deploy/production/evidence/SEQ37_LEDGER_PREVIEW_20260823.json",
+  "productionCloseoutBlockers": [
+    "PR #639 not fully green — cannot approve until CI passes and merge completes",
+    "full-dist image/tarball built pre-rebase (build-info 2a2f14f686) — must rebuild from 551fa3e570 after merge",
+    "running LIVE overlay 5a39526798 != ledger seq36 e6f26e13795a",
+    "productionCloseout explicitly not-accepted"
+  ],
+  "pr639": {
+    "url": "https://github.com/gmood2008/openbot/pull/639",
+    "approved": false,
+    "ciBlockersResolvedLocally": [
+      "rebase onto main 58e5291b5d",
+      "oxfmt RELEASE_RECORD + evidence md"
+    ],
+    "ciBlockersPending": ["check types/lint/format rerun", "empty-runner noise jobs may still fail"]
+  }
+}

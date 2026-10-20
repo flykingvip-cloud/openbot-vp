@@ -1,0 +1,22 @@
+{
+  "evidenceId": "daibai-isolation-live-cutover-20260812-r2",
+  "schema": "daibai-isolation-live-verify/v1",
+  "probeUtc": "2026-08-12T09:48:28.140172Z",
+  "classification": "production-full-dist-SUCCESS",
+  "baseline": {
+    "liveCommit": "e02cd12b250b1e2190ff96a788139c7aad8ae5bc",
+    "overlay": "isolation-chat-fanout-r2",
+    "stamp": "20260812T094635Z",
+    "tenantsRoot": "/root/openbot-tenants"
+  },
+  "checks": {
+    "healthz": "200 live",
+    "readyz": "ready:true",
+    "bareBroadcastChat": 0,
+    "broadcastChatPresent": true
+  },
+  "verdict": {
+    "productionLiveIsolation": "DEPLOYED",
+    "dg0Layout": "TENANTS_ROOT outside state/config root"
+  }
+}

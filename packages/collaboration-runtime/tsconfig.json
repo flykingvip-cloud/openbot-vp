@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "rootDir": "src",
+    "noEmit": true,
+    "paths": {
+      "@openbot/collaboration-core": ["../collaboration-core/dist/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*"]
+}

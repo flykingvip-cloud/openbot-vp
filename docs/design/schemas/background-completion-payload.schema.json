@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbot.love/design/schemas/background-completion-payload.schema.json",
+  "title": "BackgroundCompletionPayload",
+  "description": "B1 bridge payload — see docs/design/event-mapping.md rev2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event", "subagentRunId", "source"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": ["background.completed", "background.failed"]
+    },
+    "subagentRunId": { "type": "string", "minLength": 1 },
+    "bindingId": { "type": "string", "format": "uuid" },
+    "bindingVersion": { "type": "integer", "minimum": 1 },
+    "flowStepSeq": { "type": "integer", "minimum": 1 },
+    "flowSubStepId": { "type": "string" },
+    "conversationTaskId": { "type": "string" },
+    "supervisorTaskId": { "type": "string" },
+    "exitCode": { "type": "integer" },
+    "errorSummary": { "type": "string" },
+    "source": {
+      "type": "string",
+      "enum": ["gateway.subagent", "gateway.supervisor"]
+    },
+    "discardReason": {
+      "type": "string",
+      "enum": [
+        "RC_TENANT_MISMATCH",
+        "RC_BINDING_STALE",
+        "RC_RUN_STALE",
+        "RC_RACE_LOST_TO_CANCEL",
+        "RC_SOURCE_NOT_ALLOWED"
+      ]
+    }
+  }
+}

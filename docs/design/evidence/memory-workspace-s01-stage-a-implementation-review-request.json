@@ -1,0 +1,135 @@
+{
+  "schema": "memory-workspace-s01-stage-a-implementation-review-request/v1",
+  "kind": "s01-stage-a-implementation-review-request",
+  "taskId": "memory-workspace-platform-remediation:cursor-data-governance-s01-stage-a-adapter",
+  "requestedBy": "cursor-data-governance",
+  "requestedAt": "2026-08-30T07:01:00.000Z",
+  "originMain": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c",
+  "notASecondS01Spec": true,
+  "selfAccepted": false,
+  "fillsKiroSotReviewer": false,
+  "fillsCodexArchitecture": false,
+  "signedAsKiroSotReviewer": false,
+  "signedAsCodexArchitecture": false,
+  "flipsImplementationGate": false,
+  "authorizesStageAImplementation": false,
+  "authorizesStageB": false,
+  "acceptsUnauthorizedLanding833": false,
+  "thisPacketCreatesReviewSidecars": false,
+  "operatorVerdict": {
+    "stageAContractRemediation834": "accepted",
+    "stageAAdapterImplementation833": "changes-required",
+    "stageBShadowWiring": "locked",
+    "implementationUnlock": "not-issued",
+    "productionAuthorization": "not-issued"
+  },
+  "contractPacketObservation": {
+    "pr": 834,
+    "mergeSha": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c",
+    "status": "stage-a-contract-resubmitted",
+    "implementationAuthorized": false,
+    "unauthorizedImplementationLanding": {
+      "pr": 833,
+      "mergeSha": "7cad685fba613fd36b2d5f295ef2472d42f98d58",
+      "authorized": false
+    },
+    "codeCompleteness": "not-met",
+    "testCoverage": "not-met",
+    "isolationVerification": "not-verified",
+    "stageAImplementation": "blocked",
+    "implementationGate": "not-met",
+    "doesNotSign833": true
+  },
+  "implementationUnderReview": {
+    "pr": 833,
+    "presentOnMain": true,
+    "authorized": false,
+    "originMain": "74ca45c14407dc68b7102e1a3fd2cc276aeb4e6c",
+    "files": [
+      {
+        "path": "src/gateway/data-governance/s01-steward-workspace-identity.ts",
+        "blob": "2ddc9c4d4eee3def3ce64ab4e5c00c2380d12f1f"
+      },
+      {
+        "path": "src/gateway/data-governance/s01-authorized-tool-cwd.ts",
+        "blob": "e0a99abf3c120acba56f3dd7cdf8dbff21e0f434"
+      }
+    ]
+  },
+  "requiredReviewers": ["codex-architecture", "kiro-sot-reviewer"],
+  "requiredImplementationSidecars": [
+    "docs/design/evidence/memory-workspace-s01-stage-a-implementation-review-codex-architecture.json",
+    "docs/design/evidence/memory-workspace-s01-stage-a-implementation-review-kiro-sot-reviewer.json"
+  ],
+  "contractSidecarsAreNotImplementationAccept": [
+    "docs/design/evidence/memory-workspace-s01-stage-a-adapter-review-codex-architecture.json",
+    "docs/design/evidence/memory-workspace-s01-stage-a-adapter-review-kiro-sot-reviewer.json"
+  ],
+  "sidecarsPresentOnThisOriginMain": {
+    "adapterReviewCodexArchitecture": false,
+    "adapterReviewKiroSotReviewer": false,
+    "implementationReviewCodexArchitecture": false,
+    "implementationReviewKiroSotReviewer": false
+  },
+  "requiredChecks": [
+    "targetIdentity-not-null-full-ir1",
+    "eleven-unique-handoff-error-codes-only",
+    "catalog-only-no-independent-tables",
+    "membership-port-not-array",
+    "fencing-stale-maps-err-workspace-archived",
+    "path-escape-and-unverified-symlink-denied",
+    "get-reply-unwired",
+    "scan-remaining-10-liveWriteWatchIndex-10"
+  ],
+  "errorCodesFollowUniqueHandoff": [
+    "ERR_PRINCIPAL_REQUIRED",
+    "ERR_TENANT_BINDING_REQUIRED",
+    "ERR_WORKSPACE_NOT_FOUND",
+    "ERR_TENANT_MISMATCH",
+    "ERR_CAPABILITY_DENIED",
+    "ERR_WORKSPACE_ARCHIVED",
+    "ERR_BINDING_NOT_CANONICAL",
+    "ERR_PATH_OUTSIDE_WORKSPACE",
+    "ERR_CATALOG_UNAVAILABLE",
+    "ERR_INVALID_PATH",
+    "ERR_WORKSPACE_OWNER_DENIED"
+  ],
+  "rejectedParallelCodes": [
+    "ERR_WORKSPACE_SUSPENDED",
+    "ERR_WORKSPACE_RETIRED",
+    "ERR_BINDING_AMBIGUOUS",
+    "ERR_OWNERSHIP_MISMATCH",
+    "ERR_STALE_FENCING"
+  ],
+  "locks": {
+    "implementationGate": "not-met",
+    "implementationVerified": false,
+    "stageAImplementation": "blocked",
+    "stageB": "locked",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "item7": "not-met",
+    "s01Retirement": "blocked",
+    "phase1b": "blocked",
+    "deployAuthorized": false,
+    "i3": "not executed",
+    "liveDeployment": "forbidden"
+  },
+  "nextAfterBothImplementationSidecarsOnMain": "Stage A Adapter Implementation Accept only",
+  "explicitlyForbiddenNow": [
+    "sign as kiro-sot-reviewer",
+    "sign as codex-architecture",
+    "create either implementation review sidecar in this packet",
+    "treat contract sidecar as #833 implementation accept",
+    "treat code-on-main as Stage A Accepted",
+    "start Stage B shadow wiring",
+    "modify src/auto-reply/reply/get-reply.ts",
+    "modify src/memory/**",
+    "write production Catalog",
+    "change remaining or liveWriteWatchIndex",
+    "Implementation Unlock",
+    "Item 7 met",
+    "Phase 1B unlock",
+    "LIVE"
+  ]
+}

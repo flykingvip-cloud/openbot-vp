@@ -1,0 +1,87 @@
+{
+  "window": "2026-09-27",
+  "malformed": 0,
+  "rows": [
+    {
+      "window": "2026-09-27",
+      "entry": "E1",
+      "source": "agent-invocation",
+      "total": 3,
+      "skipped": 0,
+      "match": 2,
+      "divergence": 1,
+      "byClass": { "D0": 2, "D3": 1 },
+      "topReasons": [
+        { "reason": "within-policy", "count": 2 },
+        { "reason": "shadow-looser", "count": 1 }
+      ],
+      "byTenant": {
+        "t1": { "total": 2, "skipped": 0, "match": 1, "divergence": 1 },
+        "t2": { "total": 1, "skipped": 0, "match": 1, "divergence": 0 }
+      }
+    },
+    {
+      "window": "2026-09-27",
+      "entry": "E16",
+      "source": "model-entitlement",
+      "total": 1,
+      "skipped": 0,
+      "match": 0,
+      "divergence": 0,
+      "byClass": { "D4": 1 },
+      "topReasons": [{ "reason": "cli-backend-model", "count": 1 }],
+      "byTenant": {
+        "t2": { "total": 1, "skipped": 0, "match": 0, "divergence": 0 }
+      }
+    },
+    {
+      "window": "2026-09-27",
+      "entry": "E2",
+      "source": "model-entitlement",
+      "total": 1,
+      "skipped": 0,
+      "match": 0,
+      "divergence": 1,
+      "byClass": { "D1": 1 },
+      "topReasons": [{ "reason": "entitlement-empty", "count": 1 }],
+      "byTenant": {
+        "t1": { "total": 1, "skipped": 0, "match": 0, "divergence": 1 }
+      }
+    },
+    {
+      "window": "2026-09-27",
+      "entry": "E8",
+      "source": "capability",
+      "total": 2,
+      "skipped": 2,
+      "match": 0,
+      "divergence": 0,
+      "byClass": { "D5": 2 },
+      "topReasons": [
+        { "reason": "no-enterprise-scope", "count": 1 },
+        { "reason": "tenant-capability-not-enforced", "count": 1 }
+      ],
+      "byTenant": {
+        "(none)": { "total": 1, "skipped": 1, "match": 0, "divergence": 0 },
+        "t1": { "total": 1, "skipped": 1, "match": 0, "divergence": 0 }
+      }
+    },
+    {
+      "window": "2026-09-27",
+      "entry": "E9",
+      "source": "node",
+      "total": 2,
+      "skipped": 0,
+      "match": 0,
+      "divergence": 2,
+      "byClass": { "D2": 1, "D6": 1 },
+      "topReasons": [
+        { "reason": "node-ownership-unattributed", "count": 1 },
+        { "reason": "shadow-threw", "count": 1 }
+      ],
+      "byTenant": {
+        "t2": { "total": 2, "skipped": 0, "match": 0, "divergence": 2 }
+      }
+    }
+  ]
+}

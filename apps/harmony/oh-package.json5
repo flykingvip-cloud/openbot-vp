@@ -1,0 +1,13 @@
+{
+  "modelVersion": "5.0.0",
+  "name": "openbot-harmony",
+  "version": "1.0.0",
+  "description": "OpenBot employee shell for HarmonyOS NEXT",
+  "main": "",
+  "author": "OpenBot",
+  "license": "MIT",
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}

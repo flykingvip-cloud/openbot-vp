@@ -1,0 +1,32 @@
+{
+  "schema": "memory-workspace-phase1b-item5-deploy-execution-decision/v1",
+  "item": 5,
+  "deployExecution": "authorized",
+  "path": "authorize-production-container-write-and-registry-main-rebind",
+  "issuedBy": "operator",
+  "recordedBy": "cursor-data-governance",
+  "issuedAt": "2026-08-18T07:38:00.000Z",
+  "request": "docs/design/evidence/memory-workspace-phase1b-item5-deploy-execution-request.json",
+  "unlock": "issued",
+  "executed": true,
+  "deployAuthorized": true,
+  "productionContainerWrite": true,
+  "registryMainRebind": true,
+  "wiredToProductionResolver": false,
+  "enablesProduction": true,
+  "attachMissDeny": false,
+  "live": "host-openbot-and-production",
+  "identifierPolicy": "hashed-in-git",
+  "authorizes": [
+    "registry main membership rebind from historical seat binding + seat occupancy + platform-auth membership",
+    "production Catalog compareAndPut for occupancy rows plus main row when OPENBOT_PRODUCTION_STATE_DIR is configured",
+    "local host registry + main Catalog row execution for measurement when production target is unreachable"
+  ],
+  "doesNotAuthorize": [
+    "wiredToProductionResolver=true",
+    "invent membership owner without authority chain",
+    "write unredacted identifiers into git",
+    "score item 5 met from this stamp"
+  ],
+  "note": "Operator authorized production container write and registry main rebind. 2026-08-19 production run executed on /root/.openbot. wiredToProductionResolver stays false. Item 5 stays not-met."
+}

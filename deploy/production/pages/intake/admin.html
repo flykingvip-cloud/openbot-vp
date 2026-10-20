@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>接入资料管理 · OpenBot</title>
+    <style>
+      :root {
+        --bg: #f6f8fb;
+        --card: #fff;
+        --ink: #0e1a2b;
+        --sub: #4b5c72;
+        --line: #e3e8f0;
+        --navy: #123a7a;
+        --blue: #2563eb;
+        --fill: #f3f6fa;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      .page {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 18px 16px 48px;
+      }
+      header.hero {
+        background: linear-gradient(135deg, #123a7a, #2563eb);
+        color: #fff;
+        border-radius: 18px;
+        padding: 22px;
+        margin-bottom: 16px;
+      }
+      header.hero h1 {
+        margin: 0 0 4px;
+        font-size: 20px;
+      }
+      header.hero p {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.9;
+      }
+      .stats {
+        display: flex;
+        gap: 18px;
+        margin-top: 14px;
+        font-size: 12px;
+      }
+      .stats b {
+        font-size: 18px;
+        display: block;
+      }
+      .shell {
+        display: grid;
+        grid-template-columns: minmax(260px, 340px) 1fr;
+        gap: 14px;
+      }
+      .pane {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        min-height: 560px;
+      }
+      .pane h2 {
+        margin: 0;
+        padding: 14px 16px 0;
+        font-size: 15px;
+      }
+      .filters {
+        display: flex;
+        gap: 8px;
+        padding: 12px 16px;
+      }
+      .filters input,
+      .filters select,
+      textarea,
+      .detail select {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 10px;
+        font: inherit;
+        background: var(--fill);
+      }
+      .filters input {
+        flex: 1;
+      }
+      .list {
+        max-height: 680px;
+        overflow: auto;
+        padding: 0 8px 12px;
+      }
+      button.row {
+        width: 100%;
+        text-align: left;
+        border: 1px solid transparent;
+        background: transparent;
+        border-radius: 10px;
+        padding: 10px;
+        cursor: pointer;
+      }
+      button.row.on {
+        background: #eef4ff;
+        border-color: #c7d7fe;
+      }
+      .co {
+        font-weight: 700;
+      }
+      .meta {
+        color: var(--sub);
+        font-size: 12px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .pill {
+        border-radius: 999px;
+        padding: 1px 8px;
+        background: #e0e7ff;
+        color: #1e3a8a;
+      }
+      .detail {
+        padding: 8px 16px 20px;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: 96px 1fr;
+        gap: 6px;
+        font-size: 13px;
+        margin: 6px 0;
+      }
+      .k {
+        color: var(--sub);
+      }
+      .system {
+        border-top: 1px solid var(--line);
+        margin-top: 12px;
+        padding-top: 8px;
+      }
+      .btn {
+        border: none;
+        border-radius: 10px;
+        padding: 9px 14px;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(135deg, var(--navy), var(--blue));
+        cursor: pointer;
+      }
+      .empty {
+        color: var(--sub);
+        padding: 16px;
+      }
+      textarea {
+        width: 100%;
+        min-height: 88px;
+        margin-top: 8px;
+      }
+      @media (max-width: 800px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="hero">
+        <h1>接入资料管理</h1>
+        <p>查看企业或供应商提交的信息系统接入资料。令牌不在此页。</p>
+        <div class="stats">
+          <div>全部<b id="stAll">0</b></div>
+          <div>新提报<b id="stNew">0</b></div>
+          <div>近 7 日<b id="stWeek">0</b></div>
+        </div>
+      </header>
+      <div class="shell">
+        <section class="pane">
+          <h2>提报列表</h2>
+          <div class="filters">
+            <input id="q" placeholder="搜索企业 / 联系人 / 系统" />
+            <select id="status">
+              <option value="">全部</option>
+              <option value="new">新提报</option>
+              <option value="reviewing">受理中</option>
+              <option value="ready">资料齐全</option>
+              <option value="blocked">暂不能接入</option>
+              <option value="archived">已归档</option>
+            </select>
+          </div>
+          <div class="list" id="list"><div class="empty">加载中…</div></div>
+        </section>
+        <section class="pane">
+          <h2 id="detailTitle">提报详情</h2>
+          <div class="detail" id="detail"><div class="empty">从左侧选择一条提报。</div></div>
+        </section>
+      </div>
+    </div>
+    <script>
+      const STATUS = {
+        new: "新提报",
+        reviewing: "受理中",
+        ready: "资料齐全",
+        blocked: "暂不能接入",
+        archived: "已归档",
+      };
+      const CATEGORY = { marketing: "营销", hr: "人力资源", finance: "财务", other: "其他" };
+      const ACCESS = {
+        http: "只读 HTTP",
+        database: "只读数据库",
+        sap: "SAP S/4HANA",
+        salesforce: "Salesforce",
+        unavailable: "暂不能按标准提供",
+      };
+      let rows = [];
+      let selectedId = null;
+      const $ = (id) => document.getElementById(id);
+
+      async function api(path, opts = {}) {
+        const res = await fetch(new URL("/intake/admin/api" + path, location.origin), {
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          ...opts,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "请求失败");
+        return data;
+      }
+
+      function esc(value) {
+        return String(value || "").replace(
+          /[&<>"']/g,
+          (ch) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[ch],
+        );
+      }
+
+      function fmtTime(iso) {
+        const date = new Date(iso);
+        if (Number.isNaN(date.getTime())) return "—";
+        const p = (n) => String(n).padStart(2, "0");
+        return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())} ${p(date.getHours())}:${p(date.getMinutes())}`;
+      }
+
+      function renderStats() {
+        const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+        $("stAll").textContent = rows.length;
+        $("stNew").textContent = rows.filter((row) => row.status === "new").length;
+        $("stWeek").textContent = rows.filter((row) => Date.parse(row.createdAt) >= weekAgo).length;
+      }
+
+      function renderList() {
+        const q = $("q").value.trim().toLowerCase();
+        const status = $("status").value;
+        const filtered = rows.filter((row) => {
+          if (status && row.status !== status) return false;
+          if (!q) return true;
+          const systems = (row.systems || []).map((system) => system.systemName).join(" ");
+          return `${row.enterpriseName} ${row.enterpriseContact} ${systems}`
+            .toLowerCase()
+            .includes(q);
+        });
+        $("list").innerHTML = filtered.length
+          ? filtered
+              .map(
+                (row) => `
+            <button class="row ${row.id === selectedId ? "on" : ""}" data-id="${esc(row.id)}">
+              <div class="co">${esc(row.enterpriseName)}</div>
+              <div class="meta">
+                <span class="pill">${STATUS[row.status] || row.status}</span>
+                <span>${esc(row.enterpriseContact)}</span>
+                <span>${(row.systems || []).length} 个系统</span>
+              </div>
+            </button>`,
+              )
+              .join("")
+          : '<div class="empty">暂无匹配提报。</div>';
+        $("list")
+          .querySelectorAll(".row")
+          .forEach((button) => {
+            button.onclick = () => {
+              selectedId = button.dataset.id;
+              renderList();
+              renderDetail();
+            };
+          });
+      }
+
+      function systemBlock(system) {
+        const endpoints = (system.endpoints || [])
+          .filter((row) => row.objectName || row.path)
+          .map((row) => `${row.objectName || "对象"} ${row.path || ""}`.trim())
+          .join("；");
+        return `
+          <div class="system">
+            <strong>${esc(CATEGORY[system.category] || system.category)} · ${esc(system.systemName)}</strong>
+            <div class="kv"><div class="k">接入方式</div><div>${esc(ACCESS[system.accessMode] || system.accessMode)}</div></div>
+            <div class="kv"><div class="k">测试地址</div><div>${esc(system.testBaseUrl || system.sapGateway || system.sfInstance || system.dbHost || "—")}</div></div>
+            <div class="kv"><div class="k">只读对象</div><div>${esc(endpoints || system.dbObjects || system.unavailableNote || "—")}</div></div>
+            <div class="kv"><div class="k">凭证联系人</div><div>${esc(system.credentialOwner || "—")}</div></div>
+          </div>`;
+      }
+
+      function renderDetail() {
+        const row = rows.find((item) => item.id === selectedId);
+        if (!row) {
+          $("detailTitle").textContent = "提报详情";
+          $("detail").innerHTML = '<div class="empty">从左侧选择一条提报。</div>';
+          return;
+        }
+        $("detailTitle").textContent = row.enterpriseName;
+        const vendor = row.submitterRole === "vendor" ? row.vendorName : "应用企业本人";
+        $("detail").innerHTML = `
+          <div class="kv"><div class="k">编号</div><div>${esc(row.id)}</div></div>
+          <div class="kv"><div class="k">提交时间</div><div>${fmtTime(row.createdAt)}</div></div>
+          <div class="kv"><div class="k">联系人</div><div>${esc(row.enterpriseContact)} ${esc(row.enterprisePhone)} ${esc(row.enterpriseEmail)}</div></div>
+          <div class="kv"><div class="k">填写人</div><div>${esc(vendor)} ${esc(row.signName)}</div></div>
+          ${(row.systems || []).map(systemBlock).join("")}
+          <label>受理状态
+            <select id="editStatus">${Object.entries(STATUS)
+              .map(
+                ([key, label]) =>
+                  `<option value="${key}" ${row.status === key ? "selected" : ""}>${label}</option>`,
+              )
+              .join("")}</select>
+          </label>
+          <label>内部备注<textarea id="editNotes">${esc(row.notes)}</textarea></label>
+          <p><button class="btn" id="save" type="button">保存</button></p>
+          <p class="note" id="msg"></p>`;
+        $("save").onclick = async () => {
+          $("msg").textContent = "保存中…";
+          try {
+            const data = await api("/submissions/" + encodeURIComponent(row.id), {
+              method: "PATCH",
+              body: JSON.stringify({ status: $("editStatus").value, notes: $("editNotes").value }),
+            });
+            const index = rows.findIndex((item) => item.id === row.id);
+            rows[index] = data.submission;
+            renderStats();
+            renderList();
+            renderDetail();
+            $("msg").textContent = "已保存。";
+          } catch (err) {
+            $("msg").textContent = err.message;
+          }
+        };
+      }
+
+      async function load() {
+        const data = await api("/submissions");
+        rows = data.submissions || [];
+        renderStats();
+        renderList();
+        renderDetail();
+      }
+
+      $("q").addEventListener("input", renderList);
+      $("status").addEventListener("change", renderList);
+      load().catch((err) => {
+        $("list").innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+      });
+    </script>
+  </body>
+</html>

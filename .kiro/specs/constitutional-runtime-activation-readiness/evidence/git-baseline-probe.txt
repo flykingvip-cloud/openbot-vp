@@ -1,0 +1,31 @@
+=== assessedAt ===
+2026-09-28T04:10:43Z
+2026-09-28T12:10:43+0800
+=== rev-parse ===
+HEAD=6628f4bf364bd6d0560847b938b00e74035a8947
+origin/main=6628f4bf364bd6d0560847b938b00e74035a8947
+=== log -5 origin/main ===
+6628f4bf3 Docs: Constitutional runtime activation Checkpoint A baseline (#174)
+f0e9bed89 Docs: add the governance shadow staging runbook (#175)
+7d72684d3 Governance: add the capability invoke adapter (#173)
+a722492c6 Governance: add offline shadow JSONL metrics (#171)
+6e15d8586 Governance: freeze the P5-0 capability invoke map
+=== merge-base --is-ancestor origin/main HEAD ===
+exit=0
+=== rev-list --left-right --count origin/main...HEAD ===
+0	0
+=== Phase D ancestor ===
+exit=0
+=== porcelain src/ packages/ ===
+=== drift constitutional runtime paths a722492c..origin/main ===
+(empty above = no Constitutional runtime path drift)
+=== scripts/governance/README.md drift ===
+M	scripts/governance/README.md
+f0e9bed89 Docs: add the governance shadow staging runbook (#175)
+=== commits a722..origin/main ===
+6628f4bf3 Docs: Constitutional runtime activation Checkpoint A baseline (#174)
+f0e9bed89 Docs: add the governance shadow staging runbook (#175)
+7d72684d3 Governance: add the capability invoke adapter (#173)
+=== note ===
+Docs-only REVISE working tree dirty under .kiro/specs/constitutional-runtime-activation-readiness/** only.
+Registry entry already on origin/main via #174; no .loom/registry.yaml delta in this REVISE.

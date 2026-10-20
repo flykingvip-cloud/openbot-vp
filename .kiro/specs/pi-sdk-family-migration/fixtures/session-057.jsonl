@@ -1,0 +1,11 @@
+{"type":"session","version":3,"id":"f8db4331-e7e9-49d5-8e84-6cbb819f89d0","timestamp":"2026-08-29T09:09:36.700Z","cwd":"/tmp/pi-sdk-v3-session/work/workspace-057"}
+{"type":"message","id":"2f3062d4","parentId":null,"timestamp":"2026-08-29T09:09:36.701Z","message":{"role":"user","content":[{"type":"text","text":"tenant-a secret payload"}],"timestamp":1787994576701}}
+{"type":"message","id":"76b09a9b","parentId":"2f3062d4","timestamp":"2026-08-29T09:09:36.701Z","message":{"role":"assistant","content":[{"type":"text","text":"ack"},{"type":"toolCall","id":"call_1","name":"read","arguments":{"path":"notes.md"}}],"api":"openai-responses","provider":"openai","model":"test-model","usage":{"input":1,"output":1,"cacheRead":0,"cacheWrite":0,"totalTokens":2,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"toolUse","timestamp":1787994576701}}
+{"type":"message","id":"59db817a","parentId":"76b09a9b","timestamp":"2026-08-29T09:09:36.702Z","message":{"role":"toolResult","toolCallId":"call_1","toolName":"read","content":[{"type":"text","text":"tenant-a secret payload"}],"isError":false,"timestamp":1787994576702}}
+{"type":"model_change","id":"7981e10f","parentId":"59db817a","timestamp":"2026-08-29T09:09:36.702Z","provider":"openai","modelId":"test-model"}
+{"type":"thinking_level_change","id":"5f2b027d","parentId":"7981e10f","timestamp":"2026-08-29T09:09:36.702Z","thinkingLevel":"medium"}
+{"type":"custom","customType":"openbot.session-meta","data":{"tenant":"tenant-a","sessionKey":"agent:main:tenant-a"},"id":"bb042f1f","parentId":"5f2b027d","timestamp":"2026-08-29T09:09:36.702Z"}
+{"type":"custom_message","customType":"openbot.note","content":"keep this custom message","display":true,"details":{"tenant":"tenant-a"},"id":"ac06cd93","parentId":"bb042f1f","timestamp":"2026-08-29T09:09:36.703Z"}
+{"type":"session_info","id":"287737a0","parentId":"ac06cd93","timestamp":"2026-08-29T09:09:36.703Z","name":"phase-a-v3"}
+{"type":"compaction","id":"90df90f4","parentId":"287737a0","timestamp":"2026-08-29T09:09:36.703Z","summary":"compacted older turns","firstKeptEntryId":"2f3062d4","tokensBefore":128}
+{"type":"message","id":"731d4f0a","parentId":"90df90f4","timestamp":"2026-08-29T09:09:38.728Z","message":{"role":"user","content":[{"type":"text","text":"append-from-084"}],"timestamp":1787994578728}}

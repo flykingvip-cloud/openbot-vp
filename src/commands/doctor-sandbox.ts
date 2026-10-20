@@ -1,0 +1,273 @@
+import fs from "node:fs";
+import path from "node:path";
+import {
+  DEFAULT_SANDBOX_BROWSER_IMAGE,
+  DEFAULT_SANDBOX_COMMON_IMAGE,
+  DEFAULT_SANDBOX_IMAGE,
+  sandboxImageCompatPeer,
+} from "../agents/sandbox.js";
+import type { OpenBotConfig } from "../config/config.js";
+import { runDoctorChecks, type DoctorCheckRow } from "../diagnosis/doctor-check-contract.js";
+import { runCommandWithTimeout, runExec } from "../process/exec.js";
+import type { RuntimeEnv } from "../runtime.js";
+import { note } from "../terminal/note.js";
+import type { DoctorPrompter } from "./doctor-prompter.js";
+
+type SandboxScriptInfo = {
+  scriptPath: string;
+  cwd: string;
+};
+
+function resolveSandboxScript(scriptRel: string): SandboxScriptInfo | null {
+  const candidates = new Set<string>();
+  candidates.add(process.cwd());
+  const argv1 = process.argv[1];
+  if (argv1) {
+    const normalized = path.resolve(argv1);
+    candidates.add(path.resolve(path.dirname(normalized), ".."));
+    candidates.add(path.resolve(path.dirname(normalized)));
+  }
+
+  for (const root of candidates) {
+    const scriptPath = path.join(root, scriptRel);
+    if (fs.existsSync(scriptPath)) {
+      return { scriptPath, cwd: root };
+    }
+  }
+
+  return null;
+}
+
+async function runSandboxScript(scriptRel: string, runtime: RuntimeEnv): Promise<boolean> {
+  const script = resolveSandboxScript(scriptRel);
+  if (!script) {
+    note(`Unable to locate ${scriptRel}. Run it from the repo root.`, "Sandbox");
+    return false;
+  }
+
+  runtime.log(`Running ${scriptRel}...`);
+  const result = await runCommandWithTimeout(["bash", script.scriptPath], {
+    timeoutMs: 20 * 60 * 1000,
+    cwd: script.cwd,
+  });
+  if (result.code !== 0) {
+    runtime.error(
+      `Failed running ${scriptRel}: ${
+        result.stderr.trim() || result.stdout.trim() || "unknown error"
+      }`,
+    );
+    return false;
+  }
+
+  runtime.log(`Completed ${scriptRel}.`);
+  return true;
+}
+
+async function isDockerAvailable(): Promise<boolean> {
+  try {
+    await runExec("docker", ["version", "--format", "{{.Server.Version}}"], {
+      timeoutMs: 5_000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function dockerImageExists(image: string): Promise<boolean> {
+  try {
+    await runExec("docker", ["image", "inspect", image], { timeoutMs: 5_000 });
+    return true;
+  } catch (error) {
+    const stderr =
+      (error as { stderr: string } | undefined)?.stderr ||
+      (error as { message: string } | undefined)?.message ||
+      "";
+    if (String(stderr).includes("No such image")) {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function resolveSandboxDockerImage(cfg: OpenBotConfig): string {
+  const image = cfg.agents?.defaults?.sandbox?.docker?.image?.trim();
+  return image ? image : DEFAULT_SANDBOX_IMAGE;
+}
+
+function resolveSandboxBrowserImage(cfg: OpenBotConfig): string {
+  const image = cfg.agents?.defaults?.sandbox?.browser?.image?.trim();
+  return image ? image : DEFAULT_SANDBOX_BROWSER_IMAGE;
+}
+
+function updateSandboxDockerImage(cfg: OpenBotConfig, image: string): OpenBotConfig {
+  return {
+    ...cfg,
+    agents: {
+      ...cfg.agents,
+      defaults: {
+        ...cfg.agents?.defaults,
+        sandbox: {
+          ...cfg.agents?.defaults?.sandbox,
+          docker: {
+            ...cfg.agents?.defaults?.sandbox?.docker,
+            image,
+          },
+        },
+      },
+    },
+  };
+}
+
+function updateSandboxBrowserImage(cfg: OpenBotConfig, image: string): OpenBotConfig {
+  return {
+    ...cfg,
+    agents: {
+      ...cfg.agents,
+      defaults: {
+        ...cfg.agents?.defaults,
+        sandbox: {
+          ...cfg.agents?.defaults?.sandbox,
+          browser: {
+            ...cfg.agents?.defaults?.sandbox?.browser,
+            image,
+          },
+        },
+      },
+    },
+  };
+}
+
+type SandboxImageCheck = {
+  kind: string;
+  image: string;
+  buildScript?: string;
+  updateConfig: (image: string) => void;
+};
+
+async function handleMissingSandboxImage(
+  params: SandboxImageCheck,
+  runtime: RuntimeEnv,
+  prompter: DoctorPrompter,
+) {
+  const exists = await dockerImageExists(params.image);
+  if (exists) {
+    return;
+  }
+  const peer = sandboxImageCompatPeer(params.image);
+  if (peer && (await dockerImageExists(peer))) {
+    return;
+  }
+
+  const buildHint = params.buildScript
+    ? `Build it with ${params.buildScript}.`
+    : "Build or pull it first.";
+  note(`Sandbox ${params.kind} image missing: ${params.image}. ${buildHint}`, "Sandbox");
+
+  let built = false;
+  if (params.buildScript) {
+    const build = await prompter.confirmSkipInNonInteractive({
+      message: `Build ${params.kind} sandbox image now?`,
+      initialValue: true,
+    });
+    if (build) {
+      built = await runSandboxScript(params.buildScript, runtime);
+    }
+  }
+
+  if (built) {
+    return;
+  }
+}
+
+export async function maybeRepairSandboxImages(
+  cfg: OpenBotConfig,
+  runtime: RuntimeEnv,
+  prompter: DoctorPrompter,
+): Promise<OpenBotConfig> {
+  const sandbox = cfg.agents?.defaults?.sandbox;
+  const mode = sandbox?.mode ?? "off";
+  if (!sandbox || mode === "off") {
+    return cfg;
+  }
+
+  const dockerAvailable = await isDockerAvailable();
+  if (!dockerAvailable) {
+    const lines = [
+      `Sandbox mode is enabled (mode: "${mode}") but Docker is not available.`,
+      "Docker is required for sandbox mode to function.",
+      "Isolated sessions (cron jobs, sub-agents) will fail without Docker.",
+      "",
+      "Options:",
+      "- Install Docker and restart the gateway",
+      "- Disable sandbox mode: openbot config set agents.defaults.sandbox.mode off",
+    ];
+    note(lines.join("\n"), "Sandbox");
+    return cfg;
+  }
+
+  let next = cfg;
+  const changes: string[] = [];
+
+  const dockerImage = resolveSandboxDockerImage(cfg);
+  await handleMissingSandboxImage(
+    {
+      kind: "base",
+      image: dockerImage,
+      buildScript:
+        dockerImage === DEFAULT_SANDBOX_COMMON_IMAGE
+          ? "scripts/sandbox-common-setup.sh"
+          : dockerImage === DEFAULT_SANDBOX_IMAGE
+            ? "scripts/sandbox-setup.sh"
+            : undefined,
+      updateConfig: (image) => {
+        next = updateSandboxDockerImage(next, image);
+        changes.push(`Updated agents.defaults.sandbox.docker.image → ${image}`);
+      },
+    },
+    runtime,
+    prompter,
+  );
+
+  if (sandbox.browser?.enabled) {
+    await handleMissingSandboxImage(
+      {
+        kind: "browser",
+        image: resolveSandboxBrowserImage(cfg),
+        buildScript: "scripts/sandbox-browser-setup.sh",
+        updateConfig: (image) => {
+          next = updateSandboxBrowserImage(next, image);
+          changes.push(`Updated agents.defaults.sandbox.browser.image → ${image}`);
+        },
+      },
+      runtime,
+      prompter,
+    );
+  }
+
+  if (changes.length > 0) {
+    note(changes.join("\n"), "Doctor changes");
+  }
+
+  return next;
+}
+
+export function noteSandboxScopeWarnings(
+  cfg: OpenBotConfig,
+  rows: readonly DoctorCheckRow[] = runDoctorChecks({ config: cfg }),
+) {
+  const warnings = rows
+    .filter((row) => row.checkId === "sandbox-shared-override")
+    .map((row) => {
+      const agentId = row.pathLabel.replace(/^agents\.list\./, "").replace(/\.sandbox$/, "");
+      const overrides = (row.detail ?? "").split(" ")[0] ?? "";
+      return [
+        `- agents.list (id "${agentId}") sandbox ${overrides} overrides ignored.`,
+        `  scope resolves to "shared".`,
+      ].join("\n");
+    });
+
+  if (warnings.length > 0) {
+    note(warnings.join("\n"), "Sandbox");
+  }
+}

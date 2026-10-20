@@ -1,0 +1,242 @@
+/* Model pool list polish. Scoped under the assets surface so these rules win
+   over the shared enterprise table / toolbar defaults in components.css. */
+
+.platform-model-assets-surface .platform-model-assets-summary {
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.platform-model-assets-surface .platform-model-assets-summary__card {
+  align-content: start;
+  gap: 8px;
+  min-height: 0;
+  padding: 14px 16px 16px;
+}
+
+.platform-model-assets-surface .platform-model-assets-summary__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+}
+
+.platform-model-assets-surface .platform-model-assets-summary__value {
+  font-size: 26px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+}
+
+.platform-model-assets-surface .platform-model-assets-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.platform-model-assets-surface .platform-model-assets-topbar__meta {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  min-height: 36px;
+}
+
+.platform-model-assets-surface .platform-model-assets-topbar__count {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-topbar__tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.platform-model-assets-surface .platform-model-assets-topbar .chip {
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-add-btn {
+  height: 36px;
+  flex: 0 0 auto;
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-control,
+.platform-model-assets-surface .platform-model-assets-search input,
+.platform-model-assets-surface .platform-model-assets-filter-panel select {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.platform-model-assets-surface .platform-model-assets-search {
+  flex: 1 1 240px;
+  min-width: 180px;
+  max-width: 420px;
+}
+
+.platform-model-assets-surface .platform-model-assets-search input::placeholder {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.platform-model-assets-surface .enterprise-data-table.platform-model-assets-table {
+  min-width: 1120px;
+}
+
+.platform-model-assets-surface .enterprise-data-table.platform-model-assets-table th,
+.platform-model-assets-surface .enterprise-data-table.platform-model-assets-table td {
+  padding: 10px 12px;
+  vertical-align: middle;
+}
+
+.platform-model-assets-surface .enterprise-data-table.platform-model-assets-table th {
+  background: color-mix(in srgb, var(--secondary) 70%, var(--card));
+  letter-spacing: 0.01em;
+}
+
+.platform-model-assets-surface .platform-model-assets-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 4%, var(--card));
+}
+
+.platform-model-assets-surface .platform-model-assets-table__primary {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-table__metric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-table__metric.is-muted {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.platform-model-assets-surface .platform-model-assets-cost-tier {
+  min-width: 28px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-table .chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transform: none;
+}
+
+.platform-model-assets-surface .platform-model-assets-table .chip:hover {
+  transform: none;
+}
+
+.platform-model-assets-surface .platform-model-assets-table .chip-row,
+.platform-model-assets-surface .platform-model-assets-table__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.platform-model-assets-surface .platform-model-assets-table .platform-model-assets-table__col-health {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
+.platform-model-assets-surface .platform-model-assets-table .platform-model-assets-table__col-provider {
+  min-width: 132px;
+  max-width: 200px;
+}
+
+.platform-model-assets-surface .platform-model-assets-table .platform-model-assets-table__col-action {
+  min-width: 88px;
+}
+
+.platform-model-assets-surface
+  .enterprise-data-table.platform-model-assets-table
+  .platform-model-assets-table__col-context,
+.platform-model-assets-surface
+  .enterprise-data-table.platform-model-assets-table
+  .platform-model-assets-table__col-calls,
+.platform-model-assets-surface
+  .enterprise-data-table.platform-model-assets-table
+  .platform-model-assets-table__col-cost7d,
+.platform-model-assets-surface
+  .enterprise-data-table.platform-model-assets-table
+  .platform-model-assets-table__col-action {
+  text-align: right;
+}
+
+.platform-model-assets-surface
+  .platform-model-assets-table
+  thead
+  .platform-model-assets-table__col-action {
+  z-index: 2;
+  background: color-mix(in srgb, var(--secondary) 70%, var(--card));
+}
+
+.platform-model-assets-surface
+  .platform-model-assets-table
+  tbody
+  tr:hover
+  td.platform-model-assets-table__col-action {
+  background: color-mix(in srgb, var(--accent) 4%, var(--card));
+}
+
+@media (max-width: 1200px) {
+  .platform-model-assets-surface .platform-model-assets-summary {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .platform-model-assets-surface .platform-model-assets-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-model-assets-surface .platform-model-assets-topbar {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .platform-model-assets-surface .platform-model-assets-topbar__tools {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .platform-model-assets-surface .platform-model-assets-control,
+  .platform-model-assets-surface .platform-model-assets-search {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: none;
+  }
+}

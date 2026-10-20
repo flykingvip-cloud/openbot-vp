@@ -1,0 +1,83 @@
+{
+  "schema": "task-progress-ledger-e6f26e13795a-cutover/v1",
+  "recordedAt": "2026-08-23T10:41:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-cutover-e6f26e13795a-full-dist-overlay-from-clean-archive",
+  "stamp": "20260823T023758Z",
+  "overlayId": "origin-main-e6f26e13795a-r1",
+  "pr630": {
+    "url": "https://github.com/gmood2008/openbot/pull/630",
+    "reviewDecision": "APPROVED",
+    "mergedAtCutover": false,
+    "note": "Approved pending-SHA docs PR; origin/main had already moved to e6f26e13795a (#627). Cutover used the locked tip, not the #630 squash."
+  },
+  "releaseWorktree": {
+    "path": "/tmp/openbot-progress-release",
+    "lockedOriginMain": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "statusPorcelainCount": 0
+  },
+  "candidate": {
+    "ref": "origin/main",
+    "sha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "subject": "Docs: record ledger final reverify on origin/main 525ee95547 (#627)",
+    "equalsOriginMainAtLock": true,
+    "ledgerImplementationAncestor": "25df222f26971854b00f52a611e810c26e2e8b91"
+  },
+  "gatesBeforeCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "liveThen": "7cd74d4c5c69e7492eb6d624531f27592d6c809a"
+    },
+    "verifyDeliveryAlignmentTipEqualsLive": {
+      "exit": 1,
+      "summary": "FAIL before record: tag minted during this cutover; RELEASE_RECORD Latest still 7cd74d4c until this PR"
+    },
+    "checkSot": {
+      "exit": 20,
+      "note": "Compares LIVE to origin/release/baseline-recovery-20260725. Frozen SoT; not the origin/main overlay veto. User authorized cutover anyway."
+    }
+  },
+  "build": {
+    "source": "git archive e6f26e13795a86084e9f227453ee1d439d25d018",
+    "dir": "/tmp/openbot-progress-build",
+    "install": "pnpm install --frozen-lockfile",
+    "command": "GIT_COMMIT=e6f26e13795a86084e9f227453ee1d439d25d018 pnpm build",
+    "commitMatched": true,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "e6f26e13795a86084e9f227453ee1d439d25d018",
+      "builtAt": "2026-08-23T02:39:22.337Z"
+    },
+    "uiOverlayGate": "OK control-ui overlay gate (tip/full)",
+    "uiEntry": "index-Dpg8P1UR.js",
+    "gatewayTarMd5": "d0a6091532007785e44bbfaab00c313c",
+    "uiTarMd5": "6162614984871332b09a4fea52e2a2f8"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "e6f26e13795a86084e9f227453ee1d439d25d018",
+    "previousSha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "imageId": "ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPin": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisCutover": false
+    }
+  },
+  "provenanceTag": "provenance/sha-e6f26e13795a",
+  "backup": "/root/openbot-maintenance-origin-main-e6f26e13795a-r1-20260823T023758Z",
+  "explicitlyNotDone": [
+    "Did not build from kiro-loom/phase1a-section141-ownership-v2",
+    "Did not recreate the production container",
+    "Did not change Progress Ledger flag",
+    "Did not squash-merge #630 before cutover"
+  ]
+}

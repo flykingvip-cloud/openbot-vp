@@ -1,0 +1,316 @@
+/* Cost & Budget v2 shell (R0 scaffold) */
+
+.cost-budget-v2-page {
+  gap: 14px;
+}
+
+.cost-budget-v2-preview-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 10px 14px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 35%, var(--border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--primary) 6%, var(--card));
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.cost-budget-v2-body {
+  min-height: 160px;
+}
+
+.cost-budget-v2-placeholder__meta {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.cost-budget-v2-placeholder__meta div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.cost-budget-v2-placeholder__meta dt {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cost-budget-v2-plan-orders-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cost-budget-v2-my-plan-panel__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cost-budget-v2-my-plan-panel__card {
+  width: 100%;
+  max-width: none;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.cost-budget-v2-my-plan-panel__card .pricing-v3__card {
+  flex: 1;
+}
+
+.cost-budget-v2-catalog-panel .pricing-v3 {
+  padding: 0;
+  background: transparent;
+  min-height: 0;
+  /* 与平台定价预览一致：按组件容器宽度排布卡片 */
+  container-type: inline-size;
+  container-name: pricing-v3;
+}
+
+.cost-budget-v2-catalog-panel .pricing-v3__container {
+  padding-inline: 0;
+  gap: 20px;
+  max-width: none;
+  width: 100%;
+}
+
+/* 企业目录保留套餐卡 + 付费功能对比 + 常见问题；仅隐藏营销价值条 */
+.cost-budget-v2-catalog-panel .pricing-v3__hero,
+.cost-budget-v2-catalog-panel .pricing-v3__value-strip {
+  display: none;
+}
+
+/*
+ * 企业套餐卡：与平台端一样优先一行平行展示。
+ * - 宽屏 4 卡一行（基础/专业/旗舰/卓越，无试用时）
+ * - 更宽时 5 卡（含试用）
+ * - 中等宽度横向滚动，避免 3+1 换行
+ */
+.cost-budget-v2-catalog-panel .pricing-v3__grid {
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+@container pricing-v3 (min-width: 720px) and (max-width: 1099px) {
+  .cost-budget-v2-catalog-panel .pricing-v3__grid {
+    display: flex !important;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x proximity;
+    grid-template-columns: none !important;
+  }
+
+  .cost-budget-v2-catalog-panel .pricing-v3__card {
+    flex: 0 0 260px;
+    max-width: 280px;
+    scroll-snap-align: start;
+  }
+}
+
+@container pricing-v3 (min-width: 1100px) {
+  .cost-budget-v2-catalog-panel .pricing-v3__grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@container pricing-v3 (min-width: 1360px) {
+  .cost-budget-v2-catalog-panel .pricing-v3__grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+.cost-budget-v2-catalog-panel .pricing-v3__compare-section,
+.cost-budget-v2-catalog-panel .pricing-v3__faq {
+  margin-top: 8px;
+}
+
+.cost-budget-v2-catalog-panel .pricing-v3__compare-table-wrap {
+  max-height: min(60vh, 640px);
+}
+
+.cost-budget-v2-placeholder__meta dd {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 13px;
+}
+
+.cost-budget-v2-change-plan-drawer {
+  width: min(720px, 100vw);
+  max-width: 100%;
+}
+
+.cost-budget-v2-change-plan-drawer__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cost-budget-v2-change-plan-confirm__server-diff {
+  margin-top: 8px;
+}
+
+.cost-budget-v2-change-plan-confirm__server-diff h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.cost-budget-v2-seats-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cost-budget-v2-seats-page .cost-budget-seats-panel-root {
+  margin: 0;
+}
+
+.cost-budget-v2-settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cost-budget-v2-budget-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cost-budget-v2-budget-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+
+.cost-budget-v2-budget-form__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.cost-budget-v2-budget-form__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* Credits reconciliation alert (settings + shared) */
+
+.cost-budget-v2-reconciliation-alert {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+}
+
+.cost-budget-v2-reconciliation-alert__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cost-budget-v2-reconciliation-alert__title-block {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 240px;
+}
+
+.cost-budget-v2-reconciliation-alert__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.cost-budget-v2-reconciliation-alert__subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.cost-budget-v2-reconciliation-alert__badge {
+  flex-shrink: 0;
+}
+
+.cost-budget-v2-reconciliation-alert__kpis .enterprise-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 960px) {
+  .cost-budget-v2-reconciliation-alert__kpis .enterprise-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.cost-budget-v2-reconciliation-alert__issues {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2, var(--bg-subtle));
+}
+
+.cost-budget-v2-reconciliation-alert__issues-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cost-budget-v2-reconciliation-alert__issue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.cost-budget-v2-reconciliation-alert__issue-item {
+  position: relative;
+  padding-left: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cost-budget-v2-reconciliation-alert__issue-item::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--muted);
+}
+
+.cost-budget-v2-reconciliation-alert__footnote {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.cost-budget-v2-budget-form__actions {
+  display: flex;
+  justify-content: flex-start;
+}

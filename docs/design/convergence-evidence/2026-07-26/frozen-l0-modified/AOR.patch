@@ -1,0 +1,25 @@
+diff --git a/ui/src/styles.css b/ui/src/styles.css
+index 83dd9eae29..bae60c3f9c 100755
+--- a/ui/src/styles.css
++++ b/ui/src/styles.css
+@@ -1,19 +1,9 @@
+ @import "./styles/base.css";
+ @import "./styles/icon-foundation.css";
+-@import "./styles/enterprise-foundation.css";
+-@import "./styles/enterprise-components.css";
+-@import "./styles/enterprise-usage-management.css";
+-@import "./styles/enterprise-data-capability.css";
+-@import "./styles/cost-budget.css";
+-@import "./styles/cost-budget-v2.css";
+-@import "./styles/platform-agents-runtime.css";
+-@import "./styles/platform-pricing-comparison.css";
+-@import "./styles/pricing-v3.css";
+ @import "./styles/layout.css";
+ @import "./styles/layout.mobile.css";
+ @import "./styles/components.css";
+-@import "./styles/enterprise-org-archive.css";
+-@import "./styles/workbench.css";
+ @import "./styles/config.css";
+ @import "./styles/auth-home.css";
+ @import "./styles/trial-apply.css";
++@import "./styles/pricing-v3.css";

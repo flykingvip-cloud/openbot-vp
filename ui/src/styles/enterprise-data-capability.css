@@ -1,0 +1,1183 @@
+/* Enterprise Data Capability Center — module styles.
+   The module shipped referencing this BEM namespace without a stylesheet;
+   this file supplies the layout, subnav tabs, KPI grid, asset-landscape graph
+   colors, and panel styling so the surface renders to design spec. */
+
+/* ---- shell ---- */
+/* Subnav (tab strip) migrated to the shared segmented nav
+   (renderEnterpriseSegmentedNav); the home KPI metrics row migrated to the
+   shared KPI grid (renderEnterpriseKpiGrid). See
+   docs/design/enterprise-ui-baseline.md §2.2 / §3.3 (Task 11.1 / 11.4). */
+.enterprise-data-capability__shell {
+  display: grid;
+  gap: 18px;
+}
+
+.enterprise-data-capability__section {
+  display: grid;
+  gap: 16px;
+}
+
+/* ---- module card primitives (baseline migration, Task 11.2 / 11.3) ----
+   Panels reuse the foundation .enterprise-card; these layout/typography
+   helpers replace inline style= and the old generic .card-title/.card-sub. */
+.enterprise-data-capability__panel {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.enterprise-data-capability__panel--flat {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  gap: 12px;
+}
+
+.enterprise-data-capability__panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.enterprise-data-capability__hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.enterprise-data-capability__actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.enterprise-data-capability__actions--center {
+  align-items: center;
+}
+
+/* Matrix / policy rows: single-line actions, no fixed min-width that forces wrap. */
+.edc-policy-list {
+  gap: 6px;
+}
+
+.edc-policy-row {
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+  background: transparent;
+  padding: 12px 4px;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+}
+
+.edc-policy-row:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  border-color: color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.edc-policy-row .enterprise-settings-row__actions {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.edc-policy-row .enterprise-settings-row__actions .btn--sm {
+  min-width: 0;
+  padding-inline: 10px;
+}
+
+.edc-policy-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.edc-matrix-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.edc-metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.edc-metric-row__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.edc-metric-row__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.edc-metric-row__value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.edc-kv-stack {
+  margin: 0;
+  display: grid;
+  gap: 0;
+}
+
+.edc-kv-stack__row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  font-size: 13px;
+}
+
+.edc-kv-stack__row:last-child {
+  border-bottom: 0;
+}
+
+.edc-kv-stack__row dt {
+  margin: 0;
+  color: var(--muted);
+}
+
+.edc-kv-stack__row dd {
+  margin: 0;
+  color: var(--text-strong);
+  word-break: break-word;
+}
+
+.edc-kv-stack__code {
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+}
+
+.edc-lineage-chain {
+  display: grid;
+  gap: 4px;
+}
+
+.edc-lineage-chain__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.edc-empty {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 18px 4px;
+}
+
+.edc-empty strong {
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.edc-empty .muted,
+.edc-empty p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.edc-subnav {
+  margin-bottom: 4px;
+}
+
+.edc-page--governance {
+  display: grid;
+  gap: 12px;
+}
+
+.edc-policy-detail {
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+/* Grouped label + table/list block inside a panel (replaces inline margins). */
+.enterprise-data-capability__subsection {
+  display: grid;
+  gap: 8px;
+}
+
+/* ---- asset landscape graph (SVG four-layer) ---- */
+.enterprise-data-capability__graph-scroll {
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.enterprise-data-capability__graph-svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.enterprise-data-capability__graph-coltitle {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--muted);
+}
+
+.enterprise-data-capability__graph-edge {
+  stroke: color-mix(in srgb, var(--border) 70%, transparent);
+  stroke-width: 1.5;
+}
+
+.enterprise-data-capability__graph-edge--generates,
+.enterprise-data-capability__graph-edge--supplies {
+  stroke: color-mix(in srgb, #7c5cff 45%, transparent);
+}
+
+/* node groups: colored fill by layer tone */
+.enterprise-data-capability__graph-node {
+  cursor: pointer;
+}
+
+.enterprise-data-capability__graph-node rect {
+  stroke-width: 1.5;
+  transition:
+    filter 0.15s ease,
+    stroke-width 0.15s ease;
+}
+
+.enterprise-data-capability__graph-node:hover rect {
+  filter: brightness(1.04);
+}
+
+.enterprise-data-capability__graph-node.is-selected rect {
+  stroke-width: 2.5;
+}
+
+.enterprise-data-capability__graph-nodelabel {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text-strong);
+  pointer-events: none;
+}
+
+.enterprise-data-capability__graph-node--blue rect {
+  fill: color-mix(in srgb, #3b82f6 16%, var(--card));
+  stroke: color-mix(in srgb, #3b82f6 55%, var(--border));
+}
+
+.enterprise-data-capability__graph-node--green rect {
+  fill: color-mix(in srgb, #2fae6a 16%, var(--card));
+  stroke: color-mix(in srgb, #2fae6a 55%, var(--border));
+}
+
+.enterprise-data-capability__graph-node--purple rect {
+  fill: color-mix(in srgb, #7c5cff 16%, var(--card));
+  stroke: color-mix(in srgb, #7c5cff 55%, var(--border));
+}
+
+.enterprise-data-capability__graph-node--amber rect {
+  fill: color-mix(in srgb, #e0a33c 18%, var(--card));
+  stroke: color-mix(in srgb, #e0a33c 58%, var(--border));
+}
+
+/* ---- authorization overview ---- */
+.enterprise-data-capability__authz-grid {
+  gap: 12px;
+}
+
+.enterprise-data-capability__authz-targets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.enterprise-data-capability__authz-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.enterprise-data-capability__authz-target-label {
+  color: var(--text-strong);
+}
+
+.enterprise-data-capability__authz-target-count {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ---- usage board rows ---- */
+.enterprise-data-capability__usage-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.enterprise-data-capability__usage-feed {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- node detail drawer ---- */
+.enterprise-data-capability__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(380px, 92vw);
+  height: 100vh;
+  z-index: 60;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.18);
+}
+
+.enterprise-data-capability__drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.enterprise-data-capability__drawer-kind {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.enterprise-data-capability__drawer-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-strong);
+  margin-top: 2px;
+}
+
+.enterprise-data-capability__drawer-body {
+  padding: 14px 18px;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.enterprise-data-capability__drawer-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.enterprise-data-capability__drawer-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+/* ---- home cockpit: paired summary panels ---- */
+.enterprise-data-capability__home-grid {
+  align-items: start;
+  gap: 16px;
+}
+
+.enterprise-data-capability__home-grid > * {
+  min-width: 0;
+  margin: 0;
+}
+
+/* ---- status summary chips (panel headers) ---- */
+.enterprise-data-capability__status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.enterprise-data-capability__status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  color: var(--muted);
+}
+
+.enterprise-data-capability__status-chip strong {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-strong);
+}
+
+.enterprise-data-capability__status-chip--ok {
+  border-color: color-mix(in srgb, #2fae6a 38%, var(--border));
+  background: color-mix(in srgb, #2fae6a 12%, transparent);
+  color: color-mix(in srgb, #2fae6a 78%, var(--text-strong));
+}
+
+.enterprise-data-capability__status-chip--warn {
+  border-color: color-mix(in srgb, #e0a33c 40%, var(--border));
+  background: color-mix(in srgb, #e0a33c 14%, transparent);
+  color: color-mix(in srgb, #b9812a 82%, var(--text-strong));
+}
+
+.enterprise-data-capability__status-chip--danger {
+  border-color: color-mix(in srgb, #d8533f 40%, var(--border));
+  background: color-mix(in srgb, #d8533f 12%, transparent);
+  color: color-mix(in srgb, #d8533f 82%, var(--text-strong));
+}
+
+.enterprise-data-capability__status-chip--neutral {
+  border-color: var(--border);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  color: var(--muted);
+}
+
+/* ---- inline count badge in panel titles ---- */
+.enterprise-data-capability__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  vertical-align: middle;
+}
+
+/* ---- richer empty states ---- */
+.enterprise-data-capability__empty {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 18px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--muted) 4%, transparent);
+}
+
+.enterprise-data-capability__empty-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 组织架构目标选择器（授权策略 / 能力授予共用）。复用组织目录树，外层仅做布局。 */
+.enterprise-data-capability__org-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.enterprise-data-capability__org-picker-search {
+  max-width: 320px;
+}
+
+.enterprise-data-capability__org-picker-tree {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.enterprise-data-capability__org-picker-selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 自有勾选树（每个部门/岗位前带 checkbox，支持多选）。 */
+.edc-org-tree {
+  padding: 6px;
+}
+
+.edc-org-tree__hint {
+  padding: 2px 6px 8px;
+}
+
+.edc-org-tree__children {
+  padding-left: 18px;
+}
+
+.edc-org-tree__dept {
+  list-style: none;
+}
+
+.edc-org-tree__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Flex summary otherwise paints a huge native ▶ that covers the policy pane. */
+.edc-org-tree__row::-webkit-details-marker {
+  display: none;
+}
+
+.edc-org-tree__row::marker {
+  content: "";
+  font-size: 0;
+}
+
+.edc-org-tree__row:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.edc-org-tree__row.is-checked {
+  background: rgba(127, 127, 127, 0.16);
+}
+
+.edc-org-tree__checkbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.edc-org-tree__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  overflow: hidden;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.edc-org-tree__dept[open] > summary .edc-org-tree__toggle {
+  transform: rotate(90deg);
+}
+
+.edc-org-tree__icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.edc-org-tree__icon-svg,
+.edc-org-tree__toggle-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.edc-org-tree__label {
+  font-size: 13px;
+}
+
+.edc-org-tree__row--dept .edc-org-tree__label {
+  font-weight: 600;
+}
+
+.edc-org-tree__muted {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+/* ---- Add/Edit data source modal: sectioned form (3-段式) ---- */
+.edc-form-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: color-mix(in srgb, var(--muted) 4%, transparent);
+}
+
+.edc-form-section + .edc-form-section {
+  margin-top: 12px;
+}
+
+.edc-form-section__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+
+.edc-form-section__sub {
+  margin-top: -6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Top-of-form banner for connectivity result / save errors (置顶状态气泡). */
+.edc-form-banner {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.edc-form-banner__title {
+  font-weight: 700;
+}
+
+.edc-form-banner__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.edc-form-banner--ok {
+  border-color: color-mix(in srgb, #2fae6a 40%, var(--border));
+  background: color-mix(in srgb, #2fae6a 12%, transparent);
+  color: color-mix(in srgb, #2fae6a 80%, var(--text-strong));
+}
+
+.edc-form-banner--danger {
+  border-color: color-mix(in srgb, #d8533f 42%, var(--border));
+  background: color-mix(in srgb, #d8533f 12%, transparent);
+  color: color-mix(in srgb, #d8533f 84%, var(--text-strong));
+}
+
+.edc-form-banner--info {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text-strong);
+}
+
+/* Password / token input with an inline show/hide (eye) toggle. */
+.edc-secret-input {
+  position: relative;
+  display: block;
+}
+
+.edc-secret-input input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.edc-secret-input__toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 0 var(--radius-sm, 8px) var(--radius-sm, 8px) 0;
+}
+
+.edc-secret-input__toggle:hover:not(:disabled) {
+  color: var(--text-strong);
+}
+
+.edc-secret-input__toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.edc-secret-input__toggle-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+}
+
+.edc-secret-input__toggle-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- visual binding pick-list (capability editor: sources + actions) ---- */
+.edc-pick-list {
+  max-height: 160px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 2px;
+  padding: 4px;
+}
+
+.edc-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.edc-pick-row:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.edc-pick-row.is-checked {
+  background: rgba(127, 127, 127, 0.16);
+}
+
+.edc-pick-row__checkbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.edc-pick-row__icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.edc-pick-row__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.edc-pick-row__body {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.edc-pick-row__label {
+  font-size: 13px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edc-pick-row__meta {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edc-pick-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- projection studio: high-density materialization console ---- */
+.edc-section-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+
+.edc-console-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.edc-console-table thead th {
+  height: 40px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 5%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.edc-console-table tbody td {
+  height: 48px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.edc-console-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.edc-console-table tbody tr:hover {
+  background: rgba(127, 127, 127, 0.05);
+}
+
+.edc-console-table__actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* dual-encoded run-state dot (color + label inside the badge) */
+.edc-run-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: currentColor;
+  vertical-align: middle;
+}
+
+/* section header row with a trailing action (e.g. 新建投影规格) */
+.edc-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.edc-section-head .edc-section-label {
+  margin-bottom: 0;
+}
+
+/* danger-toned KPI value (e.g. 近期物化失败 > 0) */
+.edc-stat-danger {
+  color: var(--danger);
+}
+
+/* ---- approval center: status tabs + info badge + detail row ---- */
+.edc-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.edc-tab {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.edc-tab:hover {
+  color: var(--text-strong);
+}
+
+.edc-tab.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* info-toned status capsule (e.g. 待审批) — shares the shared mesh-badge shape */
+.enterprise-mesh-badge--info {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  color: var(--accent);
+}
+
+/* expandable approval detail row inside the console table */
+.edc-console-table tbody tr.edc-detail-row td {
+  height: auto;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--muted) 4%, transparent);
+}
+
+.edc-detail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- data-source console: overflow menu + secondary cell text ---- */
+/* Scoped opt-out of the table's corner clipping so a row's "···" menu can
+   escape downward without being cut off. Other console tables keep overflow
+   hidden for crisp rounded corners. */
+.edc-console-table--menus {
+  overflow: visible;
+}
+
+/* Secondary line under a cell's primary text (e.g. connector under asset name). */
+.edc-cell-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+/* Row overflow menu: native <details> disclosure, no extra JS state. */
+.edc-row-menu {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.edc-row-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-strong);
+  background: var(--card);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.edc-row-menu__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.edc-row-menu__trigger:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.edc-row-menu[open] .edc-row-menu__trigger {
+  border-color: var(--accent);
+}
+
+.edc-row-menu__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 152px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.edc-row-menu__item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: left;
+  color: var(--text-strong);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.edc-row-menu__item:hover {
+  background: rgba(127, 127, 127, 0.1);
+}
+
+/* ---- home: pending-approval cell (single line; masked id, full text on hover) ---- */
+.edc-approval-cell {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edc-approval-row__cat {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- home: data-authorization targets (stacked lines inside a table cell) ---- */
+.edc-authz-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.edc-authz-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.edc-authz-line__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edc-authz-line__count {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- home panel header row: title (left) + trailing action (right) ---- */
+.edc-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.edc-panel-head .enterprise-data-capability__panel-title,
+.edc-panel-head .enterprise-page__title {
+  margin-bottom: 0;
+}
+
+/* ---- lean list chrome (assets / products / outputs) ---- */
+.edc-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.edc-filter-bar--inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.edc-filter-input,
+.edc-filter-select {
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 13px;
+  padding: 0 10px;
+}
+
+.edc-filter-input {
+  min-width: 200px;
+  flex: 1 1 180px;
+}
+
+.edc-filter-select {
+  min-width: 120px;
+}
+
+.edc-console-table--lean {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.edc-console-table--lean thead th {
+  height: 34px;
+  padding: 0 8px;
+  background: transparent;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  font-weight: 500;
+}
+
+.edc-console-table--lean tbody td {
+  height: 56px;
+  padding: 10px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+  vertical-align: middle;
+}
+
+.edc-console-table--lean tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.edc-console-table--lean tbody tr:hover {
+  background: color-mix(in srgb, var(--muted) 6%, transparent);
+}
+
+.edc-asset-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.01em;
+}
+
+.edc-cell-muted {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.edc-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.edc-row-actions .btn--ghost {
+  color: var(--muted);
+}
+
+.edc-row-actions .btn--ghost:hover {
+  color: var(--text-strong);
+}
+
+.edc-row-menu__item--danger {
+  color: var(--danger);
+}

@@ -1,0 +1,7 @@
+interface:
+  display_name: "WeChat Article"
+  short_description: "Typeset, draft, and package WeChat article publishing workflows."
+  default_prompt: "Use $wechat-article to typeset a WeChat Official Account article, publish it to the draft box, or package the workflow as an enterprise asset. If gzh-design is loaded, use it for the typeset stage first."
+
+policy:
+  allow_implicit_invocation: true

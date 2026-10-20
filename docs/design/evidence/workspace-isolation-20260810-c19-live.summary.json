@@ -1,0 +1,511 @@
+{
+  "evidenceId": "workspace-isolation-20260810-c19-live",
+  "schema": "workspace-isolation-evidence-summary/v1",
+  "probeUtc": "2026-08-10T15:52:40Z",
+  "classification": "controlled-audit-desensitized",
+  "environment": {
+    "host": "<production-gateway-host>",
+    "container": "<gateway-container>",
+    "image": "<gateway-image>",
+    "imageId": "<gateway-image-id>",
+    "buildCommit": "<gateway-build-commit>",
+    "buildOverlay": "<gateway-overlay-id>",
+    "dataSource": "host-bind:{stateDir} -> container:{stateDir}",
+    "multitenant": true,
+    "dataMode": "managed"
+  },
+  "sample": {
+    "tenantId": "<sample-tenant>",
+    "userId": "<sample-user>"
+  },
+  "cluster": {
+    "tenantCount": 11,
+    "userDirCount": 52
+  },
+  "probe": {
+    "scriptPath": "scripts/audit/workspace-isolation-probe.mjs",
+    "scriptSha256": "0029733709845d310190fb6b188e8b35a6bc414fbabd6a16f8a3dffd55f25e2e",
+    "schema": "workspace-isolation-probe/v2",
+    "recentDays": 14,
+    "mode": "summary-redacted",
+    "derivedFrom": "workspace-isolation-probe/v2"
+  },
+  "pathSummary": {
+    "A_employee": {
+      "pathPattern": "{stateDir}/agents/main/employees/<sample-user>/workspace",
+      "exists": true,
+      "deliverableCount": 39,
+      "recentCount": 28
+    },
+    "B_flat_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace",
+      "exists": true,
+      "deliverableCount": 27,
+      "recentCount": 25
+    },
+    "C_agent_main": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/agents/main/workspace",
+      "exists": true,
+      "deliverableCount": 16,
+      "recentCount": 16
+    },
+    "D_skill_l2": {
+      "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace-bot-skill",
+      "exists": true,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "E_skill_host": {
+      "pathPattern": "{stateDir}/workspace-bot-skill",
+      "exists": true,
+      "deliverableCount": 0,
+      "recentCount": 0
+    },
+    "F_canvas": {
+      "pathPattern": "{stateDir}/canvas",
+      "exists": true,
+      "deliverableCount": 0,
+      "recentCount": 0
+    }
+  },
+  "crossClassDuplicateBasenames": {
+    "file-ebaba20845ac.html": [
+      {
+        "classId": "A_employee",
+        "size": 3865,
+        "mtimeUtc": "2026-08-09T12:23:10.505Z",
+        "sha256": "70df61de0d9e52b953e7049fec8dee822f3352abcf8fb1b5f817684e09b2db33",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 3865,
+        "mtimeUtc": "2026-08-09T12:23:10.505Z",
+        "sha256": "70df61de0d9e52b953e7049fec8dee822f3352abcf8fb1b5f817684e09b2db33",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 3865,
+        "mtimeUtc": "2026-08-09T12:23:10.505Z",
+        "sha256": "70df61de0d9e52b953e7049fec8dee822f3352abcf8fb1b5f817684e09b2db33",
+        "hashMode": "full"
+      }
+    ],
+    "file-22588a058eb5.html": [
+      {
+        "classId": "A_employee",
+        "size": 29006,
+        "mtimeUtc": "2026-08-07T04:16:45.622Z",
+        "sha256": "d4ebee85238fcbd3f126c74acfa8ec285c4872eefec95368b0def7e4728ebae9",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 29006,
+        "mtimeUtc": "2026-08-07T04:16:45.622Z",
+        "sha256": "d4ebee85238fcbd3f126c74acfa8ec285c4872eefec95368b0def7e4728ebae9",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 29006,
+        "mtimeUtc": "2026-08-07T04:16:45.622Z",
+        "sha256": "d4ebee85238fcbd3f126c74acfa8ec285c4872eefec95368b0def7e4728ebae9",
+        "hashMode": "full"
+      }
+    ],
+    "file-b46ee2265997.xlsx": [
+      {
+        "classId": "A_employee",
+        "size": 10803,
+        "mtimeUtc": "2026-08-04T03:30:30.592Z",
+        "sha256": "8eb414add1050aa46fe178ebdba00dfc4a8f2d6666c6100aa7645c3956770dda",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 10803,
+        "mtimeUtc": "2026-08-04T03:30:30.592Z",
+        "sha256": "8eb414add1050aa46fe178ebdba00dfc4a8f2d6666c6100aa7645c3956770dda",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 10803,
+        "mtimeUtc": "2026-08-04T03:30:30.592Z",
+        "sha256": "8eb414add1050aa46fe178ebdba00dfc4a8f2d6666c6100aa7645c3956770dda",
+        "hashMode": "full"
+      }
+    ],
+    "file-8a981a419218.html": [
+      {
+        "classId": "A_employee",
+        "size": 29477,
+        "mtimeUtc": "2026-08-09T12:19:57.690Z",
+        "sha256": "d6e3d8300759beb4bf3119c809267516b3417404c6e2e578285674ac18a31b5b",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 29477,
+        "mtimeUtc": "2026-08-09T12:19:57.690Z",
+        "sha256": "d6e3d8300759beb4bf3119c809267516b3417404c6e2e578285674ac18a31b5b",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 29477,
+        "mtimeUtc": "2026-08-09T12:19:57.690Z",
+        "sha256": "d6e3d8300759beb4bf3119c809267516b3417404c6e2e578285674ac18a31b5b",
+        "hashMode": "full"
+      }
+    ],
+    "file-ee4bb663f778.html": [
+      {
+        "classId": "A_employee",
+        "size": 17635,
+        "mtimeUtc": "2026-08-07T04:30:20.506Z",
+        "sha256": "7e0ce1ae5eea584d34ffda06b84ae10652693d4d08b49a5a9e288c476927b19a",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 17635,
+        "mtimeUtc": "2026-08-07T04:30:20.506Z",
+        "sha256": "7e0ce1ae5eea584d34ffda06b84ae10652693d4d08b49a5a9e288c476927b19a",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 17635,
+        "mtimeUtc": "2026-08-07T04:30:20.506Z",
+        "sha256": "7e0ce1ae5eea584d34ffda06b84ae10652693d4d08b49a5a9e288c476927b19a",
+        "hashMode": "full"
+      }
+    ],
+    "file-c8a71e80b1f7.html": [
+      {
+        "classId": "A_employee",
+        "size": 25956,
+        "mtimeUtc": "2026-08-07T04:33:42.113Z",
+        "sha256": "0a0344872cdf5efcc66f8143f04bf54f120dddc5c09fefc649d735e760d5fe91",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 25956,
+        "mtimeUtc": "2026-08-07T04:33:42.113Z",
+        "sha256": "0a0344872cdf5efcc66f8143f04bf54f120dddc5c09fefc649d735e760d5fe91",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 25956,
+        "mtimeUtc": "2026-08-07T04:33:42.113Z",
+        "sha256": "0a0344872cdf5efcc66f8143f04bf54f120dddc5c09fefc649d735e760d5fe91",
+        "hashMode": "full"
+      }
+    ],
+    "file-5d567f9859d4.docx": [
+      {
+        "classId": "A_employee",
+        "size": 42535,
+        "mtimeUtc": "2026-08-09T12:14:31.561Z",
+        "sha256": "f66aecdfe6527c864cb182ff7b5ea8024a662b86faf6ef64a2032d5ccfb5e4d7",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 42535,
+        "mtimeUtc": "2026-08-09T12:14:31.561Z",
+        "sha256": "f66aecdfe6527c864cb182ff7b5ea8024a662b86faf6ef64a2032d5ccfb5e4d7",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 42535,
+        "mtimeUtc": "2026-08-09T12:14:31.561Z",
+        "sha256": "f66aecdfe6527c864cb182ff7b5ea8024a662b86faf6ef64a2032d5ccfb5e4d7",
+        "hashMode": "full"
+      }
+    ],
+    "file-07c818d5fb41.pdf": [
+      {
+        "classId": "A_employee",
+        "size": 1327500,
+        "mtimeUtc": "2026-08-09T12:20:45.694Z",
+        "sha256": "56ef4d15235c019468b80e8f7a2333d04a1d8dc35e8f905de0b2dd17b6ec22b7",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 1327500,
+        "mtimeUtc": "2026-08-09T12:20:45.694Z",
+        "sha256": "56ef4d15235c019468b80e8f7a2333d04a1d8dc35e8f905de0b2dd17b6ec22b7",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 1327500,
+        "mtimeUtc": "2026-08-09T12:20:45.694Z",
+        "sha256": "56ef4d15235c019468b80e8f7a2333d04a1d8dc35e8f905de0b2dd17b6ec22b7",
+        "hashMode": "full"
+      }
+    ],
+    "file-9a0c8669147f.pptx": [
+      {
+        "classId": "A_employee",
+        "size": 55483,
+        "mtimeUtc": "2026-08-07T04:03:27.985Z",
+        "sha256": "c1476463fea280242ecae71ebff11a842dac5c0c8dfc694e87013c3a13acd8cd",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 55483,
+        "mtimeUtc": "2026-08-07T04:03:27.985Z",
+        "sha256": "c1476463fea280242ecae71ebff11a842dac5c0c8dfc694e87013c3a13acd8cd",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 55483,
+        "mtimeUtc": "2026-08-07T04:03:27.985Z",
+        "sha256": "c1476463fea280242ecae71ebff11a842dac5c0c8dfc694e87013c3a13acd8cd",
+        "hashMode": "full"
+      }
+    ],
+    "file-ec11a387251d.pdf": [
+      {
+        "classId": "A_employee",
+        "size": 7286211,
+        "mtimeUtc": "2026-08-07T04:16:59.304Z",
+        "sha256": "partial1MiB:a9c9e48621f1ceeb984a834d66c9877e6919bc081c3555b94120f00033b0bb24",
+        "hashMode": "partial1MiB"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 7286211,
+        "mtimeUtc": "2026-08-07T04:16:59.304Z",
+        "sha256": "partial1MiB:a9c9e48621f1ceeb984a834d66c9877e6919bc081c3555b94120f00033b0bb24",
+        "hashMode": "partial1MiB"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 7286211,
+        "mtimeUtc": "2026-08-07T04:16:59.304Z",
+        "sha256": "partial1MiB:a9c9e48621f1ceeb984a834d66c9877e6919bc081c3555b94120f00033b0bb24",
+        "hashMode": "partial1MiB"
+      }
+    ],
+    "file-23d23566e9b5.pptx": [
+      {
+        "classId": "A_employee",
+        "size": 68130,
+        "mtimeUtc": "2026-08-07T03:27:08.686Z",
+        "sha256": "ca76d32f77e31f8db13a0f24a524b8d62d6557fdebb42e3e4dfcd774af358356",
+        "hashMode": "full"
+      },
+      {
+        "classId": "A_employee",
+        "size": 68130,
+        "mtimeUtc": "2026-08-07T03:33:27.862Z",
+        "sha256": "ca76d32f77e31f8db13a0f24a524b8d62d6557fdebb42e3e4dfcd774af358356",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 68130,
+        "mtimeUtc": "2026-08-07T03:27:08.686Z",
+        "sha256": "ca76d32f77e31f8db13a0f24a524b8d62d6557fdebb42e3e4dfcd774af358356",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 68130,
+        "mtimeUtc": "2026-08-07T03:27:08.686Z",
+        "sha256": "ca76d32f77e31f8db13a0f24a524b8d62d6557fdebb42e3e4dfcd774af358356",
+        "hashMode": "full"
+      }
+    ],
+    "file-e05ac6faaf87.pdf": [
+      {
+        "classId": "A_employee",
+        "size": 1429011,
+        "mtimeUtc": "2026-08-07T04:33:51.562Z",
+        "sha256": "8e71b4193ca2e28c4cf1c65cf2dd76871b8b440dbae57b942cc019776c6b36b1",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 1429011,
+        "mtimeUtc": "2026-08-07T04:33:51.562Z",
+        "sha256": "8e71b4193ca2e28c4cf1c65cf2dd76871b8b440dbae57b942cc019776c6b36b1",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 1429011,
+        "mtimeUtc": "2026-08-07T04:33:51.562Z",
+        "sha256": "8e71b4193ca2e28c4cf1c65cf2dd76871b8b440dbae57b942cc019776c6b36b1",
+        "hashMode": "full"
+      }
+    ],
+    "file-6b3881351d28.docx": [
+      {
+        "classId": "A_employee",
+        "size": 44240,
+        "mtimeUtc": "2026-08-07T04:29:23.398Z",
+        "sha256": "60b2fbbeeb5cb24e498bac7168c66180f095e177faf69bf46f192023f11c8596",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 44240,
+        "mtimeUtc": "2026-08-07T04:29:23.398Z",
+        "sha256": "60b2fbbeeb5cb24e498bac7168c66180f095e177faf69bf46f192023f11c8596",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 44240,
+        "mtimeUtc": "2026-08-07T04:29:23.398Z",
+        "sha256": "60b2fbbeeb5cb24e498bac7168c66180f095e177faf69bf46f192023f11c8596",
+        "hashMode": "full"
+      }
+    ],
+    "file-11e15c9a1808.pdf": [
+      {
+        "classId": "A_employee",
+        "size": 1211368,
+        "mtimeUtc": "2026-08-07T04:30:31.227Z",
+        "sha256": "ee082b9a0c3bede1b03e711a2d7d607dad0229a03d5d0c8320523a6cf8f85f59",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 1211368,
+        "mtimeUtc": "2026-08-07T04:30:31.227Z",
+        "sha256": "ee082b9a0c3bede1b03e711a2d7d607dad0229a03d5d0c8320523a6cf8f85f59",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 1211368,
+        "mtimeUtc": "2026-08-07T04:30:31.227Z",
+        "sha256": "ee082b9a0c3bede1b03e711a2d7d607dad0229a03d5d0c8320523a6cf8f85f59",
+        "hashMode": "full"
+      }
+    ],
+    "file-c3b6cd577151.html": [
+      {
+        "classId": "A_employee",
+        "size": 10048,
+        "mtimeUtc": "2026-07-31T00:53:31.344Z",
+        "sha256": "e29af0cdc1896516bc019473e4e5138b30e2d64461502ad3663f8d3e6d5edeb9",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 10048,
+        "mtimeUtc": "2026-07-31T00:53:31.344Z",
+        "sha256": "e29af0cdc1896516bc019473e4e5138b30e2d64461502ad3663f8d3e6d5edeb9",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 10048,
+        "mtimeUtc": "2026-07-31T00:53:31.344Z",
+        "sha256": "e29af0cdc1896516bc019473e4e5138b30e2d64461502ad3663f8d3e6d5edeb9",
+        "hashMode": "full"
+      }
+    ],
+    "file-764c5c3c237b.xlsx": [
+      {
+        "classId": "A_employee",
+        "size": 11186,
+        "mtimeUtc": "2026-08-04T03:30:33.858Z",
+        "sha256": "f03250bf97db595a855bedb3b6af9feab82b867c23af408427860928eb4fbbb7",
+        "hashMode": "full"
+      },
+      {
+        "classId": "B_flat_l2",
+        "size": 11186,
+        "mtimeUtc": "2026-08-04T03:30:33.858Z",
+        "sha256": "f03250bf97db595a855bedb3b6af9feab82b867c23af408427860928eb4fbbb7",
+        "hashMode": "full"
+      },
+      {
+        "classId": "C_agent_main",
+        "size": 11186,
+        "mtimeUtc": "2026-08-04T03:30:33.858Z",
+        "sha256": "f03250bf97db595a855bedb3b6af9feab82b867c23af408427860928eb4fbbb7",
+        "hashMode": "full"
+      }
+    ]
+  },
+  "c19Assertions": {
+    "schema": "workspace-isolation-c19-assertions/v1",
+    "roleSource": "binding_manifest",
+    "bindingManifestPath": "{stateDir}/.openbot-c19-bindings.json",
+    "writableCanonicalByOwnerScope": [
+      {
+        "ownerScopeKind": "user_owned",
+        "canonicalClassId": "B_flat_l2",
+        "pathPattern": "{stateDir}/tenants/<sample-tenant>/users/<sample-user>/OpenBot/workspace",
+        "recentDeliverableWrites": 25
+      }
+    ],
+    "legacyRootRoles": {
+      "B_flat_l2": "canonical_writable",
+      "A_employee": "quarantined",
+      "C_agent_main": "read_only"
+    },
+    "unknownOwnership": {
+      "count": 0,
+      "isolated": true,
+      "source": "binding_manifest"
+    },
+    "sharedRootRecentWrites": {
+      "D_skill_l2": 0,
+      "E_skill_host": 0,
+      "F_canvas": 0,
+      "total": 0,
+      "pass": true
+    },
+    "crossTenantEnumeration": {
+      "fileContentScanTenantCount": 1,
+      "sampleTenantScoped": true,
+      "clusterTenantCount": 11,
+      "clusterUserDirCount": 52,
+      "pass": true,
+      "note": "Deliverable hashing is limited to SAMPLE_TENANT/SAMPLE_USER class roots; tenant/user counts are name-only readdir metadata."
+    },
+    "probeScriptSha256": "0029733709845d310190fb6b188e8b35a6bc414fbabd6a16f8a3dffd55f25e2e",
+    "observationalWriters": ["A_employee", "B_flat_l2", "C_agent_main"],
+    "errorsSampled": 0,
+    "gates": {
+      "uniqueWritableCanonical": true,
+      "legacyRootsClosed": true,
+      "sharedRootWritesZero": true,
+      "unknownOwnershipIsolated": true,
+      "noCrossTenantContentEnumeration": true,
+      "allPass": true,
+      "failures": []
+    }
+  },
+  "stats": {
+    "bytesRead": 16239198,
+    "errorCount": 0,
+    "truncated": false,
+    "truncationReasons": []
+  },
+  "controlledRawBundle": {
+    "location": "<controlled-audit-store>",
+    "bundleId": "workspace-isolation-20260810-c19-live-raw",
+    "note": "Full host/container/user identifiers and absolute paths remain outside the git repository."
+  },
+  "summarySha256Algorithm": "UTF-8 bytes of JSON.stringify(summaryWithoutSha, null, 2) + '\\n' where summaryWithoutSha omits summarySha256; Node/JSON key insertion order as produced by this script.",
+  "summarySha256": "7d402e298c9ea48ab0712df2f98dc5c0de5661ebf28c8fe94f1984ac53c19305"
+}

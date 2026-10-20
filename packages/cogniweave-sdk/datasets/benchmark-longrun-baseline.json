@@ -1,0 +1,33 @@
+{
+  "profile": "longrun",
+  "dataset": "datasets/mvp-core-eval.json",
+  "generatedAt": "2026-04-09T00:00:00.000Z",
+  "warmupIterations": 30,
+  "measureIterations": 1000,
+  "totalReasonOps": 1000,
+  "totalDistillationOps": 1000,
+  "metrics": {
+    "reasonLatencyMs": {
+      "min": 0.11987499999997908,
+      "avg": 0.20963512299999915,
+      "p50": 0.19062500000001137,
+      "p95": 0.41420800000000213,
+      "max": 2.383624999999995
+    },
+    "graphQueryLatencyMs": {
+      "min": 0.00016599999997879422,
+      "avg": 0.00037761900000108994,
+      "p50": 0.0002920000000017353,
+      "p95": 0.0006659999999669708,
+      "max": 0.020624999999995453
+    },
+    "distillationLatencyMs": {
+      "min": 0.029500000000041382,
+      "avg": 0.06121606800000018,
+      "p50": 0.05099999999998772,
+      "p95": 0.097458999999958,
+      "max": 0.8911249999999882
+    },
+    "distillationThroughputOpsPerSec": 16335.58039042947
+  }
+}

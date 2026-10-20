@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "combinations": [
+    {
+      "id": "minimum-tool-kernel",
+      "purpose": "Provide a safe, auditable base for agent execution.",
+      "tools": ["workspace", "shell", "web", "mcp-connectors", "approval", "receipt"],
+      "requiredControls": [
+        "least-privilege",
+        "structured-input",
+        "timeouts",
+        "approval-before-side-effect",
+        "execution-receipt"
+      ]
+    },
+    {
+      "id": "office-workbench",
+      "purpose": "Research, analyze, create, and visually verify office deliverables.",
+      "tools": [
+        "workspace",
+        "web",
+        "mcp-connectors",
+        "office-artifacts",
+        "visualization",
+        "approval",
+        "receipt"
+      ],
+      "requiredControls": [
+        "source-citations",
+        "preserve-originals",
+        "render-and-review",
+        "connector-scope"
+      ]
+    },
+    {
+      "id": "automation-operations",
+      "purpose": "Run repeatable workflows with schedules, retries, notifications, and evidence.",
+      "tools": ["automation", "mcp-connectors", "task-coordination", "approval", "receipt"],
+      "requiredControls": [
+        "idempotency",
+        "retry-policy",
+        "stopping-condition",
+        "notification-policy",
+        "run-history"
+      ]
+    },
+    {
+      "id": "interactive-application-control",
+      "purpose": "Operate web and desktop applications with observable verification.",
+      "tools": ["browser", "computer-use", "approval", "receipt"],
+      "requiredControls": [
+        "semantic-first",
+        "target-window-check",
+        "before-after-evidence",
+        "approval-for-consequential-actions"
+      ]
+    }
+  ]
+}

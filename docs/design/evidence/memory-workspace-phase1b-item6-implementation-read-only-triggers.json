@@ -1,0 +1,9 @@
+{
+  "schema": "memory-workspace-phase1b-item6-implementation-read-only-triggers/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-read-only-triggers.json",
+  "kind": "item6-implementation-read-only-triggers",
+  "item6": "not-met",
+  "productionSqliteWrite": false,
+  "runtime": "src/memory/item6-authorized-sqlite-read.ts",
+  "note": "Item 6 step-7 read-only sqlite_master trigger list on authorized sqlite."
+}

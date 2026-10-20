@@ -1,0 +1,88 @@
+{
+  "title": "ConversationTask origin/main production sync and browser E2E (seq82)",
+  "ledgerSeq": 82,
+  "actor": "cursor-composer",
+  "utc": "2026-09-11T22:24:00Z",
+  "candidateSha": "f0dec722277770791a939c0a456242ce62d77763",
+  "liveSha": "f0dec722277770791a939c0a456242ce62d77763",
+  "requiredCommitsPresent": {
+    "bbf7c6c57e": "ConversationTask activation",
+    "6e5cacc1f1": "explicit multi-step L2 qualification"
+  },
+  "imageTag": "rc-amd64-provenance-f0dec72227",
+  "imageDigest": "sha256:1767b3578d65e0df7ad7d035fd12f44c76f11a7db27c7cfd012185e0c5068fcd",
+  "provenanceTag": "provenance/sha-f0dec7222777",
+  "controlUiEntry": "index-iwByD4J0.js",
+  "healthz": { "ok": true, "status": "live" },
+  "readyz": { "ready": true, "failing": [] },
+  "hmac": {
+    "keySet": true,
+    "keyBits": 256,
+    "keyId": "ct-2026-09-11-host",
+    "inPodmanConfigEnv": false
+  },
+  "allowlist": {
+    "enabledCount": 1,
+    "fingerprintPrefix": "7a3e6b16cb75f48f"
+  },
+  "flags": {
+    "activation": "on",
+    "detection": "on",
+    "qualification": "on",
+    "projection": "off",
+    "authorization": "off"
+  },
+  "gates": {
+    "verifyForwardOnlyPreCutover": "pass",
+    "verifyDeliveryAlignmentPreCutover": "expected-fail-missing-tag-and-seq80-gap",
+    "verifyLivePostCutover": "pass"
+  },
+  "activation": {
+    "firstBrowserMultiStep": "activated",
+    "workbenchProgressStrip": {
+      "firstDisplay": true,
+      "labelSample": "0/1 项验收已满足 · 正在执行",
+      "refreshRestore": true,
+      "offlineOnlineReconnectRestore": true
+    },
+    "replaySameGoalViaChat": "already_active",
+    "chatSendBehavior": "unchanged_normal_reply"
+  },
+  "rpc": {
+    "conversationTaskActiveGet": {
+      "status": "ok",
+      "observedCount": 4,
+      "summary": "returns active task + progress for allowlisted session; no ids logged"
+    }
+  },
+  "tasks": {
+    "totalOnAllowlistedTenant": 2,
+    "activeOnAllowlistedTenant": 2,
+    "activeOnOtherTenantStores": 0
+  },
+  "ledger": {
+    "planSeededCount": 11,
+    "planSeededDeltaFromBrowserActivation": 1
+  },
+  "negatives": {
+    "ordinaryQa": "not_detected",
+    "shortAction": "not_eligible",
+    "reminder": "not_eligible",
+    "scheduled": "not_detected",
+    "nonAllowlistTenant": "skipped_no_active_tasks_on_other_stores"
+  },
+  "networkAudit": {
+    "rpcSuccess": true,
+    "plaintextHmacInTraffic": false,
+    "rawTenantConversationMessageIdsInUiTraffic": false,
+    "extraChatSendFromProgressPoll": false,
+    "agentMissionInvoked": false
+  },
+  "safetyContainer": "openbot-gateway-rc-prev-acb87127d2-safety",
+  "rollback": {
+    "containerStartStop": "pass",
+    "entrypoint": "/run/ct-shadow/entrypoint.sh",
+    "priorImageTag": "rc-amd64-provenance-acb87127d2"
+  },
+  "notes": "Single internal test tenant only. No HMAC value, raw tenant IDs, conversation IDs, message IDs, or user message text recorded. Browser visual acceptance completed on https://www.openbot.love/ for allowlisted employee session. Isolated in-container dist import E2E script unavailable (bundled dist); chat-path replay and negatives verified instead."
+}

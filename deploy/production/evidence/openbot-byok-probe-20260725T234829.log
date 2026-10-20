@@ -1,0 +1,82 @@
+=== BYOK deploy inventory probe ===
+2026-07-25T23:48:29+08:00
+-- methods in UI bundle --
+enterprise-model-catalog.disable
+enterprise-model-catalog.discover
+enterprise-model-catalog.enable
+enterprise-model-catalog.list
+enterprise-model-catalog.register
+enterprise-model-catalog.update
+enterprise-model-grant.grant
+enterprise-model-grant.grantBatch
+enterprise-model-grant.list
+enterprise-model-grant.revoke
+enterprise-model-provider.create
+enterprise-model-provider.delete
+enterprise-model-provider.disable
+enterprise-model-provider.list
+enterprise-model-provider.rotate-credential
+enterprise-model-provider.test
+enterprise-model-provider.update
+-- methods in gateway chunks --
+enterprise-model-catalog.disable
+enterprise-model-catalog.discover
+enterprise-model-catalog.enable
+enterprise-model-catalog.list
+enterprise-model-catalog.register
+enterprise-model-catalog.ts
+enterprise-model-catalog.update
+enterprise-model-grant.grant
+enterprise-model-grant.grantBatch
+enterprise-model-grant.list
+enterprise-model-grant.revoke
+enterprise-model-provider.create
+enterprise-model-provider.delete
+enterprise-model-provider.disable
+enterprise-model-provider.list
+enterprise-model-provider.rotate-credential
+enterprise-model-provider.test
+enterprise-model-provider.ts
+enterprise-model-provider.update
+
+🐲 OpenBot 2026.7.12-rc.2 (127fc54) — I don't judge, but your missing API keys are absolutely judging you.
+
+Usage: openbot [options] [command]
+
+Options:
+  --dev                Dev profile: isolate state under ~/.openbot-dev, default
+                       gateway port 19001, and shift derived ports
+                       (browser/canvas)
+  -h, --help           Display help for command
+  --log-level <level>  Global log level override for file + console
+                       (silent|fatal|error|warn|info|debug|trace)
+  --no-color           Disable ANSI colors
+  --profile <name>     Use a named profile (isolates
+                       OPENBOT_STATE_DIR/OPENBOT_CONFIG_PATH under
+                       ~/.openbot-<name>)
+  -V, --version        output the version number
+
+Commands:
+  Hint: commands suffixed with * have subcommands. Run <command> --help for details.
+  acp *                Agent Control Protocol tools
+  agent                Run one agent turn via the Gateway
+  agents *             Manage isolated agents (workspaces, auth, routing)
+  approvals *          Manage exec approvals (gateway or node host)
+  backup *             Create and verify local backup archives for OpenBot state
+  browser *            Manage OpenBot's dedicated browser (Chrome/Chromium)
+  channels *           Manage connected chat channels (Telegram, Discord, etc.)
+  clawbot *            Legacy clawbot command aliases
+  completion           Generate shell completion script
+  config *             Non-interactive config helpers
+                       (get/set/unset/file/validate). Default: starts setup
+                       wizard.
+  configure            Interactive setup wizard for credentials, channels,
+                       gateway, and agent defaults
+  cron *               Manage cron jobs via the Gateway scheduler
+  daemon *             Gateway service (legacy alias)
+  dashboard            Open the Control UI with your current token
+  data *               OpenBot Data Space (info, migrate, export)
+  devices *            Device pairing + token management
+  directory *          Lookup contact and group IDs (self, peers, groups) for
+=== tenant BYOK store files (names only) ===
+LOG=/root/openbot-byok-probe-20260725T234829.log

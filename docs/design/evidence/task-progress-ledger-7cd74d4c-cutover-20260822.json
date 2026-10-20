@@ -1,0 +1,79 @@
+{
+  "schema": "task-progress-ledger-7cd74d4c-cutover/v1",
+  "recordedAt": "2026-08-22T23:10:00+08:00",
+  "recordedBy": "cursor-grok",
+  "task": "task-progress-ledger",
+  "authorizedBy": "user",
+  "decision": "production-cutover-7cd74d4c-full-dist-overlay-from-clean-worktree",
+  "stamp": "20260822T150915Z",
+  "overlayId": "origin-main-7cd74d4c-item7-s18-r1",
+  "releaseWorktree": {
+    "path": "/tmp/openbot-release-wt",
+    "detachedHead": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "statusPorcelainCount": 0,
+    "fetchExit": 0,
+    "fetchHeadWritable": true
+  },
+  "candidate": {
+    "ref": "origin/main",
+    "sha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "subject": "Merge pull request #610 from gmood2008/cursor-data-governance/phase1b-item7-retirement-batch4-s18"
+  },
+  "gatesBeforeCutover": {
+    "verifyForwardOnly": {
+      "exit": 0,
+      "verdict": "allow",
+      "liveThen": "affda8bce88939e42c57000896c13fc8a457f536"
+    },
+    "verifyDeliveryAlignmentDefault": {
+      "exit": 0,
+      "note": "Unparameterized script still checks 2026-07 rc-convergence defaults, not current LIVE."
+    },
+    "verifyDeliveryAlignmentLiveVsCandidate": {
+      "exit": 1,
+      "summary": "PASS=5 FAIL=3 before minting provenance/sha-7cd74d4c5c69; origin/main RELEASE_RECORD lacked Source revision for then-live affda8bc"
+    },
+    "checkSot": {
+      "exit": 20,
+      "note": "Compares LIVE to origin/release/baseline-recovery-20260725. Frozen SoT; not the origin/main overlay veto."
+    }
+  },
+  "build": {
+    "source": "git archive 7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "dir": "/tmp/openbot-release",
+    "install": "pnpm install --frozen-lockfile",
+    "command": "GIT_COMMIT=7cd74d4c pnpm build",
+    "commitMatched": true,
+    "buildInfo": {
+      "version": "2026.7.12-rc.2",
+      "commit": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+      "builtAt": "2026-08-22T15:09:15.742Z"
+    },
+    "uiOverlayGate": "OK control-ui overlay gate (tip/full)",
+    "uiEntry": "index-Dpg8P1UR.js",
+    "gatewayTarMd5": "4c781ddb163f08a0a0c6d0a8fdeb7aae",
+    "uiTarMd5": "e449cf305b3b87b572d0ad8e791c8ea3"
+  },
+  "live": {
+    "container": "openbot-gateway-rc",
+    "sha": "7cd74d4c5c69e7492eb6d624531f27592d6c809a",
+    "previousSha": "affda8bce88939e42c57000896c13fc8a457f536",
+    "image": "localhost/openbot:rc-amd64-provenance-5c221b9ec3",
+    "healthz": "live",
+    "readyz": "ready",
+    "uiPin": "index-Dpg8P1UR.js",
+    "progressLedger": {
+      "configEnabled": true,
+      "envDocker": "1",
+      "processEnv": "UNSET",
+      "changedThisCutover": false
+    }
+  },
+  "provenanceTag": "provenance/sha-7cd74d4c5c69",
+  "backup": "/root/openbot-maintenance-origin-main-7cd74d4c-item7-s18-r1-20260822T150915Z",
+  "explicitlyNotDone": [
+    "Did not build from kiro-loom/phase1a-section141-ownership-v2",
+    "Did not recreate the production container",
+    "Did not change Progress Ledger flag"
+  ]
+}

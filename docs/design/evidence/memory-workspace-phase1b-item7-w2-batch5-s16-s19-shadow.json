@@ -1,0 +1,17 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w2-batch5-s16-s19-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w2-batch5-s16-s19-shadow.json",
+  "kind": "item7-w2-batch5-dark-dual-read-shadow",
+  "wave": "W2-write-callers",
+  "batch": 5,
+  "sitesWired": [
+    "S16-chat-mention-workspace",
+    "S18-skills-status-workspace",
+    "S19-skills-install-workspace"
+  ],
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "productionWrite": "legacy-only",
+  "sidecars": ["src/gateway/chat-w2-shadow.ts", "src/gateway/agents-w2-shadow.ts"],
+  "note": "S17 (P4 catalog synthesis) intentionally excluded — W3 wave."
+}

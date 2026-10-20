@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>消费品企业数智化自评器 · Before / After 双雷达诊断</title>
+    <style>
+      :root {
+        --bg: #f6f8fb;
+        --card: #ffffff;
+        --ink: #0e1a2b;
+        --sub: #4b5c72;
+        --weak: #93a1b5;
+        --line: #e3e8f0;
+        --navy: #123a7a;
+        --blue: #2563eb;
+        --sky: #38bdf8;
+        --gold: #ae8b4c;
+        --now: #2563eb;
+        --after: #ae8b4c;
+        --ok: #16a34a;
+        --warn: #dc2626;
+      }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        margin: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.6;
+      }
+      .wrap {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 18px 16px 64px;
+      }
+      header.hero {
+        background: linear-gradient(135deg, #123a7a, #2563eb);
+        color: #fff;
+        border-radius: 18px;
+        padding: 26px 22px;
+        margin-bottom: 18px;
+      }
+      header.hero h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        letter-spacing: 0.5px;
+      }
+      header.hero p {
+        margin: 0;
+        font-size: 13px;
+        opacity: 0.92;
+      }
+      .badges {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .badge {
+        background: rgba(255, 255, 255, 0.16);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 18px;
+        margin-bottom: 16px;
+      }
+      .card h2 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .card h2 .num {
+        background: var(--navy);
+        color: #fff;
+        width: 24px;
+        height: 24px;
+        border-radius: 7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        flex: 0 0 auto;
+      }
+      .m-sub {
+        color: var(--sub);
+        font-size: 12.5px;
+        margin: 0 0 14px;
+      }
+      .q {
+        margin-bottom: 16px;
+      }
+      .q:last-child {
+        margin-bottom: 0;
+      }
+      .q-title {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .q-title .tag {
+        display: inline-block;
+        font-size: 11px;
+        color: var(--navy);
+        background: #eaf1ff;
+        border: 1px solid #d6e3ff;
+        border-radius: 6px;
+        padding: 1px 7px;
+        margin-right: 7px;
+        font-weight: 500;
+      }
+      .scale {
+        display: flex;
+        gap: 6px;
+      }
+      .scale button {
+        flex: 1;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--sub);
+        border-radius: 9px;
+        padding: 9px 0;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: 0.15s;
+      }
+      .scale button:hover {
+        border-color: var(--sky);
+      }
+      .scale button.on {
+        background: var(--blue);
+        border-color: var(--blue);
+        color: #fff;
+      }
+      .scale button small {
+        display: block;
+        font-size: 9px;
+        font-weight: 500;
+        opacity: 0.8;
+        margin-top: 2px;
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        font-size: 11.5px;
+        color: var(--sub);
+        margin-top: 8px;
+      }
+      .legend b {
+        color: var(--ink);
+      }
+      .prog {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: rgba(246, 248, 251, 0.92);
+        backdrop-filter: blur(6px);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 14px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+      }
+      .prog .bar {
+        flex: 1;
+        height: 8px;
+        background: var(--line);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+      .prog .bar i {
+        display: block;
+        height: 100%;
+        width: 0;
+        background: linear-gradient(90deg, var(--sky), var(--blue));
+        transition: width 0.3s;
+      }
+      .btn {
+        display: inline-block;
+        border: none;
+        border-radius: 11px;
+        padding: 13px 22px;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        color: #fff;
+        background: linear-gradient(135deg, var(--navy), var(--blue));
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+      }
+      .btn.ghost {
+        background: #fff;
+        color: var(--navy);
+        border: 1px solid var(--line);
+        box-shadow: none;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 4px;
+      }
+      .radars {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .radar-box {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        text-align: center;
+      }
+      .radar-box h3 {
+        margin: 2px 0 2px;
+        font-size: 14px;
+      }
+      .radar-box .cap {
+        font-size: 11.5px;
+        color: var(--sub);
+        margin-bottom: 6px;
+      }
+      canvas {
+        width: 100%;
+        height: 300px;
+        display: block;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin: 6px 0 14px;
+      }
+      .stat {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        text-align: center;
+      }
+      .stat .v {
+        font-size: 24px;
+        font-weight: 800;
+        color: var(--navy);
+      }
+      .stat .v.gold {
+        color: var(--gold);
+      }
+      .stat .l {
+        font-size: 11.5px;
+        color: var(--sub);
+        margin-top: 2px;
+      }
+      table.detail {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+        margin-top: 6px;
+      }
+      table.detail th,
+      table.detail td {
+        border: 1px solid var(--line);
+        padding: 8px 9px;
+        text-align: center;
+      }
+      table.detail th {
+        background: #f6f8fb;
+        color: var(--sub);
+        font-weight: 600;
+      }
+      table.detail td.name {
+        text-align: left;
+        font-weight: 600;
+      }
+      .up {
+        color: var(--gold);
+        font-weight: 700;
+      }
+      .diag .block {
+        border-left: 3px solid var(--blue);
+        padding: 6px 0 6px 14px;
+        margin: 12px 0;
+      }
+      .diag .block h4 {
+        margin: 0 0 4px;
+        font-size: 14.5px;
+      }
+      .diag .pill {
+        display: inline-block;
+        font-size: 11px;
+        border-radius: 6px;
+        padding: 1px 8px;
+        margin-right: 6px;
+        font-weight: 700;
+      }
+      .pill.p0 {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .pill.p1 {
+        background: #fef3c7;
+        color: #b45309;
+      }
+      .pill.p2 {
+        background: #dbeafe;
+        color: #1d4ed8;
+      }
+      .weak {
+        color: var(--warn);
+        font-weight: 700;
+      }
+      .note {
+        font-size: 11.5px;
+        color: var(--weak);
+        margin-top: 10px;
+        line-height: 1.5;
+      }
+      .lead {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .lead label {
+        font-size: 12.5px;
+        color: var(--sub);
+        display: block;
+        margin-bottom: 4px;
+      }
+      .lead input,
+      .lead select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        padding: 9px 10px;
+        font-size: 14px;
+      }
+      .lead .full {
+        grid-column: 1/-1;
+      }
+      .hidden {
+        display: none;
+      }
+      @media (max-width: 620px) {
+        .radars {
+          grid-template-columns: 1fr;
+        }
+        .summary {
+          grid-template-columns: 1fr 1fr;
+        }
+        .lead {
+          grid-template-columns: 1fr;
+        }
+        canvas {
+          height: 280px;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        .prog,
+        .actions,
+        .lead,
+        .note {
+          display: none !important;
+        }
+        .card,
+        .radar-box {
+          border: 1px solid #ccc;
+          break-inside: avoid;
+        }
+        header.hero {
+          background: #123a7a !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <h1>消费品企业数智化自评器</h1>
+        <p>6 大模块 · 0–5 分自评 · Before / After 双雷达诊断</p>
+        <div class="badges">
+          <span class="badge">OA 管理</span>
+          <span class="badge">财务记账分析</span>
+          <span class="badge">供应链进销存</span>
+          <span class="badge">门店渠道</span>
+          <span class="badge">招聘效率</span>
+          <span class="badge">组织人效</span>
+        </div>
+      </header>
+
+      <div class="prog">
+        <span id="progText">已答 0 / 30</span>
+        <span class="bar"><i id="progBar"></i></span>
+        <button class="btn ghost" style="padding: 7px 14px; font-size: 13px" onclick="resetAll()">
+          重置
+        </button>
+      </div>
+
+      <!-- 模块表单 -->
+      <div id="modules"></div>
+
+      <!-- 操作 -->
+      <div class="card actions">
+        <button class="btn" onclick="generate()">生成诊断报告（双雷达）</button>
+        <button class="btn ghost" onclick="window.print()">打印 / 导出 PDF</button>
+        <button class="btn ghost" id="jsonBtn" onclick="exportJSON()">导出 JSON</button>
+      </div>
+
+      <!-- 结果 -->
+      <div id="result" class="hidden">
+        <div class="card">
+          <h2>核心判断</h2>
+          <div class="summary">
+            <div class="stat">
+              <div class="v" id="sScore">–</div>
+              <div class="l">综合数智化得分 /100</div>
+            </div>
+            <div class="stat">
+              <div class="v" id="sLevel">–</div>
+              <div class="l">数智化等级</div>
+            </div>
+            <div class="stat">
+              <div class="v gold" id="sGain">–</div>
+              <div class="l">AI 赋能预期提升</div>
+            </div>
+          </div>
+          <div class="radars">
+            <div class="radar-box">
+              <h3>图一 · 企业现状评分</h3>
+              <div class="cap">六维度当前自评（0–5）</div>
+              <canvas id="radarNow"></canvas>
+            </div>
+            <div class="radar-box">
+              <h3>图二 · AI AGENT 赋能后预期评分</h3>
+              <div class="cap">现状分 + uplift 因子（封顶 5）</div>
+              <canvas id="radarAfter"></canvas>
+            </div>
+          </div>
+          <table class="detail" id="detailTable"></table>
+        </div>
+
+        <div class="card diag" id="diag"></div>
+
+        <div class="card">
+          <h2>预约专属诊断（可选）</h2>
+          <p class="m-sub">
+            留下联系方式，顾问将基于您的薄弱项给出落地方案。提交后进入企业信息名单，可稍后联系您。
+          </p>
+          <div class="lead">
+            <div><label>姓名</label><input id="lk_name" placeholder="您的称呼" /></div>
+            <div><label>公司</label><input id="lk_company" placeholder="企业名称" /></div>
+            <div><label>电话</label><input id="lk_phone" placeholder="联系电话" /></div>
+            <div>
+              <label>行业</label>
+              <select id="lk_industry">
+                <option>食品</option>
+                <option>美妆</option>
+                <option>母婴</option>
+                <option>家居</option>
+                <option>服饰</option>
+                <option>其他</option>
+              </select>
+            </div>
+            <div>
+              <label>规模</label>
+              <select id="lk_scale">
+                <option>年营收 &lt; 5000万</option>
+                <option>5000万–1亿</option>
+                <option>1亿–5亿</option>
+                <option>5亿–20亿</option>
+                <option>&gt; 20亿</option>
+              </select>
+            </div>
+            <div>
+              <label>职位</label>
+              <select id="lk_role">
+                <option>企业主/CEO</option>
+                <option>财务负责人</option>
+                <option>供应链负责人</option>
+                <option>HR 负责人</option>
+                <option>其他</option>
+              </select>
+            </div>
+            <div class="full">
+              <button class="btn ghost" onclick="saveLead()">提交企业信息</button>
+            </div>
+          </div>
+          <p class="note" id="leadNote"></p>
+        </div>
+
+        <p class="note">
+          免责声明：本报告基于企业主主观自评与行业经验模型生成，仅用于辅助决策与沟通，不构成投资、法律、财务或经营结果承诺。
+          标记为「预期」的内容为经验参考区间（uplift 因子预设），实际效果以专属诊断与落地方案为准。
+        </p>
+      </div>
+    </div>
+
+    <script>
+      /* ============ 题库（人工可编辑，无需动逻辑） ============ */
+      const MODULES = [
+        {
+          key: "oa",
+          name: "企业 OA 管理效率",
+          short: "OA管理",
+          uplift: 2.5,
+          sub: "费用报销 · 差旅管理 · 薪酬计算与发放",
+          questions: [
+            {
+              id: "OA-1",
+              tag: "费用报销",
+              t: "费用报销从员工提交到财务付款，是否线上化、自动审批、周期可控？",
+            },
+            {
+              id: "OA-2",
+              tag: "差旅管理",
+              t: "差旅预订与报销是否一体化，差旅政策是否由系统自动校验？",
+            },
+            {
+              id: "OA-3",
+              tag: "薪酬计算",
+              t: "薪酬、社保、个税计算是否由系统自动完成且差错率低？",
+            },
+            { id: "OA-4", tag: "薪酬发放", t: "工资条 / 发放通知是否自动触达，员工可自助查询？" },
+            { id: "OA-5", tag: "整体自动化", t: "重复性行政事务中，由系统自动处理的比例有多高？" },
+          ],
+        },
+        {
+          key: "fin",
+          name: "财务记账与经营分析效率",
+          short: "财务记账分析",
+          uplift: 2.0,
+          sub: "经营日报及时性 · 分析智能化 · 财务人效 · 发票与记账",
+          questions: [
+            {
+              id: "FIN-1",
+              tag: "日报及时性",
+              t: "经营日报是否能在当日 / 次日自动生成，无需人工汇总拼接？",
+            },
+            {
+              id: "FIN-2",
+              tag: "分析智能化",
+              t: "财务分析（同比 / 环比 / 异常）是否由系统自动识别，而非纯人工？",
+            },
+            {
+              id: "FIN-3",
+              tag: "财务人效",
+              t: "单位财务人力服务的业务规模 / 单据量是否处于行业较高水平？",
+            },
+            { id: "FIN-4", tag: "发票流程", t: "发票采集、查验、认证是否自动化，人工干预少？" },
+            {
+              id: "FIN-5",
+              tag: "记账繁杂度",
+              t: "从业务发生到凭证生成是否高度自动化（流程越简分越高）？",
+            },
+          ],
+        },
+        {
+          key: "sc",
+          name: "供应链进销存管理",
+          short: "供应链进销存",
+          uplift: 2.3,
+          sub: "库存可见性 · 库存占用现金流 · 预测与备货",
+          questions: [
+            {
+              id: "SC-1",
+              tag: "库存可见性",
+              t: "能否实时查看各仓 / 各 SKU 库存，数据准确且自动同步？",
+            },
+            { id: "SC-2", tag: "库存现金流", t: "能否实时看到库存占用的资金与周转健康度？" },
+            {
+              id: "SC-3",
+              tag: "预测准确度",
+              t: "销售预测是否由系统基于数据自动计算且准确度较高？",
+            },
+            { id: "SC-4", tag: "备货计划", t: "补货 / 备货计划是否系统自动生成，人工仅复核？" },
+            {
+              id: "SC-5",
+              tag: "进销存协同",
+              t: "采购、销售、库存数据是否打通，无需大量手工对账？",
+            },
+          ],
+        },
+        {
+          key: "ch",
+          name: "门店或渠道开发与经营数据效率",
+          short: "门店渠道",
+          uplift: 2.0,
+          sub: "指标大盘 · 渠道盈利 · 新老品趋势",
+          questions: [
+            {
+              id: "CH-1",
+              tag: "指标大盘",
+              t: "是否拥有实时更新的门店 / 渠道核心指标大盘（营收 / 坪效 / 人效等）？",
+            },
+            { id: "CH-2", tag: "渠道盈利", t: "能否即时看到各渠道 / 门店的盈利状况与贡献？" },
+            { id: "CH-3", tag: "新老品趋势", t: "能否自动监控新品动销与老品衰减趋势并预警？" },
+            {
+              id: "CH-4",
+              tag: "渠道开发",
+              t: "新开门店 / 渠道的评估、签约、上线流程是否标准化且可追踪？",
+            },
+            { id: "CH-5", tag: "数据时效", t: "经营数据获取是否不依赖人工导出 / Excel 拼接？" },
+          ],
+        },
+        {
+          key: "hr",
+          name: "招聘流程与效率",
+          short: "招聘效率",
+          uplift: 1.8,
+          sub: "招聘花费 · 入职自动化 · HR 人效",
+          questions: [
+            { id: "HR-1", tag: "招聘花费", t: "招聘渠道费用、单人招聘成本是否可追踪、可控？" },
+            {
+              id: "HR-2",
+              tag: "入职自动化",
+              t: "offer 发放、背调、入职材料、账号开通是否自动化？",
+            },
+            { id: "HR-3", tag: "HR人效", t: "HR 人均支持的员工数 / 招聘量是否处于合理高效水平？" },
+            { id: "HR-4", tag: "流程协同", t: "从需求到入职是否在线协同、节点可视？" },
+            { id: "HR-5", tag: "人才库", t: "是否有结构化人才库并支持复用，降低重复招聘成本？" },
+          ],
+        },
+        {
+          key: "org",
+          name: "整体组织人效",
+          short: "组织人效",
+          uplift: 1.4,
+          sub: "数字化 · 数据驱动 · 自动化率 · 协同",
+          questions: [
+            {
+              id: "ORG-1",
+              tag: "数字化程度",
+              t: "核心业务流程（审批 / 协作 / 数据流转）数字化覆盖比例？",
+            },
+            { id: "ORG-2", tag: "数据驱动", t: "管理层决策是否主要基于实时数据而非经验 / 汇报？" },
+            { id: "ORG-3", tag: "自动化率", t: "可标准化的重复性工作由系统承担的比例？" },
+            {
+              id: "ORG-4",
+              tag: "协同效率",
+              t: "跨部门信息流转是否顺畅、无需大量线下会议 / 表格对接？",
+            },
+            { id: "ORG-5", tag: "人效透明", t: "是否建立全员可看的人效 / 产出指标并定期复盘？" },
+          ],
+        },
+      ];
+      const SCALE = [
+        { v: 0, h: "手工" },
+        { v: 1, h: "少量电子" },
+        { v: 2, h: "部分线上" },
+        { v: 3, h: "系统化" },
+        { v: 4, h: "高度自动" },
+        { v: 5, h: "端到端" },
+      ];
+      const TOTAL_Q = MODULES.reduce((s, m) => s + m.questions.length, 0);
+
+      /* ============ 状态 ============ */
+      const answers = {}; // {moduleKey:{qid:score}}
+      MODULES.forEach((m) => (answers[m.key] = {}));
+      const saved = localStorage.getItem("opuc_selfassess");
+      if (saved) {
+        try {
+          Object.assign(answers, JSON.parse(saved));
+        } catch (e) {}
+      }
+
+      /* ============ 渲染表单 ============ */
+      const modRoot = document.getElementById("modules");
+      MODULES.forEach((m, mi) => {
+        const card = document.createElement("div");
+        card.className = "card";
+        let qs = "";
+        m.questions.forEach((q) => {
+          let btns = "";
+          SCALE.forEach((s) => {
+            const on = answers[m.key] && answers[m.key][q.id] === s.v ? "on" : "";
+            btns += `<button class="${on}" data-m="${m.key}" data-q="${q.id}" data-v="${s.v}" onclick="pick('${m.key}','${q.id}',${s.v})">${s.v}<small>${s.h}</small></button>`;
+          });
+          qs += `<div class="q"><div class="q-title"><span class="tag">${q.tag}</span>${q.t}</div><div class="scale">${btns}</div></div>`;
+        });
+        card.innerHTML = `<h2><span class="num">${mi + 1}</span>${m.name}</h2><p class="m-sub">${m.sub}</p>${qs}
+    <div class="legend"><b>0–5 评分：</b> 0 全手工/最低 → 5 端到端智能/最高</div>`;
+        modRoot.appendChild(card);
+      });
+
+      function pick(m, q, v) {
+        answers[m][q] = v;
+        // 刷新该按钮组
+        document.querySelectorAll(`.scale button[data-m="${m}"][data-q="${q}"]`).forEach((b) => {
+          b.classList.toggle("on", Number(b.dataset.v) === v);
+        });
+        localStorage.setItem("opuc_selfassess", JSON.stringify(answers));
+        updateProgress();
+      }
+
+      function updateProgress() {
+        let n = 0;
+        MODULES.forEach((m) =>
+          Object.values(answers[m.key]).forEach((v) => {
+            if (v != null) n++;
+          }),
+        );
+        document.getElementById("progText").textContent = `已答 ${n} / ${TOTAL_Q}`;
+        document.getElementById("progBar").style.width = (n / TOTAL_Q) * 100 + "%";
+      }
+      updateProgress();
+
+      function resetAll() {
+        MODULES.forEach((m) => (answers[m.key] = {}));
+        localStorage.removeItem("opuc_selfassess");
+        document.querySelectorAll(".scale button").forEach((b) => b.classList.remove("on"));
+        updateProgress();
+        document.getElementById("result").classList.add("hidden");
+      }
+
+      /* ============ 评分 ============ */
+      function moduleScore(key) {
+        const vals = Object.values(answers[key]).filter((v) => v != null);
+        if (!vals.length) return null;
+        return vals.reduce((a, b) => a + b, 0) / vals.length;
+      }
+      function buildScores() {
+        const mod = {},
+          exp = {};
+        let sum = 0,
+          cnt = 0;
+        MODULES.forEach((m) => {
+          const s = moduleScore(m.key);
+          mod[m.key] = s;
+          if (s != null) {
+            exp[m.key] = Math.min(5, +(s + m.uplift).toFixed(1));
+            sum += s;
+            cnt++;
+          } else exp[m.key] = null;
+        });
+        const overall = cnt ? sum / cnt : null;
+        return { mod, exp, overall, cnt };
+      }
+      function levelOf(score100) {
+        if (score100 == null) return "未评";
+        if (score100 < 30) return "L1 起步期";
+        if (score100 < 50) return "L2 工具化";
+        if (score100 < 70) return "L3 系统化";
+        if (score100 < 85) return "L4 智能化";
+        return "L5 自主化";
+      }
+
+      /* ============ 雷达图（原生 Canvas） ============ */
+      function drawRadar(canvas, labels, values, color) {
+        const ctx = canvas.getContext("2d");
+        const dpr = window.devicePixelRatio || 1;
+        let w =
+          canvas.clientWidth ||
+          canvas.offsetWidth ||
+          (canvas.parentElement && canvas.parentElement.clientWidth) ||
+          320;
+        let h = canvas.clientHeight || canvas.offsetHeight || 300;
+        if (!w) w = 320;
+        if (!h) h = 300;
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2,
+          cy = h / 2 + 4,
+          R = Math.min(w, h) / 2 - 46,
+          n = labels.length,
+          max = 5,
+          rings = 5;
+        for (let r = 1; r <= rings; r++) {
+          const rr = (R * r) / rings;
+          ctx.beginPath();
+          for (let i = 0; i < n; i++) {
+            const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+            const x = cx + Math.cos(a) * rr,
+              y = cy + Math.sin(a) * rr;
+            i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = "#E3E8F0";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        // 轴线 + 标签
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        for (let i = 0; i < n; i++) {
+          const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+          const x = cx + Math.cos(a) * R,
+            y = cy + Math.sin(a) * R;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(x, y);
+          ctx.strokeStyle = "#E3E8F0";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          const lx = cx + Math.cos(a) * (R + 24),
+            ly = cy + Math.sin(a) * (R + 20);
+          ctx.fillStyle = "#4B5C72";
+          ctx.fillText(labels[i], lx, ly);
+        }
+        // 数值多边形
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+          const v = values[i] == null ? 0 : values[i];
+          const rr = (R * v) / max;
+          const x = cx + Math.cos(a) * rr,
+            y = cy + Math.sin(a) * rr;
+          i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color + "22";
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        for (let i = 0; i < n; i++) {
+          const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+          const v = values[i] == null ? 0 : values[i];
+          const rr = (R * v) / max;
+          const x = cx + Math.cos(a) * rr,
+            y = cy + Math.sin(a) * rr;
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+        }
+      }
+      function drawBoth() {
+        const { mod, exp } = buildScores();
+        const labels = MODULES.map((m) => m.short);
+        const vNow = MODULES.map((m) => (mod[m.key] == null ? 0 : +mod[m.key].toFixed(1)));
+        const vExp = MODULES.map((m) => (exp[m.key] == null ? 0 : +exp[m.key].toFixed(1)));
+        drawRadar(document.getElementById("radarNow"), labels, vNow, "#2563EB");
+        drawRadar(document.getElementById("radarAfter"), labels, vExp, "#AE8B4C");
+      }
+      window.addEventListener("resize", () => {
+        if (!document.getElementById("result").classList.contains("hidden")) drawBoth();
+      });
+
+      /* ============ 诊断报告 ============ */
+      function generate() {
+        const { mod, exp, overall, cnt } = buildScores();
+        if (cnt === 0) {
+          alert("请先至少完成一个模块的自评（点击 0–5 分）。");
+          return;
+        }
+        const score100 = Math.round((overall / 5) * 100);
+        document.getElementById("sScore").textContent = score100;
+        document.getElementById("sLevel").textContent = levelOf(score100);
+        // 提升
+        let gain = 0,
+          gc = 0;
+        MODULES.forEach((m) => {
+          if (mod[m.key] != null && exp[m.key] != null) {
+            gain += exp[m.key] - mod[m.key];
+            gc++;
+          }
+        });
+        document.getElementById("sGain").textContent =
+          "+" + (gc ? (gain / gc).toFixed(1) : "0") + " 分";
+
+        // 明细表
+        let rows = "<tr><th>维度</th><th>现状</th><th>预期</th><th>提升</th></tr>";
+        MODULES.forEach((m) => {
+          const a = mod[m.key] == null ? "—" : mod[m.key].toFixed(1);
+          const b = exp[m.key] == null ? "—" : exp[m.key].toFixed(1);
+          const up =
+            mod[m.key] != null && exp[m.key] != null
+              ? `<span class="up">+${(exp[m.key] - mod[m.key]).toFixed(1)}</span>`
+              : "—";
+          rows += `<tr><td class="name">${m.name}</td><td>${a}</td><td>${b}</td><td>${up}</td></tr>`;
+        });
+        document.getElementById("detailTable").innerHTML = rows;
+
+        // 短板诊断：现状最低 & uplift 最高
+        const ranked = MODULES.filter((m) => mod[m.key] != null)
+          .map((m) => ({ m, now: mod[m.key], exp: exp[m.key], gap: exp[m.key] - mod[m.key] }))
+          .sort((x, y) => x.now - y.now || y.gap - x.gap);
+        const diag = document.getElementById("diag");
+        let html = "<h2>短板诊断与建议</h2>";
+        const PAIN = {
+          oa: [
+            "报销/差旅/薪酬仍靠人工，周期长、易错",
+            "上线 OA 自动审批 + 薪酬自动算发 Agent，行政人力可大幅释放",
+            "部署费用报销/差旅自动审批与薪酬自动化",
+          ],
+          fin: [
+            "经营数据靠人工周更，分析滞后",
+            "自动日报 + 发票 OCR 自动记账 + 智能经营分析，财务人效提升",
+            "上线自动经营日报与发票/记账自动化",
+          ],
+          sc: [
+            "库存与备货靠经验，常缺货或积压",
+            "库存实时可视 + AI 销售预测与智能备货，周转与现货率双升",
+            "部署库存可视化与 AI 预测备货 Agent",
+          ],
+          ch: [
+            "渠道盈利说不清，趋势靠感觉",
+            "实时渠道盈利看板 + 新老品趋势自动监控预警",
+            "搭建门店/渠道实时数据大盘与趋势监控",
+          ],
+          hr: [
+            "招聘成本高、入职慢",
+            "招聘花费追踪 + 入职自动化 + 人才库复用，HR 人效提升",
+            "上线招聘与入职自动化流程",
+          ],
+          org: [
+            "决策靠开会，协同靠表格",
+            "组织数据驾驶舱 + 流程线上化，管理层基于实时数据决策",
+            "搭建组织级数据驾驶舱与流程协同",
+          ],
+        };
+        ranked.slice(0, 2).forEach((r, i) => {
+          const p = PAIN[r.m.key];
+          const lvl = i === 0 ? "P0" : "P1";
+          html += `<div class="block"><h4>${i === 0 ? "最薄弱维度" : "次薄弱维度"}：${r.m.name}
+      <span class="pill ${lvl.toLowerCase()}">${lvl}</span></h4>
+      <p style="margin:4px 0"><b>现状痛点（${r.now.toFixed(1)}/5）：</b>${p[0]}</p>
+      <p style="margin:4px 0"><b>AI 赋能预期收益（→ ${r.exp.toFixed(1)}/5）：</b>${p[1]}</p>
+      <p style="margin:4px 0"><b>建议动作：</b>${p[2]}。<br>
+      <span style="color:var(--sub);font-size:12.5px">验证指标：该维度自评分提升至 ≥ ${Math.min(5, (r.now + 1).toFixed(0))} 分；相关流程人工耗时下降 ≥ 30%。周期：0–60 天。</span></p></div>`;
+        });
+        // 最大提升空间
+        const topGain = [...ranked].sort((a, b) => b.gap - a.gap)[0];
+        if (topGain)
+          html += `<div class="block" style="border-color:var(--gold)"><h4>最大提升空间维度：${topGain.m.name}
+    <span class="pill p2">ROI 优先</span></h4>
+    <p style="margin:4px 0">现状 ${topGain.now.toFixed(1)} → 预期 ${topGain.exp.toFixed(1)}（<span class="up">+${topGain.gap.toFixed(1)}</span>），
+    是 AI AGENT 投入回报最优先的切入点，建议列入首期改造。</p></div>`;
+        diag.innerHTML = html;
+
+        const resultEl = document.getElementById("result");
+        resultEl.classList.remove("hidden"); // 必须先显示，canvas 才有尺寸
+        requestAnimationFrame(() => {
+          drawBoth();
+        });
+        setTimeout(() => {
+          resultEl.scrollIntoView({ behavior: "smooth" });
+        }, 60);
+      }
+
+      /* ============ 导出 ============ */
+      function exportJSON() {
+        const { mod, exp, overall } = buildScores();
+        const payload = {
+          answers,
+          moduleScores: mod,
+          expected: exp,
+          overall: overall == null ? null : +overall.toFixed(2),
+          overall100: overall == null ? null : Math.round((overall / 5) * 100),
+          level: levelOf(overall == null ? null : Math.round((overall / 5) * 100)),
+          generatedAt: new Date().toISOString(),
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "消费品企业数智化自评_" + Date.now() + ".json";
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }
+
+      async function saveLead() {
+        const { mod, exp, overall } = buildScores();
+        const lead = {
+          name: lk_name.value.trim(),
+          company: lk_company.value.trim(),
+          phone: lk_phone.value.trim(),
+          industry: lk_industry.value,
+          scale: lk_scale.value,
+          role: lk_role.value,
+          scores: {
+            overall: overall == null ? null : +overall.toFixed(2),
+            overall100: overall == null ? null : Math.round((overall / 5) * 100),
+            level: levelOf(overall == null ? null : Math.round((overall / 5) * 100)),
+            moduleScores: mod,
+            expected: exp,
+            answers,
+          },
+        };
+        if (!lead.company) {
+          alert("请填写企业名称后再提交。");
+          return;
+        }
+        const note = document.getElementById("leadNote");
+        note.textContent = "正在提交…";
+        try {
+          const res = await fetch("/assess/api/leads", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(lead),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "提交失败 " + res.status);
+          const all = JSON.parse(localStorage.getItem("opuc_leads") || "[]");
+          all.push({ ...lead, savedAt: new Date().toISOString() });
+          localStorage.setItem("opuc_leads", JSON.stringify(all));
+          const msg =
+            "已提交，顾问可在企业信息管理页看到您的资料。建议同时点「打印 / 导出 PDF」自行留存。";
+          note.textContent = msg;
+          alert(msg);
+        } catch (err) {
+          const fallback =
+            "网络提交失败：" + err.message + "。已改为仅保存在本机，请打印留存或稍后重试。";
+          try {
+            const all = JSON.parse(localStorage.getItem("opuc_leads") || "[]");
+            all.push({ ...lead, savedAt: new Date().toISOString() });
+            localStorage.setItem("opuc_leads", JSON.stringify(all));
+          } catch (e) {}
+          note.textContent = fallback;
+          alert(fallback);
+        }
+      }
+    </script>
+  </body>
+</html>

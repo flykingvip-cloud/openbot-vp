@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openbot://phase-b/web-read-shadow-scored-report",
+  "title": "ScoredWebReadReport",
+  "description": "Test-harness only: WebReadShadowPrediction plus annotationCompare against frozen JSONL gold. Not produced by evaluateWebReadShadow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "caseId",
+    "profile",
+    "tenantId",
+    "decision",
+    "reasonCodes",
+    "gap",
+    "humanGate",
+    "completionClaim",
+    "latencyMs",
+    "shadowVsLegacy",
+    "wroteLedger",
+    "invokedTool",
+    "annotationCompare"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["A", "B"]
+    },
+    "tenantId": {
+      "type": ["string", "null"],
+      "description": "Echo of runtime input.tenantId as-is (nullable)."
+    },
+    "decision": {
+      "type": "object"
+    },
+    "reasonCodes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "gap": {
+      "type": "object"
+    },
+    "humanGate": {
+      "type": "string",
+      "enum": ["yes", "no", "unknown"]
+    },
+    "completionClaim": {
+      "type": "object"
+    },
+    "latencyMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "shadowVsLegacy": {
+      "type": "object"
+    },
+    "wroteLedger": {
+      "type": "boolean",
+      "const": false
+    },
+    "invokedTool": {
+      "type": "boolean",
+      "const": false
+    },
+    "annotationCompare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match",
+        "falseAllowCandidate",
+        "clarifyMissCandidate",
+        "completionClaimViolation",
+        "expectedSurface",
+        "expectedDecisionClass",
+        "adjudication"
+      ],
+      "properties": {
+        "match": {
+          "type": "boolean"
+        },
+        "falseAllowCandidate": {
+          "type": "boolean"
+        },
+        "clarifyMissCandidate": {
+          "type": "boolean"
+        },
+        "completionClaimViolation": {
+          "type": "boolean"
+        },
+        "expectedSurface": {
+          "type": "string",
+          "enum": ["web_read", "not_web_read", "clarify"]
+        },
+        "expectedDecisionClass": {
+          "type": "string",
+          "enum": ["web_read", "not_web_read", "clarify"]
+        },
+        "adjudication": {
+          "type": ["string", "object"]
+        }
+      }
+    }
+  }
+}

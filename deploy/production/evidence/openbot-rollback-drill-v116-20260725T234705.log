@@ -1,0 +1,29 @@
+=== ROLLBACK DRILL v116 <-> v115 ===
+2026-07-25T23:47:05+08:00
+LIVE_BEFORE=localhost/openbot:rc-amd64-v116-baseline-recovery
+{"ok":true,"status":"live"}
+=== STEP1 stop v116 / start v115 safety ===
+openbot-gateway-rc
+openbot-gateway-rc
+V115_HEALTH_OK attempt=8
+{"ok":true,"status":"live"}
+readyz={"ready":true,"failing":[],"uptimeMs":1805}
+LIVE_V115=localhost/openbot:rc-amd64-v115-pending-admin-activations
+UI_V115=/app/dist/control-ui/assets/index-B4ez0wvV.js
+ROLLBACK_TO_V115_SECONDS=18
+=== STEP2 restore v116 ===
+openbot-gateway-rc
+openbot-gateway-rc
+V116_HEALTH_OK attempt=7
+{"ok":true,"status":"live"}
+{"ready":true,"failing":[],"uptimeMs":1015}
+LIVE_AFTER=localhost/openbot:rc-amd64-v116-baseline-recovery
+/app/dist/control-ui/assets/index-CA6HLrrO.js
+{
+  "version": "2026.7.12-rc.2",
+  "commit": "127fc543f036eb9353ce99afa22c81d7b16f73eb",
+  "builtAt": "2026-07-25T14:18:59.925Z"
+}
+RESTORE_TO_V116_SECONDS=15
+TOTAL_DRILL_SECONDS=33
+DRILL_OK LOG=/root/openbot-rollback-drill-v116-20260725T234705.log

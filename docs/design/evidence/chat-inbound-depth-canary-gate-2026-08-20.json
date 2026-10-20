@@ -1,0 +1,90 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "internal-canary",
+  "capturedAt": "2026-08-20T13:54:44+08:00",
+  "originMainShaAtCanary": "daaadd34cc44cce12a832e6f7c3bc355beb5aca6",
+  "liveSha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+  "overlayId": "inbound-depth-main-r1",
+  "overlayStamp": "20260820T040620Z",
+  "aeOnOriginMain": true,
+  "aeOnLive": true,
+  "productionLive": true,
+  "ownerApprove": {
+    "at": "2026-08-20T13:50:00+08:00",
+    "text": "批准在现有 overlay LIVE 上开灰度",
+    "scope": "existing overlay LIVE only; not full-dist; not GHCR cutover; not 394c9170c651"
+  },
+  "injection": {
+    "method": "bind-mounted /root/.openbot/.env loaded by loadDotEnv at gateway start (override:false); mirrored into /root/.openbot/.env.docker for future recreate",
+    "containerRecreated": false,
+    "restart": "/usr/local/bin/openbot-gateway-restart",
+    "backupEnv": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/dot-env.before-canary-20260820T055154Z",
+    "backupDockerEnv": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/dot-env.docker.before-canary-20260820T055154Z"
+  },
+  "rollout": [
+    {
+      "flag": "OPENBOT_CHAT_INBOUND_PERSIST_EARLY",
+      "enabled": true,
+      "healthz": 200,
+      "readyz": true
+    },
+    {
+      "flag": "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
+      "enabled": true,
+      "healthz": 200,
+      "readyz": true
+    },
+    {
+      "flag": "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER",
+      "enabled": true,
+      "healthz": 200,
+      "readyz": true
+    },
+    {
+      "flag": "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY",
+      "enabled": true,
+      "healthz": 200,
+      "readyz": true
+    },
+    {
+      "flag": "OPENBOT_CHAT_INBOUND_TOOL_POLICY",
+      "enabled": true,
+      "healthz": 200,
+      "readyz": true,
+      "note": "PR E remains unchecked for final spec sign-off in tasks.md; owner still approved this fifth flag in the published gray order"
+    }
+  ],
+  "flagsEnabled": {
+    "OPENBOT_CHAT_INBOUND_PERSIST_EARLY": true,
+    "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW": true,
+    "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER": true,
+    "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY": true,
+    "OPENBOT_CHAT_INBOUND_TOOL_POLICY": true
+  },
+  "smokeAtRecapture": {
+    "utc": "2026-08-20T05:54:44Z",
+    "healthz": { "http": 200, "body": { "ok": true, "status": "live" } },
+    "readyz": { "http": 200, "body": { "ready": true, "failing": [], "uptimeMs": 18906 } },
+    "liveCommit": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "image": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+    "uiServedEntry": "index-CYnwD_N8.js"
+  },
+  "notClaimed": [
+    "production TTFT p95/p99",
+    "double-blind quality",
+    "inbound error-rate time series beyond healthz/readyz after each restart"
+  ],
+  "rollback": {
+    "order": [
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY=0",
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY=0",
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER=0",
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=0",
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY=0"
+    ],
+    "then": "/usr/local/bin/openbot-gateway-restart openbot-gateway-rc",
+    "orRestore": "copy backup .env over /root/.openbot/.env then restart"
+  },
+  "verdict": "canary enabled on overlay LIVE aa348b38a14a; all five flags=1; healthz 200 / readyz ready:true"
+}

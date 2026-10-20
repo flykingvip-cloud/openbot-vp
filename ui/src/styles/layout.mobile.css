@@ -1,0 +1,405 @@
+/* ===========================================
+   Mobile Layout
+   =========================================== */
+
+/* Tablet: Horizontal nav */
+@media (max-width: 1100px) {
+  .nav {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-group__items {
+    display: contents;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .nav-group--collapsed .nav-group__items {
+    display: contents;
+  }
+
+  .nav-item {
+    padding: 8px 14px;
+    font-size: 13px;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
+
+/* Mobile-specific styles */
+@media (max-width: 600px) {
+  .shell {
+    --shell-pad: 8px;
+    --shell-gap: 8px;
+  }
+
+  /* Topbar */
+  .topbar {
+    padding: 8px 12px;
+    gap: 8px;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .topbar-left {
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .topbar .nav-collapse-toggle {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .brand-logo--wide {
+    max-width: 140px;
+    max-height: 44px;
+  }
+
+  .brand-logo--wide img {
+    max-width: 140px;
+    max-height: 44px;
+  }
+
+  .topbar-status {
+    gap: 6px;
+    width: auto;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+  }
+
+  .topbar-round-btn,
+  .topbar-account__trigger--user {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+
+  .topbar--workspace {
+    padding: 12px;
+  }
+
+  .workspace-topbar__context {
+    display: none;
+  }
+
+  .workspace-topbar__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .workspace-topbar__nav {
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 2px;
+  }
+
+  .workspace-topbar__link {
+    flex-shrink: 0;
+  }
+
+  /* Nav */
+  .nav {
+    padding: 8px 10px;
+    gap: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-label {
+    display: none;
+  }
+
+  .nav-item {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: var(--radius-md);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Content */
+  .content-header {
+    display: none;
+  }
+
+  .content {
+    padding: 4px 4px 16px;
+    gap: 12px;
+  }
+
+  .content--workspace {
+    padding: 10px 10px 20px;
+  }
+
+  /* Cards */
+  .card {
+    padding: 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .card-title {
+    font-size: 13px;
+  }
+
+  /* Stats */
+  .stat-grid {
+    gap: 8px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat {
+    padding: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .stat-grid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .stat--compact {
+    padding: 8px 10px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .stat--compact .stat-value {
+    font-size: 16px;
+  }
+
+  /* Notes */
+  .note-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  /* Forms */
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+  }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  /* Pills */
+  .pill {
+    padding: 4px 10px;
+    font-size: 12px;
+  }
+
+  /* Chat */
+  .chat-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .chat-header__left {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chat-header__right {
+    justify-content: space-between;
+  }
+
+  .chat-session {
+    min-width: unset;
+    width: 100%;
+  }
+
+  .chat-thread {
+    margin-top: 8px;
+    padding: 12px 8px;
+  }
+
+  .chat-msg {
+    max-width: 90%;
+  }
+
+  .chat-bubble {
+    padding: 8px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .chat-compose {
+    gap: 8px;
+  }
+
+  /* Height SoT: set token; textarea uses layout.css var(--chat-compose-field-min-height). */
+  .chat-compose:not(.chat-compose--workbench-compact) {
+    --chat-compose-field-min-height: 60px;
+  }
+
+  .chat-compose:not(.chat-compose--workbench-compact) .chat-compose__field textarea {
+    padding: 8px 10px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+  }
+
+  /* Log stream */
+  .log-stream {
+    border-radius: var(--radius-md);
+    max-height: 380px;
+  }
+
+  .log-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 8px;
+  }
+
+  .log-time {
+    font-size: 10px;
+  }
+
+  .log-level {
+    font-size: 9px;
+  }
+
+  .log-subsystem {
+    font-size: 11px;
+  }
+
+  .log-message {
+    font-size: 12px;
+  }
+
+  /* Lists */
+  .list-item {
+    padding: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .list-title {
+    font-size: 13px;
+  }
+
+  .list-sub {
+    font-size: 11px;
+  }
+
+  /* Code blocks */
+  .code-block {
+    padding: 8px;
+    border-radius: var(--radius-md);
+    font-size: 11px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 400px) {
+  .shell {
+    --shell-pad: 4px;
+  }
+
+  .topbar {
+    padding: 8px 10px;
+  }
+
+  .nav {
+    padding: 6px 8px;
+  }
+
+  .nav-item {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+
+  .content {
+    padding: 4px 4px 12px;
+    gap: 10px;
+  }
+
+  .card {
+    padding: 10px;
+  }
+
+  .stat {
+    padding: 8px;
+  }
+
+  .stat-value {
+    font-size: 16px;
+  }
+
+  .chat-bubble {
+    padding: 8px 10px;
+  }
+
+  .chat-compose:not(.chat-compose--workbench-compact) {
+    --chat-compose-field-min-height: 52px;
+  }
+
+  .chat-compose:not(.chat-compose--workbench-compact) .chat-compose__field textarea {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .btn {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .topbar-round-btn,
+  .topbar-account__trigger--user {
+    width: 32px;
+    min-width: 32px;
+    height: 32px;
+  }
+}

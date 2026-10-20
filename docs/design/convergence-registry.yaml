@@ -1,0 +1,381 @@
+# Capability convergence registry — Wave C0 artifact
+#
+# Required by `openbot-computer-network-capability-architecture-2026-09-29.md` §6.7:
+# "No implementation task starts without a registry row."
+#
+# Purpose: make §3.2's convergence mandate machine-checkable instead of aspirational.
+# Before implementing anything from the computer and network capability architecture,
+# find or add the row for that responsibility, and classify the work honestly.
+#
+# Validate with: `pnpm check:convergence-registry`
+#
+# The validator enforces the rule that matters most:
+#   mode `new-primitive` is only legal when both `currentOwners` and `pendingOwners`
+#   are empty, and every declared `currentOwners` path must exist on disk.
+# A stale registry is worse than none, so ownership claims are checked, not trusted.
+#
+# Field meanings (§6.7):
+#   responsibility    stable north-star responsibility id
+#   currentOwners     existing modules that already implement part of it (checked to exist)
+#   pendingOwners     in-flight modules not on this base yet (checked NOT to exist)
+#   pendingRef        branch, PR or commit the pending owners arrive with (required when pending)
+#   canonicalOwner    subsystem that will own the final contract, or `unassigned`
+#   mode              reuse | adapt | wire | extend | new-primitive | retire
+#   liveState         live | allowlisted | shadow | dormant | missing
+#   gate              existing feature flag, approval or rollout gate
+#   parityEvidence    tests and observations required before wiring
+#   retirementTarget  superseded path, or `none`
+#
+# `pendingOwners` exists because a responsibility can have a real predecessor that
+# has not merged yet. Omitting it would force a choice between two bad options:
+# claim the path under `currentOwners` and ship a registry that fails its own
+# validator on trunk, or omit the predecessor entirely and invite someone to build
+# a second implementation. It is the exact mirror of `currentOwners` — a pending
+# path must NOT exist — so the moment the work lands, the check fails until the
+# path is promoted. The escape hatch cannot rot into a stale claim.
+#
+# `new-primitive` counts pending owners too. In-flight work is still a predecessor,
+# and "it hasn't merged yet" is precisely the reasoning that produces two parallel
+# implementations of the same mechanism.
+#
+# liveState describes the canonical contract, not the busiest current owner:
+# `missing` means no unified contract exists yet even when the parts are live.
+#
+# KNOWN LIMITATION: the validator checks that every declared owner path exists,
+# but it cannot check that a `missing` claim is true. Absence is not provable by
+# looking at the paths a row already names. The `capability-policy-decision` row
+# was wrong for exactly this reason: it claimed `missing` while
+# `src/gateway/governance/` already held the envelope, the mode ladder and seven
+# adapters. Before writing `missing`, grep the concept across `src/` and skim the
+# candidate subsystem's own directory listing; do not infer absence from an
+# earlier audit.
+
+version: 1
+
+responsibilities:
+  - responsibility: capability-policy-decision
+    intent: One canonical ALLOW / REQUIRE_APPROVAL / DENY decision over existing authorities.
+    # CORRECTED 2026-09-30. This row previously read `canonicalOwner: unassigned`,
+    # `mode: adapt`, `liveState: missing`. All three were wrong: the governance
+    # closure program had already built the envelope (`GovernanceEffect` =
+    # allow/deny/approval_required/skipped), the legacy->shadow->enforced ladder,
+    # seven adapters, and a D0-D6 shadow divergence taxonomy. See the note on
+    # liveState in this file's header for how the error survived validation.
+    currentOwners:
+      - src/gateway/governance/decision.ts
+      - src/gateway/governance/mode.ts
+      - src/gateway/governance/adapters
+      - src/node-host/exec-policy.ts
+      - src/gateway/governance-policy.ts
+      - src/gateway/agent-invocation-governance.ts
+      - src/gateway/enterprise-data/approval-workflow.ts
+    canonicalOwner: src/gateway/governance
+    mode: wire
+    liveState: shadow
+    gate: >-
+      The governance closure plan's mode ladder. `GovernanceDefaultMode` excludes
+      `enforced` at the type level, so no flag can default to enforcement;
+      promotion is a deliberate per-entry decision. `authorizeAgentInvocation`
+      remains unwired in production until approved.
+    parityEvidence: >-
+      Shadow comparison classified by `DivergenceClass` D0-D6 (same effect,
+      stricter with known bypass, stricter with missing attribution, more
+      permissive, different subjects, either side skipped, shadow threw). A denial
+      from any intersecting authority must stay a denial.
+    retirementTarget: none
+
+  - responsibility: invocation-capability
+    intent: Signed, short-lived, single-use execution credential bound to actor, operation and target.
+    # This row is the reason `pendingOwners` exists: a complete parallel
+    # implementation of this mechanism was built and then deleted once this module
+    # was found, so the registry named it while it was still in flight. Promoted to
+    # currentOwners when the local disk read grant landed.
+    currentOwners:
+      - src/local-files
+      - src/local-files/capability.ts
+      - src/local-files/issue.ts
+      - src/local-files/redemption.ts
+      - src/local-files/nonce-ledger.ts
+      - src/local-files/canonical-json.ts
+    canonicalOwner: src/local-files
+    mode: extend
+    liveState: dormant
+    gate: >-
+      Local disk read grant design §8 step 7 acceptance and §10 evidence review.
+      Production implementation and production node pairing remain unapproved.
+    parityEvidence: >-
+      The design's §6 cases 1-14 and §9.6 cases 1-17 as runnable tests. Generalization
+      beyond local files requires a second real consumer and must be an extraction,
+      not a parallel module.
+    retirementTarget: none
+
+  - responsibility: capability-signing-and-keyset
+    intent: Signature scheme, key ids, rotation and pinned trust root for capability tokens.
+    currentOwners:
+      - src/local-files/keyset.ts
+      - src/infra/device-identity.ts
+    canonicalOwner: src/local-files/keyset.ts
+    mode: reuse
+    liveState: dormant
+    gate: Local disk read grant §9.7 P0 keyset requirements.
+    parityEvidence: >-
+      Unknown keyId refused, keyset expiry refused, rotation publishes before signing,
+      revocation by keyset removal invalidates unexpired tokens.
+    retirementTarget: none
+
+  - responsibility: approval-envelope
+    intent: One canonical approval object projected over the existing approval families.
+    currentOwners:
+      - src/gateway/enterprise-data/approval-workflow.ts
+      - src/gateway/enterprise-data/governance-approval-store.ts
+      - src/infra/exec-approvals.ts
+    canonicalOwner: unassigned
+    mode: adapt
+    liveState: missing
+    gate: >-
+      No fourth approval persistence model (§20). Domain stores keep their semantics
+      until parity is proven.
+    parityEvidence: >-
+      Every existing approval family round-trips through the envelope without losing
+      domain semantics, including context-digest invalidation and single-use consumption.
+    retirementTarget: none
+
+  - responsibility: capability-grant
+    intent: Whether a subject may perform an action against a resource now.
+    currentOwners:
+      - src/gateway/enterprise-data/capability-grant-resolver.ts
+      - src/gateway/enterprise-data/data-capability-store.ts
+    canonicalOwner: src/gateway/enterprise-data/capability-grant-resolver.ts
+    mode: adapt
+    liveState: live
+    gate: Existing enterprise-data seat and policy-backed grant authorization.
+    parityEvidence: >-
+      Semantic capability ids project onto existing seat and policy-backed grants with
+      no widening; no new universal grant database (§20).
+    retirementTarget: none
+
+  - responsibility: capability-taxonomy
+    intent: Stable semantic capability identifiers and their mapping to real predecessors.
+    currentOwners:
+      - src/capability-taxonomy
+      - src/gateway/node-command-policy.ts
+      - src/infra/node-commands.ts
+      - src/local-files/types.ts
+    canonicalOwner: src/capability-taxonomy
+    mode: adapt
+    liveState: dormant
+    gate: >-
+      Vocabulary only. Grants nothing, decides nothing, and has no consumers, so
+      adopting it cannot change behavior. Any enforcement is a separate decision.
+    parityEvidence: >-
+      Every identifier has a convergence row. Predecessors naming a node command must
+      exist in the live constants (DEFAULT_DANGEROUS_NODE_COMMANDS,
+      NODE_LOCAL_FILES_READONLY_COMMANDS, NODE_SYSTEM_RUN_COMMANDS,
+      NODE_BROWSER_PROXY_COMMAND), every LOCAL_FILES_OPERATIONS entry maps to a local
+      capability, and nothing is pending. The uncovered-command set is asserted
+      exactly, so a new dangerous command without an identifier fails the suite.
+    retirementTarget: none
+
+  - responsibility: risk-normalization
+    intent: L0-L4 normalization layer over existing risk and side-effect classifications.
+    currentOwners:
+      - src/diagnosis/evolution-proposal.ts
+      - src/diagnosis/remediation.ts
+      - src/gateway/node-command-policy.ts
+      - src/conversation-task/types.ts
+    canonicalOwner: src/capability-risk
+    mode: adapt
+    liveState: dormant
+    gate: >-
+      Mapping contract only. No stored enum migration until mapping parity and
+      operational need are proven (§8.3). No consumers yet, so adopting it cannot
+      change any existing classification's behavior.
+    parityEvidence: >-
+      Adapters bind to the real source enums (EVOLUTION_RISK_LEVELS,
+      SIDE_EFFECT_CLASSES, DEFAULT_DANGEROUS_NODE_COMMANDS) so a new source level
+      surfaces as a test failure instead of falling through. Mappings return a
+      floor that may be raised and never lowered, and unknown input fails closed
+      to L4. The model never selects a level.
+    retirementTarget: none
+
+  - responsibility: prepared-effect
+    intent: Bind an approved effect so target, amount, recipient, content and resource cannot change.
+    currentOwners:
+      - src/local-files/turn-authorization.ts
+      - src/node-host/invoke-system-run-plan.ts
+      - src/diagnosis/remediation.ts
+    canonicalOwner: unassigned
+    mode: adapt
+    liveState: missing
+    gate: Wave C5. Consequential external actions remain unapproved.
+    parityEvidence: >-
+      Approved effect equals committed effect exactly; retries produce no duplicate
+      commits; any material field change invalidates the approval.
+    retirementTarget: none
+
+  - responsibility: execution-target-router
+    intent: Select the safest capable execution target for a step.
+    currentOwners:
+      - src/task-orchestration/surface-router.ts
+      - src/task-orchestration/types.ts
+    canonicalOwner: src/task-orchestration
+    mode: wire
+    liveState: dormant
+    gate: >-
+      ORCHESTRATION_LIVE_INVOKE stays false. The similarly named execution-router
+      specs are skill/tool shadow retrieval and must not become a second live router.
+    parityEvidence: >-
+      Shadow routing decisions compared with live behavior before any dispatch;
+      capability ladder respected so a lower sufficient rung is never skipped.
+    retirementTarget: none
+
+  - responsibility: durable-task-projection
+    intent: One read model over task identity, execution facts, budgets and approvals.
+    currentOwners:
+      - src/conversation-task/types.ts
+      - src/progress-ledger/types.ts
+      - src/task-orchestration/types.ts
+      - src/gateway/supervisor/types.ts
+    canonicalOwner: unassigned
+    mode: wire
+    liveState: dormant
+    gate: >-
+      ConversationTask activation stays off. No second durable task runtime (§20);
+      the projection must not introduce another authoritative lifecycle enum.
+    parityEvidence: >-
+      Projection reproduces domain state without becoming a second source of truth;
+      survives process restart without losing ownership, budgets, approvals or evidence.
+    retirementTarget: none
+
+  - responsibility: task-budget
+    intent: Bounded time, calls, cost and side effects per task.
+    currentOwners:
+      - src/gateway/supervisor/budget.ts
+      - src/gateway/supervisor/types.ts
+    canonicalOwner: src/gateway/supervisor/budget.ts
+    mode: extend
+    liveState: live
+    gate: Existing supervisor budget enforcement.
+    parityEvidence: >-
+      Per-task budgets may only tighten a tenant ceiling, never loosen it; aggregation
+      across budget owners preserves each owner's limit.
+    retirementTarget: none
+
+  - responsibility: execution-evidence
+    intent: Immutable execution facts, evidence and verification class per action.
+    currentOwners:
+      - src/progress-ledger/types.ts
+    canonicalOwner: src/progress-ledger
+    mode: reuse
+    liveState: dormant
+    gate: Progress Ledger acceptance and cutover sign-offs.
+    parityEvidence: >-
+      LLM text cannot write status; forbidden evidence types stay rejected; events remain
+      append-only and ledger state remains a fold.
+    retirementTarget: none
+
+  - responsibility: local-device-capability-profile
+    intent: Named node capability profiles as part of connection identity.
+    currentOwners:
+      - src/local-files/capability-profile.ts
+      - src/local-files/device-binding.ts
+      - src/gateway/node-command-policy.ts
+    canonicalOwner: src/local-files/capability-profile.ts
+    mode: extend
+    liveState: dormant
+    gate: >-
+      Local disk read grant §9.5: five declarations must match exactly before a
+      connection becomes active. Production node pairing remains unapproved.
+    parityEvidence: >-
+      A local-files-readonly device refuses every system.* command at both the gateway
+      and the node, and the generic nodes invoke door stays closed.
+    retirementTarget: none
+
+  - responsibility: typed-node-commands
+    intent: Typed device commands instead of delegating local work to shell.
+    currentOwners:
+      - src/infra/node-commands.ts
+      - src/gateway/node-command-policy.ts
+      - src/node-host/invoke.ts
+    canonicalOwner: src/gateway/node-command-policy.ts
+    mode: extend
+    liveState: live
+    gate: Per-platform command policy and the dangerous-command split.
+    parityEvidence: >-
+      New typed commands are additive and never widen an existing profile; file,
+      window and accessibility commands remain the acknowledged gap.
+    retirementTarget: none
+
+  - responsibility: restricted-shell
+    intent: Shell as a restricted advanced profile, never a universal fallback.
+    currentOwners:
+      - src/node-host/exec-policy.ts
+      - src/node-host/invoke-system-run-allowlist.ts
+      - src/infra/exec-approvals.ts
+    canonicalOwner: src/node-host/exec-policy.ts
+    mode: reuse
+    liveState: live
+    gate: Existing security and ask modes plus node-side re-evaluation.
+    parityEvidence: >-
+      Mature path; reuse without rewrite. Shell must not bypass a typed capability
+      that already exists (§4.2).
+    retirementTarget: none
+
+  - responsibility: browser-binding
+    intent: Browser sessions as bound resources with profile and domain policy.
+    currentOwners:
+      - src/browser/profile-capabilities.ts
+      - src/browser/navigation-guard.ts
+      - src/node-host/invoke-browser.ts
+    canonicalOwner: src/browser
+    mode: extend
+    liveState: live
+    gate: Existing browser proxy profile allowlist.
+    parityEvidence: >-
+      Per-session allowed domains and allowed agents are the gap; today only an SSRF
+      navigation guard and a profile allowlist exist.
+    retirementTarget: none
+
+  - responsibility: operational-identity-binding
+    intent: Governed operational identities usable by an employee without exposing credentials.
+    currentOwners:
+      - src/gateway/user-operational-identity-types.ts
+      - src/gateway/user-operational-identity-access.ts
+    canonicalOwner: src/gateway/user-operational-identity-types.ts
+    mode: extend
+    liveState: live
+    gate: Operational identity governance; the enterprise authorization gate is unwired.
+    parityEvidence: >-
+      Credentials stay behind handles and out of model context; calendar, browser
+      profile, wallet and per-identity budgets remain the gap.
+    retirementTarget: none
+
+  - responsibility: trigger-binding
+    intent: Schedules and events that start bounded autonomous work.
+    currentOwners:
+      - src/cron/schedule.ts
+      - src/progress-ledger/cron-binding.ts
+      - src/cron/conversation-task-bind.ts
+    canonicalOwner: src/cron
+    mode: adapt
+    liveState: live
+    gate: Cron personal-scope authorization.
+    parityEvidence: >-
+      An event is not authorization for downstream actions; connector-event,
+      file-change and task-completion triggers remain absent.
+    retirementTarget: none
+
+  - responsibility: skill-lifecycle
+    intent: Governed skill lifecycle from draft through published to retired.
+    currentOwners:
+      - src/gateway/skill-lifecycle-store.ts
+      - src/security/skill-scanner.ts
+      - src/gateway/asset-admission.ts
+    canonicalOwner: src/gateway/skill-lifecycle-store.ts
+    mode: extend
+    liveState: live
+    gate: Skill lifecycle asset system review and publish surfaces.
+    parityEvidence: >-
+      Skills declare required capabilities before execution and cannot widen authority
+      dynamically; sandbox validation remains scanning-only.
+    retirementTarget: none

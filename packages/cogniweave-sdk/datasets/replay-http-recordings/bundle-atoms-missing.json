@@ -1,0 +1,215 @@
+{
+  "event": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_b",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "Recorded: event stage succeeded",
+        "context": "Event stage response is available.",
+        "constraints": [],
+        "decisions": ["recorded_event_stage"],
+        "turningPoints": [],
+        "linkedAtoms": [],
+        "evidenceRefs": ["evd_http_recorded_b"],
+        "eventKey": "event_key_http_recorded_b",
+        "provenance": {
+          "sourceType": "chat",
+          "ingestionChecksum": "ing_http_recorded_b"
+        }
+      },
+      "atoms": [],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_b",
+          "type": "chat",
+          "uri": "record://http/b",
+          "snippet": "Recorded stage response B.",
+          "trustScore": 0.7,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_b",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_b",
+        "eventKey": "event_key_http_recorded_b",
+        "atomDedupKeys": [],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": ["evt_http_recorded_b", "evd_http_recorded_b"],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_b"]
+      }
+    }
+  },
+  "context": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_b",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "",
+        "context": "",
+        "constraints": [],
+        "decisions": [],
+        "turningPoints": [],
+        "linkedAtoms": [],
+        "evidenceRefs": ["evd_http_recorded_b"],
+        "eventKey": "event_key_http_recorded_b",
+        "provenance": {
+          "sourceType": "chat"
+        }
+      },
+      "atoms": [],
+      "entities": [
+        {
+          "id": "ent_http_recorded_b",
+          "entityType": "service",
+          "name": "retry_worker",
+          "aliases": [],
+          "tags": [],
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "provenance": {
+            "sourceEventIds": ["evt_http_recorded_b"],
+            "evidenceRefs": ["evd_http_recorded_b"]
+          },
+          "entityKey": "entity_key_http_recorded_b"
+        }
+      ],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_b",
+          "type": "chat",
+          "uri": "record://http/b",
+          "snippet": "Recorded stage response B.",
+          "trustScore": 0.7,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_b",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_b",
+        "eventKey": "event_key_http_recorded_b",
+        "atomDedupKeys": [],
+        "entityKeys": ["entity_key_http_recorded_b"],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Entity", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": ["evt_http_recorded_b", "ent_http_recorded_b", "evd_http_recorded_b"],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_b", "ent_http_recorded_b"]
+      }
+    }
+  },
+  "atoms": null,
+  "relations": {
+    "distillationResult": {
+      "event": {
+        "id": "evt_http_recorded_b",
+        "scope": {
+          "workspaceId": "ws_eval",
+          "projectId": "proj_eval",
+          "agentId": "agent_eval",
+          "visibility": "private"
+        },
+        "goal": "",
+        "context": "",
+        "constraints": [],
+        "decisions": [],
+        "turningPoints": [],
+        "linkedAtoms": [],
+        "evidenceRefs": ["evd_http_recorded_b"],
+        "eventKey": "event_key_http_recorded_b",
+        "provenance": {
+          "sourceType": "chat"
+        }
+      },
+      "atoms": [],
+      "entities": [],
+      "scenarios": [],
+      "problems": [],
+      "relations": [],
+      "evidence": [
+        {
+          "id": "evd_http_recorded_b",
+          "type": "chat",
+          "uri": "record://http/b",
+          "snippet": "Recorded stage response B.",
+          "trustScore": 0.7,
+          "scope": {
+            "workspaceId": "ws_eval",
+            "projectId": "proj_eval",
+            "agentId": "agent_eval",
+            "visibility": "private"
+          },
+          "checksum": "checksum_http_recorded_b",
+          "locator": {
+            "messageIds": [],
+            "toolCallIds": []
+          }
+        }
+      ],
+      "keys": {
+        "ingestionChecksum": "ing_http_recorded_b",
+        "eventKey": "event_key_http_recorded_b",
+        "atomDedupKeys": [],
+        "entityKeys": [],
+        "scenarioKeys": [],
+        "problemKeys": []
+      },
+      "writePlan": {
+        "canonicalObjectTypes": ["EventSkeleton", "Evidence"],
+        "relationIds": [],
+        "graphNodeIds": ["evt_http_recorded_b", "evd_http_recorded_b"],
+        "graphEdgeIds": [],
+        "vectorDocumentIds": ["evt_http_recorded_b"]
+      }
+    }
+  }
+}

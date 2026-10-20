@@ -1,0 +1,33 @@
+{
+  "name": "@openbot/toolkit",
+  "version": "0.2.0",
+  "private": true,
+  "description": "OpenBot toolkit blueprint Phase 2: Policy → Approval → Receipt gate, ToolRegistry, and execution receipts.",
+  "files": [
+    "dist",
+    "src",
+    "catalog",
+    "combos",
+    "schemas",
+    "config",
+    "docs",
+    "README.md",
+    "LANDING.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  }
+}

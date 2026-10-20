@@ -1,0 +1,76 @@
+{
+  "kind": "human_independent_approval_record",
+  "increment": "P22",
+  "schemaVersion": 1,
+  "candidateSha": "2156a529d64cbf04bdbf2ce32f2db9f903d46460",
+  "liveSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+  "approvalDoesNotOpenGate": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "confirmHuman": true,
+  "confirmDoesNotOpenGate": true,
+  "confirmDoesNotStartP23": true,
+  "signer": "Daniel / CEO",
+  "subjects": [
+    {
+      "subject": "role",
+      "subjectId": "platform_security",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve"
+    },
+    {
+      "subject": "role",
+      "subjectId": "enterprise_admin",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve"
+    },
+    {
+      "subject": "role",
+      "subjectId": "employee",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve"
+    },
+    {
+      "subject": "role",
+      "subjectId": "delivery_ledger_owner",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve"
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": false
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": false
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": false
+    },
+    {
+      "subject": "gate",
+      "subjectId": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "signer": "Daniel / CEO",
+      "signed": true,
+      "decision": "approve",
+      "valueAfterApproval": false
+    }
+  ]
+}

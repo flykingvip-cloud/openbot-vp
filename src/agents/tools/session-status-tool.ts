@@ -1,0 +1,295 @@
+import { Type } from "@sinclair/typebox";
+import { normalizeGroupActivation } from "../../auto-reply/group-activation.js";
+import { getFollowupQueueDepth, resolveQueueSettings } from "../../auto-reply/reply/queue.js";
+import { buildStatusMessage } from "../../auto-reply/status.js";
+import type { OpenBotConfig } from "../../config/config.js";
+import { loadConfig } from "../../config/config.js";
+import { loadSessionStore, resolveStorePath, type SessionEntry } from "../../config/sessions.js";
+import { loadCombinedSessionStoreForGateway } from "../../gateway/session-utils.js";
+import {
+  formatUsageWindowSummary,
+  loadProviderUsageSummary,
+  resolveUsageProviderId,
+} from "../../infra/provider-usage.js";
+import {
+  buildAgentMainSessionKey,
+  DEFAULT_AGENT_ID,
+  resolveAgentIdFromSessionKey,
+} from "../../routing/session-key.js";
+import { resolveAgentDir } from "../agent-scope.js";
+import { formatUserTime, resolveUserTimeFormat, resolveUserTimezone } from "../date-time.js";
+import { resolveModelAuthLabel } from "../model-auth-label.js";
+import { resolveDefaultModelForAgent } from "../model-selection.js";
+import type { AnyAgentTool } from "./common.js";
+import { readStringParam } from "./common.js";
+import {
+  shouldResolveSessionIdInput,
+  resolveInternalSessionKey,
+  resolveMainSessionAlias,
+  createAgentToAgentPolicy,
+} from "./sessions-helpers.js";
+
+const SessionStatusToolSchema = Type.Object({
+  sessionKey: Type.Optional(Type.String()),
+  model: Type.Optional(Type.String()),
+});
+
+function resolveSessionEntry(params: {
+  store: Record<string, SessionEntry>;
+  keyRaw: string;
+  alias: string;
+  mainKey: string;
+}): { key: string; entry: SessionEntry } | null {
+  const keyRaw = params.keyRaw.trim();
+  if (!keyRaw) {
+    return null;
+  }
+  const internal = resolveInternalSessionKey({
+    key: keyRaw,
+    alias: params.alias,
+    mainKey: params.mainKey,
+  });
+
+  const candidates = new Set<string>([keyRaw, internal]);
+  if (!keyRaw.startsWith("agent:")) {
+    candidates.add(`agent:${DEFAULT_AGENT_ID}:${keyRaw}`);
+    candidates.add(`agent:${DEFAULT_AGENT_ID}:${internal}`);
+  }
+  if (keyRaw === "main") {
+    candidates.add(
+      buildAgentMainSessionKey({
+        agentId: DEFAULT_AGENT_ID,
+        mainKey: params.mainKey,
+      }),
+    );
+  }
+
+  for (const key of candidates) {
+    const entry = params.store[key];
+    if (entry) {
+      return { key, entry };
+    }
+  }
+
+  return null;
+}
+
+function resolveSessionKeyFromSessionId(params: {
+  cfg: OpenBotConfig;
+  sessionId: string;
+  agentId?: string;
+}): string | null {
+  const trimmed = params.sessionId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const { store } = loadCombinedSessionStoreForGateway(params.cfg);
+  const match = Object.entries(store).find(([key, entry]) => {
+    if (entry?.sessionId !== trimmed) {
+      return false;
+    }
+    if (!params.agentId) {
+      return true;
+    }
+    return resolveAgentIdFromSessionKey(key) === params.agentId;
+  });
+  return match?.[0] ?? null;
+}
+
+export function createSessionStatusTool(opts?: {
+  agentSessionKey?: string;
+  config?: OpenBotConfig;
+}): AnyAgentTool {
+  return {
+    label: "Session Status",
+    name: "session_status",
+    description:
+      "Show a /status-equivalent session status card (usage + time + cost when available). Use for model-use questions (📊 session_status).",
+    parameters: SessionStatusToolSchema,
+    execute: async (_toolCallId, args) => {
+      const params = args as Record<string, unknown>;
+      const cfg = opts?.config ?? loadConfig();
+      const { mainKey, alias } = resolveMainSessionAlias(cfg);
+      const a2aPolicy = createAgentToAgentPolicy(cfg);
+
+      const requestedKeyParam = readStringParam(params, "sessionKey");
+      let requestedKeyRaw = requestedKeyParam ?? opts?.agentSessionKey;
+      if (!requestedKeyRaw?.trim()) {
+        throw new Error("sessionKey required");
+      }
+
+      const requesterAgentId = resolveAgentIdFromSessionKey(
+        opts?.agentSessionKey ?? requestedKeyRaw,
+      );
+      const ensureAgentAccess = (targetAgentId: string) => {
+        if (targetAgentId === requesterAgentId) {
+          return;
+        }
+        // Gate cross-agent access behind tools.agentToAgent settings.
+        if (!a2aPolicy.enabled) {
+          throw new Error(
+            "Agent-to-agent status is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent access.",
+          );
+        }
+        if (!a2aPolicy.isAllowed(requesterAgentId, targetAgentId)) {
+          throw new Error("Agent-to-agent session status denied by tools.agentToAgent.allow.");
+        }
+      };
+
+      if (requestedKeyRaw.startsWith("agent:")) {
+        ensureAgentAccess(resolveAgentIdFromSessionKey(requestedKeyRaw));
+      }
+
+      const isExplicitAgentKey = requestedKeyRaw.startsWith("agent:");
+      let agentId = isExplicitAgentKey
+        ? resolveAgentIdFromSessionKey(requestedKeyRaw)
+        : requesterAgentId;
+      let storePath = resolveStorePath(cfg.session?.store, { agentId });
+      let store = loadSessionStore(storePath);
+
+      // Resolve against the requester-scoped store first to avoid leaking default agent data.
+      let resolved = resolveSessionEntry({
+        store,
+        keyRaw: requestedKeyRaw,
+        alias,
+        mainKey,
+      });
+
+      if (!resolved && shouldResolveSessionIdInput(requestedKeyRaw)) {
+        const resolvedKey = resolveSessionKeyFromSessionId({
+          cfg,
+          sessionId: requestedKeyRaw,
+          agentId: a2aPolicy.enabled ? undefined : requesterAgentId,
+        });
+        if (resolvedKey) {
+          // If resolution points at another agent, enforce A2A policy before switching stores.
+          ensureAgentAccess(resolveAgentIdFromSessionKey(resolvedKey));
+          requestedKeyRaw = resolvedKey;
+          agentId = resolveAgentIdFromSessionKey(resolvedKey);
+          storePath = resolveStorePath(cfg.session?.store, { agentId });
+          store = loadSessionStore(storePath);
+          resolved = resolveSessionEntry({
+            store,
+            keyRaw: requestedKeyRaw,
+            alias,
+            mainKey,
+          });
+        }
+      }
+
+      if (!resolved) {
+        const kind = shouldResolveSessionIdInput(requestedKeyRaw) ? "sessionId" : "sessionKey";
+        throw new Error(`Unknown ${kind}: ${requestedKeyRaw}`);
+      }
+
+      const configured = resolveDefaultModelForAgent({ cfg, agentId });
+      const modelRaw = readStringParam(params, "model");
+      const changedModel = false;
+      if (typeof modelRaw === "string") {
+        throw new Error(
+          "session_status no longer mutates per-session model overrides. Use the governed platform/enterprise model chain instead.",
+        );
+      }
+
+      const agentDir = resolveAgentDir(cfg, agentId);
+      const providerForCard = configured.provider;
+      const usageProvider = resolveUsageProviderId(providerForCard);
+      let usageLine: string | undefined;
+      if (usageProvider) {
+        try {
+          const usageSummary = await loadProviderUsageSummary({
+            timeoutMs: 3500,
+            providers: [usageProvider],
+            agentDir,
+          });
+          const snapshot = usageSummary.providers.find((entry) => entry.provider === usageProvider);
+          if (snapshot) {
+            const formatted = formatUsageWindowSummary(snapshot, {
+              now: Date.now(),
+              maxWindows: 2,
+              includeResets: true,
+            });
+            if (formatted && !formatted.startsWith("error:")) {
+              usageLine = `📊 Usage: ${formatted}`;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const isGroup =
+        resolved.entry.chatType === "group" ||
+        resolved.entry.chatType === "channel" ||
+        resolved.key.includes(":group:") ||
+        resolved.key.includes(":channel:");
+      const groupActivation = isGroup
+        ? (normalizeGroupActivation(resolved.entry.groupActivation) ?? "mention")
+        : undefined;
+
+      const queueSettings = resolveQueueSettings({
+        cfg,
+        channel: resolved.entry.channel ?? resolved.entry.lastChannel ?? "unknown",
+        sessionEntry: resolved.entry,
+      });
+      const queueKey = resolved.key ?? resolved.entry.sessionId;
+      const queueDepth = queueKey ? getFollowupQueueDepth(queueKey) : 0;
+      const queueOverrides = Boolean(
+        resolved.entry.queueDebounceMs ?? resolved.entry.queueCap ?? resolved.entry.queueDrop,
+      );
+
+      const userTimezone = resolveUserTimezone(cfg.agents?.defaults?.userTimezone);
+      const userTimeFormat = resolveUserTimeFormat(cfg.agents?.defaults?.timeFormat);
+      const userTime = formatUserTime(new Date(), userTimezone, userTimeFormat);
+      const timeLine = userTime
+        ? `🕒 Time: ${userTime} (${userTimezone})`
+        : `🕒 Time zone: ${userTimezone}`;
+
+      const agentDefaults = cfg.agents?.defaults ?? {};
+      const defaultLabel = `${configured.provider}/${configured.model}`;
+      const agentModel =
+        typeof agentDefaults.model === "object" && agentDefaults.model
+          ? { ...agentDefaults.model, primary: defaultLabel }
+          : { primary: defaultLabel };
+      const statusText = buildStatusMessage({
+        config: cfg,
+        agent: {
+          ...agentDefaults,
+          model: agentModel,
+        },
+        agentId,
+        sessionEntry: resolved.entry,
+        sessionKey: resolved.key,
+        sessionStorePath: storePath,
+        groupActivation,
+        modelAuth: resolveModelAuthLabel({
+          provider: providerForCard,
+          cfg,
+          sessionEntry: resolved.entry,
+          agentDir,
+        }),
+        usageLine,
+        timeLine,
+        queue: {
+          mode: queueSettings.mode,
+          depth: queueDepth,
+          debounceMs: queueSettings.debounceMs,
+          cap: queueSettings.cap,
+          dropPolicy: queueSettings.dropPolicy,
+          showDetails: queueOverrides,
+        },
+        includeTranscriptUsage: true,
+      });
+
+      return {
+        content: [{ type: "text", text: statusText }],
+        details: {
+          ok: true,
+          sessionKey: resolved.key,
+          changedModel,
+          statusText,
+        },
+      };
+    },
+  };
+}

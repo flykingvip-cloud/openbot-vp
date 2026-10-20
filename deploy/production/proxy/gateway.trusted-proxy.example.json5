@@ -1,0 +1,38 @@
+// Merge into production openclaw.json / openbot.json (Wave 2).
+// Cookie-native multi-subdomain path — no BFF required for first production.
+// Secrets stay in env; do not commit real tokens.
+{
+  gateway: {
+    mode: "local",
+    bind: "loopback",
+    port: 18789,
+    trustedProxies: ["127.0.0.1", "::1"],
+    controlUi: {
+      enabled: true,
+      allowedOrigins: [
+        "https://admin.openbot.love",
+        "https://biz.openbot.love",
+        "https://gw.openbot.love",
+        "https://openbot.love",
+        "https://www.openbot.love",
+      ],
+    },
+    auth: {
+      mode: "trusted-proxy",
+      trustedProxy: {
+        userHeader: "x-forwarded-user",
+        requiredHeaders: ["x-forwarded-proto", "x-forwarded-host"],
+        // Enables /__openbot/platform-auth/* for cookie login on admin.
+        platformAuth: { enabled: true },
+      },
+    },
+  },
+  data: {
+    mode: "managed",
+  },
+  agents: {
+    defaults: {
+      sandbox: { mode: "all" },
+    },
+  },
+}

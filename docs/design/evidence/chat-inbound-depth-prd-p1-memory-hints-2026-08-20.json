@@ -1,0 +1,33 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "pr": "D",
+  "fix": "p1-selected-sources-through-memory-hints",
+  "capturedAt": "2026-08-20T08:50:10+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "7ca3d8fab7",
+  "codeSha": "b3dc2add46",
+  "originMainSha": "1d89c302ea",
+  "originMainIsAncestor": true,
+  "aheadBehindAtCapture": { "ahead": 27, "behind": 0 },
+  "rebaseNote": "Rebased onto origin/main. .loom/registry.yaml conflict resolved by keeping both memory-workspace-platform-remediation:cursor-data-governance-phase1b-unlock-minima and chat-inbound-depth-router:cursor-chat-inbound-depth. git merge-base --is-ancestor origin/main HEAD now succeeds.",
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/gateway/knowledge/resolve/abort-timeout.test.ts src/gateway/knowledge/resolve/resolve-engine.inbound-policy.test.ts src/gateway/knowledge/resolve/resolve-engine.evidence.test.ts src/gateway/knowledge/resolve/evidence-format.test.ts src/gateway/knowledge/resolve-engine.test.ts src/gateway/knowledge/sources/source-api-runtime.test.ts src/gateway/chat-inbound-flags.test.ts src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts",
+  "note": "Post-rebase retest of memoryHints selected-source filter. Unmapped, restricted, expired, and source-mismatched visits fail closed. Empty selected yields memoryHints=[]. Runtime tests cover enterprise-only, personal-only, and empty selected. C chat zero-knowledge/zero-tool regression remains in this suite.",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "10 passed (10)",
+    "tests": "86 passed (86)",
+    "duration": "8.91s"
+  },
+  "assertions": {
+    "originMainIsAncestor": true,
+    "selectedEnterpriseMemoryHintsDropPersonalDataUnmappedAndRestricted": true,
+    "selectedPersonalMemoryHintsDropEnterpriseDataUnmappedAndRestricted": true,
+    "emptySelectedClearsMemoryHints": true,
+    "previousGraphRecommendationAndEvidenceGatesRemainGreen": true,
+    "chatZeroKnowledgeZeroToolRegressionCovered": true
+  },
+  "productionLive": false,
+  "liveFlagEnabled": false
+}

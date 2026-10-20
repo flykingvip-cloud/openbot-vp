@@ -1,0 +1,44 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch4-s06/v1",
+  "item": 7,
+  "status": "retirement-batch-4",
+  "batch": "S06",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S06",
+      "file": "src/gateway/checkpoint-store.ts",
+      "symbol": "resolveEmployeeBuiltinStewardWorkspaceDir",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 25,
+  "liveWriteWatchIndex": 25,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/checkpoint-store.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "7df232309134f75751be39fff42f32be8fcfac3c",
+  "note": "Batch 4 retires S06 only after #607 S07. Steward lookup uses resolveWorkspaceLocator and fail-closes. No createEmptyWorkspaceCatalog. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

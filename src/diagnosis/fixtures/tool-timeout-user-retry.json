@@ -1,0 +1,529 @@
+{
+  "schemaVersion": 1,
+  "graphKind": "DiagnosticRunGraph",
+  "run": {
+    "schemaVersion": 1,
+    "runId": "diag-run-fixture-4",
+    "caseId": "case-fixture-4",
+    "mode": "TARGETED",
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004",
+          "timeRange": {
+            "from": "2026-09-01T13:00:00.000Z",
+            "to": "2026-09-01T13:12:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      }
+    ],
+    "requestedBy": {
+      "schemaVersion": 1,
+      "principalId": "principal-fixture-enterprise-a",
+      "kind": "user",
+      "tenantId": "tenant-fixture-a"
+    },
+    "mutationPolicy": "READ_ONLY",
+    "budget": {
+      "timeoutMs": 30000,
+      "maxDiagnosers": 5,
+      "modelCalls": 0
+    },
+    "status": "completed",
+    "completion": "CONFIRMED",
+    "missingEvidence": [],
+    "startedAt": "2026-09-01T13:12:01.000Z",
+    "completedAt": "2026-09-01T13:12:03.800Z",
+    "diagnosedAgentRunId": "agent-run-fixture-4"
+  },
+  "evidences": [
+    {
+      "evidenceId": "ev-fixture-4-session-retry",
+      "evidenceType": "event",
+      "source": "session_store",
+      "authorityRecordId": "session-jsonl:sha256:fixture-session-key-a0000000000000000000000000000004#retry-window",
+      "observedAt": "2026-09-01T13:03:10.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      "summary": {
+        "messageReceived": true,
+        "retryCount": 3,
+        "userRetry": true
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-4-session-retry",
+        "collectorVersion": "session-adapter.v1"
+      },
+      "collection": {
+        "method": "query",
+        "completeness": "complete",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/sessions/transcript-events.ts"
+    },
+    {
+      "evidenceId": "ev-fixture-4-tool-timeout",
+      "evidenceType": "event",
+      "source": "tool_runtime",
+      "authorityRecordId": "tool-hook:tool-call-fixture-4",
+      "observedAt": "2026-09-01T13:00:40.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      "summary": {
+        "toolNameClass": "web_fetch",
+        "timeout": true,
+        "errorClass": "tool_timeout",
+        "latencyMs": 30000
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-4-tool-timeout",
+        "collectorVersion": "tool-hook-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "complete",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/agents/tools/"
+    },
+    {
+      "evidenceId": "ev-fixture-4-agent-failed",
+      "evidenceType": "event",
+      "source": "agent_runner",
+      "authorityRecordId": "agent-hook:agent-run-fixture-4#failed",
+      "observedAt": "2026-09-01T13:00:41.000Z",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      "summary": {
+        "agentStarted": true,
+        "agentCompleted": false,
+        "errorClass": "agent_run_failed",
+        "agentRunId": "agent-run-fixture-4"
+      },
+      "integrity": {
+        "contentHash": "sha256:fixture-content-ev-4-agent-failed",
+        "collectorVersion": "agent-hook-adapter.v1"
+      },
+      "collection": {
+        "method": "event_adapter",
+        "completeness": "complete",
+        "attributionResolution": "not_applicable"
+      },
+      "privacy": {
+        "classification": "internal",
+        "redacted": true
+      },
+      "schemaVersion": 1,
+      "authority": "src/agents/agent-runner.ts"
+    }
+  ],
+  "observations": [
+    {
+      "observationId": "obs-fixture-4-tool-timeout",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "tool.timeout",
+      "value": true,
+      "evidenceIds": ["ev-fixture-4-tool-timeout"],
+      "observedAt": "2026-09-01T13:00:40.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-4-agent-failed",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "predicate": "agent.run.failed",
+      "value": true,
+      "evidenceIds": ["ev-fixture-4-agent-failed"],
+      "observedAt": "2026-09-01T13:00:41.000Z",
+      "schemaVersion": 1
+    },
+    {
+      "observationId": "obs-fixture-4-user-retry",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "scope": {
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      "predicate": "session.user_retry",
+      "value": true,
+      "evidenceIds": ["ev-fixture-4-session-retry"],
+      "observedAt": "2026-09-01T13:03:10.000Z",
+      "schemaVersion": 1
+    }
+  ],
+  "assessments": [
+    {
+      "assessmentId": "asmt-fixture-4-tool-timeout",
+      "observationIds": ["obs-fixture-4-tool-timeout"],
+      "code": "tool_invocation_timeout",
+      "verdict": "anomalous",
+      "ruleId": "rule.tool.timeout.v1",
+      "schemaVersion": 1
+    },
+    {
+      "assessmentId": "asmt-fixture-4-agent-failed",
+      "observationIds": ["obs-fixture-4-agent-failed"],
+      "code": "agent_run_failed",
+      "verdict": "anomalous",
+      "ruleId": "rule.agent_run.failed.v1",
+      "schemaVersion": 1
+    },
+    {
+      "assessmentId": "asmt-fixture-4-user-retry",
+      "observationIds": ["obs-fixture-4-user-retry"],
+      "code": "session_user_retry",
+      "verdict": "anomalous",
+      "ruleId": "rule.session.retry.v1",
+      "schemaVersion": 1
+    }
+  ],
+  "attributions": [
+    {
+      "attributionId": "attr-fixture-4-tool",
+      "assessmentId": "asmt-fixture-4-tool-timeout",
+      "suspectedTarget": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main"
+        }
+      },
+      "responsibilityDomain": "skill_tool",
+      "state": "confirmed",
+      "basis": "rule",
+      "schemaVersion": 1
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesisId": "hyp-fixture-4-timeout-inducing-retry",
+      "code": "tool_timeout_inducing_retry",
+      "state": "confirmed",
+      "confidence": {
+        "evidence": 0.97,
+        "assessment": 0.94,
+        "rootCause": 0.9,
+        "impact": 0.62
+      },
+      "supportingEvidenceIds": [
+        "ev-fixture-4-tool-timeout",
+        "ev-fixture-4-agent-failed",
+        "ev-fixture-4-session-retry"
+      ],
+      "contradictingEvidenceIds": [],
+      "missingEvidence": [],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    },
+    {
+      "hypothesisId": "hyp-fixture-4-user-impatience",
+      "code": "user_impatience_independent",
+      "state": "rejected",
+      "confidence": {
+        "evidence": 0.7,
+        "assessment": 0.3,
+        "rootCause": 0.12,
+        "impact": 0
+      },
+      "supportingEvidenceIds": [],
+      "contradictingEvidenceIds": ["ev-fixture-4-tool-timeout"],
+      "missingEvidence": [],
+      "scoringMethod": "rule_v1",
+      "schemaVersion": 1
+    }
+  ],
+  "findings": [
+    {
+      "findingId": "find-fixture-4-tool-timeout-user-retry",
+      "code": "tool_timeout_user_retry",
+      "title": "Tool timeout caused agent failure and user retries",
+      "target": {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      "status": "open",
+      "severity": "P1",
+      "primaryDomain": "skill_tool",
+      "observationIds": [
+        "obs-fixture-4-tool-timeout",
+        "obs-fixture-4-agent-failed",
+        "obs-fixture-4-user-retry"
+      ],
+      "assessmentIds": [
+        "asmt-fixture-4-tool-timeout",
+        "asmt-fixture-4-agent-failed",
+        "asmt-fixture-4-user-retry"
+      ],
+      "attributionIds": ["attr-fixture-4-tool"],
+      "hypothesisIds": ["hyp-fixture-4-timeout-inducing-retry"],
+      "evidenceIds": [
+        "ev-fixture-4-tool-timeout",
+        "ev-fixture-4-agent-failed",
+        "ev-fixture-4-session-retry"
+      ],
+      "confidence": {
+        "evidence": 0.97,
+        "assessment": 0.94,
+        "rootCause": 0.9,
+        "impact": 0.62
+      },
+      "fingerprint": "skill_tool|tool_timeout|tool:tool-fixture-web-fetch|session:sha256:fixture-session-key-a0000000000000000000000000000004",
+      "firstSeenAt": "2026-09-01T13:00:40.000Z",
+      "lastSeenAt": "2026-09-01T13:03:10.000Z",
+      "schemaVersion": 1,
+      "completion": "CONFIRMED"
+    }
+  ],
+  "relations": [
+    {
+      "relationId": "rel-fixture-4-timeout-contributes-agent",
+      "fromId": "obs-fixture-4-tool-timeout",
+      "toId": "obs-fixture-4-agent-failed",
+      "relation": "contributes_to",
+      "derivation": "RULE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.9,
+      "evidenceIds": ["ev-fixture-4-tool-timeout", "ev-fixture-4-agent-failed"],
+      "schemaVersion": 1
+    },
+    {
+      "relationId": "rel-fixture-4-agent-correlated-retry",
+      "fromId": "obs-fixture-4-agent-failed",
+      "toId": "obs-fixture-4-user-retry",
+      "relation": "correlated_with",
+      "derivation": "EVIDENCE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.8,
+      "evidenceIds": ["ev-fixture-4-agent-failed", "ev-fixture-4-session-retry"],
+      "schemaVersion": 1
+    },
+    {
+      "relationId": "rel-fixture-4-timeout-contributes-retry",
+      "fromId": "obs-fixture-4-tool-timeout",
+      "toId": "obs-fixture-4-user-retry",
+      "relation": "contributes_to",
+      "derivation": "RULE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.86,
+      "evidenceIds": ["ev-fixture-4-tool-timeout", "ev-fixture-4-session-retry"],
+      "schemaVersion": 1
+    },
+    {
+      "relationId": "rel-fixture-4-timeout-causes-finding",
+      "fromId": "obs-fixture-4-tool-timeout",
+      "toId": "find-fixture-4-tool-timeout-user-retry",
+      "relation": "causes",
+      "derivation": "RULE_DERIVED",
+      "state": "accepted",
+      "confidence": 0.9,
+      "evidenceIds": [
+        "ev-fixture-4-tool-timeout",
+        "ev-fixture-4-agent-failed",
+        "ev-fixture-4-session-retry"
+      ],
+      "schemaVersion": 1
+    }
+  ],
+  "case": {
+    "schemaVersion": 1,
+    "caseId": "case-fixture-4",
+    "tenantId": "tenant-fixture-a",
+    "status": "DIAGNOSING",
+    "diagnosticRunIds": ["diag-run-fixture-4"],
+    "findingIds": ["find-fixture-4-tool-timeout-user-retry"],
+    "relationIds": [
+      "rel-fixture-4-timeout-contributes-agent",
+      "rel-fixture-4-agent-correlated-retry",
+      "rel-fixture-4-timeout-contributes-retry",
+      "rel-fixture-4-timeout-causes-finding"
+    ],
+    "mergeKey": "tenant-fixture-a|sha256:fixture-session-key-a0000000000000000000000000000004|skill_tool|tool_timeout|tool:tool-fixture-web-fetch",
+    "mergedObservationPredicates": ["tool.timeout", "agent.run.failed", "session.user_retry"],
+    "impact": {
+      "affectedCount": 1,
+      "code": "case:find-fixture-4-tool-timeout-user-retry"
+    },
+    "timeline": [
+      {
+        "at": "2026-09-01T13:00:40.000Z",
+        "code": "observation:obs-fixture-4-tool-timeout"
+      },
+      {
+        "at": "2026-09-01T13:00:41.000Z",
+        "code": "observation:obs-fixture-4-agent-failed"
+      },
+      {
+        "at": "2026-09-01T13:03:10.000Z",
+        "code": "observation:obs-fixture-4-user-retry"
+      }
+    ],
+    "targets": [
+      {
+        "schemaVersion": 1,
+        "targetType": "session",
+        "targetId": "session-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "session_store",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004",
+          "timeRange": {
+            "from": "2026-09-01T13:00:00.000Z",
+            "to": "2026-09-01T13:12:00.000Z"
+          }
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "run",
+        "targetId": "agent-run-fixture-4",
+        "tenantId": "tenant-fixture-a",
+        "authority": "agent_runner",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      },
+      {
+        "schemaVersion": 1,
+        "targetType": "tool",
+        "targetId": "tool-fixture-web-fetch",
+        "tenantId": "tenant-fixture-a",
+        "authority": "tool_runtime",
+        "capability": "execute",
+        "scope": {
+          "agentId": "agent-fixture-main",
+          "sessionKeyHash": "sha256:fixture-session-key-a0000000000000000000000000000004"
+        }
+      }
+    ]
+  },
+  "verification": {
+    "schemaVersion": 1,
+    "verificationId": "ver-fixture-4",
+    "caseId": "case-fixture-4",
+    "baselineWindow": {
+      "from": "2026-08-25T00:00:00.000Z",
+      "to": "2026-09-01T00:00:00.000Z"
+    },
+    "observationWindow": {
+      "from": "2026-09-01T14:00:00.000Z",
+      "to": "2026-09-02T14:00:00.000Z"
+    },
+    "expectedOutcome": {
+      "user_retry_rate": 0.1,
+      "tool_timeout_rate": 0.2,
+      "user_retry_rate_comparator": "lte",
+      "tool_timeout_rate_comparator": "lte"
+    },
+    "measuredOutcome": {
+      "user_retry_rate": 0.08,
+      "tool_timeout_rate": 0.12,
+      "authority": "evolution_governance",
+      "authorityRecordId": "gov-effect-fixture-4"
+    },
+    "verdict": "improved"
+  }
+}

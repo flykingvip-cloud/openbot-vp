@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-rgwj-5xj2-c3m3",
+  "cve": null,
+  "package": "mysql2",
+  "vulnerable_range": "<=3.23.0",
+  "affected_version_before": "3.22.5",
+  "dependency_path": ".>mysql2",
+  "severity": "moderate",
+  "direct_or_transitive": "direct",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=3.23.1",
+  "mitigated_version": "3.23.1",
+  "reachable_surface": "MySQL client / compressed protocol handler (direct root dependency)",
+  "mitigation": "Bump dependencies.mysql2 to ^3.23.1; pnpm.overrides.mysql2=3.23.1",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 26,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-rgwj-5xj2-c3m3"
+}

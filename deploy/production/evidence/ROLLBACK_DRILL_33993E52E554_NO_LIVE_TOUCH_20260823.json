@@ -1,0 +1,33 @@
+{
+  "schema": "isolated-rollback-drill/v1",
+  "status": "pass",
+  "touchedLive": false,
+  "recordedAt": "2026-08-23T11:35:20Z",
+  "timezone": "Asia/Shanghai",
+  "host": "root@8.217.93.71",
+  "baselineLive": {
+    "container": "openbot-gateway-rc",
+    "commit": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "startedAt": "2026-08-23 17:28:05.609979146 +0800 CST",
+    "port": 18789,
+    "ledgerSeq": 40
+  },
+  "rollbackTargetImage": {
+    "tag": "localhost/openbot:rc-amd64-provenance-33993e52e554",
+    "buildInfoCommit": "33993e52e5540f76e57d66ab75d8955420437d3a"
+  },
+  "drill": {
+    "containerName": "openbot-rollback-drill-33993e52e554",
+    "port": 18890,
+    "healthz": 200,
+    "readyz": true,
+    "httpRoot": 200,
+    "websocketUpgrade": "101 Switching Protocols",
+    "destroyedAfter": true
+  },
+  "after": {
+    "liveCommit": "33993e52e5540f76e57d66ab75d8955420437d3a",
+    "liveStartedAtUnchanged": true,
+    "touchedGatewayRc": false
+  }
+}

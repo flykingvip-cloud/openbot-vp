@@ -1,0 +1,150 @@
+{
+  "candidateId": "evolution-eligible-rc.2026.09.07",
+  "candidateRevision": "RC11",
+  "candidateSha": "aa749b91ff51996265093e3d83f99bf94888c389",
+  "baselineSha": "678e50c1ff0505468f0cebd569bea5bda6cc018f",
+  "originMainSha": "678e50c1ff0505468f0cebd569bea5bda6cc018f",
+  "worktreePath": "openbot-evolution-eligible-rc11-678e50c1",
+  "branch": "cursor-evolution/evolution-eligible-rc-678e50c1",
+  "generatedAt": "2026-09-07T20:41:00+08:00",
+  "ancestryValid": true,
+  "worktreeClean": true,
+  "candidateChangesCommitted": true,
+  "sharedDirtyTreeUsedAsInput": false,
+  "fetchEnvironment": {
+    "writableGitFetch": true,
+    "fetchedFrom": "openbot",
+    "note": "Fresh fetch succeeded. origin/main was 678e50c1 at generation."
+  },
+  "previousCandidateRevision": "RC10",
+  "previousCandidateSha": "5f9d6e4f0f57af0058866ecfc4f12d42fe654792",
+  "previousMergedSha": "678e50c1ff0505468f0cebd569bea5bda6cc018f",
+  "supersedes": {
+    "worktreePath": "openbot-evolution-eligible-rc10-4ccff829",
+    "expiredHead": "9d1e9d3b75ef147b795a86729d91af34917853b5",
+    "expiredEvidenceSha": "5f9d6e4f0f57af0058866ecfc4f12d42fe654792",
+    "expiredOriginMainSha": "4ccff8291442fbb51e5f1117b475b9fd76c704bd",
+    "reason": "RC10 evidence still names originMainSha=4ccff829 after #1023 squash-merged as 678e50c1. RC10 release-ready PASS cannot prove the current trunk is releasable."
+  },
+  "mergedTrunk": {
+    "pr": "https://github.com/gmood2008/openbot/pull/1023",
+    "prState": "MERGED",
+    "mergedSha": "678e50c1ff0505468f0cebd569bea5bda6cc018f",
+    "parentSha": "baab8ab1de53aa2958df63b8a98f02248b84871a",
+    "mergeKind": "squash",
+    "originalPrTipInMain": false,
+    "dockerFixPresent": true
+  },
+  "tests": {
+    "evolutionCore": {
+      "result": "12 files / 55 passed"
+    },
+    "evolutionCoreTypecheck": {
+      "result": "pass"
+    },
+    "focusedSuite": {
+      "result": "44 files / 347 passed",
+      "plusEvolutionCore": "12 files / 55 passed",
+      "requiredPresent": {
+        "capsule-eligibility": "pass",
+        "historical-closure": "pass",
+        "external-effect": "pass",
+        "skill-installation-live-loop": "pass",
+        "working-dna-promote-loop": "pass",
+        "organization-live-loop": "pass",
+        "runtime-live-loop": "pass",
+        "flight-check": "pass",
+        "skill-auto-evolution": "pass",
+        "skill-execution-binding-regression": "pass"
+      }
+    }
+  },
+  "baseDebtErrorCount": 0,
+  "firstBaseDebtError": null,
+  "typecheck": {
+    "tsgo": {
+      "command": "pnpm tsgo",
+      "result": "pass",
+      "errorCount": 0
+    }
+  },
+  "build": {
+    "full": {
+      "command": "pnpm build",
+      "result": "pass"
+    }
+  },
+  "check": {
+    "command": "pnpm check",
+    "result": "pass"
+  },
+  "diffCheck": {
+    "command": "git diff --check",
+    "result": "pass"
+  },
+  "attribution": {
+    "command": "bun scripts/agent-attribution.ts --fail-on-conflict",
+    "result": "pass",
+    "candidateConflicts": 0
+  },
+  "githubCiOnTip": {
+    "headSha": "678e50c1ff0505468f0cebd569bea5bda6cc018f",
+    "workflowSanity": "success",
+    "ciGate": "success",
+    "ci": "failure",
+    "installSmoke": "in_progress",
+    "dockerRelease": "in_progress",
+    "ciUrl": "https://github.com/gmood2008/openbot/actions/runs/34121348467",
+    "note": "GitHub CI failure is recorded and does not authorize deploy. Local tsgo/check/build on this tip passed. Do not treat ancestor images as this tip."
+  },
+  "capsuleHistoricalDisposition": {
+    "completionStatus": "not_achieved",
+    "status": "accepted_permanent_exclusion",
+    "disposition": "accepted_permanent_exclusion",
+    "reasonCode": "legacy_missing_failure_cluster",
+    "recoverable": false
+  },
+  "supportedVerifiers": [
+    {
+      "surfaceId": "agent.working-dna",
+      "verifierId": "working-dna-read-after-write",
+      "policy": "supported",
+      "proves": "external-state-only"
+    },
+    {
+      "surfaceId": "capability.skill-installation",
+      "verifierId": "skill-installation-read-after-write",
+      "policy": "supported",
+      "proves": "external-state-only"
+    }
+  ],
+  "unsupportedSurfaces": [
+    "capability.skill-spec",
+    "knowledge.experience-capsule",
+    "knowledge.managed-memory",
+    "organization.task-routing",
+    "organization.team-composition",
+    "system.diagnosis-contract",
+    "system.runtime-binding-governance"
+  ],
+  "productionCutover": false,
+  "releaseReady": "PASS",
+  "eligibleScope": "PASS",
+  "fullRepoQualityGate": "PASS",
+  "candidateOverlap": false,
+  "allowEvolutionPr": true,
+  "allowProductionDeploy": false,
+  "productionInput": false,
+  "provenanceTagForCandidate": null,
+  "conclusion": "eligible RC PASS, release-ready PASS",
+  "notExecuted": [
+    "use of expired RC9/RC10 as current release proof",
+    "provenance/sha-* tag",
+    "npm publish",
+    "production cutover",
+    "global auto",
+    "legacy Capsule rewrite",
+    "treat GitHub CI failure as local quality-gate failure",
+    "use ancestor Docker images as 678e50c1 candidate"
+  ]
+}

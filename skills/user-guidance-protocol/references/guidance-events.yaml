@@ -1,0 +1,55 @@
+# Event contract for Asset Incubation (P2)
+# Agent tool: guidance_event
+# Gateway RPC (UI/clients): asset-incubation.guidance.record
+
+events:
+  guidance_completed:
+    description: 一次引导任务成功走完
+    required: [event, skill, scenario, contextConfidence]
+    optional: [stepsCompleted, exceptions, reusablePattern, sessionKey, contextId]
+
+  guidance_step_failed:
+    description: 某一步卡住或失败
+    required: [event, skill, scenario, stepId, failureReason, contextConfidence]
+    optional: [issueClass, userAction, sessionKey]
+
+  guidance_abandoned:
+    description: 用户主动放弃引导
+    required: [event, skill, scenario, contextConfidence]
+    optional: [stepsCompleted, exceptions, sessionKey]
+
+contextConfidence: [high, medium, low]
+
+failureReason:
+  - button_missing
+  - permission
+  - viewport
+  - user_misread
+  - blocked_error
+  - other
+
+issueClass:
+  - ui_changed
+  - permission
+  - viewport
+  - user_misread
+  - blocked_error
+
+example_completed:
+  event: guidance_completed
+  skill: user-guidance-protocol
+  scenario: wechat_oa_setup
+  contextConfidence: high
+  stepsCompleted: 9
+  exceptions: 1
+  reusablePattern: true
+
+example_failed:
+  event: guidance_step_failed
+  skill: user-guidance-protocol
+  scenario: wechat_oa_setup
+  stepId: enter_settings
+  failureReason: button_missing
+  issueClass: ui_changed
+  userAction: searched
+  contextConfidence: medium

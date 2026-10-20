@@ -1,0 +1,77 @@
+name: CogniWeave SDK Nightly
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-cogniweave-sdk-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  longrun-benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+          use-sticky-disk: "false"
+
+      - name: Run CogniWeave SDK long-run benchmark gate
+        run: pnpm --dir packages/cogniweave-sdk run benchmark:longrun:gate
+
+      - name: Run CogniWeave SDK long-run benchmark diff gate
+        run: pnpm --dir packages/cogniweave-sdk run benchmark:longrun:diff:gate
+
+      - name: Run CogniWeave SDK MVP eval gate
+        run: pnpm --dir packages/cogniweave-sdk run eval:mvp:gate
+
+      - name: Run CogniWeave SDK distillation replay gate
+        run: pnpm --dir packages/cogniweave-sdk run eval:distill:replay:gate
+
+      - name: Run CogniWeave SDK HTTP-recorded distillation replay gate
+        run: pnpm --dir packages/cogniweave-sdk run eval:distill:replay:http:gate
+
+      - name: Publish benchmark summary
+        run: |
+          echo "## CogniWeave SDK Long-Run Benchmark" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## CogniWeave SDK Long-Run Benchmark Diff" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun-diff.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## CogniWeave SDK MVP Eval" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-eval-mvp.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## CogniWeave SDK Distillation Replay Eval" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-eval-distill-replay.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## CogniWeave SDK HTTP-Recorded Distillation Replay Eval" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-eval-distill-replay-http.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload long-run benchmark artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cogniweave-sdk-benchmark-longrun-${{ github.run_id }}
+          path: |
+            packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun.json
+            packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun-diff.json
+            packages/cogniweave-sdk/.runtime/cogniweave-eval-mvp.json
+            packages/cogniweave-sdk/.runtime/cogniweave-eval-distill-replay.json
+            packages/cogniweave-sdk/.runtime/cogniweave-eval-distill-replay-http.json
+          if-no-files-found: warn
+          retention-days: 30

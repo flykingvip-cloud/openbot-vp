@@ -1,0 +1,10 @@
+{
+  "schema": "memory-workspace-phase1b-item6-implementation-read-only-row-sample/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item6-implementation-read-only-row-sample.json",
+  "kind": "item6-implementation-read-only-row-sample",
+  "item6": "not-met",
+  "productionSqliteWrite": false,
+  "sampleCap": 5,
+  "runtime": "src/memory/item6-authorized-sqlite-read.ts",
+  "note": "Item 6 step-9 read-only capped COUNT(*) sample on authorized sqlite; no row payloads."
+}

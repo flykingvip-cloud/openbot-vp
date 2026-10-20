@@ -1,0 +1,25 @@
+{
+  "cell": "Stage 6 production dependency audit — one moderate advisory mitigation",
+  "advisory": "GHSA-rpw4-54j3-4h4q",
+  "cve": "CVE-2026-101913",
+  "package": "ip-address",
+  "vulnerable_range": "<=10.5.0",
+  "affected_version_before": "10.3.1",
+  "dependency_path": ".>@earendil-works/pi-ai>@google/genai>@modelcontextprotocol/sdk>express-rate-limit>ip-address",
+  "severity": "moderate",
+  "direct_or_transitive": "transitive",
+  "prod_or_dev": "prod",
+  "fixed_version": ">=10.5.1",
+  "mitigated_version": "10.5.1",
+  "reachable_surface": "Address6.isLinkLocal() via express-rate-limit (MCP SDK peer path); fe80::/64 vs fe80::/10 misclassify → SSRF/trust-boundary bypass",
+  "mitigation": "Root pnpm.overrides.ip-address 10.3.1 → 10.5.1 (transitive; no root dependencies.ip-address)",
+  "acceptance_impact": "Narrow: this GHSA cleared from local pnpm audit --prod. Same pin also clears sibling ip-address moderate GHSA-2vr4-cq9g-pvrc (also needs >=10.5.1; not a separate cell). Remaining ip-address moderates GHSA-j6r3-76f7-8jcv and GHSA-h3mg-xc3c-68pw still need >=10.7.1 — not claimed. Stage 6 overall remains not PASS; audit still exits 1 (remaining moderate/low). stage8_eligible stays false.",
+  "audit_metadata_after": {
+    "critical": 0,
+    "high": 0,
+    "moderate": 16,
+    "low": 5,
+    "exit_code": 1
+  },
+  "more_info": "https://github.com/advisories/GHSA-rpw4-54j3-4h4q"
+}

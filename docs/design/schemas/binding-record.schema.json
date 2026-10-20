@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbot.love/design/schemas/binding-record.schema.json",
+  "title": "BindingRecord",
+  "description": "B2 binding — MCP SoT — see docs/design/bridge-mvp.md rev2 §4.5",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bindingId",
+    "bindingVersion",
+    "idempotencyKey",
+    "tenantId",
+    "scope",
+    "primaryId",
+    "primaryGeneration",
+    "subagentRunIds",
+    "status",
+    "createdAt",
+    "expiresAt"
+  ],
+  "properties": {
+    "bindingId": { "type": "string", "format": "uuid" },
+    "bindingVersion": { "type": "integer", "minimum": 1 },
+    "idempotencyKey": { "type": "string", "minLength": 16 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "enum": ["group_tenant", "personal_local"] },
+    "primaryId": { "type": "string", "minLength": 1 },
+    "primaryGeneration": { "type": "integer", "minimum": 0 },
+    "flowStepSeq": { "type": "integer", "minimum": 1 },
+    "flowSubStepId": { "type": "string" },
+    "subagentRunIds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["runId", "status", "spawnedAt"],
+        "properties": {
+          "runId": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["active", "superseded", "terminal"]
+          },
+          "spawnedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "supervisorTaskId": { "type": "string" },
+    "ledgerTaskId": { "type": "string" },
+    "conversationTaskId": { "type": "string" },
+    "roundId": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["active", "superseded", "cancelled", "expired"]
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "expiresAt": { "type": "string", "format": "date-time" },
+    "supersededBy": { "type": "string", "format": "uuid" }
+  }
+}

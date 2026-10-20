@@ -1,0 +1,15 @@
+{
+  "schema": "memory-workspace-phase1b-item7-w4-batch8-call-site-shadow/v1",
+  "path": "docs/design/evidence/memory-workspace-phase1b-item7-w4-batch8-call-site-shadow.json",
+  "kind": "item7-w4-batch8-steward-helper-shadow",
+  "wave": "W4-steward-and-helpers",
+  "batch": 8,
+  "sitesWired": ["S01", "S06", "S24", "S25", "S26", "S27"],
+  "w4CallSiteShadowComplete": true,
+  "item7": "not-met",
+  "liveWriteWatchIndex": 37,
+  "catalogMissDeny": false,
+  "helperSwitch": "denied",
+  "productionWrite": "legacy-only",
+  "sidecar": "src/gateway/workspace-resolver/item7-w4-shadow.ts"
+}

@@ -1,0 +1,44 @@
+{
+  "schema": "memory-workspace-phase1a-membership-contract/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "preparedBy": "cursor-memory-platform",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "phase": "1A-design-only",
+  "owner": "codex-workspace-architecture",
+  "securityOwner": "cursor-data-governance",
+  "status": "design-frozen-pending-owner-signoff",
+  "designBasis": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+  "authorities": {
+    "employeeMembership": "Reuse platform-auth membership store (`src/gateway/platform-auth/memberships.ts`)",
+    "groupRegistry": "Authoritative tenant-scoped group Registry; group is an independent resource",
+    "agentAsset": "agentAssetId is the durable digital-human identity; agentId is a tenant-scoped runtime slug"
+  },
+  "forbiddenNewSot": [
+    "employee membership SoT inside memory-workspace",
+    "group membership SoT inside memory-workspace",
+    "WorkspaceIdentity as a parallel owner/scope store"
+  ],
+  "departmentRule": {
+    "is": "scope and grant dimension only",
+    "isNot": "immutable physical parent directory of employee, AgentAsset, or group",
+    "invariant": "W5"
+  },
+  "membershipMutations": {
+    "employeeTransfer": "change membership only; do not move directories",
+    "agentHandover": "change binding only; do not move AgentAsset primary",
+    "groupCrossDepartment": "change grants / homeDepartmentId attribute only"
+  },
+  "adapterContract": {
+    "name": "WorkspaceMembershipAuthorityAdapter",
+    "mode": "read-only in Phase 1A",
+    "inputs": ["tenantId", "userId", "seatId", "groupId", "agentAssetId"],
+    "outputs": ["authorized scopes", "deny reasons"],
+    "failClosed": "ManagedEnterprise unknown membership / unknown tenant / unknown catalog => deny"
+  },
+  "explicitlyForbidden": [
+    "new membership tables under workspace-resolver",
+    "department-as-physical-parent",
+    "deployAuthorized=true"
+  ]
+}

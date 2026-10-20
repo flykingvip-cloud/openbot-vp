@@ -1,0 +1,35 @@
+{
+  "name": "@openbot/aor-sdk-node",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AOR Node SDK: describe a task, AOR parses it, selects a model, executes it on OpenBot, and evaluates the result. Ships a CLI demo.",
+  "bin": {
+    "aor": "./dist/cli.js",
+    "aor-bench": "./dist/bench-cli.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@openbot/aor-backend-openbot": "workspace:*",
+    "@openbot/aor-core": "workspace:*"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "memory-workspace-phase1b-item2-host-catalog-persist/v1",
+  "item": 2,
+  "stage": "host-catalog-merge",
+  "unlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": false,
+  "identifierPolicy": "opaque-redacted-evidence",
+  "hostCatalogWrite": true,
+  "productionCatalogWrite": "host-merge-authorized",
+  "mintedUserOwnedFromOccupancy": true,
+  "occupancyMintedCount": 6,
+  "persistedCount": 16,
+  "skippedExistingCount": 6,
+  "quarantinedCount": 1,
+  "liveLoaderHit": true,
+  "liveLoaderResult": "matched",
+  "note": "Host merge admitted 16 new classified rows and skipped 6 existing user-owned rows. A later skipExisting rerun confirmed the loader hit. Item 2/5 stay not-met.",
+  "item2": "not-met",
+  "item5": "not-met",
+  "wiredToProductionResolver": false,
+  "explicitlyForbidden": [
+    "write unredacted dump to docs/",
+    "treat host Catalog merge as item 2 met",
+    "treat occupancy mint as item 5 met",
+    "resolver write switch",
+    "Catalog miss=deny",
+    "LIVE migration",
+    "wiredToProductionResolver=true",
+    "phase1bExecutionBlocked=false"
+  ]
+}

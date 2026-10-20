@@ -1,0 +1,119 @@
+# Add-robot: sidebar AI 助手 plus → 新建数字员工.
+# Plus hides after 4 self-created assistants (大白管家 excluded).
+# Logged-in production on 2026-09-18 had 5 self-created rows, so plus was absent.
+# Create form fields were opened when the plus was visible. Do not submit unless asked.
+
+scenario:
+  name: employee_assistant
+  title: AI 助手与添加机器人
+  trigger:
+    - AI 助手
+    - 大白
+    - 打开助手
+    - 添加机器人
+    - 新建机器人
+    - 新建数字员工
+    - 创建助手
+    - 发消息
+    - 打开成果
+  required_context:
+    - browser
+    - openbot_ui
+
+stages:
+  - id: locate
+    title: 找到并打开助手
+  - id: create
+    title: 添加机器人
+  - id: chat
+    title: 使用对话区
+
+steps:
+  - id: open_assistant_section
+    stage: locate
+    risk: low
+    instruction: 展开左侧栏，找到「AI 助手」。名单以屏幕为准。
+    visual_anchor: 侧栏「AI 助手」
+    success_signal: 用户能读出列表里的一个名字
+    on_fail: 若用户要找的名字不在列表里，直接说没看到，不要改口去「机器人管理」。
+    branches:
+      - when: 用户要新建或添加机器人
+        next: find_plus
+      - when: 用户要打开已有助手
+        next: open_named_assistant
+
+  - id: find_plus
+    stage: create
+    risk: low
+    instruction: 看「AI 助手」标题右侧有没有「+」。无障碍名称是「add AI 助手」。这是新建数字员工的入口。系统设置里的「我的机器人」没有新建按钮。协作空间「成员管理」里的「添加机器人」是把已有机器人拉进小组，不是新建。
+    visual_anchor: 「AI 助手」旁的「+」
+    success_signal: 用户看到加号，或明确说没有加号
+    branches:
+      - when: 看到加号
+        next: open_creator
+      - when: 没有加号
+        next: plus_hidden
+
+  - id: plus_hidden
+    stage: create
+    risk: low
+    instruction: 每位成员最多 4 个自建助手，大白管家不占这个名额。满了就不显示加号。告诉用户名额已满，不要编第二个新建菜单。跟大白说「帮我添加」也绕不过这个上限。
+    visual_anchor: 只有「AI 助手」标题、没有「+」
+    success_signal: 用户知道加号被配额收起
+
+  - id: open_creator
+    stage: create
+    risk: low
+    instruction: 点「AI 助手」旁的加号。页面标题变为「新建数字员工」。
+    visual_anchor: 「新建数字员工」
+    success_signal: 看到「你想要什么样的数字员工」或「机器人名称」
+
+  - id: fill_creator
+    stage: create
+    risk: medium
+    confirmation: true
+    instruction: |
+      这一页上实际有这些控件，一次只做用户要的那一步：
+      - 「你想要什么样的数字员工」
+      - 「生成设计」（未填写时是灰的）
+      - 「机器人名称」，占位「例如：市场分析助手」
+      - 「头像设置」，可选
+      - 「角色模板」
+      - 「取消」和「创建机器人」
+      云端席位的工作空间可以写「由 OpenBot 自动管理」。本机席位可能要求先在个人设置里配工作空间根目录，「创建机器人」会是灰的。
+      点「创建机器人」前必须再确认一次。
+    visual_anchor: 「创建机器人」
+    success_signal: 用户确认看到上述字段，并决定创建或取消
+
+  - id: ask_daibai
+    stage: create
+    risk: low
+    instruction: 用户也可以跟大白管家说要添加机器人。大白应带用户去点「AI 助手」旁的加号，不要说自己能在后台直接建好。大白可代办目录里没有「创建机器人」这一项。
+    visual_anchor: "「TO: 大白管家」"
+    success_signal: 用户知道大白是带路，不是后台新建
+
+  - id: open_named_assistant
+    stage: locate
+    risk: low
+    instruction: "点用户点名的那一项。打开「大白管家」后，抬头是「TO: 大白管家」。"
+    visual_anchor: 被点中的助手名
+    success_signal: 抬头变成该助手
+
+  - id: dismiss_guide
+    stage: chat
+    risk: low
+    instruction: 若中间弹出大白卡片「你好，我是大白，你的专属工作助手」，按钮是「开始引导」「稍后处理」「我知道了」。收起点「我知道了」。不要把这张卡片说成系统设置。
+    visual_anchor: 「开始引导 / 稍后处理 / 我知道了」
+    success_signal: 卡片消失，或用户说没有这张卡片
+
+  - id: use_composer
+    stage: chat
+    risk: low
+    instruction: 输入框可用时，旁边控件是可展开的「知识库」、「选择文件」、「添加附件」、语音按钮和「发送」。已有消息上可见「复制」和「引用此前回复」。部分消息有「打开成果」。一次只点用户要的那个。
+    visual_anchor: 「发送」
+    success_signal: 用户确认看到发送按钮，或说出自己点了哪一个
+    on_fail: "不要说机器人详情里有「概览 / 任务 / 成果 / 工作区 / 技能 / 记忆」页签。系统设置里点「进入工作区」会回到每日概览的对话，不是另一套工作台。"
+
+fallback:
+  - check: old_names
+    instruction: 「机器人管理」不是入口。新建走侧栏「AI 助手」加号；已有机器人列表在「系统设置 → 我的机器人」。

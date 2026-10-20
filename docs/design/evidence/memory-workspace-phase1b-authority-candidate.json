@@ -1,0 +1,80 @@
+{
+  "schema": "memory-workspace-phase1b-authority-candidate/v1",
+  "source": "local-authority-dump",
+  "live": false,
+  "writable": false,
+  "catalogWrite": false,
+  "candidateCount": 5,
+  "candidates": [
+    {
+      "resourceId": "ws:tenant-1:user:user-1:asset:asset-1",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "tenant-1",
+      "userId": "user-1",
+      "ownerType": "membership",
+      "agentAssetId": "asset-1",
+      "proof": "agent-registry owner binding + platform-auth membership"
+    },
+    {
+      "resourceId": "ws:tenant-1:seat:seat-1:asset:asset-seat",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "tenant-1",
+      "seatId": "seat-1",
+      "ownerType": "seat",
+      "agentAssetId": "asset-seat",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:tenant-1:group:group-1",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "tenant-1",
+      "groupId": "group-1",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:tenant-1:user:user-1:steward",
+      "workspaceKind": "employee_private",
+      "classification": "classified",
+      "tenantId": "tenant-1",
+      "userId": "user-1",
+      "ownerType": "membership",
+      "proof": "platform-auth membership + employee_private steward resourceId contract"
+    },
+    {
+      "resourceId": "ws:tenant-1:user:user-2:steward",
+      "workspaceKind": "employee_private",
+      "classification": "classified",
+      "tenantId": "tenant-1",
+      "userId": "user-2",
+      "ownerType": "membership",
+      "proof": "platform-auth membership + employee_private steward resourceId contract"
+    }
+  ],
+  "rejected": [
+    {
+      "reason": "agentId_is_not_agentAssetId",
+      "agentId": "bot-2",
+      "tenantId": "tenant-1"
+    },
+    {
+      "reason": "membership_missing",
+      "agentAssetId": "asset-orphan",
+      "tenantId": "tenant-1",
+      "userId": "user-missing"
+    },
+    {
+      "reason": "inactive_agent_asset",
+      "agentAssetId": "asset-inactive",
+      "tenantId": "tenant-1",
+      "status": "retired"
+    },
+    {
+      "reason": "agentId_is_not_agentAssetId",
+      "agentId": "bot-2"
+    }
+  ],
+  "note": "Shadow-compare input only. Not Catalog SoT."
+}

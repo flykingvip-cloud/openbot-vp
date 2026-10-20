@@ -1,0 +1,406 @@
+{
+  "increment": "P12",
+  "schemaVersion": 1,
+  "rehearsalOnly": true,
+  "verdict": "no-go",
+  "readyForIndependentApproval": false,
+  "approvedForProductionCutover": false,
+  "gatesOpened": false,
+  "trafficSwitched": false,
+  "p5": {
+    "contractSigned": true,
+    "liveDeliveryEnabled": false
+  },
+  "identities": {
+    "candidateSha": "e106c3e168a1c2f09fcb3017d887f841ed881bdf",
+    "originMainSha": "e106c3e168a1c2f09fcb3017d887f841ed881bdf",
+    "liveSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "ledgerOpenSha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
+    "releaseRecordSha": "e59aede2506dbe8c571f0019f7e1bac0687778b6",
+    "provenanceTagSha": "8efc2eaa052590713dd3edc210b09c748a8c34e5"
+  },
+  "gates": {
+    "adapters": {
+      "name": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "keep_flag_false"
+    },
+    "reportApi": {
+      "name": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "keep_flag_false_revoke_live_pack"
+    },
+    "daibaiDelivery": {
+      "name": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security+enterprise_admin",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "disable_gate_stop_delivery_keep_receipts"
+    },
+    "remediationExecution": {
+      "name": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security+enterprise_admin+employee",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "disable_gate_stop_tasks_keep_audit"
+    }
+  },
+  "gateApprovalMatrix": {
+    "adapters": {
+      "name": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "keep_flag_false",
+      "preconditions": [
+        "reader_injected",
+        "audit_injected",
+        "quota_injected",
+        "slo_observations_complete",
+        "independent_platform_security_approval"
+      ],
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true
+    },
+    "reportApi": {
+      "name": "DIAGNOSIS_REPORT_API_DEPLOYED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "keep_flag_false_revoke_live_pack",
+      "preconditions": [
+        "adapters_approved",
+        "live_pack_not_self_registered",
+        "slo_observations_complete",
+        "independent_platform_security_approval"
+      ],
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true
+    },
+    "daibaiDelivery": {
+      "name": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security+enterprise_admin",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "disable_gate_stop_delivery_keep_receipts",
+      "preconditions": [
+        "p5_contract_signed",
+        "allowlisted_transport",
+        "delegation_guard_bound",
+        "slo_observations_complete",
+        "platform_security_and_enterprise_admin_approval"
+      ],
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true
+    },
+    "remediationExecution": {
+      "name": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+      "default": false,
+      "value": false,
+      "approver": "platform_security+enterprise_admin+employee",
+      "auditReceipt": "pending_human_approval",
+      "rollback": "disable_gate_stop_tasks_keep_audit",
+      "preconditions": [
+        "allowlisted_executor",
+        "human_approval_for_high_risk",
+        "slo_observations_complete",
+        "platform_security_enterprise_admin_and_employee_approval"
+      ],
+      "implicitEnableForbidden": true,
+      "clientParamEnableForbidden": true
+    }
+  },
+  "dependencies": {
+    "compositeReportReader": {
+      "id": "composite_report_reader",
+      "authorityOfRecord": "composite_diagnosis_projection+session_store+skill_invocation_event_store+agent_tool_observations",
+      "schema": "diagnosis.reports@1",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "fail_closed_unavailable",
+      "timeoutMs": 3000,
+      "degradePolicy": "do_not_render_as_healthy"
+    },
+    "auditPersist": {
+      "id": "audit_persist",
+      "authorityOfRecord": "$CONFIG_DIR/diagnosis-audit/",
+      "schema": "append_only_audit_v1",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "fail_closed_missing_audit",
+      "timeoutMs": 2000,
+      "degradePolicy": "block_write_keep_history"
+    },
+    "quotaStore": {
+      "id": "quota_store",
+      "authorityOfRecord": "injected quota backend or process-local window maps",
+      "schema": "windowed_counter/60000ms",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "fail_closed_503",
+      "timeoutMs": 1000,
+      "degradePolicy": "deny_new_query"
+    },
+    "gatewayAuthMembership": {
+      "id": "gateway_auth_membership",
+      "authorityOfRecord": "server_membership_resolver",
+      "schema": "trusted_tenant_from_membership_only",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "fail_closed_unauthenticated",
+      "timeoutMs": 2000,
+      "degradePolicy": "reject_client_tenant_claims"
+    },
+    "daibaiDeliveryTransport": {
+      "id": "daibai_delivery_transport",
+      "authorityOfRecord": "injected_allowlisted_transport_only",
+      "schema": "diagnosis.daibai.delivery@1",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "reject_not_pending_then_queue_or_expire",
+      "timeoutMs": 5000,
+      "degradePolicy": "unavailable_transport_keep_receipts"
+    },
+    "conversationStateStore": {
+      "id": "conversation_state_store",
+      "authorityOfRecord": "injected_in_process_conversation_store",
+      "schema": "conversation_diagnosis_run@1",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "pause_in_WAITING_AUTHORIZATION",
+      "timeoutMs": 2000,
+      "degradePolicy": "no_live_chat_bind"
+    },
+    "remediationExecutor": {
+      "id": "remediation_executor",
+      "authorityOfRecord": "injected_allowlisted_executor_only",
+      "schema": "remediation_execution@1",
+      "tenantBoundary": "server_membership_only",
+      "faultBehavior": "unavailable_appliedToRuntime_false",
+      "timeoutMs": 5000,
+      "degradePolicy": "dry_run_only"
+    }
+  },
+  "observability": {
+    "contract": {
+      "requiredMetrics": [
+        "success",
+        "error",
+        "latency",
+        "stale",
+        "authorization_denied",
+        "quota_exhausted"
+      ],
+      "incompleteSloBlocksReadiness": true,
+      "missingMetricsMustNotRenderHealthy": true,
+      "trustedTenantSource": "server_membership_only",
+      "nonAuthoritativeTenantSources": [
+        "url",
+        "query",
+        "body",
+        "header",
+        "sessionTenantId",
+        "connect.tenantId",
+        "claimedTenantId"
+      ],
+      "gates": {
+        "adapters": {
+          "name": "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED",
+          "metrics": [
+            "success",
+            "error",
+            "latency",
+            "stale",
+            "authorization_denied",
+            "quota_exhausted"
+          ],
+          "observed": false
+        },
+        "reportApi": {
+          "name": "DIAGNOSIS_REPORT_API_DEPLOYED",
+          "metrics": [
+            "success",
+            "error",
+            "latency",
+            "stale",
+            "authorization_denied",
+            "quota_exhausted"
+          ],
+          "observed": false
+        },
+        "daibaiDelivery": {
+          "name": "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED",
+          "metrics": [
+            "success",
+            "error",
+            "latency",
+            "stale",
+            "authorization_denied",
+            "quota_exhausted"
+          ],
+          "observed": false
+        },
+        "remediationExecution": {
+          "name": "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED",
+          "metrics": [
+            "success",
+            "error",
+            "latency",
+            "stale",
+            "authorization_denied",
+            "quota_exhausted"
+          ],
+          "observed": false
+        }
+      }
+    },
+    "slo": {
+      "queryLatencyMs": {
+        "target": 300,
+        "observed": null
+      },
+      "inspectionSuccessRate": {
+        "target": 0.99,
+        "observed": null
+      },
+      "deliverySuccessRate": {
+        "target": 0.99,
+        "observed": null
+      },
+      "authorizationWaitMs": {
+        "target": 300000,
+        "observed": null
+      },
+      "verificationSuccessRate": {
+        "target": 0.95,
+        "observed": null
+      },
+      "falsePositiveRate": {
+        "target": 0.05,
+        "observed": null
+      },
+      "completeness": "empty"
+    },
+    "sloHealthy": false,
+    "health": "not_ready"
+  },
+  "checks": [
+    {
+      "id": "p5_contract_signed",
+      "ok": true,
+      "message": "P5 in-process delivery contract re-verified and signed; live Da Bai still closed"
+    },
+    {
+      "id": "candidate_equals_origin_main",
+      "ok": true,
+      "message": "candidate e106c3e168a1 equals origin/main"
+    },
+    {
+      "id": "origin_main_ancestor_of_candidate",
+      "ok": true,
+      "message": "origin/main is an ancestor of candidate"
+    },
+    {
+      "id": "live_known",
+      "ok": true,
+      "message": "LIVE 04690f8d2ed5 resolved"
+    },
+    {
+      "id": "live_ancestor_of_candidate",
+      "ok": true,
+      "message": "LIVE is an ancestor of candidate"
+    },
+    {
+      "id": "origin_main_contains_live",
+      "ok": true,
+      "message": "origin/main contains LIVE"
+    },
+    {
+      "id": "single_open_ledger_row",
+      "ok": true,
+      "message": "ledger open row 04690f8d2ed5"
+    },
+    {
+      "id": "live_equals_ledger",
+      "ok": true,
+      "message": "LIVE equals ledger open row"
+    },
+    {
+      "id": "live_equals_release_record",
+      "ok": false,
+      "message": "LIVE 04690f8d2ed5 != RELEASE_RECORD e59aede2506d"
+    },
+    {
+      "id": "live_equals_provenance",
+      "ok": false,
+      "message": "LIVE 04690f8d2ed5 != provenance 8efc2eaa0525"
+    },
+    {
+      "id": "gates_closed",
+      "ok": true,
+      "message": "all diagnosis production gates remain false"
+    },
+    {
+      "id": "live_pack_unregistered",
+      "ok": true,
+      "message": "diagnosis-reports is not registered"
+    },
+    {
+      "id": "core_handlers_clean",
+      "ok": true,
+      "message": "coreGatewayHandlers has no diagnosis methods"
+    },
+    {
+      "id": "slo_observations_complete",
+      "ok": false,
+      "message": "SLO observations are empty/incomplete and must not render as healthy"
+    },
+    {
+      "id": "reader_available",
+      "ok": false,
+      "message": "Composite Report reader is unavailable; fail closed"
+    },
+    {
+      "id": "audit_available",
+      "ok": false,
+      "message": "audit persist is unavailable; fail closed"
+    },
+    {
+      "id": "quota_available",
+      "ok": false,
+      "message": "quota store is unavailable; fail closed"
+    },
+    {
+      "id": "implicit_enable_forbidden",
+      "ok": true,
+      "message": "implicit enable and client-param enable remain forbidden"
+    }
+  ],
+  "blockingReasons": [
+    "LIVE 04690f8d2ed5 != RELEASE_RECORD e59aede2506d",
+    "LIVE 04690f8d2ed5 != provenance 8efc2eaa0525",
+    "SLO observations are empty/incomplete and must not render as healthy",
+    "Composite Report reader is unavailable; fail closed",
+    "audit persist is unavailable; fail closed",
+    "quota store is unavailable; fail closed"
+  ],
+  "pendingHumanApprovals": [
+    "production_backend_config",
+    "live_gateway_pack_registration",
+    "daibai_delivery_allowlist",
+    "remediation_executor_allowlist",
+    "internal_single_tenant_canary",
+    "production_build",
+    "restart",
+    "canary_and_traffic_switch",
+    "p12_release_record_ledger_live_reconcile",
+    "p12_slo_observations",
+    "p12_production_dependency_injection"
+  ],
+  "recordedAt": "2026-09-05T01:15:53.522Z"
+}

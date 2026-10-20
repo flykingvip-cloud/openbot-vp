@@ -1,0 +1,49 @@
+{
+  "schema": "memory-workspace-phase1a-section141-design-review/v1",
+  "roleId": "sre",
+  "roleLabel": "DBA / SRE",
+  "owner": "cursor-memory-wsc",
+  "preparedBy": "cursor-memory-workspace-followup",
+  "mainSha": "3b552ab9783143b78f01e85b9fbcc1a544954708",
+  "preparedAt": "2026-08-16T07:35:00.000Z",
+  "decision": "accepted",
+  "signedAt": "2026-08-16T14:55:08.000Z",
+  "signedBy": "cursor-memory-wsc",
+  "scope": "SQLite backup, rebuild migration, fencing, rollback (design only)",
+  "section141Criteria": [
+    "DBA/SRE confirms SQLite backup, rebuild migration, fencing, and rollback plan",
+    "Replica migration drill and Phase 0-2 automation gates green before cutover"
+  ],
+  "designBasis": {
+    "primary": "docs/design/memory-workspace-identity-remediation-2026-08-14.md",
+    "sections": ["§8.6", "§14.1 item 9", "§16"],
+    "phase0Evidence": "docs/design/evidence/memory-workspace-phase0-20260814.sqlite-risks.json"
+  },
+  "currentState": {
+    "v1PartitionColumn": null,
+    "manyToManyRisk": "One agentId sqlite opened by multiple workspace roots",
+    "dualTreeCount": 8,
+    "stopLossOnMain": true,
+    "stopLossMergedPr": 401
+  },
+  "proposedDesign": [
+    {
+      "id": "pre-cutover-backup",
+      "action": "File-level copy of {stateDir}/memory/{agentId}.sqlite before any schema v2 rebuild"
+    },
+    {
+      "id": "fencing",
+      "action": "v1-root-guard + sidecar lock remain until workspace_id partition proven on replica"
+    },
+    {
+      "id": "rollback",
+      "action": "Restore sqlite snapshot + revert resolver binding; forward-only release gate unchanged"
+    },
+    {
+      "id": "rebuild-migration",
+      "action": "Schema v2 rebuild only in same release unit as resolver write switch (Phase 1B blocked)"
+    }
+  ],
+  "explicitlyForbidden": ["live rebuild without §14.1 complete", "deployAuthorized=true"],
+  "ownerSignOffAction": "Set decision=accepted in this file and update section141-signoff-matrix.json sre row"
+}

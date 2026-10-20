@@ -1,0 +1,31 @@
+{
+  "decision": "accepted",
+  "stage": "A",
+  "acceptedBy": "cursor-data-governance",
+  "item2": "not-met",
+  "catalogWrite": false,
+  "phase1bExecutionBlocked": true,
+  "schema": "memory-workspace-phase1b-item2-stage-a-accept/v1",
+  "acceptedAt": "2026-08-17T06:00:00.000Z",
+  "productionCatalogWrite": "none",
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "live": "forbidden",
+  "acceptedDump": {
+    "path": "docs/design/evidence/memory-workspace-phase1b-authority-dump.json",
+    "live": false,
+    "source": "local-non-live-fixture",
+    "isPhase0Inventory": false
+  },
+  "authorityExtract": {
+    "path": "docs/design/evidence/memory-workspace-phase1b-authority-candidate.json",
+    "source": "local-authority-dump",
+    "candidateCount": 3,
+    "classifiedWorkspaceKinds": ["agent_primary", "group_shared"],
+    "employeePrivateClassified": 0,
+    "note": "Membership proof alone does not mint a classified employee_private resourceId"
+  },
+  "architectureRulesAccept": "docs/design/evidence/memory-workspace-phase1b-item2-stage-a-architecture-accept.json",
+  "didNotSign": "architecture Stage A rules",
+  "note": "Data-governance signs the non-LIVE dump and extract only. Architecture already signed the rules in #453. Item 2 remains not-met until Stage B persist and §5.4 four gates pass."
+}

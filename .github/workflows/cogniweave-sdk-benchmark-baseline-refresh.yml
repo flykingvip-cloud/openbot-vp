@@ -1,0 +1,76 @@
+name: CogniWeave SDK Benchmark Baseline Refresh
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why baseline refresh is needed"
+        required: true
+        type: string
+
+concurrency:
+  group: cogniweave-baseline-refresh-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh-baseline-candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: false
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+          use-sticky-disk: "false"
+
+      - name: Run long-run benchmark gate
+        run: pnpm --dir packages/cogniweave-sdk run benchmark:longrun:gate
+
+      - name: Run long-run benchmark diff (report only)
+        continue-on-error: true
+        run: pnpm --dir packages/cogniweave-sdk run benchmark:longrun:diff:gate
+
+      - name: Generate baseline candidate
+        run: pnpm --dir packages/cogniweave-sdk run benchmark:longrun:baseline:candidate
+
+      - name: Validate baseline candidate against acceptance gate
+        run: pnpm --dir packages/cogniweave-sdk run benchmark:longrun:baseline:validate
+
+      - name: Publish refresh summary
+        # `reason` is attacker-controllable workflow_dispatch input. Passing it through env
+        # keeps it a shell variable instead of letting GitHub expand it into the script.
+        env:
+          REFRESH_REASON: ${{ github.event.inputs.reason }}
+        run: |
+          echo "## CogniWeave SDK Baseline Refresh Candidate" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Reason:** $REFRESH_REASON" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Long-Run Report" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Diff Report" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun-diff.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Candidate Baseline" >> "$GITHUB_STEP_SUMMARY"
+          cat packages/cogniweave-sdk/.runtime/benchmark-longrun-baseline.candidate.json >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Candidate Validation" >> "$GITHUB_STEP_SUMMARY"
+          pnpm --dir packages/cogniweave-sdk run benchmark:longrun:baseline:validate >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload baseline refresh artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cogniweave-sdk-benchmark-baseline-refresh-${{ github.run_id }}
+          path: |
+            packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun.json
+            packages/cogniweave-sdk/.runtime/cogniweave-benchmark-longrun-diff.json
+            packages/cogniweave-sdk/.runtime/benchmark-longrun-baseline.candidate.json
+          if-no-files-found: warn
+          retention-days: 30

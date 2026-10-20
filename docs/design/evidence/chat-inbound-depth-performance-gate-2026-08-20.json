@@ -1,0 +1,52 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "performance",
+  "capturedAt": "2026-08-20T11:36:20+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainSha": "b0a3a7350b76d58318c42abce1b3cff3326877a1",
+  "originMainIsAncestor": true,
+  "productionLive": false,
+  "liveFlagEnabled": false,
+  "method": "local assembly and microbench only; not production gateway telemetry",
+  "classifier": {
+    "command": "bun -e classifyInboundDepth microbench n=2000 warmup=200 mixed chat/retrieve/act/continuation/link/attachment",
+    "unit": "ms",
+    "n": 2000,
+    "p50": 0.0002,
+    "p95": 0.0004,
+    "p99": 0.002,
+    "max": 0.5193,
+    "gate": "classifier p99 stays local-millisecond (observed 0.002ms p99)"
+  },
+  "assembly": {
+    "chatVsRetrieveKnowledgeWait": {
+      "source": "src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts",
+      "note": "chat skips mocked 80ms knowledge prefetch; retrieve still pays it. This is assembly-time, not production first-token p95."
+    },
+    "knowledgeStageCapsMs": {
+      "local": 800,
+      "liveSource": 1500,
+      "source": "src/gateway/knowledge/resolve/resolve-engine.inbound-policy.test.ts"
+    },
+    "bundleLoadedOncePerTurn": true,
+    "retrieveDefaultLiveInvokeRate": 0,
+    "secondModelCallAdded": false,
+    "lateWritesAfterTimeout": false
+  },
+  "productionTtfT": {
+    "chatP50": null,
+    "chatP95": null,
+    "chatP99": null,
+    "retrieveKnowledgeP50": null,
+    "retrieveKnowledgeP95": null,
+    "retrieveKnowledgeP99": null,
+    "actTtft": null,
+    "actCompleteMs": null,
+    "timeoutDegradedRate": null,
+    "reason": "No LIVE gateway telemetry and flags remain default-off. Production p95 gate is not claimed."
+  },
+  "verdict": "local classifier and assembly caps pass; production TTFT p95 gate not yet measurable"
+}

@@ -1,0 +1,63 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch18-s21/v1",
+  "item": 7,
+  "status": "retirement-batch-18",
+  "batch": "S21",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "schemaV2ProductionWrite": false,
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "i3Executed": false,
+  "independentRetirementReviewAccepted": true,
+  "previousAcceptedBaseline": 17,
+  "lastAcceptedRetirementBaseline": 17,
+  "sitesRetired": [
+    {
+      "ledgerId": "S21",
+      "file": "src/gateway/workspace-resolver/builders.ts",
+      "symbol": "buildUserOwnedWorkspaceCatalogEntry",
+      "lineBefore": 105,
+      "lineAfter": null,
+      "replacement": "WorkspaceResourceCatalog.getResource",
+      "replacementLocator": "src/gateway/workspace-resolver/strict-locator.ts",
+      "replacementTests": [
+        "src/gateway/workspace-resolver/strict-locator.test.ts",
+        "src/gateway/workspace-resolver/builders-item7-s21.test.ts"
+      ]
+    }
+  ],
+  "identityChecks": {
+    "tenant": "fail-closed when tenantId is missing or resource.tenantId mismatches",
+    "workspace": "read existing Catalog SoT resourceId only; no host-root or process.cwd fallback",
+    "agentAsset": "fail-closed when agentAssetId is missing; default steward:builtin is explicit",
+    "grant": "locator pass-after requires tenantContext + user grant; incomplete query fail-closed"
+  },
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 16,
+  "liveWriteWatchIndex": 16,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/workspace-resolver/builders.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "47d6934c34dced654652f027f2c66fedea35a67f",
+  "note": "Batch 18 retires S21 only after #654 S28. Read existing Catalog SoT via getResource. Do not call buildUserOwnedWorkspaceCatalogEntry from the cutover helper. Do not mint a production Catalog row. Catalog miss=deny stays off. Item 7 stays not-met. Do not write liveWriteWatchIndex=0. Phase 0 freeze baseline stays 38."
+}

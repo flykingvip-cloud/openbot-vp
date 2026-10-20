@@ -1,0 +1,45 @@
+{
+  "schema": "openbot-cogniweave-u1-design-review/v1",
+  "kind": "u1-dark-contract-review",
+  "reviewer": "cursor-conversation-lifecycle",
+  "signedBy": "cursor-conversation-lifecycle",
+  "signedAt": "2026-08-19T12:20:00.000Z",
+  "focus": "CogniWeave manager consumes complete Handle only",
+  "scope": "U1-dark-contract-only",
+  "decision": "accepted",
+  "request": "docs/design/evidence/openbot-cogniweave-u1-design-review-request-2026-08-19.json",
+  "item2": "met",
+  "item6": "not-met",
+  "unlock": "not-issued",
+  "u1": "blocked",
+  "authorizes": "none",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "live": "forbidden",
+  "schemaV2Write": "disabled",
+  "catalogWrite": "forbidden",
+  "verified": {
+    "currentManagerMintsWorkspaceIdFromStateDir": true,
+    "currentSymbol": "stableId(\"ws\", path.resolve(this.stateDir))",
+    "file": "src/memory/cogniweave-manager.ts",
+    "u1ImplementationStarted": false,
+    "requiredBeforeDarkIntegration": "complete MemoryWorkspaceHandle or structured denial"
+  },
+  "doesNotAuthorize": [
+    "implementation",
+    "Catalog write",
+    "schema-v2-write",
+    "retirement",
+    "LIVE",
+    "unlock",
+    "rewire cogniweave-manager.ts before unlock"
+  ],
+  "explicitlyForbidden": [
+    "fill coordinator request signedBy slots",
+    "sign another required U1 review as this identity",
+    "start U1 Handle wiring",
+    "keep stateDir as identity after unlock",
+    "self-issue unlock"
+  ],
+  "note": "Conversation lifecycle accepts the U1 dark contract: CogniWeave may consume only a complete Handle. The current manager still derives workspace identity from stateDir; that wiring stays untouched until unlock. Item 6 remains not-met."
+}

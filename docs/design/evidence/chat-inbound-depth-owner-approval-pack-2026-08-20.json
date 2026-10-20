@@ -1,0 +1,119 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "gate": "owner-approval-pack",
+  "capturedAt": "2026-08-20T13:08:00+08:00",
+  "worktree": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "auditorPacketRejected": {
+    "reason": "Stale packet from kiro-loom/phase1a-section141-ownership-v2 HEAD bca29399fb with failed git fetch. LIVE SoT is container /app/dist/build-info.json, not that worktree.",
+    "doNotApprove": "394c9170c6513b0b5512143f3d04a32facd94b94"
+  },
+  "ownerDecision": {
+    "codeAE": "accepted",
+    "productionCandidate394c9170c651": "rejected",
+    "productionFullDist": "rejected",
+    "productionGhcrCutover": "rejected",
+    "flagCanary": "rejected",
+    "strategy4OverlayPublication": "accepted-as-live-identity-not-full-dist",
+    "productionSwitch": "rejected"
+  },
+  "checklist": {
+    "candidateFullSha": {
+      "value": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+      "note": "origin/main tip at overlay stamp 20260820T040620Z. Not 394c9170c651."
+    },
+    "candidateEqualsOriginMain": {
+      "atOverlayTime": true,
+      "now": false,
+      "originMainNow": "c925b54ed9e48848a782a66064157cd085059367",
+      "commitsMainAheadOfLive": 26,
+      "note": "Do not overlay current origin/main; that would ship another 26 gateway commits."
+    },
+    "ghcrImageDigestTag": {
+      "present": false,
+      "digest": null,
+      "tag": null,
+      "reason": "strategy 4 was gateway-dist-keep-ui overlay, not GHCR. docker-release remains billing-blocked (#289). gh api packages returns 403 missing read:packages. Do not treat missing GHCR as image-exists."
+    },
+    "liveBeforeSha": "6ac338479a1644d28a6bca1c48e1921c11f9d36f",
+    "liveAfterSha": "aa348b38a14a69683bdc5a715ca48d2564a2542d",
+    "provenanceTag": "provenance/sha-aa348b38a14a",
+    "releaseRecordRow": "Latest cutover inbound-depth-main-r1 in deploy/production/RELEASE_RECORD.md (merged via #552)",
+    "ledgerSeq": 29,
+    "verifyForwardOnly": {
+      "liveVsAa348b38": { "exitCode": 0, "verdict": "allow" },
+      "liveVsOriginMain": {
+        "exitCode": 0,
+        "verdict": "allow",
+        "candidate": "c925b54ed9e48848a782a66064157cd085059367"
+      }
+    },
+    "verifyDeliveryAlignment": {
+      "target": "LIVE aa348b38a14a vs tag provenance/sha-aa348b38a14a",
+      "exitCode": 0,
+      "verdict": "allow",
+      "pass": 8,
+      "warn": 2,
+      "fail": 0,
+      "warnDetail": "L3-local images absent on this laptop (expected; LIVE is remote overlay)"
+    },
+    "integration": {
+      "file": "docs/design/evidence/chat-inbound-depth-integration-gate-2026-08-20.json",
+      "result": "22 files / 164 passed on origin/main after #549",
+      "refreshedAgainstCurrentMain": false
+    },
+    "performance": {
+      "file": "docs/design/evidence/chat-inbound-depth-performance-gate-2026-08-20.json",
+      "localClassifierP99Ms": 0.002,
+      "productionTtft": null,
+      "verdict": "local pass; production TTFT not measured"
+    },
+    "quality": {
+      "file": "docs/design/evidence/chat-inbound-depth-quality-gate-2026-08-20.json",
+      "unitCategoriesCovered": true,
+      "doubleBlind": false
+    },
+    "fiveFlagGrayRollout": {
+      "OPENBOT_CHAT_INBOUND_PERSIST_EARLY": false,
+      "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW": false,
+      "OPENBOT_CHAT_INBOUND_DEPTH_ROUTER": false,
+      "OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY": false,
+      "OPENBOT_CHAT_INBOUND_TOOL_POLICY": false,
+      "liveEnv": "NO_INBOUND_FLAGS",
+      "verdict": "not started; owner rejected canary this round"
+    },
+    "smoke": {
+      "healthz": 200,
+      "readyz": true,
+      "uptimeMsAtRecheck": 3669735,
+      "image": "localhost/openbot:ws-c-v1-root-guard-r1-20260815",
+      "imageId": "5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9",
+      "aePresentInDist": true,
+      "restart": "/usr/local/bin/openbot-gateway-restart"
+    },
+    "rollbackDrill": {
+      "file": "docs/design/evidence/chat-inbound-depth-rollback-drill-2026-08-20.json",
+      "backup": "/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/container-app-dist.before.tgz",
+      "sha256": "584de339c95654fc05f93c09d3820201b23e9bc4e4ff93cdc5c100536a697913",
+      "restored": false,
+      "verdict": "backup present; restore not executed"
+    },
+    "mergeBackSha": "104c3d5636bfc941998efbc47e641a8045895468",
+    "mergeBackPr": "https://github.com/gmood2008/openbot/pull/552",
+    "checkSot": {
+      "originMain": { "exitCode": 0, "verdict": "allow" },
+      "useReleaseRecordLive": {
+        "exitCode": 20,
+        "verdict": "block",
+        "reason": "parses frozen release/baseline-recovery-20260725; expected; not the production SoT"
+      }
+    }
+  },
+  "verdict": {
+    "code": "A-E accepted",
+    "productionCandidate394c9170c651": "rejected",
+    "productionSwitch": "rejected",
+    "liveIdentity": "aa348b38a14a69683bdc5a715ca48d2564a2542d overlay inbound-depth-main-r1 recorded in seq 29 / #552"
+  }
+}

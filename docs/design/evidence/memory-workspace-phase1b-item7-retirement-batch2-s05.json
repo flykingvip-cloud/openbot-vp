@@ -1,0 +1,44 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch2-s05/v1",
+  "item": 7,
+  "status": "retirement-batch-2",
+  "batch": "S05",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S05",
+      "file": "src/gateway/checkpoint-store.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 35,
+  "liveWriteWatchIndex": 35,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/checkpoint-store.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "2e09b95e73762d42f925f9d15a9ab73c115d173e",
+  "note": "Batch 2 retires S05 only. Incomplete locator queries fail closed. Steward and ForClient sites stay on lines 127 and 158. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

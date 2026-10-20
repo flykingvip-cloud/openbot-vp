@@ -1,0 +1,524 @@
+/**
+ * 平台「档位对比」视图样式。现代简约：响应式卡片网格 + 周期切换 + 推荐档锚点。
+ * 全部走设计 token（颜色/圆角/阴影/动效/焦点环），不硬编码 hex；字重仅 600/700。
+ * 配合 ui/src/ui/ports/platform/pricing/pricing-comparison-view.ts。
+ */
+
+.platform-pricing__compare {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ── 周期切换器（分段控件） ───────────────────────────────── */
+.platform-pricing__compare-cycles {
+  display: inline-flex;
+  align-self: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+}
+
+.platform-pricing__compare-cycle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.platform-pricing__compare-cycle:hover {
+  color: var(--text);
+}
+
+.platform-pricing__compare-cycle.is-active {
+  background: var(--card);
+  color: var(--text-strong);
+  box-shadow:
+    0 1px 2px rgb(15 23 42 / 8%),
+    0 2px 8px rgb(15 23 42 / 12%);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, var(--text) 8%);
+}
+
+.platform-pricing__compare-cycle:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.platform-pricing__compare-cycle-badge {
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: var(--ok-subtle);
+  color: var(--ok);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── 卡片网格 ─────────────────────────────────────────────── */
+.platform-pricing__compare-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.platform-pricing__compare-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.platform-pricing__compare-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
+}
+
+/* 推荐档：视觉锚点（不缩放，保持与其它卡片对齐） */
+.platform-pricing__compare-card.is-recommended {
+  border-color: var(--accent);
+  border-width: 2px;
+  box-shadow: var(--shadow-md);
+}
+
+.platform-pricing__compare-card.is-recommended::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--accent);
+}
+
+.platform-pricing__compare-card-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  gap: 4px;
+}
+
+.platform-pricing__compare-card-edit {
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 2px 10px;
+}
+
+.platform-pricing__compare-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.platform-pricing__compare-badge--inline {
+  position: static;
+}
+
+.platform-pricing__compare-badge svg {
+  width: 13px;
+  height: 13px;
+}
+
+.platform-pricing__compare-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.platform-pricing__compare-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+/* 价格区固定最小高度：免费/面议（无折扣行）与付费档（有划线省额行）的 CTA 仍对齐。 */
+.platform-pricing__compare-pricing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 58px;
+}
+
+.platform-pricing__compare-price {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.platform-pricing__compare-price-value {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--text-strong);
+  line-height: 1.1;
+}
+
+.platform-pricing__compare-price-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.platform-pricing__compare-savings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.platform-pricing__compare-list-price {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.platform-pricing__compare-save {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* ── 主行动按钮 ───────────────────────────────────────────── */
+.platform-pricing__compare-cta {
+  padding: 10px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.platform-pricing__compare-cta:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.platform-pricing__compare-cta.is-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.platform-pricing__compare-cta.is-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-foreground);
+}
+
+.platform-pricing__compare-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.platform-pricing__compare-cta.is-current,
+.platform-pricing__compare-cta:disabled {
+  cursor: default;
+  border-color: var(--border);
+  background: var(--bg-elevated);
+  color: var(--muted);
+}
+
+/* ── 价值清单 ─────────────────────────────────────────────── */
+.platform-pricing__compare-features {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.platform-pricing__compare-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.platform-pricing__compare-feature-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--ok);
+}
+
+.platform-pricing__compare-feature-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.platform-pricing__compare-empty {
+  padding: 32px;
+  text-align: center;
+}
+
+/* ── 卓越版「面议」价格 ─────────────────────────────────────── */
+.platform-pricing__compare-price-value--quote {
+  font-size: 22px;
+}
+
+/* ── 联系销售页 ───────────────────────────────────────────── */
+.platform-pricing__sales {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.platform-pricing__sales-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.platform-pricing__sales-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.platform-pricing__sales-back:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.platform-pricing__sales-back:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.platform-pricing__sales-back-icon {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+
+.platform-pricing__sales-back-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.platform-pricing__sales-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.platform-pricing__sales-plan {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.platform-pricing__sales-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(280px, 1.6fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .platform-pricing__sales-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-pricing__sales-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.platform-pricing__sales-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.platform-pricing__sales-card-icon {
+  display: inline-flex;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+.platform-pricing__sales-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.platform-pricing__sales-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.platform-pricing__sales-card-sub {
+  font-size: 12px;
+}
+
+.platform-pricing__sales-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.platform-pricing__sales-contact-row {
+  display: grid;
+  grid-template-columns: 24px auto 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.platform-pricing__sales-contact-icon {
+  display: inline-flex;
+  color: var(--muted);
+}
+
+.platform-pricing__sales-contact-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.platform-pricing__sales-contact-label {
+  color: var(--muted);
+}
+
+.platform-pricing__sales-contact-value {
+  color: var(--text-strong);
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ── 需求表单 ─────────────────────────────────────────────── */
+.platform-pricing__sales-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+
+.platform-pricing__sales-form-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.platform-pricing__sales-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.platform-pricing__sales-field--full {
+  grid-column: 1 / -1;
+}
+
+.platform-pricing__sales-field input,
+.platform-pricing__sales-field textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 14px;
+}
+
+.platform-pricing__sales-field input:focus-visible,
+.platform-pricing__sales-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.platform-pricing__sales-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.platform-pricing__sales-submitted {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.platform-pricing__sales-submitted-icon {
+  display: inline-flex;
+  color: var(--ok);
+}
+
+.platform-pricing__sales-submitted-icon svg {
+  width: 36px;
+  height: 36px;
+}
+
+.platform-pricing__sales-submitted-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong);
+}

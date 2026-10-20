@@ -1,0 +1,53 @@
+{
+  "version": "v1",
+  "scope": {
+    "workspaceId": "eval_ws",
+    "projectId": "eval_proj",
+    "agentId": "eval_agent",
+    "visibility": "private"
+  },
+  "cases": [
+    {
+      "id": "dbg_sync_retry_latency",
+      "rawInput": "外部 API 高延迟时，同步重试导致吞吐下降和队列阻塞，应该如何处理？",
+      "sourceType": "chat",
+      "expectedTaskType": "debugging",
+      "expectedAtomTypes": ["failure_pattern", "strategy", "constraint"]
+    },
+    {
+      "id": "dbg_idempotency_guard",
+      "rawInput": "我们准备把同步调用改成异步批处理，但担心重复执行，需要什么约束？",
+      "sourceType": "chat",
+      "expectedTaskType": "debugging",
+      "expectedAtomTypes": ["strategy", "constraint", "heuristic"]
+    },
+    {
+      "id": "plan_release_cutover",
+      "rawInput": "请规划一次灰度发布方案，要求不中断服务并可快速回滚。",
+      "sourceType": "chat",
+      "expectedTaskType": "planning",
+      "expectedAtomTypes": ["strategy", "constraint"]
+    },
+    {
+      "id": "research_failure_patterns",
+      "rawInput": "帮我研究过去一个月出现最多的故障模式，输出可复用结论。",
+      "sourceType": "chat",
+      "expectedTaskType": "research",
+      "expectedAtomTypes": ["problem_pattern", "failure_pattern", "strategy"]
+    },
+    {
+      "id": "support_customer_preference",
+      "rawInput": "这个客户偏好先看稳定性数据再看功能，请给出后续沟通策略。",
+      "sourceType": "chat",
+      "expectedTaskType": "support",
+      "expectedAtomTypes": ["preference", "strategy", "constraint"]
+    },
+    {
+      "id": "operations_incident_playbook",
+      "rawInput": "值班告警频繁但误报多，如何优化运行手册并减少重复故障？",
+      "sourceType": "chat",
+      "expectedTaskType": "operations",
+      "expectedAtomTypes": ["failure_pattern", "strategy", "heuristic"]
+    }
+  ]
+}

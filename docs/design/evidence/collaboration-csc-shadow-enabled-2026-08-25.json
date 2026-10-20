@@ -1,0 +1,55 @@
+{
+  "stage": "SHADOW_ENABLED",
+  "shadowEnabled": true,
+  "containerRecreated": true,
+  "recreateSameSha": true,
+  "liveShaUnchanged": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "executedAtUtc": "2026-08-25T10:12:14Z",
+  "authorization": "explicit production-owner grant: enable ONLY OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1 (strictly shadow-only, progress-ledger excluded per Option A); same-SHA recreate of openbot-gateway-rc accepting seconds of chat interruption; auto-rollback on anomaly; ROUTER/KNOWLEDGE_POLICY/TOOL_POLICY/PERSIST_EARLY/OPENBOT_COLLAB/CONTEXT_SCOPE kept off",
+  "enable": {
+    "tool": "csc-shadow-recreate-v2.sh enable (sha bf28e11d8b36d91ab5c3427f328d86776296c0149aca8a0b8aae0531fe0a72e6)",
+    "image": "localhost/openbot:rc-amd64-provenance-a12e4c59e575",
+    "tempEnv": "mode 600, derived from /root/.openbot/.env.docker minus shadow line and OPENBOT_PROGRESS_LEDGER_ENABLED, plus OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1; deleted after run",
+    "envDockerEdited": false,
+    "shadowOnlyDiffVsRuntime": "OK (only OPENBOT_CHAT_INBOUND_DEPTH_SHADOW added)",
+    "healthGate": "healthz 200",
+    "identityDrift": "none (build-info a12e4c59e575)",
+    "flagVerify": "only OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1"
+  },
+  "postVerify": {
+    "buildInfoCommit": "a12e4c59e5754e0c280b423c68c989c6973ac9b0",
+    "healthz": 200,
+    "readyz": { "ready": true, "failing": [] },
+    "shadowFlag": "OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1",
+    "inboundFamilyKeyCount": 1,
+    "prohibitedFlags": "none (PERSIST_EARLY/DEPTH_ROUTER/KNOWLEDGE_POLICY/TOOL_POLICY/COLLAB/CONTEXT_SCOPE all unset)",
+    "progressLedger": "absent (excluded)",
+    "containerStartedAt": "2026-08-25T18:12:14+08:00 (new container)",
+    "restartCount": 0,
+    "image": "localhost/openbot:rc-amd64-provenance-a12e4c59e575"
+  },
+  "safetyContainer": {
+    "name": "openbot-gateway-rc-prev-preshadow-20260825T101207Z",
+    "state": "Exited (0), kept for rollback",
+    "rollback": "csc-shadow-recreate-v2.sh rollback (kept at /root/cap2), or rename safety back + start"
+  },
+  "observationWindow": {
+    "durationSec": 120,
+    "auth": "PASS",
+    "wsConnect": "PASS",
+    "subscriptionAck": "PASS",
+    "nonDepthEventVisible": true,
+    "depthEvents": 0,
+    "depthEventsNote": "no inbound chat traffic during the passive window; shadow is enabled and the observation link is live. Depth events (chat.depth_decided with wouldDepth/routeStrength) will populate on natural traffic; traffic is not synthetically generated.",
+    "rawTextLeaks": 0,
+    "sensitiveFieldScan": "PASS",
+    "captureExit": 0,
+    "toolSha256": "c5bd973b15eec22344a9d2f8bc8aebff599661bc5a9cd200d4c235ee5a1d1d6b"
+  },
+  "notModified": ["RELEASE_RECORD.md", "releases.jsonl", "LIVE ledger (no new row)"],
+  "anomaly": "none (no rollback triggered)",
+  "rollbackPlan": "same-SHA: stop+rm current, rename openbot-gateway-rc-prev-preshadow-20260825T101207Z back to openbot-gateway-rc, start, health-gate; or csc-shadow-recreate-v2.sh rollback",
+  "nextObservation": "a longer or traffic-coincident observation window can capture chat.depth_decided (wouldDepth/routeStrength/reasons) to demonstrate the shadow computation on real traffic, with the same redaction + invariant checks; still no RELEASE_RECORD/releases.jsonl change."
+}

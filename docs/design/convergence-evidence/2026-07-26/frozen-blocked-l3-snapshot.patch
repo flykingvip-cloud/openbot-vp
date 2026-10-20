@@ -1,0 +1,561 @@
+diff --git a/scripts/__tests__/l3-live-snapshot.test.ts b/scripts/__tests__/l3-live-snapshot.test.ts
+new file mode 100644
+index 0000000000..0c60873a6d
+--- /dev/null
++++ b/scripts/__tests__/l3-live-snapshot.test.ts
+@@ -0,0 +1,180 @@
++import { describe, expect, it } from "vitest";
++import {
++  BLOCK_BEGIN,
++  BLOCK_END,
++  buildSnapshot,
++  findProblems,
++  parseProbe,
++  renderL3Block,
++  replaceGeneratedBlock,
++  type L3Snapshot,
++} from "../ops/l3-live-snapshot.js";
++
++/** Probe output shaped like the real production host on 2026-07-27. */
++const HEALTHY_PROBE = [
++  "L3|probedAt=2026-07-27T09:10:05+08:00",
++  "L3|container.name=openbot-gateway-rc",
++  "L3|container.created=2026-07-26 18:31:05.333111321 +0800 CST",
++  "L3|container.image=localhost/openbot:rc-amd64-provenance-aad4f39891c0",
++  "L3|container.imageId=fa5faeec9e5a9846483a4a67316500961ce2edfcc8d6ba82779551ab15598f84",
++  "L3|container.running=true",
++  "L3|container.restartCount=0",
++  "L3|container.startedAt=2026-07-26 18:31:05.496071769 +0800 CST",
++  'L3|build.raw={"version":"2026.7.12-rc.2","commit":"aad4f39891c04a10e276581a4527f38ddb7c1aab","builtAt":"2026-07-26T10:29:24.742Z"}',
++  "L3|ui.served=index-DGAEGlu2.js",
++  "L3|ui.bundleCount=1",
++  "L3|ui.appleDouble=0",
++  "L3|health.healthz=200",
++  'L3|health.readyz={"ready":true,"failing":[],"uptimeMs":52733214}',
++  "L3|port.pid=2507992",
++  "L3|port.ownedByContainer=true",
++  "L3|harden.systemdUnit=masked",
++  "L3|harden.npmGlobals=corepack@0.34.6,npm@10.9.7,pm2@7.0.1",
++  "L3|harden.gatewayBins=0",
++  "L3|rollback.container=openbot-gateway-rc-prev-provenance-safety",
++  "L3|rollback.image=localhost/openbot:rc-amd64-provenance-5cf014a637b6",
++].join("\n");
++
++function healthySnapshot(): L3Snapshot {
++  return buildSnapshot({
++    host: "root@example-gateway",
++    probe: parseProbe(HEALTHY_PROBE),
++    publicHosts: [{ host: "www.example.test", status: 200, bundle: "index-DGAEGlu2.js" }],
++  });
++}
++
++describe("l3-live-snapshot probe parsing", () => {
++  it("parses L3| key=value lines and ignores unrelated stdout noise", () => {
++    const raw = ["ssh: banner noise", "L3|ui.served=index-DGAEGlu2.js", "not a probe line"].join(
++      "\n",
++    );
++    const map = parseProbe(raw);
++    expect(map.get("ui.served")).toBe("index-DGAEGlu2.js");
++    expect(map.size).toBe(1);
++  });
++
++  it("keeps values that themselves contain '=' (JSON payloads)", () => {
++    const map = parseProbe('L3|health.readyz={"ready":true,"a=b":1}');
++    expect(map.get("health.readyz")).toBe('{"ready":true,"a=b":1}');
++  });
++
++  it("builds a typed snapshot from probe output", () => {
++    const s = healthySnapshot();
++    expect(s.container.image).toBe("localhost/openbot:rc-amd64-provenance-aad4f39891c0");
++    expect(s.container.running).toBe(true);
++    expect(s.build.commit).toBe("aad4f39891c04a10e276581a4527f38ddb7c1aab");
++    expect(s.controlUi.servedBundle).toBe("index-DGAEGlu2.js");
++    expect(s.port.ownedByContainer).toBe(true);
++    expect(s.rollback?.container).toBe("openbot-gateway-rc-prev-provenance-safety");
++  });
++
++  it("tolerates an unparseable build-info instead of throwing", () => {
++    const s = buildSnapshot({
++      host: "h",
++      probe: parseProbe("L3|build.raw=not-json"),
++      publicHosts: [],
++    });
++    expect(s.build).toEqual({ version: "", commit: "", builtAt: "" });
++  });
++
++  it("reports no rollback target when no safety container exists", () => {
++    const s = buildSnapshot({
++      host: "h",
++      probe: parseProbe("L3|rollback.container="),
++      publicHosts: [],
++    });
++    expect(s.rollback).toBeNull();
++  });
++});
++
++describe("l3-live-snapshot problem detection", () => {
++  it("finds nothing wrong with a healthy snapshot", () => {
++    expect(findProblems(healthySnapshot())).toEqual([]);
++  });
++
++  it("flags a host process holding :18789 — the 2026-07-26 incident signature", () => {
++    const s = healthySnapshot();
++    s.port.ownedByContainer = false;
++    expect(findProblems(s).join(" ")).toContain(":18789");
++  });
++
++  it("flags un-masked systemd unit and gateway bins back on PATH", () => {
++    const s = healthySnapshot();
++    s.hardening.systemdUnit = "disabled";
++    s.hardening.gatewayBinsOnPath = 2;
++    const problems = findProblems(s).join(" ");
++    expect(problems).toContain("masked");
++    expect(problems).toContain("PATH");
++  });
++
++  it("flags stale bundle accumulation and macOS AppleDouble leftovers", () => {
++    const s = healthySnapshot();
++    s.controlUi.bundleCount = 4;
++    s.controlUi.appleDoubleCount = 1;
++    const problems = findProblems(s);
++    expect(problems.some((p) => p.includes("bundle"))).toBe(true);
++    expect(problems.some((p) => p.includes("._"))).toBe(true);
++  });
++
++  it("flags a public host serving a different bundle than the container", () => {
++    const s = healthySnapshot();
++    s.publicHosts = [{ host: "www.example.test", status: 200, bundle: "index-OLDOLDOL.js" }];
++    expect(findProblems(s).join(" ")).toContain("不一致");
++  });
++
++  it("flags unhealthy gateway responses", () => {
++    const s = healthySnapshot();
++    s.health.healthz = "502";
++    s.health.readyz = '{"ready":false,"failing":["wecom"]}';
++    const problems = findProblems(s).join(" ");
++    expect(problems).toContain("502");
++    expect(problems).toContain("readyz");
++  });
++});
++
++describe("l3-live-snapshot rendering and block replacement", () => {
++  it("renders the live image, commit and served bundle", () => {
++    const md = renderL3Block(healthySnapshot());
++    expect(md).toContain("rc-amd64-provenance-aad4f39891c0");
++    expect(md).toContain("aad4f398");
++    expect(md).toContain("index-DGAEGlu2.js");
++    expect(md).toContain("No problems detected");
++  });
++
++  it("lists detected problems in the rendered block", () => {
++    const s = healthySnapshot();
++    s.container.running = false;
++    expect(renderL3Block(s)).toContain("Problems detected");
++  });
++
++  it("replaces only the delimited block and preserves surrounding text", () => {
++    const doc = [
++      "# Record",
++      "",
++      "before text",
++      BLOCK_BEGIN,
++      "stale content",
++      BLOCK_END,
++      "",
++      "after text",
++    ].join("\n");
++    const out = replaceGeneratedBlock(doc, "fresh content");
++    expect(out).toContain("before text");
++    expect(out).toContain("after text");
++    expect(out).toContain("fresh content");
++    expect(out).not.toContain("stale content");
++    expect(out.indexOf(BLOCK_BEGIN)).toBeLessThan(out.indexOf(BLOCK_END));
++  });
++
++  it("is idempotent across repeated writes", () => {
++    const doc = ["head", BLOCK_BEGIN, BLOCK_END, "tail"].join("\n");
++    const once = replaceGeneratedBlock(doc, "body");
++    expect(replaceGeneratedBlock(once, "body")).toBe(once);
++  });
++
++  it("throws a directive error when the markers are missing", () => {
++    expect(() => replaceGeneratedBlock("# Record with no markers", "body")).toThrow(
++      /markers not found/,
++    );
++  });
++});
+diff --git a/scripts/ops/l3-live-snapshot.ts b/scripts/ops/l3-live-snapshot.ts
+new file mode 100644
+index 0000000000..8cb95b9cfe
+--- /dev/null
++++ b/scripts/ops/l3-live-snapshot.ts
+@@ -0,0 +1,369 @@
++/**
++ * l3-live-snapshot.ts — probe what is ACTUALLY live on the production gateway host
++ * and regenerate the L3 pointer block in `deploy/production/RELEASE_RECORD.md`.
++ *
++ * Why: on 2026-07-26 production took **eight** cutovers in one day. A hand-written
++ * "Latest cutover" pointer in the release record went stale twice within nine hours,
++ * and during an incident the stale pointer nearly caused a restore onto an OLDER
++ * baseline. Facts that must never be inferred again (each one burned us once):
++ *   - `build-info.json` alone does not identify a UI-layer cutover (commit unchanged).
++ *   - The bundle hash alone is not unique (one hash covered three image tags).
++ *   - A directory listing does not identify the served bundle; only `index.html` does.
++ *   - `prev-vNNN-safety` carries the image of v(NNN-1), not vNNN.
++ * So: read it from the running system, never retype it.
++ *
++ * Usage:
++ *   bun scripts/ops/l3-live-snapshot.ts                 # human-readable report
++ *   bun scripts/ops/l3-live-snapshot.ts --json          # machine-readable snapshot
++ *   bun scripts/ops/l3-live-snapshot.ts --write         # rewrite the generated block in the record
++ *   bun scripts/ops/l3-live-snapshot.ts --check         # exit 1 when live state looks unhealthy
++ *   bun scripts/ops/l3-live-snapshot.ts --host root@1.2.3.4 --no-public
++ *
++ * Host defaults to $OPENBOT_PROD_HOST, else `root@8.217.93.71`.
++ */
++
++import { execFileSync } from "node:child_process";
++import { existsSync, readFileSync, writeFileSync } from "node:fs";
++
++export const BLOCK_BEGIN =
++  "<!-- L3-LIVE:BEGIN (generated by scripts/ops/l3-live-snapshot.ts — do not edit by hand) -->";
++export const BLOCK_END = "<!-- L3-LIVE:END -->";
++
++const DEFAULT_RECORD = "deploy/production/RELEASE_RECORD.md";
++const DEFAULT_HOST = process.env.OPENBOT_PROD_HOST?.trim() || "root@8.217.93.71";
++const DEFAULT_PUBLIC_HOSTS = [
++  "www.openbot.love",
++  "biz.openbot.love",
++  "admin.openbot.love",
++  "gw.openbot.love",
++];
++const CONTAINER = "openbot-gateway-rc";
++
++export type PublicHostProbe = {
++  host: string;
++  status: number | null;
++  bundle: string | null;
++};
++
++export type L3Snapshot = {
++  probedAt: string;
++  host: string;
++  container: {
++    name: string;
++    created: string;
++    image: string;
++    imageId: string;
++    running: boolean;
++    restartCount: string;
++    startedAt: string;
++  };
++  build: { version: string; commit: string; builtAt: string };
++  controlUi: { servedBundle: string; bundleCount: number; appleDoubleCount: number };
++  health: { healthz: string; readyz: string };
++  port: { pid: string; ownedByContainer: boolean };
++  hardening: { systemdUnit: string; npmGlobals: string; gatewayBinsOnPath: number };
++  rollback: { container: string; image: string } | null;
++  publicHosts: PublicHostProbe[];
++};
++
++/**
++ * Remote probe. Emits `L3|key=value` lines so parsing never depends on column
++ * layout. Kept as a constant (no interpolation) so it cannot become an injection
++ * vector; the host is passed to ssh as an argv element, not through a shell.
++ */
++const PROBE = `set -u
++C=${CONTAINER}
++emit() { printf 'L3|%s=%s\\n' "$1" "$2"; }
++emit probedAt "$(date -Is)"
++emit container.name "$C"
++emit container.created "$(podman inspect "$C" --format '{{.Created}}' 2>/dev/null)"
++emit container.image "$(podman inspect "$C" --format '{{.ImageName}}' 2>/dev/null)"
++emit container.imageId "$(podman inspect "$C" --format '{{.Image}}' 2>/dev/null)"
++emit container.running "$(podman inspect "$C" --format '{{.State.Running}}' 2>/dev/null)"
++emit container.restartCount "$(podman inspect "$C" --format '{{.RestartCount}}' 2>/dev/null)"
++emit container.startedAt "$(podman inspect "$C" --format '{{.State.StartedAt}}' 2>/dev/null)"
++emit build.raw "$(podman exec "$C" cat /app/dist/build-info.json 2>/dev/null | tr -d '\\n ')"
++emit ui.served "$(podman exec "$C" grep -oE 'index-[A-Za-z0-9_-]+\\.js' /app/dist/control-ui/index.html 2>/dev/null | head -1)"
++emit ui.bundleCount "$(podman exec "$C" sh -c 'ls /app/dist/control-ui/assets 2>/dev/null | grep -cE "^index-[A-Za-z0-9_-]+\\.js$"' 2>/dev/null)"
++emit ui.appleDouble "$(podman exec "$C" sh -c 'ls /app/dist/control-ui/assets 2>/dev/null | grep -c "^\\._"' 2>/dev/null)"
++emit health.healthz "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18789/healthz 2>/dev/null)"
++emit health.readyz "$(curl -s http://127.0.0.1:18789/readyz 2>/dev/null | head -c 120 | tr -d '\\n')"
++PORTPID="$(ss -ltnp 2>/dev/null | grep 18789 | head -1 | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2)"
++emit port.pid "$PORTPID"
++CPID="$(podman inspect "$C" --format '{{.State.Pid}}' 2>/dev/null)"
++if [ -n "$PORTPID" ] && [ "$PORTPID" = "$CPID" ]; then emit port.ownedByContainer true; else emit port.ownedByContainer false; fi
++emit harden.systemdUnit "$(systemctl is-enabled openbot-gateway.service 2>&1 | head -1)"
++emit harden.npmGlobals "$(npm ls -g --depth=0 2>/dev/null | tail -n +2 | sed 's/[^a-zA-Z0-9@._/-]//g' | grep -v '^$' | paste -sd, -)"
++emit harden.gatewayBins "$(ls /usr/bin/openbot /usr/bin/openclaw /usr/local/bin/openbot /usr/local/bin/openclaw 2>/dev/null | wc -l | tr -d ' ')"
++PREV="$(podman ps -a --format '{{.CreatedAt}}|{{.Names}}|{{.Image}}' 2>/dev/null | grep -F "|$C-prev-" | sort | tail -1)"
++emit rollback.container "$(printf '%s' "$PREV" | cut -d'|' -f2)"
++emit rollback.image "$(printf '%s' "$PREV" | cut -d'|' -f3)"
++`;
++
++/** Parse `L3|key=value` probe output into a flat map. */
++export function parseProbe(raw: string): Map<string, string> {
++  const out = new Map<string, string>();
++  for (const line of raw.split("\n")) {
++    if (!line.startsWith("L3|")) {
++      continue;
++    }
++    const body = line.slice(3);
++    const eq = body.indexOf("=");
++    if (eq < 0) {
++      continue;
++    }
++    out.set(body.slice(0, eq), body.slice(eq + 1).trim());
++  }
++  return out;
++}
++
++function parseBuildInfo(raw: string): { version: string; commit: string; builtAt: string } {
++  if (!raw) {
++    return { version: "", commit: "", builtAt: "" };
++  }
++  try {
++    const parsed: unknown = JSON.parse(raw);
++    if (parsed && typeof parsed === "object") {
++      const rec = parsed as Record<string, unknown>;
++      return {
++        version: typeof rec.version === "string" ? rec.version : "",
++        commit: typeof rec.commit === "string" ? rec.commit : "",
++        builtAt: typeof rec.builtAt === "string" ? rec.builtAt : "",
++      };
++    }
++  } catch {
++    // Fall through: an unparseable build-info is itself worth surfacing.
++  }
++  return { version: "", commit: "", builtAt: "" };
++}
++
++/** Build a snapshot from probe output plus locally-gathered public-host results. */
++export function buildSnapshot(params: {
++  host: string;
++  probe: Map<string, string>;
++  publicHosts: PublicHostProbe[];
++}): L3Snapshot {
++  const g = (k: string): string => params.probe.get(k) ?? "";
++  const rollbackContainer = g("rollback.container");
++  return {
++    probedAt: g("probedAt"),
++    host: params.host,
++    container: {
++      name: g("container.name"),
++      created: g("container.created"),
++      image: g("container.image"),
++      imageId: g("container.imageId"),
++      running: g("container.running") === "true",
++      restartCount: g("container.restartCount"),
++      startedAt: g("container.startedAt"),
++    },
++    build: parseBuildInfo(g("build.raw")),
++    controlUi: {
++      servedBundle: g("ui.served"),
++      bundleCount: Number.parseInt(g("ui.bundleCount") || "0", 10),
++      appleDoubleCount: Number.parseInt(g("ui.appleDouble") || "0", 10),
++    },
++    health: { healthz: g("health.healthz"), readyz: g("health.readyz") },
++    port: { pid: g("port.pid"), ownedByContainer: g("port.ownedByContainer") === "true" },
++    hardening: {
++      systemdUnit: g("harden.systemdUnit"),
++      npmGlobals: g("harden.npmGlobals"),
++      gatewayBinsOnPath: Number.parseInt(g("harden.gatewayBins") || "0", 10),
++    },
++    rollback: rollbackContainer
++      ? { container: rollbackContainer, image: g("rollback.image") }
++      : null,
++    publicHosts: params.publicHosts,
++  };
++}
++
++/** Findings that should block a green `--check`, worded for an operator. */
++export function findProblems(s: L3Snapshot): string[] {
++  const problems: string[] = [];
++  if (!s.container.running) {
++    problems.push("容器未运行 (container not running)");
++  }
++  if (s.health.healthz !== "200") {
++    problems.push(`healthz=${s.health.healthz || "无响应"}`);
++  }
++  if (!s.health.readyz.includes('"ready":true')) {
++    problems.push("readyz 未 ready");
++  }
++  if (!s.port.ownedByContainer) {
++    problems.push(":18789 不由容器持有 — 可能又有宿主机 gateway 抢占");
++  }
++  if (s.hardening.systemdUnit !== "masked") {
++    problems.push(`openbot-gateway.service 未处于 masked (=${s.hardening.systemdUnit || "未知"})`);
++  }
++  if (s.hardening.gatewayBinsOnPath > 0) {
++    problems.push(`PATH 上出现 ${s.hardening.gatewayBinsOnPath} 个 openbot/openclaw 可执行入口`);
++  }
++  if (s.controlUi.bundleCount > 1) {
++    problems.push(`control-ui 残留 ${s.controlUi.bundleCount} 个 bundle（UI 层未 rm -rf 清理）`);
++  }
++  if (s.controlUi.appleDoubleCount > 0) {
++    problems.push(`control-ui 含 ${s.controlUi.appleDoubleCount} 个 macOS ._ 残留文件`);
++  }
++  const bad = s.publicHosts.filter((h) => h.status !== 200);
++  if (bad.length > 0) {
++    problems.push(`公网域异常: ${bad.map((h) => `${h.host}=${h.status}`).join(", ")}`);
++  }
++  const mismatched = s.publicHosts.filter(
++    (h) => h.bundle && s.controlUi.servedBundle && h.bundle !== s.controlUi.servedBundle,
++  );
++  if (mismatched.length > 0) {
++    problems.push(
++      `公网发的 bundle 与容器内不一致: ${mismatched.map((h) => `${h.host}=${h.bundle}`).join(", ")}`,
++    );
++  }
++  return problems;
++}
++
++/** Render the generated markdown block (between the BEGIN/END markers). */
++export function renderL3Block(s: L3Snapshot): string {
++  const shortCommit = s.build.commit.slice(0, 8) || "未知";
++  const publicRows = s.publicHosts.length
++    ? s.publicHosts
++        .map((h) => `${h.host} → ${h.status ?? "无响应"} / ${h.bundle ?? "未解析"}`)
++        .join("; ")
++    : "未探测";
++  const problems = findProblems(s);
++  const lines = [
++    `**Live L3 as of ${s.probedAt}** — generated from ${s.host}, do not hand-edit.`,
++    "",
++    "| Field | Value |",
++    "| ----- | ----- |",
++    `| Image tag | \`${s.container.image}\` |`,
++    `| Image id | \`${s.container.imageId.slice(0, 32)}\` |`,
++    `| Runtime | \`${s.build.version} (${shortCommit})\` · built \`${s.build.builtAt}\` |`,
++    `| Control UI (from index.html) | \`${s.controlUi.servedBundle}\` |`,
++    `| Container | \`${s.container.name}\` created \`${s.container.created}\`, started \`${s.container.startedAt}\`, running=${s.container.running}, restarts=${s.container.restartCount} |`,
++    `| Health | healthz \`${s.health.healthz}\` · readyz \`${s.health.readyz}\` |`,
++    `| :18789 owner | pid \`${s.port.pid}\`, owned by container: ${s.port.ownedByContainer} |`,
++    `| Host hardening | \`openbot-gateway.service\` ${s.hardening.systemdUnit} · npm globals \`${s.hardening.npmGlobals}\` · gateway bins on PATH: ${s.hardening.gatewayBinsOnPath} |`,
++    `| Rollback target | ${s.rollback ? `\`${s.rollback.container}\` / \`${s.rollback.image}\`` : "无存档容器"} |`,
++    `| Public hosts | ${publicRows} |`,
++    "",
++    problems.length === 0
++      ? "No problems detected by `l3-live-snapshot --check`."
++      : `**Problems detected:**\n\n${problems.map((p) => `- ${p}`).join("\n")}`,
++  ];
++  return lines.join("\n");
++}
++
++/** Swap the generated block in place, leaving the rest of the record untouched. */
++export function replaceGeneratedBlock(fileText: string, block: string): string {
++  const start = fileText.indexOf(BLOCK_BEGIN);
++  const end = fileText.indexOf(BLOCK_END);
++  if (start < 0 || end < 0 || end < start) {
++    throw new Error(
++      `generated block markers not found in record (expected ${BLOCK_BEGIN} … ${BLOCK_END})`,
++    );
++  }
++  const head = fileText.slice(0, start + BLOCK_BEGIN.length);
++  const tail = fileText.slice(end);
++  return `${head}\n\n${block}\n\n${tail}`;
++}
++
++async function probePublicHost(host: string): Promise<PublicHostProbe> {
++  try {
++    const res = await fetch(`https://${host}/`, { redirect: "follow" });
++    const body = await res.text();
++    const match = body.match(/index-[A-Za-z0-9_-]+\.js/);
++    return { host, status: res.status, bundle: match ? match[0] : null };
++  } catch {
++    return { host, status: null, bundle: null };
++  }
++}
++
++function runProbe(host: string): string {
++  return execFileSync(
++    "ssh",
++    ["-o", "ConnectTimeout=10", "-o", "BatchMode=yes", host, "bash", "-s"],
++    {
++      input: PROBE,
++      encoding: "utf8",
++      maxBuffer: 8 * 1024 * 1024,
++    },
++  );
++}
++
++/**
++ * Normalize the record after a write. The generated table is not in oxfmt's
++ * canonical column layout, so skipping this would leave `pnpm format` red.
++ */
++function formatRecord(recordPath: string): void {
++  const bin = "node_modules/.bin/oxfmt";
++  if (!existsSync(bin)) {
++    process.stdout.write(`[l3-live-snapshot] 未找到 ${bin}，请手动运行 pnpm format:fix\n`);
++    return;
++  }
++  try {
++    execFileSync(bin, ["--write", recordPath], { stdio: "ignore" });
++  } catch {
++    process.stdout.write("[l3-live-snapshot] oxfmt 失败，请手动运行 pnpm format:fix\n");
++  }
++}
++
++function argValue(argv: string[], flag: string): string | undefined {
++  const i = argv.indexOf(flag);
++  return i >= 0 && i + 1 < argv.length ? argv[i + 1] : undefined;
++}
++
++async function main(): Promise<void> {
++  const argv = process.argv.slice(2);
++  if (argv.includes("--help") || argv.includes("-h")) {
++    process.stdout.write(
++      [
++        "l3-live-snapshot — read the live production L3 state and regenerate the record block",
++        "",
++        "  --json            machine-readable snapshot",
++        "  --write           rewrite the generated block in the release record",
++        "  --check           exit 1 when live state looks unhealthy",
++        "  --host <target>   ssh target (default $OPENBOT_PROD_HOST or root@8.217.93.71)",
++        "  --file <path>     record path (default deploy/production/RELEASE_RECORD.md)",
++        "  --no-public       skip public-domain probes",
++        "",
++      ].join("\n"),
++    );
++    return;
++  }
++
++  const host = argValue(argv, "--host") ?? DEFAULT_HOST;
++  const recordPath = argValue(argv, "--file") ?? DEFAULT_RECORD;
++  const publicHosts = argv.includes("--no-public")
++    ? []
++    : await Promise.all(DEFAULT_PUBLIC_HOSTS.map((h) => probePublicHost(h)));
++
++  const snapshot = buildSnapshot({ host, probe: parseProbe(runProbe(host)), publicHosts });
++
++  if (argv.includes("--json")) {
++    process.stdout.write(`${JSON.stringify(snapshot, null, 2)}\n`);
++  } else {
++    process.stdout.write(`${renderL3Block(snapshot)}\n`);
++  }
++
++  if (argv.includes("--write")) {
++    const before = readFileSync(recordPath, "utf8");
++    const after = replaceGeneratedBlock(before, renderL3Block(snapshot));
++    if (after !== before) {
++      writeFileSync(recordPath, after);
++      process.stdout.write(`\n[l3-live-snapshot] 已更新 ${recordPath} 的生成块\n`);
++      formatRecord(recordPath);
++    } else {
++      process.stdout.write(`\n[l3-live-snapshot] ${recordPath} 已是最新，无需改动\n`);
++    }
++  }
++
++  const problems = findProblems(snapshot);
++  if (argv.includes("--check") && problems.length > 0) {
++    process.stderr.write(`\n[l3-live-snapshot] ${problems.length} 项异常，见上表\n`);
++    process.exitCode = 1;
++  }
++}
++
++const invokedDirectly =
++  process.argv[1] !== undefined && process.argv[1].includes("l3-live-snapshot");
++if (invokedDirectly) {
++  await main();
++}

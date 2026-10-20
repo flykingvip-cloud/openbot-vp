@@ -1,0 +1,15 @@
+{
+  "contractVersion": "2026-09-15.rev2",
+  "event": "background.completed",
+  "idempotencyKey": "b1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+  "recordedAt": "2026-09-15T12:01:00Z",
+  "tenantId": "tenant-canary-1",
+  "scope": "group_tenant",
+  "serverAttribution": "gateway:subagent-announce",
+  "payload": {
+    "event": "background.completed",
+    "subagentRunId": "run-20260915-001",
+    "source": "gateway.subagent",
+    "email": "user@example.com"
+  }
+}

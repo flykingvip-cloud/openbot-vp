@@ -1,0 +1,10 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "OpenBot Harmony entry module",
+  "main": "",
+  "author": "OpenBot",
+  "license": "MIT",
+  "dependencies": {
+  }
+}

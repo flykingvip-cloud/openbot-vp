@@ -1,0 +1,223 @@
+{
+  "schema": "memory-workspace-phase1b-authority-candidate/v1",
+  "source": "local-authority-dump",
+  "live": false,
+  "writable": false,
+  "catalogWrite": false,
+  "candidateCount": 22,
+  "candidates": [
+    {
+      "resourceId": "ws:ent-1:seat:seat-3:asset:asset-1",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-3",
+      "ownerType": "seat",
+      "agentAssetId": "asset-1",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:seat:seat-1:asset:asset-2",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-1",
+      "ownerType": "seat",
+      "agentAssetId": "asset-2",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:seat:seat-2:asset:asset-3",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-2",
+      "ownerType": "seat",
+      "agentAssetId": "asset-3",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:seat:seat-2:asset:asset-5",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-2",
+      "ownerType": "seat",
+      "agentAssetId": "asset-5",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:seat:seat-1:asset:asset-6",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-1",
+      "ownerType": "seat",
+      "agentAssetId": "asset-6",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:seat:seat-1:asset:asset-7",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-1",
+      "ownerType": "seat",
+      "agentAssetId": "asset-7",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:seat:seat-1:asset:asset-8",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "seatId": "seat-1",
+      "ownerType": "seat",
+      "agentAssetId": "asset-8",
+      "proof": "agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-3:asset:asset-2",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-3",
+      "ownerType": "occupancy",
+      "agentAssetId": "asset-2",
+      "proof": "seat occupancy + agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-2:asset:asset-3",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-2",
+      "ownerType": "occupancy",
+      "agentAssetId": "asset-3",
+      "proof": "seat occupancy + agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-2:asset:asset-5",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-2",
+      "ownerType": "occupancy",
+      "agentAssetId": "asset-5",
+      "proof": "seat occupancy + agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-3:asset:asset-6",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-3",
+      "ownerType": "occupancy",
+      "agentAssetId": "asset-6",
+      "proof": "seat occupancy + agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-3:asset:asset-7",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-3",
+      "ownerType": "occupancy",
+      "agentAssetId": "asset-7",
+      "proof": "seat occupancy + agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-3:asset:asset-8",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-3",
+      "ownerType": "occupancy",
+      "agentAssetId": "asset-8",
+      "proof": "seat occupancy + agent-registry seat binding"
+    },
+    {
+      "resourceId": "ws:ent-1:group:group-1",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "groupId": "group-1",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:ent-1:group:group-2",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "groupId": "group-2",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:ent-1:group:group-3",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "groupId": "group-3",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:ent-1:group:group-4",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "groupId": "group-4",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:ent-1:group:group-5",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "groupId": "group-5",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:ent-1:group:group-6",
+      "workspaceKind": "group_shared",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "groupId": "group-6",
+      "proof": "tenant-scoped group registry"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-1:steward",
+      "workspaceKind": "employee_private",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-1",
+      "ownerType": "membership",
+      "proof": "platform-auth membership + employee_private steward resourceId contract"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-2:steward",
+      "workspaceKind": "employee_private",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-2",
+      "ownerType": "membership",
+      "proof": "platform-auth membership + employee_private steward resourceId contract"
+    },
+    {
+      "resourceId": "ws:ent-1:user:user-3:steward",
+      "workspaceKind": "employee_private",
+      "classification": "classified",
+      "tenantId": "ent-1",
+      "userId": "user-3",
+      "ownerType": "membership",
+      "proof": "platform-auth membership + employee_private steward resourceId contract"
+    }
+  ],
+  "rejected": [
+    {
+      "reason": "incomplete_agent_asset",
+      "agentAssetId": "asset-4",
+      "tenantId": "ent-1"
+    }
+  ],
+  "note": "Shadow-compare input only. Not Catalog SoT."
+}

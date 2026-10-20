@@ -1,0 +1,76 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch10-s11/v1",
+  "item": 7,
+  "status": "retirement-batch-10",
+  "batch": "S11",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S11",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "lineBefore": 146,
+      "lineAfter": null,
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "sitesRemainingHostReads": [
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1001,
+      "op": "write"
+    },
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1075,
+      "op": "write"
+    },
+    {
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "line": 1160,
+      "op": "write"
+    }
+  ],
+  "sitesRemainingTrustedWrapper": [
+    {
+      "ledgerId": "S14",
+      "file": "src/gateway/server-methods/agents.ts",
+      "symbol": "resolveAgentWorkspaceDirForClient",
+      "via": "resolveTrustedAgentLocator",
+      "line": 1159,
+      "op": "write"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 27,
+  "liveWriteWatchIndex": 27,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/server-methods/agents.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "fa540c56750233def1c27aafdbf8255db644257b",
+  "note": "Batch 10 retires S11 only. S11 is the host resolveAgentWorkspaceDir at agents.ts:146. Incomplete locator queries fail closed. Do not pass agentId. Fail-closed fallback is empty string so workspaceDir stays string. Host writes stay on lines 1001, 1075, and 1160. S14 Trusted wrapper stays on line 1159. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

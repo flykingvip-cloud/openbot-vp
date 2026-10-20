@@ -1,0 +1,3216 @@
+{
+  "schema": "memory-workspace-phase0-catalog-candidate/v2",
+  "evidenceId": "memory-workspace-phase0-20260814",
+  "generatedFrom": "raw-controlled -> catalog-candidate",
+  "note": "Per-root offline candidate only. Not a Catalog SoT. Persistent governance Catalog still absent.",
+  "persistentGovernanceCatalog": {
+    "exists": false,
+    "workspaceAdapter": false,
+    "missDenyEnabled": false
+  },
+  "sourceRootCount": 156,
+  "candidateCount": 156,
+  "coverage": {
+    "employee_private": {
+      "required": "100%",
+      "persistentCatalog": "0%",
+      "observed": 85,
+      "classifiedWithTenant": 0,
+      "pendingAuthority": 44,
+      "uniqueResourceIds": 85,
+      "gate": "fail"
+    },
+    "agent_primary": {
+      "required": "100% exact agentAssetId",
+      "persistentCatalog": "0%",
+      "classifiedExact": 12,
+      "observed": 40,
+      "gate": "fail"
+    },
+    "group_shared": {
+      "required": "100% tenant-scoped binding",
+      "persistentCatalog": "0%",
+      "observed": 31,
+      "inventoried": true,
+      "classifiedWithTenant": 0,
+      "gate": "fail"
+    },
+    "conflict_or_unknown": {
+      "required": "100% blocked + listed",
+      "listed": true,
+      "blockedInProduction": false,
+      "gate": "fail"
+    }
+  },
+  "candidates": [
+    {
+      "candidateId": "root-001",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:main",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace",
+      "slug": "main",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-002",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-2ee4d26ab9a1",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-2ee4d26ab9a1",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-003",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-b92962ca395d",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-b92962ca395d",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-004",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-6a95675a6697",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-6a95675a6697",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-005",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-acfe9790c394",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-acfe9790c394",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-006",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-65cfa47ac23f",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-65cfa47ac23f",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-007",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-244a764a8ebc",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-244a764a8ebc",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-008",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-f9f502e204b3",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-f9f502e204b3",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-009",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-003f019e11a2",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-003f019e11a2",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-010",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-44fc12d31e44",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-44fc12d31e44",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-011",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:slug-70938575096a",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "slug-70938575096a",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-012",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:attestations",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "attestations",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-013",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:bot--agent",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "bot--agent",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-014",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:bot-2",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "bot-2",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-015",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:bot-skill",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "bot-skill",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-016",
+      "resourceId": "ws:host:unknown:host-root-has-no-enterprise:panda",
+      "workspaceKind": "agent_primary",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace-<slug>",
+      "slug": "panda",
+      "proof": "host-root-has-no-enterprise",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "host-root-has-no-enterprise"
+      }
+    },
+    {
+      "candidateId": "root-017",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-63ca570182fa:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-018",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-5c46df270cf2:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-019",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c22c6e2cea1d:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-020",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-021",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:no-enterprise-match:bot--agent",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot--agent",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-022",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:no-enterprise-match:bot-2",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot-2",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-023",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:unknown:no-enterprise-match:bot-skill",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot-skill",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-024",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:asset:asset-c5daccd7846d",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "panda",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-025",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-98ecff30601a:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-026",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-100f550bd4c2:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-027",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1784875c93f4:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-028",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1883cf24b221:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-029",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-89a87973e5e1:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-030",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-d9c6cbd0c299:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-031",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e2f6367b3bee:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-032",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ed79a6508258:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-033",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ed79a6508258:asset:asset-383f60ee24f2",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-65cfa47ac23f",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-034",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b9619540e55:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-035",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-255003e50109:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-036",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1a39f9f89ce6:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-037",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-3b52291e0bce:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-038",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-76b6b8f4500d:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-039",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-300478609ae9:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-040",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-041",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:asset:asset-b039fe454fbe",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-b977332f4462",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-042",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:no-enterprise-match:bot--agent",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot--agent",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-043",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:no-enterprise-match:bot-2",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot-2",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-044",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:unknown:no-enterprise-match:bot-skill",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot-skill",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-045",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:asset:asset-c5daccd7846d",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "panda",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-046",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c7ac87fe2a93:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-047",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-6624f6ac8091:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-048",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b1f927892b41:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-049",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ca6ccbc5c086:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-050",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc7a06384635:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-051",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-052",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:asset:asset-e98e855ffd4d",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-f9f502e204b3",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-053",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:asset:asset-a680b39926ce",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-003f019e11a2",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-054",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:unknown:no-enterprise-match:slug-44fc12d31e44",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-44fc12d31e44",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-055",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:asset:asset-bc1ab6087f5a",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-70938575096a",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-056",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-057",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:asset:asset-b039fe454fbe",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-b977332f4462",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-058",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:asset:asset-8d8ed06aacf2",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-acfe9790c394",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-059",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:asset:asset-9824cd636c02",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-926162886b3d",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-060",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-09ae9eb536fb:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-061",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc0601a3edc7:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-062",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-3b7454f3d27e:unknown:no-enterprise-match:slug-d855e9277ab0",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-d855e9277ab0",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-063",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-178e7f61a4d6:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-064",
+      "resourceId": "ws:tenant-dfaa674f90d7:user:user-e3bdd1fb7a46:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-065",
+      "resourceId": "ws:tenant-dca394f41bc9:user:user-c399f7e43cf4:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-066",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-067",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:slug-214249b569eb",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-214249b569eb",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-068",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:slug-2d75473131c5",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-2d75473131c5",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-069",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:bot-2",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "bot-2",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": true,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-070",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:unknown:no-enterprise-match:pm-mentor",
+      "workspaceKind": "agent_primary",
+      "classification": "unknown",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "pm-mentor",
+      "proof": "no-enterprise-match",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "no-enterprise-match"
+      }
+    },
+    {
+      "candidateId": "root-071",
+      "resourceId": "ws:tenant-0e66013a0f87:user:user-3a892c890ac3:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-072",
+      "resourceId": "ws:tenant-faea3c1136af:user:user-229e3b011410:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-073",
+      "resourceId": "ws:tenant-179567283d83:user:user-9b7af8fe72d8:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-074",
+      "resourceId": "ws:tenant-179567283d83:user:user-fb2f8208f71f:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-075",
+      "resourceId": "ws:tenant-179567283d83:user:user-27179a700bad:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-076",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-5a42c030930f:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-077",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-34c634ea71c5:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-078",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-34c634ea71c5:asset:asset-206870529e5f",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-2216389214f3",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-079",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-2be28b4e397f:unknown:flat-l2-not-asset-scoped:main",
+      "workspaceKind": "employee_private",
+      "classification": "conflict",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace",
+      "slug": "main",
+      "proof": "flat-l2-not-asset-scoped",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "flat-l2-not-asset-scoped"
+      }
+    },
+    {
+      "candidateId": "root-080",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-2be28b4e397f:asset:asset-2fcddd078c4f",
+      "workspaceKind": "agent_primary",
+      "classification": "classified",
+      "pathPattern": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>",
+      "slug": "slug-d6de5eccfc2e",
+      "proof": "enterprise-scoped Registry asset",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "tenants/<tid>/users/<uid>/OpenBot/workspace-<slug>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "enterprise-scoped-exact"
+      }
+    },
+    {
+      "candidateId": "root-081",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-63ca570182fa:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-082",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-5c46df270cf2:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-083",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c22c6e2cea1d:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-084",
+      "resourceId": "ws:tenant-179567283d83:user:user-9b7af8fe72d8:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-085",
+      "resourceId": "ws:tenant-179567283d83:user:user-fb2f8208f71f:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-086",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b745952c1b9:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-087",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-98ecff30601a:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-088",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-100f550bd4c2:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-089",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1784875c93f4:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-090",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1883cf24b221:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-091",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-89a87973e5e1:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-092",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7d5ba21c6db1:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-093",
+      "resourceId": "ws:host:user:user-6e58b8e43a7a:unknown:employee-steward-missing-tenant",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "employee isolation tree without tenant boundary",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "employee-steward-missing-tenant"
+      }
+    },
+    {
+      "candidateId": "root-094",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-d9c6cbd0c299:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-095",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e2f6367b3bee:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-096",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ed79a6508258:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-097",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-7b9619540e55:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-098",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-255003e50109:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-099",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-5a42c030930f:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-100",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-1a39f9f89ce6:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-101",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-3b52291e0bce:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-102",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-76b6b8f4500d:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-103",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-300478609ae9:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-104",
+      "resourceId": "ws:tenant-0e66013a0f87:user:user-3a892c890ac3:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-105",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b93161aa9a66:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-106",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-7f4337913543:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-107",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-c7ac87fe2a93:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-108",
+      "resourceId": "ws:tenant-179567283d83:user:user-27179a700bad:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-109",
+      "resourceId": "ws:tenant-dfaa674f90d7:user:user-e3bdd1fb7a46:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-110",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-6624f6ac8091:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-111",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-54dce03df328:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-112",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-b1f927892b41:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-113",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-ca6ccbc5c086:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-114",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-34c634ea71c5:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-115",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc7a06384635:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-116",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-8fd9731e1425:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-117",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-e7433ed659e1:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-118",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-09ae9eb536fb:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-119",
+      "resourceId": "ws:tenant-fab1e90b9453:user:user-e6cbb0c12161:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-120",
+      "resourceId": "ws:tenant-b3c75f010b2f:user:user-2be28b4e397f:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-121",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-2ac9502ab8ee:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-122",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-cc0601a3edc7:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-123",
+      "resourceId": "ws:tenant-dca394f41bc9:user:user-c399f7e43cf4:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-124",
+      "resourceId": "ws:tenant-7a3e6b16cb75:user:user-178e7f61a4d6:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-125",
+      "resourceId": "ws:tenant-faea3c1136af:user:user-229e3b011410:pending:unique-user-dir",
+      "workspaceKind": "employee_private",
+      "classification": "unknown",
+      "resolutionStatus": "pending_authority",
+      "evidenceHint": "unique-user-dir",
+      "pathPattern": "{stateDir}/agents/main/employees/<user>/workspace",
+      "slug": "main",
+      "proof": "directory uniqueness clue only; not membership authority",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/agents/main/employees/<user>/workspace"
+      },
+      "related": {
+        "dualTree": false,
+        "sqlite": "{stateDir}/memory/<agentId>.sqlite",
+        "lookupReason": "unique-user-dir"
+      }
+    },
+    {
+      "candidateId": "root-126",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-787c3944c3bc",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/collaboration-shared/groups/<groupId>",
+      "slug": "slug-787c3944c3bc",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/collaboration-shared/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-127",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-f823d5252fb4",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/collaboration-shared/groups/<groupId>",
+      "slug": "slug-f823d5252fb4",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/collaboration-shared/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-128",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-7c74307f2976",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/collaboration-shared/groups/<groupId>",
+      "slug": "slug-7c74307f2976",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/collaboration-shared/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-129",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-27ef833b074f",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-27ef833b074f",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-130",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-bed7d1a65519",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-bed7d1a65519",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-131",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-6d22f5049f62",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-6d22f5049f62",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-132",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-580ab4050624",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-580ab4050624",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-133",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-370ac1b015fa",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-370ac1b015fa",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-134",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-51ceb72bc1d4",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-51ceb72bc1d4",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-135",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-787c3944c3bc",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-787c3944c3bc",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-136",
+      "resourceId": "ws:host:unknown:group-missing-authoritative-tenant:slug-42934fd018bb",
+      "workspaceKind": "group_shared",
+      "classification": "unknown",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-42934fd018bb",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-missing-authoritative-tenant"
+      }
+    },
+    {
+      "candidateId": "root-137",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-e3c43a5a2889",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-e3c43a5a2889",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-138",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-f7613c96fac5",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-f7613c96fac5",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-139",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-203277a76c89",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-203277a76c89",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-140",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-ce0c8312700b",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-ce0c8312700b",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-141",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-f823d5252fb4",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-f823d5252fb4",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-142",
+      "resourceId": "ws:host:unknown:group-missing-authoritative-tenant:slug-7c2d1295fef6",
+      "workspaceKind": "group_shared",
+      "classification": "unknown",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-7c2d1295fef6",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-missing-authoritative-tenant"
+      }
+    },
+    {
+      "candidateId": "root-143",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-7c74307f2976",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>",
+      "slug": "slug-7c74307f2976",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "canonical",
+        "state": "read_only",
+        "locator": "{stateDir}/workspace/.openbot/collaboration/groups/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-144",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-27ef833b074f",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-27ef833b074f",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-145",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-bed7d1a65519",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-bed7d1a65519",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-146",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-6d22f5049f62",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-6d22f5049f62",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-147",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-580ab4050624",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-580ab4050624",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-148",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-787c3944c3bc",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-787c3944c3bc",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-149",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-370ac1b015fa",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-370ac1b015fa",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-150",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-51ceb72bc1d4",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-51ceb72bc1d4",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-151",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-e3c43a5a2889",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-e3c43a5a2889",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-152",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-f7613c96fac5",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-f7613c96fac5",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-153",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-203277a76c89",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-203277a76c89",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-154",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-ce0c8312700b",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-ce0c8312700b",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-155",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-f823d5252fb4",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-f823d5252fb4",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    },
+    {
+      "candidateId": "root-156",
+      "resourceId": "ws:host:unknown:group-root-overlap:slug-7c74307f2976",
+      "workspaceKind": "group_shared",
+      "classification": "conflict",
+      "pathPattern": "{stateDir}/spaces/<groupId>",
+      "slug": "slug-7c74307f2976",
+      "proof": "collaboration group root inventory",
+      "writable": false,
+      "binding": {
+        "role": "compatibility",
+        "state": "read_only",
+        "locator": "{stateDir}/spaces/<groupId>"
+      },
+      "related": {
+        "dualTree": false,
+        "lookupReason": "group-root-overlap"
+      }
+    }
+  ],
+  "p0ExitGate": {
+    "unexplainedWritableRoots": "open",
+    "notClassifiedCount": 144,
+    "pendingAuthority": 44,
+    "coverageRecomputable": true,
+    "coveragePassed": false,
+    "freshLiveProbe": "memory-workspace-phase0-20260814"
+  }
+}

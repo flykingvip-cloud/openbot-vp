@@ -1,0 +1,17 @@
+[Unit]
+Description=OpenBot enterprise intake API (loopback)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /var/www/openbot-pages/intake/api/server.mjs
+WorkingDirectory=/var/lib/openbot-intake
+Environment=INTAKE_HOST=127.0.0.1
+Environment=INTAKE_PORT=18794
+Environment=INTAKE_DATA=/var/lib/openbot-intake/submissions.jsonl
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

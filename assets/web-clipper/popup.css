@@ -1,0 +1,40 @@
+body {
+  margin: 0;
+  min-width: 260px;
+  font-family: system-ui, sans-serif;
+  color: canvasText;
+  background: canvas;
+}
+.popup {
+  padding: 14px;
+}
+h1 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.status {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: color-mix(in oklab, canvasText 65%, transparent);
+  min-height: 2.4em;
+}
+.actions {
+  display: grid;
+  gap: 8px;
+}
+button {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklab, canvasText 18%, transparent);
+  background: color-mix(in oklab, #3b82f6 12%, canvas);
+  cursor: pointer;
+  font: inherit;
+}
+button.secondary {
+  background: canvas;
+}
+a {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 12px;
+}

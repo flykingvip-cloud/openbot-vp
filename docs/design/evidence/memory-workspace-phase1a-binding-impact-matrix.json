@@ -1,0 +1,107 @@
+{
+  "schema": "memory-workspace-phase1a-binding-impact-matrix/v1",
+  "evidenceId": "memory-workspace-phase1a-20260816",
+  "preparedBy": "cursor-memory-platform",
+  "preparedAt": "2026-08-16T08:00:00.000Z",
+  "mainSha": "d29a1a5be7073ebfc1b6bc3726353310be11429a",
+  "phase": "1A-design-only",
+  "designOwner": "cursor-data-governance",
+  "phase0EvidenceOwner": "cursor-fable",
+  "status": "owner-accepted-design-only",
+  "reuse": {
+    "bindingType": "WorkspaceBindingRecord",
+    "fields": ["bindingId", "resourceId", "role", "locator", "state", "contentVersion"],
+    "cutover": "existing workspace cutover record/guard only; no second state machine"
+  },
+  "rows": [
+    {
+      "id": "canonical-binding",
+      "topic": "canonical binding",
+      "rule": "At most one writable canonical binding per resource+data role (W4)",
+      "phase1a": "design freeze",
+      "phase1b": "enforced at resolver write switch"
+    },
+    {
+      "id": "workspace-data-role",
+      "topic": "workspace/data role",
+      "rule": "cwd / memory / continuity / artifact are separately authorized roles of one resourceId",
+      "phase1a": "design freeze",
+      "phase1b": "handles expose role roots; never infer from path"
+    },
+    {
+      "id": "storage-kind",
+      "topic": "storageKind",
+      "rule": "P0 stays WorkspaceBindingRecord; storageKind is appendix A only",
+      "phase1a": "out of P0 contract",
+      "phase1b": "must not mix into P0 cutover"
+    },
+    {
+      "id": "object-key",
+      "topic": "objectKey",
+      "rule": "objectKey is a locator fragment, never a resourceId",
+      "phase1a": "design freeze",
+      "phase1b": "export/import preserve resourceId, rewrite locators only"
+    },
+    {
+      "id": "cutover-receipt",
+      "topic": "cutover receipt",
+      "rule": "Extend existing workspace cutover record/guard; receipt stores resourceId + bindingId + contentVersion",
+      "phase1a": "design freeze",
+      "phase1b": "required before any binding flip"
+    },
+    {
+      "id": "deletion-marker",
+      "topic": "deletion marker",
+      "rule": "Lifecycle stays on DataGovernanceEnvelope; deletion marker is not a second identity",
+      "phase1a": "design freeze",
+      "phase1b": "retired binding cannot be resurrected without new receipt"
+    },
+    {
+      "id": "purge-archive-forget",
+      "topic": "purge/archive/forget adapter",
+      "rule": "Memory Asset forget/purge is Memory governance; workspace binding retirement is cutover",
+      "phase1a": "boundary freeze",
+      "phase1b": "no shared resourceId between Memory Asset and Workspace"
+    },
+    {
+      "id": "resolver-cache-key",
+      "topic": "resolver cache key",
+      "rule": "Cache key = tenantId + resourceId + governanceVersion + operation; never path or agentId",
+      "phase1a": "design freeze",
+      "phase1b": "invalidate on catalog revision / binding flip"
+    },
+    {
+      "id": "export-import",
+      "topic": "export/import",
+      "rule": "Export identity is resourceId; import remaps locators, never mints a second resourceId for the same Envelope",
+      "phase1a": "design freeze",
+      "phase1b": "blocked until §14.1"
+    },
+    {
+      "id": "rollback",
+      "topic": "rollback",
+      "rule": "Rollback flips binding + restores sqlite snapshot; resourceId unchanged (W12)",
+      "phase1a": "design freeze",
+      "phase1b": "forward-only release gate still required"
+    },
+    {
+      "id": "old-process-fail-closed",
+      "topic": "old process fail-closed",
+      "rule": "Old processes without the new binding must fail closed after fencing; no silent path fallback",
+      "phase1a": "design freeze",
+      "phase1b": "ManagedEnterprise unknown catalog/binding/auth => deny (W8)"
+    }
+  ],
+  "offlineBootstrap": {
+    "input": "docs/design/evidence/memory-workspace-phase0-20260814.catalog-candidate.json",
+    "mode": "shadow compare only",
+    "writesProductionCatalog": false,
+    "unknownConflict": "stay in disposition list; never enter normal Catalog"
+  },
+  "explicitlyForbidden": [
+    "second migration state machine",
+    "live-migration",
+    "catalog-sot-write-from-inventory-alone",
+    "deployAuthorized=true"
+  ]
+}

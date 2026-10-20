@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "required": ["research_question"],
+  "properties": {
+    "research_question": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "object"
+    },
+    "output_format": {
+      "enum": ["markdown", "json", "html", "pdf"]
+    },
+    "depth": {
+      "enum": ["quick", "standard", "deep"]
+    },
+    "constraints": {
+      "type": "object"
+    }
+  }
+}

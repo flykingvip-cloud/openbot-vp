@@ -1,0 +1,43 @@
+{
+  "schema": "memory-workspace-phase1b-item6-cutover-drill-receipt/v3",
+  "status": "green",
+  "item6": "not-met",
+  "extendsExistingRecord": true,
+  "secondStateMachine": false,
+  "backup": "green",
+  "authorizedSqliteFileBackup": "green",
+  "fencing": "green",
+  "rollback": "green",
+  "live": false,
+  "preparedBy": "cursor-fable",
+  "sreHalfRef": "docs/design/evidence/memory-workspace-phase1b-item6-sre-half.json",
+  "srePendingWscWrittenVerification": true,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "drilledAt": "2026-08-17T07:50:00.000Z",
+  "cutoverModule": "src/gateway/workspace/cutover.ts",
+  "drillHarness": "docs/design/evidence/memory-workspace-phase1b-item6-cutover-drill.mjs",
+  "details": {
+    "authorizedSqliteFileBackup": "stateDir_memory_real_sqlite_copy_restore",
+    "authorizedSqliteLayout": "{stateDir}/memory/resource-{resourceId}.sqlite",
+    "authorizedSqliteSha256": "9dc4d5bbfb3348ac87bce5da39f215446ea65de1d2c7a88c67890e8f9774a208",
+    "sqliteEngine": "node:sqlite DatabaseSync + PRAGMA integrity_check",
+    "sqliteRollbackWithCutover": "sqlite_restore_follows_cutover_rollback",
+    "cutoverRecordSnapshot": "record_snapshot_restore",
+    "fencing": "single_writer_enforced",
+    "rollback": "pre_and_post_cutover_policy",
+    "existingStateMachinePath": "existing_sm_through_dual_read"
+  },
+  "explicitlyForbidden": [
+    "second migration state machine",
+    "LIVE migration",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false",
+    "claim item 6 met from receipt green or authorizedSqliteFileBackup green",
+    "treat synthetic mkdtemp sqlite header as reviewable backup green",
+    "treat this authorized-layout drill as a production sqlite snapshot",
+    "treat cutover record snapshot as authorized sqlite backup",
+    "fill sre before cursor-memory-wsc written verification",
+    "Retirement / item 7"
+  ]
+}

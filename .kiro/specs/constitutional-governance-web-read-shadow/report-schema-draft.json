@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openbot://phase-b/web-read-shadow-report",
+  "title": "WebReadShadowEvalReport",
+  "description": "Evaluator 结构化结果 + 离线报告草案。v1 不写生产 ledger。Phase B：enqueue/invoke 恒 false；完成门采用 Option B（claim suppression）。reasonCodes 仅允许 ALL_ORCH_REASON_CODES。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "caseId",
+    "profile",
+    "decision",
+    "reasonCodes",
+    "gap",
+    "humanGate",
+    "completionJudgement",
+    "completionClaim",
+    "annotationCompare",
+    "latencyMs",
+    "shadowVsLegacy",
+    "wroteLedger",
+    "invokedTool"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "caseId": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "string",
+      "enum": ["A", "B"]
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface", "kind", "enqueue", "invoke"],
+      "properties": {
+        "surface": {
+          "type": ["string", "null"],
+          "enum": ["web_read", "not_web_read", "clarify", null]
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["selected", "clarify", "noop", "reject"]
+        },
+        "enqueue": {
+          "type": "boolean",
+          "const": false,
+          "description": "Phase B shadow：禁止入队"
+        },
+        "invoke": {
+          "type": "boolean",
+          "const": false,
+          "description": "Phase B shadow：禁止调用工具"
+        }
+      }
+    },
+    "reasonCodes": {
+      "type": "array",
+      "description": "仅允许 src/task-orchestration/reason-codes.ts 的 ALL_ORCH_REASON_CODES；禁止发明 WEB_READ_INTENT 等标注态码",
+      "items": {
+        "type": "string",
+        "enum": [
+          "orch_dormant",
+          "orch_allowlist_empty",
+          "orch_ctr_shadow_only",
+          "orch_ctr_activation_is_not_orch_enable",
+          "orch_fail_closed",
+          "orch_ladder_memory",
+          "orch_ladder_skill",
+          "orch_ladder_connector",
+          "orch_ladder_web_read",
+          "orch_ladder_browser",
+          "orch_ladder_node_fs",
+          "orch_ladder_node_exec",
+          "orch_skip_ahead_blocked_policy",
+          "orch_connector_preferred_over_browser",
+          "orch_web_read_preferred_over_browser",
+          "orch_sandbox_is_not_node",
+          "orch_node_enabled_off",
+          "orch_browser_enabled_off",
+          "orch_zero_nodes_human_gate",
+          "orch_multiple_unbound_nodes_human_gate",
+          "orch_node_unbound_human_gate",
+          "orch_human_gate",
+          "orch_dispatch_requires_ctr_activation",
+          "orch_no_invoke_when_dormant",
+          "orch_shadow_observe",
+          "orch_live_path_armed_fail_closed",
+          "orch_skill_is_recipe_not_evidence",
+          "orch_ack_is_not_delivery",
+          "orch_personal_subagent_not_mission",
+          "orch_forbidden_evidence"
+        ]
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policyGap": {
+          "type": "boolean"
+        },
+        "evidenceGap": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "required": ["policyGap", "evidenceGap", "notes"]
+    },
+    "humanGate": {
+      "type": "string",
+      "enum": ["yes", "no", "unknown"]
+    },
+    "completionJudgement": {
+      "type": "string",
+      "description": "语料 completionLabel 对照；本切片无 should_complete 正例（Option B）",
+      "enum": ["should_complete", "must_not_complete", "not_applicable", "unknown"]
+    },
+    "completionClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimedComplete", "claimKind"],
+      "description": "Option B：测量 completion claim suppression。Phase B 要求 claimedComplete=false 且 claimKind=none|suppressed",
+      "properties": {
+        "claimedComplete": {
+          "type": "boolean",
+          "const": false,
+          "description": "影子报告不得声称任务完成/交付"
+        },
+        "claimKind": {
+          "type": "string",
+          "enum": ["none", "suppressed", "claimed"],
+          "description": "none=未声称；suppressed=显式抑制；claimed=违规声称（门失败）"
+        }
+      }
+    },
+    "annotationCompare": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expectedSurface",
+        "expectedDecisionClass",
+        "match",
+        "adjudication",
+        "falseAllowCandidate",
+        "completionClaimViolation",
+        "clarifyMissCandidate"
+      ],
+      "properties": {
+        "expectedSurface": {
+          "type": "string",
+          "enum": ["web_read", "not_web_read", "clarify"]
+        },
+        "expectedDecisionClass": {
+          "type": "string",
+          "enum": ["web_read", "not_web_read", "clarify"]
+        },
+        "match": {
+          "type": "boolean"
+        },
+        "adjudication": {
+          "type": ["string", "object"]
+        },
+        "annotationA": {
+          "type": "object"
+        },
+        "annotationB": {
+          "type": "object"
+        },
+        "finalLabel": {
+          "type": "object"
+        },
+        "falseAllowCandidate": {
+          "type": "boolean"
+        },
+        "completionClaimViolation": {
+          "type": "boolean",
+          "description": "Option B：若报告 claimedComplete=true 则为 true（门失败）"
+        },
+        "clarifyMissCandidate": {
+          "type": "boolean"
+        }
+      }
+    },
+    "latencyMs": {
+      "type": "number",
+      "minimum": 0
+    },
+    "shadowVsLegacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agree", "legacySurface", "explanationRequired", "explanation"],
+      "properties": {
+        "agree": {
+          "type": "boolean"
+        },
+        "legacySurface": {
+          "type": ["string", "null"]
+        },
+        "explanationRequired": {
+          "type": "boolean"
+        },
+        "explanation": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "wroteLedger": {
+      "type": "boolean",
+      "const": false,
+      "description": "Phase B 要求 false：不写生产 ledger"
+    },
+    "invokedTool": {
+      "type": "boolean",
+      "const": false,
+      "description": "Phase B forbids tool calls (no web_search/web_fetch); always false."
+    }
+  },
+  "examples": [
+    {
+      "schemaVersion": 1,
+      "caseId": "wr-A-001",
+      "profile": "A",
+      "decision": {
+        "surface": "web_read",
+        "kind": "selected",
+        "enqueue": false,
+        "invoke": false
+      },
+      "reasonCodes": ["orch_ladder_web_read", "orch_shadow_observe"],
+      "gap": {
+        "policyGap": false,
+        "evidenceGap": false,
+        "notes": ""
+      },
+      "humanGate": "no",
+      "completionJudgement": "must_not_complete",
+      "completionClaim": {
+        "claimedComplete": false,
+        "claimKind": "suppressed"
+      },
+      "annotationCompare": {
+        "expectedSurface": "web_read",
+        "expectedDecisionClass": "web_read",
+        "match": true,
+        "adjudication": "agree",
+        "falseAllowCandidate": false,
+        "completionClaimViolation": false,
+        "clarifyMissCandidate": false
+      },
+      "latencyMs": 2.4,
+      "shadowVsLegacy": {
+        "agree": true,
+        "legacySurface": "web_read",
+        "explanationRequired": false,
+        "explanation": null
+      },
+      "wroteLedger": false,
+      "invokedTool": false
+    }
+  ]
+}

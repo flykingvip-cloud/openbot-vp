@@ -1,0 +1,53 @@
+{
+  "schema": "memory-workspace-phase1b-item4-schema-v2-same-release/v3",
+  "preparedBy": "cursor-memory-wsc",
+  "preparedAt": "2026-08-19T00:00:00.000Z",
+  "baseline": "f3ef2b62586a03ae32112bd4c7eca8be34cd7195",
+  "item": 4,
+  "status": "prepared-not-enabled",
+  "schemaV2Enabled": false,
+  "sameReleaseUnit": "memory-schema-v2",
+  "dependsOnItem3": true,
+  "item3AcceptancePath": "docs/design/evidence/memory-workspace-phase1b-item3-write-switch-acceptance.json",
+  "item3AcceptancePresent": true,
+  "item3AcceptanceGate": "packet on origin/main AND decision=accepted AND scope=write-switch AND enablesProduction=false",
+  "blockedOn": null,
+  "editsSrcMemoryProduction": false,
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "unlock": "not-issued",
+  "currentRuntime": {
+    "guard": "src/memory/v1-root-guard.ts",
+    "ddl": "src/memory/schema-v2.ts",
+    "filesV2Present": true,
+    "schemaVersion": 1,
+    "partitionColumn": "workspace_id",
+    "writePath": "closed"
+  },
+  "plan": {
+    "releaseUnit": "memory-schema-v2",
+    "partnerItem": 3,
+    "enablement": "only after independent Phase 1B unlock",
+    "steps": [
+      "Keep v1-root-guard until workspace_id partition is proven on a replica",
+      "files_v2 / chunks_v2 DDL is prepared in src/memory/schema-v2.ts and is not imported by manager-sync-ops",
+      "Store Workspace Envelope resourceId in workspace_id; never use agentId as identity",
+      "Do not enable until an independent unlock after items 2-7 are independently met"
+    ],
+    "notDone": ["enable schema v2 write path", "LIVE rebuild"]
+  },
+  "plannedWithWriteSwitch": {
+    "releaseUnit": "memory-schema-v2",
+    "partnerItem": 3,
+    "enablement": "only after independent Phase 1B unlock",
+    "sqlitePartition": "workspace_id stores Workspace Envelope resourceId"
+  },
+  "explicitlyForbidden": [
+    "enable schema v2 now",
+    "enable schema v2 write path",
+    "resolver write switch",
+    "LIVE rebuild",
+    "deployAuthorized=true",
+    "phase1bExecutionBlocked=false"
+  ]
+}

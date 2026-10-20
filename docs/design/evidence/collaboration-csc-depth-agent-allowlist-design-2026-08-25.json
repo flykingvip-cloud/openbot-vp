@@ -1,0 +1,51 @@
+{
+  "stage": "DEPTH_AGENT_ALLOWLIST_DESIGN",
+  "status": "DESIGN_PROPOSAL_NOT_IMPLEMENTED",
+  "owner": "kiro-collab-csc",
+  "task": "collaboration-csc-acceptance:owner",
+  "createdAt": "2026-08-25",
+  "codeChanged": false,
+  "productionChanged": false,
+  "problem": "depth shadow path only engages for the main default personal steward; the operator's real assistant is a custom agent (skill孵化), so the real-traffic window produced DEPTH_EVENTS=0 (target-scope mismatch)",
+  "currentGate": {
+    "file": "src/auto-reply/reply/inbound-depth.ts:isInboundDepthEmployeeStewardSession",
+    "rule": "sessionKind==employee AND (agentId empty OR agentId=='main')",
+    "sessionKind": "src/auto-reply/reply/inbound-depth.ts:resolveInboundSessionKind (employee: / space: / mission / other)",
+    "emitGate": "src/auto-reply/reply/get-reply-run.ts: !isHeartbeat && (shadow||router||knowledge||tool) && isInboundDepthEmployeeStewardSession"
+  },
+  "proposal": {
+    "widenAgentGate": "main -> main + configurable allowlist (OPENBOT_CHAT_INBOUND_DEPTH_AGENT_ALLOWLIST, comma-separated agentIds, lowercased)",
+    "keepSessionKind": "employee: only; space:/mission still excluded (space isolation preserved)",
+    "defaultBehavior": "empty allowlist = identical to today (main-only); opt-in; zero behavior change unless configured",
+    "shadowGating": "still gated by inbound flags; with DEPTH_SHADOW=1 + allowlist it is compute-only shadow for allowlisted agents",
+    "redaction": "emit/redaction path unchanged (emitChatInboundStage + assertNoSensitiveFields + sessionKeyHash)"
+  },
+  "impact": {
+    "newlyInScope": "employee: sessions of allowlisted custom agents (shadow: compute+emit only)",
+    "unaffected": ["main sessions", "spaces", "missions", "non-allowlisted agents"],
+    "dependency": "operator supplies the target agentId(s) for the allowlist (e.g. skill孵化); not embedded in this doc"
+  },
+  "testPlan": [
+    "unit tests for the gate (main/allowlisted/non-allowlisted/empty/space/mission; empty vs populated allowlist)",
+    "capture mock validation (capture-chat-lifecycle-v3.cjs already validated)",
+    "shadow-only real-traffic window on the real assistant with the allowlist set"
+  ],
+  "rollout": [
+    "implement flags+gate+unit tests; tsgo/check/scoped tests green",
+    "build + PR to main",
+    "separate authorization: shadow-only enable with DEPTH_SHADOW=1 + DEPTH_AGENT_ALLOWLIST=<assistant-agentId> (same-SHA recreate, auto-rollback)",
+    "real-traffic window on the actual assistant; acceptance all-green",
+    "only then ROUTER stage, separately authorized"
+  ],
+  "risks": [
+    "allowlist typo -> mitigated by lowercase/trim + observability count + shadow-only first",
+    "scope creep to spaces -> mitigated by retained employee: session-kind requirement",
+    "unintended behavior change -> mitigated by empty default + opt-in + shadow gating"
+  ],
+  "outOfScopeHere": [
+    "no src/ modification",
+    "no production config/container/flag/agent-identity change",
+    "implementation only after review + explicit authorization"
+  ],
+  "productionState": "shadow-OFF baseline restored after the real-traffic window; LIVE a12e4c59e575; inbound/CSC/Context flags unset; RELEASE_RECORD/releases.jsonl/ledger unchanged"
+}

@@ -1,0 +1,127 @@
+{
+  "evidenceId": "daibai-chat-isolation-frame-20260812",
+  "schema": "daibai-chat-isolation-frame-probe/v1",
+  "probeUtc": "2026-08-12T07:53:01.761Z",
+  "classification": "automated-frame-recipient-matrix",
+  "scope": "Phase 0 P0 authorized chat fan-out (broadcastToConnIds recipients). Not a production release gate.",
+  "probe": {
+    "scriptPath": "scripts/check-isolation-fail-closed.mjs",
+    "scriptSha256": "87fdfa0eb6acd221b2fc8bdfa7bb47a1f59f0986f86523907823809b614c0d4d",
+    "mode": "--daibai-frame",
+    "suites": [
+      "src/gateway/chat-event-dual-connection.test.ts",
+      "src/gateway/chat-event-isolation.test.ts",
+      "src/gateway/collaboration-learning/space-snapshot-tenant.test.ts"
+    ],
+    "exitCode": 0
+  },
+  "results": {
+    "total": 24,
+    "passed": 24,
+    "failed": 0,
+    "success": true
+  },
+  "cases": [
+    {
+      "status": "passed",
+      "name": "chat event dual-connection matrix does not deliver alice steward finals to bob's connections"
+    },
+    {
+      "status": "passed",
+      "name": "chat event dual-connection matrix keeps delta/error/abort bodies off foreign connections"
+    },
+    {
+      "status": "passed",
+      "name": "chat event dual-connection matrix does not deliver steward events across tenants for the same userId"
+    },
+    {
+      "status": "passed",
+      "name": "chat event dual-connection matrix does not deliver group events across tenants for the same groupId"
+    },
+    {
+      "status": "passed",
+      "name": "chat event dual-connection matrix stops delivering after group membership is removed from cache"
+    },
+    {
+      "status": "passed",
+      "name": "chat event dual-connection matrix keeps personal-bot events off other employees without interest"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation resolves platformUserId ahead of raw user email"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation delivers employee steward chat only to the matching owner in the resource tenant"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation delivers the same user's steward events to all of their same-tenant connections"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation denies employee shells without platformUserId for steward sessions"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation denies steward delivery to employee shells when resource tenant is unknown"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation blocks global steward chat from employee shells"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation never returns null / broadcast-all for personal bot keys"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation delivers group chat only to cached members in the resource tenant"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation keeps same groupId ACL entries for different tenants without overwrite"
+    },
+    {
+      "status": "passed",
+      "name": "chat-event-isolation resolves resource tenant from run binding on broadcastChatEvent"
+    },
+    {
+      "status": "passed",
+      "name": "resolveCollaborationGroupTenantId returns the unique ownership tenant when no tenant context is provided"
+    },
+    {
+      "status": "passed",
+      "name": "resolveCollaborationGroupTenantId resolves with authoritative tenant context via (tenantId, groupId)"
+    },
+    {
+      "status": "passed",
+      "name": "resolveCollaborationGroupTenantId fail-closes to null when the same groupId has ownership in multiple tenants"
+    },
+    {
+      "status": "passed",
+      "name": "resolveCollaborationGroupTenantId does not fall through to another tenant when context ownership is missing"
+    },
+    {
+      "status": "passed",
+      "name": "buildWorkspaceSpaceSnapshot tenantId contract surfaces authoritative ownership tenantId on the space snapshot"
+    },
+    {
+      "status": "passed",
+      "name": "buildWorkspaceSpaceSnapshot tenantId contract prefers explicit tenantId over ownership when provided"
+    },
+    {
+      "status": "passed",
+      "name": "buildWorkspaceSpaceSnapshot tenantId contract returns null tenantId when no ownership binding exists"
+    },
+    {
+      "status": "passed",
+      "name": "buildWorkspaceSpaceSnapshot tenantId contract returns null tenantId when the same groupId is owned by multiple tenants"
+    }
+  ],
+  "liveDualBrowser": {
+    "status": "manual-checklist",
+    "requires": ["two employee sessions", "DevTools WS frame capture"],
+    "stepsPath": "scripts/check-isolation-fail-closed.mjs"
+  }
+}

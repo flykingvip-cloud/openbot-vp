@@ -1,0 +1,51 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch1-s04/v1",
+  "item": 7,
+  "status": "retirement-batch-1",
+  "batch": "S04",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S04",
+      "file": "src/commands/status-all/agents.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [
+    {
+      "file": "src/commands/status.agent-local.ts",
+      "symbol": "resolveAgentWorkspaceDir",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "retiredThisChange": 1,
+  "remaining": 36,
+  "liveWriteWatchIndex": 36,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/commands/status-all/agents.ts",
+      "src/commands/status.agent-local.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "48ee0918c79572f151fc2ee53fd1b0e83e5b4038",
+  "note": "Batch 1 retires S04 only. Incomplete locator queries fail closed. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

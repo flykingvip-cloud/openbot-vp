@@ -1,0 +1,46 @@
+{
+  "schema": "memory-workspace-phase1b-item7-retirement-batch4-s08/v1",
+  "item": 7,
+  "status": "retirement-batch-4",
+  "batch": "S08",
+  "item7": "not-met",
+  "itemMet": false,
+  "phase1bUnlock": "not-issued",
+  "fullUnlock": "not-issued",
+  "phase1bExecutionBlocked": true,
+  "deployAuthorized": false,
+  "wiredToProductionResolver": false,
+  "productionCatalogWrite": "none",
+  "productionWrite": false,
+  "deleteCallSites": false,
+  "schemaV2Write": "disabled",
+  "live": "forbidden",
+  "liveCutover": false,
+  "retirementExecuted": false,
+  "independentRetirementReviewAccepted": true,
+  "sitesRetired": [
+    {
+      "ledgerId": "S08",
+      "file": "src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts",
+      "symbol": "createEmptyWorkspaceCatalog",
+      "replacement": "resolveWorkspaceLocator"
+    }
+  ],
+  "twinRetiredNotInLiveLedger": [],
+  "retiredThisChange": 1,
+  "remaining": 25,
+  "liveWriteWatchIndex": 25,
+  "frozenWriteWatchIndex": 38,
+  "rollbackProof": true,
+  "rollback": {
+    "restoreFromGit": true,
+    "restoreFiles": [
+      "src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts",
+      "docs/design/evidence/memory-workspace-phase1b-item7-retirement-scan.json"
+    ],
+    "rewriteFreezeBaselineToZero": false
+  },
+  "quarantineProof": true,
+  "originMainSha": "7df232309134f75751be39fff42f32be8fcfac3c",
+  "note": "Batch 4 retires S08 only after S18 on origin/main. Incomplete locator queries fail closed. Do not pass agentId. Do not synthesize empty Catalog. Item 7 stays not-met. Do not write liveWriteWatchIndex=0."
+}

@@ -1,0 +1,94 @@
+{
+  "kind": "cloud_diagnosis_readonly_acceptance",
+  "schemaVersion": 1,
+  "date": "2026-09-11",
+  "verdict": "partial_pass",
+  "headline": "部分通过",
+  "fullPassPhraseAllowed": false,
+  "identity": {
+    "expectedLive": "79f2d5f57b9170877e24e40b76bb8982f63e4bb1",
+    "originMain": "79f2d5f57b9170877e24e40b76bb8982f63e4bb1",
+    "containerBuildInfo": "79f2d5f57b9170877e24e40b76bb8982f63e4bb1",
+    "ociRevision": "79f2d5f57b9170877e24e40b76bb8982f63e4bb1",
+    "liveEqualsOriginMain": true,
+    "r9IdentityPass": true,
+    "l3CheckExit": 0,
+    "healthz": 200,
+    "readyzReady": true,
+    "port18789OwnedByContainer": true,
+    "rollbackPresent": true,
+    "gatewayUiSameBundle": "index-tvycM9fL.js",
+    "image": "localhost/openbot:rc-amd64-provenance-79f2d5f57b"
+  },
+  "gates": {
+    "sourceMatchesP248Approval": true,
+    "flippedDuringAcceptance": false,
+    "DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED": true,
+    "DIAGNOSIS_REPORT_API_DEPLOYED": true,
+    "DIAGNOSIS_DAIBAI_DELIVERY_ENABLED": true,
+    "DIAGNOSIS_REMEDIATION_EXECUTION_ENABLED": true,
+    "containerEnvDiagnosisFlags": [],
+    "livePackId": "diagnosis-reports",
+    "methodsInLivePack": ["diagnosis.reports.query", "diagnosis.reports.get", "diagnosis.diagnose"]
+  },
+  "rpc": {
+    "authorizedQueryGetWithReportBody": false,
+    "diagnoseNoSessionViaEnterpriseUi": true,
+    "cliOperatorToken": {
+      "diagnosis.reports.query": "forbidden",
+      "diagnosis.reports.get": "forbidden",
+      "diagnosis.diagnose": "unauthorized",
+      "diagnosis.reports.query schemaVersion=9": "forbidden",
+      "diagnosis.reports.query forged tenantId": "forbidden"
+    },
+    "invalidGatewayToken": "unauthorized / close 1008 token mismatch",
+    "unknownMethod": "unknown method: diagnosis.nope",
+    "notes": [
+      "CLI operator token is not a membership-injected diagnosis.report_admin session.",
+      "Auth deny happens before invalid-schema/cursor classification, so 400 was not isolated.",
+      "Cross-tenant 403 could not be distinguished from generic forbidden.",
+      "No reportId existed to exercise get consistency."
+    ]
+  },
+  "ui": {
+    "publicBundle": "index-tvycM9fL.js",
+    "www.openbot.love": "employee control shell reachable; not the diagnosis surface",
+    "admin.platform.diagnosis": "redirected to /platform/login; platform admin session absent",
+    "biz.enterprise.diagnosis": {
+      "route": "/enterprise/001/diagnosis",
+      "layout": ["观察", "处置", "证据"],
+      "failClosedCopy": true,
+      "noHealthyOrResolved": true,
+      "noPromptToolPayloadLeak": true,
+      "initialLoadError": "gateway_unavailable",
+      "diagnoseClick": "no_session — 没有可诊断的会话",
+      "openDaibai": "disabled; no session reference sent"
+    },
+    "approvedCanaryTenantFixtureAPresentOnLive": false
+  },
+  "wecom": {
+    "default": "enabled, not configured, stopped, missing token",
+    "official_t_001_default": "enabled, configured, running, dm:open",
+    "diagnosisConversationLoopVerified": false
+  },
+  "sideEffects": {
+    "diagnosisProjectionsDir": "absent",
+    "diagnosisAuditDir": "absent",
+    "eventsJsonl": "absent",
+    "newMessageMainChain": "not observed",
+    "doctorFix": "not invoked",
+    "channelRestart": "not invoked",
+    "daibaiMessageSent": false,
+    "remediationExecuted": false,
+    "ledgerOrProvenanceEdited": false,
+    "loomRegistryEdited": false
+  },
+  "missingForFullPass": [
+    "authorized_diagnosis_admin_query_get",
+    "diagnose_rpc_field_level_payload",
+    "wecom_or_live_chat_loop",
+    "daibai_delivery",
+    "remediation",
+    "durable_audit_or_slo"
+  ]
+}

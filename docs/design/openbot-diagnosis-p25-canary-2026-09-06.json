@@ -1,0 +1,18 @@
+{
+  "kind": "human_isolated_remediation_canary_record",
+  "increment": "P25",
+  "schemaVersion": 1,
+  "candidateSha": "0d8a31a2c4e91e13a9acff64ce57511efd694135",
+  "liveSha": "7d3fdf5bfef57077f7956ccab07c3c960984331b",
+  "approvalStartsIsolatedCanary": true,
+  "acceptsClientParam": false,
+  "acceptsModelOutput": false,
+  "confirmHuman": true,
+  "confirmIsolatedAllowlistedDryRunOnly": true,
+  "confirmLiveExecutorUndeployed": true,
+  "confirmNoDoctorFix": true,
+  "confirmNoChannelRestart": true,
+  "confirmP26NotStarted": true,
+  "confirmCanaryTenant": "tenant-fixture-a",
+  "signer": "Daniel / CEO"
+}

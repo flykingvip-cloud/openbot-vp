@@ -1,0 +1,14 @@
+{
+  "research_question": "调研某行业的主要产品、技术路线和商业模式",
+  "scope": {
+    "time_range": "近两年",
+    "region": "全球",
+    "language": "中文和英文"
+  },
+  "output_format": "markdown",
+  "depth": "deep",
+  "constraints": {
+    "prefer_primary_sources": true,
+    "require_citations": true
+  }
+}

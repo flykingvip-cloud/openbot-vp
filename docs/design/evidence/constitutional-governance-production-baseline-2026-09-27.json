@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "authorityRole": "supporting-evidence",
+  "observedAt": "2026-09-27T04:23:34Z",
+  "repository": "https://github.com/upbeyond/openbot",
+  "pullRequest127": {
+    "state": "MERGED",
+    "mergedAt": "2026-09-27T04:16:21Z",
+    "mergeCommit": "a1bdf98a4a32d9375d6c323fd6fe0061ca8c11e5",
+    "headRefOid": "ae2ba9339c133071117dddaf507fac1ed0f5fc5b",
+    "mergeCommitIsAncestorOfOriginMain": true
+  },
+  "originMainSha": "aff3fd345fa53f78ff37afc4ae40a67f28dbbe4e",
+  "originMainObservedAt": "2026-09-27T04:23:34Z",
+  "originMainSubject": "Merge pull request #129 from upbeyond/cursor/drop-hook-delivery-fault-5662",
+  "runningContainerSha": null,
+  "containerLedgerAligned": null,
+  "productionEqualsMain": null,
+  "containerIdentity": {
+    "runningContainerSha": null,
+    "containerReadStatus": "unavailable",
+    "failureClass": "production-host-unreachable; podman-not-installed-on-reachable-hosts",
+    "commit": null,
+    "version": null,
+    "builtAt": null,
+    "probeModuleSha": null,
+    "hostRole": null,
+    "observedAt": "2026-09-27T04:20:06Z",
+    "attempts": [
+      {
+        "observedAt": "2026-09-27T04:17:14Z",
+        "source": "coordinator",
+        "command": "podman exec openbot-gateway-rc cat /app/dist/build-info.json",
+        "exitCode": 127,
+        "result": "podman: command not found",
+        "note": "The only reachable registered host is not the production host. No hostname, address, or credential is recorded."
+      },
+      {
+        "observedAt": "2026-09-27T04:20:06Z",
+        "source": "cloud-vm",
+        "command": "podman exec openbot-gateway-rc cat /app/dist/build-info.json",
+        "exitCode": 127,
+        "result": "podman: command not found",
+        "note": "This VM has no production container and no podman binary."
+      }
+    ]
+  },
+  "releaseSeq": 98,
+  "ledgerGatewaySha": "41aac4a4f2ca37d15f2423aeca70f1c6aa2be001",
+  "ledgerUiSha": "41aac4a4f2ca37d15f2423aeca70f1c6aa2be001",
+  "ledgerLiveFrom": "2026-09-24T02:49:48.208Z",
+  "ledgerLiveTo": null,
+  "ledgerOpenLive": true,
+  "ledgerAuditExit": 0,
+  "ledgerAuditFirstError": null,
+  "ledgerAuditSummary": "98 releases, 0 errors, 26 warnings",
+  "ledgerFileModified": false,
+  "ancestry": {
+    "containerIsAncestorOfMain": {
+      "status": "not-run",
+      "exitCode": null,
+      "reason": "runningContainerSha unavailable"
+    },
+    "ledgerIsAncestorOfMain": {
+      "status": "ran",
+      "exitCode": 0,
+      "result": true,
+      "command": "git merge-base --is-ancestor 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001 origin/main"
+    },
+    "ledgerIsAncestorOfContainer": {
+      "status": "not-run",
+      "exitCode": null,
+      "reason": "runningContainerSha unavailable"
+    },
+    "containerIsAncestorOfLedger": {
+      "status": "not-run",
+      "exitCode": null,
+      "reason": "runningContainerSha unavailable"
+    },
+    "commitsOriginMainAheadOfLedgerGateway": 219,
+    "aheadCommand": "git rev-list --count 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001..origin/main"
+  },
+  "containerIsAncestorOfMain": null,
+  "ledgerIsAncestorOfMain": true,
+  "ledgerIsAncestorOfContainer": null,
+  "containerIsAncestorOfLedger": null,
+  "containerEqualsLedger": null,
+  "containerEqualsMain": null,
+  "ledgerEqualsMain": false,
+  "commitsOriginMainAheadOfLedgerGateway": 219,
+  "forwardOnly": {
+    "command": "./deploy/production/scripts/verify-forward-only.sh --candidate origin/main",
+    "readOnlyConfirmed": true,
+    "exitCode": 21,
+    "verdict": "block",
+    "liveSource": "none",
+    "live": null,
+    "candidate": "aff3fd345fa53f78ff37afc4ae40a67f28dbbe4e",
+    "reasons": ["LIVE is unknown; delivery verification fails closed"],
+    "warnings": ["unable to resolve LIVE from a running artifact"],
+    "deployAuthorized": false,
+    "note": "A passing forward-only check would not authorize deployment. This run did not pass. LIVE stays null and was not filled from the ledger or RELEASE_RECORD."
+  },
+  "phaseCDecision": "NO_GO_ACCEPTED",
+  "phaseDOverallGovernanceAuthorization": "no-go",
+  "productionProven": false,
+  "gateTighteningAuthorized": false,
+  "liveInvokeEnabled": false,
+  "fabricDefaultOn": false,
+  "closeGateMet": false,
+  "profileABMerged": false,
+  "seq98ExtrapolatedToPhaseCOrDPass": false,
+  "receiptTreatedAsProof": false,
+  "pluginInstallTreatedAsCapabilityAuthorized": false,
+  "priorBaseline": {
+    "path": "docs/design/evidence/constitutional-governance-state-baseline-2026-09-27.json",
+    "note": "That earlier snapshot recorded productionEqualsMain false from ledger inequality. This readback leaves productionEqualsMain, containerLedgerAligned, and runningContainerSha null because the container SHA was not read."
+  },
+  "notPromoted": [
+    "phase C remains NO-GO accepted",
+    "phase D overall governance authorization remains no-go",
+    "productionProven remains false",
+    "gate tightening remains unauthorized",
+    "live invoke remains disabled",
+    "fabric default-on remains false",
+    "close gate remains unmet",
+    "seq 98 shadow observation is not production proof",
+    "a container commit, had one been read, would only show that the commit was observed running"
+  ]
+}

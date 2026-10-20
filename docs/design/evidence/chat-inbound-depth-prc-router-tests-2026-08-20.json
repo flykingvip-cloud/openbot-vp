@@ -1,0 +1,43 @@
+{
+  "task": "chat-inbound-depth-router",
+  "agent": "cursor-chat-inbound-depth",
+  "pr": "C",
+  "capturedAt": "2026-08-20T03:20:00+08:00",
+  "cwd": "openbot-chat-inbound-depth",
+  "branch": "cursor/chat-inbound-persist-early",
+  "headSha": "7068c30dc8",
+  "originMainIsAncestor": false,
+  "aheadBehindAtCapture": { "ahead": 10, "behind": 5 },
+  "command": "OPENBOT_TEST_PROFILE=low VITEST_CACHE_DIR=/tmp/openbot-inbound-depth-vitest TMPDIR=/tmp pnpm test src/auto-reply/reply/inbound-depth.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts src/auto-reply/reply/operational-identity-context.test.ts src/auto-reply/reply/agent-runner-utils.test.ts src/gateway/chat-inbound-flags.test.ts src/auto-reply/reply/followup-runner.test.ts",
+  "note": "VITEST_CACHE_DIR is set outside the worktree so Vite temp writes do not depend on node_modules/.vite-temp permissions. TTFT evidence is assembly-time: chat skips mocked knowledge prefetch (80ms delay) while retrieve still pays it; this is not a production model first-token p95.",
+  "exitCode": 0,
+  "summary": {
+    "testFiles": "7 passed (7)",
+    "tests": "53 passed (53)",
+    "duration": "5.28s"
+  },
+  "files": [
+    "src/auto-reply/reply/inbound-depth.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-shadow.test.ts",
+    "src/auto-reply/reply/get-reply-run.inbound-depth-router.test.ts",
+    "src/auto-reply/reply/operational-identity-context.test.ts",
+    "src/auto-reply/reply/agent-runner-utils.test.ts",
+    "src/gateway/chat-inbound-flags.test.ts",
+    "src/auto-reply/reply/followup-runner.test.ts"
+  ],
+  "assertions": {
+    "flagOffKeepsKnowledgeAndTools": true,
+    "chatSkipsKnowledgeUniverse": true,
+    "chatDisableTools": true,
+    "chatEmptySkillFilter": true,
+    "chatLightweightIdentityNoLiveListing": true,
+    "retrieveKeepsKnowledgeAndTools": true,
+    "actKeepsKnowledgeAndTools": true,
+    "spaceSessionsUnchanged": true,
+    "knowledgeSkippedReason": "depth_chat",
+    "toolSkippedReason": "depth_chat",
+    "identitySnapshotHit": false,
+    "ttftAssemblyChatFasterThanRetrieveWith80msKnowledgeDelay": true
+  },
+  "productionLive": false
+}

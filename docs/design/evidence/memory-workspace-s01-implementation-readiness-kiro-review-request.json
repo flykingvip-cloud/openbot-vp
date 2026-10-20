@@ -1,0 +1,64 @@
+{
+  "schema": "memory-workspace-s01-implementation-readiness-kiro-review-request/v2",
+  "kind": "s01-implementation-readiness-kiro-review-request",
+  "requestedBy": "cursor",
+  "requestedAt": "2026-08-30T02:18:00.000Z",
+  "reviewerRequested": "kiro-sot-reviewer",
+  "scope": "s01-implementation-readiness-v1.8-ir1-ir4",
+  "decision": "fulfilled",
+  "fulfilledBy": {
+    "pr": 830,
+    "mergeCommit": "fb95efe544def447d736a4c05b6f6aeed0f0ca2a",
+    "sidecar": "docs/design/evidence/memory-workspace-s01-implementation-readiness-review-kiro-sot-reviewer.json"
+  },
+  "fillsKiroSotReviewer": false,
+  "signedAsKiroSotReviewer": false,
+  "selfAccepted": false,
+  "flipsImplementationGate": false,
+  "authorizesStageA": false,
+  "thisPacketStartsProductionImplementation": false,
+  "notASecondS01Spec": true,
+  "mergedBaseline": {
+    "readinessAPr": 828,
+    "architectureReviewPr": 829,
+    "kiroReviewPr": 830,
+    "stageALoomPr": 832,
+    "originMain": "da2eea14925c32b0cd8fe381343fbb3807789e26"
+  },
+  "alreadyFilled": {
+    "codexArchitectureSidecar": "docs/design/evidence/memory-workspace-s01-implementation-readiness-review-codex-architecture.json",
+    "codexDecision": "accepted",
+    "codexAuthorizesStageA": false,
+    "codexFillsKiroSotReviewer": false,
+    "kiroSotReviewerSidecar": "docs/design/evidence/memory-workspace-s01-implementation-readiness-review-kiro-sot-reviewer.json",
+    "kiroDecision": "accepted",
+    "kiroImplementationGate": "not-met"
+  },
+  "stillMissing": {
+    "kiroSotReviewerSidecar": null
+  },
+  "locks": {
+    "implementationGate": "not-met",
+    "remaining": 10,
+    "liveWriteWatchIndex": 10,
+    "item7": "not-met",
+    "s01Retirement": "blocked",
+    "phase1b": "blocked",
+    "deployAuthorized": false,
+    "i3": "not executed",
+    "live": "forbidden"
+  },
+  "explicitlyForbiddenNow": [
+    "sign as kiro-sot-reviewer",
+    "overwrite kiro-sot-reviewer sidecar",
+    "start Stage A adapter in this packet",
+    "modify src/auto-reply/reply/get-reply.ts",
+    "modify src/memory/**",
+    "write production Catalog",
+    "change remaining or liveWriteWatchIndex",
+    "Implementation Unlock",
+    "Item 7 met",
+    "Phase 1B unlock",
+    "LIVE"
+  ]
+}
