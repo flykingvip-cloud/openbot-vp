@@ -29,6 +29,11 @@ import {
 } from "./permissions.js";
 import type { DevicePlatformStore } from "./store.js";
 import {
+  stubGrantRegistryFromEnv,
+  type StubGrantRegistry,
+  type StubGrantView,
+} from "./stub-grant-registry.js";
+import {
   DEVICE_PLATFORM_DISABLED_DISPOSITION,
   DevicePlatformError,
   FOREGROUND_BINDING_STATUSES,
@@ -89,6 +94,11 @@ export type DevicePlatformServiceOptions = {
   env?: NodeJS.ProcessEnv;
   /** Formal mode rejects stub debug and force-session switches. */
   mode?: "formal" | "test";
+  /**
+   * When set, add/rebind/revoke write the grant into this registry.
+   * The gateway fills it from stub Basic env so device-control GET sees the grant.
+   */
+  grantRegistry?: StubGrantRegistry;
 };
 
 /**
@@ -103,6 +113,7 @@ export class DevicePlatformService {
   private readonly now: () => number;
   private readonly env: NodeJS.ProcessEnv;
   private readonly mode: "formal" | "test";
+  private readonly grantRegistry: StubGrantRegistry | undefined;
   /** Process-local grant credentials. Never written to the tenant shard. */
   private readonly credentials = new Map<string, string>();
 
@@ -114,6 +125,7 @@ export class DevicePlatformService {
     this.now = options.now ?? Date.now;
     this.env = options.env ?? process.env;
     this.mode = options.mode ?? "formal";
+    this.grantRegistry = options.grantRegistry ?? stubGrantRegistryFromEnv(this.env);
     this.store.recoverAll(this.iso());
   }
 
@@ -652,7 +664,7 @@ export class DevicePlatformService {
     }
     binding = this.markBinding(actor.tenantId, binding.bindingId, { status: "pending_auth" });
     if (!binding.authorizationRef) {
-      const grant = this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
+      const grant = await this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
       binding = this.markBinding(actor.tenantId, binding.bindingId, {
         status: "applying",
         authorizationRef: grant.authorizationRef,
@@ -687,27 +699,56 @@ export class DevicePlatformService {
     const connection = this.requireEnabledConnection(association.platformId);
     this.pushHistory(actor.tenantId, current);
     const previousRef = current.authorizationRef;
-    if (previousRef) {
-      this.revokeGrant(actor.tenantId, previousRef);
+    let binding: DeviceBinding;
+    let grant: GrantReference;
+    if (this.grantRegistry) {
+      if (!previousRef) {
+        throw new DevicePlatformError("NOT_FOUND", "Active binding has no authorization to rebind");
+      }
       this.dropToolReservations(actor.tenantId, previousRef);
+      const updated = await this.grantRegistry.rebind({
+        authorizationRef: previousRef,
+        digitalHumanId: human.digitalHumanId,
+      });
+      if (updated.authorizationRef !== previousRef) {
+        throw new DevicePlatformError(
+          "PLATFORM_UNAVAILABLE",
+          "Integrations stub changed the authorization ref",
+        );
+      }
+      grant = this.noteStubRebind(actor.tenantId, previousRef, updated);
+      binding = this.markBinding(actor.tenantId, current.bindingId, {
+        digitalHumanId: updated.digitalHumanId,
+        scopes: operation.request.scopes ?? current.scopes,
+        expectedBindingVersion: updated.bindingVersion,
+        status: "applying",
+        authorizationEstablished: true,
+        platformApplied: false,
+        authorizationRef: updated.authorizationRef,
+      });
+    } else {
+      if (previousRef) {
+        await this.revokeGrant(actor.tenantId, previousRef);
+        this.dropToolReservations(actor.tenantId, previousRef);
+      }
+      const nextVersion = current.expectedBindingVersion + 1;
+      binding = this.markBinding(actor.tenantId, current.bindingId, {
+        digitalHumanId: human.digitalHumanId,
+        scopes: operation.request.scopes ?? current.scopes,
+        expectedBindingVersion: nextVersion,
+        status: "applying",
+        authorizationEstablished: false,
+        platformApplied: false,
+        authorizationRef: undefined,
+      });
+      grant = await this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
+      binding = this.markBinding(actor.tenantId, binding.bindingId, {
+        authorizationRef: grant.authorizationRef,
+        authorizationEstablished: true,
+        platformApplied: false,
+        status: "applying",
+      });
     }
-    const nextVersion = current.expectedBindingVersion + 1;
-    let binding = this.markBinding(actor.tenantId, current.bindingId, {
-      digitalHumanId: human.digitalHumanId,
-      scopes: operation.request.scopes ?? current.scopes,
-      expectedBindingVersion: nextVersion,
-      status: "applying",
-      authorizationEstablished: false,
-      platformApplied: false,
-      authorizationRef: undefined,
-    });
-    const grant = this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
-    binding = this.markBinding(actor.tenantId, binding.bindingId, {
-      authorizationRef: grant.authorizationRef,
-      authorizationEstablished: true,
-      platformApplied: false,
-      status: "applying",
-    });
     const shardAfter = this.store.loadTenant(actor.tenantId);
     shardAfter.events.push({
       eventId: randomId("evt"),
@@ -752,7 +793,7 @@ export class DevicePlatformService {
       expectedBindingVersion: revoking.expectedBindingVersion,
     });
     if (revoking.authorizationRef) {
-      this.revokeGrant(actor.tenantId, revoking.authorizationRef);
+      await this.revokeGrant(actor.tenantId, revoking.authorizationRef);
     }
     this.pushHistory(actor.tenantId, revoking);
     const revoked = this.markBinding(actor.tenantId, revoking.bindingId, {
@@ -936,14 +977,49 @@ export class DevicePlatformService {
     return binding;
   }
 
-  private issueGrant(
+  private async issueGrant(
     actor: TrustedActor,
     binding: DeviceBinding,
     serviceClientId: string,
-  ): GrantReference {
+  ): Promise<GrantReference> {
     const connection = this.store.loadConnections().connections[binding.platformId];
     if (!connection?.enabled) {
       throw new DevicePlatformError("PLATFORM_DISABLED", "Device platform connection is disabled");
+    }
+    if (this.grantRegistry) {
+      const issued = await this.grantRegistry.issue({
+        digitalHumanId: binding.digitalHumanId,
+        deviceId: binding.externalDeviceId,
+        scopes: binding.scopes,
+        serviceAudience: serviceClientId,
+      });
+      if (
+        issued.deviceId !== binding.externalDeviceId ||
+        issued.digitalHumanId !== binding.digitalHumanId
+      ) {
+        throw new DevicePlatformError(
+          "PLATFORM_UNAVAILABLE",
+          "Integrations stub grant does not match the binding",
+        );
+      }
+      const grant: GrantReference = {
+        authorizationRef: issued.authorizationRef,
+        credentialHash: sha256Hex(issued.authorizationCredential),
+        serviceClientId,
+        digitalHumanId: issued.digitalHumanId,
+        deviceId: binding.deviceId,
+        userId: actor.userId,
+        tenantId: actor.tenantId,
+        scopes: [...binding.scopes],
+        bindingVersion: issued.bindingVersion,
+        status: "active",
+        issuedAt: this.iso(),
+      };
+      const shard = this.store.loadTenant(actor.tenantId);
+      shard.grants[grant.authorizationRef] = grant;
+      this.rememberCredential(grant.authorizationRef, issued.authorizationCredential);
+      this.store.saveTenant(actor.tenantId, shard);
+      return grant;
     }
     const credential = `obgc_${randomBytes(24).toString("hex")}`;
     const grant: GrantReference = {
@@ -975,11 +1051,38 @@ export class DevicePlatformService {
     return this.credentials.get(authorizationRef);
   }
 
-  private revokeGrant(tenantId: string, authorizationRef: string): void {
+  private noteStubRebind(
+    tenantId: string,
+    authorizationRef: string,
+    updated: StubGrantView,
+  ): GrantReference {
+    const shard = this.store.loadTenant(tenantId);
+    const grant = shard.grants[authorizationRef];
+    if (!grant) {
+      throw new DevicePlatformError("NOT_FOUND", "Grant not found");
+    }
+    grant.digitalHumanId = updated.digitalHumanId;
+    grant.bindingVersion = updated.bindingVersion;
+    grant.status = updated.status === "revoked" ? "revoked" : "active";
+    this.store.saveTenant(tenantId, shard);
+    return grant;
+  }
+
+  private async revokeGrant(tenantId: string, authorizationRef: string): Promise<void> {
     const shard = this.store.loadTenant(tenantId);
     const grant = shard.grants[authorizationRef];
     if (!grant || grant.status === "revoked") {
       return;
+    }
+    if (this.grantRegistry) {
+      const credential = this.credentials.get(authorizationRef);
+      if (!credential) {
+        throw new DevicePlatformError(
+          "PLATFORM_UNAVAILABLE",
+          "Grant credential is not available to revoke on the integrations stub",
+        );
+      }
+      await this.grantRegistry.revoke({ authorizationRef, authorizationCredential: credential });
     }
     grant.status = "revoked";
     grant.revokedAt = this.iso();

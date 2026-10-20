@@ -23,6 +23,8 @@ pnpm exec tsx src/integrations/device-digital-human/stub-server.ts
 
 Stdout prints `listening on http://127.0.0.1:8787`. The process refuses to start unless `OPENBOT_DEVICE_DH_STUB=1`, and it binds `127.0.0.1` only. `OPENBOT_DEVICE_DH_STUB_PORT` defaults to `8787`. `0` asks the OS for an ephemeral port.
 
+Device-control (a different process, default `http://127.0.0.1:8791`) reads `OPENBOT_STUB_SERVICE_USER` and `OPENBOT_STUB_SERVICE_PASSWORD` from the operator environment. It will not start without them. Those names match the service Basic client on this page. Do not copy the values into git or chat. Joint steps and the prefix collision warning: [Device platform joint staging](/integrations/device-platform/staging).
+
 Sample clients (secrets are fixtures, at least 16 characters, not production credentials):
 
 - `consent-sim` / `consent-secret-16+` / role `consent` / humans `agent-demo-1`, `agent-demo-2` / scopes `chat`, `camera.capture`, `media.read`
