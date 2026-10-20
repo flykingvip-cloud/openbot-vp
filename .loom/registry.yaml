@@ -9043,7 +9043,47 @@ tasks:
     ownerHistory: []
     since: 2026-10-20
     metadata: {}
+  - id: device-platform-b3-personal:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Personal settings devices and hardware on the shared B1 binding store
+    paths:
+      - ui/src/ui/ports/employee/views/personal-devices-page.ts
+      - ui/src/ui/ports/employee/views/personal-devices-page.node.test.ts
+    state: active
+    sessions:
+      - id: 695d1ac2-038c-46b4-9b6f-39e6d26fb3d8
+        taskId: device-platform-b3-personal:cursor-cloud
+        ide: cursor
+        agent: cursor-cloud
+        status: active
+        lastSignalAt: 2026-10-20T15:56:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-20
+    metadata: {}
 landingStreams:
+  # Shared personal-settings files. Parallel so a member device page can land
+  # with the device-platform primary without pulling i18n, workbench CSS, or
+  # the personal-settings shell into another serial stream.
+  - id: device-platform-b3-personal-ui:cursor-cloud
+    landingPolicy: parallel
+    paths:
+      - src/gateway/device-platform-personal-http.test.ts
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+      - ui/src/styles/workbench.css
+      - ui/src/ui/ports/employee/views/workbench-personal-settings-page.ts
+      - ui/src/ui/ports/employee/views/workbench-stage.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-types.ts
+      - ui/src/ui/ports/employee/views/personal-devices-page.ts
+      - ui/src/ui/ports/employee/views/personal-devices-page.node.test.ts
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Personal settings devices and hardware
+      owner: cursor-cloud
+      task: device-platform-b3-personal
   # Parallel companion so the B2 admin mount can land with the device-platform
   # primary stream. These shared files stay listed here so a connector change
   # does not mix PHW3, MRR, and platform-admin layout primaries.

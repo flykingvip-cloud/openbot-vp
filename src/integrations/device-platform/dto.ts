@@ -4,6 +4,7 @@ import {
   type DeviceBinding,
   type DevicePlatformConnection,
   type DevicePlatformEnvironment,
+  type DevicePresence,
   type ManagementOperation,
   type StatusProjection,
 } from "./types.js";
@@ -18,6 +19,7 @@ export type UserBindingDto = {
   status: DeviceBinding["status"];
   authorizationEstablished: boolean;
   platformApplied: boolean;
+  failureCode?: string;
 };
 
 export type UserDeviceDto = {
@@ -26,8 +28,11 @@ export type UserDeviceDto = {
   platformId: string;
   externalDeviceId: string;
   binding: UserBindingDto | null;
+  /** User-visible model. Absent when the platform did not send one. */
+  model?: string;
   status: {
     online: boolean;
+    presence: DevicePresence;
     lastSeen?: string;
     capabilities: string[];
     firmware?: string;
@@ -81,6 +86,10 @@ const USER_FORBIDDEN_KEYS = [
   "authorizationCredential",
   "secret",
   "proof",
+  "gatewayUrl",
+  "gatewayAddress",
+  "servicePrincipal",
+  "clientIdentity",
 ] as const;
 
 export function toUserBindingDto(binding: DeviceBinding | undefined): UserBindingDto | null {
@@ -97,6 +106,7 @@ export function toUserBindingDto(binding: DeviceBinding | undefined): UserBindin
     status: binding.status,
     authorizationEstablished: binding.authorizationEstablished,
     platformApplied: binding.platformApplied,
+    ...(binding.failureCode ? { failureCode: binding.failureCode } : {}),
   };
 }
 
@@ -111,8 +121,12 @@ export function toUserDeviceDto(
     platformId: association.platformId,
     externalDeviceId: association.externalDeviceId,
     binding: toUserBindingDto(binding),
+    ...(projection?.model ? { model: projection.model } : {}),
     status: {
-      online: projection?.online ?? false,
+      online: projection?.presence === "unknown" ? false : (projection?.online ?? false),
+      presence:
+        projection?.presence ??
+        (projection ? (projection.online ? "online" : "offline") : "unknown"),
       ...(projection?.lastSeen ? { lastSeen: projection.lastSeen } : {}),
       capabilities: projection?.capabilities ? [...projection.capabilities] : [],
       ...(projection?.firmware ? { firmware: projection.firmware } : {}),

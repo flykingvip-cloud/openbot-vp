@@ -21,9 +21,8 @@ export type DevicePlatformHttpResponse = {
 
 /**
  * Handler for the management API.
- * The gateway mounts the admin routes only. User routes stay unmounted until
- * the personal-settings and digital-human pages. The loopback integrations
- * stub stays a separate test process.
+ * The gateway mounts admin connector routes and the signed-in member device
+ * routes. The loopback integrations stub stays a separate test process.
  */
 export async function handleDevicePlatformRequest(
   service: DevicePlatformService,
@@ -59,6 +58,14 @@ async function route(
 
   if (method === "GET" && path === `${DEVICE_PLATFORM_API_PREFIX}/me/devices`) {
     return ok({ devices: service.listPersonalSettingsDevices(actor) });
+  }
+
+  if (method === "GET" && path === `${DEVICE_PLATFORM_API_PREFIX}/me/platforms`) {
+    return ok({ platforms: service.listPersonalPlatforms(actor) });
+  }
+
+  if (method === "GET" && path === `${DEVICE_PLATFORM_API_PREFIX}/me/digital-humans`) {
+    return ok({ digitalHumans: service.listPersonalDigitalHumans(actor) });
   }
 
   const humanDevices = path.match(

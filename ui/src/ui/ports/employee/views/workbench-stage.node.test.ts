@@ -2769,13 +2769,14 @@ describe("workbench stage", () => {
     expect(container.querySelector(".employee-workbench__settings-logout")).toBeNull();
     expect(container.textContent).not.toContain("Allocation rule");
     expect(container.querySelectorAll(".employee-workbench__settings-toggle")).toHaveLength(0);
-    expect(container.querySelectorAll(".employee-workbench__settings-tab")).toHaveLength(5);
+    expect(container.querySelectorAll(".employee-workbench__settings-tab")).toHaveLength(6);
     expect(container.querySelector(".employee-workbench__personal-settings-tabs")).not.toBeNull();
     expect(container.querySelector(".employee-workbench__personal-settings-rail")).toBeNull();
     expect(container.textContent).toContain("数据与备份");
     const tabLabels = Array.from(
       container.querySelectorAll(".employee-workbench__settings-tab"),
     ).map((el) => el.textContent?.trim() ?? "");
+    expect(tabLabels).toContain("设备与硬件");
     expect(tabLabels).toContain("数据与备份");
     expect(tabLabels).not.toContain("高级");
     await i18n.setLocale(previousLocale);

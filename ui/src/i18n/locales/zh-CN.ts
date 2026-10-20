@@ -3812,6 +3812,9 @@ export const zh_CN: TranslationMap = {
               subtitle: "查看机器人记住了什么，并按需忘记。云端托管模式下不可用。",
             },
           },
+          devices: {
+            tab: "设备与硬件",
+          },
           data: {
             tab: "数据与备份",
             title: "数据与备份",
