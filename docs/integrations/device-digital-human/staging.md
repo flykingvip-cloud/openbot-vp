@@ -118,6 +118,8 @@ The gateway serves this route only when `gateway.http.endpoints.chatCompletions.
 
 `POST /conversations/{id}/turns` stores the run and the idempotency record, then returns `202` and `runId` before the gateway call finishes. Progress is the run SSE. A retry with the same `Idempotency-Key` and the same body returns that `runId` with `disposition: "duplicate"` even while the gateway call is still open. A different key while the run is open is `SESSION_BUSY`.
 
+`POST /device-tool-requests/{requestId}/result` reserves that key before the media pull and before vision. The same key and the same body while vision is still running returns the processing accept (`duplicate: true`, same `requestId` and `runId`) and does not pull the image or call the model again. A different body is `IDEMPOTENCY_CONFLICT`. After vision finishes, a later retry replays the final response. Cancel, revoke, rebind, or tool timeout during vision does not leave the key as a successful completion.
+
 Cancel aborts the stub's in-flight `fetch` to `/v1/chat/completions`. The stub also best-effort calls gateway WebSocket method `chat.abort` for that session key when agent mode is on. That call is not required for the stub result: `/v1/chat/completions` has no HTTP cancel, and closing the HTTP request only stops the SSE writer (`req.on("close")` does not abort the agent). Tools the agent already started are not rolled back (`sideEffectsRolledBack` stays false). After cancel, the stub does not emit another `assistant.visible` or `assistant.final`. `run.cancelled` is the terminal event.
 
 Live secrets stay on the operator machine. CI does not call `127.0.0.1:18789`. Contract tests inject a mock completions server.
@@ -138,3 +140,4 @@ This stub still does not call an inventory MCP. The prompt tells the agent not t
 - No product approval screen. Approvals use the internal token.
 - Media pull is loopback plus an explicit origin allowlist. Do not open arbitrary intranet URLs.
 - JPEG and PNG fixtures under `examples/fixtures/` (`frame.png`, `frame.jpg`) are synthetic 1x1 images for the pull path.
+- JPEG validation is still a marker scan through EOI. It does not Huffman-decode, so a structurally complete but corrupt JPEG can pass.
