@@ -9021,6 +9021,28 @@ tasks:
     ownerHistory: []
     since: 2026-10-18
     metadata: {}
+  - id: device-platform-b1:cursor-b1
+    owner: cursor-b1
+    intent:
+      - B1 shared device platform persistence permissions and user versus admin DTO split
+    paths:
+      - src/integrations/device-platform/**
+      - docs/integrations/device-platform/**
+      - docs/docs.json
+      - CHANGELOG.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: f647d223-5382-4767-84b2-41f6563e45b1
+        taskId: device-platform-b1:cursor-b1
+        ide: cursor
+        agent: cursor-b1
+        status: active
+        lastSignalAt: 2026-10-20T15:01:04.499Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-20
+    metadata: {}
 landingStreams:
   - id: device-digital-human-v1:cursor-cloud
     landingPolicy: serial
@@ -9028,6 +9050,8 @@ landingStreams:
       - .loom/registry.yaml
       - src/integrations/device-digital-human/**
       - docs/integrations/device-digital-human/**
+      - src/integrations/device-platform/**
+      - docs/integrations/device-platform/**
       - docs/docs.json
       - CHANGELOG.md
     canLandWith: []
