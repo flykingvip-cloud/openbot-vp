@@ -1,4 +1,4 @@
-import { html, nothing } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { requestOpenBotAppRerender } from "../../../request-app-rerender.ts";
 import {
   renderPersonalMetaList,
@@ -9,8 +9,8 @@ import {
 } from "./workbench-personal-settings-layout.ts";
 
 /**
- * Personal settings「设备与硬件」.
- * Reads the same device bindings the digital-human page will use.
+ * Shared device list for personal settings「设备与硬件」and digital-human
+ * detail「已连接设备」. Both read the same device-platform bindings.
  * The connector URL and service secrets are not part of this view.
  */
 
@@ -71,8 +71,20 @@ export class PersonalDevicesRequestError extends Error {
   }
 }
 
+export type PersonalDevicesListQuery = {
+  digitalHumanId?: string;
+};
+
+/** Digital-human detail passes the current human. Personal settings omits it. */
+export type PersonalDevicesPanelOptions = {
+  digitalHumanId?: string;
+  digitalHumanName?: string;
+  title?: string;
+  surface?: "settings" | "detail";
+};
+
 export type PersonalDevicesClient = {
-  listDevices(): Promise<PersonalDeviceView[]>;
+  listDevices(query?: PersonalDevicesListQuery): Promise<PersonalDeviceView[]>;
   listPlatforms(): Promise<PersonalPlatformChoice[]>;
   listHumans(): Promise<PersonalHumanChoice[]>;
   submit(body: Record<string, unknown>): Promise<PersonalDeviceView | null>;
@@ -102,6 +114,9 @@ type PanelState = {
   rebindScopes: string[];
   confirmRevoke: boolean;
   showTransfer: boolean;
+  /** Set on the digital-human detail page. Empty on personal settings. */
+  lockedHumanId: string;
+  lockedHumanName: string;
 };
 
 const EMPTY_DRAFT: AddDraft = {
@@ -116,6 +131,8 @@ const EMPTY_DRAFT: AddDraft = {
 
 let loadToken = 0;
 let loadStarted = false;
+let activeScope = "";
+let view: PersonalDevicesPanelOptions = {};
 let clientOverride: PersonalDevicesClient | null = null;
 let state: PanelState = freshState();
 
@@ -134,6 +151,8 @@ function freshState(): PanelState {
     rebindScopes: ["chat"],
     confirmRevoke: false,
     showTransfer: false,
+    lockedHumanId: "",
+    lockedHumanName: "",
   };
 }
 
@@ -144,6 +163,8 @@ export function setPersonalDevicesClientForTests(client: PersonalDevicesClient |
 export function resetPersonalDevicesPanelForTests(): void {
   loadToken += 1;
   loadStarted = false;
+  activeScope = "";
+  view = {};
   state = freshState();
 }
 
@@ -200,33 +221,84 @@ export function parsePairingScan(
   return found.deviceId || found.challenge || found.code ? found : null;
 }
 
-export function renderPersonalDevicesPanel() {
+export function renderPersonalDevicesPanel(options?: PersonalDevicesPanelOptions) {
+  adoptScope(options);
   ensureLoaded();
   const selected = state.devices.find((device) => device.deviceId === state.selectedId) ?? null;
+  const body = html`
+    <div
+      class="personal-devices__stack"
+      data-testid="personal-devices"
+      data-personal-devices-human=${state.lockedHumanId}
+    >
+      ${renderBanner()}
+      ${renderBlock(listTitle(), renderDeviceList(selected))}
+      ${selected ? renderBlock(selected.displayName, renderDetail(selected)) : nothing}
+      ${renderBlock("添加设备", renderAddForm())}
+    </div>
+  `;
+  if (panelSurface() === "detail") {
+    return body;
+  }
   return html`
     ${renderPersonalSettingsSection(html`
-      ${renderPersonalSettingsTabIntro("设备与硬件")}
-      <div class="personal-devices__stack" data-testid="personal-devices">
-        ${renderBanner()}
-        ${renderPersonalSettingsPanel({
-          title: "我的设备",
-          content: renderDeviceList(selected),
-        })}
-        ${
-          selected
-            ? renderPersonalSettingsPanel({
-                title: selected.displayName,
-                content: renderDetail(selected),
-              })
-            : nothing
-        }
-        ${renderPersonalSettingsPanel({
-          title: "添加设备",
-          content: renderAddForm(),
-        })}
-      </div>
+      ${renderPersonalSettingsTabIntro(view.title?.trim() || "设备与硬件")}
+      ${body}
     `)}
   `;
+}
+
+function adoptScope(options?: PersonalDevicesPanelOptions): void {
+  const digitalHumanId = options?.digitalHumanId?.trim() ?? "";
+  view = {
+    ...(options?.title ? { title: options.title } : {}),
+    ...(options?.surface ? { surface: options.surface } : {}),
+    ...(digitalHumanId ? { digitalHumanId } : {}),
+    ...(options?.digitalHumanName?.trim()
+      ? { digitalHumanName: options.digitalHumanName.trim() }
+      : {}),
+  };
+  if (digitalHumanId === activeScope) {
+    if (view.digitalHumanName && state.lockedHumanName !== view.digitalHumanName) {
+      state.lockedHumanName = view.digitalHumanName;
+    }
+    return;
+  }
+  activeScope = digitalHumanId;
+  loadToken += 1;
+  loadStarted = false;
+  state = freshState();
+  state.lockedHumanId = digitalHumanId;
+  state.lockedHumanName = view.digitalHumanName ?? "";
+  state.draft = { ...EMPTY_DRAFT, scopes: ["chat"], digitalHumanId };
+}
+
+function panelSurface(): "settings" | "detail" {
+  if (view.surface) {
+    return view.surface;
+  }
+  return state.lockedHumanId ? "detail" : "settings";
+}
+
+function listTitle(): string {
+  if (panelSurface() === "detail") {
+    return view.title?.trim() || "已连接设备";
+  }
+  return "我的设备";
+}
+
+function renderBlock(title: string, content: TemplateResult) {
+  if (panelSurface() === "detail") {
+    return html`
+      <section class="wb-bots__section">
+        <div class="wb-bots__section-head">
+          <h3 class="wb-bots__section-title">${title}</h3>
+        </div>
+        <div class="wb-bots__section-body">${content}</div>
+      </section>
+    `;
+  }
+  return renderPersonalSettingsPanel({ title, content });
 }
 
 function renderBanner() {
@@ -313,7 +385,7 @@ function renderDetail(device: PersonalDeviceView) {
               state.rebindHumanId = (event.target as HTMLSelectElement).value;
             }}
           >
-            ${state.humans.map(
+            ${humanChoices().map(
               (human) => html`<option value=${human.digitalHumanId}>${human.displayName}</option>`,
             )}
           </select>
@@ -449,22 +521,7 @@ function renderAddForm() {
           }}
         />
       </label>
-      <label>
-        数字人
-        <select
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-human"
-          .value=${draft.digitalHumanId}
-          @change=${(event: Event) => {
-            draft.digitalHumanId = (event.target as HTMLSelectElement).value;
-          }}
-        >
-          <option value="">选择数字人</option>
-          ${state.humans.map(
-            (human) => html`<option value=${human.digitalHumanId}>${human.displayName}</option>`,
-          )}
-        </select>
-      </label>
+      ${renderHumanField(draft)}
       ${renderScopeChecks(draft.scopes, (scopes) => {
         draft.scopes = scopes;
       })}
@@ -472,6 +529,42 @@ function renderAddForm() {
         添加并授权
       </button>
     </form>
+  `;
+}
+
+function renderHumanField(draft: AddDraft) {
+  if (state.lockedHumanId) {
+    return html`
+      <label>
+        数字人
+        <input
+          class="employee-workbench__settings-input"
+          data-testid="personal-device-human"
+          data-digital-human-id=${state.lockedHumanId}
+          .value=${humanName(state.lockedHumanId)}
+          readonly
+          disabled
+        />
+      </label>
+    `;
+  }
+  return html`
+    <label>
+      数字人
+      <select
+        class="employee-workbench__settings-input"
+        data-testid="personal-device-human"
+        .value=${draft.digitalHumanId}
+        @change=${(event: Event) => {
+          draft.digitalHumanId = (event.target as HTMLSelectElement).value;
+        }}
+      >
+        <option value="">选择数字人</option>
+        ${humanChoices().map(
+          (human) => html`<option value=${human.digitalHumanId}>${human.displayName}</option>`,
+        )}
+      </select>
+    </label>
   `;
 }
 
@@ -559,7 +652,12 @@ async function onAdd(event: Event): Promise<void> {
     });
     state.notice =
       device?.binding?.status === "active" ? "设备已连接。" : "授权已提交，正在等待设备平台应用。";
-    state.draft = { ...EMPTY_DRAFT, platformId: draft.platformId, scopes: ["chat"] };
+    state.draft = {
+      ...EMPTY_DRAFT,
+      platformId: draft.platformId,
+      scopes: ["chat"],
+      digitalHumanId: state.lockedHumanId,
+    };
     if (device) {
       state.selectedId = device.deviceId;
     }
@@ -622,14 +720,18 @@ function ensureLoaded(): void {
 async function reload(token = loadToken): Promise<void> {
   try {
     const api = client();
-    const [devices, platforms, humans] = await Promise.all([
-      api.listDevices(),
+    const locked = state.lockedHumanId;
+    const [listed, platforms, humans] = await Promise.all([
+      api.listDevices(locked ? { digitalHumanId: locked } : undefined),
       api.listPlatforms(),
       api.listHumans(),
     ]);
     if (token !== loadToken) {
       return;
     }
+    const devices = locked
+      ? listed.filter((device) => device.binding?.digitalHumanId === locked)
+      : listed;
     state = {
       ...state,
       status: "ready",
@@ -641,12 +743,19 @@ async function reload(token = loadToken): Promise<void> {
       draft: {
         ...state.draft,
         platformId: state.draft.platformId || platforms[0]?.platformId || "",
-        digitalHumanId: state.draft.digitalHumanId || humans[0]?.digitalHumanId || "",
+        digitalHumanId: locked || state.draft.digitalHumanId || humans[0]?.digitalHumanId || "",
       },
     };
+    const selectedStillVisible = devices.some((device) => device.deviceId === state.selectedId);
+    if (state.selectedId && !selectedStillVisible) {
+      state.selectedId = "";
+      state.confirmRevoke = false;
+      state.showTransfer = false;
+    }
     if (!state.selectedId && devices[0]) {
       state.selectedId = devices[0].deviceId;
-      state.rebindHumanId = devices[0].binding?.digitalHumanId || humans[0]?.digitalHumanId || "";
+      state.rebindHumanId =
+        devices[0].binding?.digitalHumanId || locked || humans[0]?.digitalHumanId || "";
       state.rebindScopes = devices[0].binding?.scopes.length
         ? [...devices[0].binding.scopes]
         : ["chat"];
@@ -656,9 +765,10 @@ async function reload(token = loadToken): Promise<void> {
       return;
     }
     const status = error instanceof PersonalDevicesRequestError ? error.status : 0;
+    const code = error instanceof PersonalDevicesRequestError ? error.code : "";
     state = {
       ...state,
-      status: status === 401 || status === 403 ? "unauthorized" : "failure",
+      status: status === 401 || code === "UNAUTHENTICATED" ? "unauthorized" : "failure",
       message: error instanceof Error ? error.message : "读取设备失败",
       busy: false,
     };
@@ -674,8 +784,18 @@ export function createPersonalDevicesFetchClient(
   fetchImpl: typeof fetch = fetch,
 ): PersonalDevicesClient {
   return {
-    listDevices: async () =>
-      asDevices((await request(fetchImpl, "/api/device-platform/v1/me/devices", "GET")).devices),
+    listDevices: async (query) =>
+      asDevices(
+        (
+          await request(
+            fetchImpl,
+            query?.digitalHumanId
+              ? `/api/device-platform/v1/me/digital-humans/${encodeURIComponent(query.digitalHumanId)}/devices`
+              : "/api/device-platform/v1/me/devices",
+            "GET",
+          )
+        ).devices,
+      ),
     listPlatforms: async () =>
       asPlatforms(
         (await request(fetchImpl, "/api/device-platform/v1/me/platforms", "GET")).platforms,
@@ -778,12 +898,26 @@ function asHumans(value: unknown): PersonalHumanChoice[] {
   }));
 }
 
+function humanChoices(): PersonalHumanChoice[] {
+  const humans = [...state.humans];
+  if (
+    state.lockedHumanId &&
+    !humans.some((human) => human.digitalHumanId === state.lockedHumanId)
+  ) {
+    humans.unshift({
+      digitalHumanId: state.lockedHumanId,
+      displayName: state.lockedHumanName || state.lockedHumanId,
+    });
+  }
+  return humans;
+}
+
 function humanName(digitalHumanId: string | undefined): string {
   if (!digitalHumanId) {
     return "未绑定";
   }
   return (
-    state.humans.find((human) => human.digitalHumanId === digitalHumanId)?.displayName ||
+    humanChoices().find((human) => human.digitalHumanId === digitalHumanId)?.displayName ||
     digitalHumanId
   );
 }

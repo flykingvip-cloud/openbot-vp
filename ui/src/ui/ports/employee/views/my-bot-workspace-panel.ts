@@ -14,6 +14,7 @@ import type {
   MyBotWorkingStyleProjection,
 } from "../semantic/my-bot-read-model.ts";
 import type { UserOperationalIdentitySnapshot } from "../semantic/view-controller-facade.ts";
+import { renderPersonalDevicesPanel } from "./personal-devices-page.ts";
 import { normalizeGrowthReport, renderGrowthReportSummary } from "./workbench-growth-report.ts";
 import { wbSettingsDetailToolbar } from "./workbench-settings-layout.ts";
 import type {
@@ -28,6 +29,7 @@ export type MyBotDetailTabId =
   | "auth"
   | "collaboration"
   | "data"
+  | "devices"
   | "danger";
 
 const TAB_DEFS: Array<{
@@ -43,6 +45,7 @@ const TAB_DEFS: Array<{
   { id: "auth", label: "运营授权" },
   { id: "collaboration", label: "协作" },
   { id: "data", label: "数据" },
+  { id: "devices", label: "已连接设备" },
   { id: "danger", label: "删除", ownedOnly: true },
 ];
 
@@ -925,6 +928,15 @@ function renderDataTab(props: MyBotWorkspacePanelProps) {
   `;
 }
 
+function renderDevicesTab(props: MyBotWorkspacePanelProps) {
+  return renderPersonalDevicesPanel({
+    digitalHumanId: props.entry.id,
+    digitalHumanName: props.entry.name,
+    title: "已连接设备",
+    surface: "detail",
+  });
+}
+
 function renderDangerTab(props: MyBotWorkspacePanelProps) {
   const entry = props.entry;
   const busy = props.ownedRobotDeleteBusyId === entry.id;
@@ -972,6 +984,8 @@ function renderTabBody(props: MyBotWorkspacePanelProps): TemplateResult {
       return renderCollaborationTab(props);
     case "data":
       return renderDataTab(props);
+    case "devices":
+      return renderDevicesTab(props);
     case "danger":
       return renderDangerTab(props);
     default:
@@ -1053,7 +1067,7 @@ export function renderMyBotWorkspacePanel(props: MyBotWorkspacePanelProps) {
 
       <div class="wb-bots__tab-panel" role="tabpanel" data-wb-bots-tab-panel=${props.activeTab}>
         ${
-          props.loading && !props.bot
+          props.loading && !props.bot && props.activeTab !== "devices"
             ? html`
                 <div class="wb-bots__empty">正在加载详情…</div>
               `

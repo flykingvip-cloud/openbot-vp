@@ -107,7 +107,12 @@ The service Basic password is write-once, stored outside the connection record, 
 
 A wrong, expired, replayed, or mismatched code does not become an active binding. Transfer is not a second claim write: only the current owner can unbind, and the next person adds the device with a new pairing code.
 
+## Digital-human detail
+
+数字人详情「已连接设备」lists the devices bound to the open digital human. It uses the same binding store, the same add / rebind / revoke operations, and the same user DTO as personal settings. The add form preselects that digital human. The server still checks the use grant on the operation. A shared digital human does not include another member's hardware.
+
+The page reads `GET /api/device-platform/v1/me/digital-humans/{digitalHumanId}/devices`. It does not write a device binding into agent config, and it does not send pairing fields to `/api/integrations/v1`.
+
 ## Follow-ups
 
-- B4: digital-human detail, connected devices. Same binding store. Not this page.
 - B5: live joint test with the device-platform HTTP service.
