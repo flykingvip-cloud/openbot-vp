@@ -55,6 +55,11 @@ type IdemRecord = {
   createdAt: number;
   status: number;
   body: Record<string, unknown>;
+  /**
+   * Tool-result reservation written before the request leaves `pending`.
+   * Replaced by the final response after vision. Not a successful completion.
+   */
+  inflight?: boolean;
 };
 
 type AuthCode = {
@@ -269,23 +274,34 @@ export class DeviceDhService {
 
   sweep(): void {
     for (const request of this.toolRequests.values()) {
-      if (request.state === "pending" && request.expiresAt <= this.now()) {
-        request.state = "expired";
-        const run = this.runs.get(request.runId);
-        if (run && !TERMINAL.has(run.status)) {
-          this.failRun(run, "TOOL_TIMEOUT", "Device tool timed out", true);
-        }
-        this.audit({
-          action: "tool.timeout",
-          outcome: "error",
-          authorizationRef: request.authorizationRef,
-          deviceId: request.deviceId,
-          runId: request.runId,
-          requestId: request.requestId,
-          code: "TOOL_TIMEOUT",
-          traceId: request.traceId,
-        });
+      if (request.expiresAt > this.now()) {
+        continue;
       }
+      const run = this.runs.get(request.runId);
+      // Vision is still part of accepting the result. A deadline that wins
+      // during that await must not be overwritten by a later completion.
+      const visionOpen =
+        request.state === "fulfilled" && run !== undefined && !TERMINAL.has(run.status);
+      if (request.state !== "pending" && !visionOpen) {
+        continue;
+      }
+      request.state = "expired";
+      if (visionOpen) {
+        run.modelAbort?.abort();
+      }
+      if (run && !TERMINAL.has(run.status)) {
+        this.failRun(run, "TOOL_TIMEOUT", "Device tool timed out", true);
+      }
+      this.audit({
+        action: "tool.timeout",
+        outcome: "error",
+        authorizationRef: request.authorizationRef,
+        deviceId: request.deviceId,
+        runId: request.runId,
+        requestId: request.requestId,
+        code: "TOOL_TIMEOUT",
+        traceId: request.traceId,
+      });
     }
   }
 
@@ -924,6 +940,12 @@ export class DeviceDhService {
     const scope = `tool:${grant.clientId}:${grant.authorizationRef}:${requestId}:${idempotencyKey}`;
     const prior = this.takeIdem(scope, hash);
     if (prior) {
+      if (prior.inflight) {
+        const bindingVersion = readNumber(body, "bindingVersion");
+        // The attempt is still open only while the run has not been closed.
+        // A cancel, revoke, rebind, or timeout must not replay as a success.
+        this.assertInflightToolReplay(grant, request, bindingVersion, traceId);
+      }
       this.audit({
         action: "tool.result.duplicate",
         outcome: "ok",
@@ -932,7 +954,14 @@ export class DeviceDhService {
         runId: request.runId,
         traceId,
       });
-      return { ...clone(prior.body), duplicate: true };
+      const replay = clone(prior.body);
+      if (prior.inflight) {
+        const live = this.runs.get(request.runId);
+        if (live) {
+          replay.runStatus = live.status;
+        }
+      }
+      return { ...replay, duplicate: true };
     }
     this.assertActive(grant);
     if (!grant.scopes.includes("media.read") && readString(body, "status") === "ok") {
@@ -965,76 +994,101 @@ export class DeviceDhService {
       });
       return response;
     }
-    const result = isRecord(body.result) ? body.result : {};
-    const media = await this.resolveMedia(grant, request, result);
-    // The pull yields. Cancel, revoke, rebind, or timeout may have closed the run.
-    // Claim the success only after this re-check; do not emit a reply otherwise.
-    this.sweep();
-    run = this.assertToolStillOpen(grant, request, bindingVersion, traceId);
-    request.state = "fulfilled";
-    this.media.set(media.mediaId, { bytes: media.bytes, contentType: media.contentType });
-    this.audit({
-      action: "media.accepted",
-      outcome: "ok",
-      authorizationRef: grant.authorizationRef,
-      requestId: request.requestId,
-      runId: request.runId,
-    });
-    const messageId = `msg_${randomId()}`;
-    run.messageId = messageId;
-    const human = this.humans.get(grant.digitalHumanId);
-    const signal = this.bindModelAbort(run);
-    try {
-      const vision = await this.models.describeImage({
-        userText: run.inputText,
-        bytes: media.bytes,
-        contentType: media.contentType,
-        width: media.width,
-        height: media.height,
-        digitalHumanId: grant.digitalHumanId,
-        displayName: human?.displayName ?? grant.digitalHumanId,
-        locale: human?.locale,
-        conversationId: run.conversationId,
-        trustedAgent: this.trustedAgent(grant),
-        signal,
-        onDelta: (delta) => {
-          if (!delta || TERMINAL.has(run.status)) {
-            return;
-          }
-          this.pushRunEvent(
-            run,
-            "assistant.delta",
-            { text: delta, speakable: false, stable: false },
-            messageId,
-          );
-        },
-      });
-      if (!TERMINAL.has(run.status)) {
-        this.finishVisible(run, vision);
-      }
-    } catch (error) {
-      if (!TERMINAL.has(run.status)) {
-        this.failModel(run, error);
-      }
-    }
-    const response = {
+    // Reserve the key before leaving pending and before either await. A retry
+    // with the same body joins this attempt; it does not pull media or call vision.
+    const processing = {
       requestId,
       status: "accepted" as const,
       runId: run.runId,
       runStatus: run.status,
-      mediaId: media.mediaId,
     };
-    this.remember(scope, hash, 200, response);
-    this.audit({
-      action: "tool.result",
-      outcome: "ok",
-      authorizationRef: grant.authorizationRef,
-      requestId,
-      runId: run.runId,
-      traceId,
-      deviceId: grant.deviceId,
-    });
-    return response;
+    this.remember(scope, hash, 200, processing, true);
+    try {
+      const result = isRecord(body.result) ? body.result : {};
+      const media = await this.resolveMedia(grant, request, result);
+      // The pull yields. Cancel, revoke, rebind, or timeout may have closed the run.
+      // Claim the success only after this re-check; do not emit a reply otherwise.
+      this.sweep();
+      run = this.assertToolStillOpen(grant, request, bindingVersion, traceId);
+      this.remember(
+        scope,
+        hash,
+        200,
+        { ...processing, runStatus: run.status, mediaId: media.mediaId },
+        true,
+      );
+      request.state = "fulfilled";
+      this.media.set(media.mediaId, { bytes: media.bytes, contentType: media.contentType });
+      this.audit({
+        action: "media.accepted",
+        outcome: "ok",
+        authorizationRef: grant.authorizationRef,
+        requestId: request.requestId,
+        runId: request.runId,
+      });
+      const messageId = `msg_${randomId()}`;
+      run.messageId = messageId;
+      const human = this.humans.get(grant.digitalHumanId);
+      const signal = this.bindModelAbort(run);
+      try {
+        const vision = await this.models.describeImage({
+          userText: run.inputText,
+          bytes: media.bytes,
+          contentType: media.contentType,
+          width: media.width,
+          height: media.height,
+          digitalHumanId: grant.digitalHumanId,
+          displayName: human?.displayName ?? grant.digitalHumanId,
+          locale: human?.locale,
+          conversationId: run.conversationId,
+          trustedAgent: this.trustedAgent(grant),
+          signal,
+          onDelta: (delta) => {
+            if (!delta || TERMINAL.has(run.status)) {
+              return;
+            }
+            this.pushRunEvent(
+              run,
+              "assistant.delta",
+              { text: delta, speakable: false, stable: false },
+              messageId,
+            );
+          },
+        });
+        this.sweep();
+        run = this.assertToolStillOpen(grant, request, bindingVersion, traceId, "fulfilled");
+        this.finishVisible(run, vision);
+      } catch (error) {
+        if (isToolCloseError(error) || TERMINAL.has(run.status)) {
+          this.sweep();
+          this.assertToolStillOpen(grant, request, bindingVersion, traceId, "fulfilled");
+          throw error;
+        }
+        this.failModel(run, error);
+      }
+      const response = {
+        requestId,
+        status: "accepted" as const,
+        runId: run.runId,
+        runStatus: run.status,
+        mediaId: media.mediaId,
+      };
+      this.remember(scope, hash, 200, response);
+      this.audit({
+        action: "tool.result",
+        outcome: "ok",
+        authorizationRef: grant.authorizationRef,
+        requestId,
+        runId: run.runId,
+        traceId,
+        deviceId: grant.deviceId,
+      });
+      return response;
+    } catch (error) {
+      // Validation and close errors must not stay reserved as a completion.
+      this.releaseInflight(scope);
+      throw error;
+    }
   }
 
   createUploadTicket(grant: GrantRecord, body: Record<string, unknown>) {
@@ -1223,14 +1277,45 @@ export class DeviceDhService {
   }
 
   /**
+   * An in-flight reservation is replayable only while this attempt can still
+   * finish. Once cancel, revoke, rebind, or timeout has closed it, the retry
+   * gets that close error instead of a successful completion.
+   */
+  private assertInflightToolReplay(
+    grant: GrantRecord,
+    request: ToolRequest,
+    bindingVersion: number | undefined,
+    traceId?: string,
+  ): void {
+    const run = this.runs.get(request.runId);
+    const closed =
+      grant.status !== "active" ||
+      grant.expiresAt <= this.now() ||
+      bindingVersion !== grant.bindingVersion ||
+      bindingVersion !== request.bindingVersion ||
+      (run !== undefined && run.bindingVersion !== grant.bindingVersion) ||
+      !run ||
+      TERMINAL.has(run.status) ||
+      request.state === "expired" ||
+      request.state === "cancelled" ||
+      request.state === "closed";
+    if (!closed) {
+      return;
+    }
+    this.assertToolStillOpen(grant, request, bindingVersion, traceId, "fulfilled");
+  }
+
+  /**
    * Authorization, binding, and terminal state after any await.
-   * A closed run must not be completed from a late media pull.
+   * A closed run must not be completed from a late media pull or a late vision call.
+   * `fulfilled` allows the request that this attempt already claimed.
    */
   private assertToolStillOpen(
     grant: GrantRecord,
     request: ToolRequest,
     bindingVersion: number | undefined,
     traceId?: string,
+    mode: "pending" | "fulfilled" = "pending",
   ): RunRecord {
     const run = this.runs.get(request.runId);
     if (grant.status !== "active" || grant.expiresAt <= this.now()) {
@@ -1264,7 +1349,8 @@ export class DeviceDhService {
         "bindingVersion does not match the open tool request",
       );
     }
-    if (request.state !== "pending" || !run || TERMINAL.has(run.status)) {
+    const claimed = mode === "fulfilled" && request.state === "fulfilled";
+    if ((!claimed && request.state !== "pending") || !run || TERMINAL.has(run.status)) {
       if (request.state === "pending") {
         request.state = "closed";
       }
@@ -1687,8 +1773,24 @@ export class DeviceDhService {
     hash: string,
     status: number,
     body: Record<string, unknown>,
+    inflight = false,
   ): void {
-    this.idem.set(scope, { hash, createdAt: this.now(), status, body });
+    const existing = this.idem.get(scope);
+    this.idem.set(scope, {
+      hash,
+      createdAt: existing?.hash === hash ? existing.createdAt : this.now(),
+      status,
+      body,
+      ...(inflight ? { inflight: true } : {}),
+    });
+  }
+
+  /** Drop a reservation that did not become a final response. */
+  private releaseInflight(scope: string): void {
+    const existing = this.idem.get(scope);
+    if (existing?.inflight) {
+      this.idem.delete(scope);
+    }
   }
 
   private pruneIdem(): void {
@@ -1871,6 +1973,15 @@ export class DeviceDhService {
     }
     this.onAudit?.(record);
   }
+}
+
+function isToolCloseError(error: unknown): boolean {
+  return (
+    error instanceof DeviceDhError &&
+    (error.code === "LATE_RESULT" ||
+      error.code === "AUTH_REVOKED" ||
+      error.code === "BINDING_MISMATCH")
+  );
 }
 
 function idempotencyMaterial(body: Record<string, unknown>): Record<string, unknown> {
