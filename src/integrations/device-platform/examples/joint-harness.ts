@@ -28,12 +28,15 @@ import { DevicePlatformStore } from "../store.js";
 export const DEFAULT_DEVICE_CONTROL_BASE_URL = "http://127.0.0.1:8791";
 export const DEFAULT_OPENBOT_BASE_URL = "http://127.0.0.1:18789";
 
-/** Frozen OpenBot integrations contract. Do not rename its field names. */
-export const OPENBOT_CONTRACT_SHA = "92826116a9b00a596ae2360d8a643d6148050e3c";
+/**
+ * Pin for Agent A: B4 main tip this joint branched from.
+ * After merge, the coordinator publishes the new MERGE_SHA. Do not invent it.
+ */
+export const OPENBOT_CONTRACT_SHA = "490a69669c0cf9e68173ceb25cfa89c99438dfb9";
 export const OPENBOT_OPENAPI_RAW_URL =
-  "https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/92826116a9b00a596ae2360d8a643d6148050e3c/docs/integrations/device-digital-human/openapi.yaml";
+  "https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/490a69669c0cf9e68173ceb25cfa89c99438dfb9/docs/integrations/device-digital-human/openapi.yaml";
 
-/** Device-control draft that Agent A serves on loopback. Not the integrations contract. */
+/** Historical device-control draft freeze. Not OPENBOT_CONTRACT_SHA. */
 export const DEVICE_CONTROL_CONTRACT_SHA = "4ac6f2823c69a4c471fe89592a411a15535c0b81";
 export const DEVICE_CONTROL_OPENAPI_RAW_URL =
   "https://raw.githubusercontent.com/flykingvip-cloud/openbot-device-sdk/4ac6f2823c69a4c471fe89592a411a15535c0b81/contracts/device-platform/device-control.openapi.yaml";

@@ -14,18 +14,25 @@ Contract for the integrations stub: [Device digital-human API](/integrations/dev
 
 ## Status
 
-| Evidence                                                                    | State                                        |
-| --------------------------------------------------------------------------- | -------------------------------------------- |
-| Production gateway mounts `/api/device-platform/v1/admin` and `/me`         | CI, through `createGatewayHttpServer`        |
-| `/api/integrations/v1` stays off the gateway                                | CI                                           |
-| Restart keeps connections, associations, bindings, and operations queryable | CI                                           |
-| In-flight runs become `interrupted` and are not replayed                    | CI                                           |
-| me list, add, rebind, revoke through `HttpDevicePlatformControl`            | CI against an injectable fake                |
-| Device-control on `http://127.0.0.1:8791`                                   | Loopback-capable. No public URL in this repo |
-| Pair redeem, real grant bind, sync, stop, revoke on that process            | Draft maturity. Not recorded as a pass in CI |
-| Cross-host staging, gray release, flash, mass flash, physical hardware      | `JOINT_PENDING`                              |
+| Evidence                                                                    | State                                                                |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Production gateway mounts `/api/device-platform/v1/admin` and `/me`         | CI, through `createGatewayHttpServer`                                |
+| `/api/integrations/v1` stays off the gateway                                | CI                                                                   |
+| Restart keeps connections, associations, bindings, and operations queryable | CI                                                                   |
+| In-flight runs become `interrupted` and are not replayed                    | CI                                                                   |
+| me list, add, rebind, revoke through `HttpDevicePlatformControl`            | CI against an injectable fake                                        |
+| Device-control on `http://127.0.0.1:8791`                                   | Known limitation. No public staging URL. Not a pass                  |
+| Live pair redeem and stub-verified bind                                     | `JOINT_PENDING`. Live bind can return `grant_unverified`. Not a pass |
+| Cross-host staging, gray release, flash, mass flash, physical hardware      | `JOINT_PENDING`. `grayRelease` is false. Not a pass                  |
 
-`grayRelease` is false. `flash` and `massFlash` fail. Do not claim a gray or hardware pass.
+## Known limitations
+
+These are not passes:
+
+- `JOINT_PENDING` for cross-host staging and physical hardware. CI never calls a live device-control process.
+- There is no public device-control URL. The only joint target is loopback `http://127.0.0.1:8791`.
+- Live bind can return `grant_unverified` or `grant_unreachable`. The management service issues the grant in-process and does not register it on the integrations stub.
+- `grayRelease` is false. `flash` and `massFlash` fail.
 
 ## Hosts
 
@@ -41,17 +48,19 @@ Do not reverse-proxy the integrations stub onto a public host. The stub is an un
 
 Loopback is allowed on the connector only when the connection `environment` is `development`. `staging` and `production` require `https` and a public host. There is no shared public device-control URL yet, so the joint target stays loopback plus `development`.
 
-## Contract pins
+## Contract pin
 
-Frozen OpenBot integrations contract. Do not rename `authorizationRef`, `bindingVersion`, `digitalHumanId`, `deviceId`, or `assistant.*`. Pairing fields stay off `/api/integrations/v1` (`pairFieldsAccepted` is false).
+Agent A pins this OpenBot tree at the B4 main tip this joint branched from. Do not rename `authorizationRef`, `bindingVersion`, `digitalHumanId`, `deviceId`, or `assistant.*`. Pairing fields stay off `/api/integrations/v1` (`pairFieldsAccepted` is false).
 
-- `OPENBOT_CONTRACT_SHA`: `92826116a9b00a596ae2360d8a643d6148050e3c`
-- OpenAPI raw URL: `https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/92826116a9b00a596ae2360d8a643d6148050e3c/docs/integrations/device-digital-human/openapi.yaml`
+- `OPENBOT_CONTRACT_SHA`: `490a69669c0cf9e68173ceb25cfa89c99438dfb9`
+- OpenAPI raw URL: `https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/490a69669c0cf9e68173ceb25cfa89c99438dfb9/docs/integrations/device-digital-human/openapi.yaml`
 
-Device-control draft (not that frozen contract):
+That SHA is the pin. After this change merges, the coordinator publishes the new MERGE_SHA. This page does not invent that SHA.
 
-- Commit: `4ac6f2823c69a4c471fe89592a411a15535c0b81`
-- OpenAPI raw URL: `https://raw.githubusercontent.com/flykingvip-cloud/openbot-device-sdk/4ac6f2823c69a4c471fe89592a411a15535c0b81/contracts/device-platform/device-control.openapi.yaml`
+Historical only, not the pin:
+
+- B1 store commit `92826116a9b00a596ae2360d8a643d6148050e3c`
+- Device-control draft freeze `4ac6f2823c69a4c471fe89592a411a15535c0b81`, OpenAPI raw URL `https://raw.githubusercontent.com/flykingvip-cloud/openbot-device-sdk/4ac6f2823c69a4c471fe89592a411a15535c0b81/contracts/device-platform/device-control.openapi.yaml`
 
 ## Start device-control
 

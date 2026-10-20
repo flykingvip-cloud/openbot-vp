@@ -27,6 +27,6 @@ process.stdout.write(`device-control default ${DEFAULT_DEVICE_CONTROL_BASE_URL}\
 process.stdout.write(`openbot default ${DEFAULT_OPENBOT_BASE_URL}\n`);
 process.stdout.write(`OPENBOT_CONTRACT_SHA ${OPENBOT_CONTRACT_SHA}\n`);
 process.stdout.write(`openapi ${OPENBOT_OPENAPI_RAW_URL}\n`);
-process.stdout.write(`device-control openapi ${DEVICE_CONTROL_OPENAPI_RAW_URL}\n`);
+process.stdout.write(`historical device-control openapi ${DEVICE_CONTROL_OPENAPI_RAW_URL}\n`);
 process.stdout.write("grayRelease false\n");
 process.stdout.write("JOINT_PENDING cross-host hardware\n");

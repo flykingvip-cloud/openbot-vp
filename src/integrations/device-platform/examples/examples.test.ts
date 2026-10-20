@@ -101,6 +101,8 @@ describe("device platform joint harness", () => {
     const combined = `${staging}\n${script}`;
     expect(staging).toContain(DEFAULT_DEVICE_CONTROL_BASE_URL);
     expect(staging).toContain(OPENBOT_CONTRACT_SHA);
+    expect(staging).toContain("Historical only, not the pin");
+    expect(staging).not.toContain("`OPENBOT_CONTRACT_SHA`: `92826116");
     expect(staging).toContain(OPENBOT_OPENAPI_RAW_URL);
     expect(staging).toContain(DEVICE_CONTROL_OPENAPI_RAW_URL);
     expect(staging).toContain("OPENBOT_STUB_SERVICE_USER");
