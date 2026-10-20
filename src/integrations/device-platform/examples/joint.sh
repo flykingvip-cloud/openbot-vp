@@ -36,6 +36,15 @@ print_sequence() {
 DEVICE_CONTROL_BASE_URL=${DEVICE_CONTROL_BASE_URL}
 OPENBOT_BASE_URL=${OPENBOT_BASE_URL}
 
+# Admin register + health. Connector baseURL is device-control, not the OpenBot host.
+# Gateway admin routes stay on OPENBOT_BASE_URL. Grant exchange stays on the stub.
+STUB_BASE_URL=\${OPENBOT_DEVICE_DH_STUB_URL:-http://127.0.0.1:8787}
+
+curl -sS --max-time 5 \\
+  -H "cookie: \${OPENBOT_SESSION_COOKIE}" \\
+  -X POST \\
+  "\${OPENBOT_BASE_URL}/api/device-platform/v1/admin/connections/plat-local/test"
+
 curl -sS --max-time 3 \\
   -u "\${OPENBOT_STUB_SERVICE_USER}:\${OPENBOT_STUB_SERVICE_PASSWORD}" \\
   "\${DEVICE_CONTROL_BASE_URL}/api/device-platform/v1/health"
@@ -54,6 +63,10 @@ curl -sS --max-time 5 \\
   -H "cookie: \${OPENBOT_SESSION_COOKIE}" \\
   "\${OPENBOT_BASE_URL}/api/device-platform/v1/me/devices"
 
+curl -sS --max-time 5 \\
+  -H "cookie: \${OPENBOT_SESSION_COOKIE}" \\
+  "\${OPENBOT_BASE_URL}/api/device-platform/v1/me/digital-humans/dh-a/devices"
+
 curl -sS --max-time 10 \\
   -H "cookie: \${OPENBOT_SESSION_COOKIE}" \\
   -H 'content-type: application/json' \\
@@ -63,7 +76,7 @@ curl -sS --max-time 10 \\
 curl -sS --max-time 10 \\
   -H "cookie: \${OPENBOT_SESSION_COOKIE}" \\
   -H 'content-type: application/json' \\
-  -d '{"operationId":"op-rebind-1","kind":"rebind","deviceId":"DEVICE_ID","digitalHumanId":"dh-shared","scopes":["chat"]}' \\
+  -d '{"operationId":"op-rebind-1","kind":"rebind","deviceId":"DEVICE_ID","digitalHumanId":"dh-b","scopes":["chat"]}' \\
   "\${OPENBOT_BASE_URL}/api/device-platform/v1/me/operations"
 
 curl -sS --max-time 10 \\
@@ -72,6 +85,11 @@ curl -sS --max-time 10 \\
   -d '{"operationId":"op-revoke-1","kind":"revoke","deviceId":"DEVICE_ID"}' \\
   "\${OPENBOT_BASE_URL}/api/device-platform/v1/me/operations"
 
+# After exchange, device-control GET \${STUB_BASE_URL}/api/integrations/v1/grants/{authorizationRef}
+# with service Basic and X-OpenBot-Grant-Credential.
+# Rebind keeps that authorizationRef. Revoke makes the next GET status revoked.
+# A later capability call with the old credential fails. Old auth cannot execute.
+# Voice and photo are stub-only in this printout. 真机 stays PENDING.
 # Password source: docs/integrations/device-digital-human/staging.md
 # Do not commit values. grayRelease=false. JOINT_PENDING cross-host hardware.
 EOF
