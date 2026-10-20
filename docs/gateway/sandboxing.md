@@ -127,8 +127,15 @@ Build it once:
 scripts/sandbox-setup.sh
 ```
 
-Note: the default image does **not** include Node. If a skill needs Node (or
-other runtimes), either bake a custom image or install via
+The published tag stays `openbot-sandbox:bookworm-slim`. The image underneath
+is Debian 13 (trixie) with apt Node 20, npm, Chromium, poppler
+(`pdftotext` / `pdfinfo` / `pdftoppm`), and `fonts-noto-cjk` (Noto Sans CJK SC).
+Runtime user `sandbox` is uid/gid 1000:1000. `scripts/sandbox-setup.sh` runs
+`scripts/sandbox-image-smoke.sh`, which checks that contract.
+
+A missing image still falls back to raw `debian:bookworm-slim` (no Node 20 and
+no Chromium). Rebuild with `scripts/sandbox-setup.sh` before expecting the PDF
+toolchain. Extra runtimes can still be installed via
 `sandbox.docker.setupCommand` (requires network egress + writable root +
 root user).
 

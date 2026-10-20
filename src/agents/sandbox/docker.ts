@@ -350,6 +350,9 @@ export async function ensureDockerImage(image: string) {
     return;
   }
   // Exec default only. The browser image stays absent until it is built.
+  // This fallback is raw Debian bookworm. It is not Dockerfile.sandbox:
+  // that image is Debian 13 trixie with Node 20, Chromium, and poppler,
+  // still tagged openbot-sandbox:bookworm-slim via scripts/sandbox-setup.sh.
   if (image === DEFAULT_SANDBOX_IMAGE) {
     await execDocker(["pull", "debian:bookworm-slim"]);
     await execDocker(["tag", "debian:bookworm-slim", DEFAULT_SANDBOX_IMAGE]);

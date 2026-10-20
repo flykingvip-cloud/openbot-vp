@@ -44,7 +44,8 @@ Device-bound REAUTH (`device-bound` marker → `REAUTH_REQUIRED`) is unchanged.
 ## Build steps (large images; optional for unit tests)
 
 ```bash
-# ~1GB+ each; digest-pinned Debian base
+# Exec image is Debian 13 trixie (tag stays bookworm-slim) with Node 20,
+# Chromium, poppler, and fonts-noto-cjk. Digest-pinned base. ~1GB+.
 ./scripts/sandbox-setup.sh
 ./scripts/sandbox-browser-setup.sh
 docker image inspect openbot-sandbox:bookworm-slim

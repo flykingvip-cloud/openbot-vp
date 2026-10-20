@@ -110,6 +110,7 @@ Docs: https://docs.openbot.love
 - Agents/local computer: bots granted on the active operator seat may run the bounded Desktop path (`host=node`) on that seat's computer while `tools.exec.host` stays `sandbox`. Arbitrary `host=node` stays denied. A computer bound to a vacant seat, or requested by the same operator, is copied onto the active seat. Another employee's occupied seat is left alone.
 - Integrations: add a loopback device digital-human stub (`/api/integrations/v1`) for grant exchange, turns, dual SSE, camera pull, and revoke. It is not mounted on the production gateway. Start with `OPENBOT_DEVICE_DH_STUB=1` on port 8787.
 - Integrations: add a shared device-platform management store and service for later personal-settings and digital-human device lists. One binding record, one permission rule set, and one add/rebind/revoke operation machine. User payloads omit connector URLs and secrets. Platform connection config is admin-only. Tenant shards survive restart; in-flight runs are marked interrupted and are not replayed. The loopback stub and `/api/integrations/v1` are unchanged, and the new routes are not mounted on the gateway.
+- Sandbox: the conversation image tag stays `openbot-sandbox:bookworm-slim`, and the OS inside is Debian 13 with apt Node 20, Chromium, poppler, and Noto Sans CJK. Rebuild with `scripts/sandbox-setup.sh`. The runtime user remains uid/gid 1000:1000.
 
 ### Breaking
 
