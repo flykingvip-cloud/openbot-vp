@@ -2,6 +2,11 @@ import { assistantFromHuman, type DigitalHumanConfig, type StubConfig } from "./
 import { authInvalid, DeviceDhError, notFound } from "./errors.js";
 import { pullMedia, validateImageBytes, type MediaCheck } from "./media.js";
 import {
+  createPlaceholderModelClient,
+  DeviceDhModelError,
+  type DeviceDhModelClient,
+} from "./model.js";
+import {
   API_VERSION,
   IDEMPOTENCY_TTL_MS,
   PROTOCOL_VERSION,
@@ -106,6 +111,7 @@ type RunRecord = {
   deviceId: string;
   digitalHumanId: string;
   traceId?: string;
+  inputText: string;
   status: RunStatus;
   errorCode?: string;
   retryable: boolean;
@@ -168,6 +174,8 @@ export type ServiceOptions = {
   grantTtlMs?: number;
   codeTtlMs?: number;
   onAudit?: (record: AuditRecord) => void;
+  /** Defaults to the offline placeholder hatch. Pass a gateway client for real replies. */
+  models?: DeviceDhModelClient;
 };
 
 function clone<T>(value: T): T {
@@ -205,6 +213,7 @@ export class DeviceDhService {
   private readonly grantTtlMs: number;
   private readonly codeTtlMs: number;
   private readonly onAudit?: (record: AuditRecord) => void;
+  private readonly models: DeviceDhModelClient;
 
   constructor(options: ServiceOptions) {
     this.now = options.now ?? Date.now;
@@ -220,6 +229,7 @@ export class DeviceDhService {
     this.grantTtlMs = options.grantTtlMs ?? 30 * 24 * 60 * 60 * 1000;
     this.codeTtlMs = options.codeTtlMs ?? 60_000;
     this.onAudit = options.onAudit;
+    this.models = options.models ?? createPlaceholderModelClient();
     for (const client of options.config.clients) {
       this.clients.set(client.clientId, client);
     }
@@ -682,7 +692,7 @@ export class DeviceDhService {
     };
   }
 
-  submitTurn(
+  async submitTurn(
     grant: GrantRecord,
     conversationId: string,
     body: Record<string, unknown>,
@@ -745,6 +755,7 @@ export class DeviceDhService {
       deviceId: grant.deviceId,
       digitalHumanId: grant.digitalHumanId,
       traceId,
+      inputText: text,
       status: "accepted",
       retryable: false,
       createdAt: this.now(),
@@ -754,7 +765,7 @@ export class DeviceDhService {
     this.runs.set(run.runId, run);
     conversation.updatedAt = this.now();
     this.beginRun(run);
-    this.routeTurn(grant, run, text);
+    await this.routeTurn(grant, run, text);
     const response: Record<string, unknown> = {
       runId: run.runId,
       turnId,
@@ -957,36 +968,40 @@ export class DeviceDhService {
     const media = await this.resolveMedia(grant, request, result);
     request.state = "fulfilled";
     this.media.set(media.mediaId, { bytes: media.bytes, contentType: media.contentType });
-    const vision =
-      `占位视觉：收到 ${media.contentType} 图片（${media.width}x${media.height}，${media.bytes.length} 字节）。` +
-      "识别结果为占位，未修改库存。";
     const messageId = `msg_${randomId()}`;
     run.messageId = messageId;
-    run.visibleText = vision;
-    run.status = "completed";
-    run.finishedAt = this.now();
-    this.pushRunEvent(
-      run,
-      "assistant.visible",
-      {
-        text: vision,
-        speakable: true,
-        stable: true,
-      },
-      messageId,
-    );
-    this.pushRunEvent(
-      run,
-      "assistant.final",
-      {
-        text: vision,
-        speakable: false,
-        stable: true,
-        reconciliation: true,
-      },
-      messageId,
-    );
-    this.pushRunEvent(run, "run.completed", { status: "completed", messageId });
+    const human = this.humans.get(grant.digitalHumanId);
+    try {
+      const vision = await this.models.describeImage({
+        userText: run.inputText,
+        bytes: media.bytes,
+        contentType: media.contentType,
+        width: media.width,
+        height: media.height,
+        digitalHumanId: grant.digitalHumanId,
+        displayName: human?.displayName ?? grant.digitalHumanId,
+        locale: human?.locale,
+        conversationId: run.conversationId,
+        onDelta: (delta) => {
+          if (!delta || TERMINAL.has(run.status)) {
+            return;
+          }
+          this.pushRunEvent(
+            run,
+            "assistant.delta",
+            { text: delta, speakable: false, stable: false },
+            messageId,
+          );
+        },
+      });
+      if (!TERMINAL.has(run.status)) {
+        this.finishVisible(run, vision);
+      }
+    } catch (error) {
+      if (!TERMINAL.has(run.status)) {
+        this.failModel(run, error);
+      }
+    }
     const response = {
       requestId,
       status: "accepted" as const,
@@ -1212,7 +1227,7 @@ export class DeviceDhService {
     this.failRun(run, mapped.code, mapped.message, mapped.retryable);
   }
 
-  private routeTurn(grant: GrantRecord, run: RunRecord, text: string): void {
+  private async routeTurn(grant: GrantRecord, run: RunRecord, text: string): Promise<void> {
     if (wantsApproval(text)) {
       this.openApproval(run);
       return;
@@ -1223,18 +1238,34 @@ export class DeviceDhService {
     }
     const messageId = `msg_${randomId()}`;
     run.messageId = messageId;
-    const visible = placeholderText(text);
-    this.pushRunEvent(
-      run,
-      "assistant.delta",
-      {
-        text: visible.slice(0, 6),
-        speakable: false,
-        stable: false,
-      },
-      messageId,
-    );
-    this.finishVisible(run, visible);
+    const human = this.humans.get(grant.digitalHumanId);
+    try {
+      const visible = await this.models.completeTurn({
+        text,
+        digitalHumanId: grant.digitalHumanId,
+        displayName: human?.displayName ?? grant.digitalHumanId,
+        locale: human?.locale,
+        conversationId: run.conversationId,
+        onDelta: (delta) => {
+          if (!delta || TERMINAL.has(run.status)) {
+            return;
+          }
+          this.pushRunEvent(
+            run,
+            "assistant.delta",
+            { text: delta, speakable: false, stable: false },
+            messageId,
+          );
+        },
+      });
+      if (!TERMINAL.has(run.status)) {
+        this.finishVisible(run, visible);
+      }
+    } catch (error) {
+      if (!TERMINAL.has(run.status)) {
+        this.failModel(run, error);
+      }
+    }
   }
 
   private openApproval(run: RunRecord): void {
@@ -1359,6 +1390,22 @@ export class DeviceDhService {
       messageId,
     );
     this.pushRunEvent(run, "run.completed", { status: "completed", messageId });
+  }
+
+  private failModel(run: RunRecord, error: unknown): void {
+    const message =
+      error instanceof DeviceDhModelError ? error.message : "OpenBot agent request failed";
+    this.failRun(run, "INTERNAL", message, false);
+    this.audit({
+      action: "model.failed",
+      outcome: "error",
+      authorizationRef: run.authorizationRef,
+      deviceId: run.deviceId,
+      digitalHumanId: run.digitalHumanId,
+      runId: run.runId,
+      code: "INTERNAL",
+      traceId: run.traceId,
+    });
   }
 
   private failRun(run: RunRecord, code: string, message: string, retryable: boolean): void {
@@ -1766,13 +1813,6 @@ function wantsCamera(text: string): boolean {
 
 function wantsApproval(text: string): boolean {
   return /记下|确认更新|更新库存|删除库存|覆盖/.test(text);
-}
-
-function placeholderText(text: string): string {
-  if (/库存/.test(text)) {
-    return "占位回复：库存查询需要业务 MCP。当前 stub 未接入，不能播报库存结果。";
-  }
-  return `占位回复：已收到「${text}」。当前为设备数字人 stub，未调用真实模型。`;
 }
 
 function mapToolFailure(

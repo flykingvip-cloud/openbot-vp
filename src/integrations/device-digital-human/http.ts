@@ -245,7 +245,7 @@ async function dispatch(
     sendJson(
       res,
       202,
-      service.submitTurn(
+      await service.submitTurn(
         grant,
         decodeURIComponent(turns[1] ?? ""),
         body,

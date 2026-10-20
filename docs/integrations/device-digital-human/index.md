@@ -115,7 +115,7 @@ The device platform uploads JPEG or PNG bytes with a short-lived ticket (`PUT /m
 
 A camera turn stays `waiting_tool` until a result, cancel, revoke, rebind, or timeout (`TOOL_TIMEOUT`). Late results after the run is closed return `LATE_RESULT` and do not resume the run. Results after revoke return `AUTH_REVOKED`.
 
-The vision sentence is a placeholder. It does not call a vision model and it does not change inventory.
+Camera fulfillment asks the configured model for one speakable sentence. The default process does not call a model: it uses the offline placeholder hatch. Set `OPENBOT_DEVICE_DH_AGENT=1` to call the local OpenBot gateway instead. See [Staging](/integrations/device-digital-human/staging). Either way, this stub does not call an inventory MCP and must not claim that inventory was updated.
 
 ## Approvals
 
@@ -153,7 +153,9 @@ Execution failures after a turn is accepted are also a terminal `run.failed` or 
 ## Known limits
 
 - In-memory grants, runs, idempotency, events, and media. A restart loses them. There is no cross-process exactly-once tool guarantee.
-- No real model, vision model, inventory MCP, or production gateway route.
+- The stub does not mount on the production gateway. Real replies are a loopback HTTP call to a gateway that is already running beside it.
+- Default model mode is the offline placeholder hatch (`OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1` forces it). `OPENBOT_DEVICE_DH_AGENT=1` calls `POST /v1/chat/completions` on `OPENBOT_DEVICE_DH_AGENT_BASE_URL` (default `http://127.0.0.1:18789`). A failed or empty agent reply is `run.failed` / `INTERNAL`. It does not fall back to the placeholder sentences.
+- No inventory MCP. Vision and chat prompts forbid claiming an inventory write, and a reply that only claims one is `INTERNAL`.
 - Image checks are container-level (magic, IHDR/SOF, declared metadata, size caps), not a full decoder.
 - Approvals are an internal token on loopback, not the OpenBot product approval UI.
 - Idempotency retention is 24 hours and only for accepted turns, exchanges that sent a key, and accepted tool results.
