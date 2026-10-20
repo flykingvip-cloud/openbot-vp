@@ -115,4 +115,4 @@ The page reads `GET /api/device-platform/v1/me/digital-humans/{digitalHumanId}/d
 
 ## Joint staging
 
-Loopback steps, env names, and what CI does not prove: [Joint staging](/integrations/device-platform/staging). Cross-host and hardware evidence are still pending. `grayRelease` stays false.
+Loopback steps, env names, and what CI does not prove: [Joint staging](/integrations/device-platform/staging). The step-by-step evidence matrix is [Joint acceptance](/integrations/device-platform/joint-acceptance). Cross-host and hardware evidence are still pending. `grayRelease` stays false.

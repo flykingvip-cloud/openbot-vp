@@ -50,12 +50,14 @@ Loopback is allowed on the connector only when the connection `environment` is `
 
 ## Contract pin
 
-Agent A pins this OpenBot tree at the B4 main tip this joint branched from. Do not rename `authorizationRef`, `bindingVersion`, `digitalHumanId`, `deviceId`, or `assistant.*`. Pairing fields stay off `/api/integrations/v1` (`pairFieldsAccepted` is false).
+Agent A pins this OpenBot tree at the B5 main tip this joint branched from. Do not rename `authorizationRef`, `bindingVersion`, `digitalHumanId`, `deviceId`, or `assistant.*`. Pairing fields stay off `/api/integrations/v1` (`pairFieldsAccepted` is false).
 
-- `OPENBOT_CONTRACT_SHA`: `490a69669c0cf9e68173ceb25cfa89c99438dfb9`
-- OpenAPI raw URL: `https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/490a69669c0cf9e68173ceb25cfa89c99438dfb9/docs/integrations/device-digital-human/openapi.yaml`
+- `OPENBOT_CONTRACT_SHA`: `d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`
+- OpenAPI raw URL: `https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f/docs/integrations/device-digital-human/openapi.yaml`
 
 That SHA is the pin. After this change merges, the coordinator publishes the new MERGE_SHA. This page does not invent that SHA.
+
+The evidence matrix, mock-ready ports, and `CONTROL_FREEZE_SHA = TBD` placeholder are in [Joint acceptance](/integrations/device-platform/joint-acceptance).
 
 Historical only, not the pin:
 
@@ -152,7 +154,7 @@ bash src/integrations/device-platform/examples/joint.sh --print
 
 ## Harness
 
-CI does not start `openbot-device-sdk` and does not call `127.0.0.1:8791`. The harness listens on an ephemeral loopback port, speaks the frozen control routes, and drives OpenBot `me` list, add, rebind, and revoke through `ConnectorHttpControl` / `HttpDevicePlatformControl`.
+CI does not start `openbot-device-sdk` and does not call `127.0.0.1:8791`. The harness listens on ephemeral loopback ports, speaks the frozen control routes, and drives admin health, pair, redeem, grant exchange on an integrations stub, bind A, the digital-human list, rebind B, and revoke. Cell-by-cell status is [Joint acceptance](/integrations/device-platform/joint-acceptance). A harness exit code of 0 is 模拟 evidence only.
 
 ```bash
 bash src/integrations/device-platform/examples/joint.sh

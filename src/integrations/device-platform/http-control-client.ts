@@ -9,8 +9,11 @@ import { DEVICE_PLATFORM_API_PREFIX, DevicePlatformError } from "./types.js";
  * management API and is a different process. This client never calls
  * `/api/integrations/v1` and never sends `pairChallenge` or `pairingCode` there.
  *
- * Contract: openbot-device-sdk device-control.openapi.yaml @ 4ac6f282
- * (PR flykingvip-cloud/openbot-device-sdk#12).
+ * Contract: openbot-device-sdk contracts/device-platform/device-control.openapi.yaml.
+ * Historical draft freeze 4ac6f282 (PR flykingvip-cloud/openbot-device-sdk#12).
+ * Agent A main tip 9af0e59 has no field, path, or error-code changes versus docs
+ * merge 69cfb924. CONTROL_FREEZE_SHA stays TBD until the v1-frozen PR lands.
+ * Field names in this client stay frozen.
  */
 
 export const DEVICE_CONTROL_PAIRING_FIELDS = ["pairChallenge", "pairingCode"] as const;
