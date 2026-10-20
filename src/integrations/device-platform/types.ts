@@ -8,6 +8,12 @@ export const DEVICE_PLATFORM_SCHEMA_VERSION = 1;
 export const DEVICE_PLATFORM_API_PREFIX = "/api/device-platform/v1";
 export const DEVICE_PLATFORM_CONTROL_CONTRACT = "openbot.device-platform.control.v1";
 
+export const DEVICE_PLATFORM_ENVIRONMENTS = ["production", "staging", "development"] as const;
+export type DevicePlatformEnvironment = (typeof DEVICE_PLATFORM_ENVIRONMENTS)[number];
+
+/** Disable blocks new grants and executions. Existing bindings stay until the user revokes them. */
+export const DEVICE_PLATFORM_DISABLED_DISPOSITION = "block_new_keep_existing" as const;
+
 export const BINDING_STATUSES = [
   "pending_pair",
   "pending_auth",
@@ -36,15 +42,29 @@ export type OperationStatus = "reserved" | "in_progress" | "succeeded" | "failed
 
 export type DevicePlatformConnection = {
   platformId: string;
+  /** Operator-facing name. The stable id stays `platformId`. */
+  displayName: string;
+  environment: DevicePlatformEnvironment;
   serviceBaseUrl: string;
   contractVersion: string;
   /** Vault or config reference. Never a raw secret. */
   credentialRef: string;
+  /** Service Basic username. Not a secret. */
+  clientIdentity: string;
+  /** Notes for OpenBot capability-API registration. Must not contain a secret. */
+  registrationNotes: string;
+  callbackAllowlist: string[];
   serviceClientIds: string[];
   enabled: boolean;
+  disabledDisposition: typeof DEVICE_PLATFORM_DISABLED_DISPOSITION;
+  /** True when a service Basic secret is stored outside this record. */
+  credentialPresent: boolean;
+  credentialRotatedAt?: string;
   health: "unknown" | "ok" | "down";
   healthCheckedAt?: string;
   healthCode?: string;
+  /** Redacted probe error. Never a secret or raw diagnostics. */
+  healthError?: string;
   updatedAt: string;
 };
 

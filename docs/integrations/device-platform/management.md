@@ -9,9 +9,18 @@ title: "Device platform management"
 
 # Device platform management
 
-This page describes the OpenBot management layer in `src/integrations/device-platform/`. It is the shared store and service for later UI entries. It is not the frozen integrations v1 loopback stub, and it is not mounted on the production gateway.
+This page describes the OpenBot management layer in `src/integrations/device-platform/`. It is the shared store and service for the platform-admin connector page and for later user device pages. It is not the frozen integrations v1 loopback stub.
 
 The loopback stub remains a test tool. See [Device digital-human API](/integrations/device-digital-human) and [Staging](/integrations/device-digital-human/staging). Do not reverse-proxy that stub to the public internet.
+
+## Host boundary
+
+`/api/device-platform/v1` is used on two hosts:
+
+- On the OpenBot gateway, only `/api/device-platform/v1/admin/*` is mounted. A platform-admin session configures the connector there. Ordinary users and enterprise admins are rejected. Personal device routes are not mounted yet.
+- On the device platform, the same prefix is the frozen control API (`health`, `capabilities`, `pair-challenges`, `devices/.../bind`). OpenBot calls it on the admin-configured origin, not on the OpenBot host.
+
+The control client never calls `/api/integrations/v1` and never sends `pairChallenge` or `pairingCode` to OpenBot. OpenBot revoke stays on the integrations API. Device-platform `stop` and `revoke` are local only.
 
 ## Shared entries
 
@@ -74,7 +83,7 @@ User payloads never include:
 - raw diagnostics
 - grant credential or credential hash
 
-Admin connection payloads include the service base URL, contract version, credential reference, service client ids, enable flag, and coarse health. They still do not include raw secrets. The API rejects secret fields instead of storing them. Hiding a field in the UI is not sufficient; the user handler never receives it.
+Admin connection payloads include the platform name, environment, service base URL, contract version, credential reference, client identity, registration notes, callback allowlist, enable flag, disposition, and coarse health. They still do not include the service Basic password. The connection upsert rejects secret fields. A separate credential route stores that password outside the connection record and never returns it. Hiding a field in the UI is not sufficient; the user handler never receives it.
 
 ## Operations and restart
 
@@ -86,13 +95,14 @@ On startup, runs that are not terminal become `interrupted` with `UNKNOWN_AFTER_
 
 ## Control contract
 
-`DevicePlatformControlClient` is contract `openbot.device-platform.control.v1`. Methods: capability discovery, pairing challenge verify, ACL-filtered device query, apply binding, binding application status, stop or revoke, status sync, and health. B1 tests use `FakeDevicePlatformControl`. A production HTTP client waits for the device-platform draft. Do not put production secrets in a frontend build.
+`HttpDevicePlatformControl` speaks the frozen device-control contract (`agent-b-freeze-draft`). Test connection calls `GET /health` and `GET /capabilities` with the stored service Basic credential. Redirects are not followed. A failed check does not mark the connector healthy. `FakeDevicePlatformControl` remains the in-process double for management unit tests. Do not put production secrets in a frontend build.
 
-The local management routes live under `/api/device-platform/v1` and are not registered on the gateway in this change. They do not change `/api/integrations/v1`.
+Disabling a connector blocks new grants and executions immediately. Existing device relationships stay until the user revokes them (`disabledDisposition: block_new_keep_existing`). Phase 1 only configures and verifies the connector. It does not push secrets to other hosts.
+
+The service Basic password is write-once, stored outside the connection record, and omitted from every API response. Rotation is an explicit replace. Admin responses may include the credential reference, the base URL, and a redacted error.
 
 ## Follow-ups
 
-- B2: personal settings UI for devices and hardware.
-- B3: digital-human detail UI for connected devices.
-- B4: platform admin UI for the device platform connection.
-- B5: live staging against the device-platform HTTP draft.
+- B3: personal settings, devices and hardware.
+- B4: digital-human detail, connected devices.
+- B5: live joint test with the device-platform HTTP service.

@@ -1,8 +1,10 @@
 import { DEVICE_PLATFORM_CONTROL_CONTRACT } from "./types.js";
 
 /**
- * OpenBot → device-platform control seam for a later live client.
- * Paths are not fixed. B1 tests use the fake. Production HTTP waits for the platform draft.
+ * In-process control seam used by the B1 management service and its unit tests.
+ * The frozen device-platform HTTP contract lives in `http-control-client.ts`.
+ * That client calls the admin-configured device-platform origin. It does not
+ * call `/api/integrations/v1` and does not send pairing fields there.
  */
 
 export type ControlAcl = {
