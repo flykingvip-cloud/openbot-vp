@@ -48,7 +48,11 @@ const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "exam
 function loadModels(): DeviceDhModelClient {
   const mode = resolveDeviceDhModelMode();
   if (mode === "agent") {
-    return createGatewayAgentModelClient(resolveGatewayAgentConfig());
+    return createGatewayAgentModelClient({
+      ...resolveGatewayAgentConfig(),
+      // Best-effort Gateway WebSocket chat.abort. HTTP abort is the guarantee.
+      attemptGatewayAbort: true,
+    });
   }
   return createPlaceholderModelClient();
 }

@@ -6,9 +6,11 @@ import { describe, expect, it } from "vitest";
 import {
   createGatewayAgentModelClient,
   DEFAULT_DEVICE_DH_AGENT_BASE_URL,
+  deviceDhSessionKey,
   resolveGatewayAgentConfig,
+  resolveTrustedGatewayAgent,
 } from "./agent-client.js";
-import type { StubConfig } from "./config.js";
+import { parseStubConfig, type StubConfig } from "./config.js";
 import { listenDeviceDh } from "./http.js";
 import {
   createPlaceholderModelClient,
@@ -114,6 +116,7 @@ function testConfig(): StubConfig {
         status: "active",
         userSubject: "user-demo",
         tenantId: "tenant-demo",
+        gatewayAgentId: "main",
       },
     ],
   };
@@ -179,7 +182,156 @@ async function call(
   };
 }
 
+function trusted(digitalHumanId: string, gatewayAgentId?: string, allowed?: string[]) {
+  return {
+    grantDigitalHumanId: digitalHumanId,
+    humanDigitalHumanId: digitalHumanId,
+    ...(gatewayAgentId ? { gatewayAgentId } : {}),
+    ...(allowed ? { allowedGatewayAgentIds: allowed } : {}),
+  };
+}
+
+function codeOf(json: Json): string | undefined {
+  const error = json.error;
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  return (error as Json).code as string | undefined;
+}
+
+async function waitRun(
+  base: string,
+  headers: Record<string, string>,
+  runId: string,
+  ready: (run: Json) => boolean,
+) {
+  let last: Json = {};
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const run = await call(base, "GET", `/api/integrations/v1/runs/${runId}`, headers);
+    last = run.json;
+    if (ready(run.json)) {
+      return run;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error(`run ${runId} stayed ${String(last.status)}`);
+}
+
+async function listenHeldGateway(): Promise<{
+  baseUrl: string;
+  captured: Captured[];
+  started: () => boolean;
+  aborted: () => boolean;
+  release: () => void;
+  close: () => Promise<void>;
+}> {
+  const captured: Captured[] = [];
+  let started = false;
+  let aborted = false;
+  let releaseHold = () => {};
+  const hold = new Promise<void>((resolve) => {
+    releaseHold = resolve;
+  });
+  const server = http.createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on("aborted", () => {
+      aborted = true;
+      if (!res.writableEnded) {
+        res.end();
+      }
+    });
+    req.on("close", () => {
+      if (!res.writableEnded) {
+        aborted = true;
+      }
+    });
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => {
+      started = true;
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8")) as Json;
+      captured.push({ url: req.url, headers: req.headers, body });
+      void hold.then(() => {
+        if (res.writableEnded || res.destroyed) {
+          return;
+        }
+        res.writeHead(200, { "content-type": "text/event-stream" });
+        res.end(sse(["晚点到。"]));
+      });
+    });
+  });
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("held gateway did not bind");
+  }
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    captured,
+    started: () => started,
+    aborted: () => aborted,
+    release: releaseHold,
+    close: () =>
+      new Promise((resolve, reject) => {
+        releaseHold();
+        server.closeAllConnections();
+        server.close((error) => (error ? reject(error) : resolve()));
+      }),
+  };
+}
+
 describe("device digital-human gateway agent client", () => {
+  it("resolves a trusted agent and refuses a shared fallback", () => {
+    expect(resolveTrustedGatewayAgent(trusted("agent-demo-1", "agent-alpha"))).toBe("agent-alpha");
+    expect(resolveTrustedGatewayAgent(trusted("agent-demo-1"), "debug-agent")).toBe("debug-agent");
+    expect(() => resolveTrustedGatewayAgent(trusted("agent-demo-1"))).toThrow(
+      /no gateway agent mapping/,
+    );
+    expect(() =>
+      resolveTrustedGatewayAgent(trusted("agent-demo-1", "agent-alpha", ["someone-else"])),
+    ).toThrow(/not allowed to use this gateway agent/);
+    expect(() =>
+      resolveTrustedGatewayAgent({
+        grantDigitalHumanId: "agent-demo-1",
+        humanDigitalHumanId: "agent-demo-2",
+        gatewayAgentId: "agent-alpha",
+      }),
+    ).toThrow(/not allowed to use a gateway agent/);
+    expect(deviceDhSessionKey({}, "agent-demo-1", "conv-a")).toBe("device-dh:agent-demo-1:conv-a");
+    expect(deviceDhSessionKey({}, "agent-demo-2", "conv-b")).not.toBe(
+      deviceDhSessionKey({}, "agent-demo-1", "conv-a"),
+    );
+    expect(
+      deviceDhSessionKey(
+        { forceSessionKey: true, sessionKey: "space:aegis" },
+        "agent-demo-1",
+        "conv-a",
+      ),
+    ).toBe("space:aegis");
+    expect(() => parseStubConfig({ clients: [], digitalHumans: [] })).toThrow(/digital human/i);
+    expect(() =>
+      parseStubConfig({
+        clients: [
+          {
+            clientId: "consent-sim",
+            secret: "consent-secret-16+",
+            role: "consent",
+          },
+        ],
+        digitalHumans: [
+          {
+            digitalHumanId: "agent-demo-1",
+            displayName: "Demo",
+            userSubject: "user-demo",
+            tenantId: "tenant-demo",
+            gatewayAgentId: "not an id",
+          },
+        ],
+      }),
+    ).toThrow(/gatewayAgentId/);
+  });
+
   it("keeps placeholder sentences out of the real client and the service", () => {
     expect(agentSource.includes("占位")).toBe(false);
     expect(serviceSource.includes("占位")).toBe(false);
@@ -197,12 +349,23 @@ describe("device digital-human gateway agent client", () => {
     expect(resolveDeviceDhModelMode({ OPENBOT_DEVICE_DH_AGENT: "1" })).toBe("agent");
     const config = resolveGatewayAgentConfig({
       OPENBOT_DEVICE_DH_AGENT_TOKEN: "gateway-token",
+      OPENBOT_DEVICE_DH_AGENT_ID: "main",
       OPENBOT_DEVICE_DH_AGENT_SESSION_KEY: "space:aegis",
     });
     expect(config.baseUrl).toBe(DEFAULT_DEVICE_DH_AGENT_BASE_URL);
     expect(config.token).toBe("gateway-token");
-    expect(config.sessionKey).toBe("space:aegis");
-    expect(config.agentId).toBe("main");
+    expect(config.debugAgentId).toBeUndefined();
+    expect(config.sessionKey).toBeUndefined();
+    expect(config.forceSessionKey).toBe(false);
+    const forced = resolveGatewayAgentConfig({
+      OPENBOT_DEVICE_DH_AGENT_DEBUG: "1",
+      OPENBOT_DEVICE_DH_AGENT_ID: "main",
+      OPENBOT_DEVICE_DH_AGENT_SESSION_FORCE: "1",
+      OPENBOT_DEVICE_DH_AGENT_SESSION_KEY: "space:aegis",
+    });
+    expect(forced.debugAgentId).toBe("main");
+    expect(forced.sessionKey).toBe("space:aegis");
+    expect(forced.forceSessionKey).toBe(true);
     expect(() =>
       resolveGatewayAgentConfig({ OPENBOT_DEVICE_DH_AGENT_BASE_URL: "https://example.com" }),
     ).toThrow(DeviceDhModelError);
@@ -218,8 +381,8 @@ describe("device digital-human gateway agent client", () => {
     const client = createGatewayAgentModelClient({
       baseUrl: gateway.baseUrl,
       token: "gateway-token",
-      agentId: "main",
       sessionKey: "space:aegis",
+      forceSessionKey: true,
       timeoutMs: 5_000,
     });
     const deltas: string[] = [];
@@ -229,6 +392,7 @@ describe("device digital-human gateway agent client", () => {
       displayName: "Demo Assistant",
       locale: "zh-CN",
       conversationId: "conv-1",
+      trustedAgent: trusted("agent-demo-1", "main"),
       onDelta: (delta) => deltas.push(delta),
     });
     expect(spoken).toBe("你好，我在。");
@@ -253,6 +417,7 @@ describe("device digital-human gateway agent client", () => {
       displayName: "Demo Assistant",
       locale: "zh-CN",
       conversationId: "conv-1",
+      trustedAgent: trusted("agent-demo-1", "main"),
       onDelta: (delta) => visionDeltas.push(delta),
     });
     expect(vision).toBe("画面里有一个杯子。");
@@ -268,7 +433,6 @@ describe("device digital-human gateway agent client", () => {
     const gateway = await listenMockGateway();
     const client = createGatewayAgentModelClient({
       baseUrl: gateway.baseUrl,
-      agentId: "main",
       timeoutMs: 5_000,
     });
     const ctx = {
@@ -276,6 +440,7 @@ describe("device digital-human gateway agent client", () => {
       digitalHumanId: "agent-demo-1",
       displayName: "Demo Assistant",
       conversationId: "conv-1",
+      trustedAgent: trusted("agent-demo-1", "main"),
       onDelta: () => {},
     };
     await expect(client.completeTurn(ctx)).rejects.toThrow(/HTTP 500/);
@@ -306,8 +471,6 @@ describe("device digital-human gateway agent client", () => {
       models: createGatewayAgentModelClient({
         baseUrl: gateway.baseUrl,
         token: "gateway-token",
-        agentId: "main",
-        sessionKey: "space:aegis",
         timeoutMs: 5_000,
       }),
     });
@@ -387,12 +550,12 @@ describe("device digital-human gateway agent client", () => {
         },
       );
       expect(hello.status).toBe(202);
-      expect(hello.json.status).toBe("completed");
-      const helloRun = await call(
+      expect(["accepted", "running", "completed"]).toContain(hello.json.status);
+      const helloRun = await waitRun(
         server.url,
-        "GET",
-        `/api/integrations/v1/runs/${String(hello.json.runId)}`,
         headers,
+        String(hello.json.runId),
+        (run) => run.status === "completed" || run.status === "failed",
       );
       const helloAssistant = helloRun.json.assistant as Json;
       expect(helloAssistant.visibleText).toBe("你好，我在。");
@@ -490,11 +653,11 @@ describe("device digital-human gateway agent client", () => {
         },
       );
       expect(failed.status).toBe(202);
-      const failedRun = await call(
+      const failedRun = await waitRun(
         server.url,
-        "GET",
-        `/api/integrations/v1/runs/${String(failed.json.runId)}`,
         headers,
+        String(failed.json.runId),
+        (run) => run.status === "failed" || run.status === "completed",
       );
       expect(failedRun.json.status).toBe("failed");
       expect(failedRun.json.errorCode).toBe("INTERNAL");
@@ -504,4 +667,362 @@ describe("device digital-human gateway agent client", () => {
       await gateway.close();
     }
   });
+
+  it("maps each digital human to its own gateway agent and isolated session", async () => {
+    const gateway = await listenMockGateway();
+    const config = twoHumanConfig();
+    const service = new DeviceDhService({
+      config,
+      models: createGatewayAgentModelClient({
+        baseUrl: gateway.baseUrl,
+        timeoutMs: 5_000,
+        sessionKey: "space:aegis",
+      }),
+    });
+    const server = await listenDeviceDh({
+      service,
+      fixtureDir: path.join(here, "examples", "fixtures"),
+      port: 0,
+    });
+    try {
+      const alpha = await submitHello(server.url, "agent-demo-1", "key-alpha");
+      const beta = await submitHello(server.url, "agent-demo-2", "key-beta");
+      await waitRun(server.url, alpha.headers, alpha.runId, (run) => run.status === "completed");
+      await waitRun(server.url, beta.headers, beta.runId, (run) => run.status === "completed");
+      const agents = gateway.captured.map((request) => request.headers["x-openclaw-agent-id"]);
+      const models = gateway.captured.map((request) => request.body?.model);
+      const sessions = gateway.captured.map((request) => request.headers["x-openclaw-session-key"]);
+      expect(agents).toEqual(["agent-alpha", "agent-beta"]);
+      expect(models).toEqual(["openclaw:agent-alpha", "openclaw:agent-beta"]);
+      expect(sessions[0]).toBe(`device-dh:agent-demo-1:${alpha.conversationId}`);
+      expect(sessions[1]).toBe(`device-dh:agent-demo-2:${beta.conversationId}`);
+      expect(sessions[0]).not.toBe(sessions[1]);
+      expect(sessions).not.toContain("space:aegis");
+    } finally {
+      await server.close();
+      await gateway.close();
+    }
+  });
+
+  it("pins every grant to one UI session only when the force flag is set", async () => {
+    const gateway = await listenMockGateway();
+    const service = new DeviceDhService({
+      config: twoHumanConfig(),
+      models: createGatewayAgentModelClient({
+        baseUrl: gateway.baseUrl,
+        timeoutMs: 5_000,
+        sessionKey: "space:aegis",
+        forceSessionKey: true,
+      }),
+    });
+    const server = await listenDeviceDh({
+      service,
+      fixtureDir: path.join(here, "examples", "fixtures"),
+      port: 0,
+    });
+    try {
+      await submitHello(server.url, "agent-demo-1", "force-a");
+      await submitHello(server.url, "agent-demo-2", "force-b");
+      await waitFor(() => gateway.captured.length >= 2);
+      const sessions = gateway.captured.map((request) => request.headers["x-openclaw-session-key"]);
+      expect(sessions).toEqual(["space:aegis", "space:aegis"]);
+    } finally {
+      await server.close();
+      await gateway.close();
+    }
+  });
+
+  it("fails the run when the digital human has no gateway agent mapping", async () => {
+    const gateway = await listenMockGateway();
+    const config = twoHumanConfig();
+    delete config.digitalHumans[0]?.gatewayAgentId;
+    const resolved = resolveGatewayAgentConfig({ OPENBOT_DEVICE_DH_AGENT_ID: "main" });
+    const service = new DeviceDhService({
+      config,
+      models: createGatewayAgentModelClient({
+        ...resolved,
+        baseUrl: gateway.baseUrl,
+        timeoutMs: 5_000,
+      }),
+    });
+    const server = await listenDeviceDh({
+      service,
+      fixtureDir: path.join(here, "examples", "fixtures"),
+      port: 0,
+    });
+    try {
+      const turn = await submitHello(server.url, "agent-demo-1", "missing-map");
+      const run = await waitRun(
+        server.url,
+        turn.headers,
+        turn.runId,
+        (row) => row.status === "failed",
+      );
+      expect(run.json.errorCode).toBe("INTERNAL");
+      expect(gateway.captured).toHaveLength(0);
+      const events = await readSseUntil(
+        `${server.url}/api/integrations/v1/runs/${turn.runId}/events`,
+        turn.headers,
+        (rows) => rows.some((event) => event.type === "run.failed"),
+      );
+      const failed = events.find((event) => event.type === "run.failed");
+      expect(JSON.stringify(failed?.payload)).toContain("no gateway agent mapping");
+    } finally {
+      await server.close();
+      await gateway.close();
+    }
+  });
+
+  it("returns the run before the gateway finishes and replays an in-flight idempotency key", async () => {
+    const gateway = await listenHeldGateway();
+    const service = new DeviceDhService({
+      config: twoHumanConfig(),
+      models: createGatewayAgentModelClient({
+        baseUrl: gateway.baseUrl,
+        timeoutMs: 5_000,
+      }),
+    });
+    const server = await listenDeviceDh({
+      service,
+      fixtureDir: path.join(here, "examples", "fixtures"),
+      port: 0,
+    });
+    try {
+      const grant = await exchangeFor(server.url, "agent-demo-1");
+      const created = await call(
+        server.url,
+        "POST",
+        "/api/integrations/v1/conversations",
+        grant.headers,
+        {
+          bindingVersion: 1,
+          deviceId: "device-agent-demo-1",
+        },
+      );
+      const conversationId = String(created.json.conversationId);
+      const body = {
+        turnId: "t-slow",
+        text: "你好",
+        bindingVersion: 1,
+        input: { type: "text", text: "你好" },
+      };
+      const first = await Promise.race([
+        call(
+          server.url,
+          "POST",
+          `/api/integrations/v1/conversations/${conversationId}/turns`,
+          { ...grant.headers, "idempotency-key": "slow-key" },
+          body,
+        ),
+        new Promise<never>((_resolve, reject) => {
+          setTimeout(() => reject(new Error("submitTurn waited for the gateway")), 1_000);
+        }),
+      ]);
+      expect(first.status).toBe(202);
+      expect(first.json.disposition).toBe("accepted");
+      await waitFor(() => gateway.started());
+      expect(gateway.captured).toHaveLength(1);
+      const again = await call(
+        server.url,
+        "POST",
+        `/api/integrations/v1/conversations/${conversationId}/turns`,
+        { ...grant.headers, "idempotency-key": "slow-key" },
+        body,
+      );
+      expect(again.status).toBe(202);
+      expect(again.json.disposition).toBe("duplicate");
+      expect(again.json.runId).toBe(first.json.runId);
+      const busy = await call(
+        server.url,
+        "POST",
+        `/api/integrations/v1/conversations/${conversationId}/turns`,
+        { ...grant.headers, "idempotency-key": "other-key" },
+        { ...body, turnId: "t-other" },
+      );
+      expect(busy.status).toBe(409);
+      expect(codeOf(busy.json)).toBe("SESSION_BUSY");
+      gateway.release();
+      const done = await waitRun(
+        server.url,
+        grant.headers,
+        String(first.json.runId),
+        (run) => run.status === "completed",
+      );
+      expect((done.json.assistant as Json).visibleText).toBe("晚点到。");
+    } finally {
+      await server.close();
+      await gateway.close();
+    }
+  });
+
+  it("aborts the in-flight gateway fetch on cancel and emits no assistant.visible", async () => {
+    const gateway = await listenHeldGateway();
+    const cancelled: Array<{ agentId: string; sessionKey: string }> = [];
+    const service = new DeviceDhService({
+      config: twoHumanConfig(),
+      models: createGatewayAgentModelClient({
+        baseUrl: gateway.baseUrl,
+        timeoutMs: 5_000,
+        onGatewayCancel: (target) => {
+          cancelled.push(target);
+        },
+      }),
+    });
+    const server = await listenDeviceDh({
+      service,
+      fixtureDir: path.join(here, "examples", "fixtures"),
+      port: 0,
+    });
+    try {
+      const turn = await submitHello(server.url, "agent-demo-1", "cancel-key");
+      await waitFor(() => gateway.started());
+      const cancel = await call(
+        server.url,
+        "POST",
+        `/api/integrations/v1/runs/${turn.runId}/cancel`,
+        turn.headers,
+        { reason: "barge_in", turnId: "t-hello" },
+      );
+      expect(cancel.json.accepted).toBe(true);
+      expect(cancel.json.sideEffectsRolledBack).toBe(false);
+      await waitFor(() => gateway.aborted() && cancelled.length > 0);
+      expect(cancelled[0]?.agentId).toBe("agent-alpha");
+      expect(cancelled[0]?.sessionKey).toBe(`device-dh:agent-demo-1:${turn.conversationId}`);
+      const events = await readSseUntil(
+        `${server.url}/api/integrations/v1/runs/${turn.runId}/events`,
+        turn.headers,
+        (rows) => rows.some((event) => event.type === "run.cancelled"),
+      );
+      expect(events.some((event) => event.type === "assistant.visible")).toBe(false);
+      expect(events.some((event) => event.type === "assistant.final")).toBe(false);
+      expect(events.some((event) => event.type === "run.cancelled")).toBe(true);
+      const run = await call(
+        server.url,
+        "GET",
+        `/api/integrations/v1/runs/${turn.runId}`,
+        turn.headers,
+      );
+      expect(run.json.status).toBe("cancelled");
+    } finally {
+      await server.close();
+      await gateway.close();
+    }
+  });
 });
+
+function twoHumanConfig(): StubConfig {
+  return {
+    clients: [
+      {
+        clientId: "consent-sim",
+        secret: "consent-secret-16+",
+        role: "consent",
+        allowedDigitalHumanIds: ["agent-demo-1", "agent-demo-2"],
+        scopes: ["chat"],
+      },
+      {
+        clientId: "device-platform",
+        secret: "service-secret-16+",
+        role: "service",
+        redirectUris: ["https://device.example/callback"],
+      },
+    ],
+    digitalHumans: [
+      {
+        digitalHumanId: "agent-demo-1",
+        displayName: "Demo Assistant",
+        locale: "zh-CN",
+        status: "active",
+        userSubject: "user-demo",
+        tenantId: "tenant-demo",
+        gatewayAgentId: "agent-alpha",
+      },
+      {
+        digitalHumanId: "agent-demo-2",
+        displayName: "Demo Two",
+        locale: "zh-CN",
+        status: "active",
+        userSubject: "user-two",
+        tenantId: "tenant-demo",
+        gatewayAgentId: "agent-beta",
+      },
+    ],
+  };
+}
+
+async function waitFor(ready: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (ready()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error("condition was not met");
+}
+
+async function exchangeFor(base: string, digitalHumanId: string) {
+  const verifier = `v-${randomId(16)}`;
+  const consentAuth = { authorization: basicHeader("consent-sim", "consent-secret-16+") };
+  const serviceAuth = { authorization: basicHeader("device-platform", "service-secret-16+") };
+  const issued = await call(
+    base,
+    "POST",
+    "/api/integrations/v1/consent/authorization-codes",
+    consentAuth,
+    {
+      serviceAudience: "device-platform",
+      redirectUri: "https://device.example/callback",
+      codeChallenge: pkceS256(verifier),
+      codeChallengeMethod: "S256",
+      digitalHumanId,
+      deviceId: `device-${digitalHumanId}`,
+      scopes: ["chat"],
+      state: "state-1",
+    },
+  );
+  if (issued.status !== 201) {
+    throw new Error(`authorization code failed: ${issued.status}`);
+  }
+  const exchanged = await call(base, "POST", "/api/integrations/v1/grants/exchange", serviceAuth, {
+    authorizationCode: issued.json.authorizationCode,
+    codeVerifier: verifier,
+    redirectUri: "https://device.example/callback",
+  });
+  if (exchanged.status !== 200) {
+    throw new Error(`grant exchange failed: ${exchanged.status}`);
+  }
+  return {
+    headers: {
+      ...serviceAuth,
+      "x-openbot-grant-credential": String(exchanged.json.authorizationCredential),
+    },
+  };
+}
+
+async function submitHello(base: string, digitalHumanId: string, idempotencyKey: string) {
+  const grant = await exchangeFor(base, digitalHumanId);
+  const created = await call(base, "POST", "/api/integrations/v1/conversations", grant.headers, {
+    bindingVersion: 1,
+    deviceId: `device-${digitalHumanId}`,
+  });
+  if (created.status !== 201) {
+    throw new Error(`conversation failed: ${created.status}`);
+  }
+  const conversationId = String(created.json.conversationId);
+  const turn = await call(
+    base,
+    "POST",
+    `/api/integrations/v1/conversations/${conversationId}/turns`,
+    { ...grant.headers, "idempotency-key": idempotencyKey },
+    {
+      turnId: "t-hello",
+      text: "你好",
+      bindingVersion: 1,
+      input: { type: "text", text: "你好" },
+    },
+  );
+  if (turn.status !== 202) {
+    throw new Error(`turn failed: ${turn.status} ${JSON.stringify(turn.json)}`);
+  }
+  return { headers: grant.headers, conversationId, runId: String(turn.json.runId) };
+}

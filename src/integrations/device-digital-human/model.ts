@@ -5,12 +5,25 @@
 
 export type DeviceDhModelMode = "placeholder" | "agent";
 
+/**
+ * Trusted gateway target for one grant. Built from the digital-human config
+ * record, never from the device request body.
+ */
+export type DeviceDhTrustedAgent = {
+  grantDigitalHumanId: string;
+  humanDigitalHumanId?: string;
+  gatewayAgentId?: string;
+  allowedGatewayAgentIds?: readonly string[];
+};
+
 export type DeviceDhTurnContext = {
   text: string;
   digitalHumanId: string;
   displayName: string;
   locale?: string;
   conversationId: string;
+  trustedAgent?: DeviceDhTrustedAgent;
+  signal?: AbortSignal;
   onDelta: (delta: string) => void;
 };
 
@@ -24,6 +37,8 @@ export type DeviceDhVisionContext = {
   displayName: string;
   locale?: string;
   conversationId: string;
+  trustedAgent?: DeviceDhTrustedAgent;
+  signal?: AbortSignal;
   onDelta: (delta: string) => void;
 };
 
