@@ -1,5 +1,20 @@
 version: 1
 tasks:
+  - id: device-digital-human-v1:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - "Device digital-human integrations v1 loopback stub (B0-B5), not mounted on the gateway"
+    paths:
+      - .loom/registry.yaml
+      - src/integrations/device-digital-human/**
+      - docs/integrations/device-digital-human/**
+      - docs/docs.json
+      - CHANGELOG.md
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: "2026-10-20"
+    metadata: {}
   - id: collab-group-task-stable-summary:grok-bot
     owner: grok-bot
     intent:
@@ -9007,6 +9022,20 @@ tasks:
     since: 2026-10-18
     metadata: {}
 landingStreams:
+  - id: device-digital-human-v1:cursor-cloud
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/integrations/device-digital-human/**
+      - docs/integrations/device-digital-human/**
+      - docs/docs.json
+      - CHANGELOG.md
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Device digital-human integrations v1 stub
+      owner: cursor-cloud
+      task: device-digital-human-v1
   - id: collab-group-task-stable-summary:grok-bot
     landingPolicy: serial
     paths:
