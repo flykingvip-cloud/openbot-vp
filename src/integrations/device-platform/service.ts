@@ -132,6 +132,33 @@ export class DevicePlatformService {
     return this.visibleDevices(actor);
   }
 
+  /** Enabled connectors the member may target. Names only. No URL or secret. */
+  listPersonalPlatforms(actorIn: TrustedActor): Array<{ platformId: string; displayName: string }> {
+    this.actor(actorIn);
+    return Object.values(this.store.loadConnections().connections)
+      .filter((connection) => connection.enabled)
+      .map((connection) => ({
+        platformId: connection.platformId,
+        displayName: connection.displayName,
+      }));
+  }
+
+  listPersonalDigitalHumans(
+    actorIn: TrustedActor,
+  ): Array<{ digitalHumanId: string; displayName: string }> {
+    const actor = this.actor(actorIn);
+    const listed = this.directory.listUsableDigitalHumans?.(actor) ?? [];
+    return listed
+      .filter(
+        (human) =>
+          human.tenantId === actor.tenantId && this.directory.hasDigitalHumanUse(actor, human),
+      )
+      .map((human) => ({
+        digitalHumanId: human.digitalHumanId,
+        displayName: human.displayName,
+      }));
+  }
+
   listDigitalHumanDevices(actorIn: TrustedActor, digitalHumanId: string): UserDeviceDto[] {
     const actor = this.actor(actorIn);
     const human = this.directory.getDigitalHuman(digitalHumanId);
@@ -591,13 +618,32 @@ export class DevicePlatformService {
       throw new DevicePlatformError("PLATFORM_UNAVAILABLE", "Device platform health check failed");
     }
     let binding = this.ensureAddBinding(actor, operation, claimed);
-    const paired = await this.control.verifyPairingChallenge({
-      platformId: connection.platformId,
-      externalDeviceId: claimed.externalDeviceId,
-      challenge: request.challenge ?? "",
-      proof: request.proof ?? "",
-    });
+    let paired: { ok: boolean; pendingConfirm?: boolean };
+    try {
+      paired = await this.control.verifyPairingChallenge({
+        platformId: connection.platformId,
+        externalDeviceId: claimed.externalDeviceId,
+        challenge: request.challenge ?? "",
+        proof: request.proof ?? "",
+      });
+    } catch (error) {
+      this.markBinding(actor.tenantId, binding.bindingId, {
+        status: "error",
+        failureCode: error instanceof DevicePlatformError ? error.code : "PLATFORM_UNAVAILABLE",
+      });
+      throw error;
+    }
     if (!paired.ok) {
+      if (paired.pendingConfirm) {
+        this.markBinding(actor.tenantId, binding.bindingId, {
+          status: "pending_pair",
+          failureCode: "PAIRING_PENDING",
+        });
+        throw new DevicePlatformError(
+          "PAIRING_PENDING",
+          "Confirm the pairing on the device, then try again",
+        );
+      }
       this.markBinding(actor.tenantId, binding.bindingId, {
         status: "error",
         failureCode: "VALIDATION",
@@ -736,6 +782,9 @@ export class DevicePlatformService {
       authorizationRef: binding.authorizationRef ?? "",
       scopes: binding.scopes,
       expectedBindingVersion: binding.expectedBindingVersion,
+      ...(binding.authorizationRef
+        ? { grantCredential: this.peekGrantCredential(binding.authorizationRef) }
+        : {}),
     });
     const status = await this.control.getBindingApplicationStatus({
       platformId: binding.platformId,
@@ -755,12 +804,15 @@ export class DevicePlatformService {
       platformId: binding.platformId,
       externalDeviceId: binding.externalDeviceId,
     });
+    const presence = sync.presence ?? (sync.online ? "online" : "offline");
     const projection: StatusProjection = {
       deviceId: binding.deviceId,
-      online: sync.online,
+      online: presence === "online",
+      presence,
       ...(sync.lastSeen ? { lastSeen: sync.lastSeen } : {}),
       capabilities: [...sync.capabilities],
       ...(sync.firmware ? { firmware: sync.firmware } : {}),
+      ...(sync.model ? { model: sync.model } : {}),
       ...(sync.anomalySummary ? { anomalySummary: sync.anomalySummary } : {}),
       updatedAt: this.iso(),
     };
@@ -795,7 +847,7 @@ export class DevicePlatformService {
       if (foreground && operation.bindingId && foreground.bindingId !== operation.bindingId) {
         throw new DevicePlatformError("BINDING_BUSY", "Device already has a foreground binding");
       }
-      if (foreground && !operation.bindingId && foreground.status !== "error") {
+      if (foreground && !operation.bindingId && !foregroundAllowsAnotherAdd(foreground.status)) {
         throw new DevicePlatformError("BINDING_BUSY", "Device already has a foreground binding");
       }
       operation.deviceId = association.deviceId;
@@ -841,6 +893,17 @@ export class DevicePlatformService {
       ? shard.bindings[operation.bindingId]
       : this.foreground(shard, association.deviceId);
     if (existing && existing.status !== "revoked") {
+      if (foregroundAllowsAnotherAdd(existing.status)) {
+        existing.digitalHumanId = operation.request.digitalHumanId || existing.digitalHumanId;
+        existing.scopes = [...(operation.request.scopes ?? existing.scopes)];
+        existing.status = "pending_pair";
+        existing.failureCode = undefined;
+        existing.authorizationEstablished = false;
+        existing.platformApplied = false;
+        existing.updatedAt = this.iso();
+        delete existing.authorizationRef;
+        this.store.saveTenant(actor.tenantId, shard);
+      }
       operation.bindingId = existing.bindingId;
       return existing;
     }
@@ -1050,7 +1113,7 @@ export class DevicePlatformService {
       if (claim) {
         const shard = this.store.loadTenant(actor.tenantId);
         const foreground = this.foreground(shard, claim.deviceId);
-        if (foreground && foreground.status !== "error") {
+        if (foreground && !foregroundAllowsAnotherAdd(foreground.status)) {
           throw new DevicePlatformError("BINDING_BUSY", "Device already has a foreground binding");
         }
       }
@@ -1194,8 +1257,14 @@ function normalizeCallbackAllowlist(
 function retryableCode(error: unknown): boolean {
   return (
     error instanceof DevicePlatformError &&
-    (error.code === "PLATFORM_UNAVAILABLE" || error.code === "PLATFORM_DISABLED")
+    (error.code === "PLATFORM_UNAVAILABLE" ||
+      error.code === "PLATFORM_DISABLED" ||
+      error.code === "PAIRING_PENDING")
   );
+}
+
+function foregroundAllowsAnotherAdd(status: DeviceBinding["status"]): boolean {
+  return status === "error" || status === "pending_pair";
 }
 
 function randomId(prefix: string): string {

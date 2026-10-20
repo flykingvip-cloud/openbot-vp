@@ -17,7 +17,7 @@ The loopback stub remains a test tool. See [Device digital-human API](/integrati
 
 `/api/device-platform/v1` is used on two hosts:
 
-- On the OpenBot gateway, only `/api/device-platform/v1/admin/*` is mounted. A platform-admin session configures the connector there. Ordinary users and enterprise admins are rejected. Personal device routes are not mounted yet.
+- On the OpenBot gateway, `/api/device-platform/v1/admin/*` is mounted for a platform-admin session. Ordinary users and enterprise admins are rejected there. `/api/device-platform/v1/me/*` is mounted for a signed-in member and is the personal-settings device API. It does not return the connector URL or secrets.
 - On the device platform, the same prefix is the frozen control API (`health`, `capabilities`, `pair-challenges`, `devices/.../bind`). OpenBot calls it on the admin-configured origin, not on the OpenBot host.
 
 The control client never calls `/api/integrations/v1` and never sends `pairChallenge` or `pairingCode` to OpenBot. OpenBot revoke stays on the integrations API. Device-platform `stop` and `revoke` are local only.
@@ -73,7 +73,7 @@ Wire use grants from the existing employee access snapshot (`agentIds` / `ownedA
 
 ## User and admin DTOs
 
-User device and operation payloads are an allow-list: display name, platform id, external device id, binding status, scopes, `authorizationRef`, both binding versions, the two establishment flags, and the coarse status projection.
+User device and operation payloads are an allow-list: display name, model, platform id, external device id, binding status, scopes, `authorizationRef`, both binding versions, the two establishment flags, and the coarse status projection. Presence is `unknown` when the device platform did not report it. The page does not show a device as online in that case.
 
 User payloads never include:
 
@@ -101,8 +101,13 @@ Disabling a connector blocks new grants and executions immediately. Existing dev
 
 The service Basic password is write-once, stored outside the connection record, and omitted from every API response. Rotation is an explicit replace. Admin responses may include the credential reference, the base URL, and a redacted error.
 
+## Personal settings
+
+个人设置「设备与硬件」lists the signed-in member's devices, adds one from a scanned or typed pairing code, rebinds the digital human, and revokes the authorization. Add calls the connector origin with `HttpDevicePlatformControl`: health and capabilities, then pair redeem, then OpenBot grant exchange, then `POST /bind` with `X-OpenBot-Grant-Credential`. Pairing fields are not accepted on the OpenBot user body as `pairChallenge` or `pairingCode`.
+
+A wrong, expired, replayed, or mismatched code does not become an active binding. Transfer is not a second claim write: only the current owner can unbind, and the next person adds the device with a new pairing code.
+
 ## Follow-ups
 
-- B3: personal settings, devices and hardware.
-- B4: digital-human detail, connected devices.
+- B4: digital-human detail, connected devices. Same binding store. Not this page.
 - B5: live joint test with the device-platform HTTP service.

@@ -31,6 +31,11 @@ export type ApplyBindingRequest = {
   authorizationRef: string;
   scopes: string[];
   expectedBindingVersion: number;
+  /**
+   * Process-local OpenBot grant credential. Sent only as
+   * `X-OpenBot-Grant-Credential` to the device platform. Never persisted.
+   */
+  grantCredential?: string;
 };
 
 export type BindingApplicationStatus = {
@@ -41,9 +46,12 @@ export type BindingApplicationStatus = {
 
 export type StatusSyncResult = {
   online: boolean;
+  /** Unknown when the platform payload has no presence field. Never imply online. */
+  presence?: "online" | "offline" | "unknown";
   lastSeen?: string;
   capabilities: string[];
   firmware?: string;
+  model?: string;
   anomalySummary?: string;
   /** Present only on the control wire. The management service must drop this before persist. */
   rawDiagnostics?: string;
@@ -60,7 +68,7 @@ export interface DevicePlatformControlClient {
     externalDeviceId: string;
     challenge: string;
     proof: string;
-  }): Promise<{ ok: boolean }>;
+  }): Promise<{ ok: boolean; pendingConfirm?: boolean }>;
   /** The platform must filter by this ACL. Callers still filter local records. */
   queryDevices(acl: ControlAcl): Promise<DeviceQueryRow[]>;
   applyBinding(input: ApplyBindingRequest): Promise<{

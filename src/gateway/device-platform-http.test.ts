@@ -110,7 +110,21 @@ describe("device platform gateway admin routes", () => {
       "/api/device-platform/v1/me/devices",
       session({ sessionKind: "platform-admin", platformUser: true }),
     );
-    expect(userRoute.status).toBe(404);
+    expect(userRoute.status).toBe(403);
+
+    const member = await call(
+      "GET",
+      "/api/device-platform/v1/me/devices",
+      session({
+        sessionKind: "member",
+        tenantId: "tenant-1",
+        membershipId: "mem-1",
+        membershipRole: "member",
+      }),
+    );
+    expect(member.status).toBe(200);
+    expect(member.text).toContain("devices");
+    expect(member.text).not.toContain("serviceBaseUrl");
 
     const integrations = await call("GET", "/api/integrations/v1/health", null);
     expect(integrations.status).toBe(599);

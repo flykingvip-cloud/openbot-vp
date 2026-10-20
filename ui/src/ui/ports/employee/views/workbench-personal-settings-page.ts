@@ -4,6 +4,7 @@ import { formatIsoTimestamp } from "../../../format.ts";
 import "../../../capability/user-modeling/user-learned-preferences-panel.ts";
 import { renderDataDirectoryPanel } from "./data-directory-page.ts";
 import { renderMemoryCenterPanel } from "./memory-center-page.ts";
+import { renderPersonalDevicesPanel } from "./personal-devices-page.ts";
 import { renderPersonalAuthorizationPanel } from "./workbench-personal-authorization-panel.ts";
 import {
   renderPersonalSettingsPanel,
@@ -610,6 +611,12 @@ export function renderPersonalSettingsPage(
               settings.onPersonalTabChange,
             )}
             ${renderPersonalSettingsTab(
+              "devices",
+              activeTab,
+              t("frontstage.workbench.settings.personalModules.devices.tab"),
+              settings.onPersonalTabChange,
+            )}
+            ${renderPersonalSettingsTab(
               "data",
               activeTab,
               t("frontstage.workbench.settings.personalModules.data.tab"),
@@ -627,6 +634,7 @@ export function renderPersonalSettingsPage(
           ${activeTab === "authorization" ? renderPersonalAuthorizationPanel(settings) : nothing}
           ${activeTab === "preferences" ? renderPersonalPreferencesPanel(settings) : nothing}
           ${activeTab === "security" ? renderPersonalSecurityPanel(settings) : nothing}
+          ${activeTab === "devices" ? renderPersonalDevicesPanel() : nothing}
           ${
             activeTab === "data"
               ? renderDataDirectoryPanel(settings, settings.dataDirectoryPanel ?? {})

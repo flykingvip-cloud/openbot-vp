@@ -68,6 +68,8 @@ export type DevicePlatformConnection = {
   updatedAt: string;
 };
 
+export type DevicePresence = "online" | "offline" | "unknown";
+
 export type DeviceAssociation = {
   deviceId: string;
   platformId: string;
@@ -155,6 +157,10 @@ export type StatusProjection = {
   firmware?: string;
   /** Coarse label only. Raw platform diagnostics are never stored. */
   anomalySummary?: string;
+  /** Unknown when the device platform did not report presence. */
+  presence?: DevicePresence;
+  /** User-visible model name. Not a vendor key or diagnostic dump. */
+  model?: string;
   updatedAt: string;
 };
 
@@ -278,6 +284,11 @@ export const DEVICE_PLATFORM_ERROR_HTTP = {
   IDEMPOTENCY_CONFLICT: 409,
   PLATFORM_DISABLED: 409,
   PLATFORM_UNAVAILABLE: 409,
+  PAIRING_WRONG: 400,
+  PAIRING_EXPIRED: 400,
+  PAIRING_REPLAY: 400,
+  PAIRING_MISMATCH: 400,
+  PAIRING_PENDING: 400,
 } as const;
 
 export type DevicePlatformErrorCode = keyof typeof DEVICE_PLATFORM_ERROR_HTTP;

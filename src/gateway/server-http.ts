@@ -726,8 +726,8 @@ export function createGatewayHttpServer(opts: {
             }),
         },
         {
-          // Platform-admin device-platform connector. Does not mount
-          // /api/integrations/v1 or the user device routes.
+          // Device-platform admin connector and signed-in member device routes.
+          // Does not mount /api/integrations/v1.
           name: "device-platform-admin",
           run: () => handleDevicePlatformHttpRequest(req, res),
         },

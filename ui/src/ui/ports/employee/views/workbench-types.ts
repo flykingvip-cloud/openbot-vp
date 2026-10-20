@@ -125,7 +125,8 @@ export type WorkbenchPersonalSettingsTab =
   | "security"
   /** @deprecated Legacy deep-link; normalizes to `security` (隐私与记忆). */
   | "memory"
-  | "data";
+  | "data"
+  | "devices";
 
 /** 个人设置 → 授权 Tab 内：个人自有 / 企业身份 分段切换。 */
 export type WorkbenchAuthorizationIdentityTab = "personal" | "enterprise";

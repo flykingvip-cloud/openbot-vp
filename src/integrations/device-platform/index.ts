@@ -1,5 +1,7 @@
 export { handleDevicePlatformRequest } from "./api.js";
 export type { DevicePlatformHttpRequest, DevicePlatformHttpResponse } from "./api.js";
+export { ConnectorHttpControl } from "./connector-http-control.js";
+export type { ConnectorControlSource } from "./connector-http-control.js";
 export { probeDevicePlatformConnection } from "./connection-probe.js";
 export { FakeDevicePlatformControl } from "./control-client.js";
 export type { DevicePlatformControlClient } from "./control-client.js";

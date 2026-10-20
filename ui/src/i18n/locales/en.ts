@@ -3965,6 +3965,9 @@ export const en: TranslationMap = {
                 "See what agents remember and forget items when needed. Unavailable in managed cloud mode.",
             },
           },
+          devices: {
+            tab: "Devices",
+          },
           data: {
             tab: "Data & backup",
             title: "Data & backup",
