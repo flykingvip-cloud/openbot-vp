@@ -89,6 +89,11 @@ export async function probeDevicePlatformConnection(input: {
     });
   }
 
+  // parseHealth accepts only maturity=v1-frozen. Keep v1-draft on read until that passes.
+  if (connection.contractVersion === "v1-draft") {
+    connection.contractVersion = "v1";
+  }
+
   try {
     await client.getCapabilities();
   } catch (error) {

@@ -55,8 +55,22 @@ States: `pending_pair`, `pending_auth`, `applying`, `active`, `error`, `revoking
 
 - `authorizationEstablished` means OpenBot has a user-scoped grant for the current expected version.
 - `platformApplied` means the device platform has applied that same version (`appliedBindingVersion === expectedBindingVersion` and the binding is active).
+- `deviceEffect` means the device itself has confirmed the apply. The user DTO passes the stored boolean through. When the store field is absent, the value is false. This service does not write `true`. `status=active` and `platformApplied` do not imply it.
 
-Those two flags are independent. An authorization can exist while the platform apply is still in progress.
+Those flags are independent. An authorization can exist while the platform apply is still in progress, and a platform apply can succeed while the device effect stays unconfirmed.
+
+## Contract version
+
+New connection records store `contractVersion` `v1`. The admin form default and placeholder are `v1`. Omitting the field on upsert also stores `v1`.
+
+A record already stored as `v1-draft` stays readable and is treated as pending upgrade. Load does not rewrite it. `v1-draft` remains compatible, so a later probe can still run. This is read-time compatibility (option a), not an in-place rewrite on every read.
+
+Upgrade order:
+
+1. Upgrade device-control to `55ead3ef7fe7f20137123447c39e3f26f9bffbbe` or later (`CONTROL_FREEZE_SHA`). Health `maturity` must be `v1-frozen`.
+2. Then open the connection record and run test connection. After `GET /health` succeeds with `maturity=v1-frozen`, the stored `v1-draft` is rewritten to `v1` and saved. A failed health check, including a body whose maturity is not `v1-frozen`, leaves `v1-draft` in place.
+
+The user device tri-state (授权 / 平台接受 / 设备生效) is only on personal settings「设备与硬件」and digital-human「已连接设备」. It is not shown on the admin「设备平台连接」page.
 
 ## Identity
 
@@ -73,7 +87,7 @@ Wire use grants from the existing employee access snapshot (`agentIds` / `ownedA
 
 ## User and admin DTOs
 
-User device and operation payloads are an allow-list: display name, model, platform id, external device id, binding status, scopes, `authorizationRef`, both binding versions, the two establishment flags, and the coarse status projection. Presence is `unknown` when the device platform did not report it. The page does not show a device as online in that case.
+User device and operation payloads are an allow-list: display name, model, platform id, external device id, binding status, scopes, `authorizationRef`, both binding versions, the two establishment flags, `deviceEffect`, and the coarse status projection. The user binding DTO always includes `deviceEffect`. It is true only when the stored value is strictly true, and false when the field is absent. The handler does not write `deviceEffect: true`. Presence is `unknown` when the device platform did not report it. The page does not show a device as online in that case.
 
 User payloads never include:
 

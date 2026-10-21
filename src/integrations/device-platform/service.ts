@@ -220,7 +220,7 @@ export class DevicePlatformService {
     const environment = parseDevicePlatformEnvironment(input.environment);
     const serviceBaseUrl = assertSafeServiceBaseUrl(input.serviceBaseUrl, environment);
     const credentialRef = requireToken(input.credentialRef, "credentialRef");
-    const contractVersion = requireToken(input.contractVersion ?? "1", "contractVersion");
+    const contractVersion = requireToken(input.contractVersion ?? "v1", "contractVersion");
     const serviceClientIds = normalizeClientIds(input.serviceClientIds);
     const clientIdentity = normalizeClientIdentity(input.clientIdentity, serviceClientIds);
     const registrationNotes = normalizeNotes(input.registrationNotes);
@@ -840,6 +840,7 @@ export class DevicePlatformService {
       platformApplied,
       status: platformApplied ? "active" : "applying",
       authorizationEstablished: Boolean(binding.authorizationRef),
+      // deviceEffect is not derived from platform apply or status=active.
     });
     const sync = await this.control.syncStatus({
       platformId: binding.platformId,
@@ -1100,7 +1101,12 @@ export class DevicePlatformService {
     if (!binding) {
       throw new DevicePlatformError("NOT_FOUND", "Binding not found");
     }
-    Object.assign(binding, patch, { updatedAt: this.iso() });
+    const safePatch: Partial<DeviceBinding> = { ...patch };
+    // Hardware effect is not written here. A stored true may only be read through.
+    if (safePatch.deviceEffect === true) {
+      delete safePatch.deviceEffect;
+    }
+    Object.assign(binding, safePatch, { updatedAt: this.iso() });
     if (
       patch.authorizationRef === undefined &&
       Object.prototype.hasOwnProperty.call(patch, "authorizationRef")

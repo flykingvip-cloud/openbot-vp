@@ -19,6 +19,8 @@ export type UserBindingDto = {
   status: DeviceBinding["status"];
   authorizationEstablished: boolean;
   platformApplied: boolean;
+  /** Passed through from the store. Absent or false means unconfirmed. Never inferred. */
+  deviceEffect?: boolean;
   failureCode?: string;
 };
 
@@ -106,6 +108,7 @@ export function toUserBindingDto(binding: DeviceBinding | undefined): UserBindin
     status: binding.status,
     authorizationEstablished: binding.authorizationEstablished,
     platformApplied: binding.platformApplied,
+    deviceEffect: binding.deviceEffect === true,
     ...(binding.failureCode ? { failureCode: binding.failureCode } : {}),
   };
 }

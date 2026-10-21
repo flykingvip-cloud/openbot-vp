@@ -171,6 +171,15 @@ describe("platform admin device platform connection", () => {
     expect(service.getConnection(admin, "plat-1").credentialRef).toBe(
       "cred://device-platform/plat-1",
     );
+    expect(
+      service.upsertConnection(admin, "plat-new", {
+        environment: "development",
+        serviceBaseUrl: "http://127.0.0.1:8791",
+        credentialRef: "cred://device-platform/plat-new",
+        clientIdentity: "device-platform",
+        serviceClientIds: ["device-platform"],
+      }).contractVersion,
+    ).toBe("v1");
   });
 
   it("does not mark the connector healthy when health or capabilities fail", async () => {
@@ -187,6 +196,9 @@ describe("platform admin device platform connection", () => {
       res.statusCode = 500;
       res.end(JSON.stringify({ error: "http_failed", message: "capabilities down" }));
     });
+    const stale = await serve((_req, res) => {
+      res.end(JSON.stringify({ ...healthBody, maturity: "draft" }));
+    });
     try {
       service.upsertConnection(admin, "plat-down", {
         environment: "development",
@@ -200,6 +212,7 @@ describe("platform admin device platform connection", () => {
       const failed = await service.testConnection(admin, "plat-down");
       expect(failed.connection.health).toBe("down");
       expect(failed.connection.health).not.toBe("ok");
+      expect(failed.connection.contractVersion).toBe("v1-draft");
       expect(JSON.stringify(failed)).not.toContain(SECRET);
       expect(failed.checks.capabilities).toBe("skipped");
 
@@ -215,11 +228,26 @@ describe("platform admin device platform connection", () => {
       const mixed = await service.testConnection(admin, "plat-partial");
       expect(mixed.partial).toBe(true);
       expect(mixed.connection.health).toBe("down");
+      expect(mixed.connection.contractVersion).toBe("v1");
       expect(mixed.checks.health).toBe("ok");
       expect(mixed.checks.capabilities).toBe("failed");
+
+      service.upsertConnection(admin, "plat-stale", {
+        environment: "development",
+        serviceBaseUrl: stale.baseUrl,
+        contractVersion: "v1-draft",
+        credentialRef: "cred://stale",
+        clientIdentity: "device-platform",
+        serviceClientIds: ["device-platform"],
+      });
+      service.setConnectionCredential(admin, "plat-stale", { clientSecret: SECRET });
+      const rejected = await service.testConnection(admin, "plat-stale");
+      expect(rejected.connection.health).toBe("down");
+      expect(rejected.connection.contractVersion).toBe("v1-draft");
     } finally {
       await down.close();
       await partial.close();
+      await stale.close();
     }
   });
 
@@ -245,6 +273,7 @@ describe("platform admin device platform connection", () => {
       service.setConnectionCredential(admin, "plat-1", { clientSecret: SECRET });
       const ok = await service.testConnection(admin, "plat-1");
       expect(ok.connection.health).toBe("ok");
+      expect(ok.connection.contractVersion).toBe("v1");
       expect(ok.partial).toBe(false);
 
       const added = await service.submitOperation(user, {

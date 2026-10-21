@@ -99,6 +99,11 @@ export type DeviceBinding = {
   authorizationEstablished: boolean;
   /** Device platform has applied expectedBindingVersion. */
   platformApplied: boolean;
+  /**
+   * Hardware confirmed the apply. Absent means unconfirmed.
+   * Management writes must not set this to true.
+   */
+  deviceEffect?: boolean;
   failureCode?: string;
   createdAt: string;
   updatedAt: string;

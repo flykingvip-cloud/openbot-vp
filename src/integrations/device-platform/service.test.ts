@@ -327,6 +327,7 @@ describe("device platform management", () => {
     expect(lagging.device?.binding?.appliedBindingVersion).toBe(0);
     expect(lagging.device?.binding?.authorizationEstablished).toBe(true);
     expect(lagging.device?.binding?.platformApplied).toBe(false);
+    expect(lagging.device?.binding?.deviceEffect).toBe(false);
     expect(lagging.device?.binding?.status).toBe("applying");
 
     control.appliedBindingVersion = undefined;
@@ -338,6 +339,7 @@ describe("device platform management", () => {
     expect(applied.device?.binding?.appliedBindingVersion).toBe(1);
     expect(applied.device?.binding?.platformApplied).toBe(true);
     expect(applied.device?.binding?.authorizationEstablished).toBe(true);
+    expect(applied.device?.binding?.deviceEffect).toBe(false);
 
     const rebound = await service.submitOperation(userA, {
       operationId: "op-rebind-version",
@@ -349,6 +351,7 @@ describe("device platform management", () => {
     expect(rebound.device?.binding?.expectedBindingVersion).toBe(2);
     expect(rebound.device?.binding?.appliedBindingVersion).toBe(2);
     expect(rebound.device?.binding?.platformApplied).toBe(true);
+    expect(rebound.device?.binding?.deviceEffect).toBe(false);
     expect(rebound.device?.binding?.authorizationRef).not.toBe(
       applied.device?.binding?.authorizationRef,
     );
@@ -362,6 +365,11 @@ describe("device platform management", () => {
       (binding) => binding.deviceId === applied.device?.deviceId && binding.status !== "revoked",
     );
     expect(foreground).toHaveLength(1);
+    foreground[0].deviceEffect = true;
+    store.saveTenant("tenant-1", shard);
+    expect(service.getDevice(userA, applied.device?.deviceId ?? "").binding?.deviceEffect).toBe(
+      true,
+    );
   });
 
   it("reloads records after restart and does not replay side effects", async () => {
