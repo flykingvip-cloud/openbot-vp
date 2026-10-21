@@ -33,6 +33,8 @@ import {
   collapseOwnerDecisionCardsForBoardItem,
   dismissOwnerDecisionCard,
   markOwnerDecisionHydrationAttempted,
+  noteOwnerDecisionDelivery,
+  noteOwnerDecisionRecoveries,
   setOwnerDecisionActionError,
   setOwnerDecisionTodolistStatus,
   type OwnerDecisionAction,
@@ -156,6 +158,8 @@ import {
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
+
+const ownerDecisionRecoveryLoaded = new Set<string>();
 
 function normalizeThreadPrelude(value: unknown): TemplateResult | null {
   return value === nothing ? null : ((value as TemplateResult | null | undefined) ?? null);
@@ -1251,6 +1255,33 @@ export function renderApp(state: AppViewState) {
       onOwnerDecisionUIChange: () => {
         state.requestUpdate();
       },
+      onOwnerDecisionLoadRecoveries: () => {
+        const client = state.client;
+        const groupId =
+          extractSpaceIdentity(state.sessionKey) ||
+          extractSpaceIdentity(state.workbenchTeamSelectedKey);
+        if (!client || !state.connected || !groupId || ownerDecisionRecoveryLoaded.has(groupId)) {
+          return;
+        }
+        ownerDecisionRecoveryLoaded.add(groupId);
+        void client
+          .request<{
+            deliveries?: Array<{
+              userFacing: import("./chat/owner-decision-card.ts").OwnerDecisionUserFacing;
+              todolistId: string;
+              version: number;
+              card?: OwnerDecisionCardView;
+            }>;
+          }>("collaboration.task.listOwnerDecisionDeliveries", { groupId })
+          .then((result) => {
+            if (noteOwnerDecisionRecoveries(result?.deliveries ?? [])) {
+              state.requestUpdate();
+            }
+          })
+          .catch(() => {
+            ownerDecisionRecoveryLoaded.delete(groupId);
+          });
+      },
       onOwnerDecisionHydrateStatuses: (targets: OwnerDecisionHydrationTarget[]) => {
         const client = state.client;
         if (!client || !state.connected || targets.length === 0) {
@@ -1262,7 +1293,13 @@ export function renderApp(state: AppViewState) {
             markOwnerDecisionHydrationAttempted(target.todolistId);
             try {
               const result = await client.request<{
-                todolist?: { status?: string; todolistId?: string };
+                todolist?: { status?: string; todolistId?: string; version?: number };
+                cardDelivery?: {
+                  userFacing?: import("./chat/owner-decision-card.ts").OwnerDecisionUserFacing;
+                  version?: number;
+                  card?: OwnerDecisionCardView;
+                  todolistId?: string;
+                };
               }>("collaboration.task.getTodolist", {
                 groupId: target.groupId,
                 taskId: target.taskId,
@@ -1273,6 +1310,15 @@ export function renderApp(state: AppViewState) {
                 setOwnerDecisionTodolistStatus(target.todolistId, status);
                 changed = true;
               }
+              const facing = result?.cardDelivery?.userFacing;
+              if (facing) {
+                noteOwnerDecisionDelivery(
+                  target.todolistId,
+                  facing,
+                  result?.cardDelivery?.version ?? result?.todolist?.version,
+                );
+                changed = true;
+              }
             } catch {
               // Ignore hydrate failures — confirm/revise still teach status via gate errors.
             }
@@ -1280,6 +1326,59 @@ export function renderApp(state: AppViewState) {
           if (changed) {
             state.requestUpdate();
           }
+        })();
+      },
+      onOwnerDecisionRetry: (card: OwnerDecisionCardView) => {
+        void (async () => {
+          const client = state.client;
+          if (!client || !state.connected) {
+            setOwnerDecisionActionError(
+              card.decisionId,
+              "未连接网关，无法重试确认请求。提案仍在，连接后可重试。",
+            );
+            state.requestUpdate();
+            return;
+          }
+          try {
+            const retried = await client.request<{
+              todolist?: { status?: string; version?: number; todolistId?: string };
+              cardDelivery?: {
+                userFacing?: import("./chat/owner-decision-card.ts").OwnerDecisionUserFacing;
+                version?: number;
+                ok?: boolean;
+                retryable?: boolean;
+              };
+            }>("collaboration.task.retryOwnerDecisionDelivery", {
+              groupId: card.groupId,
+              taskId: card.taskId,
+              todolistId: card.todolistId,
+              ...(typeof card.version === "number" ? { expectedVersion: card.version } : {}),
+            });
+            const facing = retried?.cardDelivery?.userFacing;
+            if (facing) {
+              noteOwnerDecisionDelivery(
+                card.todolistId,
+                facing,
+                retried?.cardDelivery?.version ?? card.version,
+              );
+            }
+            const status = retried?.todolist?.status;
+            if (typeof status === "string" && status.trim()) {
+              setOwnerDecisionTodolistStatus(card.todolistId, status);
+            }
+            clearOwnerDecisionActionError(card.decisionId);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            setOwnerDecisionActionError(card.decisionId, message);
+            state.requestUpdate();
+            return;
+          }
+          try {
+            await refreshShellChat(state as unknown as Parameters<typeof refreshShellChat>[0]);
+          } catch {
+            // history reload is best-effort; the delivery record remains
+          }
+          state.requestUpdate();
         })();
       },
       onOwnerDecision: (
@@ -1310,11 +1409,7 @@ export function renderApp(state: AppViewState) {
               });
               setOwnerDecisionTodolistStatus(card.todolistId, "confirmed");
               clearOwnerDecisionActionError(card.decisionId);
-              // Drop older lookalikes for the same board; keep THIS card for review
-              // (「执行计划已确认」+ plan list; no action buttons). Do not auto-dismiss on confirm.
-              collapseOwnerDecisionCardsForBoardItem(card.boardItemId, {
-                keepDecisionId: card.decisionId,
-              });
+              // Keep older versions on screen as「旧版本已失效」. Do not dismiss them.
               state.lastError = null;
             } else if (action === "revise") {
               const reason = detail?.reason?.trim() || "退回修订（来自对话决策卡）";
@@ -1559,6 +1654,7 @@ export function renderApp(state: AppViewState) {
               meetingPendingConfirmation: state.meetingPendingConfirmation,
               meetingConfirmationLoading: state.meetingConfirmationLoading,
               meetingConfirmationError: state.meetingConfirmationError,
+              meetingConfirmationOldCardInvalid: state.meetingConfirmationOldCardInvalid,
               meetingConfirmRelease: state.meetingConfirmRelease,
               onAskDaibai: (message?: string) =>
                 message ? state.handleSendChat(message) : state.handleSendChat(),
@@ -1840,6 +1936,7 @@ export function renderApp(state: AppViewState) {
           meetingPendingConfirmation: state.meetingPendingConfirmation,
           meetingConfirmationLoading: state.meetingConfirmationLoading,
           meetingConfirmationError: state.meetingConfirmationError,
+          meetingConfirmationOldCardInvalid: state.meetingConfirmationOldCardInvalid,
           meetingConfirmRelease: state.meetingConfirmRelease,
           onConfirmMeetingPendingApproval: () => state.confirmMeetingPendingApproval(),
           onCancelMeetingPendingConfirmation: () => state.cancelMeetingPendingConfirmation(),

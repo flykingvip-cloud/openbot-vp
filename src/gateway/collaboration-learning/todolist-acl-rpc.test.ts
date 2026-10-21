@@ -7,6 +7,25 @@ import os from "node:os";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, test, vi } from "vitest";
+
+const transcriptAppend = vi.hoisted(() => ({ fail: false }));
+
+vi.mock("../server-methods/chat-transcript-inject.js", async () => {
+  const actual = await vi.importActual<
+    typeof import("../server-methods/chat-transcript-inject.js")
+  >("../server-methods/chat-transcript-inject.js");
+  return {
+    ...actual,
+    appendPersistedAgentMessageToTranscript: (
+      params: Parameters<typeof actual.appendPersistedAgentMessageToTranscript>[0],
+    ) => {
+      if (transcriptAppend.fail) {
+        return { ok: false as const, error: "disk full" };
+      }
+      return actual.appendPersistedAgentMessageToTranscript(params);
+    },
+  };
+});
 import {
   clearConfigCache,
   clearRuntimeConfigSnapshot,
@@ -17,7 +36,9 @@ import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/polic
 import {
   validateCollaborationTaskConfirmTodolistParams,
   validateCollaborationTaskGetTodolistParams,
+  validateCollaborationTaskListOwnerDecisionDeliveriesParams,
   validateCollaborationTaskListTodolistsParams,
+  validateCollaborationTaskRetryOwnerDecisionDeliveryParams,
   validateCollaborationTaskReviseTodolistParams,
 } from "../protocol/index.js";
 import {
@@ -28,9 +49,13 @@ import {
   confirmCollaborationTodolist,
   getCollaborationTodolist,
   listCollaborationTodolists,
+  listCollaborationOwnerDecisionDeliveries,
   proposeCollaborationTodolist,
   publishCollaborationBoardItem,
+  retryCollaborationOwnerDecisionDelivery,
 } from "./claim-contract-entry.js";
+import { resolveGroupPublicTranscriptPath } from "./collaboration-paths.js";
+import { readOwnerDecisionDeliveries } from "./owner-decision-delivery.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -45,6 +70,7 @@ const savedSecurityProfile = process.env.OPENBOT_SECURITY_PROFILE;
 const savedLegacySecurityProfile = process.env.OPENCLAW_SECURITY_PROFILE;
 
 afterEach(async () => {
+  transcriptAppend.fail = false;
   clearRuntimeConfigSnapshot();
   clearConfigCache();
   if (savedStateDir === undefined) {
@@ -148,7 +174,7 @@ async function seedBoardAndProposal(cfg: OpenBotConfig) {
     actor: "bot-analyst",
     cfg,
   });
-  const todolist = await proposeCollaborationTodolist({
+  const proposed = await proposeCollaborationTodolist({
     groupId,
     taskId: seed.taskId,
     boardItemId: published.itemId,
@@ -157,7 +183,7 @@ async function seedBoardAndProposal(cfg: OpenBotConfig) {
     actor: "bot-analyst",
     cfg,
   });
-  return { published, todolist };
+  return { published, todolist: proposed.todolist, cardDelivery: proposed.cardDelivery };
 }
 
 describe("Todolist ACL RPC boundary", () => {
@@ -526,5 +552,248 @@ describe("Todolist ACL RPC boundary", () => {
         cfg,
       }),
     ).rejects.toMatchObject({ code: "forbidden" });
+  });
+});
+
+describe("owner-decision delivery is independent of plan creation", () => {
+  test("retry schema rejects extra fields and accepts an expected version", () => {
+    expect(
+      validateCollaborationTaskRetryOwnerDecisionDeliveryParams({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: "td-1",
+        expectedVersion: 1,
+      }),
+    ).toBe(true);
+    expect(
+      validateCollaborationTaskRetryOwnerDecisionDeliveryParams({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: "td-1",
+        confirmationToken: "nope",
+      }),
+    ).toBe(false);
+    expect(
+      validateCollaborationTaskListOwnerDecisionDeliveriesParams({
+        groupId,
+        taskId: seed.taskId,
+      }),
+    ).toBe(true);
+  });
+
+  test("transcript write failure still returns the proposal and a retryable delivery", async () => {
+    const { cfg } = await useConfig();
+    await seedTask();
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId: seed.taskId,
+      remainingWork: "交付私有计划",
+      acceptanceCriteria: ["含来源"],
+      actor: "bot-secretary",
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId: seed.taskId,
+      itemId: published.itemId,
+      claimantId: "bot-analyst",
+      cfg,
+    });
+    await applyCollaborationBoardClaim({
+      groupId,
+      taskId: seed.taskId,
+      itemId: published.itemId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    const state = makeOperatingState({
+      groupId,
+      governance: { coordinatorBotId: "bot-secretary" },
+    });
+    state.memberRoleMap = [
+      {
+        memberId: "bot-secretary",
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({ fileStore, groupId, state });
+    transcriptAppend.fail = true;
+
+    const proposed = await proposeCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      boardItemId: published.itemId,
+      ownerMemberId: "bot-analyst",
+      steps: [{ title: SECRET_STEP }],
+      actor: "bot-analyst",
+      cfg,
+    });
+    const { todolist, cardDelivery } = proposed;
+    expect(todolist.status).toBe("proposed");
+    expect(cardDelivery.reason).toBe("transcript_append");
+    expect(cardDelivery.ok).toBe(false);
+    expect(cardDelivery.retryable).toBe(true);
+    expect(cardDelivery.historyReloadable).toBe(false);
+    expect(cardDelivery.clientPresented).toBe(false);
+    expect(cardDelivery.userFacing).toBe("delivery_failed_retryable");
+    expect(JSON.stringify(cardDelivery)).not.toContain("confirmationToken");
+
+    const stored = await getCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(stored.todolistId).toBe(todolist.todolistId);
+    expect(stored.version).toBe(todolist.version);
+    expect(stored.status).toBe("proposed");
+  });
+
+  test("same-version retry does not mint a proposal or a second card; confirm is single-consume", async () => {
+    const { cfg } = await useConfig();
+    const { todolist } = await seedBoardAndProposal(cfg);
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    const state = makeOperatingState({
+      groupId,
+      governance: { coordinatorBotId: "bot-secretary" },
+    });
+    state.memberRoleMap = [
+      {
+        memberId: "bot-secretary",
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({ fileStore, groupId, state });
+
+    const delivered = await retryCollaborationOwnerDecisionDelivery({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      expectedVersion: todolist.version,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(delivered.todolist.todolistId).toBe(todolist.todolistId);
+    expect(delivered.todolist.version).toBe(todolist.version);
+    expect(delivered.cardDelivery.historyReloadable).toBe(true);
+    expect(delivered.cardDelivery.clientPresented).toBe(false);
+    expect(delivered.cardDelivery.userFacing).toBe("waiting_confirmation");
+    const idempotencyKey = delivered.cardDelivery.idempotencyKey ?? "";
+    expect(idempotencyKey.length).toBeGreaterThan(0);
+
+    const again = await retryCollaborationOwnerDecisionDelivery({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      expectedVersion: todolist.version,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(again.todolist.todolistId).toBe(todolist.todolistId);
+    expect(again.todolist.version).toBe(todolist.version);
+    expect(again.cardDelivery.reason).toBe("idempotent_exists");
+    const transcriptPath = resolveGroupPublicTranscriptPath(groupId, cfg);
+    const transcript = await fs.readFile(transcriptPath, "utf8");
+    expect(transcript.split(idempotencyKey).length - 1).toBe(1);
+
+    const mismatched = await retryCollaborationOwnerDecisionDelivery({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      expectedVersion: todolist.version + 9,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(mismatched.todolist.version).toBe(todolist.version);
+    expect(mismatched.todolist.status).toBe("proposed");
+    expect(mismatched.cardDelivery.userFacing).toBe("stale_version");
+    expect(mismatched.cardDelivery.version).toBe(todolist.version + 9);
+    expect(mismatched.cardDelivery.retryable).toBe(false);
+    const afterMismatch = await fs.readFile(transcriptPath, "utf8");
+    expect(afterMismatch.split(idempotencyKey).length - 1).toBe(1);
+
+    const replaced = await proposeCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      boardItemId: todolist.boardItemId,
+      ownerMemberId: "bot-analyst",
+      steps: [{ title: "新步骤" }],
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(replaced.todolist.todolistId).not.toBe(todolist.todolistId);
+    const stale = await retryCollaborationOwnerDecisionDelivery({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      expectedVersion: todolist.version,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(stale.todolist.status).toBe("superseded");
+    expect(stale.cardDelivery.userFacing).toBe("stale_version");
+    expect(stale.cardDelivery.retryable).toBe(false);
+    const afterSupersede = await fs.readFile(transcriptPath, "utf8");
+    expect(afterSupersede.split(idempotencyKey).length - 1).toBe(1);
+
+    const confirmed = await confirmCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: replaced.todolist.todolistId,
+      actor: "bot-secretary",
+      cfg,
+    });
+    expect(confirmed.status).toBe("confirmed");
+    expect(confirmed.confirmedBy).toBe("bot-secretary");
+    await expect(
+      confirmCollaborationTodolist({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: replaced.todolist.todolistId,
+        actor: "bot-secretary",
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "invalid_status" });
+    const still = await getCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: replaced.todolist.todolistId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(still.status).toBe("confirmed");
+    expect(still.confirmedBy).toBe("bot-secretary");
+
+    const rows = await readOwnerDecisionDeliveries({
+      groupId,
+      todolistId: replaced.todolist.todolistId,
+      cfg,
+    });
+    expect(rows.filter((row) => row.stage === "confirmation_consumed")).toHaveLength(1);
+    expect(JSON.stringify(rows)).not.toContain("confirmationToken");
+    for (const row of rows) {
+      expect(row.clientPresented).toBe(false);
+    }
+
+    const visible = await listCollaborationOwnerDecisionDeliveries({
+      groupId,
+      taskId: seed.taskId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(
+      visible.some(
+        (row) =>
+          row.todolistId === replaced.todolist.todolistId && row.stage === "confirmation_consumed",
+      ),
+    ).toBe(true);
   });
 });

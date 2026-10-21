@@ -27,6 +27,18 @@ describe("redactSensitiveText", () => {
     expect(output).toBe("curl --token abcdef…ghij https://api.test");
   });
 
+  it("fully redacts confirmationToken JSON fields", () => {
+    const token = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const input = `{"confirmationToken":"${token}"}`;
+    const output = redactSensitiveText(input, {
+      mode: "tools",
+      patterns: defaults,
+    });
+    expect(output).toBe('{"confirmationToken":"***"}');
+    expect(output).not.toContain(token);
+    expect(output).not.toContain("aaaaaaaa");
+  });
+
   it("masks JSON fields", () => {
     const input = '{"token":"abcdef1234567890ghij"}';
     const output = redactSensitiveText(input, {

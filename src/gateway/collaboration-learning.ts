@@ -107,6 +107,8 @@ export {
   returnCollaborationBoardItemSubmission,
   submitCollaborationBoardItemForReview,
   proposeCollaborationTodolist,
+  retryCollaborationOwnerDecisionDelivery,
+  listCollaborationOwnerDecisionDeliveries,
   confirmCollaborationTodolist,
   reviseCollaborationTodolist,
   getCollaborationTodolist,

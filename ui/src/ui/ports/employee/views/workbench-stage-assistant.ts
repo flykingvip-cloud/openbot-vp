@@ -550,6 +550,10 @@ export function renderMeetingConfirmationCard(daibaiStage: WorkbenchDaibaiStageC
       : "";
   const linkPending = organizerMeetingLinkPending(pending.meeting);
   const busy = Boolean(daibaiStage.meetingConfirmationLoading);
+  const oldCardInvalid =
+    daibaiStage.meetingConfirmationOldCardInvalid === true ||
+    (typeof pending.confirmation.expiresAtMs === "number" &&
+      pending.confirmation.expiresAtMs <= Date.now());
   const canConfirm = Boolean(daibaiStage.onConfirmMeetingPendingApproval) && !busy && !linkPending;
   // Defensive: protocol violation if online-without-joinUrl still pending — no confirm controls.
   const showConfirmControls = !linkPending;
@@ -560,6 +564,7 @@ export function renderMeetingConfirmationCard(daibaiStage: WorkbenchDaibaiStageC
       aria-label=${actionTitle}
       data-meeting-confirm-card="true"
       data-meeting-link-pending=${linkPending ? "true" : "false"}
+      data-meeting-old-card-invalid=${oldCardInvalid ? "true" : "false"}
       data-confirm-chrome="thin"
     >
       <div class="employee-workbench__assistant-prelude-title">${actionTitle}</div>
@@ -578,6 +583,13 @@ export function renderMeetingConfirmationCard(daibaiStage: WorkbenchDaibaiStageC
           : nothing
       }
       ${
+        oldCardInvalid
+          ? html`
+              <div class="employee-workbench__steward-confirm-danger" data-meeting-old-card>旧卡已失效</div>
+            `
+          : nothing
+      }
+      ${
         daibaiStage.meetingConfirmationError
           ? html`<div class="employee-workbench__steward-confirm-danger">${displayMeetingConfirmationError(daibaiStage.meetingConfirmationError)}</div>`
           : nothing
@@ -592,7 +604,7 @@ export function renderMeetingConfirmationCard(daibaiStage: WorkbenchDaibaiStageC
                   ?disabled=${!canConfirm}
                   @click=${() => daibaiStage.onConfirmMeetingPendingApproval?.()}
                 >
-                  ${busy ? "确认中…" : "确认发送"}
+                  ${busy ? "确认中…" : oldCardInvalid ? "重新确认" : "确认发送"}
                 </button>
               `
             : nothing

@@ -120,6 +120,11 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
     if (!result.ok || result.skipped) {
       throw new Error(`expected emit ok, got ${JSON.stringify(result)}`);
     }
+    expect(result.delivery.clientPresented).toBe(false);
+    expect(result.delivery.historyReloadable).toBe(true);
+    expect(result.delivery.userFacing).toBe("waiting_confirmation");
+    expect(result.delivery.deliveryTracked).toBe(true);
+    expect(JSON.stringify(result.delivery)).not.toContain("confirmationToken");
     expect(result.card.mentionMemberIds).toContain(ownerId);
     expect(result.card.mentionLabels?.[0]).toBe("CEO");
     expect(result.card.mentionLabels?.join(" ")).not.toContain("@");
@@ -144,7 +149,12 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
     expect(again.ok).toBe(true);
     if (again.ok) {
       expect(again.skipped).toBe(true);
+      expect(again.reason).toBe("idempotent_exists");
     }
+    const replayed = await fs.readFile(transcriptPath, "utf8");
+    const idempotencyKey = result.delivery.idempotencyKey ?? "";
+    expect(idempotencyKey.length).toBeGreaterThan(0);
+    expect(replayed.split(idempotencyKey).length - 1).toBe(1);
   });
 
   test("skips when no active confirmer is available", async () => {
@@ -176,6 +186,113 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
       todolist,
       cfg,
     });
-    expect(result).toEqual({ ok: true, skipped: true, reason: "no_active_confirmer" });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.skipped).toBe(true);
+      expect(result.reason).toBe("no_active_confirmer");
+    }
+    expect(result.delivery).toMatchObject({
+      ok: true,
+      stage: "skipped",
+      reason: "no_active_confirmer",
+      retryable: true,
+      clientPresented: false,
+      historyReloadable: false,
+      userFacing: "skipped",
+    });
+  });
+
+  test("fence text without an idempotency key does not count as issued", async () => {
+    const { cfg, groupId } = await useConfig();
+    await seedActiveConfirmer(cfg, groupId);
+    const transcriptPath = resolveGroupPublicTranscriptPath(groupId, cfg);
+    await fs.mkdir(path.dirname(transcriptPath), { recursive: true });
+    const fenceOnly = [
+      JSON.stringify({ type: "session", id: "fence-only" }),
+      JSON.stringify({
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "text",
+              text: ["请确认", "```owner-decision", '{"todolistId":"td-fence"}', "```"].join("\n"),
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+    await fs.writeFile(transcriptPath, `${fenceOnly}\n`, "utf8");
+
+    const todolist = sampleTodolist(groupId, "td-fence");
+    const result = await emitOwnerDecisionCardForProposedTodolist({ groupId, todolist, cfg });
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.skipped) {
+      throw new Error(`fence must not short-circuit emit, got ${JSON.stringify(result)}`);
+    }
+    const body = await fs.readFile(transcriptPath, "utf8");
+    const key = result.delivery.idempotencyKey ?? "";
+    expect(key.startsWith("owner-decision:td-fence:v1:")).toBe(true);
+    expect(body.split(key).length - 1).toBe(1);
+    expect(result.delivery.historyReloadable).toBe(true);
+    expect(result.delivery.clientPresented).toBe(false);
+  });
+
+  test("a broken transcript returns a retryable delivery and does not claim the card was issued", async () => {
+    const { cfg, groupId } = await useConfig();
+    await seedActiveConfirmer(cfg, groupId);
+    const transcriptPath = resolveGroupPublicTranscriptPath(groupId, cfg);
+    await fs.mkdir(path.dirname(transcriptPath), { recursive: true });
+    await fs.writeFile(transcriptPath, "not-a-session\n", "utf8");
+
+    const result = await emitOwnerDecisionCardForProposedTodolist({
+      groupId,
+      todolist: sampleTodolist(groupId, "td-broken"),
+      cfg,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("expected transcript write failure");
+    }
+    expect(["transcript_append", "transcript_header"]).toContain(result.reason);
+    expect(result.delivery.ok).toBe(false);
+    expect(result.delivery.retryable).toBe(true);
+    expect(result.delivery.clientPresented).toBe(false);
+    expect(result.delivery.userFacing).toBe("delivery_failed_retryable");
+    expect(JSON.stringify(result.delivery)).not.toContain("confirmationToken");
   });
 });
+
+async function seedActiveConfirmer(cfg: OpenBotConfig, groupId: string): Promise<void> {
+  const { fileStore } = createWorkspaceCollaborationStores(cfg);
+  const ownerId = "daniel.hhd@gmail.com";
+  const state = makeOperatingState({
+    groupId,
+    governance: { coordinatorBotId: ownerId },
+  });
+  state.memberRoleMap = [
+    {
+      memberId: ownerId,
+      memberKind: "human",
+      governanceRole: "owner",
+      collaborationRole: null,
+      status: "active",
+    },
+  ];
+  await writeGroupOperatingState({ fileStore, groupId, state });
+}
+
+function sampleTodolist(groupId: string, todolistId: string): ExecutorPrivateTodolist {
+  return {
+    todolistId,
+    boardItemId: `board-${todolistId}`,
+    taskId: `task-${todolistId}`,
+    groupId,
+    ownerMemberId: "bot-executor",
+    status: "proposed",
+    steps: [{ stepId: "s1", title: "产出摘要", status: "pending" }],
+    proposedBy: "bot-executor",
+    proposedAt: Date.now(),
+    version: 1,
+    visibility: "executor_private",
+  };
+}

@@ -28,12 +28,18 @@ import {
   materializeGroupCollaborationWorkspace,
   resolveGroupPublicTranscriptPath,
 } from "./collaboration-paths.js";
+import {
+  normalizeOwnerDecisionDelivery,
+  recordOwnerDecisionDelivery,
+  type OwnerDecisionCardDelivery,
+} from "./owner-decision-delivery.js";
 import { createWorkspaceCollaborationStores, readGroupOperatingState } from "./shared.js";
 
-export type OwnerDecisionEmitResult =
+export type OwnerDecisionEmitResult = (
   | { ok: true; card: OwnerDecisionCard; messageId?: string; skipped?: false }
-  | { ok: true; skipped: true; reason: string }
-  | { ok: false; reason: string; message: string };
+  | { ok: true; skipped: true; reason: string; card?: OwnerDecisionCard }
+  | { ok: false; reason: string; message: string; card?: OwnerDecisionCard }
+) & { delivery: OwnerDecisionCardDelivery };
 
 type OperatingStateAclSource = {
   governance?: { coordinatorBotId?: string | null };
@@ -161,6 +167,10 @@ function buildAssistantMessageBody(params: {
   };
 }
 
+/**
+ * True only when a persisted message carries this idempotency key.
+ * A matching owner-decision fence in free text is not issuance.
+ */
 function transcriptHasIdempotencyKey(transcriptPath: string, idempotencyKey: string): boolean {
   try {
     const text = fs.readFileSync(transcriptPath, "utf-8");
@@ -223,25 +233,31 @@ async function ensureTranscriptHeader(params: {
  * Best-effort: bump space:{groupId} updatedAt so sidebar unread can fire.
  * lastMessagePreview is derived from transcript by sessions.list.
  */
+type PushOutcome = "completed" | "skipped" | "failed";
+
+/**
+ * Best-effort unread bump. Returns whether the push was skipped (no session),
+ * completed, or attempted and failed. Never throws.
+ */
 async function bumpSpaceSessionUpdatedAt(params: {
   groupId: string;
   cfg?: OpenBotConfig;
   nowMs: number;
-}): Promise<void> {
+}): Promise<PushOutcome> {
   const sessionKey = `space:${params.groupId}`;
   const cfg = params.cfg ?? loadConfig();
   let storePath: string;
   try {
     storePath = resolveStorePath(cfg.session?.store);
   } catch {
-    return;
+    return "skipped";
   }
   try {
     const store = loadSessionStore(storePath);
     const existing = store[sessionKey] ?? store[sessionKey.toLowerCase()];
     if (!existing) {
       // Do not invent a new space session — chat.send / bind owns that.
-      return;
+      return "skipped";
     }
     await updateSessionStore(
       storePath,
@@ -263,8 +279,55 @@ async function bumpSpaceSessionUpdatedAt(params: {
       },
       { activeSessionKey: sessionKey },
     );
+    return "completed";
   } catch {
-    // best-effort
+    return "failed";
+  }
+}
+
+function deliveryForTodolist(
+  todolist: ExecutorPrivateTodolist,
+  patch: Partial<OwnerDecisionCardDelivery> & Pick<OwnerDecisionCardDelivery, "ok" | "stage">,
+): OwnerDecisionCardDelivery {
+  return normalizeOwnerDecisionDelivery({
+    historyReloadable: false,
+    deliveryTracked: false,
+    clientPresented: false,
+    retryable: false,
+    userFacing: "tracked",
+    groupId: todolist.groupId,
+    taskId: todolist.taskId,
+    boardItemId: todolist.boardItemId,
+    todolistId: todolist.todolistId,
+    version: todolist.version,
+    ...patch,
+  });
+}
+
+async function finishDelivery(params: {
+  groupId: string;
+  cfg?: OpenBotConfig;
+  nowMs: number;
+  delivery: OwnerDecisionCardDelivery;
+}): Promise<OwnerDecisionCardDelivery> {
+  if (!compact(params.groupId)) {
+    return params.delivery;
+  }
+  try {
+    return await recordOwnerDecisionDelivery({
+      groupId: params.groupId,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+      delivery: params.delivery,
+    });
+  } catch (err) {
+    return normalizeOwnerDecisionDelivery({
+      ...params.delivery,
+      deliveryTracked: false,
+      retryable: true,
+      reason: params.delivery.reason ?? "delivery_record_failed",
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 
@@ -279,12 +342,35 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
   nowMs?: number;
 }): Promise<OwnerDecisionEmitResult> {
   const cfg = params.cfg ?? loadConfig();
+  const nowMs = params.nowMs ?? Date.now();
   const groupId = compact(params.groupId) || compact(params.todolist.groupId);
+  const tracked = async (delivery: OwnerDecisionCardDelivery): Promise<OwnerDecisionCardDelivery> =>
+    finishDelivery({ groupId, cfg, nowMs, delivery });
+
   if (!groupId) {
-    return { ok: true, skipped: true, reason: "missing_group_id" };
+    return {
+      ok: true,
+      skipped: true,
+      reason: "missing_group_id",
+      delivery: deliveryForTodolist(params.todolist, {
+        ok: true,
+        stage: "skipped",
+        reason: "missing_group_id",
+        retryable: false,
+      }),
+    };
   }
   if (params.todolist.status !== "proposed") {
-    return { ok: true, skipped: true, reason: `status_${params.todolist.status}` };
+    const reason = `status_${params.todolist.status}`;
+    const delivery = await tracked(
+      deliveryForTodolist(params.todolist, {
+        ok: true,
+        stage: "skipped",
+        reason,
+        retryable: params.todolist.status !== "superseded",
+      }),
+    );
+    return { ok: true, skipped: true, reason, delivery };
   }
 
   let operatingState: OperatingStateAclSource = null;
@@ -334,7 +420,15 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
     cfg,
   });
   if (mentionMemberIds.length === 0) {
-    return { ok: true, skipped: true, reason: "no_active_confirmer" };
+    const delivery = await tracked(
+      deliveryForTodolist(params.todolist, {
+        ok: true,
+        stage: "skipped",
+        reason: "no_active_confirmer",
+        retryable: true,
+      }),
+    );
+    return { ok: true, skipped: true, reason: "no_active_confirmer", delivery };
   }
 
   const card = buildOwnerDecisionCard({
@@ -349,10 +443,19 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
     supplementHint: "确认后执行者才可 markInProgress；退回修订将清除确认。",
   });
   if (!card) {
-    return { ok: false, reason: "build_failed", message: "failed to build owner decision card" };
+    const message = "failed to build owner decision card";
+    const delivery = await tracked(
+      deliveryForTodolist(params.todolist, {
+        ok: false,
+        stage: "delivery_failed",
+        reason: "build_failed",
+        message,
+        retryable: true,
+      }),
+    );
+    return { ok: false, reason: "build_failed", message, delivery };
   }
 
-  const nowMs = params.nowMs ?? Date.now();
   const text = formatOwnerDecisionMessageText(card, {
     mentionDisplayNames,
     includeFence: true,
@@ -370,15 +473,41 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
   try {
     await ensureTranscriptHeader({ transcriptPath, sessionId });
   } catch (err) {
-    return {
-      ok: false,
-      reason: "transcript_header",
-      message: err instanceof Error ? err.message : String(err),
-    };
+    const message = err instanceof Error ? err.message : String(err);
+    const delivery = await tracked(
+      deliveryForTodolist(params.todolist, {
+        ok: false,
+        stage: "delivery_failed",
+        reason: "transcript_header",
+        message,
+        retryable: true,
+        card,
+        idempotencyKey,
+      }),
+    );
+    return { ok: false, reason: "transcript_header", message, card, delivery };
   }
 
   if (transcriptHasIdempotencyKey(transcriptPath, idempotencyKey)) {
-    return { ok: true, skipped: true, reason: "idempotent_exists" };
+    const push = await bumpSpaceSessionUpdatedAt({ groupId, cfg, nowMs });
+    const pushFailed = push === "failed";
+    const delivery = await tracked(
+      deliveryForTodolist(params.todolist, {
+        ok: !pushFailed,
+        stage:
+          push === "completed"
+            ? "push_completed"
+            : pushFailed
+              ? "push_attempted"
+              : "card_persisted",
+        reason: pushFailed ? "push_failed" : "idempotent_exists",
+        historyReloadable: true,
+        retryable: pushFailed,
+        card,
+        idempotencyKey,
+      }),
+    );
+    return { ok: true, skipped: true, reason: "idempotent_exists", card, delivery };
   }
 
   const messageBody = buildAssistantMessageBody({
@@ -392,18 +521,45 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
     message: messageBody,
   });
   if (!appended.ok) {
-    return {
-      ok: false,
-      reason: "transcript_append",
-      message: appended.error ?? "failed to append owner decision message",
-    };
+    const message = appended.error ?? "failed to append owner decision message";
+    const delivery = await tracked(
+      deliveryForTodolist(params.todolist, {
+        ok: false,
+        stage: "delivery_failed",
+        reason: "transcript_append",
+        message,
+        retryable: true,
+        historyReloadable: false,
+        card,
+        idempotencyKey,
+      }),
+    );
+    return { ok: false, reason: "transcript_append", message, card, delivery };
   }
 
-  await bumpSpaceSessionUpdatedAt({
-    groupId,
-    cfg,
-    nowMs,
-  });
-
-  return { ok: true, card, messageId: appended.messageId };
+  const push = await bumpSpaceSessionUpdatedAt({ groupId, cfg, nowMs });
+  const pushFailed = push === "failed";
+  const delivery = await tracked(
+    deliveryForTodolist(params.todolist, {
+      ok: !pushFailed,
+      stage:
+        push === "completed" ? "push_completed" : pushFailed ? "push_attempted" : "card_persisted",
+      reason: pushFailed ? "push_failed" : undefined,
+      historyReloadable: true,
+      retryable: pushFailed,
+      card,
+      idempotencyKey,
+      messageId: appended.messageId,
+    }),
+  );
+  if (pushFailed) {
+    return {
+      ok: false,
+      reason: "push_failed",
+      message: "owner decision card was persisted but the session push failed",
+      card,
+      delivery,
+    };
+  }
+  return { ok: true, card, messageId: appended.messageId, delivery };
 }

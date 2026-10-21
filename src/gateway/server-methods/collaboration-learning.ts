@@ -32,6 +32,8 @@ import {
   runCollaborationSelfAdvance,
   getCollaborationAdminDailySummary,
   proposeCollaborationTodolist,
+  retryCollaborationOwnerDecisionDelivery,
+  listCollaborationOwnerDecisionDeliveries,
   confirmCollaborationTodolist,
   reviseCollaborationTodolist,
   getCollaborationTodolist,
@@ -94,6 +96,8 @@ import {
   validateCollaborationTaskAdminDailySummaryParams,
   validateCollaborationTaskTrySelfAdvanceParams,
   validateCollaborationTaskProposeTodolistParams,
+  validateCollaborationTaskRetryOwnerDecisionDeliveryParams,
+  validateCollaborationTaskListOwnerDecisionDeliveriesParams,
   validateCollaborationTaskConfirmTodolistParams,
   validateCollaborationTaskReviseTodolistParams,
   validateCollaborationTaskGetTodolistParams,
@@ -613,12 +617,80 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
     }
     try {
       const tenant = await resolveCollaborationTenantResolution(client);
-      const todolist = await proposeCollaborationTodolist({
+      const proposed = await proposeCollaborationTodolist({
         ...params,
         actor: await resolveDeliveryAclActor(client, params.groupId),
         tenant,
       });
-      respond(true, { todolist }, undefined);
+      respond(
+        true,
+        { todolist: proposed.todolist, cardDelivery: proposed.cardDelivery },
+        undefined,
+      );
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+        ),
+      );
+    }
+  },
+  "collaboration.task.retryOwnerDecisionDelivery": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskRetryOwnerDecisionDeliveryParams,
+        "collaboration.task.retryOwnerDecisionDelivery",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const retried = await retryCollaborationOwnerDecisionDelivery({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        todolistId: params.todolistId,
+        expectedVersion: params.expectedVersion,
+        actor: await resolveDeliveryAclActor(client, params.groupId),
+        tenant,
+      });
+      respond(true, { todolist: retried.todolist, cardDelivery: retried.cardDelivery }, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+        ),
+      );
+    }
+  },
+  "collaboration.task.listOwnerDecisionDeliveries": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskListOwnerDecisionDeliveriesParams,
+        "collaboration.task.listOwnerDecisionDeliveries",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const deliveries = await listCollaborationOwnerDecisionDeliveries({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        actor: await resolveDeliveryAclActor(client, params.groupId),
+        tenant,
+      });
+      respond(true, { deliveries }, undefined);
     } catch (error) {
       respond(
         false,
@@ -709,14 +781,27 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
     }
     try {
       const tenant = await resolveCollaborationTenantResolution(client);
+      const actor = await resolveDeliveryAclActor(client, params.groupId);
       const todolist = await getCollaborationTodolist({
         groupId: params.groupId,
         taskId: params.taskId,
         todolistId: params.todolistId,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
+        actor,
         tenant,
       });
-      respond(true, { todolist }, undefined);
+      const deliveries = await listCollaborationOwnerDecisionDeliveries({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        actor,
+        tenant,
+      });
+      const cardDelivery =
+        deliveries.find(
+          (row) => row.todolistId === todolist.todolistId && row.version === todolist.version,
+        ) ??
+        deliveries.find((row) => row.todolistId === todolist.todolistId) ??
+        null;
+      respond(true, { todolist, cardDelivery }, undefined);
     } catch (error) {
       respond(
         false,

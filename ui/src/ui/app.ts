@@ -1040,6 +1040,8 @@ export class OpenBotApp extends LitElement {
   @state() meetingPendingConfirmation: MeetingPendingConfirmation | null = null;
   @state() meetingConfirmationLoading = false;
   @state() meetingConfirmationError: string | null = null;
+  /** Expired or consumed meeting cards stay visible as invalid; reissue does not reuse the old token. */
+  @state() meetingConfirmationOldCardInvalid = false;
   @state() meetingConfirmRelease: MeetingConfirmRelease | null = null;
   @state() meetingScheduleReplayNeeded = false;
   @state() meetingScheduleReplayMeetingId: string | null = null;

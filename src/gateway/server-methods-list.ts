@@ -50,6 +50,8 @@ const BASE_METHODS = [
   "collaboration.task.adminDailySummary",
   "collaboration.task.trySelfAdvance",
   "collaboration.task.proposeTodolist",
+  "collaboration.task.retryOwnerDecisionDelivery",
+  "collaboration.task.listOwnerDecisionDeliveries",
   "collaboration.task.confirmTodolist",
   "collaboration.task.reviseTodolist",
   "collaboration.task.getTodolist",

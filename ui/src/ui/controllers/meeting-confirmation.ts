@@ -51,6 +51,8 @@ export type MeetingConfirmationState = WorkbenchSpacesLoadState & {
   meetingPendingConfirmation?: MeetingPendingConfirmation | null;
   meetingConfirmationLoading?: boolean;
   meetingConfirmationError?: string | null;
+  /** Previous ticket was expired or rejected. The card must not keep offering that authorization. */
+  meetingConfirmationOldCardInvalid?: boolean;
   /**
    * Hard provision_required / no-joinUrl block fingerprint (`id:updatedAt`).
    * While this matches the current pending set, skip re-calling meeting.approve
@@ -218,6 +220,7 @@ export async function syncMeetingPendingConfirmation(
     state.meetingScheduleReplayNeeded = false;
     state.meetingScheduleReplayMeetingId = null;
     state.meetingConfirmationError = null;
+    state.meetingConfirmationOldCardInvalid = false;
     state.meetingConfirmationApproveBlockKey = null;
     return;
   }
@@ -298,6 +301,7 @@ export async function syncMeetingPendingConfirmation(
           // New pending gate replaces any prior release epilogue.
           state.meetingConfirmRelease = null;
           state.meetingConfirmationError = null;
+          state.meetingConfirmationOldCardInvalid = false;
           state.meetingConfirmationApproveBlockKey = null;
           issued = true;
           break;
@@ -347,6 +351,35 @@ export async function confirmMeetingPendingApproval(
     return null;
   }
   const releasingTitle = pending.confirmationDetail?.title ?? pending.meeting.title ?? "会议";
+  const ticketStale =
+    state.meetingConfirmationOldCardInvalid === true ||
+    (typeof pending.confirmation.expiresAtMs === "number" &&
+      pending.confirmation.expiresAtMs <= Date.now());
+  if (ticketStale) {
+    state.meetingConfirmationLoading = true;
+    state.meetingConfirmationError = null;
+    try {
+      const gateway = createMeetingLifecycleGateway(client);
+      const reissued = await gateway.approveMeeting(pending.meeting.id);
+      if (reissued.status === "pending_confirmation") {
+        state.meetingPendingConfirmation = {
+          meeting: reissued.meeting,
+          confirmation: reissued.confirmation,
+          confirmationDetail: reissued.confirmationDetail,
+          message: reissued.message,
+        };
+        state.meetingConfirmationOldCardInvalid = false;
+        state.meetingConfirmRelease = null;
+      }
+      return null;
+    } catch (err) {
+      state.meetingConfirmationError = formatMeetingConfirmationError(err);
+      state.meetingConfirmationOldCardInvalid = true;
+      return null;
+    } finally {
+      state.meetingConfirmationLoading = false;
+    }
+  }
   const noticeText = formatOrganizerMeetingNotice(pending.meeting);
   state.meetingConfirmationLoading = true;
   state.meetingConfirmationError = null;
@@ -435,7 +468,11 @@ export async function confirmMeetingPendingApproval(
     }
     return continuation;
   } catch (err) {
-    state.meetingConfirmationError = formatMeetingConfirmationError(err);
+    const message = formatMeetingConfirmationError(err);
+    state.meetingConfirmationError = message;
+    if (/过期|失效|已被使用|不匹配|内容已变化/.test(message)) {
+      state.meetingConfirmationOldCardInvalid = true;
+    }
     state.meetingConfirmRelease = null;
     return null;
   } finally {
@@ -481,6 +518,7 @@ export async function cancelMeetingPendingConfirmation(
   const client = state.client;
   state.meetingPendingConfirmation = null;
   state.meetingConfirmationError = null;
+  state.meetingConfirmationOldCardInvalid = false;
   state.meetingConfirmationApproveBlockKey = null;
   state.meetingScheduleReplayNeeded = false;
   state.meetingScheduleReplayMeetingId = null;

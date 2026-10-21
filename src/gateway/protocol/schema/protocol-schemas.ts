@@ -96,6 +96,8 @@ import {
   CollaborationTaskAdminDailySummaryParamsSchema,
   CollaborationTaskTrySelfAdvanceParamsSchema,
   CollaborationTaskProposeTodolistParamsSchema,
+  CollaborationTaskRetryOwnerDecisionDeliveryParamsSchema,
+  CollaborationTaskListOwnerDecisionDeliveriesParamsSchema,
   CollaborationTaskConfirmTodolistParamsSchema,
   CollaborationTaskReviseTodolistParamsSchema,
   CollaborationTaskGetTodolistParamsSchema,
@@ -394,6 +396,10 @@ export const ProtocolSchemas = {
   CollaborationTaskAdminDailySummaryParams: CollaborationTaskAdminDailySummaryParamsSchema,
   CollaborationTaskTrySelfAdvanceParams: CollaborationTaskTrySelfAdvanceParamsSchema,
   CollaborationTaskProposeTodolistParams: CollaborationTaskProposeTodolistParamsSchema,
+  CollaborationTaskRetryOwnerDecisionDeliveryParams:
+    CollaborationTaskRetryOwnerDecisionDeliveryParamsSchema,
+  CollaborationTaskListOwnerDecisionDeliveriesParams:
+    CollaborationTaskListOwnerDecisionDeliveriesParamsSchema,
   CollaborationTaskConfirmTodolistParams: CollaborationTaskConfirmTodolistParamsSchema,
   CollaborationTaskReviseTodolistParams: CollaborationTaskReviseTodolistParamsSchema,
   CollaborationTaskGetTodolistParams: CollaborationTaskGetTodolistParamsSchema,

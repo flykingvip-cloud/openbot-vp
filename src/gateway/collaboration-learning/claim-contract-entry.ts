@@ -87,6 +87,15 @@ import {
   type GovernedTask,
 } from "../collaboration-dispatch/task-runtime.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import {
+  confirmationConsumedDelivery,
+  normalizeOwnerDecisionDelivery,
+  proposalCreatedDelivery,
+  readOwnerDecisionDeliveries,
+  recordOwnerDecisionDelivery,
+  staleOwnerDecisionDelivery,
+  type OwnerDecisionCardDelivery,
+} from "./owner-decision-delivery.js";
 import { emitOwnerDecisionCardForProposedTodolist } from "./owner-decision-emit.js";
 import {
   createWorkspaceCollaborationStores,
@@ -946,6 +955,24 @@ function unwrapTodolist<T>(result: TodolistResult<T>, step: string): T {
   throw new ClaimContractEntryError(result.reason, `${step}: ${result.message}`);
 }
 
+export type ProposeCollaborationTodolistResult = {
+  todolist: ExecutorPrivateTodolist;
+  /** Independent of plan creation. Failure here does not roll back the proposal. */
+  cardDelivery: OwnerDecisionCardDelivery;
+};
+
+async function rememberDelivery(
+  groupId: string,
+  delivery: OwnerDecisionCardDelivery,
+  cfg?: OpenBotConfig,
+): Promise<OwnerDecisionCardDelivery> {
+  try {
+    return await recordOwnerDecisionDelivery({ groupId, delivery, cfg });
+  } catch {
+    return normalizeOwnerDecisionDelivery({ ...delivery, deliveryTracked: false, retryable: true });
+  }
+}
+
 export async function proposeCollaborationTodolist(params: {
   groupId: string;
   taskId: string;
@@ -955,7 +982,7 @@ export async function proposeCollaborationTodolist(params: {
   actor?: string;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
-}): Promise<ExecutorPrivateTodolist> {
+}): Promise<ProposeCollaborationTodolistResult> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
   const ownerMemberId = params.ownerMemberId?.trim() || params.actor?.trim();
@@ -983,19 +1010,171 @@ export async function proposeCollaborationTodolist(params: {
     ),
     "proposeTodolist",
   );
-  // Best-effort: group chat owner-decision card + @confirmer for unread.
-  // Never fail propose; ACL for confirm stays on the bound session RPC.
+  // Plan creation already committed. Card delivery is a separate, retryable result.
+  let cardDelivery = proposalCreatedDelivery(todolist);
   try {
-    await emitOwnerDecisionCardForProposedTodolist({
+    const emitted = await emitOwnerDecisionCardForProposedTodolist({
       groupId: params.groupId,
       todolist,
       authority,
       cfg,
     });
-  } catch {
-    // ignore emit failures
+    cardDelivery = emitted.delivery;
+  } catch (err) {
+    cardDelivery = await rememberDelivery(
+      params.groupId,
+      normalizeOwnerDecisionDelivery({
+        ...proposalCreatedDelivery(todolist),
+        ok: false,
+        stage: "delivery_failed",
+        reason: "emit_threw",
+        message: err instanceof Error ? err.message : String(err),
+        retryable: true,
+        userFacing: "delivery_failed_retryable",
+      }),
+      cfg,
+    );
   }
-  return todolist;
+  return { todolist, cardDelivery };
+}
+
+/**
+ * Re-deliver the card for an existing proposal version.
+ * Does not call proposeTodolist or confirmTodolist.
+ */
+export async function retryCollaborationOwnerDecisionDelivery(params: {
+  groupId: string;
+  taskId: string;
+  todolistId: string;
+  expectedVersion?: number;
+  actor?: string;
+  tenant?: CollaborationTenantResolution | null;
+  cfg?: OpenBotConfig;
+}): Promise<ProposeCollaborationTodolistResult> {
+  const cfg = params.cfg ?? loadConfig();
+  requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  const todolist = await getCollaborationTodolist({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    todolistId: params.todolistId,
+    actor: params.actor,
+    tenant: params.tenant,
+    cfg,
+  });
+  const expected = params.expectedVersion;
+  if (
+    typeof expected === "number" &&
+    Number.isFinite(expected) &&
+    Math.floor(expected) !== todolist.version
+  ) {
+    const requestedVersion = Math.floor(expected);
+    const cardDelivery = await rememberDelivery(
+      params.groupId,
+      staleOwnerDecisionDelivery({
+        // Record the requested version as stale. Do not label the live proposal stale.
+        todolist: { ...todolist, version: requestedVersion },
+        reason: "version_mismatch",
+        message: "旧版本已失效",
+      }),
+      cfg,
+    );
+    return { todolist, cardDelivery };
+  }
+  if (todolist.status === "superseded") {
+    const cardDelivery = await rememberDelivery(
+      params.groupId,
+      staleOwnerDecisionDelivery({
+        todolist,
+        reason: "superseded",
+        message: "旧版本已失效",
+      }),
+      cfg,
+    );
+    return { todolist, cardDelivery };
+  }
+  if (todolist.status === "confirmed") {
+    const cardDelivery = await rememberDelivery(
+      params.groupId,
+      confirmationConsumedDelivery(todolist),
+      cfg,
+    );
+    return { todolist, cardDelivery };
+  }
+  const { authority } = await buildClaimAuthority({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    tenant: params.tenant,
+  });
+  try {
+    const emitted = await emitOwnerDecisionCardForProposedTodolist({
+      groupId: params.groupId,
+      todolist,
+      authority,
+      cfg,
+    });
+    return { todolist, cardDelivery: emitted.delivery };
+  } catch (err) {
+    const cardDelivery = await rememberDelivery(
+      params.groupId,
+      normalizeOwnerDecisionDelivery({
+        ...proposalCreatedDelivery(todolist),
+        ok: false,
+        stage: "delivery_failed",
+        reason: "emit_threw",
+        message: err instanceof Error ? err.message : String(err),
+        retryable: true,
+        userFacing: "delivery_failed_retryable",
+      }),
+      cfg,
+    );
+    return { todolist, cardDelivery };
+  }
+}
+
+export async function listCollaborationOwnerDecisionDeliveries(params: {
+  groupId: string;
+  taskId?: string;
+  actor?: string;
+  tenant?: CollaborationTenantResolution | null;
+  cfg?: OpenBotConfig;
+}): Promise<OwnerDecisionCardDelivery[]> {
+  const cfg = params.cfg ?? loadConfig();
+  const rows = await readOwnerDecisionDeliveries({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
+  const latest = new Map<string, OwnerDecisionCardDelivery>();
+  for (const row of rows) {
+    latest.set(`${row.todolistId}:v${row.version}`, row);
+  }
+  const visible: OwnerDecisionCardDelivery[] = [];
+  const readable = new Map<string, boolean>();
+  for (const row of latest.values()) {
+    const key = `${row.taskId}:${row.todolistId}`;
+    let canRead = readable.get(key);
+    if (canRead == null) {
+      try {
+        await getCollaborationTodolist({
+          groupId: params.groupId,
+          taskId: row.taskId,
+          todolistId: row.todolistId,
+          actor: params.actor,
+          tenant: params.tenant,
+          cfg,
+        });
+        canRead = true;
+      } catch {
+        canRead = false;
+      }
+      readable.set(key, canRead);
+    }
+    if (canRead || row.historyReloadable) {
+      visible.push(row);
+    }
+  }
+  return visible;
 }
 
 export async function confirmCollaborationTodolist(params: {
@@ -1033,7 +1212,7 @@ export async function confirmCollaborationTodolist(params: {
     taskId: params.taskId,
     todolistId: params.todolistId,
   });
-  return unwrapTodolist(
+  const confirmed = unwrapTodolist(
     await confirmTodolist(
       authority,
       { taskId: params.taskId, todolistId: params.todolistId, confirmerId },
@@ -1041,6 +1220,16 @@ export async function confirmCollaborationTodolist(params: {
     ),
     "confirmTodolist",
   );
+  try {
+    await recordOwnerDecisionDelivery({
+      groupId: params.groupId,
+      cfg,
+      delivery: confirmationConsumedDelivery(confirmed),
+    });
+  } catch {
+    // Confirmation already committed. Tracking must not roll it back or repeat it.
+  }
+  return confirmed;
 }
 
 export async function reviseCollaborationTodolist(params: {
