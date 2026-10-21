@@ -73,7 +73,7 @@ tray: the three glyphs sit on the wallpaper. Each glyph is its own click window
 ButtonPress still activates the icon). The folder glyph is dark gold so it
 stays visible on `#e7e7eb`. The Chrome dock icon loads
 `file:///usr/local/share/openbot/desktop/index.html` (OpenBot 云电脑).
-The files icon opens a home-folder window, and the terminal icon opens xterm.
+The files icon opens Thunar at the sandbox home (`thunar <absolute path>`, with `xdg-open` only if Thunar is missing), and the terminal icon opens xterm.
 None of that is in a running container until the image is rebuilt and the
 browser container is recreated:
 

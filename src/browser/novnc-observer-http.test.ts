@@ -220,8 +220,10 @@ describe("noVNC observer bootstrap", () => {
     expect(action("chrome", "-", "tk.Tk", "OpenBot Desktop", "0x1")).toBe("launch -");
     expect(action("chrome", "-", "chromium.Chromium", "OpenBot", "0x2")).toBe("raise 0x2");
     expect(action("chrome", "0x0002", "chromium.Chromium", "OpenBot", "0x2")).toBe("raise 0x2");
-    expect(action("files", "0x9", "tk.Tk", "文件", "0x3")).toBe("raise 0x3");
-    expect(action("files", "0x3", "tk.Tk", "文件", "0x3")).toBe("raise 0x3");
+    expect(action("files", "0x9", "thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe("raise 0x3");
+    expect(action("files", "0x3", "thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe("raise 0x3");
+    expect(action("files", "-", "Thunar", "Thunar", "0x6")).toBe("raise 0x6");
+    expect(action("files", "-", "tk.Tk", "文件", "0x7")).toBe("launch -");
     expect(action("terminal", "-", "xterm.XTerm", "终端", "0x4")).toBe("raise 0x4");
     expect(action("terminal", "0x4", "xterm.XTerm", "终端", "0x4")).toBe("raise 0x4");
     expect(action("terminal", "hidden:0x4", "xterm.XTerm", "终端", "0x4")).toBe("raise 0x4");
@@ -229,7 +231,8 @@ describe("noVNC observer bootstrap", () => {
     expect(shelf("chromium.Chromium", "OpenBot", "0x2")).toBe("hide");
     expect(shelf("google-chrome.Google-chrome", "New Tab", "0x5")).toBe("hide");
     expect(shelf("hidden:0x2", "chromium.Chromium", "OpenBot", "0x2")).toBe("show");
-    expect(shelf("tk.Tk", "文件", "0x3")).toBe("hide");
+    expect(shelf("thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe("hide");
+    expect(shelf("tk.Tk", "文件", "0x3")).toBe("show");
     expect(shelf("xterm.XTerm", "终端", "0x4")).toBe("hide");
     expect(shelf("hidden:0x4", "xterm.XTerm", "终端", "0x4")).toBe("show");
     expect(shelf("tk.Tk", "OpenBot Desktop", "0x1", "chromium.Chromium", "OpenBot", "0x2")).toBe(
