@@ -1,5 +1,10 @@
 import { textHasCompletionClaim } from "../agents/execution-preflight/completion-claim.js";
 import { formatDroppedParkedTaskSentence } from "../conversation-task/focus-policy.js";
+import {
+  classifyCronCompletion,
+  cronUserReasonFromError,
+  type CronCompletionKind,
+} from "./completion-contract.js";
 import { isCronDeliveryOnlyFailure } from "./delivery-only-failure.js";
 import type { CronRunStatus } from "./types.js";
 
@@ -68,6 +73,32 @@ function skillDeliveryStatusLine(state: CronSkillDeliveryState): string | undefi
   }
 }
 
+function cronCompletionStatusLine(
+  completion: CronCompletionKind,
+  params: {
+    deliveryOnly: boolean;
+    emptySuccess: boolean;
+    effectiveStatus: CronRunStatus;
+  },
+): string {
+  if (params.emptySuccess) {
+    if (completion === "needs_attention") {
+      return "needs_attention";
+    }
+    if (completion === "failed") {
+      return "failed";
+    }
+    return "empty";
+  }
+  if (params.effectiveStatus === "ok") {
+    return params.deliveryOnly ? "✅ 执行成功（外部通知未送达）" : "✅ 成功";
+  }
+  if (params.effectiveStatus === "skipped") {
+    return "⏭ 已跳过";
+  }
+  return "❌ 失败";
+}
+
 export function formatCronResultSurfaceMessage(params: {
   jobName: string;
   jobId: string;
@@ -76,33 +107,51 @@ export function formatCronResultSurfaceMessage(params: {
   error?: string;
   durationMs?: number;
   skillDelivery?: CronSkillDeliveryState;
+  outputText?: string;
+  hasArtifact?: boolean;
 }): string {
   const deliveryOnly = isCronDeliveryOnlyFailure(params);
-  const effectiveStatus = deliveryOnly ? "ok" : params.status;
+  const classified = classifyCronCompletion({
+    status: params.status,
+    summary: params.summary,
+    outputText: params.outputText,
+    error: params.error,
+    jobName: params.jobName,
+    hasArtifact: params.hasArtifact,
+  });
+  const emptySuccess =
+    !deliveryOnly &&
+    (classified.completion === "empty" ||
+      classified.completion === "needs_attention" ||
+      (classified.completion === "failed" &&
+        !params.summary?.trim() &&
+        !params.outputText?.trim()));
+  const effectiveStatus = deliveryOnly ? "ok" : emptySuccess ? "error" : params.status;
   const skillLine = params.skillDelivery
     ? skillDeliveryStatusLine(params.skillDelivery)
     : undefined;
-  const statusLine =
-    skillLine ??
-    (effectiveStatus === "ok"
-      ? deliveryOnly
-        ? "✅ 执行成功（外部通知未送达）"
-        : "✅ 成功"
-      : effectiveStatus === "skipped"
-        ? "⏭ 已跳过"
-        : "❌ 失败");
+  const completionLine = cronCompletionStatusLine(classified.completion, {
+    deliveryOnly,
+    emptySuccess,
+    effectiveStatus,
+  });
+  const statusLine = skillLine ?? completionLine;
   const awaitingReceipt =
     params.skillDelivery === "run_finished" ||
     params.skillDelivery === "artifact_created" ||
     params.skillDelivery === "validation_pending" ||
     params.skillDelivery === "delivery_blocked";
-  const rawSummary = params.summary?.trim();
+  const rawSummary =
+    params.summary?.trim() ||
+    (classified.completion === "ok" ? params.outputText?.trim() : undefined);
   const summary =
     awaitingReceipt && rawSummary && textHasCompletionClaim(rawSummary)
       ? "这次定时运行已经结束。"
       : rawSummary;
-  const deliverable =
-    effectiveStatus === "error"
+  const visibleReason = classified.userReason || cronUserReasonFromError(params.error) || "";
+  const deliverable = emptySuccess
+    ? visibleReason
+    : effectiveStatus === "error"
       ? params.error?.trim() || summary || "任务执行失败，未生成摘要。"
       : summary ||
         params.error?.trim() ||

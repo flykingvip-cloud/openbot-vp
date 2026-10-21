@@ -39,6 +39,13 @@ export type DeliverableEnvelope = {
    */
   settle?: DeliverableSettleState;
   /**
+   * Batch 8 trial annotation. preview_promoted / degraded_html / degraded_md / formal.
+   * Not a business accept, and not a substitute for settle.
+   */
+  grade?: string;
+  /** "1" when a skill trial/smoke gate wrote this declaration. */
+  trial?: string;
+  /**
    * Declared published/external URL (e.g. a WeChat draft link) when the deliverable was
    * published outside the workspace. Set from a `url=` envelope attribute; must be http(s).
    */
@@ -75,6 +82,8 @@ export type DeliverableEnvelopeAttributes = {
   url?: string;
   unwritten?: boolean;
   settle?: DeliverableSettleState;
+  grade?: string;
+  trial?: string;
 };
 
 /** Normalize an untrusted declaration to a safe workspace-relative file path. */
@@ -141,6 +150,16 @@ export function parseDeliverableAttributes(block: string): DeliverableEnvelopeAt
       ) {
         attrs.settle = normalized;
       }
+    } else if (key === "grade") {
+      const grade = value
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g, "")
+        .slice(0, 40);
+      if (grade) {
+        attrs.grade = grade;
+      }
+    } else if (key === "trial") {
+      attrs.trial = value === "1" || value.toLowerCase() === "true" ? "1" : "0";
     }
   }
   return attrs;
@@ -192,6 +211,8 @@ function buildTaggedEnvelope(attrBlock: string, rawBody: string): DeliverableEnv
     url: attrs.url,
     unwritten: attrs.unwritten || undefined,
     settle: attrs.settle,
+    grade: attrs.grade,
+    trial: attrs.trial,
     body,
   };
 }

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { formatActiveSkillGlossary } from "../../agents/skill-gates/glossary.js";
 import { TASK_SURFACE_CONTINUITY_LINE } from "../../agents/task-surface/surface.js";
 import { TURN_COMPLETION_CONTINUITY_LINE } from "../../agents/turn-completion/contract.js";
 import type { OpenBotConfig } from "../../config/config.js";
@@ -1228,6 +1229,13 @@ export async function buildSessionContinuityPrompt(params: {
   }
   lines.push("", TURN_COMPLETION_CONTINUITY_LINE);
   lines.push(TASK_SURFACE_CONTINUITY_LINE);
+  const skillGlossary = formatActiveSkillGlossary({
+    userText: lines.join("\n"),
+    boundSkillIds: boundTasks.map((task) => task.title),
+  });
+  if (skillGlossary) {
+    lines.push(skillGlossary);
+  }
   return truncateUtf16Safe(lines.join("\n"), MAX_INJECTED_CONTINUITY_CHARS);
 }
 

@@ -2,6 +2,7 @@ import { resolveFailoverReasonFromError } from "../../agents/failover-error.js";
 import type { CronConfig, CronRetryOn } from "../../config/types.cron.js";
 import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
 import { DEFAULT_AGENT_ID } from "../../routing/session-key.js";
+import { isCronCompletionScheduleHold } from "../completion-contract.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
 import { sweepCronRunSessions } from "../session-reaper.js";
 import type {
@@ -322,20 +323,23 @@ export function applyJobResult(
   job.state.lastRunStatus = result.status;
   job.state.lastStatus = result.status;
   job.state.lastDurationMs = Math.max(0, result.endedAt - result.startedAt);
+  const completionHold = isCronCompletionScheduleHold(result.error);
   job.state.lastError = result.error;
   job.state.lastErrorReason =
-    result.status === "error" && typeof result.error === "string"
+    result.status === "error" && !completionHold && typeof result.error === "string"
       ? (resolveFailoverReasonFromError(result.error) ?? undefined)
       : undefined;
   job.state.lastDelivered = result.delivered;
   const deliveryStatus = resolveDeliveryStatus({ job, delivered: result.delivered });
   job.state.lastDeliveryStatus = deliveryStatus;
   job.state.lastDeliveryError =
-    deliveryStatus === "not-delivered" && result.error ? result.error : undefined;
+    !completionHold && deliveryStatus === "not-delivered" && result.error
+      ? result.error
+      : undefined;
   job.updatedAtMs = result.endedAt;
 
-  // Track consecutive errors for backoff / auto-disable.
-  if (result.status === "error") {
+  // Empty / needs_attention are not success, and they are not transport failures.
+  if (result.status === "error" && !completionHold) {
     job.state.consecutiveErrors = (job.state.consecutiveErrors ?? 0) + 1;
     const alertConfig = resolveFailureAlert(state, job);
     if (alertConfig && job.state.consecutiveErrors >= alertConfig.after) {
@@ -371,7 +375,7 @@ export function applyJobResult(
 
   if (!shouldDelete) {
     if (job.schedule.kind === "at") {
-      if (result.status === "ok" || result.status === "skipped") {
+      if (result.status === "ok" || result.status === "skipped" || completionHold) {
         // One-shot done or skipped: disable to prevent tight-loop (#11452).
         job.enabled = false;
         job.state.nextRunAtMs = undefined;
@@ -413,7 +417,7 @@ export function applyJobResult(
           );
         }
       }
-    } else if (result.status === "error" && job.enabled) {
+    } else if (result.status === "error" && job.enabled && !completionHold) {
       // Apply exponential backoff for errored jobs to prevent retry storms.
       const backoff = errorBackoffMs(job.state.consecutiveErrors ?? 1);
       let normalNext: number | undefined;

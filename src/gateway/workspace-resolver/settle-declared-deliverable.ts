@@ -144,6 +144,10 @@ export function patchDeliverableDeclarationAttrs(
     nextRelativePath?: string;
     unwritten?: boolean;
     settle?: DeliverableSettleState | null;
+    /** Batch 8 trial grade. Not a new settle state and not business accepted. */
+    grade?: string | null;
+    /** Batch 8 trial marker, "1" when a smoke/trial gate promoted or degraded. */
+    trial?: string | null;
   },
 ): string {
   const escaped = declaredRelativePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -177,8 +181,29 @@ export function patchDeliverableDeclarationAttrs(
         nextAttrs = `${nextAttrs} settle="${patch.settle}"`;
       }
     }
+    nextAttrs = upsertDeclarationAttr(nextAttrs, "grade", patch.grade);
+    nextAttrs = upsertDeclarationAttr(nextAttrs, "trial", patch.trial);
     return `<<DELIVERABLE${nextAttrs}>>`;
   });
+}
+
+function upsertDeclarationAttr(
+  attrs: string,
+  name: string,
+  value: string | null | undefined,
+): string {
+  if (value === undefined) {
+    return attrs;
+  }
+  const token = value === null ? "" : value.replace(/[^a-z0-9_]/gi, "").slice(0, 40);
+  const re = new RegExp(`\\s*\\b${name}\\s*=\\s*(?:"[^"]*"|'[^']*'|[^\\s"'>]+)`, "i");
+  if (value === null || !token) {
+    return attrs.replace(re, "");
+  }
+  if (re.test(attrs)) {
+    return attrs.replace(re, ` ${name}="${token}"`);
+  }
+  return `${attrs} ${name}="${token}"`;
 }
 
 export function markDeliverableDeclarationUnwritten(text: string, relativePath: string): string {
