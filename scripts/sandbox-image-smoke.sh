@@ -18,8 +18,8 @@ if [[ "${uid}" != "1000" || "${gid}" != "1000" ]]; then
   exit 1
 fi
 node_major="$(node -p "process.versions.node.split(\".\")[0]")"
-if [[ "${node_major}" -lt 20 ]]; then
-  echo "error: node major is ${node_major}, expected >= 20 ($(node -v))" >&2
+if [[ "${node_major}" != "20" ]]; then
+  echo "error: node major is ${node_major}, expected 20 ($(node -v))" >&2
   exit 1
 fi
 command -v npm >/dev/null
@@ -42,5 +42,53 @@ if ! fc-list | grep -q "Noto Sans CJK SC"; then
   echo "error: Noto Sans CJK SC is not registered with fontconfig" >&2
   exit 1
 fi
+probe_dir="$(mktemp -d)"
+probe_html="${probe_dir}/probe.html"
+probe_pdf="${probe_dir}/probe.pdf"
+probe_txt="${probe_dir}/probe.txt"
+chrome_user_dir="${probe_dir}/chrome"
+mkdir -p "${chrome_user_dir}"
+cat > "${probe_html}" <<EOF
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>sandbox pdf probe</title>
+<style>
+  body { font-family: "Noto Sans CJK SC", sans-serif; font-size: 28px; }
+</style>
+</head>
+<body>
+<p>中文 PDF 探测</p>
+</body>
+</html>
+EOF
+if ! "${chrome_bin}" \
+  --headless \
+  --disable-gpu \
+  --no-sandbox \
+  --disable-dev-shm-usage \
+  --user-data-dir="${chrome_user_dir}" \
+  --print-to-pdf="${probe_pdf}" \
+  "${probe_html}" >/dev/null; then
+  echo "error: system chromium failed to print a Chinese PDF (${chrome_bin})" >&2
+  exit 1
+fi
+if [[ ! -s "${probe_pdf}" ]]; then
+  echo "error: chromium did not write a PDF at ${probe_pdf}" >&2
+  exit 1
+fi
+if ! pdftotext -layout "${probe_pdf}" "${probe_txt}"; then
+  echo "error: pdftotext failed to extract text from ${probe_pdf}" >&2
+  exit 1
+fi
+if ! grep -q "中文 PDF 探测" "${probe_txt}"; then
+  echo "error: pdftotext did not extract Chinese probe text「中文 PDF 探测」" >&2
+  echo "---- extracted ----" >&2
+  cat "${probe_txt}" >&2 || true
+  echo "---- end ----" >&2
+  exit 1
+fi
+echo "pdftotext extracted: 中文 PDF 探测"
 echo "sandbox smoke ok: uid:gid ${uid}:${gid} node $(node -v) npm $(npm -v) browser ${chrome_bin} (${browser_version}) pdftotext $(command -v pdftotext)"
 '

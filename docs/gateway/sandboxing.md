@@ -131,7 +131,8 @@ The published tag stays `openbot-sandbox:bookworm-slim`. The image underneath
 is Debian 13 (trixie) with apt Node 20, npm, Chromium, poppler
 (`pdftotext` / `pdfinfo` / `pdftoppm`), and `fonts-noto-cjk` (Noto Sans CJK SC).
 Runtime user `sandbox` is uid/gid 1000:1000. `scripts/sandbox-setup.sh` runs
-`scripts/sandbox-image-smoke.sh`, which checks that contract.
+`scripts/sandbox-image-smoke.sh`, which checks that contract, including a
+system-Chromium PDF whose text `pdftotext` must extract as「中文 PDF 探测」.
 
 A missing image still falls back to raw `debian:bookworm-slim` (no Node 20 and
 no Chromium). Rebuild with `scripts/sandbox-setup.sh` before expecting the PDF
