@@ -25,10 +25,12 @@ RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/
     python3 \
     python3-tk \
     socat \
+    thunar \
     websockify \
     wmctrl \
     x11-utils \
     x11vnc \
+    xdg-utils \
     xterm \
     xvfb
 
@@ -41,6 +43,15 @@ COPY --chmod=755 scripts/sandbox-browser-entrypoint.sh /usr/local/bin/openbot-sa
 COPY --chmod=755 scripts/sandbox-browser-desktop.py /usr/local/bin/openbot-sandbox-desktop
 COPY ui/public/openbot-logo.png /usr/local/share/openbot/desktop/openbot-logo.png
 COPY scripts/sandbox-browser-start.html /usr/local/share/openbot/desktop/index.html
+
+# Thunar is the directory opener. xdg-mime default writes
+# $XDG_CONFIG_HOME/mimeapps.list (else ~/.config). Point that at /etc/xdg,
+# which is the default XDG_CONFIG_DIRS, so every account resolves
+# inode/directory to thunar.desktop. The entrypoint repeats the command for
+# the runtime HOME (/tmp/openbot-home).
+RUN mkdir -p /etc/xdg /usr/share/applications \
+  && XDG_CONFIG_HOME=/etc/xdg xdg-mime default thunar.desktop inode/directory \
+  && cp /etc/xdg/mimeapps.list /usr/share/applications/mimeapps.list
 
 # Hide the "--disable-setuid-sandbox" infobar. The sandbox user cannot write /etc at runtime.
 RUN mkdir -p /etc/chromium/policies/managed /etc/chromium-browser/policies/managed \
