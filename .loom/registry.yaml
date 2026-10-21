@@ -9274,6 +9274,41 @@ tasks:
     since: 2026-10-21
     metadata: {}
 landingStreams:
+  - id: strip-ohbe-from-openbot-vp
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .github/workflows/delivery-sot-alignment.yml
+      - .github/workflows/docker-release.yml
+      - .kiro/specs/constitutional-governance-state-convergence/evidence/2026-10-14-state-refresh.md
+      - AGENTS.md
+      - deploy/production/LEDGER.md
+      - deploy/production/README.md
+      - deploy/production/releases.jsonl
+      - deploy/production/scripts/cutover-from-ghcr.sh
+      - deploy/production/scripts/verify-live-image-identity.sh
+      - docs/design/employee-skill-lifecycle-gate-a-baseline-diff-2026-10-10.md
+      - docs/design/oi-intelligent-bind-s6-social-verified-live-2026-10-19.md
+      - docs/design/oi-x-twitter-oauth-personal-identity-2026-10-14.md
+      - docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md
+      - scripts/delivery/cli.test.ts
+      - scripts/delivery/cli.ts
+      - scripts/delivery/cutover-record.ts
+      - scripts/delivery/ledger-audit.ts
+      - scripts/delivery/ledger-location.ts
+      - scripts/delivery/ledger.test.ts
+      - skills/oi-bind-x-twitter/SKILL.md
+      - skills/oi-bind-x-twitter/references/field-contract.md
+      - skills/oi-bind-x-twitter/references/live-evidence.md
+      - skills/oi-bind-x-twitter/references/oauth-path.md
+      - skills/oi-orchestrate-personal-identity/references/catalog-map.md
+      - src/gateway/skill-precipitation/skill-precipitation-actskill.integration.test.ts
+      - src/gateway/skill-precipitation/skill-precipitation.test.ts
+    canLandWith: []
+    metadata:
+      task: strip-ohbe-from-openbot-vp
+      owner: cursor-cloud
+      purpose: Remove the duplicated production ledger and point OHBE mentions at the OHBE repository. First-match so these shared files land together.
   - id: batch6-turn-completion
     landingPolicy: serial
     paths:

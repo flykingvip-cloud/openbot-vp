@@ -37,7 +37,7 @@ Repo：`upbeyond/openbot`
 | weibo | 承继 S5 Cloud PC：GeeTest / **111001** measured；绑定仍未成 | `path_unstable: true` / `verified_live: false` |
 | zhihu | 相关：Account Computer #827 登录页 QR/SMS detect（**不等于** OI `credentials.bind` 成功） | `path_unstable: true` / `verified_live: false` |
 | xiaohongshu / douyin / bilibili / kuaishou | S6 本切片未取得 Cloud PC 绑定成功证据 | 仍 unstable / not verified_live |
-| x-twitter | 应用内 OAuth 产品路径仍 `path_unstable: false`；OHBE/真机 OAuth 完成仍缺 | `verified_live: false` |
+| x-twitter | 应用内 OAuth 产品路径仍 `path_unstable: false`；OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）/真机 OAuth 完成仍缺 | `verified_live: false` |
 | 七站翻旗合计 | **0 / 7** 本切片翻为 verified_live | 优先诚实增量，禁止伪造全七站 live |
 
 ## verified_live 取证标准（闸门）

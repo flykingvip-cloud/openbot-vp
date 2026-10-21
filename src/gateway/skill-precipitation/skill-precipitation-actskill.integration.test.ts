@@ -151,9 +151,16 @@ describe("actSkill ↔ skill-precipitation integration", () => {
           { instruction: "Pin tip SHA and update oneshot templates", tools: ["shell"] },
           { instruction: "Build amd64 image and recreate LIVE Path B", tools: ["docker", "ssh"] },
           { instruction: "Verify sandbox exec.host and health endpoints", tools: ["ssh"] },
-          { instruction: "Write ledger entry and OHBE before merge", tools: ["gh"] },
+          {
+            instruction:
+              "Write ledger entry in OHBE (https://github.com/flykingvip-cloud/harness-Benchmark-Engine) before merge",
+            tools: ["gh"],
+          },
         ],
-        redLines: ["No self-merge without OHBE PASS", "Do not enable auto failover"],
+        redLines: [
+          "No self-merge without OHBE PASS (https://github.com/flykingvip-cloud/harness-Benchmark-Engine)",
+          "Do not enable auto failover",
+        ],
         acceptance: ["LIVE healthz OK", "ledger seq+1"],
         failureModes: ["gateway crash-loop if exec.host=node"],
         toolsUsed: ["shell", "docker", "ssh", "gh"],

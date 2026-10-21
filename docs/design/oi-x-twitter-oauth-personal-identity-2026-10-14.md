@@ -68,7 +68,7 @@ Callback：`<gateway-origin>/__openbot/user-operational-identity/oauth/callback`
 
 ## 非目标
 
-- 合入 main 前的 OHBE 真机 E2E（本 PR 等验收）
+- 合入 main 前的 OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）真机 E2E（本 PR 等验收）
 - Cookie / social_account 手填作为默认路径
 - 企业侧新媒体矩阵改版（可并行复用同一 adapter）
 
