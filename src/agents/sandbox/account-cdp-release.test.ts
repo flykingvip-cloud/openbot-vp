@@ -16,6 +16,9 @@ const registryMocks = vi.hoisted(() => ({
 vi.mock("./docker.js", () => ({
   execDocker: vi.fn(async () => ({ code: 0, stdout: "", stderr: "" })),
   dockerContainerState: vi.fn(),
+  // Loading context.ts evaluates account-computer-stream, which binds this
+  // export at module init. The CDP release cases still drive execDocker.
+  dockerContainerLiveness: vi.fn(async () => "running"),
 }));
 
 vi.mock("./registry.js", () => ({
