@@ -27,6 +27,8 @@ export type RestorePendingReviewItem = {
   taskId?: string;
   /** True when a workspace file for this artifact was observed. Never a close. */
   filePresent?: boolean;
+  /** Where a non-mainline row was injected from. */
+  source?: "ledger" | "restore" | "heartbeat";
 };
 
 export type RestoreTaskLedgerRow = {
@@ -34,6 +36,8 @@ export type RestoreTaskLedgerRow = {
   status: string;
   title: string;
   artifacts?: readonly string[];
+  /** Batch 7 keep-only. Never produced by file-exists reconciliation. */
+  surface_disposition?: "cancelled";
 };
 
 export type RestoreArtifactLedgerRow = {
@@ -118,10 +122,13 @@ export function reconcileRestoreTaskPointersReadOnly(params: {
     if (!label) {
       continue;
     }
-    pendingReview.push({ kind: "checkpoint_open_task", label });
+    pendingReview.push({ kind: "checkpoint_open_task", label, source: "restore" });
   }
 
   for (const task of params.taskLedger) {
+    if (task.surface_disposition === "cancelled") {
+      continue;
+    }
     if (task.status !== "active" || task.id === currentTaskId) {
       continue;
     }
@@ -129,6 +136,7 @@ export function reconcileRestoreTaskPointersReadOnly(params: {
       kind: "unbound_ledger",
       label: task.title.trim() || task.id,
       taskId: task.id,
+      source: "ledger",
     });
   }
 
@@ -145,6 +153,7 @@ export function reconcileRestoreTaskPointersReadOnly(params: {
     pendingReview.push({
       kind: "missing_relationship",
       label,
+      source: "restore",
       ...(taskId ? { taskId } : {}),
       ...(filePresent ? { filePresent: true } : {}),
     });
@@ -183,10 +192,10 @@ export function isolateLegacyRestoreTranscriptText(restoreText: string): string 
   if (restoreText.includes(RESTORE_OPEN_TASKS_FENCE_START)) {
     return restoreText;
   }
-  return restoreText.replace(
-    /^(Open tasks: .+)$/m,
-    `${RESTORE_OPEN_TASKS_FENCE_START}\n$1\n${RESTORE_OPEN_TASKS_FENCE_END}`,
-  );
+  return restoreText.replace(/^(Open tasks\b.*)$/m, (line) => {
+    const labeled = /\bsource=restore\b/.test(line) ? line : `${line} source=restore`;
+    return `${RESTORE_OPEN_TASKS_FENCE_START}\n${labeled}\n${RESTORE_OPEN_TASKS_FENCE_END}`;
+  });
 }
 
 export function stripRestorePendingReviewFences(text: string): string {

@@ -58,6 +58,9 @@ function makeTask(
     session_ids: overrides.session_ids,
     last_session_id: overrides.last_session_id ?? "",
     updated_at: overrides.updated_at ?? "2026-10-19T12:00:00.000Z",
+    ...(overrides.surface_disposition
+      ? { surface_disposition: overrides.surface_disposition }
+      : {}),
   };
 }
 
@@ -283,6 +286,22 @@ describe("loadContextCandidates + groupTaskStableSummary", () => {
     expect(candidates.task).toContain("Confirmed decisions:");
     expect(candidates.task).toContain("继续沿用已确认大纲");
     expect(candidates.task).toContain("injecting stable ledger snapshot");
+  });
+
+  it("skips a bound row the hang-list keep-only already cancelled", () => {
+    const cancelled = makeTask({
+      id: "task_cancelled",
+      status: "active",
+      title: "近5年外企在华知识产权",
+      surface_disposition: "cancelled",
+    });
+    const other = makeTask({ id: "task_other", status: "active", title: "别的任务" });
+    expect(
+      selectStableGroupTask({
+        tasks: [cancelled, other],
+        boundTaskId: "task_cancelled",
+      }),
+    ).toBeUndefined();
   });
 
   it("flag-off + bound done group task → empty (legacy active-only)", async () => {

@@ -64,12 +64,17 @@ export function selectStableGroupTask(params: {
   const boundId = params.boundTaskId?.trim();
   if (boundId) {
     const bound = params.tasks.find((task) => task.id === boundId);
+    if (bound?.surface_disposition === "cancelled") {
+      return undefined;
+    }
     if (bound) {
       return { task: bound, binding: "bound" };
     }
   }
 
-  const sorted = [...params.tasks].toSorted(sortByRecencyThenStatus);
+  const sorted = params.tasks
+    .filter((task) => task.surface_disposition !== "cancelled")
+    .toSorted(sortByRecencyThenStatus);
   const active = sorted.find((task) => task.status === "active");
   if (active) {
     return { task: active, binding: "fallback-active" };
