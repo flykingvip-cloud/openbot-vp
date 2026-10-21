@@ -118,6 +118,37 @@ describe("steward deliverable preview routing", () => {
     );
   });
 
+  it("does not accept a PDF preview when the server bytes do not parse", async () => {
+    const host = createHost();
+    const workspace = buildStewardWorkspace("讲座报告.pdf");
+    const request = vi.fn(async (method: string) => {
+      if (method === "workbench.steward-file.read") {
+        return {
+          filename: "讲座报告.pdf",
+          relativePath: "讲座报告.pdf",
+          mimeType: "application/pdf",
+          byteLength: 11,
+          textLike: false,
+          base64: btoa("not-a-pdf"),
+        };
+      }
+      throw new Error(`unexpected rpc: ${method}`);
+    });
+
+    const route = await openArtifactDeliverablePreview({
+      host,
+      workspace,
+      client: { request } as never,
+      sessionKey: "agent:main:main",
+      sessionsResult: { sessions: [{ key: "agent:main:main", updatedAt: Date.now() }] } as never,
+    });
+
+    expect(route).toBe("steward-file");
+    expect(host.sidebarArtifactWorkspace?.artifact.providerMetadata?.previewKind).not.toBe("pdf");
+    expect(host.sidebarArtifactWorkspace?.artifact.providerMetadata?.pdfParseFailed).toBe(true);
+    expect(host.sidebarArtifactWorkspace?.artifact.providerMetadata?.previewUnavailable).toBe(true);
+  });
+
   it("opens the sidebar with a loading shell before the file RPC resolves", async () => {
     const host = createHost();
     const workspace = buildStewardWorkspace("组织新未来_当数字人成为你的同事_精美版.pdf");

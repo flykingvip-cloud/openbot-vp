@@ -35,7 +35,7 @@ export async function openStewardWorkspaceFileArtifact(
   sessionKey: string | null | undefined,
   client: ReturnType<typeof adaptDaibaiState>["client"],
   options?: { shouldApply?: () => boolean },
-): Promise<"loaded" | "miss" | "unmappable" | "rejected"> {
+): Promise<"loaded" | "miss" | "unmappable" | "rejected" | "unparsed"> {
   const shouldApply = () => options?.shouldApply?.() ?? true;
   // Request a faithful render: a produced Word file comes back as HTML, text files as bytes.
   const readOptions = {
@@ -86,6 +86,9 @@ export async function openStewardWorkspaceFileArtifact(
     lane === "binary"
   ) {
     return "loaded";
+  }
+  if (host.sidebarArtifactWorkspace?.artifact.providerMetadata?.pdfParseFailed === true) {
+    return "unparsed";
   }
 
   if (!shouldApply()) {

@@ -284,6 +284,9 @@ describe("applyWorkspaceFilePreview html lane", () => {
     expect(lane).toBe("pdf");
     const meta = host.sidebarArtifactWorkspace?.artifact.providerMetadata ?? {};
     expect(meta.previewKind).toBe("pdf");
+    expect(Buffer.from(String(meta.fileBase64), "base64").subarray(0, 5).toString("utf8")).toBe(
+      "%PDF-",
+    );
     if (typeof URL !== "undefined" && typeof Blob !== "undefined") {
       expect(expectText(meta.pdfPreviewUrl)).toMatch(/^blob:/);
       expect(host.sidebarArtifactWorkspace?.artifact.previewUrl).toMatch(/^blob:/);

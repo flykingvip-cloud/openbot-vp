@@ -264,7 +264,7 @@ export async function openArtifactDeliverablePreview(params: {
   const groupFile = resolveGroupWorkspaceReadTarget(workspace, groupId, manifestEntry);
   const scopedToGroup = isGroupScopedSessionKey(sessionKey);
 
-  const tryGroup = async (): Promise<"ok" | "miss" | "stale"> => {
+  const tryGroup = async (): Promise<"ok" | "miss" | "stale" | "unparsed"> => {
     if (!groupFile) {
       return "miss";
     }
@@ -279,10 +279,15 @@ export async function openArtifactDeliverablePreview(params: {
     if (!isCurrentPreviewOpen(host, openEpoch)) {
       return "stale";
     }
+    if (host.sidebarArtifactWorkspace?.artifact.providerMetadata?.pdfParseFailed === true) {
+      return "unparsed";
+    }
     return previewLoadedWorkspaceFile(host) ? "ok" : "miss";
   };
 
-  const trySteward = async (): Promise<"ok" | "miss" | "stale" | "unmappable" | "rejected"> => {
+  const trySteward = async (): Promise<
+    "ok" | "miss" | "stale" | "unmappable" | "rejected" | "unparsed"
+  > => {
     if (!workspaceFilename) {
       return "miss";
     }
@@ -296,6 +301,9 @@ export async function openArtifactDeliverablePreview(params: {
     );
     if (!isCurrentPreviewOpen(host, openEpoch)) {
       return "stale";
+    }
+    if (opened === "unparsed") {
+      return "unparsed";
     }
     if (opened === "loaded" && previewLoadedWorkspaceFile(host)) {
       return "ok";
@@ -326,6 +334,9 @@ export async function openArtifactDeliverablePreview(params: {
     if (group === "ok") {
       return finishLoaded("group-file");
     }
+    if (group === "unparsed") {
+      return "group-file";
+    }
   } else {
     const steward = await trySteward();
     if (steward === "stale") {
@@ -333,6 +344,9 @@ export async function openArtifactDeliverablePreview(params: {
     }
     if (steward === "ok") {
       return finishLoaded("steward-file");
+    }
+    if (steward === "unparsed") {
+      return "steward-file";
     }
     if (steward === "unmappable" || steward === "rejected") {
       applyUnavailableFilePreview({

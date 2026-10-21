@@ -474,10 +474,21 @@ function buildEnvelopeArtifactRecord(
         ? { workspaceUnwritten: true, previewUnavailable: true }
         : {}),
       ...(envelope.settle === "retryable"
-        ? { settleRetryable: true, archiveClaimBlocked: true }
+        ? {
+            settleRetryable: true,
+            archiveClaimBlocked: true,
+            previewUnavailable: true,
+            deliveryUndelivered: true,
+          }
         : {}),
       ...(envelope.settle === "conflict"
-        ? { settleConflict: true, archiveClaimBlocked: true, previewStale: true }
+        ? {
+            settleConflict: true,
+            archiveClaimBlocked: true,
+            previewStale: true,
+            previewUnavailable: true,
+            deliveryUndelivered: true,
+          }
         : {}),
       ...(envelope.settle === "confirmed" ? { settleConfirmed: true } : {}),
       ...(envelopePreview.url ? { openUrl: envelopePreview.url } : {}),
