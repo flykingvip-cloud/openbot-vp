@@ -19,9 +19,18 @@ import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-erro
 import { isMemoryFlushHistoryMessage } from "../../auto-reply/reply/memory-flush-prompt.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import {
+  emptyRestoreTaskReconciliation,
+  isolateLegacyRestoreTranscriptText,
+  isRestoreTaskIsolationMessage,
+  restoreTaskIsolationStamp,
+  toRestoreTaskIsolationPayload,
+  type RestoreTaskReconciliation,
+} from "../../auto-reply/reply/restore-task-isolation.js";
+import {
   formatSessionContinuityCheckpointRestoreText,
   commitSessionContinuityForCurrentSession,
   loadLatestSessionContinuityCheckpoint,
+  loadRestoreTaskReconciliation,
   restoreWorkspaceSnapshotForCheckpoint,
   resolveSessionContinuityWorkspaceDir,
 } from "../../auto-reply/reply/session-continuity.js";
@@ -1881,6 +1890,10 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
         : undefined;
     const expectedLanguage: VisibleReplyLanguage | null =
       stamped === "zh" || stamped === "en" ? stamped : carriedLanguage;
+    if (isRestoreTaskIsolationMessage(message)) {
+      changed = true;
+      continue;
+    }
     if (isHiddenToolUseScratchpadMessage(message, expectedLanguage)) {
       changed = true;
       continue;
@@ -2635,6 +2648,8 @@ async function appendAssistantTranscriptMessage(params: {
   };
   /** Sanitized 大白引导卡片，随 assistant 转写保留。 */
   guideCard?: Record<string, unknown>;
+  /** Legacy restore receipt. Kept in the file, excluded from the task main line. */
+  restoreTaskIsolation?: ReturnType<typeof restoreTaskIsolationStamp>;
   peerDelivery?: {
     senderLabel: string;
     sourceSessionKey: string;
@@ -2715,6 +2730,7 @@ async function appendAssistantTranscriptMessage(params: {
     abortMeta: params.abortMeta,
     cronResult: params.cronResult,
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
+    ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
   });
 }
 
@@ -6490,6 +6506,25 @@ export const chatHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    // Read-only: missing relationships stay pending review. Do not close a
+    // ledger row because a workspace file exists, and do not merge those rows
+    // into the session's current task.
+    let taskReconciliation: RestoreTaskReconciliation = emptyRestoreTaskReconciliation();
+    try {
+      taskReconciliation = await loadRestoreTaskReconciliation({
+        cfg,
+        workspaceDir: restoreWorkspaceDir,
+        agentId: restoreCheckpointScope.agentId,
+        sessionKey: restoreSessionKey,
+        sessionEntry: entry,
+        checkpointOpenTasks: checkpoint.open_tasks,
+      });
+    } catch (err) {
+      context.logGateway.warn(
+        `chat.restore task reconciliation skipped session=${sessionKey}: ${String(err)}`,
+      );
+    }
+    const taskIsolation = toRestoreTaskIsolationPayload(taskReconciliation);
     // Destructive targeted restore (chat-checkpoint-rollback P3): only when a
     // specific checkpointId is requested. The legacy no-arg path stays a
     // non-destructive context re-injection for backward compatibility.
@@ -6751,6 +6786,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       respond(true, {
         ok: true,
         checkpointId: checkpoint.id,
+        taskIsolation,
         ...(restoredFiles !== undefined ? { restoredFiles } : {}),
         ...(removedFiles !== undefined ? { removedFiles } : {}),
         ...(unchangedFiles !== undefined ? { unchangedFiles } : {}),
@@ -6759,8 +6795,12 @@ export const chatHandlers: GatewayRequestHandlers = {
       return;
     }
     // Legacy no-arg restore: non-destructive context re-injection (backward
-    // compatible). Not wired to the per-turn divider UI; kept for compatibility.
-    const restoreMessage = formatSessionContinuityCheckpointRestoreText(checkpoint);
+    // compatible). The transcript may still contain checkpoint open_tasks, but
+    // they are fenced and stamped so they do not join the current task main line.
+    const restoreMessage = isolateLegacyRestoreTranscriptText(
+      formatSessionContinuityCheckpointRestoreText(checkpoint),
+    );
+    const restoreIsolation = restoreTaskIsolationStamp(checkpoint.open_tasks);
     const restoreGovernance = await resolveChatTranscriptGovernance({
       client,
       cfg,
@@ -6778,6 +6818,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       ownerUserId: restoreGovernance.ownerUserId,
       groupId: restoreGovernance.groupId,
       failClosed: restoreGovernance.failClosed,
+      restoreTaskIsolation: restoreIsolation,
     });
     if (!appended.ok || !appended.messageId || !appended.message) {
       respond(
@@ -6809,6 +6850,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       messageId: appended.messageId,
       checkpointId: checkpoint.id,
       summary: checkpoint.summary,
+      taskIsolation,
     });
   },
 };
