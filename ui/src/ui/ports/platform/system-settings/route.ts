@@ -1,6 +1,11 @@
 import { pathForTab } from "../../../navigation.ts";
 
-export type PlatformSystemSettingsSection = "admins" | "defaults" | "security" | "api";
+export type PlatformSystemSettingsSection =
+  | "admins"
+  | "defaults"
+  | "security"
+  | "api"
+  | "device-platform";
 
 export const PLATFORM_SYSTEM_SETTINGS_HASH_PREFIX = "#platform-system-settings:";
 

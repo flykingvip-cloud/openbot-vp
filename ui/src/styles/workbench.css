@@ -5131,6 +5131,65 @@
   display: block;
 }
 
+.personal-devices__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.personal-devices__list {
+  display: flex;
+  flex-direction: column;
+}
+
+.personal-devices__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.personal-devices__item.is-active {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.personal-devices__item-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.personal-devices__item-meta,
+.personal-devices__note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.personal-devices__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.personal-devices__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.personal-devices__check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .employee-workbench__personal-settings-main .employee-workbench__memory-list-label {
   margin-top: 12px;
   font-size: 12px;

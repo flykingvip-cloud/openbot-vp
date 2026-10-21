@@ -46,6 +46,11 @@ export type IdentityDirectory = {
    * Implementations must not return true from ownerId equality alone.
    */
   hasDigitalHumanUse(actor: TrustedActor, human: DigitalHumanRecord): boolean;
+  /**
+   * Digital humans this actor may bind. Omitted directories expose none.
+   * ownerId equality is not a substitute for this list.
+   */
+  listUsableDigitalHumans?(actor: TrustedActor): DigitalHumanRecord[];
 };
 
 export type PlatformSessionSlice = {

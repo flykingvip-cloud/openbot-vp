@@ -1221,7 +1221,9 @@
                       "gateway/local-models",
                       "integrations/device-digital-human/index",
                       "integrations/device-digital-human/staging",
-                      "integrations/device-platform/management"
+                      "integrations/device-platform/management",
+                      "integrations/device-platform/staging",
+                      "integrations/device-platform/joint-acceptance"
                     ]
                   },
                   {

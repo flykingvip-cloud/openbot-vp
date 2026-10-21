@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { probeDevicePlatformConnection } from "./connection-probe.js";
 import type { DevicePlatformControlClient } from "./control-client.js";
 import {
   toAdminConnectionDto,
@@ -8,6 +9,8 @@ import {
   type UserDeviceDto,
   type UserOperationDto,
 } from "./dto.js";
+import type { DeviceControlFetch } from "./http-control-client.js";
+import { assertBodyHasNoPairingFields } from "./http-control-client.js";
 import { bodyHash, dropInflightIdempotency, hashesEqual, sha256Hex } from "./idempotency.js";
 import {
   assertFormalRuntime,
@@ -26,9 +29,16 @@ import {
 } from "./permissions.js";
 import type { DevicePlatformStore } from "./store.js";
 import {
+  stubGrantRegistryFromEnv,
+  type StubGrantRegistry,
+  type StubGrantView,
+} from "./stub-grant-registry.js";
+import {
+  DEVICE_PLATFORM_DISABLED_DISPOSITION,
   DevicePlatformError,
   FOREGROUND_BINDING_STATUSES,
   type DeviceAssociation,
+  type DevicePlatformEnvironment,
   type DeviceBinding,
   type DevicePlatformConnection,
   type GrantReference,
@@ -38,6 +48,11 @@ import {
   type StatusProjection,
   type TenantShard,
 } from "./types.js";
+import {
+  assertSafeCallbackUrl,
+  assertSafeServiceBaseUrl,
+  parseDevicePlatformEnvironment,
+} from "./url-safety.js";
 
 const ALLOWED_SCOPES = new Set(["chat", "camera.capture", "media.read"]);
 const SECRET_FIELDS = [
@@ -79,6 +94,11 @@ export type DevicePlatformServiceOptions = {
   env?: NodeJS.ProcessEnv;
   /** Formal mode rejects stub debug and force-session switches. */
   mode?: "formal" | "test";
+  /**
+   * When set, add/rebind/revoke write the grant into this registry.
+   * The gateway fills it from stub Basic env so device-control GET sees the grant.
+   */
+  grantRegistry?: StubGrantRegistry;
 };
 
 /**
@@ -93,6 +113,7 @@ export class DevicePlatformService {
   private readonly now: () => number;
   private readonly env: NodeJS.ProcessEnv;
   private readonly mode: "formal" | "test";
+  private readonly grantRegistry: StubGrantRegistry | undefined;
   /** Process-local grant credentials. Never written to the tenant shard. */
   private readonly credentials = new Map<string, string>();
 
@@ -104,6 +125,7 @@ export class DevicePlatformService {
     this.now = options.now ?? Date.now;
     this.env = options.env ?? process.env;
     this.mode = options.mode ?? "formal";
+    this.grantRegistry = options.grantRegistry ?? stubGrantRegistryFromEnv(this.env);
     this.store.recoverAll(this.iso());
   }
 
@@ -120,6 +142,33 @@ export class DevicePlatformService {
   listPersonalSettingsDevices(actorIn: TrustedActor): UserDeviceDto[] {
     const actor = this.actor(actorIn);
     return this.visibleDevices(actor);
+  }
+
+  /** Enabled connectors the member may target. Names only. No URL or secret. */
+  listPersonalPlatforms(actorIn: TrustedActor): Array<{ platformId: string; displayName: string }> {
+    this.actor(actorIn);
+    return Object.values(this.store.loadConnections().connections)
+      .filter((connection) => connection.enabled)
+      .map((connection) => ({
+        platformId: connection.platformId,
+        displayName: connection.displayName,
+      }));
+  }
+
+  listPersonalDigitalHumans(
+    actorIn: TrustedActor,
+  ): Array<{ digitalHumanId: string; displayName: string }> {
+    const actor = this.actor(actorIn);
+    const listed = this.directory.listUsableDigitalHumans?.(actor) ?? [];
+    return listed
+      .filter(
+        (human) =>
+          human.tenantId === actor.tenantId && this.directory.hasDigitalHumanUse(actor, human),
+      )
+      .map((human) => ({
+        digitalHumanId: human.digitalHumanId,
+        displayName: human.displayName,
+      }));
   }
 
   listDigitalHumanDevices(actorIn: TrustedActor, digitalHumanId: string): UserDeviceDto[] {
@@ -150,9 +199,14 @@ export class DevicePlatformService {
     actorIn: TrustedActor,
     platformId: string,
     input: {
+      displayName?: string;
+      environment?: string;
       serviceBaseUrl?: string;
       contractVersion?: string;
       credentialRef?: string;
+      clientIdentity?: string;
+      registrationNotes?: string;
+      callbackAllowlist?: string[];
       serviceClientIds?: string[];
       enabled?: boolean;
     },
@@ -163,30 +217,124 @@ export class DevicePlatformService {
     if (raw) {
       rejectRequestPayload(raw);
     }
-    const serviceBaseUrl = requireUrl(input.serviceBaseUrl);
+    const environment = parseDevicePlatformEnvironment(input.environment);
+    const serviceBaseUrl = assertSafeServiceBaseUrl(input.serviceBaseUrl, environment);
     const credentialRef = requireToken(input.credentialRef, "credentialRef");
     const contractVersion = requireToken(input.contractVersion ?? "1", "contractVersion");
-    const serviceClientIds = input.serviceClientIds ?? [];
-    if (
-      serviceClientIds.length === 0 ||
-      serviceClientIds.some((id) => typeof id !== "string" || id.trim() === "")
-    ) {
-      throw new DevicePlatformError("VALIDATION", "serviceClientIds is required");
-    }
+    const serviceClientIds = normalizeClientIds(input.serviceClientIds);
+    const clientIdentity = normalizeClientIdentity(input.clientIdentity, serviceClientIds);
+    const registrationNotes = normalizeNotes(input.registrationNotes);
+    const callbackAllowlist = normalizeCallbackAllowlist(input.callbackAllowlist, environment);
+    const id = requireToken(platformId, "platformId");
     const file = this.store.loadConnections();
+    const previous = file.connections[id];
     const connection: DevicePlatformConnection = {
-      platformId: requireToken(platformId, "platformId"),
+      platformId: id,
+      displayName: normalizeDisplayName(input.displayName, id),
+      environment,
       serviceBaseUrl,
       contractVersion,
       credentialRef,
-      serviceClientIds: [...serviceClientIds],
+      clientIdentity,
+      registrationNotes,
+      callbackAllowlist,
+      serviceClientIds,
       enabled: input.enabled !== false,
+      disabledDisposition: DEVICE_PLATFORM_DISABLED_DISPOSITION,
+      credentialPresent: Boolean(previous?.credentialPresent),
+      ...(previous?.credentialRotatedAt
+        ? { credentialRotatedAt: previous.credentialRotatedAt }
+        : {}),
       health: "unknown",
       updatedAt: this.iso(),
     };
     file.connections[connection.platformId] = connection;
     this.store.saveConnections(file);
     return toAdminConnectionDto(connection);
+  }
+
+  /**
+   * Store the service Basic password once. The value is not written on the
+   * connection record and is never returned. Pass rotate to replace it.
+   */
+  setConnectionCredential(
+    actorIn: TrustedActor,
+    platformId: string,
+    input: { clientSecret?: string; rotate?: boolean },
+    raw?: Record<string, unknown>,
+  ): AdminConnectionDto {
+    const actor = this.actor(actorIn);
+    assertPlatformAdmin(actor);
+    if (raw) {
+      rejectCredentialPayload(raw);
+    }
+    const id = requireToken(platformId, "platformId");
+    const secret = requireToken(input.clientSecret, "clientSecret");
+    if (secret.length < 16) {
+      throw new DevicePlatformError("VALIDATION", "clientSecret is too short");
+    }
+    const file = this.store.loadConnections();
+    const connection = file.connections[id];
+    if (!connection) {
+      throw new DevicePlatformError("NOT_FOUND", "Platform connection not found");
+    }
+    const credentials = this.store.loadCredentials();
+    const existing = credentials.credentials[id];
+    if (existing && input.rotate !== true) {
+      throw new DevicePlatformError(
+        "CONFLICT",
+        "Service credential is write-once; rotate to replace it",
+      );
+    }
+    credentials.credentials[id] = { serviceUser: connection.clientIdentity, secret };
+    this.store.saveCredentials(credentials);
+    connection.credentialPresent = true;
+    if (input.rotate === true) {
+      connection.credentialRotatedAt = this.iso();
+    }
+    connection.health = "unknown";
+    connection.healthCode = undefined;
+    connection.healthError = undefined;
+    connection.updatedAt = this.iso();
+    this.store.saveConnections(file);
+    return toAdminConnectionDto(connection);
+  }
+
+  /**
+   * Probe the device platform at the configured origin.
+   * Health and capabilities must both succeed or the connector stays unhealthy.
+   */
+  async testConnection(
+    actorIn: TrustedActor,
+    platformId: string,
+    options?: { fetchImpl?: DeviceControlFetch; timeoutMs?: number },
+  ): Promise<{
+    connection: AdminConnectionDto;
+    checks: { health: "ok" | "failed"; capabilities: "ok" | "failed" | "skipped" };
+    partial: boolean;
+  }> {
+    const actor = this.actor(actorIn);
+    assertPlatformAdmin(actor);
+    const id = requireToken(platformId, "platformId");
+    const file = this.store.loadConnections();
+    const connection = file.connections[id];
+    if (!connection) {
+      throw new DevicePlatformError("NOT_FOUND", "Platform connection not found");
+    }
+    const probed = await probeDevicePlatformConnection({
+      connection,
+      credential: this.store.loadCredential(id),
+      now: this.iso(),
+      fetchImpl: options?.fetchImpl,
+      timeoutMs: options?.timeoutMs,
+    });
+    file.connections[id] = probed.connection;
+    this.store.saveConnections(file);
+    return {
+      connection: toAdminConnectionDto(probed.connection),
+      checks: probed.checks,
+      partial: probed.partial,
+    };
   }
 
   listConnections(actorIn: TrustedActor): AdminConnectionDto[] {
@@ -282,6 +430,9 @@ export class DevicePlatformService {
     const connection = association
       ? this.store.loadConnections().connections[association.platformId]
       : undefined;
+    if (!connection?.enabled) {
+      throw new DevicePlatformError("PLATFORM_DISABLED", "Device platform connection is disabled");
+    }
     const authenticated = this.verifyServiceClient(input.serviceClientId, input.serviceSecret);
     const allowed = assertCapabilityAccess({
       actor,
@@ -479,13 +630,32 @@ export class DevicePlatformService {
       throw new DevicePlatformError("PLATFORM_UNAVAILABLE", "Device platform health check failed");
     }
     let binding = this.ensureAddBinding(actor, operation, claimed);
-    const paired = await this.control.verifyPairingChallenge({
-      platformId: connection.platformId,
-      externalDeviceId: claimed.externalDeviceId,
-      challenge: request.challenge ?? "",
-      proof: request.proof ?? "",
-    });
+    let paired: { ok: boolean; pendingConfirm?: boolean };
+    try {
+      paired = await this.control.verifyPairingChallenge({
+        platformId: connection.platformId,
+        externalDeviceId: claimed.externalDeviceId,
+        challenge: request.challenge ?? "",
+        proof: request.proof ?? "",
+      });
+    } catch (error) {
+      this.markBinding(actor.tenantId, binding.bindingId, {
+        status: "error",
+        failureCode: error instanceof DevicePlatformError ? error.code : "PLATFORM_UNAVAILABLE",
+      });
+      throw error;
+    }
     if (!paired.ok) {
+      if (paired.pendingConfirm) {
+        this.markBinding(actor.tenantId, binding.bindingId, {
+          status: "pending_pair",
+          failureCode: "PAIRING_PENDING",
+        });
+        throw new DevicePlatformError(
+          "PAIRING_PENDING",
+          "Confirm the pairing on the device, then try again",
+        );
+      }
       this.markBinding(actor.tenantId, binding.bindingId, {
         status: "error",
         failureCode: "VALIDATION",
@@ -494,7 +664,7 @@ export class DevicePlatformService {
     }
     binding = this.markBinding(actor.tenantId, binding.bindingId, { status: "pending_auth" });
     if (!binding.authorizationRef) {
-      const grant = this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
+      const grant = await this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
       binding = this.markBinding(actor.tenantId, binding.bindingId, {
         status: "applying",
         authorizationRef: grant.authorizationRef,
@@ -529,27 +699,56 @@ export class DevicePlatformService {
     const connection = this.requireEnabledConnection(association.platformId);
     this.pushHistory(actor.tenantId, current);
     const previousRef = current.authorizationRef;
-    if (previousRef) {
-      this.revokeGrant(actor.tenantId, previousRef);
+    let binding: DeviceBinding;
+    let grant: GrantReference;
+    if (this.grantRegistry) {
+      if (!previousRef) {
+        throw new DevicePlatformError("NOT_FOUND", "Active binding has no authorization to rebind");
+      }
       this.dropToolReservations(actor.tenantId, previousRef);
+      const updated = await this.grantRegistry.rebind({
+        authorizationRef: previousRef,
+        digitalHumanId: human.digitalHumanId,
+      });
+      if (updated.authorizationRef !== previousRef) {
+        throw new DevicePlatformError(
+          "PLATFORM_UNAVAILABLE",
+          "Integrations stub changed the authorization ref",
+        );
+      }
+      grant = this.noteStubRebind(actor.tenantId, previousRef, updated);
+      binding = this.markBinding(actor.tenantId, current.bindingId, {
+        digitalHumanId: updated.digitalHumanId,
+        scopes: operation.request.scopes ?? current.scopes,
+        expectedBindingVersion: updated.bindingVersion,
+        status: "applying",
+        authorizationEstablished: true,
+        platformApplied: false,
+        authorizationRef: updated.authorizationRef,
+      });
+    } else {
+      if (previousRef) {
+        await this.revokeGrant(actor.tenantId, previousRef);
+        this.dropToolReservations(actor.tenantId, previousRef);
+      }
+      const nextVersion = current.expectedBindingVersion + 1;
+      binding = this.markBinding(actor.tenantId, current.bindingId, {
+        digitalHumanId: human.digitalHumanId,
+        scopes: operation.request.scopes ?? current.scopes,
+        expectedBindingVersion: nextVersion,
+        status: "applying",
+        authorizationEstablished: false,
+        platformApplied: false,
+        authorizationRef: undefined,
+      });
+      grant = await this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
+      binding = this.markBinding(actor.tenantId, binding.bindingId, {
+        authorizationRef: grant.authorizationRef,
+        authorizationEstablished: true,
+        platformApplied: false,
+        status: "applying",
+      });
     }
-    const nextVersion = current.expectedBindingVersion + 1;
-    let binding = this.markBinding(actor.tenantId, current.bindingId, {
-      digitalHumanId: human.digitalHumanId,
-      scopes: operation.request.scopes ?? current.scopes,
-      expectedBindingVersion: nextVersion,
-      status: "applying",
-      authorizationEstablished: false,
-      platformApplied: false,
-      authorizationRef: undefined,
-    });
-    const grant = this.issueGrant(actor, binding, connection.serviceClientIds[0] ?? "");
-    binding = this.markBinding(actor.tenantId, binding.bindingId, {
-      authorizationRef: grant.authorizationRef,
-      authorizationEstablished: true,
-      platformApplied: false,
-      status: "applying",
-    });
     const shardAfter = this.store.loadTenant(actor.tenantId);
     shardAfter.events.push({
       eventId: randomId("evt"),
@@ -594,7 +793,7 @@ export class DevicePlatformService {
       expectedBindingVersion: revoking.expectedBindingVersion,
     });
     if (revoking.authorizationRef) {
-      this.revokeGrant(actor.tenantId, revoking.authorizationRef);
+      await this.revokeGrant(actor.tenantId, revoking.authorizationRef);
     }
     this.pushHistory(actor.tenantId, revoking);
     const revoked = this.markBinding(actor.tenantId, revoking.bindingId, {
@@ -624,6 +823,9 @@ export class DevicePlatformService {
       authorizationRef: binding.authorizationRef ?? "",
       scopes: binding.scopes,
       expectedBindingVersion: binding.expectedBindingVersion,
+      ...(binding.authorizationRef
+        ? { grantCredential: this.peekGrantCredential(binding.authorizationRef) }
+        : {}),
     });
     const status = await this.control.getBindingApplicationStatus({
       platformId: binding.platformId,
@@ -643,12 +845,15 @@ export class DevicePlatformService {
       platformId: binding.platformId,
       externalDeviceId: binding.externalDeviceId,
     });
+    const presence = sync.presence ?? (sync.online ? "online" : "offline");
     const projection: StatusProjection = {
       deviceId: binding.deviceId,
-      online: sync.online,
+      online: presence === "online",
+      presence,
       ...(sync.lastSeen ? { lastSeen: sync.lastSeen } : {}),
       capabilities: [...sync.capabilities],
       ...(sync.firmware ? { firmware: sync.firmware } : {}),
+      ...(sync.model ? { model: sync.model } : {}),
       ...(sync.anomalySummary ? { anomalySummary: sync.anomalySummary } : {}),
       updatedAt: this.iso(),
     };
@@ -683,7 +888,7 @@ export class DevicePlatformService {
       if (foreground && operation.bindingId && foreground.bindingId !== operation.bindingId) {
         throw new DevicePlatformError("BINDING_BUSY", "Device already has a foreground binding");
       }
-      if (foreground && !operation.bindingId && foreground.status !== "error") {
+      if (foreground && !operation.bindingId && !foregroundAllowsAnotherAdd(foreground.status)) {
         throw new DevicePlatformError("BINDING_BUSY", "Device already has a foreground binding");
       }
       operation.deviceId = association.deviceId;
@@ -729,6 +934,17 @@ export class DevicePlatformService {
       ? shard.bindings[operation.bindingId]
       : this.foreground(shard, association.deviceId);
     if (existing && existing.status !== "revoked") {
+      if (foregroundAllowsAnotherAdd(existing.status)) {
+        existing.digitalHumanId = operation.request.digitalHumanId || existing.digitalHumanId;
+        existing.scopes = [...(operation.request.scopes ?? existing.scopes)];
+        existing.status = "pending_pair";
+        existing.failureCode = undefined;
+        existing.authorizationEstablished = false;
+        existing.platformApplied = false;
+        existing.updatedAt = this.iso();
+        delete existing.authorizationRef;
+        this.store.saveTenant(actor.tenantId, shard);
+      }
       operation.bindingId = existing.bindingId;
       return existing;
     }
@@ -761,11 +977,50 @@ export class DevicePlatformService {
     return binding;
   }
 
-  private issueGrant(
+  private async issueGrant(
     actor: TrustedActor,
     binding: DeviceBinding,
     serviceClientId: string,
-  ): GrantReference {
+  ): Promise<GrantReference> {
+    const connection = this.store.loadConnections().connections[binding.platformId];
+    if (!connection?.enabled) {
+      throw new DevicePlatformError("PLATFORM_DISABLED", "Device platform connection is disabled");
+    }
+    if (this.grantRegistry) {
+      const issued = await this.grantRegistry.issue({
+        digitalHumanId: binding.digitalHumanId,
+        deviceId: binding.externalDeviceId,
+        scopes: binding.scopes,
+        serviceAudience: serviceClientId,
+      });
+      if (
+        issued.deviceId !== binding.externalDeviceId ||
+        issued.digitalHumanId !== binding.digitalHumanId
+      ) {
+        throw new DevicePlatformError(
+          "PLATFORM_UNAVAILABLE",
+          "Integrations stub grant does not match the binding",
+        );
+      }
+      const grant: GrantReference = {
+        authorizationRef: issued.authorizationRef,
+        credentialHash: sha256Hex(issued.authorizationCredential),
+        serviceClientId,
+        digitalHumanId: issued.digitalHumanId,
+        deviceId: binding.deviceId,
+        userId: actor.userId,
+        tenantId: actor.tenantId,
+        scopes: [...binding.scopes],
+        bindingVersion: issued.bindingVersion,
+        status: "active",
+        issuedAt: this.iso(),
+      };
+      const shard = this.store.loadTenant(actor.tenantId);
+      shard.grants[grant.authorizationRef] = grant;
+      this.rememberCredential(grant.authorizationRef, issued.authorizationCredential);
+      this.store.saveTenant(actor.tenantId, shard);
+      return grant;
+    }
     const credential = `obgc_${randomBytes(24).toString("hex")}`;
     const grant: GrantReference = {
       authorizationRef: randomId("azr"),
@@ -796,11 +1051,38 @@ export class DevicePlatformService {
     return this.credentials.get(authorizationRef);
   }
 
-  private revokeGrant(tenantId: string, authorizationRef: string): void {
+  private noteStubRebind(
+    tenantId: string,
+    authorizationRef: string,
+    updated: StubGrantView,
+  ): GrantReference {
+    const shard = this.store.loadTenant(tenantId);
+    const grant = shard.grants[authorizationRef];
+    if (!grant) {
+      throw new DevicePlatformError("NOT_FOUND", "Grant not found");
+    }
+    grant.digitalHumanId = updated.digitalHumanId;
+    grant.bindingVersion = updated.bindingVersion;
+    grant.status = updated.status === "revoked" ? "revoked" : "active";
+    this.store.saveTenant(tenantId, shard);
+    return grant;
+  }
+
+  private async revokeGrant(tenantId: string, authorizationRef: string): Promise<void> {
     const shard = this.store.loadTenant(tenantId);
     const grant = shard.grants[authorizationRef];
     if (!grant || grant.status === "revoked") {
       return;
+    }
+    if (this.grantRegistry) {
+      const credential = this.credentials.get(authorizationRef);
+      if (!credential) {
+        throw new DevicePlatformError(
+          "PLATFORM_UNAVAILABLE",
+          "Grant credential is not available to revoke on the integrations stub",
+        );
+      }
+      await this.grantRegistry.revoke({ authorizationRef, authorizationCredential: credential });
     }
     grant.status = "revoked";
     grant.revokedAt = this.iso();
@@ -934,7 +1216,7 @@ export class DevicePlatformService {
       if (claim) {
         const shard = this.store.loadTenant(actor.tenantId);
         const foreground = this.foreground(shard, claim.deviceId);
-        if (foreground && foreground.status !== "error") {
+        if (foreground && !foregroundAllowsAnotherAdd(foreground.status)) {
           throw new DevicePlatformError("BINDING_BUSY", "Device already has a foreground binding");
         }
       }
@@ -997,9 +1279,27 @@ function materialOf(input: SubmitOperationInput): OperationMaterial {
 
 function rejectRequestPayload(body: Record<string, unknown>): void {
   rejectIdentityOverrides(body);
+  assertBodyHasNoPairingFields(body);
   for (const field of SECRET_FIELDS) {
     if (body[field] !== undefined) {
       throw new DevicePlatformError("SECRET_REJECTED", "Secrets are not accepted on this API");
+    }
+  }
+}
+
+const CREDENTIAL_FIELDS = new Set(["clientSecret", "rotate"]);
+
+function rejectCredentialPayload(body: Record<string, unknown>): void {
+  rejectIdentityOverrides(body);
+  assertBodyHasNoPairingFields(body);
+  for (const field of SECRET_FIELDS) {
+    if (field !== "clientSecret" && body[field] !== undefined) {
+      throw new DevicePlatformError("SECRET_REJECTED", "Secrets are not accepted on this API");
+    }
+  }
+  for (const key of Object.keys(body)) {
+    if (!CREDENTIAL_FIELDS.has(key)) {
+      throw new DevicePlatformError("VALIDATION", "Credential body is invalid");
     }
   }
 }
@@ -1012,29 +1312,62 @@ function requireToken(value: string | undefined, label: string): string {
   return trimmed;
 }
 
-function requireUrl(value: string | undefined): string {
-  const raw = requireToken(value, "serviceBaseUrl");
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new DevicePlatformError("VALIDATION", "serviceBaseUrl is invalid");
+function normalizeClientIds(value: string[] | undefined): string[] {
+  if (
+    !value ||
+    value.length === 0 ||
+    value.some((id) => typeof id !== "string" || id.trim() === "")
+  ) {
+    throw new DevicePlatformError("VALIDATION", "serviceClientIds is required");
   }
-  if (url.username || url.password) {
-    throw new DevicePlatformError("SECRET_REJECTED", "serviceBaseUrl must not contain credentials");
+  return value.map((id) => id.trim());
+}
+
+function normalizeClientIdentity(value: string | undefined, serviceClientIds: string[]): string {
+  const identity = (value?.trim() || serviceClientIds[0] || "").trim();
+  if (!identity || identity.includes(":") || /\s/.test(identity)) {
+    throw new DevicePlatformError("VALIDATION", "clientIdentity is invalid");
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new DevicePlatformError("VALIDATION", "serviceBaseUrl is invalid");
+  return identity;
+}
+
+function normalizeDisplayName(value: string | undefined, platformId: string): string {
+  const name = value?.trim() || platformId;
+  if (name.length > 80) {
+    throw new DevicePlatformError("VALIDATION", "displayName is too long");
   }
-  const path = url.pathname === "/" ? "" : url.pathname.replace(/\/$/, "");
-  return `${url.origin}${path}`;
+  return name;
+}
+
+function normalizeNotes(value: string | undefined): string {
+  const notes = value?.trim() ?? "";
+  if (notes.length > 4000) {
+    throw new DevicePlatformError("VALIDATION", "registrationNotes is too long");
+  }
+  return notes;
+}
+
+function normalizeCallbackAllowlist(
+  value: string[] | undefined,
+  environment: DevicePlatformEnvironment,
+): string[] {
+  if (!value) {
+    return [];
+  }
+  return value.map((entry) => assertSafeCallbackUrl(entry, environment));
 }
 
 function retryableCode(error: unknown): boolean {
   return (
     error instanceof DevicePlatformError &&
-    (error.code === "PLATFORM_UNAVAILABLE" || error.code === "PLATFORM_DISABLED")
+    (error.code === "PLATFORM_UNAVAILABLE" ||
+      error.code === "PLATFORM_DISABLED" ||
+      error.code === "PAIRING_PENDING")
   );
+}
+
+function foregroundAllowsAnotherAdd(status: DeviceBinding["status"]): boolean {
+  return status === "error" || status === "pending_pair";
 }
 
 function randomId(prefix: string): string {

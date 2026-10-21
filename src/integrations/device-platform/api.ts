@@ -1,4 +1,5 @@
-import { rejectIdentityOverrides } from "./identity.js";
+import { assertBodyHasNoPairingFields } from "./http-control-client.js";
+import { rejectIdentityOverrides, type TrustedActor } from "./identity.js";
 import type { DevicePlatformService, SubmitOperationInput } from "./service.js";
 import {
   DEVICE_PLATFORM_API_PREFIX,
@@ -19,15 +20,17 @@ export type DevicePlatformHttpResponse = {
 };
 
 /**
- * Handler for the management API. Not mounted on the production gateway.
- * The loopback integrations stub stays a separate test process.
+ * Handler for the management API.
+ * The gateway mounts admin connector routes and the signed-in member device
+ * routes. The loopback integrations stub stays a separate test process.
  */
 export async function handleDevicePlatformRequest(
   service: DevicePlatformService,
   request: DevicePlatformHttpRequest,
+  actorOverride?: TrustedActor,
 ): Promise<DevicePlatformHttpResponse> {
   try {
-    return await route(service, request);
+    return await route(service, request, actorOverride);
   } catch (error) {
     if (error instanceof DevicePlatformError) {
       return {
@@ -45,15 +48,24 @@ export async function handleDevicePlatformRequest(
 async function route(
   service: DevicePlatformService,
   request: DevicePlatformHttpRequest,
+  actorOverride?: TrustedActor,
 ): Promise<DevicePlatformHttpResponse> {
   const method = request.method.toUpperCase();
   const path = request.path.split("?")[0] ?? request.path;
   const headers = lowerHeaders(request.headers);
-  const actor = service.sessionActor(headers["x-openbot-session"]);
+  const actor = actorOverride ?? service.sessionActor(headers["x-openbot-session"]);
   const raw = isRecord(request.body) ? request.body : undefined;
 
   if (method === "GET" && path === `${DEVICE_PLATFORM_API_PREFIX}/me/devices`) {
     return ok({ devices: service.listPersonalSettingsDevices(actor) });
+  }
+
+  if (method === "GET" && path === `${DEVICE_PLATFORM_API_PREFIX}/me/platforms`) {
+    return ok({ platforms: service.listPersonalPlatforms(actor) });
+  }
+
+  if (method === "GET" && path === `${DEVICE_PLATFORM_API_PREFIX}/me/digital-humans`) {
+    return ok({ digitalHumans: service.listPersonalDigitalHumans(actor) });
   }
 
   const humanDevices = path.match(
@@ -89,15 +101,43 @@ async function route(
   if (connection?.[1] && method === "GET") {
     return ok({ connection: service.getConnection(actor, decodeURIComponent(connection[1])) });
   }
+  const credential = path.match(
+    /^\/api\/device-platform\/v1\/admin\/connections\/([^/]+)\/credential$/,
+  );
+  if (credential?.[1] && method === "PUT") {
+    return ok({
+      connection: service.setConnectionCredential(
+        actor,
+        decodeURIComponent(credential[1]),
+        {
+          clientSecret: readString(raw, "clientSecret"),
+          rotate: raw?.rotate === true,
+        },
+        raw,
+      ),
+    });
+  }
+
+  const probe = path.match(/^\/api\/device-platform\/v1\/admin\/connections\/([^/]+)\/test$/);
+  if (probe?.[1] && method === "POST") {
+    const result = await service.testConnection(actor, decodeURIComponent(probe[1]));
+    return ok(result);
+  }
+
   if (connection?.[1] && method === "PUT") {
     return ok({
       connection: service.upsertConnection(
         actor,
         decodeURIComponent(connection[1]),
         {
+          displayName: readString(raw, "displayName"),
+          environment: readString(raw, "environment"),
           serviceBaseUrl: readString(raw, "serviceBaseUrl"),
           contractVersion: readString(raw, "contractVersion"),
           credentialRef: readString(raw, "credentialRef"),
+          clientIdentity: readString(raw, "clientIdentity"),
+          registrationNotes: readString(raw, "registrationNotes"),
+          callbackAllowlist: readStringArray(raw, "callbackAllowlist"),
           serviceClientIds: readStringArray(raw, "serviceClientIds"),
           enabled: typeof raw?.enabled === "boolean" ? raw.enabled : undefined,
         },
@@ -138,6 +178,7 @@ const SECRET_FIELDS = [
 
 function rejectCapabilityBody(body: Record<string, unknown>): void {
   rejectIdentityOverrides(body);
+  assertBodyHasNoPairingFields(body);
   for (const field of SECRET_FIELDS) {
     if (body[field] !== undefined) {
       throw new DevicePlatformError("SECRET_REJECTED", "Secrets are not accepted on this API");

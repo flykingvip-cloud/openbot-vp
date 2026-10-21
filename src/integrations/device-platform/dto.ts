@@ -1,9 +1,12 @@
-import type {
-  DeviceAssociation,
-  DeviceBinding,
-  DevicePlatformConnection,
-  ManagementOperation,
-  StatusProjection,
+import {
+  DEVICE_PLATFORM_DISABLED_DISPOSITION,
+  type DeviceAssociation,
+  type DeviceBinding,
+  type DevicePlatformConnection,
+  type DevicePlatformEnvironment,
+  type DevicePresence,
+  type ManagementOperation,
+  type StatusProjection,
 } from "./types.js";
 
 export type UserBindingDto = {
@@ -16,6 +19,7 @@ export type UserBindingDto = {
   status: DeviceBinding["status"];
   authorizationEstablished: boolean;
   platformApplied: boolean;
+  failureCode?: string;
 };
 
 export type UserDeviceDto = {
@@ -24,8 +28,11 @@ export type UserDeviceDto = {
   platformId: string;
   externalDeviceId: string;
   binding: UserBindingDto | null;
+  /** User-visible model. Absent when the platform did not send one. */
+  model?: string;
   status: {
     online: boolean;
+    presence: DevicePresence;
     lastSeen?: string;
     capabilities: string[];
     firmware?: string;
@@ -48,14 +55,23 @@ export type UserOperationDto = {
 
 export type AdminConnectionDto = {
   platformId: string;
+  displayName: string;
+  environment: DevicePlatformEnvironment;
   serviceBaseUrl: string;
   contractVersion: string;
   credentialRef: string;
+  clientIdentity: string;
+  registrationNotes: string;
+  callbackAllowlist: string[];
   serviceClientIds: string[];
   enabled: boolean;
+  disabledDisposition: typeof DEVICE_PLATFORM_DISABLED_DISPOSITION;
+  credentialPresent: boolean;
+  credentialRotatedAt?: string;
   health: DevicePlatformConnection["health"];
   healthCheckedAt?: string;
   healthCode?: string;
+  healthError?: string;
 };
 
 const USER_FORBIDDEN_KEYS = [
@@ -70,6 +86,10 @@ const USER_FORBIDDEN_KEYS = [
   "authorizationCredential",
   "secret",
   "proof",
+  "gatewayUrl",
+  "gatewayAddress",
+  "servicePrincipal",
+  "clientIdentity",
 ] as const;
 
 export function toUserBindingDto(binding: DeviceBinding | undefined): UserBindingDto | null {
@@ -86,6 +106,7 @@ export function toUserBindingDto(binding: DeviceBinding | undefined): UserBindin
     status: binding.status,
     authorizationEstablished: binding.authorizationEstablished,
     platformApplied: binding.platformApplied,
+    ...(binding.failureCode ? { failureCode: binding.failureCode } : {}),
   };
 }
 
@@ -100,8 +121,12 @@ export function toUserDeviceDto(
     platformId: association.platformId,
     externalDeviceId: association.externalDeviceId,
     binding: toUserBindingDto(binding),
+    ...(projection?.model ? { model: projection.model } : {}),
     status: {
-      online: projection?.online ?? false,
+      online: projection?.presence === "unknown" ? false : (projection?.online ?? false),
+      presence:
+        projection?.presence ??
+        (projection ? (projection.online ? "online" : "offline") : "unknown"),
       ...(projection?.lastSeen ? { lastSeen: projection.lastSeen } : {}),
       capabilities: projection?.capabilities ? [...projection.capabilities] : [],
       ...(projection?.firmware ? { firmware: projection.firmware } : {}),
@@ -128,18 +153,52 @@ export function toUserOperationDto(
   };
 }
 
-export function toAdminConnectionDto(connection: DevicePlatformConnection): AdminConnectionDto {
+export function normalizeDevicePlatformConnection(
+  connection: DevicePlatformConnection,
+): DevicePlatformConnection {
+  const environment = isEnvironment(connection.environment) ? connection.environment : "production";
   return {
-    platformId: connection.platformId,
-    serviceBaseUrl: connection.serviceBaseUrl,
-    contractVersion: connection.contractVersion,
-    credentialRef: connection.credentialRef,
-    serviceClientIds: [...connection.serviceClientIds],
-    enabled: connection.enabled,
-    health: connection.health,
-    ...(connection.healthCheckedAt ? { healthCheckedAt: connection.healthCheckedAt } : {}),
-    ...(connection.healthCode ? { healthCode: connection.healthCode } : {}),
+    ...connection,
+    displayName: connection.displayName?.trim() || connection.platformId,
+    environment,
+    clientIdentity: connection.clientIdentity?.trim() || connection.serviceClientIds[0] || "",
+    registrationNotes: connection.registrationNotes ?? "",
+    callbackAllowlist: Array.isArray(connection.callbackAllowlist)
+      ? connection.callbackAllowlist.filter((item) => typeof item === "string")
+      : [],
+    disabledDisposition: DEVICE_PLATFORM_DISABLED_DISPOSITION,
+    credentialPresent: Boolean(connection.credentialPresent),
   };
+}
+
+export function toAdminConnectionDto(connection: DevicePlatformConnection): AdminConnectionDto {
+  const normalized = normalizeDevicePlatformConnection(connection);
+  return {
+    platformId: normalized.platformId,
+    displayName: normalized.displayName,
+    environment: normalized.environment,
+    serviceBaseUrl: normalized.serviceBaseUrl,
+    contractVersion: normalized.contractVersion,
+    credentialRef: normalized.credentialRef,
+    clientIdentity: normalized.clientIdentity,
+    registrationNotes: normalized.registrationNotes,
+    callbackAllowlist: [...normalized.callbackAllowlist],
+    serviceClientIds: [...normalized.serviceClientIds],
+    enabled: normalized.enabled,
+    disabledDisposition: normalized.disabledDisposition,
+    credentialPresent: normalized.credentialPresent,
+    ...(normalized.credentialRotatedAt
+      ? { credentialRotatedAt: normalized.credentialRotatedAt }
+      : {}),
+    health: normalized.health,
+    ...(normalized.healthCheckedAt ? { healthCheckedAt: normalized.healthCheckedAt } : {}),
+    ...(normalized.healthCode ? { healthCode: normalized.healthCode } : {}),
+    ...(normalized.healthError ? { healthError: normalized.healthError } : {}),
+  };
+}
+
+function isEnvironment(value: unknown): value is DevicePlatformEnvironment {
+  return value === "production" || value === "staging" || value === "development";
 }
 
 export function assertNoForbiddenUserKeys(value: unknown): void {

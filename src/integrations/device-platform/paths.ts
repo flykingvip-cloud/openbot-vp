@@ -6,6 +6,8 @@ const SAFE_TENANT_ID = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
 export type DevicePlatformPaths = {
   tenantsRoot: string;
   connectionFile: string;
+  /** Service Basic secrets. Never returned by admin or user APIs. */
+  credentialFile: string;
   claimFile: string;
   tenantFile: (tenantId: string) => string;
 };
@@ -36,6 +38,7 @@ export function devicePlatformPathsUnder(tenantsRoot: string): DevicePlatformPat
   return {
     tenantsRoot,
     connectionFile: path.join(platformDir, "device-platform-connections.json"),
+    credentialFile: path.join(platformDir, "device-platform-credentials.json"),
     claimFile: path.join(platformDir, "device-claims.json"),
     tenantFile(tenantId: string) {
       assertSafeTenantId(tenantId);

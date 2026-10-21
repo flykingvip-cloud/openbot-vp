@@ -4,9 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { i18n } from "../../../../i18n/index.ts";
 import { createEmptyMyBotProjection } from "../semantic/my-bot-read-model.ts";
 import { renderMyBotWorkspacePanel } from "./my-bot-workspace-panel.ts";
+import {
+  resetPersonalDevicesPanelForTests,
+  setPersonalDevicesClientForTests,
+} from "./personal-devices-page.ts";
 import type { WorkbenchSettingsRobotEntry } from "./workbench-types.ts";
 
 afterEach(() => {
+  resetPersonalDevicesPanelForTests();
+  setPersonalDevicesClientForTests(null);
   document.body.innerHTML = "";
 });
 
@@ -72,6 +78,7 @@ describe("renderMyBotWorkspacePanel", () => {
     expect(container.textContent).toContain("运营授权");
     expect(container.textContent).toContain("协作");
     expect(container.textContent).toContain("数据");
+    expect(container.textContent).toContain("已连接设备");
     expect(container.textContent).toContain("删除");
     expect(container.textContent).toContain("进入工作区");
     expect(container.textContent).toContain("定位");
@@ -309,5 +316,68 @@ describe("renderMyBotWorkspacePanel", () => {
     expect(container.textContent).toContain("Install recommended skills");
     expect(container.textContent).not.toContain("实战表现");
     expect(container.textContent).not.toContain("去安装推荐能力");
+  });
+
+  it("lists devices bound to the open digital human", async () => {
+    setPersonalDevicesClientForTests({
+      listDevices: async (query) =>
+        query?.digitalHumanId === "sales"
+          ? [
+              {
+                deviceId: "dev-1",
+                displayName: "门口相机",
+                platformId: "plat-1",
+                externalDeviceId: "cam-1",
+                binding: {
+                  bindingId: "bind-1",
+                  digitalHumanId: "sales",
+                  scopes: ["chat"],
+                  status: "active",
+                  expectedBindingVersion: 1,
+                  appliedBindingVersion: 1,
+                  authorizationEstablished: true,
+                  platformApplied: true,
+                },
+                status: { online: false, presence: "unknown", capabilities: [] },
+              },
+            ]
+          : [],
+      listPlatforms: async () => [{ platformId: "plat-1", displayName: "实验室设备" }],
+      listHumans: async () => [{ digitalHumanId: "sales", displayName: "销售助手" }],
+      submit: async () => null,
+    });
+    const container = document.createElement("div");
+    const paint = () => {
+      render(
+        html`${renderMyBotWorkspacePanel({
+          entry: baseEntry,
+          loading: true,
+          error: null,
+          saving: false,
+          bot: null,
+          identityDraft: null,
+          activeTab: "devices",
+          onTabChange: () => undefined,
+          onIdentityDraftChange: () => undefined,
+          onSaveIdentity: () => undefined,
+          onExploreCapabilities: () => undefined,
+          onOpenGroup: () => undefined,
+          onSelectSession: () => undefined,
+        })}`,
+        container,
+      );
+    };
+    paint();
+    for (let step = 0; step < 6; step += 1) {
+      await Promise.resolve();
+    }
+    paint();
+    expect(container.querySelector("[data-wb-bots-tab=devices]")).not.toBeNull();
+    expect(container.textContent).toContain("已连接设备");
+    expect(container.textContent).toContain("门口相机");
+    expect(container.textContent).not.toContain("正在加载详情");
+    const human = container.querySelector<HTMLInputElement>("[data-testid=personal-device-human]");
+    expect(human?.disabled).toBe(true);
+    expect(human?.getAttribute("data-digital-human-id")).toBe("sales");
   });
 });

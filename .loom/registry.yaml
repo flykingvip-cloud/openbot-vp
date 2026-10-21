@@ -9043,7 +9043,97 @@ tasks:
     ownerHistory: []
     since: 2026-10-20
     metadata: {}
+  - id: device-platform-b3-personal:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Personal settings devices and hardware on the shared B1 binding store
+    paths:
+      - ui/src/ui/ports/employee/views/personal-devices-page.ts
+      - ui/src/ui/ports/employee/views/personal-devices-page.node.test.ts
+    state: active
+    sessions:
+      - id: 695d1ac2-038c-46b4-9b6f-39e6d26fb3d8
+        taskId: device-platform-b3-personal:cursor-cloud
+        ide: cursor
+        agent: cursor-cloud
+        status: active
+        lastSignalAt: 2026-10-20T15:56:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-20
+    metadata: {}
+  - id: device-platform-b4-dh-detail:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Digital-human detail connected devices on the shared device-platform binding store
+    paths:
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.node.test.ts
+    state: active
+    sessions:
+      - id: 7c1a0e4b-6d2f-4a8e-9b15-3f0c8a2e6d41
+        taskId: device-platform-b4-dh-detail:cursor-cloud
+        ide: cursor
+        agent: cursor-cloud
+        status: active
+        lastSignalAt: 2026-10-20T16:20:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-20
+    metadata: {}
 landingStreams:
+  # Shared personal-settings files. Parallel so a member device page can land
+  # with the device-platform primary without pulling i18n, workbench CSS, or
+  # the personal-settings shell into another serial stream.
+  - id: device-platform-b3-personal-ui:cursor-cloud
+    landingPolicy: parallel
+    paths:
+      - src/gateway/device-platform-personal-http.test.ts
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+      - ui/src/styles/workbench.css
+      - ui/src/ui/ports/employee/views/workbench-personal-settings-page.ts
+      - ui/src/ui/ports/employee/views/workbench-stage.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-types.ts
+      - ui/src/ui/ports/employee/views/personal-devices-page.ts
+      - ui/src/ui/ports/employee/views/personal-devices-page.node.test.ts
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Personal settings devices and hardware
+      owner: cursor-cloud
+      task: device-platform-b3-personal
+  # Parallel companion so the digital-human detail device list can land with the
+  # device-platform docs primary without falling into the broad UI recovery stream.
+  - id: device-platform-b4-dh-detail:cursor-cloud
+    landingPolicy: parallel
+    paths:
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
+      - ui/src/ui/ports/employee/views/my-bot-workspace-panel.node.test.ts
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Digital-human detail connected devices
+      owner: cursor-cloud
+      task: device-platform-b4-dh-detail
+  # Parallel companion so the B2 admin mount can land with the device-platform
+  # primary stream. These shared files stay listed here so a connector change
+  # does not mix PHW3, MRR, and platform-admin layout primaries.
+  - id: device-platform-b2-admin-mount:cursor-cloud
+    landingPolicy: parallel
+    paths:
+      - src/gateway/server-http.ts
+      - src/gateway/device-platform-http.ts
+      - src/gateway/device-platform-http.test.ts
+      - ui/src/ui/ports/platform/system-settings/page.ts
+      - ui/src/ui/ports/platform/system-settings/route.ts
+      - ui/src/ui/ports/platform/device-platform/**
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Platform admin device platform connection mount
+      owner: cursor-cloud
+      task: device-platform-b2
   - id: sandbox-trixie-node20-pdf:cursor-cloud
     landingPolicy: serial
     paths:
