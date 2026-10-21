@@ -58,6 +58,7 @@ import { buildCollaborationRoundPlan } from "./round-plan.js";
 import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
+import { guardUnattendedAccept } from "./single-group-unattended.js";
 import {
   acceptanceCriteriaFullyChecked,
   assertAcceptanceProxyFields,
@@ -1318,6 +1319,23 @@ export async function acceptBoardItemSubmission(
       "acceptance_reason_required",
       "accept requires reason; 主答权威 still leaves an auditable rationale",
     );
+  }
+  // Batch 5: single-target lane only. Other groups keep the existing accept checks.
+  // This does not add an accept caller and does not let self_advance accept.
+  const existing = await loadBoardClaimItem(authority, { taskId, itemId });
+  if (existing) {
+    const laneRefusal = await guardUnattendedAccept(authority, {
+      cfg,
+      actorId,
+      publishedBy: existing.publishedBy,
+      coordinatorBotId: options?.coordinatorBotId,
+      taskId,
+      itemId,
+      nowMs: options?.nowMs,
+    });
+    if (laneRefusal) {
+      return laneRefusal;
+    }
   }
   return mutateBoardClaimItem(
     authority,

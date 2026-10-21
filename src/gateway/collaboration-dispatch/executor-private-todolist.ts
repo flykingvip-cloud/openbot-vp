@@ -27,6 +27,7 @@ import {
 import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
+import { noteUnattendedStaleConfirmation } from "./single-group-unattended.js";
 import { recordWakeEventBestEffort } from "./wake-contract.js";
 
 const todolistLog = createSubsystemLogger("gateway/executor-todolist");
@@ -672,7 +673,7 @@ export async function confirmTodolist(
   if (!safeStem(taskId)) {
     return fail("not_found", `todolist not found: ${todolistId}`);
   }
-  return commitTodolistLines(authority, taskId, options, (lines) => {
+  const result = await commitTodolistLines(authority, taskId, options, (lines) => {
     const current = latestById(lines, todolistId);
     if (!current) {
       return { result: fail("not_found", `todolist not found: ${todolistId}`) };
@@ -724,6 +725,16 @@ export async function confirmTodolist(
     };
     return { result: { ok: true, value: next }, appends: [next] };
   });
+  if (!result.ok) {
+    await noteUnattendedStaleConfirmation(authority, {
+      cfg,
+      reason: result.reason,
+      taskId,
+      todolistId,
+      nowMs: options?.nowMs,
+    });
+  }
+  return result;
 }
 
 export async function reviseTodolist(

@@ -43,12 +43,17 @@ import {
   type SelfAdvanceResult,
 } from "./self-advance.js";
 import {
+  isSingleGroupUnattendedTarget,
+  runSingleGroupUnattendedTick,
+  type UnattendedTickResult,
+} from "./single-group-unattended.js";
+import {
   isCollabTaskWakeContractEnabled,
   listWakeEvents,
   whoWokeWhom,
   type WakeEvent,
 } from "./wake-contract.js";
-import { consumeWakeForRoundDispatch } from "./wake-round-dispatch.js";
+import { consumeWakeForRoundDispatch, type WakeRoundDispatcher } from "./wake-round-dispatch.js";
 
 /** FINAL default: 30 minutes. */
 export const DEFAULT_GROUP_TASK_HEARTBEAT_SCAN_INTERVAL_MS = 30 * 60 * 1000;
@@ -91,6 +96,11 @@ export type GroupTaskHeartbeatOptions = {
    * execute is on (tests / ops). Default false.
    */
   skipClaimBridge?: boolean;
+  /**
+   * Batch 5: optional Mode B dispatcher for the single-target unattended tick.
+   * Ignored unless the group is the one allowlisted target.
+   */
+  roundDispatcher?: WakeRoundDispatcher | null;
 };
 
 export type HeartbeatActionKind = "nudge" | "escalate" | "skip";
@@ -144,6 +154,8 @@ export type GroupTaskHeartbeatResult =
       writeMode: GroupTaskHeartbeatWriteMode;
       /** Present when emit tick considered Mode B claim-first after unclaimed nudge. */
       claimBridge?: HeartbeatClaimBridgeResult;
+      /** Present when this group is the single unattended target. */
+      unattended?: UnattendedTickResult;
     }
   | {
       ok: true;
@@ -784,6 +796,11 @@ export async function runGroupTaskHeartbeat(
   // Explicit dryRun wins; otherwise follow resolveGroupTaskHeartbeatWriteMode (default observe).
   const dryRun = options?.dryRun ?? resolvedMode === "observe";
   const writeMode: GroupTaskHeartbeatWriteMode = dryRun ? "observe" : "emit";
+  const unattendedTarget = isSingleGroupUnattendedTarget(cfg, groupId, tenantId);
+  const unattendedExecuteAuthorized =
+    unattendedTarget &&
+    !dryRun &&
+    resolveSelfAdvanceWriteMode(cfg, groupId, tenantId) === "execute";
 
   // Emit path still requires Wake Contract. Observe/dry-run may scan without it.
   if (!dryRun && !isGroupTaskHeartbeatEnabled(cfg, groupId, tenantId)) {
@@ -850,7 +867,7 @@ export async function runGroupTaskHeartbeat(
     }
 
     if (decision.action === "nudge") {
-      if (!dryRun) {
+      if (!dryRun && !unattendedTarget) {
         const selfAdvanceWriteMode = resolveSelfAdvanceWriteMode(cfg, groupId, tenantId);
         const consume = await consumeWakeForRoundDispatch({
           authority,
@@ -885,7 +902,7 @@ export async function runGroupTaskHeartbeat(
     }
 
     if (decision.action === "escalate") {
-      if (!dryRun) {
+      if (!dryRun && !unattendedTarget) {
         const selfAdvanceWriteMode = resolveSelfAdvanceWriteMode(cfg, groupId, tenantId);
         const consume = await consumeWakeForRoundDispatch({
           authority,
@@ -922,10 +939,31 @@ export async function runGroupTaskHeartbeat(
     nowMs,
     actorId,
     dryRun,
-    skipClaimBridge: options?.skipClaimBridge,
+    skipClaimBridge: options?.skipClaimBridge || unattendedTarget,
     decisions,
     tenantId,
   });
+
+  let unattended: UnattendedTickResult | undefined;
+  if (unattendedTarget) {
+    try {
+      unattended = await runSingleGroupUnattendedTick(authority, {
+        cfg,
+        nowMs,
+        executeAuthorized: unattendedExecuteAuthorized,
+        items,
+        roundDispatcher: options?.roundDispatcher,
+        fromAgentId: actorId,
+        source: "nudge",
+        reason: "single_group_unattended",
+      });
+      if (unattended.wakeEvent) {
+        wakeEvents.push(unattended.wakeEvent);
+      }
+    } catch {
+      // Fence failures must not throw on the heartbeat hot path.
+    }
+  }
 
   const state: GroupTaskHeartbeatState = {
     groupId,
@@ -979,6 +1017,7 @@ export async function runGroupTaskHeartbeat(
     state,
     writeMode,
     ...(claimBridge ? { claimBridge } : {}),
+    ...(unattended?.handled ? { unattended } : {}),
   };
 }
 

@@ -897,6 +897,10 @@ export const FIELD_HELP: Record<string, string> = {
     "S5 self_advance write mode (default dry_run). dry_run = per-tick reauth + decision ledger without wake/side effects. execute still requires executeGroupAllowlist match (and L2 botMaySelfAdvanceWithoutHuman). Leave dry_run until gray execute is explicitly authorized.",
   "collaboration.task.selfAdvance.executeGroupAllowlist":
     "S5 gray-group allowlist for real self_advance side effects (default empty). Prefer tenantId/groupId (P0). Bare groupId is personal_local-only. Requires mode=execute and group L2 botMaySelfAdvanceWithoutHuman. Does not open production gray writes by listing alone. Does not default botMaySelfAdvanceWithoutHuman=true.",
+  "collaboration.task.singleGroupUnattended":
+    "Batch 5 single-target unattended fence (default off). Exactly one groupAllowlist entry binds that group's heartbeat / self_advance / wake to the current confirmed step and draft-only actions. Empty or multiple entries authorize nobody. Does not enable the heartbeat scheduler, wake, claim, selfAdvance execute, or L2 botMaySelfAdvanceWithoutHuman, and does not grant submit, accept, or finalize.",
+  "collaboration.task.singleGroupUnattended.groupAllowlist":
+    "Single target group for the unattended fence (default empty). Use one tenantId/groupId entry. Bare groupId is personal_local-only. More than one entry fails closed. Removing the entry rolls the fence back. Listing a group does not emit external side effects.",
   "collaboration.task.continueAfterRoundComplete":
     "Platform Mode B continue/re-wake after ROUND_COMPLETE (default off). Inventory-first: when authorized, scan board for applied|in_progress and wake Mode B lead + trySelfAdvance. Prefer groupAllowlist over enabled=true. No Floor live / auto-publish / LIVE. Group-agnostic.",
   "collaboration.task.continueAfterRoundComplete.enabled":

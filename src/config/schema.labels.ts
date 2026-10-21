@@ -385,6 +385,8 @@ export const FIELD_LABELS: Record<string, string> = {
   "collaboration.task.selfAdvance": "Collaboration Limited Self Advance",
   "collaboration.task.selfAdvance.mode": "Self Advance Mode",
   "collaboration.task.selfAdvance.executeGroupAllowlist": "Self Advance Execute Group Allowlist",
+  "collaboration.task.singleGroupUnattended": "Single Group Unattended Lane",
+  "collaboration.task.singleGroupUnattended.groupAllowlist": "Single Group Unattended Allowlist",
   "collaboration.task.continueAfterRoundComplete": "Continue After Round Complete",
   "collaboration.task.continueAfterRoundComplete.enabled": "Continue After Round Enabled",
   "collaboration.task.continueAfterRoundComplete.groupAllowlist":

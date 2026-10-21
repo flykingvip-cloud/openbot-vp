@@ -236,6 +236,12 @@ const CollaborationSchema = z
           })
           .strict()
           .optional(),
+        singleGroupUnattended: z
+          .object({
+            groupAllowlist: z.array(z.string()).optional(),
+          })
+          .strict()
+          .optional(),
         continueAfterRoundComplete: z
           .object({
             enabled: z.boolean().optional(),

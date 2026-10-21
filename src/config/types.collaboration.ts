@@ -404,6 +404,20 @@ export type CollaborationTaskConfig = {
     executeGroupAllowlist?: string[];
   };
   /**
+   * Batch 5 single-target unattended lane. Default empty = off.
+   * Exactly one allowlist entry arms the mission fence for that group.
+   * Zero or many entries authorize nobody (not a global any-group switch).
+   * Does not open wake, claim, heartbeat scheduler, selfAdvance execute, or
+   * L2 botMaySelfAdvanceWithoutHuman, and does not grant accept/finalize.
+   */
+  singleGroupUnattended?: {
+    /**
+     * Prefer one scoped `tenantId/groupId`. Bare groupId is personal_local-only.
+     * Listing the group does not by itself emit wakes.
+     */
+    groupAllowlist?: string[];
+  };
+  /**
    * Platform Mode B — continue / re-wake after ROUND_COMPLETE (inventory-first).
    * Default OFF. Prefer groupAllowlist (tenantId/groupId) over enabled=true.
    * When authorized: after ROUND_COMPLETE, scan board; if published|claimed|
