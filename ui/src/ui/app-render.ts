@@ -35,6 +35,7 @@ import {
   markOwnerDecisionHydrationAttempted,
   noteOwnerDecisionDelivery,
   noteOwnerDecisionRecoveries,
+  noteOwnerDecisionVersionRefusal,
   setOwnerDecisionActionError,
   setOwnerDecisionTodolistStatus,
   type OwnerDecisionAction,
@@ -1310,6 +1311,15 @@ export function renderApp(state: AppViewState) {
                 setOwnerDecisionTodolistStatus(target.todolistId, status);
                 changed = true;
               }
+              const liveVersion = result?.todolist?.version;
+              if (
+                typeof target.version === "number" &&
+                typeof liveVersion === "number" &&
+                liveVersion !== target.version
+              ) {
+                noteOwnerDecisionVersionRefusal(target.decisionId);
+                changed = true;
+              }
               const facing = result?.cardDelivery?.userFacing;
               if (facing) {
                 noteOwnerDecisionDelivery(
@@ -1406,6 +1416,7 @@ export function renderApp(state: AppViewState) {
                 groupId: card.groupId,
                 taskId: card.taskId,
                 todolistId: card.todolistId,
+                ...(typeof card.version === "number" ? { expectedVersion: card.version } : {}),
               });
               setOwnerDecisionTodolistStatus(card.todolistId, "confirmed");
               clearOwnerDecisionActionError(card.decisionId);
@@ -1418,6 +1429,7 @@ export function renderApp(state: AppViewState) {
                 taskId: card.taskId,
                 todolistId: card.todolistId,
                 reason,
+                ...(typeof card.version === "number" ? { expectedVersion: card.version } : {}),
               });
               setOwnerDecisionTodolistStatus(card.todolistId, "revise_requested");
               clearOwnerDecisionActionError(card.decisionId);

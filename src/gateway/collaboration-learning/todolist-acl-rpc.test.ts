@@ -48,6 +48,7 @@ import {
   ClaimContractEntryError,
   confirmCollaborationTodolist,
   getCollaborationTodolist,
+  reviseCollaborationTodolist,
   listCollaborationTodolists,
   listCollaborationOwnerDecisionDeliveries,
   proposeCollaborationTodolist,
@@ -204,6 +205,31 @@ describe("Todolist ACL RPC boundary", () => {
         groupId,
         taskId: seed.taskId,
         todolistId: "td-1",
+      }),
+    ).toBe(true);
+    expect(
+      validateCollaborationTaskConfirmTodolistParams({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: "td-1",
+        expectedVersion: 1,
+      }),
+    ).toBe(true);
+    expect(
+      validateCollaborationTaskConfirmTodolistParams({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: "td-1",
+        expectedVersion: 0,
+      }),
+    ).toBe(false);
+    expect(
+      validateCollaborationTaskReviseTodolistParams({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: "td-1",
+        reason: "x",
+        expectedVersion: 2,
       }),
     ).toBe(true);
   });
@@ -761,7 +787,7 @@ describe("owner-decision delivery is independent of plan creation", () => {
         actor: "bot-secretary",
         cfg,
       }),
-    ).rejects.toMatchObject({ code: "invalid_status" });
+    ).rejects.toMatchObject({ code: "confirmation_consumed" });
     const still = await getCollaborationTodolist({
       groupId,
       taskId: seed.taskId,
@@ -795,5 +821,115 @@ describe("owner-decision delivery is independent of plan creation", () => {
           row.todolistId === replaced.todolist.todolistId && row.stage === "confirmation_consumed",
       ),
     ).toBe(true);
+  });
+
+  test("service and RPC refuse stale plan confirms without widening confirmer ACL", async () => {
+    const { cfg } = await useConfig();
+    const { todolist } = await seedBoardAndProposal(cfg);
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    const state = makeOperatingState({
+      groupId,
+      governance: { coordinatorBotId: "bot-coord" },
+    });
+    state.memberRoleMap = [
+      {
+        memberId: "bot-secretary",
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({ fileStore, groupId, state });
+
+    const revised = await reviseCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      reason: "改步骤",
+      steps: [{ title: "修订后步骤" }],
+      expectedVersion: todolist.version,
+      actor: "bot-secretary",
+      cfg,
+    });
+    expect(revised.version).toBe(todolist.version + 1);
+    expect(revised.status).toBe("revise_requested");
+
+    await expect(
+      confirmCollaborationTodolist({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: todolist.todolistId,
+        actor: "bot-secretary",
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "expected_version_required" });
+
+    await expect(
+      confirmCollaborationTodolist({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: todolist.todolistId,
+        expectedVersion: todolist.version,
+        actor: "bot-secretary",
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      code: "stale_version",
+      message: expect.stringContaining("旧版本已失效"),
+    });
+
+    const untouched = await getCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(untouched.status).toBe("revise_requested");
+    expect(untouched.steps[0]?.title).toBe("修订后步骤");
+    expect(untouched.version).toBe(revised.version);
+
+    const { collaborationLearningHandlers } =
+      await import("../server-methods/collaboration-learning.js");
+    const rpc = vi.fn();
+    await collaborationLearningHandlers["collaboration.task.confirmTodolist"]({
+      req: {} as never,
+      params: {
+        groupId,
+        taskId: seed.taskId,
+        todolistId: todolist.todolistId,
+        expectedVersion: todolist.version,
+      },
+      respond: rpc as never,
+      context: {} as never,
+      client: {
+        connect: { user: "bot-secretary" },
+        platformUserId: "bot-secretary",
+      } as never,
+      isWebchatConnect: () => false,
+    });
+    expect(rpc.mock.calls[0]?.[0]).toBe(false);
+    const rpcError = rpc.mock.calls[0]?.[2] as
+      | { message?: string; reasonCode?: string; details?: { reason?: string } }
+      | undefined;
+    expect(rpcError?.reasonCode).toBe("stale_version");
+    expect(rpcError?.details?.reason).toBe("stale_version");
+    expect(rpcError?.message ?? "").toContain("stale_version");
+    expect(rpcError?.message ?? "").toContain("旧版本已失效");
+    expect(rpcError?.message ?? "").not.toContain("修订后步骤");
+    expect(rpcError?.message ?? "").not.toContain(SECRET_STEP);
+
+    const confirmed = await confirmCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: todolist.todolistId,
+      expectedVersion: revised.version,
+      actor: "bot-secretary",
+      cfg,
+    });
+    expect(confirmed.status).toBe("confirmed");
+    expect(confirmed.version).toBe(revised.version);
+    expect(confirmed.steps[0]?.title).toBe("修订后步骤");
   });
 });

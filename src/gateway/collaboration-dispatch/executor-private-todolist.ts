@@ -17,6 +17,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenBotConfig } from "../../config/types.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   boardItemGoal,
   isCollabTaskClaimContractEnabled,
@@ -27,6 +28,8 @@ import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
 import { recordWakeEventBestEffort } from "./wake-contract.js";
+
+const todolistLog = createSubsystemLogger("gateway/executor-todolist");
 
 export type TodolistStepStatus = "pending" | "active" | "done" | "skipped";
 
@@ -100,6 +103,12 @@ export type ConfirmTodolistInput = {
   taskId: string;
   todolistId: string;
   confirmerId: string;
+  /**
+   * Plan version the caller saw. Omitted confirms are allowed only while this
+   * id's steps and version are still the original proposal. After a content
+   * change, omit / stale / mismatched versions do not write.
+   */
+  expectedVersion?: number;
 };
 
 export type ReviseTodolistInput = {
@@ -109,6 +118,8 @@ export type ReviseTodolistInput = {
   reason: string;
   /** Optional replacement steps; when set, status stays revise_requested until re-confirm. */
   steps?: readonly { title: string; detail?: string; stepId?: string }[];
+  /** Same binding as confirm. A stale card must not rewrite a newer plan. */
+  expectedVersion?: number;
 };
 
 export type SignalInsightInput = {
@@ -282,27 +293,143 @@ function latestById(lines: TodolistLogLine[], todolistId: string): ExecutorPriva
   return latest;
 }
 
-async function appendTodolist(
+const TODOLIST_VERSION_REFUSAL_COPY = {
+  stale_version: "旧版本已失效",
+  version_mismatch: "计划版本不匹配",
+  card_invalid: "旧版本已失效",
+  expected_version_required: "确认必须绑定计划版本",
+  confirmation_consumed: "该确认已生效",
+} as const;
+
+type TodolistVersionRefusal = keyof typeof TODOLIST_VERSION_REFUSAL_COPY;
+
+function stepFingerprint(steps: readonly TodolistStep[]): string {
+  return steps
+    .map((step) => [step.stepId, step.title, step.detail ?? "", step.status].join("\u0000"))
+    .join("\u0001");
+}
+
+function rowsForId(lines: TodolistLogLine[], todolistId: string): ExecutorPrivateTodolist[] {
+  const rows: ExecutorPrivateTodolist[] = [];
+  for (const line of lines) {
+    if (line.todolist.todolistId === todolistId) {
+      rows.push(line.todolist);
+    }
+  }
+  return rows;
+}
+
+/** True when a later line changed this id's version or step content. Status-only lines do not count. */
+function planContentChanged(lines: TodolistLogLine[], todolistId: string): boolean {
+  const rows = rowsForId(lines, todolistId);
+  const first = rows[0];
+  const latest = rows[rows.length - 1];
+  if (!first || !latest) {
+    return false;
+  }
+  return (
+    latest.version !== first.version ||
+    stepFingerprint(latest.steps) !== stepFingerprint(first.steps)
+  );
+}
+
+function refuseVersionGate(params: {
+  op: "confirm" | "revise";
+  reason: TodolistVersionRefusal;
+  taskId: string;
+  todolistId: string;
+  status?: string;
+  expectedVersion: number | null;
+  actualVersion: number | null;
+}): TodolistResult<never> {
+  // Ids and version numbers only. Step text stays out of logs and caller messages.
+  todolistLog.warn("todolist version gate refused", {
+    op: params.op,
+    reason: params.reason,
+    taskId: params.taskId,
+    todolistId: params.todolistId,
+    status: params.status ?? null,
+    expectedVersion: params.expectedVersion,
+    actualVersion: params.actualVersion,
+  });
+  return fail(params.reason, `${params.reason}: ${TODOLIST_VERSION_REFUSAL_COPY[params.reason]}`);
+}
+
+function bindPlanVersion(params: {
+  op: "confirm" | "revise";
+  lines: TodolistLogLine[];
+  current: ExecutorPrivateTodolist;
+  expectedVersion?: number;
+}): TodolistResult<never> | null {
+  const actual = params.current.version;
+  const meta = {
+    op: params.op,
+    taskId: params.current.taskId,
+    todolistId: params.current.todolistId,
+    status: params.current.status,
+    actualVersion: actual,
+  };
+  if (params.expectedVersion == null) {
+    if (planContentChanged(params.lines, params.current.todolistId)) {
+      return refuseVersionGate({
+        ...meta,
+        reason: "expected_version_required",
+        expectedVersion: null,
+      });
+    }
+    return null;
+  }
+  const expected = params.expectedVersion;
+  if (Number.isInteger(expected) && expected >= 1 && expected < actual) {
+    return refuseVersionGate({ ...meta, reason: "stale_version", expectedVersion: expected });
+  }
+  if (!Number.isInteger(expected) || expected !== actual) {
+    return refuseVersionGate({
+      ...meta,
+      reason: "version_mismatch",
+      expectedVersion: Number.isFinite(expected) ? expected : null,
+    });
+  }
+  return null;
+}
+
+/**
+ * Read-check-append under the task lock so concurrent confirm/revise/propose
+ * cannot apply a decision against a row that just changed.
+ * Refusals append nothing.
+ */
+async function commitTodolistLines(
   authority: RuntimeAuthority,
-  todolist: ExecutorPrivateTodolist,
-  options?: TodolistOptions,
-): Promise<void> {
+  taskId: string,
+  options: TodolistOptions | undefined,
+  fn: (lines: TodolistLogLine[]) => {
+    result: TodolistResult<ExecutorPrivateTodolist>;
+    appends?: ExecutorPrivateTodolist[];
+  },
+): Promise<TodolistResult<ExecutorPrivateTodolist>> {
   const cfg = options?.cfg;
   assertCollaborationRuntimeWritable(executorTodolistsDir(authority), cfg);
-  const dir = executorTodolistsDir(authority);
-  const stem = safeStem(todolist.taskId);
+  const stem = safeStem(taskId);
   if (!stem) {
-    throw new Error("executor todolist taskId is not a safe id");
+    return fail("invalid_input", "taskId is not a safe id");
   }
-  const logPath = executorTodolistLogPath(dir, todolist.taskId);
-  const at = nowOf(options);
-  await withRoundLock(dir, stem, async () => {
+  const dir = executorTodolistsDir(authority);
+  const logPath = executorTodolistLogPath(dir, taskId);
+  return withRoundLock(dir, stem, async () => {
     await fs.mkdir(dir, { recursive: true });
-    await appendJsonlDurable(logPath, {
-      kind: "executor_private_todolist",
-      at,
-      todolist,
-    } satisfies TodolistLogLine);
+    const lines = await readLog(logPath);
+    const outcome = fn(lines);
+    if (outcome.result.ok && outcome.appends && outcome.appends.length > 0) {
+      const at = nowOf(options);
+      for (const todolist of outcome.appends) {
+        await appendJsonlDurable(logPath, {
+          kind: "executor_private_todolist",
+          at,
+          todolist,
+        } satisfies TodolistLogLine);
+      }
+    }
+    return outcome.result;
   });
 }
 
@@ -491,40 +618,40 @@ export async function proposeTodolist(
     return steps;
   }
 
-  // Supersede any prior active list for same board+owner.
-  const existing = await listExecutorTodolists(authority, {
-    taskId,
-    boardItemId,
-    ownerMemberId,
-  });
-  let version = 1;
-  for (const prev of existing) {
-    if (prev.status === "superseded") {
-      continue;
+  // Supersede any prior active list for same board+owner inside one lock.
+  return commitTodolistLines(authority, taskId, options, (lines) => {
+    const byId = new Map<string, ExecutorPrivateTodolist>();
+    for (const line of lines) {
+      byId.set(line.todolist.todolistId, line.todolist);
     }
-    version = Math.max(version, prev.version + 1);
-    const superseded: ExecutorPrivateTodolist = {
-      ...prev,
-      status: "superseded",
+    let version = 1;
+    const appends: ExecutorPrivateTodolist[] = [];
+    for (const prev of byId.values()) {
+      if (prev.status === "superseded") {
+        continue;
+      }
+      if (prev.boardItemId !== boardItemId || prev.ownerMemberId !== ownerMemberId) {
+        continue;
+      }
+      version = Math.max(version, prev.version + 1);
+      appends.push({ ...prev, status: "superseded" });
+    }
+    const todolist: ExecutorPrivateTodolist = {
+      todolistId: compact(input.todolistId) || randomUUID(),
+      boardItemId,
+      taskId,
+      groupId,
+      ownerMemberId,
+      status: "proposed",
+      steps: steps.value,
+      proposedBy,
+      proposedAt: nowOf(options),
+      version,
+      visibility: "executor_private",
     };
-    await appendTodolist(authority, superseded, options);
-  }
-
-  const todolist: ExecutorPrivateTodolist = {
-    todolistId: compact(input.todolistId) || randomUUID(),
-    boardItemId,
-    taskId,
-    groupId,
-    ownerMemberId,
-    status: "proposed",
-    steps: steps.value,
-    proposedBy,
-    proposedAt: nowOf(options),
-    version,
-    visibility: "executor_private",
-  };
-  await appendTodolist(authority, todolist, options);
-  return { ok: true, value: todolist };
+    appends.push(todolist);
+    return { result: { ok: true, value: todolist }, appends };
+  });
 }
 
 export async function confirmTodolist(
@@ -542,37 +669,61 @@ export async function confirmTodolist(
   if (!taskId || !todolistId || !confirmerId) {
     return fail("invalid_input", "confirmTodolist requires taskId, todolistId, confirmerId");
   }
-  const current = await loadExecutorTodolist(authority, { taskId, todolistId });
-  if (!current) {
+  if (!safeStem(taskId)) {
     return fail("not_found", `todolist not found: ${todolistId}`);
   }
-  if (current.status !== "proposed" && current.status !== "revise_requested") {
-    return fail(
-      "invalid_status",
-      `todolist status is ${current.status}; expected proposed|revise_requested`,
-    );
-  }
-  if (!isAuthorizedConfirmer(confirmerId, options, current.ownerMemberId)) {
-    const allowed = [
-      ...(options?.authorizedConfirmerIds ?? []).map((id) => id.trim()).filter(Boolean),
-      ...(options?.coordinatorBotId?.trim() ? [options.coordinatorBotId.trim()] : []),
-    ];
-    const allowedHint =
-      allowed.length > 0 ? `; actor=${confirmerId}; allowed=${allowed.join(",")}` : "";
-    return fail(
-      "actor_not_confirmer",
-      `confirmTodolist requires 主答/lead or coordinator (not executor self-confirm)${allowedHint}`,
-    );
-  }
-  const next: ExecutorPrivateTodolist = {
-    ...current,
-    status: "confirmed",
-    confirmedBy: confirmerId,
-    confirmedAt: nowOf(options),
-    reviseReason: undefined,
-  };
-  await appendTodolist(authority, next, options);
-  return { ok: true, value: next };
+  return commitTodolistLines(authority, taskId, options, (lines) => {
+    const current = latestById(lines, todolistId);
+    if (!current) {
+      return { result: fail("not_found", `todolist not found: ${todolistId}`) };
+    }
+    const gateMeta = {
+      op: "confirm" as const,
+      taskId,
+      todolistId,
+      status: current.status,
+      expectedVersion: input.expectedVersion ?? null,
+      actualVersion: current.version,
+    };
+    if (current.status === "superseded") {
+      return { result: refuseVersionGate({ ...gateMeta, reason: "card_invalid" }) };
+    }
+    // Version before status so an older card is not reported as a generic status error.
+    const versionGate = bindPlanVersion({
+      op: "confirm",
+      lines,
+      current,
+      expectedVersion: input.expectedVersion,
+    });
+    if (versionGate) {
+      return { result: versionGate };
+    }
+    if (current.status === "confirmed") {
+      return { result: refuseVersionGate({ ...gateMeta, reason: "confirmation_consumed" }) };
+    }
+    if (!isAuthorizedConfirmer(confirmerId, options, current.ownerMemberId)) {
+      const allowed = [
+        ...(options?.authorizedConfirmerIds ?? []).map((id) => id.trim()).filter(Boolean),
+        ...(options?.coordinatorBotId?.trim() ? [options.coordinatorBotId.trim()] : []),
+      ];
+      const allowedHint =
+        allowed.length > 0 ? `; actor=${confirmerId}; allowed=${allowed.join(",")}` : "";
+      return {
+        result: fail(
+          "actor_not_confirmer",
+          `confirmTodolist requires 主答/lead or coordinator (not executor self-confirm)${allowedHint}`,
+        ),
+      };
+    }
+    const next: ExecutorPrivateTodolist = {
+      ...current,
+      status: "confirmed",
+      confirmedBy: confirmerId,
+      confirmedAt: nowOf(options),
+      reviseReason: undefined,
+    };
+    return { result: { ok: true, value: next }, appends: [next] };
+  });
 }
 
 export async function reviseTodolist(
@@ -594,39 +745,70 @@ export async function reviseTodolist(
   if (!reason) {
     return fail("invalid_input", "reviseTodolist requires reason");
   }
-  const current = await loadExecutorTodolist(authority, { taskId, todolistId });
-  if (!current) {
+  if (!safeStem(taskId)) {
     return fail("not_found", `todolist not found: ${todolistId}`);
   }
-  if (current.status !== "proposed" && current.status !== "confirmed") {
-    return fail(
-      "invalid_status",
-      `todolist status is ${current.status}; expected proposed|confirmed`,
-    );
-  }
-  if (!isAuthorizedConfirmer(reviserId, options, current.ownerMemberId)) {
-    return fail("actor_not_confirmer", "reviseTodolist requires 主答/lead or coordinator");
-  }
-  let steps = current.steps;
+  let replacementSteps: TodolistStep[] | null = null;
   if (input.steps) {
     const normalized = normalizeSteps(input.steps);
     if (!normalized.ok) {
       return normalized;
     }
-    steps = normalized.value;
+    replacementSteps = normalized.value;
   }
-  const next: ExecutorPrivateTodolist = {
-    ...current,
-    status: "revise_requested",
-    steps,
-    revisedBy: reviserId,
-    revisedAt: nowOf(options),
-    reviseReason: reason,
-    confirmedBy: undefined,
-    confirmedAt: undefined,
-  };
-  await appendTodolist(authority, next, options);
-  return { ok: true, value: next };
+  return commitTodolistLines(authority, taskId, options, (lines) => {
+    const current = latestById(lines, todolistId);
+    if (!current) {
+      return { result: fail("not_found", `todolist not found: ${todolistId}`) };
+    }
+    const gateMeta = {
+      op: "revise" as const,
+      taskId,
+      todolistId,
+      status: current.status,
+      expectedVersion: input.expectedVersion ?? null,
+      actualVersion: current.version,
+    };
+    if (current.status === "superseded") {
+      return { result: refuseVersionGate({ ...gateMeta, reason: "card_invalid" }) };
+    }
+    const versionGate = bindPlanVersion({
+      op: "revise",
+      lines,
+      current,
+      expectedVersion: input.expectedVersion,
+    });
+    if (versionGate) {
+      return { result: versionGate };
+    }
+    if (current.status !== "proposed" && current.status !== "confirmed") {
+      return {
+        result: fail(
+          "invalid_status",
+          `todolist status is ${current.status}; expected proposed|confirmed`,
+        ),
+      };
+    }
+    if (!isAuthorizedConfirmer(reviserId, options, current.ownerMemberId)) {
+      return {
+        result: fail("actor_not_confirmer", "reviseTodolist requires 主答/lead or coordinator"),
+      };
+    }
+    const steps = replacementSteps ?? current.steps;
+    const stepsChanged = stepFingerprint(steps) !== stepFingerprint(current.steps);
+    const next: ExecutorPrivateTodolist = {
+      ...current,
+      status: "revise_requested",
+      steps,
+      version: stepsChanged ? current.version + 1 : current.version,
+      revisedBy: reviserId,
+      revisedAt: nowOf(options),
+      reviseReason: reason,
+      confirmedBy: undefined,
+      confirmedAt: undefined,
+    };
+    return { result: { ok: true, value: next }, appends: [next] };
+  });
 }
 
 /**

@@ -18,6 +18,7 @@ import {
   noteOwnerDecisionDelivery,
   ownerDecisionStatusCalloutClass,
   parseOwnerDecisionStatusGateError,
+  parseOwnerDecisionVersionRefusal,
   readOwnerDecision,
   readOwnerDecisionRow,
   renderOwnerDecisionCards,
@@ -537,6 +538,34 @@ describe("owner-decision-card UI", () => {
     const stale = container.querySelector("[data-owner-decision='dec-gate-2']");
     expect(stale).not.toBeNull();
     expect(stale?.textContent).toContain("旧版本已失效");
+    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+
+    clearOwnerDecisionDismissalsForTest();
+    const message3 = {
+      ...message,
+      ownerDecision: {
+        ...message.ownerDecision,
+        decisionId: "dec-gate-3",
+        todolistId: "td-gate-3",
+        version: 1,
+      },
+    };
+    render(renderOwnerDecisionCards([message3]), container);
+    setOwnerDecisionActionError("dec-gate-3", "confirmTodolist: version_mismatch: 计划版本不匹配");
+    expect(
+      parseOwnerDecisionVersionRefusal("confirmTodolist: version_mismatch: 计划版本不匹配"),
+    ).toBe("version_mismatch");
+    expect(parseOwnerDecisionVersionRefusal("confirmTodolist: stale_version: 旧版本已失效")).toBe(
+      "stale_version",
+    );
+    expect(parseOwnerDecisionVersionRefusal("confirmTodolist: card_invalid: 旧版本已失效")).toBe(
+      "card_invalid",
+    );
+    expect(getOwnerDecisionTodolistStatus("td-gate-3")).toBeNull();
+    render(renderOwnerDecisionCards([message3]), container);
+    const mismatched = container.querySelector("[data-owner-decision='dec-gate-3']");
+    expect(mismatched?.textContent).toContain("旧版本已失效");
+    expect(mismatched?.textContent).not.toContain("计划版本不匹配");
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
   });
 

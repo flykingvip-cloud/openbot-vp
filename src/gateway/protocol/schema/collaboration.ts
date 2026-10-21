@@ -887,6 +887,8 @@ export type CollaborationTaskConfirmTodolistParams = {
   groupId: string;
   taskId: string;
   todolistId: string;
+  /** Plan version on the card. Optional at the schema so a missing field is a domain refusal, not a parse error. */
+  expectedVersion?: number;
 };
 
 export const CollaborationTaskConfirmTodolistParamsSchema = Type.Object(
@@ -894,6 +896,7 @@ export const CollaborationTaskConfirmTodolistParamsSchema = Type.Object(
     groupId: NonEmptyString,
     taskId: NonEmptyString,
     todolistId: NonEmptyString,
+    expectedVersion: Type.Optional(Type.Integer({ minimum: 1 })),
   },
   { additionalProperties: false },
 );
@@ -904,6 +907,8 @@ export type CollaborationTaskReviseTodolistParams = {
   todolistId: string;
   reason: string;
   steps?: Array<{ title: string; detail?: string; stepId?: string }>;
+  /** Plan version on the card. A stale card must not rewrite a newer plan. */
+  expectedVersion?: number;
 };
 
 export const CollaborationTaskReviseTodolistParamsSchema = Type.Object(
@@ -913,6 +918,7 @@ export const CollaborationTaskReviseTodolistParamsSchema = Type.Object(
     todolistId: NonEmptyString,
     reason: NonEmptyString,
     steps: Type.Optional(Type.Array(CollaborationTodolistStepSchema, { minItems: 1 })),
+    expectedVersion: Type.Optional(Type.Integer({ minimum: 1 })),
   },
   { additionalProperties: false },
 );
