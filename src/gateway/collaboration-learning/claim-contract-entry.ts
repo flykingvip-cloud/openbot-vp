@@ -1182,6 +1182,8 @@ export async function confirmCollaborationTodolist(params: {
   taskId: string;
   todolistId: string;
   confirmerId?: string;
+  /** Card plan version. See confirmTodolist. Does not widen who may confirm. */
+  expectedVersion?: number;
   actor?: string;
   /** Ignored. Confirmers are resolved from board publishedBy + operating state. */
   authorizedConfirmerIds?: string[];
@@ -1215,7 +1217,12 @@ export async function confirmCollaborationTodolist(params: {
   const confirmed = unwrapTodolist(
     await confirmTodolist(
       authority,
-      { taskId: params.taskId, todolistId: params.todolistId, confirmerId },
+      {
+        taskId: params.taskId,
+        todolistId: params.todolistId,
+        confirmerId,
+        expectedVersion: params.expectedVersion,
+      },
       { cfg, ...acl },
     ),
     "confirmTodolist",
@@ -1238,6 +1245,8 @@ export async function reviseCollaborationTodolist(params: {
   todolistId: string;
   reason: string;
   reviserId?: string;
+  /** Card plan version. See reviseTodolist. Does not widen who may revise. */
+  expectedVersion?: number;
   actor?: string;
   steps?: Array<{ title: string; detail?: string; stepId?: string }>;
   /** Ignored. See confirmCollaborationTodolist. */
@@ -1278,6 +1287,7 @@ export async function reviseCollaborationTodolist(params: {
         reviserId,
         reason: params.reason,
         steps: params.steps,
+        expectedVersion: params.expectedVersion,
       },
       { cfg, ...acl },
     ),

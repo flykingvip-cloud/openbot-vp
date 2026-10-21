@@ -174,6 +174,29 @@ const OWNER_DECISION_STATUS_COPY: Record<string, string> = {
   closed: "计划已关闭。",
 };
 
+const OWNER_DECISION_VERSION_REFUSALS = [
+  "stale_version",
+  "version_mismatch",
+  "card_invalid",
+  "expected_version_required",
+  "confirmation_consumed",
+] as const;
+
+export type OwnerDecisionVersionRefusal = (typeof OWNER_DECISION_VERSION_REFUSALS)[number];
+
+/** Parse confirm/revise version-gate messages. Codes stay distinct; copy reuses batch 2. */
+export function parseOwnerDecisionVersionRefusal(
+  message: string,
+): OwnerDecisionVersionRefusal | null {
+  const text = String(message ?? "");
+  for (const code of OWNER_DECISION_VERSION_REFUSALS) {
+    if (text.includes(code)) {
+      return code;
+    }
+  }
+  return null;
+}
+
 /** Parse `todolist status is X; expected proposed|revise_requested` RPC errors. */
 export function parseOwnerDecisionStatusGateError(message: string): string | null {
   const text = String(message ?? "").trim();
@@ -343,7 +366,22 @@ export type OwnerDecisionHydrationTarget = {
   groupId: string;
   taskId: string;
   todolistId: string;
+  version?: number;
 };
+
+/** Decision ids whose card version was refused or no longer matches the live plan. */
+const versionStaleDecisionIds = new Set<string>();
+
+export function noteOwnerDecisionVersionRefusal(decisionId: string): void {
+  const id = decisionId.trim();
+  if (id) {
+    versionStaleDecisionIds.add(id);
+  }
+}
+
+export function isOwnerDecisionVersionStale(decisionId: string): boolean {
+  return versionStaleDecisionIds.has(decisionId.trim());
+}
 
 /** Todolist ids we already attempted to hydrate this page session. */
 const hydratedTodolistIds = new Set<string>();
@@ -369,6 +407,7 @@ export function collectOwnerDecisionHydrationTargets(
       groupId: card.groupId,
       taskId: card.taskId,
       todolistId,
+      ...(typeof card.version === "number" ? { version: card.version } : {}),
     });
   }
   return out;
@@ -391,6 +430,7 @@ export function clearOwnerDecisionDismissalsForTest(): void {
   todolistIdByDecisionId.clear();
   boardItemIdByDecisionId.clear();
   hydratedTodolistIds.clear();
+  versionStaleDecisionIds.clear();
 }
 
 export function dismissOwnerDecisionCard(decisionId: string): void {
@@ -447,8 +487,32 @@ export function setOwnerDecisionActionError(decisionId: string, message: string)
   if (!id || !text) {
     return;
   }
-  const gated = parseOwnerDecisionStatusGateError(text);
+  const versionRefusal = parseOwnerDecisionVersionRefusal(text);
   const todolistId = todolistIdByDecisionId.get(id);
+  if (versionRefusal === "confirmation_consumed") {
+    if (todolistId) {
+      setOwnerDecisionTodolistStatus(todolistId, "confirmed");
+    }
+    actionErrorsByDecisionId.delete(id);
+    return;
+  }
+  if (
+    versionRefusal === "stale_version" ||
+    versionRefusal === "version_mismatch" ||
+    versionRefusal === "card_invalid"
+  ) {
+    noteOwnerDecisionVersionRefusal(id);
+    if (versionRefusal === "card_invalid" && todolistId) {
+      setOwnerDecisionTodolistStatus(todolistId, "superseded");
+    }
+    actionErrorsByDecisionId.delete(id);
+    return;
+  }
+  if (versionRefusal === "expected_version_required") {
+    actionErrorsByDecisionId.set(id, "确认必须绑定计划版本");
+    return;
+  }
+  const gated = parseOwnerDecisionStatusGateError(text);
   if (gated && todolistId) {
     setOwnerDecisionTodolistStatus(todolistId, gated);
     // Prefer status banner over raw RPC gate sentence.
@@ -572,6 +636,7 @@ export function renderOwnerDecisionCards(
       const userFacing = getOwnerDecisionDelivery(card.todolistId, card.version);
       const invalid =
         staleIds.has(card.decisionId) ||
+        isOwnerDecisionVersionStale(card.decisionId) ||
         userFacing === "stale_version" ||
         todolistStatus === "superseded";
       const actionable = !invalid && isOwnerDecisionTodolistActionable(todolistStatus);

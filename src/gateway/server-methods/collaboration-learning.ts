@@ -34,6 +34,7 @@ import {
   proposeCollaborationTodolist,
   retryCollaborationOwnerDecisionDelivery,
   listCollaborationOwnerDecisionDeliveries,
+  ClaimContractEntryError,
   confirmCollaborationTodolist,
   reviseCollaborationTodolist,
   getCollaborationTodolist,
@@ -120,6 +121,28 @@ async function resolveLedgerReadTenantId(client: GatewayClient | null): Promise<
   }
   return (await resolveCollaborationTenantResolution(client)).tenantId;
 }
+
+const TODOLIST_VERSION_REASON_CODES = new Set([
+  "stale_version",
+  "version_mismatch",
+  "card_invalid",
+  "expected_version_required",
+  "confirmation_consumed",
+]);
+
+/** Confirm/revise refusals carry a stable reason code. Step text is not added here. */
+function collaborationEntryErrorShape(error: unknown) {
+  const message = resolveCollaborationTransitionError(error) ?? String(error);
+  const reasonCode = error instanceof ClaimContractEntryError ? error.code : undefined;
+  if (reasonCode && TODOLIST_VERSION_REASON_CODES.has(reasonCode)) {
+    return errorShape(ErrorCodes.INVALID_REQUEST, message, {
+      reasonCode,
+      details: { reason: reasonCode },
+    });
+  }
+  return errorShape(ErrorCodes.INVALID_REQUEST, message);
+}
+
 export const collaborationLearningHandlers: GatewayRequestHandlers = {
   "collaboration.learning.snapshot": async ({ params, respond }) => {
     if (
@@ -719,19 +742,13 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         groupId: params.groupId,
         taskId: params.taskId,
         todolistId: params.todolistId,
+        expectedVersion: params.expectedVersion,
         actor: await resolveDeliveryAclActor(client, params.groupId),
         tenant,
       });
       respond(true, { todolist }, undefined);
     } catch (error) {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          resolveCollaborationTransitionError(error) ?? String(error),
-        ),
-      );
+      respond(false, undefined, collaborationEntryErrorShape(error));
     }
   },
   "collaboration.task.reviseTodolist": async ({ params, respond, client }) => {
@@ -753,19 +770,13 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         todolistId: params.todolistId,
         reason: params.reason,
         steps: params.steps,
+        expectedVersion: params.expectedVersion,
         actor: await resolveDeliveryAclActor(client, params.groupId),
         tenant,
       });
       respond(true, { todolist }, undefined);
     } catch (error) {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          resolveCollaborationTransitionError(error) ?? String(error),
-        ),
-      );
+      respond(false, undefined, collaborationEntryErrorShape(error));
     }
   },
   "collaboration.task.getTodolist": async ({ params, respond, client }) => {
