@@ -62,6 +62,7 @@ import {
 import { appendJsonlDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
+import { advanceConfirmedStep, drainIfUnattendedHardStopped } from "./single-group-unattended.js";
 import type { CollaborationBotTarget } from "./types.js";
 import {
   isCollabTaskWakeContractEnabled,
@@ -790,9 +791,16 @@ export async function trySelfAdvance(
 
   // Claim-first: unclaimed published inventory must enter claim before delivery
   // self-advance (§A "published: claim first"). Skip on dry_run.
+  // Batch 5: a hard-stopped single target does not claim or wake.
+  const unattendedHardStop =
+    !effectiveDryRun && (await drainIfUnattendedHardStopped(authority, { cfg, nowMs: at }));
   let claimedPublishedLead = false;
   let claimedPublishedReason: string | null = null;
-  if (!effectiveDryRun && rankSelfAdvanceActiveBoardItems(boardItems).length === 0) {
+  if (
+    !effectiveDryRun &&
+    !unattendedHardStop &&
+    rankSelfAdvanceActiveBoardItems(boardItems).length === 0
+  ) {
     const claimAttempt = await tryClaimPublishedInventoryLead(authority, {
       boardItems,
       cfg,
@@ -1043,7 +1051,7 @@ export async function trySelfAdvance(
         authority.groupId,
         authority.tenantId,
       );
-      if (wakeEnabled) {
+      if (wakeEnabled && !unattendedHardStop) {
         const wake = await recordWakeEvent(
           authority,
           {
@@ -1152,25 +1160,113 @@ export async function trySelfAdvance(
   }
 
   // Execute path: P0-2 wake→Mode B round consumer (dispatched|recorded).
+  // Batch 5: the single target goes through the mission fence first. Other
+  // groups keep this consume path. The fence does not grant accept/finalize.
   const fromAgentId = compact(options.fromAgentId) || "system:self_advance";
-  const consume = await consumeWakeForRoundDispatch({
-    authority,
+  if (unattendedHardStop) {
+    const decision = buildDecisionBase({
+      at,
+      tickId,
+      authority,
+      triggerSource,
+      writeMode: effectiveWriteMode,
+      eligibility,
+      execMode: "blocked",
+      advanced: false,
+      executed: false,
+      result: "hard_stop",
+      primary: primaryItem ?? primaryCandidate,
+      fingerprint,
+      invalidatedPrior,
+      invalidationReason,
+    });
+    await maybeLedger(decision);
+    return {
+      ok: true,
+      advanced: false,
+      execMode: "blocked",
+      eligibility,
+      lead,
+      deliveryGate,
+      taskBag,
+      reason: "hard_stop",
+      message: "single-group unattended lane is hard-stopped",
+      writeMode: effectiveWriteMode,
+      executed: false,
+      decision,
+      fingerprint: fingerprint ?? undefined,
+      invalidatedPrior,
+    };
+  }
+  const fenced = await advanceConfirmedStep(authority, {
     cfg,
-    writeMode: "execute",
-    roundDispatcher: options.roundDispatcher,
-    skipRoundDispatch: options.skipRoundDispatch,
     nowMs: at,
-    request: {
-      groupId: authority.groupId,
-      tenantId: authority.tenantId,
-      fromAgentId,
-      toAgentIds: [lead.leadAgentId],
-      source: "self_advance",
-      taskId: primaryItem?.taskId,
-      itemId: primaryItem?.itemId,
-      reason: `self_advance:delivery_exec:${eligibility.reason}:${lead.reason}`,
-    },
+    executeAuthorized: true,
+    taskId: primaryItem?.taskId ?? "",
+    itemId: primaryItem?.itemId ?? "",
+    ownerMemberId: lead.leadAgentId,
+    roundDispatcher: options.skipRoundDispatch ? null : options.roundDispatcher,
+    fromAgentId,
+    toAgentId: lead.leadAgentId,
+    source: "self_advance",
+    reason: `self_advance:delivery_exec:${eligibility.reason}:${lead.reason}`,
   });
+  if (fenced.handled && !fenced.committedDispatch) {
+    const decision = buildDecisionBase({
+      at,
+      tickId,
+      authority,
+      triggerSource,
+      writeMode: effectiveWriteMode,
+      eligibility,
+      execMode: "blocked",
+      advanced: false,
+      executed: false,
+      result: fenced.reason,
+      primary: primaryItem ?? primaryCandidate,
+      fingerprint,
+      invalidatedPrior,
+      invalidationReason,
+    });
+    await maybeLedger(decision);
+    return {
+      ok: true,
+      advanced: false,
+      execMode: "blocked",
+      eligibility,
+      lead,
+      deliveryGate,
+      taskBag,
+      reason: fenced.reason,
+      message: fenced.message,
+      writeMode: effectiveWriteMode,
+      executed: false,
+      decision,
+      fingerprint: fingerprint ?? undefined,
+      invalidatedPrior,
+    };
+  }
+  const consume =
+    fenced.handled && fenced.consume
+      ? fenced.consume
+      : await consumeWakeForRoundDispatch({
+          authority,
+          cfg,
+          writeMode: "execute",
+          roundDispatcher: options.roundDispatcher,
+          skipRoundDispatch: options.skipRoundDispatch,
+          nowMs: at,
+          request: {
+            groupId: authority.groupId,
+            tenantId: authority.tenantId,
+            fromAgentId,
+            toAgentIds: [lead.leadAgentId],
+            source: "self_advance",
+            taskId: primaryItem?.taskId,
+            itemId: primaryItem?.itemId,
+            reason: `self_advance:delivery_exec:${eligibility.reason}:${lead.reason}`,
+          },
+        });
   const wakeEvent = consume.wakeEvent;
 
   const decision = buildDecisionBase({

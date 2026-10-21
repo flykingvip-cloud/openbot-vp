@@ -1,5 +1,28 @@
 version: 1
 tasks:
+  - id: batch5-single-group-unattended:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 5 single-target unattended fence and hard stop on existing heartbeat / self_advance / wake
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch5-single-group-unattended-2026-10-21.md
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/config/types.collaboration.ts
+      - src/config/zod-schema.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/self-advance.ts
+      - src/gateway/collaboration-dispatch/single-group-unattended.ts
+      - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
+      - src/gateway/collaboration-learning/state-machine.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
   - id: batch4-restore-no-task-bleed:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9226,6 +9249,27 @@ tasks:
     since: 2026-10-21
     metadata: {}
 landingStreams:
+  - id: batch5-single-group-unattended
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch5-single-group-unattended-2026-10-21.md
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/config/types.collaboration.ts
+      - src/config/zod-schema.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/self-advance.ts
+      - src/gateway/collaboration-dispatch/single-group-unattended.ts
+      - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
+      - src/gateway/collaboration-learning/state-machine.ts
+    canLandWith: []
+    metadata:
+      task: batch5-single-group-unattended
+      owner: cursor-cloud
+      purpose: Batch 5 single-target unattended fence. First-match so these shared files land with this stream.
   - id: batch4-restore-no-task-bleed
     landingPolicy: serial
     paths:

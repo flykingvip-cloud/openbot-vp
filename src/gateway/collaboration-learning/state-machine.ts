@@ -20,7 +20,16 @@ import {
   observeGovernanceLanePolicyHashDivergence,
   resolveGovernanceLaneActor,
 } from "../collaboration-dispatch/policy-lane-governance.js";
-import { compileGroupEffectivePolicy } from "../collaboration-dispatch/resolve-effective-policy.js";
+import {
+  compileGroupEffectivePolicy,
+  resolveGroupPolicyInput,
+} from "../collaboration-dispatch/resolve-effective-policy.js";
+import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
+import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import {
+  guardUnattendedFinalize,
+  isSingleGroupUnattendedTarget,
+} from "../collaboration-dispatch/single-group-unattended.js";
 import {
   applyTaskHandoff,
   asGovernedTask,
@@ -35,6 +44,7 @@ import {
   type GovernedTask,
 } from "../collaboration-dispatch/task-runtime.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import {
   recordDeliverableTransitionSatisfactionBestEffort,
   recordReviewResolutionSatisfactionBestEffort,
@@ -105,6 +115,35 @@ export async function transitionCollaborationTask(params: {
       params.groupId,
       "deliverable",
     );
+    const finalizeGate = evaluateGovernanceGate({
+      action: "finalize_decision",
+      actor,
+      effective,
+    });
+    // Batch 5 latch only. assertTaskMayComplete below is unchanged and still refuses.
+    if (isSingleGroupUnattendedTarget(cfg, params.groupId, null)) {
+      const fenceAuthority = createRuntimeAuthority({
+        snapshot: createRoundPolicySnapshot(resolveGroupPolicyInput({ operatingState }), {
+          now: Date.now(),
+          idGen: () => `pss_unattended_finalize_${params.groupId}`,
+        }),
+        episodeId: `unattended-finalize:${params.groupId}`,
+        tenant: { tenantId: null, trust: "none" },
+        groupId: params.groupId,
+        profile: resolveSecurityProfile(cfg).profile,
+        cfg,
+      });
+      await guardUnattendedFinalize({
+        authority: fenceAuthority,
+        groupId: params.groupId,
+        cfg,
+        actorId: actor.id || params.actor || "",
+        actorType: actor.type,
+        gateAllowed: finalizeGate.allowed,
+        coordinatorBotId: operatingState?.governance.coordinatorBotId,
+        publishedBy: operatingState?.governance.ownerUserId,
+      });
+    }
     assertTaskMayComplete({
       task: { ...governed, responsibility },
       effective,
