@@ -22,7 +22,7 @@ function connection(
     displayName: "生产设备平台",
     environment: "production",
     serviceBaseUrl: "https://device.example",
-    contractVersion: "v1-draft",
+    contractVersion: "v1",
     credentialRef: "cred://device-platform/plat-1",
     clientIdentity: "device-platform",
     registrationNotes: "capability registration",
@@ -72,6 +72,8 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain("还没有设备平台连接");
     });
+    expect(container.textContent).not.toContain("未确认·JOINT_PENDING");
+    expect(container.textContent).not.toContain("设备已应用");
 
     setDevicePlatformAdminClientForTests({
       ...client,

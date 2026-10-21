@@ -60,6 +60,8 @@ export class DevicePlatformStore {
   loadConnections(): ConnectionsFile {
     const file = readJson(this.locations.connectionFile, emptyConnections());
     for (const [platformId, connection] of Object.entries(file.connections)) {
+      // "v1-draft" stays on read (pending upgrade). The health probe rewrites it
+      // to "v1" only after device-control reports maturity=v1-frozen.
       file.connections[platformId] = normalizeDevicePlatformConnection({
         ...connection,
         platformId: connection.platformId || platformId,

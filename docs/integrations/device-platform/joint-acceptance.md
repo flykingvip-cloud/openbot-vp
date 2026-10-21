@@ -48,6 +48,8 @@ The frozen OpenAPI file is `contracts/device-platform/device-control.openapi.yam
 
 `grayRelease`, `realDeviceDelivery`, `flash`, and `massFlash` stay false. `firmwareUrl` stays null. 契约冻结 is the only gate marked DONE. 管理页浏览器联调, staging, 真机, 生产, and 设备实际已生效 stay PENDING / JOINT_PENDING.
 
+OpenBot connection `contractVersion` is handled. New records use `v1`. A stored `v1-draft` is pending upgrade: it stays on read, and the next health check that returns `maturity=v1-frozen` rewrites it to `v1`. Upgrade device-control to `55ead3ef7fe7f20137123447c39e3f26f9bffbbe` or later before relying on that rewrite. See [Device platform management](/integrations/device-platform/management). It is not an open limitation.
+
 Agent A sim script is `npm run sim-joint`. When credentials are unset, that script skips. A skip is not a pass. Agent A docs are `docs/integration/joint-acceptance.md` and `docs/integration/sim-joint-loopback.md`. Agent A rerun on the freeze commit: typecheck exit 0; test 75 pass / 0 fail / 4 skip. The 4 skips are live stubs.
 
 After this OpenBot change merges, the coordinator publishes MERGE_SHA. This page does not invent it.

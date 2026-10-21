@@ -38,6 +38,8 @@ export type PersonalDeviceBindingView = {
   appliedBindingVersion: number;
   authorizationEstablished: boolean;
   platformApplied: boolean;
+  /** Absent or false means the device effect is unconfirmed. */
+  deviceEffect?: boolean;
   failureCode?: string;
 };
 
@@ -327,6 +329,7 @@ function renderDeviceList(selected: PersonalDeviceView | null) {
       <p class="personal-devices__note" data-testid="personal-devices-empty">
         还没有设备。填写下面的配对信息后添加。
       </p>
+      ${renderEffectState(null)}
     `;
   }
   return html`
@@ -369,6 +372,7 @@ function renderDetail(device: PersonalDeviceView) {
           binding ? `${binding.appliedBindingVersion}/${binding.expectedBindingVersion}` : "未绑定",
         ),
       ])}
+      ${renderEffectState(binding)}
       ${
         binding?.failureCode
           ? html`<p class="personal-devices__note">${failureText(binding.failureCode)}</p>`
@@ -866,6 +870,7 @@ function asDevice(value: unknown): PersonalDeviceView {
           appliedBindingVersion: numberField(binding.appliedBindingVersion),
           authorizationEstablished: binding.authorizationEstablished === true,
           platformApplied: binding.platformApplied === true,
+          deviceEffect: binding.deviceEffect === true,
           ...(typeof binding.failureCode === "string" ? { failureCode: binding.failureCode } : {}),
         }
       : null,
@@ -934,6 +939,46 @@ function connectionText(device: PersonalDeviceView): string {
     return "未绑定";
   }
   return BINDING_LABEL[device.binding.status] ?? device.binding.status;
+}
+
+/** Additive tri-state. Connection status stays on BINDING_LABEL and is not reused here. */
+function renderEffectState(binding: PersonalDeviceBindingView | null) {
+  return html`
+    <div data-testid="personal-device-effect">
+      ${renderPersonalMetaList([
+        renderPersonalSettingsRow(
+          "授权",
+          html`<span data-testid="personal-device-effect-auth">${authorizationText(binding)}</span>`,
+        ),
+        renderPersonalSettingsRow(
+          "平台",
+          html`<span data-testid="personal-device-effect-platform">${platformText(binding)}</span>`,
+        ),
+        renderPersonalSettingsRow(
+          "设备",
+          html`<span data-testid="personal-device-effect-device">${deviceEffectText(binding)}</span>`,
+        ),
+      ])}
+    </div>
+  `;
+}
+
+function authorizationText(binding: PersonalDeviceBindingView | null): string {
+  return binding?.authorizationEstablished === true ? "已授权" : "未授权";
+}
+
+function platformText(binding: PersonalDeviceBindingView | null): string {
+  if (binding?.platformApplied === true) {
+    return "平台已接受";
+  }
+  if (binding?.status === "applying") {
+    return "应用中";
+  }
+  return "未接受";
+}
+
+function deviceEffectText(binding: PersonalDeviceBindingView | null): string {
+  return binding?.deviceEffect === true ? "设备已应用" : "未确认·JOINT_PENDING";
 }
 
 function presenceText(presence: PersonalDeviceView["status"]["presence"]): string {

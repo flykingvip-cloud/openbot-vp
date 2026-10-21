@@ -201,6 +201,69 @@ describe("personal devices panel", () => {
     expect(container.textContent).toContain("已连接");
   });
 
+  it("keeps device effect unconfirmed when authorization and platform are already true", async () => {
+    const row = cloneDevice(device);
+    if (row.binding) {
+      row.binding.authorizationEstablished = true;
+      row.binding.platformApplied = true;
+      row.binding.deviceEffect = false;
+      row.binding.status = "active";
+    }
+    setPersonalDevicesClientForTests({
+      ...client(),
+      listDevices: async () => [row],
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    await flush(() => {
+      render(html`${renderPersonalDevicesPanel()}`, container);
+    });
+
+    expect(effectText(container, "personal-device-effect-auth")).toBe("已授权");
+    expect(effectText(container, "personal-device-effect-platform")).toBe("平台已接受");
+    expect(effectText(container, "personal-device-effect-device")).toBe("未确认·JOINT_PENDING");
+    expect(container.textContent).toContain("未确认·JOINT_PENDING");
+    expect(container.textContent).toContain("已连接");
+    expect(effectText(container, "personal-device-effect-device")).not.toBe("设备已应用");
+  });
+
+  it("shows the same unconfirmed effect on an empty list and while the platform is applying", async () => {
+    setPersonalDevicesClientForTests({
+      ...client(),
+      listDevices: async () => [],
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    await flush(() => {
+      render(
+        html`${renderPersonalDevicesPanel({ title: "已连接设备", surface: "detail" })}`,
+        container,
+      );
+    });
+    expect(container.textContent).toContain("已连接设备");
+    expect(effectText(container, "personal-device-effect-auth")).toBe("未授权");
+    expect(effectText(container, "personal-device-effect-platform")).toBe("未接受");
+    expect(effectText(container, "personal-device-effect-device")).toBe("未确认·JOINT_PENDING");
+
+    const applying = cloneDevice(device);
+    if (applying.binding) {
+      applying.binding.authorizationEstablished = true;
+      applying.binding.platformApplied = false;
+      applying.binding.status = "applying";
+      delete applying.binding.deviceEffect;
+    }
+    resetPersonalDevicesPanelForTests();
+    setPersonalDevicesClientForTests({
+      ...client(),
+      listDevices: async () => [applying],
+    });
+    await flush(() => {
+      render(html`${renderPersonalDevicesPanel()}`, container);
+    });
+    expect(effectText(container, "personal-device-effect-platform")).toBe("应用中");
+    expect(effectText(container, "personal-device-effect-device")).toBe("未确认·JOINT_PENDING");
+  });
+
   it("asks the digital-human route for that human only", async () => {
     const urls: string[] = [];
     const fetchImpl = (async (input: RequestInfo | URL) => {
@@ -298,6 +361,10 @@ function setField(container: ParentNode, selector: string, value: string): void 
   }
   field.value = value;
   field.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function effectText(container: ParentNode, testId: string): string {
+  return container.querySelector(`[data-testid=${testId}]`)?.textContent ?? "";
 }
 
 function clickText(container: ParentNode, text: string): void {

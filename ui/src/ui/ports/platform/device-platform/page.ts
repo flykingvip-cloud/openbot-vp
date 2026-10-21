@@ -95,7 +95,7 @@ function emptyDraft(): Draft {
     displayName: "",
     environment: "production",
     serviceBaseUrl: "",
-    contractVersion: "v1-draft",
+    contractVersion: "v1",
     credentialRef: "",
     clientIdentity: "",
     serviceClientIds: "",
@@ -290,7 +290,7 @@ function renderForm() {
             <option value="development">development</option>
           </select>
         </label>
-        ${field("契约版本", "contractVersion", draft.contractVersion, "v1-draft")}
+        ${field("契约版本", "contractVersion", draft.contractVersion, "v1")}
         ${field("控制 API 源地址", "serviceBaseUrl", draft.serviceBaseUrl, "https://device.example")}
         ${field("客户端身份", "clientIdentity", draft.clientIdentity, "service Basic 用户名")}
         ${field("服务客户端 ID", "serviceClientIds", draft.serviceClientIds, "逗号分隔")}

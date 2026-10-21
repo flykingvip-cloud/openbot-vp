@@ -427,7 +427,7 @@ export async function runJointHarness(): Promise<JointHarnessReport> {
           displayName: "Loopback device-control",
           environment: "development",
           serviceBaseUrl: platform.baseUrl,
-          contractVersion: "v1-draft",
+          contractVersion: "v1",
           credentialRef: "cred://device-platform/plat-local",
           clientIdentity: SERVICE_USER,
           serviceClientIds: [SERVICE_USER],
