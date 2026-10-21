@@ -33,7 +33,7 @@ the closed seq 45 digest `ee132a30…`. Current LIVE is seq 51 / digest
 Do **not** treat the OP-2 reconstruction table below as LIVE. Current LIVE is seq **51**.
 This leftover still does not authorize a cutover.
 
-| Field            | In-repo claim (ledger `releases.jsonl`; host identities from last verified cutover)                |
+| Field            | In-repo claim (ledger `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`; host identities from last verified cutover)                |
 | ---------------- | -------------------------------------------------------------------------------------------------- |
 | LIVE row         | seq **51** / `59be50660d8ebacf867211a206c92b4300bec418`                                            |
 | Image            | `rc-amd64-provenance-59be50660d`                                                                   |
@@ -102,7 +102,7 @@ ledger before any `delivery:cutover:record`.
 
 ## 2. M0b — reconstruct then ledger the unrecorded seq 46 rollback
 
-`pnpm delivery:cutover:record` only closes the open row and appends **one** row.
+`pnpm delivery:cutover:record` only closes the open row and appends **one** row. In openbot-vp it refuses `deploy/production/releases.jsonl`; append that row in OHBE (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl).
 The tree does not name the rolled-back SHA. Observe the host; **do not invent**.
 
 ```bash
@@ -128,8 +128,11 @@ Call it `INTERMEDIATE`. Use host `StartedAt` / live windows, not "now".
 2. Record the **rollback** `INTERMEDIATE` → `21e1e839…` with
    `--intentional-revert`. Use `--live-verified` only after §1 verify-live PASS.
 
+`delivery:cutover:record` in this repo refuses `deploy/production/releases.jsonl`. Append the row in the OHBE ledger (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl), from an OHBE checkout. Do not pass the GitHub blob URL as `--ledger`.
+
 ```bash
 # Step A — missing forward. Replace every REPLACE_* from host evidence.
+# Historical field list. Run against the OHBE ledger, not openbot-vp.
 pnpm delivery:cutover:record -- \
   --gateway-sha REPLACE_INTERMEDIATE_40HEX \
   --ui-sha REPLACE_INTERMEDIATE_40HEX \
@@ -142,8 +145,7 @@ pnpm delivery:cutover:record -- \
   --evidence "host leftover of unledgered forward before rollback" \
   --executor REPLACE_OPERATOR_ID \
   --notes "historical reconstruction; not a new cutover" \
-  --unverified-backfill "seq 46 forward was not independently verify-live at cutover time" \
-  --ledger deploy/production/releases.jsonl
+  --unverified-backfill "seq 46 forward was not independently verify-live at cutover time"
 
 # Step B — rollback to 21e1e839 (only after §1 PASS)
 pnpm delivery:cutover:record -- \
@@ -159,13 +161,12 @@ pnpm delivery:cutover:record -- \
   --executor REPLACE_OPERATOR_ID \
   --notes "intentional revert to seq 45 SHA after unledgered forward" \
   --live-verified \
-  --intentional-revert "approved rollback of unledgered seq 46 attempt; restore 21e1e839" \
-  --ledger deploy/production/releases.jsonl
+  --intentional-revert "approved rollback of unledgered seq 46 attempt; restore 21e1e839"
 
 pnpm delivery:ledger:audit
 ```
 
-Land the ledger + `RELEASE_RECORD.md` update via PR. Do not hand-append v1 JSONL.
+Land the `RELEASE_RECORD.md` update via PR in openbot-vp. Append the JSONL row in OHBE. Do not recreate `deploy/production/releases.jsonl` here. Do not hand-append v1 JSONL.
 Do not force-push.
 
 If you are instead recording a rollback you just executed (not historical),
@@ -193,8 +194,7 @@ This leftover does not swap. After an authorized operator has already swapped:
   --digest sha256:REPLACE_NEW_DIGEST
 ```
 
-That path is the M2b proof: `--verify-live` observed the container; `--record`
-writes v2 with `--live-verified`. Do not use `--unverified-backfill` for M2b.
+That path is the M2b proof: `--verify-live` observed the container. `--record` in this repo refuses a local ledger write and prints the OHBE ledger URL; append the v2 row there with `--live-verified`. Do not use `--unverified-backfill` for M2b.
 
 ## 4. Out of scope
 

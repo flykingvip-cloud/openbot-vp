@@ -27,7 +27,7 @@ Related: [账本对账](/design/openbot-diagnosis-p20.2-ledger-2026-09-05) · [P
 | provenance tag object    | `8efc2eaa052590713dd3edc210b09c748a8c34e5`（不参与比对）                |
 | provenance peeled target | `04690f8d2ed51f24a06825c153b7c1885d17182a`                              |
 
-评估前 `git fetch origin`。candidate 使用 `--candidate-sha "$(git rev-parse origin/main)"`，不是 dirty HEAD。未修改或提交 `.loom/registry.yaml`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。未发布 `provenance/sha-*`。
+评估前 `git fetch origin`。candidate 使用 `--candidate-sha "$(git rev-parse origin/main)"`，不是 dirty HEAD。未修改或提交 `.loom/registry.yaml`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。未发布 `provenance/sha-*`。
 
 ## 2. 已删除的过期描述
 

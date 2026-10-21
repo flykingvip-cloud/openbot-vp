@@ -221,7 +221,7 @@
 - [ledger.ts](https://github.com/gmood2008/openbot/blob/main/scripts/delivery/ledger.ts) 与 [ledger-audit.ts](https://github.com/gmood2008/openbot/blob/main/scripts/delivery/ledger-audit.ts)：发布账本和一致性审计。
 - [merge-back.ts](https://github.com/gmood2008/openbot/blob/main/scripts/delivery/merge-back.ts)：cutover 后 merge-back 计划。
 - [retire-plan.ts](https://github.com/gmood2008/openbot/blob/main/scripts/delivery/retire-plan.ts)：发布资产退役计划。
-- [releases.jsonl](https://github.com/gmood2008/openbot/blob/main/deploy/production/releases.jsonl)：机器可读发布 SoT。
+- [releases.jsonl](https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl)：机器可读发布 SoT。
 - [RELEASE_RECORD.md](https://github.com/gmood2008/openbot/blob/main/deploy/production/RELEASE_RECORD.md)：人工发布视图。
 
 ## 12. 推荐定向测试

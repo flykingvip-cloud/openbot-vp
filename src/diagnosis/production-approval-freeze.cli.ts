@@ -9,6 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { refuseLocalProductionLedger } from "./external-production-ledger.ts";
 import {
   evaluateDiagnosisIndependentApproval,
   renderDiagnosisIndependentApprovalMarkdown,
@@ -82,19 +83,7 @@ function gitOk(args: string[]): boolean {
 }
 
 function readOpenLedger(): { shas: string[]; notes: string } {
-  const text = fs.readFileSync(path.join(repoRoot, "deploy/production/releases.jsonl"), "utf8");
-  const open: Array<{ gatewaySha: string; notes: string }> = [];
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("{")) {
-      continue;
-    }
-    const row = JSON.parse(trimmed) as { gatewaySha?: string; liveTo?: string; notes?: string };
-    if (typeof row.gatewaySha === "string" && row.liveTo === undefined) {
-      open.push({ gatewaySha: row.gatewaySha, notes: row.notes ?? "" });
-    }
-  }
-  return { shas: open.map((row) => row.gatewaySha), notes: open[0]?.notes ?? "" };
+  refuseLocalProductionLedger();
 }
 
 function resolveProvenanceSha(liveOrLedgerSha: string | null): string | null {

@@ -2,7 +2,7 @@
 
 > 目的：为"当前已合入的 main vs 云端已发布版本"给出统一的发布口径,供团队对齐。一页结论 + 风险清单。
 > 作者(协调,独立评审/审批方,≠ 实施 owner):`kiro-release-authority`。
-> 基线快照:LIVE = `cf7ceb40a7`(releases.jsonl seq 43);main tip = `76fea1fb0669`。
+> 基线快照:LIVE = `cf7ceb40a7`(https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl seq 43);main tip = `76fea1fb0669`。
 
 ## 结论(TL;DR)
 
@@ -28,7 +28,7 @@ LIVE `cf7ceb40a7` → main `76fea1fb0669`,12 提交 / 13 文件 / +1281-38:
 | 类别           | 内容                                                    | 默认生效行为   |
 | -------------- | ------------------------------------------------------- | -------------- |
 | 治理/规格 docs | `.kiro/specs/**`(p2-5 三件、item7 handoff、tasks)       | 无             |
-| 交付记账       | `RELEASE_RECORD.md`、`releases.jsonl`、CSC cutover 记录 | 无(记录性)     |
+| 交付记账       | `RELEASE_RECORD.md`、`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`、CSC cutover 记录 | 无(记录性)     |
 | Loom           | `.loom/registry.yaml`                                   | 无             |
 | 证据           | `docs/design/evidence/**`(json / test.mjs)              | 无             |
 | **代码**       | `src/memory/item7-stage-d-readiness.ts`(+test)          | **无默认生效** |

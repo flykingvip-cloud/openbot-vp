@@ -18,7 +18,7 @@ method: GitHub API only (cursor-github MCP); no clone; no CloudAgent; no ledger/
 
 ## Ledger (read-only)
 
-Source: `deploy/production/releases.jsonl` on `main`.
+Source: 2026-10-14 read-only observation of the openbot-vp copy on `main` (seq 127 below). That file is no longer the live ledger. Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl.
 
 Last open LIVE line:
 

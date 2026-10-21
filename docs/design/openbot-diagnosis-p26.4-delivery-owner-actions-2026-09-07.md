@@ -27,7 +27,7 @@ Related: [P26.4 放行](/design/openbot-diagnosis-p26.4-2026-09-07)
 ## 2. delivery 现在该做的事
 
 1. 继续等 #1026 必过门禁变绿后合入账本。不要把账本写进诊断 PR。
-2. 账本合入后如需记录 seq 66，只由 delivery 写 `releases.jsonl` / `RELEASE_RECORD.md`。
+2. 账本合入后如需记录 seq 66，只由 delivery 写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`。
 3. 不必为 P26.4 再 stage。现网已经在跑被放行的 SHA。
 4. 若要把本放行记录打进镜像，等 #1026 与本增量都进主干后，再按当时新鲜 `origin/main` 做下一次统一窗口。那是可选 soak 镜像，不是放行前提。
 5. 不要改诊断 gate 环境变量，不要打开 live executor。

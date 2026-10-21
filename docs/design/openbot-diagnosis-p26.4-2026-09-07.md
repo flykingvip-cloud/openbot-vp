@@ -43,5 +43,5 @@ origin/main 之后若只因账本 PR（如 #1026）前移，不撤销这次 LIVE
 - 未改 `DIAGNOSIS_PRODUCTION_SLO`
 - 未部署 live remediation executor
 - 未绑 Doctor `--fix` / Channel restart
-- 未写 `releases.jsonl` / `RELEASE_RECORD.md`
+- 未写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`
 - 未要求本增量立刻再切 LIVE（放行记录绑的是已在跑的 SHA）

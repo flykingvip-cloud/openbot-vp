@@ -38,7 +38,11 @@
     "leftoverSafetyContainers": 0,
     "rollbackToolingRemoved": true
   },
-  "notModified": ["RELEASE_RECORD.md", "releases.jsonl", "LIVE ledger (no row)"],
+  "notModified": [
+    "RELEASE_RECORD.md",
+    "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
+    "LIVE ledger (no row)"
+  ],
   "endState": "Production is back to the pre-enable shadow-OFF baseline: LIVE a12e4c59e575, healthz 200, readyz ready, all inbound/CSC/Context flags unset.",
   "reEnableNote": "Re-enabling shadow later is one authorized step: csc-shadow-recreate-v2.sh enable (strictly shadow-only) under a fresh explicit authorization; .env.docker is now 600 so the permission gate passes."
 }

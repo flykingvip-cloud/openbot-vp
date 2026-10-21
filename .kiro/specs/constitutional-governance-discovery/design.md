@@ -45,7 +45,7 @@ PR #1249 的差距评估仍是入口与对象盘点的事实源，但该 PR 未�
 1. 评审快照（`main` @ `f1c7efece96d68375bf4b7fb57e77908fedfdd6c`，生产 seq 96）只作示例初始冻结。
 2. Phase A 草案另记再生时的 `origin/main`（不含本任务自己的文档提交），与评审快照分开。
 3. 每次阶段验收再生。进入 Phase B 前、进入 Phase C 前再冻结。
-4. 生产 seq 以当时 `deploy/production/releases.jsonl` 末行（或容器自报，二者冲突时以容器为准）读取。seq 96 与后来的 seq 97 都不是六周常量。本草案已从 seq 96 再生到 seq 97。
+4. 生产 seq 以当时 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 末行（或容器自报，二者冲突时以容器为准）读取。seq 96 与后来的 seq 97 都不是六周常量。本草案已从 seq 96 再生到 seq 97。
 5. 主张分级只用 `code-present` / `runtime-enabled` / `production-proven`。未探测容器则 production-proven 写 `unknown`。
 
 ## 5. 四份正文的分工

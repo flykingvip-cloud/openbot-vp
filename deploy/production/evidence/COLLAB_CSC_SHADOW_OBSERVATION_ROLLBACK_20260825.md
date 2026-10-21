@@ -2,7 +2,7 @@
 
 After the authorized shadow enable, a passive observation window was run and then shadow was
 disabled by rolling back to the pre-shadow safety container (same SHA). Production ends at the
-pre-enable shadow-OFF baseline. `RELEASE_RECORD.md` / `releases.jsonl` / LIVE ledger unchanged.
+pre-enable shadow-OFF baseline. `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / LIVE ledger unchanged.
 
 - SHADOW_ENABLED_NOW: NO
 - LIVE_SHA (unchanged): `a12e4c59e5754e0c280b423c68c989c6973ac9b0`

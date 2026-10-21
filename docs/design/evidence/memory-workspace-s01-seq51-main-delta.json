@@ -11,7 +11,10 @@
   "liveImage": "rc-amd64-provenance-59be50660d",
   "liveDigest": "sha256:a64adc1f04f116d7dd0e7e434f1d1a00a99601ed8de8ae8523becd2b1a470595",
   "liveVerified": true,
-  "liveEvidence": ["deploy/production/releases.jsonl", "deploy/production/RELEASE_RECORD.md"],
+  "liveEvidence": [
+    "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
+    "deploy/production/RELEASE_RECORD.md"
+  ],
   "selfAccepted": false,
   "reviewRequested": "S01 seq51..main observation delta (not deploy auth)",
   "authorMustNotSelfMerge": true,

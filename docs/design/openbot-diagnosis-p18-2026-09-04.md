@@ -40,7 +40,7 @@ Forward-only：`allow`。LIVE ⊂ origin/main。
 - 写成 seq 60 / `457057ba2adb`（P17 行动单）= 回写已不是容器事实的 SHA。
 - 写成 `e59aede250` 但 ledger 仍开放 seq 60 = 伪造 Latest，与账本不一致。
 
-Diagnosis 不是 `delivery_ledger_owner`，且 CLI `ledgerAction=blocked`。本增量未改 `RELEASE_RECORD.md`，未改 `releases.jsonl`。
+Diagnosis 不是 `delivery_ledger_owner`，且 CLI `ledgerAction=blocked`。本增量未改 `RELEASE_RECORD.md`，未改 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。
 
 已在 #941 留下不合并说明：<https://github.com/gmood2008/openbot/pull/941#issuecomment-5536924672>
 

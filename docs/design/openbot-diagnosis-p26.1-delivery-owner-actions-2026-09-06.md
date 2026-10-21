@@ -36,7 +36,7 @@ I1：`is-ancestor(LIVE, origin/main)` 已为 true。这只证明可以前进，�
 3. `./deploy/production/scripts/cutover-from-ghcr.sh --stage`：image revision 与 image build-info 都必须等于当时的 `origin/main`。
 4. 由 delivery 判断 recreate / overlay；保留现有 env / mounts。不要改诊断 gate 环境变量来“提前生效”。
 5. 切后立刻 `./deploy/production/scripts/cutover-from-ghcr.sh --verify-live`，并跑 `./deploy/production/scripts/verify-live-image-identity.sh`（R9）。
-6. `pnpm delivery:cutover:record` 只由 delivery 写下一行；Diagnosis 不代写 `releases.jsonl` / `RELEASE_RECORD.md`。
+6. `pnpm delivery:cutover:record` 只由 delivery 写下一行；Diagnosis 不代写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`。
 7. 新 LIVE 的 `provenance/sha-*` 只在 cutover 当时由 delivery 发布。Diagnosis 不补历史 tag。
 8. `--verify-live` 通过后，再让诊断任务按新 LIVE == candidate 重签。Production Ready 仍要单独批准，不能从本单自动翻 true。
 
@@ -45,7 +45,7 @@ I1：`is-ancestor(LIVE, origin/main)` 已为 true。这只证明可以前进，�
 ## 3. 明确禁止
 
 - Diagnosis 代切 `openbot-gateway-rc`
-- Diagnosis 代写 `RELEASE_RECORD.md` / `releases.jsonl`
+- Diagnosis 代写 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 - 用 `0d8a31a2`、侧分支 tip 或 dirty HEAD 当 candidate
 - 把 LIVE 写成尚未发布的 `7d75c0bb` 来假装已经切过
 - 再补一条历史 `provenance/sha-7d3fdf5b*` 或伪造 `provenance/sha-7d75c0bb*`

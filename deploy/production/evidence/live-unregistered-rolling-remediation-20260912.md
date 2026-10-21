@@ -27,7 +27,7 @@
 
 ## 判定
 
-1. **LIVE `6bd45696` 是否为已批准发布？** — **否**。`releases.jsonl` 无该 commit 行；`RELEASE_RECORD.md` L3 身份仍为 seq78 / `79f2d5f57b`。
+1. **LIVE `6bd45696` 是否为已批准发布？** — **否**。`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 无该 commit 行；`RELEASE_RECORD.md` L3 身份仍为 seq78 / `79f2d5f57b`。
 2. **是否存在对应 provenance tag（已入账）？** — **否**（仅有本地镜像 tag，无 ledger 关联）。
 3. **是否存在对应 ledger 行？** — **否**。
 4. **未登记滚动？** — **是**（`unregistered_rolling`）。
@@ -36,7 +36,7 @@
 
 - **类型:** 未登记前滚（LIVE 前滚至 `6bd45696`，跳过 ledger 登记的 seq78 `79f2d5f57b`；中间 `f0dec72227` 亦未入账）
 - **处理状态:** **已识别、已文档化；待独立变更批准后再处置 LIVE**
-- **本阶段禁止:** 回滚 LIVE、补打 provenance tag、修改 `releases.jsonl` / `RELEASE_RECORD.md`（除非获得独立变更批准）
+- **本阶段禁止:** 回滚 LIVE、补打 provenance tag、修改 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`（除非获得独立变更批准）
 
 ## Remediation 方案（需独立批准）
 

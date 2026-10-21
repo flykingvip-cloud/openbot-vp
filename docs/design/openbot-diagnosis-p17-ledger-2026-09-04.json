@@ -38,7 +38,7 @@
     {
       "id": "ledger_open",
       "sha": "457057ba2adbdb6958fe092d211f75108d866f42",
-      "source": "deploy/production/releases.jsonl seq 60",
+      "source": "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl seq 60",
       "evidence": "liveFrom=2026-09-04T05:55:49Z; liveVerified=true; no liveTo; landed by #940 / d48aff7310; notes no provenance-sha-*",
       "conclusion": "equals LIVE; keep; do not rewrite seq 59 or 60",
       "provable": true
@@ -46,7 +46,7 @@
     {
       "id": "ledger_closed_seq59",
       "sha": "3d03d3b4df91ab0bfaa33900eba95287c1ab30d2",
-      "source": "deploy/production/releases.jsonl seq 59",
+      "source": "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl seq 59",
       "evidence": "liveTo=2026-09-04T05:55:49Z; historical after seq 60",
       "conclusion": "keep historical; do not write as Latest cutover",
       "provable": true

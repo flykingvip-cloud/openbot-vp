@@ -195,7 +195,7 @@ cat /var/lib/openbot/memory-monitor.log | awk '{print $1, $2, $3}'
 每次部署后更新 ledger：
 
 ```bash
-# deploy/production/releases.jsonl
+# https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
 {"seq":112,"commit":"3fc06be82777","timestamp":"2026-10-04T14:30:00Z","method":"zero-downtime"}
 ```
 
@@ -216,4 +216,4 @@ cat /var/lib/openbot/memory-monitor.log | awk '{print $1, $2, $3}'
 
 - 当前部署 SOP: `deploy/production/SOP-云端部署.md`
 - Forward-only 检查: `deploy/production/scripts/verify-forward-only.sh`
-- Release ledger: `deploy/production/releases.jsonl`
+- Release ledger: `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`

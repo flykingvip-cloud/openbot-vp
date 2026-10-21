@@ -31,7 +31,7 @@ Related:
 | provenance peeled target | `04690f8d2ed51f24a06825c153b7c1885d17182a`                              |
 | P22 人类批准             | recorded；signer=`Daniel / CEO`；`value_after_approval=false`           |
 
-账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。未提交 `.loom/registry.yaml`。未发布新的 `provenance/sha-*`。
+账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。未提交 `.loom/registry.yaml`。未发布新的 `provenance/sha-*`。
 
 P22 签署写明批准不等于开启。因此本增量**不**把 `DIAGNOSIS_PRODUCTION_ADAPTERS_ENABLED` 或 `DIAGNOSIS_REPORT_API_DEPLOYED` 写成 true，也**不**把 `diagnosis-reports` 写入 `GATEWAY_METHOD_PACKS`。
 

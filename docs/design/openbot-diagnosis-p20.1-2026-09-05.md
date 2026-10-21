@@ -19,7 +19,7 @@ Related: [P20.1 行动单](/design/openbot-diagnosis-p20.1-delivery-owner-action
 
 ## 1. 基线
 
-评估前 `git fetch origin`。HEAD 快进到 `origin/main`。candidate = `git rev-parse origin/main`。LIVE 来自运行容器 `/app/dist/build-info.json`。未用 dirty worktree 或未合并分支当 candidate。未修改或提交 `.loom/registry.yaml`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。
+评估前 `git fetch origin`。HEAD 快进到 `origin/main`。candidate = `git rev-parse origin/main`。LIVE 来自运行容器 `/app/dist/build-info.json`。未用 dirty worktree 或未合并分支当 candidate。未修改或提交 `.loom/registry.yaml`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。
 
 | 项                      | 值                                                                      |
 | ----------------------- | ----------------------------------------------------------------------- |
@@ -36,7 +36,7 @@ Related: [P20.1 行动单](/design/openbot-diagnosis-p20.1-delivery-owner-action
 | candidate                     | `e106c3e168a1c2f09fcb3017d887f841ed881bdf`            | `git rev-parse origin/main`                                                    | true   | 与 origin/main 一致                                               |
 | origin/main                   | `e106c3e168a1c2f09fcb3017d887f841ed881bdf`            | 新鲜 fetch；Merge #961                                                         | true   | 唯一生产来源                                                      |
 | LIVE                          | `04690f8d2ed51f24a06825c153b7c1885d17182a`            | 容器 `build-info.json`，`builtAt=2026-09-04T13:29:54.802Z`                     | true   | 唯一运行事实                                                      |
-| ledger 开放行 seq 63          | `04690f8d2ed51f24a06825c153b7c1885d17182a`            | `releases.jsonl`，`liveFrom=2026-09-04T13:39:37Z`，#953，`tag=main`            | true   | 与 LIVE 一致；**keep**                                            |
+| ledger 开放行 seq 63          | `04690f8d2ed51f24a06825c153b7c1885d17182a`            | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`，`liveFrom=2026-09-04T13:39:37Z`，#953，`tag=main`            | true   | 与 LIVE 一致；**keep**                                            |
 | RELEASE_RECORD Latest cutover | `e59aede2506dbe8c571f0019f7e1bac0687778b6`            | 主干第一个 `## Latest cutover` = seq 61                                        | true   | **仍落后**；修复只走 #960，Diagnosis 不代写                       |
 | provenance                    | tag object `8efc2eaa052590713dd3edc210b09c748a8c34e5` | annotated `provenance/sha-04690f8d2ed5`，剥开后是 LIVE；CLI `rev-parse` 未剥开 | 部分   | 对象 SHA ≠ LIVE，故 `liveEqualsProvenance=false`；**do_not_mint** |
 

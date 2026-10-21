@@ -20,7 +20,7 @@
 
 - OpenBot 的核心是**单进程、文件态、单信任边界**的个人助理架构；这一点在 `SECURITY.md` 与代码（loopback 默认绑定、文件态 session、进程内插件）中高度自洽。
 - Managed Enterprise（SaaS）方向已有**启动期 fail-closed 门禁**（Gate 0，`src/gateway/security-profile.ts`）与**租户寻址 fail-closed**（`src/gateway/tenant-store-paths.ts`），但共享网关的租户上下文传播尚未收口（`deploy/production/README.md` R7/B4 自认），当前不应放开 `OPENBOT_MULTITENANT`。
-- 交付流水线的最大现实风险不在设计而在**执行偏差**：发布账本中已出现「未记账 overlay」与「imageTag 与运行代码脱钩」的记录（`deploy/production/releases.jsonl` seq 40/41 notes），这直接削弱 L2==L3 一致性定义。
+- 交付流水线的最大现实风险不在设计而在**执行偏差**：发布账本中已出现「未记账 overlay」与「imageTag 与运行代码脱钩」的记录（`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 40/41 notes），这直接削弱 L2==L3 一致性定义。
 - 最重要的 5 条发现见 §6（F-1 至 F-5）。
 
 **不在范围内**：具体漏洞挖掘 / PoC、`docs/zh-CN/**`、版本号与发布操作、依赖 patch。
@@ -87,7 +87,7 @@ flowchart LR
 
 - `AGENTS.md`（Trunk and Deployment Baseline 段）钉死：`main` 是唯一 trunk 与唯一 cutover 源；I1 forward-only（`deploy/production/scripts/verify-forward-only.sh`，exit 20/21 fail-closed）；I2 anchoring（`is-ancestor(LIVE, origin/main)`）；I3 retirement。
 - LIVE 判据只读运行制品 `/app/dist/build-info.json`，不读账本或分支名（`docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md` §判据来源）。
-- `release/baseline-recovery-20260725` 冻结；`provenance/sha-*` annotated tag 是发布身份；`deploy/production/releases.jsonl` 是机器可读账本，`RELEASE_RECORD.md` 仅是人读视图。
+- `release/baseline-recovery-20260725` 冻结；`provenance/sha-*` annotated tag 是发布身份；`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 是机器可读账本，`RELEASE_RECORD.md` 仅是人读视图。
 
 ---
 
@@ -166,7 +166,7 @@ flowchart TD
 
 - 四层 SoT：L0 本地脏文件 → L1 本地 git tip → L2 GitHub（唯一发布输入）→ L3 云端运行镜像；一致性定义为 L3 build-info SHA == L2 annotated tag commit == 决策单 SHA（`docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md` §1）。
 - Gate 1 forward-only：`deploy/production/scripts/verify-forward-only.sh`（LIVE 从运行制品读取；exit 20 候选倒退、21 LIVE 未知即 fail-closed）；sibling `verify-delivery-alignment.sh` 校验 tag/origin/镜像/账本对齐。
-- 账本：`deploy/production/releases.jsonl`（每行含 gatewaySha/uiSha/imageDigest/provenance tag/evidence/rollback 路径）。
+- 账本：`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`（每行含 gatewaySha/uiSha/imageDigest/provenance tag/evidence/rollback 路径）。
 - 生产运行形态（从账本证据可确证）：单机 podman 容器 `openbot-gateway-rc`，`--network host` 语义下的端口占用问题在 bind 重试注释中被显式处理（`src/gateway/server/http-listen.ts:14-26`）。
 
 ### 4.3 云部署托管样例
@@ -222,7 +222,7 @@ flowchart TD
 
 ### F-1（P1·交付）生产 overlay 热覆盖破坏镜像不可变性，且出现过未记账的 LIVE 窗口
 
-- **证据**：`deploy/production/releases.jsonl` seq 37–40 连续以「full-dist overlay」方式将新 SHA 的 dist 覆盖进**同一运行容器**（`imageTag remains the base image`，即 OCI revision 与 build-info commit 脱钩）；seq 40/41 notes 明确记录 `Unledgered overlay 47d6934c34 ran 2026-08-23T13:55:05Z–22:37:47Z … without its own ledger row`（约 8.7 小时无账本身份的 LIVE）。
+- **证据**：`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 37–40 连续以「full-dist overlay」方式将新 SHA 的 dist 覆盖进**同一运行容器**（`imageTag remains the base image`，即 OCI revision 与 build-info commit 脱钩）；seq 40/41 notes 明确记录 `Unledgered overlay 47d6934c34 ran 2026-08-23T13:55:05Z–22:37:47Z … without its own ledger row`（约 8.7 小时无账本身份的 LIVE）。
 - **影响**：直接违反流水线标准的一致性定义「L3 镜像 OCI label 中 SHA == L2 tag commit」（`docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md` §1）；`verify-delivery-alignment.sh` 的「镜像 pin SHA」检查在 overlay 期间形同虚设；回滚身份与审计链断裂。
 - **发生前提**：无需攻击者——是维护者操作模式本身。seq 41 已回到「container recreated (not overlay)」的正确形态，但 overlay 路径未被制度性关闭。
 
@@ -330,4 +330,4 @@ flowchart TD
 
 **数据架构**：`src/config/paths.ts` · `src/config/data-space.ts` · `src/config/sessions/paths.ts` · `src/config/types.base.ts` · `src/config/backup-rotation.ts` · `src/gateway/tenant-store-paths.ts` · `src/gateway/agent-tenant.ts` · `src/agents/model-auth.ts` · `docs/design/data-classification-model.md`
 
-**云部署与交付**：`deploy/production/README.md` · `deploy/production/docker-compose.prod.yml` · `deploy/production/env-authority-matrix.md` · `deploy/production/releases.jsonl` · `deploy/production/RELEASE_RECORD.md` · `deploy/production/scripts/verify-forward-only.sh` · `docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md` · `fly.toml` · `render.yaml` · `Dockerfile` · `AGENTS.md`
+**云部署与交付**：`deploy/production/README.md` · `deploy/production/docker-compose.prod.yml` · `deploy/production/env-authority-matrix.md` · `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` · `deploy/production/RELEASE_RECORD.md` · `deploy/production/scripts/verify-forward-only.sh` · `docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md` · `fly.toml` · `render.yaml` · `Dockerfile` · `AGENTS.md`

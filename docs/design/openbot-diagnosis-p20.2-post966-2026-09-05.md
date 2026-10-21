@@ -27,7 +27,7 @@ Related: [P20.2](/design/openbot-diagnosis-p20.2-2026-09-05) · #966 <https://gi
 | 第一个 Latest            | seq 63 / `04690f8d2e`（#960）                                           |
 | provenance peeled target | `04690f8d2ed51f24a06825c153b7c1885d17182a`                              |
 
-评估前 `git fetch origin`。#966 `state=MERGED`，`mergedAt=2026-09-05T03:50:52Z`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。未提交 `.loom/registry.yaml`。未发布 `provenance/sha-*`。
+评估前 `git fetch origin`。#966 `state=MERGED`，`mergedAt=2026-09-05T03:50:52Z`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。未提交 `.loom/registry.yaml`。未发布 `provenance/sha-*`。
 
 ## 2. Go / No-Go
 

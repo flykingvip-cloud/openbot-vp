@@ -148,7 +148,7 @@ Path select 附加有界刀（#103/#104、#106/#107）仍不构成整体授权�
 
 当前 `origin/main` tip：`19549e6629d374308405edc2c0e3036739af2393`（2026-10-14T03:55:33Z / 北京时间 2026-10-14 11:55:33 CST，#697）。该 tip 为账本 seq127 文档合入；其父链含 LIVE tip `5ea7e2b7bd33e0a9f17e99829757913659db6e9f`（#696）。
 
-账本 `deploy/production/releases.jsonl` **只读**解析：最后一条开放 LIVE 为 **seq 127**（无 `liveTo`），`gatewaySha` 与 `uiSha` 均为 `5ea7e2b7bd33e0a9f17e99829757913659db6e9f`，`liveFrom` `2026-10-14T03:30:04Z`（北京时间 2026-10-14 11:30:04 CST）。seq 98 的 B2 shadow 记载仍是历史证据，**不得**外推为 Phase C/D 通过。本刷新 **不修改** 账本文件。
+账本 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` **只读**解析：最后一条开放 LIVE 为 **seq 127**（无 `liveTo`），`gatewaySha` 与 `uiSha` 均为 `5ea7e2b7bd33e0a9f17e99829757913659db6e9f`，`liveFrom` `2026-10-14T03:30:04Z`（北京时间 2026-10-14 11:30:04 CST）。seq 98 的 B2 shadow 记载仍是历史证据，**不得**外推为 Phase C/D 通过。本刷新 **不修改** 账本文件。
 
 `runningContainerSha`：**null**（本刷新未获得生产容器自证；不得用账本 SHA 顶替）。
 
@@ -181,6 +181,6 @@ Path select 附加有界刀（#103/#104、#106/#107）仍不构成整体授权�
 - 合并 Profile A 与 Profile B
 - 把 receipt 写成 proof，或把插件安装写成能力授权
 - 新建第五套状态机、生产日志库或跨域单一写权威
-- 修改 `deploy/production/releases.jsonl`、新增 release seq、改生产容器或部署（本刷新包禁止触碰）
+- 修改 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`、新增 release seq、改生产容器或部署（本刷新包禁止触碰）
 - 用账本 SHA 填写 `runningContainerSha`
 - force-push `main`

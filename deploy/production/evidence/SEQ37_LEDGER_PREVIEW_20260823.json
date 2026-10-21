@@ -1,7 +1,7 @@
 {
   "schema": "ledger-row-preview/v1",
   "status": "PREVIEW_ONLY_NOT_LIVE",
-  "note": "Do not append to deploy/production/releases.jsonl or cut over until production owner approves.",
+  "note": "Do not append to https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl or cut over until production owner approves.",
   "proposedSeq": 37,
   "row": {
     "seq": 37,

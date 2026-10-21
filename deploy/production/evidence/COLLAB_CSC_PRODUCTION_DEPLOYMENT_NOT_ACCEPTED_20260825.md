@@ -27,7 +27,7 @@ PRODUCTION_DEPLOYMENT=NOT_ACCEPTED
 - healthz / readyz / identity check / temp-env isolation / auto-rollback
 - successful rollback to the pre-shadow container after observation
 - LIVE remained `a12e4c59e575`; all inbound/CSC/Context flags currently unset
-- `RELEASE_RECORD.md` / `releases.jsonl` / LIVE ledger unmodified
+- `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / LIVE ledger unmodified
 - no leftover safety container or temp rollback tooling
 
 ## Blocker
@@ -81,7 +81,7 @@ Only when the real-event window is all-green (DEPTH_EVENTS>0, MODE_ALL_SHADOW=YE
 routeStrength correct across normal + continuation + space-control, zero tools, no extra model
 calls, space isolation, no leaks, health steady, clean rollback) may a separate explicit
 production-owner authorization for the ROUTER stage be requested. `RELEASE_RECORD.md` /
-`releases.jsonl` / LIVE ledger stay unchanged until then.
+`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / LIVE ledger stay unchanged until then.
 
 ## Appendix A — capture-chat-lifecycle-v3.cjs
 

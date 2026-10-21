@@ -36,4 +36,4 @@
 
 ## 本计划不授权
 
-不修改 releases.jsonl，不修改 RELEASE_RECORD 的发布结论，不追加发布行，不切换生产容器。代理会议没有把关键能力改成 preserved、moved、intentionally_removed 或 accidentally_regressed。
+不修改 https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl，不修改 RELEASE_RECORD 的发布结论，不追加发布行，不切换生产容器。代理会议没有把关键能力改成 preserved、moved、intentionally_removed 或 accidentally_regressed。

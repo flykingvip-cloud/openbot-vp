@@ -155,7 +155,7 @@
       "decision": "not-applicable",
       "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
       "evidenceRefs": [
-        "deploy/production/releases.jsonl",
+        "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
         "docs/design/evidence/constitutional-governance-production-baseline-2026-09-27.json"
       ],
       "conflicts": [
@@ -238,13 +238,8 @@
       "defaultOn": false,
       "decision": "not-applicable",
       "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
-      "evidenceRefs": [
-        "src/task-orchestration/types.ts",
-        "src/task-orchestration/dispatch.ts"
-      ],
-      "conflicts": [
-        "B2 designAuthorized=true 不得读成 Phase D 整体 GO 或 Phase D 切片授权。"
-      ],
+      "evidenceRefs": ["src/task-orchestration/types.ts", "src/task-orchestration/dispatch.ts"],
+      "conflicts": ["B2 designAuthorized=true 不得读成 Phase D 整体 GO 或 Phase D 切片授权。"],
       "presenceClass": "code-present-shadow-only",
       "governanceAuthorization": {
         "scope": "phase-d-as-a-whole",
@@ -383,9 +378,7 @@
         "packages/constitutional-conformance/src/boundary.ts",
         ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md"
       ],
-      "conflicts": [
-        "脚手架书面范围不推翻 Phase C NO-GO。phase-d-92 接受记录不是本包的两段门。"
-      ],
+      "conflicts": ["脚手架书面范围不推翻 Phase C NO-GO。phase-d-92 接受记录不是本包的两段门。"],
       "presenceClass": "code-present-inert",
       "id": "constitutional-conformance",
       "phase": "D",
@@ -471,9 +464,7 @@
         "packages/constitutional-registry/src/boundary.ts",
         ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md"
       ],
-      "conflicts": [
-        "profileMerge 与物理并账仍是 false。脚手架书面范围不是 Registry 产品化许可。"
-      ],
+      "conflicts": ["profileMerge 与物理并账仍是 false。脚手架书面范围不是 Registry 产品化许可。"],
       "presenceClass": "code-present-inert",
       "id": "constitutional-registry",
       "phase": "D",
@@ -559,9 +550,7 @@
         "packages/constitutional-runtime/src/boundary.ts",
         ".kiro/specs/constitutional-governance-discovery/phase-d-product-split-scaffold.md"
       ],
-      "conflicts": [
-        "第五套执行故事与跨域写权威在边界常量里仍是 false。"
-      ],
+      "conflicts": ["第五套执行故事与跨域写权威在边界常量里仍是 false。"],
       "presenceClass": "code-present-inert",
       "id": "constitutional-runtime",
       "phase": "D",
@@ -632,9 +621,7 @@
         "packages/constitutional-contracts/src/flags.ts",
         ".kiro/specs/constitutional-governance-discovery/phase-d-first-knife-note.md"
       ],
-      "conflicts": [
-        "第一刀书面范围不覆盖其后各刀，也不翻转 Phase C NO-GO。"
-      ],
+      "conflicts": ["第一刀书面范围不覆盖其后各刀，也不翻转 Phase C NO-GO。"],
       "presenceClass": "code-present-inert",
       "id": "constitutional-contracts",
       "phase": "D",
@@ -724,10 +711,7 @@
             "sotRecording": "not-landed; do not treat as authorized runtime-enabled until separate user auth + merge after SoT refresh"
           }
         ],
-        "relatedSliceIds": [
-          "path-gate-shadow-select-report",
-          "path-gate-shadow-select-diagnostics"
-        ]
+        "relatedSliceIds": ["path-gate-shadow-select-report", "path-gate-shadow-select-diagnostics"]
       },
       "evidenceRefs": [
         "packages/constitutional-contracts/src/runtime-facade/shadow.ts",
@@ -899,9 +883,7 @@
         ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-knife1-scope.md",
         ".kiro/specs/constitutional-governance-discovery/phase-d-p8b-knife1-start-order.md"
       ],
-      "conflicts": [
-        "Knife1 两段门不是整段 P8b 或整段 D。src/ 没有 selectLegalPath 调用者。"
-      ],
+      "conflicts": ["Knife1 两段门不是整段 P8b 或整段 D。src/ 没有 selectLegalPath 调用者。"],
       "presenceClass": "code-present-shadow-only",
       "id": "path-select",
       "phase": "D",
@@ -972,9 +954,7 @@
         "packages/constitutional-contracts/src/path-gap/report.ts",
         ".kiro/specs/constitutional-governance-discovery/phase-d-p8a-no-valid-path.md"
       ],
-      "conflicts": [
-        "报告薄注不授权 Path 选择或执行。"
-      ],
+      "conflicts": ["报告薄注不授权 Path 选择或执行。"],
       "presenceClass": "code-present-shadow-only",
       "id": "path-report",
       "phase": "D",
@@ -1195,9 +1175,7 @@
         ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-scope.md",
         ".kiro/specs/constitutional-governance-discovery/phase-d-meta-schema-path-gate-owner-track-start-order.md"
       ],
-      "conflicts": [
-        "Owner track 重新打开的是后续分刀轨道，不是整段 D GO。"
-      ],
+      "conflicts": ["Owner track 重新打开的是后续分刀轨道，不是整段 D GO。"],
       "presenceClass": "docs-only",
       "id": "path-gate-owner-track",
       "phase": "D",
@@ -1264,9 +1242,7 @@
         "notThisSlice": [],
         "additionalSlices": []
       },
-      "evidenceRefs": [
-        "src/task-orchestration/types.ts"
-      ],
+      "evidenceRefs": ["src/task-orchestration/types.ts"],
       "conflicts": [],
       "presenceClass": "constant-off",
       "id": "orchestration-live-invoke",
@@ -1334,9 +1310,7 @@
         "notThisSlice": [],
         "additionalSlices": []
       },
-      "evidenceRefs": [
-        "packages/constitutional-contracts/src/flags.ts"
-      ],
+      "evidenceRefs": ["packages/constitutional-contracts/src/flags.ts"],
       "conflicts": [],
       "presenceClass": "constant-off",
       "id": "fabric",
@@ -1483,10 +1457,7 @@
         "checkpointCImplementationAuthorized": true,
         "runtimeEnabled": false,
         "productionProven": "unknown-as-stated-in-packet-keep-sot-false",
-        "pullRequests": [
-          204,
-          213
-        ],
+        "pullRequests": [204, 213],
         "mergeCommits": [
           "364c2e8131dc1fccaa292c192a6c54b2dbbc90c5",
           "966372cc5e7a70c4574ad1bb869b42bfd48aa3d6"
@@ -1607,9 +1578,7 @@
         "governanceHold": true,
         "headSha": "0bee7b3c3721037aa959a5d68345d02c02e64909"
       },
-      "evidenceRefs": [
-        "https://github.com/upbeyond/openbot/pull/694"
-      ]
+      "evidenceRefs": ["https://github.com/upbeyond/openbot/pull/694"]
     },
     {
       "id": "cross-domain-finalization-protocol",
@@ -1693,10 +1662,7 @@
     "CONSTITUTIONAL_CONTRACTS_LIVE_INVOKE": false,
     "CONSTITUTIONAL_CONTRACTS_FABRIC_DEFAULT_ON": false,
     "ORCHESTRATION_LIVE_INVOKE": false,
-    "sources": [
-      "packages/constitutional-contracts/src/flags.ts",
-      "src/task-orchestration/types.ts"
-    ]
+    "sources": ["packages/constitutional-contracts/src/flags.ts", "src/task-orchestration/types.ts"]
   },
   "post20260927PacketsAbsorbed": [
     {

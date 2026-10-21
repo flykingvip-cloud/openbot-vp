@@ -84,7 +84,7 @@
     "shadow enable",
     "P2/P3",
     "modify RELEASE_RECORD.md",
-    "modify releases.jsonl",
+    "modify https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
     "append LIVE ledger row"
   ],
   "confidence": {

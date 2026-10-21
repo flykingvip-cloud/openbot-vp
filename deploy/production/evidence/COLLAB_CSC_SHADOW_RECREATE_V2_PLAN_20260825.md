@@ -77,7 +77,7 @@ CAPTURE_EXIT=0  SENSITIVE_FIELD_SCAN=PASS
 The permission gate is cleared and the plan is strictly shadow-only. The actual enable (same-SHA
 recreate, seconds of chat interruption, auto-rollback, ROUTER/KNOWLEDGE/TOOL/PERSIST_EARLY/COLLAB/
 CONTEXT_SCOPE kept off) still requires a separate explicit production-owner authorization.
-`RELEASE_RECORD.md` and `releases.jsonl` are not modified by this stage.
+`RELEASE_RECORD.md` and `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` are not modified by this stage.
 
 ## Appendix A — csc-shadow-recreate-v2.sh
 

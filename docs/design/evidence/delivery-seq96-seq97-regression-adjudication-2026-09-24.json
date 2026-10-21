@@ -493,7 +493,7 @@
   "blockerSummary": "Proxy review signed insufficient_evidence. Key capabilities are not shown to be preserved, moved, intentionally removed, or accidentally regressed. Ledger stays locked.",
   "nextPermittedAction": "Do not mutate the ledger. A later review by the named owners may supersede these proxy signatures.",
   "forbiddenActions": [
-    "modify releases.jsonl",
+    "modify https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
     "modify RELEASE_RECORD release conclusions",
     "add a regression acknowledgement",
     "append seq 98",

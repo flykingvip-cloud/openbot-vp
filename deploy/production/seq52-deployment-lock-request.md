@@ -2,7 +2,7 @@
 
 Status: **REQUESTED — NOT granted.** This document is a review artifact. It does **not**
 grant a lock, authorize a cutover, change any Stage gate, or touch production. Nothing in
-`deploy/production/releases.jsonl` or `RELEASE_RECORD.md` is written by this document.
+`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` or `RELEASE_RECORD.md` is written by this document.
 
 Prepared by: `kiro-release-authority`
 Prepared at: 2026-09-01 (UTC)
@@ -121,7 +121,7 @@ grant:              PENDING
   re-qualified 2026-09-01 (§3).
 - **Delivery SoT anchor PR #884** — **MERGED** 2026-09-01T03:23:50Z as `af5970ad93`. This is a
   **code merge only, not a production cutover**: the ledger is unchanged and LIVE is still
-  seq51 `59be5066` (`releases.jsonl` untouched by #884).
+  seq51 `59be5066` (`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` untouched by #884).
 - **Delivery gates (2026-09-01)** — `delivery:ledger:audit` 51 releases / **0 errors** / 24
   historical warnings; `delivery:check-sot --use-release-record-live --sot-ref origin/main` =
   **allow** (candidate contains LIVE); `verify-forward-only --candidate b915cb93cf` = **allow**
@@ -135,5 +135,5 @@ grant:              PENDING
 ## 9. Explicit non-authorizations
 
 This request does **not** authorize: the seq52 cutover, any LIVE container swap, any Control
-UI change, any `releases.jsonl` / `RELEASE_RECORD.md` write, image publish, S01 changes, or
+UI change, any `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md` write, image publish, S01 changes, or
 any change to Stage C/D/E, `implementationVerified`, or `deployAuthorized`.

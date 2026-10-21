@@ -91,4 +91,4 @@ is set to `status=PASS`.
 Shadow remains OFF. This baseline does not enable anything. Enabling
 `OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1` (same-SHA recreate with auto-rollback, ROUTER/KNOWLEDGE/TOOL/COLLAB/CONTEXT_SCOPE
 kept unset) requires a separate, explicit production-owner authorization requested after this
-baseline lands. `RELEASE_RECORD.md` and `releases.jsonl` are intentionally not modified by this stage.
+baseline lands. `RELEASE_RECORD.md` and `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` are intentionally not modified by this stage.

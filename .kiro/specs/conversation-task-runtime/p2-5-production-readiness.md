@@ -54,7 +54,7 @@ CANDIDATE_SHA=$(git rev-parse origin/main)
 ```
 
 - 从**新鲜、干净的 `origin/main`** 构建(不得用 dirty worktree / 侧分支 / 未合并提交)。
-- **记录发布**:`deploy/production/RELEASE_RECORD.md` + `releases.jsonl` + 注解 `provenance/sha-*` tag。
+- **记录发布**:`deploy/production/RELEASE_RECORD.md` + `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` + 注解 `provenance/sha-*` tag。
 - **cutover 后**:`pnpm delivery:merge-back-plan -- --cutover-sha <live-sha>`,再 `pnpm delivery:check-sot -- --use-release-record-live` 通过。
 - **注意**:required CI checks 尚未启用(runner 停滞)——发布方须知并据此判断门禁。
 
@@ -80,7 +80,7 @@ CANDIDATE_SHA=$(git rev-parse origin/main)
 > 用途:D(seq 45 / `21e1e839`)已完成;独立验收方逐项核验;全绿方可放行 C(金丝雀启用)。**C 仍未打开。** 实施 owner 只核验工件证据、不放行生产。冻结顺序见 §7(B → A → D → C)。
 
 - [ ] **文档门禁**:#753(CONDITIONAL 修订)已合入;`kiro-privacy-reviewer` 已复核确认 AC-cond 相位归类(cond-1..3 = 注入前置、cond-4 = 启用后)。
-- [ ] **seq-45 LIVE 存在且正确**:`deploy/production/releases.jsonl` 有 `seq 45` / `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`;`provenance/sha-21e1e8392f0f` 注解 tag 存在;`git merge-base --is-ancestor 70e3320b96 <seq45.gatewaySha>` 为真(LIVE 含 #728)。#796 同 SHA 账本重建不是新 LIVE pin。
+- [ ] **seq-45 LIVE 存在且正确**:`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 有 `seq 45` / `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`;`provenance/sha-21e1e8392f0f` 注解 tag 存在;`git merge-base --is-ancestor 70e3320b96 <seq45.gatewaySha>` 为真(LIVE 含 #728)。#796 同 SHA 账本重建不是新 LIVE pin。
 - [ ] **seq 43 未被追认**:确认 seq 44 是 CTR 密钥部署,seq 43(`cf7ceb40a7`,PR #748)仍标记为非 CTR。
 - [ ] **AC-cond-1..3 已记录**(注入前置):evidence 仅写 `OPENBOT_CT_SHADOW_HMAC_KEY set(值不记录)`(cond-1);本环境 root 独立于 staging/其他环境(cond-2);`OPENBOT_CT_SHADOW_HMAC_KEY_ID=<纪元>` + 轮转 ≤ 90d(cond-3)。ledger/日志无密钥明文值。
 - [ ] **部署后休眠确认**:allowlist 空、`detection`/`qualification` flag OFF、`activation`/`projection`/`authorization` OFF;key 存在但不输出值;`chat.send` 无影响。

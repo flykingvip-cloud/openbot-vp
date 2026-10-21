@@ -40,7 +40,7 @@
   "hardStopTriggered": false,
   "evidenceSource": {
     "originMain": "git fetch origin && git rev-parse origin/main on 2026-09-27; HEAD was already that commit and git merge-base --is-ancestor origin/main HEAD exited 0",
-    "ledger": "read-only tail of deploy/production/releases.jsonl; file not modified",
+    "ledger": "read-only tail of https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl; file not modified",
     "container": "unavailable; podman not installed; no build-info.json read from openbot-gateway-rc",
     "flags": "static TypeScript constants and default-off env readers; not a live process environment",
     "ancestry": "git merge-base --is-ancestor 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001 origin/main; git rev-list --count between those SHAs"

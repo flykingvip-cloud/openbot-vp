@@ -20,7 +20,7 @@ b2ManifestMergeSha: 2b9776708832d2cd3e533f0bf03a8498b0fc3f4a
 productionSeq: 98
 productionGatewaySha: 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001
 productionUiSha: 41aac4a4f2ca37d15f2423aeca70f1c6aa2be001
-evidenceSource: "repo ledger only (deploy/production/releases.jsonl last seq=98); no container self-report probe this round; production-proven=unknown"
+evidenceSource: "repo ledger only (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl last seq=98); no container self-report probe this round; production-proven=unknown"
 runtimeEnabled: false
 productionProven: unknown
 

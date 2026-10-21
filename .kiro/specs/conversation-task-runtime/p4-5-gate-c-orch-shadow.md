@@ -12,7 +12,7 @@
 本 PR **不是**：
 
 - 生产 host 换镜像 / 换容器 / nginx
-- `deploy/production/releases.jsonl` / `RELEASE_RECORD.md` 新行
+- `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md` 新行
 - 发明 cutover SHA
 - 打开 `ORCHESTRATION_LIVE_INVOKE`
 - 打开 DISPATCH / NODE / BROWSER
@@ -49,7 +49,7 @@
 | 4   | DISPATCH / NODE / BROWSER 仍 fail-closed | 输入这些 flag 为 true ⇒ `orch_live_path_armed_fail_closed` 或 allowlist no-op；`invokedTool` false | PASS |
 | 5   | source default 仍 OFF                    | `feature.ts` `envEnabled` 未改；`readOrchestrationFlags({})` 全 false                              | PASS |
 | 6   | 无 env 示例 / compose / CI 打开          | 不改 `.env.example` / compose / CI / deploy overlay                                                | PASS |
-| 7   | 无 ledger / 无 LIVE SHA                  | 不改 `releases.jsonl` / `RELEASE_RECORD` / `ledger.test.ts`                                        | PASS |
+| 7   | 无 ledger / 无 LIVE SHA                  | 不改 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD` / `ledger.test.ts`                                        | PASS |
 
 ## 3. 爆炸半径
 

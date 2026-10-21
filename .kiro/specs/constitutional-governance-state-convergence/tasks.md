@@ -28,6 +28,6 @@ Agent: cursor-grok-state-convergence
 
 ## 明确不做
 
-- [x] 不改 `src/**`、`packages/**`、`ui/**`、`deploy/production/releases.jsonl`
+- [x] 不改 `src/**`、`packages/**`、`ui/**`、`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 - [x] 不打开 enforce、live invoke、Fabric default-on、`ORCHESTRATION_LIVE_INVOKE`
 - [x] 不部署、不新增 release seq、不继续开发 Phase D
