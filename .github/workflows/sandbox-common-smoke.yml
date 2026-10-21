@@ -7,11 +7,15 @@ on:
       - Dockerfile.sandbox
       - Dockerfile.sandbox-common
       - scripts/sandbox-common-setup.sh
+      - scripts/sandbox-setup.sh
+      - scripts/sandbox-image-smoke.sh
   pull_request:
     paths:
       - Dockerfile.sandbox
       - Dockerfile.sandbox-common
       - scripts/sandbox-common-setup.sh
+      - scripts/sandbox-setup.sh
+      - scripts/sandbox-image-smoke.sh
 
 concurrency:
   group: sandbox-common-smoke-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -20,7 +24,7 @@ concurrency:
 jobs:
   sandbox-common-smoke:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -30,24 +34,19 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
 
-      - name: Build minimal sandbox base (USER sandbox)
+      - name: Build conversation sandbox and smoke Node, Chromium, poppler, uid
         shell: bash
         run: |
           set -euo pipefail
-
-          docker build -t openclaw-sandbox-smoke-base:bookworm-slim - <<'EOF'
-          FROM debian:bookworm-slim
-          RUN useradd --create-home --shell /bin/bash sandbox
-          USER sandbox
-          WORKDIR /home/sandbox
-          EOF
+          docker build -t openbot-sandbox:bookworm-slim -f Dockerfile.sandbox .
+          scripts/sandbox-image-smoke.sh openbot-sandbox:bookworm-slim
 
       - name: Build sandbox-common image (root for installs, sandbox at runtime)
         shell: bash
         run: |
           set -euo pipefail
 
-          BASE_IMAGE="openclaw-sandbox-smoke-base:bookworm-slim" \
+          BASE_IMAGE="openbot-sandbox:bookworm-slim" \
             TARGET_IMAGE="openclaw-sandbox-common-smoke:bookworm-slim" \
             PACKAGES="ca-certificates" \
             INSTALL_PNPM=0 \
@@ -58,3 +57,7 @@ jobs:
 
           u="$(docker run --rm openclaw-sandbox-common-smoke:bookworm-slim sh -lc 'id -un')"
           test "$u" = "sandbox"
+          uid="$(docker run --rm openclaw-sandbox-common-smoke:bookworm-slim sh -lc 'id -u')"
+          gid="$(docker run --rm openclaw-sandbox-common-smoke:bookworm-slim sh -lc 'id -g')"
+          test "$uid" = "1000"
+          test "$gid" = "1000"

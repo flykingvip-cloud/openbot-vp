@@ -82,7 +82,7 @@ const PART_A = [
 
 ### 6. 渲染 PDF（本机最稳路径）
 
-优先使用渲染机上已存在的 Chromium / Chrome 可执行文件（OpenBot 托管环境常见于 `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`）：
+优先使用系统已安装的 Chrome / Chromium（`google-chrome`、`google-chrome-stable`、`chromium`、`chromium-browser`）。OpenBot 对话沙箱提供 `/usr/bin/chromium`。只有系统没有浏览器时，才回退到 `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`：
 
 ```bash
 CHROME="<chromium 可执行文件路径>"   # 见 references/environment.md

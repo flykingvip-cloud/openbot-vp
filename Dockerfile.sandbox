@@ -4,6 +4,11 @@
 # Temporary alias: openclaw-sandbox:bookworm-slim
 # scripts/sandbox-setup.sh tags both after build.
 #
+# The tag stays bookworm-slim so existing
+# agents.defaults.sandbox.docker.image values keep resolving. The base OS is
+# Debian 13 (trixie), not bookworm: bookworm apt nodejs is 18.20.4, and
+# trixie apt nodejs is 20.19.2 (the same package Grok Bot's sandbox measured).
+#
 # UID CONTRACT: runtime user `sandbox` MUST be uid/gid 1000:1000.
 # Gateway `ensureSandboxRuntimeOwnership` chowns host workspace / artifacts /
 # browser mounts to SANDBOX_RUNTIME_UID/GID = 1000. If the container User is
@@ -11,6 +16,9 @@
 # npm hits EACCES.
 #
 # Install node/npm via apt on debian-slim so nothing steals uid 1000.
+# Chromium, poppler-utils, and fonts-noto-cjk come from the same apt
+# transaction. Debian chromium is the system browser (not Google's apt repo,
+# and not a NodeSource/nodejs.org tarball).
 #
 # FORBIDDEN rebuild pattern (LIVE 2026-10-16 EACCES regression):
 #   FROM node:22-bookworm   # official image creates node:x:1000
@@ -19,21 +27,26 @@
 # If you must start from a node image, remap/recreate `sandbox` onto
 # 1000:1000 *before* USER sandbox. Naive useradd is not allowed.
 
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,id=openclaw-sandbox-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
+# Trixie apt lists must not reuse the bookworm cache id.
+RUN --mount=type=cache,id=openclaw-sandbox-trixie-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=openclaw-sandbox-trixie-apt-lists,target=/var/lib/apt,sharing=locked \
   apt-get update \
   && apt-get install -y --no-install-recommends \
     bash \
     ca-certificates \
+    chromium \
     curl \
+    fontconfig \
+    fonts-noto-cjk \
     git \
     jq \
     nodejs \
     npm \
+    poppler-utils \
     python3 \
     ripgrep
 
@@ -41,12 +54,23 @@ RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/
 # debian-slim has no `node` user; apt nodejs/npm do not claim uid 1000.
 # Fail the build if 1000 is already taken so a FROM-node mistake cannot
 # silently ship sandbox:1001.
+# Also fail closed if apt nodejs drops below 20 or the PDF toolchain
+# (system chromium, poppler, Noto Sans CJK SC) is missing.
 RUN groupadd --gid 1000 sandbox \
   && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash sandbox \
   && test "$(id -u sandbox)" = "1000" \
   && test "$(id -g sandbox)" = "1000" \
-  && command -v node >/dev/null \
-  && command -v npm >/dev/null
+  && node_major="$(node -p 'process.versions.node.split(".")[0]')" \
+  && test "$node_major" -ge 20 \
+  && command -v npm >/dev/null \
+  && command -v pdftotext >/dev/null \
+  && command -v pdfinfo >/dev/null \
+  && command -v pdftoppm >/dev/null \
+  && chromium_bin="$(command -v chromium || command -v chromium-browser || command -v google-chrome || command -v google-chrome-stable || true)" \
+  && test -n "$chromium_bin" \
+  && test -x "$chromium_bin" \
+  && fc-cache -fs >/dev/null \
+  && fc-list | grep -q "Noto Sans CJK SC"
 
 USER sandbox
 WORKDIR /home/sandbox

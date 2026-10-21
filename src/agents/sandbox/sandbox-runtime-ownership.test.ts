@@ -205,7 +205,7 @@ describe("Dockerfile.sandbox UID contract", () => {
 
   it("pins sandbox to uid/gid 1000 and does not FROM node:*", async () => {
     const body = await fs.readFile(dockerfilePath, "utf8");
-    expect(body).toMatch(/FROM debian:bookworm-slim@/);
+    expect(body).toMatch(/FROM debian:trixie-slim@sha256:[a-f0-9]{64}/);
     expect(body).not.toMatch(/^\s*FROM\s+[^\n]*\bnode:/m);
     expect(body).toMatch(/useradd\s+--uid\s+1000\s+--gid\s+1000/);
     expect(body).toMatch(/groupadd\s+--gid\s+1000\s+sandbox/);
@@ -213,7 +213,14 @@ describe("Dockerfile.sandbox UID contract", () => {
     expect(body).toMatch(/test\s+"\$\(id -g sandbox\)"\s+=\s+"1000"/);
     expect(body).toMatch(/\bnodejs\b/);
     expect(body).toMatch(/\bnpm\b/);
+    expect(body).toMatch(/\bchromium\b/);
+    expect(body).toMatch(/\bpoppler-utils\b/);
+    expect(body).toMatch(/\bfonts-noto-cjk\b/);
+    expect(body).toMatch(/node_major/);
+    expect(body).toMatch(/test "\$node_major" -ge 20/);
+    expect(body).toMatch(/Noto Sans CJK SC/);
     expect(body).toMatch(/FORBIDDEN rebuild pattern/);
+    expect(body).toMatch(/openbot-sandbox:bookworm-slim/);
   });
 
   it("keeps SANDBOX_RUNTIME_UID aligned with the image contract", () => {

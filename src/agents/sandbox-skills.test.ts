@@ -9,6 +9,9 @@ import { writeSkill } from "./skills.e2e-test-helpers.js";
 
 vi.mock("./sandbox/docker.js", () => ({
   ensureSandboxContainer: vi.fn(async () => "openclaw-sbx-test"),
+  // account-computer-stream binds this at import time via context.ts.
+  dockerContainerLiveness: vi.fn(async () => "running"),
+  execDocker: vi.fn(async () => ({ code: 0, stdout: "", stderr: "" })),
 }));
 
 vi.mock("./sandbox/browser.js", () => ({

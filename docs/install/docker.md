@@ -703,6 +703,12 @@ scripts/sandbox-setup.sh
 ```
 
 This builds `openbot-sandbox:bookworm-slim` using `Dockerfile.sandbox`.
+The tag name stays `bookworm-slim` for existing config. The base OS is Debian 13
+(trixie), with apt Node 20, npm, Chromium, poppler-utils, and fonts-noto-cjk.
+`scripts/sandbox-setup.sh` also runs `scripts/sandbox-image-smoke.sh` and fails
+unless `node` is major 20, Chromium or Chrome is on `PATH`,
+`pdftotext` extracts「中文 PDF 探测」from a PDF printed by that system
+Chromium, and the runtime user is uid/gid 1000:1000.
 The same build tags `openclaw-sandbox:bookworm-slim` as a temporary alias, so a
 config or host that still names the previous image keeps resolving. A machine
 that already has only the alias is retagged to the canonical name instead of

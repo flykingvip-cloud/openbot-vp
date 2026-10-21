@@ -199,6 +199,8 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
     fi
 
 # Install Docker CLI for sandbox / account-worker container management by default.
+# Runtime flag OPENBOT_ACCOUNT_WORKER_DOCKER=1 (unset also defaults ON; set 0
+# to opt out) creates sibling containers. That flag is not a build arg.
 # SaaS multitenant (sandbox.mode=all + exec.host=sandbox) needs the CLI (or a
 # mounted docker.sock / podman.sock) or every tenant hits spawn docker ENOENT.
 # Opt out for slim local images: docker build --build-arg OPENCLAW_INSTALL_DOCKER_CLI= ...

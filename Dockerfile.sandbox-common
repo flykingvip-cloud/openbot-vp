@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-# Canonical base is openbot-sandbox:bookworm-slim.
+# Canonical base tag is openbot-sandbox:bookworm-slim.
 # openclaw-sandbox:bookworm-slim remains a temporary alias of that image.
+# The tag name is historical: Dockerfile.sandbox's OS is Debian 13 trixie,
+# so PACKAGES below must exist on trixie (libasound2-dev still does).
 ARG BASE_IMAGE=openbot-sandbox:bookworm-slim
 FROM ${BASE_IMAGE}
 

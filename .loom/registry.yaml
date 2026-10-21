@@ -9134,6 +9134,29 @@ landingStreams:
       legacyTitle: Platform admin device platform connection mount
       owner: cursor-cloud
       task: device-platform-b2
+  - id: sandbox-trixie-node20-pdf:cursor-cloud
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - Dockerfile.sandbox
+      - Dockerfile.sandbox-common
+      - .github/workflows/sandbox-common-smoke.yml
+      - scripts/sandbox-setup.sh
+      - scripts/sandbox-image-smoke.sh
+      - docs/gateway/sandboxing.md
+      - docs/install/docker.md
+      - skills/web-extract-html-pdf/SKILL.md
+      - skills/web-extract-html-pdf/references/environment.md
+      - src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md
+      - src/agents/sandbox/docker.ts
+      - src/agents/sandbox/sandbox-runtime-ownership.test.ts
+    canLandWith: []
+    metadata:
+      legacyDisposition: MERGE
+      legacyTitle: Conversation sandbox Node 20, Chromium, and poppler
+      owner: cursor-cloud
+      task: sandbox-trixie-node20-pdf
   - id: device-digital-human-v1:cursor-cloud
     landingPolicy: serial
     paths:

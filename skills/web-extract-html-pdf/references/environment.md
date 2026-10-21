@@ -5,9 +5,9 @@
 ## 1. 探测清单
 
 ```bash
-# 1) Chromium / Chrome 可执行文件
-ls -d "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux64/chrome 2>/dev/null
+# 1) Chromium / Chrome 可执行文件（系统浏览器优先；Playwright 缓存只是回退）
 command -v google-chrome google-chrome-stable chromium chromium-browser 2>/dev/null
+ls -d "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux64/chrome 2>/dev/null
 
 # 2) 中文字体
 fc-list 2>/dev/null | grep -iE "Noto Sans CJK SC|Songti|Noto Serif CJK SC"
@@ -24,8 +24,8 @@ command -v libreoffice soffice
 按优先级取第一个存在且可执行的：
 
 1. 环境变量 `CHROME_BIN`（若已设定）
-2. `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`（OpenBot 托管环境常见）
-3. `google-chrome` / `google-chrome-stable` / `chromium` / `chromium-browser`（PATH）
+2. `google-chrome` / `google-chrome-stable` / `chromium` / `chromium-browser`（PATH 上的系统浏览器）
+3. `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`（仅当系统没有 Chrome/Chromium 时回退）
 4. `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`（macOS 本机）
 
 拿到后先验版本与动态库：
@@ -69,5 +69,7 @@ ls -la "$WORK/out.pdf"
 
 ## 5. 已知环境事实（示例，随机器变化，勿硬编码）
 
-- Linux 容器通常无 D-Bus、无 `google-chrome`，但 Playwright 会预置 `chromium-*/chrome-linux64/chrome`，可直接用。
+- OpenBot 对话沙箱（标签仍是 `openbot-sandbox:bookworm-slim`，系统是 Debian 13 trixie）预装 `/usr/bin/chromium`、poppler、`fonts-noto-cjk`（含 Noto Sans CJK SC）。用这个系统 Chromium，不要把 Playwright 缓存当成安装前提。
+- `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome` 只在 PATH 上没有 Chrome/Chromium 时使用。
+- Linux 容器通常无 D-Bus。无头渲染时 stdout 里的 `ERROR:dbus` 是噪声。
 - `--headless=new` 在缺依赖时可能卡住，`--headless=old` 亦不能保证；真正的解法是一次性 `user-data-dir` + `--disable-dev-shm-usage`。若仍失败，按第 3 节判「缺失」并停机。
