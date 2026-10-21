@@ -13,6 +13,7 @@ import { resolveThinkingDefault } from "../../agents/model-selection.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { gateChatHistoryText, stripToolMessages } from "../../agents/tools/sessions-helpers.js";
 import { omitImagePayloadForHistory } from "../../agents/transcript-image-omit.js";
+import { settleTurnCompletion } from "../../agents/turn-completion/contract.js";
 import { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
 import { isTranscriptStartBoundary } from "../../auto-reply/reply/chat-checkpoint-boundary.js";
 import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-error-escalation.js";
@@ -3727,6 +3728,14 @@ async function runGroupBotDiscussionTurn(params: {
       }
 
       let replyText = combinedReply;
+      const turnSettled = settleTurnCompletion({
+        userText: params.message,
+        assistantText: replyText,
+        nowMs: Date.now(),
+      });
+      if (turnSettled.visibleText.trim()) {
+        replyText = turnSettled.visibleText;
+      }
       let deliverableOwnerId: string | null = null;
       let prepared: PreparedChatDeliverable | null = null;
       try {
@@ -3739,7 +3748,7 @@ async function runGroupBotDiscussionTurn(params: {
       }
       try {
         prepared = prepareChatDeliverablePublish({
-          text: combinedReply,
+          text: replyText,
           publishIntent: "group-bot-final",
           sessionKey: params.scope.rawSessionKey,
           tenantId: params.scope.tenantId,
@@ -5792,8 +5801,17 @@ export const chatHandlers: GatewayRequestHandlers = {
                 await loadSessionEntryForClient(sessionKey, client);
               const sessionId = latestEntry?.sessionId ?? entry?.sessionId ?? clientRunId;
               const replyGovernance = await resolveChatTranscriptGovernance({ client, cfg });
+              const turnSettled = settleTurnCompletion({
+                userText: transcriptMessage,
+                assistantText: combinedReply,
+                nowMs: Date.now(),
+                sessionKey: resolvedSessionKey,
+              });
+              const settledReply = turnSettled.visibleText.trim()
+                ? turnSettled.visibleText
+                : combinedReply;
               prepared = prepareChatDeliverablePublish({
-                text: combinedReply,
+                text: settledReply,
                 publishIntent: "direct-fallback-final",
                 sessionKey: resolvedSessionKey,
                 tenantId: replyGovernance.tenantId,

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { TURN_COMPLETION_CONTINUITY_LINE } from "../../agents/turn-completion/contract.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { resolveGroupCollaborationPaths } from "../../gateway/collaboration-learning/collaboration-paths.js";
@@ -1214,6 +1215,7 @@ export async function buildSessionContinuityPrompt(params: {
   if (latestCheckpoint?.summary) {
     lines.push("", `Latest checkpoint summary: ${latestCheckpoint.summary}`);
   }
+  lines.push("", TURN_COMPLETION_CONTINUITY_LINE);
   return truncateUtf16Safe(lines.join("\n"), MAX_INJECTED_CONTINUITY_CHARS);
 }
 

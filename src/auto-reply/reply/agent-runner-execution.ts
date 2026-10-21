@@ -26,6 +26,7 @@ import {
 } from "../../agents/pi-embedded-helpers.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { userFacingPreReplyFailure } from "../../agents/sandbox/docker-engine-client.js";
+import { noteSkillSmokeClock } from "../../agents/turn-completion/contract.js";
 import { normalizeUsage } from "../../agents/usage.js";
 import {
   resolveGroupSessionKey,
@@ -231,11 +232,21 @@ export async function runAgentTurnWithFallback(params: {
       params.sessionCtx.Provider,
   );
   if (params.sessionKey) {
+    const smokeStartedAtMs = noteSkillSmokeClock({
+      sessionKey: params.sessionKey,
+      userText: params.commandBody,
+      nowMs: Date.now(),
+    });
     registerAgentRunContext(runId, {
       sessionKey: params.sessionKey,
       verboseLevel: params.resolvedVerboseLevel,
       isHeartbeat: params.isHeartbeat,
       isControlUiVisible: shouldSurfaceToControlUi,
+      turnCompletion: {
+        userText: params.commandBody,
+        workspaceDir: params.followupRun.run.workspaceDir,
+        ...(smokeStartedAtMs != null ? { smokeStartedAtMs } : {}),
+      },
     });
     registerRunReplyLanguage(runId, params.opts?.expectedReplyLanguage ?? null);
   }

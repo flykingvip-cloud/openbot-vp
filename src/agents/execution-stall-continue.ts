@@ -10,10 +10,12 @@
  */
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { isExecutionStallFinal } from "../shared/text/plan-speak-final.js";
+import { isSilentExecFishingStop } from "./turn-completion/contract.js";
 
 export const EXECUTION_STALL_CONTINUE_LIMIT = 2;
 export const FALSE_CONFIRM_CONTINUE_LIMIT = 1;
 export const EMPTY_AFTER_TOOLS_CONTINUE_LIMIT = 1;
+export const SILENT_EXEC_CONTINUE_LIMIT = 1;
 
 export const EXECUTION_STALL_CONTINUE_PROMPT =
   "Internal execution continue: the previous assistant message only told the user to wait or that work is still in progress. That is not a finished turn. Continue the work the user already authorized. Call the tools and deliver the result in this turn. Stop and ask only if you need a permission you do not have, a payment or QR scan, or a fact only the user knows. Do not send another wait sentence.";
@@ -23,6 +25,9 @@ export const FALSE_CONFIRM_CONTINUE_PROMPT =
 
 export const EMPTY_AFTER_TOOLS_CONTINUE_PROMPT =
   "Internal execution continue: tools in this turn succeeded, but the visible reply is empty and there is no deliverable or draft-box result yet. The task is not finished. Continue from the tool results and deliver the result in this turn. Do not ask the user to restate the goal.";
+
+export const SILENT_EXEC_CONTINUE_PROMPT =
+  "Internal execution continue: the user said to continue and wants the result. Do not ask open parameters. Do not ask whether 绑定 means WeChat, email, or a knowledge source; in a skill smoke, 绑定 means analysis-review to task.json sha256. A task_ledger or non-deliverable permission failure is a side path: skip it, add one bypass line, and write an openable deliverable or a text degradation in this turn. Stop only for a true fork of two mutually exclusive choices, or one permanent mainline block with a reason, the degradation already tried, and one user action.";
 
 const INTERNAL_CONTINUE_PREFIX = "Internal execution continue:";
 
@@ -47,7 +52,7 @@ type StopMessage = {
 
 export type AssistantStopKind = "text" | "empty" | "tool" | "error" | "none";
 
-export type ExecutionContinueKind = "progress-stall" | "false-confirm";
+export type ExecutionContinueKind = "progress-stall" | "false-confirm" | "silent-exec";
 
 type AssistantStop =
   | { kind: "text"; text: string }
@@ -205,9 +210,17 @@ export function executionContinueKind(params: {
   continuesUsed?: number;
   latestUserText?: string;
   falseConfirmContinuesUsed?: number;
+  silentExecContinuesUsed?: number;
 }): ExecutionContinueKind | null {
   if (params.toolsDisabled) {
     return null;
+  }
+  const silentUsed = params.silentExecContinuesUsed ?? 0;
+  if (
+    silentUsed < SILENT_EXEC_CONTINUE_LIMIT &&
+    isSilentExecFishingStop(params.text, params.latestUserText ?? "")
+  ) {
+    return "silent-exec";
   }
   const stallUsed = params.continuesUsed ?? 0;
   if (stallUsed < EXECUTION_STALL_CONTINUE_LIMIT && isExecutionStallFinal(params.text)) {
@@ -229,6 +242,7 @@ export function shouldContinueAfterExecutionStall(params: {
   continuesUsed?: number;
   latestUserText?: string;
   falseConfirmContinuesUsed?: number;
+  silentExecContinuesUsed?: number;
 }): boolean {
   return executionContinueKind(params) !== null;
 }

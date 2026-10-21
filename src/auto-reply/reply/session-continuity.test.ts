@@ -118,6 +118,7 @@ describe("session continuity", () => {
     expect(prompt).not.toContain("Active tasks from Task Ledger");
     expect(prompt).not.toContain("authoritative — overrides earlier plan drift");
     expect(prompt).toContain("Latest checkpoint summary");
+    expect(prompt).toContain("Turn completion contract");
   });
 
   it("uses collaboration shared memory for group-scoped sessions", async () => {

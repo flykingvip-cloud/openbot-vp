@@ -6,6 +6,7 @@ import {
   enforceVisibleReplyTexts,
 } from "../../../shared/text/visible-reply-language.js";
 import { latestUserText } from "../../execution-stall-continue.js";
+import { readSkillSmokeClock, settleTurnCompletion } from "../../turn-completion/contract.js";
 
 type ReplyMessage = {
   role?: string;
@@ -110,6 +111,9 @@ export async function rewriteAttemptVisibleReply(params: {
   assistantTexts: string[];
   messages: ReplyMessage[];
   sessionFile?: string;
+  workspaceDir?: string;
+  sessionKey?: string;
+  nowMs?: number;
 }): Promise<void> {
   const language = getRunReplyLanguage(params.runId);
 
@@ -182,6 +186,28 @@ export async function rewriteAttemptVisibleReply(params: {
     const next = rewritePlanSpeakFinal(cur, planSpeakContext);
     if (next !== cur) {
       params.assistantTexts[i] = next;
+    }
+  }
+
+  // Turn-completion contract is the last word on the visible final.
+  const finalText = (
+    target ? assistantVisibleText(target) : params.assistantTexts.join("\n\n")
+  ).trim();
+  if (finalText) {
+    const settled = settleTurnCompletion({
+      userText: planSpeakContext,
+      assistantText: finalText,
+      workspaceDir: params.workspaceDir,
+      sessionKey: params.sessionKey,
+      nowMs: params.nowMs ?? Date.now(),
+      smokeStartedAtMs: readSkillSmokeClock(params.sessionKey),
+    });
+    if (settled.visibleText !== finalText) {
+      applyMessageRewrite(finalText, settled.visibleText);
+      const joined = params.assistantTexts.join("\n\n").trim();
+      if (joined !== settled.visibleText.trim()) {
+        params.assistantTexts.splice(0, params.assistantTexts.length, settled.visibleText);
+      }
     }
   }
 }

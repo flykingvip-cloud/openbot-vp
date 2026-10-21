@@ -11,12 +11,20 @@ export type AgentEventPayload = {
   sessionKey?: string;
 };
 
+export type TurnCompletionRunHint = {
+  userText?: string;
+  workspaceDir?: string;
+  smokeStartedAtMs?: number;
+};
+
 export type AgentRunContext = {
   sessionKey?: string;
   verboseLevel?: VerboseLevel;
   isHeartbeat?: boolean;
   /** Whether control UI clients should receive chat/agent updates for this run. */
   isControlUiVisible?: boolean;
+  /** Batch 6: user text, workspace, and skill-smoke clock for the chat final. */
+  turnCompletion?: TurnCompletionRunHint;
 };
 
 // Keep per-run counters so streams stay strictly monotonic per runId.
@@ -44,6 +52,9 @@ export function registerAgentRunContext(runId: string, context: AgentRunContext)
   }
   if (context.isHeartbeat !== undefined && existing.isHeartbeat !== context.isHeartbeat) {
     existing.isHeartbeat = context.isHeartbeat;
+  }
+  if (context.turnCompletion) {
+    existing.turnCompletion = { ...existing.turnCompletion, ...context.turnCompletion };
   }
 }
 

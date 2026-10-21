@@ -105,6 +105,8 @@ import {
   executionContinueKind,
   FALSE_CONFIRM_CONTINUE_LIMIT,
   FALSE_CONFIRM_CONTINUE_PROMPT,
+  SILENT_EXEC_CONTINUE_LIMIT,
+  SILENT_EXEC_CONTINUE_PROMPT,
   lastAssistantStopKind,
   lastAssistantStopText,
   latestUserText,
@@ -2537,10 +2539,12 @@ export async function runEmbeddedAttempt(
           let stallContinues = 0;
           let falseConfirmContinues = 0;
           let emptyAfterToolsContinues = 0;
+          let silentExecContinues = 0;
           const continueBudget =
             EXECUTION_STALL_CONTINUE_LIMIT +
             FALSE_CONFIRM_CONTINUE_LIMIT +
-            EMPTY_AFTER_TOOLS_CONTINUE_LIMIT;
+            EMPTY_AFTER_TOOLS_CONTINUE_LIMIT +
+            SILENT_EXEC_CONTINUE_LIMIT;
           for (let step = 0; step < continueBudget; step += 1) {
             if (aborted || timedOut) {
               break;
@@ -2553,6 +2557,7 @@ export async function runEmbeddedAttempt(
               continuesUsed: stallContinues,
               latestUserText: userText,
               falseConfirmContinuesUsed: falseConfirmContinues,
+              silentExecContinuesUsed: silentExecContinues,
             });
             const emptyContinue =
               !kind &&
@@ -2567,11 +2572,13 @@ export async function runEmbeddedAttempt(
               break;
             }
             const prompt =
-              kind === "false-confirm"
-                ? FALSE_CONFIRM_CONTINUE_PROMPT
-                : emptyContinue
-                  ? EMPTY_AFTER_TOOLS_CONTINUE_PROMPT
-                  : EXECUTION_STALL_CONTINUE_PROMPT;
+              kind === "silent-exec"
+                ? SILENT_EXEC_CONTINUE_PROMPT
+                : kind === "false-confirm"
+                  ? FALSE_CONFIRM_CONTINUE_PROMPT
+                  : emptyContinue
+                    ? EMPTY_AFTER_TOOLS_CONTINUE_PROMPT
+                    : EXECUTION_STALL_CONTINUE_PROMPT;
             try {
               await abortable(
                 activeSession.sendCustomMessage(
@@ -2598,6 +2605,11 @@ export async function runEmbeddedAttempt(
               if (stopText) {
                 continuedStalls.push(stopText);
               }
+            } else if (kind === "silent-exec") {
+              silentExecContinues += 1;
+              if (stopText) {
+                continuedStalls.push(stopText);
+              }
             } else {
               emptyAfterToolsContinues += 1;
             }
@@ -2617,6 +2629,8 @@ export async function runEmbeddedAttempt(
             assistantTexts,
             messages: activeSession.messages,
             sessionFile: params.sessionFile,
+            workspaceDir: effectiveWorkspace,
+            sessionKey: params.sessionKey,
           });
         } catch (err) {
           log.warn(`visible reply rewrite failed: ${String(err)}`);
