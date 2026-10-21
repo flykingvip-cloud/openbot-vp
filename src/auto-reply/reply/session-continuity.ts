@@ -9,6 +9,13 @@ import { createContentAddressedSnapshotStore } from "../../infra/workspace-snaps
 import type { WorkspaceSnapshotRef } from "../../infra/workspace-snapshot/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { truncateUtf16Safe } from "../../utils.js";
+import {
+  emptyRestoreTaskReconciliation,
+  isRestoreTaskIsolationMessage,
+  reconcileRestoreTaskPointersReadOnly,
+  stripRestorePendingReviewFences,
+  type RestoreTaskReconciliation,
+} from "./restore-task-isolation.js";
 
 const log = createSubsystemLogger("session-continuity");
 
@@ -552,11 +559,18 @@ export async function readSessionMessages(
       if (entry.type !== "message" || !entry.message) {
         continue;
       }
+      // Legacy restore receipts may quote checkpoint open_tasks. They stay in
+      // the file for compatibility and are excluded from the task main line.
+      if (isRestoreTaskIsolationMessage(entry) || isRestoreTaskIsolationMessage(entry.message)) {
+        continue;
+      }
       const role = typeof entry.message.role === "string" ? entry.message.role : "";
       if (role !== "user" && role !== "assistant") {
         continue;
       }
-      const text = extractTextContent(entry.message.content).trim();
+      const text = stripRestorePendingReviewFences(
+        extractTextContent(entry.message.content),
+      ).trim();
       if (!text || text.startsWith("/")) {
         continue;
       }
@@ -606,7 +620,10 @@ function inferArtifactKind(filename: string): ArtifactKind {
 
 function extractArtifacts(text: string): Array<{ title: string; type: ArtifactKind }> {
   const found = new Map<string, { title: string; type: ArtifactKind }>();
-  for (const match of text.matchAll(ARTIFACT_PATTERN)) {
+  // Fenced restore open-tasks are historical. They must not mint artifacts on
+  // the current task.
+  const visible = stripRestorePendingReviewFences(text);
+  for (const match of visible.matchAll(ARTIFACT_PATTERN)) {
     const title = match[1]?.trim();
     if (!title) {
       continue;
@@ -1192,10 +1209,81 @@ export async function buildSessionContinuityPrompt(params: {
       }
     }
   }
+  // Checkpoint open_tasks are historical titles. Inject the summary only.
+  // Unbound ledger rows stay filtered above (boundTasks requires taskContextId).
   if (latestCheckpoint?.summary) {
     lines.push("", `Latest checkpoint summary: ${latestCheckpoint.summary}`);
   }
   return truncateUtf16Safe(lines.join("\n"), MAX_INJECTED_CONTINUITY_CHARS);
+}
+
+/**
+ * Read-only task-pointer check used by chat.restore before any close decision.
+ * Missing relationships are reported as pending review. File existence does
+ * not close a row, and this function does not write the ledger.
+ */
+export async function loadRestoreTaskReconciliation(params: {
+  cfg: OpenBotConfig;
+  workspaceDir: string;
+  agentId: string;
+  sessionKey?: string;
+  sessionEntry?: SessionEntry;
+  checkpointOpenTasks: readonly string[];
+}): Promise<RestoreTaskReconciliation> {
+  const scopeInfo = resolveScope({
+    sessionEntry: params.sessionEntry,
+    sessionKey: params.sessionKey,
+    agentId: params.agentId,
+  });
+  const rootDir = resolveContinuityMemoryRoot({
+    cfg: params.cfg,
+    workspaceDir: params.workspaceDir,
+    scope: scopeInfo.scope,
+    ownerId: scopeInfo.ownerId,
+  });
+  const taskLedger = await readLedger<TaskLedgerEntry>(rootDir, TASK_LEDGER_FILE);
+  const artifactLedger = await readLedger<ArtifactLedgerEntry>(rootDir, ARTIFACT_LEDGER_FILE);
+  const fileExistsByArtifactKey: Record<string, boolean> = {};
+  for (const artifact of artifactLedger.items) {
+    for (const key of [artifact.id, artifact.title]) {
+      const name = key.trim();
+      if (!name || fileExistsByArtifactKey[name] !== undefined) {
+        continue;
+      }
+      fileExistsByArtifactKey[name] = await workspaceFileExists(params.workspaceDir, name);
+    }
+  }
+  const reconciliation = reconcileRestoreTaskPointersReadOnly({
+    taskContextId: params.sessionEntry?.taskContextId,
+    taskLedger: taskLedger.items,
+    artifactLedger: artifactLedger.items,
+    checkpointOpenTasks: params.checkpointOpenTasks,
+    fileExistsByArtifactKey,
+  });
+  if (reconciliation.autoClosedTaskIds.length > 0) {
+    throw new Error("restore reconciliation must not auto-close task rows");
+  }
+  return reconciliation.pendingReview.length > 0 || reconciliation.currentTaskId
+    ? reconciliation
+    : emptyRestoreTaskReconciliation();
+}
+
+async function workspaceFileExists(workspaceDir: string, relativeName: string): Promise<boolean> {
+  const trimmed = relativeName.trim();
+  if (!trimmed || trimmed.includes("..") || path.isAbsolute(trimmed)) {
+    return false;
+  }
+  const root = path.resolve(workspaceDir);
+  const target = path.resolve(root, trimmed);
+  if (target !== root && !target.startsWith(`${root}${path.sep}`)) {
+    return false;
+  }
+  try {
+    const stat = await fs.stat(target);
+    return stat.isFile();
+  } catch {
+    return false;
+  }
 }
 
 const EXTERNAL_EFFECT_TOOL_PATTERNS: Array<{ kind: string; re: RegExp }> = [

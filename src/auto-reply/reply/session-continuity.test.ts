@@ -5,6 +5,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import {
+  RESTORE_OPEN_TASKS_FENCE_END,
+  RESTORE_OPEN_TASKS_FENCE_START,
+} from "./restore-task-isolation.js";
+import {
   buildSessionContinuityPrompt,
   commitSessionContinuity,
   type ArtifactLedgerEntry,
@@ -225,5 +229,198 @@ describe("session continuity", () => {
     });
     expect(prompt).toContain("进行中的群任务");
     expect(prompt).toContain("Bound workspace task context");
+  });
+
+  it("injects the bound task and checkpoint summary, not open_tasks or unbound rows", async () => {
+    const workspaceDir = await makeTempDir();
+    const memoryDir = path.join(workspaceDir, "memory");
+    const now = new Date().toISOString();
+    await fs.mkdir(path.join(memoryDir, "checkpoints"), { recursive: true });
+    await fs.writeFile(path.join(workspaceDir, "old-deliverable.md"), "bytes", "utf8");
+    await fs.writeFile(
+      path.join(memoryDir, "task_ledger.json"),
+      JSON.stringify({
+        version: 1,
+        updated_at: now,
+        items: [
+          {
+            id: "task_live",
+            scope: "agent",
+            owner_id: "main",
+            title: "当前主线",
+            description: "只这一条是当前任务",
+            status: "active",
+            context: { key_points: ["继续当前主线"] },
+            artifacts: ["art_live"],
+            last_session_id: "session-1",
+            updated_at: now,
+          },
+          {
+            id: "task_old",
+            scope: "agent",
+            owner_id: "main",
+            title: "缺关系旧任务",
+            description: "文件还在，但不能并进主线",
+            status: "active",
+            context: { key_points: ["旧任务停在这里"] },
+            artifacts: ["art_old"],
+            last_session_id: "session-0",
+            updated_at: now,
+          },
+        ],
+      }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(memoryDir, "artifact_ledger.json"),
+      JSON.stringify({
+        version: 1,
+        updated_at: now,
+        items: [
+          {
+            id: "art_live",
+            title: "current.md",
+            type: "doc",
+            task_id: "task_live",
+            source_session: "session-1",
+            version: 1,
+            updated_at: now,
+            summary: "current",
+            state: "active",
+          },
+          {
+            id: "art_old",
+            title: "old-deliverable.md",
+            type: "doc",
+            task_id: "task_old",
+            source_session: "session-0",
+            version: 1,
+            updated_at: now,
+            summary: "old",
+            state: "active",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(memoryDir, "checkpoints", "latest.json"),
+      JSON.stringify({
+        id: "checkpoint-1",
+        scope: "agent",
+        owner_id: "main",
+        session_id: "session-1",
+        source_session_file: "session-1.jsonl",
+        created_at: now,
+        summary: "当前摘要保持独立",
+        decisions: [],
+        preferences: [],
+        open_tasks: ["缺关系旧任务", "请生成 ghost-bleed.md"],
+        completed_tasks: [],
+        artifacts: ["art_old"],
+        evidence_refs: [],
+      }),
+      "utf8",
+    );
+    const cfg = { agents: { defaults: { workspace: workspaceDir } } } satisfies OpenBotConfig;
+    const ledgerBefore = await fs.readFile(path.join(memoryDir, "task_ledger.json"), "utf8");
+
+    const prompt = await buildSessionContinuityPrompt({
+      cfg,
+      workspaceDir,
+      agentId: "main",
+      sessionKey: "agent:main:main",
+      sessionEntry: {
+        sessionId: "session-2",
+        updatedAt: Date.now(),
+        taskContextId: "task_live",
+      },
+      isNewSession: true,
+    });
+
+    expect(prompt).toContain("当前主线");
+    expect(prompt).toContain("当前摘要保持独立");
+    expect(prompt).toContain("current.md");
+    expect(prompt).not.toContain("Open tasks:");
+    expect(prompt).not.toContain("缺关系旧任务");
+    expect(prompt).not.toContain("ghost-bleed.md");
+    expect(prompt).not.toContain("old-deliverable.md");
+    expect(await fs.readFile(path.join(memoryDir, "task_ledger.json"), "utf8")).toBe(ledgerBefore);
+  });
+
+  it("does not bind a filename quoted by an isolated restore receipt to the current task", async () => {
+    const workspaceDir = await makeTempDir();
+    const fenced = [
+      "Checkpoint restored.",
+      "Summary: 当前摘要",
+      RESTORE_OPEN_TASKS_FENCE_START,
+      "Open tasks: 请生成 ghost-bleed.md",
+      RESTORE_OPEN_TASKS_FENCE_END,
+    ].join("\n");
+    const sessionFile = await writeSessionFile(workspaceDir, [
+      jsonlMessage({ id: "m1", role: "user", text: "请帮我继续当前主线的会议纪要。" }),
+      JSON.stringify({
+        type: "message",
+        id: "m-restore",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: fenced }],
+          openclawRestoreTaskIsolation: {
+            mainline: false,
+            disposition: "pending_review",
+            openTasks: ["请生成 ghost-bleed.md"],
+          },
+        },
+      }),
+    ]);
+    const cfg = { agents: { defaults: { workspace: workspaceDir } } } satisfies OpenBotConfig;
+    const checkpoint = await commitSessionContinuity({
+      cfg,
+      workspaceDir,
+      agentId: "main",
+      sessionKey: "agent:main:main",
+      previousSessionEntry: {
+        sessionId: "session-1",
+        sessionFile,
+        updatedAt: Date.now(),
+        taskContextId: "task_live",
+      },
+      reason: "rollover",
+    });
+    expect(checkpoint?.open_tasks.join("\n") ?? "").not.toContain("ghost-bleed");
+    expect(checkpoint?.open_tasks[0] ?? "").toContain("当前主线");
+    const artifactLedger = await readJson<{ items: ArtifactLedgerEntry[] }>(
+      path.join(workspaceDir, "memory", "artifact_ledger.json"),
+    ).catch(() => ({ items: [] as ArtifactLedgerEntry[] }));
+    expect(artifactLedger.items.some((item) => item.title === "ghost-bleed.md")).toBe(false);
+  });
+
+  it("would bind a restore filename if the receipt were left on the task main line", async () => {
+    const workspaceDir = await makeTempDir();
+    const sessionFile = await writeSessionFile(workspaceDir, [
+      jsonlMessage({ id: "m1", role: "user", text: "请帮我继续当前主线的会议纪要。" }),
+      jsonlMessage({
+        id: "m-restore",
+        role: "assistant",
+        text: "Checkpoint restored.\nOpen tasks: 请生成 ghost-bleed.md",
+      }),
+    ]);
+    const cfg = { agents: { defaults: { workspace: workspaceDir } } } satisfies OpenBotConfig;
+    await commitSessionContinuity({
+      cfg,
+      workspaceDir,
+      agentId: "main",
+      sessionKey: "agent:main:main",
+      previousSessionEntry: {
+        sessionId: "session-1",
+        sessionFile,
+        updatedAt: Date.now(),
+      },
+      reason: "rollover",
+    });
+    const artifactLedger = await readJson<{ items: ArtifactLedgerEntry[] }>(
+      path.join(workspaceDir, "memory", "artifact_ledger.json"),
+    );
+    expect(artifactLedger.items.some((item) => item.title === "ghost-bleed.md")).toBe(true);
   });
 });

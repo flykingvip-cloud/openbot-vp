@@ -1,6 +1,10 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { SessionManager } from "@earendil-works/pi-coding-agent";
 import { openSessionManager } from "../../agents/pi-sdk/session.js";
+import {
+  RESTORE_TASK_ISOLATION_FIELD,
+  type RestoreTaskIsolationStamp,
+} from "../../auto-reply/reply/restore-task-isolation.js";
 import { applyInputProvenanceToUserMessage } from "../../sessions/input-provenance.js";
 import { stripAssistantScratchpadFromText } from "../../shared/text/assistant-scratchpad.js";
 import { INTERNAL_MESSAGE_CHANNEL } from "../../utils/message-channel.js";
@@ -37,6 +41,8 @@ function buildInjectedTranscriptMessage(params: {
   cronResult?: GatewayInjectedCronResultMeta;
   /** Sanitized 大白引导卡片。写入转写，不另起模型回合。 */
   guideCard?: Record<string, unknown>;
+  /** Legacy checkpoint restore receipt. Not part of the current task main line. */
+  restoreTaskIsolation?: RestoreTaskIsolationStamp;
   /** Keep the caller’s text. Outbound 1:1 lines are already the sent body. */
   preserveBody?: boolean;
   now: number;
@@ -100,6 +106,9 @@ function buildInjectedTranscriptMessage(params: {
     if (params.guideCard) {
       messageBody.openclawDaibaiGuide = params.guideCard;
     }
+    if (params.restoreTaskIsolation) {
+      messageBody[RESTORE_TASK_ISOLATION_FIELD] = params.restoreTaskIsolation;
+    }
   }
 
   return messageBody;
@@ -115,6 +124,7 @@ export function appendInjectedMessageToTranscript(params: {
   abortMeta?: GatewayInjectedAbortMeta;
   cronResult?: GatewayInjectedCronResultMeta;
   guideCard?: Record<string, unknown>;
+  restoreTaskIsolation?: RestoreTaskIsolationStamp;
   now?: number;
 }): GatewayInjectedTranscriptAppendResult {
   const now = params.now ?? Date.now();
@@ -127,6 +137,7 @@ export function appendInjectedMessageToTranscript(params: {
     ...(params.abortMeta ? { abortMeta: params.abortMeta } : {}),
     ...(params.cronResult ? { cronResult: params.cronResult } : {}),
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
+    ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
     now,
   });
 
@@ -248,6 +259,7 @@ export function appendInjectedAssistantMessageToTranscript(params: {
   cronResult?: GatewayInjectedCronResultMeta;
   /** Sanitized 大白引导卡片。只随会话转写保留，不触发模型回合。 */
   guideCard?: Record<string, unknown>;
+  restoreTaskIsolation?: RestoreTaskIsolationStamp;
   now?: number;
 }): GatewayInjectedTranscriptAppendResult {
   return appendInjectedMessageToTranscript({
@@ -259,6 +271,7 @@ export function appendInjectedAssistantMessageToTranscript(params: {
     ...(params.abortMeta ? { abortMeta: params.abortMeta } : {}),
     ...(params.cronResult ? { cronResult: params.cronResult } : {}),
     ...(params.guideCard ? { guideCard: params.guideCard } : {}),
+    ...(params.restoreTaskIsolation ? { restoreTaskIsolation: params.restoreTaskIsolation } : {}),
     ...(params.now ? { now: params.now } : {}),
   });
 }

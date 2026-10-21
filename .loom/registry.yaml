@@ -1,5 +1,24 @@
 version: 1
 tasks:
+  - id: batch4-restore-no-task-bleed:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 4 restore must not mix historical open_tasks into the current task main line
+    paths:
+      - .loom/registry.yaml
+      - src/auto-reply/reply/restore-task-isolation.ts
+      - src/auto-reply/reply/restore-task-isolation.test.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/session-continuity.test.ts
+      - src/gateway/server-methods/chat-transcript-inject.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.restore.test.ts
+      - ui/src/ui/controllers/chat.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
   - id: device-digital-human-v1:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9207,6 +9226,23 @@ tasks:
     since: 2026-10-21
     metadata: {}
 landingStreams:
+  - id: batch4-restore-no-task-bleed
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/auto-reply/reply/restore-task-isolation.ts
+      - src/auto-reply/reply/restore-task-isolation.test.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/session-continuity.test.ts
+      - src/gateway/server-methods/chat-transcript-inject.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.restore.test.ts
+      - ui/src/ui/controllers/chat.ts
+    canLandWith: []
+    metadata:
+      task: batch4-restore-no-task-bleed
+      owner: cursor-cloud
+      purpose: Batch 4 restore isolation. First-match so these shared files land with this stream.
   - id: batch3-version-permission
     landingPolicy: serial
     paths:

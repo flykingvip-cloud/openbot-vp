@@ -2,7 +2,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commitSessionContinuityForCurrentSession } from "../../auto-reply/reply/session-continuity.js";
+import { RESTORE_OPEN_TASKS_FENCE_START } from "../../auto-reply/reply/restore-task-isolation.js";
+import {
+  buildSessionContinuityPrompt,
+  commitSessionContinuity,
+  commitSessionContinuityForCurrentSession,
+} from "../../auto-reply/reply/session-continuity.js";
 import { resolveGroupPublicTranscriptPath } from "../collaboration-learning/collaboration-paths.js";
 
 const state = vi.hoisted(() => ({
@@ -14,6 +19,7 @@ const state = vi.hoisted(() => ({
   denyAuthorizedCwd: false,
   decoyWorkspaceDir: "",
   groupId: "",
+  taskContextId: "",
 }));
 
 vi.mock("../session-utils.js", async (importOriginal) => {
@@ -27,6 +33,7 @@ vi.mock("../session-utils.js", async (importOriginal) => {
         sessionId: state.sessionId,
         sessionFile: state.sessionFile || state.transcriptPath,
         ...(state.groupId ? { groupId: state.groupId, space: state.groupId } : {}),
+        ...(state.taskContextId ? { taskContextId: state.taskContextId } : {}),
       },
       canonicalKey: "main",
     }),
@@ -105,7 +112,7 @@ vi.mock("../workspace-resolver/strict-locator.js", async (importOriginal) => {
 });
 
 const { chatCheckpointHandlers } = await import("./chat-checkpoints.js");
-const { chatHandlers } = await import("./chat.js");
+const { chatHandlers, sanitizeChatHistoryMessagesForTest } = await import("./chat.js");
 
 async function writeTranscriptHeader(transcriptPath: string, sessionId: string) {
   await fs.writeFile(
@@ -166,6 +173,7 @@ afterEach(async () => {
   state.denyAuthorizedCwd = false;
   state.decoyWorkspaceDir = "";
   state.groupId = "";
+  state.taskContextId = "";
 });
 
 describe("chat.restore", () => {
@@ -278,6 +286,242 @@ describe("chat.restore", () => {
       }),
     );
     await fs.rm(decoy, { recursive: true, force: true });
+  });
+});
+
+function restoreContext() {
+  return {
+    broadcastChat: vi.fn(),
+    nodeSendToSession: vi.fn(),
+    chatAbortControllers: new Map(),
+    logGateway: { info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+  };
+}
+
+async function seedCurrentAndGhostTasks(checkpointOpenTasks: string[]) {
+  await createFixture();
+  const workspaceDir = path.dirname(state.memoryDir);
+  const now = new Date().toISOString();
+  state.taskContextId = "task_live";
+  await fs.writeFile(path.join(workspaceDir, "old-deliverable.md"), "still here", "utf8");
+  const taskLedger = {
+    version: 1,
+    updated_at: now,
+    items: [
+      {
+        id: "task_live",
+        scope: "agent",
+        owner_id: "main",
+        title: "当前主线",
+        description: "只这一条是当前任务",
+        status: "active",
+        context: { key_points: ["继续当前主线"] },
+        artifacts: ["art_live"],
+        last_session_id: state.sessionId,
+        updated_at: now,
+      },
+      {
+        id: "task_old",
+        scope: "agent",
+        owner_id: "main",
+        title: "缺关系旧任务",
+        description: "文件还在，但不能并进主线",
+        status: "active",
+        context: { key_points: ["旧任务停在这里"] },
+        artifacts: ["art_old"],
+        last_session_id: "sess-old",
+        updated_at: now,
+      },
+    ],
+  };
+  const taskLedgerPath = path.join(state.memoryDir, "task_ledger.json");
+  await fs.writeFile(taskLedgerPath, JSON.stringify(taskLedger), "utf8");
+  await fs.writeFile(
+    path.join(state.memoryDir, "artifact_ledger.json"),
+    JSON.stringify({
+      version: 1,
+      updated_at: now,
+      items: [
+        {
+          id: "art_live",
+          title: "current.md",
+          type: "doc",
+          task_id: "task_live",
+          source_session: state.sessionId,
+          version: 1,
+          updated_at: now,
+          summary: "current",
+          state: "active",
+        },
+        {
+          id: "art_old",
+          title: "old-deliverable.md",
+          type: "doc",
+          task_id: "task_old",
+          source_session: "sess-old",
+          version: 1,
+          updated_at: now,
+          summary: "old",
+          state: "active",
+        },
+      ],
+    }),
+    "utf8",
+  );
+  await fs.writeFile(
+    path.join(state.memoryDir, "checkpoints", "latest.json"),
+    JSON.stringify({
+      id: "checkpoint-1",
+      scope: "agent",
+      owner_id: "main",
+      session_id: state.sessionId,
+      source_session_file: state.transcriptPath,
+      created_at: now,
+      summary: "当前摘要保持独立",
+      decisions: [],
+      preferences: [],
+      open_tasks: checkpointOpenTasks,
+      completed_tasks: [],
+      artifacts: ["art_old"],
+      evidence_refs: [],
+    }),
+    "utf8",
+  );
+  return { workspaceDir, taskLedgerPath, ledgerBefore: JSON.stringify(taskLedger) };
+}
+
+describe("chat.restore task main line", () => {
+  const ghostTasks = ["缺关系旧任务", "请生成 ghost-bleed.md"];
+
+  it("does not inject checkpoint open_tasks on a targeted restore", async () => {
+    const { taskLedgerPath, ledgerBefore } = await seedCurrentAndGhostTasks(ghostTasks);
+    const transcriptBefore = await fs.readFile(state.transcriptPath, "utf8");
+    const respond = vi.fn();
+    const context = restoreContext();
+
+    await chatHandlers["chat.restore"]({
+      params: { sessionKey: "main", checkpointId: "checkpoint-1" },
+      respond: respond as never,
+      context: context as never,
+      req: {} as never,
+      client: null,
+      isWebchatConnect: () => false,
+    });
+
+    const transcriptAfter = await fs.readFile(state.transcriptPath, "utf8");
+    expect(transcriptAfter).toBe(transcriptBefore);
+    expect(transcriptAfter).not.toContain("Open tasks:");
+    expect(transcriptAfter).not.toContain("Checkpoint restored");
+    expect(transcriptAfter).not.toContain("缺关系旧任务");
+    expect(transcriptAfter).not.toContain("ghost-bleed.md");
+    expect(await fs.readFile(taskLedgerPath, "utf8")).toBe(ledgerBefore);
+    expect(context.broadcastChat).not.toHaveBeenCalled();
+    expect(context.nodeSendToSession).not.toHaveBeenCalled();
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        ok: true,
+        checkpointId: "checkpoint-1",
+        taskIsolation: {
+          currentTaskId: "task_live",
+          pendingReviewCount: expect.any(Number),
+          autoClosedTaskIds: [],
+        },
+      }),
+    );
+    const payload = respond.mock.calls[0]?.[1] as {
+      taskIsolation: { pendingReviewCount: number };
+    };
+    expect(payload.taskIsolation.pendingReviewCount).toBeGreaterThan(0);
+  });
+
+  it("keeps legacy open_tasks in the transcript but off the current task main line", async () => {
+    const { workspaceDir, taskLedgerPath, ledgerBefore } =
+      await seedCurrentAndGhostTasks(ghostTasks);
+    const respond = vi.fn();
+    const context = restoreContext();
+
+    await chatHandlers["chat.restore"]({
+      params: { sessionKey: "main" },
+      respond: respond as never,
+      context: context as never,
+      req: {} as never,
+      client: null,
+      isWebchatConnect: () => false,
+    });
+
+    const transcript = await fs.readFile(state.transcriptPath, "utf8");
+    expect(transcript).toContain("Open tasks:");
+    expect(transcript).toContain("缺关系旧任务");
+    expect(transcript).toContain("ghost-bleed.md");
+    expect(transcript).toContain(RESTORE_OPEN_TASKS_FENCE_START);
+    expect(transcript).toContain("openclawRestoreTaskIsolation");
+    expect(await fs.readFile(taskLedgerPath, "utf8")).toBe(ledgerBefore);
+
+    const receipt = transcript
+      .split("\n")
+      .filter((line) => line.includes("openclawRestoreTaskIsolation"))
+      .map((line) => JSON.parse(line) as { message?: unknown });
+    expect(receipt.length).toBeGreaterThan(0);
+    const visible = sanitizeChatHistoryMessagesForTest(receipt.map((line) => line.message));
+    expect(JSON.stringify(visible)).not.toContain("ghost-bleed.md");
+    expect(JSON.stringify(visible)).not.toContain("缺关系旧任务");
+
+    const prompt = await buildSessionContinuityPrompt({
+      cfg: {},
+      workspaceDir,
+      agentId: "main",
+      sessionKey: "main",
+      sessionEntry: {
+        sessionId: state.sessionId,
+        updatedAt: Date.now(),
+        taskContextId: "task_live",
+      },
+      isNewSession: true,
+    });
+    expect(prompt).toContain("当前主线");
+    expect(prompt).toContain("当前摘要保持独立");
+    expect(prompt).not.toContain("Open tasks:");
+    expect(prompt).not.toContain("缺关系旧任务");
+    expect(prompt).not.toContain("ghost-bleed.md");
+    expect(prompt).not.toContain("old-deliverable.md");
+
+    const rolled = await commitSessionContinuity({
+      cfg: {},
+      workspaceDir,
+      agentId: "main",
+      sessionKey: "main",
+      previousSessionEntry: {
+        sessionId: state.sessionId,
+        sessionFile: state.transcriptPath,
+        updatedAt: Date.now(),
+        taskContextId: "task_live",
+      },
+      reason: "rollover",
+    });
+    expect(rolled?.open_tasks.join("\n") ?? "").not.toContain("ghost-bleed");
+    const artifactLedger = JSON.parse(
+      await fs.readFile(path.join(state.memoryDir, "artifact_ledger.json"), "utf8"),
+    ) as { items: Array<{ title: string; task_id?: string }> };
+    expect(
+      artifactLedger.items.some(
+        (item) => item.title === "ghost-bleed.md" && item.task_id === "task_live",
+      ),
+    ).toBe(false);
+    expect(await fs.readFile(taskLedgerPath, "utf8")).toBe(ledgerBefore);
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        ok: true,
+        checkpointId: "checkpoint-1",
+        taskIsolation: expect.objectContaining({
+          currentTaskId: "task_live",
+          autoClosedTaskIds: [],
+        }),
+      }),
+    );
+    expect(context.broadcastChat).toHaveBeenCalled();
   });
 });
 

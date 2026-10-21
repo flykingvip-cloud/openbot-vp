@@ -1,4 +1,5 @@
 import { isMemoryFlushHistoryMessage } from "../../../../src/auto-reply/reply/memory-flush-prompt.js";
+import { isRestoreTaskIsolationMessage } from "../../../../src/auto-reply/reply/restore-task-isolation.js";
 import type { MentionMetadata } from "../../../../src/organization/mention-types.js";
 import type {
   RuntimeIdentity,
@@ -83,7 +84,11 @@ function isAssistantSilentReply(message: unknown): boolean {
 
 /** Hide internal pre-compaction memory-flush prompts that look like user messages. */
 function shouldHideChatHistoryMessage(message: unknown): boolean {
-  return isAssistantSilentReply(message) || isMemoryFlushHistoryMessage(message);
+  return (
+    isAssistantSilentReply(message) ||
+    isMemoryFlushHistoryMessage(message) ||
+    isRestoreTaskIsolationMessage(message)
+  );
 }
 
 export type ChatState = {
@@ -1181,8 +1186,9 @@ function appendChatMessage(
   state: Pick<ChatEventState, "chatMessages">,
   message: Record<string, unknown>,
 ) {
-  // Defense-in-depth: never append internal memory-flush prompts as chat bubbles.
-  if (isMemoryFlushHistoryMessage(message)) {
+  // Defense-in-depth: never append internal memory-flush prompts or isolated
+  // checkpoint-restore receipts as current-task chat bubbles.
+  if (isMemoryFlushHistoryMessage(message) || isRestoreTaskIsolationMessage(message)) {
     return;
   }
   const messageId = typeof message.id === "string" ? message.id : "";
