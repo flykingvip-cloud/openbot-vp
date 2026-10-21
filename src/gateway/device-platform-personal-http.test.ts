@@ -30,7 +30,7 @@ const healthBody = {
   ok: true,
   service: "device-control",
   apiPrefix: "/api/device-platform/v1",
-  maturity: "agent-b-freeze-draft",
+  maturity: "v1-frozen",
   grayRelease: false,
   realDeviceDelivery: false,
   firmwareUrl: null,
