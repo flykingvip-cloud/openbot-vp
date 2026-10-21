@@ -5,6 +5,7 @@
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import { isTaskSurfaceUtterance } from "../agents/task-surface/surface.js";
 import { formatDroppedParkedTaskSentence, type FocusSnapshot } from "./focus-policy.js";
 import { classifyTurnRelation, titleFromGoal } from "./turn-relation.js";
 
@@ -179,6 +180,11 @@ export function applyIncomingUserMessage(params: {
     parked: [...params.board.parked],
   };
   if (!incoming || incoming.startsWith("/")) {
+    return continueResult(board, board.current?.taskId ?? "");
+  }
+  // Hang-list and keep-only are surface commands, not a new task.
+  // The task-surface reply path mutates the board against the shown ordinals.
+  if (isTaskSurfaceUtterance(incoming)) {
     return continueResult(board, board.current?.taskId ?? "");
   }
 

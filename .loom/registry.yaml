@@ -1,5 +1,32 @@
 version: 1
 tasks:
+  - id: batch7-task-surface:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 7 single task-surface truth for every bot
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch7-task-surface-2026-10-21.md
+      - src/agents/task-surface/surface.ts
+      - src/agents/task-surface/surface.test.ts
+      - src/agents/task-surface/apply.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/context-compiler/candidates.ts
+      - src/agents/context-compiler/group-task-stable-summary.ts
+      - src/agents/context-compiler/group-task-stable-summary.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/restore-task-isolation.ts
+      - src/auto-reply/reply/restore-task-isolation.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/infra/heartbeat-parked-notice.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
   - id: batch6-turn-completion:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9274,6 +9301,31 @@ tasks:
     since: 2026-10-21
     metadata: {}
 landingStreams:
+  - id: batch7-task-surface
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch7-task-surface-2026-10-21.md
+      - src/agents/task-surface/surface.ts
+      - src/agents/task-surface/surface.test.ts
+      - src/agents/task-surface/apply.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/context-compiler/candidates.ts
+      - src/agents/context-compiler/group-task-stable-summary.ts
+      - src/agents/context-compiler/group-task-stable-summary.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/restore-task-isolation.ts
+      - src/auto-reply/reply/restore-task-isolation.test.ts
+      - src/conversation-task/session-task-board.ts
+      - src/infra/heartbeat-parked-notice.ts
+    canLandWith: []
+    metadata:
+      task: batch7-task-surface
+      owner: cursor-cloud
+      purpose: Batch 7 single task-surface truth. First-match so these shared files land with this stream.
   - id: batch6-turn-completion
     landingPolicy: serial
     paths:

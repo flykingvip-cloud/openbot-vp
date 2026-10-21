@@ -1719,6 +1719,8 @@ export async function runEmbeddedAttempt(
           agentId: sessionAgentId,
           sessionKey: params.sessionKey,
           sessionEntry: params.sessionEntry,
+          userUtterance: params.prompt,
+          injectionSource: /heartbeat/iu.test(params.prompt ?? "") ? "heartbeat" : "ledger",
         });
         const collabCompileStrategy = shouldApplyCollabCompileStrategy({
           cfg: params.config,

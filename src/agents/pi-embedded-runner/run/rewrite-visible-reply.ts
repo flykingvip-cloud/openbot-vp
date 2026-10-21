@@ -6,6 +6,12 @@ import {
   enforceVisibleReplyTexts,
 } from "../../../shared/text/visible-reply-language.js";
 import { latestUserText } from "../../execution-stall-continue.js";
+import { replyForTaskSurfaceUtterance } from "../../task-surface/apply.js";
+import {
+  isOrdinalClarificationQuiz,
+  isPrimarilyTaskSurfaceUtterance,
+  parseKeepOnlyOrdinal,
+} from "../../task-surface/surface.js";
 import { readSkillSmokeClock, settleTurnCompletion } from "../../turn-completion/contract.js";
 
 type ReplyMessage = {
@@ -186,6 +192,27 @@ export async function rewriteAttemptVisibleReply(params: {
     const next = rewritePlanSpeakFinal(cur, planSpeakContext);
     if (next !== cur) {
       params.assistantTexts[i] = next;
+    }
+  }
+
+  // Keep-only already has one ordinal. A second quiz is replaced by the receipt.
+  const surfaceUser = planSpeakContext.trim();
+  if (
+    target &&
+    original.trim() &&
+    params.workspaceDir &&
+    parseKeepOnlyOrdinal(surfaceUser) != null &&
+    (isOrdinalClarificationQuiz(original) || isPrimarilyTaskSurfaceUtterance(surfaceUser))
+  ) {
+    const receipt = replyForTaskSurfaceUtterance({
+      text: surfaceUser,
+      workspaceDir: params.workspaceDir,
+      agentId: "main",
+      sessionFile: params.sessionFile,
+    });
+    if (receipt && receipt !== original) {
+      applyMessageRewrite(original, receipt);
+      original = receipt;
     }
   }
 

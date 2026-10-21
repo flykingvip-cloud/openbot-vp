@@ -567,9 +567,14 @@ function playwrightResolvable(): boolean {
   });
 }
 
-function sidePathReceipt(label: string, err?: unknown): string {
-  const code = errnoCode(err) ?? (err instanceof Error ? "write_failed" : "write_failed");
+/** Batch 6 side-path receipt. Batch 7 keep-only reuses this exact line. */
+export function formatSidePathBypassReceipt(label: string, err?: unknown): string {
+  const code = errnoCode(err) ?? "write_failed";
   return `side_path_bypass: ${label} ${code}`;
+}
+
+function sidePathReceipt(label: string, err?: unknown): string {
+  return formatSidePathBypassReceipt(label, err);
 }
 
 function writeWorkspaceFile(
