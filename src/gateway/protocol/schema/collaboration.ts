@@ -853,6 +853,36 @@ export const CollaborationTaskProposeTodolistParamsSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export type CollaborationTaskRetryOwnerDecisionDeliveryParams = {
+  groupId: string;
+  taskId: string;
+  todolistId: string;
+  expectedVersion?: number;
+};
+
+export const CollaborationTaskRetryOwnerDecisionDeliveryParamsSchema = Type.Object(
+  {
+    groupId: NonEmptyString,
+    taskId: NonEmptyString,
+    todolistId: NonEmptyString,
+    expectedVersion: Type.Optional(Type.Integer({ minimum: 1 })),
+  },
+  { additionalProperties: false },
+);
+
+export type CollaborationTaskListOwnerDecisionDeliveriesParams = {
+  groupId: string;
+  taskId?: string;
+};
+
+export const CollaborationTaskListOwnerDecisionDeliveriesParamsSchema = Type.Object(
+  {
+    groupId: NonEmptyString,
+    taskId: Type.Optional(NonEmptyString),
+  },
+  { additionalProperties: false },
+);
+
 export type CollaborationTaskConfirmTodolistParams = {
   groupId: string;
   taskId: string;

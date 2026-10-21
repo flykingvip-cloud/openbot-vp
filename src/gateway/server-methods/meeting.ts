@@ -4,8 +4,8 @@ import {
   buildMeetingConfirmResumeContinuation,
   consumeMeetingApprovalConfirmation,
   invalidateMeetingApprovalConfirmations,
-  issueMeetingApprovalConfirmation,
   meetingApprovalConfirmationDetail,
+  reissueMeetingApprovalConfirmation,
 } from "../../organization/meeting-confirmation.js";
 import {
   applyMeetingRecipientDecision,
@@ -231,12 +231,30 @@ export const meetingHandlers: GatewayRequestHandlers = {
       return;
     }
     if (!proposalId || !confirmationToken) {
-      const confirmation = issueMeetingApprovalConfirmation(meeting);
+      const reissued = reissueMeetingApprovalConfirmation({
+        meeting,
+        actorUserId: actor.userId,
+      });
+      if (!reissued.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, reissued.message, {
+            reasonCode: reissued.code,
+            details: { code: reissued.code },
+          }),
+        );
+        return;
+      }
       respond(true, {
         status: "pending_confirmation",
         meeting,
-        confirmation,
-        confirmationDetail: meetingApprovalConfirmationDetail(meeting, confirmation.expiresAtMs),
+        confirmation: reissued.confirmation,
+        confirmationDetail: meetingApprovalConfirmationDetail(
+          meeting,
+          reissued.confirmation.expiresAtMs,
+        ),
+        recovery: reissued.recovery,
         message: "请确认会议范本；确认后将发送邀请并写入你的日程，参会人知晓后才会写入其日程。",
       });
       return;
@@ -260,6 +278,13 @@ export const meetingHandlers: GatewayRequestHandlers = {
         errorShape(
           ErrorCodes.INVALID_REQUEST,
           reasonMessage[consume.reason] ?? "确认校验未通过，请重新发起确认。",
+          {
+            details: {
+              oldCardStatus: "invalidated",
+              reissueRequired: true,
+              reason: consume.reason,
+            },
+          },
         ),
       );
       return;

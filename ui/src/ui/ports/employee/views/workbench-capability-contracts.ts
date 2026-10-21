@@ -80,6 +80,7 @@ export type WorkbenchDaibaiOverviewCapabilityContract = {
   } | null;
   meetingConfirmationLoading?: boolean;
   meetingConfirmationError?: string | null;
+  meetingConfirmationOldCardInvalid?: boolean;
   /** Pause-release epilogue after confirm (pending card cleared). */
   meetingConfirmRelease?: {
     meetingId: string;
@@ -332,6 +333,7 @@ export function buildWorkbenchDaibaiStageCapabilityContract(
     meetingPendingConfirmation: props.meetingPendingConfirmation ?? null,
     meetingConfirmationLoading: props.meetingConfirmationLoading ?? false,
     meetingConfirmationError: props.meetingConfirmationError ?? null,
+    meetingConfirmationOldCardInvalid: props.meetingConfirmationOldCardInvalid ?? false,
     meetingConfirmRelease: props.meetingConfirmRelease ?? null,
     onConfirmMeetingPendingApproval: props.onConfirmMeetingPendingApproval ?? null,
     onCancelMeetingPendingConfirmation: props.onCancelMeetingPendingConfirmation ?? null,

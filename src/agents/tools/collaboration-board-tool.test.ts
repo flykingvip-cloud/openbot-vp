@@ -243,7 +243,24 @@ describe("collaboration_board tool", () => {
       status: "proposed",
       steps: [{ stepId: "s1", title: "赛道摸底" }],
     };
-    const proposeTodolist = vi.fn(async () => todolist);
+    const proposeTodolist = vi.fn(async () => ({
+      todolist,
+      cardDelivery: {
+        ok: false,
+        stage: "delivery_failed" as const,
+        reason: "transcript_append",
+        historyReloadable: false,
+        deliveryTracked: true,
+        clientPresented: false as const,
+        retryable: true,
+        userFacing: "delivery_failed_retryable" as const,
+        groupId: GROUP,
+        taskId: TASK,
+        boardItemId: ITEM,
+        todolistId: "tl-1",
+        version: 1,
+      },
+    }));
     const tool = createCollaborationBoardTool({
       requesterAgentIdOverride: "bot-2",
       agentSessionKey: SESSION,
@@ -262,7 +279,12 @@ describe("collaboration_board tool", () => {
         steps: [{ title: "赛道摸底", detail: "带来源" }],
       }),
     );
-    expect(result).toMatchObject({ ok: true, action: "propose_todolist", todolist });
+    expect(result).toMatchObject({
+      ok: true,
+      action: "propose_todolist",
+      todolist,
+      cardDelivery: { ok: false, stage: "delivery_failed", retryable: true },
+    });
     expect(proposeTodolist).toHaveBeenCalledWith(
       expect.objectContaining({
         boardItemId: ITEM,

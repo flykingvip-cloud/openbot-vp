@@ -9124,7 +9124,103 @@ tasks:
     ownerHistory: []
     since: 2026-10-21
     metadata: {}
+  - id: batch2-reliable-confirm-cards
+    owner: cursor-e26c
+    intent:
+      - "Batch 2 reliable confirmation cards: independent delivery status;
+        idempotent retry; meeting reissue"
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/collaboration-learning/owner-decision-delivery.ts
+      - src/gateway/collaboration-learning/owner-decision-delivery.test.ts
+      - src/gateway/collaboration-learning/owner-decision-emit.ts
+      - src/gateway/collaboration-learning/owner-decision-emit.test.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/todolist-acl-rpc.test.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods/steward-confirmation-store.ts
+      - src/gateway/server-methods/meeting.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/organization/meeting-confirmation.ts
+      - src/organization/meeting-confirmation.test.ts
+      - src/agents/tools/meeting-tool.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/agents/tools/collaboration-board-tool.test.ts
+      - src/logging/redact.ts
+      - src/logging/redact.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/app-view-state-shell-slices.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/meeting-confirmation.ts
+      - ui/src/ui/controllers/meeting-confirmation.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-assistant.ts
+      - ui/src/ui/ports/employee/views/meeting-confirmation-card.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-capability-contracts.ts
+      - ui/src/ui/ports/employee/render-model.ts
+    state: active
+    sessions:
+      - id: 7c2a9e14-6b31-4f08-9d55-0e26c0a1b2c3
+        taskId: batch2-reliable-confirm-cards
+        ide: cursor
+        agent: cursor-e26c
+        status: active
+        lastSignalAt: 2026-10-21T09:46:33.555Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
 landingStreams:
+  - id: batch2-reliable-confirm-cards
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/collaboration-learning/owner-decision-delivery.ts
+      - src/gateway/collaboration-learning/owner-decision-delivery.test.ts
+      - src/gateway/collaboration-learning/owner-decision-emit.ts
+      - src/gateway/collaboration-learning/owner-decision-emit.test.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/todolist-acl-rpc.test.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods/steward-confirmation-store.ts
+      - src/gateway/server-methods/meeting.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/organization/meeting-confirmation.ts
+      - src/organization/meeting-confirmation.test.ts
+      - src/agents/tools/meeting-tool.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/agents/tools/collaboration-board-tool.test.ts
+      - src/logging/redact.ts
+      - src/logging/redact.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/app-view-state-shell-slices.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/meeting-confirmation.ts
+      - ui/src/ui/controllers/meeting-confirmation.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-assistant.ts
+      - ui/src/ui/ports/employee/views/meeting-confirmation-card.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-capability-contracts.ts
+      - ui/src/ui/ports/employee/render-model.ts
+    canLandWith: []
+    metadata:
+      task: batch2-reliable-confirm-cards
+      owner: cursor-e26c
+      purpose: Batch 2 reliable confirmation cards. First-match so shared hot files land with this stream.
   - id: batch1-trusted-delivery
     landingPolicy: serial
     paths:

@@ -6851,6 +6851,7 @@ export function buildEmployeeWorkbenchProps(input: {
     meetingPendingConfirmation: state.meetingPendingConfirmation,
     meetingConfirmationLoading: state.meetingConfirmationLoading,
     meetingConfirmationError: state.meetingConfirmationError,
+    meetingConfirmationOldCardInvalid: state.meetingConfirmationOldCardInvalid,
     meetingConfirmRelease: state.meetingConfirmRelease,
     onConfirmMeetingPendingApproval: () => state.confirmMeetingPendingApproval(),
     onCancelMeetingPendingConfirmation: () => state.cancelMeetingPendingConfirmation(),

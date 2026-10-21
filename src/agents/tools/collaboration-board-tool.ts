@@ -444,7 +444,7 @@ export function createCollaborationBoardTool(options?: {
               stepId: typeof row.stepId === "string" ? row.stepId.trim() || undefined : undefined,
             };
           });
-          const todolist = await proposeTodolist({
+          const proposed = await proposeTodolist({
             groupId,
             taskId,
             boardItemId,
@@ -454,7 +454,14 @@ export function createCollaborationBoardTool(options?: {
             tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, todolist });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            todolist: proposed.todolist,
+            cardDelivery: proposed.cardDelivery,
+          });
         }
 
         if (action === "mark_in_progress") {

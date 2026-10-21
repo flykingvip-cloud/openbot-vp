@@ -23,8 +23,8 @@ import { validateMinutesDraft } from "../../organization/lifecycle-candidates.js
 import {
   consumeMeetingApprovalConfirmation,
   invalidateMeetingApprovalConfirmations,
-  issueMeetingApprovalConfirmation,
   meetingApprovalConfirmationDetail,
+  reissueMeetingApprovalConfirmation,
 } from "../../organization/meeting-confirmation.js";
 import {
   applyMeetingTransition,
@@ -446,18 +446,33 @@ export function createMeetingTool(options?: {
               message: joinUrlGate.message,
             });
           }
-          // Issue (or re-issue) a ticket but NEVER return confirmationToken to the model.
-          const confirmation = issueMeetingApprovalConfirmation(meeting);
+          // Re-check the current draft and invalidate any previous ticket.
+          // Never return confirmationToken, and never put it on the recovery row.
+          const reissued = reissueMeetingApprovalConfirmation({
+            meeting,
+            actorUserId: actor.userId,
+          });
+          if (!reissued.ok) {
+            return jsonResult({
+              ok: false,
+              action,
+              code: reissued.code,
+              error: reissued.message,
+              meeting,
+              message: reissued.message,
+            });
+          }
           return jsonResult({
             ok: true,
             action,
             status: "pending_confirmation",
             meeting,
-            proposalId: confirmation.proposalId,
-            expiresAtMs: confirmation.expiresAtMs,
+            proposalId: reissued.confirmation.proposalId,
+            expiresAtMs: reissued.confirmation.expiresAtMs,
+            recovery: reissued.recovery,
             confirmationDetail: meetingApprovalConfirmationDetail(
               meeting,
-              confirmation.expiresAtMs,
+              reissued.confirmation.expiresAtMs,
             ),
             message:
               "pending_confirmation: UI confirm card is the only exit. Do not verbally re-ask create/submit/confirm. Wait for the card tap or a user-provided confirmationToken; never invent one.",
@@ -679,17 +694,31 @@ export function createMeetingTool(options?: {
               message: joinUrlGate.message,
             });
           }
-          const confirmation = issueMeetingApprovalConfirmation(meetingForSubmit);
+          const reissued = reissueMeetingApprovalConfirmation({
+            meeting: meetingForSubmit,
+            actorUserId: actor.userId,
+          });
+          if (!reissued.ok) {
+            return jsonResult({
+              ok: false,
+              action,
+              code: reissued.code,
+              error: reissued.message,
+              meeting: meetingForSubmit,
+              message: reissued.message,
+            });
+          }
           return jsonResult({
             ok: true,
             action,
             status: "pending_confirmation",
             meeting: meetingForSubmit,
-            proposalId: confirmation.proposalId,
-            expiresAtMs: confirmation.expiresAtMs,
+            proposalId: reissued.confirmation.proposalId,
+            expiresAtMs: reissued.confirmation.expiresAtMs,
+            recovery: reissued.recovery,
             confirmationDetail: meetingApprovalConfirmationDetail(
               meetingForSubmit,
-              confirmation.expiresAtMs,
+              reissued.confirmation.expiresAtMs,
             ),
             ...(provision.provisionMeta
               ? { tencentMeetingProvisioned: true, joinUrl: provision.provisionMeta.joinUrl }

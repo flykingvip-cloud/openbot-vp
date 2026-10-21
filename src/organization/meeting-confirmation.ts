@@ -15,6 +15,7 @@ import {
   consumeConfirmation,
   createConfirmation,
   invalidateConfirmationsByActionId,
+  supersedeUnusedConfirmations,
   type ConsumeConfirmationResult,
 } from "../gateway/server-methods/steward-confirmation-store.js";
 import type { DaibaiConfirmationEnvelope } from "../shared/daibai-types.js";
@@ -87,6 +88,99 @@ export function issueMeetingApprovalConfirmation(meeting: Meeting): DaibaiConfir
     actionId: MEETING_APPROVE_CONFIRM_ACTION.buildActionId(meeting.id),
     payload: MEETING_APPROVE_CONFIRM_ACTION.buildPayload(meeting),
   });
+}
+
+/**
+ * Public recovery row for a reissued meeting ticket.
+ * Must not carry confirmationToken — that stays on the live envelope only.
+ */
+export type MeetingConfirmationRecovery = {
+  kind: "meeting_confirmation_recovery";
+  meetingId: string;
+  proposalId: string;
+  expiresAtMs: number;
+  payloadHash: string;
+  previousAuthorizationReused: false;
+  invalidatedProposalIds: string[];
+  draftRechecked: true;
+  permissionRechecked: true;
+  expiryRechecked: true;
+  oldCardStatus: "invalidated";
+};
+
+export type MeetingReissueResult =
+  | {
+      ok: true;
+      confirmation: DaibaiConfirmationEnvelope;
+      recovery: MeetingConfirmationRecovery;
+    }
+  | {
+      ok: false;
+      code: "actor_not_organizer" | "invalid_status" | "provision_required" | "provision_failed";
+      message: string;
+    };
+
+/**
+ * Re-issue a meeting confirm ticket.
+ * Re-checks the current draft, organizer permission, and expiry.
+ * Does not extend or reuse the previous authorization. Old tickets are invalidated.
+ */
+export function reissueMeetingApprovalConfirmation(params: {
+  meeting: Meeting;
+  actorUserId: string;
+  now?: number;
+}): MeetingReissueResult {
+  const actorUserId = params.actorUserId.trim();
+  if (!actorUserId || actorUserId !== params.meeting.organizerUserId.trim()) {
+    return {
+      ok: false,
+      code: "actor_not_organizer",
+      message: "只有会议组织者可以重新签发确认。",
+    };
+  }
+  if (params.meeting.status !== "pending_approval") {
+    return {
+      ok: false,
+      code: "invalid_status",
+      message: `会议当前状态为 ${params.meeting.status}，不能续用旧确认。`,
+    };
+  }
+  const preflight = MEETING_APPROVE_CONFIRM_ACTION.preflight?.(params.meeting) ?? {
+    ok: true as const,
+  };
+  if (!preflight.ok) {
+    return {
+      ok: false,
+      code: preflight.code === "provision_failed" ? "provision_failed" : "provision_required",
+      message: preflight.message,
+    };
+  }
+  const invalidated = supersedeUnusedConfirmations(
+    meetingApproveActionId(params.meeting.id),
+    params.now,
+  );
+  const confirmation = createConfirmation({
+    actionId: MEETING_APPROVE_CONFIRM_ACTION.buildActionId(params.meeting.id),
+    payload: MEETING_APPROVE_CONFIRM_ACTION.buildPayload(params.meeting),
+    ...(params.now !== undefined ? { now: params.now } : {}),
+  });
+  const recovery: MeetingConfirmationRecovery = {
+    kind: "meeting_confirmation_recovery",
+    meetingId: params.meeting.id,
+    proposalId: confirmation.proposalId,
+    expiresAtMs: confirmation.expiresAtMs,
+    payloadHash: confirmation.payloadHash,
+    previousAuthorizationReused: false,
+    invalidatedProposalIds: invalidated.invalidatedProposalIds,
+    draftRechecked: true,
+    permissionRechecked: true,
+    expiryRechecked: true,
+    oldCardStatus: "invalidated",
+  };
+  if (JSON.stringify(recovery).includes(confirmation.confirmationToken)) {
+    throw new Error("meeting confirmation recovery must not contain confirmationToken");
+  }
+  return { ok: true, confirmation, recovery };
 }
 
 export function consumeMeetingApprovalConfirmation(params: {

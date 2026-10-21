@@ -636,6 +636,8 @@ export type AppViewWorkbenchState = {
     | null;
   meetingConfirmationLoading: boolean;
   meetingConfirmationError: string | null;
+  /** True when the shown meeting card is stale and must be reissued, not extended. */
+  meetingConfirmationOldCardInvalid: boolean;
   meetingConfirmRelease:
     | import("./controllers/meeting-confirmation.ts").MeetingConfirmRelease
     | null;

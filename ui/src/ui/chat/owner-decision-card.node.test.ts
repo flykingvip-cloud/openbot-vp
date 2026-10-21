@@ -2,6 +2,7 @@
 import { render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  clearOwnerDecisionDeliveryStateForTest,
   clearOwnerDecisionDismissalsForTest,
   collapseOwnerDecisionCardsForBoardItem,
   collectOwnerDecisionHydrationTargets,
@@ -14,9 +15,11 @@ import {
   isOwnerDecisionDismissed,
   isOwnerDecisionReviseExpanded,
   isOwnerDecisionTodolistActionable,
+  noteOwnerDecisionDelivery,
   ownerDecisionStatusCalloutClass,
   parseOwnerDecisionStatusGateError,
   readOwnerDecision,
+  readOwnerDecisionRow,
   renderOwnerDecisionCards,
   selectLatestOwnerDecisionPerBoardItem,
   setOwnerDecisionActionError,
@@ -27,6 +30,7 @@ import {
 describe("owner-decision-card UI", () => {
   afterEach(() => {
     clearOwnerDecisionDismissalsForTest();
+    clearOwnerDecisionDeliveryStateForTest();
   });
 
   it("reads ownerDecision field and fence from messages", () => {
@@ -281,7 +285,8 @@ describe("owner-decision-card UI", () => {
     expect(formatOwnerDecisionStatusCopy("confirmed")).toBe("执行计划已确认");
     expect(ownerDecisionStatusCalloutClass("confirmed")).toBe("callout success");
     expect(ownerDecisionStatusCalloutClass("superseded")).toBe("callout");
-    expect(formatOwnerDecisionStatusCopy("superseded")).toContain("过期");
+    expect(formatOwnerDecisionStatusCopy("superseded")).toBe("旧版本已失效");
+    expect(formatOwnerDecisionStatusCopy("superseded")).not.toContain("过期");
     expect(isOwnerDecisionTodolistActionable("proposed")).toBe(true);
     expect(isOwnerDecisionTodolistActionable("revise_requested")).toBe(true);
     expect(isOwnerDecisionTodolistActionable("confirmed")).toBe(false);
@@ -332,7 +337,6 @@ describe("owner-decision-card UI", () => {
     expect(container.querySelector(".employee-workbench__assistant-prelude-toolbar")).toBeNull();
     expect(onDecide).not.toHaveBeenCalled();
 
-    // superseded lookalikes auto-collapse (no chrome)
     clearOwnerDecisionDismissalsForTest();
     setOwnerDecisionTodolistStatus("td-super", "superseded");
     const c2 = document.createElement("div");
@@ -349,8 +353,12 @@ describe("owner-decision-card UI", () => {
       ]),
       c2,
     );
-    expect(c2.querySelector("[data-owner-decision]")).toBeNull();
-    expect(isOwnerDecisionDismissed("dec-super")).toBe(true);
+    const stale = c2.querySelector("[data-owner-decision='dec-super']");
+    expect(stale).not.toBeNull();
+    expect(isOwnerDecisionDismissed("dec-super")).toBe(false);
+    expect(stale?.textContent).toContain("旧版本已失效");
+    expect(c2.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+    expect(c2.querySelector('[data-owner-decision-action="revise"]')).toBeNull();
   });
 
   it("parses status-gate errors even with confirmTodolist: prefix", () => {
@@ -390,13 +398,27 @@ describe("owner-decision-card UI", () => {
     ];
     const selected = selectLatestOwnerDecisionPerBoardItem(messages.map((m) => m.ownerDecision));
     expect(selected.map((c) => c.decisionId)).toEqual(["dec-new"]);
-    expect(isOwnerDecisionDismissed("dec-old")).toBe(true);
-    expect(isOwnerDecisionDismissed("dec-mid")).toBe(true);
+    expect(isOwnerDecisionDismissed("dec-old")).toBe(false);
+    expect(isOwnerDecisionDismissed("dec-mid")).toBe(false);
 
     const container = document.createElement("div");
     render(renderOwnerDecisionCards(messages), container);
-    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(1);
+    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(3);
     expect(container.querySelector("[data-owner-decision='dec-new']")).not.toBeNull();
+    expect(container.querySelector("[data-owner-decision='dec-old']")?.textContent).toContain(
+      "旧版本已失效",
+    );
+    expect(container.querySelector("[data-owner-decision='dec-mid']")?.textContent).toContain(
+      "旧版本已失效",
+    );
+    expect(
+      container.querySelector(
+        "[data-owner-decision='dec-old'] [data-owner-decision-action='confirm']",
+      ),
+    ).toBeNull();
+    expect(container.querySelector("[data-owner-decision='dec-new']")?.textContent).toContain(
+      "等待确认",
+    );
     expect(collectOwnerDecisionHydrationTargets(selected).map((t) => t.todolistId)).toEqual([
       "td-new",
     ]);
@@ -512,6 +534,101 @@ describe("owner-decision-card UI", () => {
     );
     expect(getOwnerDecisionTodolistStatus("td-gate-2")).toBe("superseded");
     render(renderOwnerDecisionCards([message2]), container);
-    expect(container.querySelector("[data-owner-decision]")).toBeNull();
+    const stale = container.querySelector("[data-owner-decision='dec-gate-2']");
+    expect(stale).not.toBeNull();
+    expect(stale?.textContent).toContain("旧版本已失效");
+    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+  });
+
+  it("shows 等待确认 for a structured card and not for a fence-only copy", () => {
+    const card = {
+      kind: "todolist_confirm" as const,
+      decisionId: "dec-wait",
+      groupId: "g",
+      taskId: "t",
+      boardItemId: "b-wait",
+      todolistId: "td-wait",
+      title: "请确认执行计划",
+      summary: ["1. 起草；"],
+      options: [
+        { id: "confirm" as const, label: "确认计划", style: "primary" as const },
+        { id: "revise" as const, label: "退回修订", style: "default" as const },
+        { id: "later" as const, label: "稍后", style: "ghost" as const },
+      ],
+      mentionMemberIds: ["ceo"],
+      mentionLabels: ["CEO"],
+    };
+    expect(readOwnerDecisionRow({ role: "assistant", ownerDecision: card })?.authority).toBe(
+      "structured",
+    );
+    const structured = document.createElement("div");
+    render(renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }]), structured);
+    expect(structured.textContent).toContain("等待确认");
+
+    const fenceText = [
+      "@CEO",
+      "```owner-decision",
+      JSON.stringify({ ...card, decisionId: "dec-fence" }),
+      "```",
+    ].join("\n");
+    expect(
+      readOwnerDecisionRow({
+        role: "assistant",
+        content: [{ type: "text", text: fenceText }],
+      })?.authority,
+    ).toBe("fence");
+    const fenced = document.createElement("div");
+    render(
+      renderOwnerDecisionCards([
+        { role: "assistant", content: [{ type: "text", text: fenceText }] },
+      ]),
+      fenced,
+    );
+    expect(fenced.textContent).not.toContain("等待确认");
+  });
+
+  it("shows a retryable delivery failure without confirming the plan", () => {
+    noteOwnerDecisionDelivery("td-fail", "delivery_failed_retryable", 1);
+    const onDecide = vi.fn();
+    const onRetryDelivery = vi.fn();
+    const container = document.createElement("div");
+    render(
+      renderOwnerDecisionCards(
+        [
+          {
+            role: "assistant",
+            ownerDecision: {
+              kind: "todolist_confirm",
+              decisionId: "dec-fail",
+              groupId: "g",
+              taskId: "t",
+              boardItemId: "b-fail",
+              todolistId: "td-fail",
+              version: 1,
+              title: "请确认执行计划",
+              summary: ["1. 起草；"],
+              options: [
+                { id: "confirm", label: "确认计划", style: "primary" },
+                { id: "revise", label: "退回修订", style: "default" },
+                { id: "later", label: "稍后", style: "ghost" },
+              ],
+              mentionMemberIds: ["ceo"],
+              mentionLabels: ["CEO"],
+            },
+          },
+        ],
+        { onDecide, onRetryDelivery },
+      ),
+      container,
+    );
+    expect(container.textContent).toContain("确认请求发送失败，可重试");
+    expect(container.textContent).not.toContain("等待确认");
+    const retry = container.querySelector(
+      '[data-owner-decision-action="retry-delivery"]',
+    ) as HTMLButtonElement;
+    expect(retry).not.toBeNull();
+    retry.click();
+    expect(onRetryDelivery).toHaveBeenCalledTimes(1);
+    expect(onDecide).not.toHaveBeenCalled();
   });
 });

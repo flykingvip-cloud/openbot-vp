@@ -17,6 +17,13 @@ import {
   type OwnerDecisionCard,
   type OwnerDecisionOptionId,
 } from "../../../../src/gateway/collaboration-dispatch/owner-decision-card.js";
+import {
+  ownerDecisionDeliveryStatusCopy,
+  type OwnerDecisionCardDelivery,
+  type OwnerDecisionUserFacing,
+} from "../../../../src/gateway/collaboration-learning/owner-decision-delivery.js";
+
+export type { OwnerDecisionUserFacing };
 
 export type OwnerDecisionAction = OwnerDecisionOptionId;
 
@@ -41,15 +48,24 @@ function extractTextFromContent(content: unknown): string {
     .join("\n");
 }
 
+export type OwnerDecisionRead = {
+  card: OwnerDecisionCardView;
+  /**
+   * `structured` is the server-written field. `fence` is a display fallback only
+   * and does not prove the card was issued.
+   */
+  authority: "structured" | "fence";
+};
+
 /** Read structured ownerDecision from a chat history message. */
-export function readOwnerDecision(message: unknown): OwnerDecisionCardView | null {
+export function readOwnerDecisionRow(message: unknown): OwnerDecisionRead | null {
   if (!message || typeof message !== "object" || Array.isArray(message)) {
     return null;
   }
   const row = message as { ownerDecision?: unknown; content?: unknown };
   const fromField = parseOwnerDecisionCard(row.ownerDecision);
   if (fromField) {
-    return fromField;
+    return { card: fromField, authority: "structured" };
   }
   const text = extractTextFromContent(row.content);
   if (!text) {
@@ -60,10 +76,16 @@ export function readOwnerDecision(message: unknown): OwnerDecisionCardView | nul
     return null;
   }
   try {
-    return parseOwnerDecisionCard(JSON.parse(fence) as unknown);
+    const card = parseOwnerDecisionCard(JSON.parse(fence) as unknown);
+    return card ? { card, authority: "fence" } : null;
   } catch {
     return null;
   }
+}
+
+/** Read structured ownerDecision from a chat history message. */
+export function readOwnerDecision(message: unknown): OwnerDecisionCardView | null {
+  return readOwnerDecisionRow(message)?.card ?? null;
 }
 
 const dismissedDecisionIds = new Set<string>();
@@ -79,13 +101,74 @@ const reviseDraftByDecisionId = new Map<string, string>();
 const todolistStatusById = new Map<string, string>();
 /** decisionId → todolistId, filled while a card is rendered. */
 const todolistIdByDecisionId = new Map<string, string>();
+const deliveryByTodolistVersion = new Map<string, OwnerDecisionUserFacing>();
+const recoveryCards: OwnerDecisionCardView[] = [];
+
+function deliveryKey(todolistId: string, version?: number): string {
+  const versionPart =
+    typeof version === "number" && Number.isFinite(version) ? `:v${Math.floor(version)}` : "";
+  return `${todolistId.trim()}${versionPart}`;
+}
+
+export function noteOwnerDecisionDelivery(
+  todolistId: string,
+  userFacing: OwnerDecisionUserFacing,
+  version?: number,
+): void {
+  const id = todolistId.trim();
+  if (!id) {
+    return;
+  }
+  deliveryByTodolistVersion.set(deliveryKey(id, version), userFacing);
+  deliveryByTodolistVersion.set(deliveryKey(id), userFacing);
+}
+
+export function getOwnerDecisionDelivery(
+  todolistId: string,
+  version?: number,
+): OwnerDecisionUserFacing | null {
+  return (
+    deliveryByTodolistVersion.get(deliveryKey(todolistId, version)) ??
+    deliveryByTodolistVersion.get(deliveryKey(todolistId)) ??
+    null
+  );
+}
+
+/** Merge server delivery rows that history may not currently show. Returns whether the set changed. */
+export function noteOwnerDecisionRecoveries(
+  deliveries: ReadonlyArray<
+    Pick<OwnerDecisionCardDelivery, "card" | "userFacing" | "todolistId" | "version">
+  >,
+): boolean {
+  let changed = false;
+  for (const row of deliveries) {
+    if (row.todolistId) {
+      noteOwnerDecisionDelivery(row.todolistId, row.userFacing, row.version);
+      changed = true;
+    }
+    if (!row.card) {
+      continue;
+    }
+    if (recoveryCards.some((card) => card.decisionId === row.card?.decisionId)) {
+      continue;
+    }
+    recoveryCards.push(row.card);
+    changed = true;
+  }
+  return changed;
+}
+
+export function clearOwnerDecisionDeliveryStateForTest(): void {
+  deliveryByTodolistVersion.clear();
+  recoveryCards.splice(0, recoveryCards.length);
+}
 
 /** Statuses that may still call confirmTodolist / reviseTodolist. */
 export const OWNER_DECISION_ACTIONABLE_STATUSES = new Set(["proposed", "revise_requested"]);
 
 const OWNER_DECISION_STATUS_COPY: Record<string, string> = {
   confirmed: "执行计划已确认",
-  superseded: "计划已更新，当前卡片已过期。",
+  superseded: "旧版本已失效",
   revise_requested: "计划已退回修订。",
   accepted: "计划已接受。",
   closed: "计划已关闭。",
@@ -144,12 +227,12 @@ export function clearOwnerDecisionTodolistStatus(todolistId: string): void {
   todolistStatusById.delete(todolistId.trim());
 }
 
-/** Superseded cards are stale lookalikes — collapse instead of leaving chrome up. */
-export function shouldAutoCollapseOwnerDecisionStatus(status: string | null | undefined): boolean {
-  const key = String(status ?? "")
-    .trim()
-    .toLowerCase();
-  return key === "superseded";
+/**
+ * Stale cards stay visible with「旧版本已失效」.
+ * Collapsing them hid the invalidation the user needs to see.
+ */
+export function shouldAutoCollapseOwnerDecisionStatus(_status: string | null | undefined): boolean {
+  return false;
 }
 
 /** decisionId → boardItemId, filled while a card is rendered. */
@@ -189,9 +272,8 @@ export function collapseOwnerDecisionCardsForBoardItem(
 }
 
 /**
- * Same boardItemId can accumulate multiple propose messages (re-propose / races).
- * Keep the highest version (then last message order); dismiss the rest so the
- * user does not see three identical-looking cards.
+ * Highest version per board item. Older cards are not dismissed; render them
+ * as「旧版本已失效」via staleOwnerDecisionDecisionIds.
  */
 export function selectLatestOwnerDecisionPerBoardItem(
   cards: OwnerDecisionCardView[],
@@ -216,16 +298,44 @@ export function selectLatestOwnerDecisionPerBoardItem(
         ? prev.card.version
         : 0;
     if (version > prevVersion || (version === prevVersion && index >= prev.index)) {
-      dismissOwnerDecisionCard(prev.card.decisionId);
       bestByBoard.set(boardId, { card, index });
-    } else {
-      dismissOwnerDecisionCard(card.decisionId);
     }
   });
   const kept = [...bestByBoard.values()]
     .toSorted((a, b) => a.index - b.index)
     .map((row) => row.card);
   return [...withoutBoard, ...kept];
+}
+
+/** Decision ids that are an older version of the same board item. */
+export function staleOwnerDecisionDecisionIds(cards: OwnerDecisionCardView[]): Set<string> {
+  const bestVersion = new Map<string, number>();
+  for (const card of cards) {
+    const boardId = String(card.boardItemId ?? "").trim();
+    if (!boardId) {
+      continue;
+    }
+    const version =
+      typeof card.version === "number" && Number.isFinite(card.version) ? card.version : 0;
+    const prev = bestVersion.get(boardId) ?? Number.NEGATIVE_INFINITY;
+    if (version > prev) {
+      bestVersion.set(boardId, version);
+    }
+  }
+  const stale = new Set<string>();
+  for (const card of cards) {
+    const boardId = String(card.boardItemId ?? "").trim();
+    if (!boardId) {
+      continue;
+    }
+    const version =
+      typeof card.version === "number" && Number.isFinite(card.version) ? card.version : 0;
+    const best = bestVersion.get(boardId) ?? version;
+    if (version < best) {
+      stale.add(card.decisionId);
+    }
+  }
+  return stale;
 }
 
 export type OwnerDecisionHydrationTarget = {
@@ -415,32 +525,35 @@ export function renderOwnerDecisionCards(
      * superseded chrome disables before the user clicks into a gate error.
      */
     onHydrateStatuses?: (targets: OwnerDecisionHydrationTarget[]) => void;
+    onRetryDelivery?: (card: OwnerDecisionCardView) => void;
+    /** Load server delivery rows so a failed card can be redrawn after refresh. */
+    onLoadRecoveries?: () => void;
   } = {},
 ): TemplateResult | typeof nothing {
-  const pending = messages
-    .map((message) => readOwnerDecision(message))
-    .filter((row): row is OwnerDecisionCardView => row !== null)
+  opts.onLoadRecoveries?.();
+  const pending = [...messages, ...recoveryCards.map((card) => ({ ownerDecision: card }))]
+    .map((message) => readOwnerDecisionRow(message))
+    .filter((row): row is OwnerDecisionRead => row !== null)
     .filter((row) => {
-      todolistIdByDecisionId.set(row.decisionId, row.todolistId);
-      boardItemIdByDecisionId.set(row.decisionId, row.boardItemId);
-      if (isOwnerDecisionDismissed(row.decisionId)) {
-        return false;
-      }
-      // Superseded lookalikes: do not render actionable chrome at all.
-      const status = getOwnerDecisionTodolistStatus(row.todolistId);
-      if (shouldAutoCollapseOwnerDecisionStatus(status)) {
-        dismissOwnerDecisionCard(row.decisionId);
+      todolistIdByDecisionId.set(row.card.decisionId, row.card.todolistId);
+      boardItemIdByDecisionId.set(row.card.decisionId, row.card.boardItemId);
+      if (isOwnerDecisionDismissed(row.card.decisionId)) {
         return false;
       }
       return true;
     });
-  // Deduplicate by decisionId (keep last).
-  const byId = new Map<string, OwnerDecisionCardView>();
+  // Deduplicate by decisionId. A structured field outranks a fence-only copy.
+  const byId = new Map<string, OwnerDecisionRead>();
   for (const row of pending) {
-    byId.set(row.decisionId, row);
+    const prev = byId.get(row.card.decisionId);
+    if (!prev || (prev.authority === "fence" && row.authority === "structured")) {
+      byId.set(row.card.decisionId, row);
+    }
   }
-  // Same boardItemId → only the newest version (re-propose / race lookalikes).
-  const cards = selectLatestOwnerDecisionPerBoardItem([...byId.values()]);
+  const reads = [...byId.values()];
+  const cards = reads.map((row) => row.card);
+  const staleIds = staleOwnerDecisionDecisionIds(cards);
+  const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
   const hydrateTargets = collectOwnerDecisionHydrationTargets(cards);
   if (hydrateTargets.length > 0) {
     opts.onHydrateStatuses?.(hydrateTargets);
@@ -456,12 +569,31 @@ export function renderOwnerDecisionCards(
       const mentionHint = formatOwnerDecisionMentionHint(card);
       const actionError = getOwnerDecisionActionError(card.decisionId);
       const todolistStatus = getOwnerDecisionTodolistStatus(card.todolistId);
-      const actionable = isOwnerDecisionTodolistActionable(todolistStatus);
-      const statusCopy =
-        todolistStatus && !actionable ? formatOwnerDecisionStatusCopy(todolistStatus) : null;
+      const userFacing = getOwnerDecisionDelivery(card.todolistId, card.version);
+      const invalid =
+        staleIds.has(card.decisionId) ||
+        userFacing === "stale_version" ||
+        todolistStatus === "superseded";
+      const actionable = !invalid && isOwnerDecisionTodolistActionable(todolistStatus);
+      const statusCopy = invalid
+        ? ownerDecisionDeliveryStatusCopy("stale_version")
+        : todolistStatus && !isOwnerDecisionTodolistActionable(todolistStatus)
+          ? formatOwnerDecisionStatusCopy(todolistStatus)
+          : null;
+      const deliveryFailed = userFacing === "delivery_failed_retryable";
+      const authority = authorityById.get(card.decisionId) ?? "fence";
+      const deliveryCopy = statusCopy
+        ? null
+        : deliveryFailed
+          ? ownerDecisionDeliveryStatusCopy("delivery_failed_retryable")
+          : actionable &&
+              !actionError &&
+              (authority === "structured" || userFacing === "waiting_confirmation")
+            ? ownerDecisionDeliveryStatusCopy("waiting_confirmation")
+            : null;
       const reviseExpanded = actionable && isOwnerDecisionReviseExpanded(card.decisionId);
       const reviseDraft = getOwnerDecisionReviseDraft(card.decisionId);
-      // Confirmed / other terminal review: no action buttons (incl. 稍后).
+      // Confirmed / stale / other terminal review: no action buttons (incl. 稍后).
       // 稍后 stays only while proposed|revise_requested.
       const visibleOptions = actionable ? card.options : [];
       return html`
@@ -472,6 +604,8 @@ export function renderOwnerDecisionCards(
           data-owner-decision=${card.decisionId}
           data-todolist-id=${card.todolistId}
           data-owner-decision-status=${todolistStatus ?? nothing}
+          data-owner-decision-authority=${authority}
+          data-owner-decision-delivery=${userFacing ?? deliveryCopy ?? nothing}
           ?data-owner-decision-terminal=${Boolean(statusCopy)}
           ?data-owner-decision-revising=${reviseExpanded}
         >
@@ -510,21 +644,47 @@ export function renderOwnerDecisionCards(
           ${
             statusCopy
               ? html`<div
-                  class=${ownerDecisionStatusCalloutClass(todolistStatus)}
+                  class=${invalid ? "callout" : ownerDecisionStatusCalloutClass(todolistStatus)}
                   data-owner-decision-status-copy
                   style="margin: 0.35rem 0 0.5rem"
                 >
                   ${statusCopy}
                 </div>`
-              : actionError
+              : deliveryCopy
                 ? html`<div
-                    class="callout danger"
-                    data-owner-decision-error
+                    class=${deliveryFailed ? "callout danger" : "callout"}
+                    data-owner-decision-delivery-copy
                     style="margin: 0.35rem 0 0.5rem"
                   >
-                    ${actionError}
+                    ${deliveryCopy}
                   </div>`
                 : nothing
+          }
+          ${
+            actionError && !statusCopy
+              ? html`<div
+                  class="callout danger"
+                  data-owner-decision-error
+                  style="margin: 0.35rem 0 0.5rem"
+                >
+                  ${actionError}
+                </div>`
+              : nothing
+          }
+          ${
+            deliveryFailed
+              ? html`<div class="employee-workbench__assistant-prelude-toolbar">
+                  <button
+                    type="button"
+                    class="btn btn--sm"
+                    ?disabled=${busy || !opts.onRetryDelivery}
+                    data-owner-decision-action="retry-delivery"
+                    @click=${() => opts.onRetryDelivery?.(card)}
+                  >
+                    重试发送
+                  </button>
+                </div>`
+              : nothing
           }
           ${
             reviseExpanded

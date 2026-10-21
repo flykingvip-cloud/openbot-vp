@@ -132,22 +132,33 @@ export function consumeConfirmation(params: {
   return { ok: true };
 }
 
-/** Invalidate unused (unconsumed, unexpired) tickets for an actionId. Returns count removed. */
-export function invalidateConfirmationsByActionId(actionId: string, now?: number): number {
+/**
+ * Drop unused tickets for an action. Does not extend their expiry or return tokens.
+ * Expired tickets are purged and are not reusable authorization.
+ */
+export function supersedeUnusedConfirmations(
+  actionId: string,
+  now?: number,
+): { invalidatedProposalIds: string[] } {
   const ts = now ?? Date.now();
   purgeExpired(ts);
-  let removed = 0;
   const target = actionId.trim();
+  const invalidatedProposalIds: string[] = [];
   if (!target) {
-    return 0;
+    return { invalidatedProposalIds };
   }
   for (const [id, ticket] of tickets) {
     if (ticket.actionId === target && !ticket.consumed) {
+      invalidatedProposalIds.push(ticket.proposalId);
       tickets.delete(id);
-      removed += 1;
     }
   }
-  return removed;
+  return { invalidatedProposalIds };
+}
+
+/** Invalidate unused (unconsumed, unexpired) tickets for an actionId. Returns count removed. */
+export function invalidateConfirmationsByActionId(actionId: string, now?: number): number {
+  return supersedeUnusedConfirmations(actionId, now).invalidatedProposalIds.length;
 }
 
 /** 测试辅助：清空票据。 */

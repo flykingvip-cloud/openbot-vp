@@ -273,6 +273,9 @@ export type ChatProps = {
   onOwnerDecisionUIChange?: () => void;
   /** Fetch todolist statuses so confirmed/superseded cards disable before click. */
   onOwnerDecisionHydrateStatuses?: (targets: OwnerDecisionHydrationTarget[]) => void;
+  /** Re-send the card for the same proposal version. Does not confirm or re-propose. */
+  onOwnerDecisionRetry?: (card: OwnerDecisionCardView) => void;
+  onOwnerDecisionLoadRecoveries?: () => void;
   /** First-visit password vs QR choice for the Account Computer login page. */
   loginMethodChoice?: LoginMethodChoiceUi | null;
   /** Opt-in “是否保存该网站登录信息” after a typed password fill. */
@@ -1885,6 +1888,8 @@ export function renderChatContent(
         onDecide: props.onOwnerDecision,
         onUIChange: props.onOwnerDecisionUIChange,
         onHydrateStatuses: props.onOwnerDecisionHydrateStatuses,
+        onRetryDelivery: props.onOwnerDecisionRetry,
+        onLoadRecoveries: props.onOwnerDecisionLoadRecoveries,
       })}
       ${renderAccountComputerLoginThreadCards({
         sessionKey: props.sessionKey,

@@ -376,4 +376,88 @@ describe("meeting-confirmation controller", () => {
     await syncMeetingPendingConfirmation(state);
     expect(request.mock.calls.filter((c) => c[0] === "meeting.approve")).toHaveLength(0);
   });
+
+  it("reissues an expired card without sending the old confirmation token", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    request.mockImplementation(async (method: string, params: Record<string, unknown>) => {
+      if (method === "meeting.approve") {
+        calls.push(params);
+        return {
+          status: "pending_confirmation",
+          meeting: pendingMeeting,
+          confirmation: {
+            proposalId: "p2",
+            confirmationToken: "new-secret",
+            payloadHash: "hash-2",
+            expiresAtMs: Date.now() + 600_000,
+          },
+          confirmationDetail: {
+            title: "周会",
+            impact: "将写入日程",
+            irreversible: false,
+            expiresAtMs: Date.now() + 600_000,
+          },
+          message: "请重新确认",
+        };
+      }
+      return {};
+    });
+    const state = baseState({
+      meetingConfirmationOldCardInvalid: false,
+      meetingPendingConfirmation: {
+        meeting: pendingMeeting,
+        confirmation: {
+          proposalId: "p1",
+          confirmationToken: "old-secret",
+          payloadHash: "hash",
+          expiresAtMs: Date.now() - 1_000,
+        },
+        confirmationDetail: {
+          title: "周会",
+          impact: "将写入日程",
+          irreversible: false,
+          expiresAtMs: Date.now() - 1_000,
+        },
+        message: "请确认",
+      },
+    });
+    await confirmMeetingPendingApproval(state);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.confirmationToken).toBeUndefined();
+    expect(calls[0]?.proposalId).toBeUndefined();
+    expect(JSON.stringify(calls)).not.toContain("old-secret");
+    expect(state.meetingPendingConfirmation?.confirmation.proposalId).toBe("p2");
+    expect(state.meetingConfirmationOldCardInvalid).toBe(false);
+  });
+
+  it("keeps the proposal when consume reports the ticket expired", async () => {
+    request.mockImplementation(async (method: string) => {
+      if (method === "meeting.approve") {
+        throw new Error("确认已过期，请重新发起确认。");
+      }
+      return {};
+    });
+    const state = baseState({
+      meetingPendingConfirmation: {
+        meeting: pendingMeeting,
+        confirmation: {
+          proposalId: "p1",
+          confirmationToken: "still-here",
+          payloadHash: "hash",
+          expiresAtMs: Date.now() + 600_000,
+        },
+        confirmationDetail: {
+          title: "周会",
+          irreversible: false,
+          expiresAtMs: Date.now() + 600_000,
+        },
+        message: "请确认",
+      },
+    });
+    await confirmMeetingPendingApproval(state);
+    expect(state.meetingConfirmationOldCardInvalid).toBe(true);
+    expect(state.meetingPendingConfirmation?.confirmation.proposalId).toBe("p1");
+    expect(state.meetingConfirmationError).toContain("过期");
+    expect(state.meetingConfirmRelease).toBeNull();
+  });
 });

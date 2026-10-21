@@ -16,7 +16,7 @@ const DEFAULT_REDACT_PATTERNS: string[] = [
   // ENV-style assignments.
   String.raw`\b[A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD)\b\s*[=:]\s*(["']?)([^\s"'\\]+)\1`,
   // JSON fields.
-  String.raw`"(?:apiKey|token|secret|password|passwd|accessToken|refreshToken)"\s*:\s*"([^"]+)"`,
+  String.raw`"(?:apiKey|token|secret|password|passwd|accessToken|refreshToken|confirmationToken)"\s*:\s*"([^"]+)"`,
   // CLI flags.
   String.raw`--(?:api[-_]?key|token|secret|password|passwd)\s+(["']?)([^\s"']+)\1`,
   // Authorization headers.
@@ -91,6 +91,10 @@ function redactMatch(match: string, groups: string[]): string {
   }
   const token =
     groups.filter((value) => typeof value === "string" && value.length > 0).at(-1) ?? match;
+  // Confirmation tokens must not survive in ordinary logs, even partially.
+  if (/"confirmationToken"/i.test(match)) {
+    return match.replace(token, "***");
+  }
   const masked = maskToken(token);
   if (token === match) {
     return masked;
