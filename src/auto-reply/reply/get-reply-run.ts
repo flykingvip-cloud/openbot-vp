@@ -23,6 +23,8 @@ import {
   resolveEmbeddedSessionLane,
 } from "../../agents/pi-embedded.js";
 import { applySkillPolicyToFilter } from "../../agents/skills/skill-policy.js";
+import { replyForTaskSurfaceUtterance } from "../../agents/task-surface/apply.js";
+import { isPrimarilyTaskSurfaceUtterance } from "../../agents/task-surface/surface.js";
 import { isWorkspaceOnboardingCompleted } from "../../agents/workspace.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
@@ -482,6 +484,25 @@ export async function runPreparedReply(
       undefined,
   });
   const inboundMessage = (sessionCtx.BodyStripped ?? sessionCtx.Body ?? "").trim();
+  let taskSurfaceNote: string | undefined;
+  if (!isHeartbeat && inboundMessage) {
+    const surfaceReply = replyForTaskSurfaceUtterance({
+      text: inboundMessage,
+      cfg,
+      workspaceDir: runWorkspaceDir,
+      agentId,
+      sessionKey,
+      sessionEntry,
+      sessionFile: sessionEntry?.sessionFile,
+    });
+    if (surfaceReply && isPrimarilyTaskSurfaceUtterance(inboundMessage)) {
+      typing.cleanup();
+      return { text: surfaceReply };
+    }
+    if (surfaceReply) {
+      taskSurfaceNote = `${surfaceReply}\n已按展示序号执行。不要再问用户第几条指的是哪一条。`;
+    }
+  }
   // Grant this turn's own attachments to the media tools. Managed Enterprise forces
   // workspace-only FS, but webchat uploads land in the shared <stateDir>/media, so
   // without this the image/pdf tools refuse every attachment the user just sent
@@ -1208,6 +1229,9 @@ export async function runPreparedReply(
       growthBirthPrompt,
       cronReplyPrompt,
     ].filter((entry): entry is string => Boolean(entry?.trim()));
+  }
+  if (taskSurfaceNote) {
+    extraSystemPromptParts = [...extraSystemPromptParts, taskSurfaceNote];
   }
   const currentSpeakerPrompt = buildCurrentSpeakerUntrustedPrompt(sessionCtx);
   if (currentSpeakerPrompt) {

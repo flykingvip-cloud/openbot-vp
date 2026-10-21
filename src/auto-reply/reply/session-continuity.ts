@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { formatActiveSkillGlossary } from "../../agents/skill-gates/glossary.js";
+import { TASK_SURFACE_CONTINUITY_LINE } from "../../agents/task-surface/surface.js";
 import { TURN_COMPLETION_CONTINUITY_LINE } from "../../agents/turn-completion/contract.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
@@ -56,6 +58,11 @@ export type TaskLedgerEntry = {
   session_ids?: string[];
   last_session_id: string;
   updated_at: string;
+  /**
+   * Batch 7: user keep-only removed this row from the hang surface.
+   * Not a file-exists auto-close. Injectors must skip it.
+   */
+  surface_disposition?: "cancelled";
 };
 
 /** Link state between an artifact and its task_id. Missing/legacy => active. */
@@ -1125,7 +1132,7 @@ export function formatSessionContinuityCheckpointRestoreText(checkpoint: MemoryC
     "Checkpoint restored.",
     checkpoint.summary ? `Summary: ${checkpoint.summary}` : "",
     checkpoint.open_tasks.length > 0
-      ? `Open tasks: ${checkpoint.open_tasks.slice(0, 5).join(", ")}`
+      ? `Open tasks: ${checkpoint.open_tasks.slice(0, 5).join(", ")} source=restore`
       : "",
     checkpoint.completed_tasks.length > 0
       ? `Recently completed: ${checkpoint.completed_tasks.slice(0, 5).join(", ")}`
@@ -1166,7 +1173,12 @@ export async function buildSessionContinuityPrompt(params: {
   const taskFilter = params.sessionEntry?.taskContextId?.trim();
   const boundTasks = taskFilter
     ? taskLedger.items
-        .filter((task) => task.status === "active" && task.id === taskFilter)
+        .filter(
+          (task) =>
+            task.status === "active" &&
+            task.id === taskFilter &&
+            task.surface_disposition !== "cancelled",
+        )
         .toSorted((a, b) => b.updated_at.localeCompare(a.updated_at))
     : [];
   if (boundTasks.length === 0 && !latestCheckpoint) {
@@ -1216,6 +1228,14 @@ export async function buildSessionContinuityPrompt(params: {
     lines.push("", `Latest checkpoint summary: ${latestCheckpoint.summary}`);
   }
   lines.push("", TURN_COMPLETION_CONTINUITY_LINE);
+  lines.push(TASK_SURFACE_CONTINUITY_LINE);
+  const skillGlossary = formatActiveSkillGlossary({
+    userText: lines.join("\n"),
+    boundSkillIds: boundTasks.map((task) => task.title),
+  });
+  if (skillGlossary) {
+    lines.push(skillGlossary);
+  }
   return truncateUtf16Safe(lines.join("\n"), MAX_INJECTED_CONTINUITY_CHARS);
 }
 

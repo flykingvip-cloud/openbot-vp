@@ -1,6 +1,7 @@
 import { qualifyTurn } from "../../conversation-task/qualification.js";
 import type { ConversationTurnInput, QualificationResult } from "../../conversation-task/types.js";
 import type { AnyAgentTool } from "../pi-tools.types.js";
+import { formatActiveSkillGlossary } from "../skill-gates/glossary.js";
 import { evaluateConfirmationGate } from "./confirmation-gate.js";
 import {
   assertDeliveryStageSend,
@@ -261,11 +262,24 @@ export function buildExecutionPreflight(input: BuildExecutionPreflightInput): Ex
   const deliveryRequirements = primary
     ? unique([...primary.requiredArtifacts, ...primary.deliveryConditions])
     : [];
-  const bindingPrompt = buildBindingPrompt({
-    decisionCode,
-    primary,
-    aliases: resolved.aliases,
+  const skillGlossary = formatActiveSkillGlossary({
+    userText: input.message,
+    boundSkillIds: primary ? [primary.skillId, ...resolved.aliases] : resolved.aliases,
+    manifests: input.skills.map((skill) => ({
+      skillId: skill.name,
+      frontmatter: skill.frontmatter,
+    })),
   });
+  const bindingPrompt = [
+    buildBindingPrompt({
+      decisionCode,
+      primary,
+      aliases: resolved.aliases,
+    }),
+    skillGlossary,
+  ]
+    .filter((part) => part?.trim())
+    .join("\n");
   const attemptNumber = nextAttemptNumber(input.taskId || "run");
   const preflight = {
     taskId: input.taskId,

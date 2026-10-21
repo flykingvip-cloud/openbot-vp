@@ -80,6 +80,7 @@ import {
   isExternalHookSession,
 } from "../../security/external-content.js";
 import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
+import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
 import { isWorkbenchOnlyLegacyCronDelivery } from "../delivery-surfaces.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
@@ -760,6 +761,19 @@ export async function runCronIsolatedAgentTurn(params: {
   const creditTaskId = `cron-credit:${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
   const completeRun = async (result: RunCronAgentTurnResult): Promise<RunCronAgentTurnResult> => {
     runEndedAt = Date.now();
+    const classified = classifyCronCompletion({
+      status: result.status,
+      summary: result.summary,
+      outputText: result.outputText,
+      error: result.error,
+      jobName: params.job.name,
+    });
+    const settled: RunCronAgentTurnResult = {
+      ...result,
+      status: classified.status,
+      completion: classified.completion,
+      ...(classified.completion === "ok" ? {} : { error: classified.error ?? result.error }),
+    };
     try {
       await surfaceCronJobResult({
         cfg: params.cfg,
@@ -783,9 +797,10 @@ export async function runCronIsolatedAgentTurn(params: {
             }
           : {}),
         result: {
-          status: result.status,
-          summary: result.summary,
-          error: result.error,
+          status: settled.status,
+          summary: settled.summary,
+          error: settled.error,
+          outputText: settled.outputText,
         },
         durationMs: Math.max(0, runEndedAt - runStartedAt),
       });
@@ -799,7 +814,7 @@ export async function runCronIsolatedAgentTurn(params: {
         const receiptId = result.receiptId?.trim() ?? "";
         const receiptSource = result.receiptSource?.trim() ?? "";
         await ledgerSession.observeRunFinish({
-          status: result.status === "ok" ? "ok" : "error",
+          status: settled.status === "ok" ? "ok" : "error",
           ...(result.delivered !== undefined ? { delivered: result.delivered } : {}),
           // Only a receipt that already exists on the delivery result. delivered:true is not one.
           ...(receiptId ? { receiptId } : {}),
@@ -810,7 +825,7 @@ export async function runCronIsolatedAgentTurn(params: {
         logWarn(`[cron:${params.job.id}] progress ledger finish failed: ${String(err)}`);
       }
     }
-    return result;
+    return settled;
   };
   try {
     const sessionFile = resolveSessionTranscriptPath(cronSession.sessionEntry.sessionId, agentId);

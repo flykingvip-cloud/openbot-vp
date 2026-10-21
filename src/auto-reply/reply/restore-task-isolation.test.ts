@@ -38,16 +38,17 @@ describe("restore task pointer reconciliation", () => {
     expect(result.preservedActiveTaskIds).toEqual(["task_live", "task_old"]);
     expect(result.pendingReview).toEqual(
       expect.arrayContaining([
-        { kind: "checkpoint_open_task", label: "缺关系旧任务" },
-        { kind: "checkpoint_open_task", label: "请生成 ghost-bleed.md" },
-        { kind: "unbound_ledger", label: "缺关系旧任务", taskId: "task_old" },
+        { kind: "checkpoint_open_task", label: "缺关系旧任务", source: "restore" },
+        { kind: "checkpoint_open_task", label: "请生成 ghost-bleed.md", source: "restore" },
+        { kind: "unbound_ledger", label: "缺关系旧任务", taskId: "task_old", source: "ledger" },
         {
           kind: "missing_relationship",
           label: "old-deliverable.md",
           taskId: "task_old",
           filePresent: true,
+          source: "restore",
         },
-        { kind: "missing_relationship", label: "orphan.md", filePresent: true },
+        { kind: "missing_relationship", label: "orphan.md", filePresent: true, source: "restore" },
       ]),
     );
     expect(result.pendingReview.some((item) => item.taskId === "task_live")).toBe(false);
@@ -72,6 +73,30 @@ describe("restore task pointer reconciliation", () => {
       "checkpoint_open_task",
       "unbound_ledger",
     ]);
+  });
+
+  it("does not auto-close or reinject a cancelled row when its file exists", () => {
+    const result = reconcileRestoreTaskPointersReadOnly({
+      taskContextId: "task_live",
+      taskLedger: [
+        { id: "task_live", status: "active", title: "当前主线", artifacts: ["art_live"] },
+        {
+          id: "task_old",
+          status: "active",
+          title: "已从挂起清掉",
+          artifacts: ["art_old"],
+          surface_disposition: "cancelled",
+        },
+      ],
+      artifactLedger: [
+        { id: "art_old", title: "old-deliverable.md", task_id: "task_old", state: "active" },
+      ],
+      checkpointOpenTasks: [],
+      fileExistsByArtifactKey: { "old-deliverable.md": true, art_old: true },
+    });
+    expect(result.autoClosedTaskIds).toEqual([]);
+    expect(result.preservedActiveTaskIds).toEqual(["task_live", "task_old"]);
+    expect(result.pendingReview.some((item) => item.kind === "unbound_ledger")).toBe(false);
   });
 });
 

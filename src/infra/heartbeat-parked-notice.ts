@@ -82,7 +82,7 @@ export function formatHeartbeatParkedNoticeMessage(params: {
   if (synopsis) {
     lines.push("", synopsis);
   }
-  lines.push("", `唤醒：\`${wakeKey}\``);
+  lines.push("", `唤醒：\`${wakeKey}\``, "source=heartbeat");
   return lines.join("\n");
 }
 
@@ -104,7 +104,8 @@ export function formatHeartbeatParkedOutboundText(params: {
       ? "当前对话正忙，且挂起已满。后台结果没有打断正在进行的工作。"
       : "当前对话还在做别的事。后台结果已挂起，没有打断正在进行的工作。";
   const synopsis = params.synopsis?.trim();
-  return synopsis ? `${headline}\n\n${synopsis}` : headline;
+  const body = synopsis ? `${headline}\n\n${synopsis}` : headline;
+  return `${body}\nsource=heartbeat`;
 }
 
 export function isHeartbeatParkedNoticeMessage(message: unknown): boolean {

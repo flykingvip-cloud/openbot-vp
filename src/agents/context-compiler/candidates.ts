@@ -6,6 +6,7 @@ import {
 } from "../../auto-reply/reply/task-context-store.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
+import { presentNonMainlineInjection } from "../task-surface/surface.js";
 import {
   buildStableGroupTaskSummaryText,
   isGroupTaskStableSummaryEnabled,
@@ -20,6 +21,9 @@ export type LoadContextCandidatesParams = {
   agentId: string;
   sessionKey?: string;
   sessionEntry?: SessionEntry;
+  /** Current user utterance. When set, unrelated non-mainline tasks are omitted. */
+  userUtterance?: string;
+  injectionSource?: "ledger" | "heartbeat" | "restore";
 };
 
 /**
@@ -63,20 +67,40 @@ async function loadTaskCandidate(params: LoadContextCandidatesParams): Promise<s
     if (!selected) {
       return "";
     }
-    return buildStableGroupTaskSummaryText(selected.task, selected.binding);
+    return presentNonMainlineInjection({
+      text: buildStableGroupTaskSummaryText(selected.task, selected.binding),
+      taskId: selected.task.id,
+      title: selected.task.title,
+      source: params.injectionSource ?? "ledger",
+      userUtterance: params.userUtterance,
+      mainline: selected.binding === "bound",
+      cancelled: selected.task.surface_disposition === "cancelled",
+    });
   }
 
   if (taskFilter) {
     const task = await getTaskContext(scope, taskFilter);
     // Sprint-1 / flag-off: bound taskContextId must still be active to inject.
-    if (!task || task.status !== "active") {
+    if (!task || task.status !== "active" || task.surface_disposition === "cancelled") {
       return "";
     }
     return buildTaskSummaryText(task);
   }
   const tasks = (await listTaskContexts(scope))
-    .filter((task) => task.status === "active")
+    .filter((task) => task.status === "active" && task.surface_disposition !== "cancelled")
     .toSorted((a, b) => b.updated_at.localeCompare(a.updated_at))
     .slice(0, 1);
-  return tasks[0] ? buildTaskSummaryText(tasks[0]) : "";
+  const task = tasks[0];
+  if (!task) {
+    return "";
+  }
+  return presentNonMainlineInjection({
+    text: buildTaskSummaryText(task),
+    taskId: task.id,
+    title: task.title,
+    source: params.injectionSource ?? "ledger",
+    userUtterance: params.userUtterance,
+    mainline: false,
+    cancelled: false,
+  });
 }

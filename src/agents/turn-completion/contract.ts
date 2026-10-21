@@ -12,10 +12,15 @@
  * clock (default 15 minutes, OPENBOT_SKILL_SMOKE_SLA_MS) forces a degradation
  * file or one permanent_block line.
  *
- * The skill-term line is a stub. Batch 8 owns the full glossary.
+ * Skill-term disambiguation lives in skill-gates/glossary.ts (Batch 8).
  */
 import fs from "node:fs";
 import path from "node:path";
+import {
+  isActiveSkillTerminologyStopAsk,
+  SKILL_BIND_GLOSSARY_STUB as GLOSSARY_BIND,
+} from "../skill-gates/glossary.js";
+import { applyTrialGate, isPreviewOkFormalBlocked } from "../skill-gates/trial-gate.js";
 
 export const TURN_COMPLETION_STATES = ["delivered", "permanent_block", "true_fork"] as const;
 export type TurnCompletionState = (typeof TURN_COMPLETION_STATES)[number];
@@ -28,12 +33,8 @@ export const SKILL_SMOKE_SLA_ENV = "OPENBOT_SKILL_SMOKE_SLA_MS";
 export const PROGRESS_PROSE_MAX_CHARS = 180;
 export const DEGRADED_DELIVERABLE_RELATIVE = "deliverables/turn-completion-degraded.md";
 
-/** Batch 8 replaces this stub with the activity-skill glossary. */
-export const SKILL_BIND_GLOSSARY_STUB = {
-  term: "绑定",
-  meaning: "analysis-review task.json sha256",
-  not: ["微信", "邮箱", "知识源", "OAuth"],
-} as const;
+/** Platform glossary entry for consulting-report「绑定」. */
+export const SKILL_BIND_GLOSSARY_STUB = GLOSSARY_BIND;
 
 export const TURN_COMPLETION_CONTINUITY_LINE =
   "Turn completion contract: finish with an openable path, one permanent_block line (reason + degradation + one user action), or a true_fork of two exclusive choices. A side-path failure such as task_ledger does not block the deliverable. After 继续, do not ask open parameters. Skill 绑定 means analysis-review task.json sha256, not WeChat, email, or OAuth.";
@@ -108,10 +109,6 @@ const SIDE_PATH_RE =
 
 const TRUE_FORK_RE =
   /(?:两种规格|两个规格|两款|两个\s*SKU|\bSKU\b|规格\s*[AＡa]\s*(?:或|\/|、|还是)\s*(?:规格\s*)?[BＢb]|价(?:格)?\s*[AＡa].{0,24}(?:或|\/|还是).{0,24}价(?:格)?\s*[BＢb]|支付方式.{0,16}(?:或|\/|还是))/u;
-
-const OAUTH_BIND_RE = /绑定方向|微信|邮箱|知识源|OAuth/u;
-
-const SKILL_BIND_CONTEXT_RE = /sha256|task\.json|analysis-review|审查记录|技能|样张|smoke/iu;
 
 const PROGRESS_RE =
   /下一步我会|接下来我会|随后我会|我会先|让我先|正在处理|正在收尾|稍等片刻|马上就好|我继续去|这一步正在做/u;
@@ -231,22 +228,15 @@ export function isTrueForkText(text: string, options?: readonly string[]): boole
 }
 
 /**
- * Skill sha256「绑定」asked as WeChat / email / knowledge-source OAuth.
- * Not a true fork. Batch 8 will inject the full glossary; this stub is enough
- * to keep the misread from becoming a required stop.
+ * Skill keyword asked as an unrelated platform concept.
+ * consulting-report「绑定」asked as WeChat / email / knowledge-source OAuth
+ * is the fixture. Not a true fork.
  */
 export function isSkillBindTerminologyMisread(text: string, context = ""): boolean {
-  if (!OAUTH_BIND_RE.test(text)) {
+  if (isTrueForkText(text) && !/微信|邮箱|知识源|OAuth|绑定/u.test(text)) {
     return false;
   }
-  if (isTrueForkText(text) && !/微信|邮箱|知识源|OAuth/u.test(text)) {
-    return false;
-  }
-  const blob = `${context}\n${text}`;
-  if (SKILL_BIND_CONTEXT_RE.test(blob)) {
-    return true;
-  }
-  return /微信/.test(text) && /邮箱/.test(text);
+  return isActiveSkillTerminologyStopAsk(text, context);
 }
 
 export function isOpenEndedFishing(text: string, context = ""): boolean {
@@ -567,9 +557,14 @@ function playwrightResolvable(): boolean {
   });
 }
 
-function sidePathReceipt(label: string, err?: unknown): string {
-  const code = errnoCode(err) ?? (err instanceof Error ? "write_failed" : "write_failed");
+/** Batch 6 side-path receipt. Batch 7 keep-only reuses this exact line. */
+export function formatSidePathBypassReceipt(label: string, err?: unknown): string {
+  const code = errnoCode(err) ?? "write_failed";
   return `side_path_bypass: ${label} ${code}`;
+}
+
+function sidePathReceipt(label: string, err?: unknown): string {
+  return formatSidePathBypassReceipt(label, err);
 }
 
 function writeWorkspaceFile(
@@ -726,7 +721,14 @@ export function settleTurnCompletion(input: TurnCompletionInput): TurnCompletion
     continueExecution: false,
     hardStopPrevented: null,
   });
-  if (!turnCompletionApplies(input) && !input.deliverable && !input.sidePathAttempt) {
+  const trial = input.skillSmoke === true || isSkillSmokeTurn(userText, assistantText);
+  const trialApplies = trial && isPreviewOkFormalBlocked(`${userText}\n${assistantText}`);
+  if (
+    !turnCompletionApplies(input) &&
+    !input.deliverable &&
+    !input.sidePathAttempt &&
+    !trialApplies
+  ) {
     return unchanged();
   }
 
@@ -779,6 +781,31 @@ export function settleTurnCompletion(input: TurnCompletionInput): TurnCompletion
         sessionKey: input.sessionKey,
       });
     }
+  }
+
+  const trialDecision = applyTrialGate({
+    trial,
+    narrative: `${userText}\n${assistantText}`,
+    workspaceDir: input.workspaceDir,
+    previewPath: firstDeliverablePath(assistantText),
+  });
+  if (trialDecision?.openablePath) {
+    return deliveredResult({
+      openablePath: trialDecision.openablePath,
+      receipt,
+      note: trialDecision.declaration,
+      hardStopPrevented,
+      sessionKey: input.sessionKey,
+    });
+  }
+  if (trialDecision?.action === "permanent_block") {
+    return permanentResult({
+      reason: trialDecision.reason,
+      degradation: "unavailable",
+      requiredUserAction: "确认成果目录可写后回复继续",
+      receipt,
+      hardStopPrevented,
+    });
   }
 
   const existing =
