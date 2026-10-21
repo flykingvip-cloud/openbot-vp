@@ -88,6 +88,9 @@ type ArtifactReference = {
   targetLabel?: string;
   /** `file=` was declared but the bytes were never written. Chip must not look synced. */
   workspaceUnwritten?: boolean;
+  /** Technical delivery is not ready. The chip must not say the file was delivered. */
+  deliveryBlocked?: boolean;
+  deliveryStatusLabel?: string;
 };
 
 type FileBlock = {
@@ -351,8 +354,32 @@ function resolveArtifactTargetLabel(artifact: Record<string, unknown>): string |
   return undefined;
 }
 
+function readDeliverablePublish(message: unknown): {
+  presentation?: string;
+  reasonLabel?: string | null;
+} | null {
+  if (!message || typeof message !== "object" || Array.isArray(message)) {
+    return null;
+  }
+  const raw = (message as Record<string, unknown>).deliverablePublish;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const record = raw as Record<string, unknown>;
+  const presentation = typeof record.presentation === "string" ? record.presentation : undefined;
+  const reasonLabel =
+    typeof record.reasonLabel === "string" && record.reasonLabel.trim()
+      ? record.reasonLabel.trim()
+      : null;
+  return { presentation, reasonLabel };
+}
+
 function extractArtifactReferences(message: unknown): ArtifactReference[] {
   const artifacts = resolvePreviewArtifactRecords(message).filter(isDeliverableResultArtifact);
+  const publish = readDeliverablePublish(message);
+  const publishBlocks =
+    publish?.presentation === "undelivered" || publish?.presentation === "pending_recovery";
+  const publishAllows = publish?.presentation === "delivered";
   const refs: ArtifactReference[] = [];
   for (const artifact of artifacts) {
     const artifactId = typeof artifact.artifactId === "string" ? artifact.artifactId.trim() : "";
@@ -371,6 +398,20 @@ function extractArtifactReferences(message: unknown): ArtifactReference[] {
       artifact.providerMetadata && typeof artifact.providerMetadata === "object"
         ? (artifact.providerMetadata as Record<string, unknown>)
         : null;
+    const metaBlocks =
+      metadata?.workspaceUnwritten === true ||
+      metadata?.previewUnavailable === true ||
+      metadata?.deliveryUndelivered === true ||
+      metadata?.settleRetryable === true ||
+      metadata?.settleConflict === true;
+    const deliveryBlocked = publishBlocks || (!publishAllows && metaBlocks);
+    const deliveryStatusLabel = deliveryBlocked
+      ? `${
+          publish?.presentation === "pending_recovery"
+            ? t("chat.deliverablePendingRecovery")
+            : t("chat.deliverableUndelivered")
+        }${publish?.reasonLabel ? `：${publish.reasonLabel}` : ""}`
+      : undefined;
     refs.push({
       artifactId,
       title,
@@ -378,6 +419,8 @@ function extractArtifactReferences(message: unknown): ArtifactReference[] {
       declared: metadata?.declared === true,
       targetLabel: resolveArtifactTargetLabel(artifact),
       workspaceUnwritten: metadata?.workspaceUnwritten === true,
+      deliveryBlocked,
+      deliveryStatusLabel,
     });
   }
   return refs;
@@ -1417,44 +1460,53 @@ function renderGroupedMessage(message: unknown, opts: GroupedMessageRenderOption
                     ${entry.targetLabel ?? entry.title}${entry.versionLabel ? ` (${entry.versionLabel})` : ""}
                   </span>
                   ${
-                    opts.onOpenArtifact
-                      ? entry.workspaceUnwritten ||
-                        isArtifactPreviewMiss(opts.unavailableArtifactIds, entry.artifactId)
-                        ? html`
+                    entry.deliveryBlocked
+                      ? html`
+                          <span
+                            data-artifact-id=${entry.artifactId}
+                            data-testid="artifact-delivery-undelivered"
+                          >
+                            ${entry.deliveryStatusLabel}
+                          </span>
+                        `
+                      : opts.onOpenArtifact
+                        ? entry.workspaceUnwritten ||
+                          isArtifactPreviewMiss(opts.unavailableArtifactIds, entry.artifactId)
+                          ? html`
+                              <button
+                                class="btn"
+                                type="button"
+                                data-artifact-id=${entry.artifactId}
+                                data-testid=${
+                                  entry.workspaceUnwritten
+                                    ? "artifact-open-unwritten"
+                                    : "artifact-open-missing"
+                                }
+                                title=${t(
+                                  entry.workspaceUnwritten
+                                    ? "chat.artifactPreviewNotWrittenTitle"
+                                    : "chat.stewardFileUnavailable",
+                                )}
+                                @click=${() => opts.onOpenArtifact?.(entry.artifactId)}
+                              >
+                                ${t(
+                                  entry.workspaceUnwritten
+                                    ? "chat.artifactPreviewNotWrittenTitle"
+                                    : "chat.artifactPreviewFileMissingTitle",
+                                )}
+                              </button>
+                            `
+                          : html`
                             <button
                               class="btn"
                               type="button"
                               data-artifact-id=${entry.artifactId}
-                              data-testid=${
-                                entry.workspaceUnwritten
-                                  ? "artifact-open-unwritten"
-                                  : "artifact-open-missing"
-                              }
-                              title=${t(
-                                entry.workspaceUnwritten
-                                  ? "chat.artifactPreviewNotWrittenTitle"
-                                  : "chat.stewardFileUnavailable",
-                              )}
                               @click=${() => opts.onOpenArtifact?.(entry.artifactId)}
                             >
-                              ${t(
-                                entry.workspaceUnwritten
-                                  ? "chat.artifactPreviewNotWrittenTitle"
-                                  : "chat.artifactPreviewFileMissingTitle",
-                              )}
+                              ${t("chat.openArtifact")}
                             </button>
                           `
-                        : html`
-                          <button
-                            class="btn"
-                            type="button"
-                            data-artifact-id=${entry.artifactId}
-                            @click=${() => opts.onOpenArtifact?.(entry.artifactId)}
-                          >
-                            ${t("chat.openArtifact")}
-                          </button>
-                        `
-                      : nothing
+                        : nothing
                   }
                   ${
                     opts.onRequestArtifactEditAccess

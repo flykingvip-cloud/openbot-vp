@@ -43,6 +43,23 @@ export type ApplyWorkspaceFilePreviewResult =
   | "binary"
   | "empty";
 
+/**
+ * Server-side `readable` only proves bytes were returned. A PDF preview is
+ * accepted here only when those bytes parse as a PDF header.
+ */
+export function pdfBase64LooksParseable(base64: string): boolean {
+  const cleaned = base64.replace(/\s+/g, "");
+  if (cleaned.length < 8) {
+    return false;
+  }
+  try {
+    const header = atob(cleaned.slice(0, 8));
+    return header.startsWith("%PDF-");
+  } catch {
+    return false;
+  }
+}
+
 const TEXT_LIKE_PREVIEW_EXT_RE = /\.(?:md|markdown|txt|text|log|csv|tsv|json|ya?ml|xml)$/i;
 
 /** Markdown / plain-text deliverables that should preview inline, not as an office download. */
@@ -443,6 +460,7 @@ export type ClassifiedWorkspaceFilePreview =
   | { lane: "html"; html: string; mimeType: string; base64?: string }
   | { lane: "canvas"; html: string; mimeType: string; source: string }
   | { lane: "pdf"; base64: string; mimeType: "application/pdf" }
+  | { lane: "pdf-rejected" }
   | { lane: "image"; base64: string; mimeType: string }
   | { lane: "text"; text: string; mimeType: string }
   | { lane: "binary"; base64: string; mimeType: string }
@@ -479,6 +497,9 @@ export function classifyWorkspaceFilePreview(
     }
   }
   if (typeof file.base64 === "string" && isGroupPdfPreviewFilename(displayName, file.mimeType)) {
+    if (!pdfBase64LooksParseable(file.base64)) {
+      return { lane: "pdf-rejected" };
+    }
     return { lane: "pdf", base64: file.base64, mimeType: "application/pdf" };
   }
   if (typeof file.base64 === "string" && isGroupImagePreviewFilename(displayName, file.mimeType)) {
@@ -562,6 +583,29 @@ export function applyWorkspaceFilePreview(params: {
       },
     });
     return "canvas";
+  }
+
+  if (classified.lane === "pdf-rejected") {
+    applyUnavailableFilePreview({
+      host,
+      workspace,
+      message: t("chat.deliverablePdfUnparsed"),
+    });
+    if (host.sidebarArtifactWorkspace) {
+      host.sidebarArtifactWorkspace = {
+        ...host.sidebarArtifactWorkspace,
+        artifact: {
+          ...host.sidebarArtifactWorkspace.artifact,
+          providerMetadata: {
+            ...host.sidebarArtifactWorkspace.artifact.providerMetadata,
+            previewKind: "pdf-unparsed",
+            pdfParseFailed: true,
+            previewUnavailable: true,
+          },
+        },
+      };
+    }
+    return "empty";
   }
 
   if (classified.lane === "pdf") {

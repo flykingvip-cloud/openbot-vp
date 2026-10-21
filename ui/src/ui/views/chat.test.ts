@@ -2022,6 +2022,103 @@ describe("chat view", () => {
     expect(onOpenArtifact.mock.calls[0]?.[0]).not.toBe(onOpenArtifact.mock.calls[1]?.[0]);
   });
 
+  it("keeps the analysis body and shows 文件暂未交付 when registration failed", () => {
+    const container = document.createElement("div");
+    const onOpenArtifact = vi.fn();
+    render(
+      renderChat(
+        createProps({
+          onOpenArtifact,
+          messages: [
+            {
+              role: "assistant",
+              content: [
+                {
+                  type: "text",
+                  text: [
+                    "三张表的字段与口径草案已写入工作区。",
+                    '<<DELIVERABLE title="底稿" file="analysis/model.md" settle="retryable">>',
+                    "正文仍然可以阅读。",
+                    "<</DELIVERABLE>>",
+                  ].join("\n"),
+                },
+              ],
+              deliverablePublish: {
+                presentation: "pending_recovery",
+                verification: "pass",
+                registration: "failed",
+                failureReason: "manifest_write_failed",
+                reasonLabel: "登记失败，可重试",
+                relativePath: "analysis/model.md",
+                versionChecksum: "abc",
+                idempotencyKey: "k",
+                settleStatus: "retryable",
+              },
+              timestamp: 1,
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    expect(container.textContent).toContain("三张表的字段与口径草案已写入工作区。");
+    expect(container.textContent).toContain("正文仍然可以阅读。");
+    expect(container.textContent).toContain(t("chat.deliverablePendingRecovery"));
+    expect(container.textContent).toContain("登记失败，可重试");
+    expect(container.textContent).not.toContain(t("chat.openArtifact"));
+    expect(container.querySelector('[data-testid="artifact-delivery-undelivered"]')).toBeTruthy();
+    expect(onOpenArtifact).not.toHaveBeenCalled();
+  });
+
+  it("opens a persisted deliverable from the real 打开成果 control", () => {
+    const container = document.createElement("div");
+    const onOpenArtifact = vi.fn();
+    render(
+      renderChat(
+        createProps({
+          onOpenArtifact,
+          messages: [
+            {
+              role: "assistant",
+              content: [
+                {
+                  type: "text",
+                  text: [
+                    "报告正文在上面。",
+                    '<<DELIVERABLE title="讲座报告" file="讲座报告.pdf" settle="confirmed">>',
+                    "PDF 已落在工作区。",
+                    "<</DELIVERABLE>>",
+                  ].join("\n"),
+                },
+              ],
+              deliverablePublish: {
+                presentation: "delivered",
+                verification: "pass",
+                registration: "registered",
+                failureReason: null,
+                reasonLabel: null,
+                relativePath: "讲座报告.pdf",
+                versionChecksum: "abc",
+                idempotencyKey: "k",
+                settleStatus: "confirmed",
+              },
+              timestamp: 1,
+            },
+          ],
+        }),
+      ),
+      container,
+    );
+
+    const open = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes(t("chat.openArtifact")),
+    );
+    expect(open).toBeTruthy();
+    open?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(onOpenArtifact).toHaveBeenCalledTimes(1);
+  });
+
   it("does not open inferred file mentions as 打开成果 when clicking a generated file link", () => {
     const container = document.createElement("div");
     const onOpenArtifact = vi.fn();

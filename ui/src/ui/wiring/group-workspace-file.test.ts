@@ -94,9 +94,9 @@ describe("openGroupWorkspaceFileArtifact", () => {
       relativePath: "reports/ai-org-report.pdf",
       filename: "ai-org-report.pdf",
       mimeType: "application/pdf",
-      byteLength: 4,
+      byteLength: 8,
       textLike: false,
-      base64: btoa("%PDF"),
+      base64: btoa("%PDF-1.4"),
     }));
 
     await openGroupWorkspaceFileArtifact(

@@ -172,6 +172,33 @@ describe("resolvePreviewArtifactRecord (declared location)", () => {
     expect(artifact?.providerMetadata?.workspaceFilename).toBe("analysis/model-framework-v0.md");
   });
 
+  it("does not leave a retryable or conflicting declaration looking previewable", () => {
+    const retryable = resolvePreviewArtifactRecord({
+      role: "assistant",
+      timestamp: "2026-10-17T00:00:00.000Z",
+      content: [
+        {
+          type: "text",
+          text: '<<DELIVERABLE title="底稿" file="analysis/model.md" settle="retryable">>\n正文\n<</DELIVERABLE>>',
+        },
+      ],
+    }) as { providerMetadata?: Record<string, unknown> } | null;
+    expect(retryable?.providerMetadata?.previewUnavailable).toBe(true);
+    expect(retryable?.providerMetadata?.deliveryUndelivered).toBe(true);
+    const conflict = resolvePreviewArtifactRecord({
+      role: "assistant",
+      timestamp: "2026-10-17T00:00:00.000Z",
+      content: [
+        {
+          type: "text",
+          text: '<<DELIVERABLE title="底稿" file="analysis/model.md" settle="conflict">>\n正文\n<</DELIVERABLE>>',
+        },
+      ],
+    }) as { providerMetadata?: Record<string, unknown> } | null;
+    expect(conflict?.providerMetadata?.previewUnavailable).toBe(true);
+    expect(conflict?.providerMetadata?.settleConflict).toBe(true);
+  });
+
   it("exposes one artifact record per located envelope", () => {
     const text = [
       "两份成果都在工作区。",

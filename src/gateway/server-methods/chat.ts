@@ -304,6 +304,12 @@ import {
 } from "../employee-workbench-scope.js";
 import { recordAgentInvocationShadow } from "../governance/agent-invocation-shadow.js";
 import { resolveKnowledgeSourceContext } from "../knowledge/context.js";
+import {
+  deliverPreparedChatFinal,
+  overlayChatDeliverablePublish,
+  prepareChatDeliverablePublish,
+  type PreparedChatDeliverable,
+} from "../knowledge/deliverables/chat-deliverable-publish.js";
 import { maybeAutoCaptureAgentDeliverable } from "../knowledge/deliverables/maybe-auto-capture-agent-deliverable.js";
 import { formatClientSessionNotFoundDetail } from "../operator-shared-session-heal.js";
 import {
@@ -356,7 +362,6 @@ import {
 import { truncateTranscriptToBoundary } from "../transcript-truncate.js";
 import { detectReplyLanguage } from "../user-modeling/derive.js";
 import * as webchatIdentity from "../webchat-client-platform-identity.js";
-import { settleCollaborationDeclaredDeliverable } from "../workspace-resolver/settle-declared-deliverable.js";
 import { resolveWorkspaceLocator } from "../workspace-resolver/strict-locator.js";
 import { resolveLiveRobotWriteRoot } from "../workspace-resolver/write-roots.js";
 import { loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
@@ -3074,13 +3079,17 @@ function extractAssistantFinalText(message?: Record<string, unknown>): string {
 }
 
 function broadcastChatFinal(params: {
-  context: Pick<GatewayRequestContext, "broadcastChat" | "nodeSendToSession" | "agentRunSeq">;
+  context: Pick<GatewayRequestContext, "broadcastChat" | "nodeSendToSession" | "agentRunSeq"> & {
+    logGateway?: { warn: (message: string) => void };
+  };
   runId: string;
   sessionKey: string;
   message?: Record<string, unknown>;
   /** Declaring bot. Collaboration space keys must not steal this from the group session. */
   deliverableAgentId?: string | null;
   deliverableOwnerId?: string | null;
+  /** Delivery preparation already ran. Broadcast must not settle or place files again. */
+  prepared?: PreparedChatDeliverable | null;
 }) {
   const seq = nextChatSeq({ agentRunSeq: params.context.agentRunSeq }, params.runId);
   const strippedEnvelopeMessage = stripEnvelopeFromMessage(params.message) as
@@ -3093,14 +3102,26 @@ function broadcastChatFinal(params: {
     state: "final" as const,
     message: stripInlineDirectiveTagsFromMessageForDisplay(strippedEnvelopeMessage),
   };
-  params.context.broadcastChat(params.sessionKey, payload, {
-    runId: params.runId,
-    tenantId: resolveChatRunTenantId(params.runId),
-  });
-  params.context.nodeSendToSession(params.sessionKey, "chat", payload);
+  const send = () => {
+    params.context.broadcastChat(params.sessionKey, payload, {
+      runId: params.runId,
+      tenantId: resolveChatRunTenantId(params.runId),
+    });
+    params.context.nodeSendToSession(params.sessionKey, "chat", payload);
+  };
+  if (params.prepared?.idempotencyKey && params.prepared.record) {
+    const delivered = deliverPreparedChatFinal({ prepared: params.prepared, send });
+    if (!delivered.ok) {
+      params.context.logGateway?.warn?.(
+        `chat deliverable broadcast failed (${params.runId}); analysis text kept, delivery left pending recovery`,
+      );
+    }
+  } else {
+    send();
+  }
   params.context.agentRunSeq.delete(params.runId);
   const captureText = extractAssistantFinalText(strippedEnvelopeMessage);
-  if (captureText) {
+  if (captureText && params.prepared?.structured !== true) {
     try {
       const messageAgentId =
         params.message && typeof params.message.agentId === "string"
@@ -3691,17 +3712,28 @@ async function runGroupBotDiscussionTurn(params: {
 
       let replyText = combinedReply;
       let deliverableOwnerId: string | null = null;
+      let prepared: PreparedChatDeliverable | null = null;
       try {
         const tenantCtx = await resolveTenantContext(params.client);
         deliverableOwnerId = tenantCtx?.userId?.trim() || null;
-        replyText = settleCollaborationDeclaredDeliverable({
+      } catch (err) {
+        params.context.logGateway.warn(
+          `collaboration deliverable owner unresolved (${params.bot.agentId}): ${formatForLog(err)}`,
+        );
+      }
+      try {
+        prepared = prepareChatDeliverablePublish({
           text: combinedReply,
-          agentId: params.bot.agentId,
-          groupId: params.scope.groupId,
+          publishIntent: "group-bot-final",
+          sessionKey: params.scope.rawSessionKey,
           tenantId: params.scope.tenantId,
+          groupId: params.scope.groupId,
+          agentId: params.bot.agentId,
           userId: deliverableOwnerId,
-          sessionKey: params.bot.sessionKey,
-        }).text;
+          clientRunId: runId,
+          taskId: null,
+        });
+        replyText = prepared.text;
       } catch (err) {
         params.context.logGateway.warn(
           `collaboration deliverable settle failed (${params.bot.agentId}): ${formatForLog(err)}`,
@@ -3729,8 +3761,9 @@ async function runGroupBotDiscussionTurn(params: {
                 ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
               },
             });
-      const message =
-        appended.ok && appended.message
+      const publishView = prepared?.structured ? prepared.view : undefined;
+      const message = {
+        ...(appended.ok && appended.message
           ? appended.message
           : {
               role: "assistant",
@@ -3740,7 +3773,9 @@ async function runGroupBotDiscussionTurn(params: {
               agentId: params.bot.agentId,
               collaborationRoundId: params.collaborationRoundId,
               ...(params.isWrapTurn ? { collaborationWrap: true } : {}),
-            };
+            }),
+        ...(publishView ? { deliverablePublish: publishView } : {}),
+      };
       broadcastChatFinal({
         context: params.context,
         runId,
@@ -3748,6 +3783,7 @@ async function runGroupBotDiscussionTurn(params: {
         message,
         deliverableAgentId: params.bot.agentId,
         deliverableOwnerId,
+        prepared,
       });
       void appendCollaborationExecutionRecord({
         groupId: params.scope.groupId,
@@ -4138,13 +4174,17 @@ export const chatHandlers: GatewayRequestHandlers = {
       stewardOwner && !(typeof before === "string" && before.trim())
         ? stewardCallAuthorizationHistoryEntries(stewardOwner)
         : [];
+    const historyMessages =
+      authorizationMessages.length > 0
+        ? [...boundedMessages, ...authorizationMessages]
+        : boundedMessages;
     respond(true, {
       sessionKey,
       sessionId,
-      messages:
-        authorizationMessages.length > 0
-          ? [...boundedMessages, ...authorizationMessages]
-          : boundedMessages,
+      messages: overlayChatDeliverablePublish({
+        sessionKey,
+        messages: historyMessages,
+      }),
       thinkingLevel,
       verboseLevel,
       activeRun,
@@ -5730,13 +5770,26 @@ export const chatHandlers: GatewayRequestHandlers = {
               .join("\n\n")
               .trim();
             let message: Record<string, unknown> | undefined;
+            let prepared: PreparedChatDeliverable | null = null;
             if (combinedReply) {
               const { storePath: latestStorePath, entry: latestEntry } =
                 await loadSessionEntryForClient(sessionKey, client);
               const sessionId = latestEntry?.sessionId ?? entry?.sessionId ?? clientRunId;
               const replyGovernance = await resolveChatTranscriptGovernance({ client, cfg });
+              prepared = prepareChatDeliverablePublish({
+                text: combinedReply,
+                publishIntent: "direct-fallback-final",
+                sessionKey: resolvedSessionKey,
+                tenantId: replyGovernance.tenantId,
+                groupId: null,
+                agentId,
+                userId: replyGovernance.ownerUserId,
+                clientRunId,
+                taskId: null,
+              });
+              const replyText = prepared.text;
               const appended = await appendAssistantTranscriptMessage({
-                message: combinedReply,
+                message: replyText,
                 sessionId,
                 storePath: latestStorePath,
                 sessionFile: latestEntry?.sessionFile,
@@ -5748,7 +5801,12 @@ export const chatHandlers: GatewayRequestHandlers = {
                 failClosed: replyGovernance.failClosed,
               });
               if (appended.ok) {
-                message = appended.message;
+                message = appended.message
+                  ? {
+                      ...appended.message,
+                      ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
+                    }
+                  : undefined;
                 emitChatInboundStage({
                   runId: clientRunId,
                   stage: "assistant_persisted",
@@ -5781,8 +5839,9 @@ export const chatHandlers: GatewayRequestHandlers = {
                 const now = Date.now();
                 message = {
                   role: "assistant",
-                  content: [{ type: "text", text: combinedReply }],
+                  content: [{ type: "text", text: replyText }],
                   timestamp: now,
+                  ...(prepared.structured ? { deliverablePublish: prepared.view } : {}),
                   // Keep this compatible with Pi stopReason enums even though this message isn't
                   // persisted to the transcript due to the append failure.
                   stopReason: "stop",
@@ -5795,6 +5854,7 @@ export const chatHandlers: GatewayRequestHandlers = {
               runId: clientRunId,
               sessionKey: resolvedSessionKey,
               message,
+              prepared,
             });
           } else {
             // Agent run completed (tools may have edited workspace files): create

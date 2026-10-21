@@ -50,6 +50,9 @@ export async function openGroupWorkspaceFileArtifact(
   ) {
     return;
   }
+  if (host.sidebarArtifactWorkspace?.artifact.providerMetadata?.pdfParseFailed === true) {
+    return;
+  }
 
   if (!shouldApply()) {
     return;

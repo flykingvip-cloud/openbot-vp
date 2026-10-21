@@ -1,3 +1,4 @@
+import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { applyUserVisibleOutputGate } from "../agents/model-output-boundary.js";
 import { DEFAULT_HEARTBEAT_ACK_MAX_CHARS, stripHeartbeatToken } from "../auto-reply/heartbeat.js";
 import { noteUnresolvedChatRunError } from "../auto-reply/reply/chat-run-error-escalation.js";
@@ -21,10 +22,46 @@ import {
 import { stripInlineDirectiveTagsForDisplay } from "../utils/directive-tags.js";
 import { markChatRunNotUndoable, type ChatAbortControllerEntry } from "./chat-abort.js";
 import { isCollaborationSpaceChildSessionKey } from "./chat-event-isolation.js";
+import {
+  listChatSessionInterestedUserIds,
+  resolveChatRunTenantId,
+  resolveUniqueBoundChatSessionTenantId,
+} from "./chat-session-interest.js";
+import {
+  deliverPreparedChatFinal,
+  prepareChatDeliverablePublish,
+  type PreparedChatDeliverable,
+} from "./knowledge/deliverables/chat-deliverable-publish.js";
 import { loadSessionEntrySyncFallback } from "./tenant-context.js";
 import { formatForLog } from "./ws-log.js";
 
 const log = createSubsystemLogger("gateway/server-chat");
+
+/** Group finals are prepared on the parent `broadcastChatFinal` path, not here. */
+function isCollaborationGroupSessionKey(sessionKey: string): boolean {
+  const raw = sessionKey.trim();
+  return raw.toLowerCase().startsWith("space:") || /:space:/i.test(raw);
+}
+
+/**
+ * 1:1 settle may write the agent workspace, so it needs the same owner chat.send
+ * already authorized. Exactly one interested user is unambiguous. Zero or many
+ * stays unset and settle fails closed instead of picking a host workspace.
+ */
+function resolveDirectDeliverableIdentity(
+  sessionKey: string,
+  clientRunId: string,
+  sourceRunId: string,
+): { tenantId: string | null; userId: string | null } {
+  const interested = [...listChatSessionInterestedUserIds(sessionKey)];
+  return {
+    tenantId:
+      resolveChatRunTenantId(clientRunId) ??
+      resolveChatRunTenantId(sourceRunId) ??
+      resolveUniqueBoundChatSessionTenantId(sessionKey),
+    userId: interested.length === 1 ? (interested[0] ?? null) : null,
+  };
+}
 
 function errorTextForTerminal(error: unknown): string {
   if (typeof error === "string") {
@@ -726,6 +763,23 @@ export function createAgentEventHandler({
         });
         return;
       }
+      let prepared: PreparedChatDeliverable | null = null;
+      let visibleText = text;
+      if (text && !shouldSuppressSilent && !isCollaborationGroupSessionKey(sessionKey)) {
+        const identity = resolveDirectDeliverableIdentity(sessionKey, clientRunId, sourceRunId);
+        prepared = prepareChatDeliverablePublish({
+          text,
+          publishIntent: "agent-run-final",
+          sessionKey,
+          tenantId: identity.tenantId,
+          groupId: null,
+          agentId: resolveSessionAgentId({ sessionKey }),
+          userId: identity.userId,
+          clientRunId,
+          taskId: null,
+        });
+        visibleText = prepared.text;
+      }
       const payload = {
         runId: clientRunId,
         sessionKey,
@@ -733,18 +787,29 @@ export function createAgentEventHandler({
         state: "final" as const,
         ...(stopReason && { stopReason }),
         message:
-          text && !shouldSuppressSilent
+          visibleText && !shouldSuppressSilent
             ? {
                 role: "assistant",
-                content: [{ type: "text", text }],
+                content: [{ type: "text", text: visibleText }],
                 timestamp: Date.now(),
                 ...(replyLanguage ? { replyLanguage } : {}),
+                ...(prepared?.structured ? { deliverablePublish: prepared.view } : {}),
               }
             : undefined,
       };
-      const recipientCount = Number(broadcastChat(sessionKey, payload) ?? 0);
-      logChatFinalBroadcast(payload, recipientCount);
-      nodeSendToSession(sessionKey, "chat", payload);
+      const sendFinal = () => {
+        const recipientCount = Number(broadcastChat(sessionKey, payload) ?? 0);
+        logChatFinalBroadcast(payload, recipientCount);
+        nodeSendToSession(sessionKey, "chat", payload);
+      };
+      if (prepared?.idempotencyKey && prepared.record) {
+        const delivered = deliverPreparedChatFinal({ prepared, send: sendFinal });
+        if (!delivered.ok) {
+          log.warn("chat.final deliverable broadcast failed", { runId: clientRunId, sessionKey });
+        }
+        return;
+      }
+      sendFinal();
       return;
     }
     const payload = {

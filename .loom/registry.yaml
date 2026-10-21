@@ -3,7 +3,8 @@ tasks:
   - id: device-digital-human-v1:cursor-cloud
     owner: cursor-cloud
     intent:
-      - "Device digital-human integrations v1 loopback stub (B0-B5), not mounted on the gateway"
+      - Device digital-human integrations v1 loopback stub (B0-B5), not mounted
+        on the gateway
     paths:
       - .loom/registry.yaml
       - src/integrations/device-digital-human/**
@@ -13,12 +14,13 @@ tasks:
     state: active
     sessions: []
     ownerHistory: []
-    since: "2026-10-20"
+    since: 2026-10-20
     metadata: {}
   - id: collab-group-task-stable-summary:grok-bot
     owner: grok-bot
     intent:
-      - "Expert #2: stable group task summary injection (default-off); keep goal when bound task not active"
+      - "Expert #2: stable group task summary injection (default-off); keep goal
+        when bound task not active"
     paths:
       - .loom/registry.yaml
       - src/agents/context-compiler/candidates.ts
@@ -32,12 +34,13 @@ tasks:
     state: active
     sessions: []
     ownerHistory: []
-    since: "2026-10-19"
+    since: 2026-10-19
     metadata: {}
   - id: collab-expert-3-5-compile-knowledge-suppress:grok-bot
     owner: grok-bot
     intent:
-      - "Expert #3–#5: collab compile strategy, explicit knowledge recovery, surface silent suppress (default-off)"
+      - "Expert #3–#5: collab compile strategy, explicit knowledge recovery,
+        surface silent suppress (default-off)"
     paths:
       - .loom/registry.yaml
       - src/agents/context-compiler/collab-compile-strategy.ts
@@ -66,7 +69,7 @@ tasks:
     state: active
     sessions: []
     ownerHistory: []
-    since: "2026-10-19"
+    since: 2026-10-19
     metadata: {}
   - id: collab-fault-round-observability:grok-bot
     owner: grok-bot
@@ -85,12 +88,13 @@ tasks:
     state: active
     sessions: []
     ownerHistory: []
-    since: "2026-10-19"
+    since: 2026-10-19
     metadata: {}
   - id: settle-checksum-group-tenant-fail:grok-bot
     owner: grok-bot
     intent:
-      - "Expert A/C rework: settle checksum conflict + managed group tenant fail-closed"
+      - "Expert A/C rework: settle checksum conflict + managed group tenant
+        fail-closed"
     paths:
       - .loom/registry.yaml
       - src/auto-reply/reply/runtime-context-assembly.ts
@@ -104,12 +108,13 @@ tasks:
     state: active
     sessions: []
     ownerHistory: []
-    since: "2026-10-19"
+    since: 2026-10-19
     metadata: {}
   - id: artifact-preview-icons-drop-incubation:grok-bot
     owner: grok-bot
     intent:
-      - Clearer deliverable-preview save/share icons and remove bottom capability-incubation strip
+      - Clearer deliverable-preview save/share icons and remove bottom
+        capability-incubation strip
     paths:
       - .loom/registry.yaml
       - ui/src/ui/icons.ts
@@ -9024,7 +9029,8 @@ tasks:
   - id: device-platform-b1:cursor-b1
     owner: cursor-b1
     intent:
-      - B1 shared device platform persistence permissions and user versus admin DTO split
+      - B1 shared device platform persistence permissions and user versus admin
+        DTO split
     paths:
       - src/integrations/device-platform/**
       - docs/integrations/device-platform/**
@@ -9065,7 +9071,8 @@ tasks:
   - id: device-platform-b4-dh-detail:cursor-cloud
     owner: cursor-cloud
     intent:
-      - Digital-human detail connected devices on the shared device-platform binding store
+      - Digital-human detail connected devices on the shared device-platform
+        binding store
     paths:
       - ui/src/ui/ports/employee/views/my-bot-workspace-panel.ts
       - ui/src/ui/ports/employee/views/my-bot-workspace-panel.node.test.ts
@@ -9081,10 +9088,70 @@ tasks:
     ownerHistory: []
     since: 2026-10-20
     metadata: {}
+  - id: batch1-trusted-delivery
+    owner: cursor-fc1a
+    intent:
+      - "Batch 1 trusted delivery: persist structured chat deliverable versions
+        before a success chip"
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/chat/generated-preview-artifact.ts
+      - ui/src/ui/chat/generated-preview-artifact.test.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/views/chat.test.ts
+      - ui/src/ui/wiring/group-deliverable-preview-flow.ts
+      - ui/src/ui/wiring/group-workspace-file.ts
+      - ui/src/ui/wiring/group-workspace-file.test.ts
+      - ui/src/ui/wiring/steward-workspace-file.ts
+      - ui/src/ui/wiring/steward-deliverable-preview.node.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+    state: active
+    sessions:
+      - id: 0c669125-d9aa-4aab-ae50-956a3dc1856b
+        taskId: batch1-trusted-delivery
+        ide: cursor
+        agent: cursor-fc1a
+        status: active
+        lastSignalAt: 2026-10-21T09:18:23.273Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
 landingStreams:
-  # Shared personal-settings files. Parallel so a member device page can land
-  # with the device-platform primary without pulling i18n, workbench CSS, or
-  # the personal-settings shell into another serial stream.
+  - id: batch1-trusted-delivery
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - ui/src/ui/chat/generated-preview-artifact.ts
+      - ui/src/ui/chat/generated-preview-artifact.test.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/views/chat.test.ts
+      - ui/src/ui/wiring/group-deliverable-preview-flow.ts
+      - ui/src/ui/wiring/group-workspace-file.ts
+      - ui/src/ui/wiring/group-workspace-file.test.ts
+      - ui/src/ui/wiring/steward-workspace-file.ts
+      - ui/src/ui/wiring/steward-deliverable-preview.node.test.ts
+      - ui/src/ui/wiring/workspace-file-preview.ts
+      - ui/src/ui/wiring/workspace-file-preview.node.test.ts
+      - ui/src/i18n/locales/en.ts
+      - ui/src/i18n/locales/zh-CN.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: Batch 1 trusted chat deliverable publish
+      legacyDisposition: MERGE
+      owner: cursor-fc1a
+      task: batch1-trusted-delivery
   - id: device-platform-b3-personal-ui:cursor-cloud
     landingPolicy: parallel
     paths:
@@ -9099,12 +9166,10 @@ landingStreams:
       - ui/src/ui/ports/employee/views/personal-devices-page.node.test.ts
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Personal settings devices and hardware
+      legacyDisposition: MERGE
       owner: cursor-cloud
       task: device-platform-b3-personal
-  # Parallel companion so the digital-human detail device list can land with the
-  # device-platform docs primary without falling into the broad UI recovery stream.
   - id: device-platform-b4-dh-detail:cursor-cloud
     landingPolicy: parallel
     paths:
@@ -9112,13 +9177,10 @@ landingStreams:
       - ui/src/ui/ports/employee/views/my-bot-workspace-panel.node.test.ts
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Digital-human detail connected devices
+      legacyDisposition: MERGE
       owner: cursor-cloud
       task: device-platform-b4-dh-detail
-  # Parallel companion so the B2 admin mount can land with the device-platform
-  # primary stream. These shared files stay listed here so a connector change
-  # does not mix PHW3, MRR, and platform-admin layout primaries.
   - id: device-platform-b2-admin-mount:cursor-cloud
     landingPolicy: parallel
     paths:
@@ -9130,8 +9192,8 @@ landingStreams:
       - ui/src/ui/ports/platform/device-platform/**
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Platform admin device platform connection mount
+      legacyDisposition: MERGE
       owner: cursor-cloud
       task: device-platform-b2
   - id: sandbox-trixie-node20-pdf:cursor-cloud
@@ -9153,8 +9215,8 @@ landingStreams:
       - src/agents/sandbox/sandbox-runtime-ownership.test.ts
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Conversation sandbox Node 20, Chromium, and poppler
+      legacyDisposition: MERGE
       owner: cursor-cloud
       task: sandbox-trixie-node20-pdf
   - id: device-digital-human-v1:cursor-cloud
@@ -9169,8 +9231,8 @@ landingStreams:
       - CHANGELOG.md
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Device digital-human integrations v1 stub
+      legacyDisposition: MERGE
       owner: cursor-cloud
       task: device-digital-human-v1
   - id: collab-group-task-stable-summary:grok-bot
@@ -9187,8 +9249,8 @@ landingStreams:
       - src/config/zod-schema.ts
     canLandWith: []
     metadata:
+      legacyTitle: Stable group task summary injection (expert
       legacyDisposition: MERGE
-      legacyTitle: Stable group task summary injection (expert #2)
       owner: grok-bot
       task: collab-group-task-stable-summary
   - id: collab-expert-3-5-compile-knowledge-suppress:grok-bot
@@ -9220,8 +9282,8 @@ landingStreams:
       - ui/src/styles/chat/grouped.css
     canLandWith: []
     metadata:
+      legacyTitle: Expert
       legacyDisposition: MERGE
-      legacyTitle: Expert #3–#5 compile strategy, knowledge recovery, suppress UI
       owner: grok-bot
       task: collab-expert-3-5-compile-knowledge-suppress
   - id: collab-fault-round-observability:grok-bot
@@ -9238,8 +9300,8 @@ landingStreams:
       - src/gateway/server-methods/chat.ts
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Collab fault-round observability (compiler + skip evidence)
+      legacyDisposition: MERGE
       owner: grok-bot
       task: collab-fault-round-observability
   - id: settle-checksum-group-tenant-fail:grok-bot
@@ -9256,8 +9318,8 @@ landingStreams:
       - ui/src/ui/chat/generated-preview-artifact.ts
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Settle checksum conflict + group tenant fail-closed
+      legacyDisposition: MERGE
       owner: grok-bot
       task: settle-checksum-group-tenant-fail
   - id: artifact-preview-icons-drop-incubation:grok-bot
@@ -9269,8 +9331,8 @@ landingStreams:
       - ui/src/ui/views/chat.test.ts
     canLandWith: []
     metadata:
-      legacyDisposition: MERGE
       legacyTitle: Artifact preview save/share icons + drop incubation strip
+      legacyDisposition: MERGE
       owner: grok-bot
       task: artifact-preview-icons-drop-incubation
   - id: collab-p1-artifact-accept-loop:grok-bot
