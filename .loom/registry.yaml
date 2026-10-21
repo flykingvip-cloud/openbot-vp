@@ -1,5 +1,31 @@
 version: 1
 tasks:
+  - id: batch8-skill-gates:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 8 skill gates, terminology glossary, and cron empty-success ban
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch8-skill-gates-2026-10-21.md
+      - src/agents/skill-gates/**
+      - src/agents/execution-preflight/resolve.ts
+      - src/agents/execution-stall-continue.ts
+      - src/agents/turn-completion/contract.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/cron/completion-contract.ts
+      - src/cron/completion-contract.test.ts
+      - src/cron/cron-result-template.ts
+      - src/cron/isolated-agent/result-surfacing.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/service/timer.ts
+      - src/cron/types.ts
+      - src/gateway/workspace-resolver/settle-declared-deliverable.ts
+      - src/shared/preview-artifact/deliverable-envelope.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
   - id: batch7-task-surface:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9301,6 +9327,30 @@ tasks:
     since: 2026-10-21
     metadata: {}
 landingStreams:
+  - id: batch8-skill-gates
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch8-skill-gates-2026-10-21.md
+      - src/agents/skill-gates/**
+      - src/agents/execution-preflight/resolve.ts
+      - src/agents/execution-stall-continue.ts
+      - src/agents/turn-completion/contract.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/cron/completion-contract.ts
+      - src/cron/completion-contract.test.ts
+      - src/cron/cron-result-template.ts
+      - src/cron/isolated-agent/result-surfacing.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/service/timer.ts
+      - src/cron/types.ts
+      - src/gateway/workspace-resolver/settle-declared-deliverable.ts
+      - src/shared/preview-artifact/deliverable-envelope.ts
+    canLandWith: []
+    metadata:
+      task: batch8-skill-gates
+      owner: cursor-cloud
+      purpose: Batch 8 skill gates and terminology. First-match so these shared files land with this stream.
   - id: batch7-task-surface
     landingPolicy: serial
     paths:

@@ -10,6 +10,7 @@
  */
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { isExecutionStallFinal } from "../shared/text/plan-speak-final.js";
+import { formatActiveSkillGlossary } from "./skill-gates/glossary.js";
 import { isSilentExecFishingStop } from "./turn-completion/contract.js";
 
 export const EXECUTION_STALL_CONTINUE_LIMIT = 2;
@@ -26,8 +27,13 @@ export const FALSE_CONFIRM_CONTINUE_PROMPT =
 export const EMPTY_AFTER_TOOLS_CONTINUE_PROMPT =
   "Internal execution continue: tools in this turn succeeded, but the visible reply is empty and there is no deliverable or draft-box result yet. The task is not finished. Continue from the tool results and deliver the result in this turn. Do not ask the user to restate the goal.";
 
-export const SILENT_EXEC_CONTINUE_PROMPT =
-  "Internal execution continue: the user said to continue and wants the result. Do not ask open parameters. Do not ask whether 绑定 means WeChat, email, or a knowledge source; in a skill smoke, 绑定 means analysis-review to task.json sha256. A task_ledger or non-deliverable permission failure is a side path: skip it, add one bypass line, and write an openable deliverable or a text degradation in this turn. Stop only for a true fork of two mutually exclusive choices, or one permanent mainline block with a reason, the degradation already tried, and one user action.";
+export const SILENT_EXEC_CONTINUE_PROMPT = [
+  "Internal execution continue: the user said to continue and wants the result. Do not ask open parameters. A task_ledger or non-deliverable permission failure is a side path: skip it, add one bypass line, and write an openable deliverable or a text degradation in this turn. Stop only for a true fork of two mutually exclusive choices, or one permanent mainline block with a reason, the degradation already tried, and one user action.",
+  formatActiveSkillGlossary({
+    userText: "技能试跑",
+    boundSkillIds: ["consulting-report-forge"],
+  }),
+].join("\n");
 
 const INTERNAL_CONTINUE_PREFIX = "Internal execution continue:";
 

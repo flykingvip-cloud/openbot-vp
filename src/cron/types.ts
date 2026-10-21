@@ -67,8 +67,15 @@ export type CronRunTelemetry = {
   usage?: CronUsageSummary;
 };
 
+export type CronCompletionKind = "ok" | "failed" | "empty" | "needs_attention";
+
 export type CronRunOutcome = {
   status: CronRunStatus;
+  /**
+   * Batch 8. Success is only `ok`. Empty runs use `empty` or `needs_attention`
+   * and must not be shown as a green check. Absent on older rows.
+   */
+  completion?: CronCompletionKind;
   error?: string;
   /** Optional classifier for execution errors to guide fallback behavior. */
   errorKind?: "delivery-target";

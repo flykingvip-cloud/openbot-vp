@@ -50,6 +50,7 @@ export function formatCronResultSurfaceMessage(params: {
   status: CronRunStatus;
   summary?: string;
   error?: string;
+  outputText?: string;
   durationMs?: number;
 }): string {
   return formatCronResultSurfaceMessageTemplate({
@@ -58,6 +59,7 @@ export function formatCronResultSurfaceMessage(params: {
     status: params.status,
     summary: params.summary,
     error: params.error,
+    outputText: params.outputText,
     durationMs: params.durationMs,
     skillDelivery: skillDeliveryFromSummary(params.summary),
   });
@@ -150,6 +152,7 @@ export async function surfaceCronJobResult(params: {
     status: CronRunStatus;
     summary?: string;
     error?: string;
+    outputText?: string;
   };
   durationMs?: number;
   nowMs?: number;
@@ -176,6 +179,7 @@ export async function surfaceCronJobResult(params: {
     status: params.result.status,
     summary: params.result.summary,
     error: params.result.error,
+    outputText: params.result.outputText,
     durationMs: params.durationMs,
   });
   const label = `定时任务 · ${params.job.name.trim() || params.job.id}`;
