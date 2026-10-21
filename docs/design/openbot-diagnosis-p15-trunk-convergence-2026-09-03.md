@@ -15,7 +15,7 @@ Related:
 - [P12 Go/No-Go 预检包](/design/openbot-diagnosis-p12-go-no-go-2026-09-03)
 - [开发交付链路标准](/design/openbot-dev-delivery-pipeline-standard-2026-07-20)
 
-硬门禁：即使 `readyForIndependentApproval=true`，也不得打开生产 gate、不得注册 live pack、不得调用真实聊天 / RPC / Doctor / Channel、不得自动修复、不得改写 `releases.jsonl` / `RELEASE_RECORD.md`、不得发布 `provenance/sha-*`。Trusted tenant 只来自服务端 membership。生产依赖只能由显式服务端配置注入。禁止新增 Report DB / Skill Health DB / 平行诊断事实源。
+硬门禁：即使 `readyForIndependentApproval=true`，也不得打开生产 gate、不得注册 live pack、不得调用真实聊天 / RPC / Doctor / Channel、不得自动修复、不得改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`、不得发布 `provenance/sha-*`。Trusted tenant 只来自服务端 membership。生产依赖只能由显式服务端配置注入。禁止新增 Report DB / Skill Health DB / 平行诊断事实源。
 
 机器可读快照：
 
@@ -72,7 +72,7 @@ Ancestry：`origin/main` 是 candidate 祖先；LIVE 是 candidate 祖先；LIVE
 
 | 对象                          | 决定                              | 原因                                                                                             |
 | ----------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `releases.jsonl` seq 58       | **keep / 不改写**                 | 开放行已等于 LIVE。改写会掩盖运行版本。                                                          |
+| `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 58       | **keep / 不改写**                 | 开放行已等于 LIVE。改写会掩盖运行版本。                                                          |
 | `RELEASE_RECORD.md`           | **defer_to_delivery_owner**       | Latest cutover 仍写 seq 54 / `37cc40e51f`。特征分支改写会使审批包看起来已对齐，而 trunk 仍落后。 |
 | `provenance/sha-6d9ea1f2d5da` | **do_not_mint / published=false** | seq 58 注明 cutover 拉取 GHCR `main` 且 `no provenance-sha-*`。事后补 tag 等于伪造发布史。       |
 
@@ -122,7 +122,7 @@ delivery_ledger_owner 若要修复人类视图：在 trunk 上把 Latest cutover
 
 ## 6. 未做
 
-- 未改写 `releases.jsonl`
+- 未改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 - 未改 `RELEASE_RECORD.md`
 - 未补 `provenance/sha-6d9ea1f2d5da`
 - 未打开任何生产 gate，未注册 live pack

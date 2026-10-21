@@ -1,6 +1,11 @@
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { decideDelivery, type GitRunner } from "./forward-guard.js";
+import {
+  CANONICAL_LEDGER_URL,
+  externalLedgerMessage,
+  localLedgerExternalized,
+} from "./ledger-location.js";
 import { parseLedger } from "./ledger.js";
 import {
   createDefaultLiveShaReaders,
@@ -128,6 +133,59 @@ export async function runDeliveryCli(
   if (command === "check-sot") {
     const trunkRef = options.trunkRef ?? "origin/main";
     const ledgerText = await readers.ledger();
+    if (ledgerText == null && localLedgerExternalized()) {
+      const live = liveResolution.sha;
+      const basePayload = {
+        command,
+        live,
+        ledgerLive: null,
+        ledgerUrl: CANONICAL_LEDGER_URL,
+        liveSource: liveResolution.source,
+        trunkRef,
+        ledgerOpenShas: [] as string[],
+        warnings: liveResolution.warnings,
+        releaseRecordSha: liveResolution.recordSha,
+      };
+      if (!live) {
+        return {
+          code: EXIT_UNKNOWN_LIVE,
+          payload: {
+            ...basePayload,
+            verdict: "unknown",
+            reasons: [externalLedgerMessage(), "LIVE is unknown; SoT verification fails closed"],
+            recommendation:
+              "Resolve LIVE from the running artifact (build-info.commit) or pass --live-sha / --use-release-record-live.",
+          },
+        };
+      }
+      const onTrunk = git(["merge-base", "--is-ancestor", live, trunkRef]).code === 0;
+      if (!onTrunk) {
+        return {
+          code: EXIT_BLOCK,
+          payload: {
+            ...basePayload,
+            verdict: "block",
+            reasons: [
+              externalLedgerMessage(),
+              `LIVE ${live.slice(0, 12)} is not contained in ${trunkRef}; production is running off-trunk code`,
+            ],
+            recommendation: `Merge the cutover to ${trunkRef}. The open ledger row lives in OHBE, not in this repo.`,
+          },
+        };
+      }
+      return {
+        code: EXIT_ALLOW,
+        payload: {
+          ...basePayload,
+          verdict: "external",
+          reasons: [
+            externalLedgerMessage(),
+            `LIVE ${live.slice(0, 12)} is contained in ${trunkRef}; the open ledger row is audited in OHBE`,
+          ],
+          recommendation: null,
+        },
+      };
+    }
     const ledgerOpenShas = ledgerText
       ? parseLedger(ledgerText)
           .rows.filter((row) => row.liveTo === undefined)

@@ -45,7 +45,7 @@ notes:
   holdoutCorpusDigest: "sha256:c12eb16b6ee75c5ac0d0399af489af0dd476dc4b68a539075fc3dc1f2729b586"
   holdoutRevealedAt: "2026-09-24T07:06:02+08:00"
   holdoutOwnerAcceptance: "本人确认 blind holdout 语料（digest sha256:c12eb16b6ee75c5ac0d0399af489af0dd476dc4b68a539075fc3dc1f2729b586；revealedAt 2026-09-24T07:06:02+08:00；classifierFrozenSha 533d3263d2de10b7ed0c1c7530b1e0bc774129ad）作为 B1 独立 Owner 证据有效。"
-  ledgerTipFile: deploy/production/releases.jsonl
+  ledgerTipFile: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   ledgerTipSeq: 97
   remediationPass: phase-b-b2-drop-global-safe-debug-2026-09-24
   postMergeAcceptance: "2026-09-24T11:51:17+08:00 Asia/Shanghai; origin/main==b2MergeSha 65ffc350d737e747175d64b6daa9b78ac79a55e9; vitest 103/103; tsgo 0; pnpm check FAIL unrelated diagnosis-reports method-pack duplicate scope (not in B2 diff); runtime-enabled false; production-proven unknown"

@@ -12,7 +12,7 @@ skill: oi-bind-x-twitter
 ```
 
 **诚实声明**：应用内 OAuth2+PKCE 产品路径已存在（`path_unstable: false`）。
-S6（2026-10-19）本机**未**完成 OHBE/真机 OAuth 至 `oauth` completed /
+S6（2026-10-19）本机**未**完成 OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）/真机 OAuth 至 `oauth` completed /
 个人授权页 X=active。**保持** `verified_live: false`。禁止口头称为已 live。
 
 ## E2E 尝试（2026-10-19）

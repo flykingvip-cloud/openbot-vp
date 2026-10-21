@@ -13,7 +13,7 @@
 | bilibili | true | oi-bind-bilibili | credentials.bind (social_account) | **true**（S6 证据 2026-10-19，无 bind 成功） | false |
 | zhihu | true | oi-bind-zhihu | credentials.bind (social_account) | **true**（S6；#827 登录 detect ≠ OI bind） | false |
 | kuaishou | true | oi-bind-kuaishou | credentials.bind (social_account) | **true**（S6 证据 2026-10-19，无 bind 成功） | false |
-| x-twitter | true | oi-bind-x-twitter | oauth.start / oauth.status / callback (PKCE) | false（应用内 OAuth；门户点击序可为 UNKNOWN） | false（S6 仍待 OHBE/真机） |
+| x-twitter | true | oi-bind-x-twitter | oauth.start / oauth.status / callback (PKCE) | false（应用内 OAuth；门户点击序可为 UNKNOWN） | false（S6 仍待 OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）/真机） |
 | wechat-personal | true | oi-bind-wechat-personal（非云电脑；委派 wechat-personal-worker-setup） | wechat-personal.* | n/a（non_cloud_primary） | n/a（本机通道，非云电脑 verified_live） |
 | feishu-personal | false | 不做 | — | — | — |
 

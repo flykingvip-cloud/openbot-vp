@@ -29,7 +29,7 @@
     "successful rollback to the pre-shadow container after observation",
     "LIVE remained a12e4c59e575",
     "all inbound/CSC/Context flags currently unset",
-    "RELEASE_RECORD.md / releases.jsonl / LIVE ledger unmodified",
+    "RELEASE_RECORD.md / https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl / LIVE ledger unmodified",
     "no leftover safety container or temp rollback tooling"
   ],
   "blocker": {
@@ -91,6 +91,6 @@
     "production deployment of KNOWLEDGE_POLICY",
     "production deployment of TOOL_POLICY",
     "production deployment of PERSIST_EARLY",
-    "modify RELEASE_RECORD.md / releases.jsonl / LIVE ledger"
+    "modify RELEASE_RECORD.md / https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl / LIVE ledger"
   ]
 }

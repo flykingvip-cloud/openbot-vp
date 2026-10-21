@@ -29,14 +29,14 @@ Related: [P15 #930 合入后重评](/design/openbot-diagnosis-p15-930-2026-09-04
 
 1. 把 `deploy/production/RELEASE_RECORD.md` 的 **Latest cutover** 写成已证明的 LIVE `3d03d3b4df`，并注明 seq 59 / container evidence / `liveFrom=2026-09-04T02:11:42Z`。
 2. 把 Latest cutover 叙述里仍写 seq 54 / `37cc40e51f` 的句子改成 historical。不要回写 `6d9ea1f2d5da` 当 Latest。
-3. 不要回写 `releases.jsonl` 历史行（含 seq 58、seq 59）。
+3. 不要回写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 历史行（含 seq 58、seq 59）。
 4. 合入后 `git fetch origin`，用 `--candidate-sha "$(git rev-parse origin/main)"` 重跑 P15 CLI。
 
 ---
 
 ## 3. 明确禁止
 
-- 改写 `deploy/production/releases.jsonl` seq 58 或 seq 59
+- 改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 58 或 seq 59
 - 发布 `provenance/sha-3d03d3b4df91`、`provenance/sha-6d9ea1f2d5da` 或任何补发旧 cutover 的 tag
 - 打开四门诊断 gate、注册 live pack、生产构建 / 发布 / 重启 / 灰度 / 切流量
 - 接真实聊天、live 大白、Doctor `--fix`、Channel restart

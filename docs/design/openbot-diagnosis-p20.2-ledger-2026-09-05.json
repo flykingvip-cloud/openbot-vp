@@ -38,7 +38,7 @@
     {
       "id": "ledger_open",
       "sha": "04690f8d2ed51f24a06825c153b7c1885d17182a",
-      "source": "deploy/production/releases.jsonl seq 63",
+      "source": "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl seq 63",
       "evidence": "liveFrom=2026-09-04T13:39:37Z; liveVerified=true; no liveTo; tag=main; landed by #953",
       "conclusion": "equals LIVE; keep; do not rewrite seq 61/62/63",
       "provable": true
@@ -46,7 +46,7 @@
     {
       "id": "ledger_closed_seq62",
       "sha": "81aafe1e218e91656c3a399edb5a9080ad00d448",
-      "source": "deploy/production/releases.jsonl seq 62",
+      "source": "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl seq 62",
       "evidence": "liveTo=2026-09-04T13:39:37Z",
       "conclusion": "historical; do not write as Latest",
       "provable": true

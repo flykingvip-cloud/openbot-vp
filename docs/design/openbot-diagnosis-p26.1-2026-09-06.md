@@ -34,7 +34,7 @@ Related:
 | cutoverOwner             | delivery                                                   |
 | diagnosisOnlyCutover     | false                                                      |
 
-祖先沿用无效。不改写旧 P22 / P24.5–P26 JSON。不重写 `releases.jsonl` / `RELEASE_RECORD.md`。不补 `provenance/sha-*`。
+祖先沿用无效。不改写旧 P22 / P24.5–P26 JSON。不重写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`。不补 `provenance/sha-*`。
 
 ## 2. 本增量做了什么
 

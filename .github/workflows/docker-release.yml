@@ -4,10 +4,11 @@ name: Docker Release
 # multi-architecture images to GHCR. It must not deploy.
 #
 # The production release chain is `main` -> GHCR -> production host pull -> podman
-# cutover, following the process in `deploy/production/RELEASE_RECORD.md`, whose
-# authoritative release identity is `deploy/production/releases.jsonl` plus the
-# annotated `provenance/sha-*` tags: the forward-only guard, that ledger and those
-# tags, in-container `/app/dist/build-info.json` verification, and merge-back.
+# cutover, following the process in `deploy/production/RELEASE_RECORD.md`. The
+# machine-readable ledger is OHBE
+# (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl),
+# together with annotated `provenance/sha-*` tags: the forward-only guard, that ledger
+# and those tags, in-container `/app/dist/build-info.json` verification, and merge-back.
 #
 # Do not add a deployment job here (Fly or otherwise). PR #160 added a
 # `deploy-fly-production` job that treated the self-host `fly.toml` template as

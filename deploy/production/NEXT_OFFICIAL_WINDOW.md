@@ -1,7 +1,7 @@
 # Next official cutover — carry list
 
 Status: **CARRY ONLY.** This file does **not** authorize a cutover, grant a deployment
-lock, change LIVE, or write `releases.jsonl`. The next official window must still
+lock, change LIVE, or write `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`. The next official window must still
 re-lock to a freshly fetched `origin/main` tip and pass I1/I2 gates.
 
 Recorded: 2026-09-03  

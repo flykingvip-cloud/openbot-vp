@@ -210,7 +210,7 @@ HK 运行中容器的 commit 就是 `65564d30…`，与台账相同，第 5.4 �
 | PATH CLI | `openbot --version` 输出 `OpenBot 2026.7.12-rc.2 (71b0c9c)` |
 | CLI 检出 git HEAD | `71b0c9c0dd1a8274d1da18254456b4c8194e16e6` |
 | 正在跑的 gateway 与 CLI 检出 | 不是同一 SHA |
-| OHBE 环境 | 没有 `OPENBOT_COMMIT`、`OPENBOT_BIN`、`OPENBOT_IMAGE` |
+| OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）环境 | 没有 `OPENBOT_COMMIT`、`OPENBOT_BIN`、`OPENBOT_IMAGE` |
 | openbot Docker 业务容器 | 没有正在跑的业务容器 |
 
 worktree 名字里的 pr537 不表示正在跑的提交就是已合入主干的 #537（`185c49583`）。正在跑的提交是 `277f6c53…`，见下表。

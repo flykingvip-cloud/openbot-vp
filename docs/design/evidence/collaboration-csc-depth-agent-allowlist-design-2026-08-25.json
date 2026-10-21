@@ -47,5 +47,5 @@
     "no production config/container/flag/agent-identity change",
     "implementation only after review + explicit authorization"
   ],
-  "productionState": "shadow-OFF baseline restored after the real-traffic window; LIVE a12e4c59e575; inbound/CSC/Context flags unset; RELEASE_RECORD/releases.jsonl/ledger unchanged"
+  "productionState": "shadow-OFF baseline restored after the real-traffic window; LIVE a12e4c59e575; inbound/CSC/Context flags unset; RELEASE_RECORD/https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl/ledger unchanged"
 }

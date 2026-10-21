@@ -15,7 +15,7 @@ Related:
 - [P11 受控灰度与回滚演练](/design/openbot-diagnosis-p11-production-cutover-2026-09-03)
 - [开发交付链路标准](/design/openbot-dev-delivery-pipeline-standard-2026-07-20)
 
-硬门禁：即使 `readyForIndependentApproval=true`，也不得打开生产 gate、不得注册 live pack、不得调用真实聊天 / RPC / Doctor / Channel、不得自动修复。Trusted tenant 只来自服务端 membership。禁止新增 Report DB / Skill Health DB / 平行诊断事实源。P13 不得改写 `releases.jsonl`、不得补 provenance tag、不得把 `RELEASE_RECORD.md` 改成看起来已对齐。
+硬门禁：即使 `readyForIndependentApproval=true`，也不得打开生产 gate、不得注册 live pack、不得调用真实聊天 / RPC / Doctor / Channel、不得自动修复。Trusted tenant 只来自服务端 membership。禁止新增 Report DB / Skill Health DB / 平行诊断事实源。P13 不得改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`、不得补 provenance tag、不得把 `RELEASE_RECORD.md` 改成看起来已对齐。
 
 机器可读快照：
 
@@ -127,7 +127,7 @@ P5 仍按 P12 签收为进程内合同，不是 live 投送。
 - 未注册 `GATEWAY_METHOD_PACKS` / `coreGatewayHandlers` 的 diagnosis live 入口
 - 未执行生产构建、发布、重启、灰度或流量切换
 - 未把 candidate 快进成 origin/main
-- 未改写 `releases.jsonl` / `RELEASE_RECORD.md`，未补 provenance tag
+- 未改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`，未补 provenance tag
 - 未接真实聊天、Doctor `--fix`、Channel restart
 - 4.1 / 4.2 仍未勾；`diagnose()` 仍未实现
 

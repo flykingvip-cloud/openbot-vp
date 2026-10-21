@@ -12,7 +12,7 @@ Transcript: `evidence/production-probe.txt`
 | Ledger sequence    | **unknown** |
 | `productionProven` | **unknown** |
 
-No live build identity was read. This page does not copy SHAs from `deploy/production/releases.jsonl` or from any branch name. Those files are repository history, not the running container.
+No live build identity was read. This page does not copy SHAs from `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` or from any branch name. Those files are repository history, not the running container.
 
 ## Probe
 

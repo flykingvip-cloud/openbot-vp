@@ -51,7 +51,7 @@ Related:
 | provenance peeled target | `04690f8d2ed51f24a06825c153b7c1885d17182a`                              |
 | P22 / P23 / P24          | 人类批准已记录；隔离金丝雀 Ready；gate 仍 false                         |
 
-账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。未提交 `.loom/registry.yaml`。
+账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。未提交 `.loom/registry.yaml`。
 
 ## 3. 条件
 

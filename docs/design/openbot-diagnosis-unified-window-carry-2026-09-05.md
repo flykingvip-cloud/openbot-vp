@@ -2,7 +2,7 @@
 
 Date: 2026-09-05
 
-Status: **CARRY ONLY。** 智能诊断已写入下一次官方统一窗口 carry 表，与对话历史弦线同一窗，不单独切。本文件只记录诊断侧对齐，不授权 cutover，不改 LIVE，不写 `releases.jsonl` / `RELEASE_RECORD.md`。
+Status: **CARRY ONLY。** 智能诊断已写入下一次官方统一窗口 carry 表，与对话历史弦线同一窗，不单独切。本文件只记录诊断侧对齐，不授权 cutover，不改 LIVE，不写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` / `RELEASE_RECORD.md`。
 
 Task: `openbot-diagnosis-platform`
 

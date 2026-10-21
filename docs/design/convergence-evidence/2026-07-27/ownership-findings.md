@@ -18,7 +18,7 @@ tooling had already flagged it. It is the machine-visible form of the same defec
 divergent copies of this file differing by 1123 insertions / 219 deletions, and that made merge-back
 of the running commit fail with a conflict.
 
-**Structural half is done:** authority moved to `deploy/production/releases.jsonl` plus the
+**Structural half is done:** authority moved to `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` plus the
 `provenance/sha-*` tags, and the Markdown file now declares itself the human view. **Attribution half
 is not:** five tasks still claim write ownership of a file that should have one owner, or none because
 it is generated.
@@ -58,7 +58,7 @@ agent doing attribution governance skipped attribution.
 
 ```
 scripts/delivery/**
-deploy/production/releases.jsonl
+https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
 docs/design/convergence-evidence/2026-07-27/**
 docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md
 .github/workflows/trunk-follow.yml

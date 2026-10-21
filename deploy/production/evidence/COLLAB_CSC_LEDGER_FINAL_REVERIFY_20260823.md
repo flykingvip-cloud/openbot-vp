@@ -48,6 +48,6 @@ The two WARNs are expected: local docker reports the **base image** SHA `5c221b9
 
 ## Production close-out
 
-**Passed.** audit errors=0, identity-mismatch=0, alignment FAIL=0, LIVE overlay/image split confirmed, `RELEASE_RECORD` matches `releases.jsonl`.
+**Passed.** audit errors=0, identity-mismatch=0, alignment FAIL=0, LIVE overlay/image split confirmed, `RELEASE_RECORD` matches `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`.
 
 Explicitly not done: no LIVE switch, no inbound/CSC flag change, no container recreate, no new overlay.

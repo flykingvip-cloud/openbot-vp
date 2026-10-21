@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "liveLedgerNow": "Historical file list. The live production ledger is no longer in openbot-vp; it lives at https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl. The path deploy/production/releases.jsonl below records a file this diff touched.",
   "compared": {
     "seq96": "1617926868e64b3d65e1b2f37e488ba6e8fb08f0",
     "seq97": "f1c7efece96d68375bf4b7fb57e77908fedfdd6c"

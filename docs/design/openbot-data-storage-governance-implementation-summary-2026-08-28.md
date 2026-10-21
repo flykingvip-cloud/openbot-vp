@@ -376,7 +376,7 @@ Stage D 已实现持久 fencing/recovery store、local-only adapter、dark canar
 - 当前 unlock 指针：`docs/design/evidence/memory-workspace-phase1b-unlock-current.json`
 - Stage C shadow 证据：`docs/design/evidence/memory-workspace-phase1b-item7-stage-c-prod-identity-wiring-shadow.json`
 - Stage D readiness：`docs/design/evidence/memory-workspace-phase1b-item7-stage-d-prod-readiness.json`
-- 发布账本：`deploy/production/releases.jsonl`
+- 发布账本：`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 - 人工发布记录：`deploy/production/RELEASE_RECORD.md`
 - 发布标准：`docs/design/openbot-dev-delivery-pipeline-standard-2026-07-20.md`
 

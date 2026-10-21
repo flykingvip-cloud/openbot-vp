@@ -14,7 +14,7 @@
   "explicitNonActions": [
     "did not recreate openbot-gateway-rc for candidate",
     "did not swap LIVE to d3f59d55d82d",
-    "did not append seq 39 to deploy/production/releases.jsonl",
+    "did not append seq 39 to https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
     "did not enable inbound or CSC flags",
     "did not set seq39 liveFrom"
   ],

@@ -9,7 +9,7 @@ on:
       - main
     paths:
       - deploy/production/RELEASE_RECORD.md
-      - deploy/production/releases.jsonl
+      - deploy/production/LEDGER.md
       - scripts/delivery/**
 
 permissions:
@@ -30,8 +30,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Anchor LIVE on immutable artifacts (open releases.jsonl row + provenance tag +
-      # RELEASE_RECORD) and require it to be contained in the sole trunk (origin/main).
+      # The machine ledger now lives in OHBE (deploy/production/LEDGER.md). When the
+      # local JSONL is absent, delivery:check-sot still requires a resolved LIVE to be
+      # contained in origin/main and reports verdict=external. It does not compare an
+      # open ledger row, because that row is no longer in this repo.
       # The frozen release/baseline-recovery branch is never consulted, so its lag can no
       # longer produce a false failure.
       - name: Ensure trunk ref is available

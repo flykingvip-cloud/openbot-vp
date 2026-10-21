@@ -9,7 +9,7 @@ live_probe_date: "2026-10-19"
 live_evidence: references/live-evidence.md
 ```
 
-**S6（2026-10-19 Asia/Shanghai）**：见 [live-evidence.md](live-evidence.md)。本切片未完成真机/OHBE OAuth → **保持** `verified_live: false`（`path_unstable` 仍为 false）。
+**S6（2026-10-19 Asia/Shanghai）**：见 [live-evidence.md](live-evidence.md)。本切片未完成真机/OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）OAuth → **保持** `verified_live: false`（`path_unstable` 仍为 false）。
 
 ## 真实 URL（adapter）
 

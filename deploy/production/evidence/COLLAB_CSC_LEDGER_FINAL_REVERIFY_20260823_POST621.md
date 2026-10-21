@@ -23,7 +23,7 @@ healthz 200 live; readyz `ready:true`.
 
 ## seq 34 / seq 35
 
-Both rows keep `imageTag=rc-amd64-provenance-5c221b9ec3` and digest `sha256:b0995382…`. gatewaySha `affda8bce889` / `7cd74d4c5c69`. provenance tags match. `RELEASE_RECORD` matches `releases.jsonl`.
+Both rows keep `imageTag=rc-amd64-provenance-5c221b9ec3` and digest `sha256:b0995382…`. gatewaySha `affda8bce889` / `7cd74d4c5c69`. provenance tags match. `RELEASE_RECORD` matches `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`.
 
 ## Gates (worktree `761d42a0ff`)
 

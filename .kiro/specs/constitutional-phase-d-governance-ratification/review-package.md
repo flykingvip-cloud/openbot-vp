@@ -125,7 +125,7 @@ This ratification re-runs the same filters; see `gate-evidence.md`.
 
 - `productionProven`: **unknown**
 - `productionEvidenceSource`: **unavailable** (no container/live probe)
-- Repo `deploy/production/releases.jsonl` historical tip is **non-baseline only**
+- Repo `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` historical tip is **non-baseline only**
 
 ## 12. Authorization honesty
 

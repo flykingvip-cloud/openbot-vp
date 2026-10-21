@@ -2,7 +2,7 @@
 
 Production shadow-only enable, executed under explicit production-owner authorization. The
 gateway was recreated from the SAME LIVE image with only `OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=1`
-added (strictly shadow-only). No release/cutover; `RELEASE_RECORD.md` and `releases.jsonl` were
+added (strictly shadow-only). No release/cutover; `RELEASE_RECORD.md` and `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` were
 not modified and no LIVE ledger row was added.
 
 - SHADOW_ENABLED: YES
@@ -57,7 +57,7 @@ redaction and invariant checks. No anomaly was observed, so no rollback was trig
 
 ## Not modified
 
-`RELEASE_RECORD.md`, `releases.jsonl`, and the LIVE ledger are unchanged (shadow is a same-SHA flag
+`RELEASE_RECORD.md`, `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`, and the LIVE ledger are unchanged (shadow is a same-SHA flag
 toggle, not a release/cutover). No secrets, raw inspect, or env values are included here.
 
 ## Next

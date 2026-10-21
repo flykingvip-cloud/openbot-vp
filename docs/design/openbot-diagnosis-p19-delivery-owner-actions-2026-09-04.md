@@ -29,7 +29,7 @@ Related: [P19 重评](/design/openbot-diagnosis-p19-2026-09-04) · #948 <https:/
 
 1. 先再读一次运行容器。若 LIVE 已不是 `81aafe1e`，停止，按新容器 SHA 重开对账；不要把 Latest 写成旧 SHA。
 2. 在 LIVE 仍等于开放 ledger seq 62 时，把 **第一个** `## Latest cutover` 写成 seq 62 / `81aafe1e`。不要改写 seq 61 或 seq 59 的旧 Latest 段。
-3. 不要改写 `releases.jsonl` seq 61 或 seq 62。
+3. 不要改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 61 或 seq 62。
 4. 不要发布 `provenance/sha-81aafe1e*`。seq 62 账本 `tag=main`，补 tag 会伪造既有发布史。
 5. 不要重开 / 合并 #945。
 6. 合入后 `git fetch origin`，用 `--candidate-sha "$(git rev-parse origin/main)" --live-sha <容器 commit>` 重跑 preflight。
@@ -40,7 +40,7 @@ Related: [P19 重评](/design/openbot-diagnosis-p19-2026-09-04) · #948 <https:/
 
 - 把 Latest 写成 seq 61 / `e59aede250`
 - 把 Latest 写成 seq 60 / `457057ba2adb` 或 seq 59 / `3d03d3b4df`
-- 改写 `releases.jsonl` seq 61 或 seq 62
+- 改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 61 或 seq 62
 - 补发 `provenance/sha-81aafe1e*` / `e59aede2506d` / `457057ba2adb` / `3d03d3b4df91`
 - 打开诊断 gate、注册 live pack、生产构建 / 发布 / 重启 / 灰度 / 切流量
 - 把 #945 CLOSED 当成合入证据

@@ -60,7 +60,7 @@ roles (no role stripped) while unblocking the loopback chat path.
 
 ## D4 — records
 
-- `deploy/production/releases.jsonl`: appended seq 43; set seq 42 `liveTo=2026-08-26T14:37:46Z`.
+- `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`: appended seq 43; set seq 42 `liveTo=2026-08-26T14:37:46Z`.
 - `deploy/production/RELEASE_RECORD.md`: new `## Latest cutover … cf7ceb40a7`; demoted
   `831dd9c749` to `## Previous cutover`.
 - Provenance: annotated tag `provenance/sha-cf7ceb40a7c4` → `cf7ceb40a7c43…` (pushed).

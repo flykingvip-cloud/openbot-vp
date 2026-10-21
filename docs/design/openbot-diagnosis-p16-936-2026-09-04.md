@@ -40,7 +40,7 @@ Related: [delivery-owner 行动单](/design/openbot-diagnosis-p15-delivery-owner
 | candidate                     | `e7c614eb54214b2f62f082c8d99dca08b8c58232` | `--candidate-sha` = 最新 origin/main                                     | 与 origin/main 一致                             |
 | origin/main                   | `e7c614eb54214b2f62f082c8d99dca08b8c58232` | `git fetch origin` 后 `rev-parse`                                        | 4.1/4.2 + `diagnose()` 已在此                   |
 | LIVE                          | `3d03d3b4df91ab0bfaa33900eba95287c1ab30d2` | 运行容器 `/app/dist/build-info.json`，`builtAt=2026-09-04T00:43:19.076Z` | 唯一运行事实；是 candidate / origin/main 的祖先 |
-| ledger 开放行 seq 59          | `3d03d3b4df91ab0bfaa33900eba95287c1ab30d2` | `deploy/production/releases.jsonl`，`liveFrom=2026-09-04T02:11:42Z`      | 与 LIVE 一致；seq 58 已 close，keep             |
+| ledger 开放行 seq 59          | `3d03d3b4df91ab0bfaa33900eba95287c1ab30d2` | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`，`liveFrom=2026-09-04T02:11:42Z`      | 与 LIVE 一致；seq 58 已 close，keep             |
 | RELEASE_RECORD Latest cutover | `37cc40e51f468404baf3077307e347f32f636cb1` | `liveFrom=2026-09-02T09:50:59Z`                                          | **仍落后**；未写 seq 59                         |
 | provenance                    | missing                                    | 无 `provenance/sha-3d03d3b4df91`                                         | **不可证明**                                    |
 

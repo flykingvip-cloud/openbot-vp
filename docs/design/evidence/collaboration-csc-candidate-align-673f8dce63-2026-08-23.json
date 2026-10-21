@@ -16,7 +16,7 @@
     "did not overlay or swap LIVE",
     "did not run cutover-from-ghcr --stage",
     "did not change inbound or CSC or Progress Ledger flags",
-    "did not append seq 37 to deploy/production/releases.jsonl on trunk",
+    "did not append seq 37 to https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl on trunk",
     "did not write seq 37 as LIVE"
   ],
   "baseline": {

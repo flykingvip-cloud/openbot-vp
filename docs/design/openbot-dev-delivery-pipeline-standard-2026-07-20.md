@@ -52,7 +52,7 @@ L0/L1 可以超前或脏，**不得** 静默等于 L2/L3。
 | **不可变发布 tag** | `provenance/sha-<12hex>`              | **L2 权威**；标注生产实际部署的 commit          |
 | 基线锚点           | `baseline/YYYY-MM-DD`                 | 退役判据基点：被它包含的对象随时可清            |
 | 归档               | `archive/<原名>-YYYYMMDD`             | 退役前的不可变备份，使删除无损                  |
-| 机器可读发布账本   | `deploy/production/releases.jsonl`    | L3 与 tag 的对照；`pnpm delivery:ledger:audit`  |
+| 机器可读发布账本   | OHBE `deploy/production/releases.jsonl`（https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl） | 2026-10-21 起不在本仓库；本仓库只留 `deploy/production/LEDGER.md` |
 | 人读发布记录       | `deploy/production/RELEASE_RECORD.md` | 渲染视图，**不是权威**                          |
 | 已冻结             | `release/baseline-recovery-20260725`  | 保留但不得派生、不得改基、不得 cutover          |
 
@@ -300,6 +300,6 @@ repository ruleset，全部 `enforcement=active` 且 **`bypass_actors` 为空**�
 
 ## 10. 一句话给所有 Agent
 
-> **能 merge 的进 `main`；能发布的必须有 `provenance/sha-*` tag；能上生产的必须是 `releases.jsonl` 里的 tag + 镜像；上完必须并回 `main`。**  
+> **能 merge 的进 `main`；能发布的必须有 `provenance/sha-*` tag；能上生产的必须是 OHBE 账本（https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl）里的 tag + 镜像；上完必须并回 `main`。不要在 openbot-vp 重建 `deploy/production/releases.jsonl`。**  
 > 本地 worktree 成功 ≠ 生产已实现。分支名不是基线，容器自报的 commit 才是。
 > 找不到以前处理过的改动，先查 `archive/*` 标签，再基于当前 `main` 开新 PR。

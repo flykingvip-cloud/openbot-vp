@@ -31,7 +31,7 @@ Related:
 | 第一个 Latest            | seq 63 / `04690f8d2e`（#960）                                           |
 | provenance peeled target | `04690f8d2ed51f24a06825c153b7c1885d17182a`                              |
 
-签署声明绑定的 SHA 与重读后的 candidate / LIVE 一致。一人同时持有四个角色被接受。账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。未提交 `.loom/registry.yaml`。未发布新的 `provenance/sha-*`。provenance remint：`do_not_mint` / `published=false`。
+签署声明绑定的 SHA 与重读后的 candidate / LIVE 一致。一人同时持有四个角色被接受。账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。未提交 `.loom/registry.yaml`。未发布新的 `provenance/sha-*`。provenance remint：`do_not_mint` / `published=false`。
 
 ## 2. 签署结果
 

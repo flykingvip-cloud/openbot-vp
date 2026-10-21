@@ -118,7 +118,7 @@ podman stop openbot-gateway-rc 2>/dev/null; podman rm openbot-gateway-rc 2>/dev/
 
 ## 4. Ledger (after ② ③ succeed) — recorded by executor via PR, value never recorded
 
-Append a new `deploy/production/releases.jsonl` row (or a seq-44 revision note) with evidence:
+Append a new `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` row (or a seq-44 revision note) with evidence:
 `root now 1Password-managed (op://Private/openbot-ct-shadow-root); interim openssl root
 retired/destroyed (shred); OPENBOT_CT_SHADOW_HMAC_KEY_ID=ct-2026-09-vault; injection A1 =
 entrypoint op read (value never on host disk / not in podman config); SA token scoped read-only,

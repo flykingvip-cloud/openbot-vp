@@ -28,7 +28,7 @@ shadow-only observation window on the `bot-skill` (Skill孵化) assistant.
 - Flags: inbound / CSC / CONTEXT_SCOPE **unset** after swap (new code live, all flags off = zero behavior change).
 - Gate code present: `getChatInboundDepthAgentAllowlist` found in `/app/dist`.
 - Control UI: served `assets/index-Dpg8P1UR.js`. `OPENBOT_UI_OVERLAY_PINNED_ENTRY` is inert in this build (no code reads it; sanitizer only rewrites retired `index-CR5cronNm[6-8].js`).
-- Ledger: `releases.jsonl` seq 42 appended; seq 41 `liveTo=2026-08-26T04:19:23Z`. `delivery:ledger:audit` exit 0 (warnings only, no errors). `delivery:check-sot --use-release-record-live --sot-ref origin/main`: `allow` / `forwardOnly:true`.
+- Ledger: `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 42 appended; seq 41 `liveTo=2026-08-26T04:19:23Z`. `delivery:ledger:audit` exit 0 (warnings only, no errors). `delivery:check-sot --use-release-record-live --sot-ref origin/main`: `allow` / `forwardOnly:true`.
 - Merge-back: candidate `831dd9c749` is already on `main`; merge-back is a no-op. `origin/main` advanced (to `70e3320b`, then `6722d3ff`) during the process; those newer commits are deferred to a future cutover.
 
 ## Rollback

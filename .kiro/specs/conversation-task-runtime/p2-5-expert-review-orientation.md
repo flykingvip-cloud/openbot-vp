@@ -3,7 +3,7 @@
 > Owner(实施): `kiro-conversation-task-runtime` · Task: `conversation-task-runtime`
 > 关联: `./p2-5-production-integration.md`(§0 边界 / §1 架构 / §7 指标 / §9 回滚)、`./p2-5-admission-package.md`(§5 AC1–AC7)、`./p2-5-production-readiness.md`(§7 顺序 / §8 放行 C 清单)、`./p2-5-ac-a1-privacy-signoff-request.md`(隐私签核 / AC-cond)、`./p2-5-review-*.md`(四份专项评审)
 > 用途: 供**专家审查 OpenBot 长程任务(ConversationTask)机制设计与业务逻辑**时快速定位代码、理解核心逻辑、识别相关方。
-> 基线: 生产 LIVE = `deploy/production/releases.jsonl` **seq 45** / `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`。`main@b7ebb6b8937eba48d4c6f49b80581f599d6499a9` 仅作可选历史行号钉,**不是**当前 LIVE。`main` 前移后行号会漂移——请以**符号名**为准。
+> 基线: 生产 LIVE = `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` **seq 45** / `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`。`main@b7ebb6b8937eba48d4c6f49b80581f599d6499a9` 仅作可选历史行号钉,**不是**当前 LIVE。`main` 前移后行号会漂移——请以**符号名**为准。
 > GitHub 基址: `https://github.com/gmood2008/openbot` · 历史行号钉 `https://github.com/gmood2008/openbot/blob/b7ebb6b8937eba48d4c6f49b80581f599d6499a9/`
 
 ## 0. 一句话概述
@@ -12,7 +12,7 @@ ConversationTask Runtime(CTR)是"从对话中**被动识别**长程任务(long-r
 
 ## 1. 审查范围与当前状态
 
-- 全部相关代码在 `main`;生产 LIVE = 发布账本 `deploy/production/releases.jsonl` 的 **seq 45**(`21e1e8392f0ff5808563727eaa8f66e6ad9ed148`)。#796 对同一 SHA 的账本重建 / 已回滚的 seq 46 **不是**新 LIVE pin。
+- 全部相关代码在 `main`;生产 LIVE = 发布账本 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 的 **seq 45**(`21e1e8392f0ff5808563727eaa8f66e6ad9ed148`)。#796 对同一 SHA 的账本重建 / 已回滚的 seq 46 **不是**新 LIVE pin。
 - shadow 与 orch **已上线但休眠**(三重 fail-closed);`activation` / `projection` / `authorization` **OFF**;`OPENBOT_CONVERSATION_TASK_ORCH_*` 默认 OFF;`ORCHESTRATION_LIVE_INVOKE === false`;`production rollout (to activation) = NOT APPROVED`。
 - 已合入 PR 清单(代码在 main,**flags OFF**,不宣称 invoke):
   - #775 / #783 / #785 — P4.5 kernel + choke-point + identity
@@ -62,7 +62,7 @@ ConversationTask Runtime(CTR)是"从对话中**被动识别**长程任务(long-r
 
 ### 2.4 生产交付证据 `deploy/production/`
 
-- `releases.jsonl` —— **seq 45 行 = 权威 LIVE 证据**(`21e1e839`;flags OFF)。seq 44 为先前 CTR 密钥部署。#796 写入的 seq 46 是未验活前向的历史重建且已回滚,**不是**新 LIVE pin。
+- `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` —— **seq 45 行 = 权威 LIVE 证据**(`21e1e839`;flags OFF)。seq 44 为先前 CTR 密钥部署。#796 写入的 seq 46 是未验活前向的历史重建且已回滚,**不是**新 LIVE pin。
 - `RELEASE_RECORD.md` · `scripts/verify-forward-only.sh` · `scripts/verify-delivery-alignment.sh`
 - `evidence/` —— cutover 回执(执行方 `kiro-collab-csc` 署名;非实施 owner)
 

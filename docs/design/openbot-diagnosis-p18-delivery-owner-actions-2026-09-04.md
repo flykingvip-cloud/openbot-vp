@@ -39,5 +39,5 @@ Task: `openbot-diagnosis-platform`
 
 - 合并 #941 / 把 Latest 写成 `3d03d3b4df`
 - 在 LIVE 仍是 `e59aede250` 时把 Latest 写成 `457057ba2adb`
-- 改写 `releases.jsonl` seq 59 或 seq 60
+- 改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 59 或 seq 60
 - 打开诊断 gate、注册 live pack、生产构建 / 发布 / 重启 / 灰度 / 切流量

@@ -155,7 +155,7 @@
       "decision": "not-applicable",
       "authoritySource": ".kiro/specs/constitutional-governance-state-convergence/current-state.md",
       "evidenceRefs": [
-        "deploy/production/releases.jsonl",
+        "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
         "docs/design/evidence/constitutional-governance-production-baseline-2026-09-27.json"
       ],
       "conflicts": [

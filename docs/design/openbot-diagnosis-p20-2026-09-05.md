@@ -36,7 +36,7 @@ Related: [P20 行动单](/design/openbot-diagnosis-p20-delivery-owner-actions-20
 | candidate                     | `65a8195278224840bfde4de850e4ce53f067d765` | `git rev-parse origin/main`                                               | true   | 与 origin/main 一致               |
 | origin/main                   | `65a8195278224840bfde4de850e4ce53f067d765` | 新鲜 fetch；Merge #952                                                    | true   | 唯一生产来源                      |
 | LIVE                          | `04690f8d2ed51f24a06825c153b7c1885d17182a` | 容器 `build-info.json`，`builtAt=2026-09-04T13:29:54.802Z`                | true   | 唯一运行事实；是 origin/main 祖先 |
-| ledger 开放行 seq 63          | `04690f8d2ed51f24a06825c153b7c1885d17182a` | `releases.jsonl`，`liveFrom=2026-09-04T13:39:37Z`，#953，`tag=main`       | true   | 与 LIVE 一致；**keep**            |
+| ledger 开放行 seq 63          | `04690f8d2ed51f24a06825c153b7c1885d17182a` | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`，`liveFrom=2026-09-04T13:39:37Z`，#953，`tag=main`       | true   | 与 LIVE 一致；**keep**            |
 | ledger seq 62                 | `81aafe1e218e91656c3a399edb5a9080ad00d448` | 已 `liveTo=2026-09-04T13:39:37Z`                                          | true   | historical；不得改写              |
 | RELEASE_RECORD Latest cutover | `e59aede2506dbe8c571f0019f7e1bac0687778b6` | 第一个 `## Latest cutover` = seq 61，`liveFrom=2026-09-04T06:53:46Z`      | true   | **落后于 LIVE seq 63**            |
 | provenance                    | missing for LIVE                           | 有 `provenance/sha-e59aede2506d`（seq 61）；无 `provenance/sha-04690f8d*` | false  | LIVE 侧不可证明；`do_not_mint`    |

@@ -25,7 +25,7 @@ Parents: [协作运行协议 v1.0](/design/collaboration-runtime-protocol-v1-exe
 | Production deployment                               | **BLOCKED · 禁止切流**                                     |
 | 脏工作区 / 侧分支 tip                               | **不得作为构建或部署输入**                                 |
 
-LIVE 仍是 `5480cefe12`（overlay `context-compiler-main-r1`），不含现行候选。未为 `25df222f26` 写入 `releases.jsonl`。
+LIVE 仍是 `5480cefe12`（overlay `context-compiler-main-r1`），不含现行候选。未为 `25df222f26` 写入 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。
 
 本合同签署的是「当前 tip 能不能当主干候选」，不是「能不能上生产」。设计原则保持冻结。
 

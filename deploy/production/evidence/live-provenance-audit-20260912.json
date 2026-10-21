@@ -33,7 +33,7 @@
 
   "verdict": "unregistered_rolling",
   "isUnregisteredRolling": true,
-  "governanceEvent": "LIVE container reports commit 6bd4569606 (image rc-amd64-provenance-6bd4569606, digest sha256:cae8337e…) but ledger SoT and RELEASE_RECORD L3 identity still claim seq 78 / 79f2d5f57b. No releases.jsonl row for liveCommit; intermediate hop f0dec72227 also unledgered. OCI revision label matches live commit; host retains f0dec and 6bd456 provenance images; seq78 79f2d5 image absent on host.",
+  "governanceEvent": "LIVE container reports commit 6bd4569606 (image rc-amd64-provenance-6bd4569606, digest sha256:cae8337e…) but ledger SoT and RELEASE_RECORD L3 identity still claim seq 78 / 79f2d5f57b. No https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl row for liveCommit; intermediate hop f0dec72227 also unledgered. OCI revision label matches live commit; host retains f0dec and 6bd456 provenance images; seq78 79f2d5 image absent on host.",
 
   "rawCommandOutput": {
     "exitCode": 125,

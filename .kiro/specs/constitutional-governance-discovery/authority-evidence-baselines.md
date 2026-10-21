@@ -94,7 +94,7 @@ mainSha: 526180af99f162f5a941cd1a7ef21a0b51791660
 productionSeq: 97
 productionGatewaySha: f1c7efece96d68375bf4b7fb57e77908fedfdd6c
 productionUiSha: f1c7efece96d68375bf4b7fb57e77908fedfdd6c
-evidenceSource: deploy/production/releases.jsonl seq 97 at mainSha (repo ledger only; no container probe); RELEASE_RECORD.md L3 identity matches this seq
+evidenceSource: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl seq 97 at mainSha (repo ledger only; no container probe); RELEASE_RECORD.md L3 identity matches this seq
 ```
 
 说明：
@@ -114,7 +114,7 @@ evidenceSource: deploy/production/releases.jsonl seq 97 at mainSha (repo ledger 
 | 当前 `origin/main`   | `526180af99f162f5a941cd1a7ef21a0b51791660`                                                              |
 | 与 §4.2 `mainSha`    | 相同。fetch 后 trunk 没有前进，所以该 SHA 在这一刻就是当前 main，不是过期标签                           |
 | 历史评审快照         | 仍是 §4.1 的 `f1c7efece96d68375bf4b7fb57e77908fedfdd6c` / seq 96。不得把评审快照的 main 叫做当前 main   |
-| 生产账本末行         | 同一时刻读取工作区 `deploy/production/releases.jsonl` 最后一行：seq 97                                  |
+| 生产账本末行         | 同一时刻读取工作区 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 最后一行：seq 97                                  |
 | gateway SHA / UI SHA | 均为 `f1c7efece96d68375bf4b7fb57e77908fedfdd6c`                                                         |
 | 账本证据字段         | `verify-live PASS: build-info=f1c7efece96d`；`liveVerified: true`；`liveFrom: 2026-09-22T23:37:05.235Z` |
 | 容器                 | 未读 `openbot-gateway-rc`。上述 SHA 是仓库账本，不是本任务对运行容器的复测                              |

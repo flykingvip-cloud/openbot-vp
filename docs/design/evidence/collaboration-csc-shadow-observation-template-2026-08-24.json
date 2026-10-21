@@ -124,5 +124,5 @@
   "rollbackAction": "set OPENBOT_CHAT_INBOUND_DEPTH_SHADOW=0, recreate gateway from the same LIVE image, verify prior behavior restored; keep any prior passed step; no image rollback unless forward-only or approved intentional-revert",
   "nextStage": "ROUTER (OPENBOT_CHAT_INBOUND_DEPTH_ROUTER=1) only after all advance_gates pass AND production owner authorizes",
   "stageOrder": ["PERSIST_EARLY", "SHADOW", "ROUTER", "KNOWLEDGE_POLICY", "TOOL_POLICY"],
-  "ledgerCoordination": "RELEASE_RECORD.md and releases.jsonl owned by task-progress-ledger:cursor-grok; kiro-collab-csc submits preview/PR requests only"
+  "ledgerCoordination": "RELEASE_RECORD.md and https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl owned by task-progress-ledger:cursor-grok; kiro-collab-csc submits preview/PR requests only"
 }

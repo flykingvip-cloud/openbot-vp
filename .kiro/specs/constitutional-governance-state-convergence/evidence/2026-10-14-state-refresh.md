@@ -18,7 +18,7 @@ method: GitHub API only (cursor-github MCP); no clone; no CloudAgent; no ledger/
 
 ## Ledger (read-only)
 
-Source: `deploy/production/releases.jsonl` on `main`.
+Source: 2026-10-14 read-only observation of the openbot-vp copy on `main` (seq 127 below). That file is no longer the live ledger. Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl.
 
 Last open LIVE line:
 
@@ -75,9 +75,9 @@ Checkpoint B final acceptance states `checkpointCImplementationAuthorized: true`
 - This evidence file retargeted accordingly; invariants unchanged.
 
 
-## OHBE FAIL alignment (2026-10-14)
+## OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）FAIL alignment (2026-10-14)
 
-Reconciled after OHBE REQUEST_CHANGES on #698:
+Reconciled after an OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）REQUEST_CHANGES on #698:
 - matrix `ledger.openLiveSeq` → **127**
 - matrix `ledger.gatewaySha` / `uiSha` → `5ea7e2b7bd33e0a9f17e99829757913659db6e9f`
 - matrix `ledger.liveFrom` → `2026-10-14T03:30:04Z`

@@ -106,7 +106,7 @@ Then re-verify `healthz`/`readyz` + old entry `index-Dpg8P1UR.js`.
 
 ## Ledger (post-approval only)
 
-Only **after** a successful cutover, and as a separate approved action, append `releases.jsonl`
+Only **after** a successful cutover, and as a separate approved action, append `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 seq 52 and update `RELEASE_RECORD.md` (build-info evidence, UI entry, rollback path). This
 runbook does not write the ledger.
 

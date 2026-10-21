@@ -78,7 +78,7 @@ SLO 字段：查询延迟、巡检成功率、投送成功率、授权等待时�
 
 ## 5. P11 遗留反馈
 
-- 运行容器 LIVE 曾观测为 `6d9ea1f2d5`。`releases.jsonl` 开放行现为 seq 58 / 同一 SHA。
+- 运行容器 LIVE 曾观测为 `6d9ea1f2d5`。`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 开放行现为 seq 58 / 同一 SHA。
 - `RELEASE_RECORD.md` Latest cutover 仍写 seq 54 / `37cc40e51f`。账本与发布记录不一致，预检 fail-closed。
 - seq 58 行 `tag=main`，缺少 `provenance/sha-6d9ea1f2d5` 锚点。
 - 上述不一致未解决前，不得输出 Ready。

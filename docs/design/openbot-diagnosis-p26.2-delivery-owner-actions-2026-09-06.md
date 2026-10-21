@@ -46,7 +46,7 @@ Related: [P26.2 就绪](/design/openbot-diagnosis-p26.2-2026-09-06) · [P26.1 �
 ## 3. 明确禁止
 
 - Diagnosis 代切 `openbot-gateway-rc`
-- Diagnosis 代写 `RELEASE_RECORD.md` / `releases.jsonl`
+- Diagnosis 代写 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 - 用 `7d75c0bb`、`0d8a31a2`、侧分支 tip 或 dirty HEAD 当 candidate
 - 在 Docker Release 未 success 前 `--stage`
 - 把 LIVE 写成尚未发布的 `040e714c` 来假装已经切过

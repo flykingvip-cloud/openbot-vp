@@ -35,7 +35,7 @@ Related:
 | P22 人类批准             | recorded；signer=`Daniel / CEO`；`value_after_approval=false`；祖先沿用 |
 | P23 隔离金丝雀           | Ready；生产 gate 仍 false                                               |
 
-账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `releases.jsonl`。未提交 `.loom/registry.yaml`。未发布新的 `provenance/sha-*`。
+账本 / Latest / provenance：`keep` / `keep` / `keep`。未改 `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`。未提交 `.loom/registry.yaml`。未发布新的 `provenance/sha-*`。
 
 P22 签署写明批准不等于开启。因此本增量**不**把 `DIAGNOSIS_DAIBAI_DELIVERY_ENABLED` 写成 true，也**不**绑定 live chat。LIVE 未变时，签署 candidate 只要是当前 `origin/main` 的祖先即可沿用，不重签、不改 LIVE 绑定。
 

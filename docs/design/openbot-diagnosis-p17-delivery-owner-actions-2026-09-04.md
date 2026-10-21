@@ -29,14 +29,14 @@ Related: [P17 对账](/design/openbot-diagnosis-p17-ledger-2026-09-04) · [seq60
 
 1. 把 `deploy/production/RELEASE_RECORD.md` 的 **Latest cutover** 写成已证明的 LIVE `457057ba2adb`，并注明 seq 60 / container evidence / `liveFrom=2026-09-04T05:55:49Z`。
 2. 把 Latest 叙述里仍写 seq 54 / `37cc40e51f` 的句子改成 historical。不要回写 `3d03d3b4df` 或 `6d9ea1f2d5da` 当 Latest。
-3. 不要回写 `releases.jsonl` 历史行（含 seq 59、seq 60）。
+3. 不要回写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` 历史行（含 seq 59、seq 60）。
 4. 合入后 `git fetch origin`，用 `--candidate-sha "$(git rev-parse origin/main)"` 重跑 P17 CLI。
 
 ---
 
 ## 3. 明确禁止
 
-- 改写 `releases.jsonl` seq 59 或 seq 60
+- 改写 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 59 或 seq 60
 - 发布 `provenance/sha-457057ba2adb`、`provenance/sha-3d03d3b4df91`、`provenance/sha-6d9ea1f2d5da`
 - 打开四门诊断 gate、注册 live pack、生产构建 / 发布 / 重启 / 灰度 / 切流量
 

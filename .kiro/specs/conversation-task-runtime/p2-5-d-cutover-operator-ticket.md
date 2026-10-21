@@ -44,7 +44,7 @@ OPENBOT_CT_SHADOW_HMAC_KEY_ID=<密钥纪元标识,必设并记录>
 
 ## 4. 记录发布(seq 44)
 
-追加 `deploy/production/releases.jsonl`(**seq 44**)+ 更新 `deploy/production/RELEASE_RECORD.md` + 打注解 tag `provenance/sha-<short>`:
+追加 `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`(**seq 44**)+ 更新 `deploy/production/RELEASE_RECORD.md` + 打注解 tag `provenance/sha-<short>`:
 
 ```json
 {

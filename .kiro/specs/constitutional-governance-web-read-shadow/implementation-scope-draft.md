@@ -45,7 +45,7 @@
 
 - `src/agents/tools/web-search.ts` / `web-fetch.ts`（不调用）
 - `packages/**`、`ui/**`、schema、依赖清单、Feature Flag 默认值翻转
-- `deploy/production/releases.jsonl`
+- `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`
 - `.loom/registry.yaml`（仍由 kiro-loom）
 
 ## 4. 回滚摘要

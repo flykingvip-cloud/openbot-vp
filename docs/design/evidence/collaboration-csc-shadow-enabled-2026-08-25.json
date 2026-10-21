@@ -48,8 +48,12 @@
     "captureExit": 0,
     "toolSha256": "c5bd973b15eec22344a9d2f8bc8aebff599661bc5a9cd200d4c235ee5a1d1d6b"
   },
-  "notModified": ["RELEASE_RECORD.md", "releases.jsonl", "LIVE ledger (no new row)"],
+  "notModified": [
+    "RELEASE_RECORD.md",
+    "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
+    "LIVE ledger (no new row)"
+  ],
   "anomaly": "none (no rollback triggered)",
   "rollbackPlan": "same-SHA: stop+rm current, rename openbot-gateway-rc-prev-preshadow-20260825T101207Z back to openbot-gateway-rc, start, health-gate; or csc-shadow-recreate-v2.sh rollback",
-  "nextObservation": "a longer or traffic-coincident observation window can capture chat.depth_decided (wouldDepth/routeStrength/reasons) to demonstrate the shadow computation on real traffic, with the same redaction + invariant checks; still no RELEASE_RECORD/releases.jsonl change."
+  "nextObservation": "a longer or traffic-coincident observation window can capture chat.depth_decided (wouldDepth/routeStrength/reasons) to demonstrate the shadow computation on real traffic, with the same redaction + invariant checks; still no RELEASE_RECORD/https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl change."
 }

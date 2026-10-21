@@ -108,7 +108,7 @@ rather than a shadow-only change. The `csc-shadow-recreate.sh plan` assumption o
 ## Prohibitions (this stage)
 
 No container restart/recreate, no shadow enable, no P2/P3, no `RELEASE_RECORD.md` or
-`releases.jsonl` change, no LIVE ledger row.
+`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` change, no LIVE ledger row.
 
 ## Confidence
 
@@ -142,5 +142,5 @@ preserved). Backups kept as `<file>.before-inbound-cleanup.20260825T042112Z` (mo
 - `csc-shadow-recreate.sh` retained but marked non-executable, pending re-review against the cleaned env.
 
 Persistent config now matches the clean running state. Shadow remains OFF; no container
-change; `RELEASE_RECORD.md` / `releases.jsonl` untouched. A future shadow-only enable
+change; `RELEASE_RECORD.md` / `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` untouched. A future shadow-only enable
 requires a fresh plan (the prior script is quarantined, not to be reused as-is).

@@ -9,6 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { refuseLocalProductionLedger } from "./external-production-ledger.ts";
 import type { DiagnosisP24_8HumanEnablementClaim } from "./production-p24.8.ts";
 import type { DiagnosisP25HumanCanaryClaim } from "./production-p25.ts";
 import {
@@ -98,19 +99,7 @@ function gitOk(args: string[]): boolean {
 }
 
 function readOpenLedgerShas(): string[] {
-  const text = fs.readFileSync(path.join(repoRoot, "deploy/production/releases.jsonl"), "utf8");
-  const open: string[] = [];
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("{")) {
-      continue;
-    }
-    const row = JSON.parse(trimmed) as { gatewaySha?: string; liveTo?: string };
-    if (typeof row.gatewaySha === "string" && row.liveTo === undefined) {
-      open.push(row.gatewaySha);
-    }
-  }
-  return open;
+  refuseLocalProductionLedger();
 }
 
 function resolveLiveSha(injected?: string): string | null {

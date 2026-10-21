@@ -138,6 +138,20 @@ describe("delivery CLI", () => {
     expect(String(result.payload.reasons)).toMatch(/missing provenance tag/i);
   });
 
+  it("check-sot reports an external OHBE ledger when this repo has no local copy", async () => {
+    const result = await runDeliveryCli(["check-sot", "--live-sha", live], {
+      git: sotGit({ tagResolvesTo: live, trunkContains: true }),
+      readers: readers(null, null),
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.payload.verdict).toBe("external");
+    expect(String(result.payload.reasons)).toMatch(/harness-Benchmark-Engine/);
+    expect(result.payload.ledgerUrl).toBe(
+      "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
+    );
+  });
+
   it("check-sot fails closed (21) when LIVE is unknown", async () => {
     const result = await runDeliveryCli(["check-sot"], {
       git: sotGit({ tagResolvesTo: live, trunkContains: true }),

@@ -97,7 +97,7 @@
     "production recreate/restart/swap/stage",
     "enable OPENBOT_CHAT_INBOUND_DEPTH_SHADOW",
     "modify RELEASE_RECORD.md",
-    "modify releases.jsonl",
+    "modify https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
     "append LIVE ledger row"
   ],
   "nextStageAdmission": "Permission gate cleared (chmod 600 done) and plan is strictly shadow-only. The actual enable (same-SHA recreate, seconds of chat interruption, auto-rollback, ROUTER/KNOWLEDGE/TOOL/PERSIST_EARLY/COLLAB/CONTEXT_SCOPE kept off) still requires a separate explicit production-owner authorization.",

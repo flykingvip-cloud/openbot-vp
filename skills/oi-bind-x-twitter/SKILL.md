@@ -28,7 +28,7 @@ metadata:
 本 skill = **oauth 类样板（对齐 `oi-bind-github-personal`）**。不改 X OAuth 服务端；只编排用户授权闸门 → `oauth.start` → 打开授权页 → 等回调 → 刷新 snapshot。
 
 `path_unstable: false`：产品主路径是应用内 OAuth（adapter 已存在），不再走 social_account 手填。  
-`verified_live: false`：S6（2026-10-19）live-evidence 记录尚未 OHBE/真机 OAuth 完成；禁止口头称为已 live。
+`verified_live: false`：S6（2026-10-19）live-evidence 记录尚未 OHBE（https://github.com/flykingvip-cloud/harness-Benchmark-Engine）/真机 OAuth 完成；禁止口头称为已 live。
 
 字段契约：[references/field-contract.md](references/field-contract.md)  
 OAuth 路径图：[references/oauth-path.md](references/oauth-path.md)  
