@@ -1,5 +1,30 @@
 version: 1
 tasks:
+  - id: batch6-turn-completion:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 6 turn completion contract for every bot
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch6-turn-completion-2026-10-21.md
+      - src/agents/turn-completion/contract.ts
+      - src/agents/turn-completion/contract.test.ts
+      - src/agents/execution-stall-continue.ts
+      - src/agents/execution-stall-continue.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/session-continuity.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - src/infra/agent-events.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-21
+    metadata: {}
   - id: batch5-single-group-unattended:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9249,6 +9274,29 @@ tasks:
     since: 2026-10-21
     metadata: {}
 landingStreams:
+  - id: batch6-turn-completion
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/notes/openbot-batch6-turn-completion-2026-10-21.md
+      - src/agents/turn-completion/contract.ts
+      - src/agents/turn-completion/contract.test.ts
+      - src/agents/execution-stall-continue.ts
+      - src/agents/execution-stall-continue.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/session-continuity.test.ts
+      - src/gateway/server-chat.ts
+      - src/gateway/server-methods/chat.ts
+      - src/infra/agent-events.ts
+    canLandWith: []
+    metadata:
+      task: batch6-turn-completion
+      owner: cursor-cloud
+      purpose: Batch 6 turn completion contract. First-match so these shared files land with this stream.
   - id: batch5-single-group-unattended
     landingPolicy: serial
     paths:

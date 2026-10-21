@@ -18,6 +18,7 @@ import {
 } from "./pi-tools.before-tool-call.js";
 import { normalizeToolName } from "./tool-policy.js";
 import { jsonResult } from "./tools/common.js";
+import { annotateToolResultText } from "./turn-completion/contract.js";
 
 type AnyAgentTool = AgentTool;
 
@@ -79,6 +80,29 @@ function stringifyToolPayload(payload: unknown): string {
   return String(payload);
 }
 
+function annotateToolResultWritability(result: AgentToolResult<unknown>): AgentToolResult<unknown> {
+  if (!Array.isArray(result.content)) {
+    return result;
+  }
+  let changed = false;
+  const content = result.content.map((block) => {
+    if (!block || typeof block !== "object") {
+      return block;
+    }
+    const entry = block as { type?: unknown; text?: unknown };
+    if (entry.type !== "text" || typeof entry.text !== "string") {
+      return block;
+    }
+    const next = annotateToolResultText(entry.text);
+    if (next === entry.text) {
+      return block;
+    }
+    changed = true;
+    return { ...entry, text: next };
+  });
+  return changed ? { ...result, content } : result;
+}
+
 function normalizeToolExecutionResult(params: {
   toolName: string;
   result: unknown;
@@ -87,12 +111,12 @@ function normalizeToolExecutionResult(params: {
   if (result && typeof result === "object") {
     const record = result as Record<string, unknown>;
     if (Array.isArray(record.content)) {
-      return result as AgentToolResult<unknown>;
+      return annotateToolResultWritability(result as AgentToolResult<unknown>);
     }
     logDebug(`tools: ${toolName} returned non-standard result (missing content[]); coercing`);
     const details = "details" in record ? record.details : record;
     const safeDetails = details ?? { status: "ok", tool: toolName };
-    return {
+    return annotateToolResultWritability({
       content: [
         {
           type: "text",
@@ -100,10 +124,10 @@ function normalizeToolExecutionResult(params: {
         },
       ],
       details: safeDetails,
-    };
+    });
   }
   const safeDetails = result ?? { status: "ok", tool: toolName };
-  return {
+  return annotateToolResultWritability({
     content: [
       {
         type: "text",
@@ -111,7 +135,7 @@ function normalizeToolExecutionResult(params: {
       },
     ],
     details: safeDetails,
-  };
+  });
 }
 
 function splitToolExecuteArgs(args: ToolExecuteArgsAny): {

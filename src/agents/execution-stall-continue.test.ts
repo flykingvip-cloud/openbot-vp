@@ -171,6 +171,33 @@ describe("execution stall continuation", () => {
     ).toBe(false);
   });
 
+  it("continues once in a silent-exec window and keeps a two-SKU fork terminal", () => {
+    const user = "沙箱已经具备 Playwright 和 Node 20 这个条件了，请继续尝试";
+    const fishing = "绑定方向是微信运营身份还是邮箱？评审对象是哪份材料？";
+    expect(
+      executionContinueKind({
+        text: fishing,
+        toolsDisabled: false,
+        latestUserText: user,
+      }),
+    ).toBe("silent-exec");
+    expect(
+      executionContinueKind({
+        text: fishing,
+        toolsDisabled: false,
+        latestUserText: user,
+        silentExecContinuesUsed: 1,
+      }),
+    ).toBeNull();
+    expect(
+      executionContinueKind({
+        text: "有两种规格，请选规格 A 还是规格 B。",
+        toolsDisabled: false,
+        latestUserText: "请继续",
+      }),
+    ).toBeNull();
+  });
+
   it("drops earlier wait lines and keeps the latest one when the turn is still stalled", () => {
     const texts = [STALL, "马上就好。"];
     dropSupersededStallTexts(texts, [STALL, "马上就好。"], "马上就好。");

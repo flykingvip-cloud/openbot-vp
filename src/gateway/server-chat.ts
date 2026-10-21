@@ -1,11 +1,16 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { applyUserVisibleOutputGate } from "../agents/model-output-boundary.js";
+import { settleTurnCompletion } from "../agents/turn-completion/contract.js";
 import { DEFAULT_HEARTBEAT_ACK_MAX_CHARS, stripHeartbeatToken } from "../auto-reply/heartbeat.js";
 import { noteUnresolvedChatRunError } from "../auto-reply/reply/chat-run-error-escalation.js";
 import { normalizeVerboseLevel } from "../auto-reply/thinking.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { loadConfig } from "../config/config.js";
-import { type AgentEventPayload, getAgentRunContext } from "../infra/agent-events.js";
+import {
+  type AgentEventPayload,
+  getAgentRunContext,
+  type TurnCompletionRunHint,
+} from "../infra/agent-events.js";
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scratchpad.js";
@@ -71,6 +76,16 @@ function errorTextForTerminal(error: unknown): string {
     return "";
   }
   return formatForLog(error);
+}
+
+function resolveTurnCompletionHint(
+  clientRunId: string,
+  sourceRunId?: string,
+): TurnCompletionRunHint | undefined {
+  return (
+    getAgentRunContext(clientRunId)?.turnCompletion ??
+    (sourceRunId ? getAgentRunContext(sourceRunId)?.turnCompletion : undefined)
+  );
 }
 
 function resolveRunReplyLanguage(clientRunId: string, sourceRunId?: string): "zh" | "en" | null {
@@ -672,6 +687,7 @@ export function createAgentEventHandler({
     jobState: "done" | "error",
     error?: unknown,
     stopReason?: string,
+    turnCompletion?: TurnCompletionRunHint,
   ) => {
     const replyLanguage = resolveRunReplyLanguage(clientRunId, sourceRunId);
     const bufferedText = stripAssistantScratchpadFromText(
@@ -765,10 +781,24 @@ export function createAgentEventHandler({
       }
       let prepared: PreparedChatDeliverable | null = null;
       let visibleText = text;
-      if (text && !shouldSuppressSilent && !isCollaborationGroupSessionKey(sessionKey)) {
+      const hint = turnCompletion ?? resolveTurnCompletionHint(clientRunId, sourceRunId);
+      if (text && !shouldSuppressSilent) {
+        const settled = settleTurnCompletion({
+          userText: hint?.userText,
+          assistantText: text,
+          workspaceDir: hint?.workspaceDir,
+          smokeStartedAtMs: hint?.smokeStartedAtMs,
+          nowMs: Date.now(),
+          sessionKey,
+        });
+        if (settled.visibleText.trim()) {
+          visibleText = settled.visibleText;
+        }
+      }
+      if (visibleText && !shouldSuppressSilent && !isCollaborationGroupSessionKey(sessionKey)) {
         const identity = resolveDirectDeliverableIdentity(sessionKey, clientRunId, sourceRunId);
         prepared = prepareChatDeliverablePublish({
-          text,
+          text: visibleText,
           publishIntent: "agent-run-final",
           sessionKey,
           tenantId: identity.tenantId,
@@ -935,6 +965,7 @@ export function createAgentEventHandler({
       } else if (!isAborted && (lifecyclePhase === "end" || lifecyclePhase === "error")) {
         const evtStopReason =
           typeof evt.data?.stopReason === "string" ? evt.data.stopReason : undefined;
+        const turnCompletionHint = resolveTurnCompletionHint(clientRunId, evt.runId);
         const emitLifecycleFinal = () => {
           if (chatLink) {
             const finished = chatRunState.registry.shift(evt.runId);
@@ -954,6 +985,7 @@ export function createAgentEventHandler({
                 lifecyclePhase === "error" ? "error" : "done",
                 evt.data?.error,
                 evtStopReason,
+                turnCompletionHint,
               );
             } else {
               emitChatFinal(
@@ -964,6 +996,7 @@ export function createAgentEventHandler({
                 lifecyclePhase === "error" ? "error" : "done",
                 evt.data?.error,
                 evtStopReason,
+                turnCompletionHint,
               );
             }
           } else {
@@ -975,6 +1008,7 @@ export function createAgentEventHandler({
               lifecyclePhase === "error" ? "error" : "done",
               evt.data?.error,
               evtStopReason,
+              turnCompletionHint,
             );
           }
         };
