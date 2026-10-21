@@ -109,7 +109,7 @@ probe_live() {
     exit 2
   fi
   if [[ "$health" != *'"grayRelease":false'* && "$health" != *'"grayRelease": false'* ]]; then
-    echo "JOINT_PENDING device-control health is not the freeze draft"
+    echo "JOINT_PENDING device-control health is not the v1 freeze"
     exit 2
   fi
   echo "device-control loopback health ok"

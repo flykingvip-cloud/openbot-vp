@@ -45,18 +45,20 @@ export const OPENBOT_OPENAPI_RAW_URL =
   "https://raw.githubusercontent.com/flykingvip-cloud/openbot-vp/d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f/docs/integrations/device-digital-human/openapi.yaml";
 
 /**
- * Device-sdk main tip Agent A named. Not a freeze.
- * Relative to docs merge 69cfb924: no field, path, or error-code changes.
- * info.version stays v1-draft. Health maturity stays agent-b-freeze-draft.
+ * Device-sdk main tip Agent A named before the freeze. Not the pin.
+ * Relative to docs merge 69cfb924: no field, path, header-name, or error-code changes.
+ * OpenAPI info.version is v1. Health maturity is v1-frozen.
  */
 export const DEVICE_SDK_MAIN_TIP = "9af0e59f6bce632fb2a38efc84a5dd3902551da5";
 export const DEVICE_SDK_DOCS_MERGE_PREFIX = "69cfb924";
-/** Their v1-frozen PR. CONTROL_FREEZE_SHA is assigned when that PR merges. */
+/** Their v1-frozen draft PR id. The pin is the squash on device-sdk main, not this id. */
 export const DEVICE_SDK_V1_FROZEN_PR = "bc-860051cc";
-/** Placeholder. Do not invent a commit SHA before Agent A merges the freeze. */
-export const CONTROL_FREEZE_SHA = "TBD";
-export const DEVICE_CONTROL_OPENAPI_PATH =
-  "contracts/device-platform/device-control.openapi.yaml";
+/**
+ * device-sdk main after flykingvip-cloud/openbot-device-sdk PR #18 squash.
+ * Not the historical main tip and not the historical draft freeze.
+ */
+export const CONTROL_FREEZE_SHA = "55ead3ef7fe7f20137123447c39e3f26f9bffbbe";
+export const DEVICE_CONTROL_OPENAPI_PATH = "contracts/device-platform/device-control.openapi.yaml";
 
 /** Historical device-control draft freeze. Not OPENBOT_CONTRACT_SHA and not CONTROL_FREEZE_SHA. */
 export const DEVICE_CONTROL_CONTRACT_SHA = "4ac6f2823c69a4c471fe89592a411a15535c0b81";
@@ -103,7 +105,7 @@ const healthBody = {
   ok: true,
   service: "device-control",
   apiPrefix: "/api/device-platform/v1",
-  maturity: "agent-b-freeze-draft",
+  maturity: "v1-frozen",
   grayRelease: false,
   realDeviceDelivery: false,
   firmwareUrl: null,

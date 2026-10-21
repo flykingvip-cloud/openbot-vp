@@ -164,7 +164,7 @@ describe("device platform joint harness", () => {
     expect(acceptance).toContain(DEVICE_SDK_MAIN_TIP);
     expect(acceptance).toContain(DEVICE_SDK_DOCS_MERGE_PREFIX);
     expect(acceptance).toContain(DEVICE_SDK_V1_FROZEN_PR);
-    expect(acceptance).toContain(`CONTROL_FREEZE_SHA = ${CONTROL_FREEZE_SHA}`);
+    expect(acceptance).toContain(`CONTROL_FREEZE_SHA=${CONTROL_FREEZE_SHA}`);
     expect(acceptance).toContain(DEVICE_CONTROL_OPENAPI_PATH);
     expect(acceptance).toContain(DEFAULT_DEVICE_CONTROL_BASE_URL);
     expect(acceptance).toContain(DEFAULT_STUB_BASE_URL);
@@ -207,7 +207,7 @@ describe("device platform joint harness", () => {
     expect(harness.stdout).toContain("JOINT_PENDING cross-host hardware");
     expect(harness.stdout).toContain(OPENBOT_CONTRACT_SHA);
     expect(harness.stdout).toContain(DEVICE_SDK_MAIN_TIP);
-    expect(harness.stdout).toContain("CONTROL_FREEZE_SHA TBD");
+    expect(harness.stdout).toContain(`CONTROL_FREEZE_SHA ${CONTROL_FREEZE_SHA}`);
     expect(harness.stdout).toContain("voice-photo stub deviceEffect false");
   }, 60_000);
 });
