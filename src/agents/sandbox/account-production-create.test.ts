@@ -377,6 +377,9 @@ describe("account production sandbox create", () => {
     expect(script).toContain("Xvfb :1 -screen 0 1280x800x24");
     expect(dockerfile).toContain("openbox");
     expect(dockerfile).toContain("python3-tk");
+    expect(dockerfile).toContain("\n    thunar \\\n");
+    expect(dockerfile).toContain("xdg-utils");
+    expect(dockerfile).toContain("xdg-mime default thunar.desktop inode/directory");
     expect(dockerfile).toContain("xterm");
     expect(dockerfile).toContain("fonts-wqy-microhei");
     expect(dockerfile).toContain(
@@ -391,9 +394,16 @@ describe("account production sandbox create", () => {
     expect(desktop).not.toContain("打开浏览器");
     expect(desktop).toContain("def open_chrome");
     expect(desktop).toContain("def open_files");
-    expect(desktop).toContain('text="上一级"');
-    expect(desktop).toContain('text="关闭"');
-    expect(desktop).toContain("WM_DELETE_WINDOW");
+    expect(desktop).toContain("def files_argv");
+    expect(desktop).toContain('shutil.which("thunar")');
+    expect(desktop).toContain('shutil.which("xdg-open")');
+    expect(desktop).toContain("files_start_dir()");
+    expect(desktop).not.toContain("class FileWindow");
+    expect(desktop).not.toContain("tk.Listbox");
+    expect(desktop).not.toContain('title("文件")');
+    expect(desktop).not.toContain('text="上一级"');
+    expect(desktop).not.toContain("WM_DELETE_WINDOW");
+    expect(desktop).toContain("def is_thunar_client");
     expect(desktop).toContain("def show_desktop");
     expect(desktop).toContain("def windows_to_hide");
     expect(desktop).toContain("def desktop_hotspots");
@@ -440,11 +450,15 @@ describe("account production sandbox create", () => {
     expect(script).toContain("<layer>above</layer>");
     expect(script).toContain("<fullscreen>no</fullscreen>");
     expect(script).toMatch(/class=\\"\*hromium\*\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
-    expect(script).toMatch(/title=\\"文件\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
+    expect(script).not.toMatch(/title=\\"文件\\"/);
+    expect(script).toMatch(/class=\\"Thunar\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
+    expect(script).toMatch(/name=\\"thunar\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
+    expect(script).toMatch(/title=\\"\* - Thunar\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
     expect(script).toMatch(/title=\\"终端\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
     expect(script).toMatch(/class=\\"XTerm\\"[\s\S]{0,220}<maximized>yes<\/maximized>/);
     expect(script).toContain("终端");
-    expect(script).toContain("文件");
+    expect(script).toContain("xdg-mime default thunar.desktop inode/directory");
+    expect(script).not.toContain("文件");
     expect(script).toContain('keybind key=\\"C-A-d\\"');
     expect(script).toContain("--show-desktop");
     expect(dockerfile).toContain("wmctrl");
@@ -461,8 +475,8 @@ describe("account production sandbox create", () => {
       "Chromium",
       "Google",
       "0x2",
-      "Tk",
-      "文件",
+      "thunar.Thunar",
+      "openbot-home - Thunar",
       "0x3",
       "OpenBot Desktop",
       "OpenBot Desktop",

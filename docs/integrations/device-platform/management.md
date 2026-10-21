@@ -95,7 +95,7 @@ On startup, runs that are not terminal become `interrupted` with `UNKNOWN_AFTER_
 
 ## Control contract
 
-`HttpDevicePlatformControl` speaks the frozen device-control contract (`agent-b-freeze-draft`). Test connection calls `GET /health` and `GET /capabilities` with the stored service Basic credential. Redirects are not followed. A failed check does not mark the connector healthy. `FakeDevicePlatformControl` remains the in-process double for management unit tests. Do not put production secrets in a frontend build.
+`HttpDevicePlatformControl` speaks the frozen device-control contract (Health `maturity=v1-frozen`, `CONTROL_FREEZE_SHA=55ead3ef7fe7f20137123447c39e3f26f9bffbbe`). Test connection calls `GET /health` and `GET /capabilities` with the stored service Basic credential. Redirects are not followed. A failed check does not mark the connector healthy. `FakeDevicePlatformControl` remains the in-process double for management unit tests. Do not put production secrets in a frontend build.
 
 Disabling a connector blocks new grants and executions immediately. Existing device relationships stay until the user revokes them (`disabledDisposition: block_new_keep_existing`). Phase 1 only configures and verifies the connector. It does not push secrets to other hosts.
 

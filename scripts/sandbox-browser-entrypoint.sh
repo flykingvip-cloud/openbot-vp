@@ -86,6 +86,20 @@ resolve_chrome_user_data_dir() {
 CHROME_USER_DATA_DIR="$(resolve_chrome_user_data_dir)"
 mkdir -p "${HOME}" "${CHROME_USER_DATA_DIR}" "${XDG_CONFIG_HOME}" "${XDG_CACHE_HOME}"
 
+# Directory opens use Thunar. The image also writes a system mimeapps.list;
+# this covers the runtime HOME (/tmp/openbot-home), which is created here.
+install_directory_mime_default() {
+  if ! command -v xdg-mime >/dev/null 2>&1; then
+    return 0
+  fi
+  if [[ ! -f /usr/share/applications/thunar.desktop ]]; then
+    return 0
+  fi
+  mkdir -p "${HOME}/.local/share/applications"
+  xdg-mime default thunar.desktop inode/directory || true
+}
+install_directory_mime_default
+
 if [[ "${OPENBOT_BROWSER_ENTRYPOINT_PRINT_USER_DATA:-${OPENCLAW_BROWSER_ENTRYPOINT_PRINT_USER_DATA:-}}" == "1" ]]; then
   printf '%s\n' "${CHROME_USER_DATA_DIR}"
   exit 0
@@ -170,7 +184,17 @@ install_openbox_desktop_rule() {
       print "    <maximized>yes</maximized>"
       print "    <fullscreen>no</fullscreen>"
       print "  </application>"
-      print "  <application title=\"文件\">"
+      print "  <application class=\"Thunar\">"
+      print "    <decor>no</decor>"
+      print "    <maximized>yes</maximized>"
+      print "    <fullscreen>no</fullscreen>"
+      print "  </application>"
+      print "  <application name=\"thunar\">"
+      print "    <decor>no</decor>"
+      print "    <maximized>yes</maximized>"
+      print "    <fullscreen>no</fullscreen>"
+      print "  </application>"
+      print "  <application title=\"* - Thunar\">"
       print "    <decor>no</decor>"
       print "    <maximized>yes</maximized>"
       print "    <fullscreen>no</fullscreen>"

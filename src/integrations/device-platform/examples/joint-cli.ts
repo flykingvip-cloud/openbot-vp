@@ -56,8 +56,8 @@ if (report.documentedControlBaseUrl !== DEFAULT_DEVICE_CONTROL_BASE_URL) {
 if (report.documentedStubBaseUrl !== DEFAULT_STUB_BASE_URL) {
   throw new Error("documented integrations stub origin drifted");
 }
-if (CONTROL_FREEZE_SHA !== "TBD") {
-  throw new Error("CONTROL_FREEZE_SHA must stay TBD until Agent A merges the freeze");
+if (CONTROL_FREEZE_SHA !== "55ead3ef7fe7f20137123447c39e3f26f9bffbbe") {
+  throw new Error("CONTROL_FREEZE_SHA drifted from the device-sdk v1 freeze");
 }
 process.stdout.write("harness ok\n");
 process.stdout.write(`device-control default ${DEFAULT_DEVICE_CONTROL_BASE_URL}\n`);

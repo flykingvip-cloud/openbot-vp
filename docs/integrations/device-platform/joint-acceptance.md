@@ -24,22 +24,31 @@ Management records: [Device platform management](/integrations/device-platform/m
 
 ## Contract pin
 
-Field names stay frozen: `authorizationRef`, `bindingVersion`, `digitalHumanId`, `deviceId`, `assistant.*`. Pairing fields stay off `/api/integrations/v1` (`pairFieldsAccepted` is false). This page does not rename them.
+Field names stay frozen: `authorizationRef`, `bindingVersion`, `digitalHumanId`, `deviceId`, `assistant.*`. Pairing fields stay off `/api/integrations/v1` (`pairFieldsAccepted` is false). Header names and error codes stay frozen. This page does not rename them.
 
 | Pin | Value |
 | --- | --- |
 | `OPENBOT_CONTRACT_SHA` | `d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f` |
 | OpenBot OpenAPI | `docs/integrations/device-digital-human/openapi.yaml` at that SHA |
-| device-sdk main tip | `9af0e59f6bce632fb2a38efc84a5dd3902551da5` |
+| device-sdk main tip (historical, not the pin) | `9af0e59f6bce632fb2a38efc84a5dd3902551da5` |
 | device-sdk OpenAPI path | `contracts/device-platform/device-control.openapi.yaml` |
 | Docs merge prefix | `69cfb924` |
-| Versus that docs merge | No field, path, or error-code changes |
-| `info.version` | `v1-draft` |
-| Health `maturity` | `agent-b-freeze-draft` |
-| v1-frozen PR | `bc-860051cc` |
-| `CONTROL_FREEZE_SHA` | `CONTROL_FREEZE_SHA = TBD` until that PR merges |
+| Versus that docs merge | No field-name, path, header-name, or error-code changes |
+| `info.version` | `v1` |
+| Health `maturity` | `v1-frozen` |
+| API prefix | `/api/device-platform/v1` |
+| Device-control loopback | `http://127.0.0.1:8791` |
+| v1-frozen PR id | `bc-860051cc` (landed as flykingvip-cloud/openbot-device-sdk PR #18) |
+| `CONTROL_FREEZE_SHA` | `CONTROL_FREEZE_SHA=55ead3ef7fe7f20137123447c39e3f26f9bffbbe` |
+| 契约冻结 | DONE |
 
-`CONTROL_FREEZE_SHA = TBD` is a placeholder, not a commit. Do not treat the device-sdk main tip as the freeze SHA. Historical draft freeze `4ac6f2823c69a4c471fe89592a411a15535c0b81` is not the pin either.
+`CONTROL_FREEZE_SHA=55ead3ef7fe7f20137123447c39e3f26f9bffbbe` is the device-sdk `main` commit after PR #18 squash-merged. It is the freeze pin. It is not the historical device-sdk main tip `9af0e59f6bce632fb2a38efc84a5dd3902551da5`, and it is not the historical draft freeze `4ac6f2823c69a4c471fe89592a411a15535c0b81`.
+
+The frozen OpenAPI file is `contracts/device-platform/device-control.openapi.yaml` with `info.version=v1` and Health `maturity=v1-frozen`. The prefix is `/api/device-platform/v1`. The loopback default is `http://127.0.0.1:8791`. Relative to docs merge `69cfb924`, field names, paths, header names, and error codes are unchanged. `OPENBOT_CONTRACT_SHA` is still `d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`.
+
+`grayRelease`, `realDeviceDelivery`, `flash`, and `massFlash` stay false. `firmwareUrl` stays null. 契约冻结 is the only gate marked DONE. 管理页浏览器联调, staging, 真机, 生产, and 设备实际已生效 stay PENDING / JOINT_PENDING.
+
+Agent A sim script is `npm run sim-joint`. When credentials are unset, that script skips. A skip is not a pass. Agent A docs are `docs/integration/joint-acceptance.md` and `docs/integration/sim-joint-loopback.md`. Agent A rerun on the freeze commit: typecheck exit 0; test 75 pass / 0 fail / 4 skip. The 4 skips are live stubs.
 
 After this OpenBot change merges, the coordinator publishes MERGE_SHA. This page does not invent it.
 
@@ -72,7 +81,7 @@ Pointers are repo-root paths. PENDING means this tree has no evidence in that co
 | --- | --- | --- | --- | --- | --- |
 | 管理页面可操作 | PASS. `ui/src/ui/ports/platform/device-platform/page.browser.test.ts` drives 设备平台连接 save and test against a fake fetch | PENDING. The harness calls the admin HTTP handler. It does not open the page | PENDING. No public staging URL | PENDING | PENDING |
 | 服务接口可调用 | PASS. `src/integrations/device-platform/admin-connection.test.ts`, `src/gateway/device-platform-http.test.ts` | PASS. Harness `POST /api/device-platform/v1/admin/connections/plat-local/test`. Connector origin is the device-control stand-in, not `http://127.0.0.1:18789` | PENDING | PENDING | PENDING |
-| 设备实际已生效 | N/A. Health is a connector probe. `executable`, `flash`, and `massFlash` stay false | N/A. The stand-in returns the freeze-draft health body. That is not a device actuation | PENDING | PENDING | PENDING |
+| 设备实际已生效 | N/A. Health is a connector probe. `executable`, `flash`, and `massFlash` stay false | N/A. The stand-in returns the v1-frozen health body. That is not a device actuation | PENDING | PENDING | PENDING |
 
 ### 2. User adds a device from 设备与硬件
 
@@ -137,7 +146,7 @@ bash src/integrations/device-platform/examples/joint.sh --print
 bash src/integrations/device-platform/examples/joint.sh
 ```
 
-Stdout must include `harness ok`, `CONTROL_FREEZE_SHA TBD`, `voice-photo stub deviceEffect false`, and `JOINT_PENDING cross-host hardware`.
+Stdout must include `harness ok`, `CONTROL_FREEZE_SHA 55ead3ef7fe7f20137123447c39e3f26f9bffbbe`, `voice-photo stub deviceEffect false`, and `JOINT_PENDING cross-host hardware`.
 
 Focused tests:
 
@@ -154,5 +163,7 @@ pnpm exec vitest run \
 - staging: PENDING. No public staging host. Loopback `development` is the only allowed connector target.
 - 真机: PENDING. `grayRelease` is false and `realDeviceDelivery` is false. Voice and photo are not device evidence.
 - 生产: PENDING. No production cutover and no production device-control URL.
-- `CONTROL_FREEZE_SHA = TBD` until Agent A merges `bc-860051cc`.
-- Operator rehearsal against real `http://127.0.0.1:8791` and `http://127.0.0.1:8787` is not this harness. `OPENBOT_DEVICE_PLATFORM_JOINT=live` still exits 2.
+- 契约冻结: DONE. `CONTROL_FREEZE_SHA=55ead3ef7fe7f20137123447c39e3f26f9bffbbe`.
+- 管理页浏览器联调: PENDING. The harness does not open the admin or member page.
+- 设备实际已生效: PENDING / JOINT_PENDING. A v1-frozen health body is not a device actuation.
+- Operator rehearsal against real `http://127.0.0.1:8791` and `http://127.0.0.1:8787` is not this harness. `OPENBOT_DEVICE_PLATFORM_JOINT=live` still exits 2. Agent A `npm run sim-joint` skips when credentials are unset. A skip is not a pass.

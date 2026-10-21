@@ -23,7 +23,7 @@ The hook writes classic RFB KeyEvent messages (type 4) for Shift, Control, Alt, 
 
 Openbox still binds `C-A-d` to `openbot-sandbox-desktop --show-desktop`, which unmaps visible apps (`wmctrl` hidden). The desktop poll then maps the dock shelf. The relay still drops the chord when this session has no input grant. Dock icon clicks still raise an app; they do not hide it.
 
-The Files window lists `/tmp/openbot-home`, `openbot-desktop.log`, and `openbot-openbox.log`. Those names live in the sandbox browser image tip (the COPY of the entrypoint). An older image still shows `openclaw-*` until `scripts/sandbox-browser-setup.sh` is rebuilt and the browser container is recreated. That rebuild is not a production cutover.
+The folder Dock icon opens Thunar at `/tmp/openbot-home` (`files_start_dir()`, the entrypoint `HOME`). `openbot-desktop.log` and `openbot-openbox.log` stay in `/tmp` beside that home and show up when Thunar goes to the parent. Those names live in the sandbox browser image tip (the COPY of the entrypoint). Thunar itself is an apt package in `Dockerfile.sandbox-browser`, so this change rebuilds the apt layer as well as the tip. An older image still shows `openclaw-*` and has no Thunar until `scripts/sandbox-browser-setup.sh` is rebuilt and the browser container is recreated. That rebuild is not a production cutover.
 
 ## Re-verify 返回桌面
 
@@ -33,15 +33,27 @@ This key path is the observer page served by the gateway. Restart or redeploy th
 2. With Chromium mapped (`xprop` `WM_STATE` `IsViewable`), click 返回桌面. Chromium becomes `IsUnMapped` and the dock icons return. The preview sidebar stays open. 全屏, 给AI, and 关闭预览 stay in the same slots.
 3. Fullscreen has no 返回桌面 title. Leave fullscreen with the X or Escape, then click 返回桌面. 关闭预览 on the docked bar still closes the sidebar.
 
-## Files window
+## Files (Thunar)
 
-Openbox draws no titlebar on the window titled 文件. The path bar keeps **上一级** and adds a large **关闭** that destroys the window (also on `WM_DELETE_WINDOW`). With no other app mapped, the dock shelf returns.
+The folder Dock icon runs `thunar <absolute path>` from `files_start_dir()` (`HOME`, normally `/tmp/openbot-home`). If `thunar` is missing, the same path is passed to `xdg-open`. The image installs `thunar` and `xdg-utils`, and both the image build and the entrypoint run `xdg-mime default thunar.desktop inode/directory`, so a directory open uses Thunar. There is no Tk list and no window titled 文件.
+
+Success check for the mapped window:
+
+- Window title (`WM_NAME`) is `«directory name» - Thunar` (for the sandbox home, `openbot-home - Thunar`).
+- Menu bar: File, Edit, View, Go, Bookmarks, Help.
+- Navigation toolbar.
+- Location bar shows the real path (`/tmp/openbot-home` at launch).
+- Left pane: Places and Devices.
+- Main pane lists the directory.
+- Status bar at the bottom.
+
+Openbox matches that window by `class="Thunar"`, `name="thunar"`, or `title="* - Thunar"`. The same preview rule used for Chromium and the terminal applies only to those Thunar matches: no window-manager frame (`<decor>no</decor>`), maximized to the 1280×800 framebuffer, fullscreen off. The title string is still `«directory» - Thunar`; Openbox does not draw it as a frame. Thunar's own menu, toolbar, location bar, side pane, and status bar stay. 返回桌面 unmaps the window and the dock shelf returns. Closing it from Thunar's File menu does the same. A second click on the folder icon raises the existing Thunar window instead of opening another list.
 
 ## Demo
 
-Files 关闭 needs a sandbox browser image built with `scripts/sandbox-browser-setup.sh`. 返回桌面 uses the gateway observer page: restart that gateway and reload the preview. Rebuild the image only when `xdotool key ctrl+alt+d` does not already unmap Chromium. The header labels and fullscreen slot do not need that rebuild.
+Seeing Thunar needs a sandbox browser image built with `scripts/sandbox-browser-setup.sh` and a recreated browser container. 返回桌面 uses the gateway observer page: restart that gateway and reload the preview. Rebuild the image only when `xdotool key ctrl+alt+d` does not already unmap Chromium, or when the image does not yet contain Thunar. The header labels and fullscreen slot do not need that rebuild.
 
 1. Open 电脑, not fullscreen. Order is 返回桌面, 全屏, 接管 or 给AI, 关闭预览. 全屏 does not float over the picture.
 2. Click 全屏. 返回桌面, 全屏, and 给AI disappear. The whole desktop stays visible, including the dock. The X returns to the docked bar (the sidebar stays open). Escape does the same. On the docked bar those three titles show again, and 关闭预览 closes the sidebar. The docked picture fills the pane width.
 3. With input, click 返回桌面 while Chromium, Files, or the terminal is up. The picture returns to the wallpaper and the three dock icons.
-4. Open Files, go up to `/`. 上一级 still changes directory. 关闭 dismisses the window and the dock icons come back.
+4. Open Files. The window is Thunar. `WM_NAME` is `openbot-home - Thunar` (Openbox draws no frame around it). The menu bar reads File, Edit, View, Go, Bookmarks, Help. The location bar shows `/tmp/openbot-home`. Places and Devices are on the left, the directory is in the main pane, and a status bar is at the bottom. The window is maximized. 返回桌面 unmaps it and the dock icons come back.

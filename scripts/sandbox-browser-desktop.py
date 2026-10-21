@@ -2,13 +2,13 @@
 """Minimal account-computer desktop inside the sandbox browser container.
 
 Flat light wallpaper, the official OpenBot logo, and three launchers
-(Chrome, files, terminal). There is no dock tray. On an empty desktop the
-three icons sit in a wallpaper-colored band so the user can still launch
-apps. While any app window is mapped and not minimized, that band is
-unmapped and the app fills the framebuffer. Agent-opened Chromium windows
-are included, not only Dock launches. The wallpaper stays below those
-apps even after Openbox raises it. This is not a full desktop
-environment.
+(Chrome, Thunar, terminal). There is no dock tray and no custom file list.
+On an empty desktop the three icons sit in a wallpaper-colored band so the
+user can still launch apps. While any app window is mapped and not
+minimized, that band is unmapped and the app fills the framebuffer.
+Agent-opened Chromium windows are included, not only Dock launches. The
+wallpaper stays below those apps even after Openbox raises it. This is not
+a full desktop environment.
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ import time
 from pathlib import Path
 
 WALLPAPER = "#e7e7eb"
-# File-window control only. The desktop icons sit on the wallpaper with no tray.
-CHIP = "#dedee3"
 # Gold folder on the light wallpaper. A near-white body disappears into #e7e7eb.
 FOLDER_EDGE = "#5c3408"
 FOLDER_TAB = "#8a4e0c"
@@ -272,92 +270,24 @@ def place_logo(root, canvas, center_x: int, center_y: int) -> None:
     canvas.create_image(center_x, center_y, image=shown, anchor="center")
 
 
-class FileWindow:
-    def __init__(self, root, start: Path) -> None:
-        tk, _tkfont = load_tk()
-        self.top = tk.Toplevel(root)
-        self.top.title("文件")
-        work_w, work_h = app_work_area(root.winfo_screenwidth(), root.winfo_screenheight())[2:]
-        self.top.geometry(f"{work_w}x{work_h}+0+0")
-        self.top.configure(bg=WALLPAPER)
-        self.path = start if start.is_dir() else start.parent
-        bar = tk.Frame(self.top, bg=WALLPAPER)
-        bar.pack(fill="x", padx=12, pady=(12, 0))
-        # Openbox sets <decor>no</decor> on title 文件, so this bar is the only chrome.
-        # 上一级 stays; 关闭 is a large client-area control, not a titlebar glyph.
-        tk.Button(
-            bar,
-            text="上一级",
-            command=self.up,
-            relief="flat",
-            bg=CHIP,
-            font=ui_font(12),
-            padx=12,
-            pady=6,
-        ).pack(side="left")
-        self.label = tk.Label(bar, text="", bg=WALLPAPER, anchor="w", font=ui_font(11))
-        self.label.pack(side="left", fill="x", expand=True, padx=8)
-        tk.Button(
-            bar,
-            text="关闭",
-            command=self.close,
-            relief="flat",
-            bg=CHIP,
-            font=ui_font(12),
-            padx=18,
-            pady=6,
-            cursor="hand2",
-        ).pack(side="right")
-        self.list = tk.Listbox(self.top, activestyle="none", font=ui_font(12), relief="flat", borderwidth=0)
-        self.list.pack(fill="both", expand=True, padx=12, pady=12)
-        self.list.bind("<Double-Button-1>", lambda _event: self.enter())
-        self.entries: list[Path] = []
-        self.top.protocol("WM_DELETE_WINDOW", self.close)
-        self.refresh()
-        self.top.lift()
-        self.top.focus_force()
+def files_launch_dir(start: Path | None = None) -> Path:
+    """Absolute directory Thunar should open. Same start as files_start_dir()."""
+    directory = start if start is not None else files_start_dir()
+    if not directory.is_dir():
+        directory = directory.parent if directory.parent.is_dir() else Path("/tmp")
+    return directory.resolve()
 
-    def close(self) -> None:
-        """Destroy the file window so the dock shelf can return. Path state is not kept."""
-        try:
-            self.top.destroy()
-        except Exception:
-            pass
-        if getattr(open_files, "window", None) is self:
-            open_files.window = None
 
-    def refresh(self) -> None:
-        self.label.configure(text=str(self.path))
-        self.list.delete(0, "end")
-        try:
-            entries = sorted(self.path.iterdir(), key=lambda item: (not item.is_dir(), item.name.lower()))
-        except OSError:
-            entries = []
-        self.entries = entries
-        if not entries:
-            self.list.insert("end", "（空文件夹）")
-            return
-        for entry in entries:
-            prefix = "📁 " if entry.is_dir() else "  "
-            self.list.insert("end", f"{prefix}{entry.name}")
-
-    def up(self) -> None:
-        parent = self.path.parent
-        if parent != self.path:
-            self.path = parent
-            self.refresh()
-
-    def enter(self) -> None:
-        selection = self.list.curselection()
-        if not selection or not self.entries:
-            return
-        index = selection[0]
-        if index >= len(self.entries):
-            return
-        entry = self.entries[index]
-        if entry.is_dir():
-            self.path = entry
-            self.refresh()
+def files_argv(start: Path | None = None) -> list[str] | None:
+    """Prefer `thunar <absolute path>`. Fall back to xdg-open for the same path."""
+    path = str(files_launch_dir(start))
+    binary = shutil.which("thunar")
+    if binary:
+        return [binary, path]
+    opener = shutil.which("xdg-open")
+    if opener:
+        return [opener, path]
+    return None
 
 
 def draw_chrome(canvas, cx: int, cy: int, radius: int) -> None:
@@ -466,17 +396,26 @@ def wait_for_wm() -> None:
         subprocess.call(["sleep", "0.05"])
 
 
-def open_files(root) -> None:
-    existing = getattr(open_files, "window", None)
-    if existing is not None:
-        try:
-            if existing.top.winfo_exists():
-                existing.top.lift()
-                existing.top.focus_force()
-                return
-        except Exception:
-            pass
-    open_files.window = FileWindow(root, files_start_dir())
+def open_files() -> None:
+    """Launch Thunar on the sandbox home. The dock raises an existing window.
+
+    There is no Tk list. Openbox matches class Thunar / title ``* - Thunar``
+    and maximizes that window. xdg-open is only used when thunar is absent.
+    """
+    argv = files_argv()
+    if not argv:
+        print("desktop launcher missing: thunar", file=sys.stderr, flush=True)
+        return
+    spawn(argv)
+
+
+def is_thunar_client(wm_class: str, title: str) -> bool:
+    """Real Thunar window. The retired Tk list titled 文件 is not one."""
+    parts = [part for part in wm_class.lower().split(".") if part]
+    if "thunar" in parts:
+        return True
+    stripped = title.strip()
+    return stripped == "Thunar" or stripped.endswith(" - Thunar")
 
 
 def same_window(left: str, right: str) -> bool:
@@ -491,20 +430,20 @@ def client_matches(name: str, wm_class: str, title: str) -> bool:
     if name == "chrome":
         return "chromium" in kind or "chrome" in kind
     if name == "files":
-        return title == "文件"
+        return is_thunar_client(wm_class, title)
     if name == "terminal":
         return title == "终端" or "xterm" in kind
     return False
 
 
 def client_is_app(wm_class: str, title: str) -> bool:
-    """Chrome, the file window, or xterm. The wallpaper and the shelf are not apps."""
+    """Chrome, Thunar, or xterm. The wallpaper and the shelf are not apps."""
     if title in {"OpenBot Desktop", "OpenBot Dock"}:
         return False
     kind = wm_class.lower()
     if "chromium" in kind or "chrome" in kind:
         return True
-    if title in {"文件", "终端"} or "xterm" in kind:
+    if is_thunar_client(wm_class, title) or title == "终端" or "xterm" in kind:
         return True
     return False
 
@@ -885,7 +824,7 @@ def launch_at(root, width: int, height: int, x: int, y: int) -> None:
     if name == "chrome":
         launch_named(root, name, open_chrome)
     elif name == "files":
-        launch_named(root, name, lambda: open_files(root))
+        launch_named(root, name, open_files)
     elif name == "terminal":
         launch_named(root, name, open_terminal)
 
@@ -994,7 +933,7 @@ def run_desktop() -> None:
         local_hotspot(hotspots["files"], shelf_x, shelf_y),
         draw_files,
         "files",
-        lambda: open_files(root),
+        open_files,
     )
     mount_launcher(
         root,

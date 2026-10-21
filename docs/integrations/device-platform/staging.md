@@ -57,7 +57,7 @@ Agent A pins this OpenBot tree at the B5 main tip this joint branched from. Do n
 
 That SHA is the pin. After this change merges, the coordinator publishes the new MERGE_SHA. This page does not invent that SHA.
 
-The evidence matrix, mock-ready ports, and `CONTROL_FREEZE_SHA = TBD` placeholder are in [Joint acceptance](/integrations/device-platform/joint-acceptance).
+The evidence matrix, mock-ready ports, and `CONTROL_FREEZE_SHA=55ead3ef7fe7f20137123447c39e3f26f9bffbbe` are in [Joint acceptance](/integrations/device-platform/joint-acceptance). 契约冻结 is DONE. staging, 真机, 生产, and 设备实际已生效 stay PENDING / JOINT_PENDING.
 
 Historical only, not the pin:
 
