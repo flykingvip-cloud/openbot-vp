@@ -37,9 +37,34 @@ vi.mock("../../config/config.js", () => ({
 }));
 
 const { employeeModelAccessHandlers } = await import("./employee-model-access.js");
+const { registerEnterpriseModelAsset } = await import("../enterprise-model/asset-store.js");
 const { upsertEnterpriseModelEntitlement } =
   await import("../model-entitlement/enterprise-model-entitlement-store.js");
 const { grantSeatModels } = await import("../model-entitlement/seat-model-grant-store.js");
+const { upsertResourceModelCatalogEntry } =
+  await import("../resource-catalog/models-catalog-store.js");
+const { recordModelProbeResults } = await import("../models/model-probe-store.js");
+
+/** Platform models reach the employee list only when catalog-active and probed ok. */
+async function seedConnectedPlatformModel(modelId: string): Promise<void> {
+  await upsertResourceModelCatalogEntry({
+    modelId,
+    tier: "tier_a",
+    enabled: true,
+  });
+  await recordModelProbeResults({
+    finishedAt: Date.now(),
+    results: [
+      {
+        provider: modelId.slice(0, modelId.indexOf("/")),
+        model: modelId,
+        label: modelId,
+        source: "models.json",
+        status: "ok",
+      },
+    ],
+  });
+}
 
 type HandlerError = { code?: string; message?: string };
 
@@ -67,7 +92,13 @@ async function invoke<P = Record<string, unknown>>(): Promise<{
 }
 
 type Summary = {
-  summary: { modelIds: string[]; state: "missing" | "resolved"; reason: string; seatId?: string };
+  summary: {
+    modelIds: string[];
+    models?: Array<{ modelId: string; title: string; sourceLabel: string }>;
+    state: "missing" | "resolved";
+    reason: string;
+    seatId?: string;
+  };
 };
 
 beforeEach(() => {
@@ -92,6 +123,7 @@ describe("employee-model-access.summary", () => {
   });
 
   it("有授权 → 返回员工可用模型与 seatId", async () => {
+    await seedConnectedPlatformModel("api-proxy-deepseek/deepseek-chat");
     await upsertEnterpriseModelEntitlement({
       tenantId: "ent-test",
       allowedModelIds: ["api-proxy-deepseek/deepseek-chat", "api-proxy-deepseek/deepseek-coder"],
@@ -106,6 +138,60 @@ describe("employee-model-access.summary", () => {
     expect(res.payload.summary.state).toBe("resolved");
     expect(res.payload.summary.modelIds).toEqual(["api-proxy-deepseek/deepseek-chat"]);
     expect(res.payload.summary.seatId).toBe("seat-1");
+  });
+
+  it("席位已授权的企业自供模型出现在员工可用列表", async () => {
+    const asset = await registerEnterpriseModelAsset({
+      tenantId: "ent-test",
+      connectionId: "conn-mimo",
+      upstreamModelId: "mimo-v2.6-flash",
+      displayName: "Mimo V2.6 Flash",
+      enabled: true,
+      healthStatus: "healthy",
+    });
+    await seedConnectedPlatformModel("api-proxy-deepseek/deepseek-chat");
+    await upsertEnterpriseModelEntitlement({
+      tenantId: "ent-test",
+      allowedModelIds: ["api-proxy-deepseek/deepseek-chat"],
+    });
+    await grantSeatModels({
+      tenantId: "ent-test",
+      seatId: "seat-1",
+      grantedModelIds: ["api-proxy-deepseek/deepseek-chat", asset.runtimeModelId],
+    });
+    const res = await invoke<Summary>();
+    expect(res.ok).toBe(true);
+    expect(res.payload.summary.state).toBe("resolved");
+    expect(res.payload.summary.modelIds).toContain(asset.runtimeModelId);
+    expect(res.payload.summary.modelIds).toContain("api-proxy-deepseek/deepseek-chat");
+    expect(res.payload.summary.models).toEqual(
+      expect.arrayContaining([
+        {
+          modelId: asset.runtimeModelId,
+          title: "Mimo V2.6 Flash",
+          sourceLabel: "企业自供",
+        },
+      ]),
+    );
+  });
+
+  it("未通过健康校验的企业自供模型不进入员工可用列表", async () => {
+    const asset = await registerEnterpriseModelAsset({
+      tenantId: "ent-test",
+      connectionId: "conn-mimo",
+      upstreamModelId: "mimo-v2.6-flash",
+      displayName: "Mimo V2.6 Flash",
+      enabled: true,
+      healthStatus: "unknown",
+    });
+    await grantSeatModels({
+      tenantId: "ent-test",
+      seatId: "seat-1",
+      grantedModelIds: [asset.runtimeModelId],
+    });
+    const res = await invoke<Summary>();
+    expect(res.ok).toBe(true);
+    expect(res.payload.summary.modelIds).not.toContain(asset.runtimeModelId);
   });
 
   it("entitlement 解析为空 → resolved 且空集（被拒语义）", async () => {

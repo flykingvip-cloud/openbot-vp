@@ -166,6 +166,27 @@ export class EmployeeModelAccessSection extends LitElement {
     }, EmployeeModelAccessSection.RETRY_INTERVAL_MS);
   }
 
+  private usageViewFor(
+    summary: EmployeeModelEntitlementSummary,
+    usageResult: UsageLoadResult,
+  ): EmployeeModelUsageView {
+    const displayLabels: Record<string, string> = {};
+    for (const model of buildEmployeeModelView(summary).models) {
+      if (model.modelId.startsWith("ent/") && model.title.trim()) {
+        displayLabels[model.modelId] = model.title.trim();
+      }
+    }
+    return buildEmployeeModelUsageView({
+      entitlementModelIds: summary.modelIds ?? [],
+      displayLabels,
+      byModel: usageResult.status === "ready" ? usageResult.byModel : [],
+      windowDays: USAGE_WINDOW_DAYS,
+      status: usageResult.status,
+      ...(usageResult.status === "unavailable" ? { unavailableReason: usageResult.reason } : {}),
+      ...(usageResult.status === "ready" && usageResult.partial ? { partial: true } : {}),
+    });
+  }
+
   /** 拉取近 30 天的员工可见完整聚合；任何不可验证响应都显式标记不可用。 */
   private async loadUsage(client: GatewayBrowserClient): Promise<UsageLoadResult> {
     try {
@@ -270,14 +291,7 @@ export class EmployeeModelAccessSection extends LitElement {
         usageSettled.status === "fulfilled"
           ? usageSettled.value
           : ({ status: "unavailable", reason: USAGE_UNAVAILABLE_REASON } as const);
-      this.usageView = buildEmployeeModelUsageView({
-        entitlementModelIds: this.summary.modelIds ?? [],
-        byModel: usageResult.status === "ready" ? usageResult.byModel : [],
-        windowDays: USAGE_WINDOW_DAYS,
-        status: usageResult.status,
-        ...(usageResult.status === "unavailable" ? { unavailableReason: usageResult.reason } : {}),
-        ...(usageResult.status === "ready" && usageResult.partial ? { partial: true } : {}),
-      });
+      this.usageView = this.usageViewFor(this.summary, usageResult);
       this.loaded = true;
     } catch {
       if (!isCurrentLoad()) {

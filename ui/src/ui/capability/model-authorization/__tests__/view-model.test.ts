@@ -167,7 +167,29 @@ describe("buildEmployeeModelView", () => {
     expect(view.statusLabel).toBe("可用");
     expect(view.hasModels).toBe(true);
     expect(view.modelIds).toEqual(["p/a", "p/b"]);
+    expect(view.models.map((model) => model.title)).toEqual(["a", "b"]);
     expect(view.seatId).toBe("seat-9");
+  });
+
+  it("企业自供模型用人读名称，而不是 ent/ 运行时 id", () => {
+    const runtimeId = "ent/abc123def4/mimo-v2.6-flash";
+    const fromId = buildEmployeeModelView({
+      modelIds: [runtimeId],
+      state: "resolved",
+      reason: "可用",
+    });
+    expect(fromId.models).toEqual([
+      { modelId: runtimeId, title: "Mimo V2.6 Flash", sourceLabel: "企业自供" },
+    ]);
+
+    const fromServer = buildEmployeeModelView({
+      modelIds: [runtimeId],
+      models: [{ modelId: runtimeId, title: "Mimo V2.6 Flash", sourceLabel: "企业自供" }],
+      state: "resolved",
+      reason: "可用",
+    });
+    expect(fromServer.models[0]?.title).toBe("Mimo V2.6 Flash");
+    expect(fromServer.models[0]?.sourceLabel).toBe("企业自供");
   });
 });
 
@@ -328,6 +350,20 @@ describe("buildEmployeeModelUsageView", () => {
     expect(view.rows).toHaveLength(1);
     expect(view.rows[0].label).toBe("p/a");
     expect(view.rows[0].used).toBe(false);
+  });
+
+  it("企业自供补零行展示登记名称，运行时 id 留在 label", () => {
+    const runtimeId = "ent/abc123def4/mimo-v2.6-flash";
+    const view = buildEmployeeModelUsageView({
+      entitlementModelIds: [runtimeId],
+      displayLabels: { [runtimeId]: "Mimo V2.6 Flash" },
+      byModel: [],
+      windowDays: 30,
+    });
+    expect(view.rows).toHaveLength(1);
+    expect(view.rows[0]?.label).toBe(runtimeId);
+    expect(view.rows[0]?.displayLabel).toBe("Mimo V2.6 Flash");
+    expect(view.rows[0]?.entitled).toBe(true);
   });
 
   it("不展示网关注入模型，也不展示未授权且未使用的行", () => {

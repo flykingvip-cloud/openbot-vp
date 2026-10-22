@@ -12,19 +12,88 @@
 
 import { loadConfig } from "../../config/config.js";
 import { resolveTrustedEnterpriseDataExecutionContext } from "../enterprise-data/enterprise-data-seat-context.js";
+import { listEnterpriseModelAssets } from "../enterprise-model/asset-store.js";
+import { isEnterpriseRuntimeModelId } from "../enterprise-model/ids.js";
 import { resolveModelEntitlementEnforce } from "../model-entitlement/entitlement-config.js";
 import { filterEmployeeDisplayModelIds } from "../model-entitlement/filter-employee-display-models.js";
 import { resolveEffectiveModelSet } from "../model-entitlement/resolve-effective-model-set.js";
 import { respondUnavailable } from "./billing-helpers.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
+/** 员工端卡片上的一条可用模型（与 UI 侧同名字段对齐）。 */
+export type EmployeeVisibleModel = {
+  modelId: string;
+  /** 卡片主标题。企业自供用资产 displayName，否则用人读上游名。 */
+  title: string;
+  /** 卡片副标题。平台模型是 provider id，企业自供固定为「企业自供」。 */
+  sourceLabel: string;
+};
+
 /** 员工端只读摘要（与 UI 侧 `EmployeeModelEntitlementSummary` 对齐）。 */
 export type EmployeeModelEntitlementSummary = {
   modelIds: string[];
+  /** 与 modelIds 同序的展示名。缺省时 UI 自行从 modelId 推导。 */
+  models?: EmployeeVisibleModel[];
   state: "missing" | "resolved";
   reason: string;
   seatId?: string;
 };
+
+function enterpriseUpstreamSlug(modelId: string): string {
+  const rest = modelId.startsWith("ent/") ? modelId.slice("ent/".length) : modelId;
+  const slash = rest.indexOf("/");
+  return (slash >= 0 ? rest.slice(slash + 1) : rest).trim();
+}
+
+function humanizeModelSlug(slug: string): string {
+  const cleaned = slug.trim().replace(/[-_]+/g, " ");
+  if (!cleaned) {
+    return slug;
+  }
+  return cleaned.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function enterpriseModelTitle(
+  modelId: string,
+  displayName: string | undefined,
+  upstreamModelId: string | undefined,
+): string {
+  const upstream = upstreamModelId?.trim() || enterpriseUpstreamSlug(modelId);
+  const name = displayName?.trim() ?? "";
+  if (name && !name.includes("/") && name !== modelId && name !== upstream) {
+    return name;
+  }
+  return humanizeModelSlug(upstream || modelId);
+}
+
+/** 把可调用 modelId 收成员工卡片文案。企业名称只读本租户资产，不暴露连接密钥。 */
+export async function describeEmployeeVisibleModels(
+  tenantId: string,
+  modelIds: readonly string[],
+): Promise<EmployeeVisibleModel[]> {
+  const needsAssets = modelIds.some((id) => isEnterpriseRuntimeModelId(id));
+  const assets = needsAssets ? await listEnterpriseModelAssets(tenantId) : [];
+  const byRuntime = new Map(assets.map((asset) => [asset.runtimeModelId, asset]));
+  return modelIds.map((modelId) => {
+    if (isEnterpriseRuntimeModelId(modelId)) {
+      const asset = byRuntime.get(modelId);
+      return {
+        modelId,
+        title: enterpriseModelTitle(modelId, asset?.displayName, asset?.upstreamModelId),
+        sourceLabel: "企业自供",
+      };
+    }
+    const slash = modelId.indexOf("/");
+    if (slash > 0 && slash < modelId.length - 1) {
+      return {
+        modelId,
+        title: modelId.slice(slash + 1),
+        sourceLabel: modelId.slice(0, slash),
+      };
+    }
+    return { modelId, title: modelId, sourceLabel: "平台提供" };
+  });
+}
 
 export const employeeModelAccessHandlers: GatewayRequestHandlers = {
   "employee-model-access.summary": async ({ client, respond }) => {
@@ -60,8 +129,10 @@ export const employeeModelAccessHandlers: GatewayRequestHandlers = {
         seatGrantInheritsEnterprise: enforce !== "strict",
       });
 
-      // 展示 = 权益交集 ∩ 网关实际可调用（排除 CLI/监督通道与未配置 provider）。
+      // 展示 = 权益交集 ∩ 实际可调用。平台模型要求网关已配置；
+      // 企业自供（ent/）已在有效集合里，不因缺 models.providers 条目被丢掉。
       const displayModelIds = filterEmployeeDisplayModelIds(result.allowedModelIds, cfg);
+      const models = await describeEmployeeVisibleModels(ctx.tenantId, displayModelIds);
       const dropped = result.allowedModelIds.length - displayModelIds.length;
       // 员工端文案：不暴露 ceiling ∩ grant 等内部解析细节。
       let reason = result.reason;
@@ -70,13 +141,14 @@ export const employeeModelAccessHandlers: GatewayRequestHandlers = {
           reason =
             dropped > 0
               ? `当前席位有 ${displayModelIds.length} 个可调用模型（已按可调用范围收敛）。`
-              : "当前席位可调用的套餐模型。";
+              : "当前席位可调用的模型。";
         } else if (dropped > 0) {
           reason = "授权模型当前均不可调用或未配置到网关。";
         }
       }
       const summary: EmployeeModelEntitlementSummary = {
         modelIds: displayModelIds,
+        models,
         state: result.state,
         reason,
         seatId: ctx.seatId,

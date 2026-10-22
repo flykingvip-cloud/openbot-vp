@@ -60,10 +60,19 @@ export type SeatModelGrant = {
 /** 员工端只读可用模型解析状态（与网关 EffectiveModelSet 两态对齐）。 */
 export type EntitlementResolutionState = "missing" | "resolved";
 
+/** 员工端可用模型卡片。企业自供的 title 来自资产 displayName。 */
+export type EmployeeVisibleModel = {
+  modelId: ModelRef;
+  title: string;
+  sourceLabel: string;
+};
+
 /** 员工端「我能用哪些模型 + 为何被拒」只读摘要。 */
 export type EmployeeModelEntitlementSummary = {
   /** 当前员工实际可用的模型集合。 */
   modelIds: ModelRef[];
+  /** 与 modelIds 对应的展示名。缺省时由 modelId 推导。 */
+  models?: EmployeeVisibleModel[];
   /** 解析状态：missing（未配置/未迁移）vs resolved（已解析，可能为空）。 */
   state: EntitlementResolutionState;
   /** 人类可读说明（可用 / 被拒原因）。 */

@@ -11,8 +11,10 @@
  * - `state="resolved"` 且集合为空 → 文案提示「已解析为空（被拒）」。
  */
 
+import { presentAuthorizedModel } from "../../views/model-authorization-presentation.ts";
 import type {
   EmployeeModelEntitlementSummary,
+  EmployeeVisibleModel,
   EnterpriseModelEntitlement,
   ModelRef,
   SeatModelGrant,
@@ -117,6 +119,8 @@ export type EmployeeModelView = {
   hasModels: boolean;
   /** 可用模型列表（已去重排序）。 */
   modelIds: ModelRef[];
+  /** 与 modelIds 同序的卡片文案。 */
+  models: EmployeeVisibleModel[];
   /** 顶部状态文案。 */
   statusLabel: string;
   /** 详细说明（被拒原因 / 未配置提示）。 */
@@ -140,8 +144,10 @@ export type ModelUsageInputRow = {
 
 /** 员工端「各模型消费量」展示行（已合并、按用量排序、含可视化占比）。 */
 export type EmployeeModelUsageRow = {
-  /** 展示标签：provider/model | model | provider。 */
+  /** 展示标签：provider/model | model | provider。企业自供时这是运行时 id。 */
   label: string;
+  /** 人读名称。企业自供用量行用它，避免把 `ent/<hash>/…` 直接铺在列表上。 */
+  displayLabel?: string;
   provider?: string;
   /** 该模型是否在员工可用（entitlement）集合内。 */
   entitled: boolean;
@@ -237,10 +243,39 @@ function isEntitled(row: ModelUsageInputRow, entitlementIds: ReadonlySet<string>
  * - `share` = 该模型 totalTokens / 本期最大模型 totalTokens，用于条形可视化。
  * - 排序：先按 tokens 降序，其次可用模型优先，最后按标签本地化排序。
  */
+function visibleModelFromId(modelId: string): EmployeeVisibleModel {
+  if (modelId.startsWith("ent/")) {
+    return {
+      modelId,
+      title: presentAuthorizedModel(modelId).title,
+      sourceLabel: "企业自供",
+    };
+  }
+  const slash = modelId.indexOf("/");
+  if (slash > 0 && slash < modelId.length - 1) {
+    return {
+      modelId,
+      title: modelId.slice(slash + 1),
+      sourceLabel: modelId.slice(0, slash),
+    };
+  }
+  return { modelId, title: modelId, sourceLabel: "" };
+}
+
+function usageDisplayLabel(
+  label: string,
+  labels: Readonly<Record<string, string>> | undefined,
+): string | undefined {
+  const title = labels?.[label]?.trim();
+  return title || undefined;
+}
+
 export function buildEmployeeModelUsageView(input: {
   entitlementModelIds: readonly ModelRef[];
   byModel: readonly ModelUsageInputRow[];
   windowDays: number;
+  /** 运行时 id → 人读标题。只替换能精确对上的行。 */
+  displayLabels?: Readonly<Record<string, string>>;
   status?: EmployeeModelUsageStatus;
   unavailableReason?: string;
   partial?: boolean;
@@ -271,8 +306,10 @@ export function buildEmployeeModelUsageView(input: {
       existing.requests += requests;
       existing.used = existing.used || tokens > 0 || requests > 0;
     } else {
+      const displayLabel = usageDisplayLabel(label, input.displayLabels);
       byLabel.set(label, {
         label,
+        ...(displayLabel ? { displayLabel } : {}),
         ...(row.provider?.trim() ? { provider: row.provider.trim() } : {}),
         entitled: isEntitled(row, entitlementIds),
         used: tokens > 0 || requests > 0,
@@ -290,8 +327,10 @@ export function buildEmployeeModelUsageView(input: {
       rowMatchesEntitlementId(r.label, r.provider, id),
     );
     if (!alreadyShown) {
+      const displayLabel = usageDisplayLabel(id, input.displayLabels);
       byLabel.set(id, {
         label: id,
+        ...(displayLabel ? { displayLabel } : {}),
         entitled: true,
         used: false,
         totalTokens: 0,
@@ -346,6 +385,20 @@ export function buildEmployeeModelView(
   summary: EmployeeModelEntitlementSummary,
 ): EmployeeModelView {
   const modelIds = dedupeSorted(summary.modelIds);
+  const provided = new Map((summary.models ?? []).map((row) => [row.modelId.trim(), row] as const));
+  const models = modelIds.map((modelId) => {
+    const fallback = visibleModelFromId(modelId);
+    const row = provided.get(modelId);
+    const title = row?.title.trim();
+    if (!title) {
+      return fallback;
+    }
+    return {
+      modelId,
+      title,
+      sourceLabel: row?.sourceLabel.trim() || fallback.sourceLabel,
+    };
+  });
   const hasModels = modelIds.length > 0;
   let statusLabel: string;
   if (summary.state === "missing") {
@@ -358,6 +411,7 @@ export function buildEmployeeModelView(
   return {
     hasModels,
     modelIds,
+    models,
     statusLabel,
     detail: summary.reason,
     ...(summary.seatId ? { seatId: summary.seatId } : {}),

@@ -40,19 +40,6 @@ function modelAccessTone(view: EmployeeModelView): "ok" | "muted" | "danger" {
   return "danger";
 }
 
-/** 拆分 provider/model，避免员工设置页堆砌技术路径。 */
-function splitModelId(modelId: string): { provider: string | null; name: string } {
-  const trimmed = modelId.trim();
-  const slash = trimmed.indexOf("/");
-  if (slash <= 0 || slash >= trimmed.length - 1) {
-    return { provider: null, name: trimmed || modelId };
-  }
-  return {
-    provider: trimmed.slice(0, slash),
-    name: trimmed.slice(slash + 1),
-  };
-}
-
 /** 内部解析文案（ceiling ∩ grant 等）不面向员工展示。 */
 function isTechnicalDetail(detail: string | undefined): boolean {
   const text = detail?.trim() ?? "";
@@ -78,14 +65,13 @@ function shouldShowDetail(view: EmployeeModelView): boolean {
   return !isTechnicalDetail(view.detail);
 }
 
-function renderModelCard(modelId: string): TemplateResult {
-  const { provider, name } = splitModelId(modelId);
+function renderModelCard(model: EmployeeModelView["models"][number]): TemplateResult {
   return html`
-    <div class="employee-model-access__model" title=${modelId}>
-      <span class="employee-model-access__model-name">${name}</span>
+    <div class="employee-model-access__model" title=${model.modelId}>
+      <span class="employee-model-access__model-name">${model.title}</span>
       ${
-        provider
-          ? html`<span class="employee-model-access__model-provider">${provider}</span>`
+        model.sourceLabel
+          ? html`<span class="employee-model-access__model-provider">${model.sourceLabel}</span>`
           : nothing
       }
     </div>
@@ -101,9 +87,7 @@ function renderModelList(view: EmployeeModelView, loading: boolean) {
   if (view.hasModels) {
     return html`
       <div class="employee-model-access__models" role="list">
-        ${view.modelIds.map(
-          (modelId) => html`<div role="listitem">${renderModelCard(modelId)}</div>`,
-        )}
+        ${view.models.map((model) => html`<div role="listitem">${renderModelCard(model)}</div>`)}
       </div>
     `;
   }
@@ -134,7 +118,9 @@ function renderUsageRow(row: EmployeeModelUsageView["rows"][number]): TemplateRe
   return html`
     <div class="employee-model-usage__row ${row.used ? "" : "is-unused"}">
       <div class="employee-model-usage__row-head">
-        <span class="employee-model-usage__model" title=${row.label}>${row.label}</span>
+        <span class="employee-model-usage__model" title=${row.label}
+          >${row.displayLabel ?? row.label}</span
+        >
         <span class="employee-model-usage__badges">
           ${
             row.entitled

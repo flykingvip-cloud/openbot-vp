@@ -54,4 +54,21 @@ describe("filterEmployeeDisplayModelIds", () => {
       ),
     ).toEqual(["api-proxy-deepseek/deepseek-v4-flash"]);
   });
+
+  it("keeps seat-granted enterprise runtime ids that are not gateway providers", () => {
+    const cfg = cfgWithProviders({
+      "api-proxy-deepseek": { models: [{ id: "deepseek-v4-flash" }] },
+    });
+    expect(
+      filterEmployeeDisplayModelIds(
+        [
+          "api-proxy-deepseek/deepseek-v4-flash",
+          "ent/abc123def4/mimo-v2.6-flash",
+          "api-proxy-gpt/gpt-5.2",
+          "codex-cli/gpt-5.4",
+        ],
+        cfg,
+      ),
+    ).toEqual(["api-proxy-deepseek/deepseek-v4-flash", "ent/abc123def4/mimo-v2.6-flash"]);
+  });
 });

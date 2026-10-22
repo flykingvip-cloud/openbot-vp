@@ -34,6 +34,30 @@ describe("renderEmployeeModelAccess (browser)", () => {
     expect(items.length).toBe(2);
   });
 
+  it("席位授权的企业自供模型显示登记名称", async () => {
+    const runtimeId = "ent/abc123def4/mimo-v2.6-flash";
+    const container = mountSummary({
+      modelIds: [runtimeId, "api-proxy-deepseek/deepseek-v4-flash"],
+      models: [
+        {
+          modelId: runtimeId,
+          title: "Mimo V2.6 Flash",
+          sourceLabel: "企业自供",
+        },
+      ],
+      state: "resolved",
+      reason: "可用",
+    });
+    await Promise.resolve();
+    const text = container.textContent ?? "";
+    expect(text).toContain("Mimo V2.6 Flash");
+    expect(text).toContain("企业自供");
+    expect(text).toContain("deepseek-v4-flash");
+    expect(text).toContain("2 个可用模型");
+    expect(text).not.toContain("abc123def4");
+    expect(container.querySelector(`[title="${runtimeId}"]`)).not.toBeNull();
+  });
+
   it("missing 状态展示未配置而非被拒", async () => {
     const container = mountSummary({ modelIds: [], state: "missing", reason: "未配置" });
     await Promise.resolve();
