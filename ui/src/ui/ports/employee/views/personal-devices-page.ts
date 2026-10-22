@@ -95,6 +95,8 @@ export type PersonalDevicesClient = {
 type AddDraft = {
   platformId: string;
   displayName: string;
+  /** Raw scan box text. Parsed into the pairing fields; not submitted as-is. */
+  scan: string;
   deviceId: string;
   challenge: string;
   code: string;
@@ -102,11 +104,18 @@ type AddDraft = {
   scopes: string[];
 };
 
+/** list is the default. empty is derived when that list has no rows. */
+type PanelMode = "list" | "add" | "detail";
+type NoticeTone = "" | "info" | "success" | "error";
+
 type PanelState = {
   status: "loading" | "unauthorized" | "failure" | "ready";
   message: string;
   notice: string;
+  noticeTone: NoticeTone;
   busy: boolean;
+  /** Front-end only. Does not change the device-platform contract. */
+  mode: PanelMode;
   devices: PersonalDeviceView[];
   platforms: PersonalPlatformChoice[];
   humans: PersonalHumanChoice[];
@@ -124,6 +133,7 @@ type PanelState = {
 const EMPTY_DRAFT: AddDraft = {
   platformId: "",
   displayName: "",
+  scan: "",
   deviceId: "",
   challenge: "",
   code: "",
@@ -143,7 +153,9 @@ function freshState(): PanelState {
     status: "loading",
     message: "",
     notice: "",
+    noticeTone: "",
     busy: false,
+    mode: "list",
     devices: [],
     platforms: [],
     humans: [],
@@ -231,12 +243,10 @@ export function renderPersonalDevicesPanel(options?: PersonalDevicesPanelOptions
     <div
       class="personal-devices__stack"
       data-testid="personal-devices"
+      data-personal-devices-view=${currentView(selected)}
       data-personal-devices-human=${state.lockedHumanId}
     >
-      ${renderBanner()}
-      ${renderBlock(listTitle(), renderDeviceList(selected))}
-      ${selected ? renderBlock(selected.displayName, renderDetail(selected)) : nothing}
-      ${renderBlock("添加设备", renderAddForm())}
+      ${renderCurrent(selected)}
     </div>
   `;
   if (panelSurface() === "detail") {
@@ -248,6 +258,49 @@ export function renderPersonalDevicesPanel(options?: PersonalDevicesPanelOptions
       ${body}
     `)}
   `;
+}
+
+function currentView(
+  selected: PersonalDeviceView | null,
+): "loading" | "error" | "add" | "detail" | "empty" | "list" {
+  if (state.status === "loading") {
+    return "loading";
+  }
+  if ((state.status === "unauthorized" || state.status === "failure") && state.mode !== "add") {
+    return "error";
+  }
+  if (state.mode === "add") {
+    return "add";
+  }
+  if (state.mode === "detail" && selected) {
+    return "detail";
+  }
+  if (state.status === "ready" && state.devices.length === 0) {
+    return "empty";
+  }
+  return "list";
+}
+
+function renderCurrent(selected: PersonalDeviceView | null) {
+  const name = currentView(selected);
+  if (name === "loading") {
+    return html`
+      <p class="personal-devices__note" data-testid="personal-devices-status">正在读取设备</p>
+    `;
+  }
+  if (name === "error") {
+    return renderLoadError();
+  }
+  if (name === "add") {
+    return renderBlock("添加设备", renderAddView());
+  }
+  if (name === "detail" && selected) {
+    return renderBlock(selected.displayName, renderDetail(selected));
+  }
+  if (name === "empty") {
+    return renderBlock(listTitle(), renderEmptyState());
+  }
+  return renderBlock(listTitle(), renderDeviceList());
 }
 
 function adoptScope(options?: PersonalDevicesPanelOptions): void {
@@ -303,43 +356,91 @@ function renderBlock(title: string, content: TemplateResult) {
   return renderPersonalSettingsPanel({ title, content });
 }
 
-function renderBanner() {
-  if (state.status === "loading") {
-    return html`
-      <p class="personal-devices__note" data-testid="personal-devices-status">正在读取设备</p>
-    `;
-  }
-  if (state.status === "unauthorized") {
-    return html`
-      <p class="personal-devices__note" data-testid="personal-devices-status">请先登录后再管理设备。</p>
-    `;
-  }
-  if (state.status === "failure") {
-    return html`<p class="personal-devices__note" data-testid="personal-devices-status">${state.message}</p>`;
-  }
-  if (state.notice) {
-    return html`<p class="personal-devices__note" data-testid="personal-devices-notice">${state.notice}</p>`;
-  }
-  return nothing;
+function renderLoadError() {
+  return html`
+    <div class="callout danger" role="alert" data-testid="personal-devices-status">
+      <p class="personal-devices__callout-copy">${loadFailureMessage()}</p>
+      <div class="personal-devices__callout-actions">
+        <button
+          type="button"
+          class="btn"
+          data-testid="personal-devices-retry"
+          ?disabled=${state.busy}
+          @click=${() => retryLoad()}
+        >
+          重试
+        </button>
+        <button
+          type="button"
+          class="btn btn--primary"
+          data-testid="personal-devices-add"
+          @click=${() => openAdd()}
+        >
+          添加设备
+        </button>
+      </div>
+    </div>
+  `;
 }
 
-function renderDeviceList(selected: PersonalDeviceView | null) {
-  if (state.status === "ready" && state.devices.length === 0) {
-    return html`
-      <p class="personal-devices__note" data-testid="personal-devices-empty">
-        还没有设备。填写下面的配对信息后添加。
-      </p>
-      ${renderEffectState(null)}
-    `;
+function renderNotice() {
+  if (!state.notice) {
+    return nothing;
   }
+  const tone =
+    state.noticeTone === "error" ? "danger" : state.noticeTone === "success" ? "success" : "info";
   return html`
+    <div
+      class="callout ${tone}"
+      role=${state.noticeTone === "error" ? "alert" : "status"}
+      data-testid="personal-devices-notice"
+    >
+      ${state.notice}
+    </div>
+  `;
+}
+
+function renderEmptyState() {
+  return html`
+    <div class="personal-devices__empty" data-testid="personal-devices-empty">
+      <p class="personal-devices__empty-title">还没有设备</p>
+      <p class="personal-devices__empty-copy">
+        添加一台设备后，可以在这里查看授权、平台接受和真机确认。
+      </p>
+      <button
+        type="button"
+        class="btn btn--primary"
+        data-testid="personal-devices-add"
+        @click=${() => openAdd()}
+      >
+        添加设备
+      </button>
+    </div>
+  `;
+}
+
+function renderDeviceList() {
+  const selectedId = state.selectedId;
+  return html`
+    <div class="personal-devices__toolbar">
+      <p class="personal-devices__count">${state.devices.length} 台设备</p>
+      <button
+        type="button"
+        class="btn btn--primary"
+        data-testid="personal-devices-add"
+        @click=${() => openAdd()}
+      >
+        添加设备
+      </button>
+    </div>
+    ${renderNotice()}
     <div class="personal-devices__list" data-testid="personal-devices-list">
       ${state.devices.map((device) => {
         const human = humanName(device.binding?.digitalHumanId);
         return html`
           <button
             type="button"
-            class="personal-devices__item ${selected?.deviceId === device.deviceId ? "is-active" : ""}"
+            class="personal-devices__item ${selectedId === device.deviceId ? "is-active" : ""}"
             data-testid="personal-device-row"
             @click=${() => selectDevice(device)}
           >
@@ -348,6 +449,7 @@ function renderDeviceList(selected: PersonalDeviceView | null) {
               ${device.model?.trim() || "型号未知"} · ${human} · ${scopeText(device.binding?.scopes ?? [])} ·
               ${connectionText(device)}
             </span>
+            ${renderEffectChips(device.binding)}
           </button>
         `;
       })}
@@ -355,10 +457,31 @@ function renderDeviceList(selected: PersonalDeviceView | null) {
   `;
 }
 
+function renderEffectChips(binding: PersonalDeviceBindingView | null) {
+  return html`
+    <span class="personal-devices__effect" data-testid="personal-device-effect">
+      <span class="personal-devices__effect-item">
+        <span class="personal-devices__effect-key">授权</span>
+        <span data-testid="personal-device-effect-auth">${authorizationText(binding)}</span>
+      </span>
+      <span class="personal-devices__effect-item">
+        <span class="personal-devices__effect-key">平台</span>
+        <span data-testid="personal-device-effect-platform">${platformText(binding)}</span>
+      </span>
+      <span class="personal-devices__effect-item">
+        <span class="personal-devices__effect-key">设备</span>
+        <span data-testid="personal-device-effect-device">${deviceEffectText(binding)}</span>
+      </span>
+    </span>
+  `;
+}
+
 function renderDetail(device: PersonalDeviceView) {
   const binding = device.binding;
   return html`
-    <div data-testid="personal-device-detail">
+    <div class="personal-devices__subview" data-testid="personal-device-detail">
+      ${renderBackButton()}
+      ${renderNotice()}
       ${renderPersonalMetaList([
         renderPersonalSettingsRow("名称", device.displayName),
         renderPersonalSettingsRow("型号", device.model?.trim() || "未知"),
@@ -375,29 +498,32 @@ function renderDetail(device: PersonalDeviceView) {
       ${renderEffectState(binding)}
       ${
         binding?.failureCode
-          ? html`<p class="personal-devices__note">${failureText(binding.failureCode)}</p>`
+          ? html`<div class="callout danger" role="alert">${failureText(binding.failureCode)}</div>`
           : nothing
       }
-      <div class="personal-devices__fields">
-        <label>
-          更换数字人
-          <select
-            class="employee-workbench__settings-input"
-            data-testid="personal-device-rebind-human"
-            .value=${state.rebindHumanId}
-            @change=${(event: Event) => {
-              state.rebindHumanId = (event.target as HTMLSelectElement).value;
-            }}
-          >
-            ${humanChoices().map(
-              (human) => html`<option value=${human.digitalHumanId}>${human.displayName}</option>`,
-            )}
-          </select>
-        </label>
-        ${renderScopeChecks(state.rebindScopes, (scopes) => {
-          state.rebindScopes = scopes;
-        })}
+      <div class="personal-devices__grid">
+        ${renderField(
+          "更换数字人",
+          html`
+            <select
+              class="employee-workbench__settings-input"
+              data-testid="personal-device-rebind-human"
+              .value=${state.rebindHumanId}
+              @change=${(event: Event) => {
+                state.rebindHumanId = (event.target as HTMLSelectElement).value;
+              }}
+            >
+              ${humanChoices().map(
+                (human) =>
+                  html`<option value=${human.digitalHumanId}>${human.displayName}</option>`,
+              )}
+            </select>
+          `,
+        )}
       </div>
+      ${renderScopeChecks(state.rebindScopes, (scopes) => {
+        state.rebindScopes = scopes;
+      })}
       <div class="personal-devices__actions">
         <button type="button" class="btn btn--primary" ?disabled=${state.busy} @click=${() => void rebind(device)}>
           保存绑定
@@ -409,6 +535,7 @@ function renderDetail(device: PersonalDeviceView) {
           ?disabled=${state.busy || !binding}
           @click=${() => {
             state.confirmRevoke = true;
+            state.showTransfer = false;
             rerender();
           }}
         >
@@ -420,6 +547,7 @@ function renderDetail(device: PersonalDeviceView) {
           data-testid="personal-device-transfer"
           @click=${() => {
             state.showTransfer = true;
+            state.confirmRevoke = false;
             rerender();
           }}
         >
@@ -428,20 +556,29 @@ function renderDetail(device: PersonalDeviceView) {
       </div>
       ${
         state.confirmRevoke
-          ? html`<div class="personal-devices__actions">
-              <p class="personal-devices__note">解除后这台设备不再使用当前授权。只有认领人可以做这一步。</p>
-              <button type="button" class="btn btn--danger" ?disabled=${state.busy} @click=${() => void revoke(device)}>
-                确认解除
-              </button>
+          ? html`<div class="callout" data-testid="personal-device-revoke-confirm">
+              <p class="personal-devices__callout-copy">
+                解除后这台设备不再使用当前授权。只有认领人可以做这一步。
+              </p>
+              <div class="personal-devices__callout-actions">
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  ?disabled=${state.busy}
+                  @click=${() => void revoke(device)}
+                >
+                  确认解除
+                </button>
+              </div>
             </div>`
           : nothing
       }
       ${
         state.showTransfer
           ? html`
-              <p class="personal-devices__note" data-testid="personal-device-transfer-note">
+              <div class="callout info" data-testid="personal-device-transfer-note">
                 只有当前认领人可以解除绑定。对方需要用新的配对码重新添加。不会把设备直接改到别人名下。
-              </p>
+              </div>
             `
           : nothing
       }
@@ -449,98 +586,167 @@ function renderDetail(device: PersonalDeviceView) {
   `;
 }
 
+function renderAddView() {
+  return html`
+    <div class="personal-devices__subview">
+      ${renderBackButton()}
+      ${renderNotice()}
+      ${renderAddForm()}
+    </div>
+  `;
+}
+
+function renderBackButton() {
+  return html`
+    <button
+      type="button"
+      class="personal-devices__back"
+      data-testid="personal-devices-back"
+      @click=${() => backToList()}
+    >
+      返回列表
+    </button>
+  `;
+}
+
 function renderAddForm() {
   const draft = state.draft;
   return html`
-    <form class="personal-devices__fields" data-testid="personal-device-add" @submit=${(event: Event) => void onAdd(event)}>
-      <label>
-        设备平台
-        <select
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-platform"
-          .value=${draft.platformId}
-          @change=${(event: Event) => {
-            draft.platformId = (event.target as HTMLSelectElement).value;
-          }}
-        >
-          <option value="">选择平台</option>
-          ${state.platforms.map(
-            (platform) =>
-              html`<option value=${platform.platformId}>${platform.displayName}</option>`,
+    <form
+      class="personal-devices__form"
+      data-testid="personal-device-add"
+      @submit=${(event: Event) => void onAdd(event)}
+    >
+      <div class="personal-devices__grid">
+        ${renderField(
+          "设备平台",
+          html`
+            <select
+              class="employee-workbench__settings-input"
+              data-testid="personal-device-platform"
+              .value=${draft.platformId}
+              @change=${(event: Event) => {
+                draft.platformId = (event.target as HTMLSelectElement).value;
+              }}
+            >
+              <option value="">选择平台</option>
+              ${state.platforms.map(
+                (platform) =>
+                  html`<option value=${platform.platformId}>${platform.displayName}</option>`,
+              )}
+            </select>
+          `,
+        )}
+        ${renderField(
+          "名称",
+          html`
+            <input
+              class="employee-workbench__settings-input"
+              data-testid="personal-device-name"
+              placeholder="例如门口相机"
+              .value=${draft.displayName}
+              @input=${(event: Event) => {
+                draft.displayName = (event.target as HTMLInputElement).value;
+              }}
+            />
+          `,
+        )}
+        <div class="personal-devices__pair">
+          ${renderField(
+            "扫描结果",
+            html`
+              <textarea
+                class="employee-workbench__settings-input personal-devices__scan mono"
+                data-testid="personal-device-scan"
+                rows="6"
+                placeholder="粘贴扫描内容，或只粘贴 6 位配对码"
+                .value=${draft.scan}
+                @input=${(event: Event) => {
+                  draft.scan = (event.target as HTMLTextAreaElement).value;
+                }}
+                @change=${(event: Event) => applyScan((event.target as HTMLTextAreaElement).value)}
+              ></textarea>
+            `,
+            "personal-devices__field--scan",
           )}
-        </select>
-      </label>
-      <label>
-        名称
-        <input
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-name"
-          .value=${draft.displayName}
-          @input=${(event: Event) => {
-            draft.displayName = (event.target as HTMLInputElement).value;
-          }}
-        />
-      </label>
-      <label>
-        扫描结果
-        <textarea
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-scan"
-          placeholder="粘贴扫描内容，或只粘贴 6 位配对码"
-          @change=${(event: Event) => applyScan((event.target as HTMLTextAreaElement).value)}
-        ></textarea>
-      </label>
-      <label>
-        设备编号
-        <input
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-id"
-          .value=${draft.deviceId}
-          @input=${(event: Event) => {
-            draft.deviceId = (event.target as HTMLInputElement).value;
-          }}
-        />
-      </label>
-      <label>
-        挑战号
-        <input
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-challenge"
-          .value=${draft.challenge}
-          @input=${(event: Event) => {
-            draft.challenge = (event.target as HTMLInputElement).value;
-          }}
-        />
-      </label>
-      <label>
-        配对码
-        <input
-          class="employee-workbench__settings-input"
-          data-testid="personal-device-code"
-          inputmode="numeric"
-          maxlength="6"
-          .value=${draft.code}
-          @input=${(event: Event) => {
-            draft.code = (event.target as HTMLInputElement).value;
-          }}
-        />
-      </label>
-      ${renderHumanField(draft)}
+          <div class="personal-devices__pair-side">
+            ${renderField(
+              "设备编号",
+              html`
+                <input
+                  class="employee-workbench__settings-input mono"
+                  data-testid="personal-device-id"
+                  .value=${draft.deviceId}
+                  @input=${(event: Event) => {
+                    draft.deviceId = (event.target as HTMLInputElement).value;
+                  }}
+                />
+              `,
+            )}
+            ${renderField(
+              "挑战号",
+              html`
+                <input
+                  class="employee-workbench__settings-input mono"
+                  data-testid="personal-device-challenge"
+                  .value=${draft.challenge}
+                  @input=${(event: Event) => {
+                    draft.challenge = (event.target as HTMLInputElement).value;
+                  }}
+                />
+              `,
+            )}
+            ${renderField(
+              "配对码",
+              html`
+                <input
+                  class="employee-workbench__settings-input mono"
+                  data-testid="personal-device-code"
+                  inputmode="numeric"
+                  maxlength="6"
+                  autocomplete="one-time-code"
+                  .value=${draft.code}
+                  @input=${(event: Event) => {
+                    draft.code = (event.target as HTMLInputElement).value;
+                  }}
+                />
+              `,
+            )}
+          </div>
+        </div>
+        ${renderHumanField(draft)}
+      </div>
       ${renderScopeChecks(draft.scopes, (scopes) => {
         draft.scopes = scopes;
       })}
-      <button type="submit" class="btn btn--primary" data-testid="personal-device-submit" ?disabled=${state.busy}>
-        添加并授权
-      </button>
+      <div class="personal-devices__form-footer">
+        <button
+          type="submit"
+          class="btn btn--primary"
+          data-testid="personal-device-submit"
+          ?disabled=${state.busy}
+        >
+          添加并授权
+        </button>
+      </div>
     </form>
+  `;
+}
+
+function renderField(label: string, control: TemplateResult, extraClass = "") {
+  return html`
+    <label class="personal-devices__field ${extraClass}">
+      <span class="personal-devices__label">${label}</span>
+      ${control}
+    </label>
   `;
 }
 
 function renderHumanField(draft: AddDraft) {
   if (state.lockedHumanId) {
-    return html`
-      <label>
-        数字人
+    return renderField(
+      "数字人",
+      html`
         <input
           class="employee-workbench__settings-input"
           data-testid="personal-device-human"
@@ -549,12 +755,12 @@ function renderHumanField(draft: AddDraft) {
           readonly
           disabled
         />
-      </label>
-    `;
+      `,
+    );
   }
-  return html`
-    <label>
-      数字人
+  return renderField(
+    "数字人",
+    html`
       <select
         class="employee-workbench__settings-input"
         data-testid="personal-device-human"
@@ -568,59 +774,98 @@ function renderHumanField(draft: AddDraft) {
           (human) => html`<option value=${human.digitalHumanId}>${human.displayName}</option>`,
         )}
       </select>
-    </label>
-  `;
+    `,
+  );
 }
 
 function renderScopeChecks(selected: string[], onChange: (scopes: string[]) => void) {
   return html`
-    <div>
-      ${SCOPES.map(
-        (scope) => html`
-          <label class="personal-devices__check">
-            <input
-              type="checkbox"
-              .checked=${selected.includes(scope.id)}
-              @change=${(event: Event) => {
-                const checked = (event.target as HTMLInputElement).checked;
-                const next = checked
-                  ? [...selected, scope.id]
-                  : selected.filter((item) => item !== scope.id);
-                onChange(next);
-                rerender();
-              }}
-            />
-            <span>${scope.label}</span>
-          </label>
-        `,
-      )}
+    <div class="personal-devices__scopes">
+      <span class="personal-devices__label">权限</span>
+      <div class="personal-devices__scope-grid" role="group" aria-label="权限" data-testid="personal-device-scopes">
+        ${SCOPES.map(
+          (scope) => html`
+            <label class="personal-devices__check">
+              <input
+                type="checkbox"
+                .checked=${selected.includes(scope.id)}
+                @change=${(event: Event) => {
+                  const checked = (event.target as HTMLInputElement).checked;
+                  const next = checked
+                    ? [...selected, scope.id]
+                    : selected.filter((item) => item !== scope.id);
+                  onChange(next);
+                  rerender();
+                }}
+              />
+              <span>${scope.label}</span>
+            </label>
+          `,
+        )}
+      </div>
     </div>
   `;
 }
 
 function selectDevice(device: PersonalDeviceView): void {
+  state.mode = "detail";
   state.selectedId = device.deviceId;
   state.confirmRevoke = false;
   state.showTransfer = false;
+  state.notice = "";
+  state.noticeTone = "";
   state.rebindHumanId = device.binding?.digitalHumanId || state.humans[0]?.digitalHumanId || "";
   state.rebindScopes = device.binding?.scopes.length ? [...device.binding.scopes] : ["chat"];
   rerender();
 }
 
+function openAdd(): void {
+  state.mode = "add";
+  state.confirmRevoke = false;
+  state.showTransfer = false;
+  state.notice = "";
+  state.noticeTone = "";
+  rerender();
+}
+
+function backToList(): void {
+  state.mode = "list";
+  state.confirmRevoke = false;
+  state.showTransfer = false;
+  state.notice = "";
+  state.noticeTone = "";
+  rerender();
+}
+
+function retryLoad(): void {
+  loadToken += 1;
+  loadStarted = false;
+  state.status = "loading";
+  state.message = "";
+  state.mode = "list";
+  state.notice = "";
+  state.noticeTone = "";
+  state.busy = false;
+  rerender();
+  ensureLoaded();
+}
+
 function applyScan(raw: string): void {
   const parsed = parsePairingScan(raw);
   if (!parsed) {
-    state.notice = "没有从扫描内容里读到设备编号或配对码。";
+    state.draft = { ...state.draft, scan: raw };
+    setNotice("没有从扫描内容里读到设备编号或配对码。", "error");
     rerender();
     return;
   }
   state.draft = {
     ...state.draft,
+    scan: raw,
     ...(parsed.deviceId ? { deviceId: parsed.deviceId } : {}),
     ...(parsed.challenge ? { challenge: parsed.challenge } : {}),
     ...(parsed.code ? { code: parsed.code } : {}),
   };
-  state.notice = "已填入配对信息。确认数字人和权限后添加。";
+  setNotice("已填入配对信息。确认数字人和权限后添加。", "info");
   rerender();
 }
 
@@ -634,12 +879,12 @@ async function onAdd(event: Event): Promise<void> {
     !draft.code ||
     !draft.digitalHumanId
   ) {
-    state.notice = "请补全平台、设备编号、挑战号、配对码和数字人。";
+    setNotice("请补全平台、设备编号、挑战号、配对码和数字人。", "error");
     rerender();
     return;
   }
   if (draft.scopes.length === 0) {
-    state.notice = "至少选择一项权限。";
+    setNotice("至少选择一项权限。", "error");
     rerender();
     return;
   }
@@ -654,8 +899,9 @@ async function onAdd(event: Event): Promise<void> {
       scopes: draft.scopes,
       pairing: { challenge: draft.challenge.trim(), proof: draft.code.trim() },
     });
-    state.notice =
-      device?.binding?.status === "active" ? "设备已连接。" : "授权已提交，正在等待设备平台应用。";
+    // Success here is "submitted". deviceEffect stays false until a real device confirms.
+    setNotice("已提交添加。列表会显示授权、平台接受和设备确认。", "success");
+    state.mode = "list";
     state.draft = {
       ...EMPTY_DRAFT,
       platformId: draft.platformId,
@@ -670,7 +916,7 @@ async function onAdd(event: Event): Promise<void> {
 
 async function rebind(device: PersonalDeviceView): Promise<void> {
   if (!state.rebindHumanId || state.rebindScopes.length === 0) {
-    state.notice = "选择要绑定的数字人和权限。";
+    setNotice("选择要绑定的数字人和权限。", "error");
     rerender();
     return;
   }
@@ -682,7 +928,7 @@ async function rebind(device: PersonalDeviceView): Promise<void> {
       digitalHumanId: state.rebindHumanId,
       scopes: state.rebindScopes,
     });
-    state.notice = "已更换数字人。";
+    setNotice("已更换数字人。", "success");
   });
 }
 
@@ -694,22 +940,46 @@ async function revoke(device: PersonalDeviceView): Promise<void> {
       deviceId: device.deviceId,
     });
     state.confirmRevoke = false;
-    state.notice = "已解除绑定。";
+    setNotice("已解除绑定。", "success");
   });
 }
 
 async function run(work: (api: PersonalDevicesClient) => Promise<void>): Promise<void> {
   state.busy = true;
   state.notice = "";
+  state.noticeTone = "";
   rerender();
   try {
     await work(client());
     await reload();
   } catch (error) {
-    state.notice = error instanceof Error ? error.message : "设备请求失败";
+    setNotice(presentFailure(error instanceof Error ? error.message : ""), "error");
     state.busy = false;
     rerender();
   }
+}
+
+function setNotice(message: string, tone: NoticeTone): void {
+  state.notice = message;
+  state.noticeTone = tone;
+}
+
+function presentFailure(message: string): string {
+  const text = message.trim();
+  if (!text || text === "设备请求失败" || text === "设备请求失败。") {
+    return "设备请求失败。请检查填写内容后重试。";
+  }
+  return text;
+}
+
+function loadFailureMessage(): string {
+  if (state.status === "unauthorized") {
+    return "登录已失效，暂时读不到已连接设备。请重新登录后再试。";
+  }
+  if (!state.message || state.message === "设备请求失败。" || state.message === "读取设备失败") {
+    return "暂时读不到已连接设备。请重试；若仍失败，请确认当前员工会话仍然有效。";
+  }
+  return state.message;
 }
 
 function ensureLoaded(): void {
@@ -755,14 +1025,9 @@ async function reload(token = loadToken): Promise<void> {
       state.selectedId = "";
       state.confirmRevoke = false;
       state.showTransfer = false;
-    }
-    if (!state.selectedId && devices[0]) {
-      state.selectedId = devices[0].deviceId;
-      state.rebindHumanId =
-        devices[0].binding?.digitalHumanId || locked || humans[0]?.digitalHumanId || "";
-      state.rebindScopes = devices[0].binding?.scopes.length
-        ? [...devices[0].binding.scopes]
-        : ["chat"];
+      if (state.mode === "detail") {
+        state.mode = "list";
+      }
     }
   } catch (error) {
     if (token !== loadToken) {
