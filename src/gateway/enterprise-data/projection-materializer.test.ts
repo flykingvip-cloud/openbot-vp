@@ -1,15 +1,38 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import { EnterpriseDataStoreError } from "./connector-action-store.js";
-import { listEnterpriseKnowledgeProjectionBindings } from "./enterprise-knowledge-projection-binding-store.js";
+import { upsertDataConnectorCredential } from "./connector-credential-store.js";
+import { saveCredentialSecret } from "./connector-credential-vault.js";
+import { ensureConnectorPackage } from "./connector-packages.js";
+import { upsertDataSource } from "./data-source-store.js";
+import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
+import {
+  listEnterpriseKnowledgeProjectionBindings,
+  upsertEnterpriseKnowledgeProjectionBinding,
+} from "./enterprise-knowledge-projection-binding-store.js";
 import { findKnowledgeFeedItem } from "./knowledge-feed-item-store.js";
 import { listKnowledgeLineageRecords } from "./knowledge-lineage-store.js";
 import { lineageRecordsVerifiedSar } from "./knowledge-publication.js";
 import { runProjectionMaterialization } from "./projection-materializer.js";
 import { upsertEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import { applyProjectionTemplate } from "./projection-template-engine.js";
+import { upsertScopePolicy } from "./scope-policy-store.js";
+import { upsertSeatActionGrant } from "./seat-action-grant-store.js";
 import { seedEnterpriseDataCatalog } from "./seeds.js";
 import { normalizeEnterpriseDataStore } from "./store.js";
+
+const yonyouVaultDir = vi.hoisted(() => ({
+  tmpDir: `/tmp/openbot-yonyou-projection-${Date.now()}`,
+}));
+
+vi.mock("../../utils.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../utils.js")>();
+  return {
+    ...actual,
+    CONFIG_DIR: yonyouVaultDir.tmpDir,
+  };
+});
 
 const tenantId = "tenant-acme";
 const nowIso = "2026-06-05T12:00:00.000Z";
@@ -249,5 +272,148 @@ describe("projection materializer M4", () => {
         gatewayResponse: { maskedFields: [], scopeApplied: "all" },
       }),
     ).toThrow(/Unsupported projection template/);
+  });
+});
+
+describe("yonyou projection cursor window", () => {
+  const tenantId = "tenant-jingshanzi";
+  const sourceId = "src-yonyou";
+  const nowIso = "2026-10-22T06:00:00.000Z";
+
+  it("sends the stored inventory cursor on materialization and keeps an explicit window", async () => {
+    fs.rmSync(yonyouVaultDir.tmpDir, { recursive: true, force: true });
+    fs.mkdirSync(yonyouVaultDir.tmpDir, { recursive: true });
+    const store = normalizeEnterpriseDataStore({});
+    seedEnterpriseDataCatalog({ store, tenantId, nowIso });
+    ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso,
+    });
+    const credential = upsertDataConnectorCredential({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      kind: "oauth2",
+      nowIso,
+    });
+    await saveCredentialSecret(credential.credentialId, {
+      oauthAccessToken: "simulated-yonyou-tplus-token-abc",
+    });
+    upsertDataSource({
+      store,
+      tenantId,
+      nowIso,
+      source: {
+        sourceId,
+        sourceKey: "yonyou-tplus",
+        displayName: "用友 T+",
+        category: "erp",
+        status: "connected",
+        connectorId: "erp-yonyou-tplus",
+        credentialId: credential.credentialId,
+      },
+    });
+    upsertScopePolicy({
+      store,
+      tenantId,
+      nowIso,
+      policy: {
+        scopePolicyId: "scope-all-readonly",
+        displayName: "全量只读范围",
+        scopeType: "ALL",
+        filterDescription: "租户内全量只读",
+      },
+    });
+    upsertSeatActionGrant({
+      store,
+      tenantId,
+      seatId: MATERIALIZER_SEAT_ID,
+      connectorId: "erp-yonyou-tplus",
+      actionKey: "erp.inventory.query_page",
+      version: "v1",
+      scopePolicyId: "scope-all-readonly",
+      nowIso,
+    });
+    const cursorId = `${sourceId}::inventory`;
+    store.connectorSyncCursors[cursorId] = {
+      cursorId,
+      tenantId,
+      sourceId,
+      streamKey: "inventory",
+      watermark: "2026-10-20 00:00:00",
+      updatedAt: "2026-10-21T00:00:00.000Z",
+    };
+    const spec = upsertEnterpriseKnowledgeProjectionSpec({
+      store,
+      tenantId,
+      nowIso,
+      spec: {
+        projectionKey: "erp.inventory.incremental",
+        displayName: "存货增量",
+        category: "inventory",
+        sourceId,
+        sourceActions: [
+          {
+            connectorId: "erp-yonyou-tplus",
+            actionKey: "erp.inventory.query_page",
+            version: "v1",
+          },
+        ],
+        objectKind: "data",
+        templateKey: "NormalizeTemplate",
+        description: "用友存货按同步水位读取一页",
+        outputSchema: { type: "object" },
+        lifecycle: "active",
+      },
+    });
+    const binding = upsertEnterpriseKnowledgeProjectionBinding({
+      store,
+      tenantId,
+      nowIso,
+      binding: {
+        projectionId: spec.projectionId,
+        materializationMode: "on_demand",
+        materializationTeamLabel: "京扇子",
+        enabled: true,
+        generatorVersion: "yonyou-cursor-1",
+      },
+    });
+    const result = await runProjectionMaterialization({
+      store,
+      tenantId,
+      bindingId: binding.bindingId,
+      nowIso,
+    });
+    expect(result.feedItem.payload.query).toEqual({
+      param: {
+        PageSize: "20",
+        PageIndex: "1",
+        UpdateDateBegin: "2026-10-20 00:00:00",
+        UpdateDateEnd: "2026-10-22 06:00:00",
+      },
+    });
+    expect(result.feedItem.title).toBe("存货增量");
+
+    const pinned = await runProjectionMaterialization({
+      store,
+      tenantId,
+      bindingId: binding.bindingId,
+      nowIso,
+      input: {
+        param: {
+          UpdateDateBegin: "2026-01-01 00:00:00",
+          UpdateDateEnd: "2026-01-02 00:00:00",
+        },
+      },
+    });
+    expect(pinned.feedItem.payload.query).toEqual({
+      param: {
+        UpdateDateBegin: "2026-01-01 00:00:00",
+        UpdateDateEnd: "2026-01-02 00:00:00",
+      },
+    });
   });
 });

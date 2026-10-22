@@ -10,6 +10,7 @@ import {
   resolveProjectionExecutionIdentity,
   type KnowledgePublicationDecision,
 } from "./knowledge-publication.js";
+import { projectionSourceId } from "./knowledge-publication.js";
 import { recordKnowledgeSupplyAudit } from "./knowledge-supply-audit-store.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import { applyProjectionTemplate } from "./projection-template-engine.js";
@@ -23,6 +24,7 @@ import type {
   EnterpriseDataStore,
   ProjectionSourceActionRef,
 } from "./types.js";
+import { applyYonyouTplusSyncCursorToInput } from "./yonyou-tplus-sync.js";
 
 export type ProjectionMaterializationResult = {
   bindingId: string;
@@ -172,6 +174,18 @@ export async function runProjectionMaterialization(params: {
     }
     assertActiveProjection(spec);
     const sourceRef = assertSingleSourceAction(spec);
+    const cursorNow = Number.isFinite(Date.parse(params.nowIso))
+      ? new Date(params.nowIso)
+      : new Date();
+    const input = applyYonyouTplusSyncCursorToInput({
+      store: params.store,
+      tenantId: params.tenantId,
+      sourceId: projectionSourceId(spec),
+      connectorId: sourceRef.connectorId,
+      actionKey: sourceRef.actionKey,
+      input: params.input,
+      now: cursorNow,
+    });
 
     const published = await invokeSourceAction({
       store: params.store,
@@ -179,7 +193,7 @@ export async function runProjectionMaterialization(params: {
       spec,
       sourceRef,
       binding,
-      input: params.input,
+      input,
       sarProvider: params.sarProvider,
       nowIso: params.nowIso,
     });
@@ -194,8 +208,7 @@ export async function runProjectionMaterialization(params: {
       published.publication === "partial" && !templateResult.title.includes("不完整")
         ? `${templateResult.title}（不完整）`
         : templateResult.title;
-    const query =
-      params.input && Object.keys(params.input).length > 0 ? { ...params.input } : undefined;
+    const query = input && Object.keys(input).length > 0 ? { ...input } : undefined;
 
     const feedItem = upsertKnowledgeFeedItem({
       store: params.store,
