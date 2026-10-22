@@ -17,13 +17,59 @@ import {
   type OwnerDecisionCard,
   type OwnerDecisionOptionId,
 } from "../../../../src/gateway/collaboration-dispatch/owner-decision-card.js";
-import {
-  ownerDecisionDeliveryStatusCopy,
-  type OwnerDecisionCardDelivery,
-  type OwnerDecisionUserFacing,
-} from "../../../../src/gateway/collaboration-learning/owner-decision-delivery.js";
+/** Browser-safe delivery copy/types (do not import owner-decision-delivery.ts — it pulls Node spawn). */
+export const OWNER_DECISION_USER_FACING = [
+  "waiting_confirmation",
+  "delivery_failed_retryable",
+  "stale_version",
+  "consumed",
+  "skipped",
+  "tracked",
+] as const;
 
-export type { OwnerDecisionUserFacing };
+export type OwnerDecisionUserFacing = (typeof OWNER_DECISION_USER_FACING)[number];
+
+const OWNER_DECISION_DELIVERY_COPY: Record<
+  "waiting_confirmation" | "delivery_failed_retryable" | "stale_version",
+  string
+> = {
+  waiting_confirmation: "等待确认",
+  delivery_failed_retryable: "确认请求发送失败，可重试",
+  stale_version: "旧版本已失效",
+};
+
+export type OwnerDecisionCardDelivery = {
+  ok: boolean;
+  stage: string;
+  reason?: string;
+  message?: string;
+  historyReloadable: boolean;
+  deliveryTracked: boolean;
+  clientPresented: false;
+  retryable: boolean;
+  userFacing: OwnerDecisionUserFacing;
+  groupId: string;
+  taskId: string;
+  boardItemId: string;
+  todolistId: string;
+  version: number;
+  messageId?: string;
+  idempotencyKey?: string;
+  card?: OwnerDecisionCard;
+};
+
+export function ownerDecisionDeliveryStatusCopy(
+  userFacing: OwnerDecisionUserFacing | null | undefined,
+): string | null {
+  if (
+    userFacing === "waiting_confirmation" ||
+    userFacing === "delivery_failed_retryable" ||
+    userFacing === "stale_version"
+  ) {
+    return OWNER_DECISION_DELIVERY_COPY[userFacing];
+  }
+  return null;
+}
 
 export type OwnerDecisionAction = OwnerDecisionOptionId;
 
