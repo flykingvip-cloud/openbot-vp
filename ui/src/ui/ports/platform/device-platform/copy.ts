@@ -3,11 +3,9 @@ import { i18n } from "../../../../i18n/index.ts";
 type Copy = {
   breadcrumb: string;
   title: string;
-  subtitle: string;
   add: string;
   createTitle: string;
   editTitle: string;
-  footnote: string;
   loading: string;
   unauthorized: string;
   loadFailed: string;
@@ -87,11 +85,9 @@ type Copy = {
 const en: Copy = {
   breadcrumb: "System Settings · Device Platform Connection",
   title: "Device Platform Connection",
-  subtitle: "Manage connector partner connection and reachability, not individual devices.",
   add: "Add connection",
   createTitle: "Add connection",
   editTitle: "Edit connection · {name}",
-  footnote: "Device list and authorization live in enterprise 「Connected Devices」.",
   loading: "Loading device platform connections…",
   unauthorized:
     "Only platform administrators can configure device platform connections. Enterprise admins and members do not have this entry.",
@@ -174,11 +170,9 @@ const en: Copy = {
 const zhCN: Copy = {
   breadcrumb: "系统设置 · 设备平台连接",
   title: "设备平台连接",
-  subtitle: "管理接入伙伴的连接与可达性，不管理单台设备",
   add: "添加连接",
   createTitle: "添加连接",
   editTitle: "编辑连接 · {name}",
-  footnote: "设备列表与授权在企业侧「已连接设备」",
   loading: "正在读取设备平台连接",
   unauthorized: "仅平台管理员可以配置设备平台连接。企业管理员和普通用户没有这个入口。",
   loadFailed: "读取设备平台连接失败。",

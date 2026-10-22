@@ -77,8 +77,9 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain("还没有设备平台连接");
     });
-    expect(container.textContent).toContain("管理接入伙伴的连接与可达性，不管理单台设备");
-    expect(container.textContent).toContain("设备列表与授权在企业侧「已连接设备」");
+    expect(container.textContent).not.toContain("管理接入伙伴的连接与可达性，不管理单台设备");
+    expect(container.textContent).not.toContain("设备列表与授权在企业侧「已连接设备」");
+    expect(container.querySelector("[data-testid='device-platform-footnote']")).toBeNull();
     expect(container.textContent).not.toContain("未确认·JOINT_PENDING");
     expect(container.textContent).not.toContain("设备已应用");
 
