@@ -34,7 +34,24 @@ type CallCredentials = {
   sid?: string;
   orgId?: string;
   appName?: string;
+  idMarketingOrgan?: string;
 };
+
+/** Chanjet documents `?idMarketingOrgan=` as a path query on some voucher writes. */
+export function buildYonyouTplusRequestUrl(params: {
+  gatewayOrigin: string;
+  path: string;
+  idMarketingOrgan?: string;
+  marketingOrganQuery?: boolean;
+}): string {
+  const base = `${params.gatewayOrigin}${params.path}`;
+  const organ = params.idMarketingOrgan?.trim();
+  if (!params.marketingOrganQuery || !organ) {
+    return base;
+  }
+  const joiner = params.path.includes("?") ? "&" : "?";
+  return `${base}${joiner}idMarketingOrgan=${encodeURIComponent(organ)}`;
+}
 
 function isSimulatedToken(token: string): boolean {
   return token.startsWith(YONYOU_TPLUS_SIMULATED_TOKEN_PREFIX) || token.startsWith("simulated-");
@@ -58,6 +75,7 @@ function resolveCallCredentials(
       sid: secret.sid?.trim() || undefined,
       orgId: secret.orgId?.trim() || undefined,
       appName: secret.appName?.trim() || undefined,
+      idMarketingOrgan: secret.idMarketingOrgan?.trim() || undefined,
     };
   }
   const appKey =
@@ -80,6 +98,7 @@ function resolveCallCredentials(
     sid: secret.sid?.trim() || undefined,
     orgId: secret.orgId?.trim() || undefined,
     appName: secret.appName?.trim() || undefined,
+    idMarketingOrgan: secret.idMarketingOrgan?.trim() || undefined,
   };
 }
 
@@ -147,10 +166,17 @@ async function postTplus(params: {
   path: string;
   body: unknown;
   successMessage: string;
+  marketingOrganQuery?: boolean;
 }): Promise<InterpretedBody> {
+  const url = buildYonyouTplusRequestUrl({
+    gatewayOrigin: params.credentials.gatewayOrigin,
+    path: params.path,
+    idMarketingOrgan: params.credentials.idMarketingOrgan,
+    marketingOrganQuery: params.marketingOrganQuery,
+  });
   let response: Response;
   try {
-    response = await fetch(`${params.credentials.gatewayOrigin}${params.path}`, {
+    response = await fetch(url, {
       method: "POST",
       headers: chanjetHeaders(params.credentials),
       body: JSON.stringify(params.body),
@@ -462,8 +488,21 @@ export async function executeYonyouTplusHandler(
   handlerRef: string,
   input: MockHandlerInput,
   secret: DataConnectorCredentialSecret,
+  options?: YonyouTplusProbeContext & { marketingOrganQuery?: boolean },
 ): Promise<MockHandlerResult> {
-  const resolved = resolveCallCredentials(secret);
+  let current = secret;
+  let refreshed = false;
+  const canPersist = Boolean(options?.credentialId?.trim());
+  let resolved = resolveCallCredentials(current);
+  if (
+    "error" in resolved &&
+    canPersist &&
+    (await renewalMaterial(current, options?.messageStorePath))
+  ) {
+    current = await renewAndPersist(current, options ?? {});
+    refreshed = true;
+    resolved = resolveCallCredentials(current);
+  }
   if ("error" in resolved) {
     throw new Error(resolved.error);
   }
@@ -471,12 +510,30 @@ export async function executeYonyouTplusHandler(
     return simulatedPayload(handlerRef);
   }
   const request = liveRequest(handlerRef, input.input);
-  const result = await postTplus({
-    credentials: resolved,
-    path: request.path,
-    body: request.body,
-    successMessage: "用友 T+ 读取成功。",
-  });
+  const call = (credentials: CallCredentials) =>
+    postTplus({
+      credentials,
+      path: request.path,
+      body: request.body,
+      successMessage: "用友 T+ 读取成功。",
+      marketingOrganQuery: options?.marketingOrganQuery,
+    });
+  let result = await call(resolved);
+  if (
+    !result.ok &&
+    !refreshed &&
+    canPersist &&
+    isOpenTokenRejected(result) &&
+    (await renewalMaterial(current, options?.messageStorePath))
+  ) {
+    current = await renewAndPersist(current, options ?? {});
+    const next = resolveCallCredentials(current);
+    if ("error" in next) {
+      throw new Error(next.error);
+    }
+    refreshed = true;
+    result = await call(next);
+  }
   if (!result.ok) {
     throw new Error(result.message);
   }

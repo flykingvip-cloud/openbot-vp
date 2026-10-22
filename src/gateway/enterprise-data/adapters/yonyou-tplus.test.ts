@@ -110,6 +110,37 @@ describe("yonyou tplus adapter", () => {
     expect(payload.records[0]?.Code).toBe("01");
   });
 
+  it("leaves idMarketingOrgan off the URL unless the caller opts into the path query", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json([{ Code: "01", Name: "温州仓" }], { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.warehouse,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      { ...LIVE_SECRET, idMarketingOrgan: "1001" },
+    );
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/warehouse/Query");
+  });
+
+  it("appends idMarketingOrgan when the caller opts into the documented path query", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json([{ Code: "01", Name: "温州仓" }], { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.warehouse,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      { ...LIVE_SECRET, idMarketingOrgan: "1001" },
+      { marketingOrganQuery: true },
+    );
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "https://openapi.chanjet.com/tplus/api/v2/warehouse/Query?idMarketingOrgan=1001",
+    );
+  });
+
   it("reads the first page of sale orders with the documented list body", async () => {
     const fetchMock = vi.fn(async () =>
       Response.json(
