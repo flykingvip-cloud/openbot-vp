@@ -171,6 +171,11 @@ export type DataConnectorCredentialSecret = {
   oauthRefreshToken?: string;
   /** Chanjet user_auth_permanent_code. */
   oauthPermanentCode?: string;
+  /**
+   * Chanjet enterprise permanent auth code (`permanentAuthCode`).
+   * Combined with a fresh appTicket and the user permanent code for headless renewal.
+   */
+  orgPermanentAuthCode?: string;
   /** Chanjet cloud enterprise id (orgId). */
   orgId?: string;
   /** Chanjet in-app name. T+Cloud is `tpluscloud`; on-prem T+ is `Tplus`. */
