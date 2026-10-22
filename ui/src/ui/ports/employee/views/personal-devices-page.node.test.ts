@@ -337,7 +337,7 @@ describe("personal devices panel", () => {
     expect(urls[1]).toBe("/api/device-platform/v1/me/devices");
   });
 
-  it("keeps a load failure in a callout and still opens add", async () => {
+  it("keeps a load failure in a callout with retry only", async () => {
     let fail = true;
     setPersonalDevicesClientForTests({
       ...client(),
@@ -363,21 +363,9 @@ describe("personal devices panel", () => {
     expect(callout?.textContent).not.toContain("设备请求失败。");
     expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
     const retry = container.querySelector("[data-testid=personal-devices-retry]");
-    const addOnError = container.querySelector("[data-testid=personal-devices-add]");
     expect(retry).not.toBeNull();
     expect(retry?.classList.contains("btn--primary")).toBe(true);
-    expect(addOnError?.classList.contains("btn--primary")).toBe(false);
-
-    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
-    paint();
-    expect(viewName(container)).toBe("add");
-    expect(container.querySelector("[data-testid=personal-devices-status]")).toBeNull();
-    expect(container.querySelector("[data-testid=personal-device-add]")).not.toBeNull();
-    expect(container.querySelector(".personal-devices__form")).not.toBeNull();
-
-    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-back]")?.click();
-    paint();
-    expect(viewName(container)).toBe("error");
+    expect(container.querySelector("[data-testid=personal-devices-add]")).toBeNull();
 
     fail = false;
     container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-retry]")?.click();
@@ -385,6 +373,38 @@ describe("personal devices panel", () => {
     expect(viewName(container)).toBe("list");
     expect(container.textContent).toContain("门口相机");
     expect(effectText(container, "personal-device-effect-device")).toBe("未确认·JOINT_PENDING");
+  });
+
+  it("breaks the scan label at the slash and explains empty platforms", async () => {
+    setPersonalDevicesClientForTests({
+      ...client(),
+      listDevices: async () => [],
+      listPlatforms: async () => [],
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const paint = () => {
+      render(
+        html`${renderPersonalDevicesPanel({ title: "已连接设备", surface: "detail" })}`,
+        container,
+      );
+    };
+    await flush(paint);
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
+    await flush(paint);
+
+    expect(viewName(container)).toBe("add");
+    const scanLabel = container.querySelector(
+      ".personal-devices__field--scan .personal-devices__label",
+    );
+    expect(scanLabel?.innerHTML).toContain("粘贴扫描 /");
+    expect(scanLabel?.innerHTML.toLowerCase()).toContain("<br");
+    expect(scanLabel?.textContent).toContain("配对码");
+    expect(scanLabel?.textContent).not.toMatch(/粘贴扫描配对码/);
+    expect(
+      container.querySelector("[data-testid=personal-device-platform-empty]")?.textContent,
+    ).toContain("设备平台连接");
+    expect(container.textContent).toContain("还没有可用的设备平台");
   });
 
   it("shows a submit failure as a callout on the add form", async () => {

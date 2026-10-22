@@ -5297,6 +5297,16 @@
   padding-top: 10px;
 }
 
+.personal-devices__platform-control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.personal-devices__platform-control .personal-devices__note {
+  margin: 0;
+}
+
 .personal-devices__scopes {
   padding: 0;
   border: 0;
