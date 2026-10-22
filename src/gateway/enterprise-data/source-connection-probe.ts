@@ -208,7 +208,9 @@ export async function probeDataSourceConnection(params: {
 
   if (secret && definition.connectorId === "erp-yonyou-tplus") {
     const { probeYonyouTplusConnection } = await import("./adapters/yonyou-tplus.js");
-    const live = await probeYonyouTplusConnection(secret);
+    const live = await probeYonyouTplusConnection(secret, {
+      credentialId: params.credentialId,
+    });
     return {
       ok: live.ok,
       connectorId: definition.connectorId,

@@ -101,7 +101,7 @@ export const DATA_CONNECTOR_CATALOG: DataConnectorCatalogDefinition[] = [
     credentialKind: "oauth2",
     accessMethod: "credential",
     description:
-      "畅捷通 T+ / T+Cloud（应用入驻 OAuth）。安装连接器包后，用 appKey、appSecret 与 openToken 探测 accountAPI/GetVersionInfo，并读取仓库、存货、往来单位、销售订单与凭证。",
+      "畅捷通 T+ / T+Cloud（应用入驻 OAuth）。安装连接器包后，用 appKey、appSecret 与 openToken 探测 accountAPI/GetVersionInfo；已保存的 refresh token 或永久授权码会在探测时续期并写回保险库。读取仓库、存货、往来单位、销售订单、销货单与凭证。",
     defaultSourceKey: "yonyou-tplus",
   },
   {
