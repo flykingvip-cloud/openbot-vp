@@ -370,14 +370,6 @@ function renderLoadError() {
         >
           重试
         </button>
-        <button
-          type="button"
-          class="btn"
-          data-testid="personal-devices-add"
-          @click=${() => openAdd()}
-        >
-          添加设备
-        </button>
       </div>
     </div>
   `;
@@ -626,20 +618,32 @@ function renderAddForm() {
         ${renderField(
           "设备平台",
           html`
-            <select
-              class="employee-workbench__settings-input"
-              data-testid="personal-device-platform"
-              .value=${draft.platformId}
-              @change=${(event: Event) => {
-                draft.platformId = (event.target as HTMLSelectElement).value;
-              }}
-            >
-              <option value="">选择平台</option>
-              ${state.platforms.map(
-                (platform) =>
-                  html`<option value=${platform.platformId}>${platform.displayName}</option>`,
-              )}
-            </select>
+            <div class="personal-devices__platform-control">
+              <select
+                class="employee-workbench__settings-input"
+                data-testid="personal-device-platform"
+                .value=${draft.platformId}
+                @change=${(event: Event) => {
+                  draft.platformId = (event.target as HTMLSelectElement).value;
+                }}
+              >
+                <option value="">选择平台</option>
+                ${state.platforms.map(
+                  (platform) =>
+                    html`<option value=${platform.platformId}>${platform.displayName}</option>`,
+                )}
+              </select>
+              ${
+                state.platforms.length === 0
+                  ? html`
+                      <p class="personal-devices__note" data-testid="personal-device-platform-empty">
+                        还没有可用的设备平台。请平台管理员在「系统设置 →
+                        设备平台连接」中启用连接，并确认当前员工会话能读取平台列表后再试。
+                      </p>
+                    `
+                  : nothing
+              }
+            </div>
           `,
         )}
         ${renderField(
@@ -658,7 +662,9 @@ function renderAddForm() {
         )}
         <div class="personal-devices__pair">
           ${renderField(
-            "粘贴扫描 / 配对码",
+            html`
+              粘贴扫描 /<br />配对码
+            `,
             html`
               <textarea
                 class="employee-workbench__settings-input personal-devices__scan mono"
@@ -748,7 +754,7 @@ function renderAddForm() {
   `;
 }
 
-function renderField(label: string, control: TemplateResult, extraClass = "") {
+function renderField(label: string | TemplateResult, control: TemplateResult, extraClass = "") {
   return html`
     <label class="personal-devices__field ${extraClass}">
       <span class="personal-devices__label">${label}</span>
@@ -840,6 +846,67 @@ function openAdd(): void {
   state.showTransfer = false;
   state.notice = "";
   state.noticeTone = "";
+  if (state.status !== "ready" || state.platforms.length === 0) {
+    // Stay on add after reload so a prior failed load cannot leave an empty platform select.
+    void reloadKeepingAdd();
+  }
+  rerender();
+}
+
+async function reloadKeepingAdd(): Promise<void> {
+  loadToken += 1;
+  const token = loadToken;
+  loadStarted = true;
+  try {
+    const api = client();
+    const locked = state.lockedHumanId;
+    const [listed, platforms, humans] = await Promise.all([
+      api.listDevices(locked ? { digitalHumanId: locked } : undefined),
+      api.listPlatforms(),
+      api.listHumans(),
+    ]);
+    if (token !== loadToken) {
+      return;
+    }
+    const devices = locked
+      ? listed.filter((device) => device.binding?.digitalHumanId === locked)
+      : listed;
+    state = {
+      ...state,
+      status: "ready",
+      message: "",
+      busy: false,
+      devices,
+      platforms,
+      humans,
+      mode: "add",
+      draft: {
+        ...state.draft,
+        platformId: state.draft.platformId || platforms[0]?.platformId || "",
+        digitalHumanId: locked || state.draft.digitalHumanId || humans[0]?.digitalHumanId || "",
+      },
+      notice:
+        platforms.length === 0
+          ? "还没有可用的设备平台。请平台管理员在「系统设置 → 设备平台连接」中启用连接后再试。"
+          : state.notice,
+      noticeTone: platforms.length === 0 ? "error" : state.noticeTone,
+    };
+  } catch (error) {
+    if (token !== loadToken) {
+      return;
+    }
+    const status = error instanceof PersonalDevicesRequestError ? error.status : 0;
+    const code = error instanceof PersonalDevicesRequestError ? error.code : "";
+    state = {
+      ...state,
+      status: status === 401 || code === "UNAUTHENTICATED" ? "unauthorized" : "failure",
+      message: error instanceof Error ? error.message : "读取设备失败",
+      busy: false,
+      mode: "list",
+      notice: "",
+      noticeTone: "",
+    };
+  }
   rerender();
 }
 
