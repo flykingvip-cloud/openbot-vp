@@ -152,6 +152,18 @@ export function resetDevicePlatformConnectionPanelForTests(): void {
   };
 }
 
+/** Tab / deep-link entry always lands on LIST; form is only via 添加连接 / 编辑. */
+export function showDevicePlatformConnectionList(): void {
+  state = {
+    ...state,
+    view: "list",
+    mode: "create",
+    draft: emptyDraft(),
+    notice: "",
+    partial: "",
+  };
+}
+
 export function createDevicePlatformFetchClient(
   fetchImpl: typeof fetch = fetch,
 ): DevicePlatformAdminClient {
@@ -218,10 +230,6 @@ export function renderDevicePlatformConnectionPanel() {
 function renderListView() {
   return html`
     <div class="device-platform-admin__header">
-      <div>
-        <div class="device-platform-admin__eyebrow">${dp((c) => c.breadcrumb)}</div>
-        <h2 class="device-platform-admin__title">${dp((c) => c.title)}</h2>
-      </div>
       <button
         class="btn primary"
         type="button"

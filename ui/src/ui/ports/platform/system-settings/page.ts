@@ -10,7 +10,10 @@ import {
 import { originForPort } from "../../../routing/subdomain-resolver.ts";
 import type { PlatformAuthPanelProps } from "../../../views/platform-auth-panel.ts";
 import { renderPlatformAuthPanel } from "../../../views/platform-auth-panel.ts";
-import { renderDevicePlatformConnectionPanel } from "../device-platform/page.ts";
+import {
+  renderDevicePlatformConnectionPanel,
+  showDevicePlatformConnectionList,
+} from "../device-platform/page.ts";
 import type { PlatformModelsMode } from "../models/snapshot-types.ts";
 import { isPlatformShellPending, renderPlatformSummaryPending } from "../shared/summary-pending.ts";
 import {
@@ -38,6 +41,8 @@ const SYSTEM_SETTINGS_TABS: Array<{ id: SystemSettingsTab; label: string }> = [
 ];
 
 let activeSystemSettingsTab: SystemSettingsTab = "admins";
+/** Tracks whether device-platform section is currently shown (in-memory form must not leak across tab visits). */
+let devicePlatformSectionMounted = false;
 
 function resolveSystemSettingsTab(): SystemSettingsTab {
   if (typeof window === "undefined") {
@@ -58,6 +63,13 @@ function activateSystemSettingsTab(tab: SystemSettingsTab) {
     return;
   }
   activeSystemSettingsTab = tab;
+  if (tab === "device-platform") {
+    // Tab chrome always opens LIST; form only via 添加连接 / 编辑.
+    showDevicePlatformConnectionList();
+    devicePlatformSectionMounted = true;
+  } else {
+    devicePlatformSectionMounted = false;
+  }
   const { pathname, search } = window.location;
   // 同页 hash 切换不能走 replaceAppHistoryState：它会派发合成 popstate，
   // 进而 onPopState → refreshActiveTab → loadOverview，把页签点击打成全量刷新。
@@ -3884,6 +3896,15 @@ function renderApiKeyTab(props: PlatformSurfaceProps) {
 
 export function renderPlatformSystemSettingsSurface(props: PlatformSurfaceProps) {
   activeSystemSettingsTab = resolveSystemSettingsTab();
+  if (activeSystemSettingsTab === "device-platform") {
+    if (!devicePlatformSectionMounted) {
+      // Deep-link / remount after leaving system-settings: drop leftover form view.
+      showDevicePlatformConnectionList();
+    }
+    devicePlatformSectionMounted = true;
+  } else {
+    devicePlatformSectionMounted = false;
+  }
   const authPanelProps = resolveSystemSettingsAuthPanelProps(props.authPanelProps);
   const canManagePlatform = Boolean(
     props.authPanelProps?.state?.canManagePlatform ||
