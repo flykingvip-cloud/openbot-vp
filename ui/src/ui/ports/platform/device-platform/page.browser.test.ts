@@ -121,6 +121,39 @@ describe("设备平台连接", () => {
     });
   });
 
+  it("puts 添加连接 on the same row as filter chips, right-aligned", async () => {
+    setDevicePlatformAdminClientForTests({
+      list: async () => [connection()],
+      save: vi.fn(),
+      setCredential: vi.fn(),
+      test: vi.fn(),
+    });
+    resetDevicePlatformConnectionPanelForTests();
+    const { renderDevicePlatformConnectionPanel } = await import("./page.ts");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const appHost = document.createElement("openbot-app") as HTMLElement & {
+      requestUpdate: () => void;
+    };
+    appHost.requestUpdate = () => render(renderDevicePlatformConnectionPanel(), container);
+    document.body.append(appHost);
+    render(renderDevicePlatformConnectionPanel(), container);
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-toolbar']")).not.toBeNull();
+    });
+    const toolbar = container.querySelector(
+      "[data-testid='device-platform-toolbar']",
+    ) as HTMLElement;
+    expect(toolbar.querySelector("[data-testid='device-platform-filter-all']")).not.toBeNull();
+    expect(toolbar.querySelector("[data-testid='device-platform-filter-enabled']")).not.toBeNull();
+    expect(toolbar.querySelector("[data-testid='device-platform-filter-abnormal']")).not.toBeNull();
+    const add = toolbar.querySelector("[data-testid='device-platform-add']");
+    expect(add).not.toBeNull();
+    expect(container.querySelector(".device-platform-admin__header")).toBeNull();
+    // Add is a direct child of the toolbar (same row as chips), not a separate header.
+    expect(add?.parentElement).toBe(toolbar);
+  });
+
   it("lists connections with filters and keeps the secret off the edit page", async () => {
     const saved = connection();
     const setCredential = vi.fn(async () => connection({ credentialPresent: true }));

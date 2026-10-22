@@ -229,19 +229,8 @@ export function renderDevicePlatformConnectionPanel() {
 
 function renderListView() {
   return html`
-    <div class="device-platform-admin__header">
-      <button
-        class="btn primary"
-        type="button"
-        data-testid="device-platform-add"
-        ?disabled=${state.status !== "ready" || state.busy}
-        @click=${() => startCreate()}
-      >
-        ${dp((c) => c.add)}
-      </button>
-    </div>
     ${renderStatus()}
-    ${state.status === "ready" ? renderFilters() : nothing}
+    ${renderToolbar()}
     ${state.status === "ready" ? renderTable() : nothing}
   `;
 }
@@ -561,7 +550,7 @@ function renderStatus() {
   return nothing;
 }
 
-function renderFilters() {
+function renderToolbar() {
   const counts = filterCounts(state.connections);
   const filters: Array<{ id: FilterId; label: string; count: number }> = [
     { id: "all", label: dp((c) => c.filters.all), count: counts.all },
@@ -569,24 +558,47 @@ function renderFilters() {
     { id: "abnormal", label: dp((c) => c.filters.abnormal), count: counts.abnormal },
   ];
   return html`
-    <div class="device-platform-admin__filters" role="tablist" aria-label=${dp((c) => c.filtersLabel)}>
-      ${filters.map(
-        (filter) => html`
-          <button
-            class="device-platform-admin__filter ${state.filter === filter.id ? "is-active" : ""}"
-            type="button"
-            role="tab"
-            aria-selected=${state.filter === filter.id ? "true" : "false"}
-            data-testid=${`device-platform-filter-${filter.id}`}
-            @click=${() => {
-              state = { ...state, filter: filter.id };
-              rerender();
-            }}
-          >
-            ${filter.label} ${filter.count}
-          </button>
-        `,
-      )}
+    <div class="device-platform-admin__toolbar" data-testid="device-platform-toolbar">
+      ${
+        state.status === "ready"
+          ? html`
+              <div
+                class="device-platform-admin__filters"
+                role="tablist"
+                aria-label=${dp((c) => c.filtersLabel)}
+              >
+                ${filters.map(
+                  (filter) => html`
+                    <button
+                      class="device-platform-admin__filter ${state.filter === filter.id ? "is-active" : ""}"
+                      type="button"
+                      role="tab"
+                      aria-selected=${state.filter === filter.id ? "true" : "false"}
+                      data-testid=${`device-platform-filter-${filter.id}`}
+                      @click=${() => {
+                        state = { ...state, filter: filter.id };
+                        rerender();
+                      }}
+                    >
+                      ${filter.label} ${filter.count}
+                    </button>
+                  `,
+                )}
+              </div>
+            `
+          : html`
+              <div class="device-platform-admin__filters" aria-hidden="true"></div>
+            `
+      }
+      <button
+        class="btn primary device-platform-admin__add"
+        type="button"
+        data-testid="device-platform-add"
+        ?disabled=${state.status !== "ready" || state.busy}
+        @click=${() => startCreate()}
+      >
+        ${dp((c) => c.add)}
+      </button>
     </div>
   `;
 }
