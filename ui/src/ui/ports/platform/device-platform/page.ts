@@ -267,7 +267,7 @@ function renderFormView() {
         </div>
       </div>
     </div>
-    ${renderStatusBanner(connection)}
+    ${editing ? renderStatusBanner(connection) : nothing}
     ${state.partial ? html`<p class="callout" data-testid="device-platform-partial">${state.partial}</p>` : nothing}
     ${state.notice ? html`<p class="callout success" data-testid="device-platform-notice">${state.notice}</p>` : nothing}
     <form
@@ -357,7 +357,6 @@ function renderFormView() {
             >
               ${CONTRACT_VERSIONS.map((version) => html`<option value=${version}>${version}</option>`)}
             </select>
-            <span class="device-platform-admin__hint">${dp((c) => c.hints.contractVersion)}</span>
           </label>
           <label class="device-platform-admin__field">
             <span>${dp((c) => c.fields.clientIdentity)}</span>
@@ -366,44 +365,13 @@ function renderFormView() {
               ?disabled=${state.busy}
               @change=${(event: Event) => {
                 const value = (event.target as HTMLSelectElement).value;
-                const next: Partial<Draft> = { clientIdentity: value };
-                if (!draft.overrideClientId) {
-                  next.serviceClientIds = value;
-                }
-                patchDraft(next);
+                patchDraft({ clientIdentity: value, serviceClientIds: value });
               }}
             >
               ${identityOptions(draft.clientIdentity).map(
                 (value) => html`<option value=${value}>${value}</option>`,
               )}
             </select>
-          </label>
-          <label class="device-platform-admin__field">
-            <span>${dp((c) => c.fields.serviceClientId)}</span>
-            <input
-              type="text"
-              .value=${draft.serviceClientIds}
-              ?disabled=${state.busy || !draft.overrideClientId}
-              @input=${(event: Event) =>
-                patchDraft({ serviceClientIds: (event.target as HTMLInputElement).value })}
-            />
-            <label class="device-platform-admin__hint">
-              <input
-                type="checkbox"
-                .checked=${draft.overrideClientId}
-                ?disabled=${state.busy}
-                @change=${(event: Event) => {
-                  const overrideClientId = (event.target as HTMLInputElement).checked;
-                  patchDraft({
-                    overrideClientId,
-                    serviceClientIds: overrideClientId
-                      ? draft.serviceClientIds
-                      : draft.clientIdentity || DEFAULT_IDENTITY,
-                  });
-                }}
-              />
-              ${dp((c) => c.hints.serviceClientOverride)}
-            </label>
           </label>
           <label class="device-platform-admin__field">
             <span>${dp((c) => c.fields.credentialRef)}</span>

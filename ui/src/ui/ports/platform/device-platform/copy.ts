@@ -62,10 +62,6 @@ type Copy = {
     secretRotate: string;
     secretSaved: string;
   };
-  hints: {
-    contractVersion: string;
-    serviceClientOverride: string;
-  };
   validation: {
     displayName: string;
     platformId: string;
@@ -149,10 +145,6 @@ const en: Copy = {
     secretNew: "Write once. It will not be shown again.",
     secretRotate: "Enter the new secret to rotate.",
     secretSaved: "Saved. Leave blank to keep unchanged.",
-  },
-  hints: {
-    contractVersion: "Aligned with the frozen contract.",
-    serviceClientOverride: "Advanced: override service client ID (defaults to identity)",
   },
   validation: {
     displayName: "Platform name is required.",
@@ -238,10 +230,6 @@ const zhCN: Copy = {
     secretNew: "只写入一次，保存后不再显示",
     secretRotate: "填写新密钥以完成轮换。",
     secretSaved: "已保存。留空不改。",
-  },
-  hints: {
-    contractVersion: "与冻结契约对齐",
-    serviceClientOverride: "高级：覆盖服务客户端 ID（默认与身份一致）",
   },
   validation: {
     displayName: "请填写平台名称。",
