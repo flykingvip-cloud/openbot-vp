@@ -1,6 +1,7 @@
 export type DataConnectorOAuthMode =
   | "notion_authorization_code"
   | "salesforce_authorization_code"
+  | "yonyou_tplus_authorization_code"
   | "simulated";
 
 export type DataConnectorOAuthSessionStatus =
@@ -18,6 +19,10 @@ export type DataConnectorOAuthSession = {
   label: string;
   mode: DataConnectorOAuthMode;
   status: DataConnectorOAuthSessionStatus;
+  /** Chanjet cloud enterprise id captured when the authorize URL is built. */
+  orgId?: string;
+  /** Chanjet appName captured when the authorize URL is built. */
+  appName?: string;
   credentialId?: string;
   returnPath?: string;
   createdAt: string;

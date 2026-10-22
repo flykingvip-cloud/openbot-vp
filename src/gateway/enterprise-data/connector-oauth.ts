@@ -19,6 +19,15 @@ import {
   exchangeSalesforceAuthorizationCode,
   resolveSalesforceOAuthConfig,
 } from "./adapters/salesforce-oauth.js";
+import {
+  buildYonyouTplusAuthorizeUrl,
+  exchangeYonyouTplusAuthorizationCode,
+  resolveYonyouTplusAppCredentials,
+  resolveYonyouTplusOAuthConfig,
+  YONYOU_TPLUS_CONNECTOR_ID,
+  YONYOU_TPLUS_GATEWAY_ORIGIN,
+  YONYOU_TPLUS_SIMULATED_TOKEN_PREFIX,
+} from "./adapters/yonyou-tplus-oauth.js";
 import { assertKnownDataConnector } from "./connector-catalog.js";
 import { upsertDataConnectorCredential } from "./connector-credential-store.js";
 import { buildSecretHint, saveCredentialSecret } from "./connector-credential-vault.js";
@@ -33,6 +42,7 @@ import type {
 } from "./connector-oauth-types.js";
 import { resolveControlUiEnterpriseDataBasePath } from "./control-ui-paths.js";
 import { loadEnterpriseDataStore, saveEnterpriseDataStore } from "./store.js";
+import type { DataConnectorCredentialSecret } from "./types.js";
 
 const DEFAULT_OAUTH_SESSION_TTL_MS = 15 * 60 * 1000;
 
@@ -61,6 +71,13 @@ function buildSimulatedOAuthCredential(
       accessToken: `simulated-salesforce-token-${suffix}`,
       workspaceId: "https://simulated.my.salesforce.com",
       workspaceName: "Salesforce 模拟组织",
+    };
+  }
+  if (connectorId === YONYOU_TPLUS_CONNECTOR_ID) {
+    return {
+      accessToken: `${YONYOU_TPLUS_SIMULATED_TOKEN_PREFIX}${suffix}`,
+      workspaceId: YONYOU_TPLUS_GATEWAY_ORIGIN,
+      workspaceName: "用友 T+ 模拟企业",
     };
   }
   return {
@@ -182,6 +199,8 @@ export function startDataConnectorOAuthSession(params: {
   returnPath?: string;
   callbackOrigin?: string;
   basePath?: string;
+  orgId?: string;
+  appName?: string;
   nowIso: string;
 }):
   | {
@@ -209,7 +228,41 @@ export function startDataConnectorOAuthSession(params: {
         basePath: params.basePath,
       })
     : null;
-  const mode = resolveOAuthModeForConnector(connectorId, callbackUrl ?? undefined);
+  let mode = resolveOAuthModeForConnector(connectorId, callbackUrl ?? undefined);
+  let yonyouAuthorize: { appKey: string; orgId: string; appName: string } | null = null;
+  if (connectorId === YONYOU_TPLUS_CONNECTOR_ID) {
+    const app = resolveYonyouTplusAppCredentials();
+    if (!app) {
+      mode = "simulated";
+    } else {
+      const orgId =
+        params.orgId?.trim() ||
+        process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_ORG_ID?.trim() ||
+        "";
+      const redirectUri =
+        callbackUrl || process.env.OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_REDIRECT_URI?.trim() || "";
+      if (!orgId) {
+        return {
+          ok: false,
+          code: "CONNECTOR_OAUTH_ORG_ID_REQUIRED",
+          error: "用友 T+ 授权需要云企业 ID（orgId）。",
+        };
+      }
+      if (!redirectUri) {
+        return {
+          ok: false,
+          code: "CONNECTOR_OAUTH_CONFIG_MISSING",
+          error: "用友 T+ OAuth 回调地址未配置。",
+        };
+      }
+      mode = "yonyou_tplus_authorization_code";
+      yonyouAuthorize = {
+        appKey: app.appKey,
+        orgId,
+        appName: params.appName?.trim() || app.appName,
+      };
+    }
+  }
   const session: DataConnectorOAuthSession = {
     sessionId: randomUUID(),
     state: randomBytes(24).toString("hex"),
@@ -218,6 +271,8 @@ export function startDataConnectorOAuthSession(params: {
     label,
     mode,
     status: "pending",
+    orgId: yonyouAuthorize?.orgId,
+    appName: yonyouAuthorize?.appName,
     returnPath: params.returnPath?.trim() || undefined,
     createdAt: params.nowIso,
     expiresAt: new Date(
@@ -248,6 +303,14 @@ export function startDataConnectorOAuthSession(params: {
       });
     }
   }
+  if (mode === "yonyou_tplus_authorization_code" && yonyouAuthorize) {
+    authorizeUrl = buildYonyouTplusAuthorizeUrl({
+      appKey: yonyouAuthorize.appKey,
+      orgId: yonyouAuthorize.orgId,
+      appName: yonyouAuthorize.appName,
+      state: session.state,
+    });
+  }
 
   return {
     ok: true,
@@ -263,6 +326,7 @@ async function finalizeDataConnectorOAuthSession(params: {
   accessToken: string;
   workspaceId?: string;
   workspaceName?: string;
+  extraSecret?: Partial<DataConnectorCredentialSecret>;
   nowIso: string;
 }): Promise<
   | { ok: true; session: DataConnectorOAuthSession; credentialId: string }
@@ -287,6 +351,7 @@ async function finalizeDataConnectorOAuthSession(params: {
   await saveCredentialSecret(credential.credentialId, {
     oauthAccessToken: params.accessToken,
     instanceUrl: params.workspaceId,
+    ...params.extraSecret,
   });
   await saveEnterpriseDataStore(dataStore, storePath);
 
@@ -324,7 +389,8 @@ export async function completeDataConnectorOAuthCallback(params: {
     }
     if (
       session.mode !== "notion_authorization_code" &&
-      session.mode !== "salesforce_authorization_code"
+      session.mode !== "salesforce_authorization_code" &&
+      session.mode !== "yonyou_tplus_authorization_code"
     ) {
       return {
         ok: false,
@@ -336,6 +402,7 @@ export async function completeDataConnectorOAuthCallback(params: {
       let accessToken: string;
       let workspaceId: string | undefined;
       let workspaceName: string | undefined;
+      let extraSecret: Partial<DataConnectorCredentialSecret> | undefined;
       if (session.mode === "notion_authorization_code") {
         const notion = resolveNotionOAuthConfig({ redirectUri: params.redirectUri });
         if (!notion) {
@@ -354,6 +421,36 @@ export async function completeDataConnectorOAuthCallback(params: {
         accessToken = exchanged.accessToken;
         workspaceId = exchanged.workspaceId;
         workspaceName = exchanged.workspaceName;
+      } else if (session.mode === "yonyou_tplus_authorization_code") {
+        const yonyou = resolveYonyouTplusOAuthConfig({
+          redirectUri: params.redirectUri,
+          orgId: session.orgId,
+          appName: session.appName,
+        });
+        if (!yonyou) {
+          return {
+            ok: false,
+            code: "CONNECTOR_OAUTH_CONFIG_MISSING",
+            error: "用友 T+ OAuth 未配置。",
+          };
+        }
+        const exchanged = await exchangeYonyouTplusAuthorizationCode({
+          code: params.code,
+          redirectUri: params.redirectUri,
+          appKey: yonyou.appKey,
+          appSecret: yonyou.appSecret,
+          gatewayOrigin: yonyou.gatewayOrigin,
+        });
+        accessToken = exchanged.accessToken;
+        workspaceId = yonyou.gatewayOrigin;
+        workspaceName = session.label;
+        extraSecret = {
+          oauthRefreshToken: exchanged.refreshToken,
+          oauthPermanentCode: exchanged.permanentCode,
+          orgId: exchanged.orgId || session.orgId,
+          appName: exchanged.appName || session.appName || yonyou.appName,
+          sid: exchanged.sid,
+        };
       } else {
         const salesforce = resolveSalesforceOAuthConfig({ redirectUri: params.redirectUri });
         if (!salesforce) {
@@ -380,6 +477,7 @@ export async function completeDataConnectorOAuthCallback(params: {
         accessToken,
         workspaceId,
         workspaceName,
+        extraSecret,
         nowIso: params.nowIso,
       });
       if (!finalized.ok) {
@@ -440,11 +538,19 @@ export async function simulateCompleteDataConnectorOAuthSession(params: {
       };
     }
     const simulated = buildSimulatedOAuthCredential(session.connectorId, session.sessionId);
+    const extraSecret =
+      session.connectorId === YONYOU_TPLUS_CONNECTOR_ID
+        ? {
+            orgId: session.orgId,
+            appName: session.appName,
+          }
+        : undefined;
     return finalizeDataConnectorOAuthSession({
       session,
       accessToken: simulated.accessToken,
       workspaceId: simulated.workspaceId,
       workspaceName: params.workspaceName?.trim() || simulated.workspaceName,
+      extraSecret,
       nowIso: params.nowIso,
     });
   }, storePath);

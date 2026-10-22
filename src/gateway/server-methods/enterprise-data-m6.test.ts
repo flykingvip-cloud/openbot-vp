@@ -379,4 +379,71 @@ describe("enterprise-data M6 dashboard handlers", () => {
     expect(response.payload?.installed).toBe(true);
     expect(response.payload?.actionCount).toBe(1);
   });
+
+  it("upserts a 用友 T+ credential and probes GetVersionInfo", async () => {
+    const installed = await invoke("enterprise-data.connectors.ensure-package", {
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+    });
+    expect(installed.ok).toBe(true);
+    expect(installed.payload?.actionCount).toBe(6);
+
+    const catalog = await invoke("enterprise-data.connectors.catalog", { tenantId });
+    const connectors = catalog.payload?.connectors as Array<{
+      connectorId: string;
+      category: string;
+      credentialKind: string;
+      integrationTier: string;
+      ready: boolean;
+    }>;
+    expect(connectors).toContainEqual(
+      expect.objectContaining({
+        connectorId: "erp-yonyou-tplus",
+        category: "erp",
+        credentialKind: "oauth2",
+        integrationTier: "production",
+        ready: true,
+      }),
+    );
+
+    const upsert = await invoke("enterprise-data.connector-credentials.upsert", {
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      kind: "oauth2",
+      appKey: "ak-test",
+      appSecret: "as-test",
+      openToken: "open-token-1",
+      orgId: "90001198862",
+      appName: "tpluscloud",
+    });
+    expect(upsert.ok).toBe(true);
+    const credential = upsert.payload?.credential as { credentialId?: string; kind?: string };
+    expect(credential.kind).toBe("oauth2");
+    expect(credential.credentialId).toBeTruthy();
+
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const probed = await invoke("enterprise-data.sources.test-connection", {
+        tenantId,
+        connectorId: "erp-yonyou-tplus",
+        credentialId: credential.credentialId,
+      });
+      expect(probed.ok).toBe(true);
+      const probe = probed.payload?.probe as { ok: boolean; mode: string };
+      expect(probe.ok).toBe(true);
+      expect(probe.mode).toBe("live_probe_ok");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    expect(fetchMock).toHaveBeenCalled();
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/tplus/api/v2/accountAPI/GetVersionInfo");
+    expect(init.headers).toMatchObject({
+      appKey: "ak-test",
+      appSecret: "as-test",
+      openToken: "open-token-1",
+    });
+  });
 });
