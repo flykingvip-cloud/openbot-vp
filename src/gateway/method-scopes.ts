@@ -738,6 +738,7 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "enterprise-data.access-policies.upsert",
     "enterprise-data.access-policies.compile",
     "enterprise-data.access-policies.archive",
+    "enterprise-data.sources.sync",
     "enterprise-data.sources.upsert",
     "enterprise-data.assets.website-access.register",
     "enterprise-data.connectors.ensure-demo-package",

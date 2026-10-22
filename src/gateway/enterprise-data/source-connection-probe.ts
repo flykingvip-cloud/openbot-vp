@@ -42,6 +42,12 @@ export type InlineConnectorCredential = {
   authQueryParam?: string;
   basicUsername?: string;
   probePath?: string;
+  appKey?: string;
+  appSecret?: string;
+  openToken?: string;
+  refreshToken?: string;
+  orgId?: string;
+  appName?: string;
 };
 
 export async function probeDataSourceConnection(params: {
@@ -200,6 +206,22 @@ export async function probeDataSourceConnection(params: {
     };
   }
 
+  if (secret && definition.connectorId === "erp-yonyou-tplus") {
+    const { probeYonyouTplusConnection } = await import("./adapters/yonyou-tplus.js");
+    const live = await probeYonyouTplusConnection(secret, {
+      credentialId: params.credentialId,
+    });
+    return {
+      ok: live.ok,
+      connectorId: definition.connectorId,
+      integrationTier: definition.integrationTier,
+      mode: live.ok ? "live_probe_ok" : "live_probe_failed",
+      message: live.message,
+      actionCount: actions.length,
+      handlerCount: handlers.length,
+    };
+  }
+
   if (secret && definition.connectorId === "erp-sap") {
     const { probeErpSapConnection } = await import("./adapters/erp-sap.js");
     const live = await probeErpSapConnection(secret);
@@ -289,6 +311,25 @@ async function resolveProbeCredentialSecret(params: {
       return null;
     }
     return loadCredentialSecret(credential.credentialId);
+  }
+  if (params.connectorId === "erp-yonyou-tplus" && params.inlineCredential) {
+    const inline = params.inlineCredential;
+    const openToken = inline.openToken?.trim() || inline.apiKey?.trim();
+    const appKey = inline.appKey?.trim();
+    const appSecret = inline.appSecret?.trim();
+    if (openToken || appKey || appSecret || inline.orgId?.trim()) {
+      const secret: DataConnectorCredentialSecret = {
+        instanceUrl: inline.instanceUrl?.trim() || undefined,
+        apiKey: inline.apiKey?.trim() || undefined,
+        oauthAccessToken: openToken || undefined,
+        appKey: appKey || undefined,
+        appSecret: appSecret || undefined,
+        oauthRefreshToken: inline.refreshToken?.trim() || undefined,
+        orgId: inline.orgId?.trim() || undefined,
+        appName: inline.appName?.trim() || undefined,
+      };
+      return secret;
+    }
   }
   if (params.credentialKind === "api_key") {
     const inline = params.inlineCredential;

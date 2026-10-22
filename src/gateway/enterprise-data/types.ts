@@ -8,8 +8,8 @@ import type {
   SiteRunStatus,
   SiteVerification,
 } from "../../site-capability/result.js";
-import type { ValidationRecord } from "../../site-capability/validation-record.js";
 import type { AccountBinding } from "../../site-capability/session-handle.js";
+import type { ValidationRecord } from "../../site-capability/validation-record.js";
 
 export type { AccountBinding };
 
@@ -160,6 +160,33 @@ export type DataConnectorCredentialSecret = {
   basicUsername?: string;
   /** Relative health-check path used by the connectivity probe, e.g. "/health". */
   probePath?: string;
+  /**
+   * Chanjet / 用友 T+ open-platform app key. Optional per-tenant override.
+   * When omitted, the connector reads OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY.
+   */
+  appKey?: string;
+  /** Per-tenant Chanjet app secret. Prefer the platform env var when the ISV app is shared. */
+  appSecret?: string;
+  /** Chanjet refresh token. Rotated by /auth/v2/refreshToken. */
+  oauthRefreshToken?: string;
+  /** Chanjet user_auth_permanent_code. */
+  oauthPermanentCode?: string;
+  /**
+   * Chanjet enterprise permanent auth code (`permanentAuthCode`).
+   * Combined with a fresh appTicket and the user permanent code for headless renewal.
+   */
+  orgPermanentAuthCode?: string;
+  /** Chanjet cloud enterprise id (orgId). */
+  orgId?: string;
+  /** Chanjet in-app name. T+Cloud is `tpluscloud`; on-prem T+ is `Tplus`. */
+  appName?: string;
+  /** T+ sid. Some product APIs expect it as a Cookie. */
+  sid?: string;
+  /**
+   * Optional marketing-organ id. Sent as `?idMarketingOrgan=` only when the
+   * Chanjet action documents that path query. QueryPage and FindVoucherList do not.
+   */
+  idMarketingOrgan?: string;
 };
 
 /** Business capability abstraction — actionRefs are the real execution source. */
@@ -387,6 +414,41 @@ export type KnowledgeLineageResolution = {
   chain: KnowledgeLineageChainNode[];
   /** Insight → Metric → Projection → ConnectorAction@version → Source Data. */
   reverseChain: KnowledgeLineageReverseNode[];
+};
+
+export type ConnectorSyncLogStatus = "success" | "warning" | "failure";
+
+/**
+ * One incremental pull of a connector stream. Visible in the data-asset sync
+ * log. This is not a projection materialization audit.
+ */
+export type ConnectorSyncLogEntry = {
+  entryId: string;
+  tenantId: string;
+  sourceId: string;
+  connectorId: string;
+  streamKey: string;
+  status: ConnectorSyncLogStatus;
+  title: string;
+  detail: string;
+  recordCount?: number;
+  /** Watermark after this run. Absent when the cursor did not advance. */
+  watermark?: string;
+  recordedAt: string;
+};
+
+/** Next incremental window start for one source stream. */
+export type ConnectorSyncCursor = {
+  cursorId: string;
+  tenantId: string;
+  sourceId: string;
+  streamKey: string;
+  /**
+   * Master data uses `YYYY-MM-DD HH:mm:ss`. Voucher dates use `YYYY-MM-DD`.
+   * The next pull starts at this value (inclusive).
+   */
+  watermark: string;
+  updatedAt: string;
 };
 
 export type KnowledgeSupplyAuditEventType = "materialization_success" | "materialization_failure";
@@ -906,6 +968,15 @@ export type EnterpriseDataStore = {
   knowledgeFeedItems: Record<string, EnterpriseKnowledgeObjectFeedItem>;
   knowledgeLineageRecords: Record<string, KnowledgeLineageRecord>;
   knowledgeSupplyAuditEvents: Record<string, KnowledgeSupplyAuditEvent>;
+  /**
+   * Connector incremental-sync cursors. Keyed by cursorId. Older files omit the map.
+   * Not a projection materialization watermark.
+   */
+  connectorSyncCursors?: Record<string, ConnectorSyncCursor>;
+  /**
+   * Connector sync-log rows shown beside projection audits. Older files omit the map.
+   */
+  connectorSyncLogEntries?: Record<string, ConnectorSyncLogEntry>;
   governanceApprovalRequests: Record<string, GovernanceApprovalRequest>;
   dataConnectorCredentials: Record<string, DataConnectorCredential>;
   /** E1 SAR execution bridges. Keyed by bridgeId. Absent on older files. */

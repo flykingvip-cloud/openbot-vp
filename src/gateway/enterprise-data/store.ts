@@ -20,6 +20,8 @@ import {
   type FieldClassification,
   type InvocationAuditEvent,
   type KnowledgeLineageRecord,
+  type ConnectorSyncCursor,
+  type ConnectorSyncLogEntry,
   type KnowledgeSupplyAuditEvent,
   type GovernanceApprovalRequest,
   type AccountBinding,
@@ -101,6 +103,10 @@ export function normalizeEnterpriseDataStore(
     ),
     knowledgeSupplyAuditEvents: normalizeRecordMap<KnowledgeSupplyAuditEvent>(
       parsed?.knowledgeSupplyAuditEvents,
+    ),
+    connectorSyncCursors: normalizeRecordMap<ConnectorSyncCursor>(parsed?.connectorSyncCursors),
+    connectorSyncLogEntries: normalizeRecordMap<ConnectorSyncLogEntry>(
+      parsed?.connectorSyncLogEntries,
     ),
     governanceApprovalRequests: normalizeRecordMap<GovernanceApprovalRequest>(
       parsed?.governanceApprovalRequests,

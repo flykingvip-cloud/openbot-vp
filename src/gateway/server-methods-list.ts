@@ -434,6 +434,7 @@ const BASE_METHODS = [
   "enterprise-data.assets.website-access.register",
   "enterprise-data.assets.owned-link",
   "enterprise-data.assets.capability-install",
+  "enterprise-data.sources.sync",
   "enterprise-data.sources.sync-log",
   "enterprise-data.semantic-objects.list",
   "enterprise-data.semantic-objects.get",

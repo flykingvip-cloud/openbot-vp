@@ -29,6 +29,7 @@ export type AssetsPageHandlers = {
   onTestConnection: (source: ManagedDataSourceRecord) => void;
   onArchive: (source: ManagedDataSourceRecord) => void;
   onOpenLogs: (source: ManagedDataSourceRecord) => void;
+  onSync: (source: ManagedDataSourceRecord) => void;
   onFiltersChange: (patch: Partial<AssetListFilters>) => void;
   onSelectSource: (sourceId: string) => void;
 };
@@ -281,6 +282,25 @@ export function renderAssetsPageContent(
                 >
                   重连
                 </button>
+                ${
+                  source.connectorId === "erp-yonyou-tplus"
+                    ? html`
+                        <button
+                          class="edc-row-menu__item"
+                          type="button"
+                          role="menuitem"
+                          @click=${(event: Event) => {
+                            (event.currentTarget as HTMLElement)
+                              .closest("details")
+                              ?.removeAttribute("open");
+                            handlers.onSync(source);
+                          }}
+                        >
+                          同步
+                        </button>
+                      `
+                    : html``
+                }
                 <button
                   class="edc-row-menu__item"
                   type="button"

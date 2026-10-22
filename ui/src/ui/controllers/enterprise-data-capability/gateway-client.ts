@@ -107,11 +107,18 @@ type SourceSyncLogResponse = {
   events: Array<{
     auditId: string;
     recordedAt: string;
-    status: "success" | "failure";
+    status: "success" | "warning" | "failure";
     projectionId: string;
     objectId?: string;
     errorCode?: string;
     errorMessage?: string;
+  }>;
+  connectorEntries?: Array<{
+    entryId: string;
+    recordedAt: string;
+    status: "success" | "warning" | "failure";
+    title: string;
+    detail: string;
   }>;
 };
 
@@ -260,6 +267,8 @@ export type EnterpriseDataCapabilityGateway = {
       callbackOrigin?: string;
       basePath?: string;
       returnPath?: string;
+      orgId?: string;
+      appName?: string;
     },
   ): Promise<
     GatewayResult<{
@@ -376,6 +385,10 @@ export type EnterpriseDataCapabilityGateway = {
     tenantId: string,
     sourceId: string,
   ): Promise<GatewayResult<ManagedDataSourceSyncLogEntry[]>>;
+  syncSource(
+    tenantId: string,
+    sourceId: string,
+  ): Promise<GatewayResult<{ status: "success" | "warning" | "failure"; summary: string }>>;
   listAccessPolicies(tenantId: string): Promise<GatewayResult<ManagedAccessPolicyRecord[]>>;
   getAccessPolicy(
     tenantId: string,
@@ -815,6 +828,8 @@ export function createEnterpriseDataCapabilityGateway(
           callbackOrigin: input.callbackOrigin,
           basePath: input.basePath,
           returnPath: input.returnPath,
+          orgId: input.orgId,
+          appName: input.appName,
         });
         const sessionId = result?.sessionId?.trim();
         if (!sessionId) {
@@ -1333,6 +1348,32 @@ export function createEnterpriseDataCapabilityGateway(
       });
     },
 
+    async syncSource(tenantId, sourceId) {
+      const normalizedTenant = tenantId.trim();
+      const normalizedSource = sourceId.trim();
+      if (!normalizedTenant || !normalizedSource) {
+        return { ok: false, error: REQUEST_FAILED };
+      }
+      try {
+        const result = await client.request<{
+          status?: "success" | "warning" | "failure";
+          summary?: string;
+        }>("enterprise-data.sources.sync", {
+          tenantId: normalizedTenant,
+          sourceId: normalizedSource,
+        });
+        if (!result?.summary || !result.status) {
+          return { ok: false, error: REQUEST_FAILED };
+        }
+        return { ok: true, data: { status: result.status, summary: result.summary } };
+      } catch (error) {
+        return {
+          ok: false,
+          error: localizeEnterpriseGatewayThrown(error, REQUEST_FAILED),
+        };
+      }
+    },
+
     async getSourceSyncLog(tenantId, sourceId) {
       const normalizedTenant = tenantId.trim();
       const normalizedSource = sourceId.trim();
@@ -1347,17 +1388,36 @@ export function createEnterpriseDataCapabilityGateway(
         if (!result || !Array.isArray(result.events)) {
           return { ok: false, error: REQUEST_FAILED };
         }
-        const entries: ManagedDataSourceSyncLogEntry[] = result.events.map((event) => ({
+        const projectionEntries: ManagedDataSourceSyncLogEntry[] = result.events.map((event) => ({
           entryId: event.auditId,
           recordedAt: event.recordedAt,
-          status: event.status === "failure" ? "failure" : "success",
+          status:
+            event.status === "failure"
+              ? "failure"
+              : event.status === "warning"
+                ? "warning"
+                : "success",
           title: event.objectId ? `对象 ${event.objectId}` : `投影 ${event.projectionId}`,
           detail:
             event.status === "failure"
               ? `${event.errorCode ?? "SYNC_FAILED"} · ${event.errorMessage ?? "同步失败"}`
-              : `投影 ${event.projectionId} 同步成功`,
+              : event.status === "warning"
+                ? `投影 ${event.projectionId} 同步有警告`
+                : `投影 ${event.projectionId} 同步成功`,
           projectionId: event.projectionId,
         }));
+        const connectorEntries: ManagedDataSourceSyncLogEntry[] = (
+          result.connectorEntries ?? []
+        ).map((entry) => ({
+          entryId: entry.entryId,
+          recordedAt: entry.recordedAt,
+          status: entry.status,
+          title: entry.title,
+          detail: entry.detail,
+        }));
+        const entries = [...connectorEntries, ...projectionEntries].toSorted((left, right) =>
+          right.recordedAt.localeCompare(left.recordedAt),
+        );
         return { ok: true, data: entries };
       } catch (error) {
         return {
