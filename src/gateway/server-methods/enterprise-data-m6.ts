@@ -4,6 +4,12 @@
 // Read-only aggregations for the home page. All handlers require enterprise-admin
 // tenant resolution and never accept a client-forged tenantId.
 
+import {
+  readYonyouTplusCredentialInput,
+  YONYOU_TPLUS_CONNECTOR_ID,
+  YONYOU_TPLUS_GATEWAY_ORIGIN,
+  yonyouTplusCredentialInputHasMaterial,
+} from "../enterprise-data/adapters/yonyou-tplus-oauth.js";
 import { resolveAssetLandscapeGraph } from "../enterprise-data/asset-landscape-store.js";
 import { EnterpriseDataStoreError } from "../enterprise-data/connector-action-store.js";
 import { resolveDataConnectorCatalog } from "../enterprise-data/connector-catalog.js";
@@ -282,6 +288,7 @@ export function createEnterpriseDataM6Handlers(
       const instanceUrl = stringValue(params.instanceUrl) || undefined;
       const apiKey = stringValue(params.apiKey) || undefined;
       const httpRest = resolveHttpRestSecretFields(params);
+      const yonyouInline = readYonyouTplusCredentialInput(params);
       const checkedAt = new Date().toISOString();
       try {
         const probed = await withEnterpriseDataStore(tenantId, client, async (store) => {
@@ -291,8 +298,21 @@ export function createEnterpriseDataM6Handlers(
             connectorId,
             credentialId,
             inlineCredential:
-              instanceUrl || apiKey || httpRest.authScheme
-                ? { instanceUrl, apiKey, ...httpRest }
+              instanceUrl ||
+              apiKey ||
+              httpRest.authScheme ||
+              yonyouTplusCredentialInputHasMaterial(yonyouInline)
+                ? {
+                    instanceUrl,
+                    apiKey,
+                    ...httpRest,
+                    appKey: yonyouInline.appKey,
+                    appSecret: yonyouInline.appSecret,
+                    openToken: yonyouInline.openToken,
+                    refreshToken: yonyouInline.refreshToken,
+                    orgId: yonyouInline.orgId,
+                    appName: yonyouInline.appName,
+                  }
                 : undefined,
           });
           if (!sourceId) {
@@ -363,37 +383,51 @@ export function createEnterpriseDataM6Handlers(
         httpRest.basicUsername != null ||
         httpRest.probePath != null;
       const kind = params.kind === "oauth2" || params.kind === "api_key" ? params.kind : "api_key";
+      const isYonyou = connectorId.trim().toLowerCase() === YONYOU_TPLUS_CONNECTOR_ID;
+      const yonyouInput = isYonyou ? readYonyouTplusCredentialInput(params) : null;
+      const hasYonyou = yonyouInput != null && yonyouTplusCredentialInputHasMaterial(yonyouInput);
       try {
         const credential = await withEnterpriseDataStore(tenantId, client, async (store) => {
           const existingSecret = credentialId ? await loadCredentialSecret(credentialId) : null;
-          if (!apiKey && !instanceUrl && !existingSecret) {
+          if (!apiKey && !instanceUrl && !existingSecret && !hasYonyou) {
             throw new Error("apiKey or instanceUrl is required for a new credential.");
           }
+          const openToken = yonyouInput?.openToken || (isYonyou ? apiKey : undefined);
+          const resolvedInstanceUrl =
+            instanceUrl ??
+            (isYonyou ? (existingSecret?.instanceUrl ?? YONYOU_TPLUS_GATEWAY_ORIGIN) : undefined);
+          const hintSource = isYonyou
+            ? openToken || apiKey || existingSecret?.oauthAccessToken || existingSecret?.apiKey
+            : apiKey || existingSecret?.apiKey;
           const record = upsertDataConnectorCredential({
             store,
             tenantId,
             connectorId,
             label,
-            kind,
-            instanceUrl,
-            secretHint: apiKey
-              ? buildSecretHint(apiKey)
-              : existingSecret?.apiKey
-                ? buildSecretHint(existingSecret.apiKey)
-                : undefined,
+            kind: isYonyou ? "oauth2" : kind,
+            instanceUrl: resolvedInstanceUrl,
+            secretHint: hintSource ? buildSecretHint(hintSource) : undefined,
             credentialId,
             nowIso: new Date().toISOString(),
           });
-          if (apiKey || instanceUrl || hasHttpRestConfig) {
+          if (apiKey || instanceUrl || hasHttpRestConfig || hasYonyou) {
             await saveCredentialSecret(record.credentialId, {
-              instanceUrl: instanceUrl ?? existingSecret?.instanceUrl,
+              instanceUrl: resolvedInstanceUrl ?? existingSecret?.instanceUrl,
               apiKey: apiKey ?? existingSecret?.apiKey,
-              oauthAccessToken: existingSecret?.oauthAccessToken,
+              oauthAccessToken: openToken ?? existingSecret?.oauthAccessToken,
               authScheme: httpRest.authScheme ?? existingSecret?.authScheme,
               authHeaderName: httpRest.authHeaderName ?? existingSecret?.authHeaderName,
               authQueryParam: httpRest.authQueryParam ?? existingSecret?.authQueryParam,
               basicUsername: httpRest.basicUsername ?? existingSecret?.basicUsername,
               probePath: httpRest.probePath ?? existingSecret?.probePath,
+              appKey: yonyouInput?.appKey ?? existingSecret?.appKey,
+              appSecret: yonyouInput?.appSecret ?? existingSecret?.appSecret,
+              oauthRefreshToken: yonyouInput?.refreshToken ?? existingSecret?.oauthRefreshToken,
+              oauthPermanentCode: yonyouInput?.permanentCode ?? existingSecret?.oauthPermanentCode,
+              orgId: yonyouInput?.orgId ?? existingSecret?.orgId,
+              appName: yonyouInput?.appName ?? existingSecret?.appName,
+              sid: yonyouInput?.sid ?? existingSecret?.sid,
+              idMarketingOrgan: yonyouInput?.idMarketingOrgan ?? existingSecret?.idMarketingOrgan,
             });
           }
           return record;
@@ -446,6 +480,8 @@ export function createEnterpriseDataM6Handlers(
             returnPath: stringValue(params.returnPath) || undefined,
             callbackOrigin: stringValue(params.callbackOrigin) || undefined,
             basePath: stringValue(params.basePath) || undefined,
+            orgId: stringValue(params.orgId) || undefined,
+            appName: stringValue(params.appName) || undefined,
             nowIso,
           }),
         oauthStorePath,

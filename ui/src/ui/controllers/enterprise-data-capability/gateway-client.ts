@@ -260,6 +260,8 @@ export type EnterpriseDataCapabilityGateway = {
       callbackOrigin?: string;
       basePath?: string;
       returnPath?: string;
+      orgId?: string;
+      appName?: string;
     },
   ): Promise<
     GatewayResult<{
@@ -815,6 +817,8 @@ export function createEnterpriseDataCapabilityGateway(
           callbackOrigin: input.callbackOrigin,
           basePath: input.basePath,
           returnPath: input.returnPath,
+          orgId: input.orgId,
+          appName: input.appName,
         });
         const sessionId = result?.sessionId?.trim();
         if (!sessionId) {

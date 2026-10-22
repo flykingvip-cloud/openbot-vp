@@ -188,6 +188,10 @@ type SourceEditorState = {
   websiteBindingDraft?: string;
   websiteOutcome?: "select_existing" | "owner_must_authorize" | null;
   websiteSelectable?: Array<{ bindingId: string }>;
+  /** Chanjet cloud enterprise id. Used by 用友 T+ OAuth. */
+  orgId?: string;
+  /** Chanjet appName. T+Cloud defaults to tpluscloud. */
+  appName?: string;
 };
 
 type PolicyEditorState = {
@@ -1325,6 +1329,16 @@ function renderMemoryScopePanel(state: DataCapabilitySurfaceState): TemplateResu
   });
 }
 
+function oauthConnectorHint(connectorId: string): string {
+  if (connectorId === "erp-yonyou-tplus") {
+    return "通过畅捷通开放平台授权用友 T+。填写云企业 ID；未配置 appKey 时使用模拟模式。T+Cloud 的应用名为 tpluscloud。";
+  }
+  if (connectorId === "crm-salesforce") {
+    return "通过 Salesforce OAuth 完成授权；未配置 Client ID 时将使用模拟模式。";
+  }
+  return "通过 Notion OAuth 完成授权；未配置 Client ID 时将使用模拟模式。";
+}
+
 function renderSourceEditorModal(
   state: SourceEditorState,
   catalog: DataConnectorCatalogEntry[],
@@ -1435,6 +1449,8 @@ function renderSourceEditorModal(
                     dbName: "",
                     passwordVisible: false,
                     saveNewCredential: false,
+                    orgId: "",
+                    appName: "",
                     oauthNotice: null,
                     probeMessage: null,
                     probeOk: null,
@@ -1748,6 +1764,36 @@ function renderSourceEditorModal(
                                   })}
                               />
                             </label>
+                            ${
+                              selectedConnector?.connectorId === "erp-yonyou-tplus"
+                                ? html`
+                                    <label class="field">
+                                      <span>云企业 ID (orgId)</span>
+                                      <input
+                                        .value=${state.orgId ?? ""}
+                                        placeholder="畅捷通云企业 ID"
+                                        ?disabled=${state.busy || state.oauthBusy}
+                                        @input=${(event: Event) =>
+                                          onUpdate({
+                                            orgId: (event.target as HTMLInputElement).value,
+                                          })}
+                                      />
+                                    </label>
+                                    <label class="field">
+                                      <span>应用名 (appName)</span>
+                                      <input
+                                        .value=${state.appName ?? ""}
+                                        placeholder="tpluscloud"
+                                        ?disabled=${state.busy || state.oauthBusy}
+                                        @input=${(event: Event) =>
+                                          onUpdate({
+                                            appName: (event.target as HTMLInputElement).value,
+                                          })}
+                                      />
+                                    </label>
+                                  `
+                                : html``
+                            }
                             <div class="field full">
                               <button
                                 class="btn btn--sm btn--primary"
@@ -1760,7 +1806,7 @@ function renderSourceEditorModal(
                                 ${state.oauthBusy ? "授权中…" : "OAuth 授权"}
                               </button>
                               <small>
-                                通过 Notion OAuth 完成授权；未配置 Client ID 时将使用模拟模式。
+                                ${oauthConnectorHint(selectedConnector?.connectorId ?? "")}
                               </small>
                               ${
                                 state.oauthNotice
@@ -3630,12 +3676,15 @@ export function renderEnterpriseDataGovernanceCenterSurface(
     editor.error = null;
     editor.oauthNotice = null;
     refreshEnterpriseSurface();
+    const connectorId = editor.connectorId.trim();
     const started = await gateway.startConnectorOAuth(tenantId, {
-      connectorId: editor.connectorId.trim(),
+      connectorId,
       label,
       callbackOrigin: window.location.origin,
       basePath,
       returnPath: window.location.pathname + window.location.search,
+      orgId: connectorId === "erp-yonyou-tplus" ? editor.orgId?.trim() || undefined : undefined,
+      appName: connectorId === "erp-yonyou-tplus" ? editor.appName?.trim() || undefined : undefined,
     });
     if (!started.ok) {
       editor.oauthBusy = false;
