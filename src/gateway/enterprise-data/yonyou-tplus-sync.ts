@@ -5,16 +5,16 @@
  * per-source watermark plus sync-log rows on the tenant enterprise-data store.
  * A finished window advances the watermark. A failed or truncated window does not.
  *
- * This does not run projection materialization. To land knowledge objects later,
- * bind a projection to the installed action keys (`erp.inventory.query_page`,
- * `erp.partner.query_page`, `erp.sale_order.query_list`, `erp.sale_delivery.query_list`)
- * and teach that materializer to read `connectorSyncCursors` for the same window.
- * Warehouse Query has no documented update-date filter, so it is not pulled here.
- * QueryPage and FindVoucherList do not document `?idMarketingOrgan=`; the query
- * is appended only when a caller opts a documented path in.
+ * Projection materialization calls `applyYonyouTplusSyncCursorToInput` so a
+ * governed read of inventory, partner, sale delivery, or sale order uses the
+ * same cursor window. Warehouse Query has no documented date filter
+ * (https://open.chanjet.com/docs/file/apiFile/tcloud/t+jcda/t+ck): the body is
+ * `{param:{}}` or `SelectFields`, so that stream is one bounded catalog read
+ * fingerprinted by Code/Name/Ts. QueryPage and FindVoucherList do not document
+ * `?idMarketingOrgan=`.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { YONYOU_TPLUS_CONNECTOR_ID } from "./adapters/yonyou-tplus-oauth.js";
 import {
   executeYonyouTplusHandler,
@@ -37,6 +37,9 @@ const LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 20;
 const MAX_PAGES = 5;
 const LOG_KEEP = 40;
+/** Warehouse Query returns the whole catalog in one response. Above this, refuse to store a fingerprint. */
+const WAREHOUSE_ROW_CAP = 500;
+const WAREHOUSE_SELECT_FIELDS = "ID,Code,Name,Ts";
 
 const READ_SCOPE: ScopeEvaluationResult = {
   scopeType: "ALL",
@@ -45,7 +48,7 @@ const READ_SCOPE: ScopeEvaluationResult = {
   scopeAppliedLabel: "ALL",
 };
 
-type StreamKind = "master" | "voucher";
+type StreamKind = "master" | "voucher" | "catalog";
 
 type SyncStream = {
   streamKey: string;
@@ -53,6 +56,7 @@ type SyncStream = {
   handlerRef: string;
   kind: StreamKind;
   voucherPrefix?: "SaleOrder" | "SaleDelivery";
+  actionKey?: string;
 };
 
 const SYNC_STREAMS: SyncStream[] = [
@@ -61,12 +65,21 @@ const SYNC_STREAMS: SyncStream[] = [
     title: "存货",
     handlerRef: YONYOU_TPLUS_HANDLERS.inventory,
     kind: "master",
+    actionKey: "erp.inventory.query_page",
   },
   {
     streamKey: "partner",
     title: "往来单位",
     handlerRef: YONYOU_TPLUS_HANDLERS.partner,
     kind: "master",
+    actionKey: "erp.partner.query_page",
+  },
+  {
+    streamKey: "warehouse",
+    title: "仓库",
+    handlerRef: YONYOU_TPLUS_HANDLERS.warehouse,
+    kind: "catalog",
+    actionKey: "erp.warehouse.query",
   },
   {
     streamKey: "sale_delivery",
@@ -74,6 +87,7 @@ const SYNC_STREAMS: SyncStream[] = [
     handlerRef: YONYOU_TPLUS_HANDLERS.saleDelivery,
     kind: "voucher",
     voucherPrefix: "SaleDelivery",
+    actionKey: "erp.sale_delivery.query_list",
   },
   {
     streamKey: "sale_order",
@@ -81,6 +95,7 @@ const SYNC_STREAMS: SyncStream[] = [
     handlerRef: YONYOU_TPLUS_HANDLERS.saleOrder,
     kind: "voucher",
     voucherPrefix: "SaleOrder",
+    actionKey: "erp.sale_order.query_list",
   },
 ];
 
@@ -300,7 +315,7 @@ function pageIsComplete(body: unknown, rows: number): boolean {
 }
 
 function windowFor(
-  kind: StreamKind,
+  kind: "master" | "voucher",
   now: Date,
   watermark: string | undefined,
 ): {
@@ -355,6 +370,148 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "用友 T+ 同步失败";
 }
 
+function textField(record: Record<string, unknown>, key: string): string {
+  const value = record[key];
+  return typeof value === "string" ? value : "";
+}
+
+function listedRows(body: unknown): unknown[] {
+  if (Array.isArray(body)) {
+    return body;
+  }
+  const record = objectRecord(body);
+  if (!record) {
+    return [];
+  }
+  if (Array.isArray(record.result)) {
+    return record.result;
+  }
+  if (Array.isArray(record.Data)) {
+    return record.Data;
+  }
+  if (Array.isArray(record.Rows)) {
+    return record.Rows;
+  }
+  const data = objectRecord(record.data);
+  if (data && Array.isArray(data.Rows)) {
+    return data.Rows;
+  }
+  return [];
+}
+
+/** Stable catalog fingerprint. Ts is a documented return field, not a request filter. */
+export function yonyouTplusCatalogWatermark(rows: unknown[]): string {
+  const parts = rows
+    .map((row) => {
+      const record = objectRecord(row);
+      if (!record) {
+        return "";
+      }
+      const code = textField(record, "Code") || textField(record, "code");
+      const name = textField(record, "Name") || textField(record, "name");
+      const ts = textField(record, "Ts") || textField(record, "ts");
+      if (!code && !name && !ts) {
+        return "";
+      }
+      return `${code}|${name}|${ts}`;
+    })
+    .filter((part) => part.length > 0)
+    .toSorted();
+  const digest = createHash("sha256").update(parts.join("\n")).digest("hex").slice(0, 16);
+  return `catalog:${digest}`;
+}
+
+function inputRecord(
+  input: Record<string, unknown> | undefined,
+  key: string,
+): Record<string, unknown> | null {
+  const value = input?.[key];
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return null;
+}
+
+function overlayMissing(
+  base: Record<string, unknown> | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    const current = next[key];
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      current &&
+      typeof current === "object" &&
+      !Array.isArray(current)
+    ) {
+      next[key] = overlayMissing(
+        current as Record<string, unknown>,
+        value as Record<string, unknown>,
+      );
+      continue;
+    }
+    if (current === undefined) {
+      next[key] = value;
+    }
+  }
+  return next;
+}
+
+function projectionStream(actionKey: string): SyncStream | undefined {
+  return SYNC_STREAMS.find((stream) => stream.actionKey === actionKey && stream.kind !== "catalog");
+}
+
+function inputHasWindow(input: Record<string, unknown> | undefined, stream: SyncStream): boolean {
+  if (stream.kind === "master") {
+    const param = inputRecord(input, "param");
+    return Boolean(param && ("UpdateDateBegin" in param || "UpdateDateEnd" in param));
+  }
+  if (stream.kind === "voucher") {
+    const paramDic = inputRecord(input, "paramDic");
+    const key = `${stream.voucherPrefix ?? "SaleOrder"}.VoucherDate`;
+    return Boolean(paramDic && key in paramDic);
+  }
+  return false;
+}
+
+/**
+ * Fill a projection read with the sync cursor window for inventory, partner,
+ * sale delivery, or sale order. An explicit date window on the input is kept.
+ * Warehouse stays a catalog read and is not rewritten here.
+ */
+export function applyYonyouTplusSyncCursorToInput(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  sourceId?: string;
+  connectorId: string;
+  actionKey: string;
+  input?: Record<string, unknown>;
+  now?: Date;
+}): Record<string, unknown> | undefined {
+  if (params.connectorId !== YONYOU_TPLUS_CONNECTOR_ID) {
+    return params.input;
+  }
+  const stream = projectionStream(params.actionKey);
+  if (!stream || stream.kind === "catalog") {
+    return params.input;
+  }
+  if (inputHasWindow(params.input, stream)) {
+    return params.input;
+  }
+  const sourceId = params.sourceId?.trim();
+  const stored = sourceId
+    ? readWatermark(params.store, params.tenantId, sourceId, stream.streamKey)
+    : undefined;
+  const watermark = stored && !stored.startsWith("catalog:") ? stored : undefined;
+  const now = params.now ?? new Date();
+  const range = windowFor(stream.kind, now, watermark);
+  const pageIndex = stream.kind === "master" ? 1 : 0;
+  return overlayMissing(params.input, streamInput(stream, range.begin, range.end, pageIndex));
+}
+
 async function pullStream(params: {
   stream: SyncStream;
   secret: DataConnectorCredentialSecret;
@@ -383,6 +540,32 @@ async function pullStream(params: {
     }
   }
   return { recordCount, truncated: true };
+}
+
+async function pullCatalog(params: {
+  stream: SyncStream;
+  secret: DataConnectorCredentialSecret;
+  context: YonyouTplusProbeContext;
+}): Promise<{ recordCount: number; truncated: boolean; watermark?: string }> {
+  const result = await executeYonyouTplusHandler(
+    params.stream.handlerRef,
+    {
+      input: { param: { SelectFields: WAREHOUSE_SELECT_FIELDS } },
+      scope: READ_SCOPE,
+      employeeId: "enterprise-data-sync",
+    },
+    params.secret,
+    params.context,
+  );
+  const rows = listedRows(payloadBody(result.payload));
+  if (rows.length > WAREHOUSE_ROW_CAP) {
+    return { recordCount: rows.length, truncated: true };
+  }
+  return {
+    recordCount: rows.length,
+    truncated: false,
+    watermark: yonyouTplusCatalogWatermark(rows),
+  };
 }
 
 function overallStatus(streams: YonyouTplusSyncStreamResult[]): ConnectorSyncLogStatus {
@@ -489,6 +672,92 @@ async function runSync(params: YonyouTplusSyncParams): Promise<YonyouTplusSyncRe
       source.sourceId,
       stream.streamKey,
     );
+    if (stream.kind === "catalog") {
+      try {
+        const pulled = await pullCatalog({ stream, secret: currentSecret, context });
+        if (pulled.truncated || !pulled.watermark) {
+          const detail = `已读取 ${pulled.recordCount} 条仓库。仓库查询没有日期条件，超过 ${WAREHOUSE_ROW_CAP} 条时不写目录指纹。`;
+          appendLog({
+            store: params.store,
+            tenantId: params.tenantId,
+            source,
+            streamKey: stream.streamKey,
+            title: stream.title,
+            status: "warning",
+            detail,
+            recordCount: pulled.recordCount,
+            nowIso,
+          });
+          streams.push({
+            streamKey: stream.streamKey,
+            title: stream.title,
+            status: "warning",
+            recordCount: pulled.recordCount,
+            pulled: true,
+            advanced: false,
+            detail,
+          });
+          continue;
+        }
+        const changed = watermark !== pulled.watermark;
+        writeWatermark({
+          store: params.store,
+          tenantId: params.tenantId,
+          sourceId: source.sourceId,
+          streamKey: stream.streamKey,
+          watermark: pulled.watermark,
+          nowIso,
+        });
+        const detail = changed
+          ? `已读取 ${pulled.recordCount} 条仓库，目录指纹更新为 ${pulled.watermark}。`
+          : `已读取 ${pulled.recordCount} 条仓库，目录未变化（${pulled.watermark}）。`;
+        appendLog({
+          store: params.store,
+          tenantId: params.tenantId,
+          source,
+          streamKey: stream.streamKey,
+          title: stream.title,
+          status: "success",
+          detail,
+          recordCount: pulled.recordCount,
+          watermark: pulled.watermark,
+          nowIso,
+        });
+        streams.push({
+          streamKey: stream.streamKey,
+          title: stream.title,
+          status: "success",
+          recordCount: pulled.recordCount,
+          pulled: true,
+          watermark: pulled.watermark,
+          advanced: changed,
+          detail,
+        });
+      } catch (error) {
+        const detail = errorText(error);
+        appendLog({
+          store: params.store,
+          tenantId: params.tenantId,
+          source,
+          streamKey: stream.streamKey,
+          title: stream.title,
+          status: "failure",
+          detail,
+          recordCount: 0,
+          nowIso,
+        });
+        streams.push({
+          streamKey: stream.streamKey,
+          title: stream.title,
+          status: "failure",
+          recordCount: 0,
+          pulled: false,
+          advanced: false,
+          detail,
+        });
+      }
+      continue;
+    }
     const range = windowFor(stream.kind, now, watermark);
     if (watermark && watermark > range.end) {
       const detail = `水位 ${watermark} 已覆盖当前时间，本次未重复拉取。`;
