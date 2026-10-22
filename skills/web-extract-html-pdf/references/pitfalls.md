@@ -5,11 +5,11 @@
 - **现象**：macOS `/Applications/LibreOffice.app` 可能缺失或损坏，`soffice --convert-to pdf` 失败。
 - **处置**：本技能**不依赖 LibreOffice**，一律走 Chrome headless 出 PDF。渲染前按 `references/environment.md` 探测 Chromium，不要探测 LibreOffice。
 
-## 2. Chrome headless 挂起（不退、不出文件）
+## 2. Chrome headless 挂起大约 120 秒（不退、不出文件）
 
-- **现象**：`--print-to-pdf` 进程长时间不退、无 `out.pdf`。
-- **根因**：复用同一 `--user-data-dir` 与上一进程争用；或容器缺 D-Bus（日志刷 `ERROR:dbus`，属正常噪声，非致命）。
-- **处置**：每次渲染**新建一次性 `--user-data-dir`**，加 `--disable-dev-shm-usage`，并对命令加 `timeout`。判据是**退出码 + 出文件**。
+- **现象**：`--headless=new --print-to-pdf` 卡到约 120 秒被超时杀掉，没有 `out.pdf`。日志反复出现 `Failed to connect to socket /run/dbus/system_bus_socket`。
+- **根因**：`--print-to-pdf` 会等文档 load。页面里只要有一个 TCP 被丢弃的 http(s) 子资源（外链 CSS、CDN 字体、远程图），连接会重传到大约 120 秒。`--virtual-time-budget` 在 `--headless=new` 下不打断这次等待。dbus 那一行是沙箱没有 system bus 时的噪声：没有外链的最小 HTML 也会打出它，并且大约 10 秒就能写出 PDF。
+- **处置**：只跑 `scripts/print-pdf.mjs`。它带 `--timeout`（默认 10 秒）和一次性 `--user-data-dir`；第一轮仍不退出时，再用 `--host-resolver-rules` 让远程子资源立即失败并写出带正文的 PDF。不要为这条日志给沙箱加 dbus。判据是**退出码 + `print-pdf: ok` + 出文件**。
 
 ## 3. `reportlab` + TTC 排中文
 

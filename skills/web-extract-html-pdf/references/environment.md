@@ -25,7 +25,7 @@ command -v libreoffice soffice
 
 1. 环境变量 `CHROME_BIN`（若已设定）
 2. `google-chrome` / `google-chrome-stable` / `chromium` / `chromium-browser`（PATH 上的系统浏览器）
-3. `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`（仅当系统没有 Chrome/Chromium 时回退）
+3. `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`，以及 `.pw-browsers/chromium-*/chrome-linux/chrome`（仅当系统没有 Chrome/Chromium 时，由 `scripts/print-pdf.mjs` 回退；不要手选这个二进制再裸跑 `--print-to-pdf`）
 4. `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`（macOS 本机）
 
 拿到后先验版本与动态库：
@@ -49,27 +49,37 @@ ldd "$CHROME" 2>&1 | grep -i "not found"   # 应为空
 
 ## 4. 渲染调用模板
 
+只调用打印助手，不要自己拼 Chromium 参数：
+
 ```bash
-CHROME="<已解析的可执行文件>"
 WORK="tmp/<task>"
-timeout 90 "$CHROME" \
-  --headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage \
-  --no-pdf-header-footer --print-to-pdf="$WORK/out.pdf" \
-  --user-data-dir="$WORK/ud-$RANDOM" \
-  --virtual-time-budget=12000 "file://$PWD/$WORK/page.html"
+node skills/web-extract-html-pdf/scripts/print-pdf.mjs \
+  --html "$WORK/page.html" \
+  --out "$WORK/out.pdf"
 echo "exit=$?"
 ls -la "$WORK/out.pdf"
 ```
 
+助手内部等价于（供排障，不要手写）：
+
+```bash
+"$CHROME" \
+  --headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage \
+  --no-pdf-header-footer --print-to-pdf="$WORK/out.pdf" \
+  --user-data-dir="$(mktemp -d)" \
+  --timeout=10000 \
+  "$WORK/page.html"
+```
+
 要点：
 
-- **每次新建一次性 `--user-data-dir`**：复用同一 profile 目录会与上次进程争用而挂起。
-- **必带 `timeout`**：无头渲染在缺依赖 / profile 争用时可能不退。
-- 判据是**退出码 + 出文件**，不是 stdout 里的 `ERROR:dbus` 之类噪声（无 D-Bus 的容器里这些属正常）。
+- **`--timeout` 才是卡住的上限**。`--headless=new` 会等文档 load。一个 SYN 被丢弃的 http(s) 子资源会把进程拖到 TCP 重传结束（大约 120 秒）。`--virtual-time-budget` 在 `--headless=new` 下**不会**打断这次等待，不要再用它当修复。
+- **每次新建一次性 `--user-data-dir`**：复用 profile 时，当前 Chromium 会因 ProcessSingleton 立刻失败退出。
+- 判据是**退出码 + `print-pdf: ok` + 出文件**。`Failed to connect to socket /run/dbus/system_bus_socket` 在无 system bus 的沙箱里是预期噪声，最小 HTML 也会打出这一行并且仍能写出 PDF。
+- 第一轮在 `--timeout` 内没写出 PDF 时，助手会加上 `--host-resolver-rules=MAP * ~NOTFOUND` 再打一次，避免远程子资源把 load 挂死。正文还在，外链图片可能缺。
 
 ## 5. 已知环境事实（示例，随机器变化，勿硬编码）
 
-- OpenBot 对话沙箱（标签仍是 `openbot-sandbox:bookworm-slim`，系统是 Debian 13 trixie）预装 `/usr/bin/chromium`、poppler、`fonts-noto-cjk`（含 Noto Sans CJK SC）。用这个系统 Chromium，不要把 Playwright 缓存当成安装前提。
-- `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome` 只在 PATH 上没有 Chrome/Chromium 时使用。
-- Linux 容器通常无 D-Bus。无头渲染时 stdout 里的 `ERROR:dbus` 是噪声。
-- `--headless=new` 在缺依赖时可能卡住，`--headless=old` 亦不能保证；真正的解法是一次性 `user-data-dir` + `--disable-dev-shm-usage`。若仍失败，按第 3 节判「缺失」并停机。
+- OpenBot 对话沙箱（标签仍是 `openbot-sandbox:bookworm-slim`，系统是 Debian 13 trixie）预装 `/usr/bin/chromium`、poppler、`fonts-noto-cjk`（含 Noto Sans CJK SC）。**没有** `/run/dbus/system_bus_socket`。用这个系统 Chromium，不要把 Playwright 缓存当成安装前提，也不要为了这条 dbus 日志去给镜像加 dbus。
+- `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome` 和 `.pw-browsers/chromium-*/chrome-linux/chrome` 只在 PATH 上没有 Chrome/Chromium 时由助手回退。
+- 最小命令 `chromium --headless=new --disable-gpu --no-sandbox --print-to-pdf=... probe.html` 在该沙箱上大约 10 秒写出 PDF，同时 stderr 仍有 dbus socket 报错。120 秒挂起是子资源等待，不是 dbus。

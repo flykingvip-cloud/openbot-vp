@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "id": "web-extract-html-pdf",
   "name": "网页/文本 → 精排 PDF",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "status": "release-candidate",
   "maturity_tier": "governed",
   "lifecycle_stage": "production-candidate",
@@ -41,7 +41,7 @@
       "web_fetch",
       "browser",
       "exec(pdftotext/pdftoppm/pdfinfo)",
-      "exec(chrome --print-to-pdf)"
+      "exec(node scripts/print-pdf.mjs)"
     ],
     "asset_contract": "交付物固定落在 output/pdf/；工作副本 tmp/ 不进版本库"
   },

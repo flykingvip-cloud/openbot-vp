@@ -5,7 +5,7 @@ description: >-
   「按章节层级重排并中文化图表」「导出一份可打印的 A4 PDF」时使用。核心流程：先用 web_fetch / pdftotext 拿到纯文字，
   再由模型重建章节层级、重绘 SVG 图、中文化表格，用 HTML+CSS 排版，最后用 Chrome headless 打印成 PDF。
   不要用于原始版式 1:1 还原或纯文字 .txt 导出。
-version: 1.0.0
+version: 1.1.0
 license: 仅供内部使用
 metadata:
   openbot:
@@ -80,21 +80,22 @@ const PART_A = [
 - 用 CSS 变量定主题色（如 `--accent`），封面 / 表格 / 引用块各自成 class。
 - 完整可复用 CSS 见 `scripts/render.js` 顶部。
 
-### 6. 渲染 PDF（本机最稳路径）
+### 6. 渲染 PDF（只走打印助手）
 
-优先使用系统已安装的 Chrome / Chromium（`google-chrome`、`google-chrome-stable`、`chromium`、`chromium-browser`）。OpenBot 对话沙箱提供 `/usr/bin/chromium`。只有系统没有浏览器时，才回退到 `~/.cache/ms-playwright/chromium-*/chrome-linux64/chrome`：
+不要手写 `chromium --headless=new --print-to-pdf`。用本技能自带的助手（它会解析 `/usr/bin/chromium`，必要时才回退到 Playwright 的 `.pw-browsers` / `ms-playwright` 缓存）：
 
 ```bash
-CHROME="<chromium 可执行文件路径>"   # 见 references/environment.md
-"$CHROME" \
-  --headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage \
-  --no-pdf-header-footer --print-to-pdf=out.pdf \
-  --user-data-dir=./ud --virtual-time-budget=12000 \
-  "file:///abs/path.html"
+node skills/web-extract-html-pdf/scripts/print-pdf.mjs \
+  --html "$WORK/page.html" \
+  --out "$WORK/out.pdf"
 ```
 
-- 每次渲染**新建一次性 `--user-data-dir`**，避免与上一次进程的 profile 争用导致挂起。
-- 给命令加超时（如 `timeout 90`）；Bash 环境的报错 / 出文件即判定结果。
+助手固定带上沙箱里已经打通过的 `--headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage`，并加上 `--timeout`（默认 10 秒）和一次性 `--user-data-dir`。`--virtual-time-budget` **不能**拦住 `--headless=new` 里卡住的子资源，不要再加。
+
+- 页面里只要有一个 TCP 被丢弃的 http(s) 子资源（外链 CSS、CDN 字体、远程图片），裸的 `--print-to-pdf` 会一直等到 TCP 重传结束，大约 **120 秒**，然后被 exec 杀掉，且没有 PDF。
+- 这 120 秒里日志会反复刷 `Failed to connect to socket /run/dbus/system_bus_socket`。沙箱镜像本来就没有 system bus。同一条日志在**没有外链的最小 HTML** 上也会出现，而那次打印大约 10 秒就成功。dbus 不是失败原因，不要为此去改镜像或加 dbus。
+- 若当前 Chromium 不认 `--timeout`、进程仍不退出，助手会再用 `--host-resolver-rules` 重试一次：远程子资源立即失败，正文仍打进 PDF（可选中文字还在；外链图片可能缺）。
+- 判据是助手退出码 + `print-pdf: ok` + 出文件，不是 stderr 里的 dbus 行。
 - 渲染完把交付物放**规范预览路径**：`output/pdf/<文件名>.pdf`（项目子目录只是工作副本）。
 
 ## 质检（交付前必做）
@@ -131,7 +132,7 @@ output/pdf/<name>.pdf # 唯一交付物（预览路径）
 - 不要试图还原原文版式（本技能是重排，不是还原）。
 - 不要用原图截图充当重绘图。
 - 不要用 `reportlab` + TTC 走这条线（`TTFont(subfontIndex=…)` 易错，中文最易踩坑）。
-- 不要因为一次渲染超时就判定 Chrome 不可用（先换一次性 `--user-data-dir` 重试）。
+- 不要手写 Chromium 参数，也不要因为 dbus 日志去改沙箱镜像。渲染只调用 `scripts/print-pdf.mjs`。
 - 不要臆造或补全表格数值与图表数据。
 
 ## 输入（每次不同）
@@ -149,3 +150,4 @@ output/pdf/<name>.pdf # 唯一交付物（预览路径）
 ## 脚本
 
 - `scripts/render.js` —— 内容模块渲染器 + 内联 SVG `lineChart()` + 全局 CSS（供第 2–5 步引用）
+- `scripts/print-pdf.mjs` —— 第 6 步唯一打印入口（`--timeout` + 一次性 profile；dbus 缺失时仍出 PDF）
