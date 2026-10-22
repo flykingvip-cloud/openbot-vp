@@ -37,18 +37,24 @@ const ACTIONS = [
     handlerRef: "enterprise-data/handlers/yonyou-tplus-sale-order-list-v1",
   },
   {
+    actionKey: "erp.sale_delivery.query_list",
+    displayName: "销货单列表",
+    handlerRef: "enterprise-data/handlers/yonyou-tplus-sale-delivery-list-v1",
+  },
+  {
     actionKey: "erp.doc.query",
     displayName: "凭证查询",
     handlerRef: "enterprise-data/handlers/yonyou-tplus-doc-query-v1",
   },
 ] as const;
 
-export function seedYonyouTplusConnectorPackage(params: {
+function installYonyouTplusActions(params: {
   store: EnterpriseDataStore;
   tenantId: string;
   nowIso: string;
+  actions: readonly (typeof ACTIONS)[number][];
 }): void {
-  for (const action of ACTIONS) {
+  for (const action of params.actions) {
     upsertConnectorAction({
       store: params.store,
       tenantId: params.tenantId,
@@ -78,6 +84,14 @@ export function seedYonyouTplusConnectorPackage(params: {
   }
 }
 
+export function seedYonyouTplusConnectorPackage(params: {
+  store: EnterpriseDataStore;
+  tenantId: string;
+  nowIso: string;
+}): void {
+  installYonyouTplusActions({ ...params, actions: ACTIONS });
+}
+
 export function ensureYonyouTplusConnectorPackage(params: {
   store: EnterpriseDataStore;
   tenantId: string;
@@ -88,14 +102,11 @@ export function ensureYonyouTplusConnectorPackage(params: {
     tenantId: params.tenantId,
     connectorId: YONYOU_TPLUS_CONNECTOR_ID,
   });
-  if (existing.length > 0) {
+  const existingKeys = new Set(existing.map((action) => action.actionKey));
+  const missing = ACTIONS.filter((action) => !existingKeys.has(action.actionKey));
+  if (missing.length === 0) {
     return { installed: false, actionCount: existing.length };
   }
-  seedYonyouTplusConnectorPackage(params);
-  const actionCount = listConnectorActions({
-    store: params.store,
-    tenantId: params.tenantId,
-    connectorId: YONYOU_TPLUS_CONNECTOR_ID,
-  }).length;
-  return { installed: true, actionCount };
+  installYonyouTplusActions({ ...params, actions: missing });
+  return { installed: true, actionCount: existing.length + missing.length };
 }

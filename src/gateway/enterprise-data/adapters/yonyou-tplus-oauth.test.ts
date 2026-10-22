@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildYonyouTplusAuthorizeUrl,
   exchangeYonyouTplusAuthorizationCode,
+  exchangeYonyouTplusTokenByPermanentCode,
   readYonyouTplusCredentialInput,
   refreshYonyouTplusAccessToken,
   resolveYonyouTplusOAuthConfig,
@@ -142,6 +143,41 @@ describe("yonyou tplus oauth", () => {
     expect(parsed.pathname).toBe("/auth/v2/refreshToken");
     expect(parsed.searchParams.get("grantType")).toBe("refresh_token");
     expect(parsed.searchParams.get("refreshToken")).toBe("refresh-1");
+  });
+
+  it("exchanges a user permanent code at /auth/token/getTokenByPermanentCode", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        code: "200",
+        result: {
+          access_token: "open-token-3",
+          refresh_token: "refresh-3",
+          user_auth_permanent_code: "user-permanent",
+          org_id: "90001198862",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await exchangeYonyouTplusTokenByPermanentCode({
+      appKey: "ak-test",
+      appSecret: "as-test",
+      orgAccessToken: "org-access",
+      userAuthPermanentCode: "user-permanent",
+    });
+    expect(result.accessToken).toBe("open-token-3");
+    expect(result.permanentCode).toBe("user-permanent");
+    expect(result.orgId).toBe("90001198862");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://openapi.chanjet.com/auth/token/getTokenByPermanentCode");
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({ appKey: "ak-test", appSecret: "as-test" });
+    if (typeof init.body !== "string") {
+      throw new Error("expected a string request body");
+    }
+    expect(JSON.parse(init.body)).toEqual({
+      orgAccessToken: "org-access",
+      userAuthPermanentCode: "user-permanent",
+    });
   });
 
   it("reads credential upsert fields without treating blanks as values", () => {

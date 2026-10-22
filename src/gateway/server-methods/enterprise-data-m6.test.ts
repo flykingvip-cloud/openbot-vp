@@ -386,7 +386,7 @@ describe("enterprise-data M6 dashboard handlers", () => {
       connectorId: "erp-yonyou-tplus",
     });
     expect(installed.ok).toBe(true);
-    expect(installed.payload?.actionCount).toBe(6);
+    expect(installed.payload?.actionCount).toBe(7);
 
     const catalog = await invoke("enterprise-data.connectors.catalog", { tenantId });
     const connectors = catalog.payload?.connectors as Array<{

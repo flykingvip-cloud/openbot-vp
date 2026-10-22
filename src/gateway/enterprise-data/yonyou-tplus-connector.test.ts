@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EnterpriseDataStoreError } from "./connector-action-store.js";
+import { EnterpriseDataStoreError, listConnectorActions } from "./connector-action-store.js";
 import { findDataConnectorDefinition, resolveDataConnectorCatalog } from "./connector-catalog.js";
 import { upsertDataConnectorCredential } from "./connector-credential-store.js";
 import { loadCredentialSecret, saveCredentialSecret } from "./connector-credential-vault.js";
@@ -16,6 +16,11 @@ import { ensureConnectorPackage } from "./connector-packages.js";
 import { upsertDataSource } from "./data-source-store.js";
 import { probeDataSourceConnection } from "./source-connection-probe.js";
 import { normalizeEnterpriseDataStore } from "./store.js";
+import {
+  loadYonyouTplusAppTicket,
+  saveYonyouTplusAppTicket,
+  saveYonyouTplusOrgPermanentAuth,
+} from "./yonyou-tplus-message-store.js";
 
 const testPaths = vi.hoisted(() => ({
   tmpDir: `/tmp/openbot-yonyou-tplus-connector-${Date.now()}`,
@@ -31,6 +36,13 @@ vi.mock("../../utils.js", async (importOriginal) => {
 
 const tenantId = "tenant-jingshanzi";
 const nowIso = "2026-10-22T00:00:00.000Z";
+
+function jsonBody(body: RequestInit["body"]): unknown {
+  if (typeof body !== "string") {
+    throw new Error("expected a string request body");
+  }
+  return JSON.parse(body);
+}
 
 function cleanStore() {
   fs.rmSync(testPaths.tmpDir, { recursive: true, force: true });
@@ -71,12 +83,12 @@ describe("yonyou tplus connector registration", () => {
       connectorId: "erp-yonyou-tplus",
       nowIso,
     });
-    expect(installed).toEqual({ installed: true, actionCount: 6 });
+    expect(installed).toEqual({ installed: true, actionCount: 7 });
     const entry = resolveDataConnectorCatalog({ store, tenantId }).find(
       (item) => item.connectorId === "erp-yonyou-tplus",
     );
     expect(entry?.ready).toBe(true);
-    expect(entry?.runtimeHandlerCount).toBe(6);
+    expect(entry?.runtimeHandlerCount).toBe(7);
     const probe = await probeDataSourceConnection({
       store,
       tenantId,
@@ -303,5 +315,172 @@ describe("yonyou tplus connector registration", () => {
     expect(url.searchParams.get("orgId")).toBe("90001198862");
     expect(url.searchParams.get("appKey")).toBe("ak-test");
     expect(url.searchParams.get("appName")).toBe("tpluscloud");
+  });
+
+  it("registers the sale delivery list action and fills it in on a later ensure", () => {
+    const store = normalizeEnterpriseDataStore({});
+    ensureConnectorPackage({ store, tenantId, connectorId: "erp-yonyou-tplus", nowIso });
+    const keys = listConnectorActions({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+    }).map((action) => action.actionKey);
+    expect(keys).toContain("erp.sale_delivery.query_list");
+    const saleDelivery = Object.values(store.connectorActions).find(
+      (action) => action.actionKey === "erp.sale_delivery.query_list",
+    );
+    if (saleDelivery) {
+      delete store.connectorActions[saleDelivery.actionId];
+    }
+    const again = ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso,
+    });
+    expect(again).toEqual({ installed: true, actionCount: 7 });
+  });
+
+  it("refreshes an expired openToken during probe and writes the new tokens", async () => {
+    const store = normalizeEnterpriseDataStore({});
+    ensureConnectorPackage({ store, tenantId, connectorId: "erp-yonyou-tplus", nowIso });
+    const credential = upsertDataConnectorCredential({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      kind: "oauth2",
+      instanceUrl: "https://openapi.chanjet.com",
+      nowIso,
+    });
+    await saveCredentialSecret(credential.credentialId, {
+      appKey: "ak-test",
+      appSecret: "as-test",
+      oauthAccessToken: "expired-open",
+      oauthRefreshToken: "refresh-1",
+      orgId: "90001198862",
+    });
+    let versionCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = String(input);
+        if (url.includes("/auth/v2/refreshToken")) {
+          return Response.json({
+            code: "200",
+            result: {
+              access_token: "open-token-2",
+              refresh_token: "refresh-2",
+              expires_in: 518400,
+              sid: "6",
+            },
+          });
+        }
+        versionCalls += 1;
+        if (versionCalls === 1) {
+          return Response.json({ code: "401", message: "openToken无效" });
+        }
+        return Response.json({ result: "16.0" });
+      }),
+    );
+    const probe = await probeDataSourceConnection({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      credentialId: credential.credentialId,
+    });
+    expect(probe.ok).toBe(true);
+    expect(probe.mode).toBe("live_probe_ok");
+    expect(probe.message).toContain("已将新的 openToken 写入凭证库");
+    const stored = await loadCredentialSecret(credential.credentialId);
+    expect(stored?.oauthAccessToken).toBe("open-token-2");
+    expect(stored?.oauthRefreshToken).toBe("refresh-2");
+    expect(stored?.appSecret).toBe("as-test");
+  });
+
+  it("renews from the permanent-code chain when an appTicket and enterprise code are stored", async () => {
+    const store = normalizeEnterpriseDataStore({});
+    ensureConnectorPackage({ store, tenantId, connectorId: "erp-yonyou-tplus", nowIso });
+    const credential = upsertDataConnectorCredential({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      label: "京扇子 T+",
+      kind: "oauth2",
+      instanceUrl: "https://openapi.chanjet.com",
+      nowIso,
+    });
+    await saveCredentialSecret(credential.credentialId, {
+      appKey: "ak-test",
+      appSecret: "as-test",
+      oauthRefreshToken: "refresh-should-not-run",
+      oauthPermanentCode: "user-permanent",
+      orgId: "90001198862",
+    });
+    await saveYonyouTplusAppTicket({
+      appKey: "ak-test",
+      appTicket: "ticket-1",
+      receivedAt: nowIso,
+    });
+    await saveYonyouTplusOrgPermanentAuth({
+      orgId: "90001198862",
+      permanentAuthCode: "org-permanent",
+      updatedAt: nowIso,
+    });
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string, init?: RequestInit) => {
+        const url = String(input);
+        urls.push(url);
+        if (url.endsWith("/auth/appAuth/getAppAccessToken")) {
+          expect(jsonBody(init?.body)).toEqual({ appTicket: "ticket-1" });
+          return Response.json({
+            code: "200",
+            result: { appAccessToken: "app-access", expireTime: 7200 },
+          });
+        }
+        if (url.endsWith("/auth/orgAuth/getOrgAccessToken")) {
+          expect(jsonBody(init?.body)).toEqual({
+            appAccessToken: "app-access",
+            permanentAuthCode: "org-permanent",
+          });
+          return Response.json({
+            code: "200",
+            result: { orgAccessToken: "org-access", orgId: "90001198862", expireTime: 7200 },
+          });
+        }
+        if (url.endsWith("/auth/token/getTokenByPermanentCode")) {
+          expect(jsonBody(init?.body)).toEqual({
+            orgAccessToken: "org-access",
+            userAuthPermanentCode: "user-permanent",
+          });
+          return Response.json({
+            code: "200",
+            result: {
+              access_token: "open-from-permanent",
+              refresh_token: "refresh-from-permanent",
+              user_auth_permanent_code: "user-permanent",
+              expires_in: 518400,
+            },
+          });
+        }
+        return Response.json({ result: "16.0" });
+      }),
+    );
+    const probe = await probeDataSourceConnection({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      credentialId: credential.credentialId,
+    });
+    expect(probe.ok).toBe(true);
+    expect(urls.some((url) => url.includes("/auth/v2/refreshToken"))).toBe(false);
+    expect(urls.some((url) => url.includes("GetVersionInfo"))).toBe(true);
+    const stored = await loadCredentialSecret(credential.credentialId);
+    expect(stored?.oauthAccessToken).toBe("open-from-permanent");
+    expect(stored?.oauthRefreshToken).toBe("refresh-from-permanent");
+    expect(stored?.orgPermanentAuthCode).toBe("org-permanent");
+    expect(await loadYonyouTplusAppTicket("ak-test")).toBe("ticket-1");
   });
 });

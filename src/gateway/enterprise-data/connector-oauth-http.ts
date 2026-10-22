@@ -6,6 +6,10 @@ import {
   completeDataConnectorOAuthCallback,
 } from "./connector-oauth.js";
 import { resolveControlUiEnterpriseDataBasePath } from "./control-ui-paths.js";
+import {
+  acceptYonyouTplusChanjetMessage,
+  YONYOU_TPLUS_MESSAGE_ACK,
+} from "./yonyou-tplus-messages.js";
 
 export type EnterpriseDataConnectorOAuthHttpOptions = {
   basePath?: string;
@@ -32,14 +36,49 @@ function resolveRequestOrigin(req: IncomingMessage): string {
   return `${protocol}://${host}`;
 }
 
+const MESSAGE_BODY_LIMIT = 64 * 1024;
+
+function readRequestBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on("data", (chunk: Buffer | string) => {
+      const buffer = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      size += buffer.length;
+      if (size > MESSAGE_BODY_LIMIT) {
+        reject(new Error("body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(buffer);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
+
+async function handleYonyouTplusMessagePost(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
+  try {
+    const text = await readRequestBody(req);
+    const body = text.trim() ? (JSON.parse(text) as unknown) : {};
+    await acceptYonyouTplusChanjetMessage({
+      body,
+      nowIso: new Date().toISOString(),
+    });
+  } catch {
+    // Chanjet retries unless the receiver answers success. Keep the ack.
+  }
+  sendJson(res, 200, YONYOU_TPLUS_MESSAGE_ACK);
+}
+
 export async function handleEnterpriseDataConnectorOAuthHttpRequest(
   req: IncomingMessage,
   res: ServerResponse,
   opts: EnterpriseDataConnectorOAuthHttpOptions,
 ): Promise<boolean> {
-  if (req.method !== "GET") {
-    return false;
-  }
   const urlRaw = req.url;
   if (!urlRaw) {
     return false;
@@ -50,6 +89,18 @@ export async function handleEnterpriseDataConnectorOAuthHttpRequest(
     basePath: opts.basePath,
   });
   if (!route) {
+    return false;
+  }
+  if (
+    req.method === "POST" &&
+    route.segments[0] === "chanjet" &&
+    route.segments[1] === "messages" &&
+    route.segments.length === 2
+  ) {
+    await handleYonyouTplusMessagePost(req, res);
+    return true;
+  }
+  if (req.method !== "GET") {
     return false;
   }
 

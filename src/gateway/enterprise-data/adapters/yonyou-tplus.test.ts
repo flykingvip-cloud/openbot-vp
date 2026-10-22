@@ -133,6 +133,31 @@ describe("yonyou tplus adapter", () => {
     });
   });
 
+  it("reads the first page of sale deliveries with the documented list body", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json(
+        { code: "0", message: "ok", data: { TotalCount: 0, Rows: [] } },
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await executeYonyouTplusHandler(
+      YONYOU_TPLUS_HANDLERS.saleDelivery,
+      { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
+      LIVE_SECRET,
+    );
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(
+      "https://openapi.chanjet.com/tplus/api/v2/SaleDeliveryOpenApi/FindVoucherList",
+    );
+    expect(readJsonBody(init)).toEqual({
+      pageSize: 20,
+      pageIndex: 0,
+      selectFields: ["SaleDelivery.ID", "SaleDelivery.VoucherDate", "SaleDelivery.Code"],
+      paramDic: {},
+    });
+  });
+
   it("uses the platform app credentials when the vault only stores the open token", async () => {
     vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY", "env-key");
     vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_SECRET", "env-secret");

@@ -1,6 +1,13 @@
+import { saveCredentialSecret } from "../connector-credential-vault.js";
 import type { MockHandlerInput, MockHandlerResult } from "../mock-handlers.js";
 import type { DataConnectorCredentialSecret } from "../types.js";
 import {
+  loadYonyouTplusAppTicket,
+  loadYonyouTplusOrgPermanentAuth,
+} from "../yonyou-tplus-message-store.js";
+import {
+  renewYonyouTplusOpenToken,
+  resolveYonyouTplusAppCredentials,
   YONYOU_TPLUS_API_PREFIX,
   YONYOU_TPLUS_GATEWAY_ORIGIN,
   YONYOU_TPLUS_SIMULATED_TOKEN_PREFIX,
@@ -12,6 +19,7 @@ export const YONYOU_TPLUS_HANDLERS = {
   inventory: "enterprise-data/handlers/yonyou-tplus-inventory-query-page-v1",
   partner: "enterprise-data/handlers/yonyou-tplus-partner-query-page-v1",
   saleOrder: "enterprise-data/handlers/yonyou-tplus-sale-order-list-v1",
+  saleDelivery: "enterprise-data/handlers/yonyou-tplus-sale-delivery-list-v1",
   doc: "enterprise-data/handlers/yonyou-tplus-doc-query-v1",
 } as const;
 
@@ -181,23 +189,180 @@ function queryBody(
   return fallback;
 }
 
+export type YonyouTplusProbeContext = {
+  /** When set, a successful renewal is written back to this vault credential. */
+  credentialId?: string;
+  vaultPath?: string;
+  messageStorePath?: string;
+};
+
+const renewLocks = new Map<string, Promise<DataConnectorCredentialSecret>>();
+
+function appMaterial(
+  secret: DataConnectorCredentialSecret,
+): { appKey: string; appSecret: string } | null {
+  const env = resolveYonyouTplusAppCredentials();
+  const appKey = secret.appKey?.trim() || env?.appKey || "";
+  const appSecret = secret.appSecret?.trim() || env?.appSecret || "";
+  if (!appKey || !appSecret) {
+    return null;
+  }
+  return { appKey, appSecret };
+}
+
+function isOpenTokenRejected(result: InterpretedBody): boolean {
+  if (result.ok) {
+    return false;
+  }
+  return (
+    result.message.includes("openToken") ||
+    result.message.includes("token无效") ||
+    result.message.includes("token失效") ||
+    result.message.includes("返回 401")
+  );
+}
+
+async function renewalMaterial(
+  secret: DataConnectorCredentialSecret,
+  messageStorePath?: string,
+): Promise<{
+  refreshToken?: string;
+  userAuthPermanentCode?: string;
+  orgPermanentAuthCode?: string;
+  appTicket?: string;
+} | null> {
+  const apps = appMaterial(secret);
+  if (!apps) {
+    return null;
+  }
+  const refreshToken = secret.oauthRefreshToken?.trim() || undefined;
+  const userAuthPermanentCode = secret.oauthPermanentCode?.trim() || undefined;
+  const orgId = secret.orgId?.trim() || "";
+  const storedOrg = orgId ? await loadYonyouTplusOrgPermanentAuth(orgId, messageStorePath) : null;
+  const orgPermanentAuthCode = secret.orgPermanentAuthCode?.trim() || storedOrg?.permanentAuthCode;
+  const appTicket = await loadYonyouTplusAppTicket(apps.appKey, messageStorePath);
+  const permanentReady = Boolean(userAuthPermanentCode && orgPermanentAuthCode && appTicket);
+  if (!refreshToken && !permanentReady) {
+    return null;
+  }
+  return {
+    refreshToken,
+    userAuthPermanentCode,
+    orgPermanentAuthCode,
+    appTicket: appTicket ?? undefined,
+  };
+}
+
+async function renewAndPersist(
+  secret: DataConnectorCredentialSecret,
+  context: YonyouTplusProbeContext,
+): Promise<DataConnectorCredentialSecret> {
+  const credentialId = context.credentialId?.trim() || "";
+  if (!credentialId) {
+    throw new Error("用友 T+ 续期需要已保存的凭证，内联探测不会轮换 token。");
+  }
+  const existing = renewLocks.get(credentialId);
+  if (existing) {
+    return existing;
+  }
+  const run = (async () => {
+    const apps = appMaterial(secret);
+    const material = await renewalMaterial(secret, context.messageStorePath);
+    if (!apps || !material) {
+      throw new Error("用友 T+ 无法续期：缺少 refresh token，或缺少 appTicket 与企业永久授权码。");
+    }
+    const token = await renewYonyouTplusOpenToken({
+      appKey: apps.appKey,
+      appSecret: apps.appSecret,
+      gatewayOrigin: secret.instanceUrl,
+      refreshToken: material.refreshToken,
+      userAuthPermanentCode: material.userAuthPermanentCode,
+      orgPermanentAuthCode: material.orgPermanentAuthCode,
+      appTicket: material.appTicket,
+    });
+    const next: DataConnectorCredentialSecret = {
+      ...secret,
+      oauthAccessToken: token.accessToken,
+      apiKey: token.accessToken,
+      oauthRefreshToken: token.refreshToken || secret.oauthRefreshToken,
+      oauthPermanentCode: token.permanentCode || secret.oauthPermanentCode,
+      orgPermanentAuthCode: material.orgPermanentAuthCode || secret.orgPermanentAuthCode,
+      orgId: token.orgId || secret.orgId,
+      appName: token.appName || secret.appName,
+      sid: token.sid || secret.sid,
+    };
+    await saveCredentialSecret(credentialId, next, context.vaultPath);
+    return next;
+  })();
+  renewLocks.set(credentialId, run);
+  try {
+    return await run;
+  } finally {
+    renewLocks.delete(credentialId);
+  }
+}
+
 export async function probeYonyouTplusConnection(
   secret: DataConnectorCredentialSecret,
-): Promise<{ ok: boolean; message: string }> {
-  const resolved = resolveCallCredentials(secret);
+  context?: YonyouTplusProbeContext,
+): Promise<{ ok: boolean; message: string; refreshed?: boolean }> {
+  let current = secret;
+  let refreshed = false;
+  const canPersist = Boolean(context?.credentialId?.trim());
+  let resolved = resolveCallCredentials(current);
+  if (
+    "error" in resolved &&
+    canPersist &&
+    (await renewalMaterial(current, context?.messageStorePath))
+  ) {
+    try {
+      current = await renewAndPersist(current, context ?? {});
+      refreshed = true;
+      resolved = resolveCallCredentials(current);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "刷新 openToken 失败";
+      return { ok: false, message };
+    }
+  }
   if ("error" in resolved) {
     return { ok: false, message: resolved.error };
   }
   if (resolved.simulated) {
     return { ok: true, message: "用友 T+ 模拟 OAuth 凭证有效（开发模式）。" };
   }
-  const result = await postTplus({
+  let result = await postTplus({
     credentials: resolved,
     path: VERSION_PATH,
     body: {},
     successMessage: "用友 T+ 连通性正常（已读取版本信息）。",
   });
-  return { ok: result.ok, message: result.message };
+  if (
+    !result.ok &&
+    !refreshed &&
+    canPersist &&
+    isOpenTokenRejected(result) &&
+    (await renewalMaterial(current, context?.messageStorePath))
+  ) {
+    try {
+      current = await renewAndPersist(current, context ?? {});
+      refreshed = true;
+      const next = resolveCallCredentials(current);
+      if ("error" in next) {
+        return { ok: false, message: next.error, refreshed: true };
+      }
+      result = await postTplus({
+        credentials: next,
+        path: VERSION_PATH,
+        body: {},
+        successMessage: "用友 T+ 连通性正常（已读取版本信息）。",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "刷新 openToken 失败";
+      return { ok: false, message: `${result.message}；${message}` };
+    }
+  }
+  const suffix = refreshed ? " 已将新的 openToken 写入凭证库。" : "";
+  return { ok: result.ok, message: `${result.message}${suffix}`, refreshed };
 }
 
 function simulatedPayload(handlerRef: string): MockHandlerResult {
@@ -211,6 +376,7 @@ function simulatedPayload(handlerRef: string): MockHandlerResult {
     case YONYOU_TPLUS_HANDLERS.partner:
       return { payload: { records: [{ Code: "001", Name: "模拟往来单位" }] } };
     case YONYOU_TPLUS_HANDLERS.saleOrder:
+    case YONYOU_TPLUS_HANDLERS.saleDelivery:
       return {
         payload: {
           records: {
@@ -225,6 +391,27 @@ function simulatedPayload(handlerRef: string): MockHandlerResult {
     default:
       throw new Error(`用友 T+ 适配器不支持该处理器：${handlerRef}`);
   }
+}
+
+function voucherListRequest(
+  input: Record<string, unknown> | undefined,
+  apiPath: string,
+  prefix: "SaleOrder" | "SaleDelivery",
+): { path: string; body: unknown } {
+  const selectFields = Array.isArray(input?.selectFields)
+    ? input.selectFields
+    : [`${prefix}.ID`, `${prefix}.VoucherDate`, `${prefix}.Code`];
+  const pageSize = typeof input?.pageSize === "number" ? input.pageSize : 20;
+  const pageIndex = typeof input?.pageIndex === "number" ? input.pageIndex : 0;
+  return {
+    path: `${YONYOU_TPLUS_API_PREFIX}/${apiPath}`,
+    body: {
+      pageSize,
+      pageIndex,
+      selectFields,
+      paramDic: objectInput(input, "paramDic") ?? {},
+    },
+  };
 }
 
 function liveRequest(
@@ -257,22 +444,10 @@ function liveRequest(
           },
         }),
       };
-    case YONYOU_TPLUS_HANDLERS.saleOrder: {
-      const selectFields = input?.selectFields ?? [
-        "SaleOrder.ID",
-        "SaleOrder.VoucherDate",
-        "SaleOrder.Code",
-      ];
-      return {
-        path: `${YONYOU_TPLUS_API_PREFIX}/SaleOrderOpenApi/FindVoucherList`,
-        body: {
-          pageSize: input?.pageSize ?? 20,
-          pageIndex: input?.pageIndex ?? 0,
-          selectFields,
-          paramDic: objectInput(input, "paramDic") ?? {},
-        },
-      };
-    }
+    case YONYOU_TPLUS_HANDLERS.saleOrder:
+      return voucherListRequest(input, "SaleOrderOpenApi/FindVoucherList", "SaleOrder");
+    case YONYOU_TPLUS_HANDLERS.saleDelivery:
+      return voucherListRequest(input, "SaleDeliveryOpenApi/FindVoucherList", "SaleDelivery");
     case YONYOU_TPLUS_HANDLERS.doc:
       return {
         path: `${YONYOU_TPLUS_API_PREFIX}/doc/Query`,

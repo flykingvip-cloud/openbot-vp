@@ -44,6 +44,7 @@ export type YonyouTplusCredentialInput = {
   openToken?: string;
   refreshToken?: string;
   permanentCode?: string;
+  orgPermanentAuthCode?: string;
   orgId?: string;
   appName?: string;
   sid?: string;
@@ -63,6 +64,7 @@ export function readYonyouTplusCredentialInput(
     openToken: readTrimmedString(params.openToken),
     refreshToken: readTrimmedString(params.refreshToken),
     permanentCode: readTrimmedString(params.permanentCode),
+    orgPermanentAuthCode: readTrimmedString(params.orgPermanentAuthCode),
     orgId: readTrimmedString(params.orgId),
     appName: readTrimmedString(params.appName),
     sid: readTrimmedString(params.sid),
@@ -77,6 +79,7 @@ export function yonyouTplusCredentialInputHasMaterial(input: YonyouTplusCredenti
     input.openToken ||
     input.refreshToken ||
     input.permanentCode ||
+    input.orgPermanentAuthCode ||
     input.orgId ||
     input.appName ||
     input.sid ||
@@ -250,4 +253,219 @@ export async function refreshYonyouTplusAccessToken(params: {
     },
   });
   return readChanjetTokenResponse(response, "用友 T+ 刷新 token");
+}
+
+function gatewayOriginOf(gatewayOrigin?: string): string {
+  return (gatewayOrigin?.trim() || YONYOU_TPLUS_GATEWAY_ORIGIN).replace(/\/+$/, "");
+}
+
+function chanjetAppHeaders(appKey: string, appSecret: string): Record<string, string> {
+  return {
+    appKey,
+    appSecret,
+    "Content-Type": "application/json",
+  };
+}
+
+async function readChanjetResult(
+  response: Response,
+  label: string,
+): Promise<Record<string, unknown>> {
+  const text = await response.text().catch(() => "");
+  if (!response.ok) {
+    throw new Error(`${label}失败（${response.status}）${text ? `：${text.slice(0, 160)}` : ""}`);
+  }
+  let payload: { code?: string | number; message?: string; result?: unknown };
+  try {
+    payload = JSON.parse(text) as { code?: string | number; message?: string; result?: unknown };
+  } catch {
+    throw new Error(`${label}返回了无法解析的响应。`);
+  }
+  if (!chanjetCodeOk(payload.code)) {
+    const codeText =
+      typeof payload.code === "string" || typeof payload.code === "number" ? `${payload.code}` : "";
+    throw new Error(
+      `${label}失败${codeText ? `（${codeText}）` : ""}${payload.message ? `：${payload.message}` : ""}`,
+    );
+  }
+  if (!payload.result || typeof payload.result !== "object" || Array.isArray(payload.result)) {
+    throw new Error(`${label}未返回 result。`);
+  }
+  return payload.result as Record<string, unknown>;
+}
+
+function requiredResultString(record: Record<string, unknown>, key: string, label: string): string {
+  const value = record[key];
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${label}未返回 ${key}。`);
+  }
+  return value.trim();
+}
+
+function optionalResultString(record: Record<string, unknown>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+/** POST /auth/appAuth/getAppAccessToken — appTicket to an app credential. */
+export async function getYonyouTplusAppAccessToken(params: {
+  appKey: string;
+  appSecret: string;
+  appTicket: string;
+  gatewayOrigin?: string;
+}): Promise<{ appAccessToken: string; expireTime?: number }> {
+  const response = await fetch(
+    `${gatewayOriginOf(params.gatewayOrigin)}/auth/appAuth/getAppAccessToken`,
+    {
+      method: "POST",
+      headers: chanjetAppHeaders(params.appKey, params.appSecret),
+      body: JSON.stringify({ appTicket: params.appTicket }),
+    },
+  );
+  const result = await readChanjetResult(response, "用友 T+ 获取应用凭证");
+  const expireTime = result.expireTime;
+  return {
+    appAccessToken: requiredResultString(result, "appAccessToken", "用友 T+ 获取应用凭证"),
+    expireTime: typeof expireTime === "number" ? expireTime : undefined,
+  };
+}
+
+/** POST /auth/orgAuth/getPermanentAuthCode — enterprise temp code to a permanent code. */
+export async function exchangeYonyouTplusOrgPermanentAuthCode(params: {
+  appKey: string;
+  appSecret: string;
+  appAccessToken: string;
+  tempAuthCode: string;
+  gatewayOrigin?: string;
+}): Promise<{ permanentAuthCode: string; orgId?: string; appName?: string; appId?: string }> {
+  const response = await fetch(
+    `${gatewayOriginOf(params.gatewayOrigin)}/auth/orgAuth/getPermanentAuthCode`,
+    {
+      method: "POST",
+      headers: chanjetAppHeaders(params.appKey, params.appSecret),
+      body: JSON.stringify({
+        appAccessToken: params.appAccessToken,
+        tempAuthCode: params.tempAuthCode,
+      }),
+    },
+  );
+  const result = await readChanjetResult(response, "用友 T+ 获取企业永久授权码");
+  return {
+    permanentAuthCode: requiredResultString(
+      result,
+      "permanentAuthCode",
+      "用友 T+ 获取企业永久授权码",
+    ),
+    orgId: optionalResultString(result, "orgId"),
+    appName: optionalResultString(result, "appName"),
+    appId: optionalResultString(result, "appId"),
+  };
+}
+
+/** POST /auth/orgAuth/getOrgAccessToken — app credential plus enterprise permanent code. */
+export async function getYonyouTplusOrgAccessToken(params: {
+  appKey: string;
+  appSecret: string;
+  appAccessToken: string;
+  permanentAuthCode: string;
+  gatewayOrigin?: string;
+}): Promise<{ orgAccessToken: string; orgId?: string; appName?: string; appId?: string }> {
+  const response = await fetch(
+    `${gatewayOriginOf(params.gatewayOrigin)}/auth/orgAuth/getOrgAccessToken`,
+    {
+      method: "POST",
+      headers: chanjetAppHeaders(params.appKey, params.appSecret),
+      body: JSON.stringify({
+        appAccessToken: params.appAccessToken,
+        permanentAuthCode: params.permanentAuthCode,
+      }),
+    },
+  );
+  const result = await readChanjetResult(response, "用友 T+ 获取企业凭证");
+  return {
+    orgAccessToken: requiredResultString(result, "orgAccessToken", "用友 T+ 获取企业凭证"),
+    orgId: optionalResultString(result, "orgId"),
+    appName: optionalResultString(result, "appName"),
+    appId: optionalResultString(result, "appId"),
+  };
+}
+
+/** POST /auth/token/getTokenByPermanentCode — enterprise credential plus user permanent code. */
+export async function exchangeYonyouTplusTokenByPermanentCode(params: {
+  appKey: string;
+  appSecret: string;
+  orgAccessToken: string;
+  userAuthPermanentCode: string;
+  gatewayOrigin?: string;
+}): Promise<YonyouTplusTokenResult> {
+  const response = await fetch(
+    `${gatewayOriginOf(params.gatewayOrigin)}/auth/token/getTokenByPermanentCode`,
+    {
+      method: "POST",
+      headers: chanjetAppHeaders(params.appKey, params.appSecret),
+      body: JSON.stringify({
+        orgAccessToken: params.orgAccessToken,
+        userAuthPermanentCode: params.userAuthPermanentCode,
+      }),
+    },
+  );
+  return readChanjetTokenResponse(response, "用友 T+ 永久授权码换 token");
+}
+
+/**
+ * Headless renewal. Prefer the permanent-code chain when appTicket, the
+ * enterprise permanent code, and the user permanent code are all present.
+ * A failed permanent-code call falls back to refreshToken. A successful
+ * refresh rotates both tokens and invalidates the previous openToken.
+ */
+export async function renewYonyouTplusOpenToken(params: {
+  appKey: string;
+  appSecret: string;
+  gatewayOrigin?: string;
+  refreshToken?: string;
+  userAuthPermanentCode?: string;
+  orgPermanentAuthCode?: string;
+  appTicket?: string;
+}): Promise<YonyouTplusTokenResult> {
+  const refreshToken = params.refreshToken?.trim() || "";
+  const userAuthPermanentCode = params.userAuthPermanentCode?.trim() || "";
+  const orgPermanentAuthCode = params.orgPermanentAuthCode?.trim() || "";
+  const appTicket = params.appTicket?.trim() || "";
+  if (userAuthPermanentCode && orgPermanentAuthCode && appTicket) {
+    try {
+      const app = await getYonyouTplusAppAccessToken({
+        appKey: params.appKey,
+        appSecret: params.appSecret,
+        appTicket,
+        gatewayOrigin: params.gatewayOrigin,
+      });
+      const org = await getYonyouTplusOrgAccessToken({
+        appKey: params.appKey,
+        appSecret: params.appSecret,
+        appAccessToken: app.appAccessToken,
+        permanentAuthCode: orgPermanentAuthCode,
+        gatewayOrigin: params.gatewayOrigin,
+      });
+      return await exchangeYonyouTplusTokenByPermanentCode({
+        appKey: params.appKey,
+        appSecret: params.appSecret,
+        orgAccessToken: org.orgAccessToken,
+        userAuthPermanentCode,
+        gatewayOrigin: params.gatewayOrigin,
+      });
+    } catch (error) {
+      if (!refreshToken) {
+        throw error;
+      }
+    }
+  }
+  if (refreshToken) {
+    return refreshYonyouTplusAccessToken({
+      appKey: params.appKey,
+      appSecret: params.appSecret,
+      refreshToken,
+      gatewayOrigin: params.gatewayOrigin,
+    });
+  }
+  throw new Error("用友 T+ 无法续期：缺少 refresh token，或缺少 appTicket 与企业永久授权码。");
 }
