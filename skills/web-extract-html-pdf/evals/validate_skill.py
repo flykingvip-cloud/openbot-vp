@@ -13,6 +13,7 @@ REQUIRED = [
     "SKILL.md",
     "manifest.json",
     "scripts/render.js",
+    "scripts/print-pdf.mjs",
     "references/environment.md",
     "references/pipeline.md",
     "references/pitfalls.md",
@@ -29,6 +30,8 @@ SKILL_CONTRACT = [
     "pdftotext",
     "Chrome",
     "--print-to-pdf",
+    "print-pdf.mjs",
+    "virtual-time-budget",
     "Noto Sans CJK SC",
     "output/pdf/",
     "不臆造",
@@ -147,7 +150,7 @@ def main() -> None:
             failures.append(f"manifest.json invalid JSON: {exc}")
     if manifest.get("id") != SKILL_NAME:
         failures.append("manifest id mismatch")
-    if manifest.get("version") != "1.0.0":
+    if manifest.get("version") != "1.1.0":
         failures.append("manifest version mismatch")
 
     cases = {}

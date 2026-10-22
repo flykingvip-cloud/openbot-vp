@@ -85,7 +85,7 @@ table {
 
 ## 6. 渲染 PDF
 
-见 `references/environment.md` 第 2、4 节。渲染后：
+见 `references/environment.md` 第 4 节。只运行 `scripts/print-pdf.mjs`，不要手写 `--print-to-pdf`。渲染后：
 
 ```bash
 cp tmp/<task>/out.pdf output/pdf/<name>.pdf

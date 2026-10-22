@@ -133,6 +133,11 @@ is Debian 13 (trixie) with apt Node 20, npm, Chromium, poppler
 Runtime user `sandbox` is uid/gid 1000:1000. `scripts/sandbox-setup.sh` runs
 `scripts/sandbox-image-smoke.sh`, which checks that contract, including a
 system-Chromium PDF whose text `pdftotext` must extract as「中文 PDF 探测」.
+The image does not ship `/run/dbus/system_bus_socket`. Chromium logs that missing
+socket during headless print; the log is noise. A print that runs for about
+120 seconds is waiting on a stalled http(s) subresource, not on dbus. Skill
+HTML→PDF goes through `skills/web-extract-html-pdf/scripts/print-pdf.mjs`, which
+passes `--timeout` so that wait cannot run out the clock.
 
 A missing image still falls back to raw `debian:bookworm-slim` (no Node 20 and
 no Chromium). Rebuild with `scripts/sandbox-setup.sh` before expecting the PDF

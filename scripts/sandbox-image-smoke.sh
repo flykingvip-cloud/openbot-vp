@@ -63,11 +63,13 @@ cat > "${probe_html}" <<EOF
 </body>
 </html>
 EOF
+# --timeout caps a stalled subresource. dbus socket errors are non-fatal here.
 if ! "${chrome_bin}" \
   --headless \
   --disable-gpu \
   --no-sandbox \
   --disable-dev-shm-usage \
+  --timeout=15000 \
   --user-data-dir="${chrome_user_dir}" \
   --print-to-pdf="${probe_pdf}" \
   "${probe_html}" >/dev/null; then
