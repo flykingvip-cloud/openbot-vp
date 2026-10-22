@@ -81,7 +81,8 @@ tasks:
   - id: batch5-single-group-unattended:cursor-cloud
     owner: cursor-cloud
     intent:
-      - Batch 5 single-target unattended fence and hard stop on existing heartbeat / self_advance / wake
+      - Batch 5 single-target unattended fence and hard stop on existing
+        heartbeat / self_advance / wake
     paths:
       - .loom/registry.yaml
       - docs/notes/openbot-batch5-single-group-unattended-2026-10-21.md
@@ -104,7 +105,8 @@ tasks:
   - id: batch4-restore-no-task-bleed:cursor-cloud
     owner: cursor-cloud
     intent:
-      - Batch 4 restore must not mix historical open_tasks into the current task main line
+      - Batch 4 restore must not mix historical open_tasks into the current task
+        main line
     paths:
       - .loom/registry.yaml
       - src/auto-reply/reply/restore-task-isolation.ts
@@ -9247,8 +9249,8 @@ tasks:
   - id: batch3-version-permission
     owner: cursor-cloud
     intent:
-      - "Batch 3 plan-version binding for todolist confirm/revise. Does not
-        widen submit, self_advance, or accept."
+      - Batch 3 plan-version binding for todolist confirm/revise. Does not widen
+        submit, self_advance, or accept.
     paths:
       - .loom/registry.yaml
       - docs/notes/openbot-batch3-version-permission-2026-10-21.md
@@ -9325,6 +9327,38 @@ tasks:
         metadata: {}
     ownerHistory: []
     since: 2026-10-21
+    metadata: {}
+  - id: locale-browser-boundary:codex-locale
+    owner: codex-locale
+    intent: []
+    paths:
+      - src/shared/owner-decision-delivery-copy.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-browser-boundary.node.test.ts
+    state: active
+    sessions:
+      - id: 923cad8f-1f27-4d28-b08b-778d1ea3da24
+        taskId: locale-browser-boundary:codex-locale
+        ide: codex
+        agent: codex-locale
+        status: active
+        lastSignalAt: 2026-10-22T01:44:24.526Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-22
+    metadata: {}
+  - id: device-platform-b2
+    owner: cursor-cloud
+    intent: []
+    paths:
+      - ui/src/ui/ports/platform/device-platform/copy.ts
+      - ui/src/ui/ports/platform/device-platform/page.browser.test.ts
+      - ui/src/ui/ports/platform/device-platform/page.css
+      - ui/src/ui/ports/platform/device-platform/page.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-22
     metadata: {}
 landingStreams:
   - id: strip-ohbe-from-openbot-vp
@@ -9483,7 +9517,8 @@ landingStreams:
     metadata:
       task: strip-ohbe-from-openbot-vp
       owner: cursor-cloud
-      purpose: Remove the duplicated production ledger and point OHBE mentions at the OHBE repository. First-match so these shared files land together.
+      purpose: Remove the duplicated production ledger and point OHBE mentions at the
+        OHBE repository. First-match so these shared files land together.
   - id: batch8-skill-gates
     landingPolicy: serial
     paths:
@@ -9507,7 +9542,8 @@ landingStreams:
     metadata:
       task: batch8-skill-gates
       owner: cursor-cloud
-      purpose: Batch 8 skill gates and terminology. First-match so these shared files land with this stream.
+      purpose: Batch 8 skill gates and terminology. First-match so these shared files
+        land with this stream.
   - id: batch7-task-surface
     landingPolicy: serial
     paths:
@@ -9532,7 +9568,8 @@ landingStreams:
     metadata:
       task: batch7-task-surface
       owner: cursor-cloud
-      purpose: Batch 7 single task-surface truth. First-match so these shared files land with this stream.
+      purpose: Batch 7 single task-surface truth. First-match so these shared files
+        land with this stream.
   - id: batch6-turn-completion
     landingPolicy: serial
     paths:
@@ -9555,7 +9592,8 @@ landingStreams:
     metadata:
       task: batch6-turn-completion
       owner: cursor-cloud
-      purpose: Batch 6 turn completion contract. First-match so these shared files land with this stream.
+      purpose: Batch 6 turn completion contract. First-match so these shared files
+        land with this stream.
   - id: batch5-single-group-unattended
     landingPolicy: serial
     paths:
@@ -9576,7 +9614,8 @@ landingStreams:
     metadata:
       task: batch5-single-group-unattended
       owner: cursor-cloud
-      purpose: Batch 5 single-target unattended fence. First-match so these shared files land with this stream.
+      purpose: Batch 5 single-target unattended fence. First-match so these shared
+        files land with this stream.
   - id: batch4-restore-no-task-bleed
     landingPolicy: serial
     paths:
@@ -9593,7 +9632,8 @@ landingStreams:
     metadata:
       task: batch4-restore-no-task-bleed
       owner: cursor-cloud
-      purpose: Batch 4 restore isolation. First-match so these shared files land with this stream.
+      purpose: Batch 4 restore isolation. First-match so these shared files land with
+        this stream.
   - id: batch3-version-permission
     landingPolicy: serial
     paths:
@@ -9612,7 +9652,8 @@ landingStreams:
     metadata:
       task: batch3-version-permission
       owner: cursor-cloud
-      purpose: Batch 3 plan-version binding. First-match so these shared files land with this stream.
+      purpose: Batch 3 plan-version binding. First-match so these shared files land
+        with this stream.
   - id: batch2-reliable-confirm-cards
     landingPolicy: serial
     paths:
@@ -9655,7 +9696,8 @@ landingStreams:
     metadata:
       task: batch2-reliable-confirm-cards
       owner: cursor-e26c
-      purpose: Batch 2 reliable confirmation cards. First-match so shared hot files land with this stream.
+      purpose: Batch 2 reliable confirmation cards. First-match so shared hot files
+        land with this stream.
   - id: batch1-trusted-delivery
     landingPolicy: serial
     paths:

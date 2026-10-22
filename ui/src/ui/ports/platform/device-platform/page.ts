@@ -1,9 +1,13 @@
 import { html, nothing } from "lit";
+import { i18n } from "../../../../i18n/index.ts";
+import { formatRelativeTimestamp } from "../../../format.ts";
 import { requestOpenBotAppRerender } from "../../../request-app-rerender.ts";
+import { dp } from "./copy.ts";
+import "./page.css";
 
 /**
  * Platform-admin「设备平台连接」.
- * Configures the device-platform connector. It does not bind a user's device.
+ * Manages connector partners (connection + reachability), not device inventory.
  */
 
 export type DevicePlatformEnvironment = "production" | "staging" | "development";
@@ -56,6 +60,9 @@ export type DevicePlatformAdminClient = {
   test(platformId: string): Promise<DevicePlatformProbeResult>;
 };
 
+type FilterId = "all" | "enabled" | "abnormal";
+type ViewMode = "list" | "form";
+
 type Draft = {
   platformId: string;
   displayName: string;
@@ -70,6 +77,7 @@ type Draft = {
   enabled: boolean;
   clientSecret: string;
   rotate: boolean;
+  overrideClientId: boolean;
 };
 
 type PanelState = {
@@ -81,29 +89,29 @@ type PanelState = {
   busy: boolean;
   draft: Draft;
   mode: "create" | "edit";
+  view: ViewMode;
+  filter: FilterId;
 };
 
-const DISPOSITION =
-  "停用后立即拒绝新的授权和执行。已经建立的设备关系会保留，直到用户自己解除。本阶段只在这里手工配置和验证，不会把密钥推送到其他地址。";
-
-const HOST_BOUNDARY =
-  "控制地址是设备平台自己的源（协议、主机、端口）。测试连接会在该主机上请求 /api/device-platform/v1/health 和 /capabilities。OpenBot 上的同名路径只给平台管理员配置连接，不是设备平台。";
+const DEFAULT_IDENTITY = "device-platform";
+const CONTRACT_VERSIONS = ["v1"] as const;
 
 function emptyDraft(): Draft {
   return {
     platformId: "",
     displayName: "",
-    environment: "production",
+    environment: "development",
     serviceBaseUrl: "",
     contractVersion: "v1",
     credentialRef: "",
-    clientIdentity: "",
-    serviceClientIds: "",
+    clientIdentity: DEFAULT_IDENTITY,
+    serviceClientIds: DEFAULT_IDENTITY,
     registrationNotes: "",
     callbackAllowlist: "",
     enabled: true,
     clientSecret: "",
     rotate: false,
+    overrideClientId: false,
   };
 }
 
@@ -118,6 +126,8 @@ let state: PanelState = {
   busy: false,
   draft: emptyDraft(),
   mode: "create",
+  view: "list",
+  filter: "all",
 };
 
 export function setDevicePlatformAdminClientForTests(
@@ -137,6 +147,8 @@ export function resetDevicePlatformConnectionPanelForTests(): void {
     busy: false,
     draft: emptyDraft(),
     mode: "create",
+    view: "list",
+    filter: "all",
   };
 }
 
@@ -193,34 +205,387 @@ export function createDevicePlatformFetchClient(
 export function renderDevicePlatformConnectionPanel() {
   ensureLoaded();
   return html`
-    <section class="device-platform-admin" data-testid="device-platform-connection" aria-label="设备平台连接">
-      <p class="muted">${HOST_BOUNDARY}</p>
-      <p class="callout info">${DISPOSITION}</p>
-      ${renderStatus()}
-      ${state.status === "ready" ? renderList() : nothing}
-      ${state.status === "ready" ? renderForm() : nothing}
+    <section
+      class="device-platform-admin"
+      data-testid="device-platform-connection"
+      aria-label=${dp((c) => c.title)}
+    >
+      ${state.view === "list" ? renderListView() : renderFormView()}
     </section>
+  `;
+}
+
+function renderListView() {
+  return html`
+    <div class="device-platform-admin__header">
+      <div>
+        <div class="device-platform-admin__eyebrow">${dp((c) => c.breadcrumb)}</div>
+        <h2 class="device-platform-admin__title">${dp((c) => c.title)}</h2>
+        <p class="device-platform-admin__subtitle">${dp((c) => c.subtitle)}</p>
+      </div>
+      <button
+        class="btn primary"
+        type="button"
+        data-testid="device-platform-add"
+        ?disabled=${state.status !== "ready" || state.busy}
+        @click=${() => startCreate()}
+      >
+        ${dp((c) => c.add)}
+      </button>
+    </div>
+    ${renderStatus()}
+    ${state.status === "ready" ? renderFilters() : nothing}
+    ${state.status === "ready" ? renderTable() : nothing}
+    <p class="device-platform-admin__footnote" data-testid="device-platform-footnote">
+      ${dp((c) => c.footnote)}
+    </p>
+  `;
+}
+
+function renderFormView() {
+  const draft = state.draft;
+  const editing = state.mode === "edit";
+  const connection = currentConnection();
+  const showSecret = !editing || !connection?.credentialPresent || draft.rotate;
+  return html`
+    <div class="device-platform-admin__header">
+      <div>
+        <div class="device-platform-admin__eyebrow">${dp((c) => c.breadcrumb)}</div>
+        <div class="device-platform-admin__form-title">
+          <h2 class="device-platform-admin__title">
+            ${
+              editing
+                ? dp((c) => c.editTitle, { name: draft.displayName || draft.platformId })
+                : dp((c) => c.createTitle)
+            }
+          </h2>
+          ${
+            editing && draft.platformId
+              ? html`<span class="device-platform-admin__badge">${draft.platformId}</span>`
+              : nothing
+          }
+        </div>
+      </div>
+    </div>
+    ${renderStatusBanner(connection)}
+    ${state.partial ? html`<p class="callout" data-testid="device-platform-partial">${state.partial}</p>` : nothing}
+    ${state.notice ? html`<p class="callout success" data-testid="device-platform-notice">${state.notice}</p>` : nothing}
+    <form
+      class="card device-platform-admin__section"
+      data-testid="device-platform-form"
+      @submit=${(event: Event) => void onSubmit(event)}
+    >
+      <div class="device-platform-admin__section">
+        <div class="device-platform-admin__section-title">${dp((c) => c.sectionBasic)}</div>
+        <div class="device-platform-admin__grid">
+          ${textField({
+            label: dp((c) => c.fields.displayName),
+            key: "displayName",
+            value: draft.displayName,
+            required: true,
+            placeholder: dp((c) => c.placeholders.displayName),
+          })}
+          ${
+            editing
+              ? html`
+                  <label class="device-platform-admin__field">
+                    <span>${dp((c) => c.fields.platformId)}</span>
+                    <input type="text" .value=${draft.platformId} disabled />
+                  </label>
+                `
+              : textField({
+                  label: dp((c) => c.fields.platformId),
+                  key: "platformId",
+                  value: draft.platformId,
+                  required: true,
+                  placeholder: dp((c) => c.placeholders.platformId),
+                  onInput: (value) =>
+                    patchDraft({
+                      platformId: value,
+                      credentialRef: value.trim() ? `cred://device-platform/${value.trim()}` : "",
+                    }),
+                })
+          }
+          <label class="device-platform-admin__field">
+            <span>${dp((c) => c.fields.environment)}</span>
+            <select
+              .value=${draft.environment}
+              ?disabled=${state.busy}
+              @change=${(event: Event) =>
+                patchDraft({
+                  environment: (event.target as HTMLSelectElement)
+                    .value as DevicePlatformEnvironment,
+                })}
+            >
+              <option value="development">development</option>
+              <option value="staging">staging</option>
+              <option value="production">production</option>
+            </select>
+          </label>
+          <label class="device-platform-admin__field" style="grid-column: 1 / -1">
+            <span>${dp((c) => c.fields.registrationNotes)}</span>
+            <textarea
+              rows="3"
+              placeholder=${dp((c) => c.placeholders.registrationNotes)}
+              .value=${draft.registrationNotes}
+              ?disabled=${state.busy}
+              @input=${(event: Event) =>
+                patchDraft({ registrationNotes: (event.target as HTMLTextAreaElement).value })}
+            ></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="device-platform-admin__section card-follow--sm">
+        <div class="device-platform-admin__section-title">${dp((c) => c.sectionIntegration)}</div>
+        <div class="device-platform-admin__grid">
+          ${textField({
+            label: dp((c) => c.fields.serviceBaseUrl),
+            key: "serviceBaseUrl",
+            value: draft.serviceBaseUrl,
+            required: true,
+            placeholder: dp((c) => c.placeholders.serviceBaseUrl),
+            testId: "device-platform-service-url",
+          })}
+          <label class="device-platform-admin__field">
+            <span>${dp((c) => c.fields.contractVersion)}</span>
+            <select
+              .value=${draft.contractVersion}
+              ?disabled=${state.busy}
+              @change=${(event: Event) =>
+                patchDraft({ contractVersion: (event.target as HTMLSelectElement).value })}
+            >
+              ${CONTRACT_VERSIONS.map((version) => html`<option value=${version}>${version}</option>`)}
+            </select>
+            <span class="device-platform-admin__hint">${dp((c) => c.hints.contractVersion)}</span>
+          </label>
+          <label class="device-platform-admin__field">
+            <span>${dp((c) => c.fields.clientIdentity)}</span>
+            <select
+              .value=${identitySelectValue(draft.clientIdentity)}
+              ?disabled=${state.busy}
+              @change=${(event: Event) => {
+                const value = (event.target as HTMLSelectElement).value;
+                const next: Partial<Draft> = { clientIdentity: value };
+                if (!draft.overrideClientId) {
+                  next.serviceClientIds = value;
+                }
+                patchDraft(next);
+              }}
+            >
+              ${identityOptions(draft.clientIdentity).map(
+                (value) => html`<option value=${value}>${value}</option>`,
+              )}
+            </select>
+          </label>
+          <label class="device-platform-admin__field">
+            <span>${dp((c) => c.fields.serviceClientId)}</span>
+            <input
+              type="text"
+              .value=${draft.serviceClientIds}
+              ?disabled=${state.busy || !draft.overrideClientId}
+              @input=${(event: Event) =>
+                patchDraft({ serviceClientIds: (event.target as HTMLInputElement).value })}
+            />
+            <label class="device-platform-admin__hint">
+              <input
+                type="checkbox"
+                .checked=${draft.overrideClientId}
+                ?disabled=${state.busy}
+                @change=${(event: Event) => {
+                  const overrideClientId = (event.target as HTMLInputElement).checked;
+                  patchDraft({
+                    overrideClientId,
+                    serviceClientIds: overrideClientId
+                      ? draft.serviceClientIds
+                      : draft.clientIdentity || DEFAULT_IDENTITY,
+                  });
+                }}
+              />
+              ${dp((c) => c.hints.serviceClientOverride)}
+            </label>
+          </label>
+          <label class="device-platform-admin__field">
+            <span>${dp((c) => c.fields.credentialRef)}</span>
+            <input type="text" .value=${draft.credentialRef} disabled data-testid="device-platform-credential-ref" />
+          </label>
+        </div>
+        <details class="device-platform-admin__advanced card-follow--sm">
+          <summary class="device-platform-admin__advanced-summary">
+            ${dp((c) => c.advancedAllowlist)}
+          </summary>
+          <div class="device-platform-admin__advanced-body">
+            <label class="device-platform-admin__field">
+              <span>${dp((c) => c.fields.callbackAllowlist)}</span>
+              <textarea
+                rows="3"
+                placeholder=${dp((c) => c.placeholders.callbackAllowlist)}
+                .value=${draft.callbackAllowlist}
+                ?disabled=${state.busy}
+                @input=${(event: Event) =>
+                  patchDraft({ callbackAllowlist: (event.target as HTMLTextAreaElement).value })}
+              ></textarea>
+            </label>
+          </div>
+        </details>
+      </div>
+
+      <div class="device-platform-admin__section card-follow--sm">
+        <div class="device-platform-admin__section-title">${dp((c) => c.sectionSecurity)}</div>
+        ${
+          editing && connection?.credentialPresent
+            ? html`
+                <label class="device-platform-admin__field">
+                  <span>
+                    <input
+                      type="checkbox"
+                      data-testid="device-platform-rotate"
+                      .checked=${draft.rotate}
+                      ?disabled=${state.busy}
+                      @change=${(event: Event) =>
+                        patchDraft({
+                          rotate: (event.target as HTMLInputElement).checked,
+                          clientSecret: "",
+                        })}
+                    />
+                    ${dp((c) => c.fields.rotateSecret)}
+                  </span>
+                </label>
+              `
+            : nothing
+        }
+        ${
+          showSecret
+            ? html`
+                <label class="device-platform-admin__field">
+                  <span>
+                    ${dp((c) => c.fields.serviceSecret)}
+                    <span class="device-platform-admin__req" aria-hidden="true">*</span>
+                  </span>
+                  <input
+                    type="password"
+                    autocomplete="new-password"
+                    data-testid="device-platform-secret"
+                    placeholder=${
+                      editing && connection?.credentialPresent
+                        ? dp((c) => c.placeholders.secretRotate)
+                        : dp((c) => c.placeholders.secretNew)
+                    }
+                    .value=${draft.clientSecret}
+                    ?disabled=${state.busy}
+                    @input=${(event: Event) =>
+                      patchDraft({ clientSecret: (event.target as HTMLInputElement).value })}
+                  />
+                </label>
+              `
+            : html`
+                <label class="device-platform-admin__field">
+                  <span>${dp((c) => c.fields.serviceSecret)}</span>
+                  <input
+                    type="password"
+                    disabled
+                    placeholder=${dp((c) => c.placeholders.secretSaved)}
+                    value=""
+                  />
+                </label>
+              `
+        }
+      </div>
+
+      <div class="device-platform-admin__footer card-follow--sm">
+        <button class="btn" type="button" ?disabled=${state.busy} @click=${() => backToList()}>
+          ${dp((c) => c.cancel)}
+        </button>
+        <button class="btn primary" type="submit" ?disabled=${state.busy}>
+          ${dp((c) => c.save)}
+        </button>
+        ${
+          editing
+            ? html`
+                <button
+                  class="device-platform-admin__link device-platform-admin__link--danger"
+                  type="button"
+                  data-testid="device-platform-disable"
+                  ?disabled=${state.busy || !draft.enabled}
+                  @click=${() => void onDisable()}
+                >
+                  ${dp((c) => c.disable)}
+                </button>
+              `
+            : nothing
+        }
+      </div>
+    </form>
+  `;
+}
+
+function renderStatusBanner(connection: DevicePlatformConnectionView | undefined) {
+  const draft = state.draft;
+  return html`
+    <div class="device-platform-admin__status" data-testid="device-platform-status-bar">
+      <div class="device-platform-admin__status-meta">
+        <label class="device-platform-admin__toggle">
+          <input
+            type="checkbox"
+            data-testid="device-platform-enabled"
+            .checked=${draft.enabled}
+            ?disabled=${state.busy}
+            @change=${(event: Event) =>
+              patchDraft({ enabled: (event.target as HTMLInputElement).checked })}
+          />
+          ${draft.enabled ? dp((c) => c.enabled) : dp((c) => c.disabled)}
+        </label>
+        <span class=${healthClass(connection?.health)}>
+          health ${connection?.health ?? "unknown"}
+        </span>
+        <span>maturity ${maturityLabel(connection)}</span>
+        <span>
+          ${dp((c) => c.lastProbe)}
+          ${probeLabel(connection?.healthCheckedAt)}
+        </span>
+        <span>
+          error ${connection?.healthError?.trim() ? connection.healthError : "—"}
+        </span>
+      </div>
+      ${
+        state.mode === "edit"
+          ? html`
+              <button
+                class="btn"
+                type="button"
+                data-testid="device-platform-test"
+                ?disabled=${state.busy}
+                @click=${() => void onTest()}
+              >
+                ${dp((c) => c.test)}
+              </button>
+            `
+          : nothing
+      }
+    </div>
   `;
 }
 
 function renderStatus() {
   if (state.status === "loading") {
     return html`
-      <p class="muted" data-testid="device-platform-status">正在读取设备平台连接</p>
+      <p class="muted" data-testid="device-platform-status">${dp((c) => c.loading)}</p>
     `;
   }
   if (state.status === "unauthorized") {
     return html`
       <p class="callout danger" data-testid="device-platform-status">
-        仅平台管理员可以配置设备平台连接。企业管理员和普通用户没有这个入口。
+        ${dp((c) => c.unauthorized)}
       </p>
     `;
   }
   if (state.status === "failure") {
     return html`
       <p class="callout danger" data-testid="device-platform-status">
-        读取设备平台连接失败。${state.message}
-        <button class="btn btn--sm" type="button" @click=${() => void reload()}>重试</button>
+        ${dp((c) => c.loadFailed)} ${state.message}
+        <button class="btn btn--sm" type="button" @click=${() => void reload()}>
+          ${dp((c) => c.retry)}
+        </button>
       </p>
     `;
   }
@@ -230,36 +595,32 @@ function renderStatus() {
   if (state.notice) {
     return html`<p class="callout success" data-testid="device-platform-notice">${state.notice}</p>`;
   }
-  if (state.connections.length === 0) {
-    return html`
-      <p class="muted" data-testid="device-platform-status">还没有设备平台连接。填写下面的表单后保存。</p>
-    `;
-  }
   return nothing;
 }
 
-function renderList() {
-  if (state.connections.length === 0) {
-    return nothing;
-  }
+function renderFilters() {
+  const counts = filterCounts(state.connections);
+  const filters: Array<{ id: FilterId; label: string; count: number }> = [
+    { id: "all", label: dp((c) => c.filters.all), count: counts.all },
+    { id: "enabled", label: dp((c) => c.filters.enabled), count: counts.enabled },
+    { id: "abnormal", label: dp((c) => c.filters.abnormal), count: counts.abnormal },
+  ];
   return html`
-    <div class="list" data-testid="device-platform-list">
-      ${state.connections.map(
-        (connection) => html`
+    <div class="device-platform-admin__filters" role="tablist" aria-label=${dp((c) => c.filtersLabel)}>
+      ${filters.map(
+        (filter) => html`
           <button
-            class="list-item"
+            class="device-platform-admin__filter ${state.filter === filter.id ? "is-active" : ""}"
             type="button"
-            data-platform-id=${connection.platformId}
-            @click=${() => selectConnection(connection)}
+            role="tab"
+            aria-selected=${state.filter === filter.id ? "true" : "false"}
+            data-testid=${`device-platform-filter-${filter.id}`}
+            @click=${() => {
+              state = { ...state, filter: filter.id };
+              rerender();
+            }}
           >
-            <div class="list-main">
-              <div class="list-title">${connection.displayName}</div>
-              <div class="list-sub">${connection.platformId} · ${connection.environment}</div>
-            </div>
-            <div class="list-meta">
-              <span class="chip">${healthLabel(connection)}</span>
-              <span class="chip">${connection.enabled ? "已启用" : "已停用"}</span>
-            </div>
+            ${filter.label} ${filter.count}
           </button>
         `,
       )}
@@ -267,147 +628,111 @@ function renderList() {
   `;
 }
 
-function renderForm() {
-  const draft = state.draft;
-  const editing = state.mode === "edit";
+function renderTable() {
+  const rows = filteredConnections();
+  if (rows.length === 0) {
+    return html`
+      <p class="muted" data-testid="device-platform-status">
+        ${state.connections.length === 0 ? dp((c) => c.empty) : dp((c) => c.emptyFilter)}
+      </p>
+    `;
+  }
   return html`
-    <form class="card" data-testid="device-platform-form" @submit=${(event: Event) => void onSubmit(event)}>
-      <div class="card-title">${editing ? "编辑设备平台连接" : "新建设备平台连接"}</div>
-      <div class="form-grid card-follow--sm">
-        ${field("平台名称", "displayName", draft.displayName, "例如 生产设备平台")}
-        ${field("稳定 ID", "platformId", draft.platformId, "创建后不可修改", editing)}
-        <label class="field">
-          <span>环境</span>
-          <select
-            .value=${draft.environment}
-            @change=${(event: Event) =>
-              patchDraft({
-                environment: (event.target as HTMLSelectElement).value as DevicePlatformEnvironment,
-              })}
-          >
-            <option value="production">production</option>
-            <option value="staging">staging</option>
-            <option value="development">development</option>
-          </select>
-        </label>
-        ${field("契约版本", "contractVersion", draft.contractVersion, "v1")}
-        ${field("控制 API 源地址", "serviceBaseUrl", draft.serviceBaseUrl, "https://device.example")}
-        ${field("客户端身份", "clientIdentity", draft.clientIdentity, "service Basic 用户名")}
-        ${field("服务客户端 ID", "serviceClientIds", draft.serviceClientIds, "逗号分隔")}
-        ${field("凭证引用", "credentialRef", draft.credentialRef, "cred://device-platform/...")}
-      </div>
-      <label class="field card-follow--sm">
-        <span>能力 API 登记说明</span>
-        <textarea
-          rows="3"
-          placeholder="OpenBot 能力 API 的客户端登记说明。不要填写密钥。"
-          .value=${draft.registrationNotes}
-          @input=${(event: Event) =>
-            patchDraft({ registrationNotes: (event.target as HTMLTextAreaElement).value })}
-        ></textarea>
-      </label>
-      <label class="field">
-        <span>回调允许列表</span>
-        <textarea
-          rows="3"
-          placeholder="每行一个 https 回调地址"
-          .value=${draft.callbackAllowlist}
-          @input=${(event: Event) =>
-            patchDraft({ callbackAllowlist: (event.target as HTMLTextAreaElement).value })}
-        ></textarea>
-      </label>
-      <label class="field">
-        <span>服务密钥</span>
-        <input
-          type="password"
-          autocomplete="new-password"
-          data-testid="device-platform-secret"
-          placeholder=${
-            editing && currentConnection()?.credentialPresent
-              ? "已保存。留空不会改动。轮换时填写新密钥。"
-              : "只写入一次，保存后不再显示"
-          }
-          .value=${draft.clientSecret}
-          @input=${(event: Event) =>
-            patchDraft({ clientSecret: (event.target as HTMLInputElement).value })}
-        />
-      </label>
-      ${
-        editing && currentConnection()?.credentialPresent
-          ? html`
-              <label class="field">
-                <span>轮换密钥</span>
-                <input
-                  type="checkbox"
-                  .checked=${draft.rotate}
-                  @change=${(event: Event) =>
-                    patchDraft({ rotate: (event.target as HTMLInputElement).checked })}
-                />
-              </label>
-            `
-          : nothing
-      }
-      <label class="field">
-        <span>启用</span>
-        <input
-          type="checkbox"
-          data-testid="device-platform-enabled"
-          .checked=${draft.enabled}
-          @change=${(event: Event) =>
-            patchDraft({ enabled: (event.target as HTMLInputElement).checked })}
-        />
-      </label>
-      ${
-        currentConnection()?.healthError
-          ? html`<p class="callout danger" data-testid="device-platform-health-error">
-              最近一次检查未通过：${currentConnection()?.healthError}
-              ${
-                currentConnection()?.healthCheckedAt
-                  ? html`<span class="muted"> ${currentConnection()?.healthCheckedAt}</span>`
-                  : nothing
-              }
-            </p>`
-          : nothing
-      }
-      <div class="row card-follow--sm">
-        <button class="btn primary" type="submit" ?disabled=${state.busy}>保存</button>
-        ${
-          editing
-            ? html`
-                <button
-                  class="btn"
-                  type="button"
-                  data-testid="device-platform-test"
-                  ?disabled=${state.busy}
-                  @click=${() => void onTest()}
-                >
-                  测试连接
-                </button>
-                <button class="btn" type="button" @click=${() => startCreate()}>新建</button>
-              `
-            : nothing
-        }
-      </div>
-    </form>
+    <div class="device-platform-admin__table-wrap" data-testid="device-platform-list">
+      <table class="device-platform-admin__table">
+        <thead>
+          <tr>
+            <th>${dp((c) => c.columns.name)}</th>
+            <th>${dp((c) => c.columns.id)}</th>
+            <th>${dp((c) => c.columns.environment)}</th>
+            <th>${dp((c) => c.columns.enabled)}</th>
+            <th>${dp((c) => c.columns.health)}</th>
+            <th>${dp((c) => c.columns.maturity)}</th>
+            <th>${dp((c) => c.columns.lastProbe)}</th>
+            <th>${dp((c) => c.columns.actions)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(
+            (connection) => html`
+              <tr data-platform-id=${connection.platformId}>
+                <td><div class="device-platform-admin__name">${connection.displayName}</div></td>
+                <td><div class="device-platform-admin__id">${connection.platformId}</div></td>
+                <td>${connection.environment}</td>
+                <td>
+                  <span class=${connection.enabled ? "device-platform-admin__chip-ok" : "device-platform-admin__chip-off"}>
+                    ${connection.enabled ? dp((c) => c.enabled) : dp((c) => c.disabled)}
+                  </span>
+                </td>
+                <td class=${healthClass(connection.health)}>${healthText(connection.health)}</td>
+                <td>${maturityLabel(connection)}</td>
+                <td>${probeLabel(connection.healthCheckedAt)}</td>
+                <td>
+                  <div class="device-platform-admin__actions">
+                    <button
+                      class="device-platform-admin__link"
+                      type="button"
+                      data-testid=${`device-platform-test-row-${connection.platformId}`}
+                      ?disabled=${state.busy}
+                      @click=${() => void onTestRow(connection.platformId)}
+                    >
+                      ${dp((c) => c.test)}
+                    </button>
+                    <span class="device-platform-admin__sep">|</span>
+                    <button
+                      class="device-platform-admin__link"
+                      type="button"
+                      data-testid=${`device-platform-edit-${connection.platformId}`}
+                      @click=${() => selectConnection(connection)}
+                    >
+                      ${dp((c) => c.edit)}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            `,
+          )}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
-function field(
-  label: string,
-  key: keyof Draft,
-  value: string,
-  placeholder: string,
-  disabled = false,
-) {
+function textField(params: {
+  label: string;
+  key: keyof Draft;
+  value: string;
+  required?: boolean;
+  placeholder: string;
+  testId?: string;
+  onInput?: (value: string) => void;
+}) {
   return html`
-    <label class="field">
-      <span>${label}</span>
+    <label class="device-platform-admin__field">
+      <span>
+        ${params.label}
+        ${
+          params.required
+            ? html`
+                <span class="device-platform-admin__req" aria-hidden="true">*</span>
+              `
+            : nothing
+        }
+      </span>
       <input
         type="text"
-        placeholder=${placeholder}
-        .value=${value}
-        ?disabled=${disabled || state.busy}
-        @input=${(event: Event) => patchDraft({ [key]: (event.target as HTMLInputElement).value })}
+        placeholder=${params.placeholder}
+        data-testid=${params.testId ?? nothing}
+        .value=${params.value}
+        ?disabled=${state.busy}
+        @input=${(event: Event) => {
+          const value = (event.target as HTMLInputElement).value;
+          if (params.onInput) {
+            params.onInput(value);
+            return;
+          }
+          patchDraft({ [params.key]: value });
+        }}
       />
     </label>
   `;
@@ -431,11 +756,8 @@ function ensureLoaded(): void {
         busy: false,
         connections,
         message: "",
+        view: "list",
       };
-      if (connections[0] && state.mode === "create" && !state.draft.platformId) {
-        selectConnection(connections[0]);
-        return;
-      }
       rerender();
     })
     .catch((error: unknown) => {
@@ -447,14 +769,22 @@ function ensureLoaded(): void {
         ...state,
         busy: false,
         status: status === 401 || status === 403 ? "unauthorized" : "failure",
-        message: error instanceof Error ? error.message : "请求失败",
+        message: error instanceof Error ? error.message : dp((c) => c.requestFailed),
       };
       rerender();
     });
 }
 
 async function reload(): Promise<void> {
-  state = { ...state, status: "loading", busy: false, notice: "", partial: "", message: "" };
+  state = {
+    ...state,
+    status: "loading",
+    busy: false,
+    notice: "",
+    partial: "",
+    message: "",
+    view: "list",
+  };
   rerender();
 }
 
@@ -462,30 +792,54 @@ async function onSubmit(event: Event): Promise<void> {
   event.preventDefault();
   const draft = state.draft;
   const platformId = draft.platformId.trim();
-  if (!platformId) {
-    state = { ...state, notice: "", partial: "请填写稳定 ID。" };
+  const displayName = draft.displayName.trim();
+  const serviceBaseUrl = draft.serviceBaseUrl.trim();
+  if (!displayName) {
+    state = { ...state, notice: "", partial: dp((c) => c.validation.displayName) };
     rerender();
     return;
   }
+  if (!platformId) {
+    state = { ...state, notice: "", partial: dp((c) => c.validation.platformId) };
+    rerender();
+    return;
+  }
+  if (!serviceBaseUrl) {
+    state = { ...state, notice: "", partial: dp((c) => c.validation.serviceBaseUrl) };
+    rerender();
+    return;
+  }
+  const needsSecret =
+    state.mode === "create" || !currentConnection()?.credentialPresent || draft.rotate;
+  if (needsSecret && !draft.clientSecret.trim()) {
+    state = { ...state, notice: "", partial: dp((c) => c.validation.secret) };
+    rerender();
+    return;
+  }
+  const credentialRef = draft.credentialRef.trim() || `cred://device-platform/${platformId}`;
+  const identity = (draft.clientIdentity.trim() || DEFAULT_IDENTITY).trim();
+  const serviceClientIds = draft.overrideClientId
+    ? draft.serviceClientIds
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [identity];
   state = { ...state, busy: true, notice: "", partial: "" };
   rerender();
   try {
     const saved = await client().save(platformId, {
-      displayName: draft.displayName,
+      displayName,
       environment: draft.environment,
-      serviceBaseUrl: draft.serviceBaseUrl,
-      contractVersion: draft.contractVersion,
-      credentialRef: draft.credentialRef,
-      clientIdentity: draft.clientIdentity,
+      serviceBaseUrl,
+      contractVersion: draft.contractVersion || "v1",
+      credentialRef,
+      clientIdentity: identity,
       registrationNotes: draft.registrationNotes,
       callbackAllowlist: draft.callbackAllowlist
         .split("\n")
         .map((line) => line.trim())
         .filter(Boolean),
-      serviceClientIds: draft.serviceClientIds
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
+      serviceClientIds,
       enabled: draft.enabled,
     });
     let connection = saved;
@@ -502,7 +856,8 @@ async function onSubmit(event: Event): Promise<void> {
       busy: false,
       status: "ready",
       mode: "edit",
-      notice: "已保存。密钥不会回显。",
+      view: "form",
+      notice: dp((c) => c.saved),
       partial: "",
       draft: { ...draftFrom(connection), clientSecret: "", rotate: false },
     };
@@ -510,8 +865,53 @@ async function onSubmit(event: Event): Promise<void> {
     state = {
       ...state,
       busy: false,
-      partial: error instanceof Error ? error.message : "保存失败",
+      partial: error instanceof Error ? error.message : dp((c) => c.saveFailed),
       notice: "",
+    };
+  }
+  rerender();
+}
+
+async function onDisable(): Promise<void> {
+  const draft = state.draft;
+  const platformId = draft.platformId.trim();
+  if (!platformId || !draft.enabled) {
+    return;
+  }
+  state = { ...state, busy: true, notice: "", partial: "", draft: { ...draft, enabled: false } };
+  rerender();
+  try {
+    const connection = await client().save(platformId, {
+      displayName: draft.displayName,
+      environment: draft.environment,
+      serviceBaseUrl: draft.serviceBaseUrl,
+      contractVersion: draft.contractVersion || "v1",
+      credentialRef: draft.credentialRef || `cred://device-platform/${platformId}`,
+      clientIdentity: draft.clientIdentity || DEFAULT_IDENTITY,
+      registrationNotes: draft.registrationNotes,
+      callbackAllowlist: draft.callbackAllowlist
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean),
+      serviceClientIds: draft.serviceClientIds
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      enabled: false,
+    });
+    replaceConnection(connection);
+    state = {
+      ...state,
+      busy: false,
+      notice: dp((c) => c.disabledNotice),
+      draft: { ...draftFrom(connection), clientSecret: "", rotate: false },
+    };
+  } catch (error) {
+    state = {
+      ...state,
+      busy: false,
+      draft: { ...draft, enabled: true },
+      partial: error instanceof Error ? error.message : dp((c) => c.saveFailed),
     };
   }
   rerender();
@@ -522,28 +922,38 @@ async function onTest(): Promise<void> {
   if (!platformId) {
     return;
   }
+  await runProbe(platformId, true);
+}
+
+async function onTestRow(platformId: string): Promise<void> {
+  await runProbe(platformId, false);
+}
+
+async function runProbe(platformId: string, syncDraft: boolean): Promise<void> {
   state = { ...state, busy: true, notice: "", partial: "" };
   rerender();
   try {
     const result = await client().test(platformId);
     replaceConnection(result.connection);
     const partial = result.partial
-      ? "健康检查已通过，但能力或契约不兼容。连接没有标记为健康。"
+      ? dp((c) => c.probePartial)
       : result.connection.health === "ok"
         ? ""
-        : result.connection.healthError || "测试未通过。连接没有标记为健康。";
+        : result.connection.healthError || dp((c) => c.probeFailed);
     state = {
       ...state,
       busy: false,
-      notice: result.connection.health === "ok" ? "连接可用。" : "",
+      notice: result.connection.health === "ok" ? dp((c) => c.probeOk) : "",
       partial,
-      draft: { ...draftFrom(result.connection), clientSecret: "", rotate: false },
+      ...(syncDraft
+        ? { draft: { ...draftFrom(result.connection), clientSecret: "", rotate: false } }
+        : {}),
     };
   } catch (error) {
     state = {
       ...state,
       busy: false,
-      partial: error instanceof Error ? error.message : "测试失败",
+      partial: error instanceof Error ? error.message : dp((c) => c.probeError),
     };
   }
   rerender();
@@ -553,6 +963,7 @@ function selectConnection(connection: DevicePlatformConnectionView): void {
   state = {
     ...state,
     mode: "edit",
+    view: "form",
     draft: { ...draftFrom(connection), clientSecret: "", rotate: false },
     notice: "",
     partial: "",
@@ -561,7 +972,26 @@ function selectConnection(connection: DevicePlatformConnectionView): void {
 }
 
 function startCreate(): void {
-  state = { ...state, mode: "create", draft: emptyDraft(), notice: "", partial: "" };
+  state = {
+    ...state,
+    mode: "create",
+    view: "form",
+    draft: emptyDraft(),
+    notice: "",
+    partial: "",
+  };
+  rerender();
+}
+
+function backToList(): void {
+  state = {
+    ...state,
+    view: "list",
+    mode: "create",
+    draft: emptyDraft(),
+    notice: "",
+    partial: "",
+  };
   rerender();
 }
 
@@ -580,31 +1010,123 @@ function currentConnection(): DevicePlatformConnectionView | undefined {
 }
 
 function draftFrom(connection: DevicePlatformConnectionView): Draft {
+  const identity = connection.clientIdentity || connection.serviceClientIds[0] || DEFAULT_IDENTITY;
+  const joinedIds = connection.serviceClientIds.join(", ");
+  const overrideClientId =
+    connection.serviceClientIds.length !== 1 || connection.serviceClientIds[0] !== identity;
   return {
     platformId: connection.platformId,
     displayName: connection.displayName,
     environment: connection.environment,
     serviceBaseUrl: connection.serviceBaseUrl,
-    contractVersion: connection.contractVersion,
-    credentialRef: connection.credentialRef,
-    clientIdentity: connection.clientIdentity,
-    serviceClientIds: connection.serviceClientIds.join(", "),
+    contractVersion: connection.contractVersion || "v1",
+    credentialRef: connection.credentialRef || `cred://device-platform/${connection.platformId}`,
+    clientIdentity: identity,
+    serviceClientIds: joinedIds || identity,
     registrationNotes: connection.registrationNotes,
     callbackAllowlist: connection.callbackAllowlist.join("\n"),
     enabled: connection.enabled,
     clientSecret: "",
     rotate: false,
+    overrideClientId,
   };
 }
 
-function healthLabel(connection: DevicePlatformConnectionView): string {
+function filteredConnections(): DevicePlatformConnectionView[] {
+  return state.connections.filter((connection) => {
+    if (state.filter === "enabled") {
+      return connection.enabled;
+    }
+    if (state.filter === "abnormal") {
+      return isAbnormal(connection);
+    }
+    return true;
+  });
+}
+
+function filterCounts(connections: DevicePlatformConnectionView[]) {
+  return {
+    all: connections.length,
+    enabled: connections.filter((item) => item.enabled).length,
+    abnormal: connections.filter((item) => isAbnormal(item)).length,
+  };
+}
+
+function isAbnormal(connection: DevicePlatformConnectionView): boolean {
+  return connection.health === "down" || Boolean(connection.healthError?.trim());
+}
+
+function maturityLabel(connection: DevicePlatformConnectionView | undefined): string {
+  if (!connection) {
+    return "—";
+  }
   if (connection.health === "ok") {
-    return "健康";
+    return "v1-frozen";
   }
-  if (connection.health === "down") {
-    return "未通过";
+  if (connection.contractVersion === "v1-draft") {
+    return "v1-draft";
   }
-  return "未检查";
+  return "—";
+}
+
+function healthText(health: DevicePlatformConnectionView["health"]): string {
+  if (health === "ok") {
+    return "ok";
+  }
+  if (health === "down") {
+    return "down";
+  }
+  return "unknown";
+}
+
+function healthClass(health: DevicePlatformConnectionView["health"] | undefined): string {
+  if (health === "ok") {
+    return "device-platform-admin__health-ok";
+  }
+  if (health === "down") {
+    return "device-platform-admin__health-down";
+  }
+  return "muted";
+}
+
+function probeLabel(iso: string | undefined): string {
+  if (!iso) {
+    return dp((c) => c.probeNever);
+  }
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) {
+    return "—";
+  }
+  const relative = formatRelativeTimestamp(ms, { fallback: "—" });
+  if (relative === "just now") {
+    return dp((c) => c.justNow);
+  }
+  if (i18n.getLocale() === "zh-CN") {
+    const ago = /^(\d+)([mhd]) ago$/.exec(relative);
+    if (ago) {
+      const amount = ago[1];
+      if (ago[2] === "m") {
+        return dp((c) => c.minutesAgo, { count: amount });
+      }
+      if (ago[2] === "h") {
+        return dp((c) => c.hoursAgo, { count: amount });
+      }
+      return dp((c) => c.daysAgo, { count: amount });
+    }
+  }
+  return relative;
+}
+
+function identityOptions(current: string): string[] {
+  const values = new Set<string>([DEFAULT_IDENTITY]);
+  if (current.trim()) {
+    values.add(current.trim());
+  }
+  return [...values];
+}
+
+function identitySelectValue(current: string): string {
+  return current.trim() || DEFAULT_IDENTITY;
 }
 
 function client(): DevicePlatformAdminClient {
@@ -631,7 +1153,7 @@ async function request(
     const message =
       isRecord(payload.error) && typeof payload.error.message === "string"
         ? payload.error.message
-        : "设备平台请求失败";
+        : dp((c) => c.requestFailed);
     throw new DevicePlatformAdminRequestError(response.status, message);
   }
   return payload;
@@ -673,7 +1195,7 @@ function asConnection(value: unknown): DevicePlatformConnectionView {
 }
 
 function environmentField(value: unknown): DevicePlatformEnvironment {
-  if (value === "staging" || value === "development") {
+  if (value === "staging" || value === "development" || value === "production") {
     return value;
   }
   return "production";
