@@ -5,11 +5,11 @@
   gap: 16px;
 }
 
-.device-platform-admin__header {
+.device-platform-admin__toolbar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -17,6 +17,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.device-platform-admin__add {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
 .device-platform-admin__filter {
