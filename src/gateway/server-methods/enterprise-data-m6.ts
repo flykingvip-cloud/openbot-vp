@@ -424,6 +424,8 @@ export function createEnterpriseDataM6Handlers(
               appSecret: yonyouInput?.appSecret ?? existingSecret?.appSecret,
               oauthRefreshToken: yonyouInput?.refreshToken ?? existingSecret?.oauthRefreshToken,
               oauthPermanentCode: yonyouInput?.permanentCode ?? existingSecret?.oauthPermanentCode,
+              orgPermanentAuthCode:
+                yonyouInput?.orgPermanentAuthCode ?? existingSecret?.orgPermanentAuthCode,
               orgId: yonyouInput?.orgId ?? existingSecret?.orgId,
               appName: yonyouInput?.appName ?? existingSecret?.appName,
               sid: yonyouInput?.sid ?? existingSecret?.sid,
