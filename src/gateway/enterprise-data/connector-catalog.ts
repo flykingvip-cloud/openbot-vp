@@ -94,6 +94,17 @@ export const DATA_CONNECTOR_CATALOG: DataConnectorCatalogDefinition[] = [
     defaultSourceKey: "db-mysql",
   },
   {
+    connectorId: "erp-yonyou-tplus",
+    label: "用友 T+",
+    category: "erp",
+    integrationTier: "production",
+    credentialKind: "oauth2",
+    accessMethod: "credential",
+    description:
+      "畅捷通 T+ / T+Cloud（应用入驻 OAuth）。安装连接器包后，用 appKey、appSecret 与 openToken 探测 accountAPI/GetVersionInfo，并读取仓库、存货、往来单位、销售订单与凭证。",
+    defaultSourceKey: "yonyou-tplus",
+  },
+  {
     connectorId: "site-session",
     label: "网站会话",
     category: "external",

@@ -80,6 +80,10 @@ export async function executeConnectorHandlerAsync(
     const { executeErpSapHandler } = await import("./adapters/erp-sap.js");
     return executeErpSapHandler(normalized, input, secret);
   }
+  if (connectorId === "erp-yonyou-tplus" && secret) {
+    const { executeYonyouTplusHandler } = await import("./adapters/yonyou-tplus.js");
+    return executeYonyouTplusHandler(normalized, input, secret);
+  }
 
   assertWebsiteSessionDoesNotMock(normalized, options);
   return executeMockHandler(normalized, input);
