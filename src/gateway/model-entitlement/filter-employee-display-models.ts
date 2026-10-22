@@ -1,13 +1,18 @@
 /**
- * 员工端「我的可用模型」展示过滤：权益交集之后，只保留员工实际可调用的套餐模型。
+ * 员工端「我的可用模型」展示过滤：权益交集之后，只保留员工实际可调用的模型。
  *
  * 排除：
  * - CLI / 开发监督后端（codex-cli、cursor-cli、kiro-cli、claude-cli 等）
- * - 网关未配置 provider、或 provider 下无对应模型条目的 id（权益有但调不通）
+ * - 网关未配置 provider、或 provider 下无对应模型条目的平台 id（权益有但调不通）
+ *
+ * 保留：
+ * - `ent/…` 企业自供运行时 id。它们不在 `models.providers` 里，由企业模型运行时解析，
+ *   并且进入本列表之前已经过席位授权 ∩ 上界 ∩ 健康资产。
  */
 
 import { isCliProvider, normalizeProviderId } from "../../agents/model-selection.js";
 import type { OpenBotConfig } from "../../config/config.js";
+import { isEnterpriseRuntimeModelId } from "../enterprise-model/ids.js";
 import type { ModelRef } from "./types.js";
 
 /** 明确属于 IDE/CLI 监督通道、不属于员工套餐聊天模型的 provider。 */
@@ -62,7 +67,7 @@ export function isSupervisionOrCliProvider(provider: string, cfg?: OpenBotConfig
 }
 
 /**
- * 员工端展示用：权益 modelId 中仅保留「网关已配置且非 CLI 监督」的可调用模型。
+ * 员工端展示用：权益 modelId 中保留网关已配置的平台模型，以及已授权的企业自供模型。
  */
 export function filterEmployeeDisplayModelIds(
   modelIds: readonly ModelRef[],
@@ -73,6 +78,12 @@ export function filterEmployeeDisplayModelIds(
   for (const raw of modelIds) {
     const modelId = raw.trim();
     if (!modelId || seen.has(modelId)) {
+      continue;
+    }
+    // Enterprise BYOK is callable through the enterprise runtime, not models.providers.
+    if (isEnterpriseRuntimeModelId(modelId)) {
+      seen.add(modelId);
+      out.push(modelId);
       continue;
     }
     const parts = splitModelRef(modelId);
