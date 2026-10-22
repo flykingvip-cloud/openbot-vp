@@ -22,6 +22,18 @@ import {
   saveYonyouTplusOrgPermanentAuth,
 } from "./yonyou-tplus-message-store.js";
 
+function isRequestInit(value: unknown): value is RequestInit {
+  return Boolean(value) && typeof value === "object";
+}
+
+function recordedFetch(mock: { mock: { calls: readonly unknown[] } }): [string, RequestInit] {
+  const call: unknown = mock.mock.calls[0];
+  if (!Array.isArray(call) || typeof call[0] !== "string" || !isRequestInit(call[1])) {
+    throw new Error("expected fetch(url, init)");
+  }
+  return [call[0], call[1]];
+}
+
 const testPaths = vi.hoisted(() => ({
   tmpDir: `/tmp/openbot-yonyou-tplus-connector-${Date.now()}`,
 }));
@@ -143,7 +155,7 @@ describe("yonyou tplus connector registration", () => {
     });
     expect(probe.ok).toBe(true);
     expect(probe.mode).toBe("live_probe_ok");
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/accountAPI/GetVersionInfo");
     expect(init.headers).toMatchObject({
       appKey: "ak-test",
@@ -310,6 +322,9 @@ describe("yonyou tplus connector registration", () => {
     }
     expect(started.session.mode).toBe("yonyou_tplus_authorization_code");
     expect(started.simulateAllowed).toBe(false);
+    expect(started.callbackUrl).toBe(
+      "https://gw.example.com/__openbot/enterprise-data/oauth/callback",
+    );
     const url = new URL(started.authorizeUrl ?? "");
     expect(url.origin + url.pathname).toBe("https://market.chanjet.com/user/v2/authorize");
     expect(url.searchParams.get("orgId")).toBe("90001198862");

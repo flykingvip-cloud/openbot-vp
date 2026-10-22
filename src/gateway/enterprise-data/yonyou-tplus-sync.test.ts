@@ -335,6 +335,7 @@ describe("yonyou tplus incremental sync", () => {
   it("does not advance the warehouse fingerprint when the catalog pull fails or exceeds the cap", async () => {
     const previous = "catalog:previous";
     const store = storeWithSource();
+    store.connectorSyncCursors ??= {};
     store.connectorSyncCursors[`${sourceId}::warehouse`] = {
       cursorId: `${sourceId}::warehouse`,
       tenantId,
@@ -378,8 +379,8 @@ describe("yonyou tplus incremental sync", () => {
       advanced: false,
       pulled: false,
     });
-    expect(store.connectorSyncCursors[`${sourceId}::warehouse`]?.watermark).toBe(previous);
-    expect(store.connectorSyncCursors[`${sourceId}::inventory`]?.watermark).toBe(
+    expect(store.connectorSyncCursors?.[`${sourceId}::warehouse`]?.watermark).toBe(previous);
+    expect(store.connectorSyncCursors?.[`${sourceId}::inventory`]?.watermark).toBe(
       "2026-10-22 06:00:00",
     );
     const failureLog = listConnectorSyncLogEntries({ store, tenantId, sourceId }).find(
@@ -429,7 +430,7 @@ describe("yonyou tplus incremental sync", () => {
       advanced: false,
       pulled: true,
     });
-    expect(store.connectorSyncCursors[`${sourceId}::warehouse`]?.watermark).toBe(previous);
+    expect(store.connectorSyncCursors?.[`${sourceId}::warehouse`]?.watermark).toBe(previous);
     const warningLog = listConnectorSyncLogEntries({ store, tenantId, sourceId }).find(
       (entry) => entry.streamKey === "warehouse" && entry.status === "warning",
     );
@@ -442,6 +443,7 @@ describe("yonyou tplus projection cursor window", () => {
 
   function writeCursor(store: EnterpriseDataStore, streamKey: string, watermark: string) {
     const id = `${sourceId}::${streamKey}`;
+    store.connectorSyncCursors ??= {};
     store.connectorSyncCursors[id] = {
       cursorId: id,
       tenantId,

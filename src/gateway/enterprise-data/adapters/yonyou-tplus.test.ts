@@ -21,6 +21,18 @@ const LIVE_SECRET = {
   sid: "6",
 };
 
+function isRequestInit(value: unknown): value is RequestInit {
+  return Boolean(value) && typeof value === "object";
+}
+
+function recordedFetch(mock: { mock: { calls: readonly unknown[] } }): [string, RequestInit] {
+  const call: unknown = mock.mock.calls[0];
+  if (!Array.isArray(call) || typeof call[0] !== "string" || !isRequestInit(call[1])) {
+    throw new Error("expected fetch(url, init)");
+  }
+  return [call[0], call[1]];
+}
+
 function readJsonBody(init: RequestInit): unknown {
   if (typeof init.body !== "string") {
     throw new Error("expected a string request body");
@@ -70,7 +82,7 @@ describe("yonyou tplus adapter", () => {
     const probe = await probeYonyouTplusConnection(LIVE_SECRET);
     expect(probe.ok).toBe(true);
     expect(probe.message).toContain("版本");
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/accountAPI/GetVersionInfo");
     expect(init.method).toBe("POST");
     expect(init.body).toBe("{}");
@@ -103,7 +115,7 @@ describe("yonyou tplus adapter", () => {
       { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
       LIVE_SECRET,
     );
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/warehouse/Query");
     expect(readJsonBody(init)).toEqual({ param: {} });
     const payload = result.payload as { records: Array<{ Code: string }> };
@@ -120,7 +132,7 @@ describe("yonyou tplus adapter", () => {
       { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
       { ...LIVE_SECRET, idMarketingOrgan: "1001" },
     );
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/warehouse/Query");
   });
 
@@ -135,7 +147,7 @@ describe("yonyou tplus adapter", () => {
       { ...LIVE_SECRET, idMarketingOrgan: "1001" },
       { marketingOrganQuery: true },
     );
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url] = recordedFetch(fetchMock);
     expect(url).toBe(
       "https://openapi.chanjet.com/tplus/api/v2/warehouse/Query?idMarketingOrgan=1001",
     );
@@ -154,7 +166,7 @@ describe("yonyou tplus adapter", () => {
       { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
       LIVE_SECRET,
     );
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/tplus/api/v2/SaleOrderOpenApi/FindVoucherList");
     expect(readJsonBody(init)).toEqual({
       pageSize: 20,
@@ -177,7 +189,7 @@ describe("yonyou tplus adapter", () => {
       { input: {}, scope: ALL_SCOPE, employeeId: "emp-1" },
       LIVE_SECRET,
     );
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe(
       "https://openapi.chanjet.com/tplus/api/v2/SaleDeliveryOpenApi/FindVoucherList",
     );
@@ -196,7 +208,7 @@ describe("yonyou tplus adapter", () => {
     vi.stubGlobal("fetch", fetchMock);
     const probe = await probeYonyouTplusConnection({ oauthAccessToken: "open-token-from-oauth" });
     expect(probe.ok).toBe(true);
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = recordedFetch(fetchMock);
     expect(init.headers).toMatchObject({
       appKey: "env-key",
       appSecret: "env-secret",

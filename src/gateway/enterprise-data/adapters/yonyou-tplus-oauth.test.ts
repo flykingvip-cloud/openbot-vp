@@ -18,6 +18,18 @@ const ENV_KEYS = [
   "OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_GATEWAY",
 ] as const;
 
+function isRequestInit(value: unknown): value is RequestInit {
+  return Boolean(value) && typeof value === "object";
+}
+
+function recordedFetch(mock: { mock: { calls: readonly unknown[] } }): [string, RequestInit] {
+  const call: unknown = mock.mock.calls[0];
+  if (!Array.isArray(call) || typeof call[0] !== "string" || !isRequestInit(call[1])) {
+    throw new Error("expected fetch(url, init)");
+  }
+  return [call[0], call[1]];
+}
+
 describe("yonyou tplus oauth", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -106,7 +118,7 @@ describe("yonyou tplus oauth", () => {
     expect(result.orgId).toBe("90001198862");
     expect(result.appName).toBe("tpluscloud");
     expect(result.sid).toBe("6");
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url.startsWith("https://openapi.chanjet.com/auth/v2/getToken?")).toBe(true);
     const parsed = new URL(url);
     expect(parsed.searchParams.get("grantType")).toBe("authorization_code");
@@ -138,7 +150,7 @@ describe("yonyou tplus oauth", () => {
     });
     expect(result.accessToken).toBe("open-token-2");
     expect(result.refreshToken).toBe("refresh-2");
-    const [url] = fetchMock.mock.calls[0] as [string];
+    const [url] = recordedFetch(fetchMock);
     const parsed = new URL(url);
     expect(parsed.pathname).toBe("/auth/v2/refreshToken");
     expect(parsed.searchParams.get("grantType")).toBe("refresh_token");
@@ -167,7 +179,7 @@ describe("yonyou tplus oauth", () => {
     expect(result.accessToken).toBe("open-token-3");
     expect(result.permanentCode).toBe("user-permanent");
     expect(result.orgId).toBe("90001198862");
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toBe("https://openapi.chanjet.com/auth/token/getTokenByPermanentCode");
     expect(init.method).toBe("POST");
     expect(init.headers).toMatchObject({ appKey: "ak-test", appSecret: "as-test" });

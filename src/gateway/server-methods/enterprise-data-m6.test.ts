@@ -14,6 +14,18 @@ import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "./type
 
 const { createEnterpriseDataM6Handlers } = await import("./enterprise-data-m6.js");
 
+function isRequestInit(value: unknown): value is RequestInit {
+  return Boolean(value) && typeof value === "object";
+}
+
+function recordedFetch(mock: { mock: { calls: readonly unknown[] } }): [string, RequestInit] {
+  const call: unknown = mock.mock.calls[0];
+  if (!Array.isArray(call) || typeof call[0] !== "string" || !isRequestInit(call[1])) {
+    throw new Error("expected fetch(url, init)");
+  }
+  return [call[0], call[1]];
+}
+
 const testPaths = vi.hoisted(() => ({
   tmpDir: `/tmp/openbot-enterprise-data-m6-handler-test-${Date.now()}`,
 }));
@@ -438,7 +450,7 @@ describe("enterprise-data M6 dashboard handlers", () => {
       vi.unstubAllGlobals();
     }
     expect(fetchMock).toHaveBeenCalled();
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = recordedFetch(fetchMock);
     expect(url).toContain("/tplus/api/v2/accountAPI/GetVersionInfo");
     expect(init.headers).toMatchObject({
       appKey: "ak-test",
