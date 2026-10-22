@@ -159,6 +159,9 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.querySelector("form")).not.toBeNull();
     });
+    expect(container.querySelector("[data-testid='device-platform-status-bar']")).not.toBeNull();
+    expect(container.textContent).not.toContain("与冻结契约对齐");
+    expect(container.textContent).not.toContain("高级：覆盖服务客户端 ID");
     expect(
       container.querySelector("[data-testid='device-platform-credential-ref']"),
     ).not.toBeNull();
@@ -234,6 +237,12 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.querySelector("form")).not.toBeNull();
     });
+    // Add form: no live status strip, contract helper, or service-client override.
+    expect(container.querySelector("[data-testid='device-platform-status-bar']")).toBeNull();
+    expect(container.textContent).not.toContain("与冻结契约对齐");
+    expect(container.textContent).not.toContain("高级：覆盖服务客户端 ID");
+    expect(container.textContent).not.toContain("health unknown");
+    expect(container.textContent).not.toContain("上次探测");
     typeInto(container, "例如 本地 joint mock", "本地 joint mock");
     typeInto(container, "例如 plat-local", "plat-local");
     typeInto(container, "http://127.0.0.1:8791", "http://127.0.0.1:8791");
