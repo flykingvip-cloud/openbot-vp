@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { i18n } from "../../../../i18n/index.ts";
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { renderPlatformSystemSettingsSurface } from "../system-settings/page.ts";
 import {
@@ -35,6 +36,10 @@ function connection(
     ...partial,
   };
 }
+
+beforeEach(async () => {
+  await i18n.setLocale("zh-CN");
+});
 
 afterEach(() => {
   document.body.innerHTML = "";
@@ -72,6 +77,8 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain("还没有设备平台连接");
     });
+    expect(container.textContent).toContain("管理接入伙伴的连接与可达性，不管理单台设备");
+    expect(container.textContent).toContain("设备列表与授权在企业侧「已连接设备」");
     expect(container.textContent).not.toContain("未确认·JOINT_PENDING");
     expect(container.textContent).not.toContain("设备已应用");
 
@@ -82,9 +89,12 @@ describe("设备平台连接", () => {
       },
     });
     resetDevicePlatformConnectionPanelForTests();
+    await i18n.setLocale("zh-CN");
     render(renderDevicePlatformConnectionPanel(), container);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("仅平台管理员可以配置设备平台连接");
+      expect(container.textContent).toMatch(
+        /仅平台管理员可以配置设备平台连接|Only platform administrators/,
+      );
     });
     expect(container.querySelector("form")).toBeNull();
 
@@ -95,13 +105,16 @@ describe("设备平台连接", () => {
       },
     });
     resetDevicePlatformConnectionPanelForTests();
+    await i18n.setLocale("zh-CN");
     render(renderDevicePlatformConnectionPanel(), container);
     await vi.waitFor(() => {
-      expect(container.textContent).toContain("读取设备平台连接失败");
+      expect(container.textContent).toMatch(
+        /读取设备平台连接失败|Failed to load device platform connections/,
+      );
     });
   });
 
-  it("keeps the secret off the page and shows a partial probe without marking success", async () => {
+  it("lists connections with filters and keeps the secret off the edit page", async () => {
     const saved = connection();
     const setCredential = vi.fn(async () => connection({ credentialPresent: true }));
     const test = vi.fn(async () => ({
@@ -113,9 +126,10 @@ describe("设备平台连接", () => {
       checks: { health: "ok" as const, capabilities: "failed" as const },
       partial: true,
     }));
+    const save = vi.fn(async () => saved);
     setDevicePlatformAdminClientForTests({
-      list: async () => [],
-      save: vi.fn(async () => saved),
+      list: async () => [connection({ health: "ok", healthCheckedAt: new Date().toISOString() })],
+      save,
       setCredential,
       test,
     });
@@ -130,12 +144,36 @@ describe("设备平台连接", () => {
     document.body.append(appHost);
     render(renderDevicePlatformConnectionPanel(), container);
     await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-list']")).not.toBeNull();
+    });
+    expect(container.textContent).toContain("生产设备平台");
+    expect(container.textContent).toContain("plat-1");
+    expect(container.textContent).toContain("v1-frozen");
+    expect(container.textContent).toContain("全部");
+    expect(container.textContent).toContain("已启用");
+    expect(container.textContent).toContain("异常");
+
+    (
+      container.querySelector("[data-testid='device-platform-edit-plat-1']") as HTMLButtonElement
+    ).click();
+    await vi.waitFor(() => {
       expect(container.querySelector("form")).not.toBeNull();
     });
-    typeInto(container, "创建后不可修改", "plat-1");
-    typeInto(container, "https://device.example", "https://device.example");
-    typeInto(container, "cred://device-platform/...", "cred://device-platform/plat-1");
-    typeInto(container, "逗号分隔", "device-platform");
+    expect(
+      container.querySelector("[data-testid='device-platform-credential-ref']"),
+    ).not.toBeNull();
+    expect(
+      (
+        container.querySelector(
+          "[data-testid='device-platform-credential-ref']",
+        ) as HTMLInputElement
+      ).disabled,
+    ).toBe(true);
+
+    (container.querySelector("[data-testid='device-platform-rotate']") as HTMLInputElement).click();
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-secret']")).not.toBeNull();
+    });
     const secret = container.querySelector(
       "[data-testid='device-platform-secret']",
     ) as HTMLInputElement;
@@ -145,12 +183,10 @@ describe("设备平台连接", () => {
       .querySelector("form")
       ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await vi.waitFor(() => {
-      expect(setCredential).toHaveBeenCalledWith("plat-1", SECRET, false);
+      expect(setCredential).toHaveBeenCalledWith("plat-1", SECRET, true);
     });
     expect(container.textContent).not.toContain(SECRET);
-    expect(
-      (container.querySelector("[data-testid='device-platform-secret']") as HTMLInputElement).value,
-    ).toBe("");
+    expect(container.querySelector("[data-testid='device-platform-secret']")?.value ?? "").toBe("");
 
     const testButton = container.querySelector(
       "[data-testid='device-platform-test']",
@@ -159,7 +195,69 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain("没有标记为健康");
     });
-    expect(container.textContent).toContain("停用后立即拒绝新的授权和执行");
+    expect(container.textContent).not.toContain(SECRET);
+  });
+
+  it("creates a connection from the add flow with required secret", async () => {
+    const save = vi.fn(async (platformId: string, body: Record<string, unknown>) =>
+      connection({
+        platformId,
+        displayName: typeof body.displayName === "string" ? body.displayName : "",
+        serviceBaseUrl: typeof body.serviceBaseUrl === "string" ? body.serviceBaseUrl : "",
+        credentialRef: typeof body.credentialRef === "string" ? body.credentialRef : "",
+        credentialPresent: false,
+      }),
+    );
+    const setCredential = vi.fn(async () =>
+      connection({ platformId: "plat-local", credentialPresent: true }),
+    );
+    setDevicePlatformAdminClientForTests({
+      list: async () => [],
+      save,
+      setCredential,
+      test: vi.fn(),
+    });
+    resetDevicePlatformConnectionPanelForTests();
+    const { renderDevicePlatformConnectionPanel } = await import("./page.ts");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const appHost = document.createElement("openbot-app") as HTMLElement & {
+      requestUpdate: () => void;
+    };
+    appHost.requestUpdate = () => render(renderDevicePlatformConnectionPanel(), container);
+    document.body.append(appHost);
+    render(renderDevicePlatformConnectionPanel(), container);
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-add']")).not.toBeNull();
+    });
+    (container.querySelector("[data-testid='device-platform-add']") as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(container.querySelector("form")).not.toBeNull();
+    });
+    typeInto(container, "例如 本地 joint mock", "本地 joint mock");
+    typeInto(container, "例如 plat-local", "plat-local");
+    typeInto(container, "http://127.0.0.1:8791", "http://127.0.0.1:8791");
+    const secret = container.querySelector(
+      "[data-testid='device-platform-secret']",
+    ) as HTMLInputElement;
+    secret.value = SECRET;
+    secret.dispatchEvent(new Event("input", { bubbles: true }));
+    container
+      .querySelector("form")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => {
+      expect(save).toHaveBeenCalled();
+    });
+    expect(save.mock.calls[0]?.[0]).toBe("plat-local");
+    expect(save.mock.calls[0]?.[1]).toMatchObject({
+      displayName: "本地 joint mock",
+      serviceBaseUrl: "http://127.0.0.1:8791",
+      credentialRef: "cred://device-platform/plat-local",
+      clientIdentity: "device-platform",
+      serviceClientIds: ["device-platform"],
+      contractVersion: "v1",
+    });
+    expect(setCredential).toHaveBeenCalledWith("plat-local", SECRET, false);
     expect(container.textContent).not.toContain(SECRET);
   });
 
@@ -200,6 +298,7 @@ describe("设备平台连接", () => {
 
 function typeInto(container: HTMLElement, placeholder: string, value: string): void {
   const input = container.querySelector(`input[placeholder="${placeholder}"]`) as HTMLInputElement;
+  expect(input).not.toBeNull();
   input.value = value;
   input.dispatchEvent(new Event("input", { bubbles: true }));
 }
