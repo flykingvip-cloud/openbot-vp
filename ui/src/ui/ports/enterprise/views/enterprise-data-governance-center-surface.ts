@@ -2052,6 +2052,7 @@ function renderSourcesManagementSection(params: {
   onTestConnection: (source: ManagedDataSourceRecord) => void;
   onArchive: (source: ManagedDataSourceRecord) => void;
   onOpenLogs: (source: ManagedDataSourceRecord) => void;
+  onSync: (source: ManagedDataSourceRecord) => void;
   onFiltersChange: (patch: Partial<AssetListFilters>) => void;
   onSelectSource: (sourceId: string) => void;
   capabilityHref: (skillId: string) => string;
@@ -2077,6 +2078,7 @@ function renderSourcesManagementSection(params: {
       onTestConnection: params.onTestConnection,
       onArchive: params.onArchive,
       onOpenLogs: params.onOpenLogs,
+      onSync: params.onSync,
       onFiltersChange: params.onFiltersChange,
       onSelectSource: params.onSelectSource,
     },
@@ -4016,6 +4018,26 @@ export function renderEnterpriseDataGovernanceCenterSurface(
     refreshEnterpriseSurface();
   };
 
+  const syncListedSource = async (source: ManagedDataSourceRecord) => {
+    if (!gateway || !tenantId) {
+      return;
+    }
+    state.sourcesNotice = `正在同步「${source.displayName}」…`;
+    state.sourcesError = null;
+    refreshEnterpriseSurface();
+    const result = await gateway.syncSource(tenantId, source.sourceId);
+    if (!result.ok) {
+      state.sourcesNotice = null;
+      state.sourcesError = result.error;
+      refreshEnterpriseSurface();
+      return;
+    }
+    state.sourcesLoaded = false;
+    await loadSourcesSection(state, gateway, tenantId);
+    state.sourcesNotice = result.data.summary;
+    await openSourceLogs(source);
+  };
+
   const closeSourceLogs = () => {
     state.sourceLogDetail = {
       open: false,
@@ -4837,6 +4859,7 @@ export function renderEnterpriseDataGovernanceCenterSurface(
               }).replace(/\/$/, "")}/${encodeURIComponent(skillId)}`,
             onArchive: archiveSource,
             onOpenLogs: openSourceLogs,
+            onSync: syncListedSource,
             onFiltersChange: (patch) => {
               state.assetFilters = { ...state.assetFilters, ...patch };
               refreshEnterpriseSurface();

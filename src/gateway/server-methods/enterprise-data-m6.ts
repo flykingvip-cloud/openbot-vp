@@ -47,6 +47,10 @@ import {
 } from "../enterprise-data/semantic-object-store.js";
 import { probeDataSourceConnection } from "../enterprise-data/source-connection-probe.js";
 import type { EnterpriseDataStore, HttpRestAuthScheme } from "../enterprise-data/types.js";
+import {
+  listConnectorSyncLogEntries,
+  syncYonyouTplusSource,
+} from "../enterprise-data/yonyou-tplus-sync.js";
 import { listTenantSeats, loadEnterpriseSeatAssetsStore } from "../enterprise-seat-assets-store.js";
 import { resolveConnectorOAuthSessionStorePathForTenantId } from "../tenant-context.js";
 import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
@@ -575,6 +579,38 @@ export function createEnterpriseDataM6Handlers(
       }
     },
 
+    "enterprise-data.sources.sync": async ({ client, params, respond }) => {
+      const tenantId = await requireResolvedEnterpriseAdminTenantId({ client, params, respond });
+      const sourceId = stringValue(params.sourceId);
+      if (!tenantId || !sourceId) {
+        respondInvalid(respond, "sourceId is required");
+        return;
+      }
+      try {
+        const synced = await withEnterpriseDataStore(tenantId, client, async (store) => {
+          const source = store.dataSources[sourceId];
+          if (!source || source.tenantId !== tenantId) {
+            throw new Error("DataSource not found.");
+          }
+          const result = await syncYonyouTplusSource({ store, tenantId, sourceId });
+          return {
+            status: result.status,
+            summary: result.summary,
+            streams: result.streams,
+            observation: {
+              lastCheckedAt: source.lastCheckedAt,
+              lastSucceededAt: source.lastSucceededAt,
+              lastMaterializedAt: source.lastMaterializedAt,
+              materializationCount: source.materializationCount ?? 0,
+            },
+          };
+        });
+        respond(true, { tenantId, sourceId, ...synced });
+      } catch (error) {
+        respondUnavailable(respond, error);
+      }
+    },
+
     "enterprise-data.sources.sync-log": async ({ client, params, respond }) => {
       const tenantId = await requireResolvedEnterpriseAdminTenantId({ client, params, respond });
       const sourceId = stringValue(params.sourceId);
@@ -602,13 +638,25 @@ export function createEnterpriseDataM6Handlers(
               )
               .map((spec) => spec.projectionId),
           );
-          return listKnowledgeSupplyAuditEvents({
-            store,
-            tenantId,
-            limit: 50,
-          }).filter((event) => projectionIds.has(event.projectionId));
+          return {
+            events: listKnowledgeSupplyAuditEvents({
+              store,
+              tenantId,
+              limit: 50,
+            }).filter((event) => projectionIds.has(event.projectionId)),
+            connectorEntries: listConnectorSyncLogEntries({
+              store,
+              tenantId,
+              sourceId,
+              limit: 50,
+            }),
+          };
         });
-        respond(true, { tenantId, events });
+        respond(true, {
+          tenantId,
+          events: events.events,
+          connectorEntries: events.connectorEntries,
+        });
       } catch (error) {
         respondUnavailable(respond, error);
       }
