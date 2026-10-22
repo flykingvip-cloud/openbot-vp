@@ -248,25 +248,6 @@ function renderFormView() {
   const connection = currentConnection();
   const showSecret = !editing || !connection?.credentialPresent || draft.rotate;
   return html`
-    <div class="device-platform-admin__header">
-      <div>
-        <div class="device-platform-admin__eyebrow">${dp((c) => c.breadcrumb)}</div>
-        <div class="device-platform-admin__form-title">
-          <h2 class="device-platform-admin__title">
-            ${
-              editing
-                ? dp((c) => c.editTitle, { name: draft.displayName || draft.platformId })
-                : dp((c) => c.createTitle)
-            }
-          </h2>
-          ${
-            editing && draft.platformId
-              ? html`<span class="device-platform-admin__badge">${draft.platformId}</span>`
-              : nothing
-          }
-        </div>
-      </div>
-    </div>
     ${editing ? renderStatusBanner(connection) : nothing}
     ${state.partial ? html`<p class="callout" data-testid="device-platform-partial">${state.partial}</p>` : nothing}
     ${state.notice ? html`<p class="callout success" data-testid="device-platform-notice">${state.notice}</p>` : nothing}
@@ -375,7 +356,17 @@ function renderFormView() {
           </label>
           <label class="device-platform-admin__field">
             <span>${dp((c) => c.fields.credentialRef)}</span>
-            <input type="text" .value=${draft.credentialRef} disabled data-testid="device-platform-credential-ref" />
+            <input
+              type="text"
+              .value=${draft.credentialRef}
+              disabled
+              readonly
+              aria-readonly="true"
+              data-testid="device-platform-credential-ref"
+            />
+            <small class="device-platform-admin__hint" data-testid="device-platform-credential-ref-hint">
+              ${dp((c) => c.credentialRefHint)}
+            </small>
           </label>
         </div>
         <details class="device-platform-admin__advanced card-follow--sm">
