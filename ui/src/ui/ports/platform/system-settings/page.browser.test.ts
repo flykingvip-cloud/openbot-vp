@@ -2,6 +2,12 @@
 
 import { render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  resetDevicePlatformConnectionPanelForTests,
+  setDevicePlatformAdminClientForTests,
+  type DevicePlatformAdminClient,
+  type DevicePlatformConnectionView,
+} from "../device-platform/page.ts";
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { renderPlatformSurface } from "../views/platform-surfaces.ts";
 import { renderPlatformSystemSettingsSurface } from "./page.ts";
@@ -146,6 +152,8 @@ function mount(hash: string) {
 afterEach(() => {
   document.body.innerHTML = "";
   window.history.replaceState({}, "", "/");
+  setDevicePlatformAdminClientForTests(null);
+  resetDevicePlatformConnectionPanelForTests();
   vi.restoreAllMocks();
 });
 
@@ -299,5 +307,52 @@ describe("renderPlatformSystemSettingsSurface", () => {
     revoke?.click();
     expect(confirm).toHaveBeenCalled();
     expect(onRemove).toHaveBeenCalledWith("ops@example.com");
+  });
+
+  it("device-platform tab click returns to list after add/edit form", async () => {
+    const connection: DevicePlatformConnectionView = {
+      platformId: "plat-1",
+      displayName: "生产设备平台",
+      environment: "production",
+      serviceBaseUrl: "https://device.example",
+      contractVersion: "v1",
+      credentialRef: "cred://device-platform/plat-1",
+      clientIdentity: "device-platform",
+      registrationNotes: "",
+      callbackAllowlist: [],
+      serviceClientIds: ["device-platform"],
+      enabled: true,
+      disabledDisposition: "block_new_keep_existing",
+      credentialPresent: true,
+      health: "unknown",
+    };
+    const client: DevicePlatformAdminClient = {
+      list: async () => [connection],
+      save: vi.fn(),
+      setCredential: vi.fn(),
+      test: vi.fn(),
+    };
+    setDevicePlatformAdminClientForTests(client);
+    resetDevicePlatformConnectionPanelForTests();
+    const { container } = mount("#platform-system-settings:device-platform");
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-list']")).not.toBeNull();
+    });
+    expect(container.querySelector(".device-platform-admin__eyebrow")).toBeNull();
+    expect(container.querySelector(".device-platform-admin__title")).toBeNull();
+    (container.querySelector("[data-testid='device-platform-add']") as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(container.querySelector("form")).not.toBeNull();
+    });
+    const tab = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.trim() === "设备平台连接",
+    );
+    expect(tab).toBeTruthy();
+    tab?.click();
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-list']")).not.toBeNull();
+    });
+    expect(container.querySelector("form")).toBeNull();
+    expect(window.location.hash).toBe("#platform-system-settings:device-platform");
   });
 });

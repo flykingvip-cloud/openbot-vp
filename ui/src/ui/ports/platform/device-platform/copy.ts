@@ -1,7 +1,6 @@
 import { i18n } from "../../../../i18n/index.ts";
 
 type Copy = {
-  breadcrumb: string;
   title: string;
   add: string;
   createTitle: string;
@@ -83,7 +82,6 @@ type Copy = {
 };
 
 const en: Copy = {
-  breadcrumb: "System Settings · Device Platform Connection",
   title: "Device Platform Connection",
   add: "Add connection",
   createTitle: "Add connection",
@@ -168,7 +166,6 @@ const en: Copy = {
 };
 
 const zhCN: Copy = {
-  breadcrumb: "系统设置 · 设备平台连接",
   title: "设备平台连接",
   add: "添加连接",
   createTitle: "添加连接",

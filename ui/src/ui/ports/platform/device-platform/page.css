@@ -7,27 +7,11 @@
 
 .device-platform-admin__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-end;
   gap: 16px;
   flex-wrap: wrap;
 }
-
-.device-platform-admin__eyebrow {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.device-platform-admin__title {
-  margin: 4px 0 0;
-  color: var(--text-strong);
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
 
 .device-platform-admin__filters {
   display: flex;

@@ -9,6 +9,7 @@ import {
   DevicePlatformAdminRequestError,
   resetDevicePlatformConnectionPanelForTests,
   setDevicePlatformAdminClientForTests,
+  showDevicePlatformConnectionList,
   type DevicePlatformAdminClient,
   type DevicePlatformConnectionView,
 } from "./page.ts";
@@ -82,6 +83,11 @@ describe("设备平台连接", () => {
     expect(container.querySelector("[data-testid='device-platform-footnote']")).toBeNull();
     expect(container.textContent).not.toContain("未确认·JOINT_PENDING");
     expect(container.textContent).not.toContain("设备已应用");
+    // List chrome under settings tabs: no breadcrumb / large title block.
+    expect(container.querySelector(".device-platform-admin__eyebrow")).toBeNull();
+    expect(container.querySelector(".device-platform-admin__title")).toBeNull();
+    expect(container.textContent).not.toContain("系统设置 · 设备平台连接");
+    expect(container.textContent).not.toContain("System Settings · Device Platform Connection");
 
     setDevicePlatformAdminClientForTests({
       ...client,
@@ -147,6 +153,9 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.querySelector("[data-testid='device-platform-list']")).not.toBeNull();
     });
+    expect(container.querySelector(".device-platform-admin__eyebrow")).toBeNull();
+    expect(container.querySelector(".device-platform-admin__title")).toBeNull();
+    expect(container.textContent).not.toContain("系统设置 · 设备平台连接");
     expect(container.textContent).toContain("生产设备平台");
     expect(container.textContent).toContain("plat-1");
     expect(container.textContent).toContain("v1-frozen");
@@ -319,6 +328,42 @@ describe("设备平台连接", () => {
     await vi.waitFor(() => {
       expect(container.textContent).toContain("还没有设备平台连接");
     });
+    expect(container.querySelector(".device-platform-admin__eyebrow")).toBeNull();
+    expect(container.querySelector(".device-platform-admin__title")).toBeNull();
+  });
+
+  it("tab re-entry defaults to list after visiting the add/edit form", async () => {
+    setDevicePlatformAdminClientForTests({
+      list: async () => [connection()],
+      save: vi.fn(),
+      setCredential: vi.fn(),
+      test: vi.fn(),
+    });
+    resetDevicePlatformConnectionPanelForTests();
+    const { renderDevicePlatformConnectionPanel } = await import("./page.ts");
+    const container = document.createElement("div");
+    document.body.append(container);
+    const appHost = document.createElement("openbot-app") as HTMLElement & {
+      requestUpdate: () => void;
+    };
+    appHost.requestUpdate = () => render(renderDevicePlatformConnectionPanel(), container);
+    document.body.append(appHost);
+    render(renderDevicePlatformConnectionPanel(), container);
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-list']")).not.toBeNull();
+    });
+    (container.querySelector("[data-testid='device-platform-add']") as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(container.querySelector("form")).not.toBeNull();
+    });
+    // Simulate leaving the settings tab then returning: leftover in-memory view must clear.
+    showDevicePlatformConnectionList();
+    render(renderDevicePlatformConnectionPanel(), container);
+    await vi.waitFor(() => {
+      expect(container.querySelector("[data-testid='device-platform-list']")).not.toBeNull();
+    });
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.querySelector("[data-testid='device-platform-add']")).not.toBeNull();
   });
 });
 
