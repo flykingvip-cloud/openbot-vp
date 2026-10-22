@@ -8,8 +8,8 @@ import type {
   SiteRunStatus,
   SiteVerification,
 } from "../../site-capability/result.js";
-import type { ValidationRecord } from "../../site-capability/validation-record.js";
 import type { AccountBinding } from "../../site-capability/session-handle.js";
+import type { ValidationRecord } from "../../site-capability/validation-record.js";
 
 export type { AccountBinding };
 
@@ -160,6 +160,25 @@ export type DataConnectorCredentialSecret = {
   basicUsername?: string;
   /** Relative health-check path used by the connectivity probe, e.g. "/health". */
   probePath?: string;
+  /**
+   * Chanjet / 用友 T+ open-platform app key. Optional per-tenant override.
+   * When omitted, the connector reads OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_APP_KEY.
+   */
+  appKey?: string;
+  /** Per-tenant Chanjet app secret. Prefer the platform env var when the ISV app is shared. */
+  appSecret?: string;
+  /** Chanjet refresh token. Rotated by /auth/v2/refreshToken. */
+  oauthRefreshToken?: string;
+  /** Chanjet user_auth_permanent_code. */
+  oauthPermanentCode?: string;
+  /** Chanjet cloud enterprise id (orgId). */
+  orgId?: string;
+  /** Chanjet in-app name. T+Cloud is `tpluscloud`; on-prem T+ is `Tplus`. */
+  appName?: string;
+  /** T+ sid. Some product APIs expect it as a Cookie. */
+  sid?: string;
+  /** Optional marketing-organ id. Stored for later reads; not sent unless an action body includes it. */
+  idMarketingOrgan?: string;
 };
 
 /** Business capability abstraction — actionRefs are the real execution source. */
