@@ -22,6 +22,7 @@ import {
   resolveTenantAgentDirForContext,
   resolveTenantRuntimeStateRootForContext,
 } from "./tenant-store-paths.js";
+import { alignFormalRootForManagedAddressing } from "./workspace-resolver/formal-deliverable-root.js";
 import { resolveRobotOwnWriteRoot } from "./workspace-resolver/write-roots.js";
 import {
   copyMissingOperatorWorkspace,
@@ -95,12 +96,15 @@ function resolveRawAccountExecutionPaths(params: {
 function relocateAccountExecutionPaths(
   raw: AccountExecutionPaths,
   env: NodeJS.ProcessEnv,
+  cfg?: OpenBotConfig,
 ): AccountExecutionPaths {
   const move = (target: string) => relocateTenantsVolumeUserPath(target, env);
   return {
     dataRoot: move(raw.dataRoot),
     stateRoot: move(raw.stateRoot),
-    workspaceDir: move(raw.workspaceDir),
+    // Same formal root as settle and preview. relocate alone misses a
+    // state-dir tenants formula that is not under OPENBOT_TENANTS_ROOT.
+    workspaceDir: alignFormalRootForManagedAddressing(raw.workspaceDir, { config: cfg, env }),
     artifactsDir: move(raw.artifactsDir),
     sharedArtifactsDir: move(raw.sharedArtifactsDir),
     browserProfileDir: move(raw.browserProfileDir),
@@ -122,7 +126,7 @@ export function resolveAccountExecutionPaths(params: {
   if (!isSharedTenantAddressingEnabled(params.cfg, env)) {
     return raw;
   }
-  return relocateAccountExecutionPaths(raw, env);
+  return relocateAccountExecutionPaths(raw, env, params.cfg);
 }
 
 function pathSegments(absPath: string): string[] {
@@ -214,7 +218,7 @@ export async function ensureAccountProductionDirectories(params: {
   const env = params.env ?? process.env;
   const raw = resolveRawAccountExecutionPaths(params);
   const paths = isSharedTenantAddressingEnabled(params.cfg, env)
-    ? relocateAccountExecutionPaths(raw, env)
+    ? relocateAccountExecutionPaths(raw, env, params.cfg)
     : raw;
   if (path.resolve(paths.workspaceDir) !== path.resolve(raw.workspaceDir)) {
     try {

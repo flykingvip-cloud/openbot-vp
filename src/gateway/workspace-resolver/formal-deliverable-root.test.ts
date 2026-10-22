@@ -252,6 +252,24 @@ describe("alignFormalRootForManagedAddressing", () => {
         config: { data: { mode: "managed" } } as OpenBotConfig,
       });
       expect(aligned).toBe(path.resolve(operatorsWs));
+      // stateDir/tenants is a second formula and is often NOT under OPENBOT_TENANTS_ROOT.
+      // It is the same bot and must still remount onto operators.
+      const stateTenantsWs = path.join(
+        stateDir,
+        "tenants",
+        "001",
+        "users",
+        "user-elle",
+        "OpenBot",
+        "agents",
+        "agt-x",
+        "workspace",
+      );
+      expect(
+        alignFormalRootForManagedAddressing(stateTenantsWs, {
+          config: { data: { mode: "managed" } } as OpenBotConfig,
+        }),
+      ).toBe(path.resolve(operatorsWs));
       // Group collaboration path must not remount.
       const groupPath = path.join(tenantsRoot, "001", "collaboration", "groups", "grp-a");
       expect(

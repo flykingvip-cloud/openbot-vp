@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { loadConfig } from "../../config/config.js";
+import type { OpenBotConfig } from "../../config/types.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   extractDeliverableEnvelope,
   normalizeDeliverableWorkspacePath,
@@ -16,9 +18,11 @@ import {
 } from "../knowledge/deliverables/group-manifest.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
-import { alignFormalRootForManagedAddressing } from "./formal-deliverable-root.js";
+import { resolveFormalAgentWorkspace } from "./formal-deliverable-root.js";
 import { resolveWorkspaceWriteLocator } from "./workspace-write-contract.js";
-import { isFilesystemWorkspaceLocator, resolvePlacedFilesystemWriteRoot } from "./write-roots.js";
+import { isFilesystemWorkspaceLocator } from "./write-roots.js";
+
+const log = createSubsystemLogger("gateway/settle-deliverable");
 
 /**
  * Collaboration deliverable settlement (PR C).
@@ -312,6 +316,12 @@ export function settleDeclaredDeliverableText(params: {
   text: string;
   agentWorkspaceRoot?: string | null;
   groupWorkspaceRoot?: string | null;
+  /**
+   * Other path shapes of the same bot workspace (tenants volume vs operators).
+   * Read-only. Bytes that exist only there, or that disagree with the formal
+   * root, fail closed as `workspace_root_skew` and are not copied.
+   */
+  siblingAgentWorkspaceRoots?: string[] | null;
 }): DeclaredDeliverableSettlement {
   const envelope = extractDeliverableEnvelope(params.text);
   const relativePath = envelope?.file;
@@ -340,6 +350,25 @@ export function settleDeclaredDeliverableText(params: {
   // over a short envelope summary preserves idempotent re-confirm of already-landed
   // SOT; agent-vs-group checksum compare below catches stale group vs newer bot write.
   const ext = path.posix.extname(relativePath).toLowerCase();
+  if (!TEXT_LIKE_EXTENSIONS.has(ext)) {
+    const skew = binaryWorkspaceRootSkew({
+      relativePath,
+      agentRoot,
+      siblingRoots: params.siblingAgentWorkspaceRoots,
+      groupRoot,
+    });
+    if (skew) {
+      log.warn(
+        `deliverable workspace_root_skew relative=${relativePath} detail=${skew} siblings=${params.siblingAgentWorkspaceRoots?.length ?? 0}`,
+      );
+      return {
+        text: markDeliverableDeclarationUnwritten(params.text, relativePath),
+        status: "unwritten",
+        relativePath,
+        reason: "workspace_root_skew",
+      };
+    }
+  }
   let bytes: Buffer | null = null;
   let byteSource: "agent" | "envelope" | "group" | null = null;
   if (agentLocated) {
@@ -489,9 +518,53 @@ export function settleDeclaredDeliverableText(params: {
 export type CollaborationDeliverableRoots = {
   agentWorkspaceRoot: string | null;
   groupWorkspaceRoot: string | null;
+  /** Other bot-workspace shapes. Never written by settle. */
+  siblingAgentWorkspaceRoots: string[];
   /** Set when groupId was present but the group formal root could not be resolved. */
   groupRootFailureReason?: "missing_tenant" | "locator_failed";
 };
+
+function binaryWorkspaceRootSkew(params: {
+  relativePath: string;
+  agentRoot: string | null;
+  groupRoot: string | null;
+  siblingRoots?: string[] | null;
+}): "sibling_only" | "checksum_mismatch" | null {
+  const siblings = (params.siblingRoots ?? []).map((root) => root.trim()).filter(Boolean);
+  if (siblings.length === 0) {
+    return null;
+  }
+  const formalBytes = params.agentRoot
+    ? readLocatedBytes(params.agentRoot, params.relativePath)
+    : null;
+  const groupBytes =
+    params.groupRoot && !isReservedGroupRelative(params.relativePath)
+      ? readLocatedBytes(params.groupRoot, params.relativePath)
+      : null;
+  const siblingBytes = siblings
+    .map((root) => readLocatedBytes(root, params.relativePath))
+    .filter((bytes): bytes is Buffer => bytes !== null);
+  if (siblingBytes.length === 0) {
+    return null;
+  }
+  const authority = formalBytes ?? groupBytes;
+  if (!authority) {
+    return "sibling_only";
+  }
+  const authorityHash = sha256Hex(authority);
+  if (siblingBytes.some((bytes) => sha256Hex(bytes) !== authorityHash)) {
+    return "checksum_mismatch";
+  }
+  return null;
+}
+
+function readLocatedBytes(root: string, relativePath: string): Buffer | null {
+  const located = locatedWrite(root, relativePath);
+  if (!located) {
+    return null;
+  }
+  return readNonEmpty(located.absolutePath);
+}
 
 export function resolveCollaborationDeliverableRoots(params: {
   agentId: string;
@@ -500,23 +573,37 @@ export function resolveCollaborationDeliverableRoots(params: {
   userId?: string | null;
   sessionKey?: string | null;
   stateDir?: string;
+  /** When omitted, loadConfig() supplies data.mode for the formal-root remount. */
+  cfg?: OpenBotConfig | null;
+  env?: NodeJS.ProcessEnv;
 }): CollaborationDeliverableRoots {
-  const placed = resolvePlacedFilesystemWriteRoot({
+  let cfg = params.cfg ?? null;
+  if (params.cfg === undefined) {
+    try {
+      cfg = loadConfig();
+    } catch {
+      cfg = null;
+    }
+  }
+  const formal = resolveFormalAgentWorkspace({
     agentId: params.agentId,
     tenantId: params.tenantId,
     userId: params.userId,
     sessionKey: params.sessionKey,
     stateDir: params.stateDir,
+    cfg,
+    env: params.env,
     ensureDirectory: Boolean(params.userId?.trim()),
   });
-  const agentWorkspaceRoot = placed ? alignFormalRootForManagedAddressing(placed) : null;
+  const agentWorkspaceRoot = formal?.rootPath ?? null;
+  const siblingAgentWorkspaceRoots = formal?.siblingRoots ?? [];
   let groupWorkspaceRoot: string | null = null;
   let groupRootFailureReason: CollaborationDeliverableRoots["groupRootFailureReason"];
   const groupId = params.groupId?.trim();
   if (groupId) {
     try {
-      const cfg = loadConfig();
-      const profile = resolveSecurityProfile(cfg, process.env);
+      const groupCfg = cfg ?? loadConfig();
+      const profile = resolveSecurityProfile(groupCfg, params.env ?? process.env);
       // PR A: group formal root always from trusted locator (same as group-file.read).
       // Missing tenant on managed_enterprise → hard miss (never invent operators path,
       // never degrade to agent-only success for a group-scoped settle).
@@ -528,7 +615,7 @@ export function resolveCollaborationDeliverableRoots(params: {
           groupId,
           tenantId: params.tenantId?.trim() || null,
           profile: profile.profile,
-          cfg,
+          cfg: groupCfg,
         });
         if (isFilesystemWorkspaceLocator(locator)) {
           groupWorkspaceRoot = path.resolve(locator);
@@ -541,7 +628,12 @@ export function resolveCollaborationDeliverableRoots(params: {
       groupRootFailureReason = "locator_failed";
     }
   }
-  return { agentWorkspaceRoot, groupWorkspaceRoot, groupRootFailureReason };
+  return {
+    agentWorkspaceRoot,
+    groupWorkspaceRoot,
+    siblingAgentWorkspaceRoots,
+    groupRootFailureReason,
+  };
 }
 
 /** Settle a collaboration reply before it is persisted or broadcast. */
@@ -555,8 +647,11 @@ export function settleCollaborationDeclaredDeliverable(params: {
   stateDir?: string;
   agentWorkspaceRoot?: string | null;
   groupWorkspaceRoot?: string | null;
+  siblingAgentWorkspaceRoots?: string[] | null;
   /** When roots are injected: true means the turn was group-scoped even if group root is null. */
   groupScoped?: boolean;
+  cfg?: OpenBotConfig | null;
+  env?: NodeJS.ProcessEnv;
 }): DeclaredDeliverableSettlement {
   // Most replies are not deliverables. Skip locator resolution until file= is present.
   if (!params.text.includes("DELIVERABLE")) {
@@ -572,6 +667,7 @@ export function settleCollaborationDeclaredDeliverable(params: {
     ? {
         agentWorkspaceRoot: params.agentWorkspaceRoot ?? null,
         groupWorkspaceRoot: params.groupWorkspaceRoot ?? null,
+        siblingAgentWorkspaceRoots: params.siblingAgentWorkspaceRoots ?? [],
         groupRootFailureReason:
           (params.groupScoped || Boolean(groupId)) && !params.groupWorkspaceRoot
             ? "locator_failed"
@@ -598,5 +694,6 @@ export function settleCollaborationDeclaredDeliverable(params: {
     text: params.text,
     agentWorkspaceRoot: roots.agentWorkspaceRoot,
     groupWorkspaceRoot: roots.groupWorkspaceRoot,
+    siblingAgentWorkspaceRoots: roots.siblingAgentWorkspaceRoots,
   });
 }

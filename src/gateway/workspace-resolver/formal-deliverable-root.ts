@@ -11,7 +11,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isSharedTenantAddressingEnabled } from "../../config/data-space.js";
+import { normalizeOperatorId } from "../../config/operator-state-scope.js";
+import { resolveStateDir } from "../../config/paths.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { normalizeAgentId } from "../../routing/session-key.js";
+import { resolveTenantsRoot } from "../tenant-store-paths.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import { relocateTenantsVolumeUserPath } from "../workspace/operator-workspace-heal.js";
 import {
@@ -19,7 +23,11 @@ import {
   seatOwnedWriteOwnership,
   type CanonicalWriteOwnership,
 } from "./canonical-write-root.js";
-import { resolveRobotWriteRoot } from "./write-roots.js";
+import {
+  resolvePlacedFilesystemWriteRoot,
+  resolveRobotOwnWriteRoot,
+  resolveRobotWriteRoot,
+} from "./write-roots.js";
 
 export type FormalResourceKind = "personal" | "seat" | "group";
 
@@ -55,10 +63,108 @@ export type FormalDeliverableRootResult =
   | FormalDeliverableRootSuccess
   | FormalDeliverableRootFailure;
 
+type BotWorkspaceShape = {
+  shape: "operators" | "tenants";
+  userId: string;
+  agentId: string;
+};
+
 /**
- * Remount tenants/<tid>/users/<u>/… onto operators/<u>/… under shared
- * addressing so write cwd and preview Locator agree. Idempotent for operators
- * and collaboration/group paths (no users/ segment).
+ * Classify a bot workspace root. Group / collaboration paths are not bot
+ * spaces and stay untouched. Only the workspace directory itself matches —
+ * a file nested under it does not, so align cannot collapse a file path.
+ */
+function classifyBotWorkspaceRoot(absPath: string): BotWorkspaceShape | null {
+  const parts = path
+    .resolve(absPath)
+    .split(path.sep)
+    .filter((part) => part.length > 0);
+  if (parts.at(-1) !== "workspace") {
+    return null;
+  }
+  for (let i = 0; i < parts.length - 5; i += 1) {
+    if (
+      parts[i] === "operators" &&
+      parts[i + 2] === "OpenBot" &&
+      parts[i + 3] === "agents" &&
+      parts[i + 5] === "workspace" &&
+      i + 5 === parts.length - 1
+    ) {
+      const userId = parts[i + 1] ?? "";
+      const agentId = parts[i + 4] ?? "";
+      if (!userId || !agentId) {
+        return null;
+      }
+      return { shape: "operators", userId, agentId };
+    }
+  }
+  for (let i = 0; i < parts.length - 7; i += 1) {
+    if (
+      parts[i] === "tenants" &&
+      parts[i + 2] === "users" &&
+      parts[i + 4] === "OpenBot" &&
+      parts[i + 5] === "agents" &&
+      parts[i + 7] === "workspace" &&
+      i + 7 === parts.length - 1
+    ) {
+      const userId = parts[i + 3] ?? "";
+      const agentId = parts[i + 6] ?? "";
+      if (!userId || !agentId) {
+        return null;
+      }
+      return { shape: "tenants", userId, agentId };
+    }
+  }
+  return null;
+}
+
+/** `$STATE_DIR/operators/<user>/OpenBot/agents/<agent>/workspace`. */
+function operatorsFormalRoot(
+  userId: string,
+  agentId: string,
+  env: NodeJS.ProcessEnv,
+): string | null {
+  const operatorId = normalizeOperatorId(userId);
+  if (!operatorId) {
+    return null;
+  }
+  return path.resolve(
+    resolveStateDir(env),
+    "operators",
+    operatorId,
+    "OpenBot",
+    "agents",
+    normalizeAgentId(agentId),
+    "workspace",
+  );
+}
+
+/**
+ * Env copy that pins OPENBOT_STATE_DIR when the caller has an explicit state
+ * directory (tests, per-request state). Does not mutate `base`.
+ */
+export function formalAddressingEnv(
+  stateDir?: string | null,
+  base: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const trimmed = stateDir?.trim();
+  if (!trimmed || base.OPENBOT_STATE_DIR === trimmed) {
+    return base;
+  }
+  return { ...base, OPENBOT_STATE_DIR: trimmed };
+}
+
+/**
+ * Remount a bot workspace onto the single formal root.
+ *
+ * When managed shared addressing is on, both path shapes of one
+ * `(tenant, user, agent)` — the tenants volume AND `$STATE_DIR/tenants/…` —
+ * resolve to `$STATE_DIR/operators/<user>/OpenBot/agents/<agent>/workspace`.
+ * `relocateTenantsVolumeUserPath` only rewrites paths under OPENBOT_TENANTS_ROOT;
+ * a state-dir tenants formula outside that volume used to stay put, so settle
+ * read an empty tree while tool cwd had already remounted onto operators.
+ *
+ * Operators paths and collaboration/group paths are unchanged.
  */
 export function alignFormalRootForManagedAddressing(
   rootPath: string,
@@ -69,7 +175,164 @@ export function alignFormalRootForManagedAddressing(
   if (!isSharedTenantAddressingEnabled(options?.config ?? undefined, env)) {
     return resolved;
   }
-  return path.resolve(relocateTenantsVolumeUserPath(resolved, env));
+  const relocated = path.resolve(relocateTenantsVolumeUserPath(resolved, env));
+  if (relocated !== resolved) {
+    return relocated;
+  }
+  const shape = classifyBotWorkspaceRoot(resolved);
+  if (!shape || shape.shape === "operators") {
+    return resolved;
+  }
+  return operatorsFormalRoot(shape.userId, shape.agentId, env) ?? resolved;
+}
+
+/**
+ * Other on-disk shapes of the same bot workspace. Read-only skew probe.
+ * Never a write target. The formal root itself is omitted.
+ */
+export function listFormalRootSkewSiblings(params: {
+  formalRoot: string;
+  tenantId?: string | null;
+  userId?: string | null;
+  agentId?: string | null;
+  stateDir?: string | null;
+  env?: NodeJS.ProcessEnv;
+}): string[] {
+  const env = formalAddressingEnv(params.stateDir, params.env ?? process.env);
+  const formal = path.resolve(params.formalRoot);
+  const classified = classifyBotWorkspaceRoot(formal);
+  const userId = params.userId?.trim() || classified?.userId || "";
+  const agentId = params.agentId?.trim() || classified?.agentId || "";
+  if (!userId || !agentId) {
+    return [];
+  }
+  const stateDir = params.stateDir?.trim() || resolveStateDir(env);
+  const tenantId = params.tenantId?.trim() || "";
+  const candidates: string[] = [];
+  const operators = operatorsFormalRoot(userId, agentId, env);
+  if (operators) {
+    candidates.push(operators);
+  }
+  if (tenantId) {
+    try {
+      candidates.push(
+        resolveRobotOwnWriteRoot({
+          stateDir,
+          tenantId,
+          userId,
+          agentId,
+        }),
+      );
+    } catch {
+      // A user id that cannot form the tenants formula is not a sibling.
+    }
+    const operatorId = normalizeOperatorId(userId);
+    const normalizedAgent = normalizeAgentId(agentId);
+    if (operatorId) {
+      const volume = path.resolve(resolveTenantsRoot(env));
+      candidates.push(
+        path.join(
+          volume,
+          tenantId,
+          "users",
+          operatorId,
+          "OpenBot",
+          "agents",
+          normalizedAgent,
+          "workspace",
+        ),
+      );
+      if (userId !== operatorId) {
+        candidates.push(
+          path.join(
+            volume,
+            tenantId,
+            "users",
+            userId,
+            "OpenBot",
+            "agents",
+            normalizedAgent,
+            "workspace",
+          ),
+        );
+      }
+    }
+  }
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const candidate of candidates) {
+    const resolved = path.resolve(candidate);
+    if (resolved === formal || seen.has(resolved)) {
+      continue;
+    }
+    seen.add(resolved);
+    out.push(resolved);
+  }
+  return out;
+}
+
+/**
+ * Formal workspace for one bot. When shared addressing is on, this is the
+ * operators remount and it does not create the tenants twin.
+ */
+export function resolveFormalAgentWorkspace(params: {
+  agentId: string;
+  tenantId?: string | null;
+  userId?: string | null;
+  sessionKey?: string | null;
+  stateDir?: string;
+  cfg?: OpenBotConfig | null;
+  env?: NodeJS.ProcessEnv;
+  ensureDirectory?: boolean;
+}): { rootPath: string; siblingRoots: string[] } | null {
+  const env = formalAddressingEnv(params.stateDir, params.env ?? process.env);
+  const cfg = params.cfg ?? undefined;
+  const shared = isSharedTenantAddressingEnabled(cfg, env);
+  const userId = params.userId?.trim() || "";
+  const tenantId = params.tenantId?.trim() || "";
+  let root: string | null = null;
+  if (shared && userId && tenantId) {
+    try {
+      const stateDir = params.stateDir?.trim() || resolveStateDir(env);
+      const synthetic = resolveRobotOwnWriteRoot({
+        stateDir,
+        tenantId,
+        userId,
+        agentId: params.agentId,
+      });
+      root = alignFormalRootForManagedAddressing(synthetic, { config: cfg, env });
+    } catch {
+      root = null;
+    }
+  }
+  if (!root) {
+    const placed = resolvePlacedFilesystemWriteRoot({
+      agentId: params.agentId,
+      tenantId: params.tenantId,
+      userId: params.userId,
+      sessionKey: params.sessionKey,
+      stateDir: params.stateDir,
+      ensureDirectory: params.ensureDirectory,
+    });
+    root = placed ? alignFormalRootForManagedAddressing(placed, { config: cfg, env }) : null;
+  }
+  if (!root) {
+    return null;
+  }
+  if (params.ensureDirectory) {
+    fs.mkdirSync(root, { recursive: true });
+  }
+  return {
+    rootPath: root,
+    siblingRoots: listFormalRootSkewSiblings({
+      formalRoot: root,
+      tenantId,
+      userId,
+      agentId: params.agentId,
+      stateDir: params.stateDir,
+      env,
+    }),
+  };
 }
 
 function identityLabel(identity: FormalResourceIdentity): string {

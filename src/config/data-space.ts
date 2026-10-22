@@ -131,7 +131,10 @@ export function isSharedTenantAddressingEnabled(
   cfg?: OpenBotConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
-  if (!isManagedDataMode(cfg)) {
+  // Honor the env argument for data mode. Callers that pass a config with
+  // data.mode=managed (and no OPENBOT_DATA_MODE) must still remount; callers
+  // that pass an explicit env mode must not be ignored in favor of process.env.
+  if (resolveDataMode(cfg, env) !== "managed") {
     return false;
   }
   const raw =

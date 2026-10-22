@@ -251,7 +251,7 @@ async function authorizeStewardWorkspaceFile(params: {
         stateDir,
       });
       if (robotOwn) {
-        runtimeWorkspaces.push(robotOwn);
+        runtimeWorkspaces.push(alignFormalRootForManagedAddressing(robotOwn, { config: cfg }));
       }
     }
     try {
@@ -280,7 +280,7 @@ async function authorizeStewardWorkspaceFile(params: {
       params.respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, PREVIEW_FILE_NOT_SYNCED));
       return { ok: false };
     }
-    locator = robotOwn;
+    locator = alignFormalRootForManagedAddressing(robotOwn, { config: cfg });
   }
   if (params.operation === "write") {
     const decision = resolveWorkspaceWriteLocator({
