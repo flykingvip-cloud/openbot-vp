@@ -172,6 +172,11 @@ describe("设备平台连接", () => {
         ) as HTMLInputElement
       ).disabled,
     ).toBe(true);
+    expect(
+      container.querySelector("[data-testid='device-platform-credential-ref-hint']")?.textContent,
+    ).toMatch(/自动生成|Auto-derived/);
+    // Edit form also drops the breadcrumb/title block under tabs.
+    expect(container.querySelector(".device-platform-admin__eyebrow")).toBeNull();
 
     (container.querySelector("[data-testid='device-platform-rotate']") as HTMLInputElement).click();
     await vi.waitFor(() => {
@@ -243,6 +248,17 @@ describe("设备平台连接", () => {
     expect(container.textContent).not.toContain("高级：覆盖服务客户端 ID");
     expect(container.textContent).not.toContain("health unknown");
     expect(container.textContent).not.toContain("上次探测");
+    // Form header (breadcrumb + 「添加连接」 title) removed under tabs.
+    expect(container.querySelector(".device-platform-admin__eyebrow")).toBeNull();
+    expect(container.querySelector(".device-platform-admin__title")).toBeNull();
+    // Credential ref is derived from stable ID, not user-editable.
+    const credRef = container.querySelector(
+      "[data-testid='device-platform-credential-ref']",
+    ) as HTMLInputElement;
+    expect(credRef.disabled).toBe(true);
+    expect(
+      container.querySelector("[data-testid='device-platform-credential-ref-hint']")?.textContent,
+    ).toMatch(/自动生成|Auto-derived/);
     typeInto(container, "例如 本地 joint mock", "本地 joint mock");
     typeInto(container, "例如 plat-local", "plat-local");
     typeInto(container, "http://127.0.0.1:8791", "http://127.0.0.1:8791");

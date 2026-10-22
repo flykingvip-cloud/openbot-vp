@@ -38,6 +38,7 @@ type Copy = {
   sectionIntegration: string;
   sectionSecurity: string;
   advancedAllowlist: string;
+  credentialRefHint: string;
   fields: {
     displayName: string;
     platformId: string;
@@ -122,6 +123,7 @@ const en: Copy = {
   sectionIntegration: "Integration parameters",
   sectionSecurity: "Security",
   advancedAllowlist: "Advanced · Callback allowlist",
+  credentialRefHint: "Auto-derived from Stable ID as cred://device-platform/{id}. Not editable.",
   fields: {
     displayName: "Platform name",
     platformId: "Stable ID",
@@ -207,6 +209,7 @@ const zhCN: Copy = {
   sectionIntegration: "对接参数",
   sectionSecurity: "安全",
   advancedAllowlist: "高级 · 回调允许列表",
+  credentialRefHint: "由稳定 ID 自动生成（cred://device-platform/{id}），不可编辑",
   fields: {
     displayName: "平台名称",
     platformId: "稳定 ID",
