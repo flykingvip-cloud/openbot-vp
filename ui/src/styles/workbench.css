@@ -5328,11 +5328,20 @@
   min-width: 0;
 }
 
-.personal-devices__pair-side {
+.personal-devices__pair-details {
   display: grid;
   gap: 12px;
-  align-content: space-between;
   min-width: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--secondary) 72%, transparent);
+}
+
+.personal-devices__pair-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, var(--muted));
 }
 
 .personal-devices__field .employee-workbench__settings-input,
@@ -5343,8 +5352,7 @@
 
 textarea.personal-devices__scan.employee-workbench__settings-input {
   box-sizing: border-box;
-  min-height: 148px;
-  height: 100%;
+  min-height: 112px;
   padding: 10px 14px;
   resize: vertical;
   line-height: 1.45;
@@ -5356,12 +5364,6 @@ textarea.personal-devices__scan.employee-workbench__settings-input {
   min-width: 8.5rem;
 }
 
-@media (min-width: 760px) {
-  .personal-devices__pair {
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-    align-items: stretch;
-  }
-}
 
 @media (max-width: 560px) {
   .personal-devices__field,

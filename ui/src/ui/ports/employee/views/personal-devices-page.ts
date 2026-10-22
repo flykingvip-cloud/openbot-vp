@@ -363,7 +363,7 @@ function renderLoadError() {
       <div class="personal-devices__callout-actions">
         <button
           type="button"
-          class="btn"
+          class="btn btn--primary"
           data-testid="personal-devices-retry"
           ?disabled=${state.busy}
           @click=${() => retryLoad()}
@@ -372,7 +372,7 @@ function renderLoadError() {
         </button>
         <button
           type="button"
-          class="btn btn--primary"
+          class="btn"
           data-testid="personal-devices-add"
           @click=${() => openAdd()}
         >
@@ -609,8 +609,13 @@ function renderBackButton() {
   `;
 }
 
+function pairingDetailsVisible(draft: AddDraft): boolean {
+  return Boolean(draft.deviceId.trim() || draft.challenge.trim() || draft.code.trim());
+}
+
 function renderAddForm() {
   const draft = state.draft;
+  const showDetails = pairingDetailsVisible(draft);
   return html`
     <form
       class="personal-devices__form"
@@ -653,13 +658,13 @@ function renderAddForm() {
         )}
         <div class="personal-devices__pair">
           ${renderField(
-            "扫描结果",
+            "粘贴扫描 / 配对码",
             html`
               <textarea
                 class="employee-workbench__settings-input personal-devices__scan mono"
                 data-testid="personal-device-scan"
-                rows="6"
-                placeholder="粘贴扫描内容，或只粘贴 6 位配对码"
+                rows="4"
+                placeholder="粘贴扫描内容，或只粘贴 6 位配对码；解析成功后会显示明细"
                 .value=${draft.scan}
                 @input=${(event: Event) => {
                   draft.scan = (event.target as HTMLTextAreaElement).value;
@@ -669,50 +674,60 @@ function renderAddForm() {
             `,
             "personal-devices__field--scan",
           )}
-          <div class="personal-devices__pair-side">
-            ${renderField(
-              "设备编号",
-              html`
-                <input
-                  class="employee-workbench__settings-input mono"
-                  data-testid="personal-device-id"
-                  .value=${draft.deviceId}
-                  @input=${(event: Event) => {
-                    draft.deviceId = (event.target as HTMLInputElement).value;
-                  }}
-                />
-              `,
-            )}
-            ${renderField(
-              "挑战号",
-              html`
-                <input
-                  class="employee-workbench__settings-input mono"
-                  data-testid="personal-device-challenge"
-                  .value=${draft.challenge}
-                  @input=${(event: Event) => {
-                    draft.challenge = (event.target as HTMLInputElement).value;
-                  }}
-                />
-              `,
-            )}
-            ${renderField(
-              "配对码",
-              html`
-                <input
-                  class="employee-workbench__settings-input mono"
-                  data-testid="personal-device-code"
-                  inputmode="numeric"
-                  maxlength="6"
-                  autocomplete="one-time-code"
-                  .value=${draft.code}
-                  @input=${(event: Event) => {
-                    draft.code = (event.target as HTMLInputElement).value;
-                  }}
-                />
-              `,
-            )}
-          </div>
+          ${
+            showDetails
+              ? html`
+                <div
+                  class="personal-devices__pair-details"
+                  data-testid="personal-device-pair-details"
+                >
+                  <p class="personal-devices__pair-hint">已从扫描内容填入，可按需微调。</p>
+                  ${renderField(
+                    "设备编号",
+                    html`
+                      <input
+                        class="employee-workbench__settings-input mono"
+                        data-testid="personal-device-id"
+                        .value=${draft.deviceId}
+                        @input=${(event: Event) => {
+                          draft.deviceId = (event.target as HTMLInputElement).value;
+                        }}
+                      />
+                    `,
+                  )}
+                  ${renderField(
+                    "挑战号",
+                    html`
+                      <input
+                        class="employee-workbench__settings-input mono"
+                        data-testid="personal-device-challenge"
+                        .value=${draft.challenge}
+                        @input=${(event: Event) => {
+                          draft.challenge = (event.target as HTMLInputElement).value;
+                        }}
+                      />
+                    `,
+                  )}
+                  ${renderField(
+                    "配对码",
+                    html`
+                      <input
+                        class="employee-workbench__settings-input mono"
+                        data-testid="personal-device-code"
+                        inputmode="numeric"
+                        maxlength="6"
+                        autocomplete="one-time-code"
+                        .value=${draft.code}
+                        @input=${(event: Event) => {
+                          draft.code = (event.target as HTMLInputElement).value;
+                        }}
+                      />
+                    `,
+                  )}
+                </div>
+              `
+              : nothing
+          }
         </div>
         ${renderHumanField(draft)}
       </div>
@@ -879,7 +894,7 @@ async function onAdd(event: Event): Promise<void> {
     !draft.code ||
     !draft.digitalHumanId
   ) {
-    setNotice("请补全平台、设备编号、挑战号、配对码和数字人。", "error");
+    setNotice("请先粘贴扫描内容或配对码并确认平台、数字人；明细不全时请补全后再提交。", "error");
     rerender();
     return;
   }

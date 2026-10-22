@@ -158,9 +158,23 @@ describe("personal devices panel", () => {
     expect(human?.getAttribute("data-digital-human-id")).toBe("dh-a");
     expect(human?.value).toBe("我的数字人");
 
-    setField(container, "[data-testid=personal-device-id]", "cam-9");
-    setField(container, "[data-testid=personal-device-challenge]", "pch_example");
-    setField(container, "[data-testid=personal-device-code]", "123456");
+    expect(container.querySelector("[data-testid=personal-device-pair-details]")).toBeNull();
+    pasteScan(
+      container,
+      JSON.stringify({
+        deviceId: "cam-9",
+        pairChallenge: "pch_example",
+        pairingCode: "123456",
+      }),
+    );
+    paint();
+    expect(container.querySelector("[data-testid=personal-device-pair-details]")).not.toBeNull();
+    expect(
+      container.querySelector<HTMLInputElement>("[data-testid=personal-device-id]")?.value,
+    ).toBe("cam-9");
+    expect(
+      container.querySelector<HTMLInputElement>("[data-testid=personal-device-challenge]")?.value,
+    ).toBe("pch_example");
     container
       .querySelector("[data-testid=personal-device-add]")
       ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -275,6 +289,8 @@ describe("personal devices panel", () => {
     expect(viewName(container)).toBe("add");
     expect(container.querySelector("[data-testid=personal-device-add]")).not.toBeNull();
     expect(container.querySelector(".personal-devices__pair")).not.toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-scan]")).not.toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-pair-details]")).toBeNull();
     expect(container.querySelector("[data-testid=personal-device-scopes]")).not.toBeNull();
     expect(container.querySelector("[data-testid=personal-device-submit]")?.textContent).toContain(
       "添加并授权",
@@ -346,7 +362,11 @@ describe("personal devices panel", () => {
     expect(callout?.textContent).toContain("登录已失效");
     expect(callout?.textContent).not.toContain("设备请求失败。");
     expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
-    expect(container.querySelector("[data-testid=personal-devices-retry]")).not.toBeNull();
+    const retry = container.querySelector("[data-testid=personal-devices-retry]");
+    const addOnError = container.querySelector("[data-testid=personal-devices-add]");
+    expect(retry).not.toBeNull();
+    expect(retry?.classList.contains("btn--primary")).toBe(true);
+    expect(addOnError?.classList.contains("btn--primary")).toBe(false);
 
     container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
     paint();
@@ -386,9 +406,15 @@ describe("personal devices panel", () => {
     await flush(paint);
     container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
     paint();
-    setField(container, "[data-testid=personal-device-id]", "cam-9");
-    setField(container, "[data-testid=personal-device-challenge]", "pch_example");
-    setField(container, "[data-testid=personal-device-code]", "123456");
+    pasteScan(
+      container,
+      JSON.stringify({
+        deviceId: "cam-9",
+        pairChallenge: "pch_example",
+        pairingCode: "123456",
+      }),
+    );
+    paint();
     container
       .querySelector("[data-testid=personal-device-add]")
       ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -476,13 +502,14 @@ async function flush(paint: () => void): Promise<void> {
   paint();
 }
 
-function setField(container: ParentNode, selector: string, value: string): void {
-  const field = container.querySelector<HTMLInputElement>(selector);
+function pasteScan(container: ParentNode, value: string): void {
+  const field = container.querySelector<HTMLTextAreaElement>("[data-testid=personal-device-scan]");
   if (!field) {
-    throw new Error(`missing ${selector}`);
+    throw new Error("missing personal-device-scan");
   }
   field.value = value;
   field.dispatchEvent(new Event("input", { bubbles: true }));
+  field.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function effectText(container: ParentNode, testId: string): string {
