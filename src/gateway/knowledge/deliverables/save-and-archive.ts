@@ -9,6 +9,7 @@ import { normalizeGroupWorkspaceRelativePath } from "../../server-methods/group-
 import { readUniquePreviewFile } from "../../server-methods/steward-preview-locator.js";
 import type { GatewayClient } from "../../server-methods/types.js";
 import { resolveTenantContext } from "../../tenant-context.js";
+import { alignFormalRootForManagedAddressing } from "../../workspace-resolver/formal-deliverable-root.js";
 import { resolvePlacedFilesystemWriteRoot } from "../../workspace-resolver/write-roots.js";
 import { assertGroupMemberAccess } from "../../workspace/group-acl.js";
 import { resolveTrustedGroupLocator } from "../../workspace/group-locator.js";
@@ -287,13 +288,18 @@ export async function saveAndArchiveWorkspaceDeliverable(params: {
           agentId,
           cfg: loadConfig(),
         });
-        birthRoot = resolvePlacedFilesystemWriteRoot({
+        const placedBirth = resolvePlacedFilesystemWriteRoot({
           locator: trusted,
           agentId,
           userId: params.userId,
           sessionKey,
           ensureDirectory: false,
         });
+        birthRoot = placedBirth
+          ? alignFormalRootForManagedAddressing(placedBirth, {
+              config: groupAuth?.cfg ?? loadConfig(),
+            })
+          : null;
       } catch {
         birthRoot = null;
       }
@@ -400,13 +406,16 @@ export async function saveAndArchiveWorkspaceDeliverable(params: {
       cfg,
     });
     // Unplaced catalog locators must not become birth-write roots; place onto robot-own.
-    const locator = resolvePlacedFilesystemWriteRoot({
+    const placedLocator = resolvePlacedFilesystemWriteRoot({
       locator: trustedLocator,
       agentId,
       userId: params.userId,
       sessionKey,
       ensureDirectory: true,
     });
+    const locator = placedLocator
+      ? alignFormalRootForManagedAddressing(placedLocator, { config: cfg })
+      : null;
     if (!locator) {
       throw new KnowledgeBaseStoreError("deliverable birth root unavailable");
     }

@@ -1,5 +1,28 @@
 version: 1
 tasks:
+  - id: batch9-formal-root:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 9 formal workspace root for deliverable write, settle, and preview
+    paths:
+      - docs/notes/openbot-batch9-formal-root-2026-10-22.md
+      - src/config/data-space.ts
+      - src/gateway/account-execution-paths.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts
+      - src/gateway/knowledge/deliverables/save-and-archive.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/workspace-resolver/formal-deliverable-root.test.ts
+      - src/gateway/workspace-resolver/formal-deliverable-root.ts
+      - src/gateway/workspace-resolver/formal-root-settle.test.ts
+      - src/gateway/workspace-resolver/index.ts
+      - src/gateway/workspace-resolver/materialize-declared-deliverable.ts
+      - src/gateway/workspace-resolver/settle-declared-deliverable.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-22
+    metadata: {}
   - id: batch8-skill-gates:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9361,6 +9384,28 @@ tasks:
     since: 2026-10-22
     metadata: {}
 landingStreams:
+  - id: batch9-formal-root
+    landingPolicy: serial
+    paths:
+      - docs/notes/openbot-batch9-formal-root-2026-10-22.md
+      - src/config/data-space.ts
+      - src/gateway/account-execution-paths.ts
+      - src/gateway/knowledge/deliverables/chat-deliverable-publish.ts
+      - src/gateway/knowledge/deliverables/maybe-auto-capture-agent-deliverable.ts
+      - src/gateway/knowledge/deliverables/save-and-archive.ts
+      - src/gateway/server-methods/steward-workspace-file.ts
+      - src/gateway/workspace-resolver/formal-deliverable-root.test.ts
+      - src/gateway/workspace-resolver/formal-deliverable-root.ts
+      - src/gateway/workspace-resolver/formal-root-settle.test.ts
+      - src/gateway/workspace-resolver/index.ts
+      - src/gateway/workspace-resolver/materialize-declared-deliverable.ts
+      - src/gateway/workspace-resolver/settle-declared-deliverable.ts
+    canLandWith:
+      - strip-ohbe-from-openbot-vp
+    metadata:
+      task: batch9-formal-root
+      owner: cursor-cloud
+      purpose: Batch 9 formal root. First-match so settle, preview, and write paths land together.
   - id: strip-ohbe-from-openbot-vp
     landingPolicy: serial
     paths:
@@ -9513,7 +9558,8 @@ landingStreams:
       - src/diagnosis/production-unified-deploy.cli.ts
       - src/diagnosis/production-unified-deps.cli.ts
       - src/diagnosis/production-unified-lock.cli.ts
-    canLandWith: []
+    canLandWith:
+      - batch9-formal-root
     metadata:
       task: strip-ohbe-from-openbot-vp
       owner: cursor-cloud

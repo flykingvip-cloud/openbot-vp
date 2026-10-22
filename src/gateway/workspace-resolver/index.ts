@@ -149,6 +149,9 @@ export {
 export {
   resolveFormalDeliverableRoot,
   alignFormalRootForManagedAddressing,
+  formalAddressingEnv,
+  listFormalRootSkewSiblings,
+  resolveFormalAgentWorkspace,
   buildFormalFileRef,
   resolveFormalPreviewAbsolutePath,
   type FormalResourceKind,

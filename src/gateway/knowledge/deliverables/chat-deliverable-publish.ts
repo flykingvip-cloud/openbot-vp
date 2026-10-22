@@ -39,7 +39,10 @@ import { maybeAutoCaptureAgentDeliverable } from "./maybe-auto-capture-agent-del
  * - Reserved group prefixes `runtime/`, `governance/`, `profile/`, `sessions/`,
  *   `.git/` are never deliverable targets.
  * - Binary declarations (pdf/office/images) never have bytes invented. Missing
- *   or zero-length bytes stay `unwritten`.
+ *   or zero-length bytes stay `unwritten`. Bytes that exist only on the other
+ *   path shape of the same bot (tenants vs operators), or that disagree with
+ *   the formal root, stay `unwritten` with `workspace_root_skew`. Settle does
+ *   not copy or overwrite across that split.
  * - A group formal-root file with different bytes is a `conflict`: do not
  *   overwrite, do not confirm.
  * - A group-scoped turn whose formal root is missing stays `retryable`. It must
@@ -130,6 +133,7 @@ const REASON_LABELS: Record<string, string> = {
   manifest_write_failed: "登记失败，可重试",
   version_conflict: "版本冲突，未覆盖已有文件",
   binary_requires_tool_write: "文件缺失或为空",
+  workspace_root_skew: "文件缺失或为空",
   empty_content: "文件缺失或为空",
   write_failed: "写入失败",
   group_reserved_path: "该路径不能作为成果",
@@ -154,8 +158,12 @@ export type PrepareChatDeliverablePublishParams = {
   userId?: string | null;
   clientRunId?: string | null;
   stateDir?: string;
+  /** Addressing env for formal-root resolution. Production omits this and uses process.env. */
+  env?: NodeJS.ProcessEnv;
   agentWorkspaceRoot?: string | null;
   groupWorkspaceRoot?: string | null;
+  /** Read-only twins of the agent formal root. Tests inject these; production resolves them. */
+  siblingAgentWorkspaceRoots?: string[] | null;
   /** True when the turn is group-scoped even if the formal root is missing. */
   groupScoped?: boolean;
   /** Tests skip knowledge-center capture. Production captures only after a persisted pass. */
@@ -535,6 +543,7 @@ export function prepareChatDeliverablePublish(
       ? {
           agentWorkspaceRoot: params.agentWorkspaceRoot ?? null,
           groupWorkspaceRoot: params.groupWorkspaceRoot ?? null,
+          siblingAgentWorkspaceRoots: params.siblingAgentWorkspaceRoots ?? [],
         }
       : resolveCollaborationDeliverableRoots({
           agentId: params.agentId,
@@ -543,6 +552,7 @@ export function prepareChatDeliverablePublish(
           userId: params.userId,
           sessionKey,
           stateDir,
+          env: params.env,
         });
     const agentRoot = resolved.agentWorkspaceRoot;
     const groupRoot = resolved.groupWorkspaceRoot;
@@ -586,6 +596,7 @@ export function prepareChatDeliverablePublish(
       stateDir,
       agentWorkspaceRoot: agentRoot,
       groupWorkspaceRoot: groupRoot,
+      siblingAgentWorkspaceRoots: resolved.siblingAgentWorkspaceRoots,
       groupScoped,
     });
     const classified = classifySettle(settled);

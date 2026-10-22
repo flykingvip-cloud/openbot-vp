@@ -1,7 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { OpenBotConfig } from "../../config/types.js";
 import { assertWrittenFileNonEmptySync } from "../../infra/non-empty-workspace-write.js";
 import { normalizeDeliverableWorkspacePath } from "../../shared/preview-artifact/deliverable-envelope.js";
+import {
+  alignFormalRootForManagedAddressing,
+  formalAddressingEnv,
+} from "./formal-deliverable-root.js";
 import { resolveWorkspaceWriteLocator } from "./workspace-write-contract.js";
 import { isFilesystemWorkspaceLocator, resolvePlacedFilesystemWriteRoot } from "./write-roots.js";
 
@@ -135,6 +140,9 @@ export function materializeDeclaredDeliverableAtPlacedRoot(params: {
   stateDir?: string;
   relativePath: string;
   content: string;
+  /** When set, managed shared addressing writes the formal (remounted) root. */
+  cfg?: OpenBotConfig | null;
+  env?: NodeJS.ProcessEnv;
 }): MaterializeDeclaredDeliverableResult {
   const workspaceRoot = resolvePlacedFilesystemWriteRoot({
     locator: params.catalogLocator,
@@ -148,8 +156,12 @@ export function materializeDeclaredDeliverableAtPlacedRoot(params: {
   if (!workspaceRoot) {
     return { ok: false, reason: "workspace_root_unavailable" };
   }
+  const formalRoot = alignFormalRootForManagedAddressing(workspaceRoot, {
+    config: params.cfg,
+    env: formalAddressingEnv(params.stateDir, params.env),
+  });
   return materializeDeclaredDeliverableInWorkspace({
-    workspaceRoot,
+    workspaceRoot: formalRoot,
     relativePath: params.relativePath,
     content: params.content,
   });

@@ -3,6 +3,7 @@ import { resolveSessionAgentId } from "../../../agents/agent-scope.js";
 import { isEmployeeBuiltinStewardSession } from "../../../agents/builtin-steward/employee-isolation.js";
 import { loadConfig } from "../../../config/config.js";
 import { isManagedDataMode } from "../../../config/data-space.js";
+import type { OpenBotConfig } from "../../../config/types.js";
 import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
 import { resolveGroupCollaborationPaths } from "../../collaboration-learning/collaboration-paths.js";
 import { resolveCollaborationGroupIdFromSessionKey } from "../../collaboration-learning/shared.js";
@@ -249,6 +250,12 @@ export function maybeAutoCaptureAgentDeliverable(
     // materialized when the write tool was skipped; office bytes are not invented.
     let fileReadable = false;
     if (acceptedFile) {
+      let captureCfg: OpenBotConfig | null = null;
+      try {
+        captureCfg = loadConfig();
+      } catch {
+        captureCfg = null;
+      }
       const placed = materializeDeclaredDeliverableAtPlacedRoot({
         agentId,
         userId: params.ownerId,
@@ -256,6 +263,7 @@ export function maybeAutoCaptureAgentDeliverable(
         stateDir: params.stateDir,
         relativePath: acceptedFile,
         content: envelope.body,
+        cfg: captureCfg,
       });
       fileReadable = placed.ok;
     }
