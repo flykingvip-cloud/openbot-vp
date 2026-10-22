@@ -147,4 +147,22 @@ describe("yonyou tplus chanjet messages", () => {
     expect(events[0]?.note).toBe("subscribed_event_stub");
     expect(events[0]?.orgId).toBe("90001198862");
   });
+
+  it("does not store a plaintext appTicket when the message key is configured", async () => {
+    vi.stubEnv("OPENBOT_ENTERPRISE_DATA_YONYOU_TPLUS_MESSAGE_KEY", "1234567890abcdef");
+    await saveYonyouTplusAppTicket({
+      appKey: "ak-test",
+      appTicket: "ticket-real",
+      receivedAt: "2026-10-22T00:00:00.000Z",
+    });
+    const response = await postMessage({
+      id: "msg-forged",
+      appKey: "ak-test",
+      msgType: "APP_TICKET",
+      bizContent: { appTicket: "ticket-forged" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json).toEqual({ result: "success" });
+    expect(await loadYonyouTplusAppTicket("ak-test")).toBe("ticket-real");
+  });
 });

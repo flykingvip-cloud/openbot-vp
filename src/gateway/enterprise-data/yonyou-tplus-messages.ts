@@ -109,6 +109,19 @@ export async function acceptYonyouTplusChanjetMessage(params: {
   storePath?: string;
   messageKey?: string;
 }): Promise<YonyouTplusMessageAcceptResult> {
+  const configuredKey = (params.messageKey ?? messageKeyFromEnv()).trim();
+  const encrypted =
+    params.body != null &&
+    typeof params.body === "object" &&
+    !Array.isArray(params.body) &&
+    typeof (params.body as { encryptMsg?: unknown }).encryptMsg === "string";
+  if (configuredKey && !encrypted) {
+    await recordYonyouTplusMessageEvent(
+      { msgType: "rejected", receivedAt: params.nowIso, note: "plaintext_rejected" },
+      params.storePath,
+    );
+    return { msgType: null, stored: false, note: "plaintext_rejected" };
+  }
   const decoded = decodeYonyouTplusChanjetBody(params.body, params.messageKey);
   const message = asMessage(decoded);
   const msgType = message?.msgType?.trim() || null;
