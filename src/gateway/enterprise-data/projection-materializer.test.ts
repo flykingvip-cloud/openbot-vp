@@ -338,6 +338,7 @@ describe("yonyou projection cursor window", () => {
       nowIso,
     });
     const cursorId = `${sourceId}::inventory`;
+    store.connectorSyncCursors ??= {};
     store.connectorSyncCursors[cursorId] = {
       cursorId,
       tenantId,
