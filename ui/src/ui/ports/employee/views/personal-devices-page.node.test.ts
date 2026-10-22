@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   createPersonalDevicesFetchClient,
   parsePairingScan,
+  PersonalDevicesRequestError,
   renderPersonalDevicesPanel,
   resetPersonalDevicesPanelForTests,
   setPersonalDevicesClientForTests,
@@ -73,12 +74,22 @@ describe("personal devices panel", () => {
     expect(container.textContent).toContain("我的数字人");
     expect(container.textContent).toContain("对话");
     expect(container.textContent).toContain("已连接");
-    expect(container.textContent).toContain("未知");
+    expect(container.textContent).toContain("未确认·JOINT_PENDING");
+    expect(container.textContent).not.toContain("设备已应用");
     expect(container.textContent).not.toContain(SECRET_URL);
     expect(container.textContent).not.toContain(SECRET);
-    expect(container.querySelector("[data-testid=personal-device-add]")).not.toBeNull();
+    expect(viewName(container)).toBe("list");
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
+    expect(container.querySelector("[data-testid=personal-devices-add]")).not.toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-revoke]")).toBeNull();
+
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-device-row]")?.click();
+    paint();
+    expect(viewName(container)).toBe("detail");
+    expect(container.textContent).toContain("未知");
     expect(container.querySelector("[data-testid=personal-device-revoke]")).not.toBeNull();
     expect(container.querySelector("[data-testid=personal-device-transfer]")).not.toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
     expect(container.textContent).not.toContain("不会把设备直接改到别人名下");
     const transfer = container.querySelector<HTMLButtonElement>(
       "[data-testid=personal-device-transfer]",
@@ -137,6 +148,11 @@ describe("personal devices panel", () => {
     expect(container.textContent).toContain("门口相机");
     expect(container.textContent).not.toContain("设备与硬件");
     expect(container.textContent).not.toContain(SECRET_URL);
+    expect(viewName(container)).toBe("list");
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
+    paint();
+    expect(viewName(container)).toBe("add");
     const human = container.querySelector<HTMLInputElement>("[data-testid=personal-device-human]");
     expect(human?.disabled).toBe(true);
     expect(human?.getAttribute("data-digital-human-id")).toBe("dh-a");
@@ -187,7 +203,10 @@ describe("personal devices panel", () => {
     await flush(() => paint("dh-a"));
     expect(container.textContent).toContain("门口相机");
     expect(container.textContent).not.toContain("会议室屏幕");
+    expect(viewName(container)).toBe("list");
 
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-device-row]")?.click();
+    paint("dh-a");
     container.querySelector<HTMLButtonElement>("[data-testid=personal-device-revoke]")?.click();
     paint("dh-a");
     clickText(container, "确认解除");
@@ -227,23 +246,43 @@ describe("personal devices panel", () => {
     expect(effectText(container, "personal-device-effect-device")).not.toBe("设备已应用");
   });
 
-  it("shows the same unconfirmed effect on an empty list and while the platform is applying", async () => {
+  it("opens add from an empty list and shows effect only on a real row", async () => {
     setPersonalDevicesClientForTests({
       ...client(),
       listDevices: async () => [],
     });
     const container = document.createElement("div");
     document.body.append(container);
-    await flush(() => {
+    const paintEmpty = () => {
       render(
         html`${renderPersonalDevicesPanel({ title: "已连接设备", surface: "detail" })}`,
         container,
       );
-    });
+    };
+    await flush(paintEmpty);
     expect(container.textContent).toContain("已连接设备");
-    expect(effectText(container, "personal-device-effect-auth")).toBe("未授权");
-    expect(effectText(container, "personal-device-effect-platform")).toBe("未接受");
-    expect(effectText(container, "personal-device-effect-device")).toBe("未确认·JOINT_PENDING");
+    expect(viewName(container)).toBe("empty");
+    expect(container.textContent).toContain("还没有设备");
+    expect(container.querySelector("[data-testid=personal-devices-add]")?.textContent).toContain(
+      "添加设备",
+    );
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-effect-device]")).toBeNull();
+    expect(container.textContent).not.toContain("设备请求失败");
+
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
+    paintEmpty();
+    expect(viewName(container)).toBe("add");
+    expect(container.querySelector("[data-testid=personal-device-add]")).not.toBeNull();
+    expect(container.querySelector(".personal-devices__pair")).not.toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-scopes]")).not.toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-submit]")?.textContent).toContain(
+      "添加并授权",
+    );
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-back]")?.click();
+    paintEmpty();
+    expect(viewName(container)).toBe("empty");
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
 
     const applying = cloneDevice(device);
     if (applying.binding) {
@@ -280,6 +319,89 @@ describe("personal devices panel", () => {
     await api.listDevices();
     expect(urls[0]).toBe("/api/device-platform/v1/me/digital-humans/dh%20a%2F1/devices");
     expect(urls[1]).toBe("/api/device-platform/v1/me/devices");
+  });
+
+  it("keeps a load failure in a callout and still opens add", async () => {
+    let fail = true;
+    setPersonalDevicesClientForTests({
+      ...client(),
+      listDevices: async () => {
+        if (fail) {
+          throw new PersonalDevicesRequestError(401, "UNAUTHENTICATED", "请先登录。");
+        }
+        return [device];
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const paint = () => {
+      render(html`${renderPersonalDevicesPanel()}`, container);
+    };
+    await flush(paint);
+
+    expect(viewName(container)).toBe("error");
+    const callout = container.querySelector("[data-testid=personal-devices-status]");
+    expect(callout?.classList.contains("callout")).toBe(true);
+    expect(callout?.classList.contains("danger")).toBe(true);
+    expect(callout?.textContent).toContain("登录已失效");
+    expect(callout?.textContent).not.toContain("设备请求失败。");
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
+    expect(container.querySelector("[data-testid=personal-devices-retry]")).not.toBeNull();
+
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
+    paint();
+    expect(viewName(container)).toBe("add");
+    expect(container.querySelector("[data-testid=personal-devices-status]")).toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-add]")).not.toBeNull();
+    expect(container.querySelector(".personal-devices__form")).not.toBeNull();
+
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-back]")?.click();
+    paint();
+    expect(viewName(container)).toBe("error");
+
+    fail = false;
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-retry]")?.click();
+    await flush(paint);
+    expect(viewName(container)).toBe("list");
+    expect(container.textContent).toContain("门口相机");
+    expect(effectText(container, "personal-device-effect-device")).toBe("未确认·JOINT_PENDING");
+  });
+
+  it("shows a submit failure as a callout on the add form", async () => {
+    setPersonalDevicesClientForTests({
+      ...client(),
+      listDevices: async () => [],
+      submit: async () => {
+        throw new Error("设备请求失败。");
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const paint = () => {
+      render(
+        html`${renderPersonalDevicesPanel({ surface: "detail", title: "已连接设备" })}`,
+        container,
+      );
+    };
+    await flush(paint);
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
+    paint();
+    setField(container, "[data-testid=personal-device-id]", "cam-9");
+    setField(container, "[data-testid=personal-device-challenge]", "pch_example");
+    setField(container, "[data-testid=personal-device-code]", "123456");
+    container
+      .querySelector("[data-testid=personal-device-add]")
+      ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await flush(paint);
+
+    expect(viewName(container)).toBe("add");
+    const notice = container.querySelector("[data-testid=personal-devices-notice]");
+    expect(notice?.classList.contains("callout")).toBe(true);
+    expect(notice?.classList.contains("danger")).toBe(true);
+    expect(notice?.textContent).toContain("设备请求失败。");
+    expect(container.querySelector("p.personal-devices__note")).toBeNull();
+    expect(container.querySelector("[data-testid=personal-device-add]")).not.toBeNull();
+    expect(container.textContent).not.toContain("设备已应用");
   });
 });
 
@@ -365,6 +487,14 @@ function setField(container: ParentNode, selector: string, value: string): void 
 
 function effectText(container: ParentNode, testId: string): string {
   return container.querySelector(`[data-testid=${testId}]`)?.textContent ?? "";
+}
+
+function viewName(container: ParentNode): string | null {
+  return (
+    container
+      .querySelector("[data-personal-devices-view]")
+      ?.getAttribute("data-personal-devices-view") ?? null
+  );
 }
 
 function clickText(container: ParentNode, text: string): void {

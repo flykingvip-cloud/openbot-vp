@@ -375,7 +375,21 @@ describe("renderMyBotWorkspacePanel", () => {
     expect(container.querySelector("[data-wb-bots-tab=devices]")).not.toBeNull();
     expect(container.textContent).toContain("已连接设备");
     expect(container.textContent).toContain("门口相机");
+    expect(container.textContent).toContain("未确认·JOINT_PENDING");
     expect(container.textContent).not.toContain("正在加载详情");
+    expect(
+      container
+        .querySelector("[data-personal-devices-view]")
+        ?.getAttribute("data-personal-devices-view"),
+    ).toBe("list");
+    expect(container.querySelector("[data-testid=personal-device-add]")).toBeNull();
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-devices-add]")?.click();
+    paint();
+    expect(
+      container
+        .querySelector("[data-personal-devices-view]")
+        ?.getAttribute("data-personal-devices-view"),
+    ).toBe("add");
     const human = container.querySelector<HTMLInputElement>("[data-testid=personal-device-human]");
     expect(human?.disabled).toBe(true);
     expect(human?.getAttribute("data-digital-human-id")).toBe("sales");
