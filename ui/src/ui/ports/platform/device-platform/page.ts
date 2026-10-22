@@ -221,7 +221,6 @@ function renderListView() {
       <div>
         <div class="device-platform-admin__eyebrow">${dp((c) => c.breadcrumb)}</div>
         <h2 class="device-platform-admin__title">${dp((c) => c.title)}</h2>
-        <p class="device-platform-admin__subtitle">${dp((c) => c.subtitle)}</p>
       </div>
       <button
         class="btn primary"
@@ -236,9 +235,6 @@ function renderListView() {
     ${renderStatus()}
     ${state.status === "ready" ? renderFilters() : nothing}
     ${state.status === "ready" ? renderTable() : nothing}
-    <p class="device-platform-admin__footnote" data-testid="device-platform-footnote">
-      ${dp((c) => c.footnote)}
-    </p>
   `;
 }
 
