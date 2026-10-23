@@ -111,6 +111,37 @@ describe("C4 OGUI→handoff projection (wired seam)", () => {
     expect(result.value.handoffBrief).toContain(SUBMISSION_ID);
   });
 
+  test("legacy answer omits decision fields; a half-present lifecycle ref is rejected", () => {
+    const legacy = parseOguiAnswerEnvelope({
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: SUBMISSION_ID,
+      answers: { channel: "direct" },
+    });
+    expect(legacy?.decision_id).toBeUndefined();
+    expect(legacy?.decision_version).toBeUndefined();
+    expect(
+      parseOguiAnswerEnvelope({
+        schema_version: "ogui/v1",
+        component_id: "biz-model-form-1",
+        submission_id: SUBMISSION_ID,
+        decision_id: "dec-1",
+        answers: { channel: "direct" },
+      }),
+    ).toBeNull();
+    const paired = parseOguiAnswerEnvelope({
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: SUBMISSION_ID,
+      decision_id: "dec-1",
+      decision_version: 2,
+      answers: { channel: "direct" },
+    });
+    expect(paired?.decision_id).toBe("dec-1");
+    expect(paired?.decision_version).toBe(2);
+    expect(formatOguiAnswersAsHandoffBrief(paired!)).toContain("decision_id: dec-1");
+  });
+
   test("format brief is projection-only (mentions no approval bypass)", () => {
     const envelope = parseOguiAnswerEnvelope({
       schema_version: "ogui/v1",

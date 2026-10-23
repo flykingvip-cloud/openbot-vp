@@ -20,6 +20,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "../../config/config.js";
+import { classifyOguiAnswerDecisionFields } from "../../config/sessions/ogui-decision-lifecycle.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { appendJsonlDurable, withRoundLock } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
@@ -33,6 +34,9 @@ export type OguiAnswerEnvelope = Readonly<{
   submission_id: string;
   answers: Readonly<Record<string, string>>;
   submitted_at?: string;
+  /** Reference only. Omitted on legacy answers. Not a consume. */
+  decision_id?: string;
+  decision_version?: number;
 }>;
 
 export type OguiProjectionResult =
@@ -167,12 +171,22 @@ export function parseOguiAnswerEnvelope(raw: unknown): OguiAnswerEnvelope | null
     typeof raw.submitted_at === "string" && raw.submitted_at.trim()
       ? raw.submitted_at.trim()
       : undefined;
+  const decisionFields = classifyOguiAnswerDecisionFields({
+    decision_id: raw.decision_id,
+    decision_version: raw.decision_version,
+  });
+  if (decisionFields.kind === "reject") {
+    return null;
+  }
   return {
     schema_version: OGUI_SCHEMA_VERSION,
     component_id: componentId,
     submission_id: submissionId,
     answers,
     ...(submittedAt ? { submitted_at: submittedAt } : {}),
+    ...(decisionFields.kind === "lifecycle"
+      ? { decision_id: decisionFields.decisionId, decision_version: decisionFields.version }
+      : {}),
   };
 }
 
@@ -188,6 +202,10 @@ export function formatOguiAnswersAsHandoffBrief(envelope: OguiAnswerEnvelope): s
   ];
   if (envelope.submitted_at) {
     lines.push(`submitted_at: ${envelope.submitted_at}`);
+  }
+  if (envelope.decision_id && envelope.decision_version) {
+    lines.push(`decision_id: ${envelope.decision_id}`);
+    lines.push(`decision_version: ${envelope.decision_version}`);
   }
   lines.push("answers:");
   for (const [fieldId, value] of Object.entries(envelope.answers)) {

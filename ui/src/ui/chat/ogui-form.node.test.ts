@@ -152,6 +152,52 @@ describe("buildOguiAnswerSubmitMessage", () => {
     };
     expect(parsed.submission_id).toBe(SUBMISSION_ID);
     expect(parsed.answers).toEqual({ channel: "hybrid", billing: "device" });
+    expect(parsed).not.toHaveProperty("decision_id");
+    expect(parsed).not.toHaveProperty("decision_version");
+  });
+
+  it("includes both decision fields when a lifecycle card is submitted", () => {
+    const form = parseOguiFormDefinition({
+      ...VALID_FORM_JSON,
+      decision_id: "dec-9",
+      decision_version: 3,
+    }) as OguiFormDefinition;
+    expect(form.decision_id).toBe("dec-9");
+    expect(form.decision_version).toBe(3);
+    const text = buildOguiAnswerSubmitMessage({
+      form,
+      answers: { channel: "hybrid", billing: "device" },
+      submissionId: SUBMISSION_ID,
+      decisionId: "dec-9",
+      decisionVersion: 3,
+    });
+    const body = text.split("```ogui-answer")[1]?.split("```")[0]?.trim() ?? "";
+    const parsed = JSON.parse(body) as {
+      submission_id: string;
+      decision_id?: string;
+      decision_version?: number;
+    };
+    expect(parsed.submission_id).toBe(SUBMISSION_ID);
+    expect(parsed.decision_id).toBe("dec-9");
+    expect(parsed.decision_version).toBe(3);
+  });
+
+  it("rejects a lifecycle submit that is missing one decision field", () => {
+    const form = parseOguiFormDefinition(VALID_FORM_JSON) as OguiFormDefinition;
+    expect(() =>
+      buildOguiAnswerSubmitMessage({
+        form,
+        answers: { channel: "hybrid", billing: "device" },
+        submissionId: SUBMISSION_ID,
+        decisionId: "dec-9",
+      }),
+    ).toThrow(/positive integer/);
+    const partial = parseOguiFormDefinition({
+      ...VALID_FORM_JSON,
+      decision_id: "dec-9",
+    });
+    expect(partial?.component_id).toBe("biz-model-form-1");
+    expect(partial?.decision_id).toBeUndefined();
   });
 
   it("rejects non-UUID submission_id and missing required answers", () => {

@@ -60,6 +60,9 @@ export function oguiAnswerToCanvasUserAction(
       submission_id: answer.submission_id,
       answers: answer.answers,
       ...(answer.submitted_at ? { submitted_at: answer.submitted_at } : {}),
+      ...(answer.decision_id && answer.decision_version
+        ? { decision_id: answer.decision_id, decision_version: answer.decision_version }
+        : {}),
       continue_agent: true,
       // High-risk actions must still go through Steward / Exec Approvals —
       // this payload is structured context only, not an approval bypass.
