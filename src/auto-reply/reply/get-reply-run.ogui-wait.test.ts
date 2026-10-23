@@ -274,4 +274,95 @@ describe("runPreparedReply OGUI ingress", () => {
     expect(stored?.decisionStatus).toBe("waiting");
     expect(stored?.resumeStatus).toBe("pending");
   });
+
+  it("binds resumeRef on the reply path and writes the resume completed", async () => {
+    const storePath = path.join(dir, "sessions.json");
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: {
+        lifecycleEnabled: true,
+        cfg: { collaboration: { task: { oguiDecisionLifecycle: true } } },
+        storePath,
+        sessionKey: SESSION_KEY,
+        userId: "user-1",
+        originRunId: "run-origin",
+        ingress: "chat",
+        allowIssue: true,
+      },
+      env: { OPENBOT_OGUI_DECISION_LIFECYCLE: "1" },
+    });
+    const answer = [
+      "```ogui-answer",
+      JSON.stringify({
+        schema_version: "ogui/v1",
+        component_id: "cmp-1",
+        submission_id: "sub-reply-1",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      }),
+      "```",
+    ].join("\n");
+    const result = await runPreparedReply(replyParams({ storePath, text: answer }));
+    expect(result).toEqual({ text: "agent-ran" });
+    const call = runReplyAgentMock.mock.calls[0]?.[0] as {
+      followupRun?: { run?: { oguiDecisionRun?: { resumeRef?: string; decisionId?: string } } };
+    };
+    expect(call.followupRun?.run?.oguiDecisionRun?.resumeRef).toBe(issued.resumeRef);
+    expect(call.followupRun?.run?.oguiDecisionRun?.decisionId).toBe(issued.decisionId);
+    const stored = loadSessionStore(storePath, { skipCache: true })[SESSION_KEY]?.oguiDecisions?.[
+      issued.decisionId ?? ""
+    ];
+    expect(stored?.decisionStatus).toBe("answered");
+    expect(stored?.resumeStatus).toBe("completed");
+    expect(stored?.resumeRef).toBe(issued.resumeRef);
+  });
+
+  it("releases a failed reply to retryable and completes the same resume on retry", async () => {
+    const storePath = path.join(dir, "sessions.json");
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: {
+        lifecycleEnabled: true,
+        cfg: { collaboration: { task: { oguiDecisionLifecycle: true } } },
+        storePath,
+        sessionKey: SESSION_KEY,
+        userId: "user-1",
+        originRunId: "run-origin",
+        ingress: "chat",
+        allowIssue: true,
+      },
+      env: { OPENBOT_OGUI_DECISION_LIFECYCLE: "1" },
+    });
+    const answer = [
+      "```ogui-answer",
+      JSON.stringify({
+        schema_version: "ogui/v1",
+        component_id: "cmp-1",
+        submission_id: "sub-reply-fail",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      }),
+      "```",
+    ].join("\n");
+    runReplyAgentMock.mockRejectedValueOnce(new Error("exec-failed"));
+    await expect(runPreparedReply(replyParams({ storePath, text: answer }))).rejects.toThrow(
+      "exec-failed",
+    );
+    const failed = loadSessionStore(storePath, { skipCache: true })[SESSION_KEY]?.oguiDecisions?.[
+      issued.decisionId ?? ""
+    ];
+    expect(failed?.decisionStatus).toBe("answered");
+    expect(failed?.resumeStatus).toBe("retryable");
+    expect(failed?.resumeRef).toBe(issued.resumeRef);
+    const retried = await runPreparedReply(replyParams({ storePath, text: answer }));
+    expect(retried).toEqual({ text: "agent-ran" });
+    const stored = loadSessionStore(storePath, { skipCache: true })[SESSION_KEY]?.oguiDecisions?.[
+      issued.decisionId ?? ""
+    ];
+    expect(stored?.resumeStatus).toBe("completed");
+    expect(stored?.resumeRef).toBe(issued.resumeRef);
+    expect(stored?.decisionStatus).toBe("answered");
+  });
 });

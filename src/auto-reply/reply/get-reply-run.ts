@@ -34,7 +34,9 @@ import {
 } from "../../config/sessions.js";
 import {
   admitOguiDecisionTurn,
+  releaseOguiDecisionResume,
   resolveOguiDecisionRunBinding,
+  runWithOguiDecisionResume,
 } from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
@@ -1483,7 +1485,7 @@ export async function runPreparedReply(
     turnExecutionIdentity?.platformUserId?.trim() ||
     replyGatewayPlatformUserId?.trim() ||
     undefined;
-  const oguiDecisionRun = resolveOguiDecisionRunBinding({
+  let oguiDecisionRun = resolveOguiDecisionRunBinding({
     cfg,
     agentId,
     tenantId: replyGatewayTenantId,
@@ -1511,6 +1513,25 @@ export async function runPreparedReply(
   if (oguiAdmission.action === "pause" || oguiAdmission.action === "ack") {
     typing.cleanup();
     return { text: oguiAdmission.text ?? "" };
+  }
+  let oguiResumeExec: { decisionId: string; resumeRef: string } | undefined;
+  if (
+    oguiAdmission.action === "resume" &&
+    oguiAdmission.decisionId &&
+    oguiAdmission.resumeRef &&
+    oguiDecisionRun &&
+    storePath &&
+    sessionKey
+  ) {
+    oguiDecisionRun = {
+      ...oguiDecisionRun,
+      decisionId: oguiAdmission.decisionId,
+      resumeRef: oguiAdmission.resumeRef,
+    };
+    oguiResumeExec = {
+      decisionId: oguiAdmission.decisionId,
+      resumeRef: oguiAdmission.resumeRef,
+    };
   }
   const isStreaming = isEmbeddedPiRunStreaming(sessionIdFinal);
   const shouldSteer = resolvedQueue.mode === "steer" || resolvedQueue.mode === "steer-backlog";
@@ -1631,32 +1652,57 @@ export async function runPreparedReply(
     },
   };
 
-  const reply = await runReplyAgent({
-    commandBody: prefixedCommandBody,
-    followupRun,
-    queueKey,
-    resolvedQueue,
-    shouldSteer,
-    shouldFollowup,
-    isActive,
-    isStreaming,
-    opts,
-    typing,
-    sessionEntry,
-    sessionStore,
-    sessionKey,
-    storePath,
-    defaultModel,
-    agentCfgContextTokens: agentCfg?.contextTokens,
-    resolvedVerboseLevel: resolvedVerboseLevel ?? "off",
-    isNewSession,
-    blockStreamingEnabled,
-    blockReplyChunking,
-    resolvedBlockStreamingBreak,
-    sessionCtx,
-    shouldInjectGroupIntro,
-    typingMode,
-  });
+  const runAgent = () =>
+    runReplyAgent({
+      commandBody: prefixedCommandBody,
+      followupRun,
+      queueKey,
+      resolvedQueue,
+      shouldSteer,
+      shouldFollowup,
+      isActive,
+      isStreaming,
+      opts,
+      typing,
+      sessionEntry,
+      sessionStore,
+      sessionKey,
+      storePath,
+      defaultModel,
+      agentCfgContextTokens: agentCfg?.contextTokens,
+      resolvedVerboseLevel: resolvedVerboseLevel ?? "off",
+      isNewSession,
+      blockStreamingEnabled,
+      blockReplyChunking,
+      resolvedBlockStreamingBreak,
+      sessionCtx,
+      shouldInjectGroupIntro,
+      typingMode,
+    });
+  let reply: Awaited<ReturnType<typeof runReplyAgent>>;
+  if (oguiResumeExec && storePath && sessionKey) {
+    try {
+      reply = await runWithOguiDecisionResume({
+        storePath,
+        sessionKey,
+        decisionId: oguiResumeExec.decisionId,
+        resumeRef: oguiResumeExec.resumeRef,
+        lifecycleEnabled: true,
+        run: runAgent,
+      });
+    } catch (err) {
+      await releaseOguiDecisionResume({
+        storePath,
+        sessionKey,
+        decisionId: oguiResumeExec.decisionId,
+        resumeRef: oguiResumeExec.resumeRef,
+        lifecycleEnabled: true,
+      });
+      throw err;
+    }
+  } else {
+    reply = await runAgent();
+  }
   if (
     reply &&
     knowledgeUniverseContext?.sourceUserId &&

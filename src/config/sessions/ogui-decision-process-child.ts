@@ -4,8 +4,14 @@
  *   consume                      — one consume, JSON on stdout
  *   consume-then-sigkill         — consume, claim (persist running), SIGKILL
  *   consume-sigkill-before-claim — consume, SIGKILL before claim
+ *   exec-then-sigkill            — consume, claim, enter exec, SIGKILL mid-flight
  */
-import { claimOguiDecisionResume, consumeOguiDecisionAnswer } from "./ogui-decision-engine.js";
+import {
+  admitOguiDecisionTurn,
+  claimOguiDecisionResume,
+  consumeOguiDecisionAnswer,
+  runWithOguiDecisionResume,
+} from "./ogui-decision-engine.js";
 
 const storePath = process.env.OGUI_CHILD_STORE ?? "";
 const sessionKey = process.env.OGUI_CHILD_SESSION ?? "";
@@ -55,6 +61,41 @@ async function main(): Promise<void> {
       lifecycleEnabled: true,
     });
     process.kill(process.pid, "SIGKILL");
+    return;
+  }
+  if (mode === "exec-then-sigkill") {
+    const text = ["```ogui-answer", JSON.stringify(answer()), "```"].join("\n");
+    const admission = await admitOguiDecisionTurn({
+      storePath,
+      sessionKey,
+      userId: "user-1",
+      inboundText: text,
+      ingress: "chat",
+      phase: "run",
+      env,
+      binding: {
+        lifecycleEnabled: true,
+        storePath,
+        sessionKey,
+        userId: "user-1",
+        originRunId: "run-child",
+        ingress: "chat",
+        allowIssue: false,
+      },
+    });
+    if (admission.action !== "resume" || !admission.decisionId || !admission.resumeRef) {
+      throw new Error(`expected resume, got ${admission.action ?? "none"}`);
+    }
+    await runWithOguiDecisionResume({
+      storePath,
+      sessionKey,
+      decisionId: admission.decisionId,
+      resumeRef: admission.resumeRef,
+      lifecycleEnabled: true,
+      run: async () => {
+        process.kill(process.pid, "SIGKILL");
+      },
+    });
     return;
   }
   throw new Error(`unknown mode ${mode}`);

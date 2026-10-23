@@ -205,6 +205,20 @@ describe("OguiAnswerSchema", () => {
     expect(validateAnswer({ ...base, decision_version: "1" })).toBe(false);
   });
 
+  it("accepts an explicit custom answer_mode and rejects an unknown mode", () => {
+    const base = {
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: "550e8400-e29b-41d4-a716-446655440000",
+      decision_id: "dec-1",
+      decision_version: 1,
+      answers: { channel: "我的口径" },
+    };
+    expect(validateAnswer({ ...base, answer_mode: "custom" })).toBe(true);
+    expect(validateAnswer({ ...base, answer_mode: "option" })).toBe(true);
+    expect(validateAnswer({ ...base, answer_mode: "forged" })).toBe(false);
+  });
+
   it("rejects identity fields because additionalProperties is false", () => {
     expect(
       validateAnswer({
@@ -219,6 +233,12 @@ describe("OguiAnswerSchema", () => {
 });
 
 describe("OguiFormSchema decision projection", () => {
+  it("accepts allow_custom on a lifecycle form", () => {
+    expect(
+      validateForm({ ...validForm, decision_id: "dec-1", decision_version: 1, allow_custom: true }),
+    ).toBe(true);
+  });
+
   it("accepts an optional decision ref with a positive version", () => {
     expect(
       validateForm({

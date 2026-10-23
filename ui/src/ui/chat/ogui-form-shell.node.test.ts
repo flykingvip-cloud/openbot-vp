@@ -49,7 +49,11 @@ function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
   };
 }
 
-function formFence(decision?: { decision_id: string; decision_version: number }): string {
+function formFence(decision?: {
+  decision_id: string;
+  decision_version: number;
+  allow_custom?: boolean;
+}): string {
   return [
     "请拍板：",
     "",
@@ -71,7 +75,11 @@ function formFence(decision?: { decision_id: string; decision_version: number })
           },
         ],
         ...(decision
-          ? { decision_id: decision.decision_id, decision_version: decision.decision_version }
+          ? {
+              decision_id: decision.decision_id,
+              decision_version: decision.decision_version,
+              ...(decision.allow_custom ? { allow_custom: true } : {}),
+            }
           : {}),
       },
       null,
@@ -124,7 +132,15 @@ describe("chat shell OGUI decision status", () => {
     const onSubmitForm = (text: string) => {
       submitted.push(text);
     };
-    const open = mount(createProps({ messages, onSubmitForm }));
+    const open = mount(
+      createProps({
+        messages,
+        onSubmitForm,
+        oguiDecisions: {
+          ogd_historical: { decisionStatus: "waiting", version: 1 },
+        },
+      }),
+    );
     choose(open, "甲");
     open.remove();
 
@@ -205,7 +221,7 @@ describe("chat shell OGUI decision status", () => {
     expect(submitted).toHaveLength(1);
   });
 
-  it("does not close a fence whose decision_id is missing from the session map (Ev8)", () => {
+  it("keeps a lifecycle card non-operable when its decision ref has no authority record", () => {
     const submitted: string[] = [];
     const messages = [
       assistantMessage(formFence({ decision_id: "ogd_missing", decision_version: 1 })),
@@ -213,7 +229,7 @@ describe("chat shell OGUI decision status", () => {
     const onSubmitForm = (text: string) => {
       submitted.push(text);
     };
-    const open = mount(
+    const missingFromMap = mount(
       createProps({
         messages,
         oguiDecisions: {
@@ -222,20 +238,56 @@ describe("chat shell OGUI decision status", () => {
         onSubmitForm,
       }),
     );
-    choose(open, "甲");
+    const fromMap = submitButton(missingFromMap);
+    expect(fromMap.disabled).toBe(true);
+    fromMap.click();
+    expect(submitted).toEqual([]);
+    missingFromMap.remove();
+
+    const noMap = mount(
+      createProps({
+        messages,
+        onSubmitForm,
+      }),
+    );
+    const bare = submitButton(noMap);
+    expect(bare.disabled).toBe(true);
+    bare.click();
+    expect(submitted).toEqual([]);
+  });
+
+  it("submits an explicit custom answer from the lifecycle card", () => {
+    const submitted: string[] = [];
+    const messages = [
+      assistantMessage(
+        formFence({ decision_id: "ogd_custom", decision_version: 1, allow_custom: true }),
+      ),
+    ];
+    const props = createProps({
+      messages,
+      oguiDecisions: {
+        ogd_custom: { decisionStatus: "waiting", version: 1 },
+      },
+      onSubmitForm: (text) => {
+        submitted.push(text);
+      },
+    });
+    const open = mount(props);
+    const input = open.querySelector('[data-testid="ogui-form-custom"]');
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    input.value = "自定义口径";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
     open.remove();
-    const ready = mount(
-      createProps({
-        messages,
-        oguiDecisions: {
-          ogd_other: { decisionStatus: "answered", version: 1 },
-        },
-        onSubmitForm,
-      }),
-    );
+    const ready = mount(props);
     const button = submitButton(ready);
     expect(button.disabled).toBe(false);
     button.click();
     expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain('"answer_mode": "custom"');
+    expect(submitted[0]).toContain("自定义口径");
+    expect(submitted[0]).toContain('"decision_id": "ogd_custom"');
   });
 });

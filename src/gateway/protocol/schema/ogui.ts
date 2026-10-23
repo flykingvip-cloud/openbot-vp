@@ -78,6 +78,8 @@ export const OguiFormSchema = Type.Object(
     decision_id: Type.Optional(NonEmptyString),
     /** Protocol `decision_version` ↔ logical `version`. Positive integer. */
     decision_version: Type.Optional(Type.Integer({ minimum: 1 })),
+    /** Lifecycle cards may accept one explicit custom string. */
+    allow_custom: Type.Optional(Type.Boolean()),
     fields: Type.Array(OguiFormFieldSchema, { minItems: 1 }),
     submit_label: Type.Optional(NonEmptyString),
     submit: Type.Optional(OguiFormSubmitSchema),
@@ -120,6 +122,12 @@ export const OguiAnswerSchema = Type.Object(
     component_id: NonEmptyString,
     submission_id: NonEmptyString,
     answers: Type.Record(NonEmptyString, NonEmptyString),
+    /**
+     * Distinguishes an option click from the custom field.
+     * Omitted means option submit. A value that is not an option does not
+     * become custom.
+     */
+    answer_mode: Type.Optional(Type.Union([Type.Literal("option"), Type.Literal("custom")])),
     submitted_at: Type.Optional(Type.String()),
     /** Server-minted decision reference. Logical name: decisionId. */
     decision_id: Type.Optional(NonEmptyString),

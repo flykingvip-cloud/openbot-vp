@@ -63,6 +63,10 @@ export type OguiDecisionRunBinding = {
   ingress: OguiDecisionIngress;
   /** Heartbeat and memory flush must not mint a decision. */
   allowIssue: boolean;
+  /** Set only after this run has consumed and claimed that decision. */
+  decisionId?: string;
+  /** Claimed resume this exec must finish. Same id across recover. */
+  resumeRef?: string;
 };
 
 export type OguiIssueKind = "flag_off" | "not_proposal" | "issued" | "failed" | "historical";
@@ -312,7 +316,12 @@ export function applyOguiPromiseCardGate(text: string, outcome: OguiIssueOutcome
         return stripFailed(text);
       }
       const nextBody = JSON.stringify(
-        { ...value, decision_id: outcome.decisionId, decision_version: outcome.version },
+        {
+          ...value,
+          decision_id: outcome.decisionId,
+          decision_version: outcome.version,
+          ...(outcome.record?.allowCustom ? { allow_custom: true } : {}),
+        },
         null,
         2,
       );
@@ -769,6 +778,23 @@ export async function admitOguiDecisionTurn(input: {
   if (!consumed.ok) {
     return { action: "ack", text: consumed.text };
   }
+  if (consumed.resumeStatus === "running" && consumed.decisionId) {
+    const continued = await continueRecoveredOguiDecisionResume({
+      storePath,
+      sessionKey,
+      decisionId: consumed.decisionId,
+      lifecycleEnabled: true,
+      nowMs: input.nowMs,
+      updateStore: input.updateStore,
+    });
+    if (continued.continued && continued.resumeRef) {
+      return {
+        action: "resume",
+        decisionId: consumed.decisionId,
+        resumeRef: continued.resumeRef,
+      };
+    }
+  }
   if (!consumed.schedule || !consumed.resumeRef || !consumed.decisionId) {
     return {
       action: "ack",
@@ -786,6 +812,23 @@ export async function admitOguiDecisionTurn(input: {
     updateStore: input.updateStore,
   });
   if (!claim.claimed) {
+    if (claim.reason === "already_started" && consumed.decisionId) {
+      const continued = await continueRecoveredOguiDecisionResume({
+        storePath,
+        sessionKey,
+        decisionId: consumed.decisionId,
+        lifecycleEnabled: true,
+        nowMs: input.nowMs,
+        updateStore: input.updateStore,
+      });
+      if (continued.continued && continued.resumeRef) {
+        return {
+          action: "resume",
+          decisionId: consumed.decisionId,
+          resumeRef: continued.resumeRef,
+        };
+      }
+    }
     return {
       action: "ack",
       text: "该决策已接受，沿用原续跑引用，不会再开一条主线。",
@@ -808,30 +851,55 @@ export type OguiConsumeResult =
       decisionId: string;
       version: number;
       resumeRef: string;
+      resumeStatus: OguiResumeStatus;
       answer: OguiDecisionAnswer;
     }
   | { ok: false; reason: string; text: string; resumeRef?: string; decisionId?: string };
 
+/**
+ * Option submit must match one stored option. A missing option is not
+ * custom. Custom requires `answer_mode: "custom"` and `allowCustom`.
+ * Single-select: exactly one non-empty string field.
+ */
 function pickAnswer(
   record: OguiDecisionRecord,
-  answers: unknown,
+  answer: unknown,
 ): { kind: "option" | "custom"; value: string; label?: string } | undefined {
+  if (!isPlain(answer)) {
+    return undefined;
+  }
+  const mode = nonEmpty(answer.answer_mode);
+  if (mode && mode !== "option" && mode !== "custom") {
+    return undefined;
+  }
+  const answers = answer.answers;
   if (!isPlain(answers)) {
     return undefined;
   }
-  const values = Object.values(answers)
-    .map((value) => nonEmpty(value))
-    .filter(Boolean);
-  for (const value of values) {
-    const option = record.options.find((item) => item.value === value);
-    if (option) {
-      return { kind: "option", value, label: option.label };
+  const entries = Object.entries(answers);
+  if (entries.length !== 1) {
+    return undefined;
+  }
+  const field = entries[0]?.[0];
+  const raw = entries[0]?.[1];
+  if (!nonEmpty(field) || typeof raw !== "string") {
+    return undefined;
+  }
+  const value = raw.trim();
+  if (!value) {
+    return undefined;
+  }
+  if (mode === "custom") {
+    if (!record.allowCustom) {
+      return undefined;
     }
+    return { kind: "custom", value };
   }
-  if (record.allowCustom && values[0]) {
-    return { kind: "custom", value: values[0] };
+  const option = record.options.find((item) => item.value === value);
+  if (!option) {
+    return undefined;
   }
-  return undefined;
+  return { kind: "option", value, label: option.label };
 }
 
 function sameStoredAnswer(
@@ -928,10 +996,18 @@ export async function consumeOguiDecisionAnswer(input: {
           resumeRef: record.resumeRef,
         });
       }
+      const recordTask = record.scope.taskContextId;
+      const sessionTask = nonEmpty(entry.taskContextId) || undefined;
+      if (recordTask && recordTask !== sessionTask) {
+        return reject("task_mismatch", {
+          decisionId: record.decisionId,
+          resumeRef: record.resumeRef,
+        });
+      }
       if (record.decisionStatus === "expired" || record.decisionStatus === "superseded") {
         return reject("historical", { decisionId: record.decisionId, resumeRef: record.resumeRef });
       }
-      const picked = pickAnswer(record, (input.answer as { answers?: unknown }).answers);
+      const picked = pickAnswer(record, input.answer);
       if (record.answer && record.answer.submissionIds.includes(submissionId)) {
         return {
           ok: true as const,
@@ -940,6 +1016,7 @@ export async function consumeOguiDecisionAnswer(input: {
           decisionId: record.decisionId,
           version: record.version,
           resumeRef: record.resumeRef,
+          resumeStatus: record.resumeStatus,
           answer: record.answer,
         };
       }
@@ -964,6 +1041,7 @@ export async function consumeOguiDecisionAnswer(input: {
           decisionId: record.decisionId,
           version: record.version,
           resumeRef: record.resumeRef,
+          resumeStatus: record.resumeStatus,
           answer: record.answer,
         };
       }
@@ -999,6 +1077,7 @@ export async function consumeOguiDecisionAnswer(input: {
         decisionId: next.decisionId,
         version: next.version,
         resumeRef: next.resumeRef,
+        resumeStatus: next.resumeStatus,
         answer,
       };
     });
@@ -1036,6 +1115,8 @@ export async function claimOguiDecisionResume(input: {
       return { claimed: false, resumeRef: record.resumeRef, reason: "not_claimable" };
     }
     record.resumeStatus = "running";
+    record.resumeOwnerPid = process.pid;
+    delete record.resumeExecStartedAtMs;
     record.updatedAtMs = now;
     entry.oguiDecisions = map;
     entry.updatedAt = now;
@@ -1068,4 +1149,192 @@ export function recoverOguiDecisionResume(
     resumeRef: found.resumeRef,
     resumeStatus: found.resumeStatus,
   };
+}
+
+function pidAlive(pid: number | undefined): boolean {
+  if (typeof pid !== "number" || !Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: unknown }).code)
+        : "";
+    return code === "EPERM";
+  }
+}
+
+type ResumeExecInput = {
+  storePath: string;
+  sessionKey: string;
+  decisionId: string;
+  resumeRef: string;
+  lifecycleEnabled: boolean;
+  nowMs?: number;
+  updateStore?: SessionStoreUpdater;
+};
+
+/**
+ * Production caller of `recoverOguiDecisionResume`.
+ * Adopts a running resume only when its owner pid is gone, and keeps the
+ * same resumeRef. A live owner stays already_started.
+ */
+export async function continueRecoveredOguiDecisionResume(
+  input: ResumeExecInput,
+): Promise<{ continued: boolean; resumeRef?: string; reason?: string }> {
+  if (!input.lifecycleEnabled) {
+    return { continued: false, reason: "flag_off" };
+  }
+  const now = input.nowMs ?? Date.now();
+  const update = input.updateStore ?? updateSessionStore;
+  return await update(input.storePath, (store) => {
+    const entry = store[input.sessionKey];
+    const map = readMap(entry);
+    const record = map?.[input.decisionId];
+    if (!entry || !map || !record || record.scope.sessionKey !== input.sessionKey) {
+      return { continued: false, reason: "missing" };
+    }
+    const recovered = recoverOguiDecisionResume(map, input.sessionKey);
+    if (
+      !recovered ||
+      recovered.decisionId !== record.decisionId ||
+      recovered.resumeRef !== record.resumeRef
+    ) {
+      return {
+        continued: false,
+        resumeRef: record.resumeRef,
+        reason: recovered ? "other_resume" : "none",
+      };
+    }
+    if (record.resumeStatus !== "running") {
+      return { continued: false, resumeRef: record.resumeRef, reason: record.resumeStatus };
+    }
+    if (pidAlive(record.resumeOwnerPid)) {
+      return { continued: false, resumeRef: record.resumeRef, reason: "already_started" };
+    }
+    record.resumeOwnerPid = process.pid;
+    record.updatedAtMs = now;
+    entry.oguiDecisions = map;
+    entry.updatedAt = now;
+    store[input.sessionKey] = entry;
+    return { continued: true, resumeRef: record.resumeRef, reason: "recovered" };
+  });
+}
+
+async function markOguiDecisionExecStarted(
+  input: ResumeExecInput,
+): Promise<{ ok: boolean; reason?: string }> {
+  if (!input.lifecycleEnabled) {
+    return { ok: false, reason: "flag_off" };
+  }
+  const now = input.nowMs ?? Date.now();
+  const update = input.updateStore ?? updateSessionStore;
+  return await update(input.storePath, (store) => {
+    const entry = store[input.sessionKey];
+    const map = readMap(entry);
+    const record = map?.[input.decisionId];
+    if (!entry || !map || !record || record.resumeRef !== input.resumeRef) {
+      return { ok: false, reason: "resume_mismatch" };
+    }
+    if (record.resumeStatus !== "running") {
+      return { ok: false, reason: "not_running" };
+    }
+    if (
+      record.resumeOwnerPid !== undefined &&
+      record.resumeOwnerPid !== process.pid &&
+      pidAlive(record.resumeOwnerPid)
+    ) {
+      return { ok: false, reason: "already_started" };
+    }
+    record.resumeOwnerPid = process.pid;
+    record.resumeExecStartedAtMs = now;
+    record.updatedAtMs = now;
+    entry.oguiDecisions = map;
+    entry.updatedAt = now;
+    store[input.sessionKey] = entry;
+    return { ok: true };
+  });
+}
+
+/** Running resume finished. decisionStatus stays answered or rejected. */
+export async function completeOguiDecisionResume(
+  input: ResumeExecInput,
+): Promise<{ ok: boolean; reason?: string }> {
+  if (!input.lifecycleEnabled) {
+    return { ok: false, reason: "flag_off" };
+  }
+  const now = input.nowMs ?? Date.now();
+  const update = input.updateStore ?? updateSessionStore;
+  return await update(input.storePath, (store) => {
+    const entry = store[input.sessionKey];
+    const map = readMap(entry);
+    const record = map?.[input.decisionId];
+    if (!entry || !map || !record || record.resumeRef !== input.resumeRef) {
+      return { ok: false, reason: "resume_mismatch" };
+    }
+    if (record.resumeStatus === "completed") {
+      return { ok: true };
+    }
+    if (record.resumeStatus !== "running") {
+      return { ok: false, reason: "not_running" };
+    }
+    record.resumeStatus = "completed";
+    delete record.resumeOwnerPid;
+    delete record.resumeExecStartedAtMs;
+    record.updatedAtMs = now;
+    entry.oguiDecisions = map;
+    entry.updatedAt = now;
+    store[input.sessionKey] = entry;
+    return { ok: true };
+  });
+}
+
+/** Exec did not finish and this process is still alive. Leaves the resume claimable. */
+export async function releaseOguiDecisionResume(input: ResumeExecInput): Promise<void> {
+  if (!input.lifecycleEnabled) {
+    return;
+  }
+  const now = input.nowMs ?? Date.now();
+  const update = input.updateStore ?? updateSessionStore;
+  await update(input.storePath, (store) => {
+    const entry = store[input.sessionKey];
+    const map = readMap(entry);
+    const record = map?.[input.decisionId];
+    if (!entry || !map || !record || record.resumeRef !== input.resumeRef) {
+      return;
+    }
+    if (record.resumeStatus !== "running") {
+      return;
+    }
+    record.resumeStatus = "retryable";
+    delete record.resumeOwnerPid;
+    delete record.resumeExecStartedAtMs;
+    record.updatedAtMs = now;
+    entry.oguiDecisions = map;
+    entry.updatedAt = now;
+    store[input.sessionKey] = entry;
+  });
+}
+
+/**
+ * Mark exec started, run the real reply, then write resume completed.
+ * A throw leaves the resume running so the caller can release it, or so a
+ * dead process can be recovered. Does not mint a second resumeRef.
+ */
+export async function runWithOguiDecisionResume<T>(
+  input: ResumeExecInput & { run: () => Promise<T> },
+): Promise<T> {
+  const marked = await markOguiDecisionExecStarted(input);
+  if (!marked.ok) {
+    throw new Error(`ogui_resume_${marked.reason ?? "not_started"}`);
+  }
+  const result = await input.run();
+  const completed = await completeOguiDecisionResume(input);
+  if (!completed.ok) {
+    throw new Error(`ogui_resume_${completed.reason ?? "complete_failed"}`);
+  }
+  return result;
 }

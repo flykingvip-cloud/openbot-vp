@@ -23,10 +23,17 @@ export type OguiFormSubmitMeta = {
 
 /**
  * Same vocabulary as the session DecisionRecord status the server strip uses.
- * UI does not import `src/`. Absent or `waiting` (including skipped, which
- * stays waiting) keeps the existing submit operable.
+ * UI does not import `src/`. `unauthoritative` is view-only: a lifecycle card
+ * carries decision refs but the session map has no matching record.
+ * Absent or `waiting` keeps the existing submit operable.
  */
-export type OguiFormDecisionStatus = "waiting" | "answered" | "rejected" | "expired" | "superseded";
+export type OguiFormDecisionStatus =
+  | "waiting"
+  | "answered"
+  | "rejected"
+  | "expired"
+  | "superseded"
+  | "unauthoritative";
 
 const OGUI_FORM_CLOSED_DECISION_STATUSES = new Set<OguiFormDecisionStatus>([
   "answered",
@@ -56,6 +63,9 @@ export function oguiFormSubmitOperable(options: OguiFormRenderOptions): boolean 
   const status = options.decisionStatus;
   if (!status || status === "waiting") {
     return true;
+  }
+  if (status === "unauthoritative") {
+    return false;
   }
   return !OGUI_FORM_CLOSED_DECISION_STATUSES.has(status);
 }
@@ -109,27 +119,28 @@ export function parseOguiDecisionStatusLookup(
 }
 
 /**
- * Match the form's decision_id to the session map. No id, or no record, stays
- * omitted so legacy and flag-off fences remain operable. A version mismatch
- * is superseded and cannot submit.
+ * Match the form's decision_id to the session map. A fence with no decision
+ * fields stays omitted so plain legacy OGUI remains operable. A lifecycle
+ * card that carries a decision ref but has no authority record is
+ * unauthoritative and cannot submit. A version mismatch is superseded.
  */
 export function resolveOguiFormDecisionStatus(
   form: OguiFormDefinition,
   lookup: OguiDecisionStatusLookup | undefined,
 ): OguiFormDecisionStatus | undefined {
-  const decisionId = form.decision_id?.trim();
-  if (!decisionId || !lookup) {
+  const decisionId = form.decision_id?.trim() ?? "";
+  const hasVersion = typeof form.decision_version === "number";
+  if (!decisionId && !hasVersion) {
     return undefined;
+  }
+  if (!decisionId || !lookup) {
+    return "unauthoritative";
   }
   const ref = lookup[decisionId];
   if (!ref) {
-    return undefined;
+    return "unauthoritative";
   }
-  if (
-    typeof form.decision_version === "number" &&
-    typeof ref.version === "number" &&
-    form.decision_version !== ref.version
-  ) {
+  if (hasVersion && typeof ref.version === "number" && form.decision_version !== ref.version) {
     return "superseded";
   }
   return ref.decisionStatus;
@@ -137,6 +148,8 @@ export function resolveOguiFormDecisionStatus(
 
 /** Ephemeral draft answers keyed by form panel id. */
 const draftByPanel = new Map<string, Record<string, string>>();
+/** option = a listed value; custom = the explicit custom field. */
+const draftModeByPanel = new Map<string, "option" | "custom">();
 
 export function getOguiFormDraft(form: OguiFormDefinition): Record<string, string> {
   return { ...draftByPanel.get(oguiFormPanelId(form)) };
@@ -145,6 +158,7 @@ export function getOguiFormDraft(form: OguiFormDefinition): Record<string, strin
 /** Test helper: clear draft map between cases. */
 export function clearOguiFormDraftState(): void {
   draftByPanel.clear();
+  draftModeByPanel.clear();
 }
 
 function setFieldDraft(form: OguiFormDefinition, fieldId: string, value: string): void {
@@ -173,6 +187,7 @@ function handleOptionClick(
   option: OguiFormOption,
   options: OguiFormRenderOptions,
 ): void {
+  draftModeByPanel.set(oguiFormPanelId(form), "option");
   setFieldDraft(form, field.id, option.value);
   const draft = getOguiFormDraft(form);
   const preview = formatDraftPreview(form, draft);
@@ -187,6 +202,36 @@ function clearComposerDraft(options: OguiFormRenderOptions): void {
   }
 }
 
+function handleCustomInput(
+  form: OguiFormDefinition,
+  value: string,
+  options: OguiFormRenderOptions,
+): void {
+  const panelId = oguiFormPanelId(form);
+  const field = form.fields[0];
+  const text = value.trim();
+  if (!field || !text) {
+    draftModeByPanel.delete(panelId);
+    draftByPanel.delete(panelId);
+    clearComposerDraft(options);
+    return;
+  }
+  draftModeByPanel.set(panelId, "custom");
+  draftByPanel.set(panelId, { [field.id]: text });
+  const preview = formatDraftPreview(form, getOguiFormDraft(form));
+  if (options.onFillComposer) {
+    options.onFillComposer(preview);
+  }
+}
+
+function readInputValue(event: Event): string {
+  const target = event.currentTarget;
+  if (!(target instanceof HTMLInputElement)) {
+    return "";
+  }
+  return target.value;
+}
+
 function handleFormSubmit(form: OguiFormDefinition, options: OguiFormRenderOptions): void {
   if (!options.onSubmitForm || !oguiFormSubmitOperable(options)) {
     return;
@@ -195,6 +240,8 @@ function handleFormSubmit(form: OguiFormDefinition, options: OguiFormRenderOptio
   if (!oguiFormDraftComplete(form, draft)) {
     return;
   }
+  const panelId = oguiFormPanelId(form);
+  const answerMode = draftModeByPanel.get(panelId) ?? "option";
   const submissionId = generateUUID();
   const submittedAt = new Date().toISOString();
   let submitText: string;
@@ -204,11 +251,16 @@ function handleFormSubmit(form: OguiFormDefinition, options: OguiFormRenderOptio
       answers: draft,
       submissionId,
       submittedAt,
+      answerMode,
+      ...(form.decision_id && typeof form.decision_version === "number"
+        ? { decisionId: form.decision_id, decisionVersion: form.decision_version }
+        : {}),
     });
   } catch {
     return;
   }
-  draftByPanel.delete(oguiFormPanelId(form));
+  draftByPanel.delete(panelId);
+  draftModeByPanel.delete(panelId);
   clearComposerDraft(options);
   options.onSubmitForm(submitText, { submissionId });
 }
@@ -268,6 +320,9 @@ export function renderOguiFormView(
   const draft = getOguiFormDraft(form);
   const canSubmit = Boolean(operable && options.onSubmitForm && oguiFormDraftComplete(form, draft));
   const submitLabel = form.submit_label?.trim() || "提交";
+  const showCustom = Boolean(form.decision_id?.trim() && form.allowCustom);
+  const customMode = draftModeByPanel.get(oguiFormPanelId(form)) === "custom";
+  const customValue = showCustom && customMode ? (draft[form.fields[0]?.id ?? ""] ?? "") : "";
 
   return html`
     <div
@@ -279,6 +334,29 @@ export function renderOguiFormView(
     >
       ${form.title ? html`<div class="ogui-form__title">${form.title}</div>` : nothing}
       ${form.fields.map((field) => renderField(form, field, draft, options, clickable))}
+      ${
+        showCustom
+          ? html`
+              <label class="ogui-form__custom">
+                <span class="ogui-form__custom-label">自定义回答</span>
+                <input
+                  type="text"
+                  class="ogui-form__custom-input"
+                  data-testid="ogui-form-custom"
+                  placeholder="输入自定义回答"
+                  ?disabled=${!clickable}
+                  .value=${customValue}
+                  @input=${(event: Event) => {
+                    if (!clickable) {
+                      return;
+                    }
+                    handleCustomInput(form, readInputValue(event), options);
+                  }}
+                />
+              </label>
+            `
+          : nothing
+      }
       ${
         options.onSubmitForm
           ? html`

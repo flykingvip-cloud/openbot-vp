@@ -8,7 +8,11 @@ import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage, normalizeUsage } from "../../agents/usage.js";
 import type { SessionEntry } from "../../config/sessions.js";
-import { admitOguiDecisionTurn } from "../../config/sessions/ogui-decision-engine.js";
+import {
+  admitOguiDecisionTurn,
+  releaseOguiDecisionResume,
+  runWithOguiDecisionResume,
+} from "../../config/sessions/ogui-decision-engine.js";
 import type { TypingMode } from "../../config/types.js";
 import {
   tryAcquireEnterpriseAgentRun,
@@ -152,6 +156,10 @@ export function createFollowupRunner(params: {
   return async (queued: FollowupRun) => {
     const runId = crypto.randomUUID();
     let followupSlotHeld = false;
+    let oguiResume:
+      | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
+      | undefined;
+    let oguiResumeSettled = false;
     try {
       if (queued.run.oguiDecisionRun) {
         const admission = await admitOguiDecisionTurn({
@@ -163,6 +171,20 @@ export function createFollowupRunner(params: {
         if (admission.action === "pause" || admission.action === "ack") {
           await sendFollowupPayloads([{ text: admission.text ?? "" }], queued);
           return;
+        }
+        if (admission.action === "resume" && admission.decisionId && admission.resumeRef) {
+          const binding = queued.run.oguiDecisionRun;
+          queued.run.oguiDecisionRun = {
+            ...binding,
+            decisionId: admission.decisionId,
+            resumeRef: admission.resumeRef,
+          };
+          oguiResume = {
+            storePath: binding.storePath,
+            sessionKey: binding.sessionKey,
+            decisionId: admission.decisionId,
+            resumeRef: admission.resumeRef,
+          };
         }
       }
       const shouldSurfaceToControlUi = isInternalMessageChannel(
@@ -234,147 +256,168 @@ export function createFollowupRunner(params: {
         if (parentSnapshot) {
           rememberRunModelSet(runId, parentSnapshot);
         }
-        const fallbackResult = await runWithModelFallback({
-          cfg: queued.run.config,
-          provider: queued.run.provider,
-          model: queued.run.model,
-          ...embeddedModelGovernance,
-          ...(modelGate.preferredModelOrder
-            ? { preferredModelOrder: modelGate.preferredModelOrder }
-            : {}),
-          runId,
-          agentDir: queued.run.agentDir,
-          fallbacksOverride: resolveRunModelFallbacksOverride({
+        const runFallback = () =>
+          runWithModelFallback({
             cfg: queued.run.config,
-            agentId: queued.run.agentId,
-            sessionKey: queued.run.sessionKey,
-          }),
-          run: async (provider, model, runOptions) => {
-            const authProfile = resolveRunAuthProfile(queued.run, provider);
-            let embeddedProvider = provider;
-            let embeddedModel = model;
-            let providerAuthOverride:
-              | {
-                  apiKey: string;
-                  source?: string;
-                  baseUrl?: string;
-                  protocol?: string;
-                }
-              | undefined;
-            let enterpriseRuntimeModelId: string | undefined;
-            const candidateRuntimeId = `${provider}/${model}`;
-            if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
-              const tenantId =
-                modelGate.tenantId?.trim() || modelGate.creditReporting?.enterpriseId?.trim() || "";
-              if (!tenantId) {
-                throw new Error(
-                  "Enterprise BYOK model selected but managed tenantId could not be resolved",
-                );
-              }
-              const invocation = await resolveEnterpriseRuntimeInvocation({
-                tenantId,
-                provider,
-                model,
-              });
-              if (!invocation) {
-                throw new Error(`Enterprise BYOK runtime config missing for ${candidateRuntimeId}`);
-              }
-              embeddedProvider = invocation.provider;
-              embeddedModel = invocation.model;
-              enterpriseRuntimeModelId = invocation.runtimeModelId;
-              providerAuthOverride = {
-                apiKey: invocation.apiKey,
-                source: "enterprise-byok",
-                ...(invocation.baseUrl ? { baseUrl: invocation.baseUrl } : {}),
-                protocol: invocation.protocol,
-              };
-            }
-            const result = await runEmbeddedPiAgent({
-              sessionId: queued.run.sessionId,
-              sessionKey: queued.run.sessionKey,
+            provider: queued.run.provider,
+            model: queued.run.model,
+            ...embeddedModelGovernance,
+            ...(modelGate.preferredModelOrder
+              ? { preferredModelOrder: modelGate.preferredModelOrder }
+              : {}),
+            runId,
+            agentDir: queued.run.agentDir,
+            fallbacksOverride: resolveRunModelFallbacksOverride({
+              cfg: queued.run.config,
               agentId: queued.run.agentId,
-              trigger: "user",
-              messageChannel: queued.originatingChannel ?? undefined,
-              messageProvider: queued.run.messageProvider,
-              agentAccountId: queued.run.agentAccountId,
-              messageTo: queued.originatingTo,
-              messageThreadId: queued.originatingThreadId,
-              currentChannelId: queued.originatingTo,
-              currentThreadTs:
-                queued.originatingThreadId != null ? String(queued.originatingThreadId) : undefined,
-              groupId: queued.run.groupId,
-              groupChannel: queued.run.groupChannel,
-              groupSpace: queued.run.groupSpace,
-              senderId: queued.run.senderId,
-              senderName: queued.run.senderName,
-              senderUsername: queued.run.senderUsername,
-              senderE164: queued.run.senderE164,
-              senderIsOwner: queued.run.senderIsOwner,
-              ...inheritExecutionIdentityRunFields(queued.run),
-              sessionFile: queued.run.sessionFile,
-              agentDir: queued.run.agentDir,
-              workspaceDir: queued.run.workspaceDir,
-              config: queued.run.config,
-              skillsSnapshot: queued.run.skillsSnapshot,
-              prompt: queued.prompt,
-              extraSystemPrompt: queued.run.extraSystemPrompt,
-              ...(queued.run.disableTools ? { disableTools: true } : {}),
-              ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
-              ...(queued.run.inboundToolCeiling
-                ? { inboundToolCeiling: queued.run.inboundToolCeiling }
-                : {}),
-              ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
-              ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
-              ...(queued.run.knowledgeConsumeRefs?.length
-                ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
-                : {}),
-              ...(queued.run.skipUserTranscriptPersist === true
-                ? { skipUserTranscriptPersist: true }
-                : {}),
-              ...(queued.run.collaborationRoundInvoked === true
-                ? { collaborationRoundInvoked: true }
-                : {}),
-              ...(queued.run.deliveryToolSideEffect
-                ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
-                : {}),
-              ownerNumbers: queued.run.ownerNumbers,
-              enforceFinalTag: queued.run.enforceFinalTag,
-              provider: embeddedProvider,
-              model: embeddedModel,
-              ...(providerAuthOverride ? { providerAuthOverride } : {}),
-              ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
-              ...authProfile,
-              thinkLevel: queued.run.thinkLevel,
-              verboseLevel: queued.run.verboseLevel,
-              reasoningLevel: queued.run.reasoningLevel,
-              suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
-              execOverrides: queued.run.execOverrides,
-              bashElevated: queued.run.bashElevated,
-              timeoutMs: queued.run.timeoutMs,
-              runId,
-              allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
-              blockReplyBreak: queued.run.blockReplyBreak,
-              bootstrapPromptWarningSignaturesSeen,
-              bootstrapPromptWarningSignature:
-                bootstrapPromptWarningSignaturesSeen[
-                  bootstrapPromptWarningSignaturesSeen.length - 1
-                ],
-              onAgentEvent: (evt) => {
-                if (evt.stream !== "compaction") {
-                  return;
+              sessionKey: queued.run.sessionKey,
+            }),
+            run: async (provider, model, runOptions) => {
+              const authProfile = resolveRunAuthProfile(queued.run, provider);
+              let embeddedProvider = provider;
+              let embeddedModel = model;
+              let providerAuthOverride:
+                | {
+                    apiKey: string;
+                    source?: string;
+                    baseUrl?: string;
+                    protocol?: string;
+                  }
+                | undefined;
+              let enterpriseRuntimeModelId: string | undefined;
+              const candidateRuntimeId = `${provider}/${model}`;
+              if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
+                const tenantId =
+                  modelGate.tenantId?.trim() ||
+                  modelGate.creditReporting?.enterpriseId?.trim() ||
+                  "";
+                if (!tenantId) {
+                  throw new Error(
+                    "Enterprise BYOK model selected but managed tenantId could not be resolved",
+                  );
                 }
-                const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
-                if (phase === "end") {
-                  autoCompactionCompleted = true;
+                const invocation = await resolveEnterpriseRuntimeInvocation({
+                  tenantId,
+                  provider,
+                  model,
+                });
+                if (!invocation) {
+                  throw new Error(
+                    `Enterprise BYOK runtime config missing for ${candidateRuntimeId}`,
+                  );
                 }
-              },
-            });
-            bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
-              result.meta?.systemPromptReport,
-            );
-            return result;
-          },
-        });
+                embeddedProvider = invocation.provider;
+                embeddedModel = invocation.model;
+                enterpriseRuntimeModelId = invocation.runtimeModelId;
+                providerAuthOverride = {
+                  apiKey: invocation.apiKey,
+                  source: "enterprise-byok",
+                  ...(invocation.baseUrl ? { baseUrl: invocation.baseUrl } : {}),
+                  protocol: invocation.protocol,
+                };
+              }
+              const result = await runEmbeddedPiAgent({
+                sessionId: queued.run.sessionId,
+                sessionKey: queued.run.sessionKey,
+                agentId: queued.run.agentId,
+                trigger: "user",
+                messageChannel: queued.originatingChannel ?? undefined,
+                messageProvider: queued.run.messageProvider,
+                agentAccountId: queued.run.agentAccountId,
+                messageTo: queued.originatingTo,
+                messageThreadId: queued.originatingThreadId,
+                currentChannelId: queued.originatingTo,
+                currentThreadTs:
+                  queued.originatingThreadId != null
+                    ? String(queued.originatingThreadId)
+                    : undefined,
+                groupId: queued.run.groupId,
+                groupChannel: queued.run.groupChannel,
+                groupSpace: queued.run.groupSpace,
+                senderId: queued.run.senderId,
+                senderName: queued.run.senderName,
+                senderUsername: queued.run.senderUsername,
+                senderE164: queued.run.senderE164,
+                senderIsOwner: queued.run.senderIsOwner,
+                ...inheritExecutionIdentityRunFields(queued.run),
+                sessionFile: queued.run.sessionFile,
+                agentDir: queued.run.agentDir,
+                workspaceDir: queued.run.workspaceDir,
+                config: queued.run.config,
+                skillsSnapshot: queued.run.skillsSnapshot,
+                prompt: queued.prompt,
+                extraSystemPrompt: queued.run.extraSystemPrompt,
+                ...(queued.run.disableTools ? { disableTools: true } : {}),
+                ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
+                ...(queued.run.inboundToolCeiling
+                  ? { inboundToolCeiling: queued.run.inboundToolCeiling }
+                  : {}),
+                ...(queued.run.contextLane ? { contextLane: queued.run.contextLane } : {}),
+                ...(queued.run.sessionEntry ? { sessionEntry: queued.run.sessionEntry } : {}),
+                ...(queued.run.oguiDecisionRun
+                  ? { oguiDecisionRun: queued.run.oguiDecisionRun }
+                  : {}),
+                ...(queued.run.knowledgeConsumeRefs?.length
+                  ? { knowledgeConsumeRefs: queued.run.knowledgeConsumeRefs }
+                  : {}),
+                ...(queued.run.skipUserTranscriptPersist === true
+                  ? { skipUserTranscriptPersist: true }
+                  : {}),
+                ...(queued.run.collaborationRoundInvoked === true
+                  ? { collaborationRoundInvoked: true }
+                  : {}),
+                ...(queued.run.deliveryToolSideEffect
+                  ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
+                  : {}),
+                ownerNumbers: queued.run.ownerNumbers,
+                enforceFinalTag: queued.run.enforceFinalTag,
+                provider: embeddedProvider,
+                model: embeddedModel,
+                ...(providerAuthOverride ? { providerAuthOverride } : {}),
+                ...(enterpriseRuntimeModelId ? { enterpriseRuntimeModelId } : {}),
+                ...authProfile,
+                thinkLevel: queued.run.thinkLevel,
+                verboseLevel: queued.run.verboseLevel,
+                reasoningLevel: queued.run.reasoningLevel,
+                suppressToolErrorWarnings: opts?.suppressToolErrorWarnings,
+                execOverrides: queued.run.execOverrides,
+                bashElevated: queued.run.bashElevated,
+                timeoutMs: queued.run.timeoutMs,
+                runId,
+                allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
+                blockReplyBreak: queued.run.blockReplyBreak,
+                bootstrapPromptWarningSignaturesSeen,
+                bootstrapPromptWarningSignature:
+                  bootstrapPromptWarningSignaturesSeen[
+                    bootstrapPromptWarningSignaturesSeen.length - 1
+                  ],
+                onAgentEvent: (evt) => {
+                  if (evt.stream !== "compaction") {
+                    return;
+                  }
+                  const phase = typeof evt.data.phase === "string" ? evt.data.phase : "";
+                  if (phase === "end") {
+                    autoCompactionCompleted = true;
+                  }
+                },
+              });
+              bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
+                result.meta?.systemPromptReport,
+              );
+              return result;
+            },
+          });
+        const fallbackResult = oguiResume
+          ? await runWithOguiDecisionResume({
+              storePath: oguiResume.storePath,
+              sessionKey: oguiResume.sessionKey,
+              decisionId: oguiResume.decisionId,
+              resumeRef: oguiResume.resumeRef,
+              lifecycleEnabled: true,
+              run: runFallback,
+            })
+          : await runFallback();
+        oguiResumeSettled = true;
         runResult = fallbackResult.result;
         fallbackProvider = fallbackResult.provider;
         fallbackModel = fallbackResult.model;
@@ -516,6 +559,15 @@ export function createFollowupRunner(params: {
 
       await sendFollowupPayloads(finalPayloads, queued);
     } finally {
+      if (oguiResume && !oguiResumeSettled) {
+        await releaseOguiDecisionResume({
+          storePath: oguiResume.storePath,
+          sessionKey: oguiResume.sessionKey,
+          decisionId: oguiResume.decisionId,
+          resumeRef: oguiResume.resumeRef,
+          lifecycleEnabled: true,
+        });
+      }
       if (followupSlotHeld) {
         void releaseEnterpriseAgentRun(runId);
         forgetRunModelSet(runId);

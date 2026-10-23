@@ -49,6 +49,8 @@ export type OguiFormDefinition = Readonly<{
   decision_id?: string;
   /** Protocol `decision_version` ↔ logical version. Positive integer. */
   decision_version?: number;
+  /** Lifecycle card accepts one explicit custom string. */
+  allowCustom?: boolean;
 }>;
 
 export type OguiAnswerEnvelope = Readonly<{
@@ -56,6 +58,8 @@ export type OguiAnswerEnvelope = Readonly<{
   component_id: string;
   submission_id: string;
   answers: Readonly<Record<string, string>>;
+  /** Present when the form distinguishes option vs custom submit. */
+  answer_mode?: "option" | "custom";
   submitted_at?: string;
   /** Lifecycle reference. Omit both decision fields for legacy OGUI (Ev1). */
   decision_id?: string;
@@ -177,6 +181,7 @@ export function parseOguiFormDefinition(raw: unknown): OguiFormDefinition | null
     fields.push(parsed);
   }
   const decisionRef = readPairedDecisionRef(raw);
+  const allowCustom = raw.allow_custom === true || raw.allowCustom === true;
   const title = typeof raw.title === "string" && raw.title.trim() ? raw.title.trim() : undefined;
   const submitLabel =
     typeof raw.submit_label === "string" && raw.submit_label.trim()
@@ -190,6 +195,7 @@ export function parseOguiFormDefinition(raw: unknown): OguiFormDefinition | null
     fields,
     ...(title ? { title } : {}),
     ...(submitLabel ? { submit_label: submitLabel } : {}),
+    ...(allowCustom ? { allowCustom: true } : {}),
     ...decisionRef,
   };
 }
@@ -264,6 +270,8 @@ export type BuildOguiAnswerSubmitInput = {
   decisionId?: string;
   /** Protocol `decision_version`. Positive integer. */
   decisionVersion?: number;
+  /** Option click vs the explicit custom field. Omitted stays an option submit. */
+  answerMode?: "option" | "custom";
 };
 
 /**
@@ -306,6 +314,7 @@ export function buildOguiAnswerSubmitMessage(input: BuildOguiAnswerSubmitInput):
     component_id: input.form.component_id,
     submission_id: submissionId,
     answers,
+    ...(input.answerMode ? { answer_mode: input.answerMode } : {}),
     ...(input.submittedAt?.trim() ? { submitted_at: input.submittedAt.trim() } : {}),
     ...decisionRef,
   };

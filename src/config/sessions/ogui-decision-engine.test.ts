@@ -9,6 +9,7 @@ import {
   claimOguiDecisionResume,
   classifyOguiWaitInbound,
   consumeOguiDecisionAnswer,
+  continueRecoveredOguiDecisionResume,
   issueOguiDecisionFromText,
   recoverOguiDecisionResume,
   type OguiDecisionRunBinding,
@@ -45,6 +46,7 @@ function answerText(input: {
   version: number;
   value: string;
   submissionId: string;
+  answerMode?: "option" | "custom";
 }): string {
   const payload = {
     schema_version: "ogui/v1",
@@ -52,6 +54,7 @@ function answerText(input: {
     submission_id: input.submissionId,
     decision_id: input.decisionId,
     decision_version: input.version,
+    ...(input.answerMode ? { answer_mode: input.answerMode } : {}),
     answers: { choice: input.value },
   };
   return ["```ogui-answer", JSON.stringify(payload), "```"].join("\n");
@@ -399,6 +402,171 @@ describe("OGUI decision engine S1–S5", () => {
     expect(Object.keys(readDecisions(session.storePath, session.sessionKey) ?? {})).toEqual([
       issued.decisionId,
     ]);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("rejects an old card after the session task switches (D20)", async () => {
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: { ...binding(session.storePath, session.sessionKey), taskContextId: "task_old" },
+      env: ENV_ON,
+    });
+    expect(issued.kind).toBe("issued");
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_new";
+      }
+    });
+    const rejected = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        submission_id: "sub-task-switch",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(rejected.ok).toBe(false);
+    if (!rejected.ok) {
+      expect(rejected.reason).toBe("task_mismatch");
+    }
+    const stale = readDecisions(session.storePath, session.sessionKey)?.[issued.decisionId ?? ""];
+    expect(stale?.decisionStatus).toBe("waiting");
+    expect(stale?.answer).toBeUndefined();
+    expect(stale?.scope.taskContextId).toBe("task_old");
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_old";
+      }
+    });
+    const accepted = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        submission_id: "sub-task-same",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(accepted.ok).toBe(true);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("rejects a forged option and accepts an explicit custom answer (D18)", async () => {
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: binding(session.storePath, session.sessionKey),
+      env: ENV_ON,
+    });
+    const forged = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        submission_id: "sub-forged",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "not-an-option" },
+      },
+    });
+    expect(forged.ok).toBe(false);
+    if (!forged.ok) {
+      expect(forged.reason).toBe("invalid_answer");
+    }
+    const untouched = readDecisions(session.storePath, session.sessionKey)?.[
+      issued.decisionId ?? ""
+    ];
+    expect(untouched?.decisionStatus).toBe("waiting");
+    expect(untouched?.answer).toBeUndefined();
+    const many = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        submission_id: "sub-many",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a", extra: "b" },
+      },
+    });
+    expect(many.ok).toBe(false);
+    const custom = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        submission_id: "sub-custom",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answer_mode: "custom",
+        answers: { choice: "我的口径" },
+      },
+    });
+    expect(custom.ok).toBe(true);
+    if (custom.ok) {
+      expect(custom.answer.kind).toBe("custom");
+      expect(custom.answer.value).toBe("我的口径");
+    }
+    const stored = readDecisions(session.storePath, session.sessionKey)?.[issued.decisionId ?? ""];
+    expect(stored?.decisionStatus).toBe("answered");
+    expect(stored?.answer?.kind).toBe("custom");
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("does not adopt a running resume while its owner pid is alive", async () => {
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: binding(session.storePath, session.sessionKey),
+      env: ENV_ON,
+    });
+    await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        submission_id: "sub-live",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    const claimed = await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId: issued.decisionId ?? "",
+      lifecycleEnabled: true,
+    });
+    expect(claimed.claimed).toBe(true);
+    const continued = await continueRecoveredOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId: issued.decisionId ?? "",
+      lifecycleEnabled: true,
+    });
+    expect(continued.continued).toBe(false);
+    expect(continued.reason).toBe("already_started");
+    expect(continued.resumeRef).toBe(issued.resumeRef);
     fs.rmSync(session.dir, { recursive: true, force: true });
   });
 

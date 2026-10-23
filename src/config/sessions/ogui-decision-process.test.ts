@@ -4,9 +4,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  admitOguiDecisionTurn,
   claimOguiDecisionResume,
   issueOguiDecisionFromText,
   recoverOguiDecisionResume,
+  runWithOguiDecisionResume,
   type OguiDecisionRunBinding,
 } from "./ogui-decision-engine.js";
 import { clearOguiWaitRegistryForTests } from "./ogui-decision-wait-registry.js";
@@ -286,6 +288,82 @@ describe("OGUI decision process fixtures", () => {
     expect(Object.keys(reloaded)).toEqual([decisionId]);
     expect(reloaded[decisionId]?.resumeStatus).toBe("running");
     expect(reloaded[decisionId]?.resumeRef).toBe(issued.resumeRef);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  }, 30_000);
+
+  it("recovers a resume killed after exec started and writes it completed", async () => {
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: binding(session.storePath, session.sessionKey),
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const killed = await spawnChild({
+      OGUI_CHILD_MODE: "exec-then-sigkill",
+      OGUI_CHILD_STORE: session.storePath,
+      OGUI_CHILD_SESSION: session.sessionKey,
+      OGUI_CHILD_DECISION: decisionId,
+      OGUI_CHILD_VALUE: "a",
+      OGUI_CHILD_SUBMISSION: "sub-exec-kill",
+    });
+    expect(killed.signal, killed.stderr).toBe("SIGKILL");
+    const crashed = loadSessionStore(session.storePath, { skipCache: true })[session.sessionKey]
+      ?.oguiDecisions?.[decisionId];
+    expect(crashed?.decisionStatus).toBe("answered");
+    expect(crashed?.resumeStatus).toBe("running");
+    expect(crashed?.resumeRef).toBe(issued.resumeRef);
+    expect(typeof crashed?.resumeExecStartedAtMs).toBe("number");
+    const blocked = await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    expect(blocked.claimed).toBe(false);
+    expect(blocked.reason).toBe("already_started");
+    const answer = [
+      "```ogui-answer",
+      JSON.stringify({
+        schema_version: "ogui/v1",
+        component_id: "cmp-1",
+        submission_id: "sub-exec-kill",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      }),
+      "```",
+    ].join("\n");
+    const recovered = await admitOguiDecisionTurn({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      inboundText: answer,
+      ingress: "chat",
+      phase: "run",
+      env: ENV_ON,
+      binding: binding(session.storePath, session.sessionKey),
+    });
+    expect(recovered.action).toBe("resume");
+    expect(recovered.resumeRef).toBe(issued.resumeRef);
+    expect(recovered.decisionId).toBe(decisionId);
+    const finished = await runWithOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      resumeRef: recovered.resumeRef ?? "",
+      lifecycleEnabled: true,
+      run: async () => "exec-finished",
+    });
+    expect(finished).toBe("exec-finished");
+    const stored = loadSessionStore(session.storePath, { skipCache: true })[session.sessionKey]
+      ?.oguiDecisions?.[decisionId];
+    expect(stored?.decisionStatus).toBe("answered");
+    expect(stored?.resumeStatus).toBe("completed");
+    expect(stored?.resumeRef).toBe(issued.resumeRef);
+    expect(stored?.resumeExecStartedAtMs).toBeUndefined();
+    expect(stored?.resumeOwnerPid).toBeUndefined();
+    expect(stored?.answer?.value).toBe("a");
     fs.rmSync(session.dir, { recursive: true, force: true });
   }, 30_000);
 });

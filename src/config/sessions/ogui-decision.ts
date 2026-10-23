@@ -76,6 +76,16 @@ export type OguiDecisionRecord = {
   resumeStatus: OguiResumeStatus;
   /** Stable resume identity. Retries reuse it; a second mainline is not minted. */
   resumeRef: string;
+  /**
+   * Pid that currently owns a `running` resume. Not a decisionStatus.
+   * A later turn may continue only when this pid is gone.
+   */
+  resumeOwnerPid?: number;
+  /**
+   * Set when the claimed resume actually entered exec. Cleared on
+   * complete or release. Not a decisionStatus.
+   */
+  resumeExecStartedAtMs?: number;
   scope: OguiDecisionScope;
   prompt: string;
   /**
@@ -246,6 +256,20 @@ export function parseOguiDecisionRecord(raw: unknown): OguiDecisionRecord | unde
       return undefined;
     }
   }
+  let resumeOwnerPid: number | undefined;
+  if (raw.resumeOwnerPid !== undefined) {
+    resumeOwnerPid = nonNegativeInt(raw.resumeOwnerPid);
+    if (resumeOwnerPid === undefined || resumeOwnerPid <= 0) {
+      return undefined;
+    }
+  }
+  let resumeExecStartedAtMs: number | undefined;
+  if (raw.resumeExecStartedAtMs !== undefined) {
+    resumeExecStartedAtMs = nonNegativeInt(raw.resumeExecStartedAtMs);
+    if (resumeExecStartedAtMs === undefined) {
+      return undefined;
+    }
+  }
   let answer: OguiDecisionAnswer | undefined;
   if (raw.answer !== undefined) {
     answer = parseAnswer(raw.answer);
@@ -260,6 +284,8 @@ export function parseOguiDecisionRecord(raw: unknown): OguiDecisionRecord | unde
     ...(raw.deferral === OGUI_DECISION_DEFERRAL_SKIPPED ? { deferral: "skipped" } : {}),
     resumeStatus: raw.resumeStatus as OguiResumeStatus,
     resumeRef,
+    ...(resumeOwnerPid !== undefined ? { resumeOwnerPid } : {}),
+    ...(resumeExecStartedAtMs !== undefined ? { resumeExecStartedAtMs } : {}),
     scope,
     prompt,
     ...(proposalKey ? { proposalKey } : {}),
