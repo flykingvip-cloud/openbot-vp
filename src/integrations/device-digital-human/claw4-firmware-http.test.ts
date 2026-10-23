@@ -4,6 +4,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createClaw4FirmwareServiceFromEnv,
+  resetClaw4FirmwareBindForTests,
+  resolveClaw4FirmwareService,
+} from "./claw4-firmware-bind.js";
+import {
   handleClaw4FirmwareHttpRequest,
   setClaw4FirmwareServiceForTests,
 } from "./claw4-firmware-http.js";
@@ -18,6 +23,14 @@ const consentSecret = "consent-secret-16+";
 const serviceSecret = "service-secret-16+";
 const redirectUri = "https://device.example/callback";
 const deviceId = "claw4-device-1";
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+  } else {
+    process.env[name] = value;
+  }
+}
 
 function stubConfig(): StubConfig {
   return {
@@ -121,7 +134,7 @@ async function withGateway(
 
 describe("claw4 firmware HTTP compat (B1)", () => {
   afterEach(() => {
-    setClaw4FirmwareServiceForTests(undefined);
+    resetClaw4FirmwareBindForTests();
   });
 
   it("upload happy-path returns {code:0,data:{text,conversationId}} and lists messages", async () => {
@@ -258,5 +271,121 @@ describe("claw4 firmware HTTP compat (B1)", () => {
     } finally {
       await listening.close();
     }
+  });
+
+  it("returns 503 UNAVAILABLE when no DeviceDhService is bound", async () => {
+    resetClaw4FirmwareBindForTests();
+    const server = http.createServer((req, res) => {
+      void handleClaw4FirmwareHttpRequest(req, res).then((owned) => {
+        if (!owned && !res.writableEnded) {
+          res.statusCode = 599;
+          res.end("not-owned");
+        }
+      });
+    });
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve());
+    });
+    const address = server.address() as AddressInfo;
+    try {
+      const upload = await fetch(`http://127.0.0.1:${address.port}/api/v1/upload`, {
+        method: "POST",
+        headers: { "content-type": "audio/wav" },
+        body: Buffer.from("RIFF"),
+      });
+      expect(upload.status).toBe(503);
+      const body = (await upload.json()) as { error: { code: string; message: string } };
+      expect(body.error.code).toBe("UNAVAILABLE");
+      expect(body.error.message.toLowerCase()).toContain("openbot_claw4_firmware_inprocess");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+  });
+
+  it("env in-process bind creates a usable DeviceDhService without test inject", async () => {
+    resetClaw4FirmwareBindForTests();
+    const configPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "examples/stub-clients.sample.json",
+    );
+    const prev = {
+      inprocess: process.env.OPENBOT_CLAW4_FIRMWARE_INPROCESS,
+      config: process.env.OPENBOT_DEVICE_DH_STUB_CONFIG,
+      placeholder: process.env.OPENBOT_DEVICE_DH_STUB_PLACEHOLDER,
+      approval: process.env.OPENBOT_DEVICE_DH_APPROVAL_TOKEN,
+      agent: process.env.OPENBOT_DEVICE_DH_AGENT,
+    };
+    process.env.OPENBOT_CLAW4_FIRMWARE_INPROCESS = "1";
+    process.env.OPENBOT_DEVICE_DH_STUB_CONFIG = configPath;
+    process.env.OPENBOT_DEVICE_DH_STUB_PLACEHOLDER = "1";
+    process.env.OPENBOT_DEVICE_DH_APPROVAL_TOKEN = "test-approval";
+    delete process.env.OPENBOT_DEVICE_DH_AGENT;
+
+    try {
+      expect(createClaw4FirmwareServiceFromEnv()).toBeTruthy();
+      const resolved = resolveClaw4FirmwareService();
+      expect(resolved).toBeTruthy();
+
+      const grant = await exchangeGrant(resolved!);
+      // No setClaw4FirmwareServiceForTests — handler must use env-bound singleton.
+      const server = http.createServer((req, res) => {
+        void handleClaw4FirmwareHttpRequest(req, res).then((owned) => {
+          if (!owned && !res.writableEnded) {
+            res.statusCode = 599;
+            res.end("not-owned");
+          }
+        });
+      });
+      await new Promise<void>((resolve) => {
+        server.listen(0, "127.0.0.1", () => resolve());
+      });
+      const address = server.address() as AddressInfo;
+      try {
+        const upload = await fetch(`http://127.0.0.1:${address.port}/api/v1/upload`, {
+          method: "POST",
+          headers: {
+            ...grant.headers,
+            "content-type": "audio/wav",
+            "x-transcript-text": "hello-inprocess",
+          },
+          body: Buffer.from("RIFF....WAVEfmt "),
+        });
+        expect(upload.status).toBe(200);
+        const body = (await upload.json()) as {
+          code: number;
+          data: { text: string; conversationId: string };
+        };
+        expect(body.code).toBe(0);
+        expect(body.data.text).toBe("hello-inprocess");
+        expect(body.data.conversationId).toMatch(/^conv_/);
+      } finally {
+        await new Promise<void>((resolve, reject) => {
+          server.close((error) => (error ? reject(error) : resolve()));
+        });
+      }
+    } finally {
+      restoreEnv("OPENBOT_CLAW4_FIRMWARE_INPROCESS", prev.inprocess);
+      restoreEnv("OPENBOT_DEVICE_DH_STUB_CONFIG", prev.config);
+      restoreEnv("OPENBOT_DEVICE_DH_STUB_PLACEHOLDER", prev.placeholder);
+      restoreEnv("OPENBOT_DEVICE_DH_APPROVAL_TOKEN", prev.approval);
+      restoreEnv("OPENBOT_DEVICE_DH_AGENT", prev.agent);
+      resetClaw4FirmwareBindForTests();
+    }
+  });
+
+  it("env bind stays off without OPENBOT_CLAW4_FIRMWARE_INPROCESS", () => {
+    resetClaw4FirmwareBindForTests();
+    const configPath = path.join(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "examples/stub-clients.sample.json",
+    );
+    expect(
+      createClaw4FirmwareServiceFromEnv({
+        OPENBOT_DEVICE_DH_STUB_CONFIG: configPath,
+      }),
+    ).toBeUndefined();
+    expect(resolveClaw4FirmwareService({}, {})).toBeUndefined();
   });
 });
