@@ -12,8 +12,12 @@ vi.mock("../gateway/governance/shadow-sink.js", () => ({
   appendGovernanceShadowDecision: appendMock,
 }));
 
-const { runWithModelFallback, runWithImageModelFallback, ModelEntitlementEmptyError } =
-  await import("./model-fallback.js");
+const {
+  runWithModelFallback,
+  runWithImageModelFallback,
+  ModelEntitlementEmptyError,
+  appendGrantedEnterpriseCandidates,
+} = await import("./model-fallback.js");
 const { EMBEDDED_MODEL_MODE_ENV, resolveEmbeddedModelGovernance } =
   await import("./embedded-model-governance.js");
 const { makeModelFallbackCfg } = await import("./test-helpers/model-fallback-config-fixture.js");
@@ -543,6 +547,48 @@ describe("runWithModelFallback allowlistEnforcement (P3-1)", () => {
       mode: "legacy",
       reason: "legacy-by-configuration",
     });
+  });
+
+  it("preexisting hard-filter runs a granted ent/* model when the session model is outside the allowlist", async () => {
+    const mimo = "ent/abc123def4/mimo-v2.6-flash";
+    const { run, result } = await runWith({
+      governanceMode: "shadow",
+      allowlistEnforcement: "preexisting",
+      entitlementAllowlist: [mimo],
+    });
+    expect(calledKeys(run)).toEqual([mimo]);
+    expect(result.result).toBe(`ok:${mimo}`);
+  });
+
+  it("shadow without preexisting does not switch the run onto a granted ent/* model", async () => {
+    const mimo = "ent/abc123def4/mimo-v2.6-flash";
+    const run = vi.fn(async () => {
+      throw Object.assign(new Error("rate-limited"), { status: 429 });
+    });
+    await expect(
+      runWithModelFallback({
+        cfg: makeModelFallbackCfg(),
+        provider: "openai",
+        model: "gpt-4.1-mini",
+        runId: "run-shadow-ent",
+        agentDir,
+        governanceMode: "shadow",
+        entitlementAllowlist: [mimo],
+        run,
+      }),
+    ).rejects.toThrow(/rate-limited/);
+    expect(calledKeys(run)).not.toContain(mimo);
+  });
+
+  it("appendGrantedEnterpriseCandidates adds only ent/* ids", () => {
+    const appended = appendGrantedEnterpriseCandidates(
+      [{ provider: "openai", model: "gpt-4.1-mini" }],
+      ["ent/abc123def4/mimo-v2.6-flash", "api-proxy-deepseek/deepseek-chat"],
+    );
+    expect(appended).toEqual([
+      { provider: "openai", model: "gpt-4.1-mini" },
+      { provider: "ent", model: "abc123def4/mimo-v2.6-flash" },
+    ]);
   });
 
   it("P3-2 rework: preexisting + legacy with nothing authorized yields the existing empty-set error", async () => {
