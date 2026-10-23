@@ -350,6 +350,36 @@ export function buildOguiAnswerSubmitMessage(input: BuildOguiAnswerSubmitInput):
   return [...summaryLines, "```ogui-answer", JSON.stringify(envelope, null, 2), "```"].join("\n");
 }
 
+/**
+ * Recovery turn for an already-accepted decision.
+ * Carried by the existing chat.send string. It is not an ogui-answer and
+ * does not reopen the decision.
+ */
+export function buildOguiResumeRecoveryMessage(input: {
+  decisionId: string;
+  decisionVersion: number;
+}): string {
+  const decisionId = input.decisionId.trim();
+  const version = input.decisionVersion;
+  if (!decisionId || !Number.isInteger(version) || version <= 0) {
+    throw new Error(
+      "buildOguiResumeRecoveryMessage: decisionId and a positive integer decisionVersion are required",
+    );
+  }
+  const envelope = {
+    schema_version: OGUI_SCHEMA_VERSION,
+    decision_id: decisionId,
+    decision_version: version,
+  };
+  return [
+    "继续执行已接受的决策，不要重新作答。",
+    "",
+    "```ogui-resume",
+    JSON.stringify(envelope, null, 2),
+    "```",
+  ].join("\n");
+}
+
 /** Stable panel id for draft selection across lit re-renders. */
 export function oguiFormPanelId(form: OguiFormDefinition): string {
   return `${form.component_id}\u0000${form.fields.map((f) => f.id).join("\u0001")}`;

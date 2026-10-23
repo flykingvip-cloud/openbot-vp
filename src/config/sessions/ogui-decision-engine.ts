@@ -9,8 +9,8 @@
  * identity (E4). Fence and answer identity fields are not copied.
  * Every mutation goes through `updateSessionStore`.
  * `submission_id` is chat.send idempotency, not the consume key.
- * Close / dismiss is not a decisionStatus. This file does not add a fence,
- * a queue, or an owner-decision kind.
+ * Close / dismiss is not a decisionStatus. Recovery reuses chat.send with an
+ * ```ogui-resume``` block. It does not add a queue, an RPC, or a decisionStatus.
  */
 import crypto from "node:crypto";
 import {
@@ -38,6 +38,8 @@ const ISSUED_CLAIM_TEST = /已签发|签发成功/u;
 const ISSUED_CLAIM_RE = /已签发|签发成功/gu;
 const FORM_RE = /```[ \t]*ogui-form[ \t]*\r?\n([\s\S]*?)```/i;
 const ANSWER_RE = /```[ \t]*ogui-answer[ \t]*\r?\n([\s\S]*?)```/i;
+const RESUME_RE = /```[ \t]*ogui-resume[ \t]*\r?\n([\s\S]*?)```/i;
+const ACCEPTED_ANSWER_MARKER = "已接受的决策答案（权威记录，不是本次重放正文）";
 
 export type OguiDecisionIngress =
   | "chat"
@@ -88,6 +90,7 @@ type ParsedForm = {
   componentId: string;
   prompt: string;
   proposalKey: string;
+  fieldIds: string[];
   options: { value: string; label: string }[];
 };
 
@@ -241,11 +244,19 @@ function parseProposal(body: string):
   }
   const options: { value: string; label: string }[] = [];
   const labels: string[] = [];
+  const fieldIds: string[] = [];
   const seen = new Set<string>();
+  const seenFields = new Set<string>();
   for (const field of raw.fields) {
     if (!isPlain(field) || field.type !== "single_select") {
       return { ok: false, reason: "invalid_form" };
     }
+    const fieldId = nonEmpty(field.id);
+    if (!fieldId || seenFields.has(fieldId)) {
+      return { ok: false, reason: "invalid_form" };
+    }
+    seenFields.add(fieldId);
+    fieldIds.push(fieldId);
     const label = nonEmpty(field.label);
     if (label) {
       labels.push(label);
@@ -270,8 +281,8 @@ function parseProposal(body: string):
     return { ok: false, reason: "insufficient_options" };
   }
   const prompt = nonEmpty(raw.title) || labels.join(" / ") || componentId;
-  const proposalKey = `${componentId}\n${prompt}\n${options.map((option) => `${option.value}=${option.label}`).join(",")}`;
-  return { ok: true, form: { componentId, prompt, proposalKey, options } };
+  const proposalKey = `${componentId}\n${prompt}\n${fieldIds.join(",")}\n${options.map((option) => `${option.value}=${option.label}`).join(",")}`;
+  return { ok: true, form: { componentId, prompt, proposalKey, fieldIds, options } };
 }
 
 function readMap(entry: SessionEntry | undefined): OguiDecisionMap | undefined {
@@ -437,6 +448,8 @@ export async function issueOguiDecisionFromText(input: {
         prompt: parsed.form.prompt,
         proposalKey: parsed.form.proposalKey,
         options: parsed.form.options,
+        componentId: parsed.form.componentId,
+        fieldIds: parsed.form.fieldIds,
         allowCustom: true,
         multiSelect: false,
         issuedAtMs: now,
@@ -528,7 +541,8 @@ export type OguiWaitInboundClass =
   | "replace"
   | "new_goal"
   | "status"
-  | "reset";
+  | "reset"
+  | "recover";
 
 function hasPhrase(text: string, phrases: readonly string[]): boolean {
   const folded = text.toLowerCase();
@@ -543,12 +557,36 @@ function isCancelText(text: string): boolean {
   return hasPhrase(trimmed, ["取消决策", "取消这个决策", "不用选了", "cancel decision"]);
 }
 
+function parseResumeRecovery(text: string): { decisionId: string; version: number } | undefined {
+  const match = RESUME_RE.exec(text);
+  if (!match?.[1]) {
+    return undefined;
+  }
+  try {
+    const value = JSON.parse(match[1]) as unknown;
+    if (!isPlain(value)) {
+      return undefined;
+    }
+    const decisionId = nonEmpty(value.decision_id);
+    const version = value.decision_version;
+    if (!decisionId || typeof version !== "number" || !Number.isInteger(version) || version < 1) {
+      return undefined;
+    }
+    return { decisionId, version };
+  } catch {
+    return undefined;
+  }
+}
+
 export function classifyOguiWaitInbound(input: {
   inboundText: string;
   hasActiveWait: boolean;
   ingress: OguiDecisionIngress;
 }): OguiWaitInboundClass {
   const text = input.inboundText ?? "";
+  if (parseResumeRecovery(text)) {
+    return "recover";
+  }
   const answerMatch = ANSWER_RE.exec(text);
   if (answerMatch?.[1]) {
     let parsed: unknown;
@@ -659,6 +697,11 @@ export type OguiAdmission = {
   text?: string;
   decisionId?: string;
   resumeRef?: string;
+  /**
+   * Accepted answer reconstructed from the session record.
+   * Resume and recover execution must use this instead of the inbound body.
+   */
+  acceptedPrompt?: string;
 };
 
 function parseAnswerObject(text: string): Record<string, unknown> | undefined {
@@ -724,6 +767,16 @@ export async function admitOguiDecisionTurn(input: {
   });
   if (klass === "proceed") {
     return { action: "proceed" };
+  }
+  if (klass === "recover") {
+    return await admitOguiDecisionRecovery({
+      storePath,
+      sessionKey,
+      userId,
+      inboundText: input.inboundText,
+      nowMs: input.nowMs,
+      updateStore: input.updateStore,
+    });
   }
   if (klass === "pause" || klass === "legacy_while_waiting") {
     return { action: "pause", text: OGUI_WAIT_PAUSE_TEXT };
@@ -792,6 +845,7 @@ export async function admitOguiDecisionTurn(input: {
         action: "resume",
         decisionId: consumed.decisionId,
         resumeRef: continued.resumeRef,
+        acceptedPrompt: consumed.acceptedPrompt,
       };
     }
   }
@@ -826,6 +880,7 @@ export async function admitOguiDecisionTurn(input: {
           action: "resume",
           decisionId: consumed.decisionId,
           resumeRef: continued.resumeRef,
+          acceptedPrompt: consumed.acceptedPrompt,
         };
       }
     }
@@ -840,6 +895,99 @@ export async function admitOguiDecisionTurn(input: {
     action: "resume",
     decisionId: consumed.decisionId,
     resumeRef: claim.resumeRef,
+    acceptedPrompt: consumed.acceptedPrompt,
+  };
+}
+
+/** Model prompt built only from the stored answer. Never includes submission ids. */
+function acceptedPromptFor(record: OguiDecisionRecord): string {
+  const shown = record.answer?.label?.trim() || record.answer?.value || "";
+  return [ACCEPTED_ANSWER_MARKER, record.prompt, shown]
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
+/**
+ * Continue an already-accepted decision from the stored answer.
+ * Does not consume a new answer and does not move decisionStatus back to waiting.
+ */
+async function admitOguiDecisionRecovery(input: {
+  storePath: string;
+  sessionKey: string;
+  userId?: string;
+  inboundText: string;
+  nowMs?: number;
+  updateStore?: SessionStoreUpdater;
+}): Promise<OguiAdmission> {
+  const parsed = parseResumeRecovery(input.inboundText);
+  const userId = input.userId?.trim() ?? "";
+  if (!parsed || !userId) {
+    return { action: "ack", text: "未签发消费。该答案不能作为普通聊天继续原决策。" };
+  }
+  const map = loadMap(input.storePath, input.sessionKey);
+  const record = map?.[parsed.decisionId];
+  if (
+    !record ||
+    record.scope.sessionKey !== input.sessionKey ||
+    record.scope.userId !== userId ||
+    record.version !== parsed.version ||
+    record.decisionStatus !== "answered" ||
+    !record.answer
+  ) {
+    return { action: "ack", text: "未签发消费。该答案不能作为普通聊天继续原决策。" };
+  }
+  const acceptedPrompt = acceptedPromptFor(record);
+  const held = {
+    action: "ack" as const,
+    text: "该决策已接受，沿用原续跑引用，不会再开一条主线。",
+    decisionId: record.decisionId,
+    resumeRef: record.resumeRef,
+  };
+  if (record.resumeStatus === "completed") {
+    return held;
+  }
+  if (record.resumeStatus === "running") {
+    const continued = await continueRecoveredOguiDecisionResume({
+      storePath: input.storePath,
+      sessionKey: input.sessionKey,
+      decisionId: record.decisionId,
+      resumeRef: record.resumeRef,
+      lifecycleEnabled: true,
+      nowMs: input.nowMs,
+      updateStore: input.updateStore,
+    });
+    if (continued.continued && continued.resumeRef) {
+      return {
+        action: "resume",
+        decisionId: record.decisionId,
+        resumeRef: continued.resumeRef,
+        acceptedPrompt,
+      };
+    }
+    return held;
+  }
+  if (record.resumeStatus !== "pending" && record.resumeStatus !== "retryable") {
+    return { action: "ack", text: "未签发消费。该答案不能作为普通聊天继续原决策。" };
+  }
+  const claim = await claimOguiDecisionResume({
+    storePath: input.storePath,
+    sessionKey: input.sessionKey,
+    decisionId: record.decisionId,
+    lifecycleEnabled: true,
+    nowMs: input.nowMs,
+    updateStore: input.updateStore,
+  });
+  if (!claim.claimed || !claim.resumeRef) {
+    return {
+      ...held,
+      resumeRef: claim.resumeRef ?? record.resumeRef,
+    };
+  }
+  return {
+    action: "resume",
+    decisionId: record.decisionId,
+    resumeRef: claim.resumeRef,
+    acceptedPrompt,
   };
 }
 
@@ -853,18 +1001,28 @@ export type OguiConsumeResult =
       resumeRef: string;
       resumeStatus: OguiResumeStatus;
       answer: OguiDecisionAnswer;
+      /** Authority text for the agent. Not the inbound body. */
+      acceptedPrompt: string;
     }
   | { ok: false; reason: string; text: string; resumeRef?: string; decisionId?: string };
+
+function answerComponentId(answer: object): string {
+  if (!isPlain(answer)) {
+    return "";
+  }
+  return nonEmpty(answer.component_id);
+}
 
 /**
  * Option submit must match one stored option. A missing option is not
  * custom. Custom requires `answer_mode: "custom"` and `allowCustom`.
- * Single-select: exactly one non-empty string field.
+ * Single-select: exactly one non-empty string field, and that field id
+ * must be one declared on the decision when field ids were persisted.
  */
 function pickAnswer(
   record: OguiDecisionRecord,
   answer: unknown,
-): { kind: "option" | "custom"; value: string; label?: string } | undefined {
+): { kind: "option" | "custom"; value: string; label?: string; fieldId: string } | undefined {
   if (!isPlain(answer)) {
     return undefined;
   }
@@ -880,9 +1038,13 @@ function pickAnswer(
   if (entries.length !== 1) {
     return undefined;
   }
-  const field = entries[0]?.[0];
+  const field = entries[0]?.[0] ?? "";
   const raw = entries[0]?.[1];
-  if (!nonEmpty(field) || typeof raw !== "string") {
+  const fieldId = nonEmpty(field);
+  if (!fieldId || typeof raw !== "string") {
+    return undefined;
+  }
+  if (record.fieldIds && record.fieldIds.length > 0 && !record.fieldIds.includes(fieldId)) {
     return undefined;
   }
   const value = raw.trim();
@@ -893,20 +1055,26 @@ function pickAnswer(
     if (!record.allowCustom) {
       return undefined;
     }
-    return { kind: "custom", value };
+    return { kind: "custom", value, fieldId };
   }
   const option = record.options.find((item) => item.value === value);
   if (!option) {
     return undefined;
   }
-  return { kind: "option", value, label: option.label };
+  return { kind: "option", value, label: option.label, fieldId };
 }
 
 function sameStoredAnswer(
   stored: OguiDecisionAnswer,
-  next: { kind: string; value: string },
+  next: { kind: string; value: string; fieldId: string },
 ): boolean {
-  return stored.kind === next.kind && stored.value === next.value;
+  if (stored.kind !== next.kind || stored.value !== next.value) {
+    return false;
+  }
+  if (stored.fieldId && stored.fieldId !== next.fieldId) {
+    return false;
+  }
+  return true;
 }
 
 export async function consumeOguiDecisionAnswer(input: {
@@ -1007,8 +1175,20 @@ export async function consumeOguiDecisionAnswer(input: {
       if (record.decisionStatus === "expired" || record.decisionStatus === "superseded") {
         return reject("historical", { decisionId: record.decisionId, resumeRef: record.resumeRef });
       }
+      if (record.componentId && answerComponentId(input.answer) !== record.componentId) {
+        return reject(record.answer ? "conflict" : "invalid_answer", {
+          decisionId: record.decisionId,
+          resumeRef: record.resumeRef,
+        });
+      }
       const picked = pickAnswer(record, input.answer);
       if (record.answer && record.answer.submissionIds.includes(submissionId)) {
+        if (!picked || !sameStoredAnswer(record.answer, picked)) {
+          return reject("conflict", {
+            decisionId: record.decisionId,
+            resumeRef: record.resumeRef,
+          });
+        }
         return {
           ok: true as const,
           idempotent: true,
@@ -1018,6 +1198,7 @@ export async function consumeOguiDecisionAnswer(input: {
           resumeRef: record.resumeRef,
           resumeStatus: record.resumeStatus,
           answer: record.answer,
+          acceptedPrompt: acceptedPromptFor(record),
         };
       }
       if (record.answer) {
@@ -1043,6 +1224,7 @@ export async function consumeOguiDecisionAnswer(input: {
           resumeRef: record.resumeRef,
           resumeStatus: record.resumeStatus,
           answer: record.answer,
+          acceptedPrompt: acceptedPromptFor(record),
         };
       }
       if (record.decisionStatus !== "waiting" || !picked) {
@@ -1055,6 +1237,7 @@ export async function consumeOguiDecisionAnswer(input: {
       const answer: OguiDecisionAnswer = {
         kind: picked.kind,
         value: picked.value,
+        fieldId: picked.fieldId,
         submissionIds: [submissionId],
         ...(picked.label ? { label: picked.label } : {}),
       };
@@ -1079,6 +1262,7 @@ export async function consumeOguiDecisionAnswer(input: {
         resumeRef: next.resumeRef,
         resumeStatus: next.resumeStatus,
         answer,
+        acceptedPrompt: acceptedPromptFor(next),
       };
     });
     publishWaits(input.storePath, input.sessionKey);

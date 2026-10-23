@@ -1533,6 +1533,22 @@ export async function runPreparedReply(
       resumeRef: oguiAdmission.resumeRef,
     };
   }
+  const oguiAuthorityPrompt =
+    oguiResumeExec && oguiAdmission.acceptedPrompt ? oguiAdmission.acceptedPrompt : undefined;
+  if (oguiAuthorityPrompt) {
+    prefixedCommandBody = oguiAuthorityPrompt;
+  }
+  const agentSessionCtx = oguiAuthorityPrompt
+    ? {
+        ...sessionCtx,
+        Body: oguiAuthorityPrompt,
+        RawBody: oguiAuthorityPrompt,
+        CommandBody: oguiAuthorityPrompt,
+        BodyStripped: oguiAuthorityPrompt,
+        BodyForAgent: oguiAuthorityPrompt,
+        BodyForCommands: oguiAuthorityPrompt,
+      }
+    : sessionCtx;
   const isStreaming = isEmbeddedPiRunStreaming(sessionIdFinal);
   const shouldSteer = resolvedQueue.mode === "steer" || resolvedQueue.mode === "steer-backlog";
   const shouldFollowup =
@@ -1675,7 +1691,7 @@ export async function runPreparedReply(
       blockStreamingEnabled,
       blockReplyChunking,
       resolvedBlockStreamingBreak,
-      sessionCtx,
+      sessionCtx: agentSessionCtx,
       shouldInjectGroupIntro,
       typingMode,
     });

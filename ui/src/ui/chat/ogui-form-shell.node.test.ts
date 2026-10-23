@@ -349,4 +349,52 @@ describe("chat shell OGUI decision status", () => {
     expect(submitted[0]).toContain("```ogui-answer");
     expect(submitted[0]).not.toContain("decision_id");
   });
+
+  it("continues an answered card from the recovery control without sending another answer", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        messages: [
+          assistantMessage(formFence({ decision_id: "ogd_answered", decision_version: 1 })),
+        ],
+        oguiDecisions: {
+          ogd_answered: { decisionStatus: "answered", version: 1 },
+        },
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const submit = submitButton(container);
+    expect(submit.disabled).toBe(true);
+    const resume = container.querySelector('[data-testid="ogui-form-resume"]');
+    expect(resume).toBeInstanceOf(HTMLButtonElement);
+    if (!(resume instanceof HTMLButtonElement)) {
+      return;
+    }
+    expect(resume.disabled).toBe(false);
+    expect(resume.textContent).toContain("继续执行");
+    resume.click();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain("```ogui-resume");
+    expect(submitted[0]).toContain("ogd_answered");
+    expect(submitted[0]).not.toContain('"answers"');
+    expect(submitted[0]).not.toContain("```ogui-answer");
+  });
+
+  it("does not offer resume recovery on a waiting card", () => {
+    const container = mount(
+      createProps({
+        messages: [
+          assistantMessage(formFence({ decision_id: "ogd_waiting", decision_version: 1 })),
+        ],
+        oguiDecisions: {
+          ogd_waiting: { decisionStatus: "waiting", version: 1 },
+        },
+        onSubmitForm: () => undefined,
+      }),
+    );
+    expect(container.querySelector('[data-testid="ogui-form-resume"]')).toBeNull();
+    expect(submitButton(container).disabled).toBe(true);
+  });
 });

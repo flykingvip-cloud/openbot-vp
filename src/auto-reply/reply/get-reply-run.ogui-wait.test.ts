@@ -365,4 +365,75 @@ describe("runPreparedReply OGUI ingress", () => {
     expect(stored?.resumeRef).toBe(issued.resumeRef);
     expect(stored?.decisionStatus).toBe("answered");
   });
+
+  it("continues a failed resume from the recovery fence without replaying the answer", async () => {
+    const storePath = path.join(dir, "sessions.json");
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: {
+        lifecycleEnabled: true,
+        cfg: { collaboration: { task: { oguiDecisionLifecycle: true } } },
+        storePath,
+        sessionKey: SESSION_KEY,
+        userId: "user-1",
+        originRunId: "run-origin",
+        ingress: "chat",
+        allowIssue: true,
+      },
+      env: { OPENBOT_OGUI_DECISION_LIFECYCLE: "1" },
+    });
+    const answer = [
+      "```ogui-answer",
+      JSON.stringify({
+        schema_version: "ogui/v1",
+        component_id: "cmp-1",
+        submission_id: "sub-reply-fail",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      }),
+      "```",
+    ].join("\n");
+    runReplyAgentMock.mockRejectedValueOnce(new Error("exec-failed"));
+    await expect(runPreparedReply(replyParams({ storePath, text: answer }))).rejects.toThrow(
+      "exec-failed",
+    );
+    const failed = loadSessionStore(storePath, { skipCache: true })[SESSION_KEY]?.oguiDecisions?.[
+      issued.decisionId ?? ""
+    ];
+    expect(failed?.resumeStatus).toBe("retryable");
+    expect(failed?.answer?.value).toBe("a");
+    const recovery = [
+      "FORGED_BODY_MUST_NOT_DRIVE",
+      "```ogui-resume",
+      JSON.stringify({
+        schema_version: "ogui/v1",
+        decision_id: issued.decisionId,
+        decision_version: 1,
+      }),
+      "```",
+    ].join("\n");
+    expect(recovery).not.toContain('"answers"');
+    const retried = await runPreparedReply(replyParams({ storePath, text: recovery }));
+    expect(retried).toEqual({ text: "agent-ran" });
+    const call = runReplyAgentMock.mock.calls.at(-1)?.[0] as {
+      commandBody?: string;
+      sessionCtx?: { Body?: string };
+    };
+    expect(call.commandBody).toContain("已接受的决策答案（权威记录，不是本次重放正文）");
+    expect(call.commandBody).toContain("甲");
+    expect(call.commandBody).not.toContain("FORGED_BODY_MUST_NOT_DRIVE");
+    expect(call.commandBody).not.toContain("ogui-resume");
+    expect(call.commandBody).not.toContain("sub-reply-fail");
+    expect(call.commandBody).not.toContain("submission_id");
+    expect(call.sessionCtx?.Body).not.toContain("FORGED_BODY_MUST_NOT_DRIVE");
+    const stored = loadSessionStore(storePath, { skipCache: true })[SESSION_KEY]?.oguiDecisions?.[
+      issued.decisionId ?? ""
+    ];
+    expect(stored?.resumeStatus).toBe("completed");
+    expect(stored?.resumeRef).toBe(issued.resumeRef);
+    expect(stored?.resumeRef).toBe(failed?.resumeRef);
+    expect(stored?.decisionStatus).toBe("answered");
+    expect(stored?.answer?.value).toBe("a");
+  });
 });

@@ -359,6 +359,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-crash",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -426,6 +427,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-task-switch",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -453,6 +455,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-task-same",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -477,6 +480,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-forged",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -499,6 +503,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-many",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -513,6 +518,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-custom",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -545,6 +551,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-live",
         decision_id: issued.decisionId,
         decision_version: 1,
@@ -761,6 +768,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-half-id",
         decision_id: decisionId,
         answers: { choice: "a" },
@@ -773,6 +781,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-half-ver",
         decision_version: 1,
         answers: { choice: "a" },
@@ -829,6 +838,7 @@ describe("OGUI decision engine S1–S5", () => {
         lifecycleEnabled: true,
         env: ENV_ON,
         answer: {
+          component_id: "cmp-1",
           submission_id: "sub-concurrent-1",
           decision_id: sameId,
           decision_version: 1,
@@ -842,6 +852,7 @@ describe("OGUI decision engine S1–S5", () => {
         lifecycleEnabled: true,
         env: ENV_ON,
         answer: {
+          component_id: "cmp-1",
           submission_id: "sub-concurrent-2",
           decision_id: sameId,
           decision_version: 1,
@@ -881,6 +892,7 @@ describe("OGUI decision engine S1–S5", () => {
         lifecycleEnabled: true,
         env: ENV_ON,
         answer: {
+          component_id: "cmp-1",
           submission_id: "sub-race-a",
           decision_id: diffId,
           decision_version: 1,
@@ -894,6 +906,7 @@ describe("OGUI decision engine S1–S5", () => {
         lifecycleEnabled: true,
         env: ENV_ON,
         answer: {
+          component_id: "cmp-1",
           submission_id: "sub-race-b",
           decision_id: diffId,
           decision_version: 1,
@@ -937,6 +950,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-exit",
         decision_id: decisionId,
         decision_version: 1,
@@ -1023,6 +1037,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-expired",
         decision_id: decisionId,
         decision_version: 1,
@@ -1055,6 +1070,7 @@ describe("OGUI decision engine S1–S5", () => {
       lifecycleEnabled: true,
       env: ENV_ON,
       answer: {
+        component_id: "cmp-1",
         submission_id: "sub-consumed",
         decision_id: consumedId,
         decision_version: 1,
@@ -1099,6 +1115,273 @@ describe("OGUI decision engine S1–S5", () => {
     expect(quote.text).not.toContain("已签发");
     expect(quote.oguiWaitActive).toBe(false);
     expect(readDecisions(session.storePath, session.sessionKey)).toBeUndefined();
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("rejects the same submission id when the answer content changes and does not resume", async () => {
+    const session = await seedSession();
+    const bound = binding(session.storePath, session.sessionKey);
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: bound,
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const consumed = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        schema_version: "ogui/v1",
+        component_id: "cmp-1",
+        submission_id: "sub-1",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(consumed.ok).toBe(true);
+    const replay = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: `REPLAY_MUST_NOT_DRIVE\n${answerText({
+        decisionId,
+        version: 1,
+        value: "b",
+        submissionId: "sub-1",
+      })}`,
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(replay.action).toBe("ack");
+    expect(replay.action).not.toBe("resume");
+    expect(replay.acceptedPrompt).toBeUndefined();
+    const stored = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(stored?.decisionStatus).toBe("answered");
+    expect(stored?.resumeStatus).toBe("pending");
+    expect(stored?.answer?.value).toBe("a");
+    expect(stored?.answer?.fieldId).toBe("choice");
+    expect(stored?.componentId).toBe("cmp-1");
+    expect(stored?.fieldIds).toEqual(["choice"]);
+    const same = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: `REPLAY_MUST_NOT_DRIVE\n${answerText({
+        decisionId,
+        version: 1,
+        value: "a",
+        submissionId: "sub-1",
+      })}`,
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(same.action).toBe("resume");
+    expect(same.resumeRef).toBe(issued.resumeRef);
+    expect(same.acceptedPrompt).toContain("已接受的决策答案（权威记录，不是本次重放正文）");
+    expect(same.acceptedPrompt).toContain("甲");
+    expect(same.acceptedPrompt).not.toContain("REPLAY_MUST_NOT_DRIVE");
+    expect(same.acceptedPrompt).not.toContain("submission_id");
+    expect(same.acceptedPrompt).not.toContain("sub-1");
+    const after = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(after?.answer?.value).toBe("a");
+    expect(after?.decisionStatus).toBe("answered");
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("rejects an undeclared answer field and a mismatched component id", async () => {
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: binding(session.storePath, session.sessionKey),
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const undeclared = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        schema_version: "ogui/v1",
+        component_id: "cmp-1",
+        submission_id: "sub-undeclared",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { undeclared_field: "a" },
+      },
+    });
+    expect(undeclared.ok).toBe(false);
+    if (!undeclared.ok) {
+      expect(undeclared.reason).toBe("invalid_answer");
+    }
+    const mismatch = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        schema_version: "ogui/v1",
+        component_id: "other",
+        submission_id: "sub-component",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(mismatch.ok).toBe(false);
+    if (!mismatch.ok) {
+      expect(mismatch.reason).toBe("invalid_answer");
+    }
+    const stored = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(stored?.decisionStatus).toBe("waiting");
+    expect(stored?.answer).toBeUndefined();
+    expect(stored?.resumeStatus).toBe("pending");
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("recovers a pending resume from the authority answer without replaying the answer body", async () => {
+    const session = await seedSession();
+    const bound = binding(session.storePath, session.sessionKey);
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: bound,
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const consumed = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        component_id: "cmp-1",
+        submission_id: "sub-recover",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(consumed.ok).toBe(true);
+    const stranger = await admitOguiDecisionTurn({
+      binding: { ...bound, userId: "user-2" },
+      env: ENV_ON,
+      userId: "user-2",
+      inboundText: [
+        "继续执行已接受的决策，不要重新作答。",
+        "",
+        "```ogui-resume",
+        JSON.stringify({
+          schema_version: "ogui/v1",
+          decision_id: decisionId,
+          decision_version: 1,
+        }),
+        "```",
+      ].join("\n"),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(stranger.action).toBe("ack");
+    expect(stranger.action).not.toBe("resume");
+    const still = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(still?.resumeStatus).toBe("pending");
+    expect(still?.decisionStatus).toBe("answered");
+    const recovery = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: [
+        "FORGED_BODY_MUST_NOT_DRIVE",
+        "```ogui-resume",
+        JSON.stringify({
+          schema_version: "ogui/v1",
+          decision_id: decisionId,
+          decision_version: 1,
+        }),
+        "```",
+      ].join("\n"),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(recovery.action).toBe("resume");
+    expect(recovery.resumeRef).toBe(issued.resumeRef);
+    expect(recovery.acceptedPrompt).toContain("已接受的决策答案（权威记录，不是本次重放正文）");
+    expect(recovery.acceptedPrompt).toContain("甲");
+    expect(recovery.acceptedPrompt).not.toContain("FORGED_BODY_MUST_NOT_DRIVE");
+    expect(recovery.acceptedPrompt).not.toContain("submission_id");
+    expect(recovery.acceptedPrompt).not.toContain("answers");
+    const resumed = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(resumed?.decisionStatus).toBe("answered");
+    expect(resumed?.answer?.value).toBe("a");
+    expect(resumed?.resumeRef).toBe(issued.resumeRef);
+    expect(resumed?.resumeStatus).toBe("running");
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("adopts a dead-owner running resume from the recovery fence without an answer replay", async () => {
+    const session = await seedSession();
+    const bound = binding(session.storePath, session.sessionKey);
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: bound,
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const consumed = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        component_id: "cmp-1",
+        submission_id: "sub-dead",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(consumed.ok).toBe(true);
+    await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    await updateSessionStore(session.storePath, (store) => {
+      const record = store[session.sessionKey]?.oguiDecisions?.[decisionId];
+      if (record) {
+        record.resumeOwnerPid = 2_147_483_646;
+      }
+    });
+    const recovery = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: [
+        "```ogui-resume",
+        JSON.stringify({
+          schema_version: "ogui/v1",
+          decision_id: decisionId,
+          decision_version: 1,
+        }),
+        "```",
+      ].join("\n"),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(recovery.action).toBe("resume");
+    expect(recovery.resumeRef).toBe(issued.resumeRef);
+    expect(recovery.acceptedPrompt).toContain("甲");
+    expect(recovery.acceptedPrompt).not.toContain("sub-dead");
+    const stored = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(stored?.decisionStatus).toBe("answered");
+    expect(stored?.answer?.value).toBe("a");
+    expect(stored?.resumeRef).toBe(issued.resumeRef);
+    expect(stored?.resumeStatus).toBe("running");
+    expect(stored?.resumeOwnerPid).toBe(process.pid);
     fs.rmSync(session.dir, { recursive: true, force: true });
   });
 });

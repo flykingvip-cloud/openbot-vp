@@ -9,6 +9,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { generateUUID } from "../uuid.ts";
 import {
   buildOguiAnswerSubmitMessage,
+  buildOguiResumeRecoveryMessage,
   oguiFormDraftComplete,
   oguiFormPanelId,
   type OguiFormDefinition,
@@ -285,6 +286,36 @@ function handleFormSubmit(form: OguiFormDefinition, options: OguiFormRenderOptio
   options.onSubmitForm(submitText, { submissionId });
 }
 
+function canOfferResumeRecovery(form: OguiFormDefinition, options: OguiFormRenderOptions): boolean {
+  return Boolean(
+    options.decisionStatus === "answered" &&
+    options.onSubmitForm &&
+    form.decision_id?.trim() &&
+    typeof form.decision_version === "number" &&
+    Number.isInteger(form.decision_version) &&
+    form.decision_version > 0,
+  );
+}
+
+/** Continues the stored resume. Does not submit a new answer or reopen the card. */
+function handleResumeRecovery(form: OguiFormDefinition, options: OguiFormRenderOptions): void {
+  if (!canOfferResumeRecovery(form, options) || !options.onSubmitForm) {
+    return;
+  }
+  const decisionId = form.decision_id?.trim() ?? "";
+  const version = form.decision_version;
+  if (!decisionId || typeof version !== "number") {
+    return;
+  }
+  let text: string;
+  try {
+    text = buildOguiResumeRecoveryMessage({ decisionId, decisionVersion: version });
+  } catch {
+    return;
+  }
+  options.onSubmitForm(text, { submissionId: generateUUID() });
+}
+
 function renderField(
   form: OguiFormDefinition,
   field: OguiFormField,
@@ -388,6 +419,20 @@ export function renderOguiFormView(
                 @click=${() => handleFormSubmit(form, options)}
               >
                 ${submitLabel}
+              </button>
+            `
+          : nothing
+      }
+      ${
+        canOfferResumeRecovery(form, options)
+          ? html`
+              <button
+                type="button"
+                class="ogui-form__submit ogui-form__resume"
+                data-testid="ogui-form-resume"
+                @click=${() => handleResumeRecovery(form, options)}
+              >
+                继续执行
               </button>
             `
           : nothing

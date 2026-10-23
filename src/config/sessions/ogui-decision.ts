@@ -43,6 +43,8 @@ export type OguiDecisionAnswerKind = "option" | "custom" | "reject";
 export type OguiDecisionAnswer = {
   kind: OguiDecisionAnswerKind;
   value: string;
+  /** Declared form field that carried this answer. Absent on older records. */
+  fieldId?: string;
   label?: string;
   submissionIds: string[];
 };
@@ -94,6 +96,16 @@ export type OguiDecisionRecord = {
    */
   proposalKey?: string;
   options: OguiDecisionOption[];
+  /**
+   * Form `component_id` captured at issue. Absent on records written
+   * before field identity was persisted. Consume rejects a different id.
+   */
+  componentId?: string;
+  /**
+   * Declared single-select field ids. Absent on older records.
+   * Consume rejects an answer key outside this set.
+   */
+  fieldIds?: string[];
   allowCustom: boolean;
   /** Hard false. `true` is an explicit reject, not a silent single-select. */
   multiSelect: false;
@@ -198,12 +210,37 @@ function parseAnswer(raw: unknown): OguiDecisionAnswer | undefined {
     submissionIds.push(trimmed);
   }
   const label = nonEmpty(raw.label);
+  let fieldId: string | undefined;
+  if (raw.fieldId !== undefined) {
+    fieldId = nonEmpty(raw.fieldId);
+    if (!fieldId) {
+      return undefined;
+    }
+  }
   return {
     kind: kind as OguiDecisionAnswerKind,
     value,
     submissionIds,
+    ...(fieldId ? { fieldId } : {}),
     ...(label ? { label } : {}),
   };
+}
+
+function parseFieldIds(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return undefined;
+  }
+  const fieldIds: string[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    const fieldId = nonEmpty(item);
+    if (!fieldId || seen.has(fieldId)) {
+      return undefined;
+    }
+    seen.add(fieldId);
+    fieldIds.push(fieldId);
+  }
+  return fieldIds;
 }
 
 /**
@@ -277,6 +314,20 @@ export function parseOguiDecisionRecord(raw: unknown): OguiDecisionRecord | unde
       return undefined;
     }
   }
+  let componentId: string | undefined;
+  if (raw.componentId !== undefined) {
+    componentId = nonEmpty(raw.componentId);
+    if (!componentId) {
+      return undefined;
+    }
+  }
+  let fieldIds: string[] | undefined;
+  if (raw.fieldIds !== undefined) {
+    fieldIds = parseFieldIds(raw.fieldIds);
+    if (!fieldIds) {
+      return undefined;
+    }
+  }
   return {
     decisionId,
     version: raw.version,
@@ -290,6 +341,8 @@ export function parseOguiDecisionRecord(raw: unknown): OguiDecisionRecord | unde
     prompt,
     ...(proposalKey ? { proposalKey } : {}),
     options,
+    ...(componentId ? { componentId } : {}),
+    ...(fieldIds ? { fieldIds } : {}),
     allowCustom: raw.allowCustom,
     multiSelect: false,
     ...(answer ? { answer } : {}),

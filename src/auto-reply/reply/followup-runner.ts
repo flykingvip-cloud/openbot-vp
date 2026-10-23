@@ -159,6 +159,7 @@ export function createFollowupRunner(params: {
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
       | undefined;
+    let oguiModelPrompt: string | undefined;
     let oguiResumeSettled = false;
     try {
       if (queued.run.oguiDecisionRun) {
@@ -185,6 +186,9 @@ export function createFollowupRunner(params: {
             decisionId: admission.decisionId,
             resumeRef: admission.resumeRef,
           };
+          if (admission.acceptedPrompt) {
+            oguiModelPrompt = admission.acceptedPrompt;
+          }
         }
       }
       const shouldSurfaceToControlUi = isInternalMessageChannel(
@@ -345,7 +349,7 @@ export function createFollowupRunner(params: {
                 workspaceDir: queued.run.workspaceDir,
                 config: queued.run.config,
                 skillsSnapshot: queued.run.skillsSnapshot,
-                prompt: queued.prompt,
+                prompt: oguiModelPrompt ?? queued.prompt,
                 extraSystemPrompt: queued.run.extraSystemPrompt,
                 ...(queued.run.disableTools ? { disableTools: true } : {}),
                 ...(queued.run.skillPolicy ? { skillPolicy: queued.run.skillPolicy } : {}),
