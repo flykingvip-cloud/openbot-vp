@@ -1923,6 +1923,56 @@ export class DeviceDhService {
     };
   }
 
+  /**
+   * Firmware-facing read model over existing runs for one conversation.
+   * Does not allocate a second conversation store.
+   */
+  listConversationMessages(grant: GrantRecord, conversationId: string) {
+    this.assertActive(grant);
+    const conversation = this.requireConversation(grant, conversationId);
+    type Msg = {
+      id: string;
+      role: "user" | "assistant" | "system";
+      text: string;
+      turnId?: string;
+      runId?: string;
+      createdAt: string;
+    };
+    const messages: Msg[] = [];
+    for (const run of this.runs.values()) {
+      if (
+        run.conversationId !== conversationId ||
+        run.authorizationRef !== grant.authorizationRef
+      ) {
+        continue;
+      }
+      messages.push({
+        id: `user_${run.turnId}`,
+        role: "user",
+        text: run.inputText,
+        turnId: run.turnId,
+        runId: run.runId,
+        createdAt: new Date(run.createdAt).toISOString(),
+      });
+      if (run.visibleText) {
+        messages.push({
+          id: run.messageId ?? `asst_${run.turnId}`,
+          role: "assistant",
+          text: run.visibleText,
+          turnId: run.turnId,
+          runId: run.runId,
+          createdAt: new Date(run.finishedAt ?? run.createdAt).toISOString(),
+        });
+      }
+    }
+    messages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return {
+      conversationId: conversation.conversationId,
+      bindingVersion: conversation.bindingVersion,
+      messages,
+    };
+  }
+
   private conversationView(conversation: ConversationRecord, grant: GrantRecord) {
     return {
       conversationId: conversation.conversationId,

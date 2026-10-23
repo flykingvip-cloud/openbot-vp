@@ -15,6 +15,7 @@ import { handleA2uiHttpRequest, isCanvasWsPath } from "../canvas-host/a2ui.js";
 import type { CanvasHostHandler } from "../canvas-host/server.js";
 import { LEGACY_HOOK_TOKEN_HEADER_DISPLAY_NAMES } from "../compat/legacy-names.js";
 import { loadConfig } from "../config/config.js";
+import { handleClaw4FirmwareHttpRequest } from "../integrations/device-digital-human/claw4-firmware-http.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
 import { safeEqualSecret } from "../security/secret-equal.js";
 import { handleSlackHttpRequest } from "../slack/http/index.js";
@@ -724,6 +725,13 @@ export function createGatewayHttpServer(opts: {
               allowRealIpFallback,
               rateLimiter,
             }),
+        },
+        {
+          // Claw4 firmware HTTP compat (Scheme B1): /api/v1/upload + messages.
+          // Maps to integrations conversations/turns. Does not change frozen
+          // device-platform OpenAPI. grayRelease stays false. No PROMOTE.
+          name: "claw4-firmware",
+          run: () => handleClaw4FirmwareHttpRequest(req, res),
         },
         {
           // OpenBot management routes only: /admin for a platform-admin session

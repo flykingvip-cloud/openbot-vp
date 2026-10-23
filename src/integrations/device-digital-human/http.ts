@@ -3,6 +3,16 @@ import { stat } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import {
+  CLAW4_RECORD_UPLOAD_PATH,
+  CLAW4_UPLOAD_PATH,
+  CLAW4_WAV_LIMIT,
+  claw4Error,
+  claw4Success,
+  authenticateClaw4Grant,
+  handleClaw4ListMessages,
+  handleClaw4Upload,
+} from "./claw4-firmware-compat.js";
 import { authInvalid, DeviceDhError } from "./errors.js";
 import type { DeviceDhService } from "./service.js";
 import { API_PREFIX, API_VERSION, PROTOCOL_VERSION, type EventEnvelope } from "./types.js";
@@ -64,6 +74,10 @@ async function handle(
     const url = new URL(req.url ?? "/", "http://127.0.0.1");
     if (req.method === "GET" && url.pathname === "/healthz") {
       sendJson(res, 200, { ok: true, service: "device-digital-human-stub" }, traceId);
+      return;
+    }
+    // Claw4 firmware HTTP compat (Scheme B1) — adjacent to integrations, same store.
+    if (await handleClaw4OnStub(options.service, req, res, url, traceId)) {
       return;
     }
     if (!url.pathname.startsWith(API_PREFIX)) {
@@ -233,6 +247,16 @@ async function dispatch(
       res,
       200,
       service.getConversation(grant, decodeURIComponent(conversation[1] ?? "")),
+      traceId,
+    );
+    return;
+  }
+  const conversationMessages = /^\/conversations\/([^/]+)\/messages$/.exec(relative);
+  if (method === "GET" && conversationMessages) {
+    sendJson(
+      res,
+      200,
+      service.listConversationMessages(grant, decodeURIComponent(conversationMessages[1] ?? "")),
       traceId,
     );
     return;
@@ -454,6 +478,95 @@ async function serveFixture(
     "cache-control": "no-store",
   });
   await pipeline(createReadStream(filePath), res);
+}
+
+async function handleClaw4OnStub(
+  service: DeviceDhService,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  url: URL,
+  traceId: string,
+): Promise<boolean> {
+  const pathname = url.pathname;
+  const auth = {
+    authorization: headerString(req, "authorization"),
+    grantCredential: headerString(req, "x-openbot-grant-credential"),
+    deviceId: headerString(req, "x-device-id"),
+    transcriptText: headerString(req, "x-transcript-text"),
+  };
+  try {
+    if (pathname === CLAW4_UPLOAD_PATH) {
+      if (req.method !== "POST") {
+        throw new DeviceDhError("PARAM_UNSUPPORTED", "POST required");
+      }
+      const wavBytes = await readLimited(req, CLAW4_WAV_LIMIT);
+      const result = await handleClaw4Upload(service, {
+        headers: auth,
+        contentType: headerString(req, "content-type"),
+        wavBytes,
+        conversationId: url.searchParams.get("conversationId") ?? undefined,
+        transcriptQuery: url.searchParams.get("transcript") ?? undefined,
+      });
+      sendClaw4Json(res, 200, claw4Success(result), traceId);
+      return true;
+    }
+    if (pathname === CLAW4_RECORD_UPLOAD_PATH) {
+      if (req.method !== "POST") {
+        throw new DeviceDhError("PARAM_UNSUPPORTED", "POST required");
+      }
+      authenticateClaw4Grant(service, auth);
+      await readLimited(req, CLAW4_WAV_LIMIT);
+      sendClaw4Json(
+        res,
+        200,
+        claw4Success({
+          text: "",
+          conversationId: url.searchParams.get("conversationId")?.trim() || "",
+          reserved: true,
+          todo: "POST /api/v1/record/upload body semantics reserved for a later slice",
+        }),
+        traceId,
+      );
+      return true;
+    }
+    const messages = /^\/api\/v1\/conversation\/([^/]+)\/messages$/.exec(pathname);
+    if (messages) {
+      if (req.method !== "GET") {
+        throw new DeviceDhError("PARAM_UNSUPPORTED", "GET required");
+      }
+      const listed = handleClaw4ListMessages(service, auth, decodeURIComponent(messages[1] ?? ""));
+      sendClaw4Json(res, 200, claw4Success(listed), traceId);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    const deviceError =
+      error instanceof DeviceDhError ? error : new DeviceDhError("INTERNAL", "Internal error");
+    sendClaw4Json(
+      res,
+      deviceError.httpStatus,
+      claw4Error(deviceError),
+      traceId,
+      deviceError.headers,
+    );
+    return true;
+  }
+}
+
+function sendClaw4Json(
+  res: http.ServerResponse,
+  status: number,
+  body: Record<string, unknown>,
+  traceId: string,
+  headers?: Record<string, string>,
+): void {
+  const payload = JSON.stringify({ ...body, traceId });
+  res.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+    "content-length": Buffer.byteLength(payload),
+    ...headers,
+  });
+  res.end(payload);
 }
 
 function sendJson(
