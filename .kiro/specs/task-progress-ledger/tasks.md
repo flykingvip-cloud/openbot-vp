@@ -4,7 +4,8 @@
 
 ## Agents
 
-- cursor-grok · role: owner · scope: Progress Ledger 规格、实现与生产对齐记录 · paths: `.kiro/specs/task-progress-ledger/**`, `src/progress-ledger/**`, `src/auto-reply/turn-contract/**`, `src/cron/**`, `src/gateway/workbench/pending-tasks-read-model.ts`, `src/gateway/server-methods/progress-ledger.ts`, `ui/src/ui/ports/employee/views/personal-cron-*.ts`, `ui/src/ui/ports/employee/views/workbench-capability-contracts.ts`, `ui/src/ui/ports/employee/views/workbench-signals.ts`, `deploy/production/RELEASE_RECORD.md`, `deploy/production/releases.jsonl`, `docs/design/evidence/task-progress-ledger-*` · since: 2026-08-22
+- cursor-grok · role: owner · scope: Progress Ledger 规格、实现与生产对齐记录 · paths: `.kiro/specs/task-progress-ledger/**`, `src/progress-ledger/**`, `src/auto-reply/turn-contract/**`, `src/cron/**`, `src/gateway/workbench/pending-tasks-read-model.ts`, `src/gateway/server-methods/progress-ledger.ts`, `ui/src/ui/ports/employee/views/personal-cron-*.ts`, `ui/src/ui/ports/employee/views/workbench-capability-contracts.ts`, `ui/src/ui/ports/employee/views/workbench-signals.ts`, `deploy/production/RELEASE_RECORD.md`, `docs/design/evidence/task-progress-ledger-*` · since: 2026-08-22
+- historical, not live: `deploy/production/releases.jsonl` was a pre-split copy claimed by this spec. It is not the live ledger and must not be recreated in openbot-vp. Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
 
 ## Tasks
 

@@ -8,7 +8,9 @@
 // permanent FALSE failure that could only be "fixed" by violating the freeze.
 //
 // The real invariant (AGENTS.md I2 "anchoring") is that production LIVE is anchored to the
-// sole trunk through immutable artifacts: the single open `releases.jsonl` row, its
+// sole trunk through immutable artifacts: the single open OHBE `releases.jsonl` row
+// (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl;
+// not a file in openbot-vp — see deploy/production/LEDGER.md), its
 // annotated `provenance/sha-*` tag, `RELEASE_RECORD.md`, and the running artifact must all
 // name the SAME commit, and that commit must be contained in `origin/main`. Immutable
 // provenance tags — not an advanceable branch — are the anchor, so a lagging frozen branch

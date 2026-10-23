@@ -20,7 +20,11 @@ export type LiveShaReaders = {
   container: () => Promise<string | null>;
   stoppedContainer: () => Promise<string | null>;
   releaseRecord: () => Promise<string | null>;
-  /** Raw text of deploy/production/releases.jsonl (the SoT ledger), or null when unreadable. */
+  /**
+   * Raw text of a ledger file, or null when unreadable.
+   * The default path is the historical openbot-vp copy and is not the live ledger.
+   * Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
+   */
   ledger: () => Promise<string | null>;
 };
 
@@ -135,6 +139,8 @@ export function createDefaultLiveShaReaders(options?: {
     process.env.OPENBOT_PRODUCTION_BUILD_INFO_PATH ??
     "/app/dist/build-info.json";
   const releaseRecordPath = options?.releaseRecordPath ?? "deploy/production/RELEASE_RECORD.md";
+  // Historical openbot-vp path. The file is gone; reading it is not a live SoT lookup.
+  // Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   const ledgerPath = options?.ledgerPath ?? "deploy/production/releases.jsonl";
 
   return {

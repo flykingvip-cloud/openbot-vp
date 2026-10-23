@@ -25,6 +25,8 @@ evaluatedTreeAt: 5ba7b134d1b2635e5a40b786a2809b28379b4a1b
 productionSeq: 97
 productionGatewaySha: f1c7efece96d68375bf4b7fb57e77908fedfdd6c
 productionUiSha: f1c7efece96d68375bf4b7fb57e77908fedfdd6c
+# Contract token below. The ledger file is OHBE, not openbot-vp:
+# https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
 evidenceSource: "repo ledger only; production-proven = unknown"
 
 notes:
