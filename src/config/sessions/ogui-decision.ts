@@ -8,7 +8,8 @@
  *
  * The fence fields are references. Authority is this record plus the
  * authenticated identity (E4). `updateSessionStore` is the only writer
- * (`src/config/sessions/store.ts`); S0 does not call it.
+ * (`src/config/sessions/store.ts`). The lifecycle engine calls it when the
+ * flag is on. Flag-off code does not.
  *
  * E1 keeps two axes:
  *   decisionStatus — waiting | answered | rejected | expired | superseded
@@ -77,6 +78,11 @@ export type OguiDecisionRecord = {
   resumeRef: string;
   scope: OguiDecisionScope;
   prompt: string;
+  /**
+   * Same semantic proposal re-entry reuses decisionId (D23).
+   * Absent on records written before the engine existed.
+   */
+  proposalKey?: string;
   options: OguiDecisionOption[];
   allowCustom: boolean;
   /** Hard false. `true` is an explicit reject, not a silent single-select. */
@@ -226,6 +232,13 @@ export function parseOguiDecisionRecord(raw: unknown): OguiDecisionRecord | unde
   if (!scope || !options || issuedAtMs === undefined || updatedAtMs === undefined) {
     return undefined;
   }
+  let proposalKey: string | undefined;
+  if (raw.proposalKey !== undefined) {
+    proposalKey = nonEmpty(raw.proposalKey);
+    if (!proposalKey) {
+      return undefined;
+    }
+  }
   let expiresAtMs: number | undefined;
   if (raw.expiresAtMs !== undefined) {
     expiresAtMs = nonNegativeInt(raw.expiresAtMs);
@@ -249,6 +262,7 @@ export function parseOguiDecisionRecord(raw: unknown): OguiDecisionRecord | unde
     resumeRef,
     scope,
     prompt,
+    ...(proposalKey ? { proposalKey } : {}),
     options,
     allowCustom: raw.allowCustom,
     multiSelect: false,

@@ -203,6 +203,7 @@ export function buildEmbeddedRunBaseParams(params: {
     ...(params.run.inboundToolCeiling ? { inboundToolCeiling: params.run.inboundToolCeiling } : {}),
     ...(params.run.contextLane ? { contextLane: params.run.contextLane } : {}),
     ...(params.run.sessionEntry ? { sessionEntry: params.run.sessionEntry } : {}),
+    ...(params.run.oguiDecisionRun ? { oguiDecisionRun: params.run.oguiDecisionRun } : {}),
     ...(params.run.knowledgeConsumeRefs?.length
       ? { knowledgeConsumeRefs: params.run.knowledgeConsumeRefs }
       : {}),

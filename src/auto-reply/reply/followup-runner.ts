@@ -8,6 +8,7 @@ import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage, normalizeUsage } from "../../agents/usage.js";
 import type { SessionEntry } from "../../config/sessions.js";
+import { admitOguiDecisionTurn } from "../../config/sessions/ogui-decision-engine.js";
 import type { TypingMode } from "../../config/types.js";
 import {
   tryAcquireEnterpriseAgentRun,
@@ -152,6 +153,18 @@ export function createFollowupRunner(params: {
     const runId = crypto.randomUUID();
     let followupSlotHeld = false;
     try {
+      if (queued.run.oguiDecisionRun) {
+        const admission = await admitOguiDecisionTurn({
+          binding: queued.run.oguiDecisionRun,
+          inboundText: queued.prompt,
+          ingress: "queue",
+          phase: "run",
+        });
+        if (admission.action === "pause" || admission.action === "ack") {
+          await sendFollowupPayloads([{ text: admission.text ?? "" }], queued);
+          return;
+        }
+      }
       const shouldSurfaceToControlUi = isInternalMessageChannel(
         resolveOriginMessageProvider({
           originatingChannel: queued.originatingChannel,

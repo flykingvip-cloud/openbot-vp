@@ -2,10 +2,9 @@
  * Batch 11 S0 — OGUI decision lifecycle gate and answer checks.
  *
  * Default OFF. Flag-off leaves legacy OGUI submit unchanged and adds no
- * issue, WAIT, or admission behavior. This module does not call
- * `updateSessionStore`. S1 (issue + WAIT) and S4 (consume + resumeRef)
- * must perform those writes with `updateSessionStore` inside its lock
- * (`src/config/sessions/store.ts`). S1 alone is not a gray open.
+ * issue, WAIT, or admission behavior. Session writes live in
+ * `ogui-decision-engine.ts` and go through `updateSessionStore` inside its
+ * lock (`src/config/sessions/store.ts`). S1 alone is not a gray open.
  * No PRODUCTION_GO and no LIVE.
  *
  * Protocol `decision_id` / `decision_version` are references. They are not
@@ -15,8 +14,8 @@
 import { isPositiveInt, type OguiDecisionRecord } from "./ogui-decision.js";
 
 /**
- * Compile-time pin to the locked session writer. S0 does not call it.
- * S1 / S4 pass this function into the locked update.
+ * Compile-time pin to the locked session writer.
+ * The engine passes this function into the locked update.
  */
 export type OguiDecisionSessionStoreMutator = typeof import("./store.js").updateSessionStore;
 
@@ -52,13 +51,20 @@ export type OguiDecisionLifecycleConfigSlice = {
 
 export type OguiDecisionMutationKind = "issue" | "consume" | "supersede";
 
-export type OguiDecisionMutationPlan = {
-  ok: false;
-  writes: false;
-  mutator: typeof OGUI_DECISION_MUTATOR_NAME;
-  reason: "flag_off" | "slice_not_ready";
-  nextSlice?: "S1" | "S4";
-};
+export type OguiDecisionMutationPlan =
+  | {
+      ok: false;
+      writes: false;
+      mutator: typeof OGUI_DECISION_MUTATOR_NAME;
+      reason: "flag_off";
+    }
+  | {
+      ok: true;
+      writes: true;
+      mutator: typeof OGUI_DECISION_MUTATOR_NAME;
+      reason: "ready";
+      kind: OguiDecisionMutationKind;
+    };
 
 export type OguiAnswerDecisionFields = {
   decision_id?: unknown;
@@ -153,9 +159,28 @@ export function isOguiDecisionLifecycleEnabled(input?: {
 }
 
 /**
- * S0 mutation plan. Always `writes: false`.
- * Flag off → no issue / WAIT / admission.
- * Flag on → still not issued; S1 or S4 owns the `updateSessionStore` write.
+ * Master switch for several authenticated subjects (tenantId or agentId).
+ * An empty subject list uses the single-subject helper. A non-empty allowlist
+ * still fails closed when none of the subjects match.
+ */
+export function isOguiDecisionLifecycleEnabledFor(input?: {
+  cfg?: OguiDecisionLifecycleConfigSlice;
+  env?: Record<string, string | undefined>;
+  subjectIds?: readonly (string | undefined)[];
+}): boolean {
+  const ids = (input?.subjectIds ?? []).map((id) => id?.trim() ?? "").filter(Boolean);
+  if (ids.length === 0) {
+    return isOguiDecisionLifecycleEnabled({ cfg: input?.cfg, env: input?.env });
+  }
+  return ids.some((subjectId) =>
+    isOguiDecisionLifecycleEnabled({ cfg: input?.cfg, env: input?.env, subjectId }),
+  );
+}
+
+/**
+ * Flag off → no issue / WAIT / admission write.
+ * Flag on → the engine may call `updateSessionStore` for this kind.
+ * The plan does not write by itself. S1 alone is not a gray open.
  */
 export function planOguiDecisionMutation(input: {
   kind: OguiDecisionMutationKind;
@@ -169,13 +194,12 @@ export function planOguiDecisionMutation(input: {
       reason: "flag_off",
     };
   }
-  const nextSlice: "S1" | "S4" = input.kind === "consume" ? "S4" : "S1";
   return {
-    ok: false,
-    writes: false,
+    ok: true,
+    writes: true,
     mutator: OGUI_DECISION_MUTATOR_NAME,
-    reason: "slice_not_ready",
-    nextSlice,
+    reason: "ready",
+    kind: input.kind,
   };
 }
 

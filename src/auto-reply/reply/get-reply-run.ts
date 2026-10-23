@@ -32,6 +32,10 @@ import {
   type SessionEntry,
   updateSessionStore,
 } from "../../config/sessions.js";
+import {
+  admitOguiDecisionTurn,
+  resolveOguiDecisionRunBinding,
+} from "../../config/sessions/ogui-decision-engine.js";
 import { buildActiveConversationTaskFocusPrompt } from "../../conversation-task/focus-prompt.js";
 import { buildFocusResumePromptFromSessionFile } from "../../conversation-task/focus-resume.js";
 import { buildCronReplySystemPrompt } from "../../cron/cron-reply-context.js";
@@ -1475,6 +1479,39 @@ export async function runPreparedReply(
   }
   const queueKey = sessionKey ?? sessionIdFinal;
   const isActive = isEmbeddedPiRunActive(sessionIdFinal);
+  const oguiUserId =
+    turnExecutionIdentity?.platformUserId?.trim() ||
+    replyGatewayPlatformUserId?.trim() ||
+    undefined;
+  const oguiDecisionRun = resolveOguiDecisionRunBinding({
+    cfg,
+    agentId,
+    tenantId: replyGatewayTenantId,
+    storePath,
+    sessionKey,
+    userId: oguiUserId,
+    originRunId: opts?.runId ?? sessionIdFinal,
+    taskContextId: sessionEntry?.taskContextId,
+    originUserMessageRef: sessionCtx.MessageSidFull ?? sessionCtx.MessageSid,
+    ingress: isHeartbeat ? "heartbeat" : "chat",
+  });
+  const oguiAdmission = await admitOguiDecisionTurn({
+    cfg,
+    agentId,
+    tenantId: replyGatewayTenantId,
+    storePath,
+    sessionKey,
+    userId: oguiUserId,
+    inboundText: inboundMessage,
+    ingress: isHeartbeat ? "heartbeat" : resetTriggered ? "reset" : "chat",
+    resetAuthorized: resetTriggered && command.isAuthorizedSender,
+    phase: isActive ? "gate" : "run",
+    binding: oguiDecisionRun,
+  });
+  if (oguiAdmission.action === "pause" || oguiAdmission.action === "ack") {
+    typing.cleanup();
+    return { text: oguiAdmission.text ?? "" };
+  }
   const isStreaming = isEmbeddedPiRunStreaming(sessionIdFinal);
   const shouldSteer = resolvedQueue.mode === "steer" || resolvedQueue.mode === "steer-backlog";
   const shouldFollowup =
@@ -1586,6 +1623,7 @@ export async function runPreparedReply(
         : {}),
       contextLane,
       ...(sessionEntry ? { sessionEntry } : {}),
+      ...(oguiDecisionRun ? { oguiDecisionRun } : {}),
       ...(knowledgeConsumeRefs.length ? { knowledgeConsumeRefs } : {}),
       ...(composerPluginMentionBindings.pluginToolAllowlist.length
         ? { mentionedPluginToolAllowlist: composerPluginMentionBindings.pluginToolAllowlist }

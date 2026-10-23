@@ -1,3 +1,4 @@
+import { oguiWaitBlocksSession } from "../config/sessions/ogui-decision-wait-registry.js";
 import type { ToolLoopDetectionConfig } from "../config/types.tools.js";
 import {
   decorateToolResultProvenance,
@@ -105,6 +106,17 @@ export async function runBeforeToolCallHook(args: {
 }): Promise<HookOutcome> {
   const toolName = normalizeToolName(args.toolName || "tool");
   const params = args.params;
+
+  // Mandatory re-check before execute. `filterToolsByPolicy` stays a name
+  // filter and is not an answer-dependency gate. Tools that already started
+  // before the issue boundary are not cancelled here.
+  if (oguiWaitBlocksSession(args.ctx?.sessionKey)) {
+    return {
+      blocked: true,
+      reason:
+        "OGUI decision WAIT is active; this task's resume is paused until the decision is answered, cancelled, or replaced.",
+    };
+  }
 
   if (args.ctx?.sessionKey) {
     const { getDiagnosticSessionState, logToolLoopAction, detectToolCallLoop, recordToolCall } =

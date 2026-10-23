@@ -23,6 +23,22 @@ tasks:
       - src/gateway/protocol/schema/ogui.ts
       - ui/src/ui/chat/ogui-form.node.test.ts
       - ui/src/ui/chat/ogui-form.ts
+      - src/config/sessions/ogui-decision-engine.ts
+      - src/config/sessions/ogui-decision-engine.test.ts
+      - src/config/sessions/ogui-decision-wait-registry.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/turn-completion/ogui-wait-settle.test.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/params.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/agent-runner-utils.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/gateway/server-methods/chat.ts
     state: active
     sessions: []
     ownerHistory: []
@@ -9437,12 +9453,28 @@ landingStreams:
       - src/gateway/protocol/schema/ogui.ts
       - ui/src/ui/chat/ogui-form.node.test.ts
       - ui/src/ui/chat/ogui-form.ts
+      - src/config/sessions/ogui-decision-engine.ts
+      - src/config/sessions/ogui-decision-engine.test.ts
+      - src/config/sessions/ogui-decision-wait-registry.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/turn-completion/ogui-wait-settle.test.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/params.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/agent-runner-utils.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/gateway/server-methods/chat.ts
     canLandWith: []
     metadata:
       task: batch11-s0-ogui-decision-lifecycle
       owner: cursor-cloud
-      purpose: Batch 11 S0 types, schema, and default-off flag. First-match so
-        the shared OGUI and config files land together. Flag stays off.
+      purpose: Batch 11 S0–S5 OGUI decision lifecycle. Flag stays off. First-match
+        so shared reply, settle, and OGUI files land together. Not a gray open.
   - id: batch9-formal-root
     landingPolicy: serial
     paths:

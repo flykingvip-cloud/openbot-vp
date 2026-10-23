@@ -172,10 +172,10 @@ export type SessionEntry = {
   taskContextId?: string;
   /**
    * Batch 11 session authority for 1:1 OGUI decision cards (key = decisionId).
-   * Absent until a later slice issues a card. Issue, consume, and supersede
-   * replace this map only inside `updateSessionStore` so sibling decisions
-   * stay intact. Close / dismiss is display-only and is not stored here.
-   * The lifecycle flag defaults off; this field adds no WAIT or admission.
+   * Absent until the lifecycle engine issues a card. Issue, consume, and
+   * supersede replace this map only inside `updateSessionStore` so sibling
+   * decisions stay intact. Close / dismiss is display-only and is not stored
+   * here. The lifecycle flag defaults off; flag-off turns do not write it.
    */
   oguiDecisions?: OguiDecisionMap;
   displayName?: string;

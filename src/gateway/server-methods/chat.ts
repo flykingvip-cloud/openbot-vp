@@ -49,6 +49,7 @@ import {
   updateSessionStore,
 } from "../../config/sessions.js";
 import type { SessionEntry } from "../../config/sessions.js";
+import { oguiWaitBlocksSession } from "../../config/sessions/ogui-decision-wait-registry.js";
 import { resolveSessionTranscriptsDirForAgent } from "../../config/sessions/paths.js";
 import {
   applyFocusSwitchGate,
@@ -3732,6 +3733,7 @@ async function runGroupBotDiscussionTurn(params: {
         userText: params.message,
         assistantText: replyText,
         nowMs: Date.now(),
+        ...(oguiWaitBlocksSession(params.scope.rawSessionKey) ? { oguiWaitActive: true } : {}),
       });
       if (turnSettled.visibleText.trim()) {
         replyText = turnSettled.visibleText;

@@ -6,6 +6,7 @@ import {
   classifyOguiAnswerDecisionFields,
   evaluateOguiAnswerLifecycle,
   isOguiDecisionLifecycleEnabled,
+  isOguiDecisionLifecycleEnabledFor,
   planOguiDecisionMutation,
 } from "./ogui-decision-lifecycle.js";
 import { parseOguiDecisionRecord, type OguiDecisionRecord } from "./ogui-decision.js";
@@ -77,7 +78,7 @@ describe("OGUI decision lifecycle flag", () => {
     ).toBe(false);
   });
 
-  it("accepts an explicit opt-in and still plans zero session writes", () => {
+  it("accepts an explicit opt-in and authorizes the locked writer", () => {
     expect(
       isOguiDecisionLifecycleEnabled({
         cfg: { collaboration: { task: { oguiDecisionLifecycle: true } } },
@@ -85,18 +86,18 @@ describe("OGUI decision lifecycle flag", () => {
       }),
     ).toBe(true);
     expect(planOguiDecisionMutation({ kind: "issue", lifecycleEnabled: true })).toEqual({
-      ok: false,
-      writes: false,
+      ok: true,
+      writes: true,
       mutator: OGUI_DECISION_MUTATOR_NAME,
-      reason: "slice_not_ready",
-      nextSlice: "S1",
+      reason: "ready",
+      kind: "issue",
     });
     expect(planOguiDecisionMutation({ kind: "consume", lifecycleEnabled: true })).toEqual({
-      ok: false,
-      writes: false,
+      ok: true,
+      writes: true,
       mutator: OGUI_DECISION_MUTATOR_NAME,
-      reason: "slice_not_ready",
-      nextSlice: "S4",
+      reason: "ready",
+      kind: "consume",
     });
     expect(planOguiDecisionMutation({ kind: "supersede", lifecycleEnabled: false })).toEqual({
       ok: false,
@@ -104,6 +105,38 @@ describe("OGUI decision lifecycle flag", () => {
       mutator: "updateSessionStore",
       reason: "flag_off",
     });
+  });
+
+  it("matches an allowlist subject without treating an empty list as an enable", () => {
+    const cfg = {
+      collaboration: {
+        task: {
+          oguiDecisionLifecycle: true,
+          oguiDecisionLifecycleAllowlist: ["tenant-a"],
+        },
+      },
+    };
+    expect(
+      isOguiDecisionLifecycleEnabledFor({
+        cfg,
+        env: {},
+        subjectIds: ["skill-incubation", "tenant-a"],
+      }),
+    ).toBe(true);
+    expect(
+      isOguiDecisionLifecycleEnabledFor({
+        cfg,
+        env: {},
+        subjectIds: ["skill-incubation"],
+      }),
+    ).toBe(false);
+    expect(
+      isOguiDecisionLifecycleEnabledFor({
+        cfg: { collaboration: { task: {} } },
+        env: {},
+        subjectIds: ["tenant-a"],
+      }),
+    ).toBe(false);
   });
 
   it("lets an explicit env off-token override a config opt-in", () => {
