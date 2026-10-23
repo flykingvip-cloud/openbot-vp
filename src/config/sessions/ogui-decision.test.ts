@@ -5,6 +5,7 @@ import {
   parseOguiDecisionMap,
   parseOguiDecisionRecord,
   projectOguiDecisionGesture,
+  projectOguiDecisionStatuses,
   type OguiDecisionRecord,
 } from "./ogui-decision.js";
 import { mergeSessionEntry, type SessionEntry } from "./types.js";
@@ -125,5 +126,17 @@ describe("OguiDecisionRecord", () => {
     };
     const merged = mergeSessionEntry(entry, { updatedAt: 11 });
     expect(merged.oguiDecisions).toEqual(entry.oguiDecisions);
+  });
+
+  it("projects only status and version for the chat shell (Ev8)", () => {
+    const record = waitingRecord({ decisionStatus: "expired" });
+    const projected = projectOguiDecisionStatuses({ [record.decisionId]: record });
+    expect(projected).toEqual({
+      "dec-1": { decisionStatus: "expired", version: 1 },
+    });
+    expect(JSON.stringify(projected)).not.toContain("user-from-auth");
+    expect(JSON.stringify(projected)).not.toContain("resume-1");
+    expect(projectOguiDecisionStatuses(undefined)).toBeUndefined();
+    expect(projectOguiDecisionStatuses({})).toBeUndefined();
   });
 });

@@ -119,6 +119,7 @@ import {
   type ChatContextScopeState,
   type ChatContextSourceCatalogItem,
 } from "./chat/context-scope.ts";
+import type { OguiDecisionStatusLookup } from "./chat/ogui-form-view.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
 import { resolveGroupIdFromSessionContext } from "./collaboration/resolve-group-scope.ts";
 import { isGroupScopedSessionKey } from "./collaboration/resolve-group-scope.ts";
@@ -985,6 +986,8 @@ export class OpenBotApp extends LitElement {
   @state() chatSending = false;
   @state() chatMessage = "";
   @state() chatMessages: unknown[] = [];
+  /** Latest chat.history status slice for SessionEntry.oguiDecisions. */
+  @state() chatOguiDecisions: OguiDecisionStatusLookup | null = null;
   @state() conversationTaskProgress:
     | import("../../../src/progress-ledger/types.ts").ProgressView
     | null = null;

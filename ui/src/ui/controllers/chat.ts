@@ -37,6 +37,7 @@ import {
 } from "../chat/generated-preview-artifact.ts";
 import { mergeIncomingHistoryWithLocalUserTurn } from "../chat/merge-local-user-history.ts";
 import { extractText } from "../chat/message-extract.ts";
+import { parseOguiDecisionStatusLookup } from "../chat/ogui-form-view.ts";
 import { composeQuotedUserMessage } from "../chat/quote-draft.ts";
 import { transcriptContainsChatError } from "../chat/run-failure-transcript.ts";
 import { resolveSpaceStreamSpeaker } from "../chat/space-stream-identity.ts";
@@ -118,6 +119,11 @@ export type ChatState = {
   sessionsResult?: SessionsListResult | null;
   chatLoading: boolean;
   chatMessages: unknown[];
+  /**
+   * decisionId → status from the latest chat.history for this session.
+   * Source is SessionEntry.oguiDecisions. Absent means legacy submit stays operable.
+   */
+  chatOguiDecisions?: import("../chat/ogui-form-view.ts").OguiDecisionStatusLookup | null;
   /** Opaque cursor from chat.history for loading older pages (CL-P1-02). */
   chatHistoryNextBefore: string | null;
   chatHistoryHasMore: boolean;
@@ -180,6 +186,7 @@ export type ChatHistoryState = Pick<
   | "sessionsResult"
   | "chatLoading"
   | "chatMessages"
+  | "chatOguiDecisions"
   | "chatHistoryNextBefore"
   | "chatHistoryHasMore"
   | "chatHistoryLoadingMore"
@@ -701,6 +708,8 @@ type ChatHistoryResponse = {
   hasMore?: boolean;
   /** In-flight server run for this session. `null` means the session is idle. */
   activeRun?: { runId?: string; text?: string } | null;
+  /** Status slice of SessionEntry.oguiDecisions. Omitted when the session has none. */
+  oguiDecisionStatuses?: unknown;
 };
 
 const CHAT_HISTORY_PAGE_LIMIT = 200;
@@ -833,6 +842,7 @@ export async function loadChatHistory(state: ChatHistoryState, options?: LoadCha
   // Hard isolation: never retain another surface's bubbles across history loads.
   if (crossSurface) {
     state.chatMessages = [];
+    state.chatOguiDecisions = null;
     state.chatStream = null;
     state.chatStreamStartedAt = null;
     state.chatStreamSessionKey = null;
@@ -925,6 +935,7 @@ export async function loadChatHistory(state: ChatHistoryState, options?: LoadCha
       );
     }
     state.chatThinkingLevel = res.thinkingLevel ?? null;
+    state.chatOguiDecisions = parseOguiDecisionStatusLookup(res.oguiDecisionStatuses) ?? null;
     // Assistant and tool rows appear long before the run ends. Dropping
     // chatRunId here turns the composer stop control back into send, so a
     // click never issues chat.abort. `activeRun` is authoritative after a
@@ -955,6 +966,7 @@ export async function loadChatHistory(state: ChatHistoryState, options?: LoadCha
       return;
     }
     state.lastError = formatChatSendError(err);
+    state.chatOguiDecisions = null;
     state.chatHistoryNextBefore = null;
     state.chatHistoryHasMore = false;
   } finally {
@@ -1004,6 +1016,7 @@ export async function loadOlderChatHistory(state: ChatHistoryState) {
       return true;
     });
     state.chatMessages = [...uniqueOlder, ...existing];
+    state.chatOguiDecisions = parseOguiDecisionStatusLookup(res.oguiDecisionStatuses) ?? null;
     applyHistoryCursorFields(state, res);
   } catch (err) {
     state.lastError = formatChatSendError(err);

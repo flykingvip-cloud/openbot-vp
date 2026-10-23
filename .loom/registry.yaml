@@ -24,6 +24,12 @@ tasks:
       - ui/src/ui/chat/ogui-form.node.test.ts
       - ui/src/ui/chat/ogui-form.ts
       - ui/src/ui/chat/ogui-form-view.ts
+      - ui/src/ui/chat/ogui-form-shell.node.test.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
       - src/config/sessions/ogui-decision-engine.ts
       - src/config/sessions/ogui-decision-engine.test.ts
       - src/config/sessions/ogui-decision-process-child.ts
@@ -45,6 +51,7 @@ tasks:
       - src/auto-reply/reply/followup-runner.ogui-wait.test.ts
       - src/auto-reply/reply/queue/types.ts
       - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.ogui-decision-history.test.ts
     state: active
     sessions: []
     ownerHistory: []
@@ -9460,6 +9467,12 @@ landingStreams:
       - ui/src/ui/chat/ogui-form.node.test.ts
       - ui/src/ui/chat/ogui-form.ts
       - ui/src/ui/chat/ogui-form-view.ts
+      - ui/src/ui/chat/ogui-form-shell.node.test.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
       - src/config/sessions/ogui-decision-engine.ts
       - src/config/sessions/ogui-decision-engine.test.ts
       - src/config/sessions/ogui-decision-process-child.ts
@@ -9481,6 +9494,7 @@ landingStreams:
       - src/auto-reply/reply/followup-runner.ogui-wait.test.ts
       - src/auto-reply/reply/queue/types.ts
       - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.ogui-decision-history.test.ts
     canLandWith: []
     metadata:
       task: batch11-s0-ogui-decision-lifecycle

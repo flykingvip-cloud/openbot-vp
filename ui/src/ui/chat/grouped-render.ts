@@ -54,7 +54,11 @@ import {
   normalizeMessage,
   normalizeRoleForGrouping,
 } from "./message-normalizer.ts";
-import { renderOguiFormView } from "./ogui-form-view.ts";
+import {
+  renderOguiFormView,
+  resolveOguiFormDecisionStatus,
+  type OguiDecisionStatusLookup,
+} from "./ogui-form-view.ts";
 import { parseOguiFormFromText, stripOguiFormFences } from "./ogui-form.ts";
 import {
   dismissParkedReminder,
@@ -117,6 +121,8 @@ type GroupedMessageRenderOptions = {
    * Prefer over onSubmitChoice so idempotencyKey can equal submission_id.
    */
   onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+  /** SessionEntry.oguiDecisions status slice. Absent keeps legacy submit operable. */
+  oguiDecisions?: OguiDecisionStatusLookup;
   onQuoteMessage?: (quote: ChatQuoteDraft) => void;
   /** HH:mm on the last assistant text bubble; also gates copy/quote. */
   turnTimestamp?: string | null;
@@ -614,6 +620,7 @@ export function renderMessageGroup(
     onFillComposer?: (text: string) => void;
     onSubmitChoice?: (text: string) => void;
     onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+    oguiDecisions?: OguiDecisionStatusLookup;
     onQuoteMessage?: (quote: ChatQuoteDraft) => void;
     showReasoning: boolean;
     showToolCards?: boolean;
@@ -700,6 +707,7 @@ export function renderMessageGroup(
             onFillComposer: opts.onFillComposer,
             onSubmitChoice: opts.onSubmitChoice,
             onSubmitForm: opts.onSubmitForm,
+            oguiDecisions: opts.oguiDecisions,
             onQuoteMessage: opts.onQuoteMessage,
             senderIdentityLookup: opts.senderIdentityLookup,
             peerRoute: peerRouteFromNormalized(normalizeMessage(item.message)),
@@ -1412,6 +1420,10 @@ function renderGroupedMessage(message: unknown, opts: GroupedMessageRenderOption
                                       opts.onSubmitChoice?.(text);
                                     }
                                   : undefined,
+                              decisionStatus: resolveOguiFormDecisionStatus(
+                                oguiForm,
+                                opts.oguiDecisions,
+                              ),
                             })
                           : nothing
                       }

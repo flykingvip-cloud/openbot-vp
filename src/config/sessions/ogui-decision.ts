@@ -307,3 +307,31 @@ export function projectOguiDecisionGesture(
   }
   return { write: true, decisionStatus: "answered" };
 }
+
+/** Status + version only. Identity, answers, and resume refs stay on the session record. */
+export type OguiDecisionStatusProjection = {
+  decisionStatus: OguiDecisionStatus;
+  version: number;
+};
+
+export function projectOguiDecisionStatuses(
+  map: OguiDecisionMap | undefined,
+): Record<string, OguiDecisionStatusProjection> | undefined {
+  if (!map) {
+    return undefined;
+  }
+  const projected: Record<string, OguiDecisionStatusProjection> = {};
+  for (const [key, record] of Object.entries(map)) {
+    if (!record || record.decisionId !== key) {
+      continue;
+    }
+    if (!DECISION_STATUS_SET.has(record.decisionStatus) || !isPositiveInt(record.version)) {
+      continue;
+    }
+    projected[key] = {
+      decisionStatus: record.decisionStatus,
+      version: record.version,
+    };
+  }
+  return Object.keys(projected).length > 0 ? projected : undefined;
+}

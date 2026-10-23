@@ -60,6 +60,81 @@ export function oguiFormSubmitOperable(options: OguiFormRenderOptions): boolean 
   return !OGUI_FORM_CLOSED_DECISION_STATUSES.has(status);
 }
 
+const OGUI_FORM_DECISION_STATUS_SET = new Set<string>([
+  "waiting",
+  "answered",
+  "rejected",
+  "expired",
+  "superseded",
+]);
+
+/** Session-authority slice the chat shell may pass. No identity or resume fields. */
+export type OguiDecisionStatusRef = {
+  decisionStatus: OguiFormDecisionStatus;
+  version?: number;
+};
+
+export type OguiDecisionStatusLookup = Readonly<Record<string, OguiDecisionStatusRef>>;
+
+function isOguiFormDecisionStatus(value: string): value is OguiFormDecisionStatus {
+  return OGUI_FORM_DECISION_STATUS_SET.has(value);
+}
+
+/** Drop anything that is not decisionId → status (+ optional version). */
+export function parseOguiDecisionStatusLookup(
+  value: unknown,
+): OguiDecisionStatusLookup | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const lookup: Record<string, OguiDecisionStatusRef> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const id = key.trim();
+    if (!id || !raw || typeof raw !== "object" || Array.isArray(raw)) {
+      continue;
+    }
+    const status = (raw as { decisionStatus?: unknown }).decisionStatus;
+    if (typeof status !== "string" || !isOguiFormDecisionStatus(status)) {
+      continue;
+    }
+    const version = (raw as { version?: unknown }).version;
+    lookup[id] = {
+      decisionStatus: status,
+      ...(typeof version === "number" && Number.isInteger(version) && version > 0
+        ? { version }
+        : {}),
+    };
+  }
+  return Object.keys(lookup).length > 0 ? lookup : undefined;
+}
+
+/**
+ * Match the form's decision_id to the session map. No id, or no record, stays
+ * omitted so legacy and flag-off fences remain operable. A version mismatch
+ * is superseded and cannot submit.
+ */
+export function resolveOguiFormDecisionStatus(
+  form: OguiFormDefinition,
+  lookup: OguiDecisionStatusLookup | undefined,
+): OguiFormDecisionStatus | undefined {
+  const decisionId = form.decision_id?.trim();
+  if (!decisionId || !lookup) {
+    return undefined;
+  }
+  const ref = lookup[decisionId];
+  if (!ref) {
+    return undefined;
+  }
+  if (
+    typeof form.decision_version === "number" &&
+    typeof ref.version === "number" &&
+    form.decision_version !== ref.version
+  ) {
+    return "superseded";
+  }
+  return ref.decisionStatus;
+}
+
 /** Ephemeral draft answers keyed by form panel id. */
 const draftByPanel = new Map<string, Record<string, string>>();
 

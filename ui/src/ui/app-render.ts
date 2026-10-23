@@ -1247,6 +1247,7 @@ export function renderApp(state: AppViewState) {
       onSubmitForm: (text: string, meta: { submissionId: string }) => {
         void state.handleSendChat(text, { idempotencyKey: meta.submissionId });
       },
+      oguiDecisions: state.chatOguiDecisions ?? undefined,
       onStewardCallAuthorizationDecision: (action: "同意" | "不同意", authorizationId: string) => {
         void state.handleSendChat(action, {
           suppressOptimisticUserMessage: true,
