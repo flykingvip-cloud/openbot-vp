@@ -3,7 +3,10 @@
  * MUST NOT mutate global loadConfig() / process-level provider state.
  */
 
-import { getEnterpriseModelAssetByRuntimeId } from "./asset-store.js";
+import {
+  getEnterpriseModelAssetByRuntimeId,
+  isEnterpriseModelAssetRuntimeEligibleOnConnection,
+} from "./asset-store.js";
 import { recordEnterpriseModelAuditEvent } from "./audit.js";
 import { assertEnterpriseModelBudgetAllows } from "./budget-gate.js";
 import { getEnterpriseModelConnection } from "./connection-store.js";
@@ -53,13 +56,6 @@ export async function resolveTenantModelRuntimeConfig(params: {
       "enterprise model asset is disabled",
     );
   }
-  // Fail-closed: unknown/unchecked/degraded must not run until re-verified.
-  if (asset.healthStatus !== "healthy") {
-    throw new EnterpriseModelError(
-      "ENTERPRISE_MODEL_MODEL_UNAVAILABLE",
-      `enterprise model asset is not verified (health=${asset.healthStatus})`,
-    );
-  }
   await assertEnterpriseModelBudgetAllows({
     tenantId: params.tenantId,
     asset,
@@ -88,6 +84,14 @@ export async function resolveTenantModelRuntimeConfig(params: {
     throw new EnterpriseModelError(
       "ENTERPRISE_MODEL_FORBIDDEN",
       `enterprise model connection is not healthy (health=${connection.healthStatus})`,
+    );
+  }
+  // Own health may still be unknown after a verified connection. Chat reads
+  // that as eligible; unhealthy / degraded stay fail-closed.
+  if (!isEnterpriseModelAssetRuntimeEligibleOnConnection(asset, connection)) {
+    throw new EnterpriseModelError(
+      "ENTERPRISE_MODEL_MODEL_UNAVAILABLE",
+      `enterprise model asset is not verified (health=${asset.healthStatus})`,
     );
   }
   const secret = await loadEnterpriseModelSecret(connection.credentialRef, params.vaultPath);

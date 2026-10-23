@@ -172,4 +172,65 @@ describe("filterModelIdsBySeatEntitlementProfile", () => {
       "ent/cea43bf898/qwen3.6-35b-a3b",
     ]);
   });
+
+  it("does not wipe platform models when the tenant plan has no tier ceiling", async () => {
+    dir = await tempDir();
+    const seatsPath = path.join(dir, "seats.json");
+    const assignmentsPath = path.join(dir, "assignments.json");
+    await __resetSeatsForTest(seatsPath);
+    const seat = await assignSeat(
+      { enterpriseId: "ent-legacy", userId: "ceo@example.com", role: "admin", botQuota: 1 },
+      seatsPath,
+    );
+    await upsertSeatEntitlementAssignment(
+      { enterpriseId: "ent-legacy", seatId: seat.id, profileId: "basic_ai" },
+      assignmentsPath,
+    );
+
+    const filtered = await filterModelIdsBySeatEntitlementProfile({
+      tenantId: "ent-legacy",
+      seatId: seat.id,
+      modelIds: ["api-proxy-deepseek/deepseek-chat", "ent/abc123def4/mimo-v2.6-flash"],
+      tenantAllowedTiers: [],
+      seatEntitlementAssignmentsPath: assignmentsPath,
+      seatsStorePath: seatsPath,
+    });
+
+    expect(filtered).toEqual([
+      "api-proxy-deepseek/deepseek-chat",
+      "ent/abc123def4/mimo-v2.6-flash",
+    ]);
+  });
+
+  it("keeps enterprise BYOK when seat tiers and tenant tiers do not overlap", async () => {
+    dir = await tempDir();
+    const catalogPath = path.join(dir, "catalog.json");
+    const seatsPath = path.join(dir, "seats.json");
+    const assignmentsPath = path.join(dir, "assignments.json");
+    await __resetSeatsForTest(seatsPath);
+    await upsertResourceModelCatalogEntry(
+      { modelId: "api-proxy-deepseek/deepseek-chat", tier: "tier_c" },
+      catalogPath,
+    );
+    const seat = await assignSeat(
+      { enterpriseId: "ent-gap", userId: "ceo@example.com", role: "viewer", botQuota: 0 },
+      seatsPath,
+    );
+    await upsertSeatEntitlementAssignment(
+      { enterpriseId: "ent-gap", seatId: seat.id, profileId: "basic_ai" },
+      assignmentsPath,
+    );
+
+    const filtered = await filterModelIdsBySeatEntitlementProfile({
+      tenantId: "ent-gap",
+      seatId: seat.id,
+      modelIds: ["api-proxy-deepseek/deepseek-chat", "ent/abc123def4/mimo-v2.6-flash"],
+      tenantAllowedTiers: ["tier_c"],
+      seatEntitlementAssignmentsPath: assignmentsPath,
+      seatsStorePath: seatsPath,
+      modelCatalogPath: catalogPath,
+    });
+
+    expect(filtered).toEqual(["ent/abc123def4/mimo-v2.6-flash"]);
+  });
 });

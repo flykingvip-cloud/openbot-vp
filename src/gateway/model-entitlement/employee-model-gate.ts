@@ -64,6 +64,8 @@ export type EmployeeModelGateInput = {
   seatGrantStorePath?: string;
   planVersionBindingStorePath?: string;
   seatAssetsStore?: EnterpriseSeatAssetsStore;
+  enterpriseModelAssetStorePath?: string;
+  enterpriseModelConnectionStorePath?: string;
   seatEntitlementAssignmentsPath?: string;
   modelCatalogPath?: string;
   overAllocationPath?: string;
@@ -215,6 +217,39 @@ async function resolveManagedEnterpriseScope(input: EmployeeModelGateInput): Pro
 }
 
 /**
+ * Bot owner seat is a grant source even when the chatting employee (or the
+ * commercial billing seat) resolved first. Same seat is not repeated.
+ */
+async function resolveBotOwnerSeatIds(input: {
+  agentId?: string;
+  tenantId: string;
+  resolvedSeatId: string;
+  seatAssetsStore?: EnterpriseSeatAssetsStore;
+}): Promise<string[]> {
+  const agentId = input.agentId?.trim();
+  if (!agentId) {
+    return [];
+  }
+  try {
+    const botScope = await resolveAgentRunEntitlementScope({
+      agentId,
+      tenantId: input.tenantId,
+      ...(input.seatAssetsStore ? { store: input.seatAssetsStore } : {}),
+    });
+    const botSeatId = botScope?.seatId?.trim();
+    if (!botScope || botScope.tenantId !== input.tenantId || !botSeatId) {
+      return [];
+    }
+    if (botSeatId === input.resolvedSeatId.trim()) {
+      return [];
+    }
+    return [botSeatId];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * 解析 entitlement 闸口结果（allowlist + 可选 AOR 顺序）。
  */
 export async function resolveEmployeeModelGate(
@@ -278,6 +313,13 @@ export async function resolveEmployeeModelGate(
     );
   }
 
+  const supplementalSeatIds = await resolveBotOwnerSeatIds({
+    agentId: input.agentId,
+    tenantId: resolved.tenantId,
+    resolvedSeatId: resolved.seatId,
+    seatAssetsStore: input.seatAssetsStore,
+  });
+
   const effective = await resolveEffectiveModelSet({
     tenantId: resolved.tenantId,
     seatId: resolved.seatId,
@@ -286,9 +328,19 @@ export async function resolveEmployeeModelGate(
     cfg: input.cfg,
     seatGrantInheritsEnterprise: enforce !== "strict",
     requirePlatformCatalog: managedCandidate,
+    ...(input.commercialBillingSeatId?.trim()
+      ? { billingSeatId: input.commercialBillingSeatId.trim() }
+      : {}),
+    ...(supplementalSeatIds.length > 0 ? { supplementalSeatIds } : {}),
     ...(input.entitlementStorePath ? { entitlementStorePath: input.entitlementStorePath } : {}),
     ...(input.seatGrantStorePath ? { seatGrantStorePath: input.seatGrantStorePath } : {}),
     ...(input.billingSeatsStorePath ? { billingSeatsStorePath: input.billingSeatsStorePath } : {}),
+    ...(input.enterpriseModelAssetStorePath
+      ? { enterpriseModelAssetStorePath: input.enterpriseModelAssetStorePath }
+      : {}),
+    ...(input.enterpriseModelConnectionStorePath
+      ? { enterpriseModelConnectionStorePath: input.enterpriseModelConnectionStorePath }
+      : {}),
     ...(input.platformConnectedModelIdsOverride
       ? { platformConnectedModelIdsOverride: input.platformConnectedModelIdsOverride }
       : {}),

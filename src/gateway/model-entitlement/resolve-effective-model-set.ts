@@ -12,6 +12,7 @@
 
 import type { OpenBotConfig } from "../../config/types.js";
 import { listActiveTenantOwnedModelIds } from "../enterprise-model/asset-store.js";
+import { isEnterpriseRuntimeModelId } from "../enterprise-model/ids.js";
 import { loadEnterpriseVisiblePlatformModelIds } from "../models/load-connected-platform-model-ids.js";
 import { listEnabledResourceCatalogModelIds } from "../resource-catalog/list-enabled-model-ids.js";
 import { computeEffectiveModelSet } from "./effective-set.js";
@@ -26,6 +27,49 @@ function hasUsableActiveGrant(grant: SeatModelGrant | null | undefined): boolean
   return Boolean(
     grant && grant.status === "active" && grant.grantedModelIds.some((id) => id.trim().length > 0),
   );
+}
+
+function unionModelIds(groups: Array<readonly ModelRef[] | undefined>): ModelRef[] {
+  return [
+    ...new Set(groups.flatMap((group) => (group ?? []).map((id) => id.trim()).filter(Boolean))),
+  ];
+}
+
+/**
+ * Employee grant wins for platform model ids (design §5.4).
+ * Enterprise BYOK (`ent/*`) is unioned from every related seat: org position,
+ * billing seat, and the bot's owning seat. A revoked/empty employee grant must
+ * not hide a usable seat grant.
+ */
+export function mergeRelatedModelGrants(input: {
+  employeeGrant: SeatModelGrant | null | undefined;
+  seatGrants: Array<SeatModelGrant | null | undefined>;
+}): SeatModelGrant | null {
+  const usableEmployee = hasUsableActiveGrant(input.employeeGrant) ? input.employeeGrant : null;
+  const usableSeats = input.seatGrants.filter((grant): grant is SeatModelGrant =>
+    hasUsableActiveGrant(grant),
+  );
+  if (!usableEmployee && usableSeats.length === 0) {
+    return input.employeeGrant ?? input.seatGrants.find((grant) => grant != null) ?? null;
+  }
+  const enterpriseIds = unionModelIds([
+    usableEmployee ? usableEmployee.grantedModelIds.filter(isEnterpriseRuntimeModelId) : [],
+    ...usableSeats.map((grant) => grant.grantedModelIds.filter(isEnterpriseRuntimeModelId)),
+  ]);
+  const platformIds = usableEmployee
+    ? usableEmployee.grantedModelIds.filter((id) => !isEnterpriseRuntimeModelId(id))
+    : unionModelIds(usableSeats.map((grant) => grant.grantedModelIds));
+  const base = usableEmployee ?? usableSeats[0];
+  if (!base) {
+    return null;
+  }
+  return {
+    ...base,
+    grantedModelIds: unionModelIds([
+      platformIds.filter((id) => !isEnterpriseRuntimeModelId(id)),
+      enterpriseIds,
+    ]),
+  };
 }
 
 function grantModelIdsEqual(
@@ -108,6 +152,18 @@ export type ResolveEffectiveModelSetInput = {
   billingSeatsStorePath?: string;
   /** 测试注入：enterprise BYOK asset store 路径。 */
   enterpriseModelAssetStorePath?: string;
+  /** 测试注入：enterprise BYOK connection store 路径。 */
+  enterpriseModelConnectionStorePath?: string;
+  /**
+   * Commercial layer already resolved the billing seat. Chat must read its
+   * grant even when employee email lookup misses (bot runs pass no userEmail).
+   */
+  billingSeatId?: string;
+  /**
+   * Other seats whose grants belong to this run — the bot owner seat when the
+   * resolved employee/billing seat is a different id.
+   */
+  supplementalSeatIds?: string[];
   /**
    * 平台已连通模型。传入后跳过探测存储与网关目录 IO。
    * 测试用它固定授权交集，不把「未探测」当成用例主题。
@@ -152,58 +208,85 @@ export async function resolveEffectiveModelSet(
     input.entitlementStorePath,
   );
   // 授权粒度：employee 级优先于 seat 级（design §5.4「seat / employee 授权」）。
+  // 企业自供模型不在 employee 平台 grant 里，必须从 org / billing / bot 席位并进来。
   const employeeGrant = input.employeeId
     ? await getEmployeeModelGrant(input.tenantId, input.employeeId, input.seatGrantStorePath)
     : null;
-  const seatGrant = input.seatId
-    ? await getSeatModelGrant(input.tenantId, input.seatId, input.seatGrantStorePath)
+  const primarySeatId = input.seatId.trim();
+  const seatGrant = primarySeatId
+    ? await getSeatModelGrant(input.tenantId, primarySeatId, input.seatGrantStorePath)
     : null;
-  let grant = employeeGrant ?? seatGrant;
 
+  const relatedSeatGrants: Array<SeatModelGrant | null> = [seatGrant];
+  const seenSeatIds = new Set<string>(primarySeatId ? [primarySeatId] : []);
+  let billingSeatIdForSync: string | undefined;
+  let billingGrantForSync: SeatModelGrant | null = null;
+
+  const explicitBillingSeatId = input.billingSeatId?.trim();
   const hasEmployeeContext = Boolean(input.employeeId?.trim() || input.userEmail?.trim());
-  // org seatId 与 billing seatId 分离：员工会话以 billing 席位 grant 为真源，org 席位为镜像。
-  if (hasEmployeeContext && !employeeGrant) {
-    const billingSeat = await resolveBillingSeatForEmployee({
-      tenantId: input.tenantId,
-      platformUserId: input.employeeId,
-      userEmail: input.userEmail,
-      billingSeatsStorePath: input.billingSeatsStorePath,
-    });
-    if (billingSeat) {
-      const billingGrant = await getSeatModelGrant(
-        input.tenantId,
-        billingSeat.id,
-        input.seatGrantStorePath,
-      );
-      if (billingGrant && hasUsableActiveGrant(billingGrant)) {
-        // Billing is the plan-grant source of truth, but org seats may already
-        // hold enterprise BYOK (ent/*) grants. Union for EffectiveModelSet so
-        // private models are not dropped when billing grant is plan-only.
-        const orgIds =
-          seatGrant && hasUsableActiveGrant(seatGrant) ? seatGrant.grantedModelIds : [];
-        const mergedIds = [...new Set([...billingGrant.grantedModelIds, ...orgIds])];
-        grant = {
-          ...billingGrant,
-          grantedModelIds: mergedIds,
-        };
-        const orgSeatId = input.seatId?.trim();
-        if (
-          orgSeatId &&
-          orgSeatId !== billingSeat.id &&
-          !grantModelIdsEqual(seatGrant, billingGrant)
-        ) {
-          await syncBillingGrantToOrgSeat({
-            tenantId: input.tenantId,
-            orgSeatId,
-            billingSeatId: billingSeat.id,
-            grant: billingGrant,
-            userEmail: input.userEmail,
-            platformUserId: input.employeeId,
-            seatGrantStorePath: input.seatGrantStorePath,
-          });
-        }
+  if (hasEmployeeContext || explicitBillingSeatId) {
+    const billingSeat = hasEmployeeContext
+      ? await resolveBillingSeatForEmployee({
+          tenantId: input.tenantId,
+          platformUserId: input.employeeId,
+          userEmail: input.userEmail,
+          billingSeatsStorePath: input.billingSeatsStorePath,
+        })
+      : null;
+    // Lookup and the commercial-layer seat can differ. Read both grants.
+    const billingSeatIds = [billingSeat?.id?.trim(), explicitBillingSeatId].filter(
+      (id): id is string => Boolean(id),
+    );
+    billingSeatIdForSync = billingSeat?.id?.trim() || explicitBillingSeatId;
+    for (const billingSeatId of billingSeatIds) {
+      const billingGrant = seenSeatIds.has(billingSeatId)
+        ? seatGrant
+        : await getSeatModelGrant(input.tenantId, billingSeatId, input.seatGrantStorePath);
+      if (billingSeatId === billingSeatIdForSync) {
+        billingGrantForSync = billingGrant;
+      }
+      if (!seenSeatIds.has(billingSeatId)) {
+        seenSeatIds.add(billingSeatId);
+        relatedSeatGrants.push(billingGrant);
       }
     }
+  }
+
+  for (const rawSeatId of input.supplementalSeatIds ?? []) {
+    const seatId = rawSeatId.trim();
+    if (!seatId || seenSeatIds.has(seatId)) {
+      continue;
+    }
+    seenSeatIds.add(seatId);
+    relatedSeatGrants.push(
+      await getSeatModelGrant(input.tenantId, seatId, input.seatGrantStorePath),
+    );
+  }
+
+  let grant = mergeRelatedModelGrants({
+    employeeGrant,
+    seatGrants: relatedSeatGrants,
+  });
+
+  // org seatId 与 billing seatId 分离：把 billing 平台授权镜像到 org 席位（union，不覆盖 ent/*）。
+  if (
+    !hasUsableActiveGrant(employeeGrant) &&
+    billingSeatIdForSync &&
+    primarySeatId &&
+    billingSeatIdForSync !== primarySeatId &&
+    billingGrantForSync &&
+    hasUsableActiveGrant(billingGrantForSync) &&
+    !grantModelIdsEqual(seatGrant, billingGrantForSync)
+  ) {
+    await syncBillingGrantToOrgSeat({
+      tenantId: input.tenantId,
+      orgSeatId: primarySeatId,
+      billingSeatId: billingSeatIdForSync,
+      grant: billingGrantForSync,
+      userEmail: input.userEmail,
+      platformUserId: input.employeeId,
+      seatGrantStorePath: input.seatGrantStorePath,
+    });
   }
 
   // 无可用 grant：按企业套餐最低档（viewer）落盘兜底，避免员工激活后无法调模型。
@@ -232,6 +315,7 @@ export async function resolveEffectiveModelSet(
   const tenantOwnedActiveModelIds = await listActiveTenantOwnedModelIds(
     input.tenantId,
     input.enterpriseModelAssetStorePath,
+    input.enterpriseModelConnectionStorePath,
   );
   const platformConnectedModelIds = await resolvePlatformConnectedModelIds(input);
 

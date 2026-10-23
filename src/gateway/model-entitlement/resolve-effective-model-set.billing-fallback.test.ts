@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assignSeat, __resetSeatsForTest } from "../billing/seats-store.js";
+import { registerEnterpriseModelAsset } from "../enterprise-model/asset-store.js";
 import { upsertEnterpriseModelEntitlement } from "./enterprise-model-entitlement-store.js";
 import { resolveEffectiveModelSet } from "./resolve-effective-model-set.js";
 import { grantSeatModels } from "./seat-model-grant-store.js";
@@ -177,6 +178,73 @@ describe("resolveEffectiveModelSet — billing seat grant fallback", () => {
 
     expect(result.state).toBe("resolved");
     expect(result.allowedModelIds).toEqual(["api-proxy-deepseek/deepseek-chat"]);
+  });
+
+  it("explicit billing seat grant unions with org BYOK when employee email lookup is absent", async () => {
+    const assetStorePath = path.join(tempDir, "assets.json");
+    await upsertEnterpriseModelEntitlement(
+      {
+        tenantId: "t1",
+        allowedModelIds: ["api-proxy-deepseek/deepseek-chat"],
+      },
+      entitlementStorePath(),
+    );
+    await __resetSeatsForTest(billingSeatsStorePath());
+    const billingSeat = await assignSeat(
+      {
+        enterpriseId: "t1",
+        userId: "ceo@example.com",
+        role: "admin",
+        botQuota: 1,
+      },
+      billingSeatsStorePath(),
+    );
+    await grantSeatModels(
+      {
+        tenantId: "t1",
+        seatId: billingSeat.id,
+        grantedModelIds: ["api-proxy-deepseek/deepseek-chat"],
+      },
+      seatGrantStorePath(),
+    );
+    const mimo = await registerEnterpriseModelAsset(
+      {
+        tenantId: "t1",
+        connectionId: "conn-mimo",
+        upstreamModelId: "mimo-v2.6-flash",
+        enabled: true,
+        healthStatus: "healthy",
+      },
+      assetStorePath,
+    );
+    await grantSeatModels(
+      {
+        tenantId: "t1",
+        seatId: "org-seat-dabai",
+        grantedModelIds: [mimo.runtimeModelId],
+      },
+      seatGrantStorePath(),
+    );
+
+    const result = await resolveEffectiveModelSet({
+      tenantId: "t1",
+      seatId: "org-seat-dabai",
+      billingSeatId: billingSeat.id,
+      cfg: baseCfg,
+      seatGrantInheritsEnterprise: false,
+      requirePlatformCatalog: false,
+      entitlementStorePath: entitlementStorePath(),
+      seatGrantStorePath: seatGrantStorePath(),
+      billingSeatsStorePath: billingSeatsStorePath(),
+      enterpriseModelAssetStorePath: assetStorePath,
+      platformConnectedModelIdsOverride: ["api-proxy-deepseek/deepseek-chat"],
+    });
+
+    expect(result.state).toBe("resolved");
+    expect(result.allowedModelIds).toEqual([
+      "api-proxy-deepseek/deepseek-chat",
+      mimo.runtimeModelId,
+    ]);
   });
 });
 

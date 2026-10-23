@@ -11,7 +11,8 @@ vi.mock("../../utils.js", async (importOriginal) => {
   return { ...actual, CONFIG_DIR: tmpDir };
 });
 
-const { createEnterpriseModelConnection } = await import("../enterprise-model/connection-store.js");
+const { createEnterpriseModelConnection, updateEnterpriseModelConnection } =
+  await import("../enterprise-model/connection-store.js");
 const {
   listActiveTenantOwnedModelIds,
   registerEnterpriseModelAsset,
@@ -90,6 +91,15 @@ describe("enterprise-model stores", () => {
     expect(activeBefore).toContain(asset.runtimeModelId);
     expect(activeBefore).not.toContain(unknownAsset.runtimeModelId);
 
+    await updateEnterpriseModelConnection({
+      tenantId: "ent-1",
+      connectionId: conn.connectionId,
+      status: "verified",
+      healthStatus: "healthy",
+      skipEndpointInvalidation: true,
+    });
+    expect(await listActiveTenantOwnedModelIds("ent-1")).toContain(unknownAsset.runtimeModelId);
+
     await setEnterpriseModelAssetEnabled("ent-1", asset.assetId, false);
     const active = await listActiveTenantOwnedModelIds("ent-1");
     expect(active).not.toContain(asset.runtimeModelId);
@@ -144,6 +154,43 @@ describe("enterprise-model stores", () => {
       const loaded = await loadEnterpriseModelSecret(`ref-${i}`);
       expect(loaded?.apiKey).toBe(`sk-concurrent-${i}`);
     }
+  });
+
+  it("resolves an unknown asset once its connection is verified and healthy", async () => {
+    const conn = await createEnterpriseModelConnection({
+      tenantId: "ent-1",
+      providerType: "openai-compatible",
+      displayName: "Mimo",
+      baseUrl: "https://mimo.example/v1",
+    });
+    await saveEnterpriseModelSecret(conn.credentialRef, { apiKey: "sk-mimo-live" });
+    const asset = await registerEnterpriseModelAsset({
+      tenantId: "ent-1",
+      connectionId: conn.connectionId,
+      upstreamModelId: "mimo-v2.6-flash",
+      enabled: true,
+      healthStatus: "unknown",
+    });
+    await expect(
+      resolveTenantModelRuntimeConfig({
+        tenantId: "ent-1",
+        runtimeModelId: asset.runtimeModelId,
+      }),
+    ).rejects.toThrow(/not verified|not healthy/i);
+
+    await updateEnterpriseModelConnection({
+      tenantId: "ent-1",
+      connectionId: conn.connectionId,
+      status: "verified",
+      healthStatus: "healthy",
+      skipEndpointInvalidation: true,
+    });
+    const runtime = await resolveTenantModelRuntimeConfig({
+      tenantId: "ent-1",
+      runtimeModelId: asset.runtimeModelId,
+    });
+    expect(runtime?.upstreamModelId).toBe("mimo-v2.6-flash");
+    expect(runtime?.apiKey).toBe("sk-mimo-live");
   });
 
   it("invalidates connection verification and degrades assets on endpoint change", async () => {
