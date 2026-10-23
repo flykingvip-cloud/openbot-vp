@@ -207,6 +207,9 @@ function mapControlError(error: unknown): DevicePlatformError {
     return new DevicePlatformError("PLATFORM_UNAVAILABLE", "Device platform request failed");
   }
   const code = error.code.toLowerCase();
+  if (code === "bind_missing" || code === "not_found") {
+    return new DevicePlatformError("NOT_FOUND", "Device is not bound on the platform");
+  }
   if (
     code === "unauthorized" ||
     code === "timeout" ||
