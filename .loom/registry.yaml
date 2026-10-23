@@ -23,6 +23,7 @@ tasks:
       - src/gateway/protocol/schema/ogui.ts
       - ui/src/ui/chat/ogui-form.node.test.ts
       - ui/src/ui/chat/ogui-form.ts
+      - ui/src/ui/chat/ogui-form-view.ts
       - src/config/sessions/ogui-decision-engine.ts
       - src/config/sessions/ogui-decision-engine.test.ts
       - src/config/sessions/ogui-decision-process-child.ts
@@ -37,6 +38,7 @@ tasks:
       - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.ogui-wait.test.ts
+      - src/auto-reply/dispatch.ogui-legacy.test.ts
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-memory.ts
       - src/auto-reply/reply/followup-runner.ts
@@ -9457,6 +9459,7 @@ landingStreams:
       - src/gateway/protocol/schema/ogui.ts
       - ui/src/ui/chat/ogui-form.node.test.ts
       - ui/src/ui/chat/ogui-form.ts
+      - ui/src/ui/chat/ogui-form-view.ts
       - src/config/sessions/ogui-decision-engine.ts
       - src/config/sessions/ogui-decision-engine.test.ts
       - src/config/sessions/ogui-decision-process-child.ts
@@ -9471,6 +9474,7 @@ landingStreams:
       - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
       - src/auto-reply/reply/get-reply-run.ts
       - src/auto-reply/reply/get-reply-run.ogui-wait.test.ts
+      - src/auto-reply/dispatch.ogui-legacy.test.ts
       - src/auto-reply/reply/agent-runner-utils.ts
       - src/auto-reply/reply/agent-runner-memory.ts
       - src/auto-reply/reply/followup-runner.ts

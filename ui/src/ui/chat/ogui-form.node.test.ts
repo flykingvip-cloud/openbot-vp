@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { shouldUseChatDeliveryComponent } from "./chat-delivery.ts";
-import { clearOguiFormDraftState, getOguiFormDraft, renderOguiFormView } from "./ogui-form-view.ts";
+import {
+  clearOguiFormDraftState,
+  getOguiFormDraft,
+  oguiFormSubmitOperable,
+  renderOguiFormView,
+} from "./ogui-form-view.ts";
 import {
   buildOguiAnswerSubmitMessage,
   extractOguiFormFenceBody,
@@ -311,6 +316,89 @@ describe("ogui form confirm wiring", () => {
       expect(parseOguiFormFromText(text)).toBeNull();
       expect(hasRenderableOguiForm(text)).toBe(false);
     }
+  });
+
+  it("keeps a historical fence inert when the decision is already closed (Ev8)", () => {
+    const historical = formFence({
+      ...VALID_FORM_JSON,
+      decision_id: "ogd_historical",
+      decision_version: 1,
+    });
+    const form = parseOguiFormFromText(historical) as OguiFormDefinition;
+    expect(form.decision_id).toBe("ogd_historical");
+    expect(hasRenderableOguiForm(historical)).toBe(true);
+    clearOguiFormDraftState();
+    const priming = renderOguiFormView(form, {
+      onFillComposer: () => undefined,
+      onSubmitForm: () => undefined,
+    });
+
+    function findValues(tpl: unknown, needle: string): unknown[] {
+      const found: unknown[] = [];
+      function walk(node: unknown): void {
+        if (!node || typeof node !== "object") {
+          return;
+        }
+        if (Array.isArray(node)) {
+          for (const item of node) {
+            walk(item);
+          }
+          return;
+        }
+        const t = node as { strings?: TemplateStringsArray; values?: unknown[] };
+        if (!t.strings || !t.values) {
+          return;
+        }
+        if (t.strings.join("").includes(needle)) {
+          found.push(...t.values);
+        }
+        for (const value of t.values) {
+          walk(value);
+        }
+      }
+      walk(tpl);
+      return found;
+    }
+
+    const optionHandlers = findValues(priming, "data-option-value=").filter(
+      (value): value is () => void => typeof value === "function",
+    );
+    optionHandlers[1]?.();
+    optionHandlers[3]?.();
+    expect(oguiFormDraftComplete(form, getOguiFormDraft(form))).toBe(true);
+
+    for (const decisionStatus of ["answered", "rejected", "expired", "superseded"] as const) {
+      const submitted: string[] = [];
+      const options = {
+        decisionStatus,
+        onSubmitForm: (text: string) => {
+          submitted.push(text);
+        },
+      };
+      expect(oguiFormSubmitOperable(options)).toBe(false);
+      const view = renderOguiFormView(form, options);
+      const submitValues = findValues(view, 'data-testid="ogui-form-submit"');
+      expect(submitValues.some((value) => value === true)).toBe(true);
+      const click = submitValues.find((value) => typeof value === "function") as
+        | (() => void)
+        | undefined;
+      expect(click).toBeTypeOf("function");
+      click?.();
+      expect(submitted).toEqual([]);
+    }
+
+    const submitted: string[] = [];
+    const ready = renderOguiFormView(form, {
+      decisionStatus: "waiting",
+      onSubmitForm: (text) => {
+        submitted.push(text);
+      },
+    });
+    const readyValues = findValues(ready, 'data-testid="ogui-form-submit"');
+    expect(readyValues.some((value) => value === true)).toBe(false);
+    const readyClick = readyValues.find((value) => typeof value === "function") as () => void;
+    readyClick();
+    expect(submitted).toHaveLength(1);
   });
 
   it("omits submit button when onSubmitForm is not wired", () => {

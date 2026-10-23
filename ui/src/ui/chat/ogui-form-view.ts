@@ -21,6 +21,20 @@ export type OguiFormSubmitMeta = {
   submissionId: string;
 };
 
+/**
+ * Same vocabulary as the session DecisionRecord status the server strip uses.
+ * UI does not import `src/`. Absent or `waiting` (including skipped, which
+ * stays waiting) keeps the existing submit operable.
+ */
+export type OguiFormDecisionStatus = "waiting" | "answered" | "rejected" | "expired" | "superseded";
+
+const OGUI_FORM_CLOSED_DECISION_STATUSES = new Set<OguiFormDecisionStatus>([
+  "answered",
+  "rejected",
+  "expired",
+  "superseded",
+]);
+
 export type OguiFormRenderOptions = {
   /** Preview selected label(s) in the composer (draft only). */
   onFillComposer?: (text: string) => void;
@@ -30,7 +44,21 @@ export type OguiFormRenderOptions = {
    * When absent, the submit button is not shown (read-only / inventory).
    */
   onSubmitForm?: (text: string, meta: OguiFormSubmitMeta) => void;
+  /**
+   * Server decision status. Closed statuses disable the existing submit
+   * button and refuse the submit handler. No new chrome.
+   */
+  decisionStatus?: OguiFormDecisionStatus;
 };
+
+/** Closed decisions cannot submit. Omitted and waiting stay operable. */
+export function oguiFormSubmitOperable(options: OguiFormRenderOptions): boolean {
+  const status = options.decisionStatus;
+  if (!status || status === "waiting") {
+    return true;
+  }
+  return !OGUI_FORM_CLOSED_DECISION_STATUSES.has(status);
+}
 
 /** Ephemeral draft answers keyed by form panel id. */
 const draftByPanel = new Map<string, Record<string, string>>();
@@ -85,7 +113,7 @@ function clearComposerDraft(options: OguiFormRenderOptions): void {
 }
 
 function handleFormSubmit(form: OguiFormDefinition, options: OguiFormRenderOptions): void {
-  if (!options.onSubmitForm) {
+  if (!options.onSubmitForm || !oguiFormSubmitOperable(options)) {
     return;
   }
   const draft = getOguiFormDraft(form);
@@ -160,9 +188,10 @@ export function renderOguiFormView(
   form: OguiFormDefinition,
   options: OguiFormRenderOptions = {},
 ): TemplateResult {
-  const clickable = Boolean(options.onFillComposer || options.onSubmitForm);
+  const operable = oguiFormSubmitOperable(options);
+  const clickable = Boolean(operable && (options.onFillComposer || options.onSubmitForm));
   const draft = getOguiFormDraft(form);
-  const canSubmit = Boolean(options.onSubmitForm && oguiFormDraftComplete(form, draft));
+  const canSubmit = Boolean(operable && options.onSubmitForm && oguiFormDraftComplete(form, draft));
   const submitLabel = form.submit_label?.trim() || "提交";
 
   return html`

@@ -237,4 +237,55 @@ describe("OGUI decision process fixtures", () => {
     expect(reloaded[decisionId]?.resumeStatus).toBe("running");
     fs.rmSync(session.dir, { recursive: true, force: true });
   }, 30_000);
+
+  it("SIGKILLs after consume persist and before claim so the parent claims once (Ev4)", async () => {
+    // Kill window: consumeOguiDecisionAnswer's locked save has returned
+    // (answered + resume pending on disk) and claimOguiDecisionResume has
+    // not been called. Not inside the write syscall.
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: binding(session.storePath, session.sessionKey),
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const killed = await spawnChild({
+      OGUI_CHILD_MODE: "consume-sigkill-before-claim",
+      OGUI_CHILD_STORE: session.storePath,
+      OGUI_CHILD_SESSION: session.sessionKey,
+      OGUI_CHILD_DECISION: decisionId,
+      OGUI_CHILD_VALUE: "a",
+      OGUI_CHILD_SUBMISSION: "sub-kill-before-claim",
+    });
+    expect(killed.signal).toBe("SIGKILL");
+    const crashed = loadSessionStore(session.storePath, { skipCache: true })[session.sessionKey]
+      ?.oguiDecisions?.[decisionId];
+    expect(crashed?.decisionStatus).toBe("answered");
+    expect(crashed?.resumeStatus).toBe("pending");
+    expect(crashed?.resumeRef).toBe(issued.resumeRef);
+    const first = await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    const second = await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    expect(first.claimed).toBe(true);
+    expect(first.resumeRef).toBe(issued.resumeRef);
+    expect(second.claimed).toBe(false);
+    expect(second.reason).toBe("already_started");
+    expect(second.resumeRef).toBe(issued.resumeRef);
+    const reloaded =
+      loadSessionStore(session.storePath, { skipCache: true })[session.sessionKey]?.oguiDecisions ??
+      {};
+    expect(Object.keys(reloaded)).toEqual([decisionId]);
+    expect(reloaded[decisionId]?.resumeStatus).toBe("running");
+    expect(reloaded[decisionId]?.resumeRef).toBe(issued.resumeRef);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  }, 30_000);
 });
