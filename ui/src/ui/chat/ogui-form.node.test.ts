@@ -306,6 +306,13 @@ describe("ogui form confirm wiring", () => {
     expect(getOguiFormDraft(form)).toEqual({});
   });
 
+  it("does not offer a form submit when the server gate removed the fence (Ev8)", () => {
+    for (const text of ["该决策已结束，不能重新操作。", "未签发"]) {
+      expect(parseOguiFormFromText(text)).toBeNull();
+      expect(hasRenderableOguiForm(text)).toBe(false);
+    }
+  });
+
   it("omits submit button when onSubmitForm is not wired", () => {
     clearOguiFormDraftState();
     const form = parseOguiFormDefinition(VALID_FORM_JSON) as OguiFormDefinition;

@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   clearOguiWaitRegistryForTests,
@@ -7,6 +10,7 @@ import {
   runBeforeToolCallHook,
   wrapToolWithBeforeToolCallHook,
 } from "./pi-tools.before-tool-call.js";
+import { createOpenClawCodingTools } from "./pi-tools.js";
 import { filterToolsByPolicy } from "./pi-tools.policy.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 
@@ -49,5 +53,36 @@ describe("before-tool-call OGUI WAIT recheck (Ev6)", () => {
       wrapped.execute("call-1", { command: "echo independent" }, undefined, undefined, undefined),
     ).rejects.toThrow(/WAIT is active/);
     expect(started).toBe(false);
+  });
+
+  it("blocks execute on the assembled coding tool after WAIT is registered (Ev6)", async () => {
+    const sessionKey = "agent:main:assembled-wait";
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ogui-tools-"));
+    const marker = path.join(dir, "ran.txt");
+    try {
+      const tools = createOpenClawCodingTools({
+        sessionKey,
+        workspaceDir: dir,
+        deliveryLaneEnabled: false,
+      });
+      expect(tools.map((tool) => tool.name)).toContain("exec");
+      const stillListed = filterToolsByPolicy(tools, { allow: ["exec", "read"] });
+      expect(stillListed.map((tool) => tool.name)).toContain("exec");
+      const exec = tools.find((tool) => tool.name === "exec");
+      expect(exec).toBeDefined();
+      replaceOguiSessionWaits(sessionKey, ["ogd_assembled"]);
+      await expect(
+        exec?.execute(
+          "call-ev6",
+          { command: `echo ran > ${marker}` },
+          undefined,
+          undefined,
+          undefined,
+        ),
+      ).rejects.toThrow(/WAIT is active/);
+      expect(fs.existsSync(marker)).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

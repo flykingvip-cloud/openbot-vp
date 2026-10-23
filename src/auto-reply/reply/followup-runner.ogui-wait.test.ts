@@ -8,7 +8,7 @@ import {
   type OguiDecisionRunBinding,
 } from "../../config/sessions/ogui-decision-engine.js";
 import { clearOguiWaitRegistryForTests } from "../../config/sessions/ogui-decision-wait-registry.js";
-import { updateSessionStore } from "../../config/sessions/store.js";
+import { loadSessionStore, updateSessionStore } from "../../config/sessions/store.js";
 import type { FollowupRun } from "./queue.js";
 import { createMockTypingController } from "./test-helpers.js";
 
@@ -99,10 +99,17 @@ describe("follow-up drain OGUI WAIT (Ev10)", () => {
         },
       } as FollowupRun;
       await runner(queued);
+      await runner(queued);
       expect(runEmbeddedPiAgentMock).not.toHaveBeenCalled();
-      expect(onBlockReply).toHaveBeenCalled();
-      const first = (onBlockReply.mock.calls as unknown as Array<Array<{ text?: string }>>)[0];
-      expect(first?.[0]?.text).toBe(OGUI_WAIT_PAUSE_TEXT);
+      expect(onBlockReply).toHaveBeenCalledTimes(2);
+      const calls = onBlockReply.mock.calls as unknown as Array<Array<{ text?: string }>>;
+      expect(calls[0]?.[0]?.text).toBe(OGUI_WAIT_PAUSE_TEXT);
+      expect(calls[1]?.[0]?.text).toBe(OGUI_WAIT_PAUSE_TEXT);
+      const stored = Object.values(
+        loadSessionStore(storePath, { skipCache: true })[sessionKey]?.oguiDecisions ?? {},
+      )[0];
+      expect(stored?.decisionStatus).toBe("waiting");
+      expect(stored?.resumeStatus).toBe("pending");
     } finally {
       if (previous === undefined) {
         delete process.env.OPENBOT_OGUI_DECISION_LIFECYCLE;
