@@ -61,6 +61,13 @@ export async function filterModelIdsBySeatEntitlementProfile(
     return input.modelIds;
   }
 
+  // Legacy plans store model ids and leave allowedTiers empty. Intersecting
+  // that with a seat profile yields [] and hard-denies every platform model
+  // the effective set already authorized — including ones chat was using.
+  if (input.tenantAllowedTiers.length === 0) {
+    return input.modelIds;
+  }
+
   let allowedTiers = intersectAllowedTiers(input.tenantAllowedTiers, profile.allowedTiers);
   const overAllocation = await getOverAllocationState(input.tenantId, input.overAllocationPath);
   if (isActionBlockedByOverAllocation(overAllocation, "run_high_tier")) {
@@ -68,7 +75,9 @@ export async function filterModelIdsBySeatEntitlementProfile(
   }
 
   if (allowedTiers.length === 0) {
-    return [];
+    // Seat tier and tenant tier do not overlap. Platform models are out of
+    // profile; enterprise BYOK is not a subscription tier and stays.
+    return input.modelIds.filter((modelId) => isEnterpriseRuntimeModelId(modelId));
   }
 
   const allowedTierSet = new Set(allowedTiers);

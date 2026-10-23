@@ -98,6 +98,57 @@ export function applyPreferredModelOrder(
     .map((entry) => entry.candidate);
 }
 
+/**
+ * Seat-granted enterprise models (`ent/...`) are not in `models.providers` and
+ * are absent from the session/config candidate chain unless the session is
+ * already pinned to them. Hard-deny then removes the platform primary and
+ * throws MODEL_ENTITLEMENT_EMPTY even though the allowlist is non-empty.
+ * Append those ids so a granted BYOK model can actually run. Platform ids stay
+ * limited to the configured chain (Property 7).
+ */
+export function appendGrantedEnterpriseCandidates(
+  candidates: readonly ModelCandidate[],
+  allowlist: readonly string[] | undefined,
+): ModelCandidate[] {
+  if (!allowlist || allowlist.length === 0) {
+    return [...candidates];
+  }
+  const extras = buildCandidatesFromPreferredModelOrder(
+    allowlist.filter((id) => isEnterpriseRuntimeModelId(id)),
+  );
+  if (extras.length === 0) {
+    return [...candidates];
+  }
+  const seen = new Set(
+    candidates.map((candidate) => modelKey(candidate.provider, candidate.model)),
+  );
+  const next = [...candidates];
+  for (const extra of extras) {
+    const key = modelKey(extra.provider, extra.model);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    next.push(extra);
+  }
+  return next;
+}
+
+function entitlementFilterWillApply(params: {
+  governanceMode?: GovernanceMode;
+  entitlementAllowlist?: readonly string[];
+  allowlistEnforcement?: AllowlistEnforcement;
+}): boolean {
+  if (params.entitlementAllowlist === undefined) {
+    return false;
+  }
+  if (params.governanceMode === undefined) {
+    return true;
+  }
+  const enforcement = params.allowlistEnforcement ?? "governance-mode";
+  return enforcement === "preexisting" || params.governanceMode === "enforced";
+}
+
 export function buildCandidatesFromPreferredModelOrder(
   preferredOrder: readonly string[],
 ): ModelCandidate[] {
@@ -762,6 +813,11 @@ export async function runWithModelFallback<T>(params: {
     model: params.model,
     fallbacksOverride: params.fallbacksOverride,
   });
+  // Only when the allowlist will actually hard-filter. Shadow-only mode must
+  // keep today's session candidate and must not switch the run onto BYOK.
+  if (entitlementFilterWillApply(params)) {
+    candidates = appendGrantedEnterpriseCandidates(candidates, params.entitlementAllowlist);
+  }
   if (params.governanceMode === undefined) {
     if (params.entitlementAllowlist !== undefined) {
       candidates = applyEntitlementHardDeny(candidates, params.entitlementAllowlist);

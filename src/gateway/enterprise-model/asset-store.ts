@@ -8,9 +8,17 @@ import path from "node:path";
 import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
 import { CONFIG_DIR, resolveUserPath } from "../../utils.js";
 import { canonicalizeTenantId } from "../tenant-canonicalization.js";
+import {
+  isEnterpriseModelConnectionCatalogReady,
+  listEnterpriseModelConnections,
+} from "./connection-store.js";
 import { EnterpriseModelError } from "./errors.js";
 import { buildRuntimeModelId } from "./ids.js";
-import type { EnterpriseModelAsset, EnterpriseModelHealthStatus } from "./types.js";
+import type {
+  EnterpriseModelAsset,
+  EnterpriseModelHealthStatus,
+  EnterpriseModelProviderConnection,
+} from "./types.js";
 
 const STORE_VERSION = 1;
 
@@ -103,13 +111,8 @@ export async function getEnterpriseModelAssetByRuntimeId(
   );
 }
 
-/** Assets that may enter ceiling / EffectiveSet: enabled + verified healthy only. */
-export function isEnterpriseModelAssetRuntimeEligible(asset: EnterpriseModelAsset): boolean {
-  return asset.enabled && asset.healthStatus === "healthy";
-}
-
 /**
- * Health states a verified connection may lift to healthy.
+ * Health states a verified connection may lift into the active ceiling.
  * `unhealthy` / `degraded` stay out until an explicit later probe policy changes them.
  */
 const CONNECTION_INHERITABLE_ASSET_HEALTH = new Set<EnterpriseModelHealthStatus>([
@@ -117,10 +120,40 @@ const CONNECTION_INHERITABLE_ASSET_HEALTH = new Set<EnterpriseModelHealthStatus>
   "unchecked",
 ]);
 
+/** Assets that may enter ceiling / EffectiveSet: enabled + verified healthy only. */
+export function isEnterpriseModelAssetRuntimeEligible(asset: EnterpriseModelAsset): boolean {
+  return asset.enabled && asset.healthStatus === "healthy";
+}
+
+/**
+ * Enabled assets whose own health is still `unknown` / `unchecked` may enter the
+ * ceiling when their connection is already verified and healthy. Admin grant
+ * writes promote those rows; chat must not wait for that write. `unhealthy` and
+ * `degraded` stay out.
+ */
+export function isEnterpriseModelAssetRuntimeEligibleOnConnection(
+  asset: EnterpriseModelAsset,
+  connection: Pick<EnterpriseModelProviderConnection, "healthStatus" | "status"> | null | undefined,
+): boolean {
+  if (!asset.enabled) {
+    return false;
+  }
+  if (asset.healthStatus === "healthy") {
+    return true;
+  }
+  if (!connection || !CONNECTION_INHERITABLE_ASSET_HEALTH.has(asset.healthStatus)) {
+    return false;
+  }
+  return (
+    connection.healthStatus === "healthy" &&
+    isEnterpriseModelConnectionCatalogReady(connection.status)
+  );
+}
+
 /**
  * Enabled assets registered before asset health was copied from the connection
- * stay `unknown` forever. A still-verified connection can lift those rows so
- * they enter EnterpriseModelCeiling. Disabled assets are left untouched.
+ * stay `unknown` on disk. A still-verified connection can lift those rows so
+ * the admin ceiling matches the read path. Disabled assets are left untouched.
  */
 export async function promoteEnabledEnterpriseModelAssets(
   tenantId: string,
@@ -160,16 +193,24 @@ export async function promoteEnabledEnterpriseModelAssets(
 export async function listActiveTenantOwnedModelIds(
   tenantId: string,
   storePath?: string,
+  connectionStorePath?: string,
 ): Promise<string[]> {
   const assets = await listEnterpriseModelAssets(tenantId, {
     enabledOnly: true,
     storePath,
   });
+  const connections = await listEnterpriseModelConnections(tenantId, connectionStorePath);
+  const connectionById = new Map(connections.map((row) => [row.connectionId, row]));
   return [
     ...new Set(
       assets
-        .filter((a) => isEnterpriseModelAssetRuntimeEligible(a))
-        .map((a) => a.runtimeModelId.trim())
+        .filter((asset) =>
+          isEnterpriseModelAssetRuntimeEligibleOnConnection(
+            asset,
+            connectionById.get(asset.connectionId),
+          ),
+        )
+        .map((asset) => asset.runtimeModelId.trim())
         .filter(Boolean),
     ),
   ];

@@ -19,6 +19,7 @@ vi.mock("../resource-catalog/list-enabled-model-ids.js", () => ({
   })),
 }));
 
+import { registerEnterpriseModelAsset } from "../enterprise-model/asset-store.js";
 import { resolveEmployeeModelGate } from "./employee-model-gate.js";
 import { upsertEnterpriseModelEntitlement } from "./enterprise-model-entitlement-store.js";
 import { grantSeatModels } from "./seat-model-grant-store.js";
@@ -147,6 +148,54 @@ describe("resolveEmployeeModelGate — scope=all-bot-runs（按 bot 归属席位
       ...storeOpts(),
     });
     expect(result.allowlist).toBeUndefined();
+  });
+
+  it("bot org seat BYOK unions with the commercial billing seat platform grant", async () => {
+    const assetStorePath = path.join(tempDir, "assets.json");
+    const mimo = await registerEnterpriseModelAsset(
+      {
+        tenantId: "tenant-a",
+        connectionId: "conn-mimo",
+        upstreamModelId: "mimo-v2.6-flash",
+        enabled: true,
+        healthStatus: "healthy",
+      },
+      assetStorePath,
+    );
+    await upsertEnterpriseModelEntitlement(
+      {
+        tenantId: "tenant-a",
+        allowedModelIds: ["api-proxy-deepseek/cheap", "api-proxy-deepseek/premium"],
+      },
+      storeOpts().entitlementStorePath,
+    );
+    await grantSeatModels(
+      {
+        tenantId: "tenant-a",
+        seatId: "seat-1",
+        grantedModelIds: [mimo.runtimeModelId],
+      },
+      storeOpts().seatGrantStorePath,
+    );
+    await grantSeatModels(
+      {
+        tenantId: "tenant-a",
+        seatId: "billing-seat-ceo",
+        grantedModelIds: ["api-proxy-deepseek/cheap"],
+      },
+      storeOpts().seatGrantStorePath,
+    );
+
+    const result = await resolveEmployeeModelGate({
+      cfg: makeCfg("employee-chat"),
+      agentId: "bot-a",
+      commercialBillingSeatId: "billing-seat-ceo",
+      seatAssetsStore: seatStore(),
+      enterpriseModelAssetStorePath: assetStorePath,
+      ...storeOpts(),
+    });
+
+    expect(result.allowlist).toEqual(["api-proxy-deepseek/cheap", mimo.runtimeModelId]);
   });
 
   it("协作群 owner 席位 override 优先于发言人 employee 会话", async () => {
