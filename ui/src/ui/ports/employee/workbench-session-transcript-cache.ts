@@ -1,4 +1,8 @@
 import { canonicalizeWorkbenchChatSessionKey } from "../../../../../src/sessions/session-key-utils.ts";
+import {
+  parseOguiDecisionStatusLookup,
+  type OguiDecisionStatusLookup,
+} from "../../chat/ogui-form-view.ts";
 
 const MAX_CACHED_SESSIONS = 24;
 const MAX_PERSISTED_MESSAGES = 80;
@@ -13,6 +17,8 @@ export type WorkbenchSessionTranscriptCacheEntry = {
   chatStreamStartedAt?: number | null;
   chatStreamSessionKey?: string | null;
   chatThinkingProgress?: unknown;
+  /** Session decisionStatus slice. Absent preserves the previous value. Null clears it. */
+  oguiDecisions?: OguiDecisionStatusLookup | null;
 };
 
 type PersistedCacheV1 = {
@@ -44,6 +50,19 @@ function getLocalStorage(): Storage | null {
   }
 }
 
+function cloneOguiDecisions(
+  value: OguiDecisionStatusLookup | null | undefined,
+): OguiDecisionStatusLookup | null {
+  if (!value) {
+    return null;
+  }
+  const copy: Record<string, OguiDecisionStatusLookup[string]> = {};
+  for (const [key, status] of Object.entries(value)) {
+    copy[key] = { ...status };
+  }
+  return copy;
+}
+
 function cloneEntry(
   entry: WorkbenchSessionTranscriptCacheEntry,
 ): WorkbenchSessionTranscriptCacheEntry {
@@ -56,6 +75,7 @@ function cloneEntry(
     chatStreamStartedAt: entry.chatStreamStartedAt ?? null,
     chatStreamSessionKey: entry.chatStreamSessionKey ?? null,
     chatThinkingProgress: entry.chatThinkingProgress ?? null,
+    ...("oguiDecisions" in entry ? { oguiDecisions: cloneOguiDecisions(entry.oguiDecisions) } : {}),
   };
 }
 
@@ -75,6 +95,9 @@ function persistToStorage(): void {
       messages: entry.messages.slice(-MAX_PERSISTED_MESSAGES),
       chatHistoryNextBefore: entry.chatHistoryNextBefore ?? null,
       chatHistoryHasMore: entry.chatHistoryHasMore ?? false,
+      ...("oguiDecisions" in entry
+        ? { oguiDecisions: cloneOguiDecisions(entry.oguiDecisions) }
+        : {}),
     };
   }
   while (keys.length > 0) {
@@ -122,11 +145,15 @@ function hydrateFromStorage(): void {
       if (!entry || !Array.isArray(entry.messages)) {
         continue;
       }
-      cache.set(key, {
+      const hydratedEntry: WorkbenchSessionTranscriptCacheEntry = {
         messages: entry.messages.slice(),
         chatHistoryNextBefore: entry.chatHistoryNextBefore ?? null,
         chatHistoryHasMore: Boolean(entry.chatHistoryHasMore),
-      });
+      };
+      if ("oguiDecisions" in entry) {
+        hydratedEntry.oguiDecisions = parseOguiDecisionStatusLookup(entry.oguiDecisions) ?? null;
+      }
+      cache.set(key, hydratedEntry);
       order.push(key);
     }
     while (order.length > MAX_CACHED_SESSIONS) {
@@ -182,6 +209,7 @@ export function writeWorkbenchSessionTranscript(
     chatStreamStartedAt?: number | null;
     chatStreamSessionKey?: string | null;
     chatThinkingProgress?: unknown;
+    oguiDecisions?: OguiDecisionStatusLookup | null;
   },
   options?: { allowEmpty?: boolean },
 ): void {
@@ -204,12 +232,15 @@ export function writeWorkbenchSessionTranscript(
         transcript.chatStreamSessionKey ?? existing.chatStreamSessionKey ?? null,
       chatThinkingProgress:
         transcript.chatThinkingProgress ?? existing.chatThinkingProgress ?? null,
+      ...("oguiDecisions" in transcript
+        ? { oguiDecisions: cloneOguiDecisions(transcript.oguiDecisions) }
+        : {}),
     });
     touch(key);
     persistToStorage();
     return;
   }
-  cache.set(key, {
+  const next: WorkbenchSessionTranscriptCacheEntry = {
     messages: incoming.slice(),
     chatHistoryNextBefore: transcript.chatHistoryNextBefore ?? null,
     chatHistoryHasMore: transcript.chatHistoryHasMore ?? false,
@@ -218,6 +249,34 @@ export function writeWorkbenchSessionTranscript(
     chatStreamStartedAt: transcript.chatStreamStartedAt ?? null,
     chatStreamSessionKey: transcript.chatStreamSessionKey ?? null,
     chatThinkingProgress: transcript.chatThinkingProgress ?? null,
+  };
+  if ("oguiDecisions" in transcript) {
+    next.oguiDecisions = cloneOguiDecisions(transcript.oguiDecisions);
+  } else if (existing && "oguiDecisions" in existing) {
+    next.oguiDecisions = cloneOguiDecisions(existing.oguiDecisions);
+  }
+  cache.set(key, next);
+  touch(key);
+  persistToStorage();
+}
+
+/** Overwrite the status slice on an existing painted transcript. Does not create rows. */
+export function patchWorkbenchSessionOguiDecisions(
+  sessionKey: string | null | undefined,
+  oguiDecisions: OguiDecisionStatusLookup | null,
+): void {
+  hydrateFromStorage();
+  const key = normalizeWorkbenchSessionCacheKey(sessionKey);
+  if (!key) {
+    return;
+  }
+  const existing = cache.get(key);
+  if (!existing) {
+    return;
+  }
+  cache.set(key, {
+    ...existing,
+    oguiDecisions: cloneOguiDecisions(oguiDecisions),
   });
   touch(key);
   persistToStorage();

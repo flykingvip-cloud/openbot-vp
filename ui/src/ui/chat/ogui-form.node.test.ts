@@ -1,7 +1,12 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { shouldUseChatDeliveryComponent } from "./chat-delivery.ts";
-import { clearOguiFormDraftState, getOguiFormDraft, renderOguiFormView } from "./ogui-form-view.ts";
+import {
+  clearOguiFormDraftState,
+  getOguiFormDraft,
+  oguiFormSubmitOperable,
+  renderOguiFormView,
+} from "./ogui-form-view.ts";
 import {
   buildOguiAnswerSubmitMessage,
   extractOguiFormFenceBody,
@@ -9,6 +14,7 @@ import {
   oguiFormDraftComplete,
   parseOguiFormDefinition,
   parseOguiFormFromText,
+  readOguiAnswerDecisionRef,
   stripOguiFormFences,
   type OguiFormDefinition,
 } from "./ogui-form.ts";
@@ -152,6 +158,52 @@ describe("buildOguiAnswerSubmitMessage", () => {
     };
     expect(parsed.submission_id).toBe(SUBMISSION_ID);
     expect(parsed.answers).toEqual({ channel: "hybrid", billing: "device" });
+    expect(parsed).not.toHaveProperty("decision_id");
+    expect(parsed).not.toHaveProperty("decision_version");
+  });
+
+  it("includes both decision fields when a lifecycle card is submitted", () => {
+    const form = parseOguiFormDefinition({
+      ...VALID_FORM_JSON,
+      decision_id: "dec-9",
+      decision_version: 3,
+    }) as OguiFormDefinition;
+    expect(form.decision_id).toBe("dec-9");
+    expect(form.decision_version).toBe(3);
+    const text = buildOguiAnswerSubmitMessage({
+      form,
+      answers: { channel: "hybrid", billing: "device" },
+      submissionId: SUBMISSION_ID,
+      decisionId: "dec-9",
+      decisionVersion: 3,
+    });
+    const body = text.split("```ogui-answer")[1]?.split("```")[0]?.trim() ?? "";
+    const parsed = JSON.parse(body) as {
+      submission_id: string;
+      decision_id?: string;
+      decision_version?: number;
+    };
+    expect(parsed.submission_id).toBe(SUBMISSION_ID);
+    expect(parsed.decision_id).toBe("dec-9");
+    expect(parsed.decision_version).toBe(3);
+  });
+
+  it("rejects a lifecycle submit that is missing one decision field", () => {
+    const form = parseOguiFormDefinition(VALID_FORM_JSON) as OguiFormDefinition;
+    expect(() =>
+      buildOguiAnswerSubmitMessage({
+        form,
+        answers: { channel: "hybrid", billing: "device" },
+        submissionId: SUBMISSION_ID,
+        decisionId: "dec-9",
+      }),
+    ).toThrow(/positive integer/);
+    const partial = parseOguiFormDefinition({
+      ...VALID_FORM_JSON,
+      decision_id: "dec-9",
+    });
+    expect(partial?.component_id).toBe("biz-model-form-1");
+    expect(partial?.decision_id).toBeUndefined();
   });
 
   it("rejects non-UUID submission_id and missing required answers", () => {
@@ -258,6 +310,120 @@ describe("ogui form confirm wiring", () => {
     );
     expect(submitted[0]).toContain(submissionIds[0]);
     expect(getOguiFormDraft(form)).toEqual({});
+  });
+
+  it("does not offer a form submit when the server gate removed the fence (Ev8)", () => {
+    for (const text of ["该决策已结束，不能重新操作。", "未签发"]) {
+      expect(parseOguiFormFromText(text)).toBeNull();
+      expect(hasRenderableOguiForm(text)).toBe(false);
+    }
+  });
+
+  it("keeps a historical fence inert when the decision is already closed (Ev8)", () => {
+    const historical = formFence({
+      ...VALID_FORM_JSON,
+      decision_id: "ogd_historical",
+      decision_version: 1,
+    });
+    const form = parseOguiFormFromText(historical) as OguiFormDefinition;
+    expect(form.decision_id).toBe("ogd_historical");
+    expect(hasRenderableOguiForm(historical)).toBe(true);
+    clearOguiFormDraftState();
+    const priming = renderOguiFormView(form, {
+      onFillComposer: () => undefined,
+      onSubmitForm: () => undefined,
+    });
+
+    function findValues(tpl: unknown, needle: string): unknown[] {
+      const found: unknown[] = [];
+      function walk(node: unknown): void {
+        if (!node || typeof node !== "object") {
+          return;
+        }
+        if (Array.isArray(node)) {
+          for (const item of node) {
+            walk(item);
+          }
+          return;
+        }
+        const t = node as { strings?: TemplateStringsArray; values?: unknown[] };
+        if (!t.strings || !t.values) {
+          return;
+        }
+        if (t.strings.join("").includes(needle)) {
+          found.push(...t.values);
+        }
+        for (const value of t.values) {
+          walk(value);
+        }
+      }
+      walk(tpl);
+      return found;
+    }
+
+    const optionHandlers = findValues(priming, "data-option-value=").filter(
+      (value): value is () => void => typeof value === "function",
+    );
+    optionHandlers[1]?.();
+    optionHandlers[3]?.();
+    expect(oguiFormDraftComplete(form, getOguiFormDraft(form))).toBe(true);
+
+    for (const decisionStatus of ["answered", "rejected", "expired", "superseded"] as const) {
+      const submitted: string[] = [];
+      const options = {
+        decisionStatus,
+        onSubmitForm: (text: string) => {
+          submitted.push(text);
+        },
+      };
+      expect(oguiFormSubmitOperable(options)).toBe(false);
+      const view = renderOguiFormView(form, options);
+      const submitValues = findValues(view, 'data-testid="ogui-form-submit"');
+      expect(submitValues.some((value) => value === true)).toBe(true);
+      const click = submitValues.find((value) => typeof value === "function") as
+        | (() => void)
+        | undefined;
+      expect(click).toBeTypeOf("function");
+      click?.();
+      expect(submitted).toEqual([]);
+    }
+
+    const submitted: string[] = [];
+    const ready = renderOguiFormView(form, {
+      decisionStatus: "waiting",
+      onSubmitForm: (text) => {
+        submitted.push(text);
+      },
+    });
+    const readyValues = findValues(ready, 'data-testid="ogui-form-submit"');
+    expect(readyValues.some((value) => value === true)).toBe(false);
+    const readyClick = readyValues.find((value) => typeof value === "function") as () => void;
+    readyClick();
+    expect(submitted).toHaveLength(1);
+  });
+
+  it("reads a paired decision ref from an ogui-answer and drops a half-present pair", () => {
+    const form = parseOguiFormDefinition(VALID_FORM_JSON) as OguiFormDefinition;
+    const paired = buildOguiAnswerSubmitMessage({
+      form,
+      answers: { channel: "direct", billing: "seat" },
+      submissionId: SUBMISSION_ID,
+      decisionId: "ogd_ref",
+      decisionVersion: 3,
+    });
+    expect(readOguiAnswerDecisionRef(paired)).toEqual({
+      decision_id: "ogd_ref",
+      decision_version: 3,
+    });
+    const legacy = buildOguiAnswerSubmitMessage({
+      form,
+      answers: { channel: "direct", billing: "seat" },
+      submissionId: SUBMISSION_ID,
+    });
+    expect(readOguiAnswerDecisionRef(legacy)).toBeUndefined();
+    expect(
+      readOguiAnswerDecisionRef('```ogui-answer\n{"decision_id":"ogd_half"}\n```'),
+    ).toBeUndefined();
   });
 
   it("omits submit button when onSubmitForm is not wired", () => {

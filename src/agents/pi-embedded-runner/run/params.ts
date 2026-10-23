@@ -4,6 +4,7 @@ import type { ReplyPayload } from "../../../auto-reply/types.js";
 import type { AgentStreamParams } from "../../../commands/agent/types.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
+import type { OguiDecisionRunBinding } from "../../../config/sessions/ogui-decision-engine.js";
 import type { DeliveryToolSideEffectSchedule } from "../../../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
 import type { ExecutionIdentityContext } from "../../../gateway/execution-identity-context.js";
 import type { RuntimeOrganizationContext } from "../../../organization/runtime.js";
@@ -118,6 +119,11 @@ export type RunEmbeddedPiAgentParams = {
   contextLane?: import("../../../auto-reply/reply/inbound-depth.js").InboundDepth;
   /** Bound session row so the compiler can load the active task, not just the latest. */
   sessionEntry?: SessionEntry;
+  /**
+   * Batch 11 OGUI decision binding. Absent when the lifecycle flag is off.
+   * Presence does not enable LIVE or PRODUCTION_GO.
+   */
+  oguiDecisionRun?: OguiDecisionRunBinding;
   provider?: string;
   model?: string;
   authProfileId?: string;

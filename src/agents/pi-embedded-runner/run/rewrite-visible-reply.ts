@@ -1,4 +1,9 @@
 import fs from "node:fs";
+import {
+  applyOguiDecisionToVisibleText,
+  type OguiDecisionRunBinding,
+} from "../../../config/sessions/ogui-decision-engine.js";
+import { oguiWaitBlocksSession } from "../../../config/sessions/ogui-decision-wait-registry.js";
 import { rewritePlanSpeakFinal } from "../../../shared/text/plan-speak-final.js";
 import { getRunReplyLanguage } from "../../../shared/text/run-reply-language.js";
 import {
@@ -120,6 +125,8 @@ export async function rewriteAttemptVisibleReply(params: {
   workspaceDir?: string;
   sessionKey?: string;
   nowMs?: number;
+  /** Absent when the OGUI lifecycle flag is off. */
+  oguiDecisionRun?: OguiDecisionRunBinding;
 }): Promise<void> {
   const language = getRunReplyLanguage(params.runId);
 
@@ -217,9 +224,21 @@ export async function rewriteAttemptVisibleReply(params: {
   }
 
   // Turn-completion contract is the last word on the visible final.
-  const finalText = (
+  let finalText = (
     target ? assistantVisibleText(target) : params.assistantTexts.join("\n\n")
   ).trim();
+  let oguiWaitActive = oguiWaitBlocksSession(params.sessionKey);
+  if (finalText && params.oguiDecisionRun?.allowIssue) {
+    const applied = await applyOguiDecisionToVisibleText({
+      text: finalText,
+      binding: params.oguiDecisionRun,
+    });
+    if (applied.text !== finalText) {
+      applyMessageRewrite(finalText, applied.text);
+      finalText = applied.text.trim();
+    }
+    oguiWaitActive = applied.oguiWaitActive;
+  }
   if (finalText) {
     const settled = settleTurnCompletion({
       userText: planSpeakContext,
@@ -228,6 +247,7 @@ export async function rewriteAttemptVisibleReply(params: {
       sessionKey: params.sessionKey,
       nowMs: params.nowMs ?? Date.now(),
       smokeStartedAtMs: readSkillSmokeClock(params.sessionKey),
+      ...(oguiWaitActive ? { oguiWaitActive: true } : {}),
     });
     if (settled.visibleText !== finalText) {
       applyMessageRewrite(finalText, settled.visibleText);

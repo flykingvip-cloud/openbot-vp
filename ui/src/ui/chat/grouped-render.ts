@@ -54,7 +54,11 @@ import {
   normalizeMessage,
   normalizeRoleForGrouping,
 } from "./message-normalizer.ts";
-import { renderOguiFormView } from "./ogui-form-view.ts";
+import {
+  renderOguiFormView,
+  resolveOguiFormDecisionStatus,
+  type OguiDecisionStatusLookup,
+} from "./ogui-form-view.ts";
 import { parseOguiFormFromText, stripOguiFormFences } from "./ogui-form.ts";
 import {
   dismissParkedReminder,
@@ -117,6 +121,8 @@ type GroupedMessageRenderOptions = {
    * Prefer over onSubmitChoice so idempotencyKey can equal submission_id.
    */
   onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+  /** SessionEntry.oguiDecisions status slice. Absent keeps legacy submit operable. */
+  oguiDecisions?: OguiDecisionStatusLookup;
   onQuoteMessage?: (quote: ChatQuoteDraft) => void;
   /** HH:mm on the last assistant text bubble; also gates copy/quote. */
   turnTimestamp?: string | null;
@@ -576,6 +582,12 @@ export function renderStreamingGroup(
   assistant?: AssistantIdentity,
   _sessionKey?: string,
   replyLanguage?: VisibleReplyLanguage | null,
+  ogui?: {
+    oguiDecisions?: OguiDecisionStatusLookup;
+    onFillComposer?: (text: string) => void;
+    onSubmitChoice?: (text: string) => void;
+    onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+  },
 ) {
   const visible = stripInlineDirectiveTagsForDisplay(text, replyLanguage).text.trim();
   if (!visible) {
@@ -595,6 +607,10 @@ export function renderStreamingGroup(
           {
             isStreaming: true,
             showReasoning: false,
+            oguiDecisions: ogui?.oguiDecisions,
+            onFillComposer: ogui?.onFillComposer,
+            onSubmitChoice: ogui?.onSubmitChoice,
+            onSubmitForm: ogui?.onSubmitForm,
           },
         )}
       </div>
@@ -614,6 +630,7 @@ export function renderMessageGroup(
     onFillComposer?: (text: string) => void;
     onSubmitChoice?: (text: string) => void;
     onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+    oguiDecisions?: OguiDecisionStatusLookup;
     onQuoteMessage?: (quote: ChatQuoteDraft) => void;
     showReasoning: boolean;
     showToolCards?: boolean;
@@ -700,6 +717,7 @@ export function renderMessageGroup(
             onFillComposer: opts.onFillComposer,
             onSubmitChoice: opts.onSubmitChoice,
             onSubmitForm: opts.onSubmitForm,
+            oguiDecisions: opts.oguiDecisions,
             onQuoteMessage: opts.onQuoteMessage,
             senderIdentityLookup: opts.senderIdentityLookup,
             peerRoute: peerRouteFromNormalized(normalizeMessage(item.message)),
@@ -1079,11 +1097,11 @@ function renderGroupedMessage(message: unknown, opts: GroupedMessageRenderOption
     });
   const delivery = useDelivery && markdown ? parseChatDelivery(markdown) : null;
   // OGUI Form P0: fenced ```ogui-form``` disables delivery chrome (``` gate), so
-  // parse + render on the plain markdown path. Invalid fences stay as markdown.
+  // parse + render on the plain markdown path. A complete fence in the
+  // in-flight bubble uses the same decisionStatus lookup. An unfinished
+  // fence has no closing ``` and stays markdown.
   const oguiForm =
-    role === "assistant" && markdown && !opts.isStreaming && !delivery
-      ? parseOguiFormFromText(markdown)
-      : null;
+    role === "assistant" && markdown && !delivery ? parseOguiFormFromText(markdown) : null;
   const markdownForDisplay =
     oguiForm && markdown ? stripOguiFormFences(markdown) || null : markdown;
   const diagnoseActions =
@@ -1412,6 +1430,10 @@ function renderGroupedMessage(message: unknown, opts: GroupedMessageRenderOption
                                       opts.onSubmitChoice?.(text);
                                     }
                                   : undefined,
+                              decisionStatus: resolveOguiFormDecisionStatus(
+                                oguiForm,
+                                opts.oguiDecisions,
+                              ),
                             })
                           : nothing
                       }

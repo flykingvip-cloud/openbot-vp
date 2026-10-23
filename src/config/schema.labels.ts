@@ -397,6 +397,8 @@ export const FIELD_LABELS: Record<string, string> = {
     "Collaboration Challenge Window Group Allowlist",
   "collaboration.task.requirePeerReview": "Collaboration Task Require Peer Review",
   "collaboration.task.oguiHandoffProjection": "Collaboration Task OGUI Handoff Projection",
+  "collaboration.task.oguiDecisionLifecycle": "OGUI Decision Lifecycle",
+  "collaboration.task.oguiDecisionLifecycleAllowlist": "OGUI Decision Lifecycle Allowlist",
   "collaboration.learning.rcisAggregate": "Collaboration Learning RCIS Aggregate",
   "collaboration.learning.privateMemoryPromote": "Collaboration Private Memory Promote",
   "collaboration.hotfix.v1RollCallGroups": "Collaboration V1 Roll-Call Hotfix Groups",

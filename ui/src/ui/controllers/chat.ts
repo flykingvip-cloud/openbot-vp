@@ -37,6 +37,11 @@ import {
 } from "../chat/generated-preview-artifact.ts";
 import { mergeIncomingHistoryWithLocalUserTurn } from "../chat/merge-local-user-history.ts";
 import { extractText } from "../chat/message-extract.ts";
+import {
+  mergeOguiDecisionAnsweredStatus,
+  parseOguiDecisionStatusLookup,
+} from "../chat/ogui-form-view.ts";
+import { readOguiAnswerDecisionRef } from "../chat/ogui-form.ts";
 import { composeQuotedUserMessage } from "../chat/quote-draft.ts";
 import { transcriptContainsChatError } from "../chat/run-failure-transcript.ts";
 import { resolveSpaceStreamSpeaker } from "../chat/space-stream-identity.ts";
@@ -48,7 +53,10 @@ import { applyWorkProgress, clearWorkProgress } from "../chat/work-progress-phas
 import { isGroupScopedSessionKey } from "../collaboration/resolve-group-scope.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
 import { importWithStaleChunkReload } from "../lazy-module.ts";
-import { writeWorkbenchSessionTranscript } from "../ports/employee/workbench-session-transcript-cache.ts";
+import {
+  patchWorkbenchSessionOguiDecisions,
+  writeWorkbenchSessionTranscript,
+} from "../ports/employee/workbench-session-transcript-cache.ts";
 import type { SessionsListResult } from "../types.ts";
 import type { ChatAttachment } from "../ui-types.ts";
 import { generateUUID } from "../uuid.ts";
@@ -118,6 +126,11 @@ export type ChatState = {
   sessionsResult?: SessionsListResult | null;
   chatLoading: boolean;
   chatMessages: unknown[];
+  /**
+   * decisionId → status from the latest chat.history for this session.
+   * Source is SessionEntry.oguiDecisions. Absent means legacy submit stays operable.
+   */
+  chatOguiDecisions?: import("../chat/ogui-form-view.ts").OguiDecisionStatusLookup | null;
   /** Opaque cursor from chat.history for loading older pages (CL-P1-02). */
   chatHistoryNextBefore: string | null;
   chatHistoryHasMore: boolean;
@@ -180,6 +193,7 @@ export type ChatHistoryState = Pick<
   | "sessionsResult"
   | "chatLoading"
   | "chatMessages"
+  | "chatOguiDecisions"
   | "chatHistoryNextBefore"
   | "chatHistoryHasMore"
   | "chatHistoryLoadingMore"
@@ -224,6 +238,7 @@ export type ChatSendState = Pick<
   chatContextExpansion?:
     | import("../chat/context-expansion.ts").ChatContextExpansionSuggestion
     | null;
+  chatOguiDecisions?: import("../chat/ogui-form-view.ts").OguiDecisionStatusLookup | null;
 };
 
 export type ChatMentionAuthorityContext = {
@@ -701,6 +716,8 @@ type ChatHistoryResponse = {
   hasMore?: boolean;
   /** In-flight server run for this session. `null` means the session is idle. */
   activeRun?: { runId?: string; text?: string } | null;
+  /** Status slice of SessionEntry.oguiDecisions. Omitted when the session has none. */
+  oguiDecisionStatuses?: unknown;
 };
 
 const CHAT_HISTORY_PAGE_LIMIT = 200;
@@ -833,6 +850,7 @@ export async function loadChatHistory(state: ChatHistoryState, options?: LoadCha
   // Hard isolation: never retain another surface's bubbles across history loads.
   if (crossSurface) {
     state.chatMessages = [];
+    state.chatOguiDecisions = null;
     state.chatStream = null;
     state.chatStreamStartedAt = null;
     state.chatStreamSessionKey = null;
@@ -908,23 +926,30 @@ export async function loadChatHistory(state: ChatHistoryState, options?: LoadCha
       // Guide retention must not block the transcript load.
     }
     applyHistoryCursorFields(state, res);
-    if (replaceLocal && historyKey) {
-      writeWorkbenchSessionTranscript(
-        historyKey,
-        {
-          messages: state.chatMessages,
-          chatHistoryNextBefore: state.chatHistoryNextBefore,
-          chatHistoryHasMore: state.chatHistoryHasMore,
-          chatRunId: state.chatRunId,
-          chatStream: state.chatStream,
-          chatStreamStartedAt: state.chatStreamStartedAt,
-          chatStreamSessionKey: state.chatStreamSessionKey,
-          chatThinkingProgress: state.chatThinkingProgress,
-        },
-        { allowEmpty: true },
-      );
-    }
     state.chatThinkingLevel = res.thinkingLevel ?? null;
+    const oguiDecisions = parseOguiDecisionStatusLookup(res.oguiDecisionStatuses) ?? null;
+    state.chatOguiDecisions = oguiDecisions;
+    if (historyKey) {
+      if (replaceLocal) {
+        writeWorkbenchSessionTranscript(
+          historyKey,
+          {
+            messages: state.chatMessages,
+            chatHistoryNextBefore: state.chatHistoryNextBefore,
+            chatHistoryHasMore: state.chatHistoryHasMore,
+            chatRunId: state.chatRunId,
+            chatStream: state.chatStream,
+            chatStreamStartedAt: state.chatStreamStartedAt,
+            chatStreamSessionKey: state.chatStreamSessionKey,
+            chatThinkingProgress: state.chatThinkingProgress,
+            oguiDecisions,
+          },
+          { allowEmpty: true },
+        );
+      } else {
+        patchWorkbenchSessionOguiDecisions(historyKey, oguiDecisions);
+      }
+    }
     // Assistant and tool rows appear long before the run ends. Dropping
     // chatRunId here turns the composer stop control back into send, so a
     // click never issues chat.abort. `activeRun` is authoritative after a
@@ -955,6 +980,7 @@ export async function loadChatHistory(state: ChatHistoryState, options?: LoadCha
       return;
     }
     state.lastError = formatChatSendError(err);
+    state.chatOguiDecisions = null;
     state.chatHistoryNextBefore = null;
     state.chatHistoryHasMore = false;
   } finally {
@@ -1004,11 +1030,99 @@ export async function loadOlderChatHistory(state: ChatHistoryState) {
       return true;
     });
     state.chatMessages = [...uniqueOlder, ...existing];
+    const oguiDecisions = parseOguiDecisionStatusLookup(res.oguiDecisionStatuses) ?? null;
+    state.chatOguiDecisions = oguiDecisions;
+    patchWorkbenchSessionOguiDecisions(sessionKey || state.sessionKey, oguiDecisions);
     applyHistoryCursorFields(state, res);
   } catch (err) {
     state.lastError = formatChatSendError(err);
   } finally {
     state.chatHistoryLoadingMore = false;
+  }
+}
+
+const pendingOguiStatusRefreshKeys = new Set<string>();
+
+function rememberOguiStatusRefresh(sessionKey: string): void {
+  const key = canonicalizeWorkbenchChatSessionKey(sessionKey.trim());
+  if (key) {
+    pendingOguiStatusRefreshKeys.add(key);
+  }
+}
+
+function takeOguiStatusRefresh(sessionKey: string): boolean {
+  const key = canonicalizeWorkbenchChatSessionKey(sessionKey.trim());
+  if (!key || !pendingOguiStatusRefreshKeys.has(key)) {
+    return false;
+  }
+  pendingOguiStatusRefreshKeys.delete(key);
+  return true;
+}
+
+function noteAcceptedLifecycleOguiAnswer(
+  state: ChatSendState,
+  sessionKey: string,
+  message: string,
+): void {
+  const ref = readOguiAnswerDecisionRef(message);
+  if (!ref) {
+    return;
+  }
+  const next = mergeOguiDecisionAnsweredStatus(state.chatOguiDecisions, ref);
+  state.chatOguiDecisions = next;
+  patchWorkbenchSessionOguiDecisions(sessionKey, next);
+  rememberOguiStatusRefresh(sessionKey);
+}
+
+type OguiStatusRefreshHost = ChatEventState & {
+  client?: GatewayBrowserClient | null;
+  connected?: boolean;
+  sessionsResult?: ChatHistoryState["sessionsResult"];
+  workbenchPrimaryModule?: ChatHistoryState["workbenchPrimaryModule"];
+  workbenchTeamSelectedKey?: ChatHistoryState["workbenchTeamSelectedKey"];
+  chatOguiDecisions?: ChatState["chatOguiDecisions"];
+};
+
+function scheduleOguiDecisionStatusRefresh(state: ChatEventState): void {
+  const host = state as OguiStatusRefreshHost;
+  const client = host.client;
+  if (!client || host.connected === false) {
+    return;
+  }
+  if (!takeOguiStatusRefresh(host.sessionKey)) {
+    return;
+  }
+  const requestedKey = host.sessionKey.trim();
+  void refreshOguiDecisionStatusSlice(host, client, requestedKey);
+}
+
+async function refreshOguiDecisionStatusSlice(
+  host: OguiStatusRefreshHost,
+  client: GatewayBrowserClient,
+  requestedKey: string,
+): Promise<void> {
+  try {
+    const historyKey = resolvePreferredChatSessionKey(
+      resolveChatHistorySessionKey({
+        sessionKey: host.sessionKey,
+        workbenchPrimaryModule: host.workbenchPrimaryModule,
+        workbenchTeamSelectedKey: host.workbenchTeamSelectedKey,
+      }),
+      host.sessionsResult,
+    );
+    const res = await requestChatHistory(client, historyKey || requestedKey, { limit: 1 });
+    if (host.sessionKey.trim() !== requestedKey) {
+      return;
+    }
+    if (isStaleChatHistoryResponse(host as ChatHistoryState, historyKey || requestedKey)) {
+      return;
+    }
+    const slice = parseOguiDecisionStatusLookup(res.oguiDecisionStatuses) ?? null;
+    host.chatOguiDecisions = slice;
+    patchWorkbenchSessionOguiDecisions(historyKey || requestedKey, slice);
+  } catch {
+    // chat.send acks before consume. A failed slice read leaves the optimistic
+    // answered patch until the next chat.history.
   }
 }
 
@@ -1018,6 +1132,9 @@ export const __test = {
     legacyChatHistoryIncludeToolsUnsupported = false;
   },
   resetTerminalChatRuns: resetTerminalChatRunsForTests,
+  resetPendingOguiStatusRefresh: () => {
+    pendingOguiStatusRefreshKeys.clear();
+  },
 };
 
 function dataUrlToBase64(
@@ -1758,6 +1875,7 @@ export async function sendChatMessage(
         consumeReceipts: [],
       };
     }
+    noteAcceptedLifecycleOguiAnswer(state, sessionKey, messageForTransport || msg);
     return runId;
   } catch (err) {
     // The frame was already on the socket. A close is not an RPC rejection:
@@ -1767,6 +1885,7 @@ export async function sendChatMessage(
         markOptimisticAttachmentStatus(state, optimisticMessageId, "sent");
       }
       state.lastError = null;
+      noteAcceptedLifecycleOguiAnswer(state, sessionKey, messageForTransport || msg);
       return runId;
     }
     const error = formatChatSendError(err);
@@ -1874,7 +1993,9 @@ export function handleChatEvent(state: ChatEventState, payload?: ChatEventPayloa
   // Group bot turns emit `${clientRunId}:${agentId}` / `${clientRunId}:user`.
   if (payload.runId && !isSameChatTurnRunId(payload.runId, state.chatRunId)) {
     if (payload.state === "final") {
-      return handleForeignRunFinalEvent(state, payload);
+      const foreign = handleForeignRunFinalEvent(state, payload);
+      scheduleOguiDecisionStatusRefresh(state);
+      return foreign;
     }
     return null;
   }
@@ -1953,6 +2074,9 @@ export function handleChatEvent(state: ChatEventState, payload?: ChatEventPayloa
     handleAbortedChatEvent(state, payload);
   } else if (payload.state === "error") {
     handleErrorChatEvent(state, payload);
+  }
+  if (payload.state === "final" || payload.state === "aborted" || payload.state === "error") {
+    scheduleOguiDecisionStatusRefresh(state);
   }
   return payload.state;
 }

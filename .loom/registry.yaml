@@ -1,5 +1,66 @@
 version: 1
 tasks:
+  - id: batch11-s0-ogui-decision-lifecycle:cursor-cloud
+    owner: cursor-cloud
+    intent:
+      - Batch 11 S0 OGUI decision lifecycle types, schema, and default-off flag
+    paths:
+      - .loom/registry.yaml
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/config/sessions/ogui-decision-lifecycle.test.ts
+      - src/config/sessions/ogui-decision-lifecycle.ts
+      - src/config/sessions/ogui-decision.test.ts
+      - src/config/sessions/ogui-decision.ts
+      - src/config/sessions/types.ts
+      - src/config/types.collaboration.ts
+      - src/config/zod-schema.ts
+      - src/gateway/collaboration-dispatch/ogui-handoff-projection.test.ts
+      - src/gateway/collaboration-dispatch/ogui-handoff-projection.ts
+      - src/gateway/protocol/ogui-canvas-adapter.test.ts
+      - src/gateway/protocol/ogui-canvas-adapter.ts
+      - src/gateway/protocol/schema/ogui.test.ts
+      - src/gateway/protocol/schema/ogui.ts
+      - ui/src/ui/chat/ogui-form.node.test.ts
+      - ui/src/ui/chat/ogui-form.ts
+      - ui/src/ui/chat/ogui-form-view.ts
+      - ui/src/ui/chat/ogui-form-shell.node.test.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
+      - src/config/sessions/ogui-decision-engine.ts
+      - src/config/sessions/ogui-decision-engine.test.ts
+      - src/config/sessions/ogui-decision-process-child.ts
+      - src/config/sessions/ogui-decision-process.test.ts
+      - src/config/sessions/ogui-decision-wait-registry.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/turn-completion/ogui-wait-settle.test.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/params.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply-run.ogui-wait.test.ts
+      - src/auto-reply/dispatch.ogui-legacy.test.ts
+      - src/auto-reply/reply/agent-runner-utils.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/followup-runner.ogui-wait.test.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.ogui-decision-history.test.ts
+      - ui/src/ui/controllers/chat.ogui-decision-status.test.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.node.test.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-23
+    metadata: {}
   - id: batch9-formal-root:cursor-cloud
     owner: cursor-cloud
     intent:
@@ -9388,6 +9449,66 @@ tasks:
     since: 2026-10-22
     metadata: {}
 landingStreams:
+  - id: batch11-s0-ogui-decision-lifecycle
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/config/sessions/ogui-decision-lifecycle.test.ts
+      - src/config/sessions/ogui-decision-lifecycle.ts
+      - src/config/sessions/ogui-decision.test.ts
+      - src/config/sessions/ogui-decision.ts
+      - src/config/sessions/types.ts
+      - src/config/types.collaboration.ts
+      - src/config/zod-schema.ts
+      - src/gateway/collaboration-dispatch/ogui-handoff-projection.test.ts
+      - src/gateway/collaboration-dispatch/ogui-handoff-projection.ts
+      - src/gateway/protocol/ogui-canvas-adapter.test.ts
+      - src/gateway/protocol/ogui-canvas-adapter.ts
+      - src/gateway/protocol/schema/ogui.test.ts
+      - src/gateway/protocol/schema/ogui.ts
+      - ui/src/ui/chat/ogui-form.node.test.ts
+      - ui/src/ui/chat/ogui-form.ts
+      - ui/src/ui/chat/ogui-form-view.ts
+      - ui/src/ui/chat/ogui-form-shell.node.test.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/views/chat.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/app-render.ts
+      - ui/src/ui/app.ts
+      - src/config/sessions/ogui-decision-engine.ts
+      - src/config/sessions/ogui-decision-engine.test.ts
+      - src/config/sessions/ogui-decision-process-child.ts
+      - src/config/sessions/ogui-decision-process.test.ts
+      - src/config/sessions/ogui-decision-wait-registry.ts
+      - src/agents/turn-completion/contract.ts
+      - src/agents/turn-completion/ogui-wait-settle.test.ts
+      - src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/params.ts
+      - src/agents/pi-tools.before-tool-call.ts
+      - src/agents/pi-tools.before-tool-call.ogui-wait.test.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/get-reply-run.ogui-wait.test.ts
+      - src/auto-reply/dispatch.ogui-legacy.test.ts
+      - src/auto-reply/reply/agent-runner-utils.ts
+      - src/auto-reply/reply/agent-runner-memory.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/followup-runner.ogui-wait.test.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/gateway/server-methods/chat.ts
+      - src/gateway/server-methods/chat.ogui-decision-history.test.ts
+      - ui/src/ui/controllers/chat.ogui-decision-status.test.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.node.test.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+    canLandWith: []
+    metadata:
+      task: batch11-s0-ogui-decision-lifecycle
+      owner: cursor-cloud
+      purpose: Batch 11 S0–S5 OGUI decision lifecycle. Flag stays off. First-match
+        so shared reply, settle, and OGUI files land together. Not a gray open.
   - id: batch9-formal-root
     landingPolicy: serial
     paths:

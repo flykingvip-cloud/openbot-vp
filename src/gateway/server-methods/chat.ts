@@ -49,6 +49,8 @@ import {
   updateSessionStore,
 } from "../../config/sessions.js";
 import type { SessionEntry } from "../../config/sessions.js";
+import { oguiWaitBlocksSession } from "../../config/sessions/ogui-decision-wait-registry.js";
+import { projectOguiDecisionStatuses } from "../../config/sessions/ogui-decision.js";
 import { resolveSessionTranscriptsDirForAgent } from "../../config/sessions/paths.js";
 import {
   applyFocusSwitchGate,
@@ -3732,6 +3734,7 @@ async function runGroupBotDiscussionTurn(params: {
         userText: params.message,
         assistantText: replyText,
         nowMs: Date.now(),
+        ...(oguiWaitBlocksSession(params.scope.rawSessionKey) ? { oguiWaitActive: true } : {}),
       });
       if (turnSettled.visibleText.trim()) {
         replyText = turnSettled.visibleText;
@@ -4068,6 +4071,8 @@ export const chatHandlers: GatewayRequestHandlers = {
     const storePath = historySession.storePath;
     await retireLeftoverWorkbenchAliasesAroundStore(storePath);
     const entry = historySession.entry;
+    const oguiDecisionStatuses = projectOguiDecisionStatuses(entry?.oguiDecisions);
+    const oguiDecisionPayload = oguiDecisionStatuses ? { oguiDecisionStatuses } : {};
     const sessionId = entry?.sessionId;
     const includeTools = resolveChatHistoryIncludeTools({
       includeTools: requestedIncludeTools,
@@ -4100,6 +4105,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         sessionKey,
         archiveId: archiveId.trim(),
         messages: archiveResult.messages,
+        ...oguiDecisionPayload,
       });
       return;
     }
@@ -4217,6 +4223,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       ...(includeArchives
         ? { archives: listOwnedSessionArchives({ transcriptsDir, callerWorkspaceCwd }) }
         : {}),
+      ...oguiDecisionPayload,
     });
   },
   "chat.abort": async ({ params, respond, context, client }) => {

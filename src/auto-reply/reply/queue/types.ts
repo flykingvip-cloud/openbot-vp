@@ -2,6 +2,7 @@ import type { ExecToolDefaults } from "../../../agents/bash-tools.js";
 import type { SkillSnapshot } from "../../../agents/skills.js";
 import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
+import type { OguiDecisionRunBinding } from "../../../config/sessions/ogui-decision-engine.js";
 import type { ExecutionIdentityContext } from "../../../gateway/execution-identity-context.js";
 import type { InputProvenance } from "../../../sessions/input-provenance.js";
 import type { OriginatingChannelType } from "../../templating.js";
@@ -101,6 +102,8 @@ export type FollowupRun = {
     contextLane?: import("../inbound-depth.js").InboundDepth;
     /** Bound session row for compiler candidate loading (task/group scope). */
     sessionEntry?: import("../../../config/sessions.js").SessionEntry;
+    /** Present only when the OGUI decision lifecycle flag is on for this turn. */
+    oguiDecisionRun?: OguiDecisionRunBinding;
     enforceFinalTag?: boolean;
     /** Pattern/knowledge: generation lineage for this turn (stable across sample ingest). */
     knowledgeLineageId?: string;

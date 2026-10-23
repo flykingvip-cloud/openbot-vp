@@ -154,4 +154,102 @@ describe("OguiAnswerSchema", () => {
       }),
     ).toBe(false);
   });
+
+  it("accepts a legacy answer that omits decision fields (Ev1)", () => {
+    expect(
+      validateAnswer({
+        schema_version: "ogui/v1",
+        component_id: "biz-model-form-1",
+        submission_id: "550e8400-e29b-41d4-a716-446655440000",
+        answers: { channel: "hybrid" },
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts decision_id plus a positive decision_version and keeps submission_id", () => {
+    const answer = {
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: "550e8400-e29b-41d4-a716-446655440000",
+      decision_id: "dec-1",
+      decision_version: 1,
+      answers: { channel: "hybrid" },
+    };
+    expect(validateAnswer(answer)).toBe(true);
+    expect(validateAnswer(JSON.parse(JSON.stringify(answer)))).toBe(true);
+  });
+
+  it("keeps a one-sided decision ref schema-valid so consume can reject it", () => {
+    expect(
+      validateAnswer({
+        schema_version: "ogui/v1",
+        component_id: "biz-model-form-1",
+        submission_id: "550e8400-e29b-41d4-a716-446655440000",
+        decision_id: "dec-1",
+        answers: { channel: "hybrid" },
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a non-positive decision_version when the field is present", () => {
+    const base = {
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: "550e8400-e29b-41d4-a716-446655440000",
+      decision_id: "dec-1",
+      answers: { channel: "hybrid" },
+    };
+    expect(validateAnswer({ ...base, decision_version: 0 })).toBe(false);
+    expect(validateAnswer({ ...base, decision_version: -1 })).toBe(false);
+    expect(validateAnswer({ ...base, decision_version: 1.5 })).toBe(false);
+    expect(validateAnswer({ ...base, decision_version: "1" })).toBe(false);
+  });
+
+  it("accepts an explicit custom answer_mode and rejects an unknown mode", () => {
+    const base = {
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: "550e8400-e29b-41d4-a716-446655440000",
+      decision_id: "dec-1",
+      decision_version: 1,
+      answers: { channel: "我的口径" },
+    };
+    expect(validateAnswer({ ...base, answer_mode: "custom" })).toBe(true);
+    expect(validateAnswer({ ...base, answer_mode: "option" })).toBe(true);
+    expect(validateAnswer({ ...base, answer_mode: "forged" })).toBe(false);
+  });
+
+  it("rejects identity fields because additionalProperties is false", () => {
+    expect(
+      validateAnswer({
+        schema_version: "ogui/v1",
+        component_id: "biz-model-form-1",
+        submission_id: "550e8400-e29b-41d4-a716-446655440000",
+        answers: { channel: "hybrid" },
+        user_id: "spoofed",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("OguiFormSchema decision projection", () => {
+  it("accepts allow_custom on a lifecycle form", () => {
+    expect(
+      validateForm({ ...validForm, decision_id: "dec-1", decision_version: 1, allow_custom: true }),
+    ).toBe(true);
+  });
+
+  it("accepts an optional decision ref with a positive version", () => {
+    expect(
+      validateForm({
+        ...validForm,
+        decision_id: "dec-1",
+        decision_version: 2,
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a non-positive decision_version on a form", () => {
+    expect(validateForm({ ...validForm, decision_id: "dec-1", decision_version: 0 })).toBe(false);
+  });
 });

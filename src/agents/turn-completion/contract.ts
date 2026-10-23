@@ -16,6 +16,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { oguiWaitBlocksSession } from "../../config/sessions/ogui-decision-wait-registry.js";
 import {
   isActiveSkillTerminologyStopAsk,
   SKILL_BIND_GLOSSARY_STUB as GLOSSARY_BIND,
@@ -88,6 +89,12 @@ export type TurnCompletionInput = {
   sidePathLabel?: string;
   deliverable?: TurnCompletionDeliverable;
   sessionKey?: string;
+  /**
+   * Batch 11 E3. When true, do not settle this turn to delivered or
+   * permanent_block. Omit or false preserves the existing settlement.
+   * The default-off OGUI lifecycle never sets this.
+   */
+  oguiWaitActive?: boolean;
 };
 
 export type TurnCompletionHardStop = "empty_success" | "side_path_refusal";
@@ -721,6 +728,13 @@ export function settleTurnCompletion(input: TurnCompletionInput): TurnCompletion
     continueExecution: false,
     hardStopPrevented: null,
   });
+  // E3: a valid OGUI WAIT is not rewritten to delivered or permanent_block by
+  // deliverable write, trial, existing-deliverable, or SLA. Visible text stays
+  // so a deliverable mention can coexist with the waiting card. Flag-off
+  // callers omit the flag and leave the in-process registry empty.
+  if (input.oguiWaitActive === true || oguiWaitBlocksSession(input.sessionKey)) {
+    return unchanged();
+  }
   const trial = input.skillSmoke === true || isSkillSmokeTurn(userText, assistantText);
   const trialApplies = trial && isPreviewOkFormalBlocked(`${userText}\n${assistantText}`);
   if (

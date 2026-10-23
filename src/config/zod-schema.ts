@@ -219,6 +219,8 @@ const CollaborationSchema = z
         challengeWindowGroupAllowlist: z.array(z.string()).optional(),
         requirePeerReview: z.boolean().optional(),
         oguiHandoffProjection: z.boolean().optional(),
+        oguiDecisionLifecycle: z.boolean().optional(),
+        oguiDecisionLifecycleAllowlist: z.array(z.string()).optional(),
         groupTaskHeartbeat: z
           .object({
             scanIntervalMs: z.number().int().positive().optional(),

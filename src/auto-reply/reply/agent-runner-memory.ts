@@ -24,6 +24,7 @@ import {
   type SessionEntry,
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
+import { admitOguiDecisionTurn } from "../../config/sessions/ogui-decision-engine.js";
 import type { GovernanceMode } from "../../gateway/governance/decision.js";
 import { lookupRunModelSet } from "../../gateway/governance/spawn-snapshot-handoff.js";
 import { logVerbose } from "../../globals.js";
@@ -536,6 +537,17 @@ export async function runMemoryFlushIfNeeded(params: {
   );
 
   let activeSessionEntry = entry ?? params.sessionEntry;
+  if (params.followupRun.run.oguiDecisionRun) {
+    const admission = await admitOguiDecisionTurn({
+      binding: { ...params.followupRun.run.oguiDecisionRun, allowIssue: false },
+      inboundText: "",
+      ingress: "memory",
+      phase: "run",
+    });
+    if (admission.action === "pause" || admission.action === "ack") {
+      return activeSessionEntry;
+    }
+  }
   const activeSessionStore = params.sessionStore;
   let bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
     activeSessionEntry?.systemPromptReport ??
@@ -598,6 +610,9 @@ export async function runMemoryFlushIfNeeded(params: {
           ...embeddedContext,
           ...senderContext,
           ...runBaseParams,
+          ...(runBaseParams.oguiDecisionRun
+            ? { oguiDecisionRun: { ...runBaseParams.oguiDecisionRun, allowIssue: false } }
+            : {}),
           trigger: "memory",
           memoryFlushWritePath,
           prompt: resolveMemoryFlushPromptForRun({

@@ -1,0 +1,400 @@
+// @vitest-environment jsdom
+import { render } from "lit";
+import { afterEach, describe, expect, it } from "vitest";
+import type { SessionsListResult } from "../types.ts";
+import { renderChat, type ChatProps } from "../views/chat.ts";
+import { clearOguiFormDraftState } from "./ogui-form-view.ts";
+
+function createSessions(): SessionsListResult {
+  return {
+    ts: 0,
+    path: "",
+    count: 0,
+    defaults: { model: null, contextTokens: null },
+    sessions: [],
+  };
+}
+
+function createProps(overrides: Partial<ChatProps> = {}): ChatProps {
+  return {
+    sessionKey: "agent:main:main",
+    onSessionKeyChange: () => undefined,
+    thinkingLevel: null,
+    showThinking: false,
+    loading: false,
+    sending: false,
+    messages: [],
+    toolMessages: [],
+    streamSegments: [],
+    stream: null,
+    streamStartedAt: null,
+    assistantAvatarUrl: null,
+    draft: "",
+    queue: [],
+    connected: true,
+    canSend: true,
+    disabledReason: null,
+    error: null,
+    sessions: createSessions(),
+    focusMode: false,
+    assistantName: "OpenBot",
+    assistantAvatar: null,
+    onRefresh: () => undefined,
+    onToggleFocusMode: () => undefined,
+    onDraftChange: () => undefined,
+    onSend: () => undefined,
+    onQueueRemove: () => undefined,
+    onNewSession: () => undefined,
+    ...overrides,
+  };
+}
+
+function formFence(decision?: {
+  decision_id: string;
+  decision_version: number;
+  allow_custom?: boolean;
+}): string {
+  return [
+    "请拍板：",
+    "",
+    "```ogui-form",
+    JSON.stringify(
+      {
+        schema_version: "ogui/v1",
+        component_id: "cmp-shell",
+        title: "选口径",
+        fields: [
+          {
+            id: "choice",
+            label: "口径",
+            type: "single_select",
+            options: [
+              { value: "a", label: "甲" },
+              { value: "b", label: "乙" },
+            ],
+          },
+        ],
+        ...(decision
+          ? {
+              decision_id: decision.decision_id,
+              decision_version: decision.decision_version,
+              ...(decision.allow_custom ? { allow_custom: true } : {}),
+            }
+          : {}),
+      },
+      null,
+      2,
+    ),
+    "```",
+  ].join("\n");
+}
+
+function assistantMessage(text: string) {
+  return {
+    role: "assistant",
+    content: [{ type: "text", text }],
+    timestamp: Date.UTC(2026, 9, 23, 5, 0, 0),
+  };
+}
+
+function mount(props: ChatProps): HTMLElement {
+  const container = document.createElement("div");
+  document.body.append(container);
+  render(renderChat(props), container);
+  return container;
+}
+
+function choose(container: HTMLElement, label: string): void {
+  const option = [...container.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes(label),
+  );
+  expect(option).toBeInstanceOf(HTMLButtonElement);
+  option?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+}
+
+function submitButton(container: HTMLElement): HTMLButtonElement {
+  const button = container.querySelector('[data-testid="ogui-form-submit"]');
+  expect(button).toBeInstanceOf(HTMLButtonElement);
+  return button as HTMLButtonElement;
+}
+
+describe("chat shell OGUI decision status", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+    clearOguiFormDraftState();
+  });
+
+  it("disables submit for a historical fence whose session record is closed (Ev8)", () => {
+    const submitted: string[] = [];
+    const messages = [
+      assistantMessage(formFence({ decision_id: "ogd_historical", decision_version: 1 })),
+    ];
+    const onSubmitForm = (text: string) => {
+      submitted.push(text);
+    };
+    const open = mount(
+      createProps({
+        messages,
+        onSubmitForm,
+        oguiDecisions: {
+          ogd_historical: { decisionStatus: "waiting", version: 1 },
+        },
+      }),
+    );
+    choose(open, "甲");
+    open.remove();
+
+    const closed = mount(
+      createProps({
+        messages,
+        onSubmitForm,
+        oguiDecisions: {
+          ogd_historical: { decisionStatus: "expired", version: 1 },
+        },
+      }),
+    );
+    const button = submitButton(closed);
+    expect(button.disabled).toBe(true);
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(submitted).toEqual([]);
+  });
+
+  it("keeps a waiting decision operable from the same shell path (Ev8)", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        messages: [
+          assistantMessage(formFence({ decision_id: "ogd_waiting", decision_version: 1 })),
+        ],
+        oguiDecisions: {
+          ogd_waiting: { decisionStatus: "waiting", version: 1 },
+        },
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    choose(container, "甲");
+    container.remove();
+    const ready = mount(
+      createProps({
+        messages: [
+          assistantMessage(formFence({ decision_id: "ogd_waiting", decision_version: 1 })),
+        ],
+        oguiDecisions: {
+          ogd_waiting: { decisionStatus: "waiting", version: 1 },
+        },
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const button = submitButton(ready);
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain("```ogui-answer");
+  });
+
+  it("leaves a legacy fence operable when the session has no decision record (Ev8)", () => {
+    const submitted: string[] = [];
+    const onSubmitForm = (text: string) => {
+      submitted.push(text);
+    };
+    const open = mount(
+      createProps({
+        messages: [assistantMessage(formFence())],
+        onSubmitForm,
+      }),
+    );
+    choose(open, "甲");
+    open.remove();
+    const ready = mount(
+      createProps({
+        messages: [assistantMessage(formFence())],
+        onSubmitForm,
+      }),
+    );
+    const button = submitButton(ready);
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(submitted).toHaveLength(1);
+  });
+
+  it("keeps a lifecycle card non-operable when its decision ref has no authority record", () => {
+    const submitted: string[] = [];
+    const messages = [
+      assistantMessage(formFence({ decision_id: "ogd_missing", decision_version: 1 })),
+    ];
+    const onSubmitForm = (text: string) => {
+      submitted.push(text);
+    };
+    const missingFromMap = mount(
+      createProps({
+        messages,
+        oguiDecisions: {
+          ogd_other: { decisionStatus: "answered", version: 1 },
+        },
+        onSubmitForm,
+      }),
+    );
+    const fromMap = submitButton(missingFromMap);
+    expect(fromMap.disabled).toBe(true);
+    fromMap.click();
+    expect(submitted).toEqual([]);
+    missingFromMap.remove();
+
+    const noMap = mount(
+      createProps({
+        messages,
+        onSubmitForm,
+      }),
+    );
+    const bare = submitButton(noMap);
+    expect(bare.disabled).toBe(true);
+    bare.click();
+    expect(submitted).toEqual([]);
+  });
+
+  it("submits an explicit custom answer from the lifecycle card", () => {
+    const submitted: string[] = [];
+    const messages = [
+      assistantMessage(
+        formFence({ decision_id: "ogd_custom", decision_version: 1, allow_custom: true }),
+      ),
+    ];
+    const props = createProps({
+      messages,
+      oguiDecisions: {
+        ogd_custom: { decisionStatus: "waiting", version: 1 },
+      },
+      onSubmitForm: (text) => {
+        submitted.push(text);
+      },
+    });
+    const open = mount(props);
+    const input = open.querySelector('[data-testid="ogui-form-custom"]');
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    if (!(input instanceof HTMLInputElement)) {
+      return;
+    }
+    input.value = "自定义口径";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    open.remove();
+    const ready = mount(props);
+    const button = submitButton(ready);
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain('"answer_mode": "custom"');
+    expect(submitted[0]).toContain("自定义口径");
+    expect(submitted[0]).toContain('"decision_id": "ogd_custom"');
+  });
+
+  it("disables an in-flight stream form when the session record is closed (Ev8)", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        stream: formFence({ decision_id: "ogd_stream", decision_version: 1 }),
+        streamStartedAt: Date.UTC(2026, 9, 23, 5, 1, 0),
+        oguiDecisions: {
+          ogd_stream: { decisionStatus: "answered", version: 1 },
+        },
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const button = submitButton(container);
+    expect(button.disabled).toBe(true);
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(submitted).toEqual([]);
+  });
+
+  it("keeps an in-flight lifecycle form non-operable when the stream has no authority record", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        stream: formFence({ decision_id: "ogd_stream_missing", decision_version: 1 }),
+        streamStartedAt: Date.UTC(2026, 9, 23, 5, 2, 0),
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const button = submitButton(container);
+    expect(button.disabled).toBe(true);
+    button.click();
+    expect(submitted).toEqual([]);
+  });
+
+  it("keeps an in-flight legacy form operable when the fence has no decision fields", () => {
+    const submitted: string[] = [];
+    const onSubmitForm = (text: string) => {
+      submitted.push(text);
+    };
+    const props = createProps({
+      stream: formFence(),
+      streamStartedAt: Date.UTC(2026, 9, 23, 5, 3, 0),
+      onSubmitForm,
+    });
+    const open = mount(props);
+    choose(open, "甲");
+    open.remove();
+    const ready = mount(props);
+    const button = submitButton(ready);
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain("```ogui-answer");
+    expect(submitted[0]).not.toContain("decision_id");
+  });
+
+  it("continues an answered card from the recovery control without sending another answer", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        messages: [
+          assistantMessage(formFence({ decision_id: "ogd_answered", decision_version: 1 })),
+        ],
+        oguiDecisions: {
+          ogd_answered: { decisionStatus: "answered", version: 1 },
+        },
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const submit = submitButton(container);
+    expect(submit.disabled).toBe(true);
+    const resume = container.querySelector('[data-testid="ogui-form-resume"]');
+    expect(resume).toBeInstanceOf(HTMLButtonElement);
+    if (!(resume instanceof HTMLButtonElement)) {
+      return;
+    }
+    expect(resume.disabled).toBe(false);
+    expect(resume.textContent).toContain("继续执行");
+    resume.click();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain("```ogui-resume");
+    expect(submitted[0]).toContain("ogd_answered");
+    expect(submitted[0]).not.toContain('"answers"');
+    expect(submitted[0]).not.toContain("```ogui-answer");
+  });
+
+  it("does not offer resume recovery on a waiting card", () => {
+    const container = mount(
+      createProps({
+        messages: [
+          assistantMessage(formFence({ decision_id: "ogd_waiting", decision_version: 1 })),
+        ],
+        oguiDecisions: {
+          ogd_waiting: { decisionStatus: "waiting", version: 1 },
+        },
+        onSubmitForm: () => undefined,
+      }),
+    );
+    expect(container.querySelector('[data-testid="ogui-form-resume"]')).toBeNull();
+    expect(submitButton(container).disabled).toBe(true);
+  });
+});

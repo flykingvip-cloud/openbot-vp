@@ -336,6 +336,8 @@ export type ChatProps = {
   onSubmitChoice?: (text: string) => void;
   /** OGUI Form P0: submit ogui-answer with submissionId → chat.send idempotencyKey. */
   onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+  /** Status slice from chat.history / SessionEntry.oguiDecisions. */
+  oguiDecisions?: import("../chat/ogui-form-view.ts").OguiDecisionStatusLookup;
   contextScope?: ChatContextScopeState;
   contextSources?: ChatContextSourceCatalogItem[];
   contextSourcesLoading?: boolean;
@@ -1719,6 +1721,14 @@ function renderChatThreadItem(
       resolveStreamItemIdentity(item, props, opts),
       props.sessionKey,
       item.replyLanguage ?? props.streamReplyLanguage,
+      {
+        oguiDecisions: props.oguiDecisions,
+        onFillComposer: (text) => props.onDraftChange(text),
+        onSubmitChoice: props.onSubmitChoice ? (text) => props.onSubmitChoice?.(text) : undefined,
+        onSubmitForm: props.onSubmitForm
+          ? (text, meta) => props.onSubmitForm?.(text, meta)
+          : undefined,
+      },
     );
   }
 
@@ -1735,6 +1745,7 @@ function renderChatThreadItem(
       onSubmitForm: props.onSubmitForm
         ? (text, meta) => props.onSubmitForm?.(text, meta)
         : undefined,
+      oguiDecisions: props.oguiDecisions,
       onQuoteMessage: props.onQuoteDraftChange
         ? (quote) => props.onQuoteDraftChange?.(quote)
         : undefined,

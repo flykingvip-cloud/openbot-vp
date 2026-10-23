@@ -40,6 +40,7 @@ describe("oguiAnswerToCanvasUserAction", () => {
       answers: { channel: "hybrid" },
       submitted_at: "2026-10-13T05:00:00.000Z",
     });
+    expect(payload.context).not.toHaveProperty("decision_id");
     expect(payload).toEqual({
       name: "ogui.answer",
       surfaceId: "main",
@@ -54,6 +55,22 @@ describe("oguiAnswerToCanvasUserAction", () => {
         does_not_bypass_steward_or_exec_approvals: true,
       },
     });
+  });
+});
+
+describe("oguiAnswerToCanvasUserAction lifecycle ref", () => {
+  it("forwards decision_id and decision_version together", () => {
+    const payload = oguiAnswerToCanvasUserAction({
+      schema_version: "ogui/v1",
+      component_id: "biz-model-form-1",
+      submission_id: "550e8400-e29b-41d4-a716-446655440000",
+      decision_id: "dec-1",
+      decision_version: 2,
+      answers: { channel: "hybrid" },
+    });
+    expect(payload.context.decision_id).toBe("dec-1");
+    expect(payload.context.decision_version).toBe(2);
+    expect(payload.context.submission_id).toBe("550e8400-e29b-41d4-a716-446655440000");
   });
 });
 

@@ -2633,6 +2633,7 @@ export async function runEmbeddedAttempt(
             sessionFile: params.sessionFile,
             workspaceDir: effectiveWorkspace,
             sessionKey: params.sessionKey,
+            ...(params.oguiDecisionRun ? { oguiDecisionRun: params.oguiDecisionRun } : {}),
           });
         } catch (err) {
           log.warn(`visible reply rewrite failed: ${String(err)}`);

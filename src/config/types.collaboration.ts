@@ -481,6 +481,23 @@ export type CollaborationTaskConfig = {
    * add `ui.*` RPC. Tip may enable for smoke; LIVE stays off.
    */
   oguiHandoffProjection?: boolean;
+  /**
+   * Batch 11 OGUI decision lifecycle (default off).
+   * When unset or false, legacy ogui-form / ogui-answer submit is unchanged
+   * and no issue, WAIT, or admission path runs. Setting true is an explicit
+   * opt-in for a later slice; S0 does not persist decisions, S1 issue alone
+   * is not a gray open, and this flag does not mint PRODUCTION_GO or open LIVE.
+   * Env `OPENBOT_OGUI_DECISION_LIFECYCLE=0` forces off. `=1` opts in for tests.
+   */
+  oguiDecisionLifecycle?: boolean;
+  /**
+   * tenantId or agentId allowlist for the OGUI decision lifecycle.
+   * Default empty. Empty does not enable the feature. A non-empty list is
+   * consulted only when `oguiDecisionLifecycle` is on; the authenticated
+   * subject must match an entry exactly. Listing a subject does not issue
+   * a card or grant PRODUCTION_GO.
+   */
+  oguiDecisionLifecycleAllowlist?: string[];
 };
 
 export type CollaborationLearningConfig = {

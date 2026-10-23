@@ -6,6 +6,19 @@ import type { ChannelId } from "../../channels/plugins/types.js";
 import type { SessionParticipationOverlayField } from "../../gateway/collaboration-learning/session-participation-overlay.js";
 import type { DeliveryContext } from "../../utils/delivery-context.js";
 import type { TtsAutoMode } from "../types.tts.js";
+import type { OguiDecisionMap } from "./ogui-decision.js";
+
+export type {
+  OguiDecisionAnswer,
+  OguiDecisionAnswerKind,
+  OguiDecisionDeferral,
+  OguiDecisionMap,
+  OguiDecisionOption,
+  OguiDecisionRecord,
+  OguiDecisionScope,
+  OguiDecisionStatus,
+  OguiResumeStatus,
+} from "./ogui-decision.js";
 
 export type SessionScope = "per-sender" | "global";
 
@@ -157,6 +170,14 @@ export type SessionEntry = {
   label?: string;
   /** Bound task/project context id (agent context lifecycle). */
   taskContextId?: string;
+  /**
+   * Batch 11 session authority for 1:1 OGUI decision cards (key = decisionId).
+   * Absent until the lifecycle engine issues a card. Issue, consume, and
+   * supersede replace this map only inside `updateSessionStore` so sibling
+   * decisions stay intact. Close / dismiss is display-only and is not stored
+   * here. The lifecycle flag defaults off; flag-off turns do not write it.
+   */
+  oguiDecisions?: OguiDecisionMap;
   displayName?: string;
   channel?: string;
   groupId?: string;
