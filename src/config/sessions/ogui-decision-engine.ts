@@ -833,11 +833,12 @@ export async function admitOguiDecisionTurn(input: {
   if (!consumed.ok) {
     return { action: "ack", text: consumed.text };
   }
-  if (consumed.resumeStatus === "running" && consumed.decisionId) {
+  if (consumed.resumeStatus === "running" && consumed.decisionId && consumed.resumeRef) {
     const continued = await continueRecoveredOguiDecisionResume({
       storePath,
       sessionKey,
       decisionId: consumed.decisionId,
+      resumeRef: consumed.resumeRef,
       lifecycleEnabled: true,
       nowMs: input.nowMs,
       updateStore: input.updateStore,
@@ -868,11 +869,12 @@ export async function admitOguiDecisionTurn(input: {
     updateStore: input.updateStore,
   });
   if (!claim.claimed) {
-    if (claim.reason === "already_started" && consumed.decisionId) {
+    if (claim.reason === "already_started" && consumed.decisionId && consumed.resumeRef) {
       const continued = await continueRecoveredOguiDecisionResume({
         storePath,
         sessionKey,
         decisionId: consumed.decisionId,
+        resumeRef: consumed.resumeRef,
         lifecycleEnabled: true,
         nowMs: input.nowMs,
         updateStore: input.updateStore,
@@ -1462,8 +1464,8 @@ type ResumeExecInput = {
 
 /**
  * Production caller of `recoverOguiDecisionResume`.
- * Adopts a running resume only when its owner pid is gone, and keeps the
- * same resumeRef. A live owner stays already_started.
+ * Adopts a running resume only when its owner pid is gone and the caller's
+ * resumeRef matches the stored one. A mismatch or a live owner does not adopt.
  */
 export async function continueRecoveredOguiDecisionResume(
   input: ResumeExecInput,
@@ -1479,6 +1481,9 @@ export async function continueRecoveredOguiDecisionResume(
     const record = map?.[input.decisionId];
     if (!entry || !map || !record || record.scope.sessionKey !== input.sessionKey) {
       return { continued: false, reason: "missing" };
+    }
+    if (record.resumeRef !== input.resumeRef) {
+      return { continued: false, reason: "resume_mismatch" };
     }
     const recovered = recoverOguiDecisionResume(map, input.sessionKey);
     if (

@@ -582,11 +582,77 @@ describe("OGUI decision engine S1–S5", () => {
       storePath: session.storePath,
       sessionKey: session.sessionKey,
       decisionId: issued.decisionId ?? "",
+      resumeRef: issued.resumeRef ?? "",
       lifecycleEnabled: true,
     });
     expect(continued.continued).toBe(false);
     expect(continued.reason).toBe("already_started");
     expect(continued.resumeRef).toBe(issued.resumeRef);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("adopts a dead-owner resume only when resumeRef matches the stored card", async () => {
+    const session = await seedSession();
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: binding(session.storePath, session.sessionKey),
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const resumeRef = issued.resumeRef ?? "";
+    await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        component_id: "cmp-1",
+        submission_id: "sub-dead-ref",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    await updateSessionStore(session.storePath, (store) => {
+      const record = store[session.sessionKey]?.oguiDecisions?.[decisionId];
+      if (record) {
+        record.resumeOwnerPid = 2_147_483_646;
+      }
+    });
+    const wrong = await continueRecoveredOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      resumeRef: "ogr_wrong",
+      lifecycleEnabled: true,
+    });
+    expect(wrong.continued).toBe(false);
+    expect(wrong.reason).toBe("resume_mismatch");
+    expect(wrong.resumeRef).toBeUndefined();
+    const held = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(held?.resumeRef).toBe(resumeRef);
+    expect(held?.resumeOwnerPid).toBe(2_147_483_646);
+    const continued = await continueRecoveredOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      resumeRef,
+      lifecycleEnabled: true,
+    });
+    expect(continued.continued).toBe(true);
+    expect(continued.reason).toBe("recovered");
+    expect(continued.resumeRef).toBe(resumeRef);
+    const stored = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(stored?.resumeRef).toBe(resumeRef);
+    expect(stored?.resumeStatus).toBe("running");
+    expect(stored?.resumeOwnerPid).toBe(process.pid);
     fs.rmSync(session.dir, { recursive: true, force: true });
   });
 
