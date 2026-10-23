@@ -119,6 +119,26 @@ export function parseOguiDecisionStatusLookup(
 }
 
 /**
+ * Client patch after an accepted lifecycle ogui-answer.
+ * Same map the shell already passes; closed status disables the existing submit.
+ */
+export function mergeOguiDecisionAnsweredStatus(
+  lookup: OguiDecisionStatusLookup | null | undefined,
+  ref: { decision_id: string; decision_version: number },
+): OguiDecisionStatusLookup {
+  const decisionId = ref.decision_id.trim();
+  const version = ref.decision_version;
+  const next: Record<string, OguiDecisionStatusRef> = {};
+  if (lookup) {
+    for (const [key, value] of Object.entries(lookup)) {
+      next[key] = value;
+    }
+  }
+  next[decisionId] = { decisionStatus: "answered", version };
+  return next;
+}
+
+/**
  * Match the form's decision_id to the session map. A fence with no decision
  * fields stays omitted so plain legacy OGUI remains operable. A lifecycle
  * card that carries a decision ref but has no authority record is

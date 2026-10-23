@@ -14,6 +14,7 @@ import {
   oguiFormDraftComplete,
   parseOguiFormDefinition,
   parseOguiFormFromText,
+  readOguiAnswerDecisionRef,
   stripOguiFormFences,
   type OguiFormDefinition,
 } from "./ogui-form.ts";
@@ -399,6 +400,30 @@ describe("ogui form confirm wiring", () => {
     const readyClick = readyValues.find((value) => typeof value === "function") as () => void;
     readyClick();
     expect(submitted).toHaveLength(1);
+  });
+
+  it("reads a paired decision ref from an ogui-answer and drops a half-present pair", () => {
+    const form = parseOguiFormDefinition(VALID_FORM_JSON) as OguiFormDefinition;
+    const paired = buildOguiAnswerSubmitMessage({
+      form,
+      answers: { channel: "direct", billing: "seat" },
+      submissionId: SUBMISSION_ID,
+      decisionId: "ogd_ref",
+      decisionVersion: 3,
+    });
+    expect(readOguiAnswerDecisionRef(paired)).toEqual({
+      decision_id: "ogd_ref",
+      decision_version: 3,
+    });
+    const legacy = buildOguiAnswerSubmitMessage({
+      form,
+      answers: { channel: "direct", billing: "seat" },
+      submissionId: SUBMISSION_ID,
+    });
+    expect(readOguiAnswerDecisionRef(legacy)).toBeUndefined();
+    expect(
+      readOguiAnswerDecisionRef('```ogui-answer\n{"decision_id":"ogd_half"}\n```'),
+    ).toBeUndefined();
   });
 
   it("omits submit button when onSubmitForm is not wired", () => {

@@ -582,6 +582,12 @@ export function renderStreamingGroup(
   assistant?: AssistantIdentity,
   _sessionKey?: string,
   replyLanguage?: VisibleReplyLanguage | null,
+  ogui?: {
+    oguiDecisions?: OguiDecisionStatusLookup;
+    onFillComposer?: (text: string) => void;
+    onSubmitChoice?: (text: string) => void;
+    onSubmitForm?: (text: string, meta: { submissionId: string }) => void;
+  },
 ) {
   const visible = stripInlineDirectiveTagsForDisplay(text, replyLanguage).text.trim();
   if (!visible) {
@@ -601,6 +607,10 @@ export function renderStreamingGroup(
           {
             isStreaming: true,
             showReasoning: false,
+            oguiDecisions: ogui?.oguiDecisions,
+            onFillComposer: ogui?.onFillComposer,
+            onSubmitChoice: ogui?.onSubmitChoice,
+            onSubmitForm: ogui?.onSubmitForm,
           },
         )}
       </div>
@@ -1087,11 +1097,11 @@ function renderGroupedMessage(message: unknown, opts: GroupedMessageRenderOption
     });
   const delivery = useDelivery && markdown ? parseChatDelivery(markdown) : null;
   // OGUI Form P0: fenced ```ogui-form``` disables delivery chrome (``` gate), so
-  // parse + render on the plain markdown path. Invalid fences stay as markdown.
+  // parse + render on the plain markdown path. A complete fence in the
+  // in-flight bubble uses the same decisionStatus lookup. An unfinished
+  // fence has no closing ``` and stays markdown.
   const oguiForm =
-    role === "assistant" && markdown && !opts.isStreaming && !delivery
-      ? parseOguiFormFromText(markdown)
-      : null;
+    role === "assistant" && markdown && !delivery ? parseOguiFormFromText(markdown) : null;
   const markdownForDisplay =
     oguiForm && markdown ? stripOguiFormFences(markdown) || null : markdown;
   const diagnoseActions =

@@ -20,6 +20,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 const OGUI_FORM_FENCE_RE = /```\s*ogui-form\s*\r?\n([\s\S]*?)```/i;
 const OGUI_FORM_FENCE_GLOBAL_RE = /```\s*ogui-form\s*\r?\n([\s\S]*?)```/gi;
+const OGUI_ANSWER_FENCE_RE = /```\s*ogui-answer\s*\r?\n([\s\S]*?)```/i;
 
 export type OguiFormOption = Readonly<{
   value: string;
@@ -233,6 +234,33 @@ function readSubmitDecisionRef(input: {
     );
   }
   return { decision_id: decisionId, decision_version: version };
+}
+
+/**
+ * Decision ref on a sent ```ogui-answer``` fence.
+ * Both fields are required. A legacy answer and a half-present pair return undefined.
+ */
+export function readOguiAnswerDecisionRef(
+  text: string,
+): { decision_id: string; decision_version: number } | undefined {
+  if (!text || typeof text !== "string") {
+    return undefined;
+  }
+  const match = OGUI_ANSWER_FENCE_RE.exec(text);
+  const body = match?.[1]?.trim() ?? "";
+  if (!body) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body) as unknown;
+  } catch {
+    return undefined;
+  }
+  if (!isPlainObject(parsed)) {
+    return undefined;
+  }
+  return readPairedDecisionRef(parsed);
 }
 
 /** Parse the first legal ogui-form fence from chat text; illegal → null. */

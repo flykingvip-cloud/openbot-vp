@@ -89,6 +89,7 @@ export type EmployeeWorkbenchSessionState = EmployeeWorkbenchGovernanceDetailSta
     chatCheckpoints?: unknown[];
     pendingRestoreCheckpointId?: string | null;
     sidebarOpen?: boolean;
+    chatOguiDecisions?: import("../../chat/ogui-form-view.ts").OguiDecisionStatusLookup | null;
   };
 
 let workbenchSessionSwitchGeneration = 0;
@@ -105,6 +106,7 @@ function snapshotWorkbenchTranscript(
     chatStreamStartedAt: state.chatStreamStartedAt,
     chatStreamSessionKey: state.chatStreamSessionKey,
     chatThinkingProgress: state.chatThinkingProgress ?? null,
+    oguiDecisions: state.chatOguiDecisions ?? null,
   };
 }
 
@@ -115,6 +117,8 @@ function applyWorkbenchTranscript(
   state.chatMessages = transcript.messages.slice();
   state.chatHistoryNextBefore = transcript.chatHistoryNextBefore ?? null;
   state.chatHistoryHasMore = transcript.chatHistoryHasMore ?? false;
+  state.chatOguiDecisions =
+    "oguiDecisions" in transcript ? (transcript.oguiDecisions ?? null) : null;
 }
 
 function applyWorkbenchRunOccupancy(
@@ -350,6 +354,7 @@ export function switchEmployeeWorkbenchSession(
     state.chatMessages = [];
     state.chatHistoryNextBefore = null;
     state.chatHistoryHasMore = false;
+    state.chatOguiDecisions = null;
     state.chatLoading = true;
   }
   applyWorkbenchRunOccupancy(state, cached);

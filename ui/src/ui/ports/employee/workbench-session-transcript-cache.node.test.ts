@@ -122,6 +122,41 @@ describe("workbench-session-transcript-cache", () => {
     expect(readWorkbenchSessionTranscript("agent:main:space:alpha")?.messages).toHaveLength(1);
   });
 
+  it("keeps a decision status slice across refresh and does not let an empty snapshot erase it", () => {
+    writeWorkbenchSessionTranscript("agent:bot-a:main", {
+      messages: [{ role: "assistant", content: [{ type: "text", text: "form" }] }],
+      oguiDecisions: {
+        ogd_cache: { decisionStatus: "answered", version: 2 },
+      },
+    });
+    writeWorkbenchSessionTranscript("agent:bot-a:main", { messages: [] });
+
+    expect(readWorkbenchSessionTranscript("agent:bot-a:main")?.oguiDecisions).toEqual({
+      ogd_cache: { decisionStatus: "answered", version: 2 },
+    });
+
+    reloadWorkbenchSessionTranscriptCacheFromStorageForTests();
+
+    expect(readWorkbenchSessionTranscript("agent:bot-a:main")?.oguiDecisions).toEqual({
+      ogd_cache: { decisionStatus: "answered", version: 2 },
+    });
+  });
+
+  it("lets an explicit null status slice clear a painted decision map", () => {
+    writeWorkbenchSessionTranscript("agent:bot-a:main", {
+      messages: [{ role: "assistant", content: [{ type: "text", text: "form" }] }],
+      oguiDecisions: {
+        ogd_cache: { decisionStatus: "waiting", version: 1 },
+      },
+    });
+    writeWorkbenchSessionTranscript("agent:bot-a:main", {
+      messages: [{ role: "assistant", content: [{ type: "text", text: "form" }] }],
+      oguiDecisions: null,
+    });
+
+    expect(readWorkbenchSessionTranscript("agent:bot-a:main")?.oguiDecisions).toBeNull();
+  });
+
   it("collapses extra robot aliases onto the bot main transcript slot", () => {
     writeWorkbenchSessionTranscript("agent:bot-a:main", {
       messages: [{ role: "assistant", content: [{ type: "text", text: "main" }] }],

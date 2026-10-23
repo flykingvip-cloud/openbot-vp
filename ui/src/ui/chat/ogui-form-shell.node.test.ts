@@ -290,4 +290,63 @@ describe("chat shell OGUI decision status", () => {
     expect(submitted[0]).toContain("自定义口径");
     expect(submitted[0]).toContain('"decision_id": "ogd_custom"');
   });
+
+  it("disables an in-flight stream form when the session record is closed (Ev8)", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        stream: formFence({ decision_id: "ogd_stream", decision_version: 1 }),
+        streamStartedAt: Date.UTC(2026, 9, 23, 5, 1, 0),
+        oguiDecisions: {
+          ogd_stream: { decisionStatus: "answered", version: 1 },
+        },
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const button = submitButton(container);
+    expect(button.disabled).toBe(true);
+    button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(submitted).toEqual([]);
+  });
+
+  it("keeps an in-flight lifecycle form non-operable when the stream has no authority record", () => {
+    const submitted: string[] = [];
+    const container = mount(
+      createProps({
+        stream: formFence({ decision_id: "ogd_stream_missing", decision_version: 1 }),
+        streamStartedAt: Date.UTC(2026, 9, 23, 5, 2, 0),
+        onSubmitForm: (text) => {
+          submitted.push(text);
+        },
+      }),
+    );
+    const button = submitButton(container);
+    expect(button.disabled).toBe(true);
+    button.click();
+    expect(submitted).toEqual([]);
+  });
+
+  it("keeps an in-flight legacy form operable when the fence has no decision fields", () => {
+    const submitted: string[] = [];
+    const onSubmitForm = (text: string) => {
+      submitted.push(text);
+    };
+    const props = createProps({
+      stream: formFence(),
+      streamStartedAt: Date.UTC(2026, 9, 23, 5, 3, 0),
+      onSubmitForm,
+    });
+    const open = mount(props);
+    choose(open, "甲");
+    open.remove();
+    const ready = mount(props);
+    const button = submitButton(ready);
+    expect(button.disabled).toBe(false);
+    button.click();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]).toContain("```ogui-answer");
+    expect(submitted[0]).not.toContain("decision_id");
+  });
 });

@@ -52,6 +52,10 @@ tasks:
       - src/auto-reply/reply/queue/types.ts
       - src/gateway/server-methods/chat.ts
       - src/gateway/server-methods/chat.ogui-decision-history.test.ts
+      - ui/src/ui/controllers/chat.ogui-decision-status.test.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.node.test.ts
+      - ui/src/ui/ports/employee/render-actions.ts
     state: active
     sessions: []
     ownerHistory: []
@@ -9495,6 +9499,10 @@ landingStreams:
       - src/auto-reply/reply/queue/types.ts
       - src/gateway/server-methods/chat.ts
       - src/gateway/server-methods/chat.ogui-decision-history.test.ts
+      - ui/src/ui/controllers/chat.ogui-decision-status.test.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.ts
+      - ui/src/ui/ports/employee/workbench-session-transcript-cache.node.test.ts
+      - ui/src/ui/ports/employee/render-actions.ts
     canLandWith: []
     metadata:
       task: batch11-s0-ogui-decision-lifecycle
