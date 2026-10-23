@@ -16,6 +16,7 @@ import type { CanvasHostHandler } from "../canvas-host/server.js";
 import { LEGACY_HOOK_TOKEN_HEADER_DISPLAY_NAMES } from "../compat/legacy-names.js";
 import { loadConfig } from "../config/config.js";
 import { handleClaw4FirmwareHttpRequest } from "../integrations/device-digital-human/claw4-firmware-http.js";
+import { handleIntegrationsGrantHttpRequest } from "../integrations/device-digital-human/integrations-grant-http.js";
 import type { createSubsystemLogger } from "../logging/subsystem.js";
 import { safeEqualSecret } from "../security/secret-equal.js";
 import { handleSlackHttpRequest } from "../slack/http/index.js";
@@ -734,11 +735,20 @@ export function createGatewayHttpServer(opts: {
           run: () => handleClaw4FirmwareHttpRequest(req, res),
         },
         {
+          // Integrations grant mint (consent → PKCE → exchange) on the same
+          // in-process DeviceDhService as Claw4 when INPROCESS/inject is on.
+          // Opt-in only; unbound production leaves these paths unclaimed.
+          // Stub 8787 remains a valid full joint path. No PROMOTE.
+          name: "integrations-grant",
+          run: () => handleIntegrationsGrantHttpRequest(req, res),
+        },
+        {
           // OpenBot management routes only: /admin for a platform-admin session
           // and /me for a signed-in member. Device-control is a different origin
           // (loopback joint default http://127.0.0.1:8791). The same path prefix
-          // on this host must not be treated as that process. Does not mount
-          // /api/integrations/v1 and does not reverse-proxy the loopback stub.
+          // on this host must not be treated as that process. Does not reverse-
+          // proxy the loopback stub. Full /api/integrations/v1 stays off except
+          // the opt-in grant mint stage above.
           name: "device-platform-admin",
           run: () => handleDevicePlatformHttpRequest(req, res),
         },

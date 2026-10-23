@@ -122,6 +122,59 @@ async function handle(
   }
 }
 
+/**
+ * Grant mint surface only: consent → PKCE authorization-code → grants/exchange,
+ * plus GET /grants/{authorizationRef} so joint can verify the minted grant.
+ * Shared by the loopback stub and the gateway co-located mount.
+ * Returns true when `relative` is owned by this surface (including wrong method).
+ */
+export async function handleDeviceDhGrantMint(
+  service: DeviceDhService,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  relative: string,
+  traceId: string,
+): Promise<boolean> {
+  const method = req.method ?? "GET";
+  if (relative === "/consent/authorization-codes") {
+    if (method !== "POST") {
+      throw new DeviceDhError("PARAM_UNSUPPORTED", "POST required");
+    }
+    const client = service.authenticate(...basicParts(req), "consent");
+    const body = await readJson(req);
+    sendJson(res, 201, service.issueAuthorizationCode(client, body, traceId), traceId);
+    return true;
+  }
+  if (relative === "/grants/exchange") {
+    if (method !== "POST") {
+      throw new DeviceDhError("PARAM_UNSUPPORTED", "POST required");
+    }
+    const client = service.authenticate(...basicParts(req), "service");
+    const body = await readJson(req);
+    sendJson(
+      res,
+      200,
+      service.exchangeGrant(client, body, headerString(req, "idempotency-key"), traceId),
+      traceId,
+    );
+    return true;
+  }
+  const grantId = /^\/grants\/([^/]+)$/.exec(relative);
+  if (grantId) {
+    if (method !== "GET") {
+      // rebind / revoke are separate routes under /grants/{id}/… — not owned here.
+      return false;
+    }
+    const client = service.authenticate(...basicParts(req), "service");
+    const credential = headerString(req, "x-openbot-grant-credential");
+    // Grant GET stays readable after revoke so device-control sees status.
+    const grant = service.requireGrant(client, credential, true);
+    sendJson(res, 200, service.getGrant(grant, decodeURIComponent(grantId[1] ?? "")), traceId);
+    return true;
+  }
+  return false;
+}
+
 async function dispatch(
   service: DeviceDhService,
   req: http.IncomingMessage,
@@ -148,21 +201,7 @@ async function dispatch(
     return;
   }
 
-  if (method === "POST" && relative === "/consent/authorization-codes") {
-    const client = service.authenticate(...basicParts(req), "consent");
-    const body = await readJson(req);
-    sendJson(res, 201, service.issueAuthorizationCode(client, body, traceId), traceId);
-    return;
-  }
-  if (method === "POST" && relative === "/grants/exchange") {
-    const client = service.authenticate(...basicParts(req), "service");
-    const body = await readJson(req);
-    sendJson(
-      res,
-      200,
-      service.exchangeGrant(client, body, headerString(req, "idempotency-key"), traceId),
-      traceId,
-    );
+  if (await handleDeviceDhGrantMint(service, req, res, relative, traceId)) {
     return;
   }
 
@@ -192,11 +231,7 @@ async function dispatch(
         /^\/device-tool-requests\/[^/]+\/result$/.test(relative)));
   const grant = service.requireGrant(client, credential, allowRevoked);
 
-  const grantId = /^\/grants\/([^/]+)$/.exec(relative);
-  if (method === "GET" && grantId) {
-    sendJson(res, 200, service.getGrant(grant, decodeURIComponent(grantId[1] ?? "")), traceId);
-    return;
-  }
+  // GET /grants/{id} is owned by handleDeviceDhGrantMint (above).
   const revoke = /^\/grants\/([^/]+)\/revoke$/.exec(relative);
   if (method === "POST" && revoke) {
     sendJson(

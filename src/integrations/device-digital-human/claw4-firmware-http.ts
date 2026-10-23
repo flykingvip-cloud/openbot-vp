@@ -9,7 +9,8 @@
  *
  * Maps onto device-digital-human conversations/turns. Does not reverse-proxy
  * arbitrary `/api/integrations/v1` onto the public gateway, and does not change
- * frozen `/api/device-platform/v1` OpenAPI field names.
+ * frozen `/api/device-platform/v1` OpenAPI field names. Grant mint for the same
+ * in-process store is a sibling mount (integrations-grant-http.ts).
  *
  * Backend: inject via setClaw4FirmwareService, or opt-in env in-process bind
  * (OPENBOT_CLAW4_FIRMWARE_INPROCESS=1 + OPENBOT_DEVICE_DH_STUB_CONFIG). See

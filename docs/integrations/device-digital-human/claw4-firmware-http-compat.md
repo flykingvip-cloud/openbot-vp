@@ -83,15 +83,32 @@ Optional (same as the adjacent stub):
 | `OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1`| Force offline placeholder hatch                                      |
 | `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` | Extra media pull origins                                           |
 
-Restart / kickstart the gateway after setting env so the lazy bind runs. Grant exchange for firmware still uses the integrations grant APIs; when only Claw4 routes are co-located on 18789 and `/api/integrations/v1` is not mounted there, exchange grants on the adjacent stub (8787) **or** inject a shared `DeviceDhService` that both surfaces use. The env bind creates a **gateway-local** store — it does not share memory with a separate 8787 process.
+Restart / kickstart the gateway after setting env so the lazy bind runs. The env bind creates a **gateway-local** store — it does not share memory with a separate 8787 process.
 
-This does **not** reverse-proxy `OPENBOT_DEVICE_DH_STUB_URL` onto the gateway and does **not** mount `/api/integrations/v1` on 18789.
+### Grant mint on local 18789 (same store as Claw4)
+
+When the in-process bind above is on (or a service is injected), the gateway also owns the **grant mint** surface against that same `DeviceDhService`:
+
+| Method | Path | Notes |
+| ------ | ---- | ----- |
+| `POST` | `/api/integrations/v1/consent/authorization-codes` | Consent client Basic; PKCE S256 |
+| `POST` | `/api/integrations/v1/grants/exchange` | Service client Basic; returns `authorizationRef` + credential |
+| `GET` | `/api/integrations/v1/grants/{authorizationRef}` | Service Basic + `X-OpenBot-Grant-Credential` |
+
+Joint can mint on **18789** and immediately use the credential on Claw4 `/api/v1/upload` without a temporary ops seed and without crossing to 8787. The rest of `/api/integrations/v1` (turns, SSE, media, rebind, revoke, …) stays **unmounted** on the gateway.
+
+**Default / production:** with `OPENBOT_CLAW4_FIRMWARE_INPROCESS` unset and no inject, grant paths are **not claimed** (fail closed / unchanged). If INPROCESS is set but `OPENBOT_DEVICE_DH_STUB_CONFIG` is missing/invalid, grant mint returns HTTP 503 `UNAVAILABLE`.
+
+**Stub 8787** remains a valid full joint path (`OPENBOT_DEVICE_DH_STUB=1` on port 8787) for the complete integrations API.
+
+This does **not** reverse-proxy `OPENBOT_DEVICE_DH_STUB_URL` onto the gateway and does **not** mount the full `/api/integrations/v1` surface on 18789.
 
 ### Local verify (after bind)
 
-1. Confirm routes no longer 503: `POST /api/v1/upload` with Basic + `X-OpenBot-Grant-Credential` + `X-Device-Id` and `Content-Type: audio/wav` (optional `X-Transcript-Text` / `transcript=`).
-2. `GET /api/v1/conversation/{id}/messages` returns `{ code: 0, data: { conversationId, messages } }`.
-3. Stub 8787 remains a valid joint path if the gateway bind is off.
+1. Mint a grant on 18789: `POST /api/integrations/v1/consent/authorization-codes` then `POST /api/integrations/v1/grants/exchange` (same Basic clients as the stub sample config).
+2. Confirm Claw4 routes no longer 503: `POST /api/v1/upload` with Basic + `X-OpenBot-Grant-Credential` + `X-Device-Id` and `Content-Type: audio/wav` (optional `X-Transcript-Text` / `transcript=`).
+3. `GET /api/v1/conversation/{id}/messages` returns `{ code: 0, data: { conversationId, messages } }`.
+4. Stub 8787 remains a valid joint path if the gateway bind is off.
 
 ## B3 field ambiguities (left open)
 
