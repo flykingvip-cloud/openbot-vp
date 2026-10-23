@@ -8,6 +8,7 @@ import {
   resetClaw4FirmwareBindForTests,
   resolveClaw4FirmwareService,
 } from "./claw4-firmware-bind.js";
+import { CLAW4_ASR_STUB_ENV } from "./claw4-firmware-compat.js";
 import {
   handleClaw4FirmwareHttpRequest,
   setClaw4FirmwareServiceForTests,
@@ -135,6 +136,7 @@ async function withGateway(
 describe("claw4 firmware HTTP compat (B1)", () => {
   afterEach(() => {
     resetClaw4FirmwareBindForTests();
+    delete process.env[CLAW4_ASR_STUB_ENV];
   });
 
   it("upload happy-path returns {code:0,data:{text,conversationId}} and lists messages", async () => {
@@ -235,6 +237,7 @@ describe("claw4 firmware HTTP compat (B1)", () => {
   });
 
   it("adjacent stub serves the same firmware routes", async () => {
+    process.env[CLAW4_ASR_STUB_ENV] = "1";
     const service = new DeviceDhService({ config: stubConfig(), approvalToken: "test-approval" });
     const listening = await listenDeviceDh({ service, fixtureDir, port: 0 });
     try {
