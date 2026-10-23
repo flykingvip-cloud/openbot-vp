@@ -555,6 +555,78 @@ describe("device platform management", () => {
     ).toThrow(DevicePlatformError);
   });
 
+
+  it("tombstones never-applied bindings when platform revoke is unavailable", async () => {
+    const { service, control, store, userA } = harness();
+    control.appliedBindingVersion = 0;
+    const added = await service.submitOperation(userA, addBody("op-na-add", "ext-never-applied"));
+    expect(added.device?.binding?.platformApplied).toBe(false);
+    expect(added.device?.binding?.status).toBe("applying");
+    const deviceId = added.device?.deviceId ?? "";
+    const authorizationRef = added.device?.binding?.authorizationRef ?? "";
+
+    control.stopOrRevokeError = new DevicePlatformError(
+      "PLATFORM_UNAVAILABLE",
+      "Device platform request failed",
+    );
+    const revoked = await service.submitOperation(userA, {
+      operationId: "op-na-revoke",
+      kind: "revoke",
+      deviceId,
+    });
+    expect(revoked.operation.status).toBe("succeeded");
+    expect(revoked.device?.binding).toBeNull();
+    const shard = store.loadTenant("tenant-1");
+    const binding = Object.values(shard.bindings).find((row) => row.deviceId === deviceId);
+    expect(binding?.status).toBe("revoked");
+    expect(shard.grants[authorizationRef]?.status).toBe("revoked");
+    expect(control.calls.filter((call) => call === "stopOrRevoke")).toHaveLength(1);
+  });
+
+  it("still fails revoke for platform-applied bindings when platform is unavailable", async () => {
+    const { service, control, store, userA } = harness();
+    const added = await service.submitOperation(userA, addBody("op-ap-add", "ext-applied-rev"));
+    expect(added.device?.binding?.platformApplied).toBe(true);
+    const deviceId = added.device?.deviceId ?? "";
+
+    control.stopOrRevokeError = new DevicePlatformError(
+      "PLATFORM_UNAVAILABLE",
+      "Device platform request failed",
+    );
+    await expect(
+      service.submitOperation(userA, {
+        operationId: "op-ap-revoke",
+        kind: "revoke",
+        deviceId,
+      }),
+    ).rejects.toMatchObject({ code: "PLATFORM_UNAVAILABLE" });
+    const shard = store.loadTenant("tenant-1");
+    const binding = Object.values(shard.bindings).find((row) => row.deviceId === deviceId);
+    expect(binding?.status).toBe("revoking");
+    expect(binding?.platformApplied).toBe(true);
+  });
+
+  it("completes revoke when platform reports the bind is already missing", async () => {
+    const { service, control, store, userA } = harness();
+    const added = await service.submitOperation(userA, addBody("op-miss-add", "ext-missing"));
+    expect(added.device?.binding?.platformApplied).toBe(true);
+    const deviceId = added.device?.deviceId ?? "";
+
+    control.stopOrRevokeError = new DevicePlatformError(
+      "NOT_FOUND",
+      "Device is not bound on the platform",
+    );
+    const revoked = await service.submitOperation(userA, {
+      operationId: "op-miss-revoke",
+      kind: "revoke",
+      deviceId,
+    });
+    expect(revoked.operation.status).toBe("succeeded");
+    const shard = store.loadTenant("tenant-1");
+    const binding = Object.values(shard.bindings).find((row) => row.deviceId === deviceId);
+    expect(binding?.status).toBe("revoked");
+  });
+
   it("retries a failed health check only when asked", async () => {
     const { service, control, userA } = harness();
     control.healthStatus = "down";

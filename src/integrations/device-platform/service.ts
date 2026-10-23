@@ -782,16 +782,26 @@ export class DevicePlatformService {
       throw new DevicePlatformError("NOT_FOUND", "Device not found");
     }
     assertCanOperateBinding(actor, current);
+    const hadPlatformApply = current.platformApplied === true;
     const revoking = this.markBinding(actor.tenantId, current.bindingId, { status: "revoking" });
     if (revoking.authorizationRef) {
       this.dropToolReservations(actor.tenantId, revoking.authorizationRef);
     }
-    await this.control.stopOrRevoke({
-      platformId: association.platformId,
-      externalDeviceId: association.externalDeviceId,
-      authorizationRef: revoking.authorizationRef,
-      expectedBindingVersion: revoking.expectedBindingVersion,
-    });
+    try {
+      await this.control.stopOrRevoke({
+        platformId: association.platformId,
+        externalDeviceId: association.externalDeviceId,
+        authorizationRef: revoking.authorizationRef,
+        expectedBindingVersion: revoking.expectedBindingVersion,
+      });
+    } catch (error) {
+      // Never-applied / already-unbound platforms must not block local tombstone.
+      // Applied bindings still require a successful platform revoke (except NOT_FOUND =
+      // already unbound, which is idempotent).
+      if (!allowLocalRevokeAfterPlatformError(hadPlatformApply, error)) {
+        throw error;
+      }
+    }
     if (revoking.authorizationRef) {
       await this.revokeGrant(actor.tenantId, revoking.authorizationRef);
     }
@@ -1370,6 +1380,29 @@ function retryableCode(error: unknown): boolean {
       error.code === "PLATFORM_DISABLED" ||
       error.code === "PAIRING_PENDING")
   );
+}
+
+
+function allowLocalRevokeAfterPlatformError(
+  hadPlatformApply: boolean,
+  error: unknown,
+): boolean {
+  if (!(error instanceof DevicePlatformError)) {
+    return false;
+  }
+  // Platform already has no bind (bind_missing / not_found mapped to NOT_FOUND).
+  if (error.code === "NOT_FOUND") {
+    return true;
+  }
+  // Never accepted on the platform: local cleanup even if DC is down or returns
+  // a generic PLATFORM_UNAVAILABLE (historical mapping for bind_missing).
+  if (
+    !hadPlatformApply &&
+    (error.code === "PLATFORM_UNAVAILABLE" || error.code === "PLATFORM_DISABLED")
+  ) {
+    return true;
+  }
+  return false;
 }
 
 function foregroundAllowsAnotherAdd(status: DeviceBinding["status"]): boolean {

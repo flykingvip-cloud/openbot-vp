@@ -96,6 +96,8 @@ export class FakeDevicePlatformControl implements DevicePlatformControlClient {
   healthStatus: "ok" | "down" = "ok";
   /** When set, apply reports this version instead of the expected one. */
   appliedBindingVersion: number | undefined;
+  /** When set, stopOrRevoke throws this error (tests for local tombstone policy). */
+  stopOrRevokeError: Error | undefined;
   rawDiagnostics = "raw-diagnostic-dump";
   private readonly visible: Array<DeviceQueryRow & ControlAcl> = [];
   private gate: Promise<void> | null = null;
@@ -158,6 +160,9 @@ export class FakeDevicePlatformControl implements DevicePlatformControlClient {
 
   async stopOrRevoke(): Promise<{ ok: boolean }> {
     await this.touch("stopOrRevoke");
+    if (this.stopOrRevokeError) {
+      throw this.stopOrRevokeError;
+    }
     return { ok: true };
   }
 
