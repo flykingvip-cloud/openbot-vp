@@ -11,8 +11,10 @@
  *
  * Reuses the same stub client config and model env as the adjacent 8787 stub
  * (OPENBOT_DEVICE_DH_AGENT, OPENBOT_DEVICE_DH_APPROVAL_TOKEN, …). Does not
- * mount /api/integrations/v1 on the gateway and does not reverse-proxy 8787.
- * Does not flip grayRelease or PROMOTE anything.
+ * reverse-proxy 8787. Grant mint (consent → exchange) can co-locate on the
+ * same in-process DeviceDhService via handleIntegrationsGrantHttpRequest when
+ * this bind is on; stub 8787 remains a valid joint path. Does not flip
+ * grayRelease or PROMOTE anything.
  */
 
 import { createGatewayAgentModelClient, resolveGatewayAgentConfig } from "./agent-client.js";
@@ -56,9 +58,13 @@ export function claw4FirmwareEnvBindWarning(): string | undefined {
   return envBindWarning;
 }
 
-function isInProcessEnabled(env: NodeJS.ProcessEnv): boolean {
+export function isClaw4FirmwareInProcessEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const raw = env.OPENBOT_CLAW4_FIRMWARE_INPROCESS?.trim().toLowerCase();
   return raw === "1" || raw === "true" || raw === "yes" || raw === "inprocess";
+}
+
+function isInProcessEnabled(env: NodeJS.ProcessEnv): boolean {
+  return isClaw4FirmwareInProcessEnabled(env);
 }
 
 function loadModels(env: NodeJS.ProcessEnv): DeviceDhModelClient {
