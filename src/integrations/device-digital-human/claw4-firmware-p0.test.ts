@@ -1,7 +1,17 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { resetClaw4AudioBridgeForTests, setClaw4AudioBridge } from "./claw4-audio-bridge.js";
+import {
+  DEVICE_SDK_AUDIO_BRIDGE_SHA,
+  assertSpeakingTtsProvider,
+  bindClaw4AudioBridgeFromCreateAudioBridge,
+  getClaw4AudioBridge,
+  resetClaw4AudioBridgeForTests,
+  setClaw4AudioBridge,
+  type AgentACreateAudioBridge,
+  type Claw4AsrProvider,
+  type Claw4TtsProvider,
+} from "./claw4-audio-bridge.js";
 import { resetClaw4FirmwareBindForTests } from "./claw4-firmware-bind.js";
 import {
   CLAW4_ASR_STUB_ENV,
@@ -178,6 +188,119 @@ describe("claw4 firmware P0 revision", () => {
       expect(body.code).toBe(0);
       expect(body.data.text).toBe(`bridge-heard:${wav.length}`);
     });
+  });
+
+  it("pins device-sdk audio bridge SHA 47ca71a7", () => {
+    expect(DEVICE_SDK_AUDIO_BRIDGE_SHA).toBe("47ca71a7ec2c59ca86e06036998ce3be11e2880e");
+  });
+
+  it("bindClaw4AudioBridgeFromCreateAudioBridge calls Agent A factory for real", async () => {
+    delete process.env[CLAW4_ASR_STUB_ENV];
+    let called = 0;
+    const asr: Claw4AsrProvider = {
+      async transcribe() {
+        return "unused";
+      },
+    };
+    const tts: Claw4TtsProvider = {
+      async *synthesize() {
+        yield Buffer.alloc(0);
+      },
+    };
+    const createAudioBridge: AgentACreateAudioBridge = (opts) => {
+      called += 1;
+      expect(opts.asr).toBe(asr);
+      expect(opts.tts).toBe(tts);
+      return {
+        createAbortHandle() {
+          const ac = new AbortController();
+          return {
+            abort: (reason?: unknown) => ac.abort(reason),
+            get signal() {
+              return ac.signal;
+            },
+            get aborted() {
+              return ac.signal.aborted;
+            },
+          };
+        },
+        async transcribeWav(wavBytes, options) {
+          expect(options?.signal).toBeDefined();
+          return `from-createAudioBridge:${wavBytes.length}`;
+        },
+      };
+    };
+    const wrapped = bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, { asr, tts });
+    expect(called).toBe(1);
+    expect(getClaw4AudioBridge()).toBe(wrapped);
+
+    const service = new DeviceDhService({ config: stubConfig(), approvalToken: "test-approval" });
+    const grant = await exchangeGrant(service);
+    await withGateway(service, async (base) => {
+      const wav = Buffer.from("RIFF....WAVEfmt ");
+      const upload = await fetch(`${base}/api/v1/upload`, {
+        method: "POST",
+        headers: {
+          ...grant.headers,
+          "content-type": "audio/wav",
+        },
+        body: wav,
+      });
+      expect(upload.status).toBe(200);
+      const body = (await upload.json()) as { code: number; data: { text: string } };
+      expect(body.code).toBe(0);
+      expect(body.data.text).toBe(`from-createAudioBridge:${wav.length}`);
+    });
+  });
+
+  it("rejects OpusFrameTtsProvider for product TTS bind", () => {
+    class OpusFrameTtsProvider {
+      async *synthesize() {
+        yield Buffer.alloc(0);
+      }
+    }
+    expect(() => assertSpeakingTtsProvider(new OpusFrameTtsProvider())).toThrow(
+      /OpusFrameTtsProvider/,
+    );
+  });
+
+  it("abort uses createAbortHandle().signal", async () => {
+    let seenSignal: AbortSignal | undefined;
+    const createAudioBridge: AgentACreateAudioBridge = () => ({
+      createAbortHandle() {
+        const ac = new AbortController();
+        return {
+          abort: (reason?: unknown) => ac.abort(reason),
+          get signal() {
+            return ac.signal;
+          },
+          get aborted() {
+            return ac.signal.aborted;
+          },
+        };
+      },
+      async transcribeWav(_wav, options) {
+        seenSignal = options?.signal;
+        return "heard";
+      },
+    });
+    bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, {
+      asr: {
+        async transcribe() {
+          return "";
+        },
+      },
+      tts: {
+        async *synthesize() {
+          yield Buffer.alloc(0);
+        },
+      },
+    });
+    const resolved = await resolveClaw4Transcript(Buffer.from("RIFF"), { env: {} });
+    expect(resolved.asr).toBe("bridge");
+    expect(resolved.text).toBe("heard");
+    expect(seenSignal).toBeDefined();
+    expect(seenSignal!.aborted).toBe(false);
   });
 
   it("formal mode rejects empty/silent bridge transcript", async () => {

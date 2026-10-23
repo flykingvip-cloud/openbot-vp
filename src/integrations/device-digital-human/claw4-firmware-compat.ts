@@ -8,8 +8,10 @@
  *
  * ASR honesty (P0):
  * - Formal/production (default): never invent `[claw4-asr-stub]` or treat empty
- *   pass-through as real ASR. Prefer injected Agent A audio bridge
- *   (`Claw4AudioBridge.transcribeWav`). Non-empty on-device pass-through via
+ *   pass-through as real ASR. Prefer Agent A `createAudioBridge` (pin
+ *   DEVICE_SDK_AUDIO_BRIDGE_SHA=47ca71a7…) via
+ *   `bindClaw4AudioBridgeFromCreateAudioBridge`; abort on
+ *   `createAbortHandle().signal`. Non-empty on-device pass-through via
  *   header / body field is allowed; query `transcript=` is deprecated.
  * - Explicit stub/test switch (`OPENBOT_CLAW4_ASR_STUB=1`): labeled stub or
  *   pass-through for joint smoke only.
@@ -107,7 +109,27 @@ export async function resolveClaw4Transcript(
 
   const bridge = resolveClaw4AudioBridge({ bridge: input.bridge });
   if (bridge) {
-    const text = (await bridge.transcribeWav(wavBytes, { signal: input.signal })).trim();
+    // Prefer Agent A abort handle.signal (createAudioBridge contract); mirror
+    // caller AbortSignal onto the handle when both are present.
+    let signal = input.signal;
+    if (typeof bridge.createAbortHandle === "function") {
+      const handle = bridge.createAbortHandle();
+      if (input.signal) {
+        if (input.signal.aborted) {
+          handle.abort(input.signal.reason);
+        } else {
+          input.signal.addEventListener(
+            "abort",
+            () => {
+              handle.abort(input.signal?.reason);
+            },
+            { once: true },
+          );
+        }
+      }
+      signal = handle.signal;
+    }
+    const text = (await bridge.transcribeWav(wavBytes, { signal })).trim();
     if (!text) {
       throw new DeviceDhError(
         "PARAM_UNSUPPORTED",

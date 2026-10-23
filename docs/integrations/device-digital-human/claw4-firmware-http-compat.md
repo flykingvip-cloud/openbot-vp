@@ -86,16 +86,19 @@ Set **`OPENBOT_CLAW4_ASR_STUB=1`** (or `true` / `yes` / `stub`) to allow the lab
 
 That text is submitted into the existing integrations turn API (`input.type = text`). Camera upload tickets remain on `/api/integrations/v1/media/*` and are rejected on this route when `Content-Type` is not `audio/wav`.
 
-### Agent A audio bridge (follow-up)
+### Agent A audio bridge (pinned)
 
-Source: **flykingvip-cloud/openbot-device-sdk PR #27 @ `9069fd50`** — exports `createAudioBridge` from `adapters/voice` / metalio / services. May not be merged yet; treat as the pin target after merge (optional peer / documented dependency on openbot-device-sdk). Until publishable, B keeps a local injectable interface and does not hard-depend on the package.
+**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`47ca71a7ec2c59ca86e06036998ce3be11e2880e`** (flykingvip-cloud/openbot-device-sdk PR #27 merged to main). Exports `createAudioBridge` from `adapters/voice` / metalio / services.
 
-B exposes:
+`OPENBOT_CONTRACT_SHA` remains **`d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`** (unchanged; CONTROL freeze untouched).
 
-- `Claw4AudioBridge` / `setClaw4AudioBridge` / `resolveClaw4AudioBridge` in `claw4-audio-bridge.ts`
-- Contract: `transcribeWav(wavBytes, { signal? }) → Promise<string>` (no default pass-through). Abort via A's `createAbortHandle().signal`.
+B wires for real:
 
-Wire-up when #27 is on a consumable tip: inject `createAudioBridge({ asr, tts })` (B only needs `transcribeWav`) via `setClaw4AudioBridge` at gateway boot. For product 播报 on the A/device side, inject a speaking `TtsProvider` — **do not** use `OpusFrameTtsProvider` for product playback.
+- `bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, { asr, tts })` — calls Agent A factory and `setClaw4AudioBridge`
+- `bindClaw4AudioBridgeFromDeviceSdk({ asr, tts })` — dynamic import via `OPENBOT_DEVICE_SDK_ROOT` (checkout at the pin SHA) or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`
+- Abort in-flight ASR via `createAbortHandle().signal` (compat mirrors caller `AbortSignal` onto the handle)
+- Product TTS: inject a **speaking** `TtsProvider` (or test `ProportionalSilenceTtsProvider`). **Reject** `OpusFrameTtsProvider` for product 播报 — it ignores `text`
+- Formal mode rejects stub ASR unless `OPENBOT_CLAW4_ASR_STUB=1`
 
 ## Upload idempotency (P0)
 
