@@ -541,6 +541,7 @@ async function handleClaw4OnStub(
         wavBytes,
         conversationId: url.searchParams.get("conversationId") ?? undefined,
         transcriptQuery: url.searchParams.get("transcript") ?? undefined,
+        idempotencyKey: headerString(req, "idempotency-key"),
       });
       sendClaw4Json(res, 200, claw4Success(result), traceId);
       return true;

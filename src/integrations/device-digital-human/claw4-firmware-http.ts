@@ -7,7 +7,8 @@
  *   GET  /api/v1/conversation/{id}/messages
  *   POST /api/v1/record/upload  (reserved stub; same success shape)
  *
- * Maps onto device-digital-human conversations/turns. Does not reverse-proxy
+ * P0: formal ASR honesty + client-stable upload idempotency. Maps onto
+ * device-digital-human conversations/turns. Does not reverse-proxy
  * arbitrary `/api/integrations/v1` onto the public gateway, and does not change
  * frozen `/api/device-platform/v1` OpenAPI field names. Grant mint for the same
  * in-process store is a sibling mount (integrations-grant-http.ts).
@@ -163,6 +164,8 @@ export async function handleClaw4FirmwareHttpRequest(
         return true;
       }
       const wavBytes = await readLimited(req, CLAW4_WAV_LIMIT);
+      // Prefer Idempotency-Key header (client-stable). Do not log raw ?transcript=
+      // (speech access-log leak); query remains for backward compat only.
       const result = await handleClaw4Upload(service, {
         headers: authHeaders(req),
         contentType: headerString(req, "content-type"),
@@ -170,6 +173,7 @@ export async function handleClaw4FirmwareHttpRequest(
         // Documented: optional conversationId is the query parameter.
         conversationId: url.searchParams.get("conversationId") ?? undefined,
         transcriptQuery: url.searchParams.get("transcript") ?? undefined,
+        idempotencyKey: headerString(req, "idempotency-key"),
       });
       sendJson(res, 200, claw4Success(result));
       return true;
