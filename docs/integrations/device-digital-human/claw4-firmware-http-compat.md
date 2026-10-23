@@ -17,11 +17,11 @@ This layer does **not**:
 
 ## Routes
 
-| Method | Path | Notes |
-|--------|------|--------|
-| `POST` | `/api/v1/upload` | `Content-Type: audio/wav`. Maps to integrations `conversations` + `turns`. |
-| `GET` | `/api/v1/conversation/{id}/messages` | Firmware-usable `{ code: 0, data: { conversationId, messages } }`. |
-| `POST` | `/api/v1/record/upload` | **Reserved stub** — same success envelope; body semantics TODO (later slice). |
+| Method | Path                                 | Notes                                                                         |
+| ------ | ------------------------------------ | ----------------------------------------------------------------------------- |
+| `POST` | `/api/v1/upload`                     | `Content-Type: audio/wav`. Maps to integrations `conversations` + `turns`.    |
+| `GET`  | `/api/v1/conversation/{id}/messages` | Firmware-usable `{ code: 0, data: { conversationId, messages } }`.            |
+| `POST` | `/api/v1/record/upload`              | **Reserved stub** — same success envelope; body semantics TODO (later slice). |
 
 Optional conversation continuity uses the **query parameter** `conversationId` (not a custom header). Example: `POST /api/v1/upload?conversationId=conv_…`.
 
