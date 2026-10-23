@@ -702,6 +702,8 @@ export type OguiAdmission = {
    * Resume and recover execution must use this instead of the inbound body.
    */
   acceptedPrompt?: string;
+  /** Refusal from the locked recovery update. Not a decisionStatus. */
+  reason?: string;
 };
 
 function parseAnswerObject(text: string): Record<string, unknown> | undefined {
@@ -908,8 +910,139 @@ function acceptedPromptFor(record: OguiDecisionRecord): string {
 }
 
 /**
+ * Same task rule as consume. A record with no taskContextId is not rejected.
+ * Compared inside the locked update, against the session row in that update.
+ */
+function decisionTaskMismatch(record: OguiDecisionRecord, entry: SessionEntry): boolean {
+  const recordTask = record.scope.taskContextId;
+  if (!recordTask) {
+    return false;
+  }
+  const sessionTask = nonEmpty(entry.taskContextId) || undefined;
+  return recordTask !== sessionTask;
+}
+
+type RecoveryLockResult = {
+  ok: boolean;
+  reason: string;
+  decisionId?: string;
+  resumeRef?: string;
+  acceptedPrompt?: string;
+};
+
+/**
+ * Identity, version, answered status, and current task are decided in this
+ * update, then pending / retryable claim or dead-owner adopt happens in the
+ * same write. decisionStatus is not changed.
+ */
+async function lockOguiDecisionRecovery(input: {
+  storePath: string;
+  sessionKey: string;
+  userId: string;
+  decisionId: string;
+  version: number;
+  nowMs?: number;
+  updateStore?: SessionStoreUpdater;
+}): Promise<RecoveryLockResult> {
+  const now = input.nowMs ?? Date.now();
+  const update = input.updateStore ?? updateSessionStore;
+  return await update(input.storePath, (store) => {
+    const entry = store[input.sessionKey];
+    const map = readMap(entry);
+    const record = map?.[input.decisionId];
+    if (
+      !entry ||
+      !map ||
+      !record ||
+      record.scope.sessionKey !== input.sessionKey ||
+      record.scope.userId !== input.userId
+    ) {
+      return { ok: false, reason: "unknown_decision" };
+    }
+    if (record.version !== input.version) {
+      return {
+        ok: false,
+        reason: "version_mismatch",
+        decisionId: record.decisionId,
+        resumeRef: record.resumeRef,
+      };
+    }
+    if (record.decisionStatus !== "answered" || !record.answer) {
+      return {
+        ok: false,
+        reason: "not_answered",
+        decisionId: record.decisionId,
+        resumeRef: record.resumeRef,
+      };
+    }
+    if (decisionTaskMismatch(record, entry)) {
+      return {
+        ok: false,
+        reason: "task_mismatch",
+        decisionId: record.decisionId,
+        resumeRef: record.resumeRef,
+      };
+    }
+    const refused = {
+      ok: false as const,
+      decisionId: record.decisionId,
+      resumeRef: record.resumeRef,
+    };
+    if (record.resumeStatus === "completed") {
+      return { ...refused, reason: "completed" };
+    }
+    if (record.resumeStatus === "running") {
+      const recovered = recoverOguiDecisionResume(map, input.sessionKey);
+      if (
+        !recovered ||
+        recovered.decisionId !== record.decisionId ||
+        recovered.resumeRef !== record.resumeRef
+      ) {
+        return { ...refused, reason: recovered ? "other_resume" : "none" };
+      }
+      if (pidAlive(record.resumeOwnerPid)) {
+        return { ...refused, reason: "already_started" };
+      }
+      record.resumeOwnerPid = process.pid;
+      record.updatedAtMs = now;
+      entry.oguiDecisions = map;
+      entry.updatedAt = now;
+      store[input.sessionKey] = entry;
+      return {
+        ok: true,
+        reason: "recovered",
+        decisionId: record.decisionId,
+        resumeRef: record.resumeRef,
+        acceptedPrompt: acceptedPromptFor(record),
+      };
+    }
+    if (record.resumeStatus !== "pending" && record.resumeStatus !== "retryable") {
+      return { ...refused, reason: "not_claimable" };
+    }
+    record.resumeStatus = "running";
+    record.resumeOwnerPid = process.pid;
+    delete record.resumeExecStartedAtMs;
+    record.updatedAtMs = now;
+    entry.oguiDecisions = map;
+    entry.updatedAt = now;
+    store[input.sessionKey] = entry;
+    return {
+      ok: true,
+      reason: "claimed",
+      decisionId: record.decisionId,
+      resumeRef: record.resumeRef,
+      acceptedPrompt: acceptedPromptFor(record),
+    };
+  });
+}
+
+const RECOVERY_REFUSAL = "未签发消费。该答案不能作为普通聊天继续原决策。";
+const RECOVERY_HELD = "该决策已接受，沿用原续跑引用，不会再开一条主线。";
+
+/**
  * Continue an already-accepted decision from the stored answer.
  * Does not consume a new answer and does not move decisionStatus back to waiting.
+ * Task, version, and answered status are checked in the claim/adopt lock.
  */
 async function admitOguiDecisionRecovery(input: {
   storePath: string;
@@ -922,72 +1055,40 @@ async function admitOguiDecisionRecovery(input: {
   const parsed = parseResumeRecovery(input.inboundText);
   const userId = input.userId?.trim() ?? "";
   if (!parsed || !userId) {
-    return { action: "ack", text: "未签发消费。该答案不能作为普通聊天继续原决策。" };
+    return { action: "ack", text: RECOVERY_REFUSAL, reason: "invalid_recovery" };
   }
-  const map = loadMap(input.storePath, input.sessionKey);
-  const record = map?.[parsed.decisionId];
-  if (
-    !record ||
-    record.scope.sessionKey !== input.sessionKey ||
-    record.scope.userId !== userId ||
-    record.version !== parsed.version ||
-    record.decisionStatus !== "answered" ||
-    !record.answer
-  ) {
-    return { action: "ack", text: "未签发消费。该答案不能作为普通聊天继续原决策。" };
-  }
-  const acceptedPrompt = acceptedPromptFor(record);
-  const held = {
-    action: "ack" as const,
-    text: "该决策已接受，沿用原续跑引用，不会再开一条主线。",
-    decisionId: record.decisionId,
-    resumeRef: record.resumeRef,
-  };
-  if (record.resumeStatus === "completed") {
-    return held;
-  }
-  if (record.resumeStatus === "running") {
-    const continued = await continueRecoveredOguiDecisionResume({
-      storePath: input.storePath,
-      sessionKey: input.sessionKey,
-      decisionId: record.decisionId,
-      resumeRef: record.resumeRef,
-      lifecycleEnabled: true,
-      nowMs: input.nowMs,
-      updateStore: input.updateStore,
-    });
-    if (continued.continued && continued.resumeRef) {
-      return {
-        action: "resume",
-        decisionId: record.decisionId,
-        resumeRef: continued.resumeRef,
-        acceptedPrompt,
-      };
-    }
-    return held;
-  }
-  if (record.resumeStatus !== "pending" && record.resumeStatus !== "retryable") {
-    return { action: "ack", text: "未签发消费。该答案不能作为普通聊天继续原决策。" };
-  }
-  const claim = await claimOguiDecisionResume({
+  const locked = await lockOguiDecisionRecovery({
     storePath: input.storePath,
     sessionKey: input.sessionKey,
-    decisionId: record.decisionId,
-    lifecycleEnabled: true,
+    userId,
+    decisionId: parsed.decisionId,
+    version: parsed.version,
     nowMs: input.nowMs,
     updateStore: input.updateStore,
   });
-  if (!claim.claimed || !claim.resumeRef) {
+  if (locked.ok && locked.resumeRef && locked.decisionId && locked.acceptedPrompt) {
     return {
-      ...held,
-      resumeRef: claim.resumeRef ?? record.resumeRef,
+      action: "resume",
+      decisionId: locked.decisionId,
+      resumeRef: locked.resumeRef,
+      acceptedPrompt: locked.acceptedPrompt,
+    };
+  }
+  if (locked.reason === "completed" || locked.reason === "already_started") {
+    return {
+      action: "ack",
+      text: RECOVERY_HELD,
+      reason: locked.reason,
+      decisionId: locked.decisionId,
+      resumeRef: locked.resumeRef,
     };
   }
   return {
-    action: "resume",
-    decisionId: record.decisionId,
-    resumeRef: claim.resumeRef,
-    acceptedPrompt,
+    action: "ack",
+    text: RECOVERY_REFUSAL,
+    reason: locked.reason,
+    decisionId: locked.decisionId,
+    resumeRef: locked.resumeRef,
   };
 }
 
@@ -1164,9 +1265,7 @@ export async function consumeOguiDecisionAnswer(input: {
           resumeRef: record.resumeRef,
         });
       }
-      const recordTask = record.scope.taskContextId;
-      const sessionTask = nonEmpty(entry.taskContextId) || undefined;
-      if (recordTask && recordTask !== sessionTask) {
+      if (decisionTaskMismatch(record, entry)) {
         return reject("task_mismatch", {
           decisionId: record.decisionId,
           resumeRef: record.resumeRef,

@@ -10,6 +10,7 @@ import {
   classifyOguiWaitInbound,
   consumeOguiDecisionAnswer,
   continueRecoveredOguiDecisionResume,
+  releaseOguiDecisionResume,
   issueOguiDecisionFromText,
   recoverOguiDecisionResume,
   type OguiDecisionRunBinding,
@@ -58,6 +59,18 @@ function answerText(input: {
     answers: { choice: input.value },
   };
   return ["```ogui-answer", JSON.stringify(payload), "```"].join("\n");
+}
+
+function resumeFence(decisionId: string, version = 1): string {
+  return [
+    "```ogui-resume",
+    JSON.stringify({
+      schema_version: "ogui/v1",
+      decision_id: decisionId,
+      decision_version: version,
+    }),
+    "```",
+  ].join("\n");
 }
 
 async function seedSession(): Promise<{ dir: string; storePath: string; sessionKey: string }> {
@@ -1382,6 +1395,184 @@ describe("OGUI decision engine S1–S5", () => {
     expect(stored?.resumeRef).toBe(issued.resumeRef);
     expect(stored?.resumeStatus).toBe("running");
     expect(stored?.resumeOwnerPid).toBe(process.pid);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("rejects recovery of an old card after the session task changes (D20)", async () => {
+    const session = await seedSession();
+    const bound = binding(session.storePath, session.sessionKey);
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: { ...bound, taskContextId: "task_old" },
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_old";
+      }
+    });
+    const consumed = await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        component_id: "cmp-1",
+        submission_id: "sub-task-recover",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    expect(consumed.ok).toBe(true);
+    const pending = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(pending?.decisionStatus).toBe("answered");
+    expect(pending?.resumeStatus).toBe("pending");
+    expect(pending?.scope.taskContextId).toBe("task_old");
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_new";
+      }
+    });
+    const crossed = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: resumeFence(decisionId),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(crossed.action).toBe("ack");
+    expect(crossed.reason).toBe("task_mismatch");
+    const refused = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(refused?.decisionStatus).toBe("answered");
+    expect(refused?.resumeStatus).toBe("pending");
+    expect(refused?.resumeRef).toBe(issued.resumeRef);
+    expect(refused?.answer?.value).toBe("a");
+    expect(refused?.scope.taskContextId).toBe("task_old");
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_old";
+      }
+    });
+    const sameTask = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: resumeFence(decisionId),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(sameTask.action).toBe("resume");
+    expect(sameTask.resumeRef).toBe(issued.resumeRef);
+    expect(sameTask.acceptedPrompt).toContain("甲");
+    const resumed = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(resumed?.decisionStatus).toBe("answered");
+    expect(resumed?.resumeStatus).toBe("running");
+    expect(resumed?.resumeRef).toBe(issued.resumeRef);
+    fs.rmSync(session.dir, { recursive: true, force: true });
+  });
+
+  it("rejects retryable and dead-owner recovery after the session task changes", async () => {
+    const session = await seedSession();
+    const bound = binding(session.storePath, session.sessionKey);
+    const issued = await issueOguiDecisionFromText({
+      text: formText(),
+      binding: { ...bound, taskContextId: "task_old" },
+      env: ENV_ON,
+    });
+    const decisionId = issued.decisionId ?? "";
+    const resumeRef = issued.resumeRef ?? "";
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_old";
+      }
+    });
+    await consumeOguiDecisionAnswer({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      userId: "user-1",
+      lifecycleEnabled: true,
+      env: ENV_ON,
+      answer: {
+        component_id: "cmp-1",
+        submission_id: "sub-task-retry",
+        decision_id: decisionId,
+        decision_version: 1,
+        answers: { choice: "a" },
+      },
+    });
+    await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    await releaseOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      resumeRef,
+      lifecycleEnabled: true,
+    });
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_new";
+      }
+    });
+    const retryable = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: resumeFence(decisionId),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(retryable.action).toBe("ack");
+    expect(retryable.reason).toBe("task_mismatch");
+    const heldRetry = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(heldRetry?.decisionStatus).toBe("answered");
+    expect(heldRetry?.resumeStatus).toBe("retryable");
+    expect(heldRetry?.resumeRef).toBe(resumeRef);
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      if (entry) {
+        entry.taskContextId = "task_old";
+      }
+    });
+    await claimOguiDecisionResume({
+      storePath: session.storePath,
+      sessionKey: session.sessionKey,
+      decisionId,
+      lifecycleEnabled: true,
+    });
+    await updateSessionStore(session.storePath, (store) => {
+      const entry = store[session.sessionKey];
+      const record = entry?.oguiDecisions?.[decisionId];
+      if (entry && record) {
+        entry.taskContextId = "task_new";
+        record.resumeOwnerPid = 2_147_483_646;
+      }
+    });
+    const deadOwner = await admitOguiDecisionTurn({
+      binding: bound,
+      env: ENV_ON,
+      inboundText: resumeFence(decisionId),
+      ingress: "chat",
+      phase: "run",
+    });
+    expect(deadOwner.action).toBe("ack");
+    expect(deadOwner.reason).toBe("task_mismatch");
+    const heldRunning = readDecisions(session.storePath, session.sessionKey)?.[decisionId];
+    expect(heldRunning?.decisionStatus).toBe("answered");
+    expect(heldRunning?.resumeStatus).toBe("running");
+    expect(heldRunning?.resumeRef).toBe(resumeRef);
+    expect(heldRunning?.resumeOwnerPid).toBe(2_147_483_646);
+    expect(heldRunning?.answer?.value).toBe("a");
     fs.rmSync(session.dir, { recursive: true, force: true });
   });
 });
