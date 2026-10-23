@@ -5150,7 +5150,6 @@ tasks:
       - .kiro/specs/task-progress-ledger/**
       - src/progress-ledger/**
       - deploy/production/RELEASE_RECORD.md
-      - deploy/production/releases.jsonl
       - docs/design/evidence/task-progress-ledger-*
     state: active
     sessions:
@@ -5163,7 +5162,10 @@ tasks:
         metadata: {}
     ownerHistory: []
     since: 2026-08-23
-    metadata: {}
+    metadata:
+      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is not
+        live in openbot-vp. Live ledger is
+        https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: memory-workspace-platform-remediation:cursor-data-governance-phase1b-item7-retirement-batch14-s15
     owner: cursor-data-governance
     intent:
@@ -8106,7 +8108,6 @@ tasks:
       - .kiro/specs/constitutional-governance-discovery/execution-entry-inventory.md
       - .loom/registry.yaml
       - deploy/production/RELEASE_RECORD.md
-      - deploy/production/releases.jsonl
       - deploy/production/scripts/cutover-from-ghcr.sh
       - docs/governance/enforced-admission-checklist.md
       - docs/governance/shadow-staging-runbook.md
@@ -8198,6 +8199,9 @@ tasks:
         - gov-delivery-tooling-defaults
       note: "Recorded 2026-09-30. #201 #203 #205 #207 predate the Task/Agent trailers;
         this entry is their attribution."
+      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is not
+        live in openbot-vp. Live ledger is
+        https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: mesh-naming-truth-sync:kiro-mesh-naming
     owner: kiro-mesh-naming
     intent:
@@ -9416,7 +9420,6 @@ landingStreams:
       - AGENTS.md
       - deploy/production/LEDGER.md
       - deploy/production/README.md
-      - deploy/production/releases.jsonl
       - deploy/production/scripts/cutover-from-ghcr.sh
       - deploy/production/scripts/verify-live-image-identity.sh
       - docs/design/employee-skill-lifecycle-gate-a-baseline-diff-2026-10-10.md
@@ -9565,6 +9568,9 @@ landingStreams:
       owner: cursor-cloud
       purpose: Remove the duplicated production ledger and point OHBE mentions at the
         OHBE repository. First-match so these shared files land together.
+      historicalLedger: deploy/production/releases.jsonl was removed by this stream and
+        is not live in openbot-vp. Live ledger is
+        https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: batch8-skill-gates
     landingPolicy: serial
     paths:
@@ -17596,7 +17602,6 @@ landingStreams:
     paths:
       - .loom/registry.yaml
       - deploy/production/RELEASE_RECORD.md
-      - deploy/production/releases.jsonl
       - scripts/delivery/ledger.test.ts
     canLandWith: []
     metadata:
@@ -17604,6 +17609,9 @@ landingStreams:
       task: gov-p3-seq104-cutover
       owner: kiro-governance-closure
       legacyDisposition: MERGE
+      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is not
+        live in openbot-vp. Live ledger is
+        https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: GOV_P3_D6
     landingPolicy: serial
     paths:

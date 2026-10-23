@@ -13,8 +13,10 @@ const tasksPath = ".kiro/specs/delivery-seq96-seq97-adjudication-evidence/tasks.
 const closeoutPlanPath = ".kiro/specs/delivery-seq96-seq97-adjudication-evidence/closeout-plan.md";
 const minutesPath = ".kiro/specs/delivery-seq96-seq97-adjudication-evidence/review-minutes.md";
 const sha = /^[0-9a-f]{40}$/;
+// The OHBE ledger URL is the historical pointer for the removed openbot-vp copy.
+// Any other URL stays forbidden, along with secret-shaped words.
 const forbidden =
-  /cookie|token|secret|credential|https?:\/\/(?!github\.com\/upbeyond\/openbot\.git)/i;
+  /cookie|token|secret|credential|https?:\/\/(?!github\.com\/(?:upbeyond\/openbot\.git|flykingvip-cloud\/harness-Benchmark-Engine\/blob\/main\/deploy\/production\/releases\.jsonl))/i;
 
 type Evidence = {
   decision: string;

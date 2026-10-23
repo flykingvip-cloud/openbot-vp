@@ -3,7 +3,8 @@
 ## Agents
 
 - cursor-grok · role: contributor · scope: Track B 历史实施与 C8 交付 · paths: `packages/evolution-core/src/**`, `src/gateway/evolution-control/**`, `src/gateway/evolution-governance/**` · since: 2026-09-19
-- codex-evolution-closeout · role: contributor · scope: C8 生产发布收尾与验收回归 · paths: `deploy/production/releases.jsonl`, `deploy/production/RELEASE_RECORD.md`, `scripts/delivery/ledger.test.ts`, `src/gateway/evolution-control/working-dna-governance-chain.test.ts` · since: 2026-09-23
+- codex-evolution-closeout · role: contributor · scope: C8 生产发布收尾与验收回归 · paths: `deploy/production/RELEASE_RECORD.md`, `scripts/delivery/ledger.test.ts`, `src/gateway/evolution-control/working-dna-governance-chain.test.ts` · since: 2026-09-23
+- historical, not live: `deploy/production/releases.jsonl` was a pre-split copy claimed by this spec. It is not the live ledger and must not be recreated in openbot-vp. Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
 - codex-evolution-e52 · role: owner · scope: E5.1.6–E5.1.7 assist 零写入观察窗、稳定控制面候选登记与 E5.2 前置收敛 · paths: `.kiro/specs/openbot-evolution-evaluation-closure/tasks.md`, `src/gateway/evolution-control/bootstrap.ts`, `src/gateway/evolution-control/index.ts`, `src/gateway/evolution-control/shadow-intent-proposal.ts`, `src/gateway/evolution-control/shadow-intent-proposal.test.ts`, `src/gateway/evolution-governance/application-consumption-shadow.ts`, `src/gateway/evolution-governance/control-plane-intent-registration.ts`, `src/gateway/evolution-governance/index.ts`, `src/gateway/evolution-governance/tick-pipeline.ts` · since: 2026-09-24
 
 每个提交 trailers：

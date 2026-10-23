@@ -2,7 +2,8 @@
 
 ## Agents
 
-- kiro-main-production-deploy · role: owner · scope: main 合入后的不可变镜像发布、阿里云生产部署门禁、健康检查与 ledger 回写 · paths: `.kiro/specs/main-production-deployment/**`, `.github/workflows/docker-release.yml`, `deploy/production/M0B_M2B_OPERATOR_RUNBOOK.md`, `deploy/production/RELEASE_RECORD.md`, `deploy/production/releases.jsonl` · since: 2026-07-30
+- kiro-main-production-deploy · role: owner · scope: main 合入后的不可变镜像发布、阿里云生产部署门禁、健康检查与 ledger 回写 · paths: `.kiro/specs/main-production-deployment/**`, `.github/workflows/docker-release.yml`, `deploy/production/M0B_M2B_OPERATOR_RUNBOOK.md`, `deploy/production/RELEASE_RECORD.md` · since: 2026-07-30
+- historical, not live: `deploy/production/releases.jsonl` was a pre-split copy claimed by this spec. It is not the live ledger and must not be recreated in openbot-vp. Live ledger: https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
 
 > **生产 SoT 不是 Fly。** `fly.toml` / `fly.private.toml` / `docs/install/fly.md` 是自托管样例，不是正式生产配置。正式生产是阿里云 `8.217.93.71` 上的 `openbot-gateway-rc`（Gateway bind loopback `:18789`）。
 

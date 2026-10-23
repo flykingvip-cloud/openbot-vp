@@ -1,4 +1,8 @@
-// Machine-readable production release ledger.
+// Machine-readable production release ledger parser.
+//
+// The live append-only file is not in openbot-vp. Append and audit it in OHBE:
+// https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
+// Do not recreate deploy/production/releases.jsonl in this repository. This module only parses text.
 //
 // Why this exists: `deploy/production/RELEASE_RECORD.md` lives inside the branch it
 // describes, so it forks per lineage. On 2026-07-27 two divergent copies existed that

@@ -141,6 +141,7 @@
     },
     {
       "path": "deploy/production/releases.jsonl",
+      "ledgerRole": "historical-pre-split-not-live",
       "status": "modified",
       "category": "ledger",
       "domain": "delivery",
