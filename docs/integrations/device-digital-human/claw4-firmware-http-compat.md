@@ -62,8 +62,36 @@ Errors use the same envelope with non-zero `code` (HTTP status) and `error: { co
 
 ## Where it is mounted
 
-- **Adjacent (primary store):** device-digital-human stub HTTP (`listenDeviceDh`) serves `/api/v1/*` against the in-process `DeviceDhService`.
-- **Gateway:** `handleClaw4FirmwareHttpRequest` owns the same paths when a `DeviceDhService` is injected (`setClaw4FirmwareServiceForTests` / ops bind). Without a backend → HTTP 503 for those paths only (does not claim other `/api/v1/*`).
+- **Adjacent (primary joint path):** device-digital-human stub HTTP (`listenDeviceDh`) on port **8787** serves `/api/v1/*` against the in-process `DeviceDhService`. Keep using this for Agent A / device-sdk loopback until the gateway inject is enabled.
+- **Gateway (18789):** `handleClaw4FirmwareHttpRequest` owns the same paths when a `DeviceDhService` is configured. Without a backend → HTTP 503 `UNAVAILABLE` for those paths only (does not claim other `/api/v1/*`).
+
+### Enabling the gateway in-process backend (local 18789)
+
+Default gateway leaves Claw4 routes on 503 so production cam_b / grayRelease stay untouched. Two ways to bind a backend:
+
+1. **Programmatic inject** (tests / custom ops): call `setClaw4FirmwareService(service)` before requests (alias: `setClaw4FirmwareServiceForTests`).
+2. **Env in-process bind** (ops for local gateway): set both of:
+   - `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1`
+   - `OPENBOT_DEVICE_DH_STUB_CONFIG` — path to the same stub clients JSON used by the 8787 stub (for example `src/integrations/device-digital-human/examples/stub-clients.sample.json`)
+
+Optional (same as the adjacent stub):
+
+| Env                                   | Role                                                                 |
+| ------------------------------------- | -------------------------------------------------------------------- |
+| `OPENBOT_DEVICE_DH_APPROVAL_TOKEN`    | Approval token for the in-process service (default `dev-approval-token`) |
+| `OPENBOT_DEVICE_DH_AGENT=1`           | Turn model calls local gateway chat completions instead of placeholder |
+| `OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1`| Force offline placeholder hatch                                      |
+| `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` | Extra media pull origins                                           |
+
+Restart / kickstart the gateway after setting env so the lazy bind runs. Grant exchange for firmware still uses the integrations grant APIs; when only Claw4 routes are co-located on 18789 and `/api/integrations/v1` is not mounted there, exchange grants on the adjacent stub (8787) **or** inject a shared `DeviceDhService` that both surfaces use. The env bind creates a **gateway-local** store — it does not share memory with a separate 8787 process.
+
+This does **not** reverse-proxy `OPENBOT_DEVICE_DH_STUB_URL` onto the gateway and does **not** mount `/api/integrations/v1` on 18789.
+
+### Local verify (after bind)
+
+1. Confirm routes no longer 503: `POST /api/v1/upload` with Basic + `X-OpenBot-Grant-Credential` + `X-Device-Id` and `Content-Type: audio/wav` (optional `X-Transcript-Text` / `transcript=`).
+2. `GET /api/v1/conversation/{id}/messages` returns `{ code: 0, data: { conversationId, messages } }`.
+3. Stub 8787 remains a valid joint path if the gateway bind is off.
 
 ## B3 field ambiguities (left open)
 

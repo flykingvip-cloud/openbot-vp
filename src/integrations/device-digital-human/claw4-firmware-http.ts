@@ -10,10 +10,15 @@
  * Maps onto device-digital-human conversations/turns. Does not reverse-proxy
  * arbitrary `/api/integrations/v1` onto the public gateway, and does not change
  * frozen `/api/device-platform/v1` OpenAPI field names.
+ *
+ * Backend: inject via setClaw4FirmwareService, or opt-in env in-process bind
+ * (OPENBOT_CLAW4_FIRMWARE_INPROCESS=1 + OPENBOT_DEVICE_DH_STUB_CONFIG). See
+ * claw4-firmware-bind.ts and docs/.../claw4-firmware-http-compat.md.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { sendJson, sendMethodNotAllowed } from "../../gateway/http-common.js";
+import { claw4FirmwareEnvBindWarning, resolveClaw4FirmwareService } from "./claw4-firmware-bind.js";
 import {
   CLAW4_FIRMWARE_API_PREFIX,
   CLAW4_RECORD_UPLOAD_PATH,
@@ -30,16 +35,15 @@ import { DeviceDhError } from "./errors.js";
 import type { DeviceDhService } from "./service.js";
 
 export type Claw4FirmwareHttpOptions = {
-  /** In-process integrations service (tests / co-located stub). */
+  /** In-process integrations service (tests / co-located stub / ops inject). */
   service?: DeviceDhService;
 };
 
-let injectedService: DeviceDhService | undefined;
-
-/** Test / ops hook: bind the integrations DeviceDhService into the gateway mount. */
-export function setClaw4FirmwareServiceForTests(service: DeviceDhService | undefined): void {
-  injectedService = service;
-}
+export {
+  setClaw4FirmwareService,
+  setClaw4FirmwareServiceForTests,
+  resolveClaw4FirmwareService,
+} from "./claw4-firmware-bind.js";
 
 function headerString(req: IncomingMessage, name: string): string | undefined {
   const value = req.headers[name];
@@ -86,6 +90,21 @@ function sendClaw4Error(res: ServerResponse, error: unknown): void {
   sendJson(res, deviceError.httpStatus, claw4Error(deviceError));
 }
 
+function sendBackendUnavailable(res: ServerResponse): void {
+  const bindHint = claw4FirmwareEnvBindWarning();
+  sendJson(res, 503, {
+    code: 503,
+    message: "Claw4 firmware compat backend is not configured",
+    error: {
+      code: "UNAVAILABLE",
+      message: bindHint
+        ? `In-process bind failed: ${bindHint}`
+        : "Inject DeviceDhService (setClaw4FirmwareService) or set OPENBOT_CLAW4_FIRMWARE_INPROCESS=1 with OPENBOT_DEVICE_DH_STUB_CONFIG. Adjacent stub on 8787 remains valid. grayRelease stays false.",
+      retryable: true,
+    },
+  });
+}
+
 /**
  * Handle Claw4 firmware routes. Returns true when this handler owned the request.
  */
@@ -107,18 +126,9 @@ export async function handleClaw4FirmwareHttpRequest(
     return false;
   }
 
-  const service = opts.service ?? injectedService;
+  const service = resolveClaw4FirmwareService(opts);
   if (!service) {
-    sendJson(res, 503, {
-      code: 503,
-      message: "Claw4 firmware compat backend is not configured",
-      error: {
-        code: "UNAVAILABLE",
-        message:
-          "Inject DeviceDhService (tests) or mount adjacent to the integrations stub. grayRelease stays false.",
-        retryable: true,
-      },
-    });
+    sendBackendUnavailable(res);
     return true;
   }
 
