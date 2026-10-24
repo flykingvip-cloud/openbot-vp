@@ -23,6 +23,7 @@ import type { ExecAllowlistEntry } from "../infra/exec-approvals.js";
 import {
   requiresExecApproval,
   resolveExecApprovals,
+  resolveExecApprovalsReadonly,
   type ExecAsk,
   type ExecSecurity,
 } from "../infra/exec-approvals.js";
@@ -49,6 +50,18 @@ export interface ExecProbeDeps {
 function defaultResolveApprovals(agentId?: string): ResolvedExecApprovals {
   const r = resolveExecApprovals(agentId);
   return { ask: r.agent.ask, security: r.agent.security, allowlist: r.allowlist };
+}
+
+/**
+ * WP-04 — Fabric shadow-compare / decide-only paths must inject this (or an
+ * equivalent in-memory stub) so `ensureExecApprovals` never mutates the
+ * approvals file during `check` / replay / dryRunDiff.
+ */
+export function createReadonlyResolveApprovals(): (agentId?: string) => ResolvedExecApprovals {
+  return (agentId?: string) => {
+    const r = resolveExecApprovalsReadonly(agentId);
+    return { ask: r.agent.ask, security: r.agent.security, allowlist: r.allowlist };
+  };
 }
 
 /** Build the exec-class allowlist + approval probe inputs for a request. */
