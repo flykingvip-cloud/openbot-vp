@@ -92,6 +92,22 @@ export function classifyExecutionFailure(input: {
   ) {
     return stopped("resource_out_of_scope", "user");
   }
+  if (
+    includesAny(message, [
+      "stale-snapshot",
+      "stale snapshot",
+      "lease-mismatch",
+      "account worker stopped billing actions: stale-snapshot",
+      "account worker stopped billing actions: lease-mismatch",
+    ])
+  ) {
+    return {
+      failureClass: "transient_transport",
+      retryable: true,
+      retryOwner: "retry_policy",
+      fallbackAllowed: false,
+    };
+  }
   if (includesAny(message, ["compaction", "context overflow"])) {
     return {
       failureClass: "compaction_retry",
