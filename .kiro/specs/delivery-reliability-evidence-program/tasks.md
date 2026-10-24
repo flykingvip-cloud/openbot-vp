@@ -32,10 +32,10 @@ Registry 路径声明含 `.loom/registry.yaml` 登记行；**该文件提交仍�
 | WP-00 | 基线/存量/归属/试点冻结 | IMPLEMENTING      | 无                              | grokbot-verifiable-delivery  | G0   | E0 基线可验收；整体未 ACCEPTED（试点未冻结） |
 | WP-01 | 任务结果与证据合同      | IMPLEMENTING      | WP-00                           | grokbot-verifiable-delivery  | G1   | 本轮仅最小合同草案 |
 | WP-02 | 交接可靠落地            | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-H | 精确接管清单；代码改动待接管成立 |
-| WP-03 | 上下文唯一预算责任      | NOT_STARTED       | WP-00、WP-01                    | 未指定                       | G2-C | |
-| WP-04 | Fabric 决策比较         | NOT_STARTED       | WP-00、WP-01                    | 未指定（需协调 kiro-fabric） | G3-A | 先快照合同/调用链审计 |
-| WP-05 | Fabric 唯一路径试点     | NOT_STARTED       | WP-04；写操作加 WP-07           | 未指定                       | G3-B | |
-| WP-06 | 编排持久恢复            | NOT_STARTED       | WP-00、WP-01                    | 未指定                       | G4-A | 先存储/租约设计；不解除 live invoke |
+| WP-03 | 上下文唯一预算责任      | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-C | 组装链路审计+单一预算提案；未宣称 G2-C |
+| WP-04 | Fabric 决策比较         | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery（需协调 kiro-fabric） | G3-A | 快照合同/调用链/副作用审计草案；无迁移代码 |
+| WP-05 | Fabric 唯一路径试点     | DESIGNING         | WP-04；写操作加 WP-07           | grokbot-verifiable-delivery  | G3-B | PREP only；未实现切换；未宣称 G3-B |
+| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | 存储/租约设计；ORCHESTRATION_LIVE_INVOKE 仍 false |
 | WP-07 | 外部副作用幂等与核对    | NOT_STARTED       | WP-06                           | 未指定                       | G4-B | |
 | WP-08 | constitutional 内部约束 | NOT_STARTED       | WP-01、WP-04；跨恢复加 WP-06/07 | 未指定                       | G5   | 待合同与归属 |
 | WP-09 | 经验归因与统计          | NOT_STARTED       | WP-00、WP-01                    | 未指定                       | G6-A | |
@@ -78,3 +78,31 @@ WP-00 / grokbot-verifiable-delivery / IMPLEMENTING / candidate SHA c0c0ba52 / pr
 下一步：人审 E0；并行 WP-12；WP-01 草案与 WP-02 接管表  
 验收：E0 可审；整体未 ACCEPTED  
 — grokbot-verifiable-delivery
+
+
+### WP-03..06 进度（2026-10-24）
+
+WP-03 / grokbot-verifiable-delivery / AUDITING / candidate SHA 2df36a55 / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：最终组装顺序审计；提案 Phase-B=`compileModelContext` 为最终 messages 预算所有者；不可静默丢弃清单；固定回放名大纲  
+证据：`wp03/context-budget-ownership-audit.md`  
+失败或未知：未宣称 G2-C；生产 flag 实取值 UNKNOWN  
+下一步：人审预算责任提案后再考虑最小代码接管  
+
+WP-04 / grokbot-verifiable-delivery / DESIGNING / candidate SHA 2df36a55 / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：check/replay/dryRunDiff/isRelaxation 调用链；快照字段草案；diff 分类；入口矩阵骨架；双零证明计划  
+关键发现：默认 probes→`ensureExecApprovals` 可能写 approvals 文件（非 billing/工具执行）  
+证据：`wp04/fabric-compare-design.md`  
+协调：kiro-fabric；不夺 execute 所有权  
+下一步：只读 resolveApprovals 夹具 + 填充矩阵 UNKNOWN 格  
+
+WP-05 / grokbot-verifiable-delivery / DESIGNING(PREP) / candidate SHA 2df36a55 / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：只读试点候选（memory/web_read/skill_snapshot）；服务端单路径规则草图；入口 keep/migrate/oos 表  
+明确：未实现切换；未宣称 G3-B；外部写等 WP-07  
+证据：`wp05/path-convergence-prep.md`  
+
+WP-06 / grokbot-verifiable-delivery / DESIGNING / candidate SHA 2df36a55 / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：实体映射；确认 LIVE_INVOKE=false；既有存储增量租约/fencing 提案；kill/restart 夹具名  
+证据：`wp06/orchestration-persistence-lease-design.md`  
+下一步：字段迁移 ADR；只读有限步骤工作流（仍不解锁 live invoke）  
+— grokbot-verifiable-delivery
+

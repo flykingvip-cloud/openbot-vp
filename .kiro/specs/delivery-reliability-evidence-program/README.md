@@ -10,6 +10,17 @@
 
 本包独立保存，预期落库目录为 `.kiro/specs/delivery-reliability-evidence-program/`。本轮校验期间共享工作区被其他操作切换并清除了未跟踪文件，计划已完整恢复到独立交付目录；没有提交到其他任务分支，也未保留有效的仓库登记。执行者先完成新鲜基线和归属登记，再将本包复制到目标目录。下列源码路径均相对于 OpenBot 仓库根目录；包内文档链接可直接打开。
 
+## 工作包产出索引（增量）
+
+- [WP-00 存储复用 ADR](wp00/storage-reuse-adr.md)
+- [WP-01 结果证据合同草案](wp01/result-evidence-contract-draft.md)
+- [WP-02 交接接管与恢复切片](wp02/takeover-and-recovery-slice.md)
+- [WP-03 上下文预算责任审计](wp03/context-budget-ownership-audit.md)
+- [WP-04 Fabric 比较设计](wp04/fabric-compare-design.md)
+- [WP-05 路径收敛预备](wp05/path-convergence-prep.md)
+- [WP-06 编排租约设计](wp06/orchestration-persistence-lease-design.md)
+- [WP-12 许可初盘](wp12/initial-inventory.md)
+
 ## 执行 Agent 从这里开始
 
 1. 阅读 [执行指令](execution-agent.md)，只启动 WP-00，不同时铺开所有实施工作。
