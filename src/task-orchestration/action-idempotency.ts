@@ -1,14 +1,29 @@
 /**
  * WP-07 — Action idempotency key helper (skeleton; not wired to live send paths).
  *
- * Key = hash(tenant, taskId, logicalActionId). Same key with a different param
- * digest is rejected. Does NOT steal Fabric execute / outbound outbox ownership:
- * this module is a pure helper + in-memory registry for unit tests and future
- * adapter wiring. Does NOT flip ORCHESTRATION_LIVE_INVOKE.
+ * Key = hash(tenant, taskId, logicalActionId) (= idempotencyKey). Same key with
+ * a different param digest is rejected (`param_digest_conflict`).
+ *
+ * Retry / attempt rules (aligned with ExecutionStep canonical schema):
+ * - logicalActionId = business action; attemptId = one try (canonical Step field).
+ * - Retries KEEP the same logicalActionId + idempotencyKey; mint a NEW attemptId.
+ * - Unclear external result → status `unknown_outcome` (NOT failed-then-auto-retry).
+ *   See ACTION_OUTCOME_UNKNOWN / CANONICAL_STEP_STATUS_UNKNOWN_OUTCOME.
+ *
+ * Does NOT steal Fabric execute / outbound outbox ownership: pure helper +
+ * in-memory registry for unit tests and future adapter wiring.
+ * Does NOT flip ORCHESTRATION_LIVE_INVOKE.
  */
 import { createHash } from "node:crypto";
 
 export const ACTION_IDEMPOTENCY_SCHEMA_VERSION = 1 as const;
+
+/**
+ * Helper-level outcome guidance when an external side effect result is unclear.
+ * Must NOT be treated as `failed` for automatic retry. Reconciliation / human
+ * or explicit policy decides the next attempt.
+ */
+export const ACTION_OUTCOME_UNKNOWN = "unknown_outcome" as const;
 
 export type ActionIdempotencyKeyInput = {
   tenantId: string | null | undefined;

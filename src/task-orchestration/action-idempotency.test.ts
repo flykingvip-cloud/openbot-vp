@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { CANONICAL_STEP_STATUS_UNKNOWN_OUTCOME } from "../progress-ledger/execution-step-canonical.js";
 import {
   ACTION_IDEMPOTENCY_SCHEMA_VERSION,
+  ACTION_OUTCOME_UNKNOWN,
   buildActionIdempotencyKey,
   createActionIdempotencyRegistry,
   digestActionParams,
@@ -105,5 +107,36 @@ describe("WP-07 action-idempotency helper", () => {
         paramDigest: " ",
       }).ok,
     ).toBe(false);
+  });
+
+  it("exposes unknown_outcome guidance (not failed-then-auto-retry)", () => {
+    expect(ACTION_OUTCOME_UNKNOWN).toBe("unknown_outcome");
+    expect(ACTION_OUTCOME_UNKNOWN).toBe(CANONICAL_STEP_STATUS_UNKNOWN_OUTCOME);
+    // Retries keep same logicalActionId + idempotencyKey (same registry key);
+    // attemptId is Step-level (new attemptId). Unclear outcomes must not be
+    // rewritten to failed for a blind auto-retry.
+    const registry = createActionIdempotencyRegistry();
+    const digest = digestActionParams({ to: "a@example.com" });
+    const first = registry.register({
+      tenantId: "t1",
+      taskId: "task-1",
+      logicalActionId: "action.send",
+      paramDigest: digest,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+    const reuse = registry.register({
+      tenantId: "t1",
+      taskId: "task-1",
+      logicalActionId: "action.send",
+      paramDigest: digest,
+    });
+    expect(reuse.ok).toBe(true);
+    if (reuse.ok) {
+      expect(reuse.reused).toBe(true);
+      expect(reuse.key).toBe(first.key);
+    }
   });
 });
