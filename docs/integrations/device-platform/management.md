@@ -119,7 +119,7 @@ The service Basic password is write-once, stored outside the connection record, 
 
 个人设置「设备与硬件」lists the signed-in member's devices, adds one from a scanned or typed pairing code, rebinds the digital human, and revokes the authorization. Add calls the connector origin with `HttpDevicePlatformControl`: health and capabilities, then pair redeem, then OpenBot grant exchange, then `POST /bind` with `X-OpenBot-Grant-Credential`. Pairing fields are not accepted on the OpenBot user body as `pairChallenge` or `pairingCode`.
 
-A wrong, expired, replayed, or mismatched code does not become an active binding. Transfer is not a second claim write: only the current owner can unbind, and the next person adds the device with a new pairing code.
+A wrong, expired, replayed, or mismatched code does not become an active binding. Transfer is not a second claim write: the personal-devices「转移」control runs revoke then add for the same claimant with a fresh pairing code and the selected digital human; another person still adds in their own session with a new pairing code.
 
 ## Digital-human detail
 
