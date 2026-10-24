@@ -123,8 +123,9 @@ async function handle(
 }
 
 /**
- * Grant mint surface only: consent → PKCE authorization-code → grants/exchange,
- * plus GET /grants/{authorizationRef} so joint can verify the minted grant.
+ * Grant lifecycle surface: consent → PKCE authorization-code → grants/exchange,
+ * GET /grants/{authorizationRef}, and POST /grants/{authorizationRef}/revoke
+ * (credential optional; revoke-by-ref for hash-only recovery after restart).
  * Shared by the loopback stub and the gateway co-located mount.
  * Returns true when `relative` is owned by this surface (including wrong method).
  */
@@ -159,10 +160,26 @@ export async function handleDeviceDhGrantMint(
     );
     return true;
   }
+  const revokeMint = /^\/grants\/([^/]+)\/revoke$/.exec(relative);
+  if (revokeMint) {
+    if (method !== "POST") {
+      throw new DeviceDhError("PARAM_UNSUPPORTED", "POST required");
+    }
+    const client = service.authenticate(...basicParts(req), "service");
+    const credential = headerString(req, "x-openbot-grant-credential");
+    const authorizationRef = decodeURIComponent(revokeMint[1] ?? "");
+    if (credential) {
+      const grant = service.requireGrant(client, credential, true);
+      sendJson(res, 200, service.revokeGrant(grant, authorizationRef, traceId), traceId);
+    } else {
+      sendJson(res, 200, service.revokeGrantByRef(client, authorizationRef, traceId), traceId);
+    }
+    return true;
+  }
   const grantId = /^\/grants\/([^/]+)$/.exec(relative);
   if (grantId) {
     if (method !== "GET") {
-      // rebind / revoke are separate routes under /grants/{id}/… — not owned here.
+      // rebind is under /grants/{id}/rebind — not owned here.
       return false;
     }
     const client = service.authenticate(...basicParts(req), "service");
@@ -218,6 +235,23 @@ async function dispatch(
     return;
   }
 
+  // Revoke before requireGrant so hash-only / missing-plaintext callers can
+  // revoke by authorizationRef with service Basic auth (same ownership model
+  // as rebind-by-ref). Credential header remains accepted when present.
+  const revoke = /^\/grants\/([^/]+)\/revoke$/.exec(relative);
+  if (method === "POST" && revoke) {
+    const client = service.authenticate(...basicParts(req), "service");
+    const credential = headerString(req, "x-openbot-grant-credential");
+    const authorizationRef = decodeURIComponent(revoke[1] ?? "");
+    if (credential) {
+      const grant = service.requireGrant(client, credential, true);
+      sendJson(res, 200, service.revokeGrant(grant, authorizationRef, traceId), traceId);
+    } else {
+      sendJson(res, 200, service.revokeGrantByRef(client, authorizationRef, traceId), traceId);
+    }
+    return;
+  }
+
   const client = service.authenticate(...basicParts(req), "service");
   const credential = headerString(req, "x-openbot-grant-credential");
   // Grant GET stays readable after revoke so device-control sees status.
@@ -225,23 +259,10 @@ async function dispatch(
   // Idempotency-Key can be replayed. The service still refuses a new result.
   const grantRead = method === "GET" && /^\/grants\/[^/]+$/.test(relative);
   const allowRevoked =
-    grantRead ||
-    (method === "POST" &&
-      (/^\/grants\/[^/]+\/revoke$/.test(relative) ||
-        /^\/device-tool-requests\/[^/]+\/result$/.test(relative)));
+    grantRead || (method === "POST" && /^\/device-tool-requests\/[^/]+\/result$/.test(relative));
   const grant = service.requireGrant(client, credential, allowRevoked);
 
   // GET /grants/{id} is owned by handleDeviceDhGrantMint (above).
-  const revoke = /^\/grants\/([^/]+)\/revoke$/.exec(relative);
-  if (method === "POST" && revoke) {
-    sendJson(
-      res,
-      200,
-      service.revokeGrant(grant, decodeURIComponent(revoke[1] ?? ""), traceId),
-      traceId,
-    );
-    return;
-  }
   const caps = /^\/grants\/([^/]+)\/device-capabilities$/.exec(relative);
   if (method === "PUT" && caps) {
     const body = await readJson(req);

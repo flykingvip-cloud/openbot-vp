@@ -782,7 +782,7 @@ export class DevicePlatformService {
       throw new DevicePlatformError("NOT_FOUND", "Device not found");
     }
     assertCanOperateBinding(actor, current);
-    const hadPlatformApply = current.platformApplied === true;
+    const hadPlatformApply = current.platformApplied;
     const revoking = this.markBinding(actor.tenantId, current.bindingId, { status: "revoking" });
     if (revoking.authorizationRef) {
       this.dropToolReservations(actor.tenantId, revoking.authorizationRef);
@@ -1087,13 +1087,21 @@ export class DevicePlatformService {
     }
     if (this.grantRegistry) {
       const credential = this.credentials.get(authorizationRef);
-      if (!credential) {
-        throw new DevicePlatformError(
-          "PLATFORM_UNAVAILABLE",
-          "Grant credential is not available to revoke on the integrations stub",
-        );
+      try {
+        // Prefer plaintext when still in memory; otherwise revoke-by-ref so
+        // employee me/operations can finish after a gateway restart left only
+        // credentialHash / authorizationRef on the binding.
+        await this.grantRegistry.revoke({
+          authorizationRef,
+          ...(credential ? { authorizationCredential: credential } : {}),
+        });
+      } catch (error) {
+        // Stub already missing the grant (restart wiped DH memory) — local
+        // tombstone still proceeds. Other failures stay visible to the caller.
+        if (!(error instanceof DevicePlatformError) || error.code !== "NOT_FOUND") {
+          throw error;
+        }
       }
-      await this.grantRegistry.revoke({ authorizationRef, authorizationCredential: credential });
     }
     grant.status = "revoked";
     grant.revokedAt = this.iso();
@@ -1382,11 +1390,7 @@ function retryableCode(error: unknown): boolean {
   );
 }
 
-
-function allowLocalRevokeAfterPlatformError(
-  hadPlatformApply: boolean,
-  error: unknown,
-): boolean {
+function allowLocalRevokeAfterPlatformError(hadPlatformApply: boolean, error: unknown): boolean {
   if (!(error instanceof DevicePlatformError)) {
     return false;
   }

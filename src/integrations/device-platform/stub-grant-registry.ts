@@ -29,7 +29,8 @@ export type StubGrantRegistry = {
   rebind(input: { authorizationRef: string; digitalHumanId: string }): Promise<StubGrantView>;
   revoke(input: {
     authorizationRef: string;
-    authorizationCredential: string;
+    /** When omitted, integrations revoke-by-ref (service Basic auth owns the grant). */
+    authorizationCredential?: string;
   }): Promise<StubGrantView>;
 };
 
@@ -123,13 +124,13 @@ export class HttpStubGrantRegistry implements StubGrantRegistry {
 
   async revoke(input: {
     authorizationRef: string;
-    authorizationCredential: string;
+    authorizationCredential?: string;
   }): Promise<StubGrantView> {
     const revoked = await this.request(
       `/api/integrations/v1/grants/${encodeURIComponent(input.authorizationRef)}/revoke`,
       {
         authorization: this.serviceAuthorization,
-        credential: input.authorizationCredential,
+        ...(input.authorizationCredential ? { credential: input.authorizationCredential } : {}),
         body: {},
       },
     );
@@ -160,6 +161,13 @@ export class HttpStubGrantRegistry implements StubGrantRegistry {
     }
     const json = await readJson(response);
     if (!response.ok) {
+      // 404: grant already gone on stub (e.g. INPROCESS restart wiped memory).
+      if (response.status === 404) {
+        throw new DevicePlatformError(
+          "NOT_FOUND",
+          "Integrations stub grant was not found to revoke",
+        );
+      }
       throw new DevicePlatformError(
         "PLATFORM_UNAVAILABLE",
         "Integrations stub rejected the grant call",

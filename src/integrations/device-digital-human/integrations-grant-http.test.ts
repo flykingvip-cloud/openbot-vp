@@ -159,6 +159,74 @@ describe("integrations grant HTTP (gateway co-locate)", () => {
     });
   });
 
+  it("revokes a minted grant by authorizationRef without credential (INPROCESS hash-only)", async () => {
+    const service = makeService();
+    await withHandler(service, async (base) => {
+      const verifier = `v-${randomId(16)}`;
+      const challenge = pkceS256(verifier);
+      const consent = await fetch(`${base}/api/integrations/v1/consent/authorization-codes`, {
+        method: "POST",
+        headers: {
+          authorization: basicHeader("consent-sim", consentSecret),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          serviceAudience: "device-platform",
+          redirectUri,
+          codeChallenge: challenge,
+          codeChallengeMethod: "S256",
+          digitalHumanId: "agent-demo-1",
+          deviceId,
+          scopes: ["chat"],
+          state: "state-revoke-by-ref",
+        }),
+      });
+      expect(consent.status).toBe(201);
+      const issued = (await consent.json()) as { authorizationCode: string };
+      const exchanged = await fetch(`${base}/api/integrations/v1/grants/exchange`, {
+        method: "POST",
+        headers: {
+          authorization: basicHeader("device-platform", serviceSecret),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          authorizationCode: issued.authorizationCode,
+          codeVerifier: verifier,
+          redirectUri,
+        }),
+      });
+      expect(exchanged.status).toBe(200);
+      const grant = (await exchanged.json()) as {
+        authorizationRef: string;
+        authorizationCredential: string;
+      };
+
+      const revoked = await fetch(
+        `${base}/api/integrations/v1/grants/${grant.authorizationRef}/revoke`,
+        {
+          method: "POST",
+          headers: {
+            authorization: basicHeader("device-platform", serviceSecret),
+            "content-type": "application/json",
+          },
+          body: "{}",
+        },
+      );
+      expect(revoked.status).toBe(200);
+      const body = (await revoked.json()) as { status: string; authorizationRef: string };
+      expect(body.status).toBe("revoked");
+      expect(body.authorizationRef).toBe(grant.authorizationRef);
+
+      expect(() =>
+        service.requireGrant(
+          service.authenticate("device-platform", serviceSecret, "service"),
+          grant.authorizationCredential,
+          false,
+        ),
+      ).toThrow(/revoked/i);
+    });
+  });
+
   it("does not claim grant paths when unbound (production fail-closed / unchanged)", async () => {
     await withHandler(undefined, async (base) => {
       const res = await fetch(`${base}/api/integrations/v1/grants/exchange`, {
