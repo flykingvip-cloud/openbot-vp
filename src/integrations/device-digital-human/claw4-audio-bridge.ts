@@ -1,18 +1,20 @@
 /**
  * Injectable audio bridge for Claw4 firmware HTTP compat (Agent B P0).
  *
- * Pins and calls Agent A `createAudioBridge` from openbot-device-sdk:
- *   DEVICE_SDK_AUDIO_BRIDGE_SHA = 47ca71a7ec2c59ca86e06036998ce3be11e2880e
- *   (flykingvip-cloud/openbot-device-sdk PR #27 merged to main)
+ * Pins and calls Agent A audio bridge factories from openbot-device-sdk:
+ *   DEVICE_SDK_AUDIO_BRIDGE_SHA = dee79554aa9fa4fcae67df0d5b36d68d2b691a8d
+ *   (flykingvip-cloud/openbot-device-sdk PR #28 VoiceEnv / reference adapters)
  *
  * OPENBOT_CONTRACT_SHA remains d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f (unchanged).
  *
  * Wiring:
- *   1. Prefer `bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, { asr, tts })`
- *      after importing `createAudioBridge` from the pinned SDK tip.
- *   2. Or `importAgentACreateAudioBridge()` via OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE /
+ *   1. Prefer `createAudioBridgeFromVoiceEnv` / `createVoiceProvidersFromEnv`
+ *      (adapters/voice) when bind is allowed and ASR/TTS_MODULE are unset.
+ *   2. Or `bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, { asr, tts })`
+ *      after importing `createAudioBridge` from the pinned SDK tip (MODULE override).
+ *   3. Or `importAgentACreateAudioBridge()` via OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE /
  *      OPENBOT_DEVICE_SDK_ROOT (checkout at the pin SHA).
- *   3. Tests may `setClaw4AudioBridge` with a double.
+ *   4. Tests may `setClaw4AudioBridge` with a double.
  *
  * Product TTS: inject a speaking TtsProvider (or test ProportionalSilenceTtsProvider).
  * Do NOT use OpusFrameTtsProvider for product 播报 — it ignores text.
@@ -23,8 +25,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DeviceDhError } from "./errors.js";
 
-/** openbot-device-sdk main after PR #27 (createAudioBridge) merged. */
-export const DEVICE_SDK_AUDIO_BRIDGE_SHA = "47ca71a7ec2c59ca86e06036998ce3be11e2880e";
+/** openbot-device-sdk tip after PR #28 (VoiceEnv / reference ASR-TTS) on main. */
+export const DEVICE_SDK_AUDIO_BRIDGE_SHA = "dee79554aa9fa4fcae67df0d5b36d68d2b691a8d";
 
 /** Env: absolute module URL or file path to audio-bridge entry exporting createAudioBridge. */
 export const DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV = "OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE";
@@ -183,6 +185,70 @@ export async function importAgentACreateAudioBridge(
     );
   }
   return mod.createAudioBridge;
+}
+
+function defaultVoiceIndexModuleFromRoot(root: string): string {
+  return pathToFileURL(path.join(root, "adapters/voice/src/index.ts")).href;
+}
+
+export type AgentACreateAudioBridgeFromVoiceEnv = (options?: {
+  env?: NodeJS.ProcessEnv;
+  forbidOpusFrameForSpoken?: boolean;
+  fetchImpl?: typeof fetch;
+}) => AgentAAudioBridge;
+
+/**
+ * Dynamically import Agent A `createAudioBridgeFromVoiceEnv` from the pinned
+ * SDK checkout (adapters/voice index) or an explicit module URL.
+ */
+export async function importAgentACreateAudioBridgeFromVoiceEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<AgentACreateAudioBridgeFromVoiceEnv> {
+  const explicit = env[DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV]?.trim();
+  const root = env[DEVICE_SDK_ROOT_ENV]?.trim();
+  const moduleUrl = explicit
+    ? explicit.startsWith("file:") || explicit.startsWith("http:")
+      ? explicit
+      : pathToFileURL(path.resolve(explicit)).href
+    : root
+      ? defaultVoiceIndexModuleFromRoot(path.resolve(root))
+      : undefined;
+  if (!moduleUrl) {
+    throw new DeviceDhError(
+      "PARAM_UNSUPPORTED",
+      `Set ${DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV} or ${DEVICE_SDK_ROOT_ENV} to import createAudioBridgeFromVoiceEnv from openbot-device-sdk@${DEVICE_SDK_AUDIO_BRIDGE_SHA}`,
+    );
+  }
+  const mod = (await import(moduleUrl)) as {
+    createAudioBridgeFromVoiceEnv?: AgentACreateAudioBridgeFromVoiceEnv;
+  };
+  if (typeof mod.createAudioBridgeFromVoiceEnv !== "function") {
+    throw new DeviceDhError(
+      "PARAM_UNSUPPORTED",
+      `Module ${moduleUrl} does not export createAudioBridgeFromVoiceEnv (expected openbot-device-sdk@${DEVICE_SDK_AUDIO_BRIDGE_SHA} adapters/voice)`,
+    );
+  }
+  return mod.createAudioBridgeFromVoiceEnv;
+}
+
+/**
+ * Import createAudioBridgeFromVoiceEnv from the pinned SDK and bind it.
+ * Provider kind / reference-http URLs come from Agent A env
+ * (OPENBOT_ASR_PROVIDER, OPENBOT_TTS_PROVIDER, …) — B does not hardcode vendors.
+ * Opus-frame spoken TTS remains forbidden (SDK default + local assert path).
+ */
+export async function bindClaw4AudioBridgeFromVoiceEnv(options: {
+  env?: NodeJS.ProcessEnv;
+}): Promise<Claw4AudioBridge> {
+  const env = options.env ?? process.env;
+  const createFromVoiceEnv = await importAgentACreateAudioBridgeFromVoiceEnv(env);
+  const agentBridge = createFromVoiceEnv({
+    env,
+    forbidOpusFrameForSpoken: true,
+  });
+  const wrapped = wrapAgentAAudioBridge(agentBridge);
+  setClaw4AudioBridge(wrapped);
+  return wrapped;
 }
 
 /**

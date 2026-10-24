@@ -1,6 +1,6 @@
 ---
 title: Claw4 firmware HTTP compat
-summary: Scheme B1 gateway/adjacent compat for Claw4 POST /api/v1/upload and conversation messages (P0 revision)
+summary: Scheme B1 gateway/adjacent compat for Claw4 POST /api/v1/upload and conversation messages (P0 + P1 bind)
 ---
 
 # Claw4 firmware HTTP compat (Scheme B1 + P0)
@@ -88,17 +88,50 @@ That text is submitted into the existing integrations turn API (`input.type = te
 
 ### Agent A audio bridge (pinned)
 
-**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`47ca71a7ec2c59ca86e06036998ce3be11e2880e`** (flykingvip-cloud/openbot-device-sdk PR #27 merged to main). Exports `createAudioBridge` from `adapters/voice` / metalio / services.
+**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`dee79554aa9fa4fcae67df0d5b36d68d2b691a8d`** (flykingvip-cloud/openbot-device-sdk PR #28 VoiceEnv / reference ASR-TTS on main). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services).
 
 `OPENBOT_CONTRACT_SHA` remains **`d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`** (unchanged; CONTROL freeze untouched).
 
 B wires for real:
 
-- `bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, { asr, tts })` — calls Agent A factory and `setClaw4AudioBridge`
+- **Preferred:** `bindClaw4AudioBridgeFromVoiceEnv` / Agent A `createAudioBridgeFromVoiceEnv` — default mock; `reference-http` via Agent A `OPENBOT_ASR_PROVIDER` / `OPENBOT_TTS_PROVIDER` (+ HTTP URLs). B only passes env into the factory (no vendor hardcoding).
+- `bindClaw4AudioBridgeFromCreateAudioBridge(createAudioBridge, { asr, tts })` — calls Agent A factory and `setClaw4AudioBridge` (MODULE override path)
 - `bindClaw4AudioBridgeFromDeviceSdk({ asr, tts })` — dynamic import via `OPENBOT_DEVICE_SDK_ROOT` (checkout at the pin SHA) or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`
 - Abort in-flight ASR via `createAbortHandle().signal` (compat mirrors caller `AbortSignal` onto the handle)
-- Product TTS: inject a **speaking** `TtsProvider` (or test `ProportionalSilenceTtsProvider`). **Reject** `OpusFrameTtsProvider` for product 播报 — it ignores `text`
+- Product TTS: inject a **speaking** `TtsProvider` (or test `ProportionalSilenceTtsProvider`). **Reject** `OpusFrameTtsProvider` for product 播报 — it ignores `text` (VoiceEnv uses `forbidOpusFrameForSpoken:true`)
 - Formal mode rejects stub ASR unless `OPENBOT_CLAW4_ASR_STUB=1`
+
+
+### P1 startup bind (device-sdk audio bridge)
+
+**Default off.** Setting `OPENBOT_DEVICE_SDK_ROOT` (or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`) alone does **not** mean the bridge is bound — those only locate Agent A `createAudioBridge`. Formal upload without a bound bridge / pass-through transcript still returns `PARAM_UNSUPPORTED`.
+
+| Env | Semantics |
+| --- | --------- |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=1` / `true` | **Allow** lazy bind of `createAudioBridge` into `setClaw4AudioBridge`. |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=0` / `false` | **Deny** bind. Explicit `0`/`false` **suppresses** the implicit path below. |
+| (unset) | Default off, unless the implicit convenience below applies. |
+
+**Implicit allow** (only when the explicit bind env is **unset**):
+
+- `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1` **and**
+- (`OPENBOT_DEVICE_SDK_ROOT` **or** `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`) is set
+
+When bind is allowed:
+
+1. **VoiceEnv (preferred when MODULE unset):** import `createAudioBridgeFromVoiceEnv` from the pinned SDK (`OPENBOT_DEVICE_SDK_ROOT` → `adapters/voice/src/index.ts`, or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE` exporting that factory). Default providers are **mock**. Set Agent A `OPENBOT_ASR_PROVIDER` / `OPENBOT_TTS_PROVIDER` (e.g. `reference-http`) plus HTTP URL envs for real reference adapters — B only forwards env into the factory.
+2. **MODULE override (fail-closed):** both of the following must be set; partial (only one) leaves unbound:
+
+| Env | Role |
+| --- | ---- |
+| `OPENBOT_DEVICE_SDK_ASR_MODULE` | Module URL/path: `default` export factory/instance, or named `create*()` (e.g. `createAsrProvider` / `createMockAsrProvider`) |
+| `OPENBOT_DEVICE_SDK_TTS_MODULE` | Module URL/path: speaking TTS factory/instance (`createTtsProvider` / `createProportionalSilenceTtsProvider`). **`OpusFrameTtsProvider` is rejected** |
+
+If MODULE override is invalid, or VoiceEnv import/factory throws, OpenBot logs clearly and **leaves the bridge unbound** (no half-bind). Product ASR/TTS vendor adapters remain Agent A's work — B does not hardcode FunASR/EdgeTTS paths.
+
+Lazy bind runs on the first formal transcript resolve that needs a bridge (`ensureClaw4DeviceSdkAudioBridgeBound`), same lifecycle style as the in-process firmware service bind.
+
+**Pin tip:** **`dee79554…`** (`dee79554aa9fa4fcae67df0d5b36d68d2b691a8d`) — device-sdk PR #28 (`createAudioBridgeFromVoiceEnv` / `createVoiceProvidersFromEnv`).
 
 ## Upload idempotency (P0)
 
@@ -152,6 +185,10 @@ Optional (same as the adjacent stub):
 | `OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1`| Force offline placeholder hatch                                      |
 | `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` | Extra media pull origins                                           |
 | `OPENBOT_CLAW4_ASR_STUB=1`            | Allow labeled stub ASR when no bridge / pass-through (smoke only)  |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE` | `1`/`true` allow P1 bind; `0`/`false` deny (suppresses INPROCESS implicit); unset = default off |
+| `OPENBOT_DEVICE_SDK_ASR_MODULE`       | Provider module for ASR factory/instance (required when bind allowed) |
+| `OPENBOT_DEVICE_SDK_TTS_MODULE`       | Provider module for speaking TTS factory/instance (required when bind allowed) |
+| `OPENBOT_DEVICE_SDK_ROOT` / `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE` | Locate `createAudioBridge` only — **not** “already bound” |
 
 Restart / kickstart the gateway after setting env so the lazy bind runs. The env bind creates a **gateway-local** store — it does not share memory with a separate 8787 process.
 
