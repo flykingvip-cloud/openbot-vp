@@ -530,6 +530,20 @@ export class DeviceDhService {
     };
   }
 
+  /**
+   * Revoke by authorizationRef when the plaintext credential is unavailable
+   * (e.g. device-platform in-memory credentials lost after gateway restart).
+   * Service Basic auth must own the grant (clientId match). Idempotent when
+   * already revoked. Missing / foreign refs → OBJECT_NOT_FOUND.
+   */
+  revokeGrantByRef(client: ClientRecord, authorizationRef: string, traceId?: string) {
+    const grant = this.grants.get(authorizationRef);
+    if (!grant || grant.clientId !== client.clientId) {
+      throw notFound();
+    }
+    return this.revokeGrant(grant, authorizationRef, traceId);
+  }
+
   rebind(
     client: ClientRecord,
     authorizationRef: string,

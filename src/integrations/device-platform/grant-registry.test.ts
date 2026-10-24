@@ -234,6 +234,43 @@ describe("integrations stub grant registry", () => {
     }
   });
 
+  it("revokes by authorizationRef when plaintext credential is omitted", async () => {
+    const stub = await startStub();
+    try {
+      const registry = registryFor(stub.url);
+      const issued = await registry.issue({
+        digitalHumanId: "agent-demo-1",
+        deviceId: "cam-hash-only",
+        scopes: ["chat", "camera.capture"],
+        serviceAudience: "device-platform",
+      });
+      const before = await readGrant(
+        stub.url,
+        issued.authorizationRef,
+        issued.authorizationCredential,
+      );
+      expect(before.status).toBe(200);
+      expect(before.json.status).toBe("active");
+
+      const revoked = await registry.revoke({
+        authorizationRef: issued.authorizationRef,
+        // no authorizationCredential — hash-only / post-restart path
+      });
+      expect(revoked.status).toBe("revoked");
+      expect(revoked.authorizationRef).toBe(issued.authorizationRef);
+
+      const after = await readGrant(
+        stub.url,
+        issued.authorizationRef,
+        issued.authorizationCredential,
+      );
+      expect(after.status).toBe(200);
+      expect(after.json.status).toBe("revoked");
+    } finally {
+      await stub.close();
+    }
+  });
+
   it("registers device-platform add, rebind, and revoke on the stub device-control reads", async () => {
     const stub = await startStub();
     try {

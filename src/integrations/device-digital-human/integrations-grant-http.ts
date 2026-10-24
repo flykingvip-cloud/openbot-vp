@@ -11,6 +11,8 @@
  *   POST /api/integrations/v1/consent/authorization-codes
  *   POST /api/integrations/v1/grants/exchange
  *   GET  /api/integrations/v1/grants/{authorizationRef}
+ *   POST /api/integrations/v1/grants/{authorizationRef}/revoke
+ *     (credential optional — revoke-by-ref for hash-only recovery)
  *
  * Does not mount the rest of /api/integrations/v1 (turns, SSE, media, …).
  * Stub 8787 remains a valid full joint path. Does not change frozen
@@ -66,6 +68,9 @@ function isGrantMintPath(pathname: string): boolean {
     return true;
   }
   if (relative === "/grants/exchange") {
+    return true;
+  }
+  if (/^\/grants\/[^/]+\/revoke$/.test(relative)) {
     return true;
   }
   return /^\/grants\/[^/]+$/.test(relative);
@@ -144,8 +149,8 @@ export async function handleIntegrationsGrantHttpRequest(
     assertNoUntrustedIdentity(req);
     const owned = await handleDeviceDhGrantMint(service, req, res, relative, traceId);
     if (!owned) {
-      // Path matched isGrantMintPath but grant-mint declined (e.g. POST on
-      // /grants/{id} which is rebind/revoke territory). Do not claim.
+      // Path matched isGrantMintPath but grant surface declined (e.g. POST on
+      // /grants/{id} without /revoke — rebind stays on the full stub). Do not claim.
       return false;
     }
     return true;

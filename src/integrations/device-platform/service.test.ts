@@ -555,7 +555,6 @@ describe("device platform management", () => {
     ).toThrow(DevicePlatformError);
   });
 
-
   it("tombstones never-applied bindings when platform revoke is unavailable", async () => {
     const { service, control, store, userA } = harness();
     control.appliedBindingVersion = 0;
@@ -625,6 +624,193 @@ describe("device platform management", () => {
     const shard = store.loadTenant("tenant-1");
     const binding = Object.values(shard.bindings).find((row) => row.deviceId === deviceId);
     expect(binding?.status).toBe("revoked");
+  });
+
+  it("revokes hash-only grants via registry revoke-by-ref after plaintext loss", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "device-platform-hashonly-"));
+    const directory = new MemoryDirectory();
+    const userA = actor({ userId: "user-a" });
+    const admin = actor({
+      userId: "admin",
+      tenantId: "platform",
+      membershipId: "mem-admin",
+      membershipRole: "enterprise-admin",
+      platformAdmin: true,
+      displayName: "Admin",
+    });
+    directory.sessions.set("session-a", userA);
+    directory.sessions.set("session-admin", admin);
+    directory.humans.set("dh-shared", {
+      digitalHumanId: "dh-shared",
+      tenantId: "tenant-1",
+      gatewayAgentId: "agent-shared",
+      displayName: "Shared",
+      status: "active",
+      ownerId: "user-a",
+    });
+    directory.permitted.set("user-a", ["dh-shared"]);
+    const control = new FakeDevicePlatformControl();
+    const store = new DevicePlatformStore(devicePlatformPathsUnder(root));
+    const revokeCalls: Array<{ authorizationRef: string; hasCredential: boolean }> = [];
+    let issueSeq = 0;
+    const grantRegistry = {
+      async issue(input: {
+        digitalHumanId: string;
+        deviceId: string;
+        scopes: string[];
+        serviceAudience: string;
+      }) {
+        issueSeq += 1;
+        return {
+          authorizationRef: `azr_hashonly_${issueSeq}`,
+          authorizationCredential: `obgc_hashonly_${issueSeq}`,
+          bindingVersion: 1,
+          digitalHumanId: input.digitalHumanId,
+          deviceId: input.deviceId,
+          status: "active",
+        };
+      },
+      async rebind(input: { authorizationRef: string; digitalHumanId: string }) {
+        return {
+          authorizationRef: input.authorizationRef,
+          bindingVersion: 2,
+          digitalHumanId: input.digitalHumanId,
+          deviceId: "ext-hash-only",
+          status: "active",
+          assistant: { digitalHumanId: input.digitalHumanId },
+        };
+      },
+      async revoke(input: { authorizationRef: string; authorizationCredential?: string }) {
+        revokeCalls.push({
+          authorizationRef: input.authorizationRef,
+          hasCredential: Boolean(input.authorizationCredential),
+        });
+        return {
+          authorizationRef: input.authorizationRef,
+          bindingVersion: 1,
+          digitalHumanId: "dh-shared",
+          deviceId: "ext-hash-only",
+          status: "revoked",
+        };
+      },
+    };
+    const service = new DevicePlatformService({
+      store,
+      directory,
+      control,
+      grantRegistry,
+      verifyServiceClient: (clientId, secret) =>
+        clientId === "device-platform" && secret === "service-secret-16+",
+    });
+    service.upsertConnection(admin, "plat-1", {
+      serviceBaseUrl: SERVICE_URL,
+      contractVersion: "1",
+      credentialRef: "cred://device-platform/plat-1",
+      serviceClientIds: ["device-platform"],
+      enabled: true,
+    });
+
+    const added = await service.submitOperation(userA, addBody("op-hash-add", "ext-hash-only"));
+    const deviceId = added.device?.deviceId ?? "";
+    const authorizationRef = added.device?.binding?.authorizationRef ?? "";
+    expect(authorizationRef).toBe("azr_hashonly_1");
+    expect(service.peekGrantCredential(authorizationRef)).toMatch(/^obgc_hashonly_/);
+
+    // Simulate gateway restart: plaintext credentials are in-memory only.
+    (service as unknown as { credentials: Map<string, string> }).credentials.clear();
+    expect(service.peekGrantCredential(authorizationRef)).toBeUndefined();
+    expect(store.loadTenant("tenant-1").grants[authorizationRef]?.credentialHash).toBeTruthy();
+
+    const revoked = await service.submitOperation(userA, {
+      operationId: "op-hash-revoke",
+      kind: "revoke",
+      deviceId,
+    });
+    expect(revoked.operation.status).toBe("succeeded");
+    expect(revoked.device?.binding).toBeNull();
+    expect(revokeCalls).toEqual([{ authorizationRef, hasCredential: false }]);
+    const shard = store.loadTenant("tenant-1");
+    expect(shard.grants[authorizationRef]?.status).toBe("revoked");
+    const binding = Object.values(shard.bindings).find((row) => row.deviceId === deviceId);
+    expect(binding?.status).toBe("revoked");
+  });
+
+  it("still completes local revoke when stub reports grant already missing", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "device-platform-hashmiss-"));
+    const directory = new MemoryDirectory();
+    const userA = actor({ userId: "user-a" });
+    const admin = actor({
+      userId: "admin",
+      tenantId: "platform",
+      membershipId: "mem-admin",
+      membershipRole: "enterprise-admin",
+      platformAdmin: true,
+      displayName: "Admin",
+    });
+    directory.sessions.set("session-a", userA);
+    directory.sessions.set("session-admin", admin);
+    directory.humans.set("dh-shared", {
+      digitalHumanId: "dh-shared",
+      tenantId: "tenant-1",
+      gatewayAgentId: "agent-shared",
+      displayName: "Shared",
+      status: "active",
+      ownerId: "user-a",
+    });
+    directory.permitted.set("user-a", ["dh-shared"]);
+    const control = new FakeDevicePlatformControl();
+    const store = new DevicePlatformStore(devicePlatformPathsUnder(root));
+    const grantRegistry = {
+      async issue(input: {
+        digitalHumanId: string;
+        deviceId: string;
+        scopes: string[];
+        serviceAudience: string;
+      }) {
+        return {
+          authorizationRef: "azr_already_gone",
+          authorizationCredential: "obgc_already_gone",
+          bindingVersion: 1,
+          digitalHumanId: input.digitalHumanId,
+          deviceId: input.deviceId,
+          status: "active",
+        };
+      },
+      async rebind() {
+        throw new DevicePlatformError("PLATFORM_UNAVAILABLE", "unused");
+      },
+      async revoke() {
+        throw new DevicePlatformError(
+          "NOT_FOUND",
+          "Integrations stub grant was not found to revoke",
+        );
+      },
+    };
+    const service = new DevicePlatformService({
+      store,
+      directory,
+      control,
+      grantRegistry,
+      verifyServiceClient: (clientId, secret) =>
+        clientId === "device-platform" && secret === "service-secret-16+",
+    });
+    service.upsertConnection(admin, "plat-1", {
+      serviceBaseUrl: SERVICE_URL,
+      contractVersion: "1",
+      credentialRef: "cred://device-platform/plat-1",
+      serviceClientIds: ["device-platform"],
+      enabled: true,
+    });
+
+    const added = await service.submitOperation(userA, addBody("op-gone-add", "ext-gone"));
+    (service as unknown as { credentials: Map<string, string> }).credentials.clear();
+    const revoked = await service.submitOperation(userA, {
+      operationId: "op-gone-revoke",
+      kind: "revoke",
+      deviceId: added.device?.deviceId,
+    });
+    expect(revoked.operation.status).toBe("succeeded");
+    expect(store.loadTenant("tenant-1").grants.azr_already_gone?.status).toBe("revoked");
   });
 
   it("retries a failed health check only when asked", async () => {
