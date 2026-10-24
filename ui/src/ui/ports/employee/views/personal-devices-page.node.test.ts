@@ -97,6 +97,108 @@ describe("personal devices panel", () => {
     transfer?.click();
     paint();
     expect(container.textContent).toContain("不会把设备直接改到别人名下");
+    expect(container.querySelector("[data-testid=personal-device-transfer-scan]")).not.toBeNull();
+    expect(
+      container.querySelector("[data-testid=personal-device-transfer-confirm]"),
+    ).not.toBeNull();
+  });
+
+  it("transfers by revoking then adding with a fresh pairing code", async () => {
+    const submitted: Array<Record<string, unknown>> = [];
+    setPersonalDevicesClientForTests({
+      listDevices: async () => [
+        {
+          deviceId: "dev-1",
+          displayName: "门口相机",
+          platformId: "1024",
+          externalDeviceId: "joint-browser-b2-1024",
+          binding: {
+            bindingId: "bind-1",
+            digitalHumanId: "agt-a",
+            scopes: ["chat"],
+            status: "active",
+            expectedBindingVersion: 1,
+            appliedBindingVersion: 1,
+            authorizationEstablished: true,
+            platformApplied: true,
+          },
+          status: { online: true, presence: "online", capabilities: [] },
+        },
+      ],
+      listPlatforms: async () => [{ platformId: "1024", displayName: "测试1024" }],
+      listHumans: async () => [
+        { digitalHumanId: "agt-a", displayName: "客户经理" },
+        { digitalHumanId: "agt-b", displayName: "法律机器人" },
+      ],
+      submit: async (body) => {
+        submitted.push(body);
+        if (body.kind === "add") {
+          return {
+            deviceId: "dev-2",
+            displayName: "门口相机",
+            platformId: "1024",
+            externalDeviceId: "joint-browser-b2-1024",
+            binding: {
+              bindingId: "bind-2",
+              digitalHumanId: String(body.digitalHumanId),
+              scopes: body.scopes as string[],
+              status: "active",
+              expectedBindingVersion: 1,
+              appliedBindingVersion: 1,
+              authorizationEstablished: true,
+              platformApplied: true,
+            },
+            status: { online: false, presence: "unknown", capabilities: [] },
+          };
+        }
+        return null;
+      },
+    });
+    const container = document.createElement("div");
+    document.body.append(container);
+    const paint = () => {
+      render(html`${renderPersonalDevicesPanel()}`, container);
+    };
+    await flush(paint);
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-device-row]")?.click();
+    paint();
+    const human = container.querySelector<HTMLSelectElement>(
+      "[data-testid=personal-device-rebind-human]",
+    );
+    if (human) {
+      human.value = "agt-b";
+      human.dispatchEvent(new Event("change"));
+    }
+    container.querySelector<HTMLButtonElement>("[data-testid=personal-device-transfer]")?.click();
+    paint();
+    const scan = container.querySelector<HTMLTextAreaElement>(
+      "[data-testid=personal-device-transfer-scan]",
+    );
+    if (!scan) {
+      throw new Error("missing transfer scan");
+    }
+    scan.value = JSON.stringify({
+      deviceId: "joint-browser-b2-1024",
+      pairChallenge: "pch_transfer01",
+      pairingCode: "654321",
+    });
+    scan.dispatchEvent(new Event("input"));
+    paint();
+    container
+      .querySelector<HTMLButtonElement>("[data-testid=personal-device-transfer-confirm]")
+      ?.click();
+    await flush(paint);
+    expect(submitted.map((row) => row.kind)).toEqual(["revoke", "add"]);
+    expect(submitted[0]).toMatchObject({ kind: "revoke", deviceId: "dev-1" });
+    expect(submitted[1]).toMatchObject({
+      kind: "add",
+      platformId: "1024",
+      externalDeviceId: "joint-browser-b2-1024",
+      digitalHumanId: "agt-b",
+      pairing: { challenge: "pch_transfer01", proof: "654321" },
+    });
+    expect(JSON.stringify(submitted)).not.toContain("pairChallenge");
+    expect(container.textContent).toContain("已转移");
   });
 
   it("reads a scanned pairing payload without keeping secrets", () => {
