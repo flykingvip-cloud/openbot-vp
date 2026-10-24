@@ -1,6 +1,12 @@
 # G4-A recovery evidence prep
 
 - 状态：**PREP / NOT_CLAIMED**
+- 冻结状态（用户绑定）：
+  ```
+  evidence_status: prepared
+  claim_status: unclaimed
+  production_status: not_verified
+  ```
 - 日期：2026-10-24（Asia/Shanghai）
 - 作者：grokbot-verifiable-delivery
 - 验收目标（work-packages.md）：进程在调度前后、执行前后、结果落库前后被终止均可恢复；无遗失/永久悬挂步骤；旧 worker 不得重复推进。
@@ -42,3 +48,4 @@
 ## 状态声明
 
 - **PREP / NOT_CLAIMED** — evidence prep for acceptance review; **not** G4-A PASSED.
+- Freeze: `evidence_status: prepared` / `claim_status: unclaimed` / `production_status: not_verified`.

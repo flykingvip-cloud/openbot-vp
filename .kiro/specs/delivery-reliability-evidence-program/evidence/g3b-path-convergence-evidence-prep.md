@@ -1,6 +1,12 @@
 # G3-B path-convergence evidence prep
 
 - 状态：**PREP / NOT_CLAIMED**
+- 冻结状态（用户绑定）：
+  ```
+  evidence_status: prepared
+  claim_status: unclaimed
+  production_status: not_verified
+  ```
 - 日期：2026-10-24（Asia/Shanghai）
 - 作者：grokbot-verifiable-delivery
 - 验收目标（work-packages.md）：同一 action 实际执行一次，业务成本记账一次；故障无二次执行；旧机制未丢失；未知/失效决策不能执行。
@@ -38,3 +44,4 @@
 ## 状态声明
 
 - **PREP / NOT_CLAIMED** — ready for human review; **not** G3-B PASSED.
+- Freeze: `evidence_status: prepared` / `claim_status: unclaimed` / `production_status: not_verified`.

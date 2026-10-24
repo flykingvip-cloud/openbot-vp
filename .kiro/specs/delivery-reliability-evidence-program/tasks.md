@@ -34,8 +34,8 @@ Registry 路径声明含 `.loom/registry.yaml` 登记行；**该文件提交仍�
 | WP-02 | 交接可靠落地            | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-H | 精确接管清单；代码改动待接管成立 |
 | WP-03 | 上下文唯一预算责任      | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-C | 组装链路审计+单一预算提案；未宣称 G2-C |
 | WP-04 | Fabric 决策比较         | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery（需协调 kiro-fabric） | G3-A | 设计+只读 approvals 夹具已落；无迁移；未宣称 G3-A |
-| WP-05 | Fabric 唯一路径试点     | DESIGNING         | WP-04；写操作加 WP-07           | grokbot-verifiable-delivery  | G3-B | PREP+绑定切片+evidence prep；默认 legacy；G3-B=PREP/NOT_CLAIMED |
-| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | +LEDGER_FIELD_INCREMENT（orch-lease-fields 扩展模块）；LIVE 仍 false；G4-A=PREP/NOT_CLAIMED；**非 G4-A** |
+| WP-05 | Fabric 唯一路径试点     | DESIGNING         | WP-04；写操作加 WP-07           | grokbot-verifiable-delivery  | G3-B | evidence_status=prepared；claim_status=unclaimed；production_status=not_verified；默认 legacy |
+| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | +ExecutionStep canonical schema/validators；LIVE=false；G4-A evidence_status=prepared / claim_status=unclaimed / production_status=not_verified；**非 G4-A** |
 | WP-07 | 外部副作用幂等与核对    | DESIGNING         | WP-06                           | grokbot-verifiable-delivery  | G4-B | DESIGN+矩阵模板+action-idempotency helper；未接线 live send；**非 G4-B** |
 | WP-08 | constitutional 内部约束 | NOT_STARTED       | WP-01、WP-04；跨恢复加 WP-06/07 | 未指定                       | G5   | 待合同与归属 |
 | WP-09 | 经验归因与统计          | NOT_STARTED       | WP-00、WP-01                    | 未指定                       | G6-A | |
@@ -48,7 +48,9 @@ Registry 路径声明含 `.loom/registry.yaml` 登记行；**该文件提交仍�
 - 计划目录已落入 `.kiro/specs/delivery-reliability-evidence-program/`；执行基线为 `c0c0ba52`（= origin/main）。编制基线 SHA 仅作阅读对照。
 - 试点业务、业务验收负责人、数据授权、最小收益和观察窗**尚未冻结** → WP-00 整体不 ACCEPTED；G0 仅部分通过。
 - 禁止整片接管 `collaboration-dispatch/**` 或 `attempt.ts`；第一刀仅已证明必需文件。
-- `.loom/registry.yaml` 由 kiro-loom lander 提交；本任务不得以改他人 owner 刷绿冲突。
+- `.loom/registry.yaml` 由 kiro-loom lander **正式 Loom 流程**提交；本任务不得直改、不得扩大代码所有权、不得认领 attempt.ts / fabric/** / collaboration-dispatch/**；须保留 owner/历史 session/takeover（见 `evidence/registry-kiro-loom-handoff.md`）。
+- **Schema freeze**：ledger 一等字段在 **ExecutionStep**；payload 仅扩展；compat-read 允许 / 新写入 prefer Step（见 `wp06/execution-step-canonical-schema.md`）。
+- **LIVE 冻结**：`ORCHESTRATION_LIVE_INVOKE=false`；G3-B/G4-A 冻结为 evidence_status=prepared / claim_status=unclaimed / production_status=not_verified；G 门不可实施 Agent 自证自批。
 - GitHub issue 未绑定；不填造编号。
 - 未核对生产 LIVE；无 E3/E4。默认开关/许可/部署行为不变。
 - `.agents/skills/PR_WORKFLOW.md` 基线缺失；进 PR 前再搜现行工作流。
@@ -124,3 +126,22 @@ WP-07 / grokbot-verifiable-delivery / DESIGNING / production NOT_DEPLOYED / bene
 Registry：`evidence/registry-kiro-loom-handoff.md` — **未提交** `.loom/registry.yaml`（脏/占用交 kiro-loom）  
 — grokbot-verifiable-delivery
 
+
+### 用户绑定冻结（ExecutionStep / LIVE / registry · 2026-10-24）
+
+WP-05 / grokbot-verifiable-delivery / DESIGNING(PREP) / production_status=not_verified / benefit UNKNOWN  
+冻结：`evidence_status: prepared` · `claim_status: unclaimed` · `production_status: not_verified`（G3-B）  
+明确：**不宣称 G3-B**；dual-exec 生产证明仍缺  
+
+WP-06 / grokbot-verifiable-delivery / DESIGNING(+EXECUTION_STEP_CANONICAL) / production_status=not_verified / benefit UNKNOWN  
+完成：`wp06/execution-step-canonical-schema.md`；`src/progress-ledger/execution-step-canonical.ts`（+test）；ADR/ledger-increment/live-readiness 回指；**KEEP LIVE=false**  
+冻结：G4-A `evidence_status: prepared` · `claim_status: unclaimed` · `production_status: not_verified`  
+明确：未改 fold；未改 `.loom/registry.yaml`；**不宣称 G4-A**；schema freeze location = **ExecutionStep**  
+
+WP-07 / grokbot-verifiable-delivery / DESIGNING / production_status=not_verified / benefit UNKNOWN  
+完成：action-idempotency 对齐 retry/attempt + `ACTION_OUTCOME_UNKNOWN`；与 canonical `unknown_outcome` 一致  
+明确：**不宣称 G4-B**；未接线 live send  
+
+Registry：`evidence/registry-kiro-loom-handoff.md` 更新为正式 Loom 登记范围；**未提交** `.loom/registry.yaml`  
+LIVE：`wp06/live-invoke-readiness.md` 纳入用户全部门禁；结论 KEEP false；通过后先 canary；G 门需代码 owner + 架构/安全 + 业务验收者分别确认  
+— grokbot-verifiable-delivery
