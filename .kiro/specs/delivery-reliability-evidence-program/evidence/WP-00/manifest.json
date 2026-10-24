@@ -1,0 +1,83 @@
+{
+  "workPackage": "WP-00",
+  "evidenceLevel": "E0",
+  "head": "c0c0ba52b0b2460a1e3e2fa9bbf7b889355dd07d",
+  "generatedAt": "2026-10-24T11:27:01+0800",
+  "agentId": "grokbot-verifiable-delivery",
+  "g0": "PARTIAL",
+  "wp00Accepted": false,
+  "alsoIncludesDrafts": ["WP-01 draft", "WP-02 takeover slice", "WP-12 initial inventory"],
+  "artifacts": [
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/baseline-manifest.json",
+      "sha256": "97caeb57d7a07778ec94c403e36161446d89a06c809ceb93e132634867580437",
+      "bytes": 1969
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/entrypoint-matrix.csv",
+      "sha256": "fa389aea358f691c7c81820aeb5014e116ac2414bec8978966d8faee6da89d43",
+      "bytes": 4566
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/existing-work-map.csv",
+      "sha256": "21c10681e323d7a6b46b594053610b5478cbfc5039dd571dc1a84f98b2fd2711",
+      "bytes": 3201
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/storage-reuse-adr.md",
+      "sha256": "3947293038e134191aef26fb1c9e8bbcce0d6fb1927f8db4cc08476269378959",
+      "bytes": 2775
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/pilot-charter.md",
+      "sha256": "332150f20dfba71ad37fc88e3c76b795b64e51fc432b2861c70ba92e509e2e81",
+      "bytes": 1922
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/path-ownership-conflicts.md",
+      "sha256": "577024e6456b663b6eb1942f259d702df073b628431d7f86639630af1ef53324",
+      "bytes": 2414
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp00/feasibility-gate-2026-10-24.md",
+      "sha256": "ead209cb5e16e47cfbfc470411bb0ecaea02fa64775fa6948f3014f8c87a19cd",
+      "bytes": 6992
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp01/result-evidence-contract-draft.md",
+      "sha256": "dd12a6a055891589b3a1370e5eec4da3dbf78368399eeca1c5cfc17796adb497",
+      "bytes": 2896
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp02/takeover-and-recovery-slice.md",
+      "sha256": "c4ba9928e82ed4263625b87321e02bd98696b6b5d128892cc900774688474263",
+      "bytes": 3854
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/wp12/initial-inventory.md",
+      "sha256": "c32b2d54be651bd2eb968ff34173386ec3470abdfd91e30c7f2fa8f6f0643030",
+      "bytes": 3108
+    },
+    {
+      "path": ".kiro/specs/delivery-reliability-evidence-program/tasks.md",
+      "sha256": "ed8506e373f29a85c3ac7e775edc2b7c4ca861d1a37cce5ecfb5bc9906976177",
+      "bytes": 6143
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "git fetch origin && git merge-base --is-ancestor origin/main HEAD",
+      "exitCode": 0
+    },
+    {
+      "cmd": "pnpm loom register ... (session 445f21c8-4bc3-431e-a284-5d74f48e487e)",
+      "exitCode": 0
+    }
+  ],
+  "limitations": [
+    "No app tests run",
+    "No production LIVE check",
+    "Pilot not frozen",
+    "Runtime code unchanged"
+  ]
+}

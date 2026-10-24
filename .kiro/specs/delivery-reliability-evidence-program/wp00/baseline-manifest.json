@@ -1,0 +1,52 @@
+{
+  "schema": "delivery-reliability-baseline-manifest/v1",
+  "generatedAt": "2026-10-24T11:25:43+0800",
+  "timezone": "Asia/Shanghai",
+  "agentId": "grokbot-verifiable-delivery",
+  "taskId": "delivery-reliability-evidence-program:grokbot-verifiable-delivery",
+  "sessionId": "445f21c8-4bc3-431e-a284-5d74f48e487e",
+  "repo": {
+    "remote": "git@github.com-flykingvip:flykingvip-cloud/openbot-vp.git",
+    "forgeHint": "github.com/flykingvip-cloud/openbot-vp"
+  },
+  "git": {
+    "head": "c0c0ba52b0b2460a1e3e2fa9bbf7b889355dd07d",
+    "originMain": "c0c0ba52b0b2460a1e3e2fa9bbf7b889355dd07d",
+    "headEqualsOriginMain": true,
+    "originMainIsAncestorOfHead": true,
+    "planCompileBaseline": "1012c1bd553e69f1b7ebe81d258f3872dfb0bea6",
+    "planBaselineIsAncestorOfHead": true,
+    "commitsSincePlanBaseline": [
+      "c0c0ba52 feat(integrations): pin DEVICE_SDK_AUDIO_BRIDGE_SHA to 87a4a1a1 (#61)",
+      "44e1fa7b feat(integrations): pin DEVICE_SDK_AUDIO_BRIDGE_SHA to 9b7fb6a8 (#60)"
+    ],
+    "dirtyPaths": [
+      "M .loom/registry.yaml",
+      "?? .kiro/specs/delivery-reliability-evidence-program/",
+      "?? .ops-evidence/"
+    ],
+    "note": "Plan compile SHA is reading baseline only; development/deploy baseline is current origin/main tip."
+  },
+  "runtimeLocal": {
+    "node": "v22.18.0",
+    "pnpm": "10.23.0",
+    "bun": "1.2.21"
+  },
+  "featureDefaultsObserved": {
+    "fabricDefaultOff": true,
+    "orchestrationLiveInvokeFrozenFalse": true,
+    "orchestrationFourFlagsDefaultOff": true,
+    "orchReadonlyInvokeDefaultOn": true,
+    "evolutionGovernanceDefaultAssist": true,
+    "constitutionalScaffoldOnlyEnforceFalse": true,
+    "collabHandoffContractDefaultFalse": true
+  },
+  "evidenceLevel": "E0",
+  "productionChecked": false,
+  "g0Status": "PARTIAL",
+  "g0Blockers": [
+    "pilot business owner / data authorization / acceptance rules not frozen",
+    "ownership conflicts on runtime hot paths block code WPs"
+  ],
+  "wp00Accepted": false
+}
