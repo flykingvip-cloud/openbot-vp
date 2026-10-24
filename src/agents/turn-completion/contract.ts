@@ -120,7 +120,8 @@ const TRUE_FORK_RE =
 const PROGRESS_RE =
   /下一步我会|接下来我会|随后我会|我会先|让我先|正在处理|正在收尾|稍等片刻|马上就好|我继续去|这一步正在做/u;
 
-const EMPTY_SUCCESS_RE = /已交付|交付完成|已经完成|任务成功|✅|已成功完成/u;
+const EMPTY_SUCCESS_RE =
+  /已交付|交付完成|已经完成|任务成功|✅|已成功完成|点预览就能打开|点预览即可|可以直接打开|可直接打开/u;
 
 /** POSIX ls mode, including the over-long `-r----------` narration seen in sandbox replies. */
 const LS_MODE_RE = /(?<![A-Za-z0-9])(-[r-][w-][xXsS-][r-][w-][xXsS-][r-][w-][xXtT-]-*)/;
