@@ -182,6 +182,36 @@ function reasonLabel(reason: string | null | undefined): string | null {
   return REASON_LABELS[reason] ?? reason;
 }
 
+/**
+ * User-visible 「可预览 / 可以直接打开 / 已交付」copy is only honest when
+ * presentation=delivered (settle success). Scrub false claims so chat never
+ * says "click preview" while the card is missing/empty.
+ */
+const FALSE_DELIVERY_CLAIM_RE =
+  /点预览就能打开|点预览即可|请(?:点击)?预览(?:打开|查看)?|可以直接打开|可直接打开|已可预览|文件已(?:生成|就绪)[，,]?\s*可(?:以)?(?:预览|打开)/gu;
+
+export function scrubFalseDeliveryClaims(text: string): string {
+  if (!text) {
+    return text;
+  }
+  const nextRaw = text.replace(FALSE_DELIVERY_CLAIM_RE, "");
+  if (nextRaw === text) {
+    return text;
+  }
+  // Collapse doubled punctuation left by mid-sentence scrub.
+  let next = nextRaw.replace(/([。.!！?？])\s*\1+/gu, "$1");
+  next = next.replace(/([，,；;：:])\s*\1+/gu, "$1");
+  next = next.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+  return next;
+}
+
+function applyDeliveryCopyGate(text: string, presentation: DeliveryPresentation): string {
+  if (presentation === "delivered" || presentation === "none") {
+    return text;
+  }
+  return scrubFalseDeliveryClaims(text);
+}
+
 function normalizeRelative(value: string | null | undefined): string {
   return (value ?? "").trim().replace(/\\/g, "/").replace(/^\/+/, "");
 }
@@ -488,10 +518,11 @@ function unresolvedResult(params: {
   verification?: DeliveryVerification;
 }): PreparedChatDeliverable {
   const relativePath = params.relativePath ?? null;
-  const text =
+  const marked =
     relativePath && params.settleStatus !== "none"
       ? markDeliverableDeclarationUnwritten(params.text, relativePath)
       : params.text;
+  const text = applyDeliveryCopyGate(marked, "undelivered");
   const view = viewFor({
     presentation: "undelivered",
     verification: params.verification ?? "unknown",
@@ -573,7 +604,10 @@ export function prepareChatDeliverablePublish(
           const view =
             existing.broadcastOk === true ? optimisticView(existing) : ledgerView(existing);
           return {
-            text: patchReplayText(text, relativePath, existing.settleStatus),
+            text: applyDeliveryCopyGate(
+              patchReplayText(text, relativePath, existing.settleStatus),
+              view.presentation,
+            ),
             structured: true,
             view,
             record: existing,
@@ -695,11 +729,12 @@ export function prepareChatDeliverablePublish(
       canRegister && stored.registration === "registered"
         ? optimisticView(stored)
         : ledgerView(stored);
+    const outgoingText =
+      failureReason === "publish_record_failed"
+        ? markDeliverableDeclarationUnwritten(text, finalPath)
+        : settled.text;
     return {
-      text:
-        failureReason === "publish_record_failed"
-          ? markDeliverableDeclarationUnwritten(text, finalPath)
-          : settled.text,
+      text: applyDeliveryCopyGate(outgoingText, view.presentation),
       structured: true,
       view,
       record: stored,
