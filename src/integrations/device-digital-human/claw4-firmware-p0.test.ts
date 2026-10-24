@@ -190,8 +190,8 @@ describe("claw4 firmware P0 revision", () => {
     });
   });
 
-  it("pins device-sdk audio bridge SHA dee79554", () => {
-    expect(DEVICE_SDK_AUDIO_BRIDGE_SHA).toBe("dee79554aa9fa4fcae67df0d5b36d68d2b691a8d");
+  it("pins device-sdk audio bridge SHA 56859b5", () => {
+    expect(DEVICE_SDK_AUDIO_BRIDGE_SHA).toBe("56859b50205e203289f9909eb28d941c7143dd26");
   });
 
   it("bindClaw4AudioBridgeFromCreateAudioBridge calls Agent A factory for real", async () => {

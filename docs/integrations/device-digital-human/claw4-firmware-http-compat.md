@@ -88,7 +88,7 @@ That text is submitted into the existing integrations turn API (`input.type = te
 
 ### Agent A audio bridge (pinned)
 
-**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`dee79554aa9fa4fcae67df0d5b36d68d2b691a8d`** (flykingvip-cloud/openbot-device-sdk PR #28 VoiceEnv / reference ASR-TTS on main). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services).
+**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`56859b50205e203289f9909eb28d941c7143dd26`** (flykingvip-cloud/openbot-device-sdk PR #29 Opus uplink stream decode on main; builds on #28 VoiceEnv). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services).
 
 `OPENBOT_CONTRACT_SHA` remains **`d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`** (unchanged; CONTROL freeze untouched).
 
@@ -131,7 +131,9 @@ If MODULE override is invalid, or VoiceEnv import/factory throws, OpenBot logs c
 
 Lazy bind runs on the first formal transcript resolve that needs a bridge (`ensureClaw4DeviceSdkAudioBridgeBound`), same lifecycle style as the in-process firmware service bind.
 
-**Pin tip:** **`dee79554…`** (`dee79554aa9fa4fcae67df0d5b36d68d2b691a8d`) — device-sdk PR #28 (`createAudioBridgeFromVoiceEnv` / `createVoiceProvidersFromEnv`).
+**Pin tip:** **`56859b5…`** (`56859b50205e203289f9909eb28d941c7143dd26`) — device-sdk PR #29 (`asrProvider.stream()` + `codec:"opus"`; PCM-only 才 `wrapAsrProviderWithOpusDecode`；WAV upload / `transcribeWav` 不变). Builds on #28 VoiceEnv.
+
+**Opus 上行选型（Agent A #29，本仓不改实现）：** 分包上行用 `asrProvider.stream()` 并标 `codec:"opus"`；仅当 Provider 只吃 PCM 时才 `wrapAsrProviderWithOpusDecode`；整段 WAV upload / `transcribeWav` 路径不变。绑桥逻辑、BIND 开关、MODULE/VoiceEnv、拒 `OpusFrameTtsProvider`、合同针 `d7f0e1d8…` / CONTROL_FREEZE **本 PR 一律不改**。
 
 ## Upload idempotency (P0)
 

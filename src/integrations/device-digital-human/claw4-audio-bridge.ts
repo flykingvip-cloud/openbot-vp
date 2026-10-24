@@ -2,8 +2,8 @@
  * Injectable audio bridge for Claw4 firmware HTTP compat (Agent B P0).
  *
  * Pins and calls Agent A audio bridge factories from openbot-device-sdk:
- *   DEVICE_SDK_AUDIO_BRIDGE_SHA = dee79554aa9fa4fcae67df0d5b36d68d2b691a8d
- *   (flykingvip-cloud/openbot-device-sdk PR #28 VoiceEnv / reference adapters)
+ *   DEVICE_SDK_AUDIO_BRIDGE_SHA = 56859b50205e203289f9909eb28d941c7143dd26
+ *   (flykingvip-cloud/openbot-device-sdk PR #29 Opus uplink stream; builds on #28 VoiceEnv)
  *
  * OPENBOT_CONTRACT_SHA remains d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f (unchanged).
  *
@@ -25,8 +25,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DeviceDhError } from "./errors.js";
 
-/** openbot-device-sdk tip after PR #28 (VoiceEnv / reference ASR-TTS) on main. */
-export const DEVICE_SDK_AUDIO_BRIDGE_SHA = "dee79554aa9fa4fcae67df0d5b36d68d2b691a8d";
+/** openbot-device-sdk tip after PR #29 (Opus uplink stream; builds on #28 VoiceEnv) on main. */
+export const DEVICE_SDK_AUDIO_BRIDGE_SHA = "56859b50205e203289f9909eb28d941c7143dd26";
 
 /** Env: absolute module URL or file path to audio-bridge entry exporting createAudioBridge. */
 export const DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV = "OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE";
