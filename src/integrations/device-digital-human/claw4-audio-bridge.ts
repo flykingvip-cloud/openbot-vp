@@ -2,8 +2,9 @@
  * Injectable audio bridge for Claw4 firmware HTTP compat (Agent B P0).
  *
  * Pins and calls Agent A audio bridge factories from openbot-device-sdk:
- *   DEVICE_SDK_AUDIO_BRIDGE_SHA = 9b7fb6a8b8bc1ac17563c71f216b112446cb7b0c
- *   (flykingvip-cloud/openbot-device-sdk PR #31 device-edge-auth 两跳 proxy; builds on #30 voice-harness / #29 Opus uplink / #28 VoiceEnv)
+ *   DEVICE_SDK_AUDIO_BRIDGE_SHA = 87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37
+ *   (flykingvip-cloud/openbot-device-sdk PR #32 npm @0.1.0 publish prep / dist voice; builds on #31 device-edge-auth / #30 voice-harness / #29 Opus uplink / #28 VoiceEnv)
+ *   Until real npm publish: keep OPENBOT_DEVICE_SDK_ROOT + pin tip (do not switch to @flykingvip-cloud/openbot-device-sdk npm import).
  *
  * OPENBOT_CONTRACT_SHA remains d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f (unchanged).
  *
@@ -25,8 +26,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { DeviceDhError } from "./errors.js";
 
-/** openbot-device-sdk tip after PR #31 (device-edge-auth 两跳 proxy; builds on #30 voice-harness / #29 Opus uplink / #28 VoiceEnv) on main. */
-export const DEVICE_SDK_AUDIO_BRIDGE_SHA = "9b7fb6a8b8bc1ac17563c71f216b112446cb7b0c";
+/** openbot-device-sdk tip after PR #32 (npm @0.1.0 publish prep / dist voice; builds on #31 device-edge-auth / #30 voice-harness / #29 Opus uplink / #28 VoiceEnv) on main. */
+export const DEVICE_SDK_AUDIO_BRIDGE_SHA = "87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37";
 
 /** Env: absolute module URL or file path to audio-bridge entry exporting createAudioBridge. */
 export const DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV = "OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE";
