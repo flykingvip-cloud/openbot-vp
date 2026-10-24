@@ -1,6 +1,6 @@
 # WP-04 Fabric 决策比较设计（compare-before-migrate）
 
-- 状态：**DESIGN**（无迁移代码；**不宣称 G3-A**）
+- 状态：**DESIGN + HARNESS_SLICE**（只读 approvals 注入已落地；**仍不宣称 G3-A**；无执行迁移）
 - 日期：2026-10-24（Asia/Shanghai）
 - HEAD（撰写时）：`2df36a55748f891d6eb05ad067318bc8783fd794`
 - 作者：grokbot-verifiable-delivery
@@ -134,3 +134,11 @@ G3-A（摘自工作包，本轮不宣称达成）：
 - 状态：**DESIGN**。
 - 无迁移代码；无 G3-A；无 ACCEPTED。
 - 关键安全发现：`check`→默认 probes→`ensureExecApprovals` **可能写 approvals 文件** — 影子比较默认必须注入只读 approvals 视图或先固化文件。
+
+## 落地记录（2026-10-24，Asia/Shanghai）— 只读 approvals 夹具
+
+- `resolveExecApprovalsReadonly`（`src/infra/exec-approvals.ts`）：`loadExecApprovals` only，不调用 `ensure`/`save`。
+- `createReadonlyResolveApprovals`（`src/fabric/probes.ts`）：影子比较注入点。
+- Seat drill（`seat-rules.ts`）改为 readonly resolve。
+- 证据测：`src/fabric/shadow-compare-readonly.test.ts`（check 路径零 `saveExecApprovals`）。
+- **未改** `defaultResolveApprovals` 生产默认（仍可 ensure）；未夺 Fabric execute 所有权；未宣称 G3-A。
