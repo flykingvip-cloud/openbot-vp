@@ -9,6 +9,7 @@ import {
   deliverPreparedChatFinal,
   overlayChatDeliverablePublish,
   prepareChatDeliverablePublish,
+  scrubFalseDeliveryClaims,
 } from "./chat-deliverable-publish.js";
 import { readGroupDeliverableManifest } from "./group-manifest.js";
 
@@ -350,5 +351,29 @@ describe("prepareChatDeliverablePublish", () => {
     expect(publish?.presentation).toBe("pending_recovery");
     expect(publish?.registration).toBe("registered");
     expect(first.text).toContain("已写入工作区");
+  });
+});
+
+describe("scrubFalseDeliveryClaims / delivery copy gate", () => {
+  it("removes preview-success claims from undelivered publish text", () => {
+    const dirs = roots();
+    const relative = "output/pdf/demo.pdf";
+    const text = [
+      "分析结论仍然有效。点预览就能打开。",
+      `<<DELIVERABLE title="demo" type="pdf" file="${relative}">>`,
+      "见附件。",
+      "<</DELIVERABLE>>",
+    ].join("\n");
+    const result = prepareGroup(dirs, text);
+    expect(result.view.presentation).toBe("undelivered");
+    expect(result.text).toContain("分析结论仍然有效。");
+    expect(result.text).not.toMatch(/点预览就能打开|可以直接打开/);
+  });
+
+  it("scrubs standalone false claims and keeps delivered prose gated by presentation", () => {
+    expect(scrubFalseDeliveryClaims("分析结论仍然有效。点预览就能打开。")).toBe(
+      "分析结论仍然有效。",
+    );
+    expect(scrubFalseDeliveryClaims("可以直接打开这份 PDF。")).not.toMatch(/可以直接打开/);
   });
 });
