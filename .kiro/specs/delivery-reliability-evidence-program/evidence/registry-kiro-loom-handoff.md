@@ -57,3 +57,23 @@
 
 - Handoff note only — registry **not** committed in this delivery slice.
 - Binding: formal Loom registration only; preserve owner/history/takeover; no hot-path ownership expansion.
+
+## 正式登记回执（用户授权 · 2026-10-24）
+
+用户授权后已通过正式 Loom CLI 完成登记（非手改 yaml 语义；`pnpm loom register`）：
+
+| 项 | 值 |
+| --- | --- |
+| task id | `delivery-reliability-evidence-program:grokbot-verifiable-delivery` |
+| owner | `grokbot-verifiable-delivery` |
+| issue | `#62` |
+| paths | **仅** `.kiro/specs/delivery-reliability-evidence-program/**` |
+| session | `grokbot-verifiable-delivery-pr62-20261024` (cursor) |
+| via | `verified` |
+| ownerHistory | `[]`（新建任务；未改写他人 takeover） |
+
+**未登记 / 未认领：** `src/task-orchestration/**`、`src/progress-ledger/**`、`src/fabric/**`、`collaboration-dispatch/**`、`attempt.ts`、gateway 运行热点（仍属既有 owner 的 glob）。本专项对这些路径的代码改动不因本登记扩大所有权。
+
+**保存副作用：** `loom register` 重写 `registry.yaml` 时可能产生既有条目的 YAML 折行差异；无 owner/session/takeover 语义改写。
+
+状态：正式登记已执行；本回执随 PR #62 提交 registry 行。
