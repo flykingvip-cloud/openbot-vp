@@ -26,7 +26,7 @@
  * Product TTS: assertSpeakingTtsProvider rejects OpusFrameTtsProvider on the
  * MODULE path; VoiceEnv path uses forbidOpusFrameForSpoken:true.
  *
- * Pin: DEVICE_SDK_AUDIO_BRIDGE_SHA (32efcee… — device-sdk PR #30 voice-harness:sim).
+ * Pin: DEVICE_SDK_AUDIO_BRIDGE_SHA (9b7fb6a… — device-sdk PR #31 device-edge-auth 两跳 proxy).
  */
 
 import path from "node:path";

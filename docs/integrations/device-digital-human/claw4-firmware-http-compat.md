@@ -88,7 +88,7 @@ That text is submitted into the existing integrations turn API (`input.type = te
 
 ### Agent A audio bridge (pinned)
 
-**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`32efcee050f32f5be0c4ca9bf18c8444d15e35a7`** (flykingvip-cloud/openbot-device-sdk PR #30 voice-harness sim on main; builds on #29 Opus uplink / #28 VoiceEnv). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services). SDK 侧另有 `npm run voice-harness:sim`（纵向 voice harness sim 层；本仓本 PR 不接入）。
+**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`9b7fb6a8b8bc1ac17563c71f216b112446cb7b0c`** (flykingvip-cloud/openbot-device-sdk PR #31 device-edge-auth 两跳 proxy on main; builds on #30 voice-harness / #29 Opus uplink / #28 VoiceEnv). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services). SDK 侧另有 `npm run device-edge-auth -- --smoke`（device→edge→OpenBot 两跳 lab proxy 冒烟；本仓本 PR **不**接入 device-edge-auth / 两跳 proxy / 鉴权改动）。
 
 `OPENBOT_CONTRACT_SHA` remains **`d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`** (unchanged; CONTROL freeze untouched).
 
@@ -131,7 +131,7 @@ If MODULE override is invalid, or VoiceEnv import/factory throws, OpenBot logs c
 
 Lazy bind runs on the first formal transcript resolve that needs a bridge (`ensureClaw4DeviceSdkAudioBridgeBound`), same lifecycle style as the in-process firmware service bind.
 
-**Pin tip:** **`32efcee…`** (`32efcee050f32f5be0c4ca9bf18c8444d15e35a7`) — device-sdk PR #30（`npm run voice-harness:sim`；sim 层 longitudinal harness；real/device 仍 JOINT_PENDING）. Builds on #29 Opus uplink / #28 VoiceEnv. Opus 上行选型（#29）仍适用：`asrProvider.stream()` + `codec:"opus"`；PCM-only 才 `wrapAsrProviderWithOpusDecode`；WAV upload / `transcribeWav` 不变。
+**Pin tip:** **`9b7fb6a…`** (`9b7fb6a8b8bc1ac17563c71f216b112446cb7b0c`) — device-sdk PR #31（`npm run device-edge-auth -- --smoke`；device→edge→OpenBot 两跳 lab proxy；本仓不接入）. Builds on #30 voice-harness / #29 Opus uplink / #28 VoiceEnv. Opus 上行选型（#29）仍适用：`asrProvider.stream()` + `codec:"opus"`；PCM-only 才 `wrapAsrProviderWithOpusDecode`；WAV upload / `transcribeWav` 不变。
 
 **Opus 上行选型（Agent A #29，本仓不改实现）：** 分包上行用 `asrProvider.stream()` 并标 `codec:"opus"`；仅当 Provider 只吃 PCM 时才 `wrapAsrProviderWithOpusDecode`；整段 WAV upload / `transcribeWav` 路径不变。绑桥逻辑、BIND 开关、MODULE/VoiceEnv、拒 `OpusFrameTtsProvider`、合同针 `d7f0e1d8…` / CONTROL_FREEZE **本 PR 一律不改**。
 
