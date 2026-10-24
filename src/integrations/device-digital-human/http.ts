@@ -91,11 +91,7 @@ async function handle(
       await serveFixture(options.fixtureDir, relative.slice("/media/fixtures/".length), req, res);
       return;
     }
-    if (req.method === "PUT" && relative.startsWith("/media/uploads/")) {
-      const ticket = decodeURIComponent(relative.slice("/media/uploads/".length));
-      const bytes = await readLimited(req, UPLOAD_LIMIT);
-      const contentType = headerString(req, "content-type")?.split(";")[0]?.trim();
-      sendJson(res, 200, options.service.acceptUpload(ticket, bytes, contentType), traceId);
+    if (await handleDeviceDhMedia(options.service, req, res, relative, traceId)) {
       return;
     }
     await dispatch(options.service, req, res, relative, url, traceId);
@@ -187,6 +183,46 @@ export async function handleDeviceDhGrantMint(
     // Grant GET stays readable after revoke so device-control sees status.
     const grant = service.requireGrant(client, credential, true);
     sendJson(res, 200, service.getGrant(grant, decodeURIComponent(grantId[1] ?? "")), traceId);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Media upload-ticket surface shared by the loopback stub and the gateway
+ * co-located mount (INPROCESS :18789).
+ * Owns POST /media/upload-tickets and PUT /media/uploads/{ticket}.
+ * Returns true when `relative` is owned by this surface (including wrong method
+ * on upload-tickets).
+ */
+export async function handleDeviceDhMedia(
+  service: DeviceDhService,
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  relative: string,
+  traceId: string,
+): Promise<boolean> {
+  const method = req.method ?? "GET";
+  if (method === "PUT" && relative.startsWith("/media/uploads/")) {
+    const rest = relative.slice("/media/uploads/".length);
+    if (!rest || rest.includes("/")) {
+      return false;
+    }
+    const ticket = decodeURIComponent(rest);
+    const bytes = await readLimited(req, UPLOAD_LIMIT);
+    const contentType = headerString(req, "content-type")?.split(";")[0]?.trim();
+    sendJson(res, 200, service.acceptUpload(ticket, bytes, contentType), traceId);
+    return true;
+  }
+  if (relative === "/media/upload-tickets") {
+    if (method !== "POST") {
+      throw new DeviceDhError("PARAM_UNSUPPORTED", "POST required");
+    }
+    const client = service.authenticate(...basicParts(req), "service");
+    const credential = headerString(req, "x-openbot-grant-credential");
+    const grant = service.requireGrant(client, credential, false);
+    const body = await readJson(req);
+    sendJson(res, 201, service.createUploadTicket(grant, body), traceId);
     return true;
   }
   return false;
@@ -393,9 +429,7 @@ async function dispatch(
     );
     return;
   }
-  if (method === "POST" && relative === "/media/upload-tickets") {
-    const body = await readJson(req);
-    sendJson(res, 201, service.createUploadTicket(grant, body), traceId);
+  if (await handleDeviceDhMedia(service, req, res, relative, traceId)) {
     return;
   }
   throw new DeviceDhError("OBJECT_NOT_FOUND", "Object is not available");
