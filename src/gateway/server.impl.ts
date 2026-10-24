@@ -96,6 +96,7 @@ import {
   recoverAccountSpawnHandoffs,
 } from "./governance/spawn-snapshot-handoff.js";
 import { startGatewayGroupTaskHeartbeatScheduler } from "./group-task-heartbeat-scheduler-boot.js";
+import { recoverPendingHandoffTxnsAtGatewayBoot } from "./handoff-recovery-boot.js";
 import { LocalFileApprovalService } from "./local-files/approval.js";
 import { createNodeInvokePort } from "./local-files/node-port.js";
 import { configureLocalFilesRuntime } from "./local-files/runtime.js";
@@ -760,6 +761,20 @@ export async function startGatewayServer(
         cfg: cfgAtStart,
       });
     })().catch((err) => log.error(`Delivery recovery failed: ${String(err)}`));
+  }
+
+  // Recover pending collaboration handoff txns (WP-02). Flag-off = no-op.
+  if (!minimalTestGateway) {
+    void (async () => {
+      const logRecovery = log.child("handoff-recovery");
+      await recoverPendingHandoffTxnsAtGatewayBoot({
+        cfg: cfgAtStart,
+        log: {
+          info: (message) => logRecovery.info(message),
+          warn: (message) => logRecovery.warn(message),
+        },
+      });
+    })().catch((err) => log.error(`Handoff recovery failed: ${String(err)}`));
   }
 
   const execApprovalManager = new ExecApprovalManager({
