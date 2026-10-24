@@ -99,14 +99,84 @@ describe("claw4 P1 ensureClaw4DeviceSdkAudioBridgeBound", () => {
     expect(getClaw4AudioBridge()).toBeUndefined();
   });
 
-  it("explicit on without provider modules leaves unbound (fail-closed)", async () => {
+  it("explicit on without locator or MODULE leaves unbound (fail-closed)", async () => {
     const ok = await ensureClaw4DeviceSdkAudioBridgeBound({
       [CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE_ENV]: "1",
-      [DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV]: "file:///tmp/missing-bridge.js",
     });
     expect(ok).toBe(false);
     expect(getClaw4AudioBridge()).toBeUndefined();
-    expect(claw4AudioBridgeEnvBindWarning()).toMatch(/ASR_MODULE|TTS_MODULE/);
+    expect(claw4AudioBridgeEnvBindWarning()).toMatch(/VoiceEnv|ASR\/TTS_MODULE|unbound/i);
+  });
+
+  it("explicit on + VoiceEnv module binds via createAudioBridgeFromVoiceEnv (default mock)", async () => {
+    const dir = makeFixtureDir();
+    const voiceUrl = writeModule(
+      dir,
+      "voice-env.mjs",
+      `
+export function createAudioBridgeFromVoiceEnv(options = {}) {
+  void options;
+  return {
+    createAbortHandle() {
+      const ac = new AbortController();
+      return {
+        abort: (reason) => ac.abort(reason),
+        get signal() { return ac.signal; },
+        get aborted() { return ac.signal.aborted; },
+      };
+    },
+    async transcribeWav(wavBytes) {
+      return "voice-env-mock:" + wavBytes.length;
+    },
+  };
+}
+`,
+    );
+    const ok = await ensureClaw4DeviceSdkAudioBridgeBound({
+      [CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE_ENV]: "1",
+      [DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV]: voiceUrl,
+    });
+    expect(ok).toBe(true);
+    const bridge = getClaw4AudioBridge();
+    expect(bridge).toBeDefined();
+    const text = await bridge!.transcribeWav(Buffer.from("RIFF...."));
+    expect(text).toBe("voice-env-mock:8");
+  });
+
+  it("VoiceEnv path fails closed when module lacks createAudioBridgeFromVoiceEnv", async () => {
+    const dir = makeFixtureDir();
+    const bridgeUrl = writeModule(
+      dir,
+      "audio-bridge-only.mjs",
+      `
+export function createAudioBridge() {
+  return {
+    createAbortHandle() {
+      const ac = new AbortController();
+      return { abort: (r) => ac.abort(r), get signal() { return ac.signal; }, get aborted() { return ac.signal.aborted; } };
+    },
+    async transcribeWav() { return "should-not-bind"; },
+  };
+}
+`,
+    );
+    const ok = await ensureClaw4DeviceSdkAudioBridgeBound({
+      [CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE_ENV]: "1",
+      [DEVICE_SDK_AUDIO_BRIDGE_MODULE_ENV]: bridgeUrl,
+    });
+    expect(ok).toBe(false);
+    expect(getClaw4AudioBridge()).toBeUndefined();
+    expect(claw4AudioBridgeEnvBindWarning()).toMatch(/createAudioBridgeFromVoiceEnv/);
+  });
+
+  it("partial MODULE override (only ASR) leaves unbound fail-closed", async () => {
+    const ok = await ensureClaw4DeviceSdkAudioBridgeBound({
+      [CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE_ENV]: "1",
+      [DEVICE_SDK_ASR_MODULE_ENV]: "file:///tmp/asr.mjs",
+    });
+    expect(ok).toBe(false);
+    expect(getClaw4AudioBridge()).toBeUndefined();
+    expect(claw4AudioBridgeEnvBindWarning()).toMatch(/only one|ASR_MODULE|TTS_MODULE/);
   });
 
   it("explicit on + mock modules binds successfully", async () => {

@@ -10,28 +10,30 @@
  *   OPENBOT_CLAW4_FIRMWARE_INPROCESS=1
  *   AND (OPENBOT_DEVICE_SDK_ROOT OR OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE)
  *
- * When allowed, loads speaking ASR+TTS provider factories from:
- *   OPENBOT_DEVICE_SDK_ASR_MODULE
- *   OPENBOT_DEVICE_SDK_TTS_MODULE
- * then calls bindClaw4AudioBridgeFromDeviceSdk (createAudioBridge @ pin
- * DEVICE_SDK_AUDIO_BRIDGE_SHA). Missing provider modules → fail closed:
- * clear log, leave unbound (formal upload without transcript stays
- * PARAM_UNSUPPORTED). Never half-binds. Never invents FunASR/EdgeTTS paths.
+ * When allowed:
+ *   1. Prefer Agent A `createAudioBridgeFromVoiceEnv` when
+ *      OPENBOT_DEVICE_SDK_ASR_MODULE / OPENBOT_DEVICE_SDK_TTS_MODULE are unset
+ *      (default mock; reference-http via Agent A OPENBOT_ASR_PROVIDER etc. —
+ *      B only passes env into the factory, never hardcodes vendors).
+ *   2. Explicit MODULE override: both ASR_MODULE and TTS_MODULE set → load
+ *      speaking providers and call createAudioBridge @ pin. Missing/invalid
+ *      MODULE path stays fail-closed (clear log, leave unbound). Partial
+ *      MODULE (only one set) also fail-closed.
  *
- * ROOT / AUDIO_BRIDGE_MODULE ≠ already bound — they only locate
- * createAudioBridge; providers still require the MODULE envs above.
+ * ROOT / AUDIO_BRIDGE_MODULE locate the SDK entry (voice index for VoiceEnv,
+ * or createAudioBridge for MODULE override). They are not a bound bridge.
  *
- * Product TTS: assertSpeakingTtsProvider rejects OpusFrameTtsProvider.
+ * Product TTS: assertSpeakingTtsProvider rejects OpusFrameTtsProvider on the
+ * MODULE path; VoiceEnv path uses forbidOpusFrameForSpoken:true.
  *
- * Forward: after device-sdk P1-1 merges, may optionally use
- * createAudioBridgeFromVoiceEnv — this module must stay on createAudioBridge
- * @ DEVICE_SDK_AUDIO_BRIDGE_SHA (47ca71a7…) until that pin is deliberately bumped.
+ * Pin: DEVICE_SDK_AUDIO_BRIDGE_SHA (dee79554… — device-sdk PR #28 VoiceEnv).
  */
 
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   bindClaw4AudioBridgeFromDeviceSdk,
+  bindClaw4AudioBridgeFromVoiceEnv,
   getClaw4AudioBridge,
   type Claw4AsrProvider,
   type Claw4TtsProvider,
@@ -227,28 +229,54 @@ async function attemptBind(env: NodeJS.ProcessEnv): Promise<boolean> {
 
   const asrSpec = env[DEVICE_SDK_ASR_MODULE_ENV]?.trim();
   const ttsSpec = env[DEVICE_SDK_TTS_MODULE_ENV]?.trim();
-  if (!asrSpec || !ttsSpec) {
+
+  // Explicit MODULE override: both required. Partial → fail-closed.
+  if (asrSpec || ttsSpec) {
+    if (!asrSpec || !ttsSpec) {
+      bindWarning = `Claw4 device-sdk audio bridge bind is allowed but only one of ${DEVICE_SDK_ASR_MODULE_ENV} / ${DEVICE_SDK_TTS_MODULE_ENV} is set — leaving unbound (fail-closed; set both for MODULE override, or unset both to use createAudioBridgeFromVoiceEnv).`;
+      console.warn(`[claw4-audio-bridge-bind] ${bindWarning}`);
+      return false;
+    }
+    try {
+      const asr = (await importProvider(asrSpec, "asr")) as Claw4AsrProvider;
+      const tts = (await importProvider(ttsSpec, "tts")) as Claw4TtsProvider;
+      await bindClaw4AudioBridgeFromDeviceSdk({ asr, tts, env });
+      bindWarning = undefined;
+      console.info(
+        "[claw4-audio-bridge-bind] Bound Claw4 audio bridge from device-sdk createAudioBridge (MODULE override, speaking TTS asserted)",
+      );
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof DeviceDhError || error instanceof Error
+          ? error.message
+          : "Claw4 device-sdk audio bridge bind failed";
+      bindWarning = message;
+      console.warn(`[claw4-audio-bridge-bind] Bind failed (fail-closed, unbound): ${message}`);
+      return false;
+    }
+  }
+
+  // No MODULE override → VoiceEnv factory (mock by default; reference-http via Agent A env).
+  if (!hasDeviceSdkBridgeLocator(env)) {
     bindWarning =
-      `Claw4 device-sdk audio bridge bind is allowed but ${DEVICE_SDK_ASR_MODULE_ENV} / ${DEVICE_SDK_TTS_MODULE_ENV} are missing — leaving unbound (formal upload without transcript stays PARAM_UNSUPPORTED). ` +
-      `OPENBOT_DEVICE_SDK_ROOT / OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE locate createAudioBridge only; they are not a bound bridge.`;
+      "Claw4 device-sdk audio bridge bind is allowed but neither VoiceEnv locator (OPENBOT_DEVICE_SDK_ROOT / OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE) nor ASR/TTS_MODULE override is set — leaving unbound (formal upload without transcript stays PARAM_UNSUPPORTED).";
     console.warn(`[claw4-audio-bridge-bind] ${bindWarning}`);
     return false;
   }
 
   try {
-    const asr = (await importProvider(asrSpec, "asr")) as Claw4AsrProvider;
-    const tts = (await importProvider(ttsSpec, "tts")) as Claw4TtsProvider;
-    await bindClaw4AudioBridgeFromDeviceSdk({ asr, tts, env });
+    await bindClaw4AudioBridgeFromVoiceEnv({ env });
     bindWarning = undefined;
     console.info(
-      "[claw4-audio-bridge-bind] Bound Claw4 audio bridge from device-sdk createAudioBridge (speaking TTS asserted)",
+      "[claw4-audio-bridge-bind] Bound Claw4 audio bridge from device-sdk createAudioBridgeFromVoiceEnv (OpusFrame forbidden)",
     );
     return true;
   } catch (error) {
     const message =
       error instanceof DeviceDhError || error instanceof Error
         ? error.message
-        : "Claw4 device-sdk audio bridge bind failed";
+        : "Claw4 device-sdk VoiceEnv audio bridge bind failed";
     bindWarning = message;
     console.warn(`[claw4-audio-bridge-bind] Bind failed (fail-closed, unbound): ${message}`);
     return false;
@@ -256,7 +284,7 @@ async function attemptBind(env: NodeJS.ProcessEnv): Promise<boolean> {
 }
 
 /**
- * Lazy once-per-process bind of Agent A createAudioBridge into setClaw4AudioBridge.
+ * Lazy once-per-process bind of Agent A createAudioBridgeFromVoiceEnv (or MODULE override createAudioBridge) into setClaw4AudioBridge.
  * Safe to call repeatedly. Returns true when a bridge is available after the call.
  */
 export async function ensureClaw4DeviceSdkAudioBridgeBound(

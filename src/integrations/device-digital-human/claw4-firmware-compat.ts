@@ -9,8 +9,8 @@
  * ASR honesty (P0):
  * - Formal/production (default): never invent `[claw4-asr-stub]` or treat empty
  *   pass-through as real ASR. Prefer Agent A `createAudioBridge` (pin
- *   DEVICE_SDK_AUDIO_BRIDGE_SHA=47ca71a7…) via
- *   `bindClaw4AudioBridgeFromCreateAudioBridge`; abort on
+ *   DEVICE_SDK_AUDIO_BRIDGE_SHA=dee79554…) via
+ *   `createAudioBridgeFromVoiceEnv` / `bindClaw4AudioBridgeFromCreateAudioBridge`; abort on
  *   `createAbortHandle().signal`. Non-empty on-device pass-through via
  *   header / body field is allowed; query `transcript=` is deprecated.
  * - Explicit stub/test switch (`OPENBOT_CLAW4_ASR_STUB=1`): labeled stub or
