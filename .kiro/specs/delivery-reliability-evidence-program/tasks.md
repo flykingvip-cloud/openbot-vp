@@ -34,9 +34,9 @@ Registry 路径声明含 `.loom/registry.yaml` 登记行；**该文件提交仍�
 | WP-02 | 交接可靠落地            | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-H | 精确接管清单；代码改动待接管成立 |
 | WP-03 | 上下文唯一预算责任      | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-C | 组装链路审计+单一预算提案；未宣称 G2-C |
 | WP-04 | Fabric 决策比较         | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery（需协调 kiro-fabric） | G3-A | 设计+只读 approvals 夹具已落；无迁移；未宣称 G3-A |
-| WP-05 | Fabric 唯一路径试点     | DESIGNING         | WP-04；写操作加 WP-07           | grokbot-verifiable-delivery  | G3-B | PREP+绑定切片；默认 legacy；未宣称 G3-B |
-| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS+FIELD_MAPPING_ADR+READONLY_MULTISTEP_PICK+PILOT；LIVE 仍 false；**非 G4-A** |
-| WP-07 | 外部副作用幂等与核对    | NOT_STARTED       | WP-06                           | 未指定                       | G4-B | |
+| WP-05 | Fabric 唯一路径试点     | DESIGNING         | WP-04；写操作加 WP-07           | grokbot-verifiable-delivery  | G3-B | PREP+绑定切片+evidence prep；默认 legacy；G3-B=PREP/NOT_CLAIMED |
+| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | +LEDGER_FIELD_INCREMENT（orch-lease-fields 扩展模块）；LIVE 仍 false；G4-A=PREP/NOT_CLAIMED；**非 G4-A** |
+| WP-07 | 外部副作用幂等与核对    | DESIGNING         | WP-06                           | grokbot-verifiable-delivery  | G4-B | DESIGN+矩阵模板+action-idempotency helper；未接线 live send；**非 G4-B** |
 | WP-08 | constitutional 内部约束 | NOT_STARTED       | WP-01、WP-04；跨恢复加 WP-06/07 | 未指定                       | G5   | 待合同与归属 |
 | WP-09 | 经验归因与统计          | NOT_STARTED       | WP-00、WP-01                    | 未指定                       | G6-A | |
 | WP-10 | 收益对照实验            | NOT_STARTED       | WP-09                           | 未指定                       | G6-B | 可备合成回放；收益 UNKNOWN |
@@ -104,6 +104,23 @@ WP-06 / grokbot-verifiable-delivery / DESIGNING(SHAPE+LEASE_HELPER+KILL_FIXTURE_
 完成：实体映射；LIVE_INVOKE=false；lease/fence 形状+文件/内存 store+单测；KILL_FIXTURE_HARNESS；FIELD_MAPPING_ADR；**READONLY_MULTISTEP_PICK+PILOT**（memory→web_read→acceptance；ADR 命名；mock 只读 invoke；不写 ledger）  
 证据：`wp06/orchestration-persistence-lease-design.md`；`wp06/field-mapping-adr.md`；`wp06/readonly-multistep-pilot.md`；`src/task-orchestration/lease-store.ts`；`src/task-orchestration/lease-kill-fixtures.ts`；`src/task-orchestration/readonly-multistep-pilot.ts`  
 明确：未武装调度器；**明确不宣称 G4-A**（harness/pilot only，非生产 ledger 证据包）；未挂 ledger 生产持久面；未打开 `ORCHESTRATION_LIVE_INVOKE`  
-下一步（延期）：ledger event 增量草案或将 lease 权威挂 ledger/task 增量；仍不解锁 live invoke  
+下一步（延期）：人审后将 provisional 字段挂 fold/生产持久面；G4-A 需生产 ledger 证据；仍不解锁 live invoke  
+— grokbot-verifiable-delivery
+
+### WP-05..07 推进（2026-10-24 · ledger increment / WP-07 DESIGN / evidence prep）
+
+WP-05 / grokbot-verifiable-delivery / DESIGNING(PREP) / evidence prep SHA pending / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：`evidence/g3b-path-convergence-evidence-prep.md`（准则映射；**PREP/NOT_CLAIMED**）  
+明确：未宣称 G3-B；外部写仍依赖 WP-07  
+
+WP-06 / grokbot-verifiable-delivery / DESIGNING(+LEDGER_FIELD_INCREMENT) / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：`src/progress-ledger/orch-lease-fields.ts`（+test）；`wp06/ledger-field-increment.md`；`wp06/live-invoke-readiness.md`（**KEEP LIVE=false**）；`evidence/g4a-recovery-evidence-prep.md`（**PREP/NOT_CLAIMED**）  
+明确：未改 ExecutionStep/Event fold；未打开 `ORCHESTRATION_LIVE_INVOKE`；**不宣称 G4-A**  
+
+WP-07 / grokbot-verifiable-delivery / DESIGNING / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：`wp07/external-side-effect-idempotency-design.md`；`wp07/adapter-capability-matrix.md`（模板）；`src/task-orchestration/action-idempotency.ts`（+test；未接线 live send）  
+明确：**不宣称 G4-B**；不夺 Fabric/outbox 所有权  
+
+Registry：`evidence/registry-kiro-loom-handoff.md` — **未提交** `.loom/registry.yaml`（脏/占用交 kiro-loom）  
 — grokbot-verifiable-delivery
 
