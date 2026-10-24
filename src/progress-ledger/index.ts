@@ -105,3 +105,20 @@ export type {
   OrchLeaseFieldsParseOk,
   OrchLeaseLedgerFields,
 } from "./orch-lease-fields.js";
+export {
+  CANONICAL_EXECUTION_STEP_SCHEMA_VERSION,
+  CANONICAL_STEP_STATUS_UNKNOWN_OUTCOME,
+  assertCanonicalStepFields,
+  compatReadCanonicalFieldsFromPayload,
+  mergeCanonicalStepFields,
+  nextAttemptCanonicalFields,
+  parseCanonicalExecutionStepFields,
+  validateCanonicalExecutionStepFields,
+} from "./execution-step-canonical.js";
+export type {
+  CanonicalExecutionStepFields,
+  CanonicalPayloadExtensions,
+  CanonicalStepParseFail,
+  CanonicalStepParseOk,
+  CanonicalStepStatusGuidance,
+} from "./execution-step-canonical.js";

@@ -6,6 +6,10 @@
  * NOT flip ORCHESTRATION_LIVE_INVOKE. Production authority remains pending human
  * acceptance of a later schema migration (see wp06/ledger-field-increment.md).
  *
+ * Canonical first-class action/attempt/idempotency fields live in
+ * execution-step-canonical.ts (ExecutionStep authority; payload extensions only).
+ * This module remains the lease/fence provisional bag.
+ *
  * Field names mirror field-mapping-adr.md and OrchLeaseRecord (lease-store.ts).
  */
 export const ORCH_LEASE_FIELDS_SCHEMA_VERSION = 1 as const;
