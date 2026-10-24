@@ -94,3 +94,14 @@ export type { HumanGateNotification, HumanGatePendingItem } from "./human-gate.j
 export type { AdminProgressLedgerItem, AdminProgressLedgerResult } from "./admin-read.js";
 export type { LedgerMetrics, LedgerMetricsSnapshot } from "./metrics.js";
 export { DEFAULT_STALE_AFTER_MS, PROGRESS_LEDGER_SCHEMA_VERSION } from "./types.js";
+export {
+  ORCH_LEASE_FIELDS_SCHEMA_VERSION,
+  orchLeaseRecordToLedgerFields,
+  parseOrchLeaseLedgerFields,
+  validateOrchLeaseLedgerFields,
+} from "./orch-lease-fields.js";
+export type {
+  OrchLeaseFieldsParseFail,
+  OrchLeaseFieldsParseOk,
+  OrchLeaseLedgerFields,
+} from "./orch-lease-fields.js";
