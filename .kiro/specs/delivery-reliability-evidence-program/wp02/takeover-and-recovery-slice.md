@@ -1,7 +1,7 @@
 # WP-02 精确接管清单与修复切片：交接恢复接线
 
-状态：AUDITING — **接管尚未成立，未改运行代码**  
-拍板约束：不整片接管 `collaboration-dispatch/**` 或 `attempt.ts`；保持 handoff 开关与权限边界现状。
+状态：WIRED (local) — loom `--via verified` 已追加精确路径；启动接线 + boot 测已落地，**未宣称 G2-H / ACCEPTED**  
+拍板约束：不整片接管 `collaboration-dispatch/**` 或 `attempt.ts`；保持 handoff 开关与权限边界现状。`handoff-contract.ts` **未改**。
 
 ## 缺口实证（E0）
 
@@ -47,3 +47,11 @@
 - 崩溃夹具：投影收敛。
 - 重复 recover：无二次 apply 效果。
 - flag off：行为与今日一致（无写）。
+
+## 落地记录（2026-10-24，Asia/Shanghai）
+
+- Loom：`delivery-reliability-evidence-program:grokbot-verifiable-delivery` 追加 paths：
+  `src/gateway/server.impl.ts`、`src/gateway/handoff-recovery-boot.ts`、`src/gateway/handoff-recovery-boot.test.ts`（`--via verified`）。
+- 实现：新建 `handoff-recovery-boot.ts`（发现 pending `*.txn` → 构造 recovery authority → `recoverPendingHandoffTxns`）；`server.impl.ts` 在 delivery recovery 旁挂 fail-closed 异步调用；flag 默认仍 false。
+- 测试：`pnpm exec vitest run src/gateway/handoff-recovery-boot.test.ts` — 2 passed（flag-off no-op；crash roll-forward + 幂等再跑）。
+- `.loom/registry.yaml` 仍由 kiro-loom land；本切片代码 commit **不含** registry。
