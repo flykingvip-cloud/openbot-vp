@@ -125,6 +125,11 @@ type PanelState = {
   rebindScopes: string[];
   confirmRevoke: boolean;
   showTransfer: boolean;
+  /** Pairing for same-claimant transfer (revoke then add). Not a cross-user claim write. */
+  transferScan: string;
+  transferDeviceId: string;
+  transferChallenge: string;
+  transferCode: string;
   /** Set on the digital-human detail page. Empty on personal settings. */
   lockedHumanId: string;
   lockedHumanName: string;
@@ -165,6 +170,10 @@ function freshState(): PanelState {
     rebindScopes: ["chat"],
     confirmRevoke: false,
     showTransfer: false,
+    transferScan: "",
+    transferDeviceId: "",
+    transferChallenge: "",
+    transferCode: "",
     lockedHumanId: "",
     lockedHumanName: "",
   };
@@ -540,6 +549,10 @@ function renderDetail(device: PersonalDeviceView) {
           @click=${() => {
             state.showTransfer = true;
             state.confirmRevoke = false;
+            state.transferScan = "";
+            state.transferDeviceId = device.externalDeviceId || "";
+            state.transferChallenge = "";
+            state.transferCode = "";
             rerender();
           }}
         >
@@ -569,7 +582,36 @@ function renderDetail(device: PersonalDeviceView) {
         state.showTransfer
           ? html`
               <div class="callout info" data-testid="personal-device-transfer-note">
-                只有当前认领人可以解除绑定。对方需要用新的配对码重新添加。不会把设备直接改到别人名下。
+                <p class="personal-devices__callout-copy">
+                  将解除当前授权，并用上方所选数字人/权限 + 新配对码一次建好新绑定。只限当前认领人；不会把设备直接改到别人名下。
+                </p>
+                <label class="personal-devices__field">
+                  <span>新配对码（粘贴扫描 JSON）</span>
+                  <textarea
+                    class="employee-workbench__settings-input"
+                    data-testid="personal-device-transfer-scan"
+                    rows="3"
+                    .value=${state.transferScan}
+                    @input=${(event: Event) => {
+                      const raw = (event.target as HTMLTextAreaElement).value;
+                      applyTransferScan(raw);
+                    }}
+                  ></textarea>
+                </label>
+                <div class="personal-devices__meta" data-testid="personal-device-transfer-parsed">
+                  设备编号 ${state.transferDeviceId || "—"} · 挑战号 ${state.transferChallenge || "—"} · 配对码 ${state.transferCode || "—"}
+                </div>
+                <div class="personal-devices__callout-actions">
+                  <button
+                    type="button"
+                    class="btn btn--primary"
+                    data-testid="personal-device-transfer-confirm"
+                    ?disabled=${state.busy}
+                    @click=${() => void transfer(device)}
+                  >
+                    确认转移
+                  </button>
+                </div>
               </div>
             `
           : nothing
@@ -1023,6 +1065,77 @@ async function revoke(device: PersonalDeviceView): Promise<void> {
     });
     state.confirmRevoke = false;
     setNotice("已解除绑定。", "success");
+  });
+}
+
+function applyTransferScan(raw: string): void {
+  const parsed = parsePairingScan(raw);
+  state.transferScan = raw;
+  if (!parsed) {
+    setNotice("没有从扫描内容里读到设备编号或配对码。", "error");
+    rerender();
+    return;
+  }
+  if (parsed.deviceId) {
+    state.transferDeviceId = parsed.deviceId;
+  }
+  if (parsed.challenge) {
+    state.transferChallenge = parsed.challenge;
+  }
+  if (parsed.code) {
+    state.transferCode = parsed.code;
+  }
+  setNotice("已填入新配对信息。确认数字人和权限后转移。", "info");
+  rerender();
+}
+
+/**
+ * Same-claimant transfer: revoke the current binding, then add again with a
+ * fresh pairing code and the selected digital human / scopes. Not a cross-user
+ * claim write — another person still adds with their own session + pairing.
+ */
+async function transfer(device: PersonalDeviceView): Promise<void> {
+  if (!state.rebindHumanId || state.rebindScopes.length === 0) {
+    setNotice("选择要绑定的数字人和权限。", "error");
+    rerender();
+    return;
+  }
+  const externalDeviceId = state.transferDeviceId.trim() || device.externalDeviceId.trim();
+  const challenge = state.transferChallenge.trim();
+  const code = state.transferCode.trim();
+  if (!device.platformId || !externalDeviceId || !challenge || !code) {
+    setNotice("请粘贴新的配对码（含设备编号、挑战号、配对码）后再转移。", "error");
+    rerender();
+    return;
+  }
+  await run(async (api) => {
+    if (device.binding) {
+      await api.submit({
+        operationId: operationId(),
+        kind: "revoke",
+        deviceId: device.deviceId,
+      });
+    }
+    const next = await api.submit({
+      operationId: operationId(),
+      kind: "add",
+      platformId: device.platformId,
+      externalDeviceId,
+      digitalHumanId: state.rebindHumanId,
+      displayName: device.displayName,
+      scopes: state.rebindScopes,
+      pairing: { challenge, proof: code },
+    });
+    state.showTransfer = false;
+    state.transferScan = "";
+    state.transferDeviceId = "";
+    state.transferChallenge = "";
+    state.transferCode = "";
+    state.mode = "list";
+    if (next) {
+      state.selectedId = next.deviceId;
+    }
+    setNotice("已转移：原绑定已解除，新绑定已提交。", "success");
   });
 }
 
