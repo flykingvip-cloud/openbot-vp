@@ -1,11 +1,11 @@
 /**
- * Gateway mount for integrations grant mint (consent → PKCE → exchange).
+ * Gateway mount for integrations grant mint + media upload-tickets.
  *
- * Co-locates the grant surface on the same in-process DeviceDhService used by
+ * Co-locates the grant/media surface on the same in-process DeviceDhService used by
  * Claw4 firmware HTTP when OPENBOT_CLAW4_FIRMWARE_INPROCESS=1 (or when a
- * service is injected via setClaw4FirmwareService). Joint can mint grants on
- * local gateway 18789 without a temporary ops seed and without talking to a
- * separate 8787 process.
+ * service is injected via setClaw4FirmwareService). Joint can mint grants and
+ * issue media upload-tickets on local gateway 18789 without a temporary ops
+ * seed and without talking to a separate 8787 process.
  *
  * Owns only:
  *   POST /api/integrations/v1/consent/authorization-codes
@@ -13,13 +13,15 @@
  *   GET  /api/integrations/v1/grants/{authorizationRef}
  *   POST /api/integrations/v1/grants/{authorizationRef}/revoke
  *     (credential optional — revoke-by-ref for hash-only recovery)
+ *   POST /api/integrations/v1/media/upload-tickets
+ *   PUT  /api/integrations/v1/media/uploads/{ticket}
  *
- * Does not mount the rest of /api/integrations/v1 (turns, SSE, media, …).
+ * Does not mount the rest of /api/integrations/v1 (turns, SSE, rebind, …).
  * Stub 8787 remains a valid full joint path. Does not change frozen
  * device-platform OpenAPI, flip grayRelease, or PROMOTE anything.
  *
  * Fail-closed:
- *   - Path not grant-mint → return false (production unchanged).
+ *   - Path not grant/media surface → return false (production unchanged).
  *   - INPROCESS/inject unbound → return false (do not claim the path).
  *   - INPROCESS enabled but bind failed → 503 UNAVAILABLE.
  */
@@ -31,7 +33,7 @@ import {
   resolveClaw4FirmwareService,
 } from "./claw4-firmware-bind.js";
 import { authInvalid, DeviceDhError } from "./errors.js";
-import { handleDeviceDhGrantMint } from "./http.js";
+import { handleDeviceDhGrantMint, handleDeviceDhMedia } from "./http.js";
 import type { DeviceDhService } from "./service.js";
 import { API_PREFIX, API_VERSION, PROTOCOL_VERSION } from "./types.js";
 import { randomId } from "./util.js";
@@ -59,7 +61,7 @@ function assertNoUntrustedIdentity(req: IncomingMessage): void {
   }
 }
 
-function isGrantMintPath(pathname: string): boolean {
+function isIntegrationsSurfacePath(pathname: string): boolean {
   if (!pathname.startsWith(API_PREFIX)) {
     return false;
   }
@@ -71,6 +73,12 @@ function isGrantMintPath(pathname: string): boolean {
     return true;
   }
   if (/^\/grants\/[^/]+\/revoke$/.test(relative)) {
+    return true;
+  }
+  if (relative === "/media/upload-tickets") {
+    return true;
+  }
+  if (/^\/media\/uploads\/[^/]+$/.test(relative)) {
     return true;
   }
   return /^\/grants\/[^/]+$/.test(relative);
@@ -117,8 +125,8 @@ function sendBackendUnavailable(res: ServerResponse, traceId: string): void {
 }
 
 /**
- * Handle grant-mint routes on the gateway. Returns true when this handler
- * owned the request.
+ * Handle grant-mint and media upload-ticket routes on the gateway.
+ * Returns true when this handler owned the request.
  */
 export async function handleIntegrationsGrantHttpRequest(
   req: IncomingMessage,
@@ -127,7 +135,7 @@ export async function handleIntegrationsGrantHttpRequest(
 ): Promise<boolean> {
   const url = new URL(req.url ?? "/", "http://localhost");
   const pathname = url.pathname;
-  if (!isGrantMintPath(pathname)) {
+  if (!isIntegrationsSurfacePath(pathname)) {
     return false;
   }
 
@@ -147,9 +155,12 @@ export async function handleIntegrationsGrantHttpRequest(
   const relative = pathname.slice(API_PREFIX.length) || "/";
   try {
     assertNoUntrustedIdentity(req);
+    if (await handleDeviceDhMedia(service, req, res, relative, traceId)) {
+      return true;
+    }
     const owned = await handleDeviceDhGrantMint(service, req, res, relative, traceId);
     if (!owned) {
-      // Path matched isGrantMintPath but grant surface declined (e.g. POST on
+      // Path matched isIntegrationsSurfacePath but surface declined (e.g. POST on
       // /grants/{id} without /revoke — rebind stays on the full stub). Do not claim.
       return false;
     }

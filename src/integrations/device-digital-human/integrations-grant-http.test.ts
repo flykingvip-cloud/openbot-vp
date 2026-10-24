@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
@@ -384,5 +385,146 @@ describe("integrations grant HTTP (gateway co-locate)", () => {
       restoreEnv("OPENBOT_DEVICE_DH_AGENT", prev.agent);
       resetClaw4FirmwareBindForTests();
     }
+  });
+
+  it("does not claim media upload-tickets when unbound", async () => {
+    await withHandler(undefined, async (base) => {
+      const res = await fetch(`${base}/api/integrations/v1/media/upload-tickets`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      expect(res.status).toBe(599);
+      expect(await res.text()).toBe("not-owned");
+    });
+  });
+
+  it("mints upload-ticket and accepts PUT on injected DeviceDhService (INPROCESS media)", async () => {
+    const service = makeService();
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const tinyJpeg = readFileSync(path.join(here, "examples", "fixtures", "frame.jpg"));
+
+    await withHandler(service, async (base) => {
+      const verifier = `v-${randomId(16)}`;
+      const challenge = pkceS256(verifier);
+      const consent = await fetch(`${base}/api/integrations/v1/consent/authorization-codes`, {
+        method: "POST",
+        headers: {
+          authorization: basicHeader("consent-sim", consentSecret),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          serviceAudience: "device-platform",
+          redirectUri,
+          codeChallenge: challenge,
+          codeChallengeMethod: "S256",
+          digitalHumanId: "agent-demo-1",
+          deviceId,
+          scopes: ["chat", "camera.capture", "media.read"],
+          state: "state-media",
+        }),
+      });
+      expect(consent.status).toBe(201);
+      const issued = (await consent.json()) as { authorizationCode: string };
+      const exchanged = await fetch(`${base}/api/integrations/v1/grants/exchange`, {
+        method: "POST",
+        headers: {
+          authorization: basicHeader("device-platform", serviceSecret),
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          authorizationCode: issued.authorizationCode,
+          codeVerifier: verifier,
+          redirectUri,
+        }),
+      });
+      expect(exchanged.status).toBe(200);
+      const grant = (await exchanged.json()) as {
+        authorizationRef: string;
+        authorizationCredential: string;
+      };
+      const client = service.authenticate("device-platform", serviceSecret, "service");
+      const record = service.requireGrant(client, grant.authorizationCredential, false);
+
+      service.putCapabilities(record, grant.authorizationRef, {
+        bindingVersion: 1,
+        deviceId,
+        online: true,
+        tools: [{ name: "camera.capture", available: true }],
+      });
+      const conversation = service.createConversation(record, {
+        bindingVersion: 1,
+        deviceId,
+      });
+      const conversationId = String(conversation.conversationId);
+      await service.submitTurn(
+        record,
+        conversationId,
+        {
+          turnId: "t-media-inprocess",
+          text: "拍照",
+          bindingVersion: 1,
+          input: { type: "text", text: "拍照" },
+        },
+        "idem-media-inprocess",
+      );
+
+      let requestId: string | undefined;
+      for (let i = 0; i < 40; i++) {
+        const events = service.listDeviceEvents(record, grant.authorizationRef, undefined);
+        const tool = events.find((event) => event.type === "tool.request");
+        if (tool && tool.payload && typeof tool.payload === "object") {
+          requestId = String((tool.payload as { requestId?: string }).requestId ?? "");
+          if (requestId) {
+            break;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 25));
+      }
+      expect(requestId).toBeTruthy();
+
+      const ticketRes = await fetch(`${base}/api/integrations/v1/media/upload-tickets`, {
+        method: "POST",
+        headers: {
+          authorization: basicHeader("device-platform", serviceSecret),
+          "x-openbot-grant-credential": grant.authorizationCredential,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          bindingVersion: 1,
+          requestId,
+          contentType: "image/jpeg",
+        }),
+      });
+      expect(ticketRes.status).toBe(201);
+      const ticket = (await ticketRes.json()) as {
+        mediaId: string;
+        ticket: string;
+        uploadPath: string;
+      };
+      expect(ticket.uploadPath).toMatch(/^\/api\/integrations\/v1\/media\/uploads\//);
+
+      const uploaded = await fetch(`${base}${ticket.uploadPath}`, {
+        method: "PUT",
+        headers: { "content-type": "image/jpeg" },
+        body: tinyJpeg,
+      });
+      expect(uploaded.status).toBe(200);
+      const meta = (await uploaded.json()) as { mediaId: string; contentType: string };
+      expect(meta.mediaId).toBe(ticket.mediaId);
+      expect(meta.contentType).toBe("image/jpeg");
+
+      // turns / SSE stay unmounted on this surface
+      const turns = await fetch(`${base}/api/integrations/v1/conversations`, {
+        method: "POST",
+        headers: {
+          authorization: basicHeader("device-platform", serviceSecret),
+          "x-openbot-grant-credential": grant.authorizationCredential,
+          "content-type": "application/json",
+        },
+        body: "{}",
+      });
+      expect(turns.status).toBe(599);
+    });
   });
 });

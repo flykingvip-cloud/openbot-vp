@@ -52,13 +52,13 @@ One session must stay on **one** runtime host:
 
 | Host | Port | Owns |
 | ---- | ---- | ---- |
-| Gateway (in-process bind) | **18789** | B1 **grant mint** + Claw4 **upload** / messages (when `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1` + stub config, or inject) |
-| Adjacent stub | **8787** | **Full** integrations surface: turns, SSE, media, rebind, revoke, **and** the same Claw4 `/api/v1/*` routes |
+| Gateway (in-process bind) | **18789** | B1 **grant mint** + **media upload-tickets** + Claw4 **upload** / messages (when `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1` + stub config, or inject) |
+| Adjacent stub | **8787** | **Full** integrations surface: turns, SSE, media, rebind, revoke, **and** the same Claw4 `/api/v1/*` routes (media also on 18789 when INPROCESS) |
 
 Rules:
 
 - Mint + upload on **18789** only when the in-process bind shares one `DeviceDhService` (same process memory).
-- Full turns / SSE / rebind / revoke remain on **8787** unless/until those routes are deliberately mounted on the gateway (they are not today).
+- Full turns / SSE / rebind remain on **8787** unless/until those routes are deliberately mounted on the gateway (they are not today). Grant revoke + media upload-tickets **are** mounted on 18789 when INPROCESS/inject is on.
 - **Do not** mint a grant on 8787 and upload on 18789 (or the reverse) — stores do not share memory across processes; the credential will not resolve.
 - Upload stays on this compat layer — **not** on the frozen device-control plane.
 
@@ -88,7 +88,7 @@ That text is submitted into the existing integrations turn API (`input.type = te
 
 ### Agent A audio bridge (pinned)
 
-**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37`** (flykingvip-cloud/openbot-device-sdk PR #32 npm `@0.1.0` 发布准备 / `dist` voice on main; builds on #31 device-edge-auth / #30 voice-harness / #29 Opus uplink / #28 VoiceEnv). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services). SDK #32 含 `@flykingvip-cloud/openbot-device-sdk@0.1.0` 发布准备与 `dist`，**尚未**真实 npm publish；真发前本仓继续 `OPENBOT_DEVICE_SDK_ROOT` + pin tip，**不**改为 npm 包 import。
+**Pin:** `DEVICE_SDK_AUDIO_BRIDGE_SHA` = **`87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37`** (flykingvip-cloud/openbot-device-sdk PR #32 npm `@0.1.0` 发布准备 / `dist` voice on main; builds on #31 device-edge-auth / #30 voice-harness / #29 Opus uplink / #28 VoiceEnv). Exports `createAudioBridge`, `createAudioBridgeFromVoiceEnv`, and `createVoiceProvidersFromEnv` from `adapters/voice` (also re-exported via metalio / services). `@flykingvip-cloud/openbot-device-sdk@0.1.0` 已发布到 GitHub Packages（tip `87a4a1a` / `DEVICE_SDK_AUDIO_BRIDGE_SHA=87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37`）。本仓 pin 不变；`OPENBOT_DEVICE_SDK_ROOT`+pin 继续可用，**不**强制切 npm import，也**不** bump SDK 版本。
 
 `OPENBOT_CONTRACT_SHA` remains **`d7f0e1d834dc9ccece6723f6d71dea8fa0cfcb1f`** (unchanged; CONTROL freeze untouched).
 
@@ -131,7 +131,7 @@ If MODULE override is invalid, or VoiceEnv import/factory throws, OpenBot logs c
 
 Lazy bind runs on the first formal transcript resolve that needs a bridge (`ensureClaw4DeviceSdkAudioBridgeBound`), same lifecycle style as the in-process firmware service bind.
 
-**Pin tip:** **`87a4a1a…`** (`87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37`) — device-sdk PR #32（npm `@0.1.0` 发布准备 / `dist`；真发前仍用 `OPENBOT_DEVICE_SDK_ROOT`+pin，不切 npm import）. Builds on #31 device-edge-auth / #30 voice-harness / #29 Opus uplink / #28 VoiceEnv. Opus 上行选型（#29）仍适用：`asrProvider.stream()` + `codec:"opus"`；PCM-only 才 `wrapAsrProviderWithOpusDecode`；WAV upload / `transcribeWav` 不变。
+**Pin tip:** **`87a4a1a…`** (`87a4a1a1448286ff0db4ad45c2f9a2a29c2b5e37`) — device-sdk PR #32；GitHub Packages 已有 `@flykingvip-cloud/openbot-device-sdk@0.1.0`（不 bump）。本仓继续可用 `OPENBOT_DEVICE_SDK_ROOT`+pin，不强制切 npm import. Builds on #31 device-edge-auth / #30 voice-harness / #29 Opus uplink / #28 VoiceEnv. Opus 上行选型（#29）仍适用：`asrProvider.stream()` + `codec:"opus"`；PCM-only 才 `wrapAsrProviderWithOpusDecode`；WAV upload / `transcribeWav` 不变。
 
 **Opus 上行选型（Agent A #29，本仓不改实现）：** 分包上行用 `asrProvider.stream()` 并标 `codec:"opus"`；仅当 Provider 只吃 PCM 时才 `wrapAsrProviderWithOpusDecode`；整段 WAV upload / `transcribeWav` 路径不变。绑桥逻辑、BIND 开关、MODULE/VoiceEnv、拒 `OpusFrameTtsProvider`、合同针 `d7f0e1d8…` / CONTROL_FREEZE **本 PR 一律不改**。
 
@@ -204,7 +204,7 @@ When the in-process bind above is on (or a service is injected), the gateway als
 | `POST` | `/api/integrations/v1/grants/exchange` | Service client Basic; returns `authorizationRef` + credential |
 | `GET` | `/api/integrations/v1/grants/{authorizationRef}` | Service Basic + `X-OpenBot-Grant-Credential` |
 
-Joint can mint on **18789** and immediately use the credential on Claw4 `/api/v1/upload` without a temporary ops seed and without crossing to 8787. The rest of `/api/integrations/v1` (turns, SSE, media, rebind, revoke, …) stays **unmounted** on the gateway.
+Joint can mint on **18789** and immediately use the credential on Claw4 `/api/v1/upload` (and media upload-tickets) without a temporary ops seed and without crossing to 8787. Turns / SSE / rebind stay **unmounted** on the gateway; grant revoke + media upload-tickets are mounted when INPROCESS/inject is on.
 
 **Default / production:** with `OPENBOT_CLAW4_FIRMWARE_INPROCESS` unset and no inject, grant paths are **not claimed** (fail closed / unchanged). If INPROCESS is set but `OPENBOT_DEVICE_DH_STUB_CONFIG` is missing/invalid, grant mint returns HTTP 503 `UNAVAILABLE`.
 
