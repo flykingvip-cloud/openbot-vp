@@ -1,6 +1,6 @@
 # WP-06 编排持久恢复与租约 — 设计（现有存储增量）
 
-- 状态：**DESIGN / SHAPE+LEASE_HELPER**（**不解除** `ORCHESTRATION_LIVE_INVOKE`；已落 lease/fence 形状与单测，调度器仍 fail-closed）
+- 状态：**DESIGN / SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS**（**不解除** `ORCHESTRATION_LIVE_INVOKE`；已落 lease/fence 形状、文件背 kill/restart 夹具与单测；调度器仍 fail-closed；**非 G4-A**）
 - 日期：2026-10-24（Asia/Shanghai）
 - HEAD（撰写时）：`2df36a55748f891d6eb05ad067318bc8783fd794`
 - 作者：grokbot-verifiable-delivery
@@ -59,7 +59,7 @@ Readonly invoke 行为保持：可执行 memory/web/skill 适配；`invokedTool`
 
 ## 5. Kill / restart 夹具计划（命名级）
 
-对齐 G4-A，本轮只定场景名与期望，不造假指标：
+对齐 G4-A 场景名与期望；**slice #2** 已落文件背演练夹具（`lease-kill-fixtures`），仍**不是**生产 ledger 证据包 / **不宣称 G4-A**：
 
 | 夹具 ID | 杀点 | 期望（设计） |
 | --- | --- | --- |
@@ -70,20 +70,22 @@ Readonly invoke 行为保持：可执行 memory/web/skill 适配；`invokedTool`
 | `orch.kill.before-result-persist` | 持久化中崩溃 | 重启收敛到单一终态；无永久悬挂 step |
 | `orch.kill.after-result-persist` | 已落库未投影 | 投影/只读恢复收敛；重复 recover 无二次业务效果 |
 
-夹具存储必须用真实持久面（ledger 文件/既有 task store），禁止只测 in-memory `OrchestratorJob`。
+夹具存储：slice #2 对 **lease-store 可注入 `rootDir` 文件 JSON** 做真实 temp-dir 演练（新 store 实例 = 重启）；禁止只测 in-memory `OrchestratorJob`。生产权威仍须未来挂 ledger/task 增量——本 harness **不是** 生产 Progress Ledger 证据包。
 
-## 6. 增量落地顺序（后续轮，非本轮）
+## 6. 增量落地顺序（后续轮）
 
 1. 文档化字段映射表 + 与 WP-01 信封对齐。
 2. 选一个 **只读** 有限步骤工作流（例如 memory→web_read→acceptance check 名），planner 行为保持冻结。
 3. ~~持久化 job/step/attempt 最小字段 + lease/fence（仍 LIVE=false，调度器不武装）。~~ → **部分完成**：lease/fence 形状+单测已落（`lease-store`）；尚未接到 ledger/task 生产面。
-4. 跑 kill/restart 夹具证据包（夹具 ID 已枚举；证据包未跑）。
+4. ~~跑 kill/restart 夹具（命名+harness）。~~ → **KILL_FIXTURE_HARNESS 已落**（`lease-kill-fixtures` + vitest，真实 `fs.mkdtemp`）；**生产 ledger 证据包仍未跑**；**明确不宣称 G4-A**。
 5. **禁止**本设计直接授权打开 `ORCHESTRATION_LIVE_INVOKE`。
 
 ## 7. 状态声明
 
-- 状态：**DESIGN / SHAPE+LEASE_HELPER**（2026-10-24 slice #1）。
-- 已落地：`src/task-orchestration/lease-store.ts`（+ unit tests）— 内存或可注入 `rootDir` 的文件 JSON 租约/fencing 状态机；`ORCH_KILL_FIXTURE_IDS` 场景枚举（只读恢复演练命名，无假指标）。
-- live invoke 仍 **false**；调度器未武装；**无 G4-A / ACCEPTED 宣称**。
-- 仍缺口：未挂既有 ledger/task 生产持久面；未跑真实 kill/restart 证据包；禁止本切片打开 `ORCHESTRATION_LIVE_INVOKE`。
-- 关键结论：编排面已有可测租约/fencing **形状**；生产恢复权威仍须挂既有存储增量（非新 DB），并继续借鉴（而非挪用）handoff lock / memory fencing 语义。
+- 状态：**DESIGN / SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS**（2026-10-24 slice #2）。
+- 已落地：
+  - `src/task-orchestration/lease-store.ts`（+ unit tests）— 内存或可注入 `rootDir` 的文件 JSON 租约/fencing 状态机；`ORCH_KILL_FIXTURE_IDS` 场景枚举。
+  - `src/task-orchestration/lease-kill-fixtures.ts`（+ unit tests）— **真实文件背** kill/restart 演练：每夹具 seed → drop store → 同 `rootDir` 新实例 → 断言；导出 id 列表 + `runOrchKillFixture` / `runAllOrchKillFixtures`。
+- live invoke 仍 **false**；调度器未武装；**无 G4-A / ACCEPTED 宣称**（harness only，非生产 ledger 证据包）。
+- 仍缺口：未挂既有 ledger/task 生产持久面；未跑挂生产存储的 G4-A 证据包；禁止本切片打开 `ORCHESTRATION_LIVE_INVOKE`。
+- 关闭结论：编排面已有可测租约/fencing **形状** + 文件背 kill 夹具；生产恢复权威仍须挂既有存储增量（非新 DB），并继续借鉴（而非挪用）handoff lock / memory fencing 语义。
