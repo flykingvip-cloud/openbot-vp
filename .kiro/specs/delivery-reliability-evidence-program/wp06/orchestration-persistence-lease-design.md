@@ -1,6 +1,6 @@
 # WP-06 编排持久恢复与租约 — 设计（现有存储增量）
 
-- 状态：**DESIGN**（**不解除** `ORCHESTRATION_LIVE_INVOKE`；本轮无 runtime 代码）
+- 状态：**DESIGN / SHAPE+LEASE_HELPER**（**不解除** `ORCHESTRATION_LIVE_INVOKE`；已落 lease/fence 形状与单测，调度器仍 fail-closed）
 - 日期：2026-10-24（Asia/Shanghai）
 - HEAD（撰写时）：`2df36a55748f891d6eb05ad067318bc8783fd794`
 - 作者：grokbot-verifiable-delivery
@@ -76,12 +76,14 @@ Readonly invoke 行为保持：可执行 memory/web/skill 适配；`invokedTool`
 
 1. 文档化字段映射表 + 与 WP-01 信封对齐。
 2. 选一个 **只读** 有限步骤工作流（例如 memory→web_read→acceptance check 名），planner 行为保持冻结。
-3. 持久化 job/step/attempt 最小字段 + lease/fence（仍 LIVE=false，调度器不武装）。
-4. 跑 kill/restart 夹具证据包。
+3. ~~持久化 job/step/attempt 最小字段 + lease/fence（仍 LIVE=false，调度器不武装）。~~ → **部分完成**：lease/fence 形状+单测已落（`lease-store`）；尚未接到 ledger/task 生产面。
+4. 跑 kill/restart 夹具证据包（夹具 ID 已枚举；证据包未跑）。
 5. **禁止**本设计直接授权打开 `ORCHESTRATION_LIVE_INVOKE`。
 
 ## 7. 状态声明
 
-- 状态：**DESIGN**。
-- 无 runtime 代码；live invoke 仍 false；无 G4-A。
-- 关键结论：编排面今日 **无** 生产租约/fencing 实体；`OrchestratorJob` 仅为未来形状；恢复能力需挂既有 ledger/task 存储增量，并借鉴（而非挪用）handoff lock / memory fencing 语义。
+- 状态：**DESIGN / SHAPE+LEASE_HELPER**（2026-10-24 slice #1）。
+- 已落地：`src/task-orchestration/lease-store.ts`（+ unit tests）— 内存或可注入 `rootDir` 的文件 JSON 租约/fencing 状态机；`ORCH_KILL_FIXTURE_IDS` 场景枚举（只读恢复演练命名，无假指标）。
+- live invoke 仍 **false**；调度器未武装；**无 G4-A / ACCEPTED 宣称**。
+- 仍缺口：未挂既有 ledger/task 生产持久面；未跑真实 kill/restart 证据包；禁止本切片打开 `ORCHESTRATION_LIVE_INVOKE`。
+- 关键结论：编排面已有可测租约/fencing **形状**；生产恢复权威仍须挂既有存储增量（非新 DB），并继续借鉴（而非挪用）handoff lock / memory fencing 语义。

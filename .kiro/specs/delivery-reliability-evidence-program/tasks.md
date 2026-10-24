@@ -35,7 +35,7 @@ Registry 路径声明含 `.loom/registry.yaml` 登记行；**该文件提交仍�
 | WP-03 | 上下文唯一预算责任      | AUDITING          | WP-00、WP-01                    | grokbot-verifiable-delivery  | G2-C | 组装链路审计+单一预算提案；未宣称 G2-C |
 | WP-04 | Fabric 决策比较         | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery（需协调 kiro-fabric） | G3-A | 设计+只读 approvals 夹具已落；无迁移；未宣称 G3-A |
 | WP-05 | Fabric 唯一路径试点     | DESIGNING         | WP-04；写操作加 WP-07           | grokbot-verifiable-delivery  | G3-B | PREP+绑定切片；默认 legacy；未宣称 G3-B |
-| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | 存储/租约设计；ORCHESTRATION_LIVE_INVOKE 仍 false |
+| WP-06 | 编排持久恢复            | DESIGNING         | WP-00、WP-01                    | grokbot-verifiable-delivery  | G4-A | SHAPE+LEASE_HELPER 已落；LIVE 仍 false；未宣称 G4-A |
 | WP-07 | 外部副作用幂等与核对    | NOT_STARTED       | WP-06                           | 未指定                       | G4-B | |
 | WP-08 | constitutional 内部约束 | NOT_STARTED       | WP-01、WP-04；跨恢复加 WP-06/07 | 未指定                       | G5   | 待合同与归属 |
 | WP-09 | 经验归因与统计          | NOT_STARTED       | WP-00、WP-01                    | 未指定                       | G6-A | |
@@ -100,9 +100,10 @@ WP-05 / grokbot-verifiable-delivery / DESIGNING(PREP) / candidate SHA 2df36a55 /
 明确：未实现切换；未宣称 G3-B；外部写等 WP-07  
 证据：`wp05/path-convergence-prep.md`  
 
-WP-06 / grokbot-verifiable-delivery / DESIGNING / candidate SHA 2df36a55 / production NOT_DEPLOYED / benefit UNKNOWN  
-完成：实体映射；确认 LIVE_INVOKE=false；既有存储增量租约/fencing 提案；kill/restart 夹具名  
-证据：`wp06/orchestration-persistence-lease-design.md`  
-下一步：字段迁移 ADR；只读有限步骤工作流（仍不解锁 live invoke）  
+WP-06 / grokbot-verifiable-delivery / DESIGNING(SHAPE+LEASE_HELPER) / candidate SHA pending-wp06-lease-helper / production NOT_DEPLOYED / benefit UNKNOWN  
+完成：实体映射；LIVE_INVOKE=false；lease/fence 形状+文件/内存 store+单测；kill 夹具 ID 枚举  
+证据：`wp06/orchestration-persistence-lease-design.md`；`src/task-orchestration/lease-store.ts`  
+明确：未武装调度器；未宣称 G4-A；未挂 ledger 生产持久面  
+下一步：字段迁移 ADR；只读有限步骤工作流 + 真实 kill/restart 证据（仍不解锁 live invoke）  
 — grokbot-verifiable-delivery
 
