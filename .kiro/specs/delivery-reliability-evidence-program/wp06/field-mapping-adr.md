@@ -105,8 +105,32 @@
 
 本 ADR 正文仍不实施 runtime 迁移；只读多步 pilot 见独立切片文档与 helper。
 
+
+## 用户绑定冻结（2026-10-24）：ExecutionStep canonical
+
+**权威位置冻结为 ExecutionStep（一等字段）**；payload 仅扩展 / 脱敏诊断 / adapter 元数据。详见 `wp06/execution-step-canonical-schema.md`。
+
+### Canonical Step 字段（first-class）
+
+`logicalActionId`, `taskId`, `stepId`, `attemptId`, `tenantId`/`operatorId`, `executionPath`, `idempotencyKey`, `status`, `outcome`, `policyVersion`, `executorVersion`, `startedAt`/`completedAt`, `retryCount`, `evidenceRefs`, `externalReceiptRefs`, `errorCode`/`unknownReason`
+
+### payload（non-authority）
+
+adapter request/response、provider metadata、redacted diagnostics、non-canonical extensions。原始 payload 必须带内容哈希或版本引用。
+
+### 规则
+
+- 重试：同一 `logicalActionId` + `idempotencyKey`，新 `attemptId`
+- 同幂等键不同参数摘要 → 拒绝
+- 外部结果不明 → `status = unknown_outcome`（禁止 failed 后自动重试）
+- **compat read** 允许从 payload 回填缺失 Step 字段；**新写入优先 Step**；禁止双权威
+
+代码：`src/progress-ledger/execution-step-canonical.ts`（validators + merge/compat-read；**未**迁移 fold）。
+
+本 ADR 原「step **或** event payload」provisional 表述，对 **身份/状态/幂等** 字段以上述冻结为准（lease/fence 等仍见 `orch-lease-fields`）。
+
 ## 状态声明
 
-- 状态：**FIELD_MAPPING_ADR**（2026-10-24）；后续切片已落 **READONLY_MULTISTEP_PICK+PILOT**（见 `readonly-multistep-pilot.md`）。
+- 状态：**FIELD_MAPPING_ADR**（2026-10-24）；后续切片已落 **READONLY_MULTISTEP_PICK+PILOT**；**ExecutionStep canonical 边界已冻结**（见 `execution-step-canonical-schema.md`）。
 - 文档：`wp06/field-mapping-adr.md`（本文件）；设计文与 `tasks.md` 回指。
 - 本 ADR 切片无运行时迁移；`OrchLeaseRecord` 仍为形状合同。
