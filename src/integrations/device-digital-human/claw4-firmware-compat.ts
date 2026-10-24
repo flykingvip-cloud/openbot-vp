@@ -20,6 +20,7 @@
  * fallback). Never use a random turnId as the retry key.
  */
 
+import { ensureClaw4DeviceSdkAudioBridgeBound } from "./claw4-audio-bridge-bind.js";
 import { resolveClaw4AudioBridge, type Claw4AudioBridge } from "./claw4-audio-bridge.js";
 import { DeviceDhError, authInvalid } from "./errors.js";
 import type { DeviceDhService } from "./service.js";
@@ -105,6 +106,11 @@ export async function resolveClaw4Transcript(
     // Deprecated: speech in URL query leaks to access logs. Accepted for
     // backward compat only; callers should migrate to header/body.
     return { text: query, asr: "pass-through-query-deprecated" };
+  }
+
+  // P1 lazy startup bind (default off). No-op when switch denied or already injected.
+  if (!input.bridge) {
+    await ensureClaw4DeviceSdkAudioBridgeBound(env);
   }
 
   const bridge = resolveClaw4AudioBridge({ bridge: input.bridge });

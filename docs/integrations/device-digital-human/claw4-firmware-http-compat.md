@@ -1,6 +1,6 @@
 ---
 title: Claw4 firmware HTTP compat
-summary: Scheme B1 gateway/adjacent compat for Claw4 POST /api/v1/upload and conversation messages (P0 revision)
+summary: Scheme B1 gateway/adjacent compat for Claw4 POST /api/v1/upload and conversation messages (P0 + P1 bind)
 ---
 
 # Claw4 firmware HTTP compat (Scheme B1 + P0)
@@ -100,6 +100,35 @@ B wires for real:
 - Product TTS: inject a **speaking** `TtsProvider` (or test `ProportionalSilenceTtsProvider`). **Reject** `OpusFrameTtsProvider` for product 播报 — it ignores `text`
 - Formal mode rejects stub ASR unless `OPENBOT_CLAW4_ASR_STUB=1`
 
+
+### P1 startup bind (device-sdk audio bridge)
+
+**Default off.** Setting `OPENBOT_DEVICE_SDK_ROOT` (or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`) alone does **not** mean the bridge is bound — those only locate Agent A `createAudioBridge`. Formal upload without a bound bridge / pass-through transcript still returns `PARAM_UNSUPPORTED`.
+
+| Env | Semantics |
+| --- | --------- |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=1` / `true` | **Allow** lazy bind of `createAudioBridge` into `setClaw4AudioBridge`. |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=0` / `false` | **Deny** bind. Explicit `0`/`false` **suppresses** the implicit path below. |
+| (unset) | Default off, unless the implicit convenience below applies. |
+
+**Implicit allow** (only when the explicit bind env is **unset**):
+
+- `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1` **and**
+- (`OPENBOT_DEVICE_SDK_ROOT` **or** `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`) is set
+
+When bind is allowed, providers are loaded fail-closed from:
+
+| Env | Role |
+| --- | ---- |
+| `OPENBOT_DEVICE_SDK_ASR_MODULE` | Module URL/path: `default` export factory/instance, or named `create*()` (e.g. `createAsrProvider` / `createMockAsrProvider`) |
+| `OPENBOT_DEVICE_SDK_TTS_MODULE` | Module URL/path: speaking TTS factory/instance (`createTtsProvider` / `createProportionalSilenceTtsProvider`). **`OpusFrameTtsProvider` is rejected** |
+
+If either provider module is missing or invalid, OpenBot logs clearly and **leaves the bridge unbound** (no half-bind). Product ASR/TTS vendor adapters are Agent A's work — B does not hardcode FunASR/EdgeTTS paths. For local smoke, point the MODULE envs at Agent A's mock/silence factories exported from the pinned SDK voice index; for product, point them at reference speaking providers.
+
+Lazy bind runs on the first formal transcript resolve that needs a bridge (`ensureClaw4DeviceSdkAudioBridgeBound`), same lifecycle style as the in-process firmware service bind.
+
+**Forward note (do not depend yet):** after Agent A SDK P1-1 lands (`createAudioBridgeFromVoiceEnv` / `createVoiceProvidersFromEnv`, e.g. device-sdk PR #28), this bind path may optionally switch to that helper and `OPENBOT_ASR_PROVIDER=reference-http`. Until then this gateway PR stays pinned to tip **`47ca71a7…`** and the existing `createAudioBridge` + `OPENBOT_DEVICE_SDK_ASR_MODULE` / `OPENBOT_DEVICE_SDK_TTS_MODULE` fail-closed wiring.
+
 ## Upload idempotency (P0)
 
 `POST /api/v1/upload` maps to `submitTurn`, which requires a stable **Idempotency-Key**.
@@ -152,6 +181,10 @@ Optional (same as the adjacent stub):
 | `OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1`| Force offline placeholder hatch                                      |
 | `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` | Extra media pull origins                                           |
 | `OPENBOT_CLAW4_ASR_STUB=1`            | Allow labeled stub ASR when no bridge / pass-through (smoke only)  |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE` | `1`/`true` allow P1 bind; `0`/`false` deny (suppresses INPROCESS implicit); unset = default off |
+| `OPENBOT_DEVICE_SDK_ASR_MODULE`       | Provider module for ASR factory/instance (required when bind allowed) |
+| `OPENBOT_DEVICE_SDK_TTS_MODULE`       | Provider module for speaking TTS factory/instance (required when bind allowed) |
+| `OPENBOT_DEVICE_SDK_ROOT` / `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE` | Locate `createAudioBridge` only — **not** “already bound” |
 
 Restart / kickstart the gateway after setting env so the lazy bind runs. The env bind creates a **gateway-local** store — it does not share memory with a separate 8787 process.
 
