@@ -1,6 +1,6 @@
 # WP-05 Fabric 单一路径试点 — 预备（PREP）
 
-- 状态：**PREP**（依赖 WP-04 设计；**不实现切换**；**不宣称 G3-B**）
+- 状态：**PREP + PILOT_BINDING**（默认 legacy；`OPENBOT_ORCH_READONLY_PATH_PILOT=fabric` 可注入 decide-only 闸；**不宣称 G3-B**；live invoke 仍冻）
 - 日期：2026-10-24（Asia/Shanghai）
 - HEAD（撰写时）：`2df36a55748f891d6eb05ad067318bc8783fd794`
 - 作者：grokbot-verifiable-delivery
@@ -88,3 +88,11 @@ onRequestStart(req):
 - 状态：**PREP**。
 - 无切换实现；无 G3-B；无集成测试宣称。
 - 下一步：WP-04 比较证据包 → 人指定 P1/P2 试点租户 → 精确文件接管表 → 最小开关（另轮）。
+
+## 落地记录（2026-10-24）— 只读单路径绑定
+
+- `src/task-orchestration/path-binding.ts`：`bindReadonlyPilotAction` + 进程内 dual-exec 拒绝；默认 path=`legacy`。
+- `readonly-invoke.ts`：试点 surface 绑定；fabric 路径需注入 `policyCheck`（DENY 不调工具；ALLOW 仍只调原适配器一次）。
+- Env：`OPENBOT_ORCH_READONLY_PATH_PILOT`（`feature.ts` 再导出）。
+- 测：`path-binding.test.ts` + `readonly-invoke.test.ts` WP-05 用例（含 dual-exec / fabric DENY|ALLOW）。
+- **未**解锁 `ORCHESTRATION_LIVE_INVOKE`；**未**宣称 G3-B；**未**经 loopback 再入 Fabric execute。
