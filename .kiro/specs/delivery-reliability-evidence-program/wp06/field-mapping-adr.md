@@ -92,21 +92,21 @@
 
 ## 下一切片建议（不实现）
 
-**推荐优先：只读有限步骤工作流选型 + 演练接线（仍不写生产 ledger，除非另开显式迁移切片）。**
+**推荐优先（已落地选型+最小 pilot）：只读有限步骤工作流 — 见 `wp06/readonly-multistep-pilot.md`（仍不写生产 ledger）。**
 
-1. **Readonly multi-step workflow pick（推荐下一刀）**  
-   - 候选：`memory → web_read → acceptance check`（名级；对齐 WP-05/§6.2）。  
-   - Planner / LIVE 保持冻结；用既有 `invokeReadonlySurface` + path bind。  
-   - 目的：在真实只读路径上验证 jobStep 键、attempt、resultRef 命名是否够用，再决定是否动 ledger schema。
+1. ~~**Readonly multi-step workflow pick（推荐下一刀）**~~ → **已落地**（`READONLY_MULTISTEP_PICK+PILOT`）。  
+   - 冻结：`memory → web_read → acceptance check`（名级；对齐 WP-05/§6.2）。  
+   - Planner / LIVE 保持冻结；用既有 `considerReadonlyInvoke` / `invokeReadonlySurface` + path bind（经注入 mock）。  
+   - 目的：在真实只读路径形状上验证 jobStep 键、attempt、resultRef、lease key 命名是否够用。
 
-2. **备选：Ledger event extension（设计→最小类型/payload 草案）**  
+2. **备选 / 下一步延期：Ledger event extension（设计→最小类型/payload 草案）**  
    - 仅当（1）证明只读工作流需要跨重启权威且（2）人审同意增量 `ExecutionEventPayload` / `ExecutionStep` 字段时。  
    - 仍禁止 LIVE unlock；禁止从 readonly invoke 自动写 ledger。
 
-本 ADR **不**实现上述任一项。
+本 ADR 正文仍不实施 runtime 迁移；只读多步 pilot 见独立切片文档与 helper。
 
 ## 状态声明
 
-- 状态：**FIELD_MAPPING_ADR**（2026-10-24）。
+- 状态：**FIELD_MAPPING_ADR**（2026-10-24）；后续切片已落 **READONLY_MULTISTEP_PICK+PILOT**（见 `readonly-multistep-pilot.md`）。
 - 文档：`wp06/field-mapping-adr.md`（本文件）；设计文与 `tasks.md` 回指。
-- 无运行时代码变更（本切片）；无类型导出必需项（`OrchLeaseRecord` 已足够作形状合同）。
+- 本 ADR 切片无运行时迁移；`OrchLeaseRecord` 仍为形状合同。

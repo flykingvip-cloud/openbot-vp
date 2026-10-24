@@ -1,6 +1,6 @@
 # WP-06 编排持久恢复与租约 — 设计（现有存储增量）
 
-- 状态：**DESIGN / SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS+FIELD_MAPPING_ADR**（**不解除** `ORCHESTRATION_LIVE_INVOKE`；已落 lease/fence 形状、文件背 kill/restart 夹具与单测；**字段映射 ADR 已落**；调度器仍 fail-closed；**非 G4-A**）
+- 状态：**DESIGN / SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS+FIELD_MAPPING_ADR+READONLY_MULTISTEP_PICK+PILOT**（**不解除** `ORCHESTRATION_LIVE_INVOKE`；已落 lease/fence 形状、文件背 kill/restart 夹具与单测；**字段映射 ADR 已落**；**只读多步选型+最小 pilot 已落**；调度器仍 fail-closed；**非 G4-A**）
 - 日期：2026-10-24（Asia/Shanghai）
 - HEAD（撰写时）：`2df36a55748f891d6eb05ad067318bc8783fd794`
 - 作者：grokbot-verifiable-delivery
@@ -76,19 +76,20 @@ Readonly invoke 行为保持：可执行 memory/web/skill 适配；`invokedTool`
 ## 6. 增量落地顺序（后续轮）
 
 1. ~~文档化字段映射表 + 与 WP-01 信封对齐。~~ → **FIELD_MAPPING_ADR 已落**（`wp06/field-mapping-adr.md`）。
-2. 选一个 **只读** 有限步骤工作流（例如 memory→web_read→acceptance check 名），planner 行为保持冻结。
+2. ~~选一个 **只读** 有限步骤工作流（例如 memory→web_read→acceptance check 名），planner 行为保持冻结。~~ → **READONLY_MULTISTEP_PICK+PILOT 已落**（`wp06/readonly-multistep-pilot.md`；`readonly-multistep-pilot.ts`）。
 3. ~~持久化 job/step/attempt 最小字段 + lease/fence（仍 LIVE=false，调度器不武装）。~~ → **部分完成**：lease/fence 形状+单测已落（`lease-store`）；尚未接到 ledger/task 生产面。
 4. ~~跑 kill/restart 夹具（命名+harness）。~~ → **KILL_FIXTURE_HARNESS 已落**（`lease-kill-fixtures` + vitest，真实 `fs.mkdtemp`）；**生产 ledger 证据包仍未跑**；**明确不宣称 G4-A**。
 5. **禁止**本设计直接授权打开 `ORCHESTRATION_LIVE_INVOKE`。
 
 ## 7. 状态声明
 
-- 状态：**DESIGN / SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS+FIELD_MAPPING_ADR**（2026-10-24）。
+- 状态：**DESIGN / SHAPE+LEASE_HELPER+KILL_FIXTURE_HARNESS+FIELD_MAPPING_ADR+READONLY_MULTISTEP_PICK+PILOT**（2026-10-24）。
 - 已落地：
   - `src/task-orchestration/lease-store.ts`（+ unit tests）— 内存或可注入 `rootDir` 的文件 JSON 租约/fencing 状态机；`ORCH_KILL_FIXTURE_IDS` 场景枚举。
   - `src/task-orchestration/lease-kill-fixtures.ts`（+ unit tests）— **真实文件背** kill/restart 演练：每夹具 seed → drop store → 同 `rootDir` 新实例 → 断言；导出 id 列表 + `runOrchKillFixture` / `runAllOrchKillFixtures`。
   - `wp06/field-mapping-adr.md` — **FIELD_MAPPING_ADR**：无新 orch DB；逻辑概念→既有实体→增量字段→所有者；lease-store↔ledger/task 对照；WP-01 信封对齐；明确非目标。
-- live invoke 仍 **false**；调度器未武装；**无 G4-A / ACCEPTED 宣称**（harness only，非生产 ledger 证据包）。
+  - `wp06/readonly-multistep-pilot.md` + `src/task-orchestration/readonly-multistep-pilot.ts`（+ unit tests）— **READONLY_MULTISTEP_PICK+PILOT**：memory→web_read→acceptance；ADR 命名；mock 只读 invoke；内存 lease 键演练；**不写 ledger**。
+- live invoke 仍 **false**；调度器未武装；**无 G4-A / ACCEPTED 宣称**（harness / pilot only，非生产 ledger 证据包）。
 - 仍缺口：未挂既有 ledger/task 生产持久面；未跑挂生产存储的 G4-A 证据包；禁止本切片打开 `ORCHESTRATION_LIVE_INVOKE`。
-- 下一步（设计建议，未实现）：只读有限步骤工作流选型（memory→web_read→acceptance）**或** ledger event 扩展草案——见 ADR「下一切片建议」。
-- 关闭结论：编排面已有可测租约/fencing **形状** + 文件背 kill 夹具 + **字段映射合同**；生产恢复权威仍须挂既有存储增量（非新 DB），并继续借鉴（而非挪用）handoff lock / memory fencing 语义。
+- 下一步（延期）：ledger event 增量草案（仅当命名不够）**或** 将 lease 权威挂到 Progress Ledger / ConversationTask 增量——仍不解锁 live invoke。
+- 关闭结论：编排面已有可测租约/fencing **形状** + 文件背 kill 夹具 + **字段映射合同** + **只读多步命名 pilot**；生产恢复权威仍须挂既有存储增量（非新 DB），并继续借鉴（而非挪用）handoff lock / memory fencing 语义。
