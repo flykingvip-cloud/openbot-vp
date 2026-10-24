@@ -164,6 +164,7 @@ describe("turn completion contract", () => {
   it("does not report success when there is no artifact", () => {
     const workspaceDir = tempWorkspace();
     expect(claimsSuccessWithoutArtifact("已交付，任务成功。")).toBe(true);
+    expect(claimsSuccessWithoutArtifact("点预览就能打开。")).toBe(true);
     const settled = settleTurnCompletion({
       userText: "请继续",
       assistantText: "已交付，任务成功。这一步已经完成。",

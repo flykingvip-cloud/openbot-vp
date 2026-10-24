@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { userFacingPreReplyFailure } from "./docker-engine-client.js";
 import {
   ENTITLEMENT_USER_MESSAGES,
+  isSoftRecoverableEntitlementFailure,
+  isSoftRecoverableEntitlementReason,
   messageForWorkerHeartbeatReason,
   userFacingEntitlementPreReplyFailure,
 } from "./user-facing-entitlement-failure.js";
@@ -19,6 +21,32 @@ describe("userFacingEntitlementPreReplyFailure", () => {
     expect(messageForWorkerHeartbeatReason("not-allowed")).toBe(
       ENTITLEMENT_USER_MESSAGES.notAllowed,
     );
+  });
+
+  it("does not surface lease-mismatch or stale-snapshot as 「请重新发送」", () => {
+    expect(isSoftRecoverableEntitlementReason("lease-mismatch")).toBe(true);
+    expect(isSoftRecoverableEntitlementReason("stale-snapshot")).toBe(true);
+    expect(messageForWorkerHeartbeatReason("lease-mismatch")).toBeNull();
+    expect(messageForWorkerHeartbeatReason("stale-snapshot")).toBeNull();
+    expect(
+      userFacingEntitlementPreReplyFailure(
+        "account worker stopped billing actions: lease-mismatch",
+      ),
+    ).toBeNull();
+    expect(
+      userFacingEntitlementPreReplyFailure(
+        "account worker stopped billing actions: stale-snapshot",
+      ),
+    ).toBeNull();
+    expect(
+      userFacingEntitlementPreReplyFailure("AccountWorkerFailedError: stale snapshot"),
+    ).toBeNull();
+    expect(isSoftRecoverableEntitlementFailure("stale snapshot")).toBe(true);
+    expect(isSoftRecoverableEntitlementFailure("lease-mismatch mid-tool")).toBe(true);
+    const softCopy =
+      userFacingPreReplyFailure("account worker stopped billing actions: stale-snapshot") ?? "";
+    expect(softCopy).not.toMatch(/重新发送|执行授权已更新/);
+    expect(softCopy).toBe("");
   });
 
   it("maps model and workspace authorization denials", () => {

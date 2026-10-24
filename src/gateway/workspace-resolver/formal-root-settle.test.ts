@@ -140,6 +140,8 @@ describe("batch 9 formal root settle", () => {
     expect(result.record?.settleStatus).toBe("unwritten");
     expect(result.view.failureReason).toBe("binary_requires_tool_write");
     expect(result.view.reasonLabel).toBe("文件缺失或为空");
+    expect(result.text).toContain("分析结论仍然有效。");
+    expect(result.text).not.toMatch(/点预览就能打开|可以直接打开/);
     expect(fs.existsSync(path.join(dirs.operators, RELATIVE))).toBe(false);
   });
 
@@ -154,6 +156,7 @@ describe("batch 9 formal root settle", () => {
     expect(result.view.failureReason).toBe("workspace_root_skew");
     expect(result.view.reasonLabel).toBe("文件缺失或为空");
     expect(result.text).toContain("分析结论仍然有效。");
+    expect(result.text).not.toMatch(/点预览就能打开|可以直接打开/);
     expect(fs.existsSync(path.join(dirs.operators, RELATIVE))).toBe(false);
     expect(fs.readFileSync(path.join(dirs.volumeTenants, RELATIVE)).equals(PDF_BYTES)).toBe(true);
     expect(fs.readFileSync(path.join(dirs.stateTenants, RELATIVE)).equals(PDF_BYTES)).toBe(true);
