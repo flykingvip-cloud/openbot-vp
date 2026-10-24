@@ -5224,8 +5224,8 @@ tasks:
     ownerHistory: []
     since: 2026-08-23
     metadata:
-      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is not
-        live in openbot-vp. Live ledger is
+      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is
+        not live in openbot-vp. Live ledger is
         https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: memory-workspace-platform-remediation:cursor-data-governance-phase1b-item7-retirement-batch14-s15
     owner: cursor-data-governance
@@ -8260,8 +8260,8 @@ tasks:
         - gov-delivery-tooling-defaults
       note: "Recorded 2026-09-30. #201 #203 #205 #207 predate the Task/Agent trailers;
         this entry is their attribution."
-      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is not
-        live in openbot-vp. Live ledger is
+      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is
+        not live in openbot-vp. Live ledger is
         https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: mesh-naming-truth-sync:kiro-mesh-naming
     owner: kiro-mesh-naming
@@ -9448,6 +9448,26 @@ tasks:
     ownerHistory: []
     since: 2026-10-22
     metadata: {}
+  - id: delivery-reliability-evidence-program:grokbot-verifiable-delivery
+    owner: grokbot-verifiable-delivery
+    issue: 62
+    intent:
+      - "OpenBot delivery-reliability evidence program (WP-00..07); PR #62
+        handoff; register plan/evidence only — no hot-path ownership"
+    paths:
+      - .kiro/specs/delivery-reliability-evidence-program/**
+    state: active
+    sessions:
+      - id: grokbot-verifiable-delivery-pr62-20261024
+        taskId: delivery-reliability-evidence-program:grokbot-verifiable-delivery
+        ide: cursor
+        agent: grokbot-verifiable-delivery
+        status: active
+        lastSignalAt: 2026-10-24T08:50:25.858Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-24
+    metadata: {}
 landingStreams:
   - id: batch11-s0-ogui-decision-lifecycle
     landingPolicy: serial
@@ -9507,8 +9527,8 @@ landingStreams:
     metadata:
       task: batch11-s0-ogui-decision-lifecycle
       owner: cursor-cloud
-      purpose: Batch 11 S0–S5 OGUI decision lifecycle. Flag stays off. First-match
-        so shared reply, settle, and OGUI files land together. Not a gray open.
+      purpose: Batch 11 S0–S5 OGUI decision lifecycle. Flag stays off. First-match so
+        shared reply, settle, and OGUI files land together. Not a gray open.
   - id: batch9-formal-root
     landingPolicy: serial
     paths:
@@ -9530,7 +9550,8 @@ landingStreams:
     metadata:
       task: batch9-formal-root
       owner: cursor-cloud
-      purpose: Batch 9 formal root. First-match so settle, preview, and write paths land together.
+      purpose: Batch 9 formal root. First-match so settle, preview, and write paths
+        land together.
   - id: strip-ohbe-from-openbot-vp
     landingPolicy: serial
     paths:
@@ -9689,8 +9710,8 @@ landingStreams:
       owner: cursor-cloud
       purpose: Remove the duplicated production ledger and point OHBE mentions at the
         OHBE repository. First-match so these shared files land together.
-      historicalLedger: deploy/production/releases.jsonl was removed by this stream and
-        is not live in openbot-vp. Live ledger is
+      historicalLedger: deploy/production/releases.jsonl was removed by this stream
+        and is not live in openbot-vp. Live ledger is
         https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: batch8-skill-gates
     landingPolicy: serial
@@ -17730,8 +17751,8 @@ landingStreams:
       task: gov-p3-seq104-cutover
       owner: kiro-governance-closure
       legacyDisposition: MERGE
-      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is not
-        live in openbot-vp. Live ledger is
+      historicalLedger: deploy/production/releases.jsonl was a pre-split copy and is
+        not live in openbot-vp. Live ledger is
         https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
   - id: GOV_P3_D6
     landingPolicy: serial
