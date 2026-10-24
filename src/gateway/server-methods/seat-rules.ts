@@ -5,7 +5,7 @@ import { createFabricService } from "../../fabric/service.js";
 import {
   normalizeExecAsk,
   normalizeExecSecurity,
-  resolveExecApprovals,
+  resolveExecApprovalsReadonly,
   type ExecAsk,
   type ExecSecurity,
 } from "../../infra/exec-approvals.js";
@@ -428,8 +428,9 @@ export const seatRulesHandlers: GatewayRequestHandlers = {
     const request = buildSeatDrillSampleRequest({ tenantId, command });
 
     // 席位有效 ask/security 覆盖探测；允许列表仍读企业现有配置（演练不改写）。
+    // WP-04: seat drill is decide-only — never ensure/save approvals file.
     const resolveApprovals = (agentId?: string) => {
-      const resolved = resolveExecApprovals(agentId);
+      const resolved = resolveExecApprovalsReadonly(agentId);
       return {
         ask: effectiveAsk,
         security: effectiveSecurity,
