@@ -8,12 +8,19 @@
  * Kept out of surface-binding.ts so that file stays execute:false / name-only.
  */
 
+import { randomUUID } from "node:crypto";
 import type { SkillSnapshot } from "../agents/skills/types.js";
 import { createMemorySearchTool } from "../agents/tools/memory-tool.js";
 import { createWebFetchTool } from "../agents/tools/web-fetch.js";
 import { createWebSearchTool } from "../agents/tools/web-search.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { resolveCronSkillsSnapshot } from "../cron/isolated-agent/skills-snapshot.js";
+import {
+  bindReadonlyPilotAction,
+  releaseReadonlyPathBinding,
+  type ReadonlyActionBinding,
+  type ReadonlyPilotPolicyCheck,
+} from "./path-binding.js";
 import type { ExecutionSurface } from "./types.js";
 
 const UNTRUSTED_TEXT_MAX = 2_000;
@@ -23,6 +30,10 @@ export type ReadonlyInvokeDeps = {
   createWebFetchTool?: typeof createWebFetchTool;
   createWebSearchTool?: typeof createWebSearchTool;
   resolveCronSkillsSnapshot?: typeof resolveCronSkillsSnapshot;
+  /** WP-05 fabric path: decide-only gate (no tool execute). Injected — no Fabric ownership steal. */
+  policyCheck?: (
+    binding: ReadonlyActionBinding,
+  ) => ReadonlyPilotPolicyCheck | Promise<ReadonlyPilotPolicyCheck>;
 };
 
 export type InvokeReadonlySurfaceInput = {
@@ -36,6 +47,12 @@ export type InvokeReadonlySurfaceInput = {
   isFastTestEnv?: boolean;
   existingSkillsSnapshot?: SkillSnapshot;
   deps?: ReadonlyInvokeDeps;
+  /** Stable action id for single-path binding; default derived if omitted. */
+  actionId?: string;
+  correlationId?: string;
+  tenantId?: string | null;
+  policyVersion?: string | null;
+  env?: NodeJS.ProcessEnv;
 };
 
 export type InvokeReadonlySurfaceResult = {
@@ -44,6 +61,8 @@ export type InvokeReadonlySurfaceResult = {
   toolName?: string;
   /** Truncated adapter text. Not ProgressEvidence. */
   untrustedText?: string;
+  /** WP-05 single-path binding (pilot surfaces only). */
+  pathBinding?: ReadonlyActionBinding;
 };
 
 export function formatReadonlyUntrustedPrompt(text: string | undefined): string {
@@ -141,7 +160,43 @@ export async function invokeReadonlySurface(
     return { invokedTool: false, reason: "readonly_invoke_refused" };
   }
 
+  const actionId =
+    input.actionId?.trim() ||
+    `orch-ro-${input.surface}-${input.correlationId?.trim() || "anon"}-${randomUUID()}`;
+  const bound = bindReadonlyPilotAction({
+    surface: input.surface,
+    actionId,
+    correlationId: input.correlationId,
+    tenantId: input.tenantId,
+    policyVersion: input.policyVersion,
+    env: input.env,
+  });
+  if (!bound.ok) {
+    return { invokedTool: false, reason: bound.reason };
+  }
+  const pathBinding = bound.binding;
+
   try {
+    if (pathBinding.path === "fabric") {
+      const check = input.deps?.policyCheck;
+      if (!check) {
+        releaseReadonlyPathBinding(actionId);
+        return {
+          invokedTool: false,
+          reason: "fabric_path_requires_policy_check",
+          pathBinding,
+        };
+      }
+      const verdict = await check(pathBinding);
+      if (verdict.decision === "DENY") {
+        releaseReadonlyPathBinding(actionId);
+        return {
+          invokedTool: false,
+          reason: verdict.reason ?? "fabric_policy_denied",
+          pathBinding,
+        };
+      }
+    }
     if (input.surface === "memory") {
       const factory = input.deps?.createMemorySearchTool ?? createMemorySearchTool;
       const tool = factory({
@@ -149,17 +204,20 @@ export async function invokeReadonlySurface(
         agentSessionKey: input.agentSessionKey,
       });
       if (!tool) {
-        return { invokedTool: false, reason: "memory_search_unavailable" };
+        releaseReadonlyPathBinding(actionId);
+        return { invokedTool: false, reason: "memory_search_unavailable", pathBinding };
       }
       const query = input.query.trim();
       if (!query) {
-        return { invokedTool: false, reason: "memory_search_unavailable" };
+        releaseReadonlyPathBinding(actionId);
+        return { invokedTool: false, reason: "memory_search_unavailable", pathBinding };
       }
       const result = await tool.execute("orch-readonly-memory", { query });
       return {
         invokedTool: true,
         toolName: "memory_search",
         untrustedText: untrustedTextFromToolResult(result),
+        pathBinding,
       };
     }
 
@@ -169,28 +227,33 @@ export async function invokeReadonlySurface(
         const factory = input.deps?.createWebFetchTool ?? createWebFetchTool;
         const tool = factory({ config: input.config });
         if (!tool) {
-          return { invokedTool: false, reason: "web_read_unavailable" };
+          releaseReadonlyPathBinding(actionId);
+          return { invokedTool: false, reason: "web_read_unavailable", pathBinding };
         }
         const result = await tool.execute("orch-readonly-web-fetch", { url: query });
         return {
           invokedTool: true,
           toolName: "web_fetch",
           untrustedText: untrustedTextFromToolResult(result),
+          pathBinding,
         };
       }
       const factory = input.deps?.createWebSearchTool ?? createWebSearchTool;
       const tool = factory({ config: input.config });
       if (!tool) {
-        return { invokedTool: false, reason: "web_read_unavailable" };
+        releaseReadonlyPathBinding(actionId);
+        return { invokedTool: false, reason: "web_read_unavailable", pathBinding };
       }
       if (!query) {
-        return { invokedTool: false, reason: "web_read_unavailable" };
+        releaseReadonlyPathBinding(actionId);
+        return { invokedTool: false, reason: "web_read_unavailable", pathBinding };
       }
       const result = await tool.execute("orch-readonly-web-search", { query });
       return {
         invokedTool: true,
         toolName: "web_search",
         untrustedText: untrustedTextFromToolResult(result),
+        pathBinding,
       };
     }
 
@@ -207,14 +270,16 @@ export async function invokeReadonlySurface(
       invokedTool: true,
       toolName: "skill_snapshot",
       untrustedText: skillSnapshotText(snapshot, skillId),
+      pathBinding,
     };
   } catch {
+    releaseReadonlyPathBinding(actionId);
     if (input.surface === "memory") {
-      return { invokedTool: false, reason: "memory_search_unavailable" };
+      return { invokedTool: false, reason: "memory_search_unavailable", pathBinding };
     }
     if (input.surface === "web_read") {
-      return { invokedTool: false, reason: "web_read_unavailable" };
+      return { invokedTool: false, reason: "web_read_unavailable", pathBinding };
     }
-    return { invokedTool: false, reason: "skill_snapshot_unavailable" };
+    return { invokedTool: false, reason: "skill_snapshot_unavailable", pathBinding };
   }
 }
