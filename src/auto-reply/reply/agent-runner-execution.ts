@@ -26,6 +26,7 @@ import {
 } from "../../agents/pi-embedded-helpers.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
 import { userFacingPreReplyFailure } from "../../agents/sandbox/docker-engine-client.js";
+import { isSoftRecoverableEntitlementFailure } from "../../agents/sandbox/user-facing-entitlement-failure.js";
 import { noteSkillSmokeClock } from "../../agents/turn-completion/contract.js";
 import { normalizeUsage } from "../../agents/usage.js";
 import {
@@ -147,6 +148,7 @@ export async function runAgentTurnWithFallback(params: {
   resolvedVerboseLevel: VerboseLevel;
 }): Promise<AgentRunLoopResult> {
   const TRANSIENT_HTTP_RETRY_DELAY_MS = 2_500;
+  const SOFT_ENTITLEMENT_RETRY_DELAY_MS = 400;
   let didLogHeartbeatStrip = false;
   let autoCompactionCompleted = false;
   // Track payloads sent directly (not via pipeline) during tool flush to avoid duplicates.
@@ -256,6 +258,7 @@ export async function runAgentTurnWithFallback(params: {
   let fallbackAttempts: RuntimeFallbackAttempt[] = [];
   let didResetAfterCompactionFailure = false;
   let didRetryTransientHttpError = false;
+  let didRetrySoftEntitlement = false;
   let commercialToolCallCount = 0;
   const commercialToolClasses: string[] = [];
   let bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
@@ -1024,6 +1027,19 @@ export async function runAgentTurnWithFallback(params: {
               text: "⚠️ Session history was corrupted. I've reset the conversation - please try again!",
             },
           };
+        }
+
+        if (isSoftRecoverableEntitlementFailure(message) && !didRetrySoftEntitlement) {
+          didRetrySoftEntitlement = true;
+          // lease-mismatch / stale-snapshot: refresh and self-advance once.
+          // Never ask the user to 「重新发送」as fuel for a soft runtime stop.
+          defaultRuntime.error(
+            `Soft entitlement stop before reply (${message}). Self-advancing once in ${SOFT_ENTITLEMENT_RETRY_DELAY_MS}ms.`,
+          );
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, SOFT_ENTITLEMENT_RETRY_DELAY_MS);
+          });
+          continue;
         }
 
         if (isTransientHttp && !didRetryTransientHttpError && retryAllowedForMessage(message)) {
