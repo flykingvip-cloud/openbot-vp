@@ -9478,6 +9478,8 @@ landingStreams:
       - src/agents/protocol-violation.test.ts
       - src/agents/model-output-boundary.ts
       - src/agents/model-output-boundary.test.ts
+      - src/agents/execution-stall-continue-loop.ts
+      - src/agents/execution-stall-continue-loop.test.ts
       - src/agents/system-prompt.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts

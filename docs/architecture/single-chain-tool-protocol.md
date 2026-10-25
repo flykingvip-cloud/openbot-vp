@@ -199,7 +199,7 @@ PR 交付物：在代码旁或本附录增加「正例 / 残缺例 / 反例」�
 | 项 | P0 落定要求 |
 | --- | --- |
 | **存储位置** | 选定唯一 sink（例如会话/run 旁路的结构化事件流或既有 diagnostics/evolution 管道中的一处）；PR 描述与代码注释写明路径 |
-| **保留期** | 与所选 sink 的既有保留策略对齐；若新建 sink，PR 中写明默认保留期 |
+| **保留期** | sink=`$STATE_DIR/logs/protocol-violations.jsonl`（`OPENBOT_PROTOCOL_VIOLATION_LOG` 可覆盖）。**进程内不自转**；与同目录其他 `*.jsonl` 一并走既有 state-log 运维轮转（默认约 30 天）。代码注释与 `protocol-violation.ts` 文件头说明一致。 |
 | **去重键（优先于随机 eventId）** | 建议：`runId + attemptOrTurnId + protocolKind + snippetHash`（或等价稳定组合）。同一模型响应若经多个回调（流式 chunk、订阅、展示）触发检测，**必须**用该键幂等写入或先查后写 |
 | **eventId** | 可为去重键的确定性派生（推荐）或「首次写入时生成并缓存到该响应的 violation fact」；**禁止**每个回调各自 `randomUUID()` 导致重复记账 |
 | **写入失败** | 执行边界仍成立（正文仍不执行）；发出告警/计数；不得为了「补写观测」而重放模型或打开 repair |

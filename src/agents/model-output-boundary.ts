@@ -46,6 +46,8 @@ function collapseVisible(text: string): string {
 const INCOMPLETE_PIPE_TAIL_RE = /^<\s*\/?\s*[|｜][^>]*$/;
 /** Bare `<` / `</` at EOS. Held so `<|DSML` cannot leak across chunks. */
 const INCOMPLETE_BARE_LT_RE = /^<\s*\/?\s*$/;
+/** Unclosed MiniMax marker prefix at EOS (`<minimax` / `<minimax:tool_call`). */
+const INCOMPLETE_MINIMAX_TAIL_RE = /^<\s*\/?\s*minimax(?::[\w.-]*)?$/i;
 
 function splitIncompleteProtocolTail(
   text: string,
@@ -59,7 +61,11 @@ function splitIncompleteProtocolTail(
   if (tail.includes(">")) {
     return { head: text, tail: "" };
   }
-  if (INCOMPLETE_PIPE_TAIL_RE.test(tail) || (includeBareLt && INCOMPLETE_BARE_LT_RE.test(tail))) {
+  if (
+    INCOMPLETE_PIPE_TAIL_RE.test(tail) ||
+    INCOMPLETE_MINIMAX_TAIL_RE.test(tail) ||
+    (includeBareLt && INCOMPLETE_BARE_LT_RE.test(tail))
+  ) {
     return { head: text.slice(0, lastLt), tail };
   }
   return { head: text, tail: "" };
@@ -216,6 +222,113 @@ function stripAndParseDsml(text: string): {
   };
 }
 
+/** MiniMax marked protocol — only when `minimax:tool_call` appears outside fences. */
+function stripAndDetectMinimax(text: string): {
+  visible: string;
+  detected: boolean;
+  incomplete: boolean;
+  recoveredCalls: CanonicalToolCall[];
+} {
+  const codeRegions = findCodeRegions(text);
+  const markerRe = /<\/?minimax:tool_call>/gi;
+  let markerOutside = false;
+  let markerMatch: RegExpExecArray | null;
+  while ((markerMatch = markerRe.exec(text))) {
+    if (!isInsideCode(markerMatch.index, codeRegions)) {
+      markerOutside = true;
+      break;
+    }
+  }
+  if (!markerOutside) {
+    return { visible: text, detected: false, incomplete: false, recoveredCalls: [] };
+  }
+
+  const recoveredCalls: CanonicalToolCall[] = [];
+  let callIndex = 0;
+  const invokeOpenRe = /<invoke\b[^>]*\bname\s*=\s*["']([^"']+)["'][^>]*>/gi;
+  let invokeMatch: RegExpExecArray | null;
+  while ((invokeMatch = invokeOpenRe.exec(text))) {
+    if (isInsideCode(invokeMatch.index, codeRegions)) {
+      continue;
+    }
+    const toolName = invokeMatch[1]?.trim() || "";
+    if (toolName) {
+      recoveredCalls.push({
+        callId: `detect-minimax-${callIndex}`,
+        toolName,
+        arguments: {},
+        source: "adapter",
+      });
+      callIndex += 1;
+    }
+  }
+
+  const openMinimax = /<minimax:tool_call>/gi;
+  const closeMinimax = /<\/minimax:tool_call>/gi;
+  let openCount = 0;
+  let closeCount = 0;
+  let m: RegExpExecArray | null;
+  while ((m = openMinimax.exec(text))) {
+    if (!isInsideCode(m.index, codeRegions)) {
+      openCount += 1;
+    }
+  }
+  while ((m = closeMinimax.exec(text))) {
+    if (!isInsideCode(m.index, codeRegions)) {
+      closeCount += 1;
+    }
+  }
+  let incomplete = openCount > closeCount;
+  if (!incomplete) {
+    const openInvoke = /<invoke\b[^>]*>/gi;
+    while ((m = openInvoke.exec(text))) {
+      if (isInsideCode(m.index, codeRegions)) {
+        continue;
+      }
+      const after = text.slice(m.index);
+      if (!/<\/invoke>/i.test(after)) {
+        incomplete = true;
+        break;
+      }
+    }
+  }
+
+  // Char-wise strip of markers/invokes outside fences (preserve fenced examples).
+  let visible = "";
+  let i = 0;
+  while (i < text.length) {
+    if (isInsideCode(i, codeRegions)) {
+      visible += text[i];
+      i += 1;
+      continue;
+    }
+    const rest = text.slice(i);
+    const markerAt = rest.match(/^<\/?minimax:tool_call>/i);
+    if (markerAt) {
+      i += markerAt[0].length;
+      continue;
+    }
+    const invokeAt = rest.match(/^<invoke\b[^>]*>[\s\S]*?<\/invoke>/i);
+    if (invokeAt) {
+      i += invokeAt[0].length;
+      continue;
+    }
+    const truncInvoke = rest.match(/^<invoke\b[^>]*>/i);
+    if (truncInvoke && !rest.toLowerCase().includes("</invoke>")) {
+      break;
+    }
+    visible += text[i];
+    i += 1;
+  }
+
+  return {
+    visible: collapseVisible(visible),
+    detected: true,
+    incomplete,
+    recoveredCalls,
+  };
+}
+
 export function applyUserVisibleOutputGate(
   text: string,
   opts?: { streaming?: boolean },
@@ -231,8 +344,9 @@ export function applyUserVisibleOutputGate(
   }
   const { head, tail } = splitIncompleteProtocolTail(text, Boolean(opts?.streaming));
   const dsml = stripAndParseDsml(head);
-  const incomplete = Boolean(tail) || dsml.incomplete;
-  const detected = dsml.detected || Boolean(tail);
+  const minimax = stripAndDetectMinimax(dsml.detected ? dsml.visible : head);
+  const incomplete = Boolean(tail) || dsml.incomplete || minimax.incomplete;
+  const detected = dsml.detected || minimax.detected || Boolean(tail);
   if (!detected) {
     return {
       visibleText: text,
@@ -242,12 +356,21 @@ export function applyUserVisibleOutputGate(
       recoveredCalls: [],
     };
   }
+  let protocol: ProtocolKind | null = null;
+  if (minimax.detected || /minimax/i.test(tail)) {
+    protocol = "minimax";
+  } else if (dsml.detected || /dsml/i.test(tail)) {
+    protocol = "dsml";
+  } else {
+    protocol = "special_token";
+  }
+  const visibleSource = minimax.detected ? minimax.visible : dsml.visible;
   return {
-    visibleText: collapseVisible(dsml.visible),
+    visibleText: collapseVisible(visibleSource),
     detected: true,
     incomplete,
-    protocol: dsml.detected || /dsml/i.test(tail) ? "dsml" : "special_token",
-    recoveredCalls: dsml.recoveredCalls,
+    protocol,
+    recoveredCalls: [...dsml.recoveredCalls, ...minimax.recoveredCalls],
   };
 }
 

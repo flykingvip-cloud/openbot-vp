@@ -3,9 +3,17 @@
  * durable logging. Body protocol text must never become an executable tool call.
  *
  * Persistence sink (§7.3.B): `$STATE_DIR/logs/protocol-violations.jsonl`
- * Retention: same as other state logs; default keep 30 days (ops rotate).
+ * (override: `OPENBOT_PROTOCOL_VIOLATION_LOG`).
+ *
+ * Retention: this module does **not** self-rotate. Ops rotate/prune the sink
+ * with the same state-log retention used for other `$STATE_DIR/logs/*.jsonl`
+ * files (repo ops default ~30 days). Set `OPENBOT_PROTOCOL_VIOLATION_LOG` to
+ * point at a path already covered by that rotation. There is no separate
+ * in-process 30-day timer.
+ *
  * Dedupe key: `runId + attemptOrTurnId + protocolKind + snippetHash`
  * eventId: SHA256 hex of the dedupe key (deterministic; never randomUUID per callback).
+ * Mark written **only after** successful append; failed writes stay retryable.
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -18,6 +26,9 @@ export const PROTOCOL_VIOLATION_STOP_REASON = "protocol_violation" as const;
 
 export const PROTOCOL_VIOLATION_SCHEMA_VERSION = 1 as const;
 
+/** Soft cap for process-local successful-write dedupe cache (§7.3.B). */
+export const PROTOCOL_VIOLATION_DEDUPE_CACHE_LIMIT = 4_096;
+
 /** Closed recognition list — new kinds require list + tests (§7.3.A). */
 export const PROTOCOL_RECOGNITION_CLOSED_LIST = {
   dsml_complete:
@@ -25,9 +36,9 @@ export const PROTOCOL_RECOGNITION_CLOSED_LIST = {
   dsml_incomplete:
     "Unclosed / truncated same-family DSML or special-token tails held by the streaming incomplete detector.",
   minimax_marked:
-    "MiniMax XML cleanup only when text contains the agreed `minimax:tool_call` marker (display strip; never execute).",
+    "MiniMax XML only when text contains the agreed `minimax:tool_call` marker — detected by applyUserVisibleOutputGate (never execute).",
   fenced_example:
-    "Fenced code DSML examples: never execute; default not an execution-oriented violation (keep existing example boundary).",
+    "Fenced code DSML/MiniMax examples: never execute; default not an execution-oriented violation (keep existing example boundary).",
   excluded:
     "Ordinary word `invoke`, bare `<` comparisons, arbitrary XML/HTML without agreed markers — must NOT count as violation.",
 } as const;
@@ -58,23 +69,40 @@ export type ProtocolViolationFact = {
   detectedToolNames: string[];
   snippetHash: string;
   snippetLength: number;
-  displayOutcome: "failure_copy" | "stripped_partial";
-  /** True only when this response caused new tool execution from body (must stay false). */
+  displayOutcome: "failure_copy" | "stripped_partial" | "stripped_empty";
   bodyDerivedToolExecution: false;
-  /** Native structured calls on the same response (§7.3.C). */
   nativeExecutionStatus: NativeCallExecutionStatus;
   triggeredExtraModelTurn: false;
   terminated: boolean;
 };
 
-export type ProtocolBoundaryState = {
-  /** Pure-body violation: skip auto-continue / repair. */
-  terminated: boolean;
-  lastFact: ProtocolViolationFact | null;
+export type NativeCallOutcomeFact = {
+  schemaVersion: typeof PROTOCOL_VIOLATION_SCHEMA_VERSION;
+  event: "protocol_violation_native_outcome";
+  eventId: string;
+  parentEventId: string;
+  dedupeKey: string;
+  ts: number;
+  runId: string;
+  status: "rejected" | "executed";
+  toolName?: string;
+  toolCallId?: string;
 };
 
-export function createProtocolBoundaryState(): ProtocolBoundaryState {
-  return { terminated: false, lastFact: null };
+export type ProtocolBoundaryState = {
+  terminated: boolean;
+  lastFact: ProtocolViolationFact | null;
+  attemptId: string;
+  modelResponseSeq: number;
+};
+
+export function createProtocolBoundaryState(attemptId = "attempt"): ProtocolBoundaryState {
+  return { terminated: false, lastFact: null, attemptId, modelResponseSeq: 0 };
+}
+
+export function allocateModelResponseAttemptId(state: ProtocolBoundaryState): string {
+  state.modelResponseSeq += 1;
+  return `${state.attemptId}:mr${state.modelResponseSeq}`;
 }
 
 export function buildProtocolViolationDedupeKey(parts: {
@@ -98,16 +126,37 @@ export function hashProtocolSnippet(text: string): { snippetHash: string; snippe
   };
 }
 
-const writtenDedupeKeys = new Set<string>();
+const writtenDedupeKeys = new Map<string, number>();
 let writeFailureCount = 0;
+let dedupeInsertSeq = 0;
 
 export function resetProtocolViolationPersistForTest(): void {
   writtenDedupeKeys.clear();
   writeFailureCount = 0;
+  dedupeInsertSeq = 0;
 }
 
 export function getProtocolViolationWriteFailureCountForTest(): number {
   return writeFailureCount;
+}
+
+export function getProtocolViolationDedupeCacheSizeForTest(): number {
+  return writtenDedupeKeys.size;
+}
+
+function rememberSuccessfulWrite(dedupeKey: string): void {
+  if (writtenDedupeKeys.has(dedupeKey)) {
+    return;
+  }
+  dedupeInsertSeq += 1;
+  writtenDedupeKeys.set(dedupeKey, dedupeInsertSeq);
+  while (writtenDedupeKeys.size > PROTOCOL_VIOLATION_DEDUPE_CACHE_LIMIT) {
+    const oldest = writtenDedupeKeys.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    writtenDedupeKeys.delete(oldest);
+  }
 }
 
 export function resolveProtocolViolationLogPath(env: NodeJS.ProcessEnv = process.env): string {
@@ -118,10 +167,6 @@ export function resolveProtocolViolationLogPath(env: NodeJS.ProcessEnv = process
   return path.join(resolveStateDir(env), "logs", "protocol-violations.jsonl");
 }
 
-/**
- * Idempotent persist. Same dedupe key from stream/subscribe/display callbacks
- * writes once. Write failure never re-opens repair or re-prompts the model.
- */
 export function persistProtocolViolationFact(
   fact: ProtocolViolationFact,
   opts?: { logPath?: string; env?: NodeJS.ProcessEnv },
@@ -129,12 +174,12 @@ export function persistProtocolViolationFact(
   if (writtenDedupeKeys.has(fact.dedupeKey)) {
     return { written: false, duplicate: true };
   }
-  writtenDedupeKeys.add(fact.dedupeKey);
 
   const logPath = opts?.logPath ?? resolveProtocolViolationLogPath(opts?.env);
   try {
     fs.mkdirSync(path.dirname(logPath), { recursive: true });
     fs.appendFileSync(logPath, `${JSON.stringify(fact)}\n`, "utf8");
+    rememberSuccessfulWrite(fact.dedupeKey);
     return { written: true, duplicate: false };
   } catch (err) {
     writeFailureCount += 1;
@@ -169,7 +214,7 @@ export function buildProtocolViolationFact(input: {
   allowedToolNames: Iterable<string>;
   detectedToolNames: string[];
   rawText: string;
-  displayOutcome: "failure_copy" | "stripped_partial";
+  displayOutcome: "failure_copy" | "stripped_partial" | "stripped_empty";
   nativeExecutionStatus: NativeCallExecutionStatus;
   terminated: boolean;
 }): ProtocolViolationFact {
@@ -206,6 +251,94 @@ export function buildProtocolViolationFact(input: {
   };
 }
 
+export function buildNativeCallOutcomeFact(input: {
+  parentEventId: string;
+  runId: string;
+  status: "rejected" | "executed";
+  toolName?: string;
+  toolCallId?: string;
+}): NativeCallOutcomeFact {
+  const dedupeKey = [
+    "native_outcome",
+    input.parentEventId,
+    input.toolCallId ?? input.toolName ?? "",
+    input.status,
+  ].join("|");
+  return {
+    schemaVersion: PROTOCOL_VIOLATION_SCHEMA_VERSION,
+    event: "protocol_violation_native_outcome",
+    eventId: eventIdFromDedupeKey(dedupeKey),
+    parentEventId: input.parentEventId,
+    dedupeKey,
+    ts: Date.now(),
+    runId: input.runId,
+    status: input.status,
+    toolName: input.toolName,
+    toolCallId: input.toolCallId,
+  };
+}
+
+export function persistNativeCallOutcomeFact(
+  fact: NativeCallOutcomeFact,
+  opts?: { logPath?: string; env?: NodeJS.ProcessEnv },
+): { written: boolean; duplicate: boolean; error?: string } {
+  if (writtenDedupeKeys.has(fact.dedupeKey)) {
+    return { written: false, duplicate: true };
+  }
+  const logPath = opts?.logPath ?? resolveProtocolViolationLogPath(opts?.env);
+  try {
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    fs.appendFileSync(logPath, `${JSON.stringify(fact)}\n`, "utf8");
+    rememberSuccessfulWrite(fact.dedupeKey);
+    return { written: true, duplicate: false };
+  } catch (err) {
+    writeFailureCount += 1;
+    const message = err instanceof Error ? err.message : String(err);
+    try {
+      emitAgentEvent({
+        runId: fact.runId,
+        stream: "error",
+        data: {
+          event: "protocol_violation_persist_failed",
+          dedupeKey: fact.dedupeKey,
+          error: message,
+          writeFailureCount,
+        },
+      });
+    } catch {
+      // ignore
+    }
+    return { written: false, duplicate: false, error: message };
+  }
+}
+
+export function linkNativeOutcomesForViolation(params: {
+  parentFact: ProtocolViolationFact | null | undefined;
+  runId: string;
+  tools: ReadonlyArray<{ toolName: string; toolCallId?: string; success?: boolean }>;
+  logPath?: string;
+}): number {
+  const parent = params.parentFact;
+  if (!parent || parent.nativeExecutionStatus !== "requested") {
+    return 0;
+  }
+  let written = 0;
+  for (const tool of params.tools) {
+    const fact = buildNativeCallOutcomeFact({
+      parentEventId: parent.eventId,
+      runId: params.runId,
+      status: tool.success === false ? "rejected" : "executed",
+      toolName: tool.toolName,
+      toolCallId: tool.toolCallId,
+    });
+    const result = persistNativeCallOutcomeFact(fact, { logPath: params.logPath });
+    if (result.written) {
+      written += 1;
+    }
+  }
+  return written;
+}
+
 export function isProtocolViolationStopReason(stopReason: unknown): boolean {
   return stopReason === PROTOCOL_VIOLATION_STOP_REASON;
 }
@@ -221,6 +354,19 @@ export function lastAssistantHasProtocolViolation(messages: readonly unknown[]):
       continue;
     }
     return isProtocolViolationStopReason(rec.stopReason);
+  }
+  return false;
+}
+
+export function isProtocolViolationContinueBlocked(params: {
+  boundaryTerminated?: boolean;
+  messages?: readonly unknown[];
+}): boolean {
+  if (params.boundaryTerminated) {
+    return true;
+  }
+  if (params.messages && lastAssistantHasProtocolViolation(params.messages)) {
+    return true;
   }
   return false;
 }

@@ -95,6 +95,7 @@ import {
   toHookDeliveryResult,
   resolveSkillFrontmatter,
 } from "../../execution-preflight/index.js";
+import { runExecutionStallContinueLoop } from "../../execution-stall-continue-loop.js";
 import {
   dropSupersededStallTexts,
   EMPTY_AFTER_TOOLS_CONTINUE_LIMIT,
@@ -143,9 +144,11 @@ import { toClientToolDefinitions } from "../../pi-tool-definition-adapter.js";
 import { createOpenClawCodingTools, resolveToolLoopDetectionConfig } from "../../pi-tools.js";
 import { normalizeClientToolNamesForProvider } from "../../pi-tools.schema.js";
 import {
+  allocateModelResponseAttemptId,
   buildProtocolViolationFact,
   createProtocolBoundaryState,
-  lastAssistantHasProtocolViolation,
+  isProtocolViolationContinueBlocked,
+  linkNativeOutcomesForViolation,
   persistProtocolViolationFact,
   PROTOCOL_VIOLATION_STOP_REASON,
   type ProtocolBoundaryState,
@@ -609,7 +612,7 @@ export function enforceProtocolTextNonExecutionInMessage(
 
   const recordFact = (
     terminated: boolean,
-    displayOutcome: "failure_copy" | "stripped_partial",
+    displayOutcome: "failure_copy" | "stripped_partial" | "stripped_empty",
     nativeExecutionStatus: "none" | "requested",
   ) => {
     if (!ctx) {
@@ -660,7 +663,9 @@ export function enforceProtocolTextNonExecutionInMessage(
       ...nonTextBlocks,
       ...(visible ? [{ type: "text", text: gated.visibleText }] : []),
     ];
-    recordFact(false, visible ? "stripped_partial" : "failure_copy", "requested");
+    // Mixed: never pretreat native as executed; empty stripped body is stripped_empty
+    // (not failure_copy — failure copy is only for pure-body terminate).
+    recordFact(false, visible ? "stripped_partial" : "stripped_empty", "requested");
     return { status: "stripped-mixed" };
   }
 
@@ -689,13 +694,19 @@ export function wrapStreamFnEnforceProtocolTextNonExecution(
   ctx: EnforceProtocolTextContext,
 ): StreamFn {
   return (model, context, options) => {
+    // One attemptOrTurnId per model-response stream invocation; multi-callback
+    // within the same stream reuses it via the closed-over perResponseCtx.
+    const attemptOrTurnId = ctx.boundaryState
+      ? allocateModelResponseAttemptId(ctx.boundaryState)
+      : ctx.attemptOrTurnId;
+    const perResponseCtx: EnforceProtocolTextContext = { ...ctx, attemptOrTurnId };
     const maybeStream = baseFn(model, context, options);
     if (maybeStream && typeof maybeStream === "object" && "then" in maybeStream) {
       return Promise.resolve(maybeStream).then((stream) =>
-        wrapStreamEnforceProtocolTextNonExecution(stream, ctx),
+        wrapStreamEnforceProtocolTextNonExecution(stream, perResponseCtx),
       );
     }
-    return wrapStreamEnforceProtocolTextNonExecution(maybeStream, ctx);
+    return wrapStreamEnforceProtocolTextNonExecution(maybeStream, perResponseCtx);
   };
 }
 
@@ -1592,7 +1603,7 @@ export async function runEmbeddedAttempt(
     let removeContextCompiler: (() => void) | undefined;
     let removeReplyLanguageReminder: (() => void) | undefined;
     let removeVisibleReplyRewriter: (() => void) | undefined;
-    const protocolBoundaryState = createProtocolBoundaryState();
+    const protocolBoundaryState = createProtocolBoundaryState(`${params.runId}:attempt`);
     try {
       await repairSessionFileIfNeeded({
         sessionFile: params.sessionFile,
@@ -2056,6 +2067,7 @@ export async function runEmbeddedAttempt(
         activeSession.agent.streamFunction,
         {
           runId: params.runId,
+          // Seed only — wrapStreamFn allocates `${attemptId}:mrN` per model response.
           attemptOrTurnId: `${params.runId}:attempt`,
           sessionId: params.sessionId,
           agentId: sessionAgentId,
@@ -2578,8 +2590,10 @@ export async function runEmbeddedAttempt(
           !promptError &&
           !aborted &&
           !timedOut &&
-          !protocolBoundaryState.terminated &&
-          !lastAssistantHasProtocolViolation(activeSession.messages)
+          !isProtocolViolationContinueBlocked({
+            boundaryTerminated: protocolBoundaryState.terminated,
+            messages: activeSession.messages,
+          })
         ) {
           const toolsDisabled = params.disableTools === true;
           const continuedStalls: string[] = [];
@@ -2592,75 +2606,81 @@ export async function runEmbeddedAttempt(
             FALSE_CONFIRM_CONTINUE_LIMIT +
             EMPTY_AFTER_TOOLS_CONTINUE_LIMIT +
             SILENT_EXEC_CONTINUE_LIMIT;
-          for (let step = 0; step < continueBudget; step += 1) {
-            if (aborted || timedOut) {
-              break;
-            }
-            const stopText = lastAssistantStopText(activeSession.messages);
-            const userText = latestUserText(activeSession.messages);
-            const kind = executionContinueKind({
-              text: stopText,
-              toolsDisabled,
-              continuesUsed: stallContinues,
-              latestUserText: userText,
-              falseConfirmContinuesUsed: falseConfirmContinues,
-              silentExecContinuesUsed: silentExecContinues,
-            });
-            const emptyContinue =
-              !kind &&
-              shouldContinueAfterEmptyToolFinal({
-                stopKind: lastAssistantStopKind(activeSession.messages),
+          await runExecutionStallContinueLoop({
+            continueBudget,
+            isAbortedOrTimedOut: () => aborted || timedOut,
+            getProtocolBlock: () => ({
+              boundaryTerminated: protocolBoundaryState.terminated,
+              messages: activeSession.messages,
+            }),
+            resolveContinue: () => {
+              const stopText = lastAssistantStopText(activeSession.messages);
+              const userText = latestUserText(activeSession.messages);
+              const kind = executionContinueKind({
+                text: stopText,
                 toolsDisabled,
-                continuesUsed: emptyAfterToolsContinues,
-                tools: toolMetas,
-                visibleTexts: assistantTexts,
+                continuesUsed: stallContinues,
+                latestUserText: userText,
+                falseConfirmContinuesUsed: falseConfirmContinues,
+                silentExecContinuesUsed: silentExecContinues,
               });
-            if (!kind && !emptyContinue) {
-              break;
-            }
-            const prompt =
-              kind === "silent-exec"
-                ? SILENT_EXEC_CONTINUE_PROMPT
-                : kind === "false-confirm"
-                  ? FALSE_CONFIRM_CONTINUE_PROMPT
-                  : emptyContinue
-                    ? EMPTY_AFTER_TOOLS_CONTINUE_PROMPT
-                    : EXECUTION_STALL_CONTINUE_PROMPT;
-            try {
-              await abortable(
-                activeSession.sendCustomMessage(
-                  {
-                    customType: "openbot:execution-stall-continue",
-                    content: prompt,
-                    display: false,
-                    details: { reason: kind ?? "empty-after-tools" },
-                  },
-                  { triggerTurn: true },
-                ),
-              );
-            } catch (err) {
-              log.warn(`execution stall continuation failed: ${String(err)}`);
-              break;
-            }
-            if (kind === "progress-stall") {
-              stallContinues += 1;
-              if (stopText) {
-                continuedStalls.push(stopText);
+              const emptyContinue =
+                !kind &&
+                shouldContinueAfterEmptyToolFinal({
+                  stopKind: lastAssistantStopKind(activeSession.messages),
+                  toolsDisabled,
+                  continuesUsed: emptyAfterToolsContinues,
+                  tools: toolMetas,
+                  visibleTexts: assistantTexts,
+                });
+              return { kind, emptyContinue, stopText };
+            },
+            sendContinue: async ({ kind }) => {
+              try {
+                await abortable(
+                  activeSession.sendCustomMessage(
+                    {
+                      customType: "openbot:execution-stall-continue",
+                      content:
+                        kind === "silent-exec"
+                          ? SILENT_EXEC_CONTINUE_PROMPT
+                          : kind === "false-confirm"
+                            ? FALSE_CONFIRM_CONTINUE_PROMPT
+                            : kind === "empty-after-tools"
+                              ? EMPTY_AFTER_TOOLS_CONTINUE_PROMPT
+                              : EXECUTION_STALL_CONTINUE_PROMPT,
+                      display: false,
+                      details: { reason: kind },
+                    },
+                    { triggerTurn: true },
+                  ),
+                );
+              } catch (err) {
+                log.warn(`execution stall continuation failed: ${String(err)}`);
+                throw err;
               }
-            } else if (kind === "false-confirm") {
-              falseConfirmContinues += 1;
-              if (stopText) {
-                continuedStalls.push(stopText);
+            },
+            onContinued: (kind, stopText) => {
+              if (kind === "progress-stall") {
+                stallContinues += 1;
+                if (stopText) {
+                  continuedStalls.push(stopText);
+                }
+              } else if (kind === "false-confirm") {
+                falseConfirmContinues += 1;
+                if (stopText) {
+                  continuedStalls.push(stopText);
+                }
+              } else if (kind === "silent-exec") {
+                silentExecContinues += 1;
+                if (stopText) {
+                  continuedStalls.push(stopText);
+                }
+              } else {
+                emptyAfterToolsContinues += 1;
               }
-            } else if (kind === "silent-exec") {
-              silentExecContinues += 1;
-              if (stopText) {
-                continuedStalls.push(stopText);
-              }
-            } else {
-              emptyAfterToolsContinues += 1;
-            }
-          }
+            },
+          });
           if (continuedStalls.length > 0) {
             dropSupersededStallTexts(
               assistantTexts,
@@ -2931,6 +2951,27 @@ export async function runEmbeddedAttempt(
           success: entry.success !== false,
           startedAt: entry.startedAt,
         }));
+
+      // Linked native outcome rows (requested → rejected/executed) for mixed violations (§7.3.C).
+      // Detection fact stays immutable at requested; outcomes are separate linked events.
+      if (
+        protocolBoundaryState.lastFact?.nativeExecutionStatus === "requested" &&
+        toolMetasNormalized.length > 0
+      ) {
+        try {
+          linkNativeOutcomesForViolation({
+            parentFact: protocolBoundaryState.lastFact,
+            runId: params.runId,
+            tools: toolMetasNormalized.map((entry) => ({
+              toolName: entry.toolName,
+              toolCallId: entry.toolCallId,
+              success: entry.success,
+            })),
+          });
+        } catch (err) {
+          log.warn(`protocol violation native outcome link failed: ${String(err)}`);
+        }
+      }
 
       if (hookRunner?.hasHooks("llm_output")) {
         hookRunner

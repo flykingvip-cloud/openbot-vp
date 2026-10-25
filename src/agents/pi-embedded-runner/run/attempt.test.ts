@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../../config/config.js";
+import { runExecutionStallContinueLoop } from "../../execution-stall-continue-loop.js";
 import { PROTOCOL_FAILURE_USER_TEXT } from "../../model-output-boundary.js";
 import { resolveOllamaBaseUrlForRun } from "../../ollama-stream.js";
 import {
@@ -612,6 +613,158 @@ describe("enforceProtocolTextNonExecutionInMessage", () => {
     expect(
       lastAssistantHasProtocolViolation([{ role: "assistant", stopReason: "stop", content: [] }]),
     ).toBe(false);
+  });
+
+  it("mixed empty stripped body records stripped_empty not failure_copy", () => {
+    const message = {
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: [
+            "<｜DSML｜tool_calls>",
+            '<｜DSML｜invoke name="read">',
+            "</｜DSML｜invoke>",
+            "</｜DSML｜tool_calls>",
+          ].join("\n"),
+        },
+        { type: "toolCall", id: "call_1", name: "read", arguments: { path: "a.md" } },
+      ],
+      stopReason: "toolUse",
+    };
+    const boundaryState = createProtocolBoundaryState("run-empty:attempt");
+    enforceProtocolTextNonExecutionInMessage(message, {
+      runId: "run-empty",
+      attemptOrTurnId: "run-empty:attempt:mr1",
+      allowedToolNames: new Set(["read"]),
+      boundaryState,
+    });
+    expect(boundaryState.lastFact?.displayOutcome).toBe("stripped_empty");
+    expect(boundaryState.lastFact?.nativeExecutionStatus).toBe("requested");
+    expect(message.content.some((b: { type?: string }) => b.type === "text")).toBe(false);
+  });
+
+  it("stream wrapper allocates distinct attemptOrTurnId per model response", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pv-seq-"));
+    const logPath = path.join(dir, "violations.jsonl");
+    const prev = process.env.OPENBOT_PROTOCOL_VIOLATION_LOG;
+    process.env.OPENBOT_PROTOCOL_VIOLATION_LOG = logPath;
+    try {
+      const body = [
+        "<｜DSML｜tool_calls>",
+        '<｜DSML｜invoke name="read">',
+        "</｜DSML｜invoke>",
+        "</｜DSML｜tool_calls>",
+      ].join("\n");
+      const boundaryState = createProtocolBoundaryState("run-seq:attempt");
+      const mkMessage = () => ({
+        role: "assistant" as const,
+        content: [{ type: "text", text: body }],
+        stopReason: "stop",
+      });
+      const baseFn = vi.fn(() => {
+        const message = mkMessage();
+        return {
+          async result() {
+            return message;
+          },
+          [Symbol.asyncIterator]() {
+            return (async function* () {})();
+          },
+        };
+      });
+      const wrapped = wrapStreamFnEnforceProtocolTextNonExecution(baseFn as never, {
+        runId: "run-seq",
+        attemptOrTurnId: "run-seq:attempt",
+        allowedToolNames: new Set(["read"]),
+        boundaryState,
+      });
+      const s1 = await wrapped({} as never, {} as never, {} as never);
+      await s1.result();
+      const s2 = await wrapped({} as never, {} as never, {} as never);
+      await s2.result();
+      const lines = fs
+        .readFileSync(logPath, "utf8")
+        .trim()
+        .split("\n")
+        .map((l) => JSON.parse(l));
+      expect(lines).toHaveLength(2);
+      expect(lines[0].attemptOrTurnId).toBe("run-seq:attempt:mr1");
+      expect(lines[1].attemptOrTurnId).toBe("run-seq:attempt:mr2");
+      expect(lines[0].eventId).not.toBe(lines[1].eventId);
+      expect(boundaryState.modelResponseSeq).toBe(2);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENBOT_PROTOCOL_VIOLATION_LOG;
+      } else {
+        process.env.OPENBOT_PROTOCOL_VIOLATION_LOG = prev;
+      }
+    }
+  });
+
+  it("mid-continue protocol violation stops further model calls (loop isolation)", async () => {
+    let modelCalls = 0;
+    const messages: Array<{ role: string; stopReason?: string; content?: unknown[] }> = [
+      { role: "assistant", stopReason: "stop", content: [{ type: "text", text: "进行中…" }] },
+    ];
+    const boundary = createProtocolBoundaryState("run-cont:attempt");
+    const result = await runExecutionStallContinueLoop({
+      continueBudget: 5,
+      isAbortedOrTimedOut: () => false,
+      getProtocolBlock: () => ({
+        boundaryTerminated: boundary.terminated,
+        messages,
+      }),
+      resolveContinue: () => ({
+        kind: "progress-stall" as const,
+        emptyContinue: false,
+        stopText: "进行中…",
+      }),
+      sendContinue: async () => {
+        modelCalls += 1;
+        if (modelCalls === 1) {
+          messages.push({
+            role: "assistant",
+            stopReason: PROTOCOL_VIOLATION_STOP_REASON,
+            content: [{ type: "text", text: PROTOCOL_FAILURE_USER_TEXT }],
+          });
+          boundary.terminated = true;
+        } else {
+          messages.push({
+            role: "assistant",
+            stopReason: "stop",
+            content: [{ type: "text", text: "should-not-happen" }],
+          });
+        }
+      },
+    });
+    expect(result.continuesSent).toBe(1);
+    expect(modelCalls).toBe(1);
+    expect(boundary.terminated).toBe(true);
+  });
+
+  it("MiniMax pure body terminates via unified gate path", () => {
+    const message = {
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: '<minimax:tool_call><invoke name="read"></invoke></minimax:tool_call>',
+        },
+      ],
+      stopReason: "stop",
+    };
+    const boundaryState = createProtocolBoundaryState();
+    expect(
+      enforceProtocolTextNonExecutionInMessage(message, {
+        runId: "run-mm",
+        attemptOrTurnId: "run-mm:attempt:mr1",
+        allowedToolNames: new Set(["read"]),
+        boundaryState,
+      }),
+    ).toEqual({ status: "terminated", classification: "pure_body" });
+    expect(boundaryState.lastFact?.protocol).toBe("minimax");
+    expect(message.stopReason).toBe(PROTOCOL_VIOLATION_STOP_REASON);
   });
 });
 
