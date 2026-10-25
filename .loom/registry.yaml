@@ -9554,12 +9554,14 @@ tasks:
       - src/gateway/collaboration-learning/trusted-tenant.ts
       - src/gateway/collaboration-learning/trusted-tenant.test.ts
       - src/gateway/collaboration-learning/delivery-actor-binding.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.test.ts
       - src/gateway/collaboration-learning/handoff-contract-entry.ts
       - src/gateway/collaboration-learning/handoff-contract-entry.test.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/claim-contract-entry.test.ts
       - src/gateway/collaboration-learning/todolist-acl-rpc.ts
       - src/gateway/collaboration-learning/todolist-acl-rpc.test.ts
+      - src/gateway/collaboration-learning/platform-role-binding-mt.test.ts
       - src/gateway/collaboration-learning/self-advance-entry.ts
       - src/agents/tools/collaboration-board-tool.ts
       - src/agents/tools/collaboration-board-tool.test.ts
