@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 describe("resolvePreviewFilesystemLocator", () => {
-  it("keeps a trusted locator that is an existing directory", () => {
+  it("keeps a trusted locator that is an existing directory when no runtime root exists", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-preview-trusted-"));
     tempDirs.push(dir);
     expect(
@@ -34,6 +34,28 @@ describe("resolvePreviewFilesystemLocator", () => {
         stateDir: "/tmp/state",
       }),
     ).toBe(path.resolve(dir));
+  });
+
+  it("prefers formal runtime operators over an empty existing tenants trusted twin", () => {
+    // LIVE smoke-memo-67: tenants L2 dir exists (no deliverables/) while
+    // operators formal SoT already has the file + ledger delivered+readable.
+    const tenantsTwin = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-preview-tenants-twin-"));
+    const operators = fs.mkdtempSync(path.join(os.tmpdir(), "openbot-preview-operators-"));
+    tempDirs.push(tenantsTwin, operators);
+    fs.mkdirSync(path.join(operators, "deliverables", "smoke-memo-67"), { recursive: true });
+    fs.writeFileSync(
+      path.join(operators, "deliverables", "smoke-memo-67", "冒烟备忘67.md"),
+      "# smoke\n",
+    );
+    expect(
+      resolvePreviewFilesystemLocator({
+        trustedLocator: tenantsTwin,
+        runtimeWorkspaces: [operators],
+        configuredWorkspace: "/tmp/configured-should-not-win",
+        agentId: "bot-skill",
+        stateDir: "/tmp/state",
+      }),
+    ).toBe(path.resolve(operators));
   });
 
   it("prefers an existing runtime write workspace over a stale configured checkout", () => {
