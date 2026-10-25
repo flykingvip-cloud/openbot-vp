@@ -121,7 +121,7 @@ function ledgerRowsFromFile(file: LedgerFile): LedgerSurfaceRow[] {
         title: typeof item.title === "string" ? item.title : id,
         status: typeof item.status === "string" ? item.status : "",
         ...(typeof item.description === "string" ? { description: item.description } : {}),
-        ...(disposition ? { surface_disposition: disposition as const } : {}),
+        ...(disposition ? { surface_disposition: "cancelled" } : {}),
       },
     ];
   });
