@@ -9569,6 +9569,15 @@ tasks:
       - src/gateway/context-scope/authorize.test.ts
       - src/gateway/collaboration-dispatch/self-advance.ts
       - src/gateway/collaboration-dispatch/self-advance.test.ts
+      - src/gateway/collaboration-dispatch/task-runtime.ts
+      - src/gateway/collaboration-dispatch/task-runtime.test.ts
+      - src/gateway/collaboration-dispatch/handoff-invariant.test.ts
+      - src/gateway/collaboration-learning/state-machine.ts
+      - src/config/schema.help.ts
+      - src/config/types.collaboration.ts
+      - ui/src/ui/controllers/collaboration-governance-actions.ts
+      - ui/src/ui/controllers/collaboration-governance-actions.node.test.ts
+
     state: active
     sessions:
       - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
