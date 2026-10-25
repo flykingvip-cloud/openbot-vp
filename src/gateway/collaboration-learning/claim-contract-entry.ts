@@ -103,7 +103,10 @@ import {
   resolveCollaborationGroupTenantId,
   syncGroupOperatingState,
 } from "./shared.js";
-import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "./trusted-tenant.js";
 
 export { oralDispatchCreatesBoardFact };
 export { freeChatIsTodolist, todolistIsGroupSharedBoardSubrecord };
@@ -172,10 +175,10 @@ async function buildClaimAuthority(params: {
     idGen: () => generatePolicySnapshotId(now),
   });
   const groupTenantId = resolveCollaborationGroupTenantId(params.groupId);
-  const tenant: CollaborationTenantResolution = params.tenant ?? {
-    tenantId: groupTenantId,
-    trust: groupTenantId ? "actor_fallback" : "none",
-  };
+  const tenant: CollaborationTenantResolution = resolveAuthorityTenantForEntry({
+    preferred: params.tenant,
+    groupTenantId,
+  });
   const profile = resolveSecurityProfile(params.cfg).profile;
   const authority = createRuntimeAuthority({
     snapshot,
