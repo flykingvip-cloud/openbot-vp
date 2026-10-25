@@ -98,7 +98,7 @@ function annotateToolResultWritability(result: AgentToolResult<unknown>): AgentT
       return block;
     }
     changed = true;
-    return { ...entry, text: next };
+    return { type: "text" as const, text: next };
   });
   return changed ? { ...result, content } : result;
 }
