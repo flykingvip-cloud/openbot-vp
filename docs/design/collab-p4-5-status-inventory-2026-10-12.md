@@ -37,7 +37,7 @@ Prior inventories: [`collab-p0-status-inventory-2026-10-12.md`](./collab-p0-stat
 | HandoffContract state machine | **EXISTS (FLAG-OFF)** | `proposeHandoff` → `acceptHandoff` → `approveHandoff` → `applyApprovedHandoff` in `handoff-contract.ts`; flag `collaboration.task.handoffContract` |
 | Flag-on refuse of `owner_transfer` shortcut | **EXISTS** (P1 seam) | `HandoffContractRequiredError` in `task-runtime.ts`; `handoffCollaborationTask` in `collaboration-learning/state-machine.ts` fail-closed when flag ON |
 | Production callers of contract APIs | **EXISTS (FLAG-OFF)** (P4a) | RPC `collaboration.task.proposeHandoff` / `acceptHandoff` / `approveHandoff` / `applyHandoff` → `handoff-contract-entry.ts` → existing `proposeHandoff*` APIs. Default flag still OFF |
-| `collaboration.task.handoff` RPC shortcut | **EXISTS (LIVE when flag OFF)** | `handoffCollaborationTask` → `applyTaskHandoff` |
+| `collaboration.task.handoff` RPC shortcut | **RETIRED (T09-B1)** | refuses mutation flag-off/on; UI → `proposeHandoff` |
 | `[[collab_edge:handoff\|…]]` | **EXISTS (LIVE) ≠ contract** | `parseCollabEdgesFromText` in `collab-edge.ts`; same-round routing in `round-runtime.ts`. Does **not** write HandoffContract or mutate responsibility |
 | Governance Gate | **EXISTS (LIVE)** | `evaluateGovernanceGate` in `governance-gate.ts` (`finalize_decision` / `publish_proposal` / `self_advance`). Callers: handoff approve, `assertTaskMayComplete`, learning finalize |
 | `self_advance` action | **PARTIAL** | Gate supports it; **zero** production callers; still gated by `botMaySelfAdvanceWithoutHuman` (default false) |
@@ -70,7 +70,7 @@ Prior inventories: [`collab-p0-status-inventory-2026-10-12.md`](./collab-p0-stat
 Reviewed against this inventory. **No edit in this PR.**
 
 - R6 HandoffContract = FLAG-OFF — still accurate.
-- R6 flag-off `owner_transfer` shortcut = LIVE — still accurate (P1 seam only changes flag-ON behavior).
+- R6 flag-off `owner_transfer` shortcut = **RETIRED (T09-B1 2026-10-25)** — refuses on both flag states.
 - R2 Governance Gate = LIVE — still accurate.
 - Claim = FLAG-OFF wired (P4b) — see Constitution matrix update.
 - Multi-beat = no production controller; G2 refuses `next_beat` — already stated in §3.4 after P3.
