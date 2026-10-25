@@ -1690,6 +1690,7 @@ export async function runEmbeddedAttempt(
         sandboxEnabled: !!sandbox?.enabled,
         deliveryToolSideEffect: params.deliveryToolSideEffect,
         cfg: params.config,
+        privateRunBag: params.privateRunBag,
       });
 
       // Add client tools (OpenResponses hosted tools) to customTools

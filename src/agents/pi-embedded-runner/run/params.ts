@@ -6,6 +6,7 @@ import type { OpenBotConfig } from "../../../config/config.js";
 import type { SessionEntry } from "../../../config/sessions.js";
 import type { OguiDecisionRunBinding } from "../../../config/sessions/ogui-decision-engine.js";
 import type { DeliveryToolSideEffectSchedule } from "../../../gateway/collaboration-dispatch/delivery-tool-side-effect.js";
+import type { CollaborationPrivateRunBag } from "../../../gateway/collaboration-dispatch/private-run-bag.js";
 import type { ExecutionIdentityContext } from "../../../gateway/execution-identity-context.js";
 import type { RuntimeOrganizationContext } from "../../../organization/runtime.js";
 import type { enqueueCommand } from "../../../process/command-queue.js";
@@ -89,6 +90,12 @@ export type RunEmbeddedPiAgentParams = {
    * the durable ledger before execute. Omitted on ordinary chat turns.
    */
   deliveryToolSideEffect?: DeliveryToolSideEffectSchedule | null;
+  /**
+   * Ephemeral per-bot private run bag for this turn. Forwarded into the tool loop
+   * so scheduleDurableToolSideEffect can index claimed side effects in-memory.
+   * Never written to GROUP_PUBLIC.
+   */
+  privateRunBag?: CollaborationPrivateRunBag;
   workspaceDir: string;
   agentDir?: string;
   config?: OpenBotConfig;

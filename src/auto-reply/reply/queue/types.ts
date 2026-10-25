@@ -70,6 +70,8 @@ export type FollowupRun = {
     collaborationRoundInvoked?: boolean;
     /** Confirmed delivery fingerprint forwarded into the embedded tool loop. */
     deliveryToolSideEffect?: import("../../../gateway/collaboration-dispatch/delivery-tool-side-effect.js").DeliveryToolSideEffectSchedule;
+    /** Ephemeral private run bag forwarded into the embedded tool loop (Residual B). */
+    privateRunBag?: import("../../../gateway/collaboration-dispatch/private-run-bag.js").CollaborationPrivateRunBag;
     workspaceDir: string;
     config: OpenBotConfig;
     skillsSnapshot?: SkillSnapshot;

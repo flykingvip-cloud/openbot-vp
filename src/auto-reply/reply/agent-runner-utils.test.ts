@@ -178,6 +178,30 @@ describe("agent-runner-utils", () => {
     expect(resolved.deliveryToolSideEffect).toEqual(deliveryToolSideEffect);
   });
 
+  it("forwards the private run bag into the embedded run for Residual B indexing", () => {
+    const privateRunBag = {
+      __privateRunBag: true as const,
+      agentId: "bot-a",
+      participationOverlay: null,
+      capabilitySet: { personal: [], group: [], participation: [], final: [] },
+      privateScratch: {},
+      toolSideEffectIndex: [],
+      createdAtMs: 1,
+    };
+    const run = makeRun({ privateRunBag });
+    const resolved = buildEmbeddedRunBaseParams({
+      run,
+      provider: "openai",
+      model: "gpt-4.1-mini",
+      runId: "run-private-run-bag",
+      authProfile: resolveProviderScopedAuthProfile({
+        provider: "openai",
+        primaryProvider: "openai",
+      }),
+    });
+    expect(resolved.privateRunBag).toBe(privateRunBag);
+  });
+
   it("omits skipUserTranscriptPersist when not set on the queued run", () => {
     const run = makeRun();
     const resolved = buildEmbeddedRunBaseParams({

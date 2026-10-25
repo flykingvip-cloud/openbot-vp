@@ -373,6 +373,7 @@ export function createFollowupRunner(params: {
                 ...(queued.run.deliveryToolSideEffect
                   ? { deliveryToolSideEffect: queued.run.deliveryToolSideEffect }
                   : {}),
+                ...(queued.run.privateRunBag ? { privateRunBag: queued.run.privateRunBag } : {}),
                 ownerNumbers: queued.run.ownerNumbers,
                 enforceFinalTag: queued.run.enforceFinalTag,
                 provider: embeddedProvider,

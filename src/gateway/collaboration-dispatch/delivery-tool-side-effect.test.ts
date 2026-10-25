@@ -2,6 +2,7 @@
  * Residual B: the embedded tool loop claims durable side effects.
  * A second execute with the same task/step/tool fingerprint must skip.
  */
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -23,6 +24,7 @@ import {
   isSideEffectingDeliveryTool,
   resolveDeliveryToolSideEffectLedgerDir,
 } from "./delivery-tool-side-effect.js";
+import { createCollaborationPrivateRunBag } from "./private-run-bag.js";
 import { isCollabRuntimeNamespaceEnabled } from "./runtime-namespace.js";
 
 const tempDirs: string[] = [];
@@ -208,6 +210,61 @@ describe("delivery tool side effect loop", () => {
     expect(calls).toBe(1);
     expect(failed.details).toMatchObject({ status: "error", error: "send failed" });
     expect(skipped.details).toMatchObject({ status: "skipped" });
+  });
+
+  it("indexes the private run bag once and never double-fires the same fingerprint", async () => {
+    const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-loop-bag-"));
+    tempDirs.push(ledgerDir);
+    const bag = createCollaborationPrivateRunBag({ agentId: "bot-residual-b" });
+    let calls = 0;
+    const { customTools } = splitSdkTools({
+      tools: [
+        tool("message", () => {
+          calls += 1;
+          return { content: [{ type: "text", text: "sent" }], details: { status: "ok" } };
+        }),
+      ],
+      sandboxEnabled: false,
+      deliveryToolSideEffect: {
+        ledgerDir,
+        taskId: "task-bag",
+        boardItemId: "item-bag",
+        stepId: "step-bag",
+      },
+      privateRunBag: bag,
+    });
+    const message = customTools[0];
+    if (!message) {
+      throw new Error("missing message");
+    }
+    await execute(message, "m1");
+    await execute(message, "m2");
+    expect(calls).toBe(1);
+    expect(bag.toolSideEffectIndex).toHaveLength(1);
+    expect(bag.toolSideEffectIndex[0]?.toolName).toBe("message");
+  });
+});
+
+describe("Residual B production call-site regression", () => {
+  it("keeps toToolDefinitions claiming via runDeliveryToolSideEffect → scheduleDurableToolSideEffect", () => {
+    const adapter = fsSync.readFileSync(
+      path.join(process.cwd(), "src/agents/pi-tool-definition-adapter.ts"),
+      "utf8",
+    );
+    const choke = fsSync.readFileSync(
+      path.join(process.cwd(), "src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts"),
+      "utf8",
+    );
+    const attempt = fsSync.readFileSync(
+      path.join(process.cwd(), "src/agents/pi-embedded-runner/run/attempt.ts"),
+      "utf8",
+    );
+    expect(adapter).toContain("runDeliveryToolSideEffect");
+    expect(adapter).toContain("options?.deliveryToolSideEffect");
+    expect(adapter).toContain("options?.privateRunBag");
+    expect(choke).toContain("scheduleDurableToolSideEffect");
+    expect(attempt).toContain("deliveryToolSideEffect: params.deliveryToolSideEffect");
+    expect(attempt).toContain("privateRunBag: params.privateRunBag");
   });
 });
 

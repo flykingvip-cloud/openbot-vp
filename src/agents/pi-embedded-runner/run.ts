@@ -947,6 +947,7 @@ export async function runEmbeddedPiAgent(
             skipUserTranscriptPersist: params.skipUserTranscriptPersist,
             collaborationRoundInvoked: params.collaborationRoundInvoked,
             deliveryToolSideEffect: params.deliveryToolSideEffect,
+            privateRunBag: params.privateRunBag,
             workspaceDir: resolvedWorkspace,
             agentDir,
             config: params.config,
