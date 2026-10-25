@@ -30,7 +30,7 @@ Base inventory HEAD at authoring: `b9e2a34423` (P0 merge). Constitution matrix:
 | Flag-on refusal of `owner_transfer` shortcut | **EXISTS** | `applyTaskHandoff` → `HandoffContractRequiredError` in `task-runtime.ts` |
 | Learning RPC seam never bypasses contract when flag ON | **PARTIAL → fixed in this PR** | `handoffCollaborationTask` in `collaboration-learning/state-machine.ts` previously reached `applyTaskHandoff` (which throws when flag ON). Now checks the flag first and **never** calls the shortcut when enabled. |
 | Production callers of contract APIs | **MISSING** (by design until gates) | No non-test callers of `proposeHandoff*` yet; closed loop is the contract API surface, not `collaboration.task.handoff` RPC |
-| Flag-off shortcut | **EXISTS** (intentional) | `applyTaskHandoff` still mutates when flag OFF; matrix R6 known gap until cutover |
+| Flag-off shortcut | **RETIRED (T09-B1 2026-10-25)** | `applyTaskHandoff` / `handoffCollaborationTask` refuse on flag-off and flag-on; sole writer `applyApprovedHandoff` when flag explicitly on |
 | Episode Store (P1-B① adjacent) | **EXISTS** (FLAG-OFF) | `episode-store.ts` / `isCollabEpisodeStoreEnabled` |
 | Group task board / claim | **PARTIAL / MISSING** (map only) | `operatingState.activeContext.currentTaskId`; 1:1 `SessionTaskBoard`; UI `SupervisorTaskBoard`. No collab-group claim board product — **do not invent here** |
 | Floor live / namespace cutover | **OFF** | `FLOOR_LIVE_CUTOVER_DEFAULT=false`; `RUNTIME_NAMESPACE_CUTOVER_DEFAULT=false` |
