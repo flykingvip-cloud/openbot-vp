@@ -210,15 +210,21 @@ describe("orch lease-store cross-process exclusivity", () => {
     const oldToken = childOut.split("lock-held:")[1]?.split(":")[0];
     expect(oldToken).toBeTruthy();
 
-    // Simulate crash reclaim + new holder: replace lock with a new ownerToken.
-    fs.unlinkSync(lockPath);
+    // Simulate crash reclaim + new holder via the same companion+link protocol.
+    const { writeLeaseLockPayload } = await import("./lease-file-lock.ts");
+    // Drop public name left by the paused holder (companion may remain briefly).
+    try {
+      fs.unlinkSync(lockPath);
+    } catch {
+      // ignore
+    }
     const newToken = randomUUID();
     const newPayload: LeaseLockPayload = {
       pid: process.pid,
       createdAt: new Date().toISOString(),
       ownerToken: newToken,
     };
-    fs.writeFileSync(lockPath, `${JSON.stringify(newPayload, null, 2)}\n`, "utf8");
+    writeLeaseLockPayload(lockPath, newPayload);
 
     // Signal old holder to attempt release.
     fs.writeFileSync(`${lockPath}.release-signal`, "go\n", "utf8");
@@ -242,23 +248,15 @@ describe("orch lease-store cross-process exclusivity", () => {
     const lockPath = `${leaseFile}.lock`;
     fs.mkdirSync(path.dirname(lockPath), { recursive: true });
 
-    // Dead-PID lock (crash leftover).
+    // Dead-PID lock (crash leftover) via companion+link protocol.
     const staleToken = randomUUID();
-    fs.writeFileSync(
-      lockPath,
-      `${JSON.stringify(
-        {
-          pid: 2_147_483_642,
-          createdAt: new Date(Date.now() - 120_000).toISOString(),
-          ownerToken: staleToken,
-        },
-        null,
-        2,
-      )}\n`,
-      "utf8",
-    );
-
-    const { tryReclaimStaleLeaseLock } = await import("./lease-file-lock.ts");
+    const { tryReclaimStaleLeaseLock, writeLeaseLockPayload } =
+      await import("./lease-file-lock.ts");
+    writeLeaseLockPayload(lockPath, {
+      pid: 2_147_483_642,
+      createdAt: new Date(Date.now() - 120_000).toISOString(),
+      ownerToken: staleToken,
+    });
     const expected = {
       pid: 2_147_483_642,
       createdAt: JSON.parse(fs.readFileSync(lockPath, "utf8")).createdAt as string,

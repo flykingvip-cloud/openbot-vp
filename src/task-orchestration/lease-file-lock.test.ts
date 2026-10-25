@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   evaluateLeaseLock,
   isPidAlive,
+  ownerCompanionPath,
   releaseLeaseLockOwned,
   tryReclaimStaleLeaseLock,
   withLeaseFileLock,
@@ -29,6 +30,10 @@ function tempRoot(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "orch-lease-lock-"));
   tempDirs.push(dir);
   return dir;
+}
+
+function readOwner(lockPath: string): LeaseLockPayload {
+  return JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
 }
 
 describe("orch lease-file-lock ownership / liveness", () => {
@@ -76,7 +81,7 @@ describe("orch lease-file-lock ownership / liveness", () => {
     ).toThrow(/orch_lease_file_lock_timeout/);
 
     // Do not call store.get while the foreign lock is held — get also needs the lock.
-    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
+    const still = readOwner(lockPath);
     expect(still.ownerToken).toBe("still-alive");
     expect(fs.existsSync(leaseFile)).toBe(false);
   }, 20_000);
@@ -97,6 +102,7 @@ describe("orch lease-file-lock ownership / liveness", () => {
     }
     expect(tryReclaimStaleLeaseLock(lockPath, evaluation.payload)).toBe(true);
     expect(fs.existsSync(lockPath)).toBe(false);
+    expect(fs.existsSync(ownerCompanionPath(lockPath, payload.ownerToken))).toBe(false);
   });
 
   it("does not delete incomplete lock metadata during reclaim", () => {
@@ -124,8 +130,7 @@ describe("orch lease-file-lock ownership / liveness", () => {
     });
     releaseLeaseLockOwned(lockPath, "old-owner");
     expect(fs.existsSync(lockPath)).toBe(true);
-    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
-    expect(still.ownerToken).toBe("new-owner");
+    expect(readOwner(lockPath).ownerToken).toBe("new-owner");
 
     releaseLeaseLockOwned(lockPath, "new-owner");
     expect(fs.existsSync(lockPath)).toBe(false);
@@ -145,8 +150,7 @@ describe("orch lease-file-lock ownership / liveness", () => {
       ownerToken: "replacement-owner",
     });
     expect(tryReclaimStaleLeaseLock(lockPath, stale)).toBe(false);
-    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
-    expect(still.ownerToken).toBe("replacement-owner");
+    expect(readOwner(lockPath).ownerToken).toBe("replacement-owner");
   });
 
   it("withLeaseFileLock serializes and cleans up owned lock", () => {
@@ -162,9 +166,9 @@ describe("orch lease-file-lock ownership / liveness", () => {
   });
 
   it("late reclaim after claim must not delete a replacement lock (acceptance interleave)", () => {
-    // Deterministic injection of the acceptance race:
-    // reclaimer finishes claim (rename), then replacement appears at lockPath
-    // before tomb unlink — replacement must survive; reclaim still succeeds on tomb.
+    // afterClaim: companion claimed to tomb; public name still held by same inode
+    // until unlink-if-same. Injection force-replaces public with a new holder —
+    // reclaim must not remove the replacement (different inode).
     const root = tempRoot();
     const lockPath = path.join(root, "interleave.json.lock");
     const stale: LeaseLockPayload = {
@@ -183,7 +187,6 @@ describe("orch lease-file-lock ownership / liveness", () => {
     let injected = false;
     const reclaimResult = tryReclaimStaleLeaseLock(lockPath, stale, {
       afterClaim: () => {
-        // lockPath is free after rename claim — new holder installs here.
         writeLeaseLockPayload(lockPath, replacement);
         injected = true;
       },
@@ -192,11 +195,10 @@ describe("orch lease-file-lock ownership / liveness", () => {
     expect(injected).toBe(true);
     expect(reclaimResult).toBe(true);
 
-    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
+    const still = readOwner(lockPath);
     expect(still.ownerToken).toBe("replacement-holder");
     expect(still.pid).toBe(process.pid);
     expect(isPidAlive(still.pid)).toBe(true);
-    // No unreclaimed tomb should remain for the stale token.
     const leftovers = fs.readdirSync(root).filter((n) => n.includes(".reclaimed."));
     expect(leftovers).toEqual([]);
   });
@@ -215,7 +217,6 @@ describe("orch lease-file-lock ownership / liveness", () => {
     expect(first).toBe(true);
     expect(fs.existsSync(lockPath)).toBe(false);
 
-    // New holder installs after first reclaim completes.
     const replacement: LeaseLockPayload = {
       pid: process.pid,
       createdAt: new Date().toISOString(),
@@ -223,12 +224,127 @@ describe("orch lease-file-lock ownership / liveness", () => {
     };
     writeLeaseLockPayload(lockPath, replacement);
 
-    // Late reclaimer still armed with the old expected payload.
     const second = tryReclaimStaleLeaseLock(lockPath, stale);
     expect(second).toBe(false);
 
-    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
+    const still = readOwner(lockPath);
     expect(still.ownerToken).toBe("post-reclaim-holder");
     expect(isPidAlive(still.pid)).toBe(true);
+  });
+
+  it("exact interleave: after preview, B acquires then late claim must not move B or admit C or overwrite", () => {
+    // Counterexample from acceptance:
+    // 1) old lock A check completes
+    // 2) beforeClaim: peer reclaim finishes + holder B publishes
+    // 3) late reclaimer continues (companion claim for A)
+    // 4) C tries to publish
+    // Prove: B never moved, C cannot enter, restore never overwrites lockPath.
+    const root = tempRoot();
+    const lockPath = path.join(root, "exact-interleave.json.lock");
+    const stale: LeaseLockPayload = {
+      pid: 2_147_483_641,
+      createdAt: new Date(Date.now() - 120_000).toISOString(),
+      ownerToken: "stale-A",
+    };
+    writeLeaseLockPayload(lockPath, stale);
+    const staleCompanion = ownerCompanionPath(lockPath, stale.ownerToken);
+    const bInoBeforeClaim = { current: -1 as number };
+
+    const holderB: LeaseLockPayload = {
+      pid: process.pid,
+      createdAt: new Date().toISOString(),
+      ownerToken: "live-B",
+    };
+
+    let bInstalled = false;
+
+    const reclaimResult = tryReclaimStaleLeaseLock(lockPath, stale, {
+      beforeClaim: () => {
+        expect(tryReclaimStaleLeaseLock(lockPath, stale)).toBe(true);
+        writeLeaseLockPayload(lockPath, holderB);
+        bInstalled = true;
+        bInoBeforeClaim.current = fs.statSync(lockPath).ino;
+        expect(readOwner(lockPath).ownerToken).toBe("live-B");
+        expect(fs.existsSync(staleCompanion)).toBe(false);
+      },
+    });
+
+    expect(bInstalled).toBe(true);
+    expect(reclaimResult).toBe(false);
+
+    // B's lock was never moved (same inode still published).
+    expect(fs.existsSync(lockPath)).toBe(true);
+    expect(fs.statSync(lockPath).ino).toBe(bInoBeforeClaim.current);
+    const finalOwner = readOwner(lockPath);
+    expect(finalOwner.ownerToken).toBe("live-B");
+    expect(isPidAlive(finalOwner.pid)).toBe(true);
+    expect(fs.existsSync(ownerCompanionPath(lockPath, "live-B"))).toBe(true);
+    expect(fs.existsSync(staleCompanion)).toBe(false);
+
+    // C cannot enter while B holds (link to occupied lockPath → EEXIST).
+    const cCompanion = ownerCompanionPath(lockPath, "live-C");
+    fs.writeFileSync(
+      cCompanion,
+      `${JSON.stringify(
+        {
+          pid: process.pid,
+          createdAt: new Date().toISOString(),
+          ownerToken: "live-C",
+        },
+        null,
+        2,
+      )}
+`,
+      "utf8",
+    );
+    expect(() => fs.linkSync(cCompanion, lockPath)).toThrow(/EEXIST/);
+    fs.unlinkSync(cCompanion);
+
+    // No reclaim tomb renamed onto lockPath.
+    expect(fs.readdirSync(root).filter((n) => n.includes(".reclaimed."))).toEqual([]);
+  });
+
+  it("restore path never renames onto an occupied lockPath (companion-only restore)", () => {
+    const root = tempRoot();
+    const lockPath = path.join(root, "norestore.json.lock");
+    const stale: LeaseLockPayload = {
+      pid: 2_147_483_640,
+      createdAt: new Date(Date.now() - 30_000).toISOString(),
+      ownerToken: "tomb-mismatch",
+    };
+    writeLeaseLockPayload(lockPath, stale);
+
+    const holderB: LeaseLockPayload = {
+      pid: process.pid,
+      createdAt: new Date().toISOString(),
+      ownerToken: "keep-B",
+    };
+
+    // Force verify failure after claim by swapping tomb contents via afterClaim
+    // while B occupies lockPath — restore must target companion only.
+    const result = tryReclaimStaleLeaseLock(lockPath, stale, {
+      afterClaim: (tombPath) => {
+        // Install B at public path (force replace).
+        writeLeaseLockPayload(lockPath, holderB);
+        // Corrupt tomb so verify fails and restoreCompanionFromTomb runs.
+        fs.writeFileSync(
+          tombPath,
+          `${JSON.stringify(
+            {
+              pid: process.pid,
+              createdAt: new Date().toISOString(),
+              ownerToken: "not-the-expected-token",
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+      },
+    });
+
+    expect(result).toBe(false);
+    expect(readOwner(lockPath).ownerToken).toBe("keep-B");
+    expect(isPidAlive(readOwner(lockPath).pid)).toBe(true);
   });
 });
