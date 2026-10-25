@@ -271,19 +271,33 @@ export function mergeCanonicalStepFields<T extends Record<string, unknown>>(
 /**
  * Compat-read: pull canonical fields from a payload bag when Step lacks them.
  * Payload is never authoritative once Step has the field set.
+ *
+ * Fail-closed: if Step is present and claims any canonical field that fails
+ * validation, throw — never silently discard Step identity/status and fall
+ * back to payload (which would re-author the record).
  */
 export function compatReadCanonicalFieldsFromPayload(
   step: Partial<CanonicalExecutionStepFields> | null | undefined,
   payload: Record<string, unknown> | null | undefined,
 ): CanonicalExecutionStepFields {
-  const fromStep = parseCanonicalExecutionStepFields(step ?? {});
-  const stepValue = fromStep.ok ? fromStep.value : {};
+  let stepValue: CanonicalExecutionStepFields = {};
+  if (step != null && typeof step === "object" && !Array.isArray(step)) {
+    const fromStep = parseCanonicalExecutionStepFields(step);
+    if (!fromStep.ok) {
+      const detail = fromStep.field ? `${fromStep.reason}:${fromStep.field}` : fromStep.reason;
+      throw new Error(`canonical_execution_step_fields_invalid:${detail}`);
+    }
+    stepValue = fromStep.value;
+  }
   if (!payload || typeof payload !== "object") {
     return stepValue;
   }
   const fromPayload = parseCanonicalExecutionStepFields(payload);
+  // Invalid payload is ignored for gap-fill (payload is never authority).
   const payloadValue = fromPayload.ok ? fromPayload.value : {};
   const merged: CanonicalExecutionStepFields = { ...payloadValue };
+  // Step keys present (even if value is undefined after parse) already won via
+  // stepValue; overwrite payload for every key Step successfully supplied.
   for (const [key, val] of Object.entries(stepValue) as [
     keyof CanonicalExecutionStepFields,
     CanonicalExecutionStepFields[keyof CanonicalExecutionStepFields],

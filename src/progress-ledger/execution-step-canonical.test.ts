@@ -121,4 +121,30 @@ describe("WP-06 execution-step-canonical", () => {
       ),
     ).toThrow(/unknown_outcome/);
   });
+
+  it("compat-read fail-closed: invalid Step status must not fall back to payload identity", () => {
+    expect(() =>
+      compatReadCanonicalFieldsFromPayload(
+        { logicalActionId: "authoritative", status: "invalid" },
+        {
+          logicalActionId: "payload-override",
+          status: "completed",
+        },
+      ),
+    ).toThrow(/canonical_execution_step_fields_invalid:invalid_status:status/);
+  });
+
+  it("compat-read still fills gaps when Step fields are valid", () => {
+    const merged = compatReadCanonicalFieldsFromPayload(
+      { logicalActionId: "authoritative", status: "in_progress" },
+      {
+        logicalActionId: "payload-override",
+        attemptId: "att-payload",
+        status: "completed",
+      },
+    );
+    expect(merged.logicalActionId).toBe("authoritative");
+    expect(merged.status).toBe("in_progress");
+    expect(merged.attemptId).toBe("att-payload");
+  });
 });
