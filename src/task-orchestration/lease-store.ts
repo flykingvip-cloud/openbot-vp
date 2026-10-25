@@ -9,6 +9,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { withLeaseFileLock } from "./lease-file-lock.js";
 import { ORCHESTRATION_LIVE_INVOKE } from "./types.js";
 
 /** Named kill/restart fixture IDs from design §5 (scenario enums only — no fake metrics). */
@@ -162,103 +163,6 @@ function isLeaseActive(record: OrchLeaseRecord, nowMs: number): boolean {
  */
 export function safeFileToken(jobStepId: string): string {
   return Buffer.from(jobStepId, "utf8").toString("base64url");
-}
-
-const LEASE_LOCK_STALE_MS = 30_000;
-const LEASE_LOCK_TIMEOUT_MS = 5_000;
-
-function sleepMs(ms: number): void {
-  const sab = new SharedArrayBuffer(4);
-  Atomics.wait(new Int32Array(sab), 0, 0, ms);
-}
-
-function isPidAlive(pid: number): boolean {
-  if (!Number.isInteger(pid) || pid <= 0) {
-    return false;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isStaleLeaseLock(lockPath: string): boolean {
-  try {
-    const raw = fs.readFileSync(lockPath, "utf8");
-    try {
-      const parsed = JSON.parse(raw) as { pid?: unknown; createdAt?: unknown };
-      if (typeof parsed.pid === "number" && !isPidAlive(parsed.pid)) {
-        return true;
-      }
-      if (typeof parsed.createdAt === "string") {
-        const createdAt = Date.parse(parsed.createdAt);
-        if (!Number.isFinite(createdAt) || Date.now() - createdAt > LEASE_LOCK_STALE_MS) {
-          return true;
-        }
-      }
-    } catch {
-      // unreadable payload → fall through to mtime
-    }
-    const stat = fs.statSync(lockPath);
-    return Date.now() - stat.mtimeMs > LEASE_LOCK_STALE_MS;
-  } catch {
-    return true;
-  }
-}
-
-/**
- * Cross-process exclusive lock for a lease JSON path (wx lockfile).
- * Same-process reentry is not supported — callers must not nest.
- */
-function withLeaseFileLock<T>(leaseFilePath: string, fn: () => T): T {
-  const lockPath = `${leaseFilePath}.lock`;
-  fs.mkdirSync(path.dirname(leaseFilePath), { recursive: true });
-  const deadline = Date.now() + LEASE_LOCK_TIMEOUT_MS;
-  let attempt = 0;
-  while (true) {
-    try {
-      const fd = fs.openSync(lockPath, "wx");
-      try {
-        fs.writeFileSync(
-          fd,
-          `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }, null, 2)}\n`,
-          "utf8",
-        );
-        return fn();
-      } finally {
-        try {
-          fs.closeSync(fd);
-        } catch {
-          // ignore
-        }
-        try {
-          fs.unlinkSync(lockPath);
-        } catch {
-          // ignore
-        }
-      }
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code !== "EEXIST") {
-        throw err;
-      }
-      if (isStaleLeaseLock(lockPath)) {
-        try {
-          fs.unlinkSync(lockPath);
-        } catch {
-          // ignore
-        }
-        continue;
-      }
-      if (Date.now() >= deadline) {
-        throw new Error(`orch_lease_file_lock_timeout:${leaseFilePath}`, { cause: err });
-      }
-      sleepMs(Math.min(25, 5 + attempt));
-      attempt += 1;
-    }
-  }
 }
 
 function writeJsonAtomic(dest: string, value: unknown): void {
