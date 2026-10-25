@@ -156,7 +156,14 @@ describe("handleControlUiHttpRequest", () => {
           },
         );
         expect(handled).toBe(true);
-        expect(end).toHaveBeenCalledWith(html);
+        const served = String(end.mock.calls[0]?.[0] ?? "");
+        // Ops smoke may stamp data-openbot-build-commit on <html>; that is not script injection.
+        expect(served).toMatch(
+          /^<html(?:\s+data-openbot-build-commit="[a-f0-9]+")?><head><\/head><body>Hello<\/body><\/html>\n$/,
+        );
+        expect(served).not.toContain("<script");
+        expect(served).not.toContain("alert(1)");
+        expect(served).not.toContain("</script><script>");
       },
     });
   });
