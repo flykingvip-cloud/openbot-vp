@@ -1,7 +1,6 @@
 import { html, nothing } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { scrubFalseDeliveryClaims } from "../../../../src/gateway/knowledge/deliverables/chat-deliverable-publish.js";
 import type { VisibleReplyLanguage } from "../../../../src/shared/text/assistant-scratchpad.js";
 import type { ThinkingProgressSnapshot } from "../../../../src/shared/text/thinking-progress.js";
 import { THINKING_PROGRESS_PLACEHOLDER } from "../../../../src/shared/text/thinking-progress.js";
@@ -74,6 +73,7 @@ import {
   type PeerRouteParty,
 } from "./peer-exchange.ts";
 import { buildQuoteDraft, type ChatQuoteDraft } from "./quote-draft.ts";
+import { scrubFalseDeliveryClaims } from "./scrub-false-delivery-claims.js";
 import { resolveSpaceAwareAssistantIdentity } from "./space-stream-identity.ts";
 import { formatThinkingElapsed, thinkingElapsedMs } from "./thinking-elapsed.ts";
 
