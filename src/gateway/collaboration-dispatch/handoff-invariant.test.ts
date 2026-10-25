@@ -226,7 +226,7 @@ describe("collaboration.task.handoffContract", () => {
     );
   });
 
-  test("flag-off owner_transfer shortcut still changes owner", () => {
+  test("flag-off owner_transfer shortcut is refused and does not change owner", () => {
     const current = asGovernedTask({
       taskId: "task-h1",
       groupId: "grp_handoff",
@@ -242,21 +242,23 @@ describe("collaboration.task.handoffContract", () => {
       executors: ["bot-a"],
       decisionAuthority: "human",
     };
-    const next = applyTaskHandoff({
-      task: current,
-      responsibility,
-      cfg: { collaboration: { task: { handoffContract: false } } },
-      handoff: normalizeTaskHandoff({
-        taskId: current.taskId,
-        from: "bot-a",
-        to: "bot-b",
-        reason: "owner_transfer",
-        remainingWork: "finish the review",
-        acceptanceCriteria: ["signed off"],
+    expect(() =>
+      applyTaskHandoff({
+        task: current,
+        responsibility,
+        cfg: { collaboration: { task: { handoffContract: false } } },
+        handoff: normalizeTaskHandoff({
+          taskId: current.taskId,
+          from: "bot-a",
+          to: "bot-b",
+          reason: "owner_transfer",
+          remainingWork: "finish the review",
+          acceptanceCriteria: ["signed off"],
+        }),
       }),
-    });
-    expect(next.responsibility.owner).toBe("bot-b");
+    ).toThrow(HandoffContractRequiredError);
     expect(responsibility.owner).toBe("bot-a");
+    expect(current.ownerMemberId).toBe("bot-a");
   });
 
   test("flag-on owner_transfer shortcut does not change responsibility", () => {
@@ -481,7 +483,7 @@ describe("handoff contract invariants", () => {
 });
 
 describe("handoffCollaborationTask × handoffContract (learning seam)", () => {
-  test("flag-off keeps applyTaskHandoff shortcut and changes owner", async () => {
+  test("flag-off refuses handoffCollaborationTask and leaves owner unchanged", async () => {
     const { cfg, groupId } = await useLearningHandoffConfig(false);
     const applySpy = vi.spyOn(taskRuntime, "applyTaskHandoff");
     const { createWorkspaceCollaborationStores } =
@@ -490,16 +492,17 @@ describe("handoffCollaborationTask × handoffContract (learning seam)", () => {
     const { objectStorage } = createWorkspaceCollaborationStores(cfg);
     await objectStorage.writeObject(groupId, "task", "task-sm-1", learningSeedTask(groupId));
 
-    const updated = await handoffCollaborationTask({
-      groupId,
-      taskId: "task-sm-1",
-      ...learningHandoffParams,
-    });
+    await expect(
+      handoffCollaborationTask({
+        groupId,
+        taskId: "task-sm-1",
+        ...learningHandoffParams,
+      }),
+    ).rejects.toBeInstanceOf(HandoffContractRequiredError);
 
-    expect(applySpy).toHaveBeenCalled();
-    expect(updated.ownerMemberId).toBe("bot-b");
+    expect(applySpy).not.toHaveBeenCalled();
     const stored = await objectStorage.readObject<Task>(groupId, "task", "task-sm-1");
-    expect(stored?.ownerMemberId).toBe("bot-b");
+    expect(stored?.ownerMemberId).toBe("bot-a");
   });
 
   test("flag-on never calls applyTaskHandoff and leaves responsibility unchanged", async () => {
