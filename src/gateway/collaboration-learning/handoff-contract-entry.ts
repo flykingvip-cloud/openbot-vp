@@ -45,7 +45,10 @@ import {
   resolveCollaborationGroupTenantId,
   syncGroupOperatingState,
 } from "./shared.js";
-import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "./trusted-tenant.js";
 
 export class HandoffContractFlagOffError extends Error {
   readonly code = "HANDOFF_CONTRACT_FLAG_OFF";
@@ -117,10 +120,10 @@ async function buildHandoffAuthority(params: {
     idGen: () => generatePolicySnapshotId(now),
   });
   const groupTenantId = resolveCollaborationGroupTenantId(params.groupId);
-  const tenant: CollaborationTenantResolution = params.tenant ?? {
-    tenantId: groupTenantId,
-    trust: groupTenantId ? "actor_fallback" : "none",
-  };
+  const tenant: CollaborationTenantResolution = resolveAuthorityTenantForEntry({
+    preferred: params.tenant,
+    groupTenantId,
+  });
   const profile = resolveSecurityProfile(params.cfg).profile;
   const authority = createRuntimeAuthority({
     snapshot,
