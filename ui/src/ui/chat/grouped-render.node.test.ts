@@ -289,6 +289,61 @@ describe("renderMessageGroup", () => {
     expect(output).toContain("msg-user-1");
   });
 
+  it("scrubs historical false preview claims when deliverablePublish is undelivered", () => {
+    const group = {
+      kind: "group" as const,
+      key: "group-history-false-claim",
+      role: "assistant",
+      senderLabel: "Skill孵化",
+      timestamp: Date.UTC(2026, 9, 25, 8, 0, 0),
+      isStreaming: false,
+      messages: [
+        {
+          key: "m-1",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "text",
+                text: "PDF 已经生成，可以直接打开。分析结论仍然有效。",
+              },
+            ],
+            deliverablePublish: {
+              presentation: "undelivered",
+              reasonLabel: "文件缺失或为空",
+            },
+          },
+        },
+      ],
+    };
+    const output = templateToString(renderMessageGroup(group, { showReasoning: false }));
+    expect(output).not.toContain("可以直接打开");
+    expect(output).toContain("分析结论仍然有效");
+  });
+
+  it("keeps preview claims when deliverablePublish is delivered", () => {
+    const group = {
+      kind: "group" as const,
+      key: "group-history-delivered",
+      role: "assistant",
+      senderLabel: "Skill孵化",
+      timestamp: Date.UTC(2026, 9, 25, 8, 1, 0),
+      isStreaming: false,
+      messages: [
+        {
+          key: "m-1",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "可以直接打开这份 PDF。" }],
+            deliverablePublish: { presentation: "delivered" },
+          },
+        },
+      ],
+    };
+    const output = templateToString(renderMessageGroup(group, { showReasoning: false }));
+    expect(output).toContain("可以直接打开");
+  });
+
   it("uses senderLabel initials for collaboration group assistant avatars", () => {
     for (const [senderLabel, expectedInitial] of [
       ["Skill孵化", "S"],
