@@ -23,7 +23,10 @@ import {
   readGroupOperatingState,
   resolveCollaborationGroupTenantId,
 } from "./shared.js";
-import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "./trusted-tenant.js";
 
 async function buildSelfAdvanceAuthority(params: {
   groupId: string;
@@ -41,10 +44,10 @@ async function buildSelfAdvanceAuthority(params: {
     idGen: () => generatePolicySnapshotId(now),
   });
   const groupTenantId = resolveCollaborationGroupTenantId(params.groupId);
-  const tenant: CollaborationTenantResolution = params.tenant ?? {
-    tenantId: groupTenantId,
-    trust: groupTenantId ? "actor_fallback" : "none",
-  };
+  const tenant: CollaborationTenantResolution = resolveAuthorityTenantForEntry({
+    preferred: params.tenant,
+    groupTenantId,
+  });
   const profile = resolveSecurityProfile(params.cfg).profile;
   const authority = createRuntimeAuthority({
     snapshot,
@@ -62,6 +65,13 @@ async function buildSelfAdvanceAuthority(params: {
     null;
   return { authority, operatingState, mission };
 }
+
+/**
+ * T09-B3: this entry only adapts RPC → {@link trySelfAdvance}. It does not
+ * implement a parallel plan-gate / reauth / write path. Independent PASS remains
+ * 人工控制 (CF-008). Full-entrypoint stop + wake-revoke races stay 待测.
+ */
+export const SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE = true as const;
 
 /** Production self_advance tick — non-zero Governance Gate caller. */
 export async function runCollaborationSelfAdvance(params: {
