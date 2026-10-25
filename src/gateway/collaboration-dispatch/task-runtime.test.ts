@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { compileEffectiveCollaborationPolicy } from "./policy-compiler.js";
 import {
   applyTaskHandoff,
+  HandoffContractRequiredError,
   asGovernedTask,
   assertTaskMayComplete,
   InvalidTaskHandoffError,
@@ -83,7 +84,7 @@ describe("task responsibility and handoff", () => {
     expect(responsibility.executors).toEqual(["owner-1"]);
   });
 
-  it("keeps owner when handing work to another executor", () => {
+  it("refuses applyTaskHandoff shortcut for executor handoff (T09-B1)", () => {
     const current = asGovernedTask(
       task({ ownerMemberId: "owner-1", assignedMemberIds: ["bot-a"] }),
     );
@@ -91,24 +92,25 @@ describe("task responsibility and handoff", () => {
       task: current,
       effective: taskDriven,
     });
-    const next = applyTaskHandoff({
-      task: current,
-      responsibility,
-      handoff: normalizeTaskHandoff({
-        taskId: current.taskId,
-        from: "bot-a",
-        to: "bot-b",
-        reason: "need_specialist",
-        remainingWork: "Finish the checklist",
-        acceptanceCriteria: ["checklist reviewed"],
-        completedArtifacts: ["draft.md"],
-        assumptions: ["scope unchanged"],
-        blockers: [],
+    expect(() =>
+      applyTaskHandoff({
+        task: current,
+        responsibility,
+        handoff: normalizeTaskHandoff({
+          taskId: current.taskId,
+          from: "bot-a",
+          to: "bot-b",
+          reason: "need_specialist",
+          remainingWork: "Finish the checklist",
+          acceptanceCriteria: ["checklist reviewed"],
+          completedArtifacts: ["draft.md"],
+          assumptions: ["scope unchanged"],
+          blockers: [],
+        }),
       }),
-    });
-    expect(next.responsibility.owner).toBe("owner-1");
-    expect(next.responsibility.executors).toEqual(["bot-b"]);
-    expect(next.handoffs).toHaveLength(1);
+    ).toThrow(HandoffContractRequiredError);
+    expect(responsibility.owner).toBe("owner-1");
+    expect(responsibility.executors).toEqual(["bot-a"]);
   });
 
   it("rejects a chat-history-style handoff without acceptance criteria", () => {

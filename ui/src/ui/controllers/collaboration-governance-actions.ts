@@ -53,6 +53,20 @@ function resolveLearningScope(state: CollaborationGovernanceActionState) {
   return groupId ? { groupId } : null;
 }
 
+function mapHandoffReasonToKind(
+  reason: string,
+): "continue" | "review" | "owner_transfer" | "evidence" {
+  switch (reason.trim()) {
+    case "continue":
+    case "review":
+    case "owner_transfer":
+    case "evidence":
+      return reason.trim() as "continue" | "review" | "owner_transfer" | "evidence";
+    default:
+      return "continue";
+  }
+}
+
 function resolveMethodAndPayload(
   scope: { groupId: string },
   params: CollaborationGovernanceTransitionParams,
@@ -60,16 +74,20 @@ function resolveMethodAndPayload(
   switch (params.kind) {
     case "task":
       if (params.handoff) {
+        // T09-B1: UI migrates to contract propose entry. Accept/approve/apply stay
+        // multi-party RPCs; shortcut collaboration.task.handoff no longer mutates.
+        const kind = mapHandoffReasonToKind(params.handoff.reason);
         return {
-          method: "collaboration.task.handoff",
+          method: "collaboration.task.proposeHandoff",
           payload: {
             groupId: scope.groupId,
             taskId: params.id,
             from: params.handoff.from,
             to: params.handoff.to,
-            reason: params.handoff.reason,
             remainingWork: params.handoff.remainingWork,
             acceptanceCriteria: params.handoff.acceptanceCriteria,
+            kind,
+            ...(kind === "owner_transfer" ? { toRole: "owner" as const } : {}),
             ...(params.handoff.completedArtifacts
               ? { completedArtifacts: params.handoff.completedArtifacts }
               : {}),
