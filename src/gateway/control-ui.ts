@@ -22,6 +22,7 @@ import {
   resolveControlUiBrowserAuthMode,
   type ResolvedGatewayAuth,
 } from "./auth.js";
+import { resolveControlUiBuildCommit } from "./control-ui-build-commit.js";
 import {
   resolveControlUiBootstrapConfigPath,
   type ControlUiPlatformAuthState,
@@ -333,10 +334,28 @@ function serveResolvedFile(
   res.end(body);
 }
 
+function injectBuildCommitIntoIndexHtml(body: string): string {
+  const buildCommit = resolveControlUiBuildCommit(process.env);
+  if (!buildCommit) {
+    return body;
+  }
+  // Prefer a stable ops smoke handle: data-openbot-build-commit on <html>.
+  if (/\sdata-openbot-build-commit=/i.test(body)) {
+    return body.replace(
+      /\sdata-openbot-build-commit=(["']).*?\1/i,
+      ` data-openbot-build-commit="${buildCommit}"`,
+    );
+  }
+  if (/<html\b/i.test(body)) {
+    return body.replace(/<html\b([^>]*)>/i, `<html$1 data-openbot-build-commit="${buildCommit}">`);
+  }
+  return body;
+}
+
 function serveResolvedIndexHtml(res: ServerResponse, body: string) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
-  res.end(sanitizeControlUiIndexHtml(body));
+  res.end(sanitizeControlUiIndexHtml(injectBuildCommitIntoIndexHtml(body)));
 }
 
 function resolveControlUiRelativePath(uiPath: string): string {
@@ -547,7 +566,8 @@ export async function handleControlUiHttpRequest(
     const dataMode = resolveDataMode(config ?? undefined);
     const dataSpaceDisplayRoot =
       dataMode === "managed" ? undefined : shortenHomePath(resolveDataRoot(config ?? undefined));
-    sendJson(res, 200, {
+    const buildCommit = resolveControlUiBuildCommit(process.env);
+    const bootstrapPayload: ControlUiBootstrapConfig & { buildCommit?: string } = {
       basePath,
       assistantName: identity.name,
       assistantAvatar: avatarValue ?? identity.avatar,
@@ -568,7 +588,9 @@ export async function handleControlUiHttpRequest(
         mode: dataMode,
         ...(dataSpaceDisplayRoot ? { displayRoot: dataSpaceDisplayRoot } : {}),
       },
-    } satisfies ControlUiBootstrapConfig);
+      ...(buildCommit ? { buildCommit } : {}),
+    };
+    sendJson(res, 200, bootstrapPayload);
     return true;
   }
 
