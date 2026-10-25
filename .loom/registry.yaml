@@ -9469,6 +9469,30 @@ tasks:
     since: 2026-10-24
     metadata: {}
 landingStreams:
+  - id: COLLAB_RESIDUAL_B_TOOL_LOOP
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/agents/pi-embedded-runner/run.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/params.ts
+      - src/agents/pi-embedded-runner/tool-split.ts
+      - src/agents/pi-tool-definition-adapter.ts
+      - src/auto-reply/reply/agent-runner-utils.ts
+      - src/auto-reply/reply/agent-runner-utils.test.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/get-reply-run.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.test.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.ts
+      - src/gateway/collaboration-dispatch/private-run-bag.test.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: FINAL v3 Residual B tool-loop durable side-effect
+      task: collab-final-v3-residual-b
+      owner: cursor-cloud
+      legacyDisposition: OPEN
   - id: single-chain-tool-protocol-p0
     landingPolicy: serial
     paths:

@@ -217,6 +217,7 @@ export function buildEmbeddedRunBaseParams(params: {
     ...(params.run.deliveryToolSideEffect
       ? { deliveryToolSideEffect: params.run.deliveryToolSideEffect }
       : {}),
+    ...(params.run.privateRunBag ? { privateRunBag: params.run.privateRunBag } : {}),
     ...inheritExecutionIdentityRunFields(params.run),
   };
 }

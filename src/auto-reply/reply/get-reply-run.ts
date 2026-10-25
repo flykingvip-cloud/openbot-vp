@@ -1623,6 +1623,9 @@ export async function runPreparedReply(
       ...(sessionCtx.DeliveryToolSideEffect
         ? { deliveryToolSideEffect: sessionCtx.DeliveryToolSideEffect }
         : {}),
+      ...(sessionCtx.CollaborationPrivateRunBag
+        ? { privateRunBag: sessionCtx.CollaborationPrivateRunBag }
+        : {}),
       workspaceDir: runWorkspaceDir,
       config: cfg,
       skillsSnapshot,

@@ -1,12 +1,15 @@
 /**
- * Choke point for durable at-most-once delivery tool steps.
+ * Residual B choke point for durable at-most-once delivery tool steps.
  *
  * The embedded agent loop (`splitSdkTools` → `toToolDefinitions`) calls
- * `runDeliveryToolSideEffect` before a classified side-effecting tool runs.
- * Read tools and turns without a confirmed delivery fingerprint execute as usual.
- * The ledger is a runtime directory (`tool-side-effects`), not GROUP_PUBLIC
- * `runtime/transcript.jsonl`. `collaboration.runtimeNamespace` stays at its
- * configured default; flag-off resolves the legacy group runtime dir.
+ * `runDeliveryToolSideEffect` before a classified side-effecting tool runs,
+ * which claims via `scheduleDurableToolSideEffect` (private-run-bag). Optional
+ * `privateRunBag` is forwarded from the turn so the in-memory index updates
+ * without touching GROUP_PUBLIC. Read tools and turns without a confirmed
+ * delivery fingerprint execute as usual. The ledger is a runtime directory
+ * (`tool-side-effects`), not GROUP_PUBLIC `runtime/transcript.jsonl`.
+ * `collaboration.runtimeNamespace` stays at its configured default; flag-off
+ * resolves the legacy group runtime dir. No LIVE/gray flag changes.
  */
 import path from "node:path";
 import { resolveCoreToolCapability } from "../../agents/tool-catalog.js";
