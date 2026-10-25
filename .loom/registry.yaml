@@ -9473,6 +9473,7 @@ landingStreams:
       - ui/src/ui/chat/ogui-form-view.ts
       - ui/src/ui/chat/ogui-form-shell.node.test.ts
       - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/chat/grouped-render.node.test.ts
       - ui/src/ui/views/chat.ts
       - ui/src/ui/controllers/chat.ts
       - ui/src/ui/app-render.ts

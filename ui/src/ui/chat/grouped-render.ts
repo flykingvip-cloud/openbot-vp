@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
+import { scrubFalseDeliveryClaims } from "../../../../src/gateway/knowledge/deliverables/chat-deliverable-publish.js";
 import type { VisibleReplyLanguage } from "../../../../src/shared/text/assistant-scratchpad.js";
 import type { ThinkingProgressSnapshot } from "../../../../src/shared/text/thinking-progress.js";
 import { THINKING_PROGRESS_PLACEHOLDER } from "../../../../src/shared/text/thinking-progress.js";
@@ -1062,7 +1063,18 @@ function renderGroupedMessage(message: unknown, opts: GroupedMessageRenderOption
     opts.showReasoning && role === "assistant" ? extractThinkingCached(message) : null;
   const markdownBase = extractedText?.trim() ? extractedText : null;
   const reasoningMarkdown = extractedThinking ? formatReasoningMarkdown(extractedThinking) : null;
-  const markdown = markdownBase;
+  // History JSONL is append-only; outbound scrub does not rewrite old bubbles.
+  // Re-apply the delivery copy gate at render when the card is undelivered /
+  // pending_recovery or any artifact is delivery-blocked (preview miss).
+  const publishForCopyGate = readDeliverablePublish(message);
+  const scrubHistoryCopy =
+    role === "assistant" &&
+    Boolean(markdownBase) &&
+    (publishForCopyGate?.presentation === "undelivered" ||
+      publishForCopyGate?.presentation === "pending_recovery" ||
+      artifacts.some((entry) => entry.deliveryBlocked));
+  const markdown =
+    scrubHistoryCopy && markdownBase ? scrubFalseDeliveryClaims(markdownBase) : markdownBase;
   const isArtifactOutput =
     role === "assistant" && artifacts.length > 0 && Boolean(markdown?.trim());
   const isCronResultOutput =
