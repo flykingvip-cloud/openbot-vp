@@ -156,7 +156,14 @@ describe("handleControlUiHttpRequest", () => {
           },
         );
         expect(handled).toBe(true);
-        expect(end).toHaveBeenCalledWith(html);
+        const served = String(end.mock.calls[0]?.[0] ?? "");
+        // Ops smoke may stamp data-openbot-build-commit on <html>; that is not script injection.
+        expect(served).toMatch(
+          /^<html(?:\s+data-openbot-build-commit="[a-f0-9]+")?><head><\/head><body>Hello<\/body><\/html>\n$/,
+        );
+        expect(served).not.toContain("<script");
+        expect(served).not.toContain("alert(1)");
+        expect(served).not.toContain("</script><script>");
       },
     });
   });
@@ -194,6 +201,69 @@ describe("handleControlUiHttpRequest", () => {
         expect(String(end.mock.calls[0]?.[0] ?? "")).toBe("Gone");
       },
     });
+  });
+
+  it("includes buildCommit from OPENBOT_BUILD_SHA on bootstrap", async () => {
+    const prev = process.env.OPENBOT_BUILD_SHA;
+    process.env.OPENBOT_BUILD_SHA = "d06542abea832b48c4ef0ba96d428e8a922e3e3d";
+    try {
+      await withControlUiRoot({
+        fn: async (tmp) => {
+          const { res, end } = makeMockHttpResponse();
+          const handled = await handleControlUiHttpRequest(
+            { url: CONTROL_UI_BOOTSTRAP_CONFIG_PATH, method: "GET" } as IncomingMessage,
+            res,
+            {
+              root: { kind: "resolved", path: tmp },
+              config: { agents: { defaults: { workspace: tmp } } },
+            },
+          );
+          expect(handled).toBe(true);
+          const parsed = parseBootstrapPayload(end) as ControlUiBootstrapConfig & {
+            buildCommit?: string;
+          };
+          expect(parsed.buildCommit).toBe("d06542abea832b48c4ef0ba96d428e8a922e3e3d");
+        },
+      });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENBOT_BUILD_SHA;
+      } else {
+        process.env.OPENBOT_BUILD_SHA = prev;
+      }
+    }
+  });
+
+  it("stamps data-openbot-build-commit on served index.html", async () => {
+    const prev = process.env.OPENBOT_BUILD_SHA;
+    process.env.OPENBOT_BUILD_SHA = "d06542abea832b48c4ef0ba96d428e8a922e3e3d";
+    try {
+      await withControlUiRoot({
+        indexHtml: "<html><head></head><body>ui</body></html>\n",
+        fn: async (tmp) => {
+          const { res, end } = makeMockHttpResponse();
+          const handled = await handleControlUiHttpRequest(
+            { url: "/", method: "GET" } as IncomingMessage,
+            res,
+            {
+              root: { kind: "resolved", path: tmp },
+              config: { agents: { defaults: { workspace: tmp } } },
+            },
+          );
+          expect(handled).toBe(true);
+          const html = String(end.mock.calls[0]?.[0] ?? "");
+          expect(html).toContain(
+            'data-openbot-build-commit="d06542abea832b48c4ef0ba96d428e8a922e3e3d"',
+          );
+        },
+      });
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENBOT_BUILD_SHA;
+      } else {
+        process.env.OPENBOT_BUILD_SHA = prev;
+      }
+    }
   });
 
   it("serves bootstrap config JSON", async () => {

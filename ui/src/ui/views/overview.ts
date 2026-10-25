@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html, nothing } from "lit";
 import type {
   ControlUiAuthMode,
   ControlUiPlatformAuthMode,
@@ -15,10 +15,23 @@ import type { UiSettings } from "../storage.ts";
 import { shouldShowPairingHint } from "./overview-hints.ts";
 import { renderPlatformAuthPanel } from "./platform-auth-panel.ts";
 
+function resolveOverviewBuildCommit(props: { buildCommit?: string | null }): string | null {
+  const fromProps = typeof props.buildCommit === "string" ? props.buildCommit.trim() : "";
+  if (fromProps) {
+    return fromProps;
+  }
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const fromDom = document.documentElement.dataset.openbotBuildCommit?.trim() ?? "";
+  return fromDom || null;
+}
+
 export type OverviewProps = {
   basePath?: string;
   connected: boolean;
   hello: GatewayHelloOk | null;
+  buildCommit?: string | null;
   settings: UiSettings;
   password: string;
   bootstrapAuthMode: ControlUiAuthMode | null;
@@ -443,6 +456,17 @@ export function renderOverview(props: OverviewProps) {
               ${props.connected ? t("common.ok") : t("common.offline")}
             </div>
           </div>
+          ${(() => {
+            const buildCommit = resolveOverviewBuildCommit(props);
+            return buildCommit
+              ? html`<div class="stat" data-openbot-build-commit=${buildCommit}>
+                    <div class="stat-label">build</div>
+                    <div class="stat-value" style="font-size: 0.85em; word-break: break-all;">
+                      ${buildCommit.slice(0, 12)}
+                    </div>
+                  </div>`
+              : nothing;
+          })()}
           <div class="stat">
             <div class="stat-label">${t("overview.snapshot.uptime")}</div>
             <div class="stat-value">${uptime}</div>
