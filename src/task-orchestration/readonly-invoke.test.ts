@@ -499,4 +499,34 @@ describe("WP-05 readonly single-path pilot", () => {
     expect(allowed.pathBinding?.path).toBe("fabric");
     expect(adapters.memoryExecute).toHaveBeenCalledTimes(1);
   });
+
+  it("fabric path MODIFY is refused (unsupported) and does not execute", async () => {
+    const modified = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-modify",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+        policyCheck: async () => ({ decision: "MODIFY", reason: "shadow_modify" }),
+      },
+    });
+    expect(modified.invokedTool).toBe(false);
+    expect(modified.reason).toBe("shadow_modify");
+    expect(adapters.memoryExecute).not.toHaveBeenCalled();
+
+    const modifiedDefaultReason = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-modify-default",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+        policyCheck: async () => ({ decision: "MODIFY" }),
+      },
+    });
+    expect(modifiedDefaultReason.invokedTool).toBe(false);
+    expect(modifiedDefaultReason.reason).toBe("fabric_modify_unsupported");
+    expect(adapters.memoryExecute).not.toHaveBeenCalled();
+  });
 });
