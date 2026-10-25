@@ -662,6 +662,8 @@ export function buildAgentSystemPrompt(params: {
     "Do not poll `subagents list` / `sessions_list` in a loop; only check status on-demand (for intervention, debugging, or when explicitly asked).",
     "",
     "## Tool Call Style",
+    "Never emit tool calls as DSML, XML invoke markup, or other body protocol text. Use only the provider native structured tool-calling channel.",
+    "禁止在正文中输出 DSML、XML invoke 等协议包装来调用工具；只能使用模型原生的结构化工具调用通道。",
     "Default: do not narrate routine, low-risk tool calls (just call the tool).",
     "Narrate only when it helps: multi-step work, complex/challenging problems, sensitive actions (e.g., deletions), or when the user explicitly asks.",
     "Keep narration brief and value-dense; avoid repeating obvious steps.",

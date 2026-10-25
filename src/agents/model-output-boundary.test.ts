@@ -59,7 +59,7 @@ describe("model output boundary", () => {
       expect.objectContaining({
         toolName: "browser",
         source: "adapter",
-        arguments: { action: "launch", profile: "openclaw" },
+        arguments: {},
       }),
     ]);
   });
@@ -136,7 +136,7 @@ describe("model output boundary", () => {
     );
     expect(gated.visibleText).toBe("");
     expect(gated.detected).toBe(true);
-    expect(PROTOCOL_FAILURE_USER_TEXT).toContain("工具调用格式异常");
+    expect(PROTOCOL_FAILURE_USER_TEXT).toContain("本步工具调用未能执行");
   });
 
   it("lets chat merge shrink after protocol text is stripped", () => {
@@ -150,7 +150,7 @@ describe("model output boundary", () => {
     expect(merged).not.toContain("DSML");
   });
 
-  it("strips and recovers DeepSeek double-fullwidth-pipe DSML so exec can continue", () => {
+  it("strips DeepSeek double-fullwidth-pipe DSML and detects tool name without executable args", () => {
     const leaked = [
       "老大，我先把之前的 skill 盘点成果接上。",
       "<｜｜DSML｜｜tool_calls>",
@@ -169,7 +169,7 @@ describe("model output boundary", () => {
       expect.objectContaining({
         toolName: "exec",
         source: "adapter",
-        arguments: { command: "ls -1 ~/.openbot/skills/" },
+        arguments: {},
       }),
     ]);
   });

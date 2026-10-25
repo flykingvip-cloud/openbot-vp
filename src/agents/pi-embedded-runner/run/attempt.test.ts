@@ -1,6 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenBotConfig } from "../../../config/config.js";
+import { PROTOCOL_FAILURE_USER_TEXT } from "../../model-output-boundary.js";
 import { resolveOllamaBaseUrlForRun } from "../../ollama-stream.js";
+import {
+  PROTOCOL_VIOLATION_STOP_REASON,
+  createProtocolBoundaryState,
+  lastAssistantHasProtocolViolation,
+  resetProtocolViolationPersistForTest,
+} from "../../protocol-violation.js";
 import {
   buildAfterTurnRuntimeContext,
   composeSystemPromptWithHookContext,
@@ -13,10 +23,9 @@ import {
   shouldInjectOllamaCompatNumCtx,
   decodeHtmlEntitiesInObject,
   wrapOllamaCompatNumCtx,
-  wrapStreamFnPromoteProtocolToolCalls,
+  wrapStreamFnEnforceProtocolTextNonExecution,
   wrapStreamFnTrimToolCallNames,
-  promoteProtocolToolCallsInMessage,
-  type ProtocolRepairState,
+  enforceProtocolTextNonExecutionInMessage,
 } from "./attempt.js";
 
 function createOllamaProviderConfig(injectNumCtxForOpenAICompat: boolean): OpenBotConfig {
@@ -471,7 +480,7 @@ describe("wrapStreamFnTrimToolCallNames", () => {
   });
 });
 
-describe("promoteProtocolToolCallsInMessage", () => {
+describe("enforceProtocolTextNonExecutionInMessage", () => {
   const dsml = [
     "我来读取文件。",
     "<｜DSML｜tool_calls>",
@@ -481,110 +490,48 @@ describe("promoteProtocolToolCallsInMessage", () => {
     "</｜DSML｜tool_calls>",
   ].join("\n");
 
-  it("promotes complete DSML into a canonical structured tool call", () => {
-    const message = {
-      role: "assistant",
-      content: [{ type: "text", text: dsml }],
-      stopReason: "stop",
-    };
-
-    expect(promoteProtocolToolCallsInMessage(message, new Set(["read"]))).toEqual({
-      status: "promoted",
-      count: 1,
-    });
-    expect(message.stopReason).toBe("toolUse");
-    expect(message.content).toEqual([
-      { type: "text", text: "我来读取文件。" },
-      expect.objectContaining({
-        type: "toolCall",
-        name: "read",
-        arguments: { path: "README.md" },
-      }),
-    ]);
-    expect(JSON.stringify(message.content)).not.toContain("DSML");
+  afterEach(() => {
+    resetProtocolViolationPersistForTest();
   });
 
-  it("promotes DeepSeek double-pipe DSML exec into a canonical tool call", () => {
-    const leaked = [
-      "我重新完整执行一遍盘点。",
-      "<｜｜DSML｜｜tool_calls>",
-      '<｜｜DSML｜｜invoke name="exec">',
-      '<｜｜DSML｜｜parameter name="command" string="true">ls -1 ~/.openbot/skills/</｜｜DSML｜｜parameter>',
-      "</｜｜DSML｜｜invoke>",
-      "</｜｜DSML｜｜tool_calls>",
-    ].join("\n");
-    const message = {
-      role: "assistant",
-      content: [{ type: "text", text: leaked }],
-      stopReason: "stop",
-    };
-
-    expect(promoteProtocolToolCallsInMessage(message, new Set(["exec"]))).toEqual({
-      status: "promoted",
-      count: 1,
-    });
-    expect(message.stopReason).toBe("toolUse");
-    expect(JSON.stringify(message.content)).not.toContain("DSML");
-    expect(message.content).toEqual([
-      { type: "text", text: "我重新完整执行一遍盘点。" },
-      expect.objectContaining({
-        type: "toolCall",
-        name: "exec",
-        arguments: { command: "ls -1 ~/.openbot/skills/" },
-      }),
-    ]);
+  it("terminates pure body DSML without synthesizing toolCall", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pv-attempt-"));
+    const logPath = path.join(dir, "violations.jsonl");
+    const prev = process.env.OPENBOT_PROTOCOL_VIOLATION_LOG;
+    process.env.OPENBOT_PROTOCOL_VIOLATION_LOG = logPath;
+    try {
+      const message = {
+        role: "assistant",
+        content: [{ type: "text", text: dsml }],
+        stopReason: "stop",
+      };
+      const boundaryState = createProtocolBoundaryState();
+      expect(
+        enforceProtocolTextNonExecutionInMessage(message, {
+          runId: "run-pure",
+          attemptOrTurnId: "run-pure:attempt",
+          allowedToolNames: new Set(["read"]),
+          boundaryState,
+          provider: "test",
+          model: "m",
+        }),
+      ).toEqual({ status: "terminated", classification: "pure_body" });
+      expect(message.stopReason).toBe(PROTOCOL_VIOLATION_STOP_REASON);
+      expect(message.content).toEqual([{ type: "text", text: PROTOCOL_FAILURE_USER_TEXT }]);
+      expect(JSON.stringify(message.content)).not.toContain("toolCall");
+      expect(JSON.stringify(message.content)).not.toContain("DSML");
+      expect(boundaryState.terminated).toBe(true);
+      expect(fs.readFileSync(logPath, "utf8").trim().split("\n")).toHaveLength(1);
+    } finally {
+      if (prev === undefined) {
+        delete process.env.OPENBOT_PROTOCOL_VIOLATION_LOG;
+      } else {
+        process.env.OPENBOT_PROTOCOL_VIOLATION_LOG = prev;
+      }
+    }
   });
 
-  it("fails closed when the recovered tool is unavailable", () => {
-    const message = {
-      role: "assistant",
-      content: [{ type: "text", text: dsml }],
-      stopReason: "stop",
-    };
-
-    expect(promoteProtocolToolCallsInMessage(message, new Set(["exec"]))).toEqual({
-      status: "failed",
-      reason: "unknown-tool",
-    });
-    expect(message.stopReason).toBe("stop");
-    expect(JSON.stringify(message.content)).not.toContain("DSML");
-    expect(message.content).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: "toolCall" })]),
-    );
-  });
-
-  it("schedules at most one run-scoped repair before failing closed", () => {
-    const repairState: ProtocolRepairState = { attempted: false };
-    const first = {
-      role: "assistant",
-      content: [{ type: "text", text: dsml }],
-      stopReason: "stop",
-    };
-
-    expect(promoteProtocolToolCallsInMessage(first, new Set(["exec"]), repairState)).toEqual({
-      status: "repair-scheduled",
-      reason: "unknown-tool",
-    });
-    expect(repairState).toEqual({
-      attempted: true,
-      pendingReason: "unknown-tool",
-    });
-    expect(first.content).toEqual([]);
-
-    delete repairState.pendingReason;
-    const second = {
-      role: "assistant",
-      content: [{ type: "text", text: dsml }],
-      stopReason: "stop",
-    };
-    expect(promoteProtocolToolCallsInMessage(second, new Set(["exec"]), repairState)).toEqual({
-      status: "failed",
-      reason: "unknown-tool",
-    });
-    expect(JSON.stringify(second.content)).not.toContain("DSML");
-  });
-
-  it("does not promote when a structured tool call already exists", () => {
+  it("keeps native toolCall on mixed messages and does not add body-derived calls", () => {
     const message = {
       role: "assistant",
       content: [
@@ -593,14 +540,45 @@ describe("promoteProtocolToolCallsInMessage", () => {
       ],
       stopReason: "toolUse",
     };
-
-    expect(promoteProtocolToolCallsInMessage(message, new Set(["read"]))).toEqual({
-      status: "none",
-    });
-    expect(message.content).toHaveLength(2);
+    const boundaryState = createProtocolBoundaryState();
+    expect(
+      enforceProtocolTextNonExecutionInMessage(message, {
+        runId: "run-mixed",
+        attemptOrTurnId: "run-mixed:attempt",
+        allowedToolNames: new Set(["read"]),
+        boundaryState,
+      }),
+    ).toEqual({ status: "stripped-mixed" });
+    expect(message.stopReason).toBe("toolUse");
+    expect(message.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "toolCall", id: "call_1", name: "read" }),
+      ]),
+    );
+    expect(message.content.filter((b: { type?: string }) => b.type === "toolCall")).toHaveLength(1);
+    expect(boundaryState.terminated).toBe(false);
+    expect(JSON.stringify(message.content)).not.toContain("DSML");
   });
 
-  it("promotes the final stream result before agent-core dispatch", async () => {
+  it("unknown tool name in body still terminates without execution", () => {
+    const message = {
+      role: "assistant",
+      content: [{ type: "text", text: dsml }],
+      stopReason: "stop",
+    };
+    expect(
+      enforceProtocolTextNonExecutionInMessage(message, {
+        runId: "run-unknown",
+        attemptOrTurnId: "run-unknown:attempt",
+        allowedToolNames: new Set(["exec"]),
+      }),
+    ).toMatchObject({ status: "terminated" });
+    expect(message.content).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "toolCall" })]),
+    );
+  });
+
+  it("stream wrapper enforces before dispatch and never promotes", async () => {
     const message = {
       role: "assistant",
       content: [{ type: "text", text: dsml }],
@@ -614,15 +592,26 @@ describe("promoteProtocolToolCallsInMessage", () => {
         return (async function* () {})();
       },
     }));
-    const wrapped = wrapStreamFnPromoteProtocolToolCalls(baseFn as never, new Set(["read"]));
-
+    const wrapped = wrapStreamFnEnforceProtocolTextNonExecution(baseFn as never, {
+      runId: "run-stream",
+      attemptOrTurnId: "run-stream:attempt",
+      allowedToolNames: new Set(["read"]),
+    });
     const stream = await wrapped({} as never, {} as never, {} as never);
     await stream.result();
+    expect(message.stopReason).toBe(PROTOCOL_VIOLATION_STOP_REASON);
+    expect(message.content).toEqual([{ type: "text", text: PROTOCOL_FAILURE_USER_TEXT }]);
+  });
 
-    expect(message.stopReason).toBe("toolUse");
-    expect(message.content).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: "toolCall", name: "read" })]),
-    );
+  it("lastAssistantHasProtocolViolation blocks continue eligibility", () => {
+    expect(
+      lastAssistantHasProtocolViolation([
+        { role: "assistant", stopReason: PROTOCOL_VIOLATION_STOP_REASON, content: [] },
+      ]),
+    ).toBe(true);
+    expect(
+      lastAssistantHasProtocolViolation([{ role: "assistant", stopReason: "stop", content: [] }]),
+    ).toBe(false);
   });
 });
 

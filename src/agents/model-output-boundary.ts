@@ -6,9 +6,11 @@ import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scrat
  */
 import { findCodeRegions, isInsideCode } from "../shared/text/code-regions.js";
 
+/** Detection hit only — `arguments` stay empty; never used to execute. */
 export type CanonicalToolCall = {
   callId: string;
   toolName: string;
+  /** Always empty for body-protocol detection; execution uses adapter-normalized native calls only. */
   arguments: Record<string, unknown>;
   source: "structured" | "adapter";
 };
@@ -23,7 +25,11 @@ export type UserVisibleGateResult = {
   recoveredCalls: CanonicalToolCall[];
 };
 
-export const PROTOCOL_FAILURE_USER_TEXT = "当前工具调用格式异常，我暂时无法继续执行这一步。";
+export const PROTOCOL_FAILURE_USER_TEXT = "本步工具调用未能执行，请重试。";
+
+export function detectedToolNamesFromGate(gate: UserVisibleGateResult): string[] {
+  return gate.recoveredCalls.map((call) => call.toolName).filter(Boolean);
+}
 
 /** One or two pipes: `<|DSML|` / `<｜DSML｜` and DeepSeek's `<｜｜DSML｜｜`. */
 const DSML_PIPE = String.raw`[|｜]{1,2}`;
@@ -59,43 +65,17 @@ function splitIncompleteProtocolTail(
   return { head: text, tail: "" };
 }
 
-function parseParameterValue(raw: string, isString: boolean): unknown {
-  const value = raw.trim();
-  if (isString) {
-    return value;
-  }
-  if (!value) {
-    return value;
-  }
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return value;
-  }
-}
-
 function parseDsmlInvokeBlock(block: string, index: number): CanonicalToolCall | null {
   const nameMatch = /invoke\s+name\s*=\s*["']([^"']+)["']/i.exec(block);
   const toolName = nameMatch?.[1]?.trim();
   if (!toolName) {
     return null;
   }
-  const args: Record<string, unknown> = {};
-  const paramRe = new RegExp(
-    String.raw`parameter\s+name\s*=\s*["']([^"']+)["'](?:[^>]*\bstring\s*=\s*["'](true|false)["'])?[^>]*>([\s\S]*?)<\s*/\s*${DSML_PIPE}\s*DSML\s*${DSML_PIPE}\s*parameter`,
-    "gi",
-  );
-  for (const match of block.matchAll(paramRe)) {
-    const key = match[1]?.trim();
-    if (!key) {
-      continue;
-    }
-    args[key] = parseParameterValue(match[3] ?? "", match[2]?.toLowerCase() !== "false");
-  }
+  // Detection-only: never carry full executable parameters (§5.4). Names suffice for observation.
   return {
-    callId: `adapter-dsml-${index}`,
+    callId: `detect-dsml-${index}`,
     toolName,
-    arguments: args,
+    arguments: {},
     source: "adapter",
   };
 }

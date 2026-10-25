@@ -26,7 +26,6 @@ import {
   collectConnectedPreferredNodeIds,
   formatOperatorComputerTurnPrompt,
 } from "../../../infra/operator-local-computer.js";
-import { generateSecureToken } from "../../../infra/secure-random.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import type {
@@ -118,6 +117,7 @@ import { filterClientToolDefinitionsForInboundCeiling } from "../../inbound-tool
 import { resolveModelAuthMode } from "../../model-auth.js";
 import {
   applyUserVisibleOutputGate,
+  detectedToolNamesFromGate,
   PROTOCOL_FAILURE_USER_TEXT,
 } from "../../model-output-boundary.js";
 import { normalizeProviderId, resolveDefaultModelForAgent } from "../../model-selection.js";
@@ -142,6 +142,14 @@ import { applyPiAutoCompactionGuard } from "../../pi-settings.js";
 import { toClientToolDefinitions } from "../../pi-tool-definition-adapter.js";
 import { createOpenClawCodingTools, resolveToolLoopDetectionConfig } from "../../pi-tools.js";
 import { normalizeClientToolNamesForProvider } from "../../pi-tools.schema.js";
+import {
+  buildProtocolViolationFact,
+  createProtocolBoundaryState,
+  lastAssistantHasProtocolViolation,
+  persistProtocolViolationFact,
+  PROTOCOL_VIOLATION_STOP_REASON,
+  type ProtocolBoundaryState,
+} from "../../protocol-violation.js";
 import { wrapStreamFnSanitizeProviderToolNames } from "../../provider-tool-name-stream.js";
 import { resolveSandboxContext } from "../../sandbox.js";
 import {
@@ -530,27 +538,31 @@ export function wrapStreamFnTrimToolCallNames(
   };
 }
 
-type ProtocolRepairReason = "incomplete" | "unparseable" | "unknown-tool";
+export type ProtocolBodyBoundaryResult =
+  | { status: "none" }
+  | { status: "stripped-mixed" }
+  | { status: "terminated"; classification: string };
 
-const PROTOCOL_REPAIR_PROMPT =
-  "Internal protocol repair: retry the same intended action once using native structured tool calling. Do not emit DSML, XML, or explanatory text. If no allowed tool applies, answer normally without claiming execution.";
-
-export type ProtocolRepairState = {
-  attempted: boolean;
-  pendingReason?: ProtocolRepairReason;
+export type EnforceProtocolTextContext = {
+  runId: string;
+  attemptOrTurnId: string;
+  sessionId?: string;
+  agentId?: string;
+  provider?: string;
+  model?: string;
+  allowedToolNames?: Set<string>;
+  boundaryState?: ProtocolBoundaryState;
 };
 
-type ProtocolToolCallPromotionResult =
-  | { status: "none" }
-  | { status: "promoted"; count: number }
-  | { status: "repair-scheduled"; reason: ProtocolRepairReason }
-  | { status: "failed"; reason: ProtocolRepairReason };
-
-export function promoteProtocolToolCallsInMessage(
+/**
+ * Body protocol text is never promoted to executable tool calls.
+ * Pure-body violations terminate with protocol_violation; mixed messages keep
+ * adapter-normalized native calls and only strip/record the body markup.
+ */
+export function enforceProtocolTextNonExecutionInMessage(
   message: unknown,
-  allowedToolNames?: Set<string>,
-  repairState?: ProtocolRepairState,
-): ProtocolToolCallPromotionResult {
+  ctx?: EnforceProtocolTextContext,
+): ProtocolBodyBoundaryResult {
   if (!message || typeof message !== "object") {
     return { status: "none" };
   }
@@ -562,94 +574,128 @@ export function promoteProtocolToolCallsInMessage(
     return { status: "none" };
   }
   const content = typedMessage.content as Array<Record<string, unknown>>;
-  if (content.some((block) => isToolCallBlockType(block?.type))) {
-    return { status: "none" };
-  }
+  const hasNativeToolCall = content.some((block) => isToolCallBlockType(block?.type));
 
-  const text = content
+  const textBlocks = content
     .filter((block) => block?.type === "text" && typeof block.text === "string")
     .map((block) => block.text as string)
     .join("\n");
-  const gated = applyUserVisibleOutputGate(text);
-  if (!gated.detected || gated.protocol !== "dsml") {
+  const gated = applyUserVisibleOutputGate(textBlocks);
+  if (!gated.detected) {
     return { status: "none" };
   }
 
-  const nonTextBlocks = content.filter((block) => block?.type !== "text");
-  const fail = (reason: ProtocolRepairReason): ProtocolToolCallPromotionResult => {
-    if (repairState && !repairState.attempted) {
-      repairState.attempted = true;
-      repairState.pendingReason = reason;
-      // Suppress the malformed turn; a hidden custom message triggers one repair turn.
-      typedMessage.content = nonTextBlocks;
-      typedMessage.stopReason = "stop";
-      return { status: "repair-scheduled", reason };
+  const detectedNames = detectedToolNamesFromGate(gated);
+  const allowed = ctx?.allowedToolNames;
+  let classification:
+    | "pure_body"
+    | "mixed_native_and_body"
+    | "incomplete_body"
+    | "unknown_tool_name_in_body"
+    | "no_tools_available" = hasNativeToolCall ? "mixed_native_and_body" : "pure_body";
+  if (!hasNativeToolCall) {
+    if (gated.incomplete) {
+      classification = "incomplete_body";
+    } else if (!allowed || allowed.size === 0) {
+      classification = "no_tools_available";
+    } else if (
+      detectedNames.some((name) => !allowed.has(normalizeToolCallNameForDispatch(name, allowed)))
+    ) {
+      classification = "unknown_tool_name_in_body";
     }
-    typedMessage.content = [...nonTextBlocks, { type: "text", text: PROTOCOL_FAILURE_USER_TEXT }];
-    typedMessage.stopReason = "stop";
-    return { status: "failed", reason };
+  }
+
+  const nonTextBlocks = content.filter((block) => block?.type !== "text");
+
+  const recordFact = (
+    terminated: boolean,
+    displayOutcome: "failure_copy" | "stripped_partial",
+    nativeExecutionStatus: "none" | "requested",
+  ) => {
+    if (!ctx) {
+      return;
+    }
+    const fact = buildProtocolViolationFact({
+      runId: ctx.runId,
+      attemptOrTurnId: ctx.attemptOrTurnId,
+      sessionId: ctx.sessionId,
+      agentId: ctx.agentId,
+      provider: ctx.provider,
+      model: ctx.model,
+      protocol: gated.protocol,
+      classification,
+      allowedToolNames: allowed ?? [],
+      detectedToolNames: detectedNames,
+      rawText: textBlocks,
+      displayOutcome,
+      nativeExecutionStatus,
+      terminated,
+    });
+    persistProtocolViolationFact(fact);
+    if (ctx.boundaryState) {
+      ctx.boundaryState.lastFact = fact;
+      if (terminated) {
+        ctx.boundaryState.terminated = true;
+      }
+    }
+    emitAgentEvent({
+      runId: ctx.runId,
+      stream: "lifecycle",
+      data: {
+        event: "protocol_violation",
+        eventId: fact.eventId,
+        classification: fact.classification,
+        protocol: fact.protocol,
+        terminated,
+        nativeExecutionStatus: fact.nativeExecutionStatus,
+        detectedToolNames: fact.detectedToolNames,
+        ...(terminated ? { stopReason: PROTOCOL_VIOLATION_STOP_REASON } : {}),
+      },
+    });
   };
 
-  if (gated.incomplete) {
-    return fail("incomplete");
-  }
-  if (gated.recoveredCalls.length === 0) {
-    return fail("unparseable");
-  }
-  if (!allowedToolNames || allowedToolNames.size === 0) {
-    return fail("unknown-tool");
-  }
-
-  const calls = gated.recoveredCalls.map((call) => {
-    const name = normalizeToolCallNameForDispatch(call.toolName, allowedToolNames);
-    return { call, name };
-  });
-  if (calls.some(({ name }) => !allowedToolNames.has(name))) {
-    return fail("unknown-tool");
+  if (hasNativeToolCall) {
+    const visible = gated.visibleText.trim();
+    typedMessage.content = [
+      ...nonTextBlocks,
+      ...(visible ? [{ type: "text", text: gated.visibleText }] : []),
+    ];
+    recordFact(false, visible ? "stripped_partial" : "failure_copy", "requested");
+    return { status: "stripped-mixed" };
   }
 
-  typedMessage.content = [
-    ...nonTextBlocks,
-    ...(gated.visibleText ? [{ type: "text", text: gated.visibleText }] : []),
-    ...calls.map(({ call, name }) => ({
-      type: "toolCall",
-      id: `dsml_${generateSecureToken(8)}`,
-      name,
-      arguments: call.arguments,
-    })),
-  ];
-  typedMessage.stopReason = "toolUse";
-  normalizeToolCallIdsInMessage(typedMessage);
-  return { status: "promoted", count: calls.length };
+  // Pure body: never synthesize toolCall; explicit failure + terminate (§4 / §7.1).
+  typedMessage.content = [...nonTextBlocks, { type: "text", text: PROTOCOL_FAILURE_USER_TEXT }];
+  typedMessage.stopReason = PROTOCOL_VIOLATION_STOP_REASON;
+  recordFact(true, "failure_copy", "none");
+  return { status: "terminated", classification };
 }
 
-function wrapStreamPromoteProtocolToolCalls(
+function wrapStreamEnforceProtocolTextNonExecution(
   stream: ReturnType<typeof streamSimple>,
-  allowedToolNames?: Set<string>,
-  repairState?: ProtocolRepairState,
+  ctx: EnforceProtocolTextContext,
 ): ReturnType<typeof streamSimple> {
   const originalResult = stream.result.bind(stream);
   stream.result = async () => {
     const message = await originalResult();
-    promoteProtocolToolCallsInMessage(message, allowedToolNames, repairState);
+    enforceProtocolTextNonExecutionInMessage(message, ctx);
     return message;
   };
   return stream;
 }
 
-export function wrapStreamFnPromoteProtocolToolCalls(
+export function wrapStreamFnEnforceProtocolTextNonExecution(
   baseFn: StreamFn,
-  allowedToolNames?: Set<string>,
-  repairState?: ProtocolRepairState,
+  ctx: EnforceProtocolTextContext,
 ): StreamFn {
   return (model, context, options) => {
     const maybeStream = baseFn(model, context, options);
     if (maybeStream && typeof maybeStream === "object" && "then" in maybeStream) {
       return Promise.resolve(maybeStream).then((stream) =>
-        wrapStreamPromoteProtocolToolCalls(stream, allowedToolNames, repairState),
+        wrapStreamEnforceProtocolTextNonExecution(stream, ctx),
       );
     }
-    return wrapStreamPromoteProtocolToolCalls(maybeStream, allowedToolNames, repairState);
+    return wrapStreamEnforceProtocolTextNonExecution(maybeStream, ctx);
   };
 }
 
@@ -1546,7 +1592,7 @@ export async function runEmbeddedAttempt(
     let removeContextCompiler: (() => void) | undefined;
     let removeReplyLanguageReminder: (() => void) | undefined;
     let removeVisibleReplyRewriter: (() => void) | undefined;
-    const protocolRepairState: ProtocolRepairState = { attempted: false };
+    const protocolBoundaryState = createProtocolBoundaryState();
     try {
       await repairSessionFileIfNeeded({
         sessionFile: params.sessionFile,
@@ -2006,10 +2052,18 @@ export async function runEmbeddedAttempt(
         activeSession.agent.streamFunction,
         allowedToolNames,
       );
-      activeSession.agent.streamFunction = wrapStreamFnPromoteProtocolToolCalls(
+      activeSession.agent.streamFunction = wrapStreamFnEnforceProtocolTextNonExecution(
         activeSession.agent.streamFunction,
-        allowedToolNames,
-        protocolRepairState,
+        {
+          runId: params.runId,
+          attemptOrTurnId: `${params.runId}:attempt`,
+          sessionId: params.sessionId,
+          agentId: sessionAgentId,
+          provider: params.provider,
+          model: params.modelId,
+          allowedToolNames,
+          boundaryState: protocolBoundaryState,
+        },
       );
 
       if (isXaiProvider(params.provider, params.modelId)) {
@@ -2507,21 +2561,6 @@ export async function runEmbeddedAttempt(
           } else {
             await abortable(activeSession.prompt(effectivePrompt));
           }
-          const protocolRepairReason = protocolRepairState.pendingReason;
-          if (protocolRepairReason) {
-            delete protocolRepairState.pendingReason;
-            await abortable(
-              activeSession.sendCustomMessage(
-                {
-                  customType: "openbot:protocol-repair",
-                  content: PROTOCOL_REPAIR_PROMPT,
-                  display: false,
-                  details: { reason: protocolRepairReason },
-                },
-                { triggerTurn: true },
-              ),
-            );
-          }
         } catch (err) {
           promptError = err;
           promptErrorSource = "prompt";
@@ -2535,7 +2574,13 @@ export async function runEmbeddedAttempt(
         // final after successful tools otherwise end the run. Each continues
         // a small bounded number of times. Questions, permission, payment,
         // scan, and authorization pauses stay terminal.
-        if (!promptError && !aborted && !timedOut) {
+        if (
+          !promptError &&
+          !aborted &&
+          !timedOut &&
+          !protocolBoundaryState.terminated &&
+          !lastAssistantHasProtocolViolation(activeSession.messages)
+        ) {
           const toolsDisabled = params.disableTools === true;
           const continuedStalls: string[] = [];
           let stallContinues = 0;
