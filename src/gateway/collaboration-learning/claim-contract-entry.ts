@@ -1170,7 +1170,9 @@ export async function listCollaborationOwnerDecisionDeliveries(params: {
       }
       readable.set(key, canRead);
     }
-    if (canRead || row.historyReloadable) {
+    // D6b: historyReloadable describes redraw eligibility for an already-authorized
+    // viewer; it must not bypass current access re-check after revocation.
+    if (canRead) {
       visible.push(row);
     }
   }
