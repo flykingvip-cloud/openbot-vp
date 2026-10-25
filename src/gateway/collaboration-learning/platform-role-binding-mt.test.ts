@@ -20,6 +20,10 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
 import {
+  COLLAB_EDGE_NAME_RESOLVE_IS_NOT_ACL,
+  createCollabEdgeTargetResolver,
+} from "../collaboration-dispatch/collab-edge.js";
+import {
   formatManagedGrayAllowlistKey,
   matchGrayGroupAllowlist,
 } from "../collaboration-dispatch/gray-group-allowlist.js";
@@ -30,10 +34,16 @@ import {
 import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
+  selfAdvanceDeliveryRequiresConfirmedPlan,
+  selfAdvanceDoesNotAutoCompleteTask,
+  selfAdvanceRequiresPerTickReauth,
+} from "../collaboration-dispatch/self-advance.js";
+import {
   bindDeliveryActor,
   isMappedDeliveryIdentity,
   preferMappedSessionSubjects,
   resolveDeliveryAclActor,
+  claimedConnectActorId,
 } from "./delivery-actor-binding.js";
 import {
   acceptCollaborationTaskHandoffContract,
@@ -42,11 +52,15 @@ import {
   proposeCollaborationTaskHandoffContract,
   resolveHandoffGovernanceActor,
 } from "./handoff-contract-entry.js";
+import { SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE } from "./self-advance-entry.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
 import {
   resolveCollaborationTenantResolution,
   resolveMembershipTenantIdForAcl,
+  isAclSafeTenantTrust,
+  resolveAuthorityTenantForEntry,
 } from "./trusted-tenant.js";
+import { WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE } from "./wake-contract-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -586,6 +600,44 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
     });
     expect(cfg.collaboration?.task?.selfAdvance?.mode ?? "dry_run").toBe("dry_run");
     expect(cfg.collaboration?.task?.selfAdvance?.executeGroupAllowlist ?? []).toEqual([]);
+    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
+    expect(selfAdvanceRequiresPerTickReauth()).toBe(true);
+    expect(selfAdvanceDeliveryRequiresConfirmedPlan()).toBe(true);
+    expect(selfAdvanceDoesNotAutoCompleteTask()).toBe(true);
+    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+  });
+
+  test("T09-B2: displayName claim alone does not authenticate write actor", () => {
+    const claimed = claimedConnectActorId({
+      connect: { client: { displayName: "Alice", id: "client-1" } },
+    });
+    expect(claimed).toBe("Alice");
+    expect(() =>
+      bindDeliveryActor({
+        claimedId: claimed,
+        subjects: ["session-subject-not-alice"],
+        privileged: true,
+      }),
+    ).toThrow(/actor_not_authenticated/);
+  });
+
+  test("T09-B2: group/authority fallback tenant is never ACL-safe membership", () => {
+    const labeled = resolveAuthorityTenantForEntry({
+      preferred: null,
+      groupTenantId: "tenant-from-group-ownership",
+    });
+    expect(labeled.trust).toBe("actor_fallback");
+    expect(isAclSafeTenantTrust(labeled.trust)).toBe(false);
+  });
+
+  test("T09-B2: collab-edge byName resolves mention only — not an ACL grant", () => {
+    expect(COLLAB_EDGE_NAME_RESOLVE_IS_NOT_ACL).toBe(true);
+    const resolve = createCollabEdgeTargetResolver([
+      { agentId: "bot-a", name: "AliceBot" },
+      { agentId: "bot-b", name: "BobBot" },
+    ]);
+    expect(resolve("AliceBot")).toBe("bot-a");
+    expect(resolve("unknown-name")).toBeNull();
   });
 });
 
