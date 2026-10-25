@@ -196,6 +196,16 @@ export async function invokeReadonlySurface(
           pathBinding,
         };
       }
+      // MODIFY would require constraint application on the invoke; this pilot
+      // path does not implement field rewriting — refuse rather than ignore.
+      if (verdict.decision === "MODIFY") {
+        releaseReadonlyPathBinding(actionId);
+        return {
+          invokedTool: false,
+          reason: verdict.reason ?? "fabric_modify_unsupported",
+          pathBinding,
+        };
+      }
     }
     if (input.surface === "memory") {
       const factory = input.deps?.createMemorySearchTool ?? createMemorySearchTool;

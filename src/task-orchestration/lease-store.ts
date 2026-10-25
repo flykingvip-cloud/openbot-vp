@@ -123,11 +123,7 @@ export type OrchLeaseStore = {
     resultRef?: string;
   }): SubmitResultOk | SubmitResultFail;
   requestCancel(jobStepId: string): OrchLeaseRecord;
-  assertFence(input: {
-    jobStepId: string;
-    holder: string;
-    fencingToken: number;
-  }):
+  assertFence(input: { jobStepId: string; holder: string; fencingToken: number }):
     | { ok: true; record: OrchLeaseRecord }
     | {
         ok: false;
@@ -160,8 +156,109 @@ function isLeaseActive(record: OrchLeaseRecord, nowMs: number): boolean {
   return nowMs < record.deadlineAt;
 }
 
-function safeFileToken(jobStepId: string): string {
-  return jobStepId.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
+/**
+ * Collision-resistant filename token: utf8 → base64url (no `/` `:` collapse).
+ * Distinct jobStepIds always map to distinct files (`a/b` ≠ `a:b`).
+ */
+export function safeFileToken(jobStepId: string): string {
+  return Buffer.from(jobStepId, "utf8").toString("base64url");
+}
+
+const LEASE_LOCK_STALE_MS = 30_000;
+const LEASE_LOCK_TIMEOUT_MS = 5_000;
+
+function sleepMs(ms: number): void {
+  const sab = new SharedArrayBuffer(4);
+  Atomics.wait(new Int32Array(sab), 0, 0, ms);
+}
+
+function isPidAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return false;
+  }
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isStaleLeaseLock(lockPath: string): boolean {
+  try {
+    const raw = fs.readFileSync(lockPath, "utf8");
+    try {
+      const parsed = JSON.parse(raw) as { pid?: unknown; createdAt?: unknown };
+      if (typeof parsed.pid === "number" && !isPidAlive(parsed.pid)) {
+        return true;
+      }
+      if (typeof parsed.createdAt === "string") {
+        const createdAt = Date.parse(parsed.createdAt);
+        if (!Number.isFinite(createdAt) || Date.now() - createdAt > LEASE_LOCK_STALE_MS) {
+          return true;
+        }
+      }
+    } catch {
+      // unreadable payload → fall through to mtime
+    }
+    const stat = fs.statSync(lockPath);
+    return Date.now() - stat.mtimeMs > LEASE_LOCK_STALE_MS;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Cross-process exclusive lock for a lease JSON path (wx lockfile).
+ * Same-process reentry is not supported — callers must not nest.
+ */
+function withLeaseFileLock<T>(leaseFilePath: string, fn: () => T): T {
+  const lockPath = `${leaseFilePath}.lock`;
+  fs.mkdirSync(path.dirname(leaseFilePath), { recursive: true });
+  const deadline = Date.now() + LEASE_LOCK_TIMEOUT_MS;
+  let attempt = 0;
+  while (true) {
+    try {
+      const fd = fs.openSync(lockPath, "wx");
+      try {
+        fs.writeFileSync(
+          fd,
+          `${JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }, null, 2)}\n`,
+          "utf8",
+        );
+        return fn();
+      } finally {
+        try {
+          fs.closeSync(fd);
+        } catch {
+          // ignore
+        }
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // ignore
+        }
+      }
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== "EEXIST") {
+        throw err;
+      }
+      if (isStaleLeaseLock(lockPath)) {
+        try {
+          fs.unlinkSync(lockPath);
+        } catch {
+          // ignore
+        }
+        continue;
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(`orch_lease_file_lock_timeout:${leaseFilePath}`, { cause: err });
+      }
+      sleepMs(Math.min(25, 5 + attempt));
+      attempt += 1;
+    }
+  }
 }
 
 function writeJsonAtomic(dest: string, value: unknown): void {
@@ -224,20 +321,24 @@ export function createOrchLeaseStore(opts: { rootDir?: string } = {}): OrchLease
     return path.join(rootDir, "leases", `${safeFileToken(jobStepId)}.json`);
   };
 
-  const load = (jobStepId: string): OrchLeaseRecord | null => {
+  const loadUnlocked = (jobStepId: string): OrchLeaseRecord | null => {
     const fp = filePathFor(jobStepId);
     if (fp) {
       const parsed = parseRecord(readJsonFile(fp), jobStepId);
-      if (parsed) {
+      // Identity check: reject colliding/wrong-id files as missing for this key.
+      if (parsed && parsed.jobStepId === jobStepId) {
         memory.set(jobStepId, parsed);
         return { ...parsed };
+      }
+      if (parsed && parsed.jobStepId !== jobStepId) {
+        return null;
       }
     }
     const mem = memory.get(jobStepId);
     return mem ? { ...mem } : null;
   };
 
-  const save = (record: OrchLeaseRecord): OrchLeaseRecord => {
+  const saveUnlocked = (record: OrchLeaseRecord): OrchLeaseRecord => {
     const copy = { ...record };
     memory.set(record.jobStepId, copy);
     const fp = filePathFor(record.jobStepId);
@@ -247,8 +348,20 @@ export function createOrchLeaseStore(opts: { rootDir?: string } = {}): OrchLease
     return { ...copy };
   };
 
-  const getOrInit = (jobStepId: string): OrchLeaseRecord => {
-    return load(jobStepId) ?? emptyRecord(jobStepId);
+  const withRecordLock = <T>(jobStepId: string, fn: () => T): T => {
+    const fp = filePathFor(jobStepId);
+    if (!fp) {
+      return fn();
+    }
+    return withLeaseFileLock(fp, fn);
+  };
+
+  const load = (jobStepId: string): OrchLeaseRecord | null => {
+    return withRecordLock(jobStepId, () => loadUnlocked(jobStepId));
+  };
+
+  const getOrInitUnlocked = (jobStepId: string): OrchLeaseRecord => {
+    return loadUnlocked(jobStepId) ?? emptyRecord(jobStepId);
   };
 
   return {
@@ -270,82 +383,89 @@ export function createOrchLeaseStore(opts: { rootDir?: string } = {}): OrchLease
           record: emptyRecord(""),
         };
       }
-      if (!holder) {
-        return {
-          ok: false,
-          reason: "invalid_holder",
-          record: getOrInit(jobStepId),
-        };
-      }
-      const current = getOrInit(jobStepId);
-      if (current.cancelRequested) {
-        return { ok: false, reason: "cancel_requested", record: current };
-      }
-      if (isLeaseActive(current, input.nowMs) && current.leaseHolder !== holder) {
-        return { ok: false, reason: "lease_held", record: current };
-      }
-      // Same holder renewing while active keeps fence; expired or free → bump fence.
-      const renewingSame = isLeaseActive(current, input.nowMs) && current.leaseHolder === holder;
-      const nextFence = renewingSame ? current.fencingToken : current.fencingToken + 1;
-      const ttl = input.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
-      const deadlineAt = input.deadlineAt ?? input.nowMs + ttl;
-      const record = save({
-        ...current,
-        leaseHolder: holder,
-        fencingToken: nextFence,
-        heartbeatAt: input.nowMs,
-        deadlineAt,
-        attempt: input.attempt ?? current.attempt,
-        budgetRemaining: input.budgetRemaining ?? current.budgetRemaining,
+      return withRecordLock(jobStepId, () => {
+        if (!holder) {
+          return {
+            ok: false as const,
+            reason: "invalid_holder" as const,
+            record: getOrInitUnlocked(jobStepId),
+          };
+        }
+        const current = getOrInitUnlocked(jobStepId);
+        if (current.cancelRequested) {
+          return { ok: false as const, reason: "cancel_requested" as const, record: current };
+        }
+        if (isLeaseActive(current, input.nowMs) && current.leaseHolder !== holder) {
+          return { ok: false as const, reason: "lease_held" as const, record: current };
+        }
+        // Same holder renewing while active keeps fence; expired or free → bump fence.
+        const renewingSame = isLeaseActive(current, input.nowMs) && current.leaseHolder === holder;
+        const nextFence = renewingSame ? current.fencingToken : current.fencingToken + 1;
+        const ttl = input.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
+        const deadlineAt = input.deadlineAt ?? input.nowMs + ttl;
+        const record = saveUnlocked({
+          ...current,
+          leaseHolder: holder,
+          fencingToken: nextFence,
+          heartbeatAt: input.nowMs,
+          deadlineAt,
+          attempt: input.attempt ?? current.attempt,
+          budgetRemaining: input.budgetRemaining ?? current.budgetRemaining,
+        });
+        return { ok: true as const, record };
       });
-      return { ok: true, record };
     },
     heartbeat(input) {
       const jobStepId = input.jobStepId.trim();
-      const current = load(jobStepId);
-      if (!current || !current.leaseHolder) {
-        return { ok: false, reason: "no_lease", record: current };
-      }
-      if (current.cancelRequested) {
-        return { ok: false, reason: "cancel_requested", record: current };
-      }
-      if (current.fencingToken !== input.fencingToken) {
-        return { ok: false, reason: "stale_fencing_token", record: current };
-      }
-      if (current.leaseHolder !== input.holder.trim()) {
-        return { ok: false, reason: "holder_mismatch", record: current };
-      }
-      if (!isLeaseActive(current, input.nowMs)) {
-        return { ok: false, reason: "lease_expired", record: current };
-      }
-      // Heartbeat must not extend past deadline: cap heartbeatAt at deadlineAt.
-      const capped =
-        current.deadlineAt == null ? input.nowMs : Math.min(input.nowMs, current.deadlineAt);
-      const record = save({
-        ...current,
-        heartbeatAt: capped,
-        // deadlineAt unchanged — never extended by heartbeat
+      return withRecordLock(jobStepId, () => {
+        const current = loadUnlocked(jobStepId);
+        if (!current || !current.leaseHolder) {
+          return { ok: false as const, reason: "no_lease" as const, record: current };
+        }
+        if (current.cancelRequested) {
+          return { ok: false as const, reason: "cancel_requested" as const, record: current };
+        }
+        if (current.fencingToken !== input.fencingToken) {
+          return { ok: false as const, reason: "stale_fencing_token" as const, record: current };
+        }
+        if (current.leaseHolder !== input.holder.trim()) {
+          return { ok: false as const, reason: "holder_mismatch" as const, record: current };
+        }
+        if (!isLeaseActive(current, input.nowMs)) {
+          return { ok: false as const, reason: "lease_expired" as const, record: current };
+        }
+        // Heartbeat must not extend past deadline: cap heartbeatAt at deadlineAt.
+        const capped =
+          current.deadlineAt == null ? input.nowMs : Math.min(input.nowMs, current.deadlineAt);
+        const record = saveUnlocked({
+          ...current,
+          heartbeatAt: capped,
+          // deadlineAt unchanged — never extended by heartbeat
+        });
+        return { ok: true as const, record };
       });
-      return { ok: true, record };
     },
     release(input) {
-      const current = load(input.jobStepId.trim());
-      if (!current || !current.leaseHolder) {
-        return { ok: false, reason: "no_lease", record: current };
-      }
-      if (current.fencingToken !== input.fencingToken) {
-        return { ok: false, reason: "stale_fencing_token", record: current };
-      }
-      if (current.leaseHolder !== input.holder.trim()) {
-        return { ok: false, reason: "holder_mismatch", record: current };
-      }
-      const record = save({
-        ...current,
-        leaseHolder: null,
-        heartbeatAt: null,
-        // Keep fencingToken / deadline / cancel / resultRef for audit continuity
+      const jobStepId = input.jobStepId.trim();
+      return withRecordLock(jobStepId, () => {
+        const current = loadUnlocked(jobStepId);
+        if (!current || !current.leaseHolder) {
+          return { ok: false as const, reason: "no_lease" as const, record: current };
+        }
+        if (current.fencingToken !== input.fencingToken) {
+          return { ok: false as const, reason: "stale_fencing_token" as const, record: current };
+        }
+        if (current.leaseHolder !== input.holder.trim()) {
+          return { ok: false as const, reason: "holder_mismatch" as const, record: current };
+        }
+        const record = saveUnlocked({
+          ...current,
+          leaseHolder: null,
+          heartbeatAt: null,
+          // Keep fencingToken / deadline / cancel / resultRef for audit continuity
+        });
+        return { ok: true as const, record };
       });
-      return { ok: true, record };
     },
     assertFence(input) {
       const current = load(input.jobStepId.trim());
@@ -363,29 +483,34 @@ export function createOrchLeaseStore(opts: { rootDir?: string } = {}): OrchLease
       return { ok: true, record: current };
     },
     submitResult(input) {
-      const current = load(input.jobStepId.trim());
-      if (!current || !current.leaseHolder) {
-        return { ok: false, reason: "no_lease", record: current };
-      }
-      if (current.fencingToken !== input.fencingToken) {
-        return { ok: false, reason: "stale_fencing_token", record: current };
-      }
-      if (current.leaseHolder !== input.holder.trim()) {
-        return { ok: false, reason: "holder_mismatch", record: current };
-      }
-      if (!isLeaseActive(current, input.nowMs)) {
-        return { ok: false, reason: "lease_expired", record: current };
-      }
-      const record = save({
-        ...current,
-        resultRef: input.resultRef ?? current.resultRef ?? null,
+      const jobStepId = input.jobStepId.trim();
+      return withRecordLock(jobStepId, () => {
+        const current = loadUnlocked(jobStepId);
+        if (!current || !current.leaseHolder) {
+          return { ok: false as const, reason: "no_lease" as const, record: current };
+        }
+        if (current.fencingToken !== input.fencingToken) {
+          return { ok: false as const, reason: "stale_fencing_token" as const, record: current };
+        }
+        if (current.leaseHolder !== input.holder.trim()) {
+          return { ok: false as const, reason: "holder_mismatch" as const, record: current };
+        }
+        if (!isLeaseActive(current, input.nowMs)) {
+          return { ok: false as const, reason: "lease_expired" as const, record: current };
+        }
+        const record = saveUnlocked({
+          ...current,
+          resultRef: input.resultRef ?? current.resultRef ?? null,
+        });
+        return { ok: true as const, record };
       });
-      return { ok: true, record };
     },
     requestCancel(jobStepId: string) {
       const id = jobStepId.trim();
-      const current = getOrInit(id);
-      return save({ ...current, cancelRequested: true });
+      return withRecordLock(id, () => {
+        const current = getOrInitUnlocked(id);
+        return saveUnlocked({ ...current, cancelRequested: true });
+      });
     },
   };
 }

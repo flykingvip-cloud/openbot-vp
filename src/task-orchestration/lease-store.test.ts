@@ -2,7 +2,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ORCH_KILL_FIXTURE_IDS, createOrchLeaseStore, isOrchKillFixtureId } from "./lease-store.js";
+import {
+  ORCH_KILL_FIXTURE_IDS,
+  createOrchLeaseStore,
+  isOrchKillFixtureId,
+  safeFileToken,
+} from "./lease-store.js";
 import { ORCHESTRATION_LIVE_INVOKE } from "./types.js";
 
 const tempDirs: string[] = [];
@@ -255,5 +260,58 @@ describe("WP-06 orch lease-store", () => {
     }
     expect(second.record.fencingToken).toBe(2);
     expect(second.record.leaseHolder).toBe("worker-b");
+  });
+
+  it("safeFileToken keeps slash and colon ids on distinct files", () => {
+    expect(safeFileToken("a/b")).not.toBe(safeFileToken("a:b"));
+    expect(safeFileToken("a/b")).toBe(Buffer.from("a/b", "utf8").toString("base64url"));
+    const root = tempRoot();
+    const store = createOrchLeaseStore({ rootDir: root });
+    const first = store.tryAcquireLease({
+      jobStepId: "a/b",
+      holder: "worker-a",
+      nowMs: 1_000,
+      leaseTtlMs: 10_000,
+    });
+    expect(first.ok).toBe(true);
+    // Querying the colliding-under-old-scheme id must not see the first lease.
+    expect(store.get("a:b")).toBeNull();
+    const second = store.tryAcquireLease({
+      jobStepId: "a:b",
+      holder: "worker-b",
+      nowMs: 1_100,
+      leaseTtlMs: 10_000,
+    });
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) {
+      return;
+    }
+    expect(first.record.leaseHolder).toBe("worker-a");
+    expect(second.record.leaseHolder).toBe("worker-b");
+    expect(store.get("a/b")?.leaseHolder).toBe("worker-a");
+    expect(store.get("a:b")?.leaseHolder).toBe("worker-b");
+    const leasesDir = path.join(root, "leases");
+    const files = fs.readdirSync(leasesDir).filter((f) => f.endsWith(".json"));
+    expect(files).toContain(`${safeFileToken("a/b")}.json`);
+    expect(files).toContain(`${safeFileToken("a:b")}.json`);
+    expect(files).toHaveLength(2);
+  });
+
+  it("rejects file content whose jobStepId does not match the request key", () => {
+    const root = tempRoot();
+    const store = createOrchLeaseStore({ rootDir: root });
+    const acquired = store.tryAcquireLease({
+      jobStepId: "real-id",
+      holder: "worker-a",
+      nowMs: 1_000,
+      leaseTtlMs: 10_000,
+    });
+    expect(acquired.ok).toBe(true);
+    const fp = path.join(root, "leases", `${safeFileToken("real-id")}.json`);
+    const raw = JSON.parse(fs.readFileSync(fp, "utf8")) as Record<string, unknown>;
+    raw.jobStepId = "spoofed-other-id";
+    fs.writeFileSync(fp, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+    const reloaded = createOrchLeaseStore({ rootDir: root });
+    expect(reloaded.get("real-id")).toBeNull();
   });
 });
