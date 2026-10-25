@@ -2,8 +2,9 @@
  * P4a — production organizer entry onto existing HandoffContract APIs.
  *
  * Reuses proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff only.
- * When collaboration.task.handoffContract is off, these entry points refuse and the
- * legacy collaboration.task.handoff → handoffCollaborationTask shortcut stays live.
+ * When collaboration.task.handoffContract is off, these entry points refuse.
+ * The legacy collaboration.task.handoff → handoffCollaborationTask shortcut is retired
+ * (T09-B1) and never mutates responsibility whether the flag is on or off.
  * Does not invent a second handoff system, Floor live, task board, or RCIS.
  */
 import type { Task } from "@openbot/collaboration-core";
@@ -50,7 +51,7 @@ export class HandoffContractFlagOffError extends Error {
   readonly code = "HANDOFF_CONTRACT_FLAG_OFF";
   constructor() {
     super(
-      "collaboration.task.handoffContract is off; use collaboration.task.handoff shortcut, or enable the flag to run propose → accept → approve → apply",
+      "collaboration.task.handoffContract is off; enable the flag (gray/explicit deploy only — not silent platform LIVE) to run propose → accept → approve → apply. The collaboration.task.handoff shortcut is retired and does not mutate",
     );
     this.name = "HandoffContractFlagOffError";
   }
