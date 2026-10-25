@@ -9578,6 +9578,8 @@ tasks:
       - ui/src/ui/controllers/collaboration-governance-actions.ts
       - ui/src/ui/controllers/collaboration-governance-actions.node.test.ts
 
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/gateway/collaboration-dispatch/collab-edge.ts
     state: active
     sessions:
       - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
