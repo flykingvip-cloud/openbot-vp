@@ -7,11 +7,6 @@ import { renameSync, writeFileSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import type { GitRunner } from "./forward-guard.ts";
 import {
-  externalLedgerMessage,
-  isLocalProductionLedgerPath,
-  LOCAL_LEDGER_PATH,
-} from "./ledger-location.ts";
-import {
   auditLedger,
   closeLiveInterval,
   isSha256Digest,
@@ -21,7 +16,7 @@ import {
   type ReleaseRow,
 } from "./ledger.ts";
 
-export const DEFAULT_LEDGER_PATH = LOCAL_LEDGER_PATH;
+export const DEFAULT_LEDGER_PATH = "deploy/production/releases.jsonl";
 
 export type CutoverRecordInput = {
   gatewaySha: string;
@@ -261,12 +256,6 @@ export function writeCutoverRecord(
   input: CutoverRecordInput,
   git: GitRunner,
 ): CutoverRecordResult {
-  // The openbot-vp default path was the duplicated production ledger. Appending here
-  // would recreate a second SoT. Callers that still need the writer pass an explicit
-  // non-production path (tests, or a checkout of the OHBE ledger).
-  if (isLocalProductionLedgerPath(ledgerPath)) {
-    return fail([externalLedgerMessage()]);
-  }
   let text: string;
   try {
     text = readFileSync(ledgerPath, "utf8");
@@ -437,14 +426,8 @@ export function parseCutoverArgs(args: string[]): ParsedArgs {
 
 const HELP = `pnpm delivery:cutover:record — atomically close the previous LIVE row and append a v2 row.
 
-The production ledger is OHBE, not deploy/production/releases.jsonl in this repo:
-  https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
-This command refuses that default path. Pass --ledger only for a non-production file
-(for example a checkout of the OHBE ledger).
-
 Usage:
-  pnpm delivery:cutover:record -- --ledger <path-outside-openbot-vp> \\
-    --gateway-sha <sha> --build-mode full-dist \\
+  pnpm delivery:cutover:record -- --gateway-sha <sha> --build-mode full-dist \\
     --artifact-kind image --artifact-id <tag> --artifact-digest sha256:<64-hex> \\
     --tag provenance/sha-<12> --evidence <text> --executor <id> \\
     --live-verified

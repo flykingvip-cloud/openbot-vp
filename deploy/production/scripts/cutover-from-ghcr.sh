@@ -80,8 +80,8 @@ Options:
   --slug <name>            short release slug for the local image alias
   --digest <sha256:...>    pull this exact manifest digest (strongest provenance)
   --image-tag <tag>        pull this GHCR tag (e.g. provenance-sha-2a45057c6671)
-  --intentional-revert <r> approved rollback; forwarded to the forward-only gate
-  --record                 refuse a local ledger write and print the OHBE ledger URL
+  --intentional-revert <r> approved rollback; forwarded to the forward-only gate and ledger writer
+  --record                 record via pnpm delivery:cutover:record (v2; closes previous liveTo)
   -h, --help               show this help
 
 Environment:
@@ -208,51 +208,65 @@ live_build_info() {
 }
 
 emit_ledger_row() {
-  # Production rows are appended in OHBE. This script must not recreate the
-  # duplicated deploy/production/releases.jsonl in openbot-vp.
-  ledger_url="https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl"
+  ledger="$ROOT/deploy/production/releases.jsonl"
   live_from="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   executor="${OPENBOT_CUTOVER_EXECUTOR:-$(git config user.name 2> /dev/null || echo operator)}"
+  # Existing rows carry imageTag without the registry/repo prefix
+  # (e.g. rc-amd64-provenance-2a45057c66-employee-model-usage).
   ledger_image_tag="${LOCAL_ALIAS#localhost/openbot:}"
   evidence="container build-info (commit=${CANDIDATE})"
   notes="pulled from GHCR; no host build"
 
-  if [[ "$RECORD" == true && "$MODE" != "verify-live" ]]; then
-    echo "NOTE: --record is only honored with --verify-live (evidence must be observed)."
-  fi
-  if [[ "$RECORD" == true && "$MODE" == "verify-live" && -z "$DIGEST" ]]; then
-    DIGEST="$(run_host podman inspect --format '{{.ImageDigest}}' "$CONTAINER" || true)"
-    [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] ||
-      die "cannot describe a v2 ledger row without artifactDigest; pass --digest sha256:<64-hex>"
-  fi
-  cat <<EOF
---- production ledger is OHBE, not this repo ---
-  Append the cutover row in:
-  ${ledger_url}
-  See deploy/production/LEDGER.md.
-  refusing to append deploy/production/releases.jsonl in openbot-vp
-  gateway-sha ${CANDIDATE}
-  ui-sha ${CANDIDATE}
-  build-mode full-dist
-  artifact-kind image
-  artifact-id ${ledger_image_tag}
-  artifact-digest ${DIGEST:-sha256:REPLACE_WITH_OBSERVED_DIGEST}
-  tag provenance/sha-${TAG_SHORT}
-  live-from ${live_from}
-  evidence ${evidence}
-  executor ${executor}
-  notes ${notes}
-  live-verified
-EOF
-  if [[ -n "$INTENTIONAL_REVERT" ]]; then
-    echo "  intentional-revert ${INTENTIONAL_REVERT}"
-  fi
+  # Only --verify-live has actually observed the container, so only it may write a
+  # row whose evidence claims a container observation.
   if [[ "$RECORD" == true && "$MODE" == "verify-live" ]]; then
-    die "refusing to append deploy/production/releases.jsonl in openbot-vp; record the row in OHBE: ${ledger_url}"
+    if [[ -z "$DIGEST" ]]; then
+      DIGEST="$(run_host podman inspect --format '{{.ImageDigest}}' "$CONTAINER" || true)"
+    fi
+    [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+      die "cannot record a v2 ledger row without artifactDigest; pass --digest sha256:<64-hex>"
+    revert_args=()
+    if [[ -n "$INTENTIONAL_REVERT" ]]; then
+      revert_args+=(--intentional-revert "$INTENTIONAL_REVERT")
+    fi
+    (cd "$ROOT" && pnpm delivery:cutover:record -- \
+      --gateway-sha "$CANDIDATE" \
+      --ui-sha "$CANDIDATE" \
+      --build-mode full-dist \
+      --artifact-kind image \
+      --artifact-id "$ledger_image_tag" \
+      --artifact-digest "$DIGEST" \
+      --tag "provenance/sha-${TAG_SHORT}" \
+      --live-from "$live_from" \
+      --evidence "$evidence" \
+      --executor "$executor" \
+      --notes "$notes" \
+      --live-verified \
+      --ledger "$ledger" \
+      ${revert_args[@]+"${revert_args[@]}"}) || die "ledger record refused (audit would fail)"
+  else
+    if [[ "$RECORD" == true ]]; then
+      echo "NOTE: --record is only honored with --verify-live (evidence must be observed)."
+    fi
+    echo "--- record after the swap (pnpm delivery:cutover:record; do not hand-append v1 JSONL) ---"
+    echo "  pnpm delivery:cutover:record -- \\"
+    echo "    --gateway-sha ${CANDIDATE} --ui-sha ${CANDIDATE} \\"
+    echo "    --build-mode full-dist --artifact-kind image \\"
+    echo "    --artifact-id ${ledger_image_tag} \\"
+    echo "    --artifact-digest ${DIGEST:-sha256:REPLACE_WITH_OBSERVED_DIGEST} \\"
+    echo "    --tag provenance/sha-${TAG_SHORT} --live-from ${live_from} \\"
+    echo "    --evidence $(printf '%q' "$evidence") \\"
+    echo "    --executor $(printf '%q' "$executor") --notes $(printf '%q' "$notes") \\"
+    echo "    --live-verified \\"
+    if [[ -n "$INTENTIONAL_REVERT" ]]; then
+      echo "    --intentional-revert $(printf '%q' "$INTENTIONAL_REVERT") \\"
+    fi
+    echo "    --ledger ${ledger}"
   fi
   cat <<EOF
 
 --- close out ---
+  pnpm delivery:ledger:audit
   git tag -a provenance/sha-${TAG_SHORT} ${CANDIDATE} -m "production cutover"
   pnpm delivery:merge-back-plan -- --cutover-sha ${CANDIDATE}
 EOF

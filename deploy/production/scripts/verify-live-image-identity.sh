@@ -5,8 +5,7 @@
 # same way as scripts/delivery/resolve-live-sha.ts: `podman exec … cat
 # /app/dist/build-info.json`) equals the `org.opencontainers.image.revision` label of the
 # image the container was created from. A hot overlay of /app/dist makes the two diverge
-# (see OHBE ledger seq 34–41:
-# https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl),
+# (see Path B ledger seq 34–41: deploy/production/releases.jsonl),
 # so this check is a machine-executable
 # detector for the overlay pattern banned by red line R9 in deploy/production/README.md.
 #
