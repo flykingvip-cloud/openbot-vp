@@ -1,0 +1,34 @@
+{
+  "planBaseline": "1012c1bd553e69f1b7ebe81d258f3872dfb0bea6",
+  "observedHead": "a05bcad048fd19b7c128122cadbf9114cdaa3bb2",
+  "interveningChangedPaths": [
+    "docs/integrations/device-digital-human/claw4-firmware-http-compat.md",
+    "src/integrations/device-digital-human/claw4-audio-bridge-bind.ts",
+    "src/integrations/device-digital-human/claw4-audio-bridge.ts",
+    "src/integrations/device-digital-human/claw4-firmware-compat.ts",
+    "src/integrations/device-digital-human/claw4-firmware-p0.test.ts"
+  ],
+  "documents": 8,
+  "internalLinks": 8,
+  "literalSourcePathsChecked": 15,
+  "workPackages": [
+    "WP-00",
+    "WP-01",
+    "WP-02",
+    "WP-03",
+    "WP-04",
+    "WP-05",
+    "WP-06",
+    "WP-07",
+    "WP-08",
+    "WP-09",
+    "WP-10",
+    "WP-11",
+    "WP-12"
+  ],
+  "errors": [],
+  "applicationTestsRun": false,
+  "planDocuments": 7,
+  "supportingDocuments": 1,
+  "formatCheck": "PASS"
+}

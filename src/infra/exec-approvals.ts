@@ -437,6 +437,27 @@ export function resolveExecApprovals(
   });
 }
 
+/**
+ * Read-only resolve for shadow compare / seat drill / Fabric `check` paths.
+ * Uses `loadExecApprovals` only — never calls `ensureExecApprovals` / `saveExecApprovals`.
+ * Missing file → empty normalized defaults in memory (same as load). Socket path/token
+ * may be empty until a real ensure has run; compare must not mint tokens.
+ */
+export function resolveExecApprovalsReadonly(
+  agentId?: string,
+  overrides?: ExecApprovalsDefaultOverrides,
+): ExecApprovalsResolved {
+  const file = loadExecApprovals();
+  return resolveExecApprovalsFromFile({
+    file,
+    agentId,
+    overrides,
+    path: resolveExecApprovalsPath(),
+    socketPath: expandHomePrefix(file.socket?.path ?? resolveExecApprovalsSocketPath()),
+    token: file.socket?.token ?? "",
+  });
+}
+
 export function resolveExecApprovalsFromFile(params: {
   file: ExecApprovalsFile;
   agentId?: string;

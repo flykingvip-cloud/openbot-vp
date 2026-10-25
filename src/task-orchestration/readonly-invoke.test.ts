@@ -6,6 +6,7 @@ import type { OpenBotConfig } from "../config/config.js";
 import { considerDispatch, considerReadonlyInvoke } from "./dispatch.js";
 import { ORCH_READONLY_INVOKE_ENV, isReadonlyInvokeEnabled } from "./feature.js";
 import { observeOrchestrationConsider } from "./gateway-hook.js";
+import { ORCH_READONLY_PATH_PILOT_ENV, clearReadonlyPathBindingsForTests } from "./path-binding.js";
 import { invokeReadonlySurface } from "./readonly-invoke.js";
 import { ORCH_REASON } from "./reason-codes.js";
 import {
@@ -85,6 +86,7 @@ function resetAdapters() {
 
 describe("OPENBOT_ORCH_READONLY_INVOKE", () => {
   beforeEach(() => {
+    clearReadonlyPathBindingsForTests();
     resetAdapters();
   });
 
@@ -406,5 +408,125 @@ describe("OPENBOT_ORCH_READONLY_INVOKE", () => {
     const gateSource = readFileSync(join(here, "observe-gate.ts"), "utf8");
     expect(gateSource).toMatch(/intent: "recall_memory"/);
     expect(gateSource).toMatch(/allowlistEmpty = !\(explicit && allowlisted\)/);
+  });
+});
+
+describe("WP-05 readonly single-path pilot", () => {
+  beforeEach(() => {
+    clearReadonlyPathBindingsForTests();
+    resetAdapters();
+  });
+  afterEach(() => {
+    clearReadonlyPathBindingsForTests();
+  });
+
+  it("default legacy path invokes memory_search once and returns binding", async () => {
+    const result = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-legacy-1",
+      env: {},
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+      },
+    });
+    expect(result.invokedTool).toBe(true);
+    expect(result.toolName).toBe("memory_search");
+    expect(result.pathBinding?.path).toBe("legacy");
+    expect(result.pathBinding?.actionId).toBe("act-legacy-1");
+    expect(adapters.memoryExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses dual-exec for the same actionId", async () => {
+    await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-dual-1",
+      env: {},
+      deps: { createMemorySearchTool: adapters.createMemorySearchTool },
+    });
+    const second = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello-again",
+      actionId: "act-dual-1",
+      env: {},
+      deps: { createMemorySearchTool: adapters.createMemorySearchTool },
+    });
+    expect(second.invokedTool).toBe(false);
+    expect(second.reason).toBe("dual_exec_refused");
+    expect(adapters.memoryExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("fabric path without policyCheck refuses and does not execute", async () => {
+    const result = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-no-check",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: { createMemorySearchTool: adapters.createMemorySearchTool },
+    });
+    expect(result.invokedTool).toBe(false);
+    expect(result.reason).toBe("fabric_path_requires_policy_check");
+    expect(adapters.memoryExecute).not.toHaveBeenCalled();
+  });
+
+  it("fabric path DENY skips tool; ALLOW executes once", async () => {
+    const denied = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-deny",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+        policyCheck: async () => ({ decision: "DENY", reason: "shadow_deny" }),
+      },
+    });
+    expect(denied.invokedTool).toBe(false);
+    expect(denied.reason).toBe("shadow_deny");
+    expect(adapters.memoryExecute).not.toHaveBeenCalled();
+
+    const allowed = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-allow",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+        policyCheck: async () => ({ decision: "ALLOW" }),
+      },
+    });
+    expect(allowed.invokedTool).toBe(true);
+    expect(allowed.pathBinding?.path).toBe("fabric");
+    expect(adapters.memoryExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("fabric path MODIFY is refused (unsupported) and does not execute", async () => {
+    const modified = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-modify",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+        policyCheck: async () => ({ decision: "MODIFY", reason: "shadow_modify" }),
+      },
+    });
+    expect(modified.invokedTool).toBe(false);
+    expect(modified.reason).toBe("shadow_modify");
+    expect(adapters.memoryExecute).not.toHaveBeenCalled();
+
+    const modifiedDefaultReason = await invokeReadonlySurface({
+      surface: "memory",
+      query: "hello",
+      actionId: "act-fabric-modify-default",
+      env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool,
+        policyCheck: async () => ({ decision: "MODIFY" }),
+      },
+    });
+    expect(modifiedDefaultReason.invokedTool).toBe(false);
+    expect(modifiedDefaultReason.reason).toBe("fabric_modify_unsupported");
+    expect(adapters.memoryExecute).not.toHaveBeenCalled();
   });
 });

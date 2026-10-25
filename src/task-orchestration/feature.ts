@@ -133,3 +133,6 @@ export const WEB_READ_SHADOW_FLAG_NAME =
 export function isWebReadShadowEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return envEnabled(env, WEB_READ_SHADOW_ENV);
 }
+
+/** WP-05: re-export path pilot env name (default legacy; set `fabric` to opt in). */
+export { ORCH_READONLY_PATH_PILOT_ENV, resolveReadonlyPilotPath } from "./path-binding.js";

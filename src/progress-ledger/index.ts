@@ -94,3 +94,31 @@ export type { HumanGateNotification, HumanGatePendingItem } from "./human-gate.j
 export type { AdminProgressLedgerItem, AdminProgressLedgerResult } from "./admin-read.js";
 export type { LedgerMetrics, LedgerMetricsSnapshot } from "./metrics.js";
 export { DEFAULT_STALE_AFTER_MS, PROGRESS_LEDGER_SCHEMA_VERSION } from "./types.js";
+export {
+  ORCH_LEASE_FIELDS_SCHEMA_VERSION,
+  orchLeaseRecordToLedgerFields,
+  parseOrchLeaseLedgerFields,
+  validateOrchLeaseLedgerFields,
+} from "./orch-lease-fields.js";
+export type {
+  OrchLeaseFieldsParseFail,
+  OrchLeaseFieldsParseOk,
+  OrchLeaseLedgerFields,
+} from "./orch-lease-fields.js";
+export {
+  CANONICAL_EXECUTION_STEP_SCHEMA_VERSION,
+  CANONICAL_STEP_STATUS_UNKNOWN_OUTCOME,
+  assertCanonicalStepFields,
+  compatReadCanonicalFieldsFromPayload,
+  mergeCanonicalStepFields,
+  nextAttemptCanonicalFields,
+  parseCanonicalExecutionStepFields,
+  validateCanonicalExecutionStepFields,
+} from "./execution-step-canonical.js";
+export type {
+  CanonicalExecutionStepFields,
+  CanonicalPayloadExtensions,
+  CanonicalStepParseFail,
+  CanonicalStepParseOk,
+  CanonicalStepStatusGuidance,
+} from "./execution-step-canonical.js";
