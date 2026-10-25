@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   evaluateLeaseLock,
+  isPidAlive,
   releaseLeaseLockOwned,
   tryReclaimStaleLeaseLock,
   withLeaseFileLock,
@@ -158,5 +159,76 @@ describe("orch lease-file-lock ownership / liveness", () => {
     });
     expect(seen).toEqual([1]);
     expect(fs.existsSync(`${leaseFile}.lock`)).toBe(false);
+  });
+
+  it("late reclaim after claim must not delete a replacement lock (acceptance interleave)", () => {
+    // Deterministic injection of the acceptance race:
+    // reclaimer finishes claim (rename), then replacement appears at lockPath
+    // before tomb unlink — replacement must survive; reclaim still succeeds on tomb.
+    const root = tempRoot();
+    const lockPath = path.join(root, "interleave.json.lock");
+    const stale: LeaseLockPayload = {
+      pid: 2_147_483_644,
+      createdAt: new Date(Date.now() - 60_000).toISOString(),
+      ownerToken: "stale-to-reclaim",
+    };
+    writeLeaseLockPayload(lockPath, stale);
+
+    const replacement: LeaseLockPayload = {
+      pid: process.pid,
+      createdAt: new Date().toISOString(),
+      ownerToken: "replacement-holder",
+    };
+
+    let injected = false;
+    const reclaimResult = tryReclaimStaleLeaseLock(lockPath, stale, {
+      afterClaim: () => {
+        // lockPath is free after rename claim — new holder installs here.
+        writeLeaseLockPayload(lockPath, replacement);
+        injected = true;
+      },
+    });
+
+    expect(injected).toBe(true);
+    expect(reclaimResult).toBe(true);
+
+    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
+    expect(still.ownerToken).toBe("replacement-holder");
+    expect(still.pid).toBe(process.pid);
+    expect(isPidAlive(still.pid)).toBe(true);
+    // No unreclaimed tomb should remain for the stale token.
+    const leftovers = fs.readdirSync(root).filter((n) => n.includes(".reclaimed."));
+    expect(leftovers).toEqual([]);
+  });
+
+  it("two reclaimers on the same dead lock: after one completes a new acquire, the other must not delete it", () => {
+    const root = tempRoot();
+    const lockPath = path.join(root, "dual-reclaim.json.lock");
+    const stale: LeaseLockPayload = {
+      pid: 2_147_483_643,
+      createdAt: new Date(Date.now() - 90_000).toISOString(),
+      ownerToken: "dual-stale",
+    };
+    writeLeaseLockPayload(lockPath, stale);
+
+    const first = tryReclaimStaleLeaseLock(lockPath, stale);
+    expect(first).toBe(true);
+    expect(fs.existsSync(lockPath)).toBe(false);
+
+    // New holder installs after first reclaim completes.
+    const replacement: LeaseLockPayload = {
+      pid: process.pid,
+      createdAt: new Date().toISOString(),
+      ownerToken: "post-reclaim-holder",
+    };
+    writeLeaseLockPayload(lockPath, replacement);
+
+    // Late reclaimer still armed with the old expected payload.
+    const second = tryReclaimStaleLeaseLock(lockPath, stale);
+    expect(second).toBe(false);
+
+    const still = JSON.parse(fs.readFileSync(lockPath, "utf8")) as LeaseLockPayload;
+    expect(still.ownerToken).toBe("post-reclaim-holder");
+    expect(isPidAlive(still.pid)).toBe(true);
   });
 });

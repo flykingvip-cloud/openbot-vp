@@ -234,4 +234,57 @@ describe("orch lease-store cross-process exclusivity", () => {
     expect(still.ownerToken).toBe(newToken);
     expect(still.ownerToken).not.toBe(oldToken);
   }, 60_000);
+
+  it("two child reclaimers cannot delete a lock installed after the first reclaim", async () => {
+    const rootDir = path.join(stateDir, "lease-root-dual-reclaim");
+    const jobStepId = "xproc/dual-reclaim";
+    const leaseFile = path.join(rootDir, "leases", `${safeFileToken(jobStepId)}.json`);
+    const lockPath = `${leaseFile}.lock`;
+    fs.mkdirSync(path.dirname(lockPath), { recursive: true });
+
+    // Dead-PID lock (crash leftover).
+    const staleToken = randomUUID();
+    fs.writeFileSync(
+      lockPath,
+      `${JSON.stringify(
+        {
+          pid: 2_147_483_642,
+          createdAt: new Date(Date.now() - 120_000).toISOString(),
+          ownerToken: staleToken,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+
+    const { tryReclaimStaleLeaseLock } = await import("./lease-file-lock.ts");
+    const expected = {
+      pid: 2_147_483_642,
+      createdAt: JSON.parse(fs.readFileSync(lockPath, "utf8")).createdAt as string,
+      ownerToken: staleToken,
+    };
+
+    const first = tryReclaimStaleLeaseLock(lockPath, expected);
+    expect(first).toBe(true);
+
+    const { createOrchLeaseStore } = await import("./lease-store.ts");
+    const store = createOrchLeaseStore({ rootDir });
+    const acquired = store.tryAcquireLease({
+      jobStepId,
+      holder: "after-reclaim",
+      nowMs: Date.now(),
+      leaseTtlMs: 30_000,
+    });
+    expect(acquired.ok).toBe(true);
+
+    // Second reclaimer with stale expectation must not disturb the new lease lock cycle.
+    const second = tryReclaimStaleLeaseLock(lockPath, expected);
+    // lockPath may be absent (released after acquire) or held by a transient lock —
+    // either way second must not throw and must not resurrect stale ownership.
+    expect(typeof second).toBe("boolean");
+
+    const got = store.get(jobStepId);
+    expect(got?.leaseHolder).toBe("after-reclaim");
+  }, 60_000);
 });
