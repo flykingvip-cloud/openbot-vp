@@ -82,9 +82,9 @@ per-tenant orchestrator.
 An overlay rewrites `/app/dist` inside the running container, so the LIVE authority
 (`build-info.commit`, read via `podman exec … cat /app/dist/build-info.json`) and the
 container image's `org.opencontainers.image.revision` label diverge. That split breaks
-rollback identity and the audit chain (see the OHBE ledger seq 34–41 notes, including
+rollback identity and the audit chain (see the Path B ledger seq 34–41 notes, including
 the unledgered `47d6934c34` window recorded on seq 40/41:
-https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl).
+deploy/production/releases.jsonl).
 
 - **Machine gate**: `scripts/verify-live-image-identity.sh` asserts running
   `build-info.commit` == image OCI revision, fail-closed (exit `20` = identity split /
@@ -98,9 +98,8 @@ https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/pr
 - **Break-glass**: if a hot overlay is truly unavoidable, register it explicitly in
   `RELEASE_RECORD.md` **before** it goes live and record the ledger row with an
   acknowledgement — explicit, reasoned, never default. Historical overlay rows stay in
-  the OHBE ledger (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl)
-  untouched; the ban is forward-looking. This repo no longer stores that JSONL
-  (`deploy/production/LEDGER.md`).
+  `deploy/production/releases.jsonl` untouched; the ban is forward-looking
+  (see `deploy/production/LEDGER.md`).
 
 ---
 
@@ -124,7 +123,8 @@ data volume fills (availability incident, not governance). The same applies to t
 | `docker-compose.prod.yml`          | Production-oriented compose (auth required, no unconfigured)                            |
 | `smoke-checklist.md`               | Staging / prod smoke list                                                               |
 | `RELEASE_RECORD.md`                | Human release notes in this repo (not the machine ledger)                              |
-| `LEDGER.md`                        | Pointer to the OHBE production ledger; do not recreate `releases.jsonl` here            |
+| `LEDGER.md`                        | Documents Path B machine SoT (`releases.jsonl` in this repo)                            |
+| `releases.jsonl`                   | Append-only Path B machine cutover ledger (SoT)                                         |
 | `M0B_M2B_OPERATOR_RUNBOOK.md`      | M0b/M2b verify-live + seq 46 rollback record (commands only; no secrets; no swap)       |
 
 ---

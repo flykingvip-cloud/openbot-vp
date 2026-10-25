@@ -5,8 +5,7 @@ name: Docker Release
 #
 # The production release chain is `main` -> GHCR -> production host pull -> podman
 # cutover, following the process in `deploy/production/RELEASE_RECORD.md`. The
-# machine-readable ledger is OHBE
-# (https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl),
+# machine-readable Path B ledger is deploy/production/releases.jsonl in this repo,
 # together with annotated `provenance/sha-*` tags: the forward-only guard, that ledger
 # and those tags, in-container `/app/dist/build-info.json` verification, and merge-back.
 #

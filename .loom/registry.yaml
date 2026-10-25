@@ -9483,7 +9483,8 @@ landingStreams:
       - src/agents/system-prompt.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/agents/pi-embedded-runner/run/attempt.test.ts
-    canLandWith: []
+    canLandWith:
+      - strip-ohbe-from-openbot-vp
     metadata:
       legacyTitle: Single-chain tool protocol P0 (body DSML non-execution)
   - id: batch11-s0-ogui-decision-lifecycle
@@ -9592,7 +9593,11 @@ landingStreams:
       - scripts/delivery/cutover-record.ts
       - scripts/delivery/ledger-audit.ts
       - scripts/delivery/ledger-location.ts
+      - scripts/delivery/ledger.ts
       - scripts/delivery/ledger.test.ts
+      - scripts/delivery/resolve-live-sha.ts
+      - scripts/delivery/sot-consistency.ts
+      - deploy/production/releases.jsonl
       - skills/oi-bind-x-twitter/SKILL.md
       - skills/oi-bind-x-twitter/references/field-contract.md
       - skills/oi-bind-x-twitter/references/live-evidence.md
@@ -9724,14 +9729,16 @@ landingStreams:
       - src/diagnosis/production-unified-lock.cli.ts
     canLandWith:
       - batch9-formal-root
+      - single-chain-tool-protocol-p0
     metadata:
       task: strip-ohbe-from-openbot-vp
       owner: cursor-cloud
-      purpose: Remove the duplicated production ledger and point OHBE mentions at the
-        OHBE repository. First-match so these shared files land together.
-      historicalLedger: deploy/production/releases.jsonl was removed by this stream
-        and is not live in openbot-vp. Live ledger is
-        https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl
+      purpose: Path B machine ledger SoT lives in openbot-vp deploy/production/releases.jsonl.
+        First-match so restore/cutover delivery files land together. OHBE is a separate
+        project and is not the openbot-vp Path B append target.
+      historicalLedger: deploy/production/releases.jsonl was briefly removed then restored
+        as Path B SoT (seq seed through 144 tip 9a8e91d19e89). Do not append Path B rows
+        to harness-Benchmark-Engine going forward.
   - id: batch8-skill-gates
     landingPolicy: serial
     paths:

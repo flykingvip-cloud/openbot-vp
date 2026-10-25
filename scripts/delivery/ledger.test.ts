@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -690,36 +690,194 @@ describe("repaired ledger warning profile", () => {
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
   });
 
-  it("production ledger lives in OHBE, not in this repo", () => {
-    expect(existsSync("deploy/production/releases.jsonl")).toBe(false);
-    const stub = readFileSync("deploy/production/LEDGER.md", "utf8");
-    expect(stub).toContain(
-      "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
+  it("production releases.jsonl Path B SoT reaches seq144 tip 9a8e91d19e89", () => {
+    const text = readFileSync("deploy/production/releases.jsonl", "utf8");
+    const { rows, errors } = parseLedger(text);
+    expect(errors).toEqual([]);
+    const git: GitRunner = (args) => {
+      const result = spawnSync("git", args, { encoding: "utf8" });
+      return { code: result.status ?? 1, stdout: result.stdout ?? "" };
+    };
+    const audit = auditLedger(rows, git);
+    // Path B SoT structure (history rewrite means many gatewaySha values are no longer
+    // in this GitHub repo, so ancestry regression ERRORs are expected delivery debt).
+    expect(rows.length).toBeGreaterThanOrEqual(142);
+    expect(Math.max(...rows.map((r) => r.seq))).toBe(144);
+    // Historical debt: seq 127 never received liveTo. Tip seq 144 is the Path B LIVE open row.
+    // Dual-open remains an audit error until seq 127 is closed with an authentic stop time.
+    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([127, 144]);
+    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
+    expect(audit.findings.some((f) => f.seq === 1 && f.code === "missing-tag")).toBe(true);
+    expect(audit.findings.some((f) => f.code === "overlay-debt")).toBe(true);
+    // seq 99-102 were backfilled from host metadata; their real stop times keep the
+    // 2026-09-28 holes visible instead of being papered over.
+    expect(rows.find((r) => r.seq === 98)?.liveTo).toBe("2026-09-26T15:39:59.221Z");
+    expect(rows.find((r) => r.seq === 99)?.liveTo).toBe("2026-09-28T04:15:35.109Z");
+    expect(rows.find((r) => r.seq === 99)?.liveVerified).toBe(false);
+    expect(rows.find((r) => r.seq === 103)?.liveTo).toBe("2026-09-29T14:21:24.723Z");
+    expect(rows.find((r) => r.seq === 103)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 104)?.liveTo).toBe("2026-09-29T14:25:30.609Z");
+    expect(rows.find((r) => r.seq === 105)?.liveTo).toBe("2026-09-30T02:34:08.329Z");
+    expect(rows.find((r) => r.seq === 105)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 106)?.liveTo).toBe("2026-09-30T07:30:37.254Z");
+    expect(rows.find((r) => r.seq === 106)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 107)?.liveTo).toBe("2026-10-01T06:37:00.000Z");
+    expect(rows.find((r) => r.seq === 107)?.liveVerified).toBe(true);
+    // seq 108-109 closed when the next recorded LIVE started. seq 110/111 are an
+    // allowed sequence gap. seq 109 liveTo is seq 112 liveFrom (no stronger stop time).
+    // seq 112 closed at seq 113 liveFrom. The cutover writer stores that instant
+    // without a millisecond suffix (same instant as 2026-10-10T10:30:46.000Z).
+    // seq 113 closed at seq 114 liveFrom, also without a millisecond suffix.
+    // seq 114 closed at seq 115 liveFrom (HK HOME=/root + --user 0 recreate).
+    // seq 115 closed at seq 116 liveFrom (HK Path B tip 3a001aac).
+    // seq 116 closed at seq 117 liveFrom (HK Path B tip eff6f8f0).
+    // seq 117 closed at seq 118 liveFrom (HK Path B tip 0b9c480f ≥7d594803).
+    // seq 118 closed at seq 119 liveFrom (HK Path B tip a958c7ee #608).
+    // seq 119 closed at seq 120 liveFrom (HK Path B tip 0411972c #612+#613).
+    // seq 120 closed at seq 121 liveFrom (HK Path B tip 13ff093d #618+#619).
+    // seq 121 closed at seq 122 liveFrom (HK Path B tip 8680c6b45).
+    // seq 122 closed at seq 123 liveFrom (HK Path B tip 872bea69 #632).
+    // seq 123 closed at seq 124 liveFrom (HK Path B tip 961afe6f #642+#644).
+    // seq 124 closed at seq 125 liveFrom (HK Path B tip da30646b #649+#650+#651).
+    expect(rows.find((r) => r.seq === 108)?.liveTo).toBe("2026-10-01T15:20:34.024Z");
+    expect(rows.find((r) => r.seq === 108)?.liveVerified).toBe(false);
+    expect(rows.find((r) => r.seq === 109)?.liveTo).toBe("2026-10-03T15:45:00.000Z");
+    expect(rows.find((r) => r.seq === 109)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 112)?.liveFrom).toBe("2026-10-03T15:45:00.000Z");
+    expect(rows.find((r) => r.seq === 112)?.liveTo).toBe("2026-10-10T10:30:46Z");
+    expect(rows.find((r) => r.seq === 112)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 113)?.liveFrom).toBe("2026-10-10T10:30:46Z");
+    expect(rows.find((r) => r.seq === 113)?.liveTo).toBe("2026-10-10T12:50:10Z");
+    expect(rows.find((r) => r.seq === 113)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 114)?.liveFrom).toBe("2026-10-10T12:50:10Z");
+    expect(rows.find((r) => r.seq === 114)?.liveTo).toBe("2026-10-10T22:36:52Z");
+    expect(rows.find((r) => r.seq === 114)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 115)?.liveFrom).toBe("2026-10-10T22:36:52Z");
+    expect(rows.find((r) => r.seq === 115)?.liveTo).toBe("2026-10-11T01:12:20Z");
+    expect(rows.find((r) => r.seq === 115)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 116)?.liveFrom).toBe("2026-10-11T01:12:20Z");
+    expect(rows.find((r) => r.seq === 116)?.liveTo).toBe("2026-10-11T06:04:08Z");
+    expect(rows.find((r) => r.seq === 116)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 117)?.liveFrom).toBe("2026-10-11T06:04:08Z");
+    expect(rows.find((r) => r.seq === 117)?.liveTo).toBe("2026-10-11T06:27:52Z");
+    expect(rows.find((r) => r.seq === 117)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 118)?.liveFrom).toBe("2026-10-11T06:27:52Z");
+    expect(rows.find((r) => r.seq === 118)?.liveTo).toBe("2026-10-11T07:39:46Z");
+    expect(rows.find((r) => r.seq === 118)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 119)?.liveFrom).toBe("2026-10-11T07:39:46Z");
+    expect(rows.find((r) => r.seq === 119)?.liveTo).toBe("2026-10-11T10:34:20Z");
+    expect(rows.find((r) => r.seq === 119)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 120)?.liveFrom).toBe("2026-10-11T10:34:20Z");
+    expect(rows.find((r) => r.seq === 120)?.liveTo).toBe("2026-10-11T12:39:48Z");
+    expect(rows.find((r) => r.seq === 120)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 121)?.liveFrom).toBe("2026-10-11T12:39:48Z");
+    expect(rows.find((r) => r.seq === 121)?.liveTo).toBe("2026-10-11T14:21:17Z");
+    expect(rows.find((r) => r.seq === 121)?.liveVerified).toBe(true);
+    // seq 122 closed at seq 123 liveFrom (HK Path B tip 872bea69 #632).
+    expect(rows.find((r) => r.seq === 122)?.liveFrom).toBe("2026-10-11T14:21:17Z");
+    expect(rows.find((r) => r.seq === 122)?.liveTo).toBe("2026-10-12T00:53:24Z");
+    expect(rows.find((r) => r.seq === 122)?.liveVerified).toBe(true);
+    // seq 123 closed at seq 124 liveFrom (HK Path B tip 961afe6f #642+#644).
+    expect(rows.find((r) => r.seq === 123)?.liveFrom).toBe("2026-10-12T00:53:24Z");
+    expect(rows.find((r) => r.seq === 123)?.liveTo).toBe("2026-10-12T03:40:00Z");
+    expect(rows.find((r) => r.seq === 123)?.liveVerified).toBe(true);
+    // seq 124 closed at seq 125 liveFrom (HK Path B tip da30646b #649+#650+#651).
+    expect(rows.find((r) => r.seq === 124)?.liveFrom).toBe("2026-10-12T03:40:00Z");
+    expect(rows.find((r) => r.seq === 124)?.liveTo).toBe("2026-10-12T06:57:30Z");
+    expect(rows.find((r) => r.seq === 124)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 124)?.gatewaySha).toBe(
+      "961afe6fbe9611b81ac02d597a291096f08f2234",
     );
-    expect(stub).toContain("seq 144");
-  });
-
-  it("refuses to append the removed local production ledger", () => {
-    const result = writeCutoverRecord(
-      "deploy/production/releases.jsonl",
-      {
-        gatewaySha: "a".repeat(40),
-        uiSha: "a".repeat(40),
-        buildMode: "full-dist",
-        artifactKind: "image",
-        artifactId: "rc",
-        artifactDigest: DIGEST_A,
-        tag: "provenance/sha-aaaaaaaaaaaa",
-        liveFrom: "2026-10-21T00:00:00Z",
-        evidence: "external",
-        executor: "test",
-        liveVerified: true,
-      },
-      ancestryRunner({}),
+    expect(rows.find((r) => r.seq === 124)?.artifactDigest).toBe(
+      "sha256:bb4aeec3aa4d646a54be75437021ee6c89295596bb30df354561c73a0720d58a",
     );
-    expect(result.ok).toBe(false);
-    expect(result.errors.join("\n")).toMatch(/harness-Benchmark-Engine/);
-    expect(existsSync("deploy/production/releases.jsonl")).toBe(false);
+    expect(rows.find((r) => r.seq === 125)?.liveFrom).toBe("2026-10-12T06:57:30Z");
+    expect(rows.find((r) => r.seq === 125)?.liveTo).toBeDefined();
+    expect(rows.find((r) => r.seq === 125)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 125)?.gatewaySha).toBe(
+      "da30646bff58d2faee008b5e06907762b2a16fe0",
+    );
+    expect(rows.find((r) => r.seq === 125)?.artifactDigest).toBe(
+      "sha256:9125dc6bae39836c4e591e3d024fb71b48cb09269d907bfd1650eb5cd7b30ac3",
+    );
+    // seq 143 closed at seq 144 liveFrom when Path B SoT was restored with the OHBE/PR19 seed.
+    expect(rows.find((r) => r.seq === 143)?.liveTo).toBe("2026-10-20T09:21:32Z");
+    expect(rows.find((r) => r.seq === 144)?.liveFrom).toBe("2026-10-20T09:21:32Z");
+    expect(rows.find((r) => r.seq === 144)?.liveTo).toBeUndefined();
+    expect(rows.find((r) => r.seq === 144)?.gatewaySha).toBe(
+      "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+    );
+    expect(rows.find((r) => r.seq === 144)?.artifactDigest).toBe(
+      "sha256:8fd6d63213f53ce22d59f4ce6c9c7d11a52c4db708c74eb3aa7348f4a2dfd193",
+    );
+    expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
+    expect(rows.filter((r) => r.seq >= 99 && r.seq <= 103).map((r) => r.executor)).toEqual(
+      Array(5).fill("cursor"),
+    );
+    expect(audit.findings.some((f) => f.seq === 100 && f.code === "timeline-gap")).toBe(true);
+    expect(rows.find((r) => r.seq === 95)?.liveTo).toBe("2026-09-22T07:12:37.955Z");
+    expect(rows.find((r) => r.seq === 96)?.liveTo).toBe("2026-09-22T23:37:05.235Z");
+    expect(rows.find((r) => r.seq === 97)?.liveTo).toBe("2026-09-24T02:49:48.208Z");
+    expect(rows.find((r) => r.seq === 98)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 97)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 96)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 94)?.liveTo).toBe("2026-09-19T12:41:27Z");
+    expect(rows.find((r) => r.seq === 95)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 93)?.liveTo).toBe("2026-09-18T15:49:14Z");
+    expect(rows.find((r) => r.seq === 94)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 92)?.liveTo).toBe("2026-09-18T13:53:32Z");
+    expect(rows.find((r) => r.seq === 93)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 91)?.liveTo).toBe("2026-09-18T11:07:28Z");
+    expect(rows.find((r) => r.seq === 92)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 90)?.liveTo).toBe("2026-09-18T10:20:02Z");
+    expect(rows.find((r) => r.seq === 89)?.liveTo).toBe("2026-09-17T14:01:31Z");
+    expect(rows.find((r) => r.seq === 88)?.liveTo).toBe("2026-09-16T07:33:48Z");
+    expect(rows.find((r) => r.seq === 87)?.liveTo).toBe("2026-09-15T12:51:27Z");
+    expect(rows.find((r) => r.seq === 86)?.liveTo).toBe("2026-09-14T14:14:20Z");
+    expect(rows.find((r) => r.seq === 85)?.liveTo).toBe("2026-09-13T14:19:40Z");
+    expect(rows.find((r) => r.seq === 84)?.liveTo).toBe("2026-09-13T02:03:42Z");
+    expect(rows.find((r) => r.seq === 64)?.liveTo).toBe("2026-09-07T13:55:51Z");
+    expect(rows.find((r) => r.seq === 65)?.liveTo).toBe("2026-09-07T14:29:34Z");
+    expect(rows.find((r) => r.seq === 66)?.liveTo).toBe("2026-09-07T16:04:59Z");
+    expect(rows.find((r) => r.seq === 67)?.liveTo).toBe("2026-09-07T23:12:12Z");
+    expect(rows.find((r) => r.seq === 68)?.liveTo).toBe("2026-09-08T03:29:15Z");
+    expect(rows.find((r) => r.seq === 69)?.liveTo).toBe("2026-09-08T15:24:22Z");
+    expect(rows.find((r) => r.seq === 70)?.liveTo).toBe("2026-09-09T03:34:54Z");
+    expect(rows.find((r) => r.seq === 71)?.liveTo).toBe("2026-09-09T13:05:01Z");
+    expect(rows.find((r) => r.seq === 72)?.liveTo).toBe("2026-09-10T03:10:13Z");
+    expect(rows.find((r) => r.seq === 73)?.liveTo).toBe("2026-09-10T05:42:25Z");
+    expect(rows.find((r) => r.seq === 74)?.liveTo).toBe("2026-09-10T22:43:40Z");
+    expect(rows.find((r) => r.seq === 75)?.liveTo).toBe("2026-09-11T03:22:25Z");
+    expect(rows.find((r) => r.seq === 76)?.liveTo).toBe("2026-09-11T05:40:39Z");
+    expect(rows.find((r) => r.seq === 77)?.liveTo).toBe("2026-09-11T10:24:34Z");
+    expect(rows.find((r) => r.seq === 78)?.liveTo).toBe("2026-09-11T12:32:07Z");
+    expect(rows.find((r) => r.seq === 79)?.liveTo).toBe("2026-09-11T14:11:51Z");
+    expect(rows.find((r) => r.seq === 80)?.liveTo).toBe("2026-09-11T17:29:04Z");
+    expect(rows.find((r) => r.seq === 81)?.liveTo).toBe("2026-09-11T22:12:23Z");
+    expect(rows.find((r) => r.seq === 65)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 66)?.liveVerified).toBe(false);
+    expect(rows.find((r) => r.seq === 67)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 68)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 69)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 70)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 71)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 72)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 73)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 74)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 75)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 76)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 77)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 78)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 79)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 80)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 81)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 82)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 47)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 48)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 49)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 50)?.liveVerified).toBe(true);
+    expect(rows.find((r) => r.seq === 51)?.liveVerified).toBe(true);
+    expect(audit.findings.some((f) => f.code === "unverified-live")).toBe(false);
   });
 });
 
@@ -735,15 +893,14 @@ describe("alignment gate fail-closed", () => {
     );
   });
 
-  it("cutover-from-ghcr.sh points ledger appends at OHBE instead of a local JSONL", () => {
+  it("cutover-from-ghcr.sh records via delivery:cutover:record instead of appending v1 JSONL", () => {
     const src = readFileSync("deploy/production/scripts/cutover-from-ghcr.sh", "utf8");
-    expect(src).toContain(
-      "https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl",
-    );
-    expect(src).toContain("refusing to append deploy/production/releases.jsonl");
+    expect(src).toContain("pnpm delivery:cutover:record");
     expect(src).not.toMatch(/printf '%s\\n' "\$row" >>/);
     expect(src).not.toContain('"schemaVersion":1');
-    expect(src).not.toContain("pnpm delivery:cutover:record");
+    expect(src).toContain("${revert_args[@]}");
+    expect(src).toContain("--intentional-revert");
+    expect(src).toContain("--live-verified");
   });
 
   it("verify-delivery-alignment.sh normalizes CANDIDATE_SHA before comparisons", () => {

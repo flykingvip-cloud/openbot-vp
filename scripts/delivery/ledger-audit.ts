@@ -1,7 +1,4 @@
-// CLI: audit a production release ledger against real git ancestry.
-//
-// The canonical ledger is the OHBE copy. When this repo only has the stub at
-// deploy/production/LEDGER.md, the default invocation exits 0 and does not invent a local ledger.
+// CLI: audit deploy/production/releases.jsonl against real git ancestry.
 //
 // Read-only. Exit 0 when no errors, 30 when the ledger records a regression or a broken
 // identity. Warnings (overlay debt, missing tag, unobserved row) never fail the run;
@@ -10,11 +7,6 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import type { GitRunner } from "./forward-guard.ts";
-import {
-  externalLedgerMessage,
-  LOCAL_LEDGER_PATH,
-  localLedgerExternalized,
-} from "./ledger-location.ts";
 import { auditLedger, parseLedger } from "./ledger.ts";
 
 const gitRunner: GitRunner = (args) => {
@@ -23,16 +15,11 @@ const gitRunner: GitRunner = (args) => {
 };
 
 function main(): number {
-  const path = process.argv[2] ?? LOCAL_LEDGER_PATH;
+  const path = process.argv[2] ?? "deploy/production/releases.jsonl";
   let text: string;
   try {
     text = readFileSync(path, "utf8");
   } catch (error) {
-    if (process.argv[2] === undefined && localLedgerExternalized()) {
-      console.log(externalLedgerMessage());
-      console.log("ledger: external, audit skipped in openbot-vp");
-      return 0;
-    }
     console.error(`cannot read ledger at ${path}: ${(error as Error).message}`);
     return 30;
   }
