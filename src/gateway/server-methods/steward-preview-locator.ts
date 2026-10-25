@@ -54,9 +54,13 @@ const CANONICAL_OUTPUT_DIR_BY_EXT: Record<string, string> = {
 
 /**
  * Pick the filesystem workspace for conversation sidebar preview.
- * Trusted catalog wins only when it already points at an existing directory.
- * Runtime write roots (tenant-user / client) beat a stale `agents.list[].workspace`
- * that still points at the host checkout.
+ *
+ * Formal-aligned runtime write roots win over a catalog trusted twin that
+ * exists as an empty tenants directory while settle already wrote operators
+ * (batch9 skew / LIVE smoke-memo-67: tenants L2 without deliverables/,
+ * operators formal SoT delivered+readable, steward-file.read still miss).
+ * Trusted still wins when no runtime directory exists (legacy catalog-only).
+ * Runtime also beats a stale `agents.list[].workspace` host checkout.
  */
 export function resolvePreviewFilesystemLocator(params: {
   trustedLocator: string | null;
@@ -66,14 +70,14 @@ export function resolvePreviewFilesystemLocator(params: {
   agentId: string;
   stateDir: string;
 }): string {
-  const trusted = params.trustedLocator?.trim() ?? "";
-  if (isExistingWorkspaceDirectory(trusted)) {
-    return path.resolve(trusted);
-  }
   for (const candidate of params.runtimeWorkspaces ?? []) {
     if (isExistingWorkspaceDirectory(candidate)) {
       return path.resolve(candidate);
     }
+  }
+  const trusted = params.trustedLocator?.trim() ?? "";
+  if (isExistingWorkspaceDirectory(trusted)) {
+    return path.resolve(trusted);
   }
   void params.configuredWorkspace;
   return resolveLiveRobotWriteRoot({
