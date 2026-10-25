@@ -59,7 +59,7 @@ describe("model output boundary", () => {
       expect.objectContaining({
         toolName: "browser",
         source: "adapter",
-        arguments: { action: "launch", profile: "openclaw" },
+        arguments: {},
       }),
     ]);
   });
@@ -136,7 +136,7 @@ describe("model output boundary", () => {
     );
     expect(gated.visibleText).toBe("");
     expect(gated.detected).toBe(true);
-    expect(PROTOCOL_FAILURE_USER_TEXT).toContain("工具调用格式异常");
+    expect(PROTOCOL_FAILURE_USER_TEXT).toContain("本步工具调用未能执行");
   });
 
   it("lets chat merge shrink after protocol text is stripped", () => {
@@ -150,7 +150,7 @@ describe("model output boundary", () => {
     expect(merged).not.toContain("DSML");
   });
 
-  it("strips and recovers DeepSeek double-fullwidth-pipe DSML so exec can continue", () => {
+  it("strips DeepSeek double-fullwidth-pipe DSML and detects tool name without executable args", () => {
     const leaked = [
       "老大，我先把之前的 skill 盘点成果接上。",
       "<｜｜DSML｜｜tool_calls>",
@@ -169,7 +169,7 @@ describe("model output boundary", () => {
       expect.objectContaining({
         toolName: "exec",
         source: "adapter",
-        arguments: { command: "ls -1 ~/.openbot/skills/" },
+        arguments: {},
       }),
     ]);
   });
@@ -211,5 +211,43 @@ describe("model output boundary", () => {
     expect(text?.text).not.toMatch(/Let me/i);
     // Process channel stays structurally present; dropThinkingBlocks decides model feed.
     expect(thinking?.thinking).toContain("sandbox path");
+  });
+});
+
+describe("MiniMax marked protocol in applyUserVisibleOutputGate", () => {
+  const MINIMAX = [
+    "我来读取。",
+    "<minimax:tool_call>",
+    '<invoke name="browser">',
+    '<parameter name="action">launch</parameter>',
+    "</invoke>",
+    "</minimax:tool_call>",
+  ].join("\n");
+
+  it("detects pure MiniMax body and strips markers", () => {
+    const gated = applyUserVisibleOutputGate(MINIMAX);
+    expect(gated.detected).toBe(true);
+    expect(gated.protocol).toBe("minimax");
+    expect(gated.visibleText).toBe("我来读取。");
+    expect(gated.recoveredCalls[0]?.toolName).toBe("browser");
+    expect(gated.visibleText).not.toContain("minimax");
+  });
+
+  it("keeps fenced MiniMax examples non-detected", () => {
+    const fenced = ["示例", "```", "<minimax:tool_call>", "```"].join("\n");
+    expect(applyUserVisibleOutputGate(fenced).detected).toBe(false);
+  });
+
+  it("does not treat bare XML invoke as MiniMax", () => {
+    expect(
+      applyUserVisibleOutputGate('<invoke name="read"><parameter>x</parameter></invoke>').detected,
+    ).toBe(false);
+  });
+
+  it("marks truncated MiniMax as incomplete", () => {
+    const gated = applyUserVisibleOutputGate('prefix\n<minimax:tool_call>\n<invoke name="read">');
+    expect(gated.detected).toBe(true);
+    expect(gated.incomplete).toBe(true);
+    expect(gated.protocol).toBe("minimax");
   });
 });

@@ -9469,6 +9469,23 @@ tasks:
     since: 2026-10-24
     metadata: {}
 landingStreams:
+  - id: single-chain-tool-protocol-p0
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/architecture/single-chain-tool-protocol.md
+      - src/agents/protocol-violation.ts
+      - src/agents/protocol-violation.test.ts
+      - src/agents/model-output-boundary.ts
+      - src/agents/model-output-boundary.test.ts
+      - src/agents/execution-stall-continue-loop.ts
+      - src/agents/execution-stall-continue-loop.test.ts
+      - src/agents/system-prompt.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/attempt.test.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: Single-chain tool protocol P0 (body DSML non-execution)
   - id: batch11-s0-ogui-decision-lifecycle
     landingPolicy: serial
     paths:
