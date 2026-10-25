@@ -1,8 +1,10 @@
 # SAR A4：物化身份与持续授权
 
 - 日期：2026-10-18（Asia/Shanghai）
+- Docs refresh：2026-10-25（Asia/Shanghai）— 仅刷新设计报告基线，供 opencli 阶段验收；不改实现
+- 仓库：https://github.com/flykingvip-cloud/openbot-vp
 - 分支：`feat/sar-a4-projection-identity-auth`
-- 基线：`origin/main` A3 squash `2357c74b4b3228c5a3796a42d7a8175b58ed3805`
+- 基线：`origin/main` tip `7c111408fd7dea24c6384b65db3e76658879647c`（A4 实现已随 recovery snapshot 落在新仓 main；本 PR 仅 docs refresh）
 - 专家闸门：`expert-e0-e5-acceptance-2026-10-18.md` §身份边界 / A4
 - 路径：Path C；复用 `SeatActionGrant` + `AccountBinding`；不扩新架构/目录
 - 正式执行接入：**仍暂缓**
