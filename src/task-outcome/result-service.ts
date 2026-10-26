@@ -96,7 +96,12 @@ export class TaskOutcomeResultService {
   submit(
     taskId: string,
     transition: SubmitTransition,
-    opts?: { commandId?: string; requiredScope?: TrustedScope },
+    opts?: {
+      commandId?: string;
+      requiredScope?: TrustedScope;
+      /** Verified caller subject; corrections must use this as authorizedBy. */
+      callerSubjectRef?: string;
+    },
   ): SubmitResult {
     return this.store.withTaskLock(taskId, () => this.submitLocked(taskId, transition, opts));
   }
@@ -104,12 +109,24 @@ export class TaskOutcomeResultService {
   private submitLocked(
     taskId: string,
     transition: SubmitTransition,
-    opts?: { commandId?: string; requiredScope?: TrustedScope },
+    opts?: {
+      commandId?: string;
+      requiredScope?: TrustedScope;
+      callerSubjectRef?: string;
+    },
   ): SubmitResult {
     const current = this.store.loadTask(taskId);
     const nowIso = this.now().toISOString();
 
-    if (opts?.requiredScope && current) {
+    if (current) {
+      if (!opts?.requiredScope) {
+        return {
+          ok: false,
+          code: "scope_mismatch",
+          message: "requiredScope is mandatory for existing tasks",
+          current,
+        };
+      }
       const mismatch = this.assertScope(taskId, opts.requiredScope);
       if (mismatch) {
         return mismatch;
@@ -128,9 +145,11 @@ export class TaskOutcomeResultService {
             current,
           };
         }
-        const tip = this.store.loadTask(prior.taskId);
-        if (tip) {
-          return { ok: true, record: tip, createdEvents: [] };
+        const historical =
+          this.store.loadTaskVersion(prior.taskId, prior.outcomeVersion) ??
+          this.store.loadTask(prior.taskId);
+        if (historical) {
+          return { ok: true, record: historical, createdEvents: [] };
         }
       }
     }
@@ -164,11 +183,28 @@ export class TaskOutcomeResultService {
           current,
         };
       }
-      if (!this.correctionAllowlist.has(transition.authorizedBy)) {
+      const caller = opts?.callerSubjectRef?.trim();
+      if (!caller) {
         return {
           ok: false,
           code: "unauthorized_correction",
-          message: "authorizedBy is not in trusted correction allowlist",
+          message: "correction requires verified callerSubjectRef",
+          current,
+        };
+      }
+      if (transition.authorizedBy !== caller) {
+        return {
+          ok: false,
+          code: "unauthorized_correction",
+          message: "authorizedBy does not match verified callerSubjectRef",
+          current,
+        };
+      }
+      if (!this.correctionAllowlist.has(caller)) {
+        return {
+          ok: false,
+          code: "unauthorized_correction",
+          message: "callerSubjectRef is not in trusted correction allowlist",
           current,
         };
       }
@@ -242,6 +278,16 @@ export class TaskOutcomeResultService {
       expectedVersion,
       record,
       events,
+      ...(opts?.commandId
+        ? {
+            commandLog: {
+              commandId: opts.commandId,
+              digest: digestTransition(taskId, transition),
+              taskId,
+              outcomeVersion: record.outcomeVersion,
+            },
+          }
+        : {}),
     });
     if (!committed.ok) {
       return {
@@ -250,14 +296,6 @@ export class TaskOutcomeResultService {
         message: "commit lost race under lock",
         current: committed.current,
       };
-    }
-
-    if (opts?.commandId) {
-      this.store.saveCommand(opts.commandId, {
-        digest: digestTransition(taskId, transition),
-        taskId,
-        outcomeVersion: record.outcomeVersion,
-      });
     }
 
     return { ok: true, record, createdEvents: events };

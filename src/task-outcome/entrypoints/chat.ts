@@ -44,7 +44,7 @@ export class ChatTaskOutcomeAdapter {
     return { ok: true as const, record: res.record, fencingToken };
   }
 
-  rejectBeforePreflight(taskId: string, reasonDetail: string, scope?: TrustedScope) {
+  rejectBeforePreflight(taskId: string, reasonDetail: string, scope: TrustedScope) {
     return this.service.submit(
       taskId,
       {
@@ -52,7 +52,7 @@ export class ChatTaskOutcomeAdapter {
         reasonCode: "preflight_rejected",
         reasonDetail,
       },
-      scope ? { requiredScope: scope } : undefined,
+      { requiredScope: scope },
     );
   }
 
@@ -62,8 +62,15 @@ export class ChatTaskOutcomeAdapter {
     fencingToken: string,
     attempt: AttemptResult,
     run: RunResult,
-    opts?: { scope?: TrustedScope; commandId?: string },
+    opts?: { scope: TrustedScope; commandId?: string },
   ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
     return this.service.submit(
       taskId,
       {
@@ -73,7 +80,7 @@ export class ChatTaskOutcomeAdapter {
         expectedVersion,
         fencingToken,
       },
-      { requiredScope: opts?.scope, commandId: opts?.commandId },
+      { requiredScope: opts.scope, commandId: opts.commandId },
     );
   }
 
@@ -91,7 +98,7 @@ export class ChatTaskOutcomeAdapter {
     opts: {
       allowRetry: boolean;
       evidence?: AcceptanceEvidence[];
-      scope?: TrustedScope;
+      scope: TrustedScope;
       commandId?: string;
     },
   ) {
@@ -117,8 +124,15 @@ export class ChatTaskOutcomeAdapter {
       | { status: "pending" | "blocked" | "delivered" | "delivery_unknown" | "failed" }
       | { status: "not_required"; reason: string },
     deliveryId?: string,
-    opts?: { scope?: TrustedScope; commandId?: string },
+    opts?: { scope: TrustedScope; commandId?: string },
   ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
     return this.service.submit(
       taskId,
       {
@@ -128,7 +142,7 @@ export class ChatTaskOutcomeAdapter {
         expectedVersion,
         fencingToken,
       },
-      { requiredScope: opts?.scope, commandId: opts?.commandId },
+      { requiredScope: opts.scope, commandId: opts.commandId },
     );
   }
 
@@ -136,17 +150,24 @@ export class ChatTaskOutcomeAdapter {
     taskId: string,
     expectedVersion: number,
     fencingToken?: string,
-    opts?: { scope?: TrustedScope; commandId?: string; reasonDetail?: string },
+    opts?: { scope: TrustedScope; commandId?: string; reasonDetail?: string },
   ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
     return this.service.submit(
       taskId,
       {
         type: "cancel",
         expectedVersion,
         fencingToken,
-        reasonDetail: opts?.reasonDetail,
+        reasonDetail: opts.reasonDetail,
       },
-      { requiredScope: opts?.scope, commandId: opts?.commandId },
+      { requiredScope: opts.scope, commandId: opts.commandId },
     );
   }
 
@@ -165,20 +186,27 @@ export class ChatTaskOutcomeAdapter {
     opts?: {
       fencingToken?: string;
       reasonDetail?: string;
-      scope?: TrustedScope;
+      scope: TrustedScope;
       commandId?: string;
     },
   ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
     return this.service.submit(
       taskId,
       {
         type: "fail_closed",
         reasonCode,
-        reasonDetail: opts?.reasonDetail,
+        reasonDetail: opts.reasonDetail,
         expectedVersion,
-        fencingToken: opts?.fencingToken,
+        fencingToken: opts.fencingToken,
       },
-      { requiredScope: opts?.scope, commandId: opts?.commandId },
+      { requiredScope: opts.scope, commandId: opts.commandId },
     );
   }
 }

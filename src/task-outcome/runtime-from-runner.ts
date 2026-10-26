@@ -7,7 +7,12 @@ import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
+import { scopeIdOf } from "./transitions.js";
 import type { CloseReasonCode, TaskOutcomeRecord, TrustedScope } from "./types.js";
+
+function scopeIdSafe(scope: TrustedScope): string {
+  return scopeIdOf(scope);
+}
 
 export const TASK_OUTCOME_STORE_DIRNAME = "task-outcomes";
 
@@ -187,31 +192,49 @@ export async function recordRunnerTurnOutcome(
     if (!res.ok) {
       throw new Error(`task-outcome fail_closed failed: ${res.code}`);
     }
-  } else if (input.acceptance) {
-    res = chat.setAcceptance(taskId, res.record.outcomeVersion, fencingToken, input.acceptance, {
+  } else {
+    const acceptance =
+      input.acceptance ??
+      ({
+        status: "not_required",
+        reason: "runner_turn_no_external_acceptance",
+      } as const);
+    res = chat.setAcceptance(taskId, res.record.outcomeVersion, fencingToken, acceptance, {
       allowRetry: input.allowRetry ?? true,
-      evidence: input.acceptanceEvidence,
+      evidence: input.acceptanceEvidence ?? [
+        {
+          validatorId: "agent-runner-execution",
+          validatorVersion: "1.0.0",
+          scope: scopeIdSafe(scope),
+          artifactDigestOrReceiptRef: `run:${input.runId}`,
+          taskContractVersion: "1.0.0",
+          executionVersion: String(res.record.outcomeVersion),
+        },
+      ],
       scope,
       commandId: `accept:${taskId}:${input.runId}`,
     });
     if (!res.ok) {
       throw new Error(`task-outcome set_acceptance failed: ${res.code}`);
     }
-    if (input.delivery && res.ok) {
-      res = chat.setDelivery(
-        taskId,
-        res.record.outcomeVersion,
-        fencingToken,
-        input.delivery,
-        input.deliveryId,
-        { scope, commandId: `delivery:${taskId}:${input.runId}` },
-      );
-      if (!res.ok) {
-        throw new Error(`task-outcome set_delivery failed: ${res.code}`);
-      }
+    const delivery =
+      input.delivery ??
+      ({
+        status: "not_required",
+        reason: "runner_turn_inline_delivery",
+      } as const);
+    res = chat.setDelivery(
+      taskId,
+      res.record.outcomeVersion,
+      fencingToken,
+      delivery,
+      input.deliveryId ?? `delivery:${input.runId}`,
+      { scope, commandId: `delivery:${taskId}:${input.runId}` },
+    );
+    if (!res.ok) {
+      throw new Error(`task-outcome set_delivery failed: ${res.code}`);
     }
   }
-  // bare success with no acceptance/delivery: leave awaiting_acceptance
 
   const evolution = drainGrowthEvolution(cfg, agentId, store);
   return { record: res.record, evolution };

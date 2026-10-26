@@ -32,3 +32,5 @@ entrypoint adapter (chat|gateway_agent|cron|cli|collab)
 - commandId digest idempotency; correction allowlist; restore scope/subject checks.
 
 - Entry: `ensureChatTurnTaskOutcome` at `agent-runner-execution` turn start; `recordRunnerTurnOutcome` requires taskId (no `run:` invent).
+
+- R85: recover tip monotonic; handler-independent ack; contribution count flags + always rebuild; commandLog in commit bundle; requiredScope mandatory; correction binds callerSubjectRef; runner success closes with not_required acceptance/delivery.

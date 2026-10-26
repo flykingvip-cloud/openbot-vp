@@ -14,6 +14,13 @@ export type CommitBundle = {
   record: TaskOutcomeRecord;
   events: OutcomeOutboxEvent[];
   createdAt: string;
+  /** Optional command idempotency record applied in the same materialization boundary. */
+  commandLog?: {
+    commandId: string;
+    digest: string;
+    taskId: string;
+    outcomeVersion: number;
+  };
 };
 
 export type DurableProjection = {
@@ -171,6 +178,12 @@ export class DurableTaskOutcomeStore {
     expectedVersion: number;
     record: TaskOutcomeRecord;
     events: OutcomeOutboxEvent[];
+    commandLog?: {
+      commandId: string;
+      digest: string;
+      taskId: string;
+      outcomeVersion: number;
+    };
   }):
     | { ok: true; commitId: string }
     | { ok: false; code: "version_conflict"; current?: TaskOutcomeRecord } {
@@ -188,6 +201,7 @@ export class DurableTaskOutcomeStore {
       record: input.record,
       events: input.events,
       createdAt: new Date().toISOString(),
+      ...(input.commandLog ? { commandLog: input.commandLog } : {}),
     };
 
     const staging = path.join(this.rootDir, "commits", `${commitId}.staging.json`);
@@ -199,39 +213,88 @@ export class DurableTaskOutcomeStore {
     return { ok: true, commitId };
   }
 
-  /** Idempotent materialization of a published commit. */
+  /**
+   * Idempotent materialization of a published commit.
+   * Never regresses tip: older commits only backfill missing version snapshots / outbox / command log.
+   */
   applyCommit(bundle: CommitBundle): void {
     const appliedMarker = path.join(this.rootDir, "commits-applied", `${bundle.commitId}.json`);
     if (fs.existsSync(appliedMarker)) {
       return;
     }
 
-    // Version snapshot first (immutable history for payloadRef).
-    atomicWriteJson(this.versionPath(bundle.taskId, bundle.record.outcomeVersion), bundle.record);
-    atomicWriteJson(this.tipPath(bundle.taskId), bundle.record);
+    const versionFile = this.versionPath(bundle.taskId, bundle.record.outcomeVersion);
+    if (!fs.existsSync(versionFile)) {
+      atomicWriteJson(versionFile, bundle.record);
+    }
+
+    const tip = this.loadTask(bundle.taskId);
+    const tipVersion = tip?.outcomeVersion ?? 0;
+    if (!tip || tipVersion < bundle.record.outcomeVersion) {
+      atomicWriteJson(this.tipPath(bundle.taskId), bundle.record);
+    }
+    // tipVersion > bundle: keep newer tip (do not regress)
+
     for (const ev of bundle.events) {
       const file = path.join(this.rootDir, "outbox", `${ev.eventId}.json`);
       if (!fs.existsSync(file)) {
         atomicWriteJson(file, { ...ev, processingStatus: "pending", attempts: 0 });
       }
     }
+
+    if (bundle.commandLog) {
+      const cmdPath = this.commandLogPath(bundle.commandLog.commandId);
+      if (!fs.existsSync(cmdPath)) {
+        atomicWriteJson(cmdPath, bundle.commandLog);
+      }
+    }
+
     atomicWriteJson(appliedMarker, {
       commitId: bundle.commitId,
       taskId: bundle.taskId,
       appliedAt: new Date().toISOString(),
+      tipAdvanced:
+        !tip || tipVersion < bundle.record.outcomeVersion
+          ? bundle.record.outcomeVersion
+          : tipVersion,
     });
   }
 
+  /**
+   * Replay unpublished materializations under per-task locks, oldest version first.
+   * Safe when an older commit lost its applied marker after a newer tip exists.
+   */
   recoverPendingCommits(): void {
     const dir = path.join(this.rootDir, "commits");
+    const bundles: CommitBundle[] = [];
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith(".json") || name.endsWith(".staging.json")) {
         continue;
       }
       const bundle = readJson<CommitBundle>(path.join(dir, name));
       if (bundle) {
-        this.applyCommit(bundle);
+        bundles.push(bundle);
       }
+    }
+    bundles.sort((a, b) => {
+      const av = a.record.outcomeVersion - b.record.outcomeVersion;
+      if (av !== 0) {
+        return av;
+      }
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+    const byTask = new Map<string, CommitBundle[]>();
+    for (const b of bundles) {
+      const list = byTask.get(b.taskId) ?? [];
+      list.push(b);
+      byTask.set(b.taskId, list);
+    }
+    for (const [taskId, list] of byTask) {
+      this.withTaskLock(taskId, () => {
+        for (const bundle of list) {
+          this.applyCommit(bundle);
+        }
+      });
     }
   }
 

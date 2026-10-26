@@ -62,7 +62,9 @@ describe("growth-bridge", () => {
     if (!opened.ok) {
       throw new Error("open");
     }
-    const cancelled = chat.cancel("g2", opened.record.outcomeVersion, opened.fencingToken);
+    const cancelled = chat.cancel("g2", opened.record.outcomeVersion, opened.fencingToken, {
+      scope,
+    });
     if (!cancelled.ok) {
       throw new Error("cancel");
     }

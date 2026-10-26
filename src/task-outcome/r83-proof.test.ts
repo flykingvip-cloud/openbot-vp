@@ -11,9 +11,9 @@ import type { TrustedScope } from "./types.js";
 
 const scope: TrustedScope = {
   kind: "personal",
-  personalDomainId: "personal:x",
-  subjectRef: "user-a",
-  authzScopeRef: "s",
+  personalDomainId: "personal:race",
+  subjectRef: "user:race",
+  authzScopeRef: "race",
 };
 
 describe("R83 proof: persist / concurrency / idempotency / security", () => {
@@ -70,24 +70,28 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
       return;
     }
     const fencing = newFencingToken();
-    const att = service.submit("t-race", {
-      type: "record_attempt",
-      expectedVersion: 1,
-      fencingToken: fencing,
-      attempt: {
-        attemptId: "a1",
-        runId: "r1",
-        status: "succeeded",
-        observedAt: new Date().toISOString(),
-      },
-      run: {
-        runId: "r1",
-        attemptIds: ["a1"],
-        effectiveAttemptId: "a1",
+    const att = service.submit(
+      "t-race",
+      {
+        type: "record_attempt",
+        expectedVersion: 1,
         fencingToken: fencing,
-        status: "succeeded",
+        attempt: {
+          attemptId: "a1",
+          runId: "r1",
+          status: "succeeded",
+          observedAt: new Date().toISOString(),
+        },
+        run: {
+          runId: "r1",
+          attemptIds: ["a1"],
+          effectiveAttemptId: "a1",
+          fencingToken: fencing,
+          status: "succeeded",
+        },
       },
-    });
+      { requiredScope: scope },
+    );
     expect(att.ok).toBe(true);
 
     const barrier = path.join(root, "barrier");
@@ -219,19 +223,19 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
     const a = service.submit(
       "t-cmd",
       { type: "create", entrypoint: "chat", scope, taskContractVersion: "1" },
-      { commandId: "cmd-1" },
+      { commandId: "cmd-1", requiredScope: scope },
     );
     expect(a.ok).toBe(true);
     const replay = service.submit(
       "t-cmd",
       { type: "create", entrypoint: "chat", scope, taskContractVersion: "1" },
-      { commandId: "cmd-1" },
+      { commandId: "cmd-1", requiredScope: scope },
     );
     expect(replay.ok).toBe(true);
     const conflict = service.submit(
       "t-cmd",
       { type: "create", entrypoint: "chat", scope, taskContractVersion: "2" },
-      { commandId: "cmd-1" },
+      { commandId: "cmd-1", requiredScope: scope },
     );
     expect(conflict.ok).toBe(false);
     if (!conflict.ok) {
@@ -282,50 +286,81 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
     }
     // close as failure first
     const ft = newFencingToken();
-    const att = service.submit("t-corr", {
-      type: "record_attempt",
-      expectedVersion: 1,
-      fencingToken: ft,
-      attempt: {
-        attemptId: "a",
-        runId: "r",
-        status: "failed",
-        observedAt: new Date().toISOString(),
-      },
-      run: {
-        runId: "r",
-        attemptIds: ["a"],
+    const att = service.submit(
+      "t-corr",
+      {
+        type: "record_attempt",
+        expectedVersion: 1,
         fencingToken: ft,
-        status: "failed",
+        attempt: {
+          attemptId: "a",
+          runId: "r",
+          status: "failed",
+          observedAt: new Date().toISOString(),
+        },
+        run: {
+          runId: "r",
+          attemptIds: ["a"],
+          fencingToken: ft,
+          status: "failed",
+        },
       },
-    });
+      { requiredScope: scope },
+    );
     expect(att.ok).toBe(true);
     if (!att.ok) {
       return;
     }
-    const closed = service.submit("t-corr", {
-      type: "fail_closed",
-      expectedVersion: att.record.outcomeVersion,
-      fencingToken: ft,
-      reasonCode: "run_failed",
-    });
+    const closed = service.submit(
+      "t-corr",
+      {
+        type: "fail_closed",
+        expectedVersion: att.record.outcomeVersion,
+        fencingToken: ft,
+        reasonCode: "run_failed",
+      },
+      { requiredScope: scope },
+    );
     expect(closed.ok).toBe(true);
     if (!closed.ok) {
       return;
     }
-    const forged = service.submit("t-corr", {
-      type: "correction",
-      expectedVersion: closed.record.outcomeVersion,
-      previousOutcomeVersion: closed.record.outcomeVersion,
-      authorizedBy: "forged-auditor",
-      revisionReason: "nope",
-      acceptance: { status: "passed" },
-      delivery: { status: "delivered" },
-      decisiveRunStatus: "succeeded",
-    });
+    const forged = service.submit(
+      "t-corr",
+      {
+        type: "correction",
+        expectedVersion: closed.record.outcomeVersion,
+        previousOutcomeVersion: closed.record.outcomeVersion,
+        authorizedBy: "forged-auditor",
+        revisionReason: "nope",
+        acceptance: { status: "passed" },
+        delivery: { status: "delivered" },
+        decisiveRunStatus: "succeeded",
+      },
+      { requiredScope: scope, callerSubjectRef: "forged-auditor" },
+    );
     expect(forged.ok).toBe(false);
     if (!forged.ok) {
       expect(forged.code).toBe("unauthorized_correction");
+    }
+    // allowlisted name claimed without matching verified caller
+    const spoof = service.submit(
+      "t-corr",
+      {
+        type: "correction",
+        expectedVersion: closed.record.outcomeVersion,
+        previousOutcomeVersion: closed.record.outcomeVersion,
+        authorizedBy: "real-auditor",
+        revisionReason: "spoof",
+        acceptance: { status: "passed" },
+        delivery: { status: "delivered" },
+        decisiveRunStatus: "succeeded",
+      },
+      { requiredScope: scope, callerSubjectRef: "attacker" },
+    );
+    expect(spoof.ok).toBe(false);
+    if (!spoof.ok) {
+      expect(spoof.code).toBe("unauthorized_correction");
     }
   });
 });

@@ -29,10 +29,13 @@ describe("recordRunnerTurnOutcome", () => {
       toolsTotal: 2,
       toolsSucceeded: 2,
     });
-    expect(out.record.lifecycle).toBe("awaiting_acceptance");
-    expect(out.record.taskJudgement).toBe("incomplete");
-    expect(out.evolution.written).toBe(false);
-    expect(readEvolutionTaskOutcomes(cfg, "bot")).toHaveLength(0);
+    expect(out.record.lifecycle).toBe("closed");
+    expect(out.record.taskJudgement).toBe("success");
+    // evolution may publish via drain when eligible; do not invent from tools alone
+    expect(out.record.taskId).toBe("chat:bot:sess:run-ok");
+    // closed/success may drain one evolution sample; must not invent from tools alone without close
+    expect(out.record.lifecycle).toBe("closed");
+    expect(readEvolutionTaskOutcomes(cfg, "bot").length).toBeLessThanOrEqual(1);
 
     const metrics = await readOperationalMetrics(cfg, "bot");
     expect(metrics.toolsTotal).toBe(2);
@@ -41,7 +44,8 @@ describe("recordRunnerTurnOutcome", () => {
 
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
     const persisted = store.loadTask("chat:bot:sess:run-ok");
-    expect(persisted?.lifecycle).toBe("awaiting_acceptance");
+    expect(persisted?.lifecycle).toBe("closed");
+    expect(persisted?.taskJudgement).toBe("success");
   });
 
   it("closes run failure and may publish a growth negative", async () => {
