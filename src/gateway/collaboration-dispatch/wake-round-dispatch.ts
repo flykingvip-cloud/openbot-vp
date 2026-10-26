@@ -30,6 +30,15 @@ import {
   type WakeOutcome,
   type WakeSource,
 } from "./wake-contract.js";
+import {
+  claimWakeOpRunning,
+  inspectWakeOp,
+  markWakeOpCompleted,
+  markWakeOpFailed,
+  markWakeOpUnknown,
+  wakeOpIdempotencyKey,
+  type WakeOpRecord,
+} from "./wake-op-ledger.js";
 
 export const WAKE_ROUND_DISPATCH_SOURCES = ["self_advance", "nudge", "escalate"] as const;
 
@@ -47,6 +56,8 @@ export type WakeRoundDispatchRequest = Readonly<{
   itemId?: string;
   reason?: string;
   relatedId?: string;
+  /** Explicit U3 idempotency key; when omitted, derived from request fields. */
+  opKey?: string;
 }>;
 
 export type WakeRoundDispatchResult =
@@ -210,6 +221,12 @@ export type ConsumeWakeRoundDispatchResult = Readonly<{
   wakeEvent?: WakeEvent;
   roundId?: string;
   dispatcherPresent: boolean;
+  /** U3 durable op key (derived or explicit). */
+  opKey?: string;
+  /** U3 persistent processing snapshot when consulted. */
+  wakeOp?: WakeOpRecord;
+  /** True when a prior completed result was reused (no new side effect). */
+  reused?: boolean;
 }>;
 
 /**
@@ -228,6 +245,57 @@ export async function consumeWakeForRoundDispatch(
     toAgentIds: params.request.toAgentIds.map((id) => compact(id)).filter(Boolean),
   };
 
+  const keyInput = {
+    groupId: request.groupId,
+    source: request.source,
+    fromAgentId: request.fromAgentId,
+    toAgentIds: request.toAgentIds,
+    taskId: request.taskId,
+    itemId: request.itemId,
+    opKey: request.opKey,
+  };
+  const opKey = wakeOpIdempotencyKey(keyInput);
+
+  const emptyGate = (): WakeRoundDispatchGate =>
+    evaluateWakeRoundDispatchGate({
+      source: request.source,
+      groupId: request.groupId,
+      tenantId: request.tenantId,
+      cfg: params.cfg,
+      writeMode: params.writeMode,
+    });
+
+  // U3: durable inspect before side effects (reuse / suppress without memory-only dedup).
+  let inspected = await inspectWakeOp({ authority: params.authority, keyInput });
+  if (inspected.action === "reuse") {
+    return {
+      outcome: "dispatched",
+      dispatched: true,
+      gate: emptyGate(),
+      reason: "idempotent_reuse",
+      wakeEvent: undefined,
+      roundId: inspected.record.roundId,
+      dispatcherPresent: false,
+      opKey: inspected.opKey,
+      wakeOp: inspected.record,
+      reused: true,
+    };
+  }
+  if (inspected.action === "suppress") {
+    return {
+      outcome: "recorded",
+      dispatched: false,
+      gate: emptyGate(),
+      reason: inspected.reason,
+      wakeEvent: undefined,
+      roundId: undefined,
+      dispatcherPresent: false,
+      opKey: inspected.opKey,
+      wakeOp: inspected.record,
+      reused: false,
+    };
+  }
+
   const stoppedTaskId = compact(request.taskId);
   if (stoppedTaskId) {
     try {
@@ -237,17 +305,13 @@ export async function consumeWakeForRoundDispatch(
         return {
           outcome: "recorded",
           dispatched: false,
-          gate: evaluateWakeRoundDispatchGate({
-            source: request.source,
-            groupId: request.groupId,
-            tenantId: request.tenantId,
-            cfg: params.cfg,
-            writeMode: params.writeMode,
-          }),
+          gate: emptyGate(),
           reason: "task_stopped",
           wakeEvent: undefined,
           roundId: undefined,
           dispatcherPresent: false,
+          opKey,
+          reused: false,
         };
       }
     } catch {
@@ -268,19 +332,51 @@ export async function consumeWakeForRoundDispatch(
       return {
         outcome: "recorded",
         dispatched: false,
-        gate: evaluateWakeRoundDispatchGate({
-          source: request.source,
-          groupId: request.groupId,
-          tenantId: request.tenantId,
-          cfg: params.cfg,
-          writeMode: params.writeMode,
-        }),
+        gate: emptyGate(),
         reason: "auth_revoked",
         wakeEvent: undefined,
         roundId: undefined,
         dispatcherPresent: false,
+        opKey,
+        reused: false,
       };
     }
+  }
+
+  // U3: claim durable running only after stop+auth passed (covers resume retry).
+  const claimed = await claimWakeOpRunning({
+    authority: params.authority,
+    keyInput,
+    cfg: params.cfg,
+    nowMs: params.nowMs,
+  });
+  if (claimed.action === "reuse") {
+    return {
+      outcome: "dispatched",
+      dispatched: true,
+      gate: emptyGate(),
+      reason: "idempotent_reuse",
+      wakeEvent: undefined,
+      roundId: claimed.record.roundId,
+      dispatcherPresent: false,
+      opKey: claimed.opKey,
+      wakeOp: claimed.record,
+      reused: true,
+    };
+  }
+  if (claimed.action === "suppress") {
+    return {
+      outcome: "recorded",
+      dispatched: false,
+      gate: emptyGate(),
+      reason: claimed.reason,
+      wakeEvent: undefined,
+      roundId: undefined,
+      dispatcherPresent: false,
+      opKey: claimed.opKey,
+      wakeOp: claimed.record,
+      reused: false,
+    };
   }
 
   const gate = evaluateWakeRoundDispatchGate({
@@ -302,6 +398,7 @@ export async function consumeWakeForRoundDispatch(
   let dispatched = false;
   let reason = gate.reason;
   let roundId: string | undefined;
+  let wakeOp: WakeOpRecord | undefined = claimed.record ?? undefined;
 
   if (gate.allowed && dispatcherPresent && dispatcher) {
     try {
@@ -311,15 +408,69 @@ export async function consumeWakeForRoundDispatch(
         dispatched = true;
         roundId = compact(result.roundId);
         reason = result.detail ? `dispatched:${result.detail}` : `dispatched:${request.source}`;
+        const completed = await markWakeOpCompleted({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          roundId,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail: reason,
+        });
+        if (completed) {
+          wakeOp = completed;
+        }
       } else {
         reason = result.ok ? "dispatch_missing_round_id" : `dispatch_failed:${result.reason}`;
+        const failed = await markWakeOpFailed({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail: reason,
+        });
+        if (failed) {
+          wakeOp = failed;
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       reason = `dispatch_threw:${message.slice(0, 160)}`;
+      // Cannot prove whether the dispatcher side effect landed — unknown, no blind re-run.
+      const unknown = await markWakeOpUnknown({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail: reason,
+      });
+      if (unknown) {
+        wakeOp = unknown;
+      }
     }
   } else if (gate.allowed && !dispatcherPresent) {
     reason = "no_consumer";
+    const failed = await markWakeOpFailed({
+      authority: params.authority,
+      opKey: claimed.opKey,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+      detail: reason,
+    });
+    if (failed) {
+      wakeOp = failed;
+    }
+  } else {
+    // Gate refused after claim — release to failed so work is not stuck running.
+    const failed = await markWakeOpFailed({
+      authority: params.authority,
+      opKey: claimed.opKey,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+      detail: reason,
+    });
+    if (failed) {
+      wakeOp = failed;
+    }
   }
 
   let wakeEvent: WakeEvent | undefined;
@@ -344,7 +495,11 @@ export async function consumeWakeForRoundDispatch(
         wakeEvent = wake.value;
       }
     } catch {
-      // wake write best-effort
+      // wake write best-effort — if dispatch already succeeded but receipt path
+      // fails later, op ledger already holds completed; if only wake write fails
+      // after completed mark, reuse still works. If completed mark failed and
+      // wake write failed after dispatch, resume marks unknown via stuck running
+      // → inspect suppresses blind re-run.
     }
   }
 
@@ -356,6 +511,9 @@ export async function consumeWakeForRoundDispatch(
     wakeEvent,
     roundId,
     dispatcherPresent,
+    opKey: claimed.opKey,
+    wakeOp,
+    reused: false,
   };
 }
 
