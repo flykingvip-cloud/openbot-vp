@@ -2,24 +2,70 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
+import { GROWTH_EVOLUTION_CONSUMER_ID, OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
-import type { TaskOutcomeRecord, TrustedScope } from "./types.js";
+import { scopeIdOf } from "./transitions.js";
+import type { CloseReasonCode, TaskOutcomeRecord, TrustedScope } from "./types.js";
+
+function scopeIdSafe(scope: TrustedScope): string {
+  return scopeIdOf(scope);
+}
 
 export const TASK_OUTCOME_STORE_DIRNAME = "task-outcomes";
 
+export type RunnerTurnFailureReason =
+  | "run_failed"
+  | "user_cancelled"
+  | "provider_fault"
+  | "user_filtered"
+  | "timeout"
+  | "authz_denied"
+  | "prepare_failed"
+  | "other";
+
 export type RunnerTurnOutcomeInput = {
+  /** When true, records attempt/run as succeeded; does NOT invent acceptance/delivery. */
   success: boolean;
   runId: string;
   toolsTotal?: number;
   toolsSucceeded?: number;
   latencyMs?: number;
   tenantId?: string;
-  /** Stable task id; defaults to `run:${runId}` for this turn. */
+  /** Required stable task id from entry; do not invent from runId when provided. */
   taskId?: string;
   scope?: TrustedScope;
+  /** Structured failure — required when success=false. Defaults to run_failed. */
+  failureReason?: RunnerTurnFailureReason;
+  failureDetail?: string;
+  /**
+   * Explicit acceptance/delivery only. Missing → leave pending (incomplete).
+   * `not_required` is allowed only when a resolved task contract supplies the reason.
+   */
+  acceptance?:
+    | { status: "pending" | "passed" | "failed" }
+    | { status: "not_required"; reason: string };
+  delivery?:
+    | { status: "pending" | "blocked" | "delivered" | "delivery_unknown" | "failed" }
+    | { status: "not_required"; reason: string };
+  deliveryId?: string;
+  acceptanceEvidence?: import("./types.js").AcceptanceEvidence[];
+  allowRetry?: boolean;
+  /** Process placeholder / interim reply — never closes as success. */
+  processPlaceholder?: boolean;
+};
+
+export type GrowthOutcomeCommitOpts = {
+  failureReason?: RunnerTurnFailureReason;
+  failureDetail?: string;
+  acceptance?: RunnerTurnOutcomeInput["acceptance"];
+  delivery?: RunnerTurnOutcomeInput["delivery"];
+  deliveryId?: string;
+  acceptanceEvidence?: import("./types.js").AcceptanceEvidence[];
+  allowRetry?: boolean;
+  processPlaceholder?: boolean;
 };
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
@@ -45,15 +91,54 @@ function defaultScope(tenantId?: string): TrustedScope {
   };
 }
 
+function drainGrowthEvolution(
+  cfg: OpenBotConfig,
+  agentId: string,
+  store: DurableTaskOutcomeStore,
+): { written: boolean; reason: string; processed: number; deferred: number } {
+  let written = false;
+  let reason = "no_closed_events";
+  const runtime = new OutcomeConsumerRuntime(store, {
+    consumerId: GROWTH_EVOLUTION_CONSUMER_ID,
+    handlers: [
+      {
+        consumerId: "growth-evolution-bridge",
+        onEvent: (_event, record) => {
+          const pub = publishEvolutionFromTaskOutcome(cfg, agentId, record);
+          if (pub.written) {
+            written = true;
+            reason = pub.reason;
+          } else if (!written) {
+            reason = pub.reason;
+          }
+        },
+      },
+    ],
+  });
+  const drained = runtime.drain((taskId) => store.loadTask(taskId));
+  return {
+    written,
+    reason,
+    processed: drained.processed,
+    deferred: drained.deferred,
+  };
+}
+
+/**
+ * Drain pending TaskOutcome outbox → growth evolution for one agent.
+ * Safe to call from boot or a runtime timer without a user turn.
+ */
+export function drainPendingGrowthEvolution(
+  cfg: OpenBotConfig,
+  agentId: string,
+): { written: boolean; reason: string; processed: number; deferred: number } {
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
+  return drainGrowthEvolution(cfg, agentId, store);
+}
+
 /**
  * Production chat-runner hot path into unified TaskOutcome.
- *
- * - Always persists attempt/run on durable TaskOutcome under the agent dir.
- * - Run failure → close as acceptance failed (stop) → growth-bridge may publish a negative.
- * - Run success → leave `awaiting_acceptance` (incomplete); does **not** invent task success
- *   or append an evolution success sample.
- * - Tool counters always update via `recordToolOutcomes`; task-level operational counters are
- *   deferred until a later acceptance/delivery close (P0 stops inventing success).
+ * Evolution publish goes only through OutcomeConsumerRuntime drain (no direct bypass).
  */
 export async function recordRunnerTurnOutcome(
   cfg: OpenBotConfig,
@@ -72,13 +157,19 @@ export async function recordRunnerTurnOutcome(
     submittedBy: "agent-runner-execution",
   });
   const chat = new ChatTaskOutcomeAdapter(service);
-  const taskId = input.taskId?.trim() || `run:${input.runId}`;
+  const taskId = input.taskId?.trim();
+  if (!taskId) {
+    throw new Error(
+      "recordRunnerTurnOutcome requires taskId from chat entry (ensureChatTurnTaskOutcome); refusing runId invent",
+    );
+  }
   const scope = input.scope ?? defaultScope(input.tenantId);
 
   const opened = chat.createOrRestore({
     taskId,
     scope,
     taskContractVersion: "1.0.0",
+    commandId: `create:${taskId}`,
   });
   if (!opened.ok) {
     throw new Error(`task-outcome open failed: ${"code" in opened ? opened.code : "unknown"}`);
@@ -117,26 +208,165 @@ export async function recordRunnerTurnOutcome(
       fencingToken,
       status: runStatus,
     },
+    { scope, commandId: `attempt:${taskId}:${input.runId}` },
   );
   if (!res.ok) {
     throw new Error(`task-outcome record_attempt failed: ${res.code}`);
   }
 
   if (!input.success) {
-    // Close as capability failure — do not invent success.
-    res = chat.setAcceptance(
-      taskId,
-      res.record.outcomeVersion,
+    const reason = (input.failureReason ?? "run_failed") as CloseReasonCode;
+    res = chat.failClosed(taskId, res.record.outcomeVersion, reason as RunnerTurnFailureReason, {
       fencingToken,
-      { status: "failed" },
-      { allowRetry: false },
-    );
+      reasonDetail: input.failureDetail,
+      scope,
+      commandId: `fail:${taskId}:${input.runId}`,
+    });
     if (!res.ok) {
-      throw new Error(`task-outcome set_acceptance failed: ${res.code}`);
+      throw new Error(`task-outcome fail_closed failed: ${res.code}`);
     }
+  } else if (!input.processPlaceholder) {
+    // R85b: never invent not_required. Only apply gates the caller explicitly resolved.
+    if (input.acceptance) {
+      const evidence =
+        input.acceptanceEvidence ??
+        (input.acceptance.status === "passed" || input.acceptance.status === "not_required"
+          ? [
+              {
+                validatorId: "agent-runner-execution",
+                validatorVersion: "1.0.0",
+                scope: scopeIdSafe(scope),
+                artifactDigestOrReceiptRef: input.deliveryId ?? `receipt:${taskId}:${input.runId}`,
+                taskContractVersion: "1.0.0",
+                executionVersion: String(res.record.outcomeVersion),
+              },
+            ]
+          : undefined);
+      res = chat.setAcceptance(taskId, res.record.outcomeVersion, fencingToken, input.acceptance, {
+        allowRetry: input.allowRetry ?? true,
+        evidence,
+        scope,
+        commandId: `accept:${taskId}:${input.runId}`,
+      });
+      if (!res.ok) {
+        throw new Error(`task-outcome set_acceptance failed: ${res.code}`);
+      }
+    }
+    if (input.delivery) {
+      res = chat.setDelivery(
+        taskId,
+        res.record.outcomeVersion,
+        fencingToken,
+        input.delivery,
+        input.deliveryId ?? `delivery:${input.runId}`,
+        { scope, commandId: `delivery:${taskId}:${input.runId}` },
+      );
+      if (!res.ok) {
+        throw new Error(`task-outcome set_delivery failed: ${res.code}`);
+      }
+    }
+    // Missing acceptance and/or delivery → remain pending / incomplete (no evolution positive).
   }
-  // success: leave acceptance pending → awaiting_acceptance → incomplete (no evolution success)
+  // processPlaceholder: attempt recorded; acceptance/delivery stay pending.
 
-  const evolution = publishEvolutionFromTaskOutcome(cfg, agentId, res.record);
+  const evolution = drainGrowthEvolution(cfg, agentId, store);
+  return { record: res.record, evolution };
+}
+
+/**
+ * Apply channel send result to a turn that was prepared with delivery pending.
+ * Prepare must leave delivery=pending; only this (or equivalent) may set delivered.
+ */
+export async function confirmRunnerTurnDelivery(
+  cfg: OpenBotConfig,
+  agentId: string,
+  input: {
+    taskId: string;
+    deliveryId: string;
+    status: "delivered" | "failed" | "delivery_unknown";
+    scope?: TrustedScope;
+    failureDetail?: string;
+  },
+): Promise<{ record: TaskOutcomeRecord; evolution: { written: boolean; reason: string } }> {
+  const taskId = input.taskId.trim();
+  if (!taskId) {
+    throw new Error("confirmRunnerTurnDelivery requires taskId");
+  }
+  const deliveryId = input.deliveryId.trim();
+  if (!deliveryId) {
+    throw new Error("confirmRunnerTurnDelivery requires deliveryId");
+  }
+
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
+  const service = new TaskOutcomeResultService({
+    store,
+    submittedBy: "agent-runner-delivery-confirm",
+  });
+  const chat = new ChatTaskOutcomeAdapter(service);
+
+  // Brief retry: prepare commit may still be flushing when dispatch confirms.
+  let record = store.loadTask(taskId);
+  for (let i = 0; i < 20 && !record; i += 1) {
+    await new Promise((r) => setTimeout(r, 25));
+    record = store.loadTask(taskId);
+  }
+  if (!record) {
+    throw new Error(`confirmRunnerTurnDelivery: task not found: ${taskId}`);
+  }
+
+  if (record.lifecycle === "closed") {
+    return {
+      record,
+      evolution: { written: false, reason: "already_closed" },
+    };
+  }
+
+  // Already recorded delivered/failed — idempotent (do not reopen).
+  if (
+    record.deliveryId === deliveryId &&
+    (record.delivery.status === "delivered" || record.delivery.status === "failed")
+  ) {
+    return {
+      record,
+      evolution: { written: false, reason: "delivery_already_terminal" },
+    };
+  }
+  // Same unknown status — idempotent; still allow later upgrade to delivered/failed.
+  if (
+    record.deliveryId === deliveryId &&
+    record.delivery.status === "delivery_unknown" &&
+    input.status === "delivery_unknown"
+  ) {
+    return {
+      record,
+      evolution: { written: false, reason: "delivery_already_unknown" },
+    };
+  }
+
+  const scope = input.scope ?? record.scope;
+  const fencingToken = record.fencingToken || newFencingToken();
+  const deliveryGate =
+    input.status === "delivered"
+      ? ({ status: "delivered" } as const)
+      : input.status === "failed"
+        ? ({ status: "failed" } as const)
+        : ({ status: "delivery_unknown" } as const);
+
+  const res = chat.setDelivery(
+    taskId,
+    record.outcomeVersion,
+    fencingToken,
+    deliveryGate,
+    deliveryId,
+    {
+      scope,
+      commandId: `delivery-confirm:${taskId}:${deliveryId}:${input.status}`,
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`confirmRunnerTurnDelivery set_delivery failed: ${res.code}`);
+  }
+
+  const evolution = drainGrowthEvolution(cfg, agentId, store);
   return { record: res.record, evolution };
 }

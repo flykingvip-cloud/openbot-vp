@@ -72,6 +72,7 @@ import {
   getActiveSecretsRuntimeSnapshot,
   resolveCommandSecretsFromActiveRuntimeSnapshot,
 } from "../secrets/runtime.js";
+import { recoverTaskOutcomeConsumersAtGatewayBoot } from "../task-outcome/consumer-boot.js";
 import { setVaultSyncRevisionEventSink, VAULT_SYNC_REVISIONS_EVENT } from "../vault-sync/index.js";
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { registerGrowthEventBroadcast } from "./agent-growth/growth-events.js";
@@ -775,6 +776,22 @@ export async function startGatewayServer(
         },
       });
     })().catch((err) => log.error(`Handoff recovery failed: ${String(err)}`));
+  }
+
+  // Recover pending TaskOutcome growth-evolution consumers (R85b).
+  // Also starts an independent runtime drain so retries do not need a new user message.
+  if (!minimalTestGateway) {
+    void (async () => {
+      const logRecovery = log.child("task-outcome-consumer");
+      recoverTaskOutcomeConsumersAtGatewayBoot({
+        cfg: cfgAtStart,
+        startRuntimeDrain: true,
+        log: {
+          info: (message) => logRecovery.info(message),
+          warn: (message) => logRecovery.warn(message),
+        },
+      });
+    })().catch((err) => log.error(`TaskOutcome consumer recovery failed: ${String(err)}`));
   }
 
   const execApprovalManager = new ExecApprovalManager({

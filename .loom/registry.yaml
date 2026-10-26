@@ -9705,7 +9705,48 @@ tasks:
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
+
+  - id: askOutcome-p0-r83-remediation
+    owner: executor-acceptance
+    intent:
+      - R83 P0 persist CAS consumer chat-wire remediation
+      - R85b no-evidence-no-success growth-bridge failure-attribution
+      - R85c contract-gated acceptance send-confirm delivery effective DNA reads
+      - R85d deliver-AND durable-pending execution-no-chat-waive DNA observation fields
+      - R85e real-deliver-callback unknown-keeps-pending id-threading AND-no-early-success
+      - R85f classify-from-preflight-intent not-hookDelivery-presence production-entry-proof
+    paths:
+      - src/task-outcome/**
+      - docs/design/task-outcome/**
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: askoutcome-p0-r83-20261026
+        taskId: askOutcome-p0-r83-remediation
+        ide: cursor-local
+        agent: executor-acceptance
+        status: active
+        lastSignalAt: 2026-10-26T05:14:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+
 landingStreams:
+
+  - id: askOutcome-p0-r83-remediation
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/contract.md
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - src/task-outcome/**
+    canLandWith: []
+    metadata:
+      task: askOutcome-p0-r83-remediation
+      owner: executor-acceptance
+      purpose: R83/R85 TaskOutcome module land; hot-file temp landers restored pre-merge
+
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
     paths:
@@ -22560,7 +22601,7 @@ sharedPaths:
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
-    reason: Hot-file lander restored to evolution-loop-fix after askOutcome P0 wired recordGrowthTaskOutcome → recordRunnerTurnOutcome (call site owned here; TaskOutcome module stays askOutcome-p0).
+    reason: Hot-file lander restored to evolution-loop-fix after askOutcome R83/R85 wiring (call site owned here; TaskOutcome module stays askOutcome-p0).
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok

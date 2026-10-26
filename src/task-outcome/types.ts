@@ -101,6 +101,9 @@ export type CloseReasonCode =
   | "prepare_failed"
   | "preflight_rejected"
   | "correction"
+  | "run_failed"
+  | "user_filtered"
+  | "timeout"
   | "other";
 
 export type TaskOutcomeRecord = {
@@ -212,6 +215,13 @@ export type SubmitTransition =
       reasonDetail?: string;
     }
   | {
+      type: "fail_closed";
+      reasonCode: CloseReasonCode;
+      reasonDetail?: string;
+      expectedVersion: number;
+      fencingToken?: string;
+    }
+  | {
       type: "correction";
       expectedVersion: number;
       previousOutcomeVersion: number;
@@ -222,19 +232,22 @@ export type SubmitTransition =
       decisiveRunStatus?: DecisiveRunStatus;
     };
 
+export type SubmitFailure = {
+  ok: false;
+  code:
+    | "version_conflict"
+    | "stale_fencing"
+    | "illegal_transition"
+    | "terminal_protected"
+    | "scope_mismatch"
+    | "unauthorized_correction"
+    | "evidence_stale"
+    | "command_conflict"
+    | "not_found";
+  message: string;
+  current?: TaskOutcomeRecord;
+};
+
 export type SubmitResult =
   | { ok: true; record: TaskOutcomeRecord; createdEvents: OutcomeOutboxEvent[] }
-  | {
-      ok: false;
-      code:
-        | "version_conflict"
-        | "stale_fencing"
-        | "illegal_transition"
-        | "terminal_protected"
-        | "scope_mismatch"
-        | "unauthorized_correction"
-        | "evidence_stale"
-        | "not_found";
-      message: string;
-      current?: TaskOutcomeRecord;
-    };
+  | SubmitFailure;
