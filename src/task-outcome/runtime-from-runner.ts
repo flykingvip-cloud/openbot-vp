@@ -112,7 +112,6 @@ function defaultScope(tenantId?: string): TrustedScope {
   };
 }
 
-
 /** True when trusted run evidence may advance routing_ok/incomplete → completed. */
 function canMarkCompletedFromTrustedRun(
   modality: NonNullable<TaskOutcomeRecord["capabilityModality"]>,
