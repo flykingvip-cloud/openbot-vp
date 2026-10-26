@@ -258,6 +258,8 @@ export async function runCronIsolatedAgentTurn(params: {
   deps: CliDeps;
   job: CronJob;
   message: string;
+  /** askOutcome W1: scheduler-persisted fire identity (same-fire retry/restart reuse). */
+  fireId?: string;
   abortSignal?: AbortSignal;
   signal?: AbortSignal;
   sessionKey: string;
@@ -768,8 +770,12 @@ export async function runCronIsolatedAgentTurn(params: {
   let commercialFallbackAttempts: unknown;
   // 每次执行唯一的记账幂等键（隔离/非隔离 cron 都按执行计费，不被会话 id 复用去重）。
   const creditTaskId = `cron-credit:${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
-  // askOutcome W1: each fire = new task; same-fire retry reuses fireId.
-  const cronFireId = `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+  // askOutcome W1: scheduler owns fire identity; run only falls back when unset (tests/manual).
+  const cronFireId =
+    (typeof params.fireId === "string" && params.fireId.trim()) ||
+    (typeof params.job.state?.currentFireId === "string" &&
+      params.job.state.currentFireId.trim()) ||
+    `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
   const cronOwnerRaw = params.job.ownership?.ownerId?.trim() || `cron:${params.job.id}`;
   const cronSubjectRef =
     cronOwnerRaw.startsWith("platform-user:") || cronOwnerRaw.includes(":")

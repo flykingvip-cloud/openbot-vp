@@ -217,8 +217,16 @@ export function ensureGatewayAgentTurnTaskOutcome(
  * Follow-up turns reuse chat entrypoint identity (continuation of a chat turn),
  * with a stable followup-scoped taskId so tips land under chat.
  */
+/**
+ * askOutcome W1 followup semantics (independent child):
+ * - Stable identity = enqueue-time `followupItemId` (not a fresh random per drain).
+ * - taskId = chat:{agent}:followup:{session?}:{followupItemId}
+ * - Optional parentTaskId links to the originating user/chat/collab task.
+ * - Agent runId remains a separate correlation id for registerAgentRunContext.
+ */
 export function followupTurnTaskId(params: {
   agentId: string;
+  /** Stable followupItemId (preferred) or legacy runId alias. */
   runId: string;
   sessionKey?: string;
 }): string {
@@ -233,12 +241,14 @@ export function ensureFollowupTurnTaskOutcome(
   cfg: OpenBotConfig,
   identity: {
     agentId: string;
+    /** Stable followupItemId allocated at enqueue. */
     runId: string;
     sessionKey?: string;
     subjectRef: string;
     tenantId?: string;
     authzScopeRef?: string;
     taskContractVersion?: string;
+    parentTaskId?: string;
   },
 ): EntrypointEnsureOk | EntrypointEnsureErr {
   const taskId = followupTurnTaskId({
@@ -258,6 +268,7 @@ export function ensureFollowupTurnTaskOutcome(
       }),
       taskContractVersion: identity.taskContractVersion ?? "1.0.0",
       commandId: `entry:${taskId}`,
+      ...(identity.parentTaskId?.trim() ? { parentTaskId: identity.parentTaskId.trim() } : {}),
     }),
   );
 }

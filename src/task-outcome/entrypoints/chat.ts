@@ -27,6 +27,8 @@ export class ChatTaskOutcomeAdapter {
     commandId?: string;
     /** Override; defaults to this.entrypoint so subclasses persist their identity. */
     entrypoint?: Entrypoint;
+    /** Independent-child followup: link to parent TaskOutcome taskId. */
+    parentTaskId?: string;
   }): { ok: true; record: TaskOutcomeRecord; fencingToken: string } | SubmitFailure {
     const existing = this.service.get(params.taskId);
     if (existing) {
@@ -49,6 +51,7 @@ export class ChatTaskOutcomeAdapter {
         entrypoint,
         scope: params.scope,
         taskContractVersion: params.taskContractVersion,
+        ...(params.parentTaskId?.trim() ? { parentTaskId: params.parentTaskId.trim() } : {}),
       },
       { commandId: params.commandId, requiredScope: params.scope },
     );

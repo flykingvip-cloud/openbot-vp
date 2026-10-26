@@ -163,7 +163,11 @@ export function createFollowupRunner(params: {
   };
 
   return async (queued: FollowupRun) => {
+    // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
+    // askOutcome W1: TaskOutcome identity is the enqueue-stable followupItemId.
+    const followupItemId =
+      queued.followupItemId?.trim() || (queued.followupItemId = crypto.randomUUID());
     let followupOutcomeTaskId: string | undefined;
     let followupOutcomeScope: import("../../task-outcome/types.js").TrustedScope | undefined;
     if (queued.run.agentId) {
@@ -184,12 +188,15 @@ export function createFollowupRunner(params: {
         queued.run.executionIdentity?.enterpriseId?.trim() ||
         queued.run.executionIdentity?.collaborationOwnerEntitlement?.tenantId?.trim() ||
         undefined;
+      const parentTaskId =
+        queued.parentTaskId?.trim() || queued.run.collaborationTaskId?.trim() || undefined;
       const opened = ensureFollowupTurnTaskOutcome(queued.run.config, {
         agentId: queued.run.agentId,
-        runId,
+        runId: followupItemId,
         sessionKey: queued.run.sessionKey ?? sessionKey,
         subjectRef,
         ...(tenantId ? { tenantId } : {}),
+        ...(parentTaskId ? { parentTaskId } : {}),
       });
       if (opened.ok) {
         followupOutcomeTaskId = opened.taskId;

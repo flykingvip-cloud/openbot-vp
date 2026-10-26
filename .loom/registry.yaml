@@ -9778,6 +9778,35 @@ tasks:
     since: 2026-10-26
     metadata: {}
 landingStreams:
+  - id: askOutcome-p0-task-outcome-contract
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/contract.md
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - docs/notes/askOutcome-p0-baseline.md
+      - src/task-outcome/**
+      # W1 remediation temp lander (hot entry wiring); restore before merge
+      - src/auto-reply/reply/followup-runner.ts
+      - src/auto-reply/reply/queue/enqueue.ts
+      - src/auto-reply/reply/queue/types.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/service/state.ts
+      - src/cron/service/timer.ts
+      - src/cron/types.ts
+      - src/gateway/protocol/schema/cron.ts
+      - src/gateway/server-cron.ts
+      - src/commands/agent.ts
+      - src/gateway/server-methods/agent.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+    canLandWith:
+      - p1-task-driven-aor-scoring
+      - askOutcome-p0-r83-remediation
+    metadata:
+      task: askOutcome-p0-task-outcome-contract
+      owner: executor-acceptance
+      purpose: TaskOutcome unified durable replayable judgement (askOutcome P0)
+      tempLanderNote: W1 remediation hot-entry paths; restore after P1 commits
   - id: p1-task-driven-aor-scoring
     landingPolicy: serial
     paths:
@@ -9840,38 +9869,7 @@ landingStreams:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
       purpose: R83/R85 TaskOutcome module land; hot-file temp landers restored pre-merge
-  - id: askOutcome-p0-task-outcome-contract
-    landingPolicy: serial
-    paths:
-      - .loom/registry.yaml
-      - docs/design/task-outcome/contract.md
-      - docs/design/task-outcome/call-chain-and-replacements.md
-      - docs/notes/askOutcome-p0-baseline.md
-      - src/task-outcome/types.ts
-      - src/task-outcome/judge.ts
-      - src/task-outcome/judge.test.ts
-      - src/task-outcome/eligibility.ts
-      - src/task-outcome/transitions.ts
-      - src/task-outcome/store.ts
-      - src/task-outcome/result-service.ts
-      - src/task-outcome/result-service.test.ts
-      - src/task-outcome/consumers.ts
-      - src/task-outcome/growth-bridge.ts
-      - src/task-outcome/growth-bridge.test.ts
-      - src/task-outcome/index.ts
-      - src/task-outcome/entrypoints/chat.ts
-      - src/task-outcome/entrypoints/gateway-agent.ts
-      - src/task-outcome/entrypoints/cron.ts
-      - src/task-outcome/entrypoints/cli.ts
-      - src/task-outcome/entrypoints/collab.ts
-      - src/task-outcome/runtime-from-runner.ts
-      - src/task-outcome/runtime-from-runner.test.ts
-    canLandWith:
-      - p1-task-driven-aor-scoring
-    metadata:
-      task: askOutcome-p0-task-outcome-contract
-      owner: executor-acceptance
-      purpose: TaskOutcome unified durable replayable judgement (askOutcome P0)
+
   - id: p0a-p0-task-capability-plan
     landingPolicy: serial
     paths:

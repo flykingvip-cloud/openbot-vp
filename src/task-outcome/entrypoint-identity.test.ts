@@ -275,6 +275,39 @@ describe("askOutcome W1 entrypoint identity", () => {
     }
   });
 
+  it("followup uses stable followupItemId and stores parentTaskId", () => {
+    const itemId = "fu-item-stable-1";
+    const parentTaskId = "chat:bot:parent-task";
+    const opened = ensureFollowupTurnTaskOutcome(cfg, {
+      agentId: "bot",
+      runId: itemId,
+      sessionKey: "sess-1",
+      subjectRef: "platform-user:u1",
+      parentTaskId,
+    });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) {
+      return;
+    }
+    expect(opened.taskId).toContain(itemId);
+    expect(opened.record.parentTaskId).toBe(parentTaskId);
+    expect(opened.record.entrypoint).toBe("chat");
+
+    // Replay same queue item → restore same tip, not a new unrelated task
+    const again = ensureFollowupTurnTaskOutcome(cfg, {
+      agentId: "bot",
+      runId: itemId,
+      sessionKey: "sess-1",
+      subjectRef: "platform-user:u1",
+      parentTaskId,
+    });
+    expect(again.ok).toBe(true);
+    if (again.ok) {
+      expect(again.taskId).toBe(opened.taskId);
+      expect(again.record.parentTaskId).toBe(parentTaskId);
+    }
+  });
+
   it("subclasses no longer silently write chat via createOrRestore", () => {
     const service = new TaskOutcomeResultService({
       store: store(),
