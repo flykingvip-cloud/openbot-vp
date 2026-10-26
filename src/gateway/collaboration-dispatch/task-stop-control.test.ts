@@ -33,4 +33,24 @@ describe("task-stop-control", () => {
       expect((error as TaskStoppedError).taskId).toBe("t1");
     }
   });
+
+  it("honesty: accepted defaults externalEffect=unknown; inFlightAbort=best_effort is request not confirmed", () => {
+    const stop = buildAcceptedTaskStopControl({ requestedBy: "owner-1" });
+    expect(stop.status).toBe("accepted");
+    expect(stop.externalEffect).toBe("unknown");
+    expect(stop.inFlightAbort).toBe("best_effort");
+    // No confirmed-abort enum — best_effort must not be read as confirmed.
+    expect(stop.inFlightAbort === "best_effort").toBe(true);
+    expect(["none", "best_effort"]).toContain(stop.inFlightAbort);
+  });
+
+  it("honesty: explicit none externalEffect only when caller asserts fact", () => {
+    const stop = buildAcceptedTaskStopControl({
+      requestedBy: "owner-1",
+      externalEffect: "none",
+      inFlightAbort: "none",
+    });
+    expect(stop.externalEffect).toBe("none");
+    expect(stop.inFlightAbort).toBe("none");
+  });
 });

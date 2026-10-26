@@ -6,12 +6,18 @@
  * {@link assertTaskNotStopped} before starting write / dispatch actions.
  *
  * Semantics recorded on accept:
- * - status accepted
- * - inFlightAbort: best-effort abort of in-flight work (or none)
- * - externalEffect: happened | unknown | none (do not fake success)
+ * - status `accepted` = stop *request* accepted only (not proof in-flight work ended)
+ * - inFlightAbort: `best_effort` = abort *requested*; `none` = no abort requested.
+ *   There is no "confirmed abort" value — confirmation requires a receipt; never invent one.
+ * - externalEffect: `happened` | `unknown` | `none` must rest on facts.
+ *   Missing receipt must not become `none`; uncertainty stays `unknown`.
+ * - wake `dispatched=false` alone proves this wake did not dispatch; it does **not**
+ *   by itself prove a previously running action has stopped.
  */
 
+/** `best_effort` = abort requested (not confirmed). No confirmed-abort enum on purpose. */
 export type TaskStopInFlightAbort = "none" | "best_effort";
+/** Fact-backed only. Default builders use `unknown`; never infer `none` from silence. */
 export type TaskStopExternalEffect = "none" | "happened" | "unknown";
 
 export type TaskStopControl = {

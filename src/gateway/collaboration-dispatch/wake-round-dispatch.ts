@@ -20,6 +20,7 @@ import type { OpenBotConfig } from "../../config/types.js";
 import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
+import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
 import { asGovernedTask } from "./task-runtime.js";
 import { isTaskStopAccepted } from "./task-stop-control.js";
 import {
@@ -251,6 +252,34 @@ export async function consumeWakeForRoundDispatch(
       }
     } catch {
       // store read failure: fall through; do not invent stop
+    }
+  }
+
+  // U2: current-auth recheck at the same preflight position as U1 stop.
+  // Independent of stop — revoked membership/duty must not dispatch.
+  {
+    const auth = await recheckCurrentDispatchAuthorization({
+      groupId: request.groupId,
+      taskId: request.taskId,
+      targetActorIds: request.toAgentIds,
+      cfg: params.cfg,
+    });
+    if (!auth.ok) {
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: evaluateWakeRoundDispatchGate({
+          source: request.source,
+          groupId: request.groupId,
+          tenantId: request.tenantId,
+          cfg: params.cfg,
+          writeMode: params.writeMode,
+        }),
+        reason: "auth_revoked",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+      };
     }
   }
 

@@ -49,6 +49,7 @@ import {
   runSingleGroupUnattendedTick,
   type UnattendedTickResult,
 } from "./single-group-unattended.js";
+import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
 import { asGovernedTask } from "./task-runtime.js";
 import { isTaskStopAccepted } from "./task-stop-control.js";
 import {
@@ -800,6 +801,22 @@ async function isPersistedTaskStopped(params: {
   }
 }
 
+/** U2 sibling of stop preflight: refuse HB wake emit when targets/duty revoked. */
+async function isPersistedDispatchAuthRevoked(params: {
+  groupId: string;
+  taskId: string;
+  targetActorIds: readonly string[];
+  cfg?: OpenBotConfig;
+}): Promise<boolean> {
+  const auth = await recheckCurrentDispatchAuthorization({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    targetActorIds: params.targetActorIds,
+    cfg: params.cfg,
+  });
+  return !auth.ok;
+}
+
 export async function runGroupTaskHeartbeat(
   authority: RuntimeAuthority,
   input: { groupId: string },
@@ -901,6 +918,24 @@ export async function runGroupTaskHeartbeat(
           };
           continue;
         }
+        // U2: auth recheck at same position as U1 stop (does not replace stop).
+        if (
+          await isPersistedDispatchAuthRevoked({
+            groupId,
+            taskId: item.taskId,
+            targetActorIds: decision.toAgentIds,
+            cfg,
+          })
+        ) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: prior?.lastEscalateAt,
+            lastFingerprint: progressFingerprint(item),
+            lastStatus: item.status,
+          };
+          continue;
+        }
         const selfAdvanceWriteMode = resolveSelfAdvanceWriteMode(cfg, groupId, tenantId);
         const consume = await consumeWakeForRoundDispatch({
           authority,
@@ -937,6 +972,24 @@ export async function runGroupTaskHeartbeat(
     if (decision.action === "escalate") {
       if (!dryRun && !unattendedTarget) {
         if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg })) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: prior?.lastEscalateAt,
+            lastFingerprint: progressFingerprint(item),
+            lastStatus: item.status,
+          };
+          continue;
+        }
+        // U2: auth recheck at same position as U1 stop (does not replace stop).
+        if (
+          await isPersistedDispatchAuthRevoked({
+            groupId,
+            taskId: item.taskId,
+            targetActorIds: decision.toAgentIds,
+            cfg,
+          })
+        ) {
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,

@@ -9599,6 +9599,7 @@ tasks:
     paths:
       - src/gateway/collaboration-dispatch/task-stop-control.ts
       - src/gateway/collaboration-dispatch/task-stop-control.test.ts
+      - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/task-stop-entry.test.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
@@ -9620,13 +9621,16 @@ tasks:
       - src/gateway/collaboration-learning.ts
     state: active
     sessions:
-      - id: t29u-u1-1792978422
+      - id: t30u-u1-boundary-20261026
         taskId: u1-unified-task-stop:协作小组
         ide: cursor
         agent: 协作小组
         status: active
-        lastSignalAt: 2026-10-26T01:33:43.118Z
-        metadata: {}
+        lastSignalAt: 2026-10-26T02:32:53.093Z
+        metadata:
+          org: 协作小组
+          executor: 协作小组
+          t30u: true
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
@@ -9637,19 +9641,23 @@ tasks:
       - wl2-revoke-wake-hb
     paths:
       - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
       - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
       - src/gateway/collaboration-learning/wake-contract-entry.ts
       - src/gateway/collaboration-learning/delivery-actor-binding.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
-    state: ready
+    state: active
     sessions:
-      - id: t29u-u2-1792978429
+      - id: t30u-u2-revoke-20261026
         taskId: u2-background-revoke-recheck:协作小组
         ide: cursor
         agent: 协作小组
         status: active
-        lastSignalAt: 2026-10-26T01:33:50.357Z
-        metadata: {}
+        lastSignalAt: 2026-10-26T02:32:53.093Z
+        metadata:
+          org: 协作小组
+          executor: 协作小组
+          t30u: true
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
@@ -9683,6 +9691,7 @@ landingStreams:
       - .loom/registry.yaml
       - src/gateway/collaboration-dispatch/task-stop-control.ts
       - src/gateway/collaboration-dispatch/task-stop-control.test.ts
+      - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
       - src/gateway/collaboration-learning/handoff-contract-entry.ts
@@ -19049,6 +19058,7 @@ landingStreams:
       - CDUI
       - LDRG
       - CHAT_HISTORY_P0_IMAGE_OMIT
+      - u1-unified-task-stop
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
