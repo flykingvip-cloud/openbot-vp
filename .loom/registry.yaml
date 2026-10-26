@@ -9717,14 +9717,6 @@ tasks:
       - R85f classify-from-preflight-intent not-hookDelivery-presence production-entry-proof
     paths:
       - src/task-outcome/**
-      - src/agents/execution-preflight/hook-delivery.ts
-      - src/auto-reply/reply/agent-runner-execution.ts
-      - src/auto-reply/reply/agent-runner.ts
-      - src/auto-reply/reply/dispatch-from-config.ts
-      - src/auto-reply/reply/reply-dispatcher.ts
-      - src/auto-reply/types.ts
-      - src/gateway/server.impl.ts
-      - src/gateway/evolution-control/adapters/working-dna.ts
       - docs/design/task-outcome/**
       - .loom/registry.yaml
     state: active
@@ -9749,19 +9741,11 @@ landingStreams:
       - docs/design/task-outcome/contract.md
       - docs/design/task-outcome/call-chain-and-replacements.md
       - src/task-outcome/**
-      - src/agents/execution-preflight/hook-delivery.ts
-      - src/auto-reply/reply/agent-runner-execution.ts
-      - src/auto-reply/reply/agent-runner.ts
-      - src/auto-reply/reply/dispatch-from-config.ts
-      - src/auto-reply/reply/reply-dispatcher.ts
-      - src/auto-reply/types.ts
-      - src/gateway/server.impl.ts
-      - src/gateway/evolution-control/adapters/working-dna.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
-      purpose: R83/R85b/R85c/R85d/R85e/R85f TaskOutcome classify-from-intent production-entry
+      purpose: R83/R85 TaskOutcome module land; hot-file temp landers restored pre-merge
 
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
@@ -21684,8 +21668,8 @@ landingStreams:
       owner: cursor-deliverable-path
 sharedPaths:
   - glob: src/task-outcome/**
-    landerTask: askOutcome-p0-r83-remediation
-    reason: R83 remediation of TaskOutcome persist/CAS/consumer; resolves src/** overlap with pi-sdk-family-migration-v3.
+    landerTask: askOutcome-p0-task-outcome-contract
+    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with pi-sdk-family-migration-v3.
     reviewAfter: 2026-11-30
   - glob: src/gateway/collaboration-dispatch/claim-contract.ts
     landerTask: collab-p1-artifact-accept-loop:grok-bot
@@ -22154,9 +22138,13 @@ sharedPaths:
       overrides broad memory-workspace-platform-remediation globs.
       kiro-data-governance is the sole owner of the S01/S02 semantic gate CR.
   - glob: src/auto-reply/reply/dispatch-from-config.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: "R85d temporary lander: AND delivery confirm + durable pending resolve.
-      Restore to constitutional-governance-web-read-shadow:grok-bot after land."
+    landerTask: constitutional-governance-web-read-shadow:grok-bot
+    reason: "CTR Owner release (OWNER_RELEASE_AND_LANDER_PROXY):
+      conversation-task-runtime:kiro-conversation-task-runtime releases this
+      exact file to constitutional-governance-web-read-shadow:grok-bot as sole
+      sharedPath lander; authorize grok-bot as kiro-loom lander proxy for this
+      Registry land only. Transfer of prior CTR lander (do not retain competing
+      lander). Phase B B2 web-read shadow wiring."
   - glob: .kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance.md
     landerTask: kiro-data-governance-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance
     reason: Batch 26 / S01+S02 personal-local residual acceptance handoff authored
@@ -22547,10 +22535,6 @@ sharedPaths:
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Evolution core package; sole lander cursor-evolution.
     reviewAfter: 2026-10-07
-  - glob: src/gateway/evolution-control/adapters/working-dna.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: "R85d temporary lander: preserve cohort/latency/security/humanTakeover on effective DNA reads. Restore to openbot-evolution-unification:cursor-evolution after land."
-    reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/**
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Evolution control plane; sole lander cursor-evolution.
@@ -22616,16 +22600,8 @@ sharedPaths:
     reason: Ingest ownership proof tests. Resolves src/** overlap.
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: R83/R85c entry taskId wire + decisive status cancel/excluded revoke path. Temporary lander; restore to evolution-loop-fix after land.
-    reviewAfter: 2026-11-30
-  - glob: src/auto-reply/reply/agent-runner.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: R85b/R85c chat-turn close gates + contract-gated acceptance + awaiting delivery prepare. Temporary lander; restore to ZH_SCRATCHPAD_PREAMBLE after land.
-    reviewAfter: 2026-11-30
-  - glob: src/gateway/server.impl.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: R85b boot hook for pending growth-evolution drain. Temporary lander; restore to COLLAB_S4_HEARTBEAT_SCHEDULER after land.
+    landerTask: openbot-evolution-loop-fix:cursor-grok
+    reason: Hot-file lander restored to evolution-loop-fix after askOutcome R83/R85 wiring (call site owned here; TaskOutcome module stays askOutcome-p0).
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
