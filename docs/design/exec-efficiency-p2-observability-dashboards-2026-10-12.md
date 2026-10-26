@@ -14,14 +14,14 @@ local durable harvest `src/gateway/chat-inbound-depth-harvest.ts`
 
 Lifecycle stream events (via `emitAgentEvent`, `stream: "lifecycle"`):
 
-| Stage / event | Useful extras | Maps to KPI |
-| --- | --- | --- |
-| `chat.depth_decided` | `wouldDepth`, `routeMs`, `mode` (`shadow`\|`router`\|…), `reasons` | depth mix, classifier cost |
-| `chat.knowledge_started` / `chat.knowledge_finished` / `chat.knowledge_degraded` | `knowledgeMs`, `depth`, `knowledgeSkippedReason`, `selectedSourceCount` | **knowledgeMs**; chat-lane skip rate |
-| `chat.model_started` / `chat.first_token` / `chat.model_finished` | `modelTtftMs` on first_token | **ttfb** (model); compare to UI-visible ACK from P1 thinking progress |
-| `chat.tool_policy_applied` / `chat.tool_rejected` | `toolCount`, `toolPolicy`, `toolSkippedReason` | tool ceiling / **tool_rounds** proxy |
-| `chat.context_compiled` / `chat.context_provider_boundary` | (when present) budget / provider notes | **context_tokens_in** adjacent signals |
-| `chat.execution_observation` (flag on) | `latencies`, `stages`, tool/skill baselines | end-to-end stage histogram |
+| Stage / event                                                                    | Useful extras                                                           | Maps to KPI                                                           |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `chat.depth_decided`                                                             | `wouldDepth`, `routeMs`, `mode` (`shadow`\|`router`\|…), `reasons`      | depth mix, classifier cost                                            |
+| `chat.knowledge_started` / `chat.knowledge_finished` / `chat.knowledge_degraded` | `knowledgeMs`, `depth`, `knowledgeSkippedReason`, `selectedSourceCount` | **knowledgeMs**; chat-lane skip rate                                  |
+| `chat.model_started` / `chat.first_token` / `chat.model_finished`                | `modelTtftMs` on first_token                                            | **ttfb** (model); compare to UI-visible ACK from P1 thinking progress |
+| `chat.tool_policy_applied` / `chat.tool_rejected`                                | `toolCount`, `toolPolicy`, `toolSkippedReason`                          | tool ceiling / **tool_rounds** proxy                                  |
+| `chat.context_compiled` / `chat.context_provider_boundary`                       | (when present) budget / provider notes                                  | **context_tokens_in** adjacent signals                                |
+| `chat.execution_observation` (flag on)                                           | `latencies`, `stages`, tool/skill baselines                             | end-to-end stage histogram                                            |
 
 **ttfb_visible (product):** P1 emits process-channel thinking progress on lifecycle
 `start` before knowledge/model work. Dashboard should treat (a) time-to-first

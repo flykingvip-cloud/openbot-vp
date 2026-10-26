@@ -1,0 +1,40 @@
+
+ RUN  v4.0.18 /private/tmp/openbot-memory-batch1-rework
+
+ ❯ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts (15 tests | 1 failed | 14 skipped) 307ms
+     ↓ configurable defaults; scheduler off; observe-first; chat does not reset stall
+     ↓ LIVE_touched=false: defaults stay observe/scheduler off (no Floor emit)
+     ↓ observe (default): plans nudge but writes no wake events
+     ↓ emit allowlist + wake: writes nudge wake
+     ↓ terminal accepted: skip and no longer remind; escalate then await progress (anti-spam)
+     ↓ stall: nudge then escalate after 2 consecutive no-response (observe keeps decisions)
+     ↓ default schedulerEnabled=false: timer dormant; targets from allowlists
+     ↓ restart recovery: persisted lastScanAt causes interval skip after new scheduler
+     ↓ duplicate trigger dedup: overlapping runTickNow skips
+     ↓ exception retry: consecutiveFailures increments; next tick can succeed
+     ↓ updateConfig arms/disarms timer; stop is idempotent
+     ↓ slow timer tick then resumes single chain
+     ↓ timer-driven tick exception still re-arms once
+     ↓ stop during in-flight tick prevents finally re-arm
+     × updateConfig during slow tick does not create duplicate timer chains 306ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts > S4 scheduler reliability > updateConfig during slow tick does not create duplicate timer chains
+AssertionError: expected 12 to be less than or equal to 8
+ ❯ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts:714:19
+    712|     // Single chain @40ms over ~220ms ⇒ ~5 fires. Duplicate chains ≫ 8.
+    713|     expect(delta).toBeGreaterThanOrEqual(3);
+    714|     expect(delta).toBeLessThanOrEqual(8);
+       |                   ^
+    715|     scheduler.stop();
+    716|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  15:07:32
+   Duration  3.84s (transform 2.39s, setup 175ms, import 3.28s, tests 307ms, environment 0ms)
+

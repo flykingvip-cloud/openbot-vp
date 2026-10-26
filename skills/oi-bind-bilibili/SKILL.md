@@ -31,12 +31,12 @@ S6 live 证据：[references/live-evidence.md](references/live-evidence.md)
 
 与 `renderSocialAccountForm` / `SOCIAL_FORM_COPY[bilibili]`（无专属 copy 时用默认）一致：
 
-| UI 标签 | 写入 | 必填 |
-|---------|------|------|
-| 显示名称 | displayName | 建议 |
-| 账号标识 | accountHandle（表单 credentialHandleId） | 是 |
+| UI 标签  | 写入                                        | 必填                       |
+| -------- | ------------------------------------------- | -------------------------- |
+| 显示名称 | displayName                                 | 建议                       |
+| 账号标识 | accountHandle（表单 credentialHandleId）    | 是                         |
 | 访问凭证 | accessToken（表单 appSecret）→ secret store | 是（编辑可留空保持原凭证） |
-| 提交 | 「添加并认证」/「更新并认证」 | — |
+| 提交     | 「添加并认证」/「更新并认证」               | —                          |
 
 运营动作（catalog）：`publish_post / reply_comment / sync_profile_metrics`。  
 数字人授权：另调 `oi-grant-owned-bots`，不要混进本 bind。

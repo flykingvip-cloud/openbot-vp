@@ -14,24 +14,24 @@ and return already woke the claimant; **submit did not wake 主答/coordinator**
 
 ## Inventory-first
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| `submitBoardItemForReview` + required `artifactVersion` | EXISTS | Unchanged; still refuses empty / unbound version |
-| `acceptBoardItemSubmission` / `returnBoardItemSubmission` | EXISTS | Contract layer; tool surface was missing |
-| Return → wake claimant (`source: return`) | EXISTS | Unchanged |
-| Submit → wake reviewer/coordinator | **THIS PR** | Best-effort; `source: insight` (no WAKE_SOURCES `submit`) |
-| `collaboration_board` accept/return actions | **THIS PR** | Wire entry; no claimant check in tool |
-| Second orchestrator / ui.* RPC / LIVE flips | NON-GOAL | |
+| Surface                                                   | Status      | Note                                                      |
+| --------------------------------------------------------- | ----------- | --------------------------------------------------------- |
+| `submitBoardItemForReview` + required `artifactVersion`   | EXISTS      | Unchanged; still refuses empty / unbound version          |
+| `acceptBoardItemSubmission` / `returnBoardItemSubmission` | EXISTS      | Contract layer; tool surface was missing                  |
+| Return → wake claimant (`source: return`)                 | EXISTS      | Unchanged                                                 |
+| Submit → wake reviewer/coordinator                        | **THIS PR** | Best-effort; `source: insight` (no WAKE_SOURCES `submit`) |
+| `collaboration_board` accept/return actions               | **THIS PR** | Wire entry; no claimant check in tool                     |
+| Second orchestrator / ui.\* RPC / LIVE flips              | NON-GOAL    |                                                           |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| `collaboration_board` WRITE_ACTIONS | `accept_submission`, `return_submission` |
-| Tool params | `expectedSubmissionId`, `reason`, `checkedAcceptanceCriteria`, optional `proxyForActorId` / `proxyBasis` |
-| Entry `submitCollaborationBoardItemForReview` | Loads operating-state `coordinatorBotId` into claim options |
-| `submitBoardItemForReview` | After real submit transition, best-effort wake reviewer: prefer `options.coordinatorBotId`, else `publishedBy` (never intendedClaimant) |
-| Tests | Tool accept/return happy + missing reason/expectedSubmissionId; claim-contract wake-on-submit on/off |
+| Surface                                       | Behavior                                                                                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `collaboration_board` WRITE_ACTIONS           | `accept_submission`, `return_submission`                                                                                                |
+| Tool params                                   | `expectedSubmissionId`, `reason`, `checkedAcceptanceCriteria`, optional `proxyForActorId` / `proxyBasis`                                |
+| Entry `submitCollaborationBoardItemForReview` | Loads operating-state `coordinatorBotId` into claim options                                                                             |
+| `submitBoardItemForReview`                    | After real submit transition, best-effort wake reviewer: prefer `options.coordinatorBotId`, else `publishedBy` (never intendedClaimant) |
+| Tests                                         | Tool accept/return happy + missing reason/expectedSubmissionId; claim-contract wake-on-submit on/off                                    |
 
 ## Explicit non-goals
 

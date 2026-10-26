@@ -40,8 +40,7 @@ metadata:
 
 ## 与私有数字身份智能化编排
 
-用户要「大白帮我配数字身份 / 绑定账户 / 完善授权」且明确授权代配时：优先加载 **`oi-orchestrate-personal-identity`**（默认推荐 `verified_live`；再委派 `oi-bind-wechat-official` / `oi-bind-personal-email` / `oi-bind-github-personal` / `oi-bind-xiaohongshu` 等社媒 oi-bind-* / `oi-grant-owned-bots`）。本协议仍用于**用户自己点界面**的带路；公众号扫码代写底层仍是 `wechat-official-credential`。微信个人号非云电脑主路径，见 `oi-bind-wechat-personal`（委派 `wechat-personal-worker-setup`）。
-
+用户要「大白帮我配数字身份 / 绑定账户 / 完善授权」且明确授权代配时：优先加载 **`oi-orchestrate-personal-identity`**（默认推荐 `verified_live`；再委派 `oi-bind-wechat-official` / `oi-bind-personal-email` / `oi-bind-github-personal` / `oi-bind-xiaohongshu` 等社媒 oi-bind-\* / `oi-grant-owned-bots`）。本协议仍用于**用户自己点界面**的带路；公众号扫码代写底层仍是 `wechat-official-credential`。微信个人号非云电脑主路径，见 `oi-bind-wechat-personal`（委派 `wechat-personal-worker-setup`）。
 
 ## 架构
 

@@ -24,11 +24,11 @@ resolveContextLaneForRound / resolveContextLaneForReplyRun
 planPolicy + groupConfidentiality  →  resolveContextScopePlan(...)
 ```
 
-| Mode | Live serve | Side effect |
-|------|------------|-------------|
-| `legacy` (kill-switch) | PolicyV1 / session-tier path | none |
-| `shadow` | same as legacy | `policy_lane_divergence` when legacy ≠ effective |
-| `effective` (default) | `authority.policy.effective.context` | none |
+| Mode                   | Live serve                           | Side effect                                      |
+| ---------------------- | ------------------------------------ | ------------------------------------------------ |
+| `legacy` (kill-switch) | PolicyV1 / session-tier path         | none                                             |
+| `shadow`               | same as legacy                       | `policy_lane_divergence` when legacy ≠ effective |
+| `effective` (default)  | `authority.policy.effective.context` | none                                             |
 
 Bypass ratchet: `scripts/check-collab-policy-consumption.mjs` — context bucket is `[]`. New raw `PolicyV1.contextPolicy` reads in consumers **fail CI**.
 
@@ -36,12 +36,12 @@ Bypass ratchet: `scripts/check-collab-policy-consumption.mjs` — context bucket
 
 For collaboration group sessions (`groupId` set):
 
-| Inbound / UI | Mode | Mandatory sources | Knowledge |
-|--------------|------|-------------------|-----------|
-| `chat` | minimal | conversation + group | **no** auto prefetch |
-| unset depth (group) | minimal (P2) | conversation + group | **no** auto prefetch |
-| `retrieve` / `act` | auto / deep | conversation + group | optional / strategy-gated |
-| UI `focused` + sources | focused | conversation + group | only requested sources |
+| Inbound / UI           | Mode         | Mandatory sources    | Knowledge                 |
+| ---------------------- | ------------ | -------------------- | ------------------------- |
+| `chat`                 | minimal      | conversation + group | **no** auto prefetch      |
+| unset depth (group)    | minimal (P2) | conversation + group | **no** auto prefetch      |
+| `retrieve` / `act`     | auto / deep  | conversation + group | optional / strategy-gated |
+| UI `focused` + sources | focused      | conversation + group | only requested sources    |
 
 Direct 1:1 sessions without depth keep `auto` (unchanged).
 

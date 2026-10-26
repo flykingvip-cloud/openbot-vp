@@ -10,9 +10,9 @@ requires-ui-confirmation: true
 
 ## Two layers
 
-| Layer | Responsibility |
-| --- | --- |
-| **Skill** (this file) | When to emit a form, field/option wording, how to read `ogui-answer` |
+| Layer                                                    | Responsibility                                                                |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| **Skill** (this file)                                    | When to emit a form, field/option wording, how to read `ogui-answer`          |
 | **Renderer** (control-ui `ogui-form` / `ogui-form-view`) | Clickable options, draft selection, 「提交」 → `chat.send` / `handleSendChat` |
 
 Canonical wire shapes are TypeBox `OguiForm` / `OguiAnswer` (`src/gateway/protocol/schema/ogui.ts`, `schema_version: ogui/v1`). Wizard mapping is a thin adapter only — do not merge Wizard session stepper with this skill.
@@ -31,7 +31,7 @@ Do **not** force a form for a single missing free-text fact — ask in plain tex
 
 Emit a short prose lead-in, then exactly one fence:
 
-~~~~text
+````text
 请拍板以下口径：
 
 ```ogui-form
@@ -53,7 +53,7 @@ Emit a short prose lead-in, then exactly one fence:
   "submit_label": "确认拍板"
 }
 ```
-~~~~
+````
 
 Rules:
 
@@ -66,7 +66,7 @@ Rules:
 
 After the user selects and clicks **提交**, control-ui sends a user turn shaped like:
 
-~~~~text
+````text
 已提交 OGUI 表单选择：
 
 表单：<title>
@@ -84,7 +84,7 @@ After the user selects and clicks **提交**, control-ui sends a user turn shape
   "submitted_at": "<iso>"
 }
 ```
-~~~~
+````
 
 Helpers: `buildOguiAnswerSubmitMessage` / `parseOguiFormFromText` in `ui/src/ui/chat/ogui-form.ts`.
 

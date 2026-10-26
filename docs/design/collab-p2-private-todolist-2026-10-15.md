@@ -6,12 +6,12 @@
 
 ## 交付对照（FINAL §3.3）
 
-| # | 工程项 | 实现 |
-| --- | --- | --- |
+| #    | 工程项                                                         | 实现                                                                                                                                                                          |
+| ---- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | P2.1 | `ExecutorPrivateTodolist` 绑定 `boardItemId` + `ownerMemberId` | `src/gateway/collaboration-dispatch/executor-private-todolist.ts`；存储 `<ns>/executor-todolists/`；`visibility: executor_private`；可读：本人 + 主答/lead + 可选 coordinator |
-| P2.2 | `proposeTodolist` → `confirmTodolist` / `reviseTodolist` | 同模块 + RPC `collaboration.task.*`；未 confirm 时 `markInProgress` → `plan_gate_unconfirmed` |
-| P2.3 | 执行注入三件套 | `buildExecutionTaskBag` / `formatExecutionTaskBagForPrompt`：看板摘要 + 群上下文指针 + 本人 Todolist 当前步 |
-| P2.4 | `signalInsight` → wake 主答 | `signalInsight` → Wake Contract `source: insight`（`wakeContract` OFF 时 best-effort 不写） |
+| P2.2 | `proposeTodolist` → `confirmTodolist` / `reviseTodolist`       | 同模块 + RPC `collaboration.task.*`；未 confirm 时 `markInProgress` → `plan_gate_unconfirmed`                                                                                 |
+| P2.3 | 执行注入三件套                                                 | `buildExecutionTaskBag` / `formatExecutionTaskBagForPrompt`：看板摘要 + 群上下文指针 + 本人 Todolist 当前步                                                                   |
+| P2.4 | `signalInsight` → wake 主答                                    | `signalInsight` → Wake Contract `source: insight`（`wakeContract` OFF 时 best-effort 不写）                                                                                   |
 
 过渡期：结构化协议 + 持久私有 log；`freeChatIsTodolist()===false`。
 
@@ -28,14 +28,14 @@ claim/apply（谁接）
 
 ## RPC
 
-| Method | 说明 |
-| --- | --- |
-| `collaboration.task.proposeTodolist` | 执行者起草私有清单 |
-| `collaboration.task.confirmTodolist` | 主答确认（计划门禁通过） |
-| `collaboration.task.reviseTodolist` | 主答要求修订（清除确认） |
-| `collaboration.task.getTodolist` / `listTodolists` | 私有读（ACL） |
-| `collaboration.task.buildExecutionTaskBag` | 取三件套袋 |
-| `collaboration.task.signalInsight` | 贡献/创新 → wake 主答 |
+| Method                                             | 说明                     |
+| -------------------------------------------------- | ------------------------ |
+| `collaboration.task.proposeTodolist`               | 执行者起草私有清单       |
+| `collaboration.task.confirmTodolist`               | 主答确认（计划门禁通过） |
+| `collaboration.task.reviseTodolist`                | 主答要求修订（清除确认） |
+| `collaboration.task.getTodolist` / `listTodolists` | 私有读（ACL）            |
+| `collaboration.task.buildExecutionTaskBag`         | 取三件套袋               |
+| `collaboration.task.signalInsight`                 | 贡献/创新 → wake 主答    |
 
 写入仍受 **同一** ClaimContract 开关/灰组 allowlist 约束（与看板写路径一致）；**本 PR 不打开任何旗标**。
 
@@ -62,12 +62,12 @@ claim/apply（谁接）
 
 ## 风险与 LIVE
 
-| 项 | 说明 |
-| --- | --- |
-| LIVE 授权 | **不需要**（默认旗 OFF；不改生产配置；不灰开 allowlist） |
-| 风险 | 计划门禁会拒绝「未确认就标推进」——符合终稿；旧调用方需先 confirm |
-| 回滚 | 回退本 PR；或暂时不走 markInProgress 路径 |
-| 不做 | Floor / P3 群心跳 / P4 self_advance / 全局开旗 / 第二编排器 |
+| 项        | 说明                                                             |
+| --------- | ---------------------------------------------------------------- |
+| LIVE 授权 | **不需要**（默认旗 OFF；不改生产配置；不灰开 allowlist）         |
+| 风险      | 计划门禁会拒绝「未确认就标推进」——符合终稿；旧调用方需先 confirm |
+| 回滚      | 回退本 PR；或暂时不走 markInProgress 路径                        |
+| 不做      | Floor / P3 群心跳 / P4 self_advance / 全局开旗 / 第二编排器      |
 
 ## 与 P1 关系
 

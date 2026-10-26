@@ -1,0 +1,11 @@
+
+ RUN  v4.0.18 /private/tmp/openbot-memory-batch1-rework
+
+ ✓ src/gateway/server-methods/collaboration-learning.test.ts (10 tests) 3935ms
+     ✓ loads persisted collaboration learning objects for the active bot scope  3896ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  17:29:02
+   Duration  4.20s (transform 2.62s, setup 176ms, import 22ms, tests 3.93s, environment 0ms)
+

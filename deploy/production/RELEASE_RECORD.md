@@ -69,7 +69,7 @@ User-authorized forward-only full-dist recreate from freshly fetched `upbeyond/o
 | Image digest    | `sha256:173c2e029601788145fd5df598205750c993b6369035ea7491902ad073376ace`                                                                                                                                                         |
 | Provenance      | annotated tag `provenance/sha-bb72d0340284`                                                                                                                                                                                       |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist`; governance shadow log + 5 path flags on; no governance MODE set; Fabric off (seq 106)                                                                                                 |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 99–107; seq 98 closed at `2026-09-26T15:39:59.221Z`                                                                                                                                        |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 99–107; seq 98 closed at `2026-09-26T15:39:59.221Z`                                                                 |
 | Rollback        | `openbot-gateway-rc-prev-bb72d03402-nofabric-safety`, then `openbot-gateway-rc-prev-bb72d03402-shadow-safety` + config backup, then `openbot-gateway-rc-prev-bb72d03402-safety`, then `openbot-gateway-rc-prev-ca0c3765ba-safety` |
 | Executor        | `kiro-governance-closure`                                                                                                                                                                                                         |
 
@@ -261,20 +261,20 @@ User-authorized **forward-only** cutover from freshly fetched `origin/main` `786
 
 User-authorized **forward ledger** reconciliation for an unrecorded production deploy already running `origin/main` `6bd4569606fd286b7d8b46fb7d9198fb7a134493` (#1093 billing position attribution atop seq82 ConversationTask canary). **No rollback.** Stays **assist**; CT boundaries unchanged for **one** internal test tenant (`activation/detection/qualification=on`, `projection/authorization=off`). Host 8.217.93.71 / `openbot-gateway-rc` image `localhost/openbot:rc-amd64-provenance-6bd4569606` digest `sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f`. Container started `2026-09-12T03:59:30Z` with `/run/ct-shadow/entrypoint.sh`; safety `openbot-gateway-rc-prev-f0dec72227-safety`. verify-live PASS. Control UI `index-iwByD4J0.js`. Read-only retention: existing active tasks readable (2 on allowlist store, 0 elsewhere); no new canary task. Browser E2E from seq82 remains authoritative. liveFrom `2026-09-12T03:59:30Z` closes seq 82. Executor cursor-composer. liveVerified=true. Annotated SoT identity tag `provenance/sha-6bd4569606fd`. Evidence `docs/design/evidence/ct-production-retention-6bd4569606-20260912.json`.
 
-| Field           | Value                                                                                                                                            |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Date            | liveFrom `2026-09-12T03:59:30Z`                                                                                                                  |
-| Source revision | `6bd4569606fd286b7d8b46fb7d9198fb7a134493`                                                                                                       |
-| Source          | host alias `localhost/openbot:rc-amd64-provenance-6bd4569606` / digest `sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f` |
-| Image digest    | `sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f`                                                                        |
-| Provenance      | annotated tag `provenance/sha-6bd4569606fd`                                                                                                      |
-| Control UI      | `index-iwByD4J0.js`                                                                                                                              |
-| CT flags        | activation/detection/qualification on (allowlist=1); projection/authorization off                                                                |
-| HMAC            | epoch `ct-2026-09-11-host` unchanged via entrypoint (value withheld)                                                                             |
-| Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                      |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 83; `--live-verified`. Seq 82 closed.                                                                     |
-| Rollback        | container `openbot-gateway-rc-prev-f0dec72227-safety`; image `localhost/openbot:rc-amd64-provenance-f0dec72227`                                  |
-| Executor        | `cursor-composer`                                                                                                                                |
+| Field           | Value                                                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-09-12T03:59:30Z`                                                                                                                     |
+| Source revision | `6bd4569606fd286b7d8b46fb7d9198fb7a134493`                                                                                                          |
+| Source          | host alias `localhost/openbot:rc-amd64-provenance-6bd4569606` / digest `sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f`    |
+| Image digest    | `sha256:cae8337e9b596d50062863899a4c3239c5a90471dccb3db00e680c21dbbe355f`                                                                           |
+| Provenance      | annotated tag `provenance/sha-6bd4569606fd`                                                                                                         |
+| Control UI      | `index-iwByD4J0.js`                                                                                                                                 |
+| CT flags        | activation/detection/qualification on (allowlist=1); projection/authorization off                                                                   |
+| HMAC            | epoch `ct-2026-09-11-host` unchanged via entrypoint (value withheld)                                                                                |
+| Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                         |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 83; `--live-verified`. Seq 82 closed. |
+| Rollback        | container `openbot-gateway-rc-prev-f0dec72227-safety`; image `localhost/openbot:rc-amd64-provenance-f0dec72227`                                     |
+| Executor        | `cursor-composer`                                                                                                                                   |
 
 ## Previous cutover (2026-09-12) — seq 82 / f0dec7222777 ConversationTask sync
 
@@ -291,7 +291,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `f0dec7222
 | CT flags        | activation/detection/qualification on (allowlist=1); projection/authorization off                                                                     |
 | HMAC            | epoch `ct-2026-09-11-host` via entrypoint (value withheld)                                                                                            |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 82; `--live-verified`. Seq 81 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 82; `--live-verified`. Seq 81 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-acb87127d2-safety`; image `localhost/openbot:rc-amd64-provenance-acb87127d2`                                       |
 | Executor        | `cursor-composer`                                                                                                                                     |
 
@@ -308,7 +308,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `acb87127d
 | Provenance      | annotated tag `provenance/sha-acb87127d2b3`                                                                                                           |
 | Control UI      | `index-iwByD4J0.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 81; `--live-verified`. Seq 80 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 81; `--live-verified`. Seq 80 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-d5b2ef9c64-safety`; image `localhost/openbot:rc-amd64-provenance-d5b2ef9c64`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -316,18 +316,18 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `acb87127d
 
 User-authorized host-managed HMAC epoch rotation on the already-running LIVE image `d5b2ef9c644c0931f24026033ce367082ee9da96`. No code cutover and no 1Password. New epoch `ct-2026-09-11-host` is injected by entrypoint from a host `0600` file into PID 1 environ; the value is not in podman `Config.Env`. Old epoch `ct-2026-08` file shredded; 26 maint `env.list` files stripped of HMAC lines. healthz 200 / readyz ready. activation / detection / qualification remain unset. Safety container `openbot-gateway-rc-prev-d5b2ef9c64-prehmac`. Executor cursor-grok. liveFrom `2026-09-11T14:11:51Z` closes seq 79 as the prior code cutover.
 
-| Field           | Value                                                                                                                                          |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Date            | liveFrom `2026-09-11T14:11:51Z`                                                                                                                |
-| Source revision | `d5b2ef9c644c0931f24026033ce367082ee9da96` (unchanged)                                                                                         |
-| Source          | same image `localhost/openbot:rc-amd64-provenance-d5b2ef9c64` digest `sha256:8b35316de0fc215c91a83e37d19a3b59a39783018f8b9921f9f6b028b5c11f43` |
-| Image digest    | `sha256:8b35316de0fc215c91a83e37d19a3b59a39783018f8b9921f9f6b028b5c11f43`                                                                      |
-| Provenance      | existing tag `provenance/sha-d5b2ef9c644c`                                                                                                     |
-| HMAC            | `OPENBOT_CT_SHADOW_HMAC_KEY` set (value withheld, 256-bit); `OPENBOT_CT_SHADOW_HMAC_KEY_ID=ct-2026-09-11-host`; not in podman Config.Env       |
-| Flags           | activation/detection/qualification unset; projection/authorization off                                                                         |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 80; `--live-verified`. Seq 79 closed.                                                                   |
-| Rollback        | container `openbot-gateway-rc-prev-d5b2ef9c64-prehmac`; image unchanged                                                                        |
-| Executor        | `cursor-grok`                                                                                                                                  |
+| Field           | Value                                                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-09-11T14:11:51Z`                                                                                                                     |
+| Source revision | `d5b2ef9c644c0931f24026033ce367082ee9da96` (unchanged)                                                                                              |
+| Source          | same image `localhost/openbot:rc-amd64-provenance-d5b2ef9c64` digest `sha256:8b35316de0fc215c91a83e37d19a3b59a39783018f8b9921f9f6b028b5c11f43`      |
+| Image digest    | `sha256:8b35316de0fc215c91a83e37d19a3b59a39783018f8b9921f9f6b028b5c11f43`                                                                           |
+| Provenance      | existing tag `provenance/sha-d5b2ef9c644c`                                                                                                          |
+| HMAC            | `OPENBOT_CT_SHADOW_HMAC_KEY` set (value withheld, 256-bit); `OPENBOT_CT_SHADOW_HMAC_KEY_ID=ct-2026-09-11-host`; not in podman Config.Env            |
+| Flags           | activation/detection/qualification unset; projection/authorization off                                                                              |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 80; `--live-verified`. Seq 79 closed. |
+| Rollback        | container `openbot-gateway-rc-prev-d5b2ef9c64-prehmac`; image unchanged                                                                             |
+| Executor        | `cursor-grok`                                                                                                                                       |
 
 ## Latest cutover (2026-09-11) — seq 79 / d5b2ef9c644c GHCR
 
@@ -342,7 +342,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `d5b2ef9c6
 | Provenance      | annotated tag `provenance/sha-d5b2ef9c644c`                                                                                                           |
 | Control UI      | `index-tvycM9fL.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 79; `--live-verified`. Seq 78 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 79; `--live-verified`. Seq 78 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-79f2d5f57b-safety`; image `localhost/openbot:rc-amd64-provenance-79f2d5f57b`                                       |
 | Executor        | `cursor-composer`                                                                                                                                     |
 
@@ -359,7 +359,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `79f2d5f57
 | Provenance      | annotated tag `provenance/sha-79f2d5f57b91`                                                                                                           |
 | Control UI      | `index-tvycM9fL.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 78; `--live-verified`. Seq 77 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 78; `--live-verified`. Seq 77 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-d537f2fdce-safety`; image `localhost/openbot:rc-amd64-provenance-d537f2fdce`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -376,7 +376,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `d537f2fdc
 | Provenance      | annotated tag `provenance/sha-d537f2fdce97`                                                                                                           |
 | Control UI      | `index-D_VTujI8.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 77; `--live-verified`. Seq 76 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 77; `--live-verified`. Seq 76 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-c4df1f47bb-safety`; image `localhost/openbot:rc-amd64-provenance-c4df1f47bb`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -393,7 +393,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `c4df1f47b
 | Provenance      | annotated tag `provenance/sha-c4df1f47bb46`                                                                                                           |
 | Control UI      | `index-CtfXQDSz.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 76; `--live-verified`. Seq 75 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 76; `--live-verified`. Seq 75 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-e4a2679da2-safety`; image `localhost/openbot:rc-amd64-provenance-e4a2679da2`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -410,7 +410,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `e4a2679da
 | Provenance      | annotated tag `provenance/sha-e4a2679da272`                                                                                                           |
 | Control UI      | `index-CUiQ_-0f.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 75; `--live-verified`. Seq 74 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 75; `--live-verified`. Seq 74 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-4a3853899c-safety`; image `localhost/openbot:rc-amd64-provenance-4a3853899c`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -427,7 +427,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `cfe9d22ee
 | Provenance      | annotated tag `provenance/sha-cfe9d22ee148`                                                                                                           |
 | Control UI      | `index-wcFq7WbB.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 74; `--live-verified`. Seq 73 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 74; `--live-verified`. Seq 73 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-7a6416cdfe-safety`; image `localhost/openbot:rc-amd64-provenance-7a6416cdfe`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -444,7 +444,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `7a6416cdf
 | Provenance      | annotated tag `provenance/sha-7a6416cdfe35`                                                                                                           |
 | Control UI      | `index-wcFq7WbB.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 73; `--live-verified`. Seq 72 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 73; `--live-verified`. Seq 72 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-aac4d9884d-safety`; image `localhost/openbot:rc-amd64-provenance-aac4d9884d`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -461,7 +461,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `470336cd0
 | Provenance      | annotated tag `provenance/sha-470336cd0c0a`                                                                                                           |
 | Control UI      | `index-DxnkqSrE.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 72; `--live-verified`. Seq 71 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 72; `--live-verified`. Seq 71 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-74fe2064ba-safety`; image `localhost/openbot:rc-amd64-provenance-74fe2064ba`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -478,7 +478,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `74fe2064b
 | Provenance      | annotated tag `provenance/sha-74fe2064ba11`                                                                                                           |
 | Control UI      | `index-DxnkqSrE.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 71; `--live-verified`. Seq 70 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 71; `--live-verified`. Seq 70 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-3cbd21a9e1-safety`; image `localhost/openbot:rc-amd64-provenance-3cbd21a9e1`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -495,7 +495,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `3cbd21a9e
 | Provenance      | annotated tag `provenance/sha-3cbd21a9e10f`                                                                                                           |
 | Control UI      | `index-E66c70ZW.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 70; `--live-verified`. Seq 69 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 70; `--live-verified`. Seq 69 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-68271086f7-safety`; image `localhost/openbot:rc-amd64-provenance-68271086f7`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -512,7 +512,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `05fe95832
 | Provenance      | annotated tag `provenance/sha-05fe958325f3`                                                                                                           |
 | Control UI      | `index-DVERNwfZ.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 69; `--live-verified`. Seq 68 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 69; `--live-verified`. Seq 68 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-882d2d22f8-safety`; image `localhost/openbot:rc-amd64-provenance-882d2d22f8`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -529,7 +529,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `882d2d22f
 | Provenance      | annotated tag `provenance/sha-882d2d22f8c5`                                                                                                           |
 | Control UI      | `index-DLuLgm-z.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 68; `--live-verified`. Seq 67 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 68; `--live-verified`. Seq 67 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-7e41fecc42-safety`; image `localhost/openbot:rc-amd64-provenance-7e41fecc42`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -546,7 +546,7 @@ Historical backfill of the already-running LIVE after #1026 and #1027. Does not 
 | Provenance      | annotated tag `provenance/sha-7e41fecc4241`                                                                                                           |
 | Control UI      | `index-B-aaozb7.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 67; `--live-verified`. Seq 66 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 67; `--live-verified`. Seq 66 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-8b5db08ee1-safety`; image `localhost/openbot:rc-amd64-provenance-8b5db08ee1`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -554,18 +554,18 @@ Historical backfill of the already-running LIVE after #1026 and #1027. Does not 
 
 Historical reconstruction of the already-cut I2 hop. Does not mint a new cutover or image. Host leftover `openbot-gateway-rc-prev-8b5db08ee1-safety` Created/StartedAt `2026-09-07T14:29:34Z` FinishedAt `2026-09-07T16:04:59Z`. Image `localhost/openbot:rc-amd64-provenance-8b5db08ee1` digest `sha256:1390775cbf05081c95236ee75e84e30f6cf8855aa82ce97c2063a0024a66f570`. Pulled `ghcr.io/gmood2008/openbot@sha256:1390775cbf05081c95236ee75e84e30f6cf8855aa82ce97c2063a0024a66f570` (Docker Release 34132195155 amd64). Recreated container; safety `openbot-gateway-rc-prev-98a9a6c743-safety`. Contemporaneous verify-live PASS and R9 PASS at cutover. liveFrom `2026-09-07T14:29:34Z` closes seq 65. Executor cursor-grok. liveVerified=false (`--unverified-backfill`: no longer the running LIVE). Annotated SoT identity tag `provenance/sha-8b5db08ee149`. Shadow I2 record wiring; stays **assist**.
 
-| Field           | Value                                                                                                                                                 |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Date            | liveFrom `2026-09-07T14:29:34Z`                                                                                                                       |
-| Source revision | `8b5db08ee149db694a47210d4e65bd0958ffdcd3`                                                                                                            |
-| Source          | GHCR digest `sha256:1390775cbf05081c95236ee75e84e30f6cf8855aa82ce97c2063a0024a66f570` / host alias `localhost/openbot:rc-amd64-provenance-8b5db08ee1` |
-| Image digest    | `sha256:1390775cbf05081c95236ee75e84e30f6cf8855aa82ce97c2063a0024a66f570`                                                                             |
-| Provenance      | annotated tag `provenance/sha-8b5db08ee149`                                                                                                           |
-| Control UI      | `index-B-aaozb7.js`                                                                                                                                   |
-| Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 66; `--unverified-backfill`. Seq 65 closed.                                                                    |
-| Rollback        | container `openbot-gateway-rc-prev-98a9a6c743-safety`; image `localhost/openbot:rc-amd64-provenance-98a9a6c743`                                       |
-| Executor        | `cursor-grok`                                                                                                                                         |
+| Field           | Value                                                                                                                                                     |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-09-07T14:29:34Z`                                                                                                                           |
+| Source revision | `8b5db08ee149db694a47210d4e65bd0958ffdcd3`                                                                                                                |
+| Source          | GHCR digest `sha256:1390775cbf05081c95236ee75e84e30f6cf8855aa82ce97c2063a0024a66f570` / host alias `localhost/openbot:rc-amd64-provenance-8b5db08ee1`     |
+| Image digest    | `sha256:1390775cbf05081c95236ee75e84e30f6cf8855aa82ce97c2063a0024a66f570`                                                                                 |
+| Provenance      | annotated tag `provenance/sha-8b5db08ee149`                                                                                                               |
+| Control UI      | `index-B-aaozb7.js`                                                                                                                                       |
+| Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                               |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 66; `--unverified-backfill`. Seq 65 closed. |
+| Rollback        | container `openbot-gateway-rc-prev-98a9a6c743-safety`; image `localhost/openbot:rc-amd64-provenance-98a9a6c743`                                           |
+| Executor        | `cursor-grok`                                                                                                                                             |
 
 ## Latest cutover (2026-09-07) — seq 65 / 98a9a6c743 GHCR
 
@@ -580,7 +580,7 @@ User-authorized full-dist recreate from freshly fetched `origin/main` `98a9a6c74
 | Provenance      | annotated tag `provenance/sha-98a9a6c743ff`                                                                                                           |
 | Control UI      | `index-B-aaozb7.js`                                                                                                                                   |
 | Governance      | `OPENBOT_EVOLUTION_GOVERNANCE_MODE=assist` (no global auto)                                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 65; `--live-verified`. Seq 64 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 65; `--live-verified`. Seq 64 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-7d3fdf5bfe-safety`; image `localhost/openbot:rc-amd64-provenance-7d3fdf5bfe`                                       |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
@@ -596,7 +596,7 @@ User-authorized unified-window full-dist recreate from freshly fetched `origin/m
 | Image digest    | `sha256:db7b64563e591e0887915f2d9bbef2cb8130e77f5940ac7dcbb5dd817ffd044c`                                                                             |
 | Provenance      | annotated tag `provenance/sha-7d3fdf5bfef5`                                                                                                           |
 | Control UI      | `index-Ch6EMLgY.js`                                                                                                                                   |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 64; `--live-verified`. Seq 63 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 64; `--live-verified`. Seq 63 closed.   |
 | Rollback        | container `openbot-gateway-rc-prev-04690f8d2e-safety`; image `localhost/openbot:rc-amd64-provenance-04690f8d2e`                                       |
 | Executor        | `delivery`                                                                                                                                            |
 
@@ -612,7 +612,7 @@ Human Latest cutover backfill of the existing open `https://github.com/flykingvi
 | Image digest    | `sha256:f9775147138b1f8d733c95c2e708ddc00b26d88a74af534b49274526b22da4f1`                                                                             |
 | Provenance      | annotated tag `provenance/sha-04690f8d2ed5` (SoT identity for already-running LIVE; ledger `tag=main`)                                                |
 | Control UI      | `index-D68V9vJz.js`                                                                                                                                   |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 63; `--live-verified`. Seq 62 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 63; `--live-verified`. Seq 62 closed.   |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
 ## Latest cutover (2026-09-04) — seq 61 / e59aede250 GHCR
@@ -627,7 +627,7 @@ Record of the already-running LIVE container. Does not mint a new image or cut o
 | Image digest    | `sha256:314be4cd76f7d06c4028f0c430afada99d1c5bcbb010353b4c764465597a7423`                                                                             |
 | Provenance      | annotated tag `provenance/sha-e59aede2506d`                                                                                                           |
 | Control UI      | `index-Pt6WG8nT.js`                                                                                                                                   |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 61; `--live-verified`. Seq 60 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 61; `--live-verified`. Seq 60 closed.   |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
 ## Latest cutover (2026-09-04) — seq 59 / 3d03d3b4 GHCR
@@ -642,23 +642,23 @@ Human Latest cutover backfill of the existing open `https://github.com/flykingvi
 | Image digest    | `sha256:1881c4a8d5739c84d40a668dc4fb2c8cfeb3084de0c221881fd2a58c03e00e6e`                                                                             |
 | Provenance      | none (ledger `tag=main`; no `provenance/sha-3d03d3b4df91`)                                                                                            |
 | Control UI      | `index-mGJyINL7.js`                                                                                                                                   |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 59; `--live-verified`. Seq 58 closed.                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 59; `--live-verified`. Seq 58 closed.   |
 | Executor        | `cursor-grok`                                                                                                                                         |
 
 ## Latest cutover (2026-09-02) — seq 54 / 37cc40e51f GHCR
 
 User-authorized origin/main full-dist after #895/#898. Host 8.217.93.71 / openbot-gateway-rc image localhost/openbot:rc-amd64-provenance-37cc40e51f digest sha256:7ad093be0b62f83d735cc548a3814a5c521cf31d5d0473fc866b22f1740fe5ab OCI revision 37cc40e51f468404baf3077307e347f32f636cb1. Pulled ghcr.io/gmood2008/openbot:provenance-sha-37cc40e51f46-amd64 (Docker Release 33611768109). Recreated container; safety openbot-gateway-rc-prev-45087ca676-safety. verify-live PASS. liveFrom 2026-09-02T09:50:59Z closes seq 53. Executor cursor-grok. liveVerified=true.
 
-| Field           | Value                                                                                                    |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| Date            | liveFrom `2026-09-02T09:50:59Z`                                                                          |
-| Source revision | `37cc40e51f468404baf3077307e347f32f636cb1`                                                               |
-| Source          | GHCR `provenance-sha-37cc40e51f46-amd64` / host alias `localhost/openbot:rc-amd64-provenance-37cc40e51f` |
-| Image digest    | `sha256:7ad093be0b62f83d735cc548a3814a5c521cf31d5d0473fc866b22f1740fe5ab`                                |
-| Provenance      | annotated tag `provenance/sha-37cc40e51f46`                                                              |
-| Control UI      | `index-p7Oe0D9v.js` (www + gw)                                                                           |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 54; `--live-verified`. Seq 53 closed.                             |
-| Executor        | `cursor-grok`                                                                                            |
+| Field           | Value                                                                                                                                               |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-09-02T09:50:59Z`                                                                                                                     |
+| Source revision | `37cc40e51f468404baf3077307e347f32f636cb1`                                                                                                          |
+| Source          | GHCR `provenance-sha-37cc40e51f46-amd64` / host alias `localhost/openbot:rc-amd64-provenance-37cc40e51f`                                            |
+| Image digest    | `sha256:7ad093be0b62f83d735cc548a3814a5c521cf31d5d0473fc866b22f1740fe5ab`                                                                           |
+| Provenance      | annotated tag `provenance/sha-37cc40e51f46`                                                                                                         |
+| Control UI      | `index-p7Oe0D9v.js` (www + gw)                                                                                                                      |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 54; `--live-verified`. Seq 53 closed. |
+| Executor        | `cursor-grok`                                                                                                                                       |
 
 ### Historical pending candidate — 2026-08-23 `d3f59d55d8` (SUPERSEDED, not LIVE)
 
@@ -716,46 +716,46 @@ User-authorized OP-3/M2b. Host 8.217.93.71 / openbot-gateway-rc image localhost/
 
 Intentional revert after the unledgered seq 46 forward. Host `8.217.93.71` / running container `openbot-gateway-rc` image `localhost/openbot:rc-amd64-provenance-21e1e8392f0f`, image id `6df3e092fcf9118914964a8bcd6089e4bcb48849c2e08a472a3ad502aebe77f2`, digest `sha256:715122a14a8805c40f071c078a99132addbbb00633be21eabb55da7b85f65a5b`, OCI revision `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`, image Created `2026-08-28 03:58:45.25814315 +0000 UTC`. This running image is **distinct** from the seq 45 recorded digest `sha256:ee132a30aea0461b71e8d98395e17ebae13f8224f20c3a14b6b818406b75ecb2`. OP-1 `--verify-live` PASS (healthz 200 live; readyz `ready:true` `failing:[]`); seq 45 was **not** `--record`ed again. liveFrom `2026-08-28T05:51:33Z` closes seq 46. Executor `gmood2008`. `liveVerified=true`. OP-3 (next GHCR cutover `--verify-live --record`) remains open. Tracker: `docs/design/openbot-aliyun-prod-v2-implementable-2026-08-28.md` § Operator tracking.
 
-| Field           | Value                                                                                                           |
-| --------------- | --------------------------------------------------------------------------------------------------------------- |
-| Date            | liveFrom `2026-08-28T05:51:33Z` (FinishedAt of `openbot-gateway-rc-prev-471b3a2c3099-safety`)                   |
-| Source revision | `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`                                                                      |
-| Source          | host image `localhost/openbot:rc-amd64-provenance-21e1e8392f0f`                                                 |
-| Image digest    | `sha256:715122a14a8805c40f071c078a99132addbbb00633be21eabb55da7b85f65a5b`                                       |
-| Image id        | `6df3e092fcf9118914964a8bcd6089e4bcb48849c2e08a472a3ad502aebe77f2`                                              |
-| Provenance      | annotated tag `provenance/sha-21e1e8392f0f`                                                                     |
+| Field           | Value                                                                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-08-28T05:51:33Z` (FinishedAt of `openbot-gateway-rc-prev-471b3a2c3099-safety`)                                                                                          |
+| Source revision | `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`                                                                                                                                             |
+| Source          | host image `localhost/openbot:rc-amd64-provenance-21e1e8392f0f`                                                                                                                        |
+| Image digest    | `sha256:715122a14a8805c40f071c078a99132addbbb00633be21eabb55da7b85f65a5b`                                                                                                              |
+| Image id        | `6df3e092fcf9118914964a8bcd6089e4bcb48849c2e08a472a3ad502aebe77f2`                                                                                                                     |
+| Provenance      | annotated tag `provenance/sha-21e1e8392f0f`                                                                                                                                            |
 | Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 47; `--live-verified`; `--intentional-revert`. Seq 45 and seq 46 closed. |
-| Executor        | `gmood2008`                                                                                                     |
+| Executor        | `gmood2008`                                                                                                                                                                            |
 
 ## Historical cutover (2026-08-28) — seq 46 / 471b3a2c (~11 min)
 
 Unledgered forward reconstructed from host leftover (not a new cutover). Image `localhost/openbot:rc-amd64-provenance-471b3a2c3099`, image id `3274060a31d4bf4187026687ac8369ae98da9545075dea4690750cba756bfe01`, digest `sha256:1aaa7406c0965d9ffd33b9237030e43d5af833119cc2663e9821c930e545765b`, OCI revision `471b3a2c30990c2cc555c01bfa496870e147c229`. Container `817c9dfe13db` name `openbot-gateway-rc-prev-471b3a2c3099-safety`. Started `2026-08-28 13:40:36.539960152 +0800 CST` = `2026-08-28T05:40:36Z`; Finished `2026-08-28 13:51:33.478518998 +0800 CST` = `2026-08-28T05:51:33Z`. Recorded with `--unverified-backfill` (not `--live-verified`). Closes seq 45 at the same `liveFrom`.
 
-| Field           | Value                                                                                           |
-| --------------- | ----------------------------------------------------------------------------------------------- |
-| Date            | liveFrom `2026-08-28T05:40:36Z`; liveTo `2026-08-28T05:51:33Z`                                  |
-| Source revision | `471b3a2c30990c2cc555c01bfa496870e147c229`                                                      |
-| Source          | host leftover `localhost/openbot:rc-amd64-provenance-471b3a2c3099`                              |
-| Image digest    | `sha256:1aaa7406c0965d9ffd33b9237030e43d5af833119cc2663e9821c930e545765b`                       |
-| Image id        | `3274060a31d4bf4187026687ac8369ae98da9545075dea4690750cba756bfe01`                              |
-| Container       | `817c9dfe13db` / `openbot-gateway-rc-prev-471b3a2c3099-safety`                                  |
-| Provenance      | tag field `provenance/sha-471b3a2c3099` (writer-recorded; not a new annotated tag from this PR) |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 46; `liveVerified=false`; historical reconstruction      |
-| Executor        | `gmood2008`                                                                                     |
+| Field           | Value                                                                                                                                                             |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-08-28T05:40:36Z`; liveTo `2026-08-28T05:51:33Z`                                                                                                    |
+| Source revision | `471b3a2c30990c2cc555c01bfa496870e147c229`                                                                                                                        |
+| Source          | host leftover `localhost/openbot:rc-amd64-provenance-471b3a2c3099`                                                                                                |
+| Image digest    | `sha256:1aaa7406c0965d9ffd33b9237030e43d5af833119cc2663e9821c930e545765b`                                                                                         |
+| Image id        | `3274060a31d4bf4187026687ac8369ae98da9545075dea4690750cba756bfe01`                                                                                                |
+| Container       | `817c9dfe13db` / `openbot-gateway-rc-prev-471b3a2c3099-safety`                                                                                                    |
+| Provenance      | tag field `provenance/sha-471b3a2c3099` (writer-recorded; not a new annotated tag from this PR)                                                                   |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 46; `liveVerified=false`; historical reconstruction |
+| Executor        | `gmood2008`                                                                                                                                                       |
 
 ## Historical cutover (2026-08-28) — seq 45 / 21e1e839 GHCR backfill
 
 Ledger-recorded cutover from `76fea1fb0669` to `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`. GHCR image `rc-amd64-provenance-21e1e8392f`, digest `sha256:ee132a30aea0461b71e8d98395e17ebae13f8224f20c3a14b6b818406b75ecb2`, tag `provenance/sha-21e1e8392f0f`, liveFrom `2026-08-28T03:59:00Z`, liveTo `2026-08-28T05:40:36Z`, executor `kiro-daibai`. Seq 45 was ledger-backfilled (`liveVerified` absent). Closed when seq 46 was reconstructed. The later independently verified running image is seq 47 (`21e1e8392f0f` / digest `sha256:715122a1…`), not this recorded digest.
 
-| Field           | Value                                                                            |
-| --------------- | -------------------------------------------------------------------------------- |
-| Date            | liveFrom `2026-08-28T03:59:00Z`; liveTo `2026-08-28T05:40:36Z`                   |
-| Source revision | `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`                                       |
-| Source          | GHCR image `rc-amd64-provenance-21e1e8392f`                                      |
-| Image digest    | `sha256:ee132a30aea0461b71e8d98395e17ebae13f8224f20c3a14b6b818406b75ecb2`        |
-| Provenance      | annotated tag `provenance/sha-21e1e8392f0f`                                      |
+| Field           | Value                                                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date            | liveFrom `2026-08-28T03:59:00Z`; liveTo `2026-08-28T05:40:36Z`                                                                                          |
+| Source revision | `21e1e8392f0ff5808563727eaa8f66e6ad9ed148`                                                                                                              |
+| Source          | GHCR image `rc-amd64-provenance-21e1e8392f`                                                                                                             |
+| Image digest    | `sha256:ee132a30aea0461b71e8d98395e17ebae13f8224f20c3a14b6b818406b75ecb2`                                                                               |
+| Provenance      | annotated tag `provenance/sha-21e1e8392f0f`                                                                                                             |
 | Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 45; historical backfill; closed by seq 46 |
-| Executor        | `kiro-daibai`                                                                    |
+| Executor        | `kiro-daibai`                                                                                                                                           |
 
 ## Latest cutover (2026-08-27) — origin/main full-swap `76fea1fb` (CTR P2.5 shadow, dormant)
 
@@ -774,7 +774,7 @@ Authorization: Handoff A conditional-GO (`kiro-release-authority`) + pre-deploy 
 | Provenance      | annotated tag `provenance/sha-76fea1fb0669` → `76fea1fb0669357fa7ed8c4c882bc4588b614cab`                                                                                                                                                                                                           |
 | Shadow key      | `OPENBOT_CT_SHADOW_HMAC_KEY` set (value withheld; 256-bit), `OPENBOT_CT_SHADOW_HMAC_KEY_ID=ct-2026-08`. AC-cond-1 **partial/pending**: openssl-generated on host, NOT vault-managed → vault migration is a hard pre-activation (C) follow-up + privacy-reviewer acceptance. AC-cond-2/3 met.       |
 | Dormancy        | detection/qualification flags OFF, allowlist empty, no shadow activity in logs; normal chat reply/timing unaffected                                                                                                                                                                                |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 44; seq 43 `liveTo=2026-08-27T04:11:44Z`                                                                                                                                                                                                                    |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 44; seq 43 `liveTo=2026-08-27T04:11:44Z`                                                                                                                                             |
 | Smoke           | healthz **200**; readyz **ready:true** `failing:[]`; `verify-forward-only`=allow (forwardOnly true, from LIVE `cf7ceb40a7`); `verify-delivery-alignment`=PASS8/WARN2/FAIL0                                                                                                                         |
 | Rollback        | rename/start `openbot-gateway-rc-prev-cf7ceb40a7` (image `rc-amd64-provenance-cf7ceb40a7`) — instant; old image retained                                                                                                                                                                           |
 | Executor        | `kiro-collab-csc` (release operator); implementation owner `kiro-conversation-task-runtime`. Boundary AC-A6: shadow dormant only; production rollout to activation = NOT APPROVED                                                                                                                  |
@@ -793,7 +793,7 @@ User-authorized forward-only cutover from `831dd9c749` to `origin/main` commit `
 | Control UI      | Served `assets/index-Dpg8P1UR.js`.                                                                                                                                                                                                                                                                                       |
 | Image           | `localhost/openbot:rc-amd64-provenance-cf7ceb40a7` (`ImageID=389c082c274b…`; OCI revision `cf7ceb40a7c43edf3698f8cba4b944f3c09c2dc4`)                                                                                                                                                                                    |
 | Provenance      | annotated tag `provenance/sha-cf7ceb40a7c4` → `cf7ceb40a7c43edf3698f8cba4b944f3c09c2dc4` (new tag; old tags not moved)                                                                                                                                                                                                   |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 43; seq 42 `liveTo=2026-08-26T14:37:46Z`                                                                                                                                                                                                                                          |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 43; seq 42 `liveTo=2026-08-26T14:37:46Z`                                                                                                                                                                   |
 | Smoke           | After swap: healthz **200**; readyz **ready:true** `failing:[]`; inbound / CSC / CONTEXT_SCOPE unset; `cutover-from-ghcr.sh --verify-live` **PASS**                                                                                                                                                                      |
 | Rollback        | rename/start `openbot-gateway-rc-prev-831dd9c749-safety` (image `rc-amd64-provenance-831dd9c749`) — instant; old image retained                                                                                                                                                                                          |
 | Executor        | `kiro-collab-csc`; user-authorized 2026-08-26 cutover to deploy #748                                                                                                                                                                                                                                                     |
@@ -813,7 +813,7 @@ User-authorized **Route A** forward-only cutover from `a12e4c59e575` to `origin/
 | Control UI      | Served `assets/index-Dpg8P1UR.js` (host + container). `OPENBOT_UI_OVERLAY_PINNED_ENTRY` is inert in this build (no code reads it; sanitizer only rewrites retired `index-CR5cronNm[6-8].js`).                                                                                                                        |
 | Image           | `localhost/openbot:rc-amd64-provenance-831dd9c749` (`ImageID=127113e7c0fb…`; OCI revision `831dd9c749b506c82009ee5e30d10dfa98e97eee`)                                                                                                                                                                                |
 | Provenance      | annotated tag `provenance/sha-831dd9c749b5` → `831dd9c749b506c82009ee5e30d10dfa98e97eee` (new tag; old tags not moved)                                                                                                                                                                                               |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 42; seq 41 `liveTo=2026-08-26T04:19:23Z`                                                                                                                                                                                                                                      |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 42; seq 41 `liveTo=2026-08-26T04:19:23Z`                                                                                                                                                               |
 | Smoke           | After swap: healthz **200**; readyz **ready:true** `failing:[]`; inbound / CSC / CONTEXT_SCOPE unset; `getChatInboundDepthAgentAllowlist` present in `/app/dist`; `cutover-from-ghcr.sh --verify-live` **PASS**                                                                                                      |
 | Rollback        | rename/start `openbot-gateway-rc-prev-a12e4c59e5-safety` (image `rc-amd64-provenance-a12e4c59e575`) — instant; old image retained                                                                                                                                                                                    |
 | Executor        | `kiro-collab-csc`; user-authorized 2026-08-26 Route A full-swap                                                                                                                                                                                                                                                      |
@@ -844,7 +844,7 @@ User authorized merge of #656 then a **full container recreate** onto freshly fe
 | Gateway         | full-dist `build-info.commit=a12e4c59e5754e0c280b423c68c989c6973ac9b0`; previous observed LIVE overlay `47d6934c34dced654652f027f2c66fedea35a67f` on base `5c221b9ec38c` (unledgered; StartedAt `2026-08-23 21:55:05 +0800`); ledger previous row seq 40 `33993e52e554`                               |
 | Image           | `localhost/openbot:rc-amd64-provenance-a12e4c59e575` (`ImageID=f2fcc345923017749ef03a46cc41bb4cd49bbc12758d7cb3ba74710966a25f74`; OCI revision `a12e4c59e5754e0c280b423c68c989c6973ac9b0`)                                                                                                            |
 | Provenance      | annotated tag `provenance/sha-a12e4c59e575` → `a12e4c59e5754e0c280b423c68c989c6973ac9b0` (new tag; old tags not moved)                                                                                                                                                                                |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 41; seq 40 `liveTo=2026-08-23T22:37:47Z`                                                                                                                                                                                                                       |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 41; seq 40 `liveTo=2026-08-23T22:37:47Z`                                                                                                                                                |
 | Smoke           | Isolated `:18889` healthz 200 / readyz ready; rollback drill `:18890` on `5c221b9ec3`; `touchedLive=false` during drills. After swap: healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC / CONTEXT_SCOPE unset; `cutover-from-ghcr.sh --verify-live` **PASS** |
 | Rollback        | `podman start`/`rename` `openbot-gateway-rc-prev-47d693-before-a12e4c`, or recreate `localhost/openbot:rc-amd64-provenance-5c221b9ec3` and restore `/root/openbot-maintenance-full-swap-a12e4c59e575-r1-20260823T223738Z/container-app-dist.before.tgz` (47d693 overlay).                             |
 | Executor        | `cursor-collab-csc`; user authorized 2026-08-23 full-swap after #656                                                                                                                                                                                                                                  |
@@ -896,7 +896,7 @@ seq 28 / seq 29 stay historical (`ws-c-v1-root-guard-r1-20260815` + `6ac338` / `
 | Gateway         | overlay artifact `build-info.commit=33993e52e5540f76e57d66ab75d8955420437d3a`; previous overlay `b576641a96eb49285e8454f30e060de0eabc49a0` (seq 39)                                                                                                                                                         |
 | Image           | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`; OCI revision `5c221b9ec38c6316b98797342a01fb39ffd80562`)                                  |
 | Provenance      | overlay tag `provenance/sha-33993e52e554` → `33993e52e5540f76e57d66ab75d8955420437d3a`; base-image tag `provenance/sha-5c221b9ec38c` unchanged                                                                                                                                                              |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 40; seq 39 `liveTo=2026-08-23T09:28:05Z`; seq 38 `liveTo=2026-08-23T08:06:29Z`                                                                                                                                                                                       |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 40; seq 39 `liveTo=2026-08-23T09:28:05Z`; seq 38 `liveTo=2026-08-23T08:06:29Z`                                                                                                                |
 | Smoke           | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC flags unset; Progress Ledger **on** via `gateway.progressLedger.enabled=true` and `OPENBOT_PROGRESS_LEDGER_ENABLED=1` in `/root/.openbot/.env.docker` (process env still UNSET until recreate)                   |
 | Rollback        | restore `/root/openbot-maintenance-origin-main-33993e52e554-full-dist-r1-20260823T092707Z/container-app-dist.before.tgz` into `/app/dist` (returns overlay `b576641a96eb`). Image stays `rc-amd64-provenance-5c221b9ec3`. Do **not** treat overlay SHA as a new image.                                      |
 | Executor        | overlay `cursor-grok`; user authorized 2026-08-23 shortest safe path for latest `origin/main`                                                                                                                                                                                                               |
@@ -941,7 +941,7 @@ seq 28 / seq 29 stay historical (`ws-c-v1-root-guard-r1-20260815` + `6ac338` / `
 | Gateway         | overlay artifact `build-info.commit=b576641a96eb49285e8454f30e060de0eabc49a0`; previous overlay `bad5f90a1d33082d9fa6b6c6e361044ac7017f13` (seq 38)                                                                                                                                                         |
 | Image           | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`; OCI revision `5c221b9ec38c6316b98797342a01fb39ffd80562`)                                  |
 | Provenance      | overlay tag `provenance/sha-b576641a96eb` → `b576641a96eb49285e8454f30e060de0eabc49a0`; base-image tag `provenance/sha-5c221b9ec38c` unchanged                                                                                                                                                              |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 39; seq 38 `liveTo=2026-08-23T08:06:29Z`; seq 37 `liveTo=2026-08-23T06:42:02Z`                                                                                                                                                                                       |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 39; seq 38 `liveTo=2026-08-23T08:06:29Z`; seq 37 `liveTo=2026-08-23T06:42:02Z`                                                                                                                |
 | Smoke           | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC flags unset; Progress Ledger **on** via `gateway.progressLedger.enabled=true` and `OPENBOT_PROGRESS_LEDGER_ENABLED=1` in `/root/.openbot/.env.docker` (process env still UNSET until recreate)                   |
 | Admin           | production cron fold via `readAdminProgressLedger` returned `projectionKind=canonical`, 6 items, I1–I8 `0`; admin === cron.list projection; TOOL_SUCCEEDED only reaches `executed`                                                                                                                          |
 | Rollback        | restore `/root/openbot-maintenance-origin-main-b576641a96eb-full-dist-r1-20260823T080458Z/container-app-dist.before.tgz` into `/app/dist` (returns overlay `bad5f90a1d33`). Image stays `rc-amd64-provenance-5c221b9ec3`. Do **not** treat overlay SHA as a new image.                                      |
@@ -987,7 +987,7 @@ seq 28 / seq 29 stay historical (`ws-c-v1-root-guard-r1-20260815` + `6ac338` / `
 | Gateway         | overlay artifact `build-info.commit=bad5f90a1d33082d9fa6b6c6e361044ac7017f13`; previous overlay `5a39526798493464ff0a7f29ab65ab66ad7670ed` (seq 37)                                                                                                                                                         |
 | Image           | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`; OCI revision `5c221b9ec38c6316b98797342a01fb39ffd80562`)                                  |
 | Provenance      | overlay tag `provenance/sha-bad5f90a1d33` → `bad5f90a1d33082d9fa6b6c6e361044ac7017f13`; base-image tag `provenance/sha-5c221b9ec38c` unchanged                                                                                                                                                              |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 38; seq 37 `liveTo=2026-08-23T06:42:02Z`; seq 36 `liveTo=2026-08-23T03:40:11Z`                                                                                                                                                                                       |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 38; seq 37 `liveTo=2026-08-23T06:42:02Z`; seq 36 `liveTo=2026-08-23T03:40:11Z`                                                                                                                |
 | Smoke           | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC flags unset; Progress Ledger **on** via `gateway.progressLedger.enabled=true` and `OPENBOT_PROGRESS_LEDGER_ENABLED=1` in `/root/.openbot/.env.docker` (process env still UNSET until recreate)                   |
 | Admin           | `progress-ledger.admin.list` registered in live dist; production cron fold via `readAdminProgressLedger` returned `projectionKind=canonical`, 6 items, I1–I8 `0`                                                                                                                                            |
 | Rollback        | restore `/root/openbot-maintenance-origin-main-bad5f90a1d33-r1-20260823T063918Z/container-app-dist-pkg.before.tgz` into `/app/dist` (returns overlay `5a3952679849`). Image stays `rc-amd64-provenance-5c221b9ec3`. Do **not** treat overlay SHA as a new image.                                            |
@@ -1033,7 +1033,7 @@ seq 28 / seq 29 stay historical (`ws-c-v1-root-guard-r1-20260815` + `6ac338` / `
 | Gateway         | overlay artifact `build-info.commit=5a39526798493464ff0a7f29ab65ab66ad7670ed`; previous overlay `e6f26e13795a86084e9f227453ee1d439d25d018` (seq 36)                                                                                                                                                         |
 | Image           | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`; OCI revision `5c221b9ec38c6316b98797342a01fb39ffd80562`)                                  |
 | Provenance      | overlay tag `provenance/sha-5a3952679849` → `5a39526798493464ff0a7f29ab65ab66ad7670ed`; base-image tag `provenance/sha-5c221b9ec38c` unchanged                                                                                                                                                              |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 37; seq 36 `liveTo=2026-08-23T03:40:11Z`; seq 35 `liveTo=2026-08-23T02:40:47Z`                                                                                                                                                                                       |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 37; seq 36 `liveTo=2026-08-23T03:40:11Z`; seq 35 `liveTo=2026-08-23T02:40:47Z`                                                                                                                |
 | Smoke           | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC flags unset; Progress Ledger **on** via `gateway.progressLedger.enabled=true` and `OPENBOT_PROGRESS_LEDGER_ENABLED=1` in `/root/.openbot/.env.docker` (process env still UNSET until recreate)                   |
 | Rollback        | restore `/root/openbot-maintenance-origin-main-5a3952679849-r1-20260823T033629Z/container-app-dist-pkg.before.tgz` into `/app/dist` (returns overlay `e6f26e13795a`). Image stays `rc-amd64-provenance-5c221b9ec3`. Do **not** treat overlay SHA as a new image.                                            |
 | Executor        | overlay `cursor-grok`; user authorized 2026-08-23 after closeout that `e6f26e13795a` was not the trunk tip                                                                                                                                                                                                  |
@@ -1078,7 +1078,7 @@ seq 28 / seq 29 stay historical (`ws-c-v1-root-guard-r1-20260815` + `6ac338` / `
 | Gateway         | overlay artifact `build-info.commit=e6f26e13795a86084e9f227453ee1d439d25d018`; previous overlay `7cd74d4c5c69e7492eb6d624531f27592d6c809a` (seq 35)                                                                                                                                                         |
 | Image           | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`; OCI revision `5c221b9ec38c6316b98797342a01fb39ffd80562`)                                  |
 | Provenance      | overlay tag `provenance/sha-e6f26e13795a` → `e6f26e13795a86084e9f227453ee1d439d25d018`; base-image tag `provenance/sha-5c221b9ec38c` unchanged                                                                                                                                                              |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 36; seq 35 `liveTo=2026-08-23T02:40:47Z`; seq 34 `liveTo=2026-08-22T15:09:15Z`                                                                                                                                                                                       |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 36; seq 35 `liveTo=2026-08-23T02:40:47Z`; seq 34 `liveTo=2026-08-22T15:09:15Z`                                                                                                                |
 | Smoke           | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC flags unset; Progress Ledger **on** via `gateway.progressLedger.enabled=true` and `OPENBOT_PROGRESS_LEDGER_ENABLED=1` in `/root/.openbot/.env.docker` (process env still UNSET until recreate)                   |
 | Rollback        | restore `/root/openbot-maintenance-origin-main-e6f26e13795a-r1-20260823T023758Z/container-app-dist-pkg.before.tgz` into `/app/dist` (returns overlay `7cd74d4c5c69`). Image stays `rc-amd64-provenance-5c221b9ec3`. Do **not** treat overlay SHA as a new image.                                            |
 | Executor        | overlay `cursor-grok`; user authorized 2026-08-23 after #630 approve + cutover current origin/main                                                                                                                                                                                                          |
@@ -1123,7 +1123,7 @@ seq 28 / seq 29 stay historical (`ws-c-v1-root-guard-r1-20260815` + `6ac338` / `
 | Gateway         | overlay artifact `build-info.commit=7cd74d4c5c69e7492eb6d624531f27592d6c809a`; previous overlay `affda8bce88939e42c57000896c13fc8a457f536` (seq 34)                                                                                                                                                                                                             |
 | Image           | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`; OCI revision `5c221b9ec38c6316b98797342a01fb39ffd80562`)                                                                                      |
 | Provenance      | overlay tag `provenance/sha-7cd74d4c5c69` → `7cd74d4c5c69e7492eb6d624531f27592d6c809a`; base-image tag `provenance/sha-5c221b9ec38c` unchanged                                                                                                                                                                                                                  |
-| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 35; seq 34 `liveTo=2026-08-22T15:09:15Z`; seq 33 `liveTo=2026-08-22T14:50:54Z`                                                                                                                                                                                                                                           |
+| Ledger          | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 35; seq 34 `liveTo=2026-08-22T15:09:15Z`; seq 33 `liveTo=2026-08-22T14:50:54Z`                                                                                                                                                                    |
 | Smoke           | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; inbound / CSC flags unset; Progress Ledger **on** via `gateway.progressLedger.enabled=true` and `OPENBOT_PROGRESS_LEDGER_ENABLED=1` in `/root/.openbot/.env.docker` (process env still UNSET until recreate)                                                                       |
 | Rollback        | restore `/root/openbot-maintenance-origin-main-7cd74d4c-item7-s18-r1-20260822T150915Z/container-app-dist-pkg.before.tgz` into `/app/dist` (returns overlay `affda8bce889`). Image stays `rc-amd64-provenance-5c221b9ec3`. Do **not** treat overlay SHA as a new image.                                                                                          |
 | Executor        | overlay observed; ledger close-out `cursor-collab-csc`; `Source revision` row + flag correction `cursor-grok`                                                                                                                                                                                                                                                   |
@@ -1171,7 +1171,7 @@ This row is **historical**. Current LIVE is seq 44 (`76fea1fb0669`), not seq 35 
 | Gateway    | `build-info.commit=5c221b9ec38c6316b98797342a01fb39ffd80562` `builtAt=2026-08-22T13:00:50.669Z`; previousLive `c393dca8feedd8b9db1a1f7fafc4796ac60b5d06` (seq 32 overlay)                                                                                                                                                      |
 | Image      | `localhost/openbot:rc-amd64-provenance-5c221b9ec3` (`ImageID=ca71ba79d8009c219b9aa1fa79fe6349b0cfd32621b0f3212cbd5146dc8b1d8c`; digest `sha256:b09953827133890b162dcd47dda12509bdf4a7a86d6d57e32b221dbd41b8b257`)                                                                                                              |
 | Provenance | annotated tag `provenance/sha-5c221b9ec38c` → `5c221b9ec38c6316b98797342a01fb39ffd80562` (minted earlier as CSC candidate on the same SHA; reused, not force-moved)                                                                                                                                                            |
-| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 33; `liveTo=2026-08-22T14:50:54Z`; seq 32 `liveTo=2026-08-22T13:21:21Z`                                                                                                                                                                                                                 |
+| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 33; `liveTo=2026-08-22T14:50:54Z`; seq 32 `liveTo=2026-08-22T13:21:21Z`                                                                                                                                          |
 | Smoke      | healthz **200** `{ok:true,status:live}`; readyz **ready:true** `failing:[]`; edge 200 on `www.openbot.love/`, `www.openbot.love/__openbot/control-ui-config.json`, `gw.openbot.love/healthz`; container env has `OPENBOT_DATA_MODE=managed` + `OPENBOT_MULTITENANT=1` and **no** inbound / CSC / Progress Ledger flags         |
 | Rollback   | rename safety container `openbot-gateway-rc-prev-c393dca8fe-safety` back to `openbot-gateway-rc` and start. Backup `/root/openbot-maintenance-ghcr-csc-5c221b9ec38c-20260822T132121Z/`. Do **not** overlay-restore seq 32 tarball into this image.                                                                             |
 | Executor   | `cursor-collab-csc`                                                                                                                                                                                                                                                                                                            |
@@ -1208,7 +1208,7 @@ This row is **historical**. Current LIVE is seq 44 (`76fea1fb0669` / `rc-amd64-p
 | Gateway    | overlay `origin-main-item6-path-gate-r1` @ `c393dca8feedd8b9db1a1f7fafc4796ac60b5d06`; previousLive `5480cefe122f38fdf1064c1672b860e10060a32c`; 236 commits from previous LIVE                                                                                                                                                                                                                                                                               |
 | Image      | `localhost/openbot:ws-c-v1-root-guard-r1-20260815` (`ImageID=5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9`)                                                                                                                                                                                                                                                                                                                              |
 | Provenance | annotated tag `provenance/sha-c393dca8feed` → `c393dca8feedd8b9db1a1f7fafc4796ac60b5d06` (minted earlier as CSC candidate on the same SHA; reused, not force-moved)                                                                                                                                                                                                                                                                                          |
-| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 32                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 32                                                                                                                                                                                                                                                                                                                                             |
 | Smoke      | healthz **200**; readyz **ready:true**; edge 200 on `gw.openbot.love/healthz`, `www.openbot.love/`, `biz.openbot.love/`, `admin.openbot.love/`; UI pin file `/app/dist/control-ui/assets/index-Ol92eg1L.js` present; container env has `OPENBOT_DATA_MODE=managed` + `OPENBOT_MULTITENANT=1` and **no** Progress Ledger / sqlite / schema v2 flags                                                                                                           |
 | Rollback   | restore `/root/openbot-maintenance-origin-main-item6-path-gate-r1-20260822T085042Z/container-app-dist-pkg.before.tgz` into `/app/dist` then `/usr/local/bin/openbot-gateway-restart`. Preserve host Control UI. Do **not** `podman restart -t 0`.                                                                                                                                                                                                            |
 | Executor   | `cursor-grok`                                                                                                                                                                                                                                                                                                                                                                                                                                                |
@@ -1250,7 +1250,7 @@ This row is **historical**. Current LIVE is seq 44 (`76fea1fb0669`), not seq 35 
 | Gateway    | overlay `context-compiler-main-r1` @ `5480cefe122f38fdf1064c1672b860e10060a32c`; previousLive `2022bcb0d192b5f99e291d0b50930aa7a6177664`; 7 commits from previous LIVE                                                                                 |
 | Image      | `localhost/openbot:ws-c-v1-root-guard-r1-20260815` (`ImageID=5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9`)                                                                                                                        |
 | Provenance | annotated tag `provenance/sha-5480cefe122f` → `5480cefe122f38fdf1064c1672b860e10060a32c`                                                                                                                                                               |
-| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 31                                                                                                                                                                                                              |
+| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 31                                                                                                                                       |
 | Smoke      | healthz **200**; readyz **ready:true**; compiler marker `OPENBOT_CONTEXT_COMPILER` in `/app/dist/reply-Dqqp6vRL.js`; runtime env default-on; inbound flags still `=1` in `/root/.openbot/.env`                                                         |
 | Rollback   | restore `/root/openbot-maintenance-context-compiler-main-r1-20260820T131501Z/container-app-dist.before.tgz` into `/app/dist` then `/usr/local/bin/openbot-gateway-restart`. Preserve host Control UI. Do **not** `podman restart -t 0`.                |
 | Executor   | `cursor-chat-inbound-depth`                                                                                                                                                                                                                            |
@@ -1289,7 +1289,7 @@ Context Compiler is **on this LIVE SHA** and remains **default-on** (`OPENBOT_CO
 | Gateway    | overlay `ws-reconnect-hydrate-r1` @ `2022bcb0d192b5f99e291d0b50930aa7a6177664`; previousLive `aa348b38a14a69683bdc5a715ca48d2564a2542d`; 51 commits from previous LIVE                                                                                     |
 | Image      | `localhost/openbot:ws-c-v1-root-guard-r1-20260815` (`ImageID=5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9`)                                                                                                                            |
 | Provenance | annotated tag `provenance/sha-2022bcb0d192` → `2022bcb0d192b5f99e291d0b50930aa7a6177664`                                                                                                                                                                   |
-| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 30                                                                                                                                                                                                                  |
+| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 30                                                                                                                                           |
 | Smoke      | healthz **200**; readyz **ready:true**; public entry `index-Ol92eg1L.js`; inbound flags kept `=1` in `/root/.openbot/.env`                                                                                                                                 |
 | Rollback   | restore `/root/openbot-maintenance-ws-reconnect-hydrate-r1-20260820T100640Z/container-app-dist.before.tgz` into `/app/dist` and restore host Control UI from that backup, then `/usr/local/bin/openbot-gateway-restart`. Do **not** `podman restart -t 0`. |
 | Executor   | `cursor-chat-inbound-depth`                                                                                                                                                                                                                                |
@@ -1322,7 +1322,7 @@ This row is **historical**. Current LIVE is seq 44 (`76fea1fb0669`), not seq 31.
 | Gateway    | overlay `inbound-depth-main-r1` @ `aa348b38a14a69683bdc5a715ca48d2564a2542d`; previousLive `6ac338479a1644d28a6bca1c48e1921c11f9d36f`; 143 commits from previous LIVE                                                                     |
 | Image      | `localhost/openbot:ws-c-v1-root-guard-r1-20260815` (`ImageID=5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9`)                                                                                                           |
 | Provenance | annotated tag `provenance/sha-aa348b38a14a` → `aa348b38a14a69683bdc5a715ca48d2564a2542d`                                                                                                                                                  |
-| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 29                                                                                                                                                                                                 |
+| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 29                                                                                                                          |
 | Smoke      | healthz **200**; readyz **ready:true**; no `OPENBOT_CHAT_INBOUND_*` env (`NO_INBOUND_FLAGS`); A–E strings present in `/app/dist` (default off)                                                                                            |
 | Rollback   | restore `/root/openbot-maintenance-inbound-depth-main-r1-20260820T040620Z/container-app-dist.before.tgz` into `/app/dist` then `/usr/local/bin/openbot-gateway-restart`. Preserve host Control UI. Do **not** `podman restart -t 0`.      |
 | Executor   | `cursor-chat-inbound-depth`                                                                                                                                                                                                               |
@@ -1374,7 +1374,7 @@ A–E inbound-depth code is **on this LIVE SHA**. Flag canary was enabled on thi
 | Gateway    | overlay `item5-runtime-align-r1` @ `6ac338479a1644d28a6bca1c48e1921c11f9d36f`; previousLive `34595862f785c90a4e0e30587db33690c2e139d2`                                                                                                                      |
 | Image      | `localhost/openbot:ws-c-v1-root-guard-r1-20260815` (`ImageID=5c4357c469f5f3614d49bd8b8ae84bdccc45f3b61c68c098ea3aee605a3453e9`)                                                                                                                             |
 | Provenance | annotated tag `provenance/sha-6ac338479a16` → `6ac338479a1644d28a6bca1c48e1921c11f9d36f` (LIVE identity; **not** `provenance/sha-394c9170c651`)                                                                                                             |
-| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 28                                                                                                                                                                                                                   |
+| Ledger     | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 28                                                                                                                                            |
 | Smoke      | healthz **200**; readyz **ready:true**; no `OPENBOT_CHAT_INBOUND_*` env (`NO_INBOUND_FLAGS`)                                                                                                                                                                |
 | Rollback   | restore `/root/openbot-maintenance-item5-runtime-align-20260819T162800Z/container-app-dist.before.tgz` into `/app/dist` (preserve control-ui) + `podman restart`. Write-pre dir is catalog/registry only, not dist. This row does **not** authorize a swap. |
 | Executor   | overlay: Item 5 runtime alignment (`cursor-data-governance`); ledger/RELEASE_RECORD backfill: `cursor-chat-inbound-depth`                                                                                                                                   |

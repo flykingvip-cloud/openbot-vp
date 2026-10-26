@@ -1,11 +1,11 @@
 # Collab P0 — Tenant isolation gate before gray enable (FINAL v3)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | **Blocking gate** — do not open production gray writes until this passes |
-| Spec | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §3 P0 |
-| Code | `gray-group-allowlist.ts`, claim/wake allowlist matchers, vitest `collab-p0-tenant-isolation-gate.test.ts` |
+| Field  | Value                                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------------------------- |
+| Date   | 2026-10-15 Asia/Shanghai                                                                                   |
+| Status | **Blocking gate** — do not open production gray writes until this passes                                   |
+| Spec   | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §3 P0                                                     |
+| Code   | `gray-group-allowlist.ts`, claim/wake allowlist matchers, vitest `collab-p0-tenant-isolation-gate.test.ts` |
 
 ## Why
 

@@ -20,21 +20,21 @@ outcome to `dispatched`.
 
 ## Inventory-first
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| Human structured `@` → decideParticipants + wake `dispatched` | EXISTS | Unchanged |
-| Assistant `[[collab_edge:peer_ask|…]]` → same-round supplement | EXISTS | Unchanged |
-| Assistant plain `@Name` in reply text | WAS observe-only | This PR consumes |
-| `assistantInlineAtCreatesRound()` | FROZEN `false` | Still true — no new round |
+| Surface                                                       | Status                       | Note                      |
+| ------------------------------------------------------------- | ---------------------------- | ------------------------- | --------- |
+| Human structured `@` → decideParticipants + wake `dispatched` | EXISTS                       | Unchanged                 |
+| Assistant `[[collab_edge:peer_ask                             | …]]` → same-round supplement | EXISTS                    | Unchanged |
+| Assistant plain `@Name` in reply text                         | WAS observe-only             | This PR consumes          |
+| `assistantInlineAtCreatesRound()`                             | FROZEN `false`               | Still true — no new round |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| `assistant-mention-dispatch.ts` | Resolve `@` → bots; build `peer_ask` edges; merge with directives under budget ≤2 |
-| `attachEdgesAfterPrimary` | Flag ON → attach consumer edges so existing invited-supplement path runs |
-| `observeAssistantReplyWakeBestEffort` | Pass bots; resolved → wake outcome `dispatched` |
-| Tests | Flag off / unmatched eligible / resolved dispatched / edge budget |
+| Surface                               | Behavior                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------- |
+| `assistant-mention-dispatch.ts`       | Resolve `@` → bots; build `peer_ask` edges; merge with directives under budget ≤2 |
+| `attachEdgesAfterPrimary`             | Flag ON → attach consumer edges so existing invited-supplement path runs          |
+| `observeAssistantReplyWakeBestEffort` | Pass bots; resolved → wake outcome `dispatched`                                   |
+| Tests                                 | Flag off / unmatched eligible / resolved dispatched / edge budget                 |
 
 ## Explicit non-goals
 

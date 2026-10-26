@@ -12,4 +12,3 @@
 - 正式终版引擎：`PptxGenJS`（cyber-ppt）。沙箱镜像含 nodejs/npm；缺 Node/PptxGenJS 才是真 blocker。
 - 禁止：把「沙箱没有 python-pptx/pip」写成无法做 PPT；禁止再跑 `skills/pptx/scripts/pptx_engine.py` 冒充终版。
 - PDF→PPT / 做成 PPT：命中后立刻走 cyber-ppt（`pptx` 仅为 alias-of）。
-

@@ -9,25 +9,25 @@
 
 ## Inventory-first (AS-IS)
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| 1:1 `SessionTaskBoard` | EXISTS (different domain) | Session focus park/resume — **do not reinvent or overload for group claims** |
-| UI `supervisor-task-board` | EXISTS (different domain) | Development Supervisor dashboard — not collab group board |
-| `operatingState.activeContext.currentTaskId` | EXISTS | Set via `syncGroupOperatingState` / active task selection |
-| `seedTaskResponsibility` / task-runtime | EXISTS | Reused on applyClaim |
-| L3 `task.assign` for bots | DENIED (L1-hard) | Unchanged; Claim is not `task.assign` |
-| Group ClaimContract / board publish | **was DESIGN-ONLY** | This PR adds flag-gated contract |
+| Surface                                      | Status                    | Note                                                                         |
+| -------------------------------------------- | ------------------------- | ---------------------------------------------------------------------------- |
+| 1:1 `SessionTaskBoard`                       | EXISTS (different domain) | Session focus park/resume — **do not reinvent or overload for group claims** |
+| UI `supervisor-task-board`                   | EXISTS (different domain) | Development Supervisor dashboard — not collab group board                    |
+| `operatingState.activeContext.currentTaskId` | EXISTS                    | Set via `syncGroupOperatingState` / active task selection                    |
+| `seedTaskResponsibility` / task-runtime      | EXISTS                    | Reused on applyClaim                                                         |
+| L3 `task.assign` for bots                    | DENIED (L1-hard)          | Unchanged; Claim is not `task.assign`                                        |
+| Group ClaimContract / board publish          | **was DESIGN-ONLY**       | This PR adds flag-gated contract                                             |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| Flag `collaboration.task.claimContract` | Default OFF |
-| `publishBoardItem` / `claimBoardItem` / `applyClaim` | Library under `<ns>/board-claims/*.jsonl` |
-| RPC `collaboration.task.publishBoardItem` | Flag-on → publish; flag-off → refuse |
-| RPC `collaboration.task.claimBoardItem` | Flag-on → claim |
-| RPC `collaboration.task.applyClaim` | Flag-on → seed assigned + responsibility + sync `currentTaskId` |
-| `oralDispatchCreatesBoardFact()` | Always `false` — verbal “已派工” is not a board fact |
+| Surface                                              | Behavior                                                        |
+| ---------------------------------------------------- | --------------------------------------------------------------- |
+| Flag `collaboration.task.claimContract`              | Default OFF                                                     |
+| `publishBoardItem` / `claimBoardItem` / `applyClaim` | Library under `<ns>/board-claims/*.jsonl`                       |
+| RPC `collaboration.task.publishBoardItem`            | Flag-on → publish; flag-off → refuse                            |
+| RPC `collaboration.task.claimBoardItem`              | Flag-on → claim                                                 |
+| RPC `collaboration.task.applyClaim`                  | Flag-on → seed assigned + responsibility + sync `currentTaskId` |
+| `oralDispatchCreatesBoardFact()`                     | Always `false` — verbal “已派工” is not a board fact            |
 
 Composition root: `claim-contract-entry.ts` (reuses `createRuntimeAuthority` +
 `seedTaskResponsibility` + objectStorage task write + `syncGroupOperatingState`).

@@ -72,10 +72,7 @@ describe("Stage 3 CLI errors (E1/E2 narrow)", () => {
   });
 
   it("invalid --timeout local validation uses usage: + exit 2", () => {
-    const registerSrc = readFileSync(
-      "src/cli/program/register.status-health-sessions.ts",
-      "utf8",
-    );
+    const registerSrc = readFileSync("src/cli/program/register.status-health-sessions.ts", "utf8");
     expect(registerSrc).toMatch(/reportCliError/);
     expect(registerSrc).toMatch(/"usage"/);
     expect(registerSrc).toMatch(/--timeout must be a positive integer/);

@@ -1,0 +1,11 @@
+
+ RUN  v4.0.18 /private/tmp/openbot-memory-batch1-rework
+
+ ✓ src/gateway/collaboration-dispatch/decision-engine.test.ts (49 tests) 105ms
+ ✓ src/gateway/collaboration-dispatch/wake-round-dispatch.test.ts (12 tests) 377ms
+
+ Test Files  2 passed (2)
+      Tests  61 passed (61)
+   Start at  17:29:10
+   Duration  5.82s (transform 7.30s, setup 327ms, import 10.42s, tests 482ms, environment 0ms)
+

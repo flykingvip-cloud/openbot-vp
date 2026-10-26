@@ -22,11 +22,11 @@
 
 ## 2. 与缺口 / 模式 / 策展的关系
 
-| 来源 | 沉淀角色 |
-| --- | --- |
-| capability-gap consumer | `actSkill` 优先走 precipitation；缺轨迹则 partial stub（向后兼容） |
-| pattern-detection | 仍走既有 approve → publishPatternCandidateAsDraftSkill；签名去重避免与 precipitation 平行复制同 whenToUse |
-| learning-skill-curation | 仍产出 draft；后续可复用 extract（本 PR 不强制改策展写盘） |
+| 来源                    | 沉淀角色                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------- |
+| capability-gap consumer | `actSkill` 优先走 precipitation；缺轨迹则 partial stub（向后兼容）                                        |
+| pattern-detection       | 仍走既有 approve → publishPatternCandidateAsDraftSkill；签名去重避免与 precipitation 平行复制同 whenToUse |
+| learning-skill-curation | 仍产出 draft；后续可复用 extract（本 PR 不强制改策展写盘）                                                |
 
 ## 3. 候选契约（`SkillPrecipitationCandidate`）
 

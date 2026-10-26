@@ -53,12 +53,12 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 
 ## 2. 环境身份
 
-| 身份 | commit | 本文如何知道 | 与 HK LIVE 的关系 |
-| --- | --- | --- | --- |
-| Mac 私服对照 gateway | `277f6c5304b00142a180effcf2c0062fa9b0d5e3` | #550 第 5.6 节记录 pin 与进程 cwd。约 13:50 Asia/Shanghai 性能评测再次读到 pin、cwd HEAD、pid `66973`、loopback `18789`。本文作者用 git 读了该 commit 的 blob | Mac。不是 HK LIVE。本文五步只钉这一 SHA |
-| HK LIVE | `65564d30b25a41f49866f96e0efed9caacd80a9b` | #550 独立验收，2026-10-10。RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f`。闸门 A 已完全通过 | 这是 HK LIVE。本文没有在该 commit 上做五步实测 |
-| 调查基线 | `93ce9df262b3666d83f64c559a5e7801e6bde089` | #549 / #550。本文 `git diff` 复核技能路径为空 | 调查基线。不是本文的五步现场 |
-| 本文撰写时检出的 `main` | 不作为对照行为的依据 | 行为陈述不从 `main` 另读实现 | 不是 HK LIVE，也不是 Mac 对照 |
+| 身份                    | commit                                     | 本文如何知道                                                                                                                                                  | 与 HK LIVE 的关系                              |
+| ----------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| Mac 私服对照 gateway    | `277f6c5304b00142a180effcf2c0062fa9b0d5e3` | #550 第 5.6 节记录 pin 与进程 cwd。约 13:50 Asia/Shanghai 性能评测再次读到 pin、cwd HEAD、pid `66973`、loopback `18789`。本文作者用 git 读了该 commit 的 blob | Mac。不是 HK LIVE。本文五步只钉这一 SHA        |
+| HK LIVE                 | `65564d30b25a41f49866f96e0efed9caacd80a9b` | #550 独立验收，2026-10-10。RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f`。闸门 A 已完全通过                            | 这是 HK LIVE。本文没有在该 commit 上做五步实测 |
+| 调查基线                | `93ce9df262b3666d83f64c559a5e7801e6bde089` | #549 / #550。本文 `git diff` 复核技能路径为空                                                                                                                 | 调查基线。不是本文的五步现场                   |
+| 本文撰写时检出的 `main` | 不作为对照行为的依据                       | 行为陈述不从 `main` 另读实现                                                                                                                                  | 不是 HK LIVE，也不是 Mac 对照                  |
 
 技能路径（与 #550 第 3 节相同的七条）在 `93ce9df262b3666d83f64c559a5e7801e6bde089` 与 `277f6c5304b00142a180effcf2c0062fa9b0d5e3` 之间 diff 为空：
 
@@ -90,13 +90,13 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 - 缺 name 或 summary：抛 `SkillAssetStoreError`，文案 `skill name and summary are required`。指定已存在的 `skillId`：`skill <id> already exists`。`skill-lifecycle.save` 经 `respondSkillError` 变成 `INVALID_REQUEST`，正文是 `error.message`。其他错误走 `UNAVAILABLE`。
 - `finalizeDraftSkill`：非 draft 抛 `skill <id> is not in draft state`；成功把 lifecycle 写成 `private`，并对已启用的关系 `emitSkillRelationMutation({ op: "install" })`，返回 `EmployeeSkillDetail`。RPC 包一层 `{ skill }`。
 
-| 层 | 源码形状 | 现场 |
-| --- | --- | --- |
-| 安装关系 | 选择（list/detail）不写关系。新建时，仅当 `sourceAgentId` 非空且 `autoInstallEnabled !== false` 且 lifecycle 落在 `mayAutoInstall` 时，向 `robotRelations` push 一条 `enabled: true`。`reviewing` 不走这条自动关系 | 未实测（只读源码） |
-| 执行投影 | 自动关系会 `emitSkillRelationMutation({ op: "save" })`。hook 调用 `syncSkillExecutionBinding` 并丢弃返回值。draft 会走到 `materializeSkillExecutionBinding` 的 `action: "removed"`，`reason: "non-executable-lifecycle"` | 未实测（只读源码） |
-| 运行时绑定 | 本步不调用 `syncInstallToRuntime` | 未实测（只读源码） |
-| 结论栏 | 成功形状是 `{ skillId, detail }` 或 list/detail 的 respond 成功体。draft 在源码上不可投影。没有一次真实 `skillId` | 未实测（只读源码） |
-| 失败原因原文 | 源码字符串见上。没有一次真实 RPC 正文 | 未实测（只读源码） |
+| 层           | 源码形状                                                                                                                                                                                                                 | 现场               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| 安装关系     | 选择（list/detail）不写关系。新建时，仅当 `sourceAgentId` 非空且 `autoInstallEnabled !== false` 且 lifecycle 落在 `mayAutoInstall` 时，向 `robotRelations` push 一条 `enabled: true`。`reviewing` 不走这条自动关系       | 未实测（只读源码） |
+| 执行投影     | 自动关系会 `emitSkillRelationMutation({ op: "save" })`。hook 调用 `syncSkillExecutionBinding` 并丢弃返回值。draft 会走到 `materializeSkillExecutionBinding` 的 `action: "removed"`，`reason: "non-executable-lifecycle"` | 未实测（只读源码） |
+| 运行时绑定   | 本步不调用 `syncInstallToRuntime`                                                                                                                                                                                        | 未实测（只读源码） |
+| 结论栏       | 成功形状是 `{ skillId, detail }` 或 list/detail 的 respond 成功体。draft 在源码上不可投影。没有一次真实 `skillId`                                                                                                        | 未实测（只读源码） |
+| 失败原因原文 | 源码字符串见上。没有一次真实 RPC 正文                                                                                                                                                                                    | 未实测（只读源码） |
 
 ### 3.2 保存
 
@@ -107,12 +107,12 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 - 再读入口是 `personal-skills.detail` → `loadOwnedPersonalSkill`。本文没有展开所有权失败的文案，不把未读到的句子写成实测。
 - `~/.config/openbot/stores/employee-install.json`（`INSTALL_STORE_FILE`）属于对照入口，不是本步的 skill-assets。
 
-| 层 | 源码形状 | 现场 |
-| --- | --- | --- |
-| 安装关系 | 保存本身不保证关系。自动关系条件同 §3.1。无 `sourceAgentId` 时本步不 push `robotRelations` | 未实测（只读源码） |
-| 执行投影 | 无自动关系时不调用物化。有自动关系时投影结果被 hook 丢弃 | 未实测（只读源码） |
-| 运行时绑定 | 不调用 `syncInstallToRuntime` | 未实测（只读源码） |
-| 结论栏 | 源码承诺落在 `skill-assets/store.json`。同 `skillId` 再读是否一致，要另一次 RPC | 未实测（只读源码） |
+| 层           | 源码形状                                                                                                                                                                                                                                                    | 现场               |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 安装关系     | 保存本身不保证关系。自动关系条件同 §3.1。无 `sourceAgentId` 时本步不 push `robotRelations`                                                                                                                                                                  | 未实测（只读源码） |
+| 执行投影     | 无自动关系时不调用物化。有自动关系时投影结果被 hook 丢弃                                                                                                                                                                                                    | 未实测（只读源码） |
+| 运行时绑定   | 不调用 `syncInstallToRuntime`                                                                                                                                                                                                                               | 未实测（只读源码） |
+| 结论栏       | 源码承诺落在 `skill-assets/store.json`。同 `skillId` 再读是否一致，要另一次 RPC                                                                                                                                                                             | 未实测（只读源码） |
 | 失败原因原文 | store 抛错时 `skill-lifecycle.save` 走 `respondSkillError`。若抛错发生在已注册 hook 内部，`emitSkillRelationMutation` 空 `catch`（注释 `hooks must not break asset mutations`），保存返回值仍可能是 `{ skillId, detail }`。那种「原因被吃掉」没有在现场复现 | 未实测（只读源码） |
 
 ### 3.3 授权/安装
@@ -136,13 +136,13 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 
 `employee-install.ts` 不引用 `materializeSkillExecutionBinding` 或 `syncSkillExecutionBinding`。主切片的投影只可能来自关系 hook，不来自对照入口。
 
-| 层 | 源码形状 | 现场 |
-| --- | --- | --- |
-| 安装关系 | `installSkillToRobotAsset` 写入或更新一条 `robotRelations`。RPC 成功体是 `{ skill }`。源码的更新分支不会为同一对 id 再 push 第二条；这不是现场幂等实验 | 未实测（只读源码） |
-| 执行投影 | hook 可能物化 `CONFIG_DIR/skill-execution-bindings/<agent>/ob-asset-…/SKILL.md`，但 `SyncSkillExecutionBindingResult` 被丢掉。异常被空 `catch` 吃掉。读不到 `action`/`reason` 时，笔记不能填 `ready` | 未实测（只读源码） |
-| 运行时绑定 | 无 `userEmail` 时函数不被调用；`syncInstallToRuntime` 对空邮箱的返回是 `{ synced: false, reason: "missing-user" }`，但调用方根本没调用。有邮箱时结果被丢弃。成功响应里没有 `synced` | 未实测（只读源码） |
-| 结论栏 | `{ skill }` 只说明关系函数返回了。它不证明投影 `ready`，也不证明绑定 `synced`，更不是下一次 loader | 未实测（只读源码） |
-| 失败原因原文 | store / `assertRobotSkillInstallAllowed` 的 `SkillAssetStoreError` 能进 `INVALID_REQUEST`。投影 reason 与绑定 reason 不在该响应里 | 未实测（只读源码） |
+| 层           | 源码形状                                                                                                                                                                                             | 现场               |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 安装关系     | `installSkillToRobotAsset` 写入或更新一条 `robotRelations`。RPC 成功体是 `{ skill }`。源码的更新分支不会为同一对 id 再 push 第二条；这不是现场幂等实验                                               | 未实测（只读源码） |
+| 执行投影     | hook 可能物化 `CONFIG_DIR/skill-execution-bindings/<agent>/ob-asset-…/SKILL.md`，但 `SyncSkillExecutionBindingResult` 被丢掉。异常被空 `catch` 吃掉。读不到 `action`/`reason` 时，笔记不能填 `ready` | 未实测（只读源码） |
+| 运行时绑定   | 无 `userEmail` 时函数不被调用；`syncInstallToRuntime` 对空邮箱的返回是 `{ synced: false, reason: "missing-user" }`，但调用方根本没调用。有邮箱时结果被丢弃。成功响应里没有 `synced`                  | 未实测（只读源码） |
+| 结论栏       | `{ skill }` 只说明关系函数返回了。它不证明投影 `ready`，也不证明绑定 `synced`，更不是下一次 loader                                                                                                   | 未实测（只读源码） |
+| 失败原因原文 | store / `assertRobotSkillInstallAllowed` 的 `SkillAssetStoreError` 能进 `INVALID_REQUEST`。投影 reason 与绑定 reason 不在该响应里                                                                    | 未实测（只读源码） |
 
 #### 3.3.2 对照 `employee-install.confirm`
 
@@ -156,13 +156,13 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 - `employee-install.confirm` 成功体只有 `{ requestId, status, completedAt, nextStep }`。`executeInstallConfirmation` 返回值里的 `bindingId` 没有放进这个成功体。
 - `employee-install.apply-configuration` 先把 `status` 写成 `installed`，再尝试 `updateBindingState(..., "active")`。失败只 `console.warn("[employee-install.apply-configuration] re-enable binding failed:", bindErr)`，随后仍 `respond(true, { requestId, status, configurationState: "complete", ... })`。
 
-| 层 | 源码形状 | 现场 |
-| --- | --- | --- |
-| 安装关系 | 只存在安装请求记录。无配置项时确认函数先写 `installed`。这不是 `robotRelations`，也不是投影关系 | 未实测（只读源码） |
-| 执行投影 | 本文件不调用物化。固定 `not_materialized`。不能标投影 `ready` | 未实测（只读源码） |
-| 运行时绑定 | `synced` 与 `reason` 只出现在 `console.warn`，或在 `userEmail` 为空时根本不调用。响应体没有结构化 reason | 未实测（只读源码） |
-| 结论栏 | 响应可以在绑定未同步时仍为成功加 `installed`。不能当成主切片运行通过，也不能当成可用性 `ready` | 未实测（只读源码） |
-| 失败原因原文 | 扫描失败能进 `INVALID_REQUEST` 的 `error.message`。运行时同步失败的 reason 不在响应体 | 未实测（只读源码） |
+| 层           | 源码形状                                                                                                 | 现场               |
+| ------------ | -------------------------------------------------------------------------------------------------------- | ------------------ |
+| 安装关系     | 只存在安装请求记录。无配置项时确认函数先写 `installed`。这不是 `robotRelations`，也不是投影关系          | 未实测（只读源码） |
+| 执行投影     | 本文件不调用物化。固定 `not_materialized`。不能标投影 `ready`                                            | 未实测（只读源码） |
+| 运行时绑定   | `synced` 与 `reason` 只出现在 `console.warn`，或在 `userEmail` 为空时根本不调用。响应体没有结构化 reason | 未实测（只读源码） |
+| 结论栏       | 响应可以在绑定未同步时仍为成功加 `installed`。不能当成主切片运行通过，也不能当成可用性 `ready`           | 未实测（只读源码） |
+| 失败原因原文 | 扫描失败能进 `INVALID_REQUEST` 的 `error.message`。运行时同步失败的 reason 不在响应体                    | 未实测（只读源码） |
 
 ### 3.4 运行（下一次 loader）
 
@@ -172,13 +172,13 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 
 `resolveRuntimeSkillPolicy` 仍在 `src/auto-reply/reply/runtime-skill-policy.ts`。本文没有追踪它的调用现场。
 
-| 层 | 源码形状 | 现场 |
-| --- | --- | --- |
-| 安装关系 | 本函数不写 `robotRelations` | 未实测（只读源码） |
-| 执行投影 | 只读取已物化目录。名字来自 `skillExecutionSkillName`。读失败变成空数组 | 未实测（只读源码） |
-| 运行时绑定 | `respectRuntimeBindingPause: true` 时会滤掉暂停名。这不是 `syncInstallToRuntime` 的 `synced` 字段 | 未实测（只读源码） |
-| 结论栏 | 正向证据必须是安装返回之后的另一次调用，且条目里有该净化名、来源链路为 `openbot-lifecycle-binding`。同一次安装响应、以及目录里刚写的文件，都不是这次调用 | 未实测（只读源码） |
-| 失败原因原文 | 函数不返回投影 `reason`。未见名字时，原因要回到投影行；投影行的 reason 又被安装 RPC 丢掉 | 未实测（只读源码） |
+| 层           | 源码形状                                                                                                                                                 | 现场               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 安装关系     | 本函数不写 `robotRelations`                                                                                                                              | 未实测（只读源码） |
+| 执行投影     | 只读取已物化目录。名字来自 `skillExecutionSkillName`。读失败变成空数组                                                                                   | 未实测（只读源码） |
+| 运行时绑定   | `respectRuntimeBindingPause: true` 时会滤掉暂停名。这不是 `syncInstallToRuntime` 的 `synced` 字段                                                        | 未实测（只读源码） |
+| 结论栏       | 正向证据必须是安装返回之后的另一次调用，且条目里有该净化名、来源链路为 `openbot-lifecycle-binding`。同一次安装响应、以及目录里刚写的文件，都不是这次调用 | 未实测（只读源码） |
+| 失败原因原文 | 函数不返回投影 `reason`。未见名字时，原因要回到投影行；投影行的 reason 又被安装 RPC 丢掉                                                                 | 未实测（只读源码） |
 
 ### 3.5 撤销
 
@@ -189,13 +189,13 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 - 写入成功后 `emitSkillRelationMutation({ op: "remove" })`。hook 再调 `syncSkillExecutionBinding`。关系已不在时该函数调用 `removeSkillExecutionBindingFiles`（`reason: "explicit-remove"`）。返回值仍被 hook 丢弃。hook 抛错仍被空 `catch` 吃掉，`removeRobotSkillAsset` 仍返回 `{ ok: true }`。
 - `employee-install` 没有与 `removeRobotSkillAsset` 对等的请求撤销。对照入口完不成本步。
 
-| 层 | 源码形状 | 现场 |
-| --- | --- | --- |
-| 安装关系 | 成功则该对 id 从 `robotRelations` 消失。响应是 `{ ok: true }` | 未实测（只读源码） |
-| 执行投影 | hook 可能删目录，结果不回传。`{ ok: true }` 不等于目录已删除 | 未实测（只读源码） |
-| 运行时绑定 | 本函数不读、不改 `syncInstallToRuntime` 的绑定。安装时的 `synced` 不能沿用 | 未实测（只读源码） |
-| 结论栏 | 撤销通过还要看 RPC 完成之后的下一次 `resolveEmbeddedRunSkillEntries` 不再包含该名字。这次调用没有发生 | 未实测（只读源码） |
-| 失败原因原文 | 未安装时的 store 文案能进 RPC。投影仍在时的原因不在 `{ ok: true }` 里 | 未实测（只读源码） |
+| 层           | 源码形状                                                                                              | 现场               |
+| ------------ | ----------------------------------------------------------------------------------------------------- | ------------------ |
+| 安装关系     | 成功则该对 id 从 `robotRelations` 消失。响应是 `{ ok: true }`                                         | 未实测（只读源码） |
+| 执行投影     | hook 可能删目录，结果不回传。`{ ok: true }` 不等于目录已删除                                          | 未实测（只读源码） |
+| 运行时绑定   | 本函数不读、不改 `syncInstallToRuntime` 的绑定。安装时的 `synced` 不能沿用                            | 未实测（只读源码） |
+| 结论栏       | 撤销通过还要看 RPC 完成之后的下一次 `resolveEmbeddedRunSkillEntries` 不再包含该名字。这次调用没有发生 | 未实测（只读源码） |
+| 失败原因原文 | 未安装时的 store 文案能进 RPC。投影仍在时的原因不在 `{ ok: true }` 里                                 | 未实测（只读源码） |
 
 撤销后的下一次 loader：整行 `未实测（只读源码）`。
 
@@ -209,15 +209,15 @@ product_implementation: "Gate B frozen on #551; this file is not product impleme
 
 来源：openbot 性能评测，2026-10-10 约 13:50 Asia/Shanghai，只读。本文转述，不把这次探测算成文档代理自己跑的 RPC，也不把它填进第 3 节的五步格子。
 
-| 项 | 转述 |
-| --- | --- |
-| gateway SHA | 仍为 `277f6c5304b00142a180effcf2c0062fa9b0d5e3` |
-| 证据 | pin、cwd HEAD、pid `66973`，端口 `18789` loopback |
-| `GET http://127.0.0.1:18789/health` | HTTP 200，正文 `{"ok":true,"status":"live"}` |
-| 点名的可读路径 | `~/.openbot/skills`、`skill-assets`、`skill-invocation-events`、`skill-execution-bindings`、`plugins/installs.json`、`diagnosis-projections`、sandbox skills、collaboration projections、gateway logs，以及 `openbot-ui-accept-tmp` 下的 accept-tmp skill logs |
-| 配置 | 这次只读没有改配置 |
-| HTTP `/api/skills` | 404 |
-| HTTP `/v1/skills`、`/skills`、`/health/skills` | SPA HTML 回退，不是技能 API |
+| 项                                             | 转述                                                                                                                                                                                                                                                           |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| gateway SHA                                    | 仍为 `277f6c5304b00142a180effcf2c0062fa9b0d5e3`                                                                                                                                                                                                                |
+| 证据                                           | pin、cwd HEAD、pid `66973`，端口 `18789` loopback                                                                                                                                                                                                              |
+| `GET http://127.0.0.1:18789/health`            | HTTP 200，正文 `{"ok":true,"status":"live"}`                                                                                                                                                                                                                   |
+| 点名的可读路径                                 | `~/.openbot/skills`、`skill-assets`、`skill-invocation-events`、`skill-execution-bindings`、`plugins/installs.json`、`diagnosis-projections`、sandbox skills、collaboration projections、gateway logs，以及 `openbot-ui-accept-tmp` 下的 accept-tmp skill logs |
+| 配置                                           | 这次只读没有改配置                                                                                                                                                                                                                                             |
+| HTTP `/api/skills`                             | 404                                                                                                                                                                                                                                                            |
+| HTTP `/v1/skills`、`/skills`、`/health/skills` | SPA HTML 回退，不是技能 API                                                                                                                                                                                                                                    |
 
 这些事实只说明 Mac 进程身份、健康端点、以及若干路径名当时可读。它们不包含技能资产内容、关系条数、投影文件、绑定 `synced`，也不包含五步 RPC。Mac 上 `/health` 的 `live` 是这台对照 gateway 的健康响应。HK LIVE 是另一条身份：commit `65564d30b25a41f49866f96e0efed9caacd80a9b`，RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f`（闸门 A 已完全通过，见 #550）。该健康响应也不是 #549 §5.2 的「真实执行上下文可见」。
 

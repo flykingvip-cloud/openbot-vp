@@ -1,0 +1,75 @@
+=== pnpm check post-rebase (after format fix) ===
+date: 2026-10-26 19:20:38 CST
+HEAD: 997170823bfb5971841515c0439d389237f3aefd
+origin/main: 29f4edd0a2c16a7682f6ac5da9bc0766e503447f
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check /private/tmp/openbot-memory-batch1-rework
+> pnpm check:host-env-policy:swift && pnpm format:check && pnpm build:collaboration:packages && pnpm build:evolution:packages && pnpm tsgo && pnpm lint && pnpm lint:tmp:no-random-messaging && pnpm lint:tmp:channel-agnostic-boundaries && pnpm lint:tmp:no-raw-channel-fetch && pnpm lint:agent:ingress-owner && pnpm lint:plugins:no-register-http-handler && pnpm lint:plugins:no-monolithic-plugin-sdk-entry-imports && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope && pnpm lint:ui:capability-boundaries && pnpm lint:ui:employee-capability-terminology && pnpm lint:core:composition-root-loc && pnpm lint:gateway:method-packs && pnpm lint:gateway:isolation-fail-closed && pnpm lint:core:architecture-manifest && pnpm lint:aor:boundaries && pnpm lint:convergence:registry && pnpm lint:collab:runtime-capabilities && pnpm lint:collab:runtime-authority && pnpm lint:collab:policy-consumption && pnpm test:collab:runtime-lifecycle
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check:host-env-policy:swift /private/tmp/openbot-memory-batch1-rework
+> node scripts/generate-host-env-security-policy-swift.mjs --check
+
+OK apps/macos/Sources/OpenBot/HostEnvSecurityPolicy.generated.swift
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /private/tmp/openbot-memory-batch1-rework
+> oxfmt --check
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 5983ms on 16910 files using 14 threads.
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:collaboration:packages /private/tmp/openbot-memory-batch1-rework
+> pnpm --dir packages/collaboration-core build && pnpm --dir packages/collaboration-runtime build && pnpm --dir packages/collaboration-openbot-adapter build
+
+
+> @openbot/collaboration-core@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-core
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-runtime@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-runtime
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-openbot-adapter@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-openbot-adapter
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:evolution:packages /private/tmp/openbot-memory-batch1-rework
+> pnpm --dir packages/evolution-core build
+
+
+> @openbot/evolution-core@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/evolution-core
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint /private/tmp/openbot-memory-batch1-rework
+> oxlint --type-aware
+
+
+  x eslint(no-unused-vars): Function 'semanticallyEqualForIdempotency' is declared but never used.
+     ,-[src/task-outcome/result-service.ts:385:10]
+ 384 | 
+ 385 | function semanticallyEqualForIdempotency(a: TaskOutcomeRecord, b: TaskOutcomeRecord): boolean {
+     :          ^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^
+     :                         `-- 'semanticallyEqualForIdempotency' is declared here
+ 386 |   return (
+     `----
+  help: Consider removing this declaration.
+
+  x typescript-eslint(no-floating-promises): Promises must be awaited, add void operator to ignore.
+     ,-[src/auto-reply/reply/agent-runner-execution.ts:546:11]
+ 545 |         if (executionRouting.planFailure.kind === "no_executable_candidates") {
+ 546 |           recordGrowthTaskOutcome(false);
+     :           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 547 |           return {
+     `----
+  help: The promise must end with a call to .catch, or end with a call to .then with a rejection handler, or be explicitly marked as ignored with the `void` operator.
+
+Found 0 warnings and 2 errors.
+Finished in 8.6s on 12272 files with 136 rules using 14 threads.
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.
+EXIT=1

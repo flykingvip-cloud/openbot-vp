@@ -50,10 +50,10 @@ Device-control pairing / bind / local revoke tokens stay on `/api/device-platfor
 
 One session must stay on **one** runtime host:
 
-| Host | Port | Owns |
-| ---- | ---- | ---- |
-| Gateway (in-process bind) | **18789** | B1 **grant mint** + **media upload-tickets** + Claw4 **upload** / messages (when `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1` + stub config, or inject) |
-| Adjacent stub | **8787** | **Full** integrations surface: turns, SSE, media, rebind, revoke, **and** the same Claw4 `/api/v1/*` routes (media also on 18789 when INPROCESS) |
+| Host                      | Port      | Owns                                                                                                                                             |
+| ------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Gateway (in-process bind) | **18789** | B1 **grant mint** + **media upload-tickets** + Claw4 **upload** / messages (when `OPENBOT_CLAW4_FIRMWARE_INPROCESS=1` + stub config, or inject)  |
+| Adjacent stub             | **8787**  | **Full** integrations surface: turns, SSE, media, rebind, revoke, **and** the same Claw4 `/api/v1/*` routes (media also on 18789 when INPROCESS) |
 
 Rules:
 
@@ -101,16 +101,15 @@ B wires for real:
 - Product TTS: inject a **speaking** `TtsProvider` (or test `ProportionalSilenceTtsProvider`). **Reject** `OpusFrameTtsProvider` for product 播报 — it ignores `text` (VoiceEnv uses `forbidOpusFrameForSpoken:true`)
 - Formal mode rejects stub ASR unless `OPENBOT_CLAW4_ASR_STUB=1`
 
-
 ### P1 startup bind (device-sdk audio bridge)
 
 **Default off.** Setting `OPENBOT_DEVICE_SDK_ROOT` (or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE`) alone does **not** mean the bridge is bound — those only locate Agent A `createAudioBridge`. Formal upload without a bound bridge / pass-through transcript still returns `PARAM_UNSUPPORTED`.
 
-| Env | Semantics |
-| --- | --------- |
-| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=1` / `true` | **Allow** lazy bind of `createAudioBridge` into `setClaw4AudioBridge`. |
+| Env                                                      | Semantics                                                                   |
+| -------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=1` / `true`  | **Allow** lazy bind of `createAudioBridge` into `setClaw4AudioBridge`.      |
 | `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE=0` / `false` | **Deny** bind. Explicit `0`/`false` **suppresses** the implicit path below. |
-| (unset) | Default off, unless the implicit convenience below applies. |
+| (unset)                                                  | Default off, unless the implicit convenience below applies.                 |
 
 **Implicit allow** (only when the explicit bind env is **unset**):
 
@@ -122,9 +121,9 @@ When bind is allowed:
 1. **VoiceEnv (preferred when MODULE unset):** import `createAudioBridgeFromVoiceEnv` from the pinned SDK (`OPENBOT_DEVICE_SDK_ROOT` → `adapters/voice/src/index.ts`, or `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE` exporting that factory). Default providers are **mock**. Set Agent A `OPENBOT_ASR_PROVIDER` / `OPENBOT_TTS_PROVIDER` (e.g. `reference-http`) plus HTTP URL envs for real reference adapters — B only forwards env into the factory.
 2. **MODULE override (fail-closed):** both of the following must be set; partial (only one) leaves unbound:
 
-| Env | Role |
-| --- | ---- |
-| `OPENBOT_DEVICE_SDK_ASR_MODULE` | Module URL/path: `default` export factory/instance, or named `create*()` (e.g. `createAsrProvider` / `createMockAsrProvider`) |
+| Env                             | Role                                                                                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPENBOT_DEVICE_SDK_ASR_MODULE` | Module URL/path: `default` export factory/instance, or named `create*()` (e.g. `createAsrProvider` / `createMockAsrProvider`)                         |
 | `OPENBOT_DEVICE_SDK_TTS_MODULE` | Module URL/path: speaking TTS factory/instance (`createTtsProvider` / `createProportionalSilenceTtsProvider`). **`OpusFrameTtsProvider` is rejected** |
 
 If MODULE override is invalid, or VoiceEnv import/factory throws, OpenBot logs clearly and **leaves the bridge unbound** (no half-bind). Product ASR/TTS vendor adapters remain Agent A's work — B does not hardcode FunASR/EdgeTTS paths.
@@ -139,10 +138,10 @@ Lazy bind runs on the first formal transcript resolve that needs a bridge (`ensu
 
 `POST /api/v1/upload` maps to `submitTurn`, which requires a stable **Idempotency-Key**.
 
-| Source | Behavior |
-| ------ | -------- |
-| Header **`Idempotency-Key`** | Preferred. Client-stable across retries. |
-| (absent) | Content-addressed fallback: `claw4-upload:{authorizationRef}:{conversationId}:{sha256(wav)[0:32]}` |
+| Source                       | Behavior                                                                                           |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| Header **`Idempotency-Key`** | Preferred. Client-stable across retries.                                                           |
+| (absent)                     | Content-addressed fallback: `claw4-upload:{authorizationRef}:{conversationId}:{sha256(wav)[0:32]}` |
 
 `turnId` is derived from the idempotency key (not `randomId`), so a retry with the same key and same body replays instead of minting a second turn. **Do not** use a random turnId as the retry key.
 
@@ -180,17 +179,17 @@ Default gateway leaves Claw4 routes on 503 so production cam_b / grayRelease sta
 
 Optional (same as the adjacent stub):
 
-| Env                                   | Role                                                                 |
-| ------------------------------------- | -------------------------------------------------------------------- |
-| `OPENBOT_DEVICE_DH_APPROVAL_TOKEN`    | Approval token for the in-process service (default `dev-approval-token`) |
-| `OPENBOT_DEVICE_DH_AGENT=1`           | Turn model calls local gateway chat completions instead of placeholder |
-| `OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1`| Force offline placeholder hatch                                      |
-| `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS` | Extra media pull origins                                           |
-| `OPENBOT_CLAW4_ASR_STUB=1`            | Allow labeled stub ASR when no bridge / pass-through (smoke only)  |
-| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE` | `1`/`true` allow P1 bind; `0`/`false` deny (suppresses INPROCESS implicit); unset = default off |
-| `OPENBOT_DEVICE_SDK_ASR_MODULE`       | Provider module for ASR factory/instance (required when bind allowed) |
-| `OPENBOT_DEVICE_SDK_TTS_MODULE`       | Provider module for speaking TTS factory/instance (required when bind allowed) |
-| `OPENBOT_DEVICE_SDK_ROOT` / `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE` | Locate `createAudioBridge` only — **not** “already bound” |
+| Env                                                                  | Role                                                                                            |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `OPENBOT_DEVICE_DH_APPROVAL_TOKEN`                                   | Approval token for the in-process service (default `dev-approval-token`)                        |
+| `OPENBOT_DEVICE_DH_AGENT=1`                                          | Turn model calls local gateway chat completions instead of placeholder                          |
+| `OPENBOT_DEVICE_DH_STUB_PLACEHOLDER=1`                               | Force offline placeholder hatch                                                                 |
+| `OPENBOT_DEVICE_DH_MEDIA_ALLOW_ORIGINS`                              | Extra media pull origins                                                                        |
+| `OPENBOT_CLAW4_ASR_STUB=1`                                           | Allow labeled stub ASR when no bridge / pass-through (smoke only)                               |
+| `OPENBOT_CLAW4_BIND_DEVICE_SDK_AUDIO_BRIDGE`                         | `1`/`true` allow P1 bind; `0`/`false` deny (suppresses INPROCESS implicit); unset = default off |
+| `OPENBOT_DEVICE_SDK_ASR_MODULE`                                      | Provider module for ASR factory/instance (required when bind allowed)                           |
+| `OPENBOT_DEVICE_SDK_TTS_MODULE`                                      | Provider module for speaking TTS factory/instance (required when bind allowed)                  |
+| `OPENBOT_DEVICE_SDK_ROOT` / `OPENBOT_DEVICE_SDK_AUDIO_BRIDGE_MODULE` | Locate `createAudioBridge` only — **not** “already bound”                                       |
 
 Restart / kickstart the gateway after setting env so the lazy bind runs. The env bind creates a **gateway-local** store — it does not share memory with a separate 8787 process.
 
@@ -198,11 +197,11 @@ Restart / kickstart the gateway after setting env so the lazy bind runs. The env
 
 When the in-process bind above is on (or a service is injected), the gateway also owns the **grant mint** surface against that same `DeviceDhService`:
 
-| Method | Path | Notes |
-| ------ | ---- | ----- |
-| `POST` | `/api/integrations/v1/consent/authorization-codes` | Consent client Basic; PKCE S256 |
-| `POST` | `/api/integrations/v1/grants/exchange` | Service client Basic; returns `authorizationRef` + credential |
-| `GET` | `/api/integrations/v1/grants/{authorizationRef}` | Service Basic + `X-OpenBot-Grant-Credential` |
+| Method | Path                                               | Notes                                                         |
+| ------ | -------------------------------------------------- | ------------------------------------------------------------- |
+| `POST` | `/api/integrations/v1/consent/authorization-codes` | Consent client Basic; PKCE S256                               |
+| `POST` | `/api/integrations/v1/grants/exchange`             | Service client Basic; returns `authorizationRef` + credential |
+| `GET`  | `/api/integrations/v1/grants/{authorizationRef}`   | Service Basic + `X-OpenBot-Grant-Credential`                  |
 
 Joint can mint on **18789** and immediately use the credential on Claw4 `/api/v1/upload` (and media upload-tickets) without a temporary ops seed and without crossing to 8787. Turns / SSE / rebind stay **unmounted** on the gateway; grant revoke + media upload-tickets are mounted when INPROCESS/inject is on.
 

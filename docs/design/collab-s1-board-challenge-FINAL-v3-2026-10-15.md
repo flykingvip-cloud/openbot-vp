@@ -1,12 +1,12 @@
 # Collab S1 — Shared board + single-challenger window (FINAL v3)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **flags default OFF** — tip gray needs explicit allowlist |
-| Spec | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S1 + §2.1 / §C |
-| Depends | **P0 #731** tip-proven (`7a577bf851…`) |
-| Code | `intent-board-materialize.ts` (§C quality), `challenge-window.ts`, `claim-contract.ts`, `collab-s1-board-challenge-flow.test.ts` |
+| Field   | Value                                                                                                                            |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Date    | 2026-10-15 Asia/Shanghai                                                                                                         |
+| Status  | Code ready; **flags default OFF** — tip gray needs explicit allowlist                                                            |
+| Spec    | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S1 + §2.1 / §C                                                                 |
+| Depends | **P0 #731** tip-proven (`7a577bf851…`)                                                                                           |
+| Code    | `intent-board-materialize.ts` (§C quality), `challenge-window.ts`, `claim-contract.ts`, `collab-s1-board-challenge-flow.test.ts` |
 
 ## Scope
 
@@ -21,12 +21,12 @@
 
 ## Flags (stay OFF in this PR)
 
-| Flag | Default | Tip gray enable |
-| --- | --- | --- |
-| `collaboration.task.claimContract` | false | Prefer `claimContractGroupAllowlist: ["001/grp-…"]` (P0 scoped) |
-| `collaboration.task.challengeWindow` | false | Set true only after gray claim proven |
-| `collaboration.runtimeNamespace` | false | Unchanged (N2 unsigned) |
-| `botMaySelfAdvanceWithoutHuman` | false | S5 only |
+| Flag                                 | Default | Tip gray enable                                                 |
+| ------------------------------------ | ------- | --------------------------------------------------------------- |
+| `collaboration.task.claimContract`   | false   | Prefer `claimContractGroupAllowlist: ["001/grp-…"]` (P0 scoped) |
+| `collaboration.task.challengeWindow` | false   | Set true only after gray claim proven                           |
+| `collaboration.runtimeNamespace`     | false   | Unchanged (N2 unsigned)                                         |
+| `botMaySelfAdvanceWithoutHuman`      | false   | S5 only                                                         |
 
 **Does not** open production gray writes. Tip ops must explicitly configure scoped allowlist keys after P0 tip proof.
 

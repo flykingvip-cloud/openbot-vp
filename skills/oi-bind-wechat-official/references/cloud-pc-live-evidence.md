@@ -19,15 +19,15 @@ delegate: wechat-official-credential
 
 ## 云电脑步骤（与 console-map 对齐）
 
-| 序 | 步骤 | 落点 | 证据级别 |
-|----|------|------|----------|
-| 1 | SCAN_MP | 云电脑 Chrome 打开 `https://mp.weixin.qq.com/`，隔离会话扫码进公众平台 | cloud_pc_measured |
-| 2 | IDENTIFY / 基本配置 | 确认昵称/主体；抄 AppID（`wx…`）；**AppSecret 不进聊天** | cloud_pc_measured |
-| 3 | SCAN_DEV | 前往开发者平台 / `developers.weixin.qq.com`（常需再扫） | cloud_pc_measured |
-| 4 | SECRET（按需） | 查看/重置开发者密码；新密钥只显示一次 → 只交大白 / secret store | cloud_pc_measured |
-| 5 | BIND | `user-operational-identity.credentials.bind`（`manualKind=wechat_oa`，personal）或工作台「添加并认证」 | product_path |
-| 6 | IP 白名单 | 抄工作台全部出口 IP → 微信侧 IP 白名单 → 管理员扫码确认；回读列表 | cloud_pc_measured |
-| 7 | verify / PROBE | `verify_credentials` / 换票；失败按 `40164`→补 IP、`40001`→核密钥（见 errors.md） | cloud_pc_measured |
+| 序  | 步骤                | 落点                                                                                                   | 证据级别          |
+| --- | ------------------- | ------------------------------------------------------------------------------------------------------ | ----------------- |
+| 1   | SCAN_MP             | 云电脑 Chrome 打开 `https://mp.weixin.qq.com/`，隔离会话扫码进公众平台                                 | cloud_pc_measured |
+| 2   | IDENTIFY / 基本配置 | 确认昵称/主体；抄 AppID（`wx…`）；**AppSecret 不进聊天**                                               | cloud_pc_measured |
+| 3   | SCAN_DEV            | 前往开发者平台 / `developers.weixin.qq.com`（常需再扫）                                                | cloud_pc_measured |
+| 4   | SECRET（按需）      | 查看/重置开发者密码；新密钥只显示一次 → 只交大白 / secret store                                        | cloud_pc_measured |
+| 5   | BIND                | `user-operational-identity.credentials.bind`（`manualKind=wechat_oa`，personal）或工作台「添加并认证」 | product_path      |
+| 6   | IP 白名单           | 抄工作台全部出口 IP → 微信侧 IP 白名单 → 管理员扫码确认；回读列表                                      | cloud_pc_measured |
+| 7   | verify / PROBE      | `verify_credentials` / 换票；失败按 `40164`→补 IP、`40001`→核密钥（见 errors.md）                      | cloud_pc_measured |
 
 ## 禁止
 

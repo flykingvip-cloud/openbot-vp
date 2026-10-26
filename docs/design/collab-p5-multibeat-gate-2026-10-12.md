@@ -6,15 +6,15 @@
 
 ## Inventory (main @ cdc345df07 / #663)
 
-| Capability | Status | Evidence |
-| --- | --- | --- |
-| Episode state `next_beat → BID_ADMISSION` | **EXISTS** | `episode-state-machine.ts` |
-| G2 single-beat runtime | **EXISTS (FLAG-OFF)** | `episode-single-beat-runtime.ts`; `assertSingleBeatEvent` / `assertAtMostOneBeat` refuse `next_beat` |
-| Facilitator `next_beat` deny (default) | **EXISTS** | `facilitator-control.ts` `outcomeFor` → denied when maxBeats=1 |
-| L1 `maxBeatsPerEpisode` | **HARDCODED 1** (pre-P5) | `policy-compiler-sections.ts` `L1_FLOOR_TUNING_DEFAULTS.beats` |
-| Config raise path | **MISSING → THIS PR** | no `collaboration.episode.maxBeats` before P5 |
-| Multi-beat production controller | **MISSING (intentional)** | no `multi-beat-runtime` / beat loop module |
-| Floor live cutover | **OFF** | `FLOOR_LIVE_CUTOVER_DEFAULT=false` |
+| Capability                                | Status                    | Evidence                                                                                             |
+| ----------------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Episode state `next_beat → BID_ADMISSION` | **EXISTS**                | `episode-state-machine.ts`                                                                           |
+| G2 single-beat runtime                    | **EXISTS (FLAG-OFF)**     | `episode-single-beat-runtime.ts`; `assertSingleBeatEvent` / `assertAtMostOneBeat` refuse `next_beat` |
+| Facilitator `next_beat` deny (default)    | **EXISTS**                | `facilitator-control.ts` `outcomeFor` → denied when maxBeats=1                                       |
+| L1 `maxBeatsPerEpisode`                   | **HARDCODED 1** (pre-P5)  | `policy-compiler-sections.ts` `L1_FLOOR_TUNING_DEFAULTS.beats`                                       |
+| Config raise path                         | **MISSING → THIS PR**     | no `collaboration.episode.maxBeats` before P5                                                        |
+| Multi-beat production controller          | **MISSING (intentional)** | no `multi-beat-runtime` / beat loop module                                                           |
+| Floor live cutover                        | **OFF**                   | `FLOOR_LIVE_CUTOVER_DEFAULT=false`                                                                   |
 
 ## Gap-only change
 

@@ -18,11 +18,11 @@
 
 ## 状态同义词（PRODUCT_LOOP）
 
-| PRODUCT_LOOP | InterventionCase |
-| --- | --- |
-| authorized | queued |
-| acknowledged | receipted |
-| verified | 预留；M2 不实现迁移（receipted ≠ 再诊断闭合） |
+| PRODUCT_LOOP | InterventionCase                              |
+| ------------ | --------------------------------------------- |
+| authorized   | queued                                        |
+| acknowledged | receipted                                     |
+| verified     | 预留；M2 不实现迁移（receipted ≠ 再诊断闭合） |
 
 ## 组派发
 

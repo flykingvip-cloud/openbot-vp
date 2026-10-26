@@ -58,11 +58,11 @@ CLI 优先采用容器 LIVE。注入 SHA 与容器不一致时丢弃注入值，
 
 ## 2. Provenance 与账本修复决定
 
-| 对象                        | 决定                        | 原因                                                                                       |
-| --------------------------- | --------------------------- | ------------------------------------------------------------------------------------------ |
-| `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`            | **keep / 不改写**           | 开放行已等于 LIVE。改写会掩盖运行版本。                                                    |
-| `RELEASE_RECORD.md`         | **defer_to_delivery_owner** | Latest cutover 落后。Diagnosis 特征分支改写会使审批包看起来已对齐，而 trunk / 生产仍落后。 |
-| `provenance/sha-6d9ea1f2d5` | **do_not_mint**             | seq 58 注明 cutover 拉取 GHCR `main` 且 `no provenance-sha-*`。事后补 tag 等于伪造发布史。 |
+| 对象                                                                                                      | 决定                        | 原因                                                                                       |
+| --------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------ |
+| `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` | **keep / 不改写**           | 开放行已等于 LIVE。改写会掩盖运行版本。                                                    |
+| `RELEASE_RECORD.md`                                                                                       | **defer_to_delivery_owner** | Latest cutover 落后。Diagnosis 特征分支改写会使审批包看起来已对齐，而 trunk / 生产仍落后。 |
+| `provenance/sha-6d9ea1f2d5`                                                                               | **do_not_mint**             | seq 58 注明 cutover 拉取 GHCR `main` 且 `no provenance-sha-*`。事后补 tag 等于伪造发布史。 |
 
 `ledgerMutated=false` `releaseRecordMutated=false` `provenanceMinted=false`。
 

@@ -15,19 +15,19 @@
 
 本轮已核实的身份与引用如下。生产运行版本未核实。Permalink 清单另见 `docs/design/target-codebase-evidence-2026-10-10.md`。
 
-| 项 | 结论 | 状态 |
-| --- | --- | --- |
-| D0 | **A。** 产品负责人于 2026-10-10 确认。对象是本私有仓 gateway 的员工技能资产 / employee-install / 投影 / runtime binding | 已冻结 |
-| 目标仓库 | 私有仓库 `https://github.com/upbeyond/openbot`（`visibility=private`） | 已核实 |
-| 与公开仓的关系 | 不是公开的 CopilotKit/OpenBot。公开仓上编号同为 #545 的 PR 是另一仓库、另一主题。这是编号撞车，不是本文件写错了本仓库内的 PR 号 | 已核实 |
-| 本仓库 PR #545 | 标题「Docs: 员工端技能进化通道现状分析」。draft，未合入。分支 `cursor/employee-skill-lifecycle-analysis-05dc`。文件 `docs/design/employee-skill-lifecycle-channel-2026-10-10.md` | 已核实 |
-| 本仓库 PR #546 | 本优化方案。draft。分支 `cursor/employee-skill-lifecycle-opt-plan-aa8c`。文件即本文 | 已核实 |
-| 调查基线 | `93ce9df262b3666d83f64c559a5e7801e6bde089`。它是 #545 与本方案初稿开出时相对当时 `main` 的 base。§1.4 的源码复核发生在该 SHA。只称为**调查基线** | 已核实 |
-| 修订时的 `origin/main` | `833fb81bbc6e0cf12b98249c988d2f89a3fe52ab`：`UI: 连接成功后才进入模型池，并接通企业自建提供方`（#544）。相对调查基线只多这一笔，且不修改本文、不修改 #545 的分析文件。调查基线因此不等于修订时的主干 HEAD | 已核实（2026-10-10 fetch） |
-| 实施前的基线义务 | 开工前须再核对当时的 `main` HEAD，以及生产部署版本，是否仍等于调查基线。若不同，须列出差异后再决定是否沿用本文结论。不得把调查基线默认当成当时的主干或生产版本。上表这一笔差异只覆盖本次修订时的 fetch，不代替开工前的再核对 | 规则；主干差异已列一笔，生产尚未核对 |
-| 生产运行版本、本机部署 HEAD | 本轮无生产访问 | **待核实** |
-| 调查基线上的四个源码文件 | 均存在且可读，见下方 permalink。`employee-install.ts` 文件头自称 Phase 1 stub；confirm 在 sync 失败时仍可把请求标成 `installed`（约第 391 行）。这与 §1.4 一致 | 已核实 |
-| 公开仓代码搜索 | 在 `https://github.com/CopilotKit/OpenBot` 搜索 `employee-install`、`skill-lifecycle-store`、`runtime-binding-sync`、`install-pack-to-robot` 为 **0 命中**。公开仓 PR #545 是另一主题。公开仓找不到这些路径是预期，不能据此否定私有仓分析 | 已核实 |
+| 项                          | 结论                                                                                                                                                                                                                                      | 状态                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| D0                          | **A。** 产品负责人于 2026-10-10 确认。对象是本私有仓 gateway 的员工技能资产 / employee-install / 投影 / runtime binding                                                                                                                   | 已冻结                               |
+| 目标仓库                    | 私有仓库 `https://github.com/upbeyond/openbot`（`visibility=private`）                                                                                                                                                                    | 已核实                               |
+| 与公开仓的关系              | 不是公开的 CopilotKit/OpenBot。公开仓上编号同为 #545 的 PR 是另一仓库、另一主题。这是编号撞车，不是本文件写错了本仓库内的 PR 号                                                                                                           | 已核实                               |
+| 本仓库 PR #545              | 标题「Docs: 员工端技能进化通道现状分析」。draft，未合入。分支 `cursor/employee-skill-lifecycle-analysis-05dc`。文件 `docs/design/employee-skill-lifecycle-channel-2026-10-10.md`                                                          | 已核实                               |
+| 本仓库 PR #546              | 本优化方案。draft。分支 `cursor/employee-skill-lifecycle-opt-plan-aa8c`。文件即本文                                                                                                                                                       | 已核实                               |
+| 调查基线                    | `93ce9df262b3666d83f64c559a5e7801e6bde089`。它是 #545 与本方案初稿开出时相对当时 `main` 的 base。§1.4 的源码复核发生在该 SHA。只称为**调查基线**                                                                                          | 已核实                               |
+| 修订时的 `origin/main`      | `833fb81bbc6e0cf12b98249c988d2f89a3fe52ab`：`UI: 连接成功后才进入模型池，并接通企业自建提供方`（#544）。相对调查基线只多这一笔，且不修改本文、不修改 #545 的分析文件。调查基线因此不等于修订时的主干 HEAD                                 | 已核实（2026-10-10 fetch）           |
+| 实施前的基线义务            | 开工前须再核对当时的 `main` HEAD，以及生产部署版本，是否仍等于调查基线。若不同，须列出差异后再决定是否沿用本文结论。不得把调查基线默认当成当时的主干或生产版本。上表这一笔差异只覆盖本次修订时的 fetch，不代替开工前的再核对              | 规则；主干差异已列一笔，生产尚未核对 |
+| 生产运行版本、本机部署 HEAD | 本轮无生产访问                                                                                                                                                                                                                            | **待核实**                           |
+| 调查基线上的四个源码文件    | 均存在且可读，见下方 permalink。`employee-install.ts` 文件头自称 Phase 1 stub；confirm 在 sync 失败时仍可把请求标成 `installed`（约第 391 行）。这与 §1.4 一致                                                                            | 已核实                               |
+| 公开仓代码搜索              | 在 `https://github.com/CopilotKit/OpenBot` 搜索 `employee-install`、`skill-lifecycle-store`、`runtime-binding-sync`、`install-pack-to-robot` 为 **0 命中**。公开仓 PR #545 是另一主题。公开仓找不到这些路径是预期，不能据此否定私有仓分析 | 已核实                               |
 
 源码结论（§1，尤其 §1.4）描述的是私有仓调查基线上的代码。闸门 A 未通过时，这些结论不能当成「当前生产已逐项复核」。它们也不是公开仓 CopilotKit/OpenBot 的架构说明。
 
@@ -50,11 +50,11 @@
 
 同名「技能」在三个系统里不是同一件事。后文的投影、`installed`、runtime binding，只描述表中第三行。
 
-| 概念 | 所在系统 | 已核实或专家指出的机制 | 本文件何时适用 |
-| --- | --- | --- | --- |
-| 应用内技能 | 公开仓 CopilotKit/OpenBot | 指令不等于能力授权。`save_skill` 须人工确认。保存后不自动分配 Bot。部署包使用 `skills.yaml`，不是本仓的 `SKILL.md` 投影加 runtime binding | 仅当 D0=B。验收见文末附录，不得套到 D0=A |
-| Intelligence Learning 技能 | 公开仓 CopilotKit/OpenBot | 与应用内技能是另一套 Learning 运行时。本文件不描述其内部状态机 | 仅当 D0=C。选 C 表示本方案不是实施合同 |
-| 员工技能资产 + 文件系统 `SKILL.md` | 私有仓 upbeyond/openbot 的 gateway | 资产在 `skill-assets`；投影为 `ob-asset-<skillId>/SKILL.md`；安装向导在 `employee-install.ts`；绑定在 `runtime-binding-sync.ts`。文件系统技能由 loader 从目录发现 | **D0=A，已确认。** 本方案只操作这一行 |
+| 概念                               | 所在系统                           | 已核实或专家指出的机制                                                                                                                                            | 本文件何时适用                           |
+| ---------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 应用内技能                         | 公开仓 CopilotKit/OpenBot          | 指令不等于能力授权。`save_skill` 须人工确认。保存后不自动分配 Bot。部署包使用 `skills.yaml`，不是本仓的 `SKILL.md` 投影加 runtime binding                         | 仅当 D0=B。验收见文末附录，不得套到 D0=A |
+| Intelligence Learning 技能         | 公开仓 CopilotKit/OpenBot          | 与应用内技能是另一套 Learning 运行时。本文件不描述其内部状态机                                                                                                    | 仅当 D0=C。选 C 表示本方案不是实施合同   |
+| 员工技能资产 + 文件系统 `SKILL.md` | 私有仓 upbeyond/openbot 的 gateway | 资产在 `skill-assets`；投影为 `ob-asset-<skillId>/SKILL.md`；安装向导在 `employee-install.ts`；绑定在 `runtime-binding-sync.ts`。文件系统技能由 loader 从目录发现 | **D0=A，已确认。** 本方案只操作这一行    |
 
 ## 0. 执行摘要
 
@@ -64,17 +64,16 @@
 4. 公开仓 CopilotKit/OpenBot 搜不到上述四个路径，这是预期。文末附录不适用 D0=A。
 5. 调查基线仍是 `93ce9df…`。生产部署版本 **待核实**。自动进化默认关闭，不自动批准，不补 `openbot skills install`。
 
-
 ## 1. 现状盘点
 
 以下为私有仓 #545 分析文档的压缩复述，加上调查基线上的源码复核。它只在 D0=A 时成立。细节以该分析 §1–§4 为准。若 D0=A，目标语义以 D5/D9 为准，不再以「单一 installed 谓词」为目标。D0 未勾选时，本节是证据，不是开工许可。
 
 ### 1.1 两条栈
 
-| 栈 | 发现物 | 持久化 | 进入同一次 turn |
-| --- | --- | --- | --- |
-| 文件系统技能 | `SKILL.md` | bundled / managed / workspace / extra / plugin / 两级 `.agents/skills` | `loadWorkspaceSkillEntries` → `resolveEmbeddedRunSkillEntries` → 系统提示词与普通工具 |
-| 员工技能资产 | `EmployeeSkillProfile` + `SkillRuntimeDefinition` | `CONFIG_DIR/skill-assets/store.json` | 机器人关系变更 → `syncSkillExecutionBinding` → `ob-asset-<skillId>/SKILL.md` → 同上一次加载 |
+| 栈           | 发现物                                            | 持久化                                                                 | 进入同一次 turn                                                                             |
+| ------------ | ------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 文件系统技能 | `SKILL.md`                                        | bundled / managed / workspace / extra / plugin / 两级 `.agents/skills` | `loadWorkspaceSkillEntries` → `resolveEmbeddedRunSkillEntries` → 系统提示词与普通工具       |
+| 员工技能资产 | `EmployeeSkillProfile` + `SkillRuntimeDefinition` | `CONFIG_DIR/skill-assets/store.json`                                   | 机器人关系变更 → `syncSkillExecutionBinding` → `ob-asset-<skillId>/SKILL.md` → 同上一次加载 |
 
 员工资产在物化之前不是 Pi loader 的技能目录。`draft` / `rejected` / `retired` 不进执行投影（`NON_EXECUTABLE_LIFECYCLES`）。`private` / `reviewing` / `approved` / `published` 可进投影（`EXECUTABLE_LIFECYCLES`）。`reviewing` 可执行是 `types.ts` 的显式注释：所有者在企业审核期间可以把完整资产装到自己的机器人。`saveSkillAsset` 附近仍有「跳过 draft/reviewing」的相反注释，以 `isExecutableSkillProjectionEligible` 为准。
 
@@ -84,15 +83,15 @@ ClawHub 不在 gateway TypeScript 客户端里。外部 CLI 若把目录写入 w
 
 未找到单一函数在「检索外部源」与「自己创建技能」之间做优先级选择。实际路径按请求顺序并列存在：
 
-| 层 | 入口 | 实际行为 |
-| --- | --- | --- |
-| 成长门控 | `shouldBlockGrowthTaskSend` | 仅首条 mission，且用户未点 proceed。候选来自模板 + `listSkillRecommendations`。禁止发明目录外 key。后续任务直接放行 |
-| 执行预检 | `resolvePrimary` | 无 skill contract 时 `decisionCode = "no_skill_contract"`，不安装、不检索 |
-| 系统提示词 | `buildUserVisibleReplySection` | 能力不够时打一次 `[[capability_gap:...]]`。`buildDocsSection` 要求不要把用户导向第三方 registry |
-| 缺口摄入 | `recordHonestCapabilityGap` | 记事件。store 抛错被吃掉，不让回复失败 |
-| 缺口消费 | `actSkill` / `actTool` | scheduler 上，离开本 turn。skill 类写 `lifecycle=draft` 且 `autoInstallEnabled=false`；tool 类交 governance proposal，不安装 |
-| 诊断 | `install_existing_skill` | 只提议安装已有 skillId。live auto-submit 未接线。`capability.skill-spec` 的 recheck 为 `unsupported_surface` |
-| 学习策展 / 模式检测 | `curateLearningSkillDrafts`、`publish-draft-skill` | 产出 draft。发布与批准走人工 RPC |
+| 层                  | 入口                                               | 实际行为                                                                                                                     |
+| ------------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 成长门控            | `shouldBlockGrowthTaskSend`                        | 仅首条 mission，且用户未点 proceed。候选来自模板 + `listSkillRecommendations`。禁止发明目录外 key。后续任务直接放行          |
+| 执行预检            | `resolvePrimary`                                   | 无 skill contract 时 `decisionCode = "no_skill_contract"`，不安装、不检索                                                    |
+| 系统提示词          | `buildUserVisibleReplySection`                     | 能力不够时打一次 `[[capability_gap:...]]`。`buildDocsSection` 要求不要把用户导向第三方 registry                              |
+| 缺口摄入            | `recordHonestCapabilityGap`                        | 记事件。store 抛错被吃掉，不让回复失败                                                                                       |
+| 缺口消费            | `actSkill` / `actTool`                             | scheduler 上，离开本 turn。skill 类写 `lifecycle=draft` 且 `autoInstallEnabled=false`；tool 类交 governance proposal，不安装 |
+| 诊断                | `install_existing_skill`                           | 只提议安装已有 skillId。live auto-submit 未接线。`capability.skill-spec` 的 recheck 为 `unsupported_surface`                 |
+| 学习策展 / 模式检测 | `curateLearningSkillDrafts`、`publish-draft-skill` | 产出 draft。发布与批准走人工 RPC                                                                                             |
 
 `surfaceForCategory`（`capability-gap-ingest.ts`）把 skill 标成 `capability.skill-spec`，把 tool 标成 `capability.skill-installation`。消费端是 skill 写 draft、tool 交治理提案，名字与动作相反。
 
@@ -102,14 +101,14 @@ ClawHub 不在 gateway TypeScript 客户端里。外部 CLI 若把目录写入 w
 
 没有一条 `candidate → published` 总状态机。下面几套同时存在。
 
-| 状态机 | 枚举（压缩） | 谁推进 | 与「员工可用」的关系 |
-| --- | --- | --- | --- |
+| 状态机                     | 枚举（压缩）                                                                                       | 谁推进                                                               | 与「员工可用」的关系                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | 资产 `SkillLifecycleState` | `draft → private → reviewing → published`，另有 `approved` / `deprecated` / `rejected` / `retired` | 人工 RPC：`finalizeDraftSkill`、分享、提交企业、`publishSkillReview` | 只有可执行 lifecycle 且类型在 `EXECUTABLE_ASSET_TYPES` 才投影。`knowledge` 排除 |
-| 企业 proposal | `proposed / under_review / approved / rejected / withdrawn` | `enterprise-capability.review` | 拒绝主要落在 proposal。未找到把 `skill.lifecycle` 写成 `rejected` 的 store 函数 |
-| Registry | `draft / review / approved / active / deprecated / retired` | 审核通过后 `approveAndRegister` | 员工安装与装包读的是这份目录 |
-| 平台 submission | `pending-review / reviewing / published / rejected / ...` | 脱敏后 `submit-to-platform`，平台 RPC 发布 | 员工 RPC 到不了平台发布 |
-| 孵化中心 | 候选池 + `incubation.decide` 日志 | 人写 reason | `decide` 不调用 `submit-to-platform` |
-| auto-evolution | 默认关 | 仅当环境变量为 on 且 governance mode 为 auto | 永不自动 approve，只推进带 `autoInstallIntent` 的 job |
+| 企业 proposal              | `proposed / under_review / approved / rejected / withdrawn`                                        | `enterprise-capability.review`                                       | 拒绝主要落在 proposal。未找到把 `skill.lifecycle` 写成 `rejected` 的 store 函数 |
+| Registry                   | `draft / review / approved / active / deprecated / retired`                                        | 审核通过后 `approveAndRegister`                                      | 员工安装与装包读的是这份目录                                                    |
+| 平台 submission            | `pending-review / reviewing / published / rejected / ...`                                          | 脱敏后 `submit-to-platform`，平台 RPC 发布                           | 员工 RPC 到不了平台发布                                                         |
+| 孵化中心                   | 候选池 + `incubation.decide` 日志                                                                  | 人写 reason                                                          | `decide` 不调用 `submit-to-platform`                                            |
+| auto-evolution             | 默认关                                                                                             | 仅当环境变量为 on 且 governance mode 为 auto                         | 永不自动 approve，只推进带 `autoInstallIntent` 的 job                           |
 
 孵化候选门槛（分析 §3.3）：成熟度 ≥ 企业认证，`calls30d >= 100`（由 `calls7d * 4` 估算），`departmentCount >= 2`（值是 unique robots），`successRate >= 0.8`。`employeeSatisfaction` 恒为 null。观测值、估算值与治理决策必须分开写；这组数字不能当发布依据。
 
@@ -145,52 +144,52 @@ ClawHub 不在 gateway TypeScript 客户端里。外部 CLI 若把目录写入 w
 
 ### 1.5 关键路径索引
 
-| 主题 | 符号 | 路径 |
-| --- | --- | --- |
-| 资产生命周期与安装关系 | `saveSkillAsset`、`finalizeDraftSkill`、`installSkillToRobotAsset`、`emitSkillRelationMutation` | `src/gateway/skill-lifecycle-store.ts` |
-| 投影资格与物化 | `EXECUTABLE_LIFECYCLES`、`syncSkillExecutionBinding`、`isExecutableSkillProjectionEligible` | `src/gateway/skill-execution-binding/` |
-| 关系 hook | `ensureSkillExecutionBindingHooksRegistered` | `src/gateway/skill-execution-binding/register-hooks.ts`（gateway 启动见 `src/gateway/server.impl.ts`） |
-| Turn 加载 | `loadWorkspaceSkillEntries`、`resolveEmbeddedRunSkillEntries` | `src/agents/skills/workspace.ts`、`src/agents/pi-embedded-runner/skills-runtime.ts` |
-| 安装向导 | `executeInstallConfirmation`、`employee-install.apply-configuration` | `src/gateway/server-methods/employee-install.ts` |
-| 运行时绑定 | `syncInstallToRuntime` | `src/gateway/runtime-binding-sync.ts` |
-| 创建机器人装包 | `installRegistrySkillOntoRobot`、`installSkillKeysOntoRobot` | `src/gateway/capability-packs/install-pack-to-robot.ts` |
-| 缺口 | `surfaceForCategory`、`actSkill`、`actTool` | `src/gateway/evolution-control/capability-gap-ingest.ts`、`capability-gap-consumer.ts` |
-| CLI | `registerSkillsCli` | `src/cli/skills-cli.ts` |
-| 自动进化开关 | `isSkillAutoEvolutionEnabled` | `src/gateway/evolution-governance/skill-auto-evolution.ts` |
-| 孵化效果 | `saveEffectTracking` | 定义于 `src/gateway/incubation-store.ts`；调用仅见 `src/gateway/__tests__/incubation-store.test.ts` |
-| 提示词与缺口标记 | `buildUserVisibleReplySection`、`buildDocsSection` | `src/agents/system-prompt.ts` |
+| 主题                   | 符号                                                                                            | 路径                                                                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 资产生命周期与安装关系 | `saveSkillAsset`、`finalizeDraftSkill`、`installSkillToRobotAsset`、`emitSkillRelationMutation` | `src/gateway/skill-lifecycle-store.ts`                                                                 |
+| 投影资格与物化         | `EXECUTABLE_LIFECYCLES`、`syncSkillExecutionBinding`、`isExecutableSkillProjectionEligible`     | `src/gateway/skill-execution-binding/`                                                                 |
+| 关系 hook              | `ensureSkillExecutionBindingHooksRegistered`                                                    | `src/gateway/skill-execution-binding/register-hooks.ts`（gateway 启动见 `src/gateway/server.impl.ts`） |
+| Turn 加载              | `loadWorkspaceSkillEntries`、`resolveEmbeddedRunSkillEntries`                                   | `src/agents/skills/workspace.ts`、`src/agents/pi-embedded-runner/skills-runtime.ts`                    |
+| 安装向导               | `executeInstallConfirmation`、`employee-install.apply-configuration`                            | `src/gateway/server-methods/employee-install.ts`                                                       |
+| 运行时绑定             | `syncInstallToRuntime`                                                                          | `src/gateway/runtime-binding-sync.ts`                                                                  |
+| 创建机器人装包         | `installRegistrySkillOntoRobot`、`installSkillKeysOntoRobot`                                    | `src/gateway/capability-packs/install-pack-to-robot.ts`                                                |
+| 缺口                   | `surfaceForCategory`、`actSkill`、`actTool`                                                     | `src/gateway/evolution-control/capability-gap-ingest.ts`、`capability-gap-consumer.ts`                 |
+| CLI                    | `registerSkillsCli`                                                                             | `src/cli/skills-cli.ts`                                                                                |
+| 自动进化开关           | `isSkillAutoEvolutionEnabled`                                                                   | `src/gateway/evolution-governance/skill-auto-evolution.ts`                                             |
+| 孵化效果               | `saveEffectTracking`                                                                            | 定义于 `src/gateway/incubation-store.ts`；调用仅见 `src/gateway/__tests__/incubation-store.test.ts`    |
+| 提示词与缺口标记       | `buildUserVisibleReplySection`、`buildDocsSection`                                              | `src/agents/system-prompt.ts`                                                                          |
 
 ### 1.6 上一稿阶段编号对照
 
-| 上一稿 | 本修订 |
-| --- | --- |
-| Phase 0 决策契约 | Phase 0：基线确认 + D1–D9 |
-| Phase 1 单一安装成功谓词 | Phase 1：分层状态与投影可靠性，先测后改 |
-| Phase 2 文档 / CLI / 提示词 | Phase 2A |
-| Phase 3 缺口 surface 与 finalize | Phase 2B |
-| Phase 4 孵化标注 | Phase 3 |
+| 上一稿                           | 本修订                                  |
+| -------------------------------- | --------------------------------------- |
+| Phase 0 决策契约                 | Phase 0：基线确认 + D1–D9               |
+| Phase 1 单一安装成功谓词         | Phase 1：分层状态与投影可靠性，先测后改 |
+| Phase 2 文档 / CLI / 提示词      | Phase 2A                                |
+| Phase 3 缺口 surface 与 finalize | Phase 2B                                |
+| Phase 4 孵化标注                 | Phase 3                                 |
 
 ## 2. 问题与风险对照表
 
 「是否阻塞优化」指：不先处理或不定案，后续阶段会把错误语义写进实现或文档。
 
-| ID | 级 | 现象 | 证据 | 影响 | 是否阻塞优化 |
-| --- | --- | --- | --- | --- | --- |
-| P0-1 | P0 | 缺技能没有决策点。检索 registry、ClawHub、生成技能、继续普通工具由不同层各自发生 | 分析 §2；未找到单一优先级函数 | 后续任务缺技能只进 evolution 日志或占位 draft | **是。** 阻塞任何「缺技能时做什么」的行为改动，直到 D1–D3 勾选 |
-| P0-2 | P0 | 「创建技能」停在占位 draft。自动进化默认关且永不自动批准 | 分析 §2.3、§3.4；`skill-auto-evolution.ts` 文件头 | 不能把 draft 或进化日志说成已可用技能 | **是，作为非目标锁定。** 阻塞打开自动进化或自动批准 |
-| P0-3 | P0 | 关系写入、投影、绑定可以被同一个 `installed` 同时代表 | 调查基线 §1.4 | 员工看到已安装，下一轮仍可能不可执行 | **是。** 阻塞 Phase 1 代码，直到 D5 新文案与 D9 冻结（闸门 B） |
-| P0-4 | P0 | 公开文档把不存在的 `openbot skills install/update` 和 ClawHub 写成主通道；系统提示词禁止导向第三方 registry | 分析 §6。本调查只复核了 CLI：`skills-cli.ts` 仅 `list` / `info` / `check`。文档句段待 Phase 2A 逐页核对 | 员工、文档、模型会走向不同安装动作 | **有条件。** 阻塞 Phase 2A 的完成声明。文档须在 D5/D9 冻结之后再写「可用」 |
-| P1-1 | P1 | surface 名与动作相反；诊断不消费 skill-spec；live auto-submit 未接线 | `surfaceForCategory`；诊断行为见分析 §2.1 | 运营把 capability-gap draft 当成已进化或已可用 | **有条件。** 阻塞 Phase 2B。surface 改名须保留向后兼容 |
-| P1-2 | P1 | 资产 RPC 有明确错误；文件系统缺依赖、策略拒绝、frontmatter 失败则技能从列表消失 | 分析 §7 P1-2。过滤实现本轮未重读 | 两条栈排障方式不同 | **否**（非目标）。不并进 Phase 1 |
-| P1-3 | P1 | 孵化分把估算写成 30 日调用，部门数等于机器人数，满意度恒 null；效果跟踪无生产写入 | 分析 §3.3；`saveEffectTracking` 仅测试调用 | 用分数做发布或上传建议会误导 | **是，阻塞「把孵化分当发布依据」。** Phase 3 只做未采集标注，并区分观测 / 估算 / 治理决策 |
-| P1-4 | P1 | store 分裂：技能资产、安装请求、registry 不在同一目录 | `~/.config/openbot/stores/employee-install.json` 与 `CONFIG_DIR/skill-assets` | 排障时「装过」可能只在其中一个文件。生产数据是否必须迁移 **待核实** | **有条件。** 阻塞物理迁移，直到 D6。不阻塞 D5 分层本身 |
-| P1-5 | P1 | 资产态 `approved` / `rejected` 与企业审核态、UI 分段不是同一套词 | 分析 §3.1、§3.4 | 审核拒绝与资产 lifecycle 可能对不上 | **否。** 非目标 |
-| P1-6 | P1 | `reviewing` 可投影与 `saveSkillAsset` 附近注释矛盾 | `skill-execution-binding/types.ts`；相反注释见分析 §3.1 | 后续修改会按错误注释收紧或放开 | **有条件。** 阻塞 Phase 2A 的注释收口。运行时是否收紧由 D4 决定 |
-| P2-1 | P2 | 有 24h 健康度与 patch 版本，没有「评测通过才可 published」 | 分析 §3.1、§7 P2-1 | 健康度不是发布门 | **否。** 不新建评测门 |
-| P2-2 | P2 | 学习策展的「三次」与 `skill-authoring` 的「同一错误三次」不是同一条规则 | 分析 §7 P2-2 | 可能各存一份 draft 与目录技能 | **否。** Phase 0 写明二者不可互换 |
-| P2-3 | P2 | `runtime-appliance` 名称未落地 | 分析 §0、§9 | 用该词会检索不到代码 | **否。** 契约使用 §1.5 的模块名 |
-| P2-4 | P2 | ClawHub 可以出现在治理提案类型里，没有安装执行器 | 分析 §7 P2-4。提案类型定义本轮未重读；若要改枚举则 **待核实** | UI 容易写成已接通的市场 | **是，阻塞 D1。** 推荐维持无执行器、不自动安装 |
-| P2-5 | P2 | `docs/zh-CN/**` 会复制英文文档中的错误 | 仓库 i18n 约定；分析 §6 | 只改英文会留下中文对外文档漂移 | **有条件。** 阻塞「中文对外文档已对齐」。禁止手改 `docs/zh-CN/**` |
+| ID   | 级  | 现象                                                                                                        | 证据                                                                                                    | 影响                                                                | 是否阻塞优化                                                                              |
+| ---- | --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| P0-1 | P0  | 缺技能没有决策点。检索 registry、ClawHub、生成技能、继续普通工具由不同层各自发生                            | 分析 §2；未找到单一优先级函数                                                                           | 后续任务缺技能只进 evolution 日志或占位 draft                       | **是。** 阻塞任何「缺技能时做什么」的行为改动，直到 D1–D3 勾选                            |
+| P0-2 | P0  | 「创建技能」停在占位 draft。自动进化默认关且永不自动批准                                                    | 分析 §2.3、§3.4；`skill-auto-evolution.ts` 文件头                                                       | 不能把 draft 或进化日志说成已可用技能                               | **是，作为非目标锁定。** 阻塞打开自动进化或自动批准                                       |
+| P0-3 | P0  | 关系写入、投影、绑定可以被同一个 `installed` 同时代表                                                       | 调查基线 §1.4                                                                                           | 员工看到已安装，下一轮仍可能不可执行                                | **是。** 阻塞 Phase 1 代码，直到 D5 新文案与 D9 冻结（闸门 B）                            |
+| P0-4 | P0  | 公开文档把不存在的 `openbot skills install/update` 和 ClawHub 写成主通道；系统提示词禁止导向第三方 registry | 分析 §6。本调查只复核了 CLI：`skills-cli.ts` 仅 `list` / `info` / `check`。文档句段待 Phase 2A 逐页核对 | 员工、文档、模型会走向不同安装动作                                  | **有条件。** 阻塞 Phase 2A 的完成声明。文档须在 D5/D9 冻结之后再写「可用」                |
+| P1-1 | P1  | surface 名与动作相反；诊断不消费 skill-spec；live auto-submit 未接线                                        | `surfaceForCategory`；诊断行为见分析 §2.1                                                               | 运营把 capability-gap draft 当成已进化或已可用                      | **有条件。** 阻塞 Phase 2B。surface 改名须保留向后兼容                                    |
+| P1-2 | P1  | 资产 RPC 有明确错误；文件系统缺依赖、策略拒绝、frontmatter 失败则技能从列表消失                             | 分析 §7 P1-2。过滤实现本轮未重读                                                                        | 两条栈排障方式不同                                                  | **否**（非目标）。不并进 Phase 1                                                          |
+| P1-3 | P1  | 孵化分把估算写成 30 日调用，部门数等于机器人数，满意度恒 null；效果跟踪无生产写入                           | 分析 §3.3；`saveEffectTracking` 仅测试调用                                                              | 用分数做发布或上传建议会误导                                        | **是，阻塞「把孵化分当发布依据」。** Phase 3 只做未采集标注，并区分观测 / 估算 / 治理决策 |
+| P1-4 | P1  | store 分裂：技能资产、安装请求、registry 不在同一目录                                                       | `~/.config/openbot/stores/employee-install.json` 与 `CONFIG_DIR/skill-assets`                           | 排障时「装过」可能只在其中一个文件。生产数据是否必须迁移 **待核实** | **有条件。** 阻塞物理迁移，直到 D6。不阻塞 D5 分层本身                                    |
+| P1-5 | P1  | 资产态 `approved` / `rejected` 与企业审核态、UI 分段不是同一套词                                            | 分析 §3.1、§3.4                                                                                         | 审核拒绝与资产 lifecycle 可能对不上                                 | **否。** 非目标                                                                           |
+| P1-6 | P1  | `reviewing` 可投影与 `saveSkillAsset` 附近注释矛盾                                                          | `skill-execution-binding/types.ts`；相反注释见分析 §3.1                                                 | 后续修改会按错误注释收紧或放开                                      | **有条件。** 阻塞 Phase 2A 的注释收口。运行时是否收紧由 D4 决定                           |
+| P2-1 | P2  | 有 24h 健康度与 patch 版本，没有「评测通过才可 published」                                                  | 分析 §3.1、§7 P2-1                                                                                      | 健康度不是发布门                                                    | **否。** 不新建评测门                                                                     |
+| P2-2 | P2  | 学习策展的「三次」与 `skill-authoring` 的「同一错误三次」不是同一条规则                                     | 分析 §7 P2-2                                                                                            | 可能各存一份 draft 与目录技能                                       | **否。** Phase 0 写明二者不可互换                                                         |
+| P2-3 | P2  | `runtime-appliance` 名称未落地                                                                              | 分析 §0、§9                                                                                             | 用该词会检索不到代码                                                | **否。** 契约使用 §1.5 的模块名                                                           |
+| P2-4 | P2  | ClawHub 可以出现在治理提案类型里，没有安装执行器                                                            | 分析 §7 P2-4。提案类型定义本轮未重读；若要改枚举则 **待核实**                                           | UI 容易写成已接通的市场                                             | **是，阻塞 D1。** 推荐维持无执行器、不自动安装                                            |
+| P2-5 | P2  | `docs/zh-CN/**` 会复制英文文档中的错误                                                                      | 仓库 i18n 约定；分析 §6                                                                                 | 只改英文会留下中文对外文档漂移                                      | **有条件。** 阻塞「中文对外文档已对齐」。禁止手改 `docs/zh-CN/**`                         |
 
 ## 3. 优化目标与非目标
 
@@ -223,18 +222,18 @@ ClawHub 不在 gateway TypeScript 客户端里。外部 CLI 若把目录写入 w
 
 推荐列是本修订的默认合同。未勾选的项保持阻塞。
 
-| ID | 决定 | 方案推荐 | 专家结论 |
-| --- | --- | --- | --- |
-| D0 | 系统边界：本方案操作哪一个系统 | **A。** 私有仓 upbeyond/openbot 的 gateway：员工技能资产、`employee-install`、执行投影、runtime binding | **已确认：A**（产品负责人，2026-10-10）。B/C/D 关闭 |
-| D1 | 缺技能时允许的源 | 不新增 turn 内自动安装。显式安装只用已有源：企业 registry、`listSkillRecommendations`（published / 小组共享）、先 `scan-external` 再确认的 external-local。禁止发明 skillKey。workspace 与 `.agents/skills` 由文件系统栈被动发现。ClawHub 不进入 gateway | ☐ 同意推荐 ☐ 改选： |
-| D2 | 创作边界 | `actSkill`、学习策展、模式检测、quick-save 档案增强只停在 `draft`，且 `autoInstallEnabled=false`。不自动安装，不自动 published。缺口草稿的 `assetType` 必须是 `EXECUTABLE_ASSET_TYPES` 中的显式值（落地在 Phase 2B） | ☐ 同意推荐 ☐ 改选： |
-| D3 | 谁把 draft 推进到可执行 | 没有自动推进者。唯一人工入口是 `finalizeDraftSkill` / `personal-skills.finalize-draft`。finalize 前通过扩展后的内容检查（Phase 2B）。通过之后才允许进入安装与投影 | ☐ 同意推荐 ☐ 改选： |
-| D4 | `reviewing` 是否维持可投影 | 维持 `reviewing` ∈ `EXECUTABLE_LIFECYCLES`。Phase 2A 只修正相反注释。本方案不收紧投影 | ☐ 同意推荐 ☐ 改选为收紧（须另写影响说明；现网自用面 **待核实**） |
-| D5 | 安装状态分层 | 见下方「D5 正文」。取代上一稿「installed = 投影且绑定都成功」 | ☐ 同意本修订正文 ☐ 改选： |
-| D6 | 安装请求 store 是否迁入 `CONFIG_DIR` | 不迁移。Phase 2A 把 stub 路径写成临时事实。生产文件是否必须迁移 **待核实** | ☐ 同意不迁移 ☐ 要求迁移（另页验收，阻塞 Phase 1 完成声明） |
-| D7 | 孵化效果 | Phase 3 标明效果对比未采集；区分观测、估算、治理决策。不用乘 4 的 `calls30d`、部门=机器人、满意度 null 做发布或上传判断。不接 `saveEffectTracking` 生产写入。不改 auto-evolution，不代发平台 | ☐ 同意只标注 ☐ 要求接生产写入（另页定义数据来源） |
-| D8 | 是否实现 `openbot skills install/update` | 不实现。Phase 2A 改写文档，使文档服从 CLI | ☐ 同意不实现 ☐ 要求实现 CLI（新阶段，不进入本方案） |
-| D9 | 安装状态与可用性语义 | 见下方「D9 正文」。仅在 D0=A 之后冻结。**未冻结不得开始分层状态的产品改动** | ☐ 同意本修订正文 ☐ 改选： |
+| ID  | 决定                                     | 方案推荐                                                                                                                                                                                                                                                 | 专家结论                                                         |
+| --- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| D0  | 系统边界：本方案操作哪一个系统           | **A。** 私有仓 upbeyond/openbot 的 gateway：员工技能资产、`employee-install`、执行投影、runtime binding                                                                                                                                                  | **已确认：A**（产品负责人，2026-10-10）。B/C/D 关闭              |
+| D1  | 缺技能时允许的源                         | 不新增 turn 内自动安装。显式安装只用已有源：企业 registry、`listSkillRecommendations`（published / 小组共享）、先 `scan-external` 再确认的 external-local。禁止发明 skillKey。workspace 与 `.agents/skills` 由文件系统栈被动发现。ClawHub 不进入 gateway | ☐ 同意推荐 ☐ 改选：                                              |
+| D2  | 创作边界                                 | `actSkill`、学习策展、模式检测、quick-save 档案增强只停在 `draft`，且 `autoInstallEnabled=false`。不自动安装，不自动 published。缺口草稿的 `assetType` 必须是 `EXECUTABLE_ASSET_TYPES` 中的显式值（落地在 Phase 2B）                                     | ☐ 同意推荐 ☐ 改选：                                              |
+| D3  | 谁把 draft 推进到可执行                  | 没有自动推进者。唯一人工入口是 `finalizeDraftSkill` / `personal-skills.finalize-draft`。finalize 前通过扩展后的内容检查（Phase 2B）。通过之后才允许进入安装与投影                                                                                        | ☐ 同意推荐 ☐ 改选：                                              |
+| D4  | `reviewing` 是否维持可投影               | 维持 `reviewing` ∈ `EXECUTABLE_LIFECYCLES`。Phase 2A 只修正相反注释。本方案不收紧投影                                                                                                                                                                    | ☐ 同意推荐 ☐ 改选为收紧（须另写影响说明；现网自用面 **待核实**） |
+| D5  | 安装状态分层                             | 见下方「D5 正文」。取代上一稿「installed = 投影且绑定都成功」                                                                                                                                                                                            | ☐ 同意本修订正文 ☐ 改选：                                        |
+| D6  | 安装请求 store 是否迁入 `CONFIG_DIR`     | 不迁移。Phase 2A 把 stub 路径写成临时事实。生产文件是否必须迁移 **待核实**                                                                                                                                                                               | ☐ 同意不迁移 ☐ 要求迁移（另页验收，阻塞 Phase 1 完成声明）       |
+| D7  | 孵化效果                                 | Phase 3 标明效果对比未采集；区分观测、估算、治理决策。不用乘 4 的 `calls30d`、部门=机器人、满意度 null 做发布或上传判断。不接 `saveEffectTracking` 生产写入。不改 auto-evolution，不代发平台                                                             | ☐ 同意只标注 ☐ 要求接生产写入（另页定义数据来源）                |
+| D8  | 是否实现 `openbot skills install/update` | 不实现。Phase 2A 改写文档，使文档服从 CLI                                                                                                                                                                                                                | ☐ 同意不实现 ☐ 要求实现 CLI（新阶段，不进入本方案）              |
+| D9  | 安装状态与可用性语义                     | 见下方「D9 正文」。仅在 D0=A 之后冻结。**未冻结不得开始分层状态的产品改动**                                                                                                                                                                              | ☐ 同意本修订正文 ☐ 改选：                                        |
 
 #### D0=A 已冻结之后怎么走
 
@@ -246,12 +245,12 @@ ClawHub 不在 gateway TypeScript 客户端里。外部 CLI 若把目录写入 w
 
 安装生命周期分四层记录。层与层独立更新。任何一层的成功都不能填满其他层。
 
-| 层 | 状态 | 含义 |
-| --- | --- | --- |
-| 安装关系 | `requested` / `linked` | 技能与机器人的关系是否已经建立。`requested` 表示本次操作已受理但关系尚未提交；`linked` 表示关系已在 store 中建立 |
-| 执行投影 | `pending` / `ready` / `failed` | `ob-asset-<skillId>/SKILL.md` 是否已按可执行 lifecycle 物化。`pending` 表示尚未核对或正在物化；`ready` 表示物化结果可被后续加载使用；`failed` 表示本次物化失败并带有原因 |
-| 运行时绑定 | `not_required` / `pending` / `synced` / `failed` | 仅当 D9 规定该入口需要 `syncInstallToRuntime` 时，才使用 `pending` / `synced` / `failed`。不需要绑定的入口保持 `not_required` |
-| 最终可用性 | `ready` / `degraded` / `failed` | 按该入口的必需条件计算。`ready`：必需条件全部满足。`degraded`：投影 `ready`，但该入口的辅助同步失败。`failed`：必需条件未满足 |
+| 层         | 状态                                             | 含义                                                                                                                                                                     |
+| ---------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 安装关系   | `requested` / `linked`                           | 技能与机器人的关系是否已经建立。`requested` 表示本次操作已受理但关系尚未提交；`linked` 表示关系已在 store 中建立                                                         |
+| 执行投影   | `pending` / `ready` / `failed`                   | `ob-asset-<skillId>/SKILL.md` 是否已按可执行 lifecycle 物化。`pending` 表示尚未核对或正在物化；`ready` 表示物化结果可被后续加载使用；`failed` 表示本次物化失败并带有原因 |
+| 运行时绑定 | `not_required` / `pending` / `synced` / `failed` | 仅当 D9 规定该入口需要 `syncInstallToRuntime` 时，才使用 `pending` / `synced` / `failed`。不需要绑定的入口保持 `not_required`                                            |
+| 最终可用性 | `ready` / `degraded` / `failed`                  | 按该入口的必需条件计算。`ready`：必需条件全部满足。`degraded`：投影 `ready`，但该入口的辅助同步失败。`failed`：必需条件未满足                                            |
 
 规则：
 
@@ -269,14 +268,14 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 
 **入口分类（推荐）**
 
-| 入口 | 关系 | 投影 | 绑定 | 绑定在该入口中的角色 |
-| --- | --- | --- | --- | --- |
-| 文件系统发现（bundled / managed / workspace / extra / plugin / `.agents/skills`） | 不建立员工安装关系 | 目录本身由 loader 发现 | `not_required` | 不走安装状态机。UI 不得把这类技能说成 employee-install 的安装结果 |
-| `installSkillToRobotAsset` / `robot-skills.install` | 必需，成功后 `linked` | 必需，成功后 `ready` | `not_required`，除非同一次调用按下行另外要求绑定 | 只安装关系时，绑定不是门槛 |
-| `installSkillKeysOntoRobot`（提供了 `userEmail` 与 `cfg` 并调用了 `syncInstallToRuntime`） | 必需 | 必需 | 需要 | **辅助。** 投影 `ready` 且绑定 `failed` → 可用性 `degraded`。绑定失败不得抹掉投影，也不得只返回一个无原因的 `installed` |
-| `installSkillKeysOntoRobot`（未调用绑定） | 必需 | 必需 | `not_required` | 可用性只看投影 |
-| `employee-install.confirm` / `apply-configuration` | 安装请求记录；不把它写成技能投影关系 | 本入口今天不物化 `SKILL.md`。未另做投影时，投影不标 `ready` | 需要 | **必需。** 绑定未 `synced` 时，该入口可用性为 `failed`。不得用该入口的成功推断下一轮 prompt 里有技能 |
-| 缺口 draft、未 finalize 的资产 | 可以挂关系 | 必须保持非 `ready` | `not_required` | draft 的执行可用性为 `failed` |
+| 入口                                                                                       | 关系                                 | 投影                                                        | 绑定                                             | 绑定在该入口中的角色                                                                                                    |
+| ------------------------------------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 文件系统发现（bundled / managed / workspace / extra / plugin / `.agents/skills`）          | 不建立员工安装关系                   | 目录本身由 loader 发现                                      | `not_required`                                   | 不走安装状态机。UI 不得把这类技能说成 employee-install 的安装结果                                                       |
+| `installSkillToRobotAsset` / `robot-skills.install`                                        | 必需，成功后 `linked`                | 必需，成功后 `ready`                                        | `not_required`，除非同一次调用按下行另外要求绑定 | 只安装关系时，绑定不是门槛                                                                                              |
+| `installSkillKeysOntoRobot`（提供了 `userEmail` 与 `cfg` 并调用了 `syncInstallToRuntime`） | 必需                                 | 必需                                                        | 需要                                             | **辅助。** 投影 `ready` 且绑定 `failed` → 可用性 `degraded`。绑定失败不得抹掉投影，也不得只返回一个无原因的 `installed` |
+| `installSkillKeysOntoRobot`（未调用绑定）                                                  | 必需                                 | 必需                                                        | `not_required`                                   | 可用性只看投影                                                                                                          |
+| `employee-install.confirm` / `apply-configuration`                                         | 安装请求记录；不把它写成技能投影关系 | 本入口今天不物化 `SKILL.md`。未另做投影时，投影不标 `ready` | 需要                                             | **必需。** 绑定未 `synced` 时，该入口可用性为 `failed`。不得用该入口的成功推断下一轮 prompt 里有技能                    |
+| 缺口 draft、未 finalize 的资产                                                             | 可以挂关系                           | 必须保持非 `ready`                                          | `not_required`                                   | draft 的执行可用性为 `failed`                                                                                           |
 
 **UI「安装成功」的最低证据**
 
@@ -303,11 +302,11 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 
 闸门是阶段开工条件。阶段里的单元测试通过，不等于闸门通过。
 
-| 闸门 | 内容 | 通过条件 | 未通过时 |
-| --- | --- | --- | --- |
-| A 基线确认 | D0、四文件 permalink、调查基线、实施当时的主干与生产版本 | D0 已勾选。私有仓 URL、四个 permalink、#545、#546、调查基线 SHA 已核对。实施当时重新读取 `main` HEAD 与生产部署版本。与调查基线不同则列出差异。生产版本本轮 **待核实**，因此闸门 A 现在尚未通过 | 禁止把调查基线写成当前生产事实。禁止开始 Phase 1 及以后的代码。D0 不是 A 时，禁止沿用 §4 的投影改动面 |
-| B 状态机与失败语义冻结 | 仅 D0=A：D5 正文 + D9 正文，且已有授权/工具筛选的映射说明 | §7 中 D5 与 D9 已勾选，并写明四层如何映射到现有关系、投影资格和绑定，而不是平行总开关 | 禁止开始分层状态的产品改动。允许继续修订本文。垂直切片可以在映射说明写清后、全量 Phase 1 之前做 |
-| C 端到端集成验收 | 先是垂直切片，再是 §6 矩阵 | 切片五步进入真实执行上下文。矩阵每一行同样不得只在同一次请求内读回刚写的文件。撤销后旧投影不再授权 | 切片未通过时，不得扩文档与指标，也不得宣称员工端安装已经验收完成 |
+| 闸门                   | 内容                                                      | 通过条件                                                                                                                                                                                        | 未通过时                                                                                              |
+| ---------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| A 基线确认             | D0、四文件 permalink、调查基线、实施当时的主干与生产版本  | D0 已勾选。私有仓 URL、四个 permalink、#545、#546、调查基线 SHA 已核对。实施当时重新读取 `main` HEAD 与生产部署版本。与调查基线不同则列出差异。生产版本本轮 **待核实**，因此闸门 A 现在尚未通过 | 禁止把调查基线写成当前生产事实。禁止开始 Phase 1 及以后的代码。D0 不是 A 时，禁止沿用 §4 的投影改动面 |
+| B 状态机与失败语义冻结 | 仅 D0=A：D5 正文 + D9 正文，且已有授权/工具筛选的映射说明 | §7 中 D5 与 D9 已勾选，并写明四层如何映射到现有关系、投影资格和绑定，而不是平行总开关                                                                                                           | 禁止开始分层状态的产品改动。允许继续修订本文。垂直切片可以在映射说明写清后、全量 Phase 1 之前做       |
+| C 端到端集成验收       | 先是垂直切片，再是 §6 矩阵                                | 切片五步进入真实执行上下文。矩阵每一行同样不得只在同一次请求内读回刚写的文件。撤销后旧投影不再授权                                                                                              | 切片未通过时，不得扩文档与指标，也不得宣称员工端安装已经验收完成                                      |
 
 **D0=A 已冻结，但闸门 A 仍未通过**（生产版本待核实）。分层状态的产品改动还要闸门 B，并且必须是闸门 B 之后的独立实施 PR。闸门 C 从垂直切片的真实执行开始；切片设计勾选完成，不等于切片已经跑过。
 
@@ -496,13 +495,13 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 
 只做垂直切片的**设计与验收勾选**。不写实现代码，不改产品。
 
-| 步 | 范围 | 验收时必须看到 |
-| --- | --- | --- |
+| 步         | 范围                                                                                                     | 验收时必须看到                                     |
+| ---------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | 创建或选择 | 在私有仓 gateway 上选定一条已有员工技能，或保存一条新的员工资产。不自动 published，不打开 auto-evolution | 记录技能标识与 lifecycle。draft 不得被当成已可执行 |
-| 保存 | 资产写入 `skill-assets` 一类的既有存储。本工作包只规定要观察的字段，不新写存储 | 保存结果可再次读到；失败有原因 |
-| 授权/安装 | 装到一台机器人，或走 `employee-install` 确认。关系、投影、runtime binding 分开记录 | 不得只用 `installed` 宣布下一轮可执行 |
-| 运行 | 下一轮真实 loader 或该入口声明的执行上下文 | 同一次请求里读回刚写的文件不算通过 |
-| 撤销 | 解除该机器人上的这次授权或安装 | 撤销之后的下一轮执行上下文里，该投影不再可用 |
+| 保存       | 资产写入 `skill-assets` 一类的既有存储。本工作包只规定要观察的字段，不新写存储                           | 保存结果可再次读到；失败有原因                     |
+| 授权/安装  | 装到一台机器人，或走 `employee-install` 确认。关系、投影、runtime binding 分开记录                       | 不得只用 `installed` 宣布下一轮可执行              |
+| 运行       | 下一轮真实 loader 或该入口声明的执行上下文                                                               | 同一次请求里读回刚写的文件不算通过                 |
+| 撤销       | 解除该机器人上的这次授权或安装                                                                           | 撤销之后的下一轮执行上下文里，该投影不再可用       |
 
 切片设计写完并勾选之前：不扩 Phase 2A 的对外文档，不做 Phase 3 的指标标注，不铺开 Phase 1 的全部入口。
 
@@ -517,12 +516,12 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 5. **Phase 2B：** gap ingest/consumer 与诊断文件可以在不改 store 的前提下与 Phase 1 并行，但仍在 D0=A 且切片通过之后。finalize 的 store 改动等待 Phase 1 合入。
 6. **Phase 3：** 孵化标注放在切片之后，独立批准。禁止与 auto-evolution 默认值或平台发布放在同一 PR。
 
-| 可以并行 | 必须串行或禁止 |
-| --- | --- |
-| Phase 2A 起草与 Phase 1 的测试编写（切片已通过，D5/D9 已冻结） | 当前任何产品代码；闸门 B 未通过时修改分层状态 |
-| Phase 2B 的 ingest/consumer 与 Phase 1 的 `employee-install.ts`、pack 文件 | 两阶段同时改 `skill-lifecycle-store.ts` |
-| Phase 3 文案与 Phase 2A 的 ClawHub/CLI 段落 | Phase 3 与任何修改 `OPENBOT_SKILL_AUTO_EVOLUTION` 默认值的改动 |
-| 各阶段各自的测试 | 一个 PR 跨阶段且改共享热文件；用文档提前宣称「安装成功」而闸门 C 未跑 |
+| 可以并行                                                                   | 必须串行或禁止                                                        |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Phase 2A 起草与 Phase 1 的测试编写（切片已通过，D5/D9 已冻结）             | 当前任何产品代码；闸门 B 未通过时修改分层状态                         |
+| Phase 2B 的 ingest/consumer 与 Phase 1 的 `employee-install.ts`、pack 文件 | 两阶段同时改 `skill-lifecycle-store.ts`                               |
+| Phase 3 文案与 Phase 2A 的 ClawHub/CLI 段落                                | Phase 3 与任何修改 `OPENBOT_SKILL_AUTO_EVOLUTION` 默认值的改动        |
+| 各阶段各自的测试                                                           | 一个 PR 跨阶段且改共享热文件；用文档提前宣称「安装成功」而闸门 C 未跑 |
 
 建议 PR 切分：Phase 1 先测试、后实现，可以是同一 PR 的两个提交，或「测试 PR 合入失败用例」再跟修复 PR。Phase 2A、Phase 2B、Phase 3 各自独立。不要合成一个「进化闭环」大 PR。
 
@@ -534,19 +533,19 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 
 垂直切片是本表的前置最小集，五步都要有记录：创建或选择、保存、授权或安装、运行、撤销。
 
-| 场景 | 关系 | 投影 | 绑定 | 可用性 | 必须观察到的结果 |
-| --- | --- | --- | --- | --- | --- |
-| 安装正常 | `linked` | `ready` | `synced` 或 `not_required`（按 D9） | `ready` | 下一轮 `resolveEmbeddedRunSkillEntries`（或该入口声明的执行路径）能看见该技能。UI「安装成功」只在这一行出现 |
-| 投影失败 | 新关系可回滚；原有有效关系保持 `linked` | `failed` | 不得标成 `synced` | `failed` | 结构化原因；可重试；原有有效投影仍在下一轮授权中，失败的新投影不在 |
-| 绑定失败且绑定为辅助 | `linked` | `ready` | `failed` | `degraded` | 下一轮 loader 仍能看见投影。UI 使用 degraded 文案与原因，不写「安装成功」 |
-| 绑定失败且绑定为必需（employee-install） | 不把请求写成投影 `ready` | 不标 `ready` | `failed` | `failed` | 响应含 `syncInstallToRuntime` 的 reason。不得推断下一轮 prompt 已有该技能 |
-| 重复安装 | 仍是一条 `linked` | 仍是一份 `ready` | 与首次成功相同 | 与首次成功相同 | 没有第二份仍在授权的投影 |
-| 并发安装 | 最终一条关系 | 最终一份授权投影 | 无两份互相覆盖后都仍授权 | 单一终态 | 重叠请求结束后状态机只有一套记录 |
-| draft 不可执行 | 可以存在 | 非 `ready` | `not_required` | `failed` | 下一轮 loader 不把该 draft 当作可执行技能 |
-| 内容检查拒绝 | 不变 | 非 `ready` | `not_required` | `failed` | finalize RPC 失败；lifecycle 仍为 draft；原因覆盖 frontmatter、危险能力、依赖声明、授权权、ID/版本冲突中的被测项 |
-| 撤销授权 | 关系解除 | 旧投影不再 `ready` | 失效 | `failed` | 撤销之后的下一轮执行上下文不再授权该投影 |
-| 历史兼容 | 旧 `installed=true` 读成 `linked` | `pending`，直到核对 | 未知则为 `pending`，不得默认 `synced` | 不得默认 `ready` | 旧客户端仍能读到关系已建立；新客户端不把该记录显示成可以使用 |
-| 文档与 UI 一致 | — | — | — | — | 英文文档、i18n 生成的中文文档、系统提示词、UI「安装成功」使用同一最低证据：可用性 `ready`。创建、部署、发现分节。CLI 不出现不存在的 install/update |
+| 场景                                     | 关系                                    | 投影                | 绑定                                  | 可用性           | 必须观察到的结果                                                                                                                                   |
+| ---------------------------------------- | --------------------------------------- | ------------------- | ------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 安装正常                                 | `linked`                                | `ready`             | `synced` 或 `not_required`（按 D9）   | `ready`          | 下一轮 `resolveEmbeddedRunSkillEntries`（或该入口声明的执行路径）能看见该技能。UI「安装成功」只在这一行出现                                        |
+| 投影失败                                 | 新关系可回滚；原有有效关系保持 `linked` | `failed`            | 不得标成 `synced`                     | `failed`         | 结构化原因；可重试；原有有效投影仍在下一轮授权中，失败的新投影不在                                                                                 |
+| 绑定失败且绑定为辅助                     | `linked`                                | `ready`             | `failed`                              | `degraded`       | 下一轮 loader 仍能看见投影。UI 使用 degraded 文案与原因，不写「安装成功」                                                                          |
+| 绑定失败且绑定为必需（employee-install） | 不把请求写成投影 `ready`                | 不标 `ready`        | `failed`                              | `failed`         | 响应含 `syncInstallToRuntime` 的 reason。不得推断下一轮 prompt 已有该技能                                                                          |
+| 重复安装                                 | 仍是一条 `linked`                       | 仍是一份 `ready`    | 与首次成功相同                        | 与首次成功相同   | 没有第二份仍在授权的投影                                                                                                                           |
+| 并发安装                                 | 最终一条关系                            | 最终一份授权投影    | 无两份互相覆盖后都仍授权              | 单一终态         | 重叠请求结束后状态机只有一套记录                                                                                                                   |
+| draft 不可执行                           | 可以存在                                | 非 `ready`          | `not_required`                        | `failed`         | 下一轮 loader 不把该 draft 当作可执行技能                                                                                                          |
+| 内容检查拒绝                             | 不变                                    | 非 `ready`          | `not_required`                        | `failed`         | finalize RPC 失败；lifecycle 仍为 draft；原因覆盖 frontmatter、危险能力、依赖声明、授权权、ID/版本冲突中的被测项                                   |
+| 撤销授权                                 | 关系解除                                | 旧投影不再 `ready`  | 失效                                  | `failed`         | 撤销之后的下一轮执行上下文不再授权该投影                                                                                                           |
+| 历史兼容                                 | 旧 `installed=true` 读成 `linked`       | `pending`，直到核对 | 未知则为 `pending`，不得默认 `synced` | 不得默认 `ready` | 旧客户端仍能读到关系已建立；新客户端不把该记录显示成可以使用                                                                                       |
+| 文档与 UI 一致                           | —                                       | —                   | —                                     | —                | 英文文档、i18n 生成的中文文档、系统提示词、UI「安装成功」使用同一最低证据：可用性 `ready`。创建、部署、发现分节。CLI 不出现不存在的 install/update |
 
 ## 7. 专家验收清单
 
@@ -589,7 +588,7 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 - [ ] 批准 Phase 2A
 - [ ] 批准 Phase 2B
 - [ ] 批准 Phase 3 的「未采集」标注
-- [ ] 明确不批准的阶段：____________
+- [ ] 明确不批准的阶段：\***\*\_\_\_\_\*\***
 - [ ] 闸门 C 的 §6 矩阵将作为 Phase 1 完成条件，而不是开工条件
 
 部分批准有效。只勾 Phase 0 时仍然禁止写代码。只勾 Phase 1 时，不得夹带 Phase 2B 的 surface 改名或 Phase 3 的公式修改。
@@ -601,7 +600,7 @@ D0 未选 A，或 D9 未冻结时，不得按本节改产品代码。测试可�
 - [ ] P0-3：D5/D9 已冻结，文档不会把单独的 `installed` 写成可执行
 - [ ] P0-4：若批准 Phase 2A，实施前逐页核对分析 §6（未核对前保持 **待核实**）
 - [ ] P2-4：ClawHub 不在 D1 的自动源里
-- [ ] 下列阻塞若仍开放，则对应阶段不得开始：________________
+- [ ] 下列阻塞若仍开放，则对应阶段不得开始：**\*\***\_\_\_\_**\*\***
 
 ### 7.5 实施禁令
 
@@ -637,11 +636,11 @@ D0=A 已冻结。完整实施仍然暂缓，产品改动仍然禁止：
 
 D0 已冻结为 A。本附录只保留对照，**不适用于**私有仓 `https://github.com/upbeyond/openbot` 的验收。下列四行全部不适用。
 
-| 要验证的事 | 公开仓侧的预期（专家第二轮） | 不得误接到私有仓的方式 |
-| --- | --- | --- |
-| 保存后分配 | `save_skill` 人工确认之后，不自动分配给 Bot | 不要用 `installSkillToRobotAsset` 的关系写入来代替这段验收 |
-| 所有权 | 技能所有权与 Bot 授权分开 | 不要把私有仓的 `linked` 直接叫成公开仓所有权 |
-| 工具交集 | 指令不等于能力授权；可用工具是授权交集 | 不要用「投影里出现了 SKILL.md」代替工具交集 |
-| 部署包重载 | `skills.yaml` 重载可以覆盖已保存技能 | 这不是 `ob-asset-<id>/SKILL.md` 投影，也不是 `syncInstallToRuntime` |
+| 要验证的事 | 公开仓侧的预期（专家第二轮）                | 不得误接到私有仓的方式                                              |
+| ---------- | ------------------------------------------- | ------------------------------------------------------------------- |
+| 保存后分配 | `save_skill` 人工确认之后，不自动分配给 Bot | 不要用 `installSkillToRobotAsset` 的关系写入来代替这段验收          |
+| 所有权     | 技能所有权与 Bot 授权分开                   | 不要把私有仓的 `linked` 直接叫成公开仓所有权                        |
+| 工具交集   | 指令不等于能力授权；可用工具是授权交集      | 不要用「投影里出现了 SKILL.md」代替工具交集                         |
+| 部署包重载 | `skills.yaml` 重载可以覆盖已保存技能        | 这不是 `ob-asset-<id>/SKILL.md` 投影，也不是 `syncInstallToRuntime` |
 
 D0=A 时与上表相近、但必须改写后才能用的私有仓等价物是：关系是否授予这台机器人、投影资格（`EXECUTABLE_LIFECYCLES`）是否允许进入 loader、工具策略是否仍可能把技能滤掉、runtime binding 是否另有一套门。垂直切片要观察的是这四件事在下一轮执行里的合取结果，而不是把公开仓矩阵抄进测试名。

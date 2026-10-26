@@ -12,12 +12,12 @@
 
 ## 与 Wave 1 / node push 的边界（SHALL / SHALL NOT）
 
-| 维度 | Wave 1（已定） | Wave 2（本契约） | node / 伴侣（既有，禁止混用） |
-| --- | --- | --- | --- |
-| 能力 | 深链 + **本地/系统通知**点击直达 | **服务端**远程 push → 员工设备 → 点击进员工面 | APNs `push.apns.register` / `push.test` / `node.wake`（`nodeId`） |
-| 身份键 | `activeAccountId` 内解析深链 | **employee `accountId`**（+ device 并存） | `nodeId` |
-| 点击 | `EmployeeNotificationRouter` + `deepLink` | **必须复用同一 Router** | 伴侣/node 路径，不进员工窗 |
-| 已连接扇出 | 本地通知 / WS UI | 远程 push **补离线/后台**；`GatewayPush` **不是** Wave 2 | `GatewayPush` in-process |
+| 维度       | Wave 1（已定）                            | Wave 2（本契约）                                         | node / 伴侣（既有，禁止混用）                                     |
+| ---------- | ----------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------- |
+| 能力       | 深链 + **本地/系统通知**点击直达          | **服务端**远程 push → 员工设备 → 点击进员工面            | APNs `push.apns.register` / `push.test` / `node.wake`（`nodeId`） |
+| 身份键     | `activeAccountId` 内解析深链              | **employee `accountId`**（+ device 并存）                | `nodeId`                                                          |
+| 点击       | `EmployeeNotificationRouter` + `deepLink` | **必须复用同一 Router**                                  | 伴侣/node 路径，不进员工窗                                        |
+| 已连接扇出 | 本地通知 / WS UI                          | 远程 push **补离线/后台**；`GatewayPush` **不是** Wave 2 | `GatewayPush` in-process                                          |
 
 **SHALL NOT：**
 
@@ -29,14 +29,14 @@
 
 ## 已拍板决策（Daniel · 2026-10-08 Asia/Shanghai）
 
-| ID | 决策 | 拍板 |
-| --- | --- | --- |
-| **D-PUSH-W2-TRIGGER** | MVP 触发源 | **仅 @mention**（挂既有 `human-mention-notifications` inbox；缺远程投递） |
-| **D-PUSH-W2-PLATFORM** | 平台顺序 | **iOS APNs 首刀** → Android FCM 另刀 → Mac 员工壳远程后置 → **Windows WNS/Toast 明确不在本契约 MVP** |
-| **D-PUSH-W2-MULTI** | 同账号多设备 | **是**：同一 `accountId` 允许多 registration 并存 |
-| **D-PUSH-W2-CREDS** | APNs 凭据 | **员工独立配置/topic**（不写 node 表；不复用 node registration）；env 占位见下；**bundle / topic 具体值 TBD**（实现前由 iOS/发布 owner 填实） |
-| **D-PUSH-W2-CLICK** | 点击与 payload | 复用 Wave 1 Router；**强制** `deepLink`；短 title/body；**alert**（非 silent）；客户端按 `accountId` 存 token；登出/切账号 **注销**服务端 registration |
-| **D-PUSH-W2-RPC** | RPC 命名 | **已确认落地**：`employee.push.register` / `unregister` / `test`（gateway method pack `employee-push`）；platform-auth HTTP 镜像供 iOS cookie 会话：`/employee/push/register|unregister` |
+| ID                     | 决策           | 拍板                                                                                                                                                                         |
+| ---------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| **D-PUSH-W2-TRIGGER**  | MVP 触发源     | **仅 @mention**（挂既有 `human-mention-notifications` inbox；缺远程投递）                                                                                                    |
+| **D-PUSH-W2-PLATFORM** | 平台顺序       | **iOS APNs 首刀** → Android FCM 另刀 → Mac 员工壳远程后置 → **Windows WNS/Toast 明确不在本契约 MVP**                                                                         |
+| **D-PUSH-W2-MULTI**    | 同账号多设备   | **是**：同一 `accountId` 允许多 registration 并存                                                                                                                            |
+| **D-PUSH-W2-CREDS**    | APNs 凭据      | **员工独立配置/topic**（不写 node 表；不复用 node registration）；env 占位见下；**bundle / topic 具体值 TBD**（实现前由 iOS/发布 owner 填实）                                |
+| **D-PUSH-W2-CLICK**    | 点击与 payload | 复用 Wave 1 Router；**强制** `deepLink`；短 title/body；**alert**（非 silent）；客户端按 `accountId` 存 token；登出/切账号 **注销**服务端 registration                       |
+| **D-PUSH-W2-RPC**      | RPC 命名       | **已确认落地**：`employee.push.register` / `unregister` / `test`（gateway method pack `employee-push`）；platform-auth HTTP 镜像供 iOS cookie 会话：`/employee/push/register | unregister` |
 
 **继承的已定案（勿重开）：** `D-PUSH-SCOPE=A`（W1 本地/深链；W2 服务端 employee push 净新增）。
 
@@ -54,13 +54,13 @@
 
 ## Payload（远程 push → 系统通知）
 
-| 字段 | 要求 | 说明 |
-| --- | --- | --- |
-| `deepLink` | **强制** | 符合 `deeplink-grammar.md`（`openbot://` / `openclaw://`；host ∈ employee/chat/space/knowledge）。Mac/iOS userInfo key = `"deepLink"`；Android Intent extra = `ai.openclaw.employee.deepLink`（与 Wave 1 Router 对齐）。 |
-| `title` / `body` | **短文案** | 用户可见 alert；本地化可后置（先 zh-CN/en 资源位即可）。 |
-| `accountId` | **建议携带** | 多账号提示切换；不替代服务端按 registration 选设备。 |
-| 业务正文 | **禁止** | 不含消息全文、密钥、附件；仅元数据级（R10.5：APNs/FCM 仅投递元数据）。 |
-| 类型 | **alert** | 非 silent；勿与伴侣 `node.wake` silent 混淆。 |
+| 字段             | 要求         | 说明                                                                                                                                                                                                                     |
+| ---------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `deepLink`       | **强制**     | 符合 `deeplink-grammar.md`（`openbot://` / `openclaw://`；host ∈ employee/chat/space/knowledge）。Mac/iOS userInfo key = `"deepLink"`；Android Intent extra = `ai.openclaw.employee.deepLink`（与 Wave 1 Router 对齐）。 |
+| `title` / `body` | **短文案**   | 用户可见 alert；本地化可后置（先 zh-CN/en 资源位即可）。                                                                                                                                                                 |
+| `accountId`      | **建议携带** | 多账号提示切换；不替代服务端按 registration 选设备。                                                                                                                                                                     |
+| 业务正文         | **禁止**     | 不含消息全文、密钥、附件；仅元数据级（R10.5：APNs/FCM 仅投递元数据）。                                                                                                                                                   |
+| 类型             | **alert**    | 非 silent；勿与伴侣 `node.wake` silent 混淆。                                                                                                                                                                            |
 
 点击路径（所有平台，一旦弹出系统通知）：
 
@@ -72,20 +72,20 @@
 
 ## 触发（MVP）
 
-| 波次 | 触发 | 说明 |
-| --- | --- | --- |
-| **MVP** | **@mention** | 既有租户 inbox（`human-mention-notifications`）在持久化后 **enqueue** 员工远程投递；本契约不发明新业务事件总线。 |
-| 明确后置 | 待办到期 / 审批 / 日程 / 全量业务总线 | 另开产品拍板，不随 2.1 首刀。 |
-| 可测辅助 | `employee.push.test`（提案名） | 实现刀可先于 mention 接线，用于真机验收；**不等于**产品触发 MVP 变更。 |
+| 波次     | 触发                                  | 说明                                                                                                             |
+| -------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **MVP**  | **@mention**                          | 既有租户 inbox（`human-mention-notifications`）在持久化后 **enqueue** 员工远程投递；本契约不发明新业务事件总线。 |
+| 明确后置 | 待办到期 / 审批 / 日程 / 全量业务总线 | 另开产品拍板，不随 2.1 首刀。                                                                                    |
+| 可测辅助 | `employee.push.test`（提案名）        | 实现刀可先于 mention 接线，用于真机验收；**不等于**产品触发 MVP 变更。                                           |
 
 ## 平台范围
 
-| 平台 | MVP | 说明 |
-| --- | --- | --- |
-| **iOS** | **首刀** | APNs 重绑到 **employee** 身份；消费本契约 + Wave 1 Router。 |
-| **Android** | 第二刀（tasks 2.2） | FCM **从零**；同一 employee registration 模型。 |
-| **macOS** | 后置 | Stage 54 以本地 UNUserNotification 为主；远程 APNs 可另刀。 |
-| **Windows** | **不在 MVP** | Stage 55 non-goal；无 Toast/WNS 实现假设；桌面继续已连接 + 本地通知直至另案。 |
+| 平台        | MVP                 | 说明                                                                          |
+| ----------- | ------------------- | ----------------------------------------------------------------------------- |
+| **iOS**     | **首刀**            | APNs 重绑到 **employee** 身份；消费本契约 + Wave 1 Router。                   |
+| **Android** | 第二刀（tasks 2.2） | FCM **从零**；同一 employee registration 模型。                               |
+| **macOS**   | 后置                | Stage 54 以本地 UNUserNotification 为主；远程 APNs 可另刀。                   |
+| **Windows** | **不在 MVP**        | Stage 55 non-goal；无 Toast/WNS 实现假设；桌面继续已连接 + 本地通知直至另案。 |
 
 ## 凭据与环境（占位 · 非真实密钥）
 
@@ -93,12 +93,12 @@
 
 **提案 env 占位（待 owner 确认前缀；禁止写入真实密钥到仓库）：**
 
-| 变量（提案） | 含义 |
-| --- | --- |
-| `OPENBOT_EMPLOYEE_APNS_KEY_ID` | APNs key id |
-| `OPENBOT_EMPLOYEE_APNS_TEAM_ID` | Apple team id |
-| `OPENBOT_EMPLOYEE_APNS_KEY_PATH` | `.p8` 路径（或由密钥管理注入，不落库） |
-| `OPENBOT_EMPLOYEE_APNS_TOPIC` | **员工 App** APNs topic（通常 = bundle id；**TBD**） |
+| 变量（提案）                        | 含义                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `OPENBOT_EMPLOYEE_APNS_KEY_ID`      | APNs key id                                                               |
+| `OPENBOT_EMPLOYEE_APNS_TEAM_ID`     | Apple team id                                                             |
+| `OPENBOT_EMPLOYEE_APNS_KEY_PATH`    | `.p8` 路径（或由密钥管理注入，不落库）                                    |
+| `OPENBOT_EMPLOYEE_APNS_TOPIC`       | **员工 App** APNs topic（通常 = bundle id；**TBD**）                      |
 | `OPENBOT_EMPLOYEE_APNS_ENVIRONMENT` | `sandbox` \| `production`（建议 Debug→sandbox，与现 node 约定对齐作起点） |
 
 FCM（2.2）：**新建** Firebase 项目/服务账号（仓库当前无 FCM）；变量名在 Android 刀前由 gateway+android owner 写入本契约修订，不在本刀发明。
@@ -109,11 +109,11 @@ FCM（2.2）：**新建** Firebase 项目/服务账号（仓库当前无 FCM）�
 
 > 规格要求「新增按 employee 身份的注册与投递」。下列方法名 **已确认并落码**（gateway method pack；亦经 pack manifest 注册，不直接改 BASE_METHODS）。
 
-| 方法 | 方向 | 语义 |
-| --- | --- | --- |
-| `employee.push.register` | client → gateway | 登录态下登记 `{ accountId, deviceId, platform, token, … }`；upsert |
-| `employee.push.unregister` | client → gateway | 注销当前设备或指定 device；logout/switch 必调 |
-| `employee.push.test` | client/ops → gateway | 向该账号已注册设备发一条测试 alert（含强制 `deepLink`） |
+| 方法                       | 方向                 | 语义                                                               |
+| -------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `employee.push.register`   | client → gateway     | 登录态下登记 `{ accountId, deviceId, platform, token, … }`；upsert |
+| `employee.push.unregister` | client → gateway     | 注销当前设备或指定 device；logout/switch 必调                      |
+| `employee.push.test`       | client/ops → gateway | 向该账号已注册设备发一条测试 alert（含强制 `deepLink`）            |
 
 **非客户端 RPC（实现内部）：** mention upsert 后的 enqueue / APNs|FCM adapter。名称与队列实现由 gateway owner 在实现 PR 自定，**不得**挤占 node `push.*` 命名空间语义。
 
@@ -137,7 +137,7 @@ FCM（2.2）：**新建** Firebase 项目/服务账号（仓库当前无 FCM）�
 
 ## 版本
 
-| 版本 | 日期 | 说明 |
-| --- | --- | --- |
-| v0.1 | 2026-10-08 | 产品契约首版：Daniel 拍板 MVP（mention + iOS 首刀 + 多设备 + 独立凭据）；RPC 名为提案 |
+| 版本 | 日期       | 说明                                                                                                                                                                |
+| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| v0.1 | 2026-10-08 | 产品契约首版：Daniel 拍板 MVP（mention + iOS 首刀 + 多设备 + 独立凭据）；RPC 名为提案                                                                               |
 | v0.2 | 2026-10-09 | 实现首刀：RPC 确认；gateway pack + employee registration store + mention enqueue；iOS register/unregister；无真实 APNs 凭据时 credentials-required，不声称 e2e 投递 |

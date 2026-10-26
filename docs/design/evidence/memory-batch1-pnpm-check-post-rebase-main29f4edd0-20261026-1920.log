@@ -1,0 +1,27 @@
+=== pnpm check post-rebase ===
+date: 2026-10-26 19:19:45 CST
+HEAD: 55a8ba7e04f88d162a1fda33772fc62d60b190a9
+origin/main: 29f4edd0a2c16a7682f6ac5da9bc0766e503447f
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check /private/tmp/openbot-memory-batch1-rework
+> pnpm check:host-env-policy:swift && pnpm format:check && pnpm build:collaboration:packages && pnpm build:evolution:packages && pnpm tsgo && pnpm lint && pnpm lint:tmp:no-random-messaging && pnpm lint:tmp:channel-agnostic-boundaries && pnpm lint:tmp:no-raw-channel-fetch && pnpm lint:agent:ingress-owner && pnpm lint:plugins:no-register-http-handler && pnpm lint:plugins:no-monolithic-plugin-sdk-entry-imports && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope && pnpm lint:ui:capability-boundaries && pnpm lint:ui:employee-capability-terminology && pnpm lint:core:composition-root-loc && pnpm lint:gateway:method-packs && pnpm lint:gateway:isolation-fail-closed && pnpm lint:core:architecture-manifest && pnpm lint:aor:boundaries && pnpm lint:convergence:registry && pnpm lint:collab:runtime-capabilities && pnpm lint:collab:runtime-authority && pnpm lint:collab:policy-consumption && pnpm test:collab:runtime-lifecycle
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check:host-env-policy:swift /private/tmp/openbot-memory-batch1-rework
+> node scripts/generate-host-env-security-policy-swift.mjs --check
+
+OK apps/macos/Sources/OpenBot/HostEnvSecurityPolicy.generated.swift
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /private/tmp/openbot-memory-batch1-rework
+> oxfmt --check
+
+Checking formatting...
+
+src/task-outcome/runtime-from-runner.ts (0ms)
+
+Format issues found in above 1 files. Run without `--check` to fix.
+Finished in 6205ms on 16910 files using 14 threads.
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.
+EXIT=1
