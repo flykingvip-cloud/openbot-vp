@@ -40,6 +40,7 @@ import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
+import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
@@ -163,6 +164,40 @@ export function createFollowupRunner(params: {
 
   return async (queued: FollowupRun) => {
     const runId = crypto.randomUUID();
+    let followupOutcomeTaskId: string | undefined;
+    let followupOutcomeScope: import("../../task-outcome/types.js").TrustedScope | undefined;
+    if (queued.run.agentId) {
+      const subjectRaw = (
+        queued.run.gatewayClientPlatformUserId ??
+        queued.run.gatewayClientUser ??
+        queued.run.sessionKey ??
+        sessionKey ??
+        "followup"
+      )
+        .toString()
+        .trim();
+      const subjectRef =
+        subjectRaw.startsWith("platform-user:") || subjectRaw.includes(":")
+          ? subjectRaw
+          : `subject:${subjectRaw}`;
+      const tenantId =
+        queued.run.executionIdentity?.enterpriseId?.trim() ||
+        queued.run.executionIdentity?.collaborationOwnerEntitlement?.tenantId?.trim() ||
+        undefined;
+      const opened = ensureFollowupTurnTaskOutcome(queued.run.config, {
+        agentId: queued.run.agentId,
+        runId,
+        sessionKey: queued.run.sessionKey ?? sessionKey,
+        subjectRef,
+        ...(tenantId ? { tenantId } : {}),
+      });
+      if (opened.ok) {
+        followupOutcomeTaskId = opened.taskId;
+        followupOutcomeScope = opened.scope;
+      } else {
+        logVerbose(`followup task-outcome entry failed: ${opened.code} ${opened.message}`);
+      }
+    }
     let followupSlotHeld = false;
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
@@ -274,12 +309,17 @@ export function createFollowupRunner(params: {
         );
         if (executionRouting.planFailure.kind === "no_executable_candidates") {
           if (consumedCapability.capabilityOutcome && queued.run.agentId) {
-            void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
-              success: false,
-              runId,
-              ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
-              capabilityOutcome: consumedCapability.capabilityOutcome,
-            });
+            if (followupOutcomeTaskId && followupOutcomeScope) {
+              void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
+                success: false,
+                runId,
+                taskId: followupOutcomeTaskId,
+                scope: followupOutcomeScope,
+                entrypoint: "chat",
+                ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
+                capabilityOutcome: consumedCapability.capabilityOutcome,
+              });
+            }
           }
           logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
           return;
@@ -537,13 +577,18 @@ export function createFollowupRunner(params: {
         queued.run.agentId &&
         consumedCapability.executionSurface.status !== "ok"
       ) {
-        void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
-          // Explanatory text may have returned; never invent image/music success.
-          success: consumedCapability.executionSurface.textReturnedAllowed,
-          runId,
-          ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
-          capabilityOutcome: consumedCapability.capabilityOutcome,
-        });
+        if (followupOutcomeTaskId && followupOutcomeScope) {
+          void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
+            // Explanatory text may have returned; never invent image/music success.
+            success: consumedCapability.executionSurface.textReturnedAllowed,
+            runId,
+            taskId: followupOutcomeTaskId,
+            scope: followupOutcomeScope,
+            entrypoint: "chat",
+            ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
+            capabilityOutcome: consumedCapability.capabilityOutcome,
+          });
+        }
       }
       const payloadArray = runResult.payloads ?? [];
       if (payloadArray.length === 0) {

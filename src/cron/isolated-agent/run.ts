@@ -87,6 +87,7 @@ import {
   isExternalHookSession,
 } from "../../security/external-content.js";
 import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
+import { ensureCronTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
 import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
@@ -767,6 +768,29 @@ export async function runCronIsolatedAgentTurn(params: {
   let commercialFallbackAttempts: unknown;
   // 每次执行唯一的记账幂等键（隔离/非隔离 cron 都按执行计费，不被会话 id 复用去重）。
   const creditTaskId = `cron-credit:${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+  // askOutcome W1: each fire = new task; same-fire retry reuses fireId.
+  const cronFireId = `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+  const cronOwnerRaw = params.job.ownership?.ownerId?.trim() || `cron:${params.job.id}`;
+  const cronSubjectRef =
+    cronOwnerRaw.startsWith("platform-user:") || cronOwnerRaw.includes(":")
+      ? cronOwnerRaw
+      : `subject:${cronOwnerRaw}`;
+  const cronOutcomeOpened = ensureCronTurnTaskOutcome(cfgWithAgentDefaults, {
+    agentId,
+    jobId: params.job.id,
+    fireId: cronFireId,
+    subjectRef: cronSubjectRef,
+    ...(params.job.ownership?.tenantId?.trim()
+      ? { tenantId: params.job.ownership.tenantId.trim() }
+      : {}),
+  });
+  const cronOutcomeTaskId = cronOutcomeOpened.ok ? cronOutcomeOpened.taskId : undefined;
+  const cronOutcomeScope = cronOutcomeOpened.ok ? cronOutcomeOpened.scope : undefined;
+  if (!cronOutcomeOpened.ok) {
+    logWarn(
+      `[cron:${params.job.id}] task-outcome entry failed: ${cronOutcomeOpened.code} ${cronOutcomeOpened.message}`,
+    );
+  }
   const completeRun = async (result: RunCronAgentTurnResult): Promise<RunCronAgentTurnResult> => {
     runEndedAt = Date.now();
     const classified = classifyCronCompletion({
@@ -909,12 +933,19 @@ export async function runCronIsolatedAgentTurn(params: {
         consumedCapability.capabilityOutcome &&
         consumedCapability.executionSurface.status !== "ok"
       ) {
-        void recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
-          success: consumedCapability.executionSurface.targetModalityCompleted,
-          runId: cronRunId,
-          ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
-          capabilityOutcome: consumedCapability.capabilityOutcome,
-        });
+        if (cronOutcomeTaskId && cronOutcomeScope) {
+          void recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
+            success: consumedCapability.executionSurface.targetModalityCompleted,
+            runId: cronRunId,
+            taskId: cronOutcomeTaskId,
+            scope: cronOutcomeScope,
+            entrypoint: "cron",
+            ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
+            capabilityOutcome: consumedCapability.capabilityOutcome,
+          });
+        } else {
+          logWarn(`[cron:${params.job.id}] skip recordRunnerTurnOutcome: missing cron task entry`);
+        }
       }
       if (executionRouting.planFailure.kind === "no_executable_candidates") {
         throw new Error(executionRouting.planFailure.message);

@@ -2,6 +2,7 @@ import { newFencingToken, TaskOutcomeResultService } from "../result-service.js"
 import type {
   AcceptanceEvidence,
   AttemptResult,
+  Entrypoint,
   RunResult,
   SubmitFailure,
   TaskOutcomeRecord,
@@ -13,6 +14,9 @@ import type {
  * from tool observations or placeholder messages.
  */
 export class ChatTaskOutcomeAdapter {
+  /** Persisted tip entrypoint; subclasses override (cron/cli/collab/gateway_agent). */
+  readonly entrypoint: Entrypoint = "chat";
+
   constructor(private readonly service: TaskOutcomeResultService) {}
 
   createOrRestore(params: {
@@ -21,6 +25,8 @@ export class ChatTaskOutcomeAdapter {
     taskContractVersion: string;
     restoreIfExists?: boolean;
     commandId?: string;
+    /** Override; defaults to this.entrypoint so subclasses persist their identity. */
+    entrypoint?: Entrypoint;
   }): { ok: true; record: TaskOutcomeRecord; fencingToken: string } | SubmitFailure {
     const existing = this.service.get(params.taskId);
     if (existing) {
@@ -35,11 +41,12 @@ export class ChatTaskOutcomeAdapter {
       };
     }
     const fencingToken = newFencingToken();
+    const entrypoint = params.entrypoint ?? this.entrypoint;
     const res = this.service.submit(
       params.taskId,
       {
         type: "create",
-        entrypoint: "chat",
+        entrypoint,
         scope: params.scope,
         taskContractVersion: params.taskContractVersion,
       },

@@ -483,6 +483,8 @@ describe("TaskOutcome result service + durable consume", () => {
     if (a.ok && b.ok) {
       expect(a.record.taskId).toBe(b.record.taskId);
       expect(a.record.outcomeVersion).toBe(b.record.outcomeVersion);
+      expect(a.record.entrypoint).toBe("cron");
+      expect(b.record.entrypoint).toBe("cron");
     }
     const other = cron.openTask({
       taskId: "cron:job1:fire-10",
@@ -492,6 +494,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(other.ok).toBe(true);
     if (other.ok) {
       expect(other.record.taskId).toBe("cron:job1:fire-10");
+      expect(other.record.entrypoint).toBe("cron");
     }
   });
 
