@@ -1,4 +1,3 @@
-import type { TaskOutcomeResultService } from "../result-service.js";
 import type { TrustedScope } from "../types.js";
 import { ChatTaskOutcomeAdapter } from "./chat.js";
 

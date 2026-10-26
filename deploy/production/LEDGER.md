@@ -17,4 +17,5 @@ On 2026-10-21 the openbot-vp copy of `releases.jsonl` was temporarily removed af
 
 - seq **127** still omits `liveTo` (pre-existing historical debt).
 - seq **143** was closed with `liveTo` = seq 144 `liveFrom` (`2026-10-20T09:21:32Z`) when restoring the seed — OHBE/PR19 had appended seq 144 without closing 143; the close uses the authentic next `liveFrom` only.
-- seq **144** tip `9a8e91d19e893fc5d963103538cdbd35f315ac30` is the current Path B LIVE open row.
+- seq **144** tip `9a8e91d19e893fc5d963103538cdbd35f315ac30` was closed with `liveTo` = seq 145 `liveFrom` (`2026-10-25T10:45:47.391Z`) when recording Path B tip 065840dfba12 (#79).
+- seq **145** tip `065840dfba129475c9c9030c80af07970dcdd084` is the current Path B LIVE open row.

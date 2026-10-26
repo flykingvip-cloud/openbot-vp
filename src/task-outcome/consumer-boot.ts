@@ -1,10 +1,12 @@
 /**
- * Boot + runtime drain for TaskOutcome growth-evolution consumers.
- * Ensures pending outbox events are consumed without waiting for another user turn.
+ * Boot + runtime drain for TaskOutcome growth-evolution consumers, plus
+ * awaiting-delivery memory hydrate so restart does not rely only on peek lazy-read.
  */
-import { listAgentIds } from "../agents/agent-scope.js";
+import path from "node:path";
+import { listAgentIds, resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
-import { drainPendingGrowthEvolution } from "./runtime-from-runner.js";
+import { hydrateAwaitingDeliveriesFromDisk } from "./pending-delivery.js";
+import { drainPendingGrowthEvolution, TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
 
 export type TaskOutcomeConsumerBootLog = {
   info?: (message: string) => void;
@@ -13,6 +15,8 @@ export type TaskOutcomeConsumerBootLog = {
 
 export type TaskOutcomeConsumerBootResult = {
   agentsScanned: number;
+  /** Durable awaiting-delivery rows loaded into memory at boot. */
+  hydrated: number;
   processed: number;
   deferred: number;
   written: number;
@@ -22,7 +26,30 @@ const RUNTIME_DRAIN_INTERVAL_MS = 15_000;
 let runtimeDrainTimer: ReturnType<typeof setInterval> | undefined;
 let runtimeDrainCfg: OpenBotConfig | undefined;
 
-export function drainAllAgentsPendingGrowth(cfg: OpenBotConfig): TaskOutcomeConsumerBootResult {
+/**
+ * Preload awaiting-delivery registrations from each agent TaskOutcome store.
+ * One bad agent root must never block boot.
+ */
+export function hydrateAllAgentsAwaitingDeliveries(cfg: OpenBotConfig): {
+  agentsScanned: number;
+  hydrated: number;
+} {
+  let hydrated = 0;
+  const agents = listAgentIds(cfg);
+  for (const agentId of agents) {
+    try {
+      const persistRoot = path.join(resolveAgentDir(cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
+      hydrated += hydrateAwaitingDeliveriesFromDisk(persistRoot);
+    } catch {
+      // never block boot on one bad agent store
+    }
+  }
+  return { agentsScanned: agents.length, hydrated };
+}
+
+export function drainAllAgentsPendingGrowth(
+  cfg: OpenBotConfig,
+): Omit<TaskOutcomeConsumerBootResult, "hydrated"> {
   let processed = 0;
   let deferred = 0;
   let written = 0;
@@ -43,8 +70,9 @@ export function drainAllAgentsPendingGrowth(cfg: OpenBotConfig): TaskOutcomeCons
 }
 
 /**
- * Gateway boot: drain once, then keep a lightweight runtime timer so failed
- * handler acks can retry without a subsequent user message.
+ * Gateway boot: hydrate awaiting deliveries from disk, drain growth consumers
+ * once, then keep a lightweight runtime timer so failed handler acks can retry
+ * without a subsequent user message.
  */
 export function recoverTaskOutcomeConsumersAtGatewayBoot(params: {
   cfg: OpenBotConfig;
@@ -53,9 +81,14 @@ export function recoverTaskOutcomeConsumersAtGatewayBoot(params: {
   startRuntimeDrain?: boolean;
   intervalMs?: number;
 }): TaskOutcomeConsumerBootResult {
-  const result = drainAllAgentsPendingGrowth(params.cfg);
+  const hydrate = hydrateAllAgentsAwaitingDeliveries(params.cfg);
   params.log?.info?.(
-    `task-outcome consumer boot: agents=${result.agentsScanned} processed=${result.processed} deferred=${result.deferred} written=${result.written}`,
+    `task-outcome awaiting-delivery hydrate: agents=${hydrate.agentsScanned} hydrated=${hydrate.hydrated}`,
+  );
+
+  const drain = drainAllAgentsPendingGrowth(params.cfg);
+  params.log?.info?.(
+    `task-outcome consumer boot: agents=${drain.agentsScanned} processed=${drain.processed} deferred=${drain.deferred} written=${drain.written}`,
   );
   if (params.startRuntimeDrain !== false) {
     startTaskOutcomeRuntimeDrain(params.cfg, {
@@ -63,7 +96,13 @@ export function recoverTaskOutcomeConsumersAtGatewayBoot(params: {
       log: params.log,
     });
   }
-  return result;
+  return {
+    agentsScanned: Math.max(hydrate.agentsScanned, drain.agentsScanned),
+    hydrated: hydrate.hydrated,
+    processed: drain.processed,
+    deferred: drain.deferred,
+    written: drain.written,
+  };
 }
 
 export function startTaskOutcomeRuntimeDrain(
