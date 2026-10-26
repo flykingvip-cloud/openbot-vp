@@ -28,6 +28,7 @@ import {
   casCommitTaskDispatchEligibility,
   casReleaseUnconsumedCommittedClaim,
   casTakeTaskDispatchEligibility,
+  readOperatingStateAuthEpoch,
 } from "./task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
 import { asGovernedTask } from "./task-runtime.js";
@@ -473,6 +474,7 @@ export async function consumeWakeForRoundDispatch(
   // M3 linearization point: commit dispatch eligibility under wake-op lock after
   // stop+auth recheck. Does not hold the lock across external I/O.
   let eligibilityControlEpoch = 0;
+  let eligibilityAuthEpoch = 0;
   let eligibilityAuthFingerprint = "";
   /** True when a task record was observed for stop/epoch (distinct from missing). */
   let eligibilityTaskObserved = false;
@@ -588,6 +590,7 @@ export async function consumeWakeForRoundDispatch(
     try {
       const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
       const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+      eligibilityAuthEpoch = readOperatingStateAuthEpoch(os);
       eligibilityAuthFingerprint = wakeOpAuthFingerprint(os, request.toAgentIds);
     } catch {
       // Do not commit a sentinel fingerprint and fail-open; refuse eligibility.
@@ -729,6 +732,7 @@ export async function consumeWakeForRoundDispatch(
       try {
         const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
         const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+        eligibilityAuthEpoch = readOperatingStateAuthEpoch(os);
         eligibilityAuthFingerprint = wakeOpAuthFingerprint(os, request.toAgentIds);
       } catch {
         const failed = await markWakeOpFailed({
@@ -753,9 +757,9 @@ export async function consumeWakeForRoundDispatch(
       }
     }
 
-    // T41: shared expected-version CAS on the task authority record BEFORE wake-op
-    // mirror. Stop that advanced controlEpoch loses here; revoke is refused via
-    // live auth fingerprint mismatch inside the CAS (not a shared-epoch writer).
+    // T41/T51: shared expected-version CAS on the task authority record BEFORE wake-op
+    // mirror. Stop that advanced controlEpoch loses here; revoke loses via authEpoch
+    // (shared version) and fingerprint secondary inside the CAS.
     if (params._testAfterRecheckBeforeTaskCasBarrier) {
       await params._testAfterRecheckBeforeTaskCasBarrier();
     }
@@ -767,6 +771,7 @@ export async function consumeWakeForRoundDispatch(
         taskId: stoppedTaskId,
         opKey: claimed.opKey,
         expectedControlEpoch: eligibilityControlEpoch,
+        expectedAuthEpoch: eligibilityAuthEpoch,
         authFingerprint: eligibilityAuthFingerprint,
         targetActorIds: request.toAgentIds,
         executionAttemptId: claimed.record?.executionAttemptId,
@@ -777,7 +782,9 @@ export async function consumeWakeForRoundDispatch(
         const detail = `task_eligibility_cas_failed:${cas.reason}:${cas.detail}`;
         const isStop = cas.reason === "task_stopped" || cas.reason === "epoch_mismatch";
         const isAuth =
-          cas.reason === "auth_fingerprint_mismatch" || cas.reason === "auth_source_unreadable";
+          cas.reason === "auth_fingerprint_mismatch" ||
+          cas.reason === "auth_epoch_mismatch" ||
+          cas.reason === "auth_source_unreadable";
         if (cas.reason === "task_control_unreadable" || cas.reason === "task_missing") {
           const unknown = await markWakeOpUnknown({
             authority: params.authority,
@@ -878,6 +885,7 @@ export async function consumeWakeForRoundDispatch(
       cfg: params.cfg,
       nowMs: params.nowMs,
       controlEpoch: eligibilityControlEpoch,
+      authEpoch: eligibilityAuthEpoch,
       authFingerprint: eligibilityAuthFingerprint,
     });
     if (!eligible?.dispatchEligibility) {
@@ -921,9 +929,9 @@ export async function consumeWakeForRoundDispatch(
     await params._testAfterEligibilityBarrier();
   }
 
-  // T41: CAS-take task dispatchClaim (unoverwritable version condition) before any
+  // T41/T51: CAS-take task dispatchClaim (unoverwritable version condition) before any
   // external dispatcher call. Stop that advanced controlEpoch refuses take; revoke
-  // mismatch is a fingerprint recheck under the same lock, not shared-epoch write.
+  // that bumped OS authEpoch refuses take under the same lock (fingerprint secondary).
   if (stoppedTaskId && taskEligibilityCasCommitted) {
     const take = await casTakeTaskDispatchEligibility({
       groupId: request.groupId,
@@ -1005,7 +1013,7 @@ export async function consumeWakeForRoundDispatch(
       const reason =
         take.reason === "auth_source_unreadable"
           ? "auth_source_unreadable"
-          : take.reason === "auth_fingerprint_mismatch"
+          : take.reason === "auth_fingerprint_mismatch" || take.reason === "auth_epoch_mismatch"
             ? "auth_revoked"
             : "eligibility_take_rejected";
       return {
@@ -1027,8 +1035,8 @@ export async function consumeWakeForRoundDispatch(
 
   try {
     // Post-eligibility defense-in-depth (FO unreadable paths + wake-op snapshot check).
-    // Shared-version adjudication for *stop* is the CAS take above — not another recheck.
-    // Revoke remains fingerprint-conditioned at commit/take (not shared-epoch with OS).
+    // Shared-version adjudication for stop + auth revoke is the CAS take above — not another recheck.
+    // Revoke is authEpoch-conditioned at commit/take (fingerprint secondary).
     {
       let stopAfterEligibility = false;
       let currentEpoch = eligibilityControlEpoch;
@@ -1065,6 +1073,7 @@ export async function consumeWakeForRoundDispatch(
         }
       }
       let authFp = eligibilityAuthFingerprint;
+      let authEpochLive = eligibilityAuthEpoch;
       let authSourceUnreadable = false;
       try {
         if (params._testForcePostEligibilityAuthSourceReadError) {
@@ -1073,6 +1082,7 @@ export async function consumeWakeForRoundDispatch(
         }
         const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
         const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+        authEpochLive = readOperatingStateAuthEpoch(os);
         authFp = wakeOpAuthFingerprint(os, request.toAgentIds);
       } catch {
         // Do not retain the eligibility-time fingerprint.
@@ -1144,6 +1154,7 @@ export async function consumeWakeForRoundDispatch(
         isDispatchEligibilityCurrent({
           eligibility: wakeOp?.dispatchEligibility,
           controlEpoch: currentEpoch,
+          authEpoch: authEpochLive,
           authFingerprint: authFp,
         });
       if (!eligibilityStillValid) {
@@ -1230,6 +1241,7 @@ export async function consumeWakeForRoundDispatch(
           // silently complete as success (expired holder).
           let receiptEpoch = eligibilityControlEpoch;
           let receiptAuthFp = eligibilityAuthFingerprint;
+          let receiptAuthEpoch = eligibilityAuthEpoch;
           let stopAfterExternal = false;
           let receiptTaskMissing = false;
           let receiptTaskUnreadable = false;
@@ -1263,6 +1275,7 @@ export async function consumeWakeForRoundDispatch(
           try {
             const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
             const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+            receiptAuthEpoch = readOperatingStateAuthEpoch(os);
             receiptAuthFp = wakeOpAuthFingerprint(os, request.toAgentIds);
           } catch {
             receiptAuthUnreadable = true;
@@ -1275,6 +1288,7 @@ export async function consumeWakeForRoundDispatch(
             isDispatchEligibilityCurrent({
               eligibility: wakeOp?.dispatchEligibility,
               controlEpoch: receiptEpoch,
+              authEpoch: receiptAuthEpoch,
               authFingerprint: receiptAuthFp,
             });
           if (!mayComplete || stopAfterExternal) {

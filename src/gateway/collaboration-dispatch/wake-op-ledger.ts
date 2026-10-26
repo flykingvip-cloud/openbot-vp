@@ -120,6 +120,8 @@ export type WakeOpRecord = Readonly<{
   dispatchEligibility?: {
     committedAtMs: number;
     controlEpoch: number;
+    /** T51: OS authEpoch snapshot for shared revoke version observability. */
+    authEpoch?: number;
     authFingerprint: string;
   };
   createdAtMs: number;
@@ -547,6 +549,7 @@ export type CommitDispatchEligibilityParams = {
   cfg?: OpenBotConfig;
   nowMs?: number;
   controlEpoch: number;
+  authEpoch?: number;
   authFingerprint: string;
 };
 
@@ -571,6 +574,10 @@ export async function commitWakeOpDispatchEligibility(
       dispatchEligibility: {
         committedAtMs: nowMs,
         controlEpoch: params.controlEpoch,
+        authEpoch:
+          typeof params.authEpoch === "number" && Number.isFinite(params.authEpoch)
+            ? Number(params.authEpoch)
+            : 0,
         authFingerprint: compact(params.authFingerprint),
       },
       updatedAtMs: nowMs,
@@ -586,6 +593,7 @@ export function isDispatchEligibilityCurrent(params: {
   eligibility: WakeOpRecord["dispatchEligibility"] | undefined;
   controlEpoch: number;
   authFingerprint: string;
+  authEpoch?: number;
 }): boolean {
   const el = params.eligibility;
   if (!el) {
@@ -593,6 +601,13 @@ export function isDispatchEligibilityCurrent(params: {
   }
   if (el.controlEpoch !== params.controlEpoch) {
     return false;
+  }
+  if (typeof params.authEpoch === "number" && Number.isFinite(params.authEpoch)) {
+    const elAuth =
+      typeof el.authEpoch === "number" && Number.isFinite(el.authEpoch) ? Number(el.authEpoch) : 0;
+    if (elAuth !== Number(params.authEpoch)) {
+      return false;
+    }
   }
   if (compact(el.authFingerprint) !== compact(params.authFingerprint)) {
     return false;

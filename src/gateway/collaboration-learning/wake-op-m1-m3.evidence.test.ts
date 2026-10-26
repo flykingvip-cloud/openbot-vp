@@ -2,6 +2,7 @@
  * T36 M1–M3 mechanism evidence: trusted auth, trusted verify, stop×dispatch races.
  * Fail-first gaps closed with barrier-ordered concurrency (not only error returns).
  */
+import { spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -26,12 +27,14 @@ import {
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
+  applyAuthRevokeSharedCas,
   applyBusinessTaskPatchUnderControlLock,
   applyTaskStopUnderControlLock,
   casClearTaskDispatchClaimForOp,
   casCommitTaskDispatchEligibility,
   casReleaseUnconsumedCommittedClaim,
   casTakeTaskDispatchEligibility,
+  readOperatingStateAuthEpoch,
 } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import {
@@ -2151,6 +2154,7 @@ describe("T44 M3 other task writers under control lock", () => {
         claimId: "claim-hazard",
         opKey: opKeyFor(taskId2, "hazard"),
         controlEpoch: 3,
+        authEpoch: 0,
         authFingerprint: wakeOpAuthFingerprint(os, [tenant.bot0]),
         committedAtMs: 10,
         phase: "committed",
@@ -3501,5 +3505,466 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
     expect(repaired.item.revision).toBe(rev1);
     expect(repaired.task.assignedMemberIds).toContain(tenant.admin);
     expect(repaired.task.responsibility?.executors).toContain(tenant.admin);
+  });
+});
+
+describe("T51 M3-REVOKE shared authEpoch CAS", () => {
+  test("M3-REV-1: after recheck before task CAS — auth revoke bumps authEpoch → commit拒; calls=0", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-rev-1";
+    const { authority, fileStore, groupId, objectStorage } = await seed({
+      cfg,
+      taskId,
+      itemId: "rev1",
+    });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered = false;
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterRecheckBeforeTaskCasBarrier: async () => {
+        entered = true;
+        await barrier;
+      },
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "no" };
+      },
+      request: wakeReq(taskId, "rev1"),
+    });
+    for (let i = 0; i < 200; i += 1) {
+      if (entered) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(entered).toBe(true);
+    const beforeOs = await readGroupOperatingState({ fileStore, groupId });
+    const beforeAuth = readOperatingStateAuthEpoch(beforeOs);
+    const revoked = await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskId],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+        governance: {
+          ...state.governance,
+          coordinatorBotId: tenant.coordinator,
+          ownerUserId: tenant.owner,
+        },
+      }),
+    });
+    expect(revoked.authEpoch).toBeGreaterThan(beforeAuth);
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(["auth_revoked", "eligibility_cas_rejected", "task_stopped"]).toContain(wake.reason);
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.dispatchClaim).toBeFalsy();
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(os)).toBe(revoked.authEpoch);
+  });
+
+  test("M3-REV-2: commit ok → revoke+authEpoch bump → take拒; no external dispatch", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-rev-2";
+    const { authority, fileStore, groupId, objectStorage } = await seed({
+      cfg,
+      taskId,
+      itemId: "rev2",
+    });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered = false;
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterEligibilityBarrier: async () => {
+        entered = true;
+        await barrier;
+      },
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "no" };
+      },
+      request: wakeReq(taskId, "rev2"),
+    });
+    for (let i = 0; i < 200; i += 1) {
+      if (entered) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(entered).toBe(true);
+    const mid = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(mid.dispatchClaim?.phase).toBe("committed");
+    const claimAuth = mid.dispatchClaim?.authEpoch ?? 0;
+    await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskId],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    const afterOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(afterOs)).toBeGreaterThan(claimAuth);
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(["auth_revoked", "eligibility_take_rejected", "task_stopped_in_flight"]).toContain(
+      wake.reason,
+    );
+  });
+
+  test("M3-REV-3: fingerprint held constant but authEpoch bumped → still拒 (not fingerprint-only)", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-rev-3";
+    const { fileStore, groupId, objectStorage } = await seed({ cfg, taskId, itemId: "rev3" });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os0, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const auth0 = readOperatingStateAuthEpoch(os0);
+
+    const revoked = await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [],
+      bumpTaskControlEpoch: false,
+      mutate: (state) => state,
+    });
+    expect(revoked.authEpoch).toBe(auth0 + 1);
+    const os1 = await readGroupOperatingState({ fileStore, groupId });
+    expect(wakeOpAuthFingerprint(os1, [tenant.bot0])).toBe(fp);
+
+    const cas = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "rev3"),
+      expectedControlEpoch: epoch,
+      expectedAuthEpoch: auth0,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      _testForceLiveAuthFingerprint: fp,
+      cfg,
+    });
+    expect(cas.ok).toBe(false);
+    if (cas.ok) {
+      throw new Error("must refuse on authEpoch alone");
+    }
+    expect(cas.reason).toBe("auth_epoch_mismatch");
+
+    const casOk = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "rev3-fresh"),
+      expectedControlEpoch: epoch,
+      expectedAuthEpoch: revoked.authEpoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(casOk.ok).toBe(true);
+    if (!casOk.ok) {
+      throw new Error("fresh authEpoch must commit");
+    }
+    expect(casOk.claim.authEpoch).toBe(revoked.authEpoch);
+
+    await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [],
+      mutate: (state) => state,
+    });
+    const take = await casTakeTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "rev3-fresh"),
+      claimId: casOk.claim.claimId,
+      targetActorIds: [tenant.bot0],
+      _testForceLiveAuthFingerprint: fp,
+      cfg,
+    });
+    expect(take.ok).toBe(false);
+    if (take.ok) {
+      throw new Error("take must refuse");
+    }
+    expect(take.reason).toBe("auth_epoch_mismatch");
+  });
+
+  test("M3-REV-4: revoke actor A; actor B independent eligibility still obtainable", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskA = "task-m3-rev-4a";
+    const taskB = "task-m3-rev-4b";
+    const { fileStore, groupId, objectStorage } = await seed({
+      cfg,
+      taskId: taskA,
+      itemId: "rev4a",
+    });
+    await objectStorage.writeObject(groupId, "task", taskB, {
+      taskId: taskB,
+      groupId,
+      title: "t51-b",
+      status: "in_progress",
+      ownerMemberId: tenant.coordinator,
+      assignedMemberIds: [tenant.coordinator],
+      responsibility: {
+        owner: tenant.coordinator,
+        executors: [tenant.coordinator],
+        reviewers: [],
+        approvers: [tenant.approver],
+      },
+      controlEpoch: 0,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    } as Task);
+
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const fpA = wakeOpAuthFingerprint(os0, [tenant.bot0]);
+    const auth0 = readOperatingStateAuthEpoch(os0);
+
+    await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskA],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    const os1 = await readGroupOperatingState({ fileStore, groupId });
+    const auth1 = readOperatingStateAuthEpoch(os1);
+    expect(auth1).toBeGreaterThan(auth0);
+
+    const refuseA = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId: taskA,
+      opKey: opKeyFor(taskA, "rev4a"),
+      expectedControlEpoch: 0,
+      expectedAuthEpoch: auth0,
+      authFingerprint: fpA,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(refuseA.ok).toBe(false);
+
+    // Fresh authEpoch but still presenting pre-revoke fingerprint for A → fingerprint refuse.
+    const refuseA2 = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId: taskA,
+      opKey: opKeyFor(taskA, "rev4a-2"),
+      expectedControlEpoch: 1,
+      expectedAuthEpoch: auth1,
+      authFingerprint: fpA,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(refuseA2.ok).toBe(false);
+    if (refuseA2.ok) {
+      throw new Error("A must not commit with stale fingerprint");
+    }
+    expect(refuseA2.reason).toBe("auth_fingerprint_mismatch");
+
+    // Authorization recheck also refuses unmapped A (execution path gate).
+    const authA = await recheckCurrentDispatchAuthorization({
+      groupId,
+      taskId: taskA,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(authA.ok).toBe(false);
+
+    const okB = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId: taskB,
+      opKey: opKeyFor(taskB, "rev4b"),
+      expectedControlEpoch: 0,
+      expectedAuthEpoch: auth1,
+      authFingerprint: wakeOpAuthFingerprint(os1, [tenant.coordinator]),
+      targetActorIds: [tenant.coordinator],
+      cfg,
+    });
+    expect(okB.ok).toBe(true);
+    if (!okB.ok) {
+      throw new Error("B must still obtain eligibility");
+    }
+    expect(okB.claim.authEpoch).toBe(auth1);
+  });
+
+  test("M3-REV-5: cross-handle + cross-process authEpoch vs eligibility CAS", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-rev-5";
+    const { fileStore, groupId } = await seed({ cfg, taskId, itemId: "rev5" });
+    const storesA = createWorkspaceCollaborationStores(cfg);
+    const storesB = createWorkspaceCollaborationStores(cfg);
+    expect(storesA.objectStorage).not.toBe(storesB.objectStorage);
+
+    const os = await readGroupOperatingState({ fileStore: storesA.fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await storesA.objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const expectedEpoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const expectedAuth = readOperatingStateAuthEpoch(os);
+
+    const casP = casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "rev5"),
+      expectedControlEpoch: expectedEpoch,
+      expectedAuthEpoch: expectedAuth,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    const revokeP = applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskId],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    const [casResult, revokeResult] = await Promise.all([casP, revokeP]);
+    expect(revokeResult.authEpoch).toBeGreaterThan(expectedAuth);
+
+    const final = asGovernedTask(
+      (await storesB.objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const finalOs = await readGroupOperatingState({ fileStore: storesB.fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(revokeResult.authEpoch);
+
+    if (casResult.ok) {
+      expect(final.dispatchClaim).toBeFalsy();
+      expect(casResult.claim.authEpoch).toBe(expectedAuth);
+    } else {
+      expect([
+        "auth_epoch_mismatch",
+        "auth_fingerprint_mismatch",
+        "epoch_mismatch",
+        "claim_held",
+      ]).toContain(casResult.reason);
+      expect(final.dispatchClaim).toBeFalsy();
+    }
+
+    const take = await casTakeTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "rev5"),
+      claimId: casResult.ok ? casResult.claim.claimId : "none",
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(take.ok).toBe(false);
+
+    // Cross-process: child bumps OS authEpoch + strips member on durable file.
+    const taskId2 = "task-m3-rev-5-child";
+    await storesA.objectStorage.writeObject(groupId, "task", taskId2, {
+      taskId: taskId2,
+      groupId,
+      title: "t51-child",
+      status: "in_progress",
+      ownerMemberId: tenant.coordinator,
+      assignedMemberIds: [tenant.bot0],
+      responsibility: {
+        owner: tenant.coordinator,
+        executors: [tenant.bot0],
+        reviewers: [],
+        approvers: [tenant.approver],
+      },
+      controlEpoch: 0,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    } as Task);
+    await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [],
+      mutate: (state) => {
+        const map = [...(state.memberRoleMap ?? [])];
+        if (!map.some((r) => r.memberId === tenant.bot0)) {
+          map.push({
+            memberId: tenant.bot0,
+            memberKind: "bot",
+            governanceRole: "member",
+            collaborationRole: null,
+            status: "active",
+          });
+        }
+        return { ...state, memberRoleMap: map };
+      },
+    });
+    const osReady = await readGroupOperatingState({ fileStore, groupId });
+    const fpReady = wakeOpAuthFingerprint(osReady, [tenant.bot0]);
+    const authReady = readOperatingStateAuthEpoch(osReady);
+    const stateDir = process.env.OPENBOT_STATE_DIR!;
+    const childScript = [
+      "const fs = require('node:fs');",
+      "const path = require('node:path');",
+      "const stateDir = process.argv[1];",
+      "const groupId = process.argv[2];",
+      "const botId = process.argv[3];",
+      "function walk(dir, acc) {",
+      "  acc = acc || [];",
+      "  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {",
+      "    const p = path.join(dir, ent.name);",
+      "    if (ent.isDirectory()) walk(p, acc);",
+      "    else if (ent.name.indexOf('operating-state') >= 0 && ent.name.endsWith('.json')) acc.push(p);",
+      "  }",
+      "  return acc;",
+      "}",
+      "const tenants = path.join(stateDir, 'tenants');",
+      "let files = fs.existsSync(tenants) ? walk(tenants) : [];",
+      "if (!files.length) files = walk(stateDir);",
+      "const target = files.find((f) => f.indexOf(groupId) >= 0) || files[0];",
+      "if (!target) { console.error('no OS'); process.exit(3); }",
+      "const raw = JSON.parse(fs.readFileSync(target, 'utf8'));",
+      "raw.authEpoch = (typeof raw.authEpoch === 'number' ? raw.authEpoch : 0) + 1;",
+      "raw.memberRoleMap = (raw.memberRoleMap || []).filter((r) => r.memberId !== botId);",
+      "fs.writeFileSync(target, JSON.stringify(raw, null, 2));",
+      "process.stdout.write(String(raw.authEpoch));",
+      "process.exit(0);",
+    ].join("\n");
+    const child = spawnSync(process.execPath, ["-e", childScript, stateDir, groupId, tenant.bot0], {
+      encoding: "utf8",
+    });
+    expect(child.status).toBe(0);
+    const childAuth = Number((child.stdout || "").trim());
+    expect(childAuth).toBeGreaterThan(authReady);
+
+    const casAfterChild = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId: taskId2,
+      opKey: opKeyFor(taskId2, "rev5-child"),
+      expectedControlEpoch: 0,
+      expectedAuthEpoch: authReady,
+      authFingerprint: fpReady,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(casAfterChild.ok).toBe(false);
+    if (casAfterChild.ok) {
+      throw new Error("cross-process authEpoch bump must refuse stale commit");
+    }
+    expect(["auth_epoch_mismatch", "auth_fingerprint_mismatch"]).toContain(casAfterChild.reason);
   });
 });

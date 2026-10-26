@@ -1,21 +1,21 @@
 /**
- * T41/T42/T43/T44 M3 — shared control-version CAS for stop vs dispatch eligibility
- * and business task writers (preserve stopControl/controlEpoch/dispatchClaim).
+ * T41/T42/T43/T44/T51 M3 — shared control-version CAS for stop vs dispatch eligibility,
+ * business task writers, and auth revoke (preserve stopControl/controlEpoch/dispatchClaim).
  *
  * Linearization point: task authority record under a per-task control lock.
  * - stop bumps controlEpoch and clears any dispatchClaim
- * - eligibility commit is expected-version CAS on controlEpoch (+ auth fingerprint)
- *   under a **single-claim** model (one valid claim per task; same-op retry must not
- *   reset taken → committed)
+ * - eligibility commit is expected-version CAS on controlEpoch + OS authEpoch
+ *   (+ auth fingerprint as diagnostic/secondary) under a **single-claim** model
  * - each claim carries an unconfusable claimId (generation token); take/clear compare it
  * - committed-but-not-taken may be released only when phase is still committed + claimId
  *   matches (prove unconsumed via wake-op/attempt association — never by timeout alone)
  * - taken leases must not be auto-released by timeout; clear requires matching claimId
  * - external dispatch must CAS-take the claim before invoking the dispatcher
  *
- * Auth revoke is **not** on this shared version plane: commit/take re-check the live
- * auth fingerprint under the lock (refuse on mismatch). That is a fingerprint
- * condition, not OS+task single-file / shared-epoch adjudication with member revoke.
+ * T51 Auth revoke **is** on a shared version plane: OS `authEpoch` is the unique auth
+ * version source; claims snapshot it; commit/take refuse on authEpoch mismatch even when
+ * fingerprint is held constant. Shared revoke writers bump authEpoch, then clear (and
+ * optionally bump controlEpoch on) outstanding task claims under the same task lock.
  *
  * Wake-op dispatchEligibility remains an audit/mirror; the task claim is authoritative.
  * Wakes without a persisted task authority record stay wake-op-only (no task CAS).
@@ -26,11 +26,18 @@ import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import type { GatewayCollaborationGroupOperatingState } from "../collaboration-learning/operating-state-types.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
   resolveGroupWorkspacePath,
+  writeGroupOperatingState,
 } from "../collaboration-learning/shared.js";
+
+/** T51: OS auth version lives on the durable operating-state object (field authEpoch). */
+export type OperatingStateWithAuthEpoch = GatewayCollaborationGroupOperatingState & {
+  authEpoch?: number;
+};
 import { withRoundLock } from "./round-store-io.js";
 import { asGovernedTask, type GovernedTask, type TaskDispatchClaim } from "./task-runtime.js";
 import { assertTaskNotStopped, isTaskStopAccepted } from "./task-stop-control.js";
@@ -45,6 +52,21 @@ function compact(value: string | null | undefined): string {
 function readControlEpoch(task: GovernedTask): number {
   return typeof task.controlEpoch === "number" && Number.isFinite(task.controlEpoch)
     ? Number(task.controlEpoch)
+    : 0;
+}
+
+/** OS authEpoch SoT; absent ⇒ 0. */
+export function readOperatingStateAuthEpoch(
+  state: { authEpoch?: number } | null | undefined,
+): number {
+  return typeof state?.authEpoch === "number" && Number.isFinite(state.authEpoch)
+    ? Number(state.authEpoch)
+    : 0;
+}
+
+function readClaimAuthEpoch(claim: { authEpoch?: number } | null | undefined): number {
+  return typeof claim?.authEpoch === "number" && Number.isFinite(claim.authEpoch)
+    ? Number(claim.authEpoch)
     : 0;
 }
 
@@ -79,6 +101,11 @@ export type CasCommitTaskDispatchEligibilityParams = {
   opKey: string;
   /** Observed controlEpoch that must still match under the lock (expected-version). */
   expectedControlEpoch: number;
+  /**
+   * Observed OS authEpoch that must still match under the lock (T51 shared auth version).
+   * Defaults to 0 when omitted (legacy callers / OS without authEpoch).
+   */
+  expectedAuthEpoch?: number;
   authFingerprint: string;
   cfg?: OpenBotConfig;
   nowMs?: number;
@@ -86,6 +113,12 @@ export type CasCommitTaskDispatchEligibilityParams = {
   targetActorIds?: readonly string[];
   /** Optional wake-op executionAttemptId to bind into the claim at commit. */
   executionAttemptId?: string;
+  /**
+   * Test-only: force the fingerprint string used for the live compare (and stamped
+   * claim) so M3-REV-3 can prove authEpoch refuses even when fingerprint is held
+   * constant artificially.
+   */
+  _testForceLiveAuthFingerprint?: string;
 };
 
 export type CasCommitTaskDispatchEligibilityResult =
@@ -96,6 +129,7 @@ export type CasCommitTaskDispatchEligibilityResult =
         | "task_missing"
         | "task_stopped"
         | "epoch_mismatch"
+        | "auth_epoch_mismatch"
         | "auth_fingerprint_mismatch"
         | "auth_source_unreadable"
         | "task_control_unreadable"
@@ -106,8 +140,8 @@ export type CasCommitTaskDispatchEligibilityResult =
 
 /**
  * Expected-version CAS: under task control lock, commit dispatchClaim on the
- * task authority record iff controlEpoch still equals expected, task is not stopped,
- * and no other valid claim is held (single-claim model).
+ * task authority record iff controlEpoch and OS authEpoch still equal expected,
+ * task is not stopped, and no other valid claim is held (single-claim model).
  */
 export async function casCommitTaskDispatchEligibility(
   params: CasCommitTaskDispatchEligibilityParams,
@@ -116,6 +150,10 @@ export async function casCommitTaskDispatchEligibility(
   const nowMs = params.nowMs ?? Date.now();
   const opKey = compact(params.opKey);
   const expected = params.expectedControlEpoch;
+  const expectedAuth =
+    typeof params.expectedAuthEpoch === "number" && Number.isFinite(params.expectedAuthEpoch)
+      ? Number(params.expectedAuthEpoch)
+      : 0;
   const wantFp = compact(params.authFingerprint);
 
   return withTaskControlLock({
@@ -156,26 +194,43 @@ export async function casCommitTaskDispatchEligibility(
         };
       }
 
-      // Re-read auth fingerprint under the same lock window so a revoke that
-      // raced after the caller's observation cannot be stamped as eligible.
-      // (Fingerprint condition only — revoke writes are not on this task CAS.)
+      // T51: re-read OS authEpoch (+ fingerprint) under the same lock window so a
+      // revoke that raced after the caller's observation cannot be stamped eligible.
+      // authEpoch is the shared version condition; fingerprint remains secondary.
       let liveFp = wantFp;
-      if (params.targetActorIds && params.targetActorIds.length > 0) {
-        try {
-          const { fileStore } = createWorkspaceCollaborationStores(cfg);
-          const os = await readGroupOperatingState({
-            fileStore,
-            groupId: params.groupId,
-          });
+      let liveAuthEpoch = expectedAuth;
+      try {
+        const { fileStore } = createWorkspaceCollaborationStores(cfg);
+        const os = await readGroupOperatingState({
+          fileStore,
+          groupId: params.groupId,
+        });
+        liveAuthEpoch = readOperatingStateAuthEpoch(os);
+        if (params._testForceLiveAuthFingerprint !== undefined) {
+          liveFp = compact(params._testForceLiveAuthFingerprint);
+        } else if (params.targetActorIds && params.targetActorIds.length > 0) {
           liveFp = wakeOpAuthFingerprint(os, params.targetActorIds);
-        } catch (error) {
-          return {
-            ok: false,
-            reason: "auth_source_unreadable",
-            detail: `auth source unreadable during eligibility CAS: ${String(error)}`,
-            task: governed,
-          };
         }
+      } catch (error) {
+        return {
+          ok: false,
+          reason: "auth_source_unreadable",
+          detail: `auth source unreadable during eligibility CAS: ${String(error)}`,
+          task: governed,
+        };
+      }
+      if (liveAuthEpoch !== expectedAuth) {
+        return {
+          ok: false,
+          reason: "auth_epoch_mismatch",
+          detail: `expected authEpoch ${expectedAuth}, live ${liveAuthEpoch}`,
+          task: governed,
+        };
+      }
+      if (
+        (params.targetActorIds && params.targetActorIds.length > 0) ||
+        params._testForceLiveAuthFingerprint !== undefined
+      ) {
         if (compact(liveFp) !== wantFp) {
           return {
             ok: false,
@@ -214,6 +269,7 @@ export async function casCommitTaskDispatchEligibility(
         claimId: randomUUID(),
         opKey,
         controlEpoch: liveEpoch,
+        authEpoch: liveAuthEpoch,
         authFingerprint: wantFp,
         committedAtMs: nowMs,
         phase: "committed",
@@ -241,6 +297,8 @@ export type CasTakeTaskDispatchEligibilityParams = {
   cfg?: OpenBotConfig;
   nowMs?: number;
   targetActorIds?: readonly string[];
+  /** Test-only: force live fingerprint string (M3-REV-3 constant-fp proof). */
+  _testForceLiveAuthFingerprint?: string;
 };
 
 export type CasTakeTaskDispatchEligibilityResult =
@@ -254,6 +312,7 @@ export type CasTakeTaskDispatchEligibilityResult =
         | "claim_op_mismatch"
         | "claim_id_mismatch"
         | "epoch_mismatch"
+        | "auth_epoch_mismatch"
         | "auth_fingerprint_mismatch"
         | "auth_source_unreadable"
         | "task_control_unreadable"
@@ -264,9 +323,10 @@ export type CasTakeTaskDispatchEligibilityResult =
 
 /**
  * Before external dispatcher: CAS-take the task dispatchClaim with unoverwritable
- * version condition (epoch + fingerprint still match). Stop that advanced
- * controlEpoch (or a fingerprint mismatch from live revoke recheck) causes take
- * to fail — dispatcher must not run. Revoke itself is not a shared-epoch writer.
+ * version condition (controlEpoch + OS authEpoch + fingerprint). Stop that advanced
+ * controlEpoch, or a revoke that bumped authEpoch, causes take to fail — dispatcher
+ * must not run. Auth revoke is a shared-epoch writer via OS authEpoch (+ optional
+ * task claim clear under the same lock).
  */
 export async function casTakeTaskDispatchEligibility(
   params: CasTakeTaskDispatchEligibilityParams,
@@ -347,23 +407,40 @@ export async function casTakeTaskDispatchEligibility(
         };
       }
 
-      if (params.targetActorIds && params.targetActorIds.length > 0) {
-        let liveFp = "";
-        try {
-          const { fileStore } = createWorkspaceCollaborationStores(cfg);
-          const os = await readGroupOperatingState({
-            fileStore,
-            groupId: params.groupId,
-          });
+      let liveFp = compact(claim.authFingerprint);
+      let liveAuthEpoch = readClaimAuthEpoch(claim);
+      try {
+        const { fileStore } = createWorkspaceCollaborationStores(cfg);
+        const os = await readGroupOperatingState({
+          fileStore,
+          groupId: params.groupId,
+        });
+        liveAuthEpoch = readOperatingStateAuthEpoch(os);
+        if (params._testForceLiveAuthFingerprint !== undefined) {
+          liveFp = compact(params._testForceLiveAuthFingerprint);
+        } else if (params.targetActorIds && params.targetActorIds.length > 0) {
           liveFp = wakeOpAuthFingerprint(os, params.targetActorIds);
-        } catch (error) {
-          return {
-            ok: false,
-            reason: "auth_source_unreadable",
-            detail: `auth source unreadable during eligibility take: ${String(error)}`,
-            task: governed,
-          };
         }
+      } catch (error) {
+        return {
+          ok: false,
+          reason: "auth_source_unreadable",
+          detail: `auth source unreadable during eligibility take: ${String(error)}`,
+          task: governed,
+        };
+      }
+      if (liveAuthEpoch !== readClaimAuthEpoch(claim)) {
+        return {
+          ok: false,
+          reason: "auth_epoch_mismatch",
+          detail: `claim authEpoch ${readClaimAuthEpoch(claim)} != live ${liveAuthEpoch}`,
+          task: governed,
+        };
+      }
+      if (
+        (params.targetActorIds && params.targetActorIds.length > 0) ||
+        params._testForceLiveAuthFingerprint !== undefined
+      ) {
         if (compact(liveFp) !== compact(claim.authFingerprint)) {
           return {
             ok: false,
@@ -641,6 +718,118 @@ export async function applyBusinessTaskPatchUnderControlLock(params: {
 }
 
 /** Test helper: brief yield so concurrent lock contenders can interleave. */
+
+/**
+ * T51: shared auth-revoke writer.
+ *
+ * 1) Mutate OS (member map / role / duty bindings), then bump OS `authEpoch`
+ *    (unique auth version SoT) and persist.
+ * 2) For each invalidateTaskId, under the **same** task control lock used by
+ *    eligibility CAS: clear outstanding dispatchClaim and (by default) bump
+ *    controlEpoch so revoke linearizes with stop/eligibility on the task plane.
+ *
+ * Call this (or an equivalent that bumps authEpoch before mapping changes) from
+ * production revoke / membership / duty-change paths. Plain `writeGroupOperatingState`
+ * without an authEpoch bump does **not** participate in the shared version plane.
+ */
+export async function applyAuthRevokeSharedCas(params: {
+  groupId: string;
+  cfg?: OpenBotConfig;
+  nowMs?: number;
+  /**
+   * Apply membership / role / duty mutations. Do not set authEpoch here — this
+   * helper bumps it after mutate. Identity mutate (no mapping change) is valid
+   * for authEpoch-only bump proofs (M3-REV-3).
+   */
+  mutate: (state: OperatingStateWithAuthEpoch) => OperatingStateWithAuthEpoch;
+  /** Tasks whose outstanding eligibility must lose under the shared task lock. */
+  invalidateTaskIds?: readonly string[];
+  /**
+   * When true (default), bump each invalidated task's controlEpoch (revoke ≈
+   * interrupt unconsumed eligibility on the stop/eligibility version plane).
+   */
+  bumpTaskControlEpoch?: boolean;
+}): Promise<{
+  authEpoch: number;
+  operatingState: OperatingStateWithAuthEpoch;
+  invalidatedTasks: Array<{
+    taskId: string;
+    controlEpoch: number;
+    clearedClaim: boolean;
+  }>;
+}> {
+  const cfg = params.cfg ?? loadConfig();
+  const nowMs = params.nowMs ?? Date.now();
+  const bumpTask = params.bumpTaskControlEpoch !== false;
+  const { fileStore } = createWorkspaceCollaborationStores(cfg);
+  const current = await readGroupOperatingState({
+    fileStore,
+    groupId: params.groupId,
+  });
+  if (!current) {
+    throw new Error(`operating state missing for auth revoke: ${params.groupId}`);
+  }
+  const mutated = params.mutate(current);
+  const nextAuth = readOperatingStateAuthEpoch(mutated) + 1;
+  // If mutate already advanced authEpoch, keep the higher bump once.
+  const prior = readOperatingStateAuthEpoch(current);
+  const authEpoch = Math.max(nextAuth, prior + 1);
+  const operatingState: OperatingStateWithAuthEpoch = {
+    ...mutated,
+    authEpoch,
+    updatedAtMs: nowMs,
+  };
+  await writeGroupOperatingState({
+    fileStore,
+    groupId: params.groupId,
+    state: operatingState,
+  });
+
+  const invalidatedTasks: Array<{
+    taskId: string;
+    controlEpoch: number;
+    clearedClaim: boolean;
+  }> = [];
+  for (const rawId of params.invalidateTaskIds ?? []) {
+    const taskId = compact(rawId);
+    if (!taskId) {
+      continue;
+    }
+    const result = await withTaskControlLock({
+      groupId: params.groupId,
+      taskId,
+      cfg,
+      fn: async () => {
+        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+        const task = await objectStorage.readObject<Task>(params.groupId, "task", taskId);
+        if (!task) {
+          return null;
+        }
+        const governed = asGovernedTask(task);
+        const clearedClaim = Boolean(governed.dispatchClaim);
+        const priorEpoch = readControlEpoch(governed);
+        const nextEpoch = bumpTask ? priorEpoch + 1 : priorEpoch;
+        const updated: GovernedTask = {
+          ...governed,
+          controlEpoch: nextEpoch,
+          dispatchClaim: undefined,
+          updatedAtMs: nowMs,
+        };
+        await objectStorage.writeObject(params.groupId, "task", taskId, updated);
+        return {
+          taskId,
+          controlEpoch: nextEpoch,
+          clearedClaim,
+        };
+      },
+    });
+    if (result) {
+      invalidatedTasks.push(result);
+    }
+  }
+  return { authEpoch, operatingState, invalidatedTasks };
+}
+
 export function _testTaskControlCasYieldMs(): number {
   return LOCK_RETRY_MS;
 }

@@ -24,6 +24,11 @@ export type TaskDispatchClaim = {
   claimId: string;
   opKey: string;
   controlEpoch: number;
+  /**
+   * T51: snapshot of OS authEpoch at commit. take/commit compare live OS authEpoch
+   * so revoke is on a shared version plane — not fingerprint alone.
+   */
+  authEpoch: number;
   authFingerprint: string;
   committedAtMs: number;
   /** committed = eligible; taken = leased for external dispatch (CAS take). */
