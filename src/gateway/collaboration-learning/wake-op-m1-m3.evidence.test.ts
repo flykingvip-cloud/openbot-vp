@@ -30,7 +30,10 @@ import {
   casTakeTaskDispatchEligibility,
 } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
-import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
+import {
+  asGovernedTask,
+  MissingTaskDeliverableError,
+} from "../collaboration-dispatch/task-runtime.js";
 import {
   buildAcceptedTaskStopControl,
   TaskStoppedError,
@@ -50,6 +53,18 @@ import {
 } from "../collaboration-dispatch/wake-op-ledger.js";
 import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import {
+  applyCollaborationBoardClaim,
+  claimCollaborationBoardItem,
+  loadCollaborationBoardClaimItem,
+  publishCollaborationBoardItem,
+} from "./claim-contract-entry.js";
+import {
+  acceptCollaborationTaskHandoffContract,
+  applyCollaborationTaskHandoffContract,
+  approveCollaborationTaskHandoffContract,
+  proposeCollaborationTaskHandoffContract,
+} from "./handoff-contract-entry.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -2363,5 +2378,341 @@ describe("T44 M3 other task writers under control lock", () => {
     expect(patched.dispatchClaim?.claimId).toBe(commit.claim.claimId);
     expect(patched.controlEpoch).toBe(epoch);
     expect(patched.stopControl).toBeFalsy();
+  });
+});
+
+describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", () => {
+  async function useBizCfg() {
+    const { root, cfg: base } = await useIsolationRoot();
+    const cfg = {
+      ...base,
+      collaboration: {
+        ...base.collaboration,
+        task: {
+          ...base.collaboration?.task,
+          wakeContract: true,
+          handoffContract: true,
+          claimContract: true,
+        },
+      },
+    } as OpenBotConfig;
+    const configPath = process.env.OPENBOT_CONFIG_PATH!;
+    await fs.writeFile(configPath, JSON.stringify(cfg, null, 2), "utf8");
+    setRuntimeConfigSnapshot(cfg);
+    clearConfigCache();
+    return { root, cfg };
+  }
+
+  test("M3-BIZ-A handoff apply vs concurrent responsibility move — must conflict (not overwrite)", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-a";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-a" });
+
+    const proposed = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.bot0,
+      kind: "owner_transfer",
+      remainingWork: "finish biz-a",
+      acceptanceCriteria: ["owner moved"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let hitRead!: () => void;
+    const readHit = new Promise<void>((r) => {
+      hitRead = r;
+    });
+
+    const applyP = applyCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.owner,
+      cfg,
+      _testAfterTaskReadBarrier: async () => {
+        hitRead();
+        await barrier;
+      },
+    });
+
+    await readHit;
+    // Concurrent live responsibility move while stale approved contract is mid-apply.
+    await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId,
+      cfg,
+      buildPatch: (live) => {
+        const liveGoverned = asGovernedTask(live);
+        return {
+          responsibility: {
+            ...(liveGoverned.responsibility ?? {
+              owner: tenant.coordinator,
+              executors: [tenant.bot0],
+              reviewers: [],
+              approvers: [tenant.approver],
+            }),
+            owner: tenant.admin,
+          },
+          ownerMemberId: tenant.admin,
+          updatedAtMs: Date.now(),
+          updatedBy: tenant.admin,
+        };
+      },
+    });
+    release();
+
+    await expect(applyP).rejects.toMatchObject({
+      name: "HandoffContractEntryError",
+      code: "responsibility_conflict",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    // Live concurrent owner must stick; stale handoff must not overwrite to bot0.
+    expect(final.responsibility?.owner).toBe(tenant.admin);
+    expect(final.ownerMemberId).toBe(tenant.admin);
+    const historyIds = (final.handoffs ?? []).map((h) => h.handoffId).filter(Boolean);
+    expect(historyIds).not.toContain(proposed.handoffId);
+  });
+
+  test("M3-BIZ-B board claim apply vs concurrent stop — refuse before board applied", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-b";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-b" });
+
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId,
+      remainingWork: "biz-b chapter",
+      acceptanceCriteria: ["sources"],
+      intendedClaimantIds: [tenant.bot0],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      claimantId: tenant.bot0,
+      cfg,
+    });
+
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let hitRead!: () => void;
+    const readHit = new Promise<void>((r) => {
+      hitRead = r;
+    });
+
+    const applyP = applyCollaborationBoardClaim({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      actor: tenant.bot0,
+      cfg,
+      _testAfterTaskReadBarrier: async () => {
+        hitRead();
+        await barrier;
+      },
+    });
+
+    await readHit;
+    const stopControl = buildAcceptedTaskStopControl({
+      requestedBy: tenant.owner,
+      reason: "biz-b-stop",
+      externalEffect: "none",
+      requestedAtMs: 42,
+    });
+    await applyTaskStopUnderControlLock({
+      groupId,
+      taskId,
+      stopControl,
+      updatedBy: tenant.owner,
+      updatedAtMs: 42,
+      cfg,
+    });
+    release();
+
+    await expect(applyP).rejects.toBeInstanceOf(TaskStoppedError);
+
+    const board = await loadCollaborationBoardClaimItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      cfg,
+    });
+    // Board must not reach applied if stop won the race under the shared lock.
+    expect(board?.status).toBe("claimed");
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.stopControl?.status).toBe("accepted");
+    expect(final.stopControl?.reason).toBe("biz-b-stop");
+    // Seed already assigns bot0; ensure claim-apply did not mutate status / add claim history.
+    expect(final.status).toBe("in_progress");
+  });
+
+  test("M3-BIZ-B2 prior partial: board applied + task stopped → identifiable code", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-b2";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-b2" });
+
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId,
+      remainingWork: "biz-b2 chapter",
+      acceptanceCriteria: ["sources"],
+      intendedClaimantIds: [tenant.bot0],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      claimantId: tenant.bot0,
+      cfg,
+    });
+    // Happy-path apply first (board + task).
+    await applyCollaborationBoardClaim({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      actor: tenant.bot0,
+      cfg,
+    });
+    const boardApplied = await loadCollaborationBoardClaimItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      cfg,
+    });
+    expect(boardApplied?.status).toBe("applied");
+
+    const stopControl = buildAcceptedTaskStopControl({
+      requestedBy: tenant.owner,
+      reason: "biz-b2-after-apply",
+      externalEffect: "none",
+      requestedAtMs: 99,
+    });
+    await applyTaskStopUnderControlLock({
+      groupId,
+      taskId,
+      stopControl,
+      updatedBy: tenant.owner,
+      updatedAtMs: 99,
+      cfg,
+    });
+
+    await expect(
+      applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: published.itemId,
+        actor: tenant.bot0,
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      name: "ClaimContractEntryError",
+      code: "partial_success_board_applied_task_stopped",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.stopControl?.status).toBe("accepted");
+  });
+
+  test("M3-BIZ-C complete-gate revalidate at commit — missing deliverable after barrier refuses", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-c";
+    const { objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "biz-c",
+    });
+    // task_driven ⇒ deliverableRequired
+    const state = buildState();
+    (state as { groupProfile: Record<string, unknown> }).groupProfile = {
+      ...(state as { groupProfile?: Record<string, unknown> }).groupProfile,
+      displayName: "T45 biz-c",
+      expectedOutputs: ["task"],
+      successCriteria: [],
+      collaborationMode: "task_driven",
+    };
+    await writeGroupOperatingState({ fileStore, groupId, state });
+
+    const delId = "del-biz-c";
+    await objectStorage.writeObject(groupId, "deliverable", delId, {
+      deliverableId: delId,
+      groupId,
+      taskId,
+      title: "biz-c deliverable",
+      status: "submitted",
+      version: 1,
+      submittedBy: tenant.bot0,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    } as never);
+
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let hitRead!: () => void;
+    const readHit = new Promise<void>((r) => {
+      hitRead = r;
+    });
+
+    const transitionP = transitionCollaborationTask({
+      groupId,
+      taskId,
+      toStatus: "completed",
+      actor: tenant.owner,
+      cfg,
+      _testAfterTaskReadBarrier: async () => {
+        hitRead();
+        await barrier;
+      },
+    });
+
+    await readHit;
+    // Remove deliverable after outside read / before commit-boundary revalidate.
+    await objectStorage.deleteObject(groupId, "deliverable", delId);
+    release();
+
+    await expect(transitionP).rejects.toBeInstanceOf(MissingTaskDeliverableError);
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.status).toBe("in_progress");
+    expect(final.completedAtMs).toBeFalsy();
   });
 });

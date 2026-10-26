@@ -9619,6 +9619,10 @@ tasks:
       - src/gateway/protocol/index.ts
       - src/gateway/collaboration-dispatch/task-runtime.ts
       - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/task-control-cas.ts
+      - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     state: active
     sessions:
       - id: t30u-u1-boundary-20261026
@@ -9954,6 +9958,10 @@ landingStreams:
       - src/gateway/protocol/index.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/task-control-cas.ts
+      - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     canLandWith:
       - COLLAB_RESIDUAL_B_TOOL_LOOP
       - batch2-reliable-confirm-cards

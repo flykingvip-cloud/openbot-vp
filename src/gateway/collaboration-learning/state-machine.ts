@@ -102,26 +102,16 @@ export async function transitionCollaborationTask(params: {
     legacyOverlay: null,
     cfg,
   });
-  const governed = asGovernedTask(current);
-  const responsibility = resolveTaskResponsibility({
-    task: governed,
-    effective,
-    actor: params.actor,
-    ownerUserId: operatingState?.governance.ownerUserId,
-    coordinatorBotId: operatingState?.governance.coordinatorBotId,
-    memberRoleMap: operatingState?.memberRoleMap,
-  });
+  // Immutable / outside-lock inputs: actor resolution, cfg snapshot, unattended fence
+  // setup. Deliverable / responsibility / live-status gates re-check under the lock
+  // at commit (T45) — do not treat outside "gates already passed" as final.
   if (params.toStatus === "completed") {
-    const deliverables = await objectStorage.listObjects<Deliverable>(
-      params.groupId,
-      "deliverable",
-    );
     const finalizeGate = evaluateGovernanceGate({
       action: "finalize_decision",
       actor,
       effective,
     });
-    // Batch 5 latch only. assertTaskMayComplete below is unchanged and still refuses.
+    // Batch 5 latch only. Commit-boundary assertTaskMayComplete still refuses.
     if (isSingleGroupUnattendedTarget(cfg, params.groupId, null)) {
       const fenceAuthority = createRuntimeAuthority({
         snapshot: createRoundPolicySnapshot(resolveGroupPolicyInput({ operatingState }), {
@@ -145,15 +135,7 @@ export async function transitionCollaborationTask(params: {
         publishedBy: operatingState?.governance.ownerUserId,
       });
     }
-    assertTaskMayComplete({
-      task: { ...governed, responsibility },
-      effective,
-      actor,
-      deliverables,
-    });
   }
-  // Intent from outside read (gates already passed). Persist under task control lock
-  // so concurrent stop/claim cannot be lost to `{...stale, ...fields}` (T44).
   if (params._testAfterTaskReadBarrier) {
     await params._testAfterTaskReadBarrier();
   }
@@ -163,7 +145,7 @@ export async function transitionCollaborationTask(params: {
     taskId: params.taskId,
     cfg: writeCfg,
     refuseIfStopped: true,
-    buildPatch: (live) => {
+    buildPatch: async (live) => {
       const machine = new TaskStateMachine();
       const status = machine.transition(live.status, params.toStatus, params.actor);
       const now = Date.now();
@@ -176,6 +158,19 @@ export async function transitionCollaborationTask(params: {
         coordinatorBotId: operatingState?.governance.coordinatorBotId,
         memberRoleMap: operatingState?.memberRoleMap,
       });
+      if (params.toStatus === "completed") {
+        // Re-list deliverables + re-assert at commit boundary (T45).
+        const deliverables = await objectStorage.listObjects<Deliverable>(
+          params.groupId,
+          "deliverable",
+        );
+        assertTaskMayComplete({
+          task: { ...liveGoverned, responsibility: liveResponsibility },
+          effective,
+          actor,
+          deliverables,
+        });
+      }
       const governanceFields = nextGovernedTaskFields({
         task: liveGoverned,
         liveStatus: status,

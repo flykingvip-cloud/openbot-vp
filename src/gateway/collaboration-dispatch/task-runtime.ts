@@ -219,12 +219,14 @@ export function normalizeTaskHandoff(input: {
   completedArtifacts?: readonly string[];
   assumptions?: readonly string[];
   blockers?: readonly string[];
+  handoffId?: string;
 }): TaskHandoff {
   const from = compactId(input.from);
   const to = compactId(input.to);
   const reason = compactId(input.reason);
   const remainingWork = compactId(input.remainingWork);
   const acceptanceCriteria = uniqueIds([...input.acceptanceCriteria]);
+  const handoffId = compactId(input.handoffId) || undefined;
   if (!from || !to) {
     throw new InvalidTaskHandoffError("handoff requires from and to");
   }
@@ -250,6 +252,7 @@ export function normalizeTaskHandoff(input: {
     assumptions: uniqueIds([...(input.assumptions ?? [])]),
     blockers: uniqueIds([...(input.blockers ?? [])]),
     acceptanceCriteria,
+    ...(handoffId ? { handoffId } : {}),
   };
 }
 

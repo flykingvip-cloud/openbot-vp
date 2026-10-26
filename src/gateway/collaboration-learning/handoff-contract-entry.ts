@@ -14,8 +14,10 @@ import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-e
 import type { GovernanceActor } from "../collaboration-dispatch/governance-gate.js";
 import {
   acceptHandoff,
+  appendHandoffHistoryById,
   applyApprovedHandoff,
   approveHandoff,
+  classifyHandoffApplyAgainstLive,
   loadHandoffContract,
   proposeHandoff,
   type HandoffApproval,
@@ -319,45 +321,73 @@ export async function applyCollaborationTaskHandoffContract(
   if (!current) {
     throw new HandoffContractEntryError("task_not_found", `task not found: ${params.taskId}`);
   }
-  const governed = asGovernedTask(current);
-  const handoffTask: HandoffTask = {
-    ...governed,
-    responsibility: governed.responsibility,
-  };
-  const applied = unwrap(
-    await applyApprovedHandoff(authority, contract, handoffTask, { cfg }),
-    "applyApprovedHandoff",
-  );
-  const responsibility = applied.task.responsibility;
-  if (!responsibility) {
-    throw new HandoffContractEntryError(
-      "responsibility_missing",
-      "applyApprovedHandoff returned no responsibility",
-    );
-  }
-  const history = normalizeTaskHandoff({
-    taskId: contract.taskId,
-    from: contract.from.agentId,
-    to: contract.to.agentId,
-    reason: contract.kind,
-    remainingWork: contract.remainingWork,
-    acceptanceCriteria: [...contract.acceptanceCriteria],
-    completedArtifacts: [...contract.completedArtifacts],
-    assumptions: [...contract.assumptions],
-    blockers: [...contract.blockers],
-  });
-  const handoffsNext = [...(governed.handoffs ?? []), history];
   if (params._testAfterTaskReadBarrier) {
     await params._testAfterTaskReadBarrier();
   }
+  // T45: under the control lock, classify against *live* responsibility, then
+  // apply ledger + business fields. Never write lock-outside responsibility /
+  // whole handoffs[] replacement onto a newer live task.
   const updated = await applyBusinessTaskPatchUnderControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
     refuseIfStopped: true,
-    buildPatch: (live) => {
+    buildPatch: async (live) => {
       const now = Date.now();
       const liveGoverned = asGovernedTask(live);
+      const liveHandoffTask: HandoffTask = {
+        ...liveGoverned,
+        responsibility: liveGoverned.responsibility,
+      };
+      const decision = classifyHandoffApplyAgainstLive({
+        contract,
+        live: liveHandoffTask,
+        historyHandoffIds: (liveGoverned.handoffs ?? []).map((h) => h.handoffId),
+      });
+      if (decision.kind === "conflict") {
+        throw new HandoffContractEntryError(
+          "responsibility_conflict",
+          `stale handoff ${contract.handoffId} refused: ${decision.detail}`,
+        );
+      }
+      // Idempotent / already-at-target: refuse blind retry mutate (T-E5 / WL2).
+      // Distinct from conflict — live already reflects this handoff.
+      if (decision.kind === "idempotent") {
+        throw new HandoffContractEntryError(
+          "already_applied",
+          `handoff ${contract.handoffId} already reflected on live task; refusing blind retry mutate`,
+        );
+      }
+      const history = normalizeTaskHandoff({
+        taskId: contract.taskId,
+        from: contract.from.agentId,
+        to: contract.to.agentId,
+        reason: contract.kind,
+        remainingWork: contract.remainingWork,
+        acceptanceCriteria: [...contract.acceptanceCriteria],
+        completedArtifacts: [...contract.completedArtifacts],
+        assumptions: [...contract.assumptions],
+        blockers: [...contract.blockers],
+        handoffId: contract.handoffId,
+      });
+      const handoffsNext = appendHandoffHistoryById(liveGoverned.handoffs, history);
+      let responsibility = decision.responsibility;
+      // Ledger apply only after live classify (kind===apply).
+      // If ledger already says applied but live still needs projection, repair
+      // responsibility without re-entering applyApprovedHandoff (status_mismatch).
+      if (contract.status !== "applied") {
+        const applied = unwrap(
+          await applyApprovedHandoff(authority, contract, liveHandoffTask, { cfg }),
+          "applyApprovedHandoff",
+        );
+        if (!applied.task.responsibility) {
+          throw new HandoffContractEntryError(
+            "responsibility_missing",
+            "applyApprovedHandoff returned no responsibility",
+          );
+        }
+        responsibility = applied.task.responsibility;
+      }
       const governanceFields = nextGovernedTaskFields({
         task: liveGoverned,
         liveStatus: live.status,

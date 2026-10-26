@@ -22,7 +22,11 @@ import type { OpenBotConfig } from "../../config/types.js";
 import type { CollaborationFactRecord, HandoffFactType } from "../collaboration-ledger/types.js";
 import { appendCollaborationFactRecord } from "../collaboration-ledger/writer.js";
 import { eventKeyOf } from "./collaboration-event-key.js";
-import type { EffectiveCollaborationPolicy, TaskResponsibility } from "./effective-policy.js";
+import type {
+  EffectiveCollaborationPolicy,
+  TaskHandoff,
+  TaskResponsibility,
+} from "./effective-policy.js";
 import { evaluateGovernanceGate, type GovernanceActor } from "./governance-gate.js";
 import {
   enrichHandoffAssumptionsWithOguiBrief,
@@ -507,6 +511,132 @@ function nextResponsibility(
     ...current.executors.filter((id) => id !== contract.from.agentId),
   ]);
   return { ...current, executors };
+}
+
+/** T45: expose responsibility projection for live-lock apply. */
+export function responsibilityFromHandoffTask(task: HandoffTask): TaskResponsibility {
+  return responsibilityOf(task);
+}
+
+/** T45: apply approved contract to a live responsibility snapshot. */
+export function applyHandoffContractToResponsibility(
+  current: TaskResponsibility,
+  contract: HandoffContract,
+): TaskResponsibility {
+  return nextResponsibility(current, contract);
+}
+
+export type HandoffLiveApplyDecision =
+  | { kind: "apply"; responsibility: TaskResponsibility }
+  | { kind: "idempotent"; responsibility: TaskResponsibility }
+  | { kind: "conflict"; detail: string; responsibility: TaskResponsibility };
+
+/**
+ * T45: classify whether an approved handoff may still change live responsibility.
+ * Old contracts whose expected `from` no longer matches live must conflict — not overwrite.
+ * History keyed by handoffId is treated as idempotent.
+ */
+export function classifyHandoffApplyAgainstLive(params: {
+  contract: HandoffContract;
+  live: HandoffTask;
+  historyHandoffIds?: ReadonlySet<string> | readonly (string | undefined | null)[];
+}): HandoffLiveApplyDecision {
+  const liveResp = responsibilityOf(params.live);
+  const handoffId = compact(params.contract.handoffId);
+  const ids = params.historyHandoffIds;
+  const idSet =
+    ids instanceof Set
+      ? ids
+      : new Set([...(ids ?? [])].map((v) => compact(v)).filter((v): v is string => Boolean(v)));
+  if (handoffId && idSet.has(handoffId)) {
+    return { kind: "idempotent", responsibility: liveResp };
+  }
+
+  const fromId = compact(params.contract.from.agentId);
+  const toId = compact(params.contract.to.agentId);
+  const role = params.contract.to.responsibilityRole;
+  const isOwnerMove = params.contract.kind === "owner_transfer" || role === "owner";
+
+  if (isOwnerMove) {
+    if (compact(liveResp.owner) === toId) {
+      return { kind: "idempotent", responsibility: liveResp };
+    }
+    if (compact(liveResp.owner) !== fromId) {
+      return {
+        kind: "conflict",
+        detail: `expected owner ${fromId}, live owner ${liveResp.owner}`,
+        responsibility: liveResp,
+      };
+    }
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
+  if (role === "reviewer") {
+    if (compact(liveResp.reviewer) === toId) {
+      return { kind: "idempotent", responsibility: liveResp };
+    }
+    if (liveResp.reviewer && compact(liveResp.reviewer) !== fromId) {
+      return {
+        kind: "conflict",
+        detail: `expected reviewer ${fromId}, live reviewer ${liveResp.reviewer}`,
+        responsibility: liveResp,
+      };
+    }
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
+  if (role === "approver") {
+    if (compact(liveResp.approver) === toId) {
+      return { kind: "idempotent", responsibility: liveResp };
+    }
+    if (liveResp.approver && compact(liveResp.approver) !== fromId) {
+      return {
+        kind: "conflict",
+        detail: `expected approver ${fromId}, live approver ${liveResp.approver}`,
+        responsibility: liveResp,
+      };
+    }
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
+  // continue / evidence / executor role: from must still be an executor (or already transferred).
+  const executors = new Set(liveResp.executors.map((id) => compact(id)).filter(Boolean));
+  if (executors.has(toId) && !executors.has(fromId)) {
+    return { kind: "idempotent", responsibility: liveResp };
+  }
+  if (!executors.has(fromId)) {
+    return {
+      kind: "conflict",
+      detail: `expected executor ${fromId} still assigned; live executors=[${[...executors].join(",")}]`,
+      responsibility: liveResp,
+    };
+  }
+  return {
+    kind: "apply",
+    responsibility: nextResponsibility(liveResp, params.contract),
+  };
+}
+
+/** Append handoff history by handoffId (no whole-array replace from outside the lock). */
+export function appendHandoffHistoryById(
+  existing: readonly TaskHandoff[] | null | undefined,
+  entry: TaskHandoff,
+): TaskHandoff[] {
+  const prior = [...(existing ?? [])];
+  const id = compact(entry.handoffId);
+  if (id && prior.some((h) => compact(h.handoffId) === id)) {
+    return prior;
+  }
+  return [...prior, entry];
 }
 
 function withResponsibility(

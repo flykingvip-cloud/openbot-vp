@@ -82,7 +82,15 @@ import {
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
 import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
-import { asGovernedTask, nextGovernedTaskFields } from "../collaboration-dispatch/task-runtime.js";
+import {
+  asGovernedTask,
+  nextGovernedTaskFields,
+  seedTaskResponsibility,
+} from "../collaboration-dispatch/task-runtime.js";
+import {
+  assertTaskNotStopped,
+  isTaskStopAccepted,
+} from "../collaboration-dispatch/task-stop-control.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
   confirmationConsumedDelivery,
@@ -440,17 +448,20 @@ export type ApplyCollaborationBoardClaimParams = {
  * Applies a claimed board item: adds claimant to assignedMemberIds, seeds
  * responsibility via task-runtime, persists Task, syncs operatingState
  * (currentTaskId from active task selection).
+ *
+ * T45: board applyClaim runs **under** the task control lock after the live
+ * stop check, so stop cannot land between board-applied and task patch.
+ * If board is already applied (retry / prior partial), task side is repaired
+ * idempotently without re-mutating the board row.
  */
 export async function applyCollaborationBoardClaim(
   params: ApplyCollaborationBoardClaimParams,
 ): Promise<{ task: Task; item: GroupBoardClaimItem }> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
-  await assertPersistedTaskNotStopped({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-  });
+  // T45: stop / partial_success classification runs under the control lock below.
+  // An early assertPersistedTaskNotStopped would collapse "board already applied +
+  // task stopped" into generic TaskStoppedError and hide the recoverable signal.
   const { authority, stores, operatingState } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -465,42 +476,99 @@ export async function applyCollaborationBoardClaim(
   if (!current) {
     throw new ClaimContractEntryError("task_not_found", `task not found: ${params.taskId}`);
   }
-  const governed = asGovernedTask(current);
-  const applied = unwrap(
-    await applyClaim(
-      authority,
-      { taskId: params.taskId, itemId: params.itemId },
-      governed,
-      authority.policy.effective,
-      { cfg, memberRoleMap: operatingState?.memberRoleMap ?? null },
-    ),
-    "applyClaim",
-  );
   if (params._testAfterTaskReadBarrier) {
     await params._testAfterTaskReadBarrier();
   }
+  let resultItem: GroupBoardClaimItem | null = null;
   const updated = await applyBusinessTaskPatchUnderControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
-    refuseIfStopped: true,
-    buildPatch: (live) => {
+    // Custom stop handling so board-already-applied + stopped is identifiable.
+    refuseIfStopped: false,
+    buildPatch: async (live) => {
       const now = Date.now();
       const liveGoverned = asGovernedTask(live);
+      const existing = await loadBoardClaimItem(authority, {
+        taskId: params.taskId,
+        itemId: params.itemId,
+      });
+      if (isTaskStopAccepted(liveGoverned)) {
+        if (existing?.status === "applied") {
+          throw new ClaimContractEntryError(
+            "partial_success_board_applied_task_stopped",
+            `board item ${params.itemId} is applied but task ${params.taskId} is stopped; responsibility not repaired`,
+          );
+        }
+        assertTaskNotStopped(liveGoverned);
+      }
+
+      let assignedMemberIds: string[];
+      let responsibility: NonNullable<typeof liveGoverned.responsibility>;
+      let item: GroupBoardClaimItem;
+
+      if (existing?.status === "applied") {
+        // Idempotent recovery: board durable; finish / re-seed task side from live.
+        const claimantId = (existing.claimantId ?? "").trim();
+        if (!claimantId) {
+          throw new ClaimContractEntryError(
+            "claimant_missing",
+            "applied board item has no claimantId",
+          );
+        }
+        const merged = Array.from(
+          new Set(
+            [...(liveGoverned.assignedMemberIds ?? []), claimantId]
+              .map((s) => s.trim())
+              .filter(Boolean),
+          ),
+        );
+        responsibility = seedTaskResponsibility({
+          task: { ...liveGoverned, assignedMemberIds: merged },
+          effective: authority.policy.effective,
+          actor: claimantId,
+          nominatedOwnerId: (liveGoverned.ownerMemberId ?? "").trim() || undefined,
+          memberRoleMap: operatingState?.memberRoleMap ?? undefined,
+        });
+        assignedMemberIds = merged;
+        item = existing;
+      } else {
+        const applied = unwrap(
+          await applyClaim(
+            authority,
+            { taskId: params.taskId, itemId: params.itemId },
+            liveGoverned,
+            authority.policy.effective,
+            { cfg, memberRoleMap: operatingState?.memberRoleMap ?? null },
+          ),
+          "applyClaim",
+        );
+        assignedMemberIds = applied.assignedMemberIds;
+        responsibility = applied.responsibility;
+        item = applied.item;
+      }
+      resultItem = item;
+
       const governanceFields = nextGovernedTaskFields({
         task: liveGoverned,
         liveStatus: live.status,
-        responsibility: applied.responsibility,
-        handoffs: liveGoverned.handoffs ?? governed.handoffs ?? [],
+        responsibility,
+        handoffs: liveGoverned.handoffs ?? [],
       });
       return {
         ...governanceFields,
-        assignedMemberIds: applied.assignedMemberIds,
-        updatedBy: params.actor ?? applied.item.claimantId ?? live.updatedBy,
+        assignedMemberIds,
+        updatedBy: params.actor ?? item.claimantId ?? live.updatedBy,
         updatedAtMs: now,
       };
     },
   });
+  if (!resultItem) {
+    throw new ClaimContractEntryError(
+      "apply_incomplete",
+      "board claim apply finished without an item result",
+    );
+  }
   await syncGroupOperatingState({
     fileStore: stores.fileStore,
     groupStorage: stores.groupStorage,
@@ -510,7 +578,7 @@ export async function applyCollaborationBoardClaim(
     objectStorage: stores.objectStorage,
     groupId: params.groupId,
   });
-  return { task: updated, item: applied.item };
+  return { task: updated, item: resultItem };
 }
 
 /**
