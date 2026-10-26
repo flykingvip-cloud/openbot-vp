@@ -1007,6 +1007,64 @@ export async function writeGroupOperatingState(params: {
 }
 
 /**
+ * W1: project durable OS authorization fields from profile + members.
+ * Omits removed/revoked members so leave/revoke cannot linger as mapped.
+ * Used by sync (lock-internal reproject) and production roster auth CAS.
+ */
+export function projectOperatingStateAuthFromRoster(params: {
+  profile:
+    | {
+        ownerUserId?: string | null;
+        coordinatorBotId?: string | null;
+        finalDecisionPolicy?: GatewayCollaborationGroupOperatingState["governance"]["finalDecisionPolicy"];
+      }
+    | null
+    | undefined;
+  members: CollaborationMember[];
+}): {
+  memberRoleMap: GatewayCollaborationGroupOperatingState["memberRoleMap"];
+  governance: {
+    ownerUserId: string | null;
+    adminUserIds: string[];
+    coordinatorBotId: string | null;
+    finalDecisionPolicy: GatewayCollaborationGroupOperatingState["governance"]["finalDecisionPolicy"];
+  };
+} {
+  const adminUserIds = params.members
+    .filter(
+      (member) =>
+        member.memberKind === "human" &&
+        member.governanceRole === "admin" &&
+        member.status !== "removed" &&
+        member.status !== "revoked",
+    )
+    .map((member) => normalizeValue(member.userId))
+    .filter(Boolean) as string[];
+  return {
+    memberRoleMap: params.members
+      .filter((member) => member.status !== "removed" && member.status !== "revoked")
+      .map((member) => ({
+        memberId: member.memberId,
+        memberKind: member.memberKind,
+        label:
+          normalizeValue(member.name) ??
+          normalizeValue(member.userId) ??
+          normalizeValue(member.agentId) ??
+          null,
+        governanceRole: member.governanceRole,
+        collaborationRole: member.collaborationRole ?? null,
+        status: member.status,
+      })),
+    governance: {
+      ownerUserId: normalizeValue(params.profile?.ownerUserId) ?? null,
+      adminUserIds,
+      coordinatorBotId: normalizeValue(params.profile?.coordinatorBotId) ?? null,
+      finalDecisionPolicy: params.profile?.finalDecisionPolicy ?? null,
+    },
+  };
+}
+
+/**
  * T54: persist a sync-built OS draft under the unified auth lock.
  * - Business fields always come from `desired`.
  * - Authorization surface is taken from trusted profile/members projection in
@@ -1020,6 +1078,12 @@ export async function commitSyncedGroupOperatingState(params: {
   baseDir?: string;
   groupRootDir?: string;
   cfg?: ReturnType<typeof loadConfig>;
+  /**
+   * W1: when set, re-read profile+members **under the auth lock** and reproject
+   * the authorization surface before compare/write. Closes lock-external stale
+   * member snapshots that would otherwise re-grant after a concurrent revoke.
+   */
+  groupStorage?: OpenBotGroupStorage;
 }): Promise<GatewayCollaborationGroupOperatingState & { authEpoch: number }> {
   const groupRootDir = resolveOperatingStateAuthLockRoot({
     baseDir: params.baseDir,
@@ -1037,7 +1101,28 @@ export async function commitSyncedGroupOperatingState(params: {
         groupId: params.groupId,
         baseDir: params.baseDir,
       });
-      const desiredSurface = readOperatingStateAuthSurface(params.desired);
+      let desired = params.desired;
+      if (params.groupStorage) {
+        const [profile, members] = await Promise.all([
+          params.groupStorage.readProfile(params.groupId),
+          params.groupStorage.readMembers(params.groupId),
+        ]);
+        const projected = projectOperatingStateAuthFromRoster({ profile, members });
+        desired = {
+          ...params.desired,
+          memberRoleMap: projected.memberRoleMap,
+          governance: {
+            ...params.desired.governance,
+            ownerUserId: projected.governance.ownerUserId,
+            adminUserIds: projected.governance.adminUserIds,
+            coordinatorBotId: projected.governance.coordinatorBotId,
+            finalDecisionPolicy:
+              params.desired.governance?.finalDecisionPolicy ??
+              projected.governance.finalDecisionPolicy,
+          },
+        };
+      }
+      const desiredSurface = readOperatingStateAuthSurface(desired);
       const liveSurface = readOperatingStateAuthSurface(live);
       const authContentChanged =
         !live || !operatingStateAuthContentEqual(desiredSurface, liveSurface);
@@ -1045,7 +1130,7 @@ export async function commitSyncedGroupOperatingState(params: {
         return await writeGroupOperatingState({
           fileStore: params.fileStore,
           groupId: params.groupId,
-          state: params.desired,
+          state: desired,
           baseDir: params.baseDir,
           groupRootDir,
           cfg: params.cfg,
@@ -1056,14 +1141,14 @@ export async function commitSyncedGroupOperatingState(params: {
       if (authContentChanged) {
         const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
         const authIncoming: GatewayCollaborationGroupOperatingState & { authEpoch: number } = {
-          ...params.desired,
+          ...desired,
           authEpoch: nextEpoch,
-          memberRoleMap: params.desired.memberRoleMap,
+          memberRoleMap: desired.memberRoleMap,
           governance: {
-            ...params.desired.governance,
-            ownerUserId: params.desired.governance?.ownerUserId ?? null,
-            adminUserIds: [...(params.desired.governance?.adminUserIds ?? [])],
-            coordinatorBotId: params.desired.governance?.coordinatorBotId ?? null,
+            ...desired.governance,
+            ownerUserId: desired.governance?.ownerUserId ?? null,
+            adminUserIds: [...(desired.governance?.adminUserIds ?? [])],
+            coordinatorBotId: desired.governance?.coordinatorBotId ?? null,
           },
         };
         return await writeGroupOperatingState({
@@ -1080,7 +1165,7 @@ export async function commitSyncedGroupOperatingState(params: {
       return await writeGroupOperatingState({
         fileStore: params.fileStore,
         groupId: params.groupId,
-        state: params.desired,
+        state: desired,
         baseDir: params.baseDir,
         groupRootDir,
         cfg: params.cfg,
@@ -1158,16 +1243,7 @@ export async function syncGroupOperatingState(params: {
     decision?.updatedAt ?? 0,
     bootstrapMemory?.updatedAtMs ?? 0,
   );
-  const adminUserIds = members
-    .filter(
-      (member) =>
-        member.memberKind === "human" &&
-        member.governanceRole === "admin" &&
-        member.status !== "removed" &&
-        member.status !== "revoked",
-    )
-    .map((member) => normalizeValue(member.userId))
-    .filter(Boolean) as string[];
+  const projectedAuth = projectOperatingStateAuthFromRoster({ profile, members });
   const state = (await import("./policy-revision-carry.js")).carryPolicyRevision(existingState, {
     groupId: params.groupId,
     groupProfile: {
@@ -1185,9 +1261,9 @@ export async function syncGroupOperatingState(params: {
       successCriteria: normalizeStringList(profile?.successCriteria),
     },
     governance: {
-      ownerUserId: normalizeValue(profile?.ownerUserId) ?? null,
-      adminUserIds,
-      coordinatorBotId: normalizeValue(profile?.coordinatorBotId) ?? null,
+      ownerUserId: projectedAuth.governance.ownerUserId,
+      adminUserIds: projectedAuth.governance.adminUserIds,
+      coordinatorBotId: projectedAuth.governance.coordinatorBotId,
       finalDecisionPolicy: profile?.finalDecisionPolicy ?? null,
     },
     collaborationPolicy: {
@@ -1204,20 +1280,7 @@ export async function syncGroupOperatingState(params: {
       ...existingState?.collaborationPolicy,
     },
     // Auth surface: omit removed/revoked so leave/revoke cannot linger as mapped.
-    memberRoleMap: members
-      .filter((member) => member.status !== "removed" && member.status !== "revoked")
-      .map((member) => ({
-        memberId: member.memberId,
-        memberKind: member.memberKind,
-        label:
-          normalizeValue(member.name) ??
-          normalizeValue(member.userId) ??
-          normalizeValue(member.agentId) ??
-          null,
-        governanceRole: member.governanceRole,
-        collaborationRole: member.collaborationRole ?? null,
-        status: member.status,
-      })),
+    memberRoleMap: projectedAuth.memberRoleMap,
     activeContext: {
       currentOperatingPhase: phase,
       currentMission: activeMission,
@@ -1264,6 +1327,7 @@ export async function syncGroupOperatingState(params: {
     fileStore: params.fileStore,
     groupId: params.groupId,
     desired: state,
+    groupStorage: params.groupStorage,
   });
   const { syncGroupCharter } = await import("./group-charter.js");
   const { charter, changed: charterChangedFlag } = await syncGroupCharter({
@@ -3134,10 +3198,12 @@ export async function ensureWorkspaceGroupBootstrapArtifacts(params: {
       }
     : syncedOperatingState;
   if (existingOperatingState) {
+    // Business-only follow-up after sync (activeContext carry). Auth is preserved by merge.
     await writeGroupOperatingState({
       fileStore: params.fileStore,
       groupId: params.groupId,
       state: operatingState,
+      writeKind: "business",
     });
   }
 

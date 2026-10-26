@@ -29,6 +29,7 @@ import {
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
   applyAuthRevokeSharedCas,
+  applyRosterAuthChangeSharedCas,
   applyBusinessTaskPatchUnderControlLock,
   applyTaskStopUnderControlLock,
   casClearTaskDispatchClaimForOp,
@@ -88,6 +89,7 @@ import {
   writeGroupOperatingState,
 } from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
+import { leaveGatewayCollaborationSpace } from "./space-store.js";
 import { transitionCollaborationTask } from "./state-machine.js";
 import { requestCollaborationTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
@@ -4890,5 +4892,257 @@ describe("T54 M3 AUTH sync production entry (syncGroupOperatingState)", () => {
         readOperatingStateAuthSurface(after),
       ),
     ).toBe(true);
+  });
+});
+
+describe("W1 AUTH production entry close (roster CAS + stale sync)", () => {
+  function rosterMembers(overrides?: {
+    omitBot0?: boolean;
+    bot0Removed?: boolean;
+    ownerUserId?: string;
+    coordinatorBotId?: string;
+    adminUserId?: string;
+  }): CollaborationMember[] {
+    const owner = overrides?.ownerUserId ?? tenant.owner;
+    const admin = overrides?.adminUserId ?? tenant.admin;
+    const coordinator = overrides?.coordinatorBotId ?? tenant.coordinator;
+    const rows: CollaborationMember[] = [
+      {
+        memberId: owner,
+        memberKind: "human",
+        userId: owner,
+        governanceRole: "owner",
+        status: "active",
+        updatedAtMs: 1,
+      },
+      {
+        memberId: admin,
+        memberKind: "human",
+        userId: admin,
+        governanceRole: "admin",
+        status: "active",
+        updatedAtMs: 1,
+      },
+      {
+        memberId: tenant.approver,
+        memberKind: "human",
+        userId: tenant.approver,
+        governanceRole: "member",
+        status: "active",
+        updatedAtMs: 1,
+      },
+      {
+        memberId: coordinator,
+        memberKind: "bot",
+        agentId: coordinator,
+        governanceRole: "member",
+        status: "active",
+        updatedAtMs: 1,
+      },
+    ];
+    if (!overrides?.omitBot0) {
+      rows.push({
+        memberId: tenant.bot0,
+        memberKind: "bot",
+        agentId: tenant.bot0,
+        governanceRole: "member",
+        status: overrides?.bot0Removed ? "removed" : "active",
+        updatedAtMs: 1,
+      });
+    }
+    return rows;
+  }
+
+  async function seedRoster(params: { cfg: OpenBotConfig; taskId: string }) {
+    const stores = createWorkspaceCollaborationStores(params.cfg);
+    const groupId = tenant.groupId;
+    await stores.groupStorage.writeProfile({
+      groupId,
+      groupCode: groupId,
+      displayName: "w1-auth-entries",
+      ownerUserId: tenant.owner,
+      coordinatorBotId: tenant.coordinator,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    });
+    await stores.groupStorage.writeMembers(groupId, rosterMembers());
+    const seeded = await seed({ cfg: params.cfg, taskId: params.taskId, itemId: "w1" });
+    return { ...seeded, stores };
+  }
+
+  test("W1-ENTRY-1: stale lock-external sync draft cannot re-grant after roster revoke", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-w1-entry-1";
+    const { fileStore, groupId, stores } = await seedRoster({ cfg, taskId });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const auth0 = readOperatingStateAuthEpoch(os0);
+    const staleDesired = {
+      ...(os0 as NonNullable<typeof os0>),
+      updatedAtMs: Date.now(),
+    };
+
+    await stores.groupStorage.writeMembers(groupId, rosterMembers({ bot0Removed: true }));
+    const revoked = await applyRosterAuthChangeSharedCas({
+      groupId,
+      cfg,
+      profile: await stores.groupStorage.readProfile(groupId),
+      members: await stores.groupStorage.readMembers(groupId),
+      invalidateTaskIds: [taskId],
+    });
+    expect(revoked.authEpoch).toBe(auth0 + 1);
+    expect(isMappedDeliveryIdentity(revoked.operatingState, tenant.bot0)).toBe(false);
+
+    // Stale draft still lists bot0, but groupStorage reproject under lock must win.
+    const returned = await commitSyncedGroupOperatingState({
+      fileStore,
+      groupId,
+      desired: staleDesired,
+      groupStorage: stores.groupStorage,
+      cfg,
+    });
+    expect(isMappedDeliveryIdentity(returned, tenant.bot0)).toBe(false);
+    expect((returned.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(returned)).toBeGreaterThanOrEqual(revoked.authEpoch);
+
+    const persisted = await readGroupOperatingState({ fileStore, groupId });
+    expect(isMappedDeliveryIdentity(persisted, tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(persisted)).toBe(readOperatingStateAuthEpoch(returned));
+
+    const recheck = await recheckCurrentDispatchAuthorization({
+      groupId,
+      taskId,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(recheck.ok).toBe(false);
+    expect(recheck.reason).toBe("auth_revoked");
+  });
+
+  test("W1-ENTRY-2: production leave entry drops actor mapping + bumps authEpoch", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-w1-entry-2";
+    const { fileStore, groupId, stores } = await seedRoster({ cfg, taskId });
+    const auth0 = readOperatingStateAuthEpoch(
+      await readGroupOperatingState({ fileStore, groupId }),
+    );
+    expect(
+      isMappedDeliveryIdentity(
+        await readGroupOperatingState({ fileStore, groupId }),
+        tenant.approver,
+      ),
+    ).toBe(true);
+
+    const left = await leaveGatewayCollaborationSpace({
+      groupId,
+      actor: tenant.approver,
+    });
+    expect(left.left).toBe(true);
+    expect(
+      (left.space.operatingState?.memberRoleMap ?? []).some((r) => r.memberId === tenant.approver),
+    ).toBe(false);
+
+    const persisted = await readGroupOperatingState({ fileStore, groupId });
+    expect(isMappedDeliveryIdentity(persisted, tenant.approver)).toBe(false);
+    expect(readOperatingStateAuthEpoch(persisted)).toBeGreaterThan(auth0);
+
+    const members = await stores.groupStorage.readMembers(groupId);
+    const approver = members.find((m) => m.memberId === tenant.approver);
+    expect(approver?.status).toBe("removed");
+  });
+
+  test("W1-ENTRY-3: direct business OS write cannot restore revoked member after roster CAS", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-w1-entry-3";
+    const { fileStore, groupId, stores } = await seedRoster({ cfg, taskId });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const stale = {
+      ...(os0 as NonNullable<typeof os0>),
+      activeContext: {
+        ...(os0 as NonNullable<typeof os0>).activeContext,
+        summary: "w1-entry-3-stale-biz",
+      },
+      updatedAtMs: Date.now(),
+    };
+
+    await stores.groupStorage.writeMembers(groupId, rosterMembers({ omitBot0: true }));
+    const revoked = await applyRosterAuthChangeSharedCas({
+      groupId,
+      cfg,
+      profile: await stores.groupStorage.readProfile(groupId),
+      members: await stores.groupStorage.readMembers(groupId),
+    });
+    expect(isMappedDeliveryIdentity(revoked.operatingState, tenant.bot0)).toBe(false);
+
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      cfg,
+      state: stale,
+      writeKind: "business",
+    });
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(finalOs?.activeContext?.summary).toBe("w1-entry-3-stale-biz");
+    expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(revoked.authEpoch);
+  });
+
+  test("W1-ENTRY-4: concurrent legal owner sync vs stale business — auth kept, business retained", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-w1-entry-4";
+    const newOwner = `${tenant.tenantId}/emp-owner-w1`;
+    const { fileStore, groupId, stores } = await seedRoster({ cfg, taskId });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const auth0 = readOperatingStateAuthEpoch(os0);
+    const staleBiz = {
+      ...(os0 as NonNullable<typeof os0>),
+      activeContext: {
+        ...(os0 as NonNullable<typeof os0>).activeContext,
+        summary: "w1-entry-4-stale",
+      },
+      updatedAtMs: Date.now(),
+    };
+
+    await stores.groupStorage.writeProfile({
+      groupId,
+      groupCode: groupId,
+      displayName: "w1-auth-entries",
+      ownerUserId: newOwner,
+      coordinatorBotId: tenant.coordinator,
+      createdAtMs: 1,
+      updatedAtMs: Date.now(),
+    });
+    await stores.groupStorage.writeMembers(groupId, rosterMembers({ ownerUserId: newOwner }));
+    await applyRosterAuthChangeSharedCas({
+      groupId,
+      cfg,
+      profile: await stores.groupStorage.readProfile(groupId),
+      members: await stores.groupStorage.readMembers(groupId),
+    });
+
+    const [synced] = await Promise.all([
+      syncGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupStorage: stores.groupStorage,
+        metadataStorage: stores.metadataStorage,
+        memoryStorage: stores.memoryStorage,
+        learningStorage: stores.learningStorage,
+        objectStorage: stores.objectStorage,
+        groupId,
+      }),
+      writeGroupOperatingState({
+        fileStore,
+        groupId,
+        cfg,
+        state: staleBiz,
+        writeKind: "business",
+      }),
+    ]);
+
+    expect(synced.governance.ownerUserId).toBe(newOwner);
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(finalOs?.governance?.ownerUserId).toBe(newOwner);
+    expect(readOperatingStateAuthEpoch(finalOs)).toBeGreaterThan(auth0);
+    // Late business write after auth may land summary; either way auth must hold.
+    expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(true);
   });
 });

@@ -26,11 +26,13 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
+import type { CollaborationMember } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import type { GatewayCollaborationGroupOperatingState } from "../collaboration-learning/operating-state-types.js";
 import {
   createWorkspaceCollaborationStores,
+  projectOperatingStateAuthFromRoster,
   readGroupOperatingState,
   readOperatingStateAuthEpoch,
   resolveGroupWorkspacePath,
@@ -164,138 +166,138 @@ export async function casCommitTaskDispatchEligibility(
     cfg,
     fn: async () =>
       withTaskControlLock({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-    fn: async () => {
-      let current: Task | null;
-      try {
-        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-        current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
-      } catch (error) {
-        return {
-          ok: false,
-          reason: "task_control_unreadable",
-          detail: `task read failed during eligibility CAS: ${String(error)}`,
-        };
-      }
-      if (!current) {
-        return { ok: false, reason: "task_missing", detail: "task missing at eligibility CAS" };
-      }
-      const governed = asGovernedTask(current);
-      if (isTaskStopAccepted(governed)) {
-        return {
-          ok: false,
-          reason: "task_stopped",
-          detail: "task already stopped at eligibility CAS",
-          task: governed,
-        };
-      }
-      const liveEpoch = readControlEpoch(governed);
-      if (liveEpoch !== expected) {
-        return {
-          ok: false,
-          reason: "epoch_mismatch",
-          detail: `expected controlEpoch ${expected}, live ${liveEpoch}`,
-          task: governed,
-        };
-      }
+        groupId: params.groupId,
+        taskId: params.taskId,
+        cfg,
+        fn: async () => {
+          let current: Task | null;
+          try {
+            const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+            current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+          } catch (error) {
+            return {
+              ok: false,
+              reason: "task_control_unreadable",
+              detail: `task read failed during eligibility CAS: ${String(error)}`,
+            };
+          }
+          if (!current) {
+            return { ok: false, reason: "task_missing", detail: "task missing at eligibility CAS" };
+          }
+          const governed = asGovernedTask(current);
+          if (isTaskStopAccepted(governed)) {
+            return {
+              ok: false,
+              reason: "task_stopped",
+              detail: "task already stopped at eligibility CAS",
+              task: governed,
+            };
+          }
+          const liveEpoch = readControlEpoch(governed);
+          if (liveEpoch !== expected) {
+            return {
+              ok: false,
+              reason: "epoch_mismatch",
+              detail: `expected controlEpoch ${expected}, live ${liveEpoch}`,
+              task: governed,
+            };
+          }
 
-      // T51: re-read OS authEpoch (+ fingerprint) under the same lock window so a
-      // revoke that raced after the caller's observation cannot be stamped eligible.
-      // authEpoch is the shared version condition; fingerprint remains secondary.
-      let liveFp = wantFp;
-      let liveAuthEpoch = expectedAuth;
-      try {
-        const { fileStore } = createWorkspaceCollaborationStores(cfg);
-        const os = await readGroupOperatingState({
-          fileStore,
-          groupId: params.groupId,
-        });
-        liveAuthEpoch = readOperatingStateAuthEpoch(os);
-        if (params._testForceLiveAuthFingerprint !== undefined) {
-          liveFp = compact(params._testForceLiveAuthFingerprint);
-        } else if (params.targetActorIds && params.targetActorIds.length > 0) {
-          liveFp = wakeOpAuthFingerprint(os, params.targetActorIds);
-        }
-      } catch (error) {
-        return {
-          ok: false,
-          reason: "auth_source_unreadable",
-          detail: `auth source unreadable during eligibility CAS: ${String(error)}`,
-          task: governed,
-        };
-      }
-      if (params._testAfterOsReadBarrier) {
-        await params._testAfterOsReadBarrier();
-      }
-      if (liveAuthEpoch !== expectedAuth) {
-        return {
-          ok: false,
-          reason: "auth_epoch_mismatch",
-          detail: `expected authEpoch ${expectedAuth}, live ${liveAuthEpoch}`,
-          task: governed,
-        };
-      }
-      if (
-        (params.targetActorIds && params.targetActorIds.length > 0) ||
-        params._testForceLiveAuthFingerprint !== undefined
-      ) {
-        if (compact(liveFp) !== wantFp) {
-          return {
-            ok: false,
-            reason: "auth_fingerprint_mismatch",
-            detail: "auth fingerprint changed before eligibility CAS commit",
-            task: governed,
+          // T51: re-read OS authEpoch (+ fingerprint) under the same lock window so a
+          // revoke that raced after the caller's observation cannot be stamped eligible.
+          // authEpoch is the shared version condition; fingerprint remains secondary.
+          let liveFp = wantFp;
+          let liveAuthEpoch = expectedAuth;
+          try {
+            const { fileStore } = createWorkspaceCollaborationStores(cfg);
+            const os = await readGroupOperatingState({
+              fileStore,
+              groupId: params.groupId,
+            });
+            liveAuthEpoch = readOperatingStateAuthEpoch(os);
+            if (params._testForceLiveAuthFingerprint !== undefined) {
+              liveFp = compact(params._testForceLiveAuthFingerprint);
+            } else if (params.targetActorIds && params.targetActorIds.length > 0) {
+              liveFp = wakeOpAuthFingerprint(os, params.targetActorIds);
+            }
+          } catch (error) {
+            return {
+              ok: false,
+              reason: "auth_source_unreadable",
+              detail: `auth source unreadable during eligibility CAS: ${String(error)}`,
+              task: governed,
+            };
+          }
+          if (params._testAfterOsReadBarrier) {
+            await params._testAfterOsReadBarrier();
+          }
+          if (liveAuthEpoch !== expectedAuth) {
+            return {
+              ok: false,
+              reason: "auth_epoch_mismatch",
+              detail: `expected authEpoch ${expectedAuth}, live ${liveAuthEpoch}`,
+              task: governed,
+            };
+          }
+          if (
+            (params.targetActorIds && params.targetActorIds.length > 0) ||
+            params._testForceLiveAuthFingerprint !== undefined
+          ) {
+            if (compact(liveFp) !== wantFp) {
+              return {
+                ok: false,
+                reason: "auth_fingerprint_mismatch",
+                detail: "auth fingerprint changed before eligibility CAS commit",
+                task: governed,
+              };
+            }
+          }
+
+          // Single-claim model: one valid claim per task. Do not overwrite another op's
+          // committed/taken claim; same-op retry must not reset taken → committed.
+          const existing = governed.dispatchClaim;
+          if (existing) {
+            const existingOp = compact(existing.opKey);
+            if (existingOp && existingOp !== opKey) {
+              return {
+                ok: false,
+                reason: "claim_held",
+                detail: `task already holds dispatchClaim for op ${existing.opKey} (phase=${existing.phase})`,
+                task: governed,
+              };
+            }
+            if (existingOp === opKey && existing.phase === "taken") {
+              // Idempotent: keep taken; never reset to committed.
+              return { ok: true, task: governed, claim: existing };
+            }
+            if (existingOp === opKey && existing.phase === "committed") {
+              // Idempotent same-op retry of committed claim.
+              return { ok: true, task: governed, claim: existing };
+            }
+          }
+
+          const attempt = compact(params.executionAttemptId) || undefined;
+          const claim: TaskDispatchClaim = {
+            claimId: randomUUID(),
+            opKey,
+            controlEpoch: liveEpoch,
+            authEpoch: liveAuthEpoch,
+            authFingerprint: wantFp,
+            committedAtMs: nowMs,
+            phase: "committed",
+            ...(attempt ? { executionAttemptId: attempt } : {}),
           };
-        }
-      }
-
-      // Single-claim model: one valid claim per task. Do not overwrite another op's
-      // committed/taken claim; same-op retry must not reset taken → committed.
-      const existing = governed.dispatchClaim;
-      if (existing) {
-        const existingOp = compact(existing.opKey);
-        if (existingOp && existingOp !== opKey) {
-          return {
-            ok: false,
-            reason: "claim_held",
-            detail: `task already holds dispatchClaim for op ${existing.opKey} (phase=${existing.phase})`,
-            task: governed,
+          const updated: GovernedTask = {
+            ...governed,
+            controlEpoch: liveEpoch,
+            dispatchClaim: claim,
+            updatedAtMs: nowMs,
           };
-        }
-        if (existingOp === opKey && existing.phase === "taken") {
-          // Idempotent: keep taken; never reset to committed.
-          return { ok: true, task: governed, claim: existing };
-        }
-        if (existingOp === opKey && existing.phase === "committed") {
-          // Idempotent same-op retry of committed claim.
-          return { ok: true, task: governed, claim: existing };
-        }
-      }
-
-      const attempt = compact(params.executionAttemptId) || undefined;
-      const claim: TaskDispatchClaim = {
-        claimId: randomUUID(),
-        opKey,
-        controlEpoch: liveEpoch,
-        authEpoch: liveAuthEpoch,
-        authFingerprint: wantFp,
-        committedAtMs: nowMs,
-        phase: "committed",
-        ...(attempt ? { executionAttemptId: attempt } : {}),
-      };
-      const updated: GovernedTask = {
-        ...governed,
-        controlEpoch: liveEpoch,
-        dispatchClaim: claim,
-        updatedAtMs: nowMs,
-      };
-      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
-      return { ok: true, task: updated, claim };
-    },
-  }),
+          const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+          await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+          return { ok: true, task: updated, claim };
+        },
+      }),
   });
 }
 
@@ -357,139 +359,143 @@ export async function casTakeTaskDispatchEligibility(
     cfg,
     fn: async () =>
       withTaskControlLock({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-    fn: async () => {
-      let current: Task | null;
-      try {
-        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-        current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
-      } catch (error) {
-        return {
-          ok: false,
-          reason: "task_control_unreadable",
-          detail: `task read failed during eligibility take: ${String(error)}`,
-        };
-      }
-      if (!current) {
-        return { ok: false, reason: "task_missing", detail: "task missing at eligibility take" };
-      }
-      const governed = asGovernedTask(current);
-      if (isTaskStopAccepted(governed)) {
-        return {
-          ok: false,
-          reason: "task_stopped",
-          detail: "task stopped before dispatch take",
-          task: governed,
-        };
-      }
-      const claim = governed.dispatchClaim;
-      if (!claim) {
-        return {
-          ok: false,
-          reason: "claim_missing",
-          detail: "no task dispatchClaim to take",
-          task: governed,
-        };
-      }
-      if (compact(claim.opKey) !== opKey) {
-        return {
-          ok: false,
-          reason: "claim_op_mismatch",
-          detail: `dispatchClaim opKey mismatch: ${claim.opKey} vs ${opKey}`,
-          task: governed,
-        };
-      }
-      const wantClaimId = compact(params.claimId);
-      if (!wantClaimId || compact(claim.claimId) !== wantClaimId) {
-        return {
-          ok: false,
-          reason: "claim_id_mismatch",
-          detail: `dispatchClaim claimId mismatch: ${claim.claimId ?? "<missing>"} vs ${wantClaimId || "<missing>"}`,
-          task: governed,
-        };
-      }
-      const liveEpoch = readControlEpoch(governed);
-      if (liveEpoch !== claim.controlEpoch) {
-        return {
-          ok: false,
-          reason: "epoch_mismatch",
-          detail: `claim epoch ${claim.controlEpoch} != live ${liveEpoch}`,
-          task: governed,
-        };
-      }
-      if (claim.phase === "taken") {
-        return {
-          ok: false,
-          reason: "already_taken",
-          detail: "dispatchClaim already taken",
-          task: governed,
-        };
-      }
+        groupId: params.groupId,
+        taskId: params.taskId,
+        cfg,
+        fn: async () => {
+          let current: Task | null;
+          try {
+            const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+            current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+          } catch (error) {
+            return {
+              ok: false,
+              reason: "task_control_unreadable",
+              detail: `task read failed during eligibility take: ${String(error)}`,
+            };
+          }
+          if (!current) {
+            return {
+              ok: false,
+              reason: "task_missing",
+              detail: "task missing at eligibility take",
+            };
+          }
+          const governed = asGovernedTask(current);
+          if (isTaskStopAccepted(governed)) {
+            return {
+              ok: false,
+              reason: "task_stopped",
+              detail: "task stopped before dispatch take",
+              task: governed,
+            };
+          }
+          const claim = governed.dispatchClaim;
+          if (!claim) {
+            return {
+              ok: false,
+              reason: "claim_missing",
+              detail: "no task dispatchClaim to take",
+              task: governed,
+            };
+          }
+          if (compact(claim.opKey) !== opKey) {
+            return {
+              ok: false,
+              reason: "claim_op_mismatch",
+              detail: `dispatchClaim opKey mismatch: ${claim.opKey} vs ${opKey}`,
+              task: governed,
+            };
+          }
+          const wantClaimId = compact(params.claimId);
+          if (!wantClaimId || compact(claim.claimId) !== wantClaimId) {
+            return {
+              ok: false,
+              reason: "claim_id_mismatch",
+              detail: `dispatchClaim claimId mismatch: ${claim.claimId ?? "<missing>"} vs ${wantClaimId || "<missing>"}`,
+              task: governed,
+            };
+          }
+          const liveEpoch = readControlEpoch(governed);
+          if (liveEpoch !== claim.controlEpoch) {
+            return {
+              ok: false,
+              reason: "epoch_mismatch",
+              detail: `claim epoch ${claim.controlEpoch} != live ${liveEpoch}`,
+              task: governed,
+            };
+          }
+          if (claim.phase === "taken") {
+            return {
+              ok: false,
+              reason: "already_taken",
+              detail: "dispatchClaim already taken",
+              task: governed,
+            };
+          }
 
-      let liveFp = compact(claim.authFingerprint);
-      let liveAuthEpoch = readClaimAuthEpoch(claim);
-      try {
-        const { fileStore } = createWorkspaceCollaborationStores(cfg);
-        const os = await readGroupOperatingState({
-          fileStore,
-          groupId: params.groupId,
-        });
-        liveAuthEpoch = readOperatingStateAuthEpoch(os);
-        if (params._testForceLiveAuthFingerprint !== undefined) {
-          liveFp = compact(params._testForceLiveAuthFingerprint);
-        } else if (params.targetActorIds && params.targetActorIds.length > 0) {
-          liveFp = wakeOpAuthFingerprint(os, params.targetActorIds);
-        }
-      } catch (error) {
-        return {
-          ok: false,
-          reason: "auth_source_unreadable",
-          detail: `auth source unreadable during eligibility take: ${String(error)}`,
-          task: governed,
-        };
-      }
-      if (params._testAfterOsReadBarrier) {
-        await params._testAfterOsReadBarrier();
-      }
-      if (liveAuthEpoch !== readClaimAuthEpoch(claim)) {
-        return {
-          ok: false,
-          reason: "auth_epoch_mismatch",
-          detail: `claim authEpoch ${readClaimAuthEpoch(claim)} != live ${liveAuthEpoch}`,
-          task: governed,
-        };
-      }
-      if (
-        (params.targetActorIds && params.targetActorIds.length > 0) ||
-        params._testForceLiveAuthFingerprint !== undefined
-      ) {
-        if (compact(liveFp) !== compact(claim.authFingerprint)) {
-          return {
-            ok: false,
-            reason: "auth_fingerprint_mismatch",
-            detail: "auth fingerprint changed before dispatch take",
-            task: governed,
+          let liveFp = compact(claim.authFingerprint);
+          let liveAuthEpoch = readClaimAuthEpoch(claim);
+          try {
+            const { fileStore } = createWorkspaceCollaborationStores(cfg);
+            const os = await readGroupOperatingState({
+              fileStore,
+              groupId: params.groupId,
+            });
+            liveAuthEpoch = readOperatingStateAuthEpoch(os);
+            if (params._testForceLiveAuthFingerprint !== undefined) {
+              liveFp = compact(params._testForceLiveAuthFingerprint);
+            } else if (params.targetActorIds && params.targetActorIds.length > 0) {
+              liveFp = wakeOpAuthFingerprint(os, params.targetActorIds);
+            }
+          } catch (error) {
+            return {
+              ok: false,
+              reason: "auth_source_unreadable",
+              detail: `auth source unreadable during eligibility take: ${String(error)}`,
+              task: governed,
+            };
+          }
+          if (params._testAfterOsReadBarrier) {
+            await params._testAfterOsReadBarrier();
+          }
+          if (liveAuthEpoch !== readClaimAuthEpoch(claim)) {
+            return {
+              ok: false,
+              reason: "auth_epoch_mismatch",
+              detail: `claim authEpoch ${readClaimAuthEpoch(claim)} != live ${liveAuthEpoch}`,
+              task: governed,
+            };
+          }
+          if (
+            (params.targetActorIds && params.targetActorIds.length > 0) ||
+            params._testForceLiveAuthFingerprint !== undefined
+          ) {
+            if (compact(liveFp) !== compact(claim.authFingerprint)) {
+              return {
+                ok: false,
+                reason: "auth_fingerprint_mismatch",
+                detail: "auth fingerprint changed before dispatch take",
+                task: governed,
+              };
+            }
+          }
+
+          const taken: TaskDispatchClaim = {
+            ...claim,
+            phase: "taken",
+            takenAtMs: nowMs,
           };
-        }
-      }
-
-      const taken: TaskDispatchClaim = {
-        ...claim,
-        phase: "taken",
-        takenAtMs: nowMs,
-      };
-      const updated: GovernedTask = {
-        ...governed,
-        dispatchClaim: taken,
-        updatedAtMs: nowMs,
-      };
-      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
-      return { ok: true, task: updated, claim: taken };
-    },
-  }),
+          const updated: GovernedTask = {
+            ...governed,
+            dispatchClaim: taken,
+            updatedAtMs: nowMs,
+          };
+          const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+          await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+          return { ok: true, task: updated, claim: taken };
+        },
+      }),
   });
 }
 
@@ -781,9 +787,7 @@ export async function applyAuthRevokeSharedCas(params: {
    * concurrent revokes can observe the same stale snapshot), before acquiring
    * the lock / re-read / write. Stable counterexample for lost concurrent revoke.
    */
-  _testAfterInitialReadBeforeLock?: (
-    state: OperatingStateWithAuthEpoch,
-  ) => void | Promise<void>;
+  _testAfterInitialReadBeforeLock?: (state: OperatingStateWithAuthEpoch) => void | Promise<void>;
   /** Test-only: after re-read under auth lock, before mutate/write. */
   _testAfterOsReadUnderLock?: (state: OperatingStateWithAuthEpoch) => void | Promise<void>;
 }): Promise<{
@@ -893,4 +897,59 @@ export async function applyAuthRevokeSharedCas(params: {
 
 export function _testTaskControlCasYieldMs(): number {
   return LOCK_RETRY_MS;
+}
+
+/**
+ * W1 production roster → OS auth entry: project profile+members into OS under
+ * `applyAuthRevokeSharedCas` (writeKind auth + bump authEpoch + optional task
+ * claim invalidation). Call **after** durable members/profile writes, then
+ * `syncGroupOperatingState` for business fields (auth content should match).
+ */
+export async function applyRosterAuthChangeSharedCas(params: {
+  groupId: string;
+  cfg?: OpenBotConfig;
+  nowMs?: number;
+  profile:
+    | {
+        ownerUserId?: string | null;
+        coordinatorBotId?: string | null;
+        finalDecisionPolicy?: OperatingStateWithAuthEpoch["governance"]["finalDecisionPolicy"];
+      }
+    | null
+    | undefined;
+  members: CollaborationMember[];
+  invalidateTaskIds?: readonly string[];
+  bumpTaskControlEpoch?: boolean;
+}): Promise<{
+  authEpoch: number;
+  operatingState: OperatingStateWithAuthEpoch;
+  invalidatedTasks: Array<{
+    taskId: string;
+    controlEpoch: number;
+    clearedClaim: boolean;
+  }>;
+}> {
+  const projected = projectOperatingStateAuthFromRoster({
+    profile: params.profile,
+    members: params.members,
+  });
+  return applyAuthRevokeSharedCas({
+    groupId: params.groupId,
+    cfg: params.cfg,
+    nowMs: params.nowMs,
+    invalidateTaskIds: params.invalidateTaskIds,
+    bumpTaskControlEpoch: params.bumpTaskControlEpoch,
+    mutate: (state) => ({
+      ...state,
+      memberRoleMap: projected.memberRoleMap,
+      governance: {
+        ...state.governance,
+        ownerUserId: projected.governance.ownerUserId,
+        adminUserIds: projected.governance.adminUserIds,
+        coordinatorBotId: projected.governance.coordinatorBotId,
+        finalDecisionPolicy:
+          state.governance?.finalDecisionPolicy ?? projected.governance.finalDecisionPolicy,
+      },
+    }),
+  });
 }
