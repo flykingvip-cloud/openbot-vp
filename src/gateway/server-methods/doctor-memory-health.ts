@@ -2,8 +2,10 @@ import path from "node:path";
 import { resolveMemorySearchConfig } from "../../agents/memory-search.js";
 import { resolveDefaultAgentWorkspaceDir } from "../../agents/workspace.js";
 import { loadConfig } from "../../config/config.js";
+import { resolveDataRoot, resolvePortableCanonicalStorePath } from "../../config/data-space.js";
 import { resolveStateDir } from "../../config/paths.js";
 import { resolveCommitHash } from "../../infra/git-commit.js";
+import { resolveMemoryBackendConfig } from "../../memory/backend-config.js";
 import { resolveProbeModuleSha } from "../../memory/health-probe-build-info.js";
 import { runOpsHealthProbe, type RunOpsHealthProbeResult } from "../../memory/health-probe-run.js";
 import type { MemoryHealthProbeAgentInput } from "../../memory/health-probe.js";
@@ -74,6 +76,42 @@ export function buildMemoryProbeAgentInput(
   agentId: string,
 ): MemoryHealthProbeAgentInput {
   const workspaceRoot = healthProbeAgentWorkspaceRoot(cfg, agentId);
+  const resolved = resolveMemoryBackendConfig({ cfg, agentId });
+  const configuredBackend = resolved.backend;
+
+  if (configuredBackend === "cogniweave") {
+    // Read-only path resolve only — never ensurePortableCanonicalStore / migrate / mkdir.
+    const explicit = resolved.cogniweave?.storePath?.trim();
+    const indexPath = explicit
+      ? resolveUserPath(explicit)
+      : resolvePortableCanonicalStorePath(resolveDataRoot(cfg));
+    const cogniweaveMode = resolved.cogniweave?.mode === "rest" ? "rest" : "embedded";
+    return {
+      agentId,
+      workspaceRoot,
+      indexPath,
+      backend: "cogniweave",
+      configuredBackend: "cogniweave",
+      cogniweaveMode,
+      // Complete CogniWeave scope is not available from agentId alone — leave count null.
+      scopeCountTrusted: false,
+      scopedDocumentCount: null,
+    };
+  }
+
+  if (configuredBackend === "qmd") {
+    const collections = resolved.qmd?.collections ?? [];
+    return {
+      agentId,
+      workspaceRoot,
+      // QMD does not use builtin agent sqlite; keep a non-created sentinel under workspace.
+      indexPath: path.join(workspaceRoot, ".openbot-qmd-probe-sentinel"),
+      backend: "qmd",
+      configuredBackend: "qmd",
+      qmdCollectionPaths: collections.map((collection) => collection.path),
+    };
+  }
+
   const memorySearch = resolveMemorySearchConfig(cfg, agentId);
   const indexPath = memorySearch
     ? resolveUserPath(memorySearch.store.path)
@@ -83,6 +121,7 @@ export function buildMemoryProbeAgentInput(
     workspaceRoot,
     indexPath,
     backend: memorySearch ? "builtin" : "unknown",
+    configuredBackend: "builtin",
   };
 }
 
