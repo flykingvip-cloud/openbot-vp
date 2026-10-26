@@ -39,7 +39,7 @@ export function isGatewayRejectError(err: unknown): boolean {
   if (typeof e.gatewayCode === "string" && e.gatewayCode.length > 0) {
     return true;
   }
-  const message = typeof e.message === "string" ? e.message : String(err);
+  const message = typeof e.message === "string" ? e.message : "";
   return isGatewayRejectMessage(message);
 }
 
@@ -52,9 +52,7 @@ export function isGatewayRejectMessage(message: string): boolean {
   if (/^gateway\b/i.test(text)) {
     return true;
   }
-  if (
-    /\bgateway (closed|timeout|url|remote|not connected|request failed)\b/i.test(text)
-  ) {
+  if (/\bgateway (closed|timeout|url|remote|not connected|request failed)\b/i.test(text)) {
     return true;
   }
   if (/\b(gateway token mismatch|device token mismatch)\b/i.test(text)) {
@@ -75,12 +73,7 @@ export function classifyCliError(err: unknown): CliErrorKind {
   if (isGatewayRejectError(err)) {
     return "gateway_reject";
   }
-  const message =
-    err instanceof Error
-      ? err.message
-      : typeof err === "string"
-        ? err
-        : String(err ?? "");
+  const message = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (/^usage:/i.test(message) || /^error:\s/i.test(message)) {
     return "usage";
   }
@@ -97,9 +90,7 @@ export function classifyCliError(err: unknown): CliErrorKind {
 }
 
 export function stripCliErrorPrefix(message: string): string {
-  return message
-    .replace(/^(usage|gateway reject|gateway|error):\s*/i, "")
-    .trim();
+  return message.replace(/^(usage|gateway reject|gateway|error):\s*/i, "").trim();
 }
 
 export function formatCliErrorMessage(kind: CliErrorKind, message: string): string {

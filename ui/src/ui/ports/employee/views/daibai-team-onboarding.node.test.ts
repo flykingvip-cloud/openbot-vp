@@ -363,7 +363,9 @@ describe("daibai team onboarding surface", () => {
     expect(host.querySelector('[data-team-gaps="email"]')).toBeTruthy();
     host.querySelector<HTMLButtonElement>('[data-team-gap-cta="oauth_authorize"]')?.click();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(apply.mock.calls[0]?.[0]).toBe("oauth_authorize");
+    expect((apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[0]).toBe(
+      "oauth_authorize",
+    );
     expect(dismiss).toHaveBeenCalledTimes(1);
   });
 
@@ -440,14 +442,20 @@ describe("daibai team onboarding surface", () => {
     await Promise.resolve();
 
     expect(submit).toHaveBeenCalledTimes(1);
-    expect(submit.mock.calls[0]?.[0]).toMatchObject({
+    expect(
+      (submit.mock.calls as unknown as ReadonlyArray<[Record<string, unknown>]>)[0]?.[0],
+    ).toMatchObject({
       mcpServer: "hubspot-crm",
       mcpTool: "list_leads",
       discoveryStatusSnapshot: "unmapped",
       catalogId: "crm",
       templateId: "sales_assistant",
     });
-    expect(submit.mock.calls[0]?.[0].clientRequestId).toContain("hubspot-crm");
+    expect(
+      (
+        submit.mock.calls as unknown as ReadonlyArray<ReadonlyArray<{ clientRequestId?: string }>>
+      )[0]?.[0]?.clientRequestId,
+    ).toContain("hubspot-crm");
     expect(apply).not.toHaveBeenCalled();
     expect(host.querySelector("[data-scan-submit-success='apr-mcp-1']")?.textContent).toContain(
       "已提交申请 #apr-mcp-1",
@@ -456,8 +464,12 @@ describe("daibai team onboarding surface", () => {
     // Secondary EDC deeplink still available (admin Save); still no grant.
     host.querySelector<HTMLButtonElement>("[data-team-scan-edc]")?.click();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(apply.mock.calls[0]?.[0]).toBe("mcp_scan_apply");
-    expect(apply.mock.calls[0]?.[3]).toMatchObject({
+    expect((apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[0]).toBe(
+      "mcp_scan_apply",
+    );
+    expect(
+      (apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[3],
+    ).toMatchObject({
       mcpServer: "hubspot-crm",
       mcpTool: "list_leads",
       edc: "capabilities",
@@ -571,7 +583,7 @@ describe("daibai team onboarding surface", () => {
     expect(applicationsView).not.toContain("grants.upsert");
     expect(applicationsView).not.toContain("approve_and_provision");
 
-    let releaseRefresh: ((value: unknown) => void) | null = null;
+    const refreshGate: { release: ((value: unknown) => void) | null } = { release: null };
     let listCalls = 0;
     const list = vi.fn(async () => {
       listCalls += 1;
@@ -589,7 +601,9 @@ describe("daibai team onboarding surface", () => {
         };
       }
       return await new Promise((resolve) => {
-        releaseRefresh = resolve;
+        refreshGate.release = (value: unknown) => {
+          resolve(value);
+        };
       });
     });
     const cancel = vi.fn(async () => undefined);
@@ -664,7 +678,11 @@ describe("daibai team onboarding surface", () => {
     expect(optimistic?.textContent).toContain("已提交");
     expect(optimistic?.textContent).toContain("hubspot-crm / list_leads");
 
-    releaseRefresh?.({
+    const releaseRefresh = refreshGate.release;
+    if (!releaseRefresh) {
+      throw new Error("refresh not armed");
+    }
+    releaseRefresh({
       requests: [
         {
           approvalId: "apr-new",
@@ -727,8 +745,12 @@ describe("daibai team onboarding surface", () => {
 
     host.querySelector<HTMLButtonElement>("[data-team-my-application-edc='apr-new']")?.click();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(apply.mock.calls[0]?.[0]).toBe("mcp_scan_apply");
-    expect(apply.mock.calls[0]?.[3]).toMatchObject({
+    expect((apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[0]).toBe(
+      "mcp_scan_apply",
+    );
+    expect(
+      (apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[3],
+    ).toMatchObject({
       mcpServer: "hubspot-crm",
       mcpTool: "list_leads",
       edc: "capabilities",
@@ -817,15 +839,25 @@ describe("daibai team onboarding surface", () => {
     await flushPaints();
 
     expect(submit).toHaveBeenCalledTimes(1);
-    expect(submit.mock.calls[0]?.[0]).toMatchObject({
+    expect(
+      (submit.mock.calls as unknown as ReadonlyArray<[Record<string, unknown>]>)[0]?.[0],
+    ).toMatchObject({
       identityScope: "personal",
       identityId: "id-mail",
       targetAgentId: "agent-email",
       catalogId: "email",
       templateId: "personal_mail_assistant",
     });
-    expect(submit.mock.calls[0]?.[0].clientRequestId).toContain("id-mail");
-    expect(submit.mock.calls[0]?.[0].clientRequestId).not.toContain("oi_personal_mail");
+    expect(
+      (
+        submit.mock.calls as unknown as ReadonlyArray<ReadonlyArray<{ clientRequestId?: string }>>
+      )[0]?.[0]?.clientRequestId,
+    ).toContain("id-mail");
+    expect(
+      (
+        submit.mock.calls as unknown as ReadonlyArray<ReadonlyArray<{ clientRequestId?: string }>>
+      )[0]?.[0]?.clientRequestId,
+    ).not.toContain("oi_personal_mail");
     expect(apply).not.toHaveBeenCalled();
     expect(host.querySelector("[data-oi-submit-success='apr-oi-1']")?.textContent).toContain(
       "已提交申请 #apr-oi-1",
@@ -838,7 +870,9 @@ describe("daibai team onboarding surface", () => {
     host.querySelector<HTMLButtonElement>('[data-team-oi-submit="apply_enterprise_oi"]')?.click();
     await flushPaints();
     expect(submit).toHaveBeenCalledTimes(2);
-    expect(submit.mock.calls[1]?.[0]).toMatchObject({
+    expect(
+      (submit.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[1]?.[0],
+    ).toMatchObject({
       identityScope: "enterprise",
       identityId: "ent-crm",
       targetAgentId: "agent-crm",
@@ -849,7 +883,9 @@ describe("daibai team onboarding surface", () => {
 
     host.querySelector<HTMLButtonElement>('[data-team-oi-open="apply_personal_oi"]')?.click();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(apply.mock.calls[0]?.[0]).toBe("apply_personal_oi");
+    expect((apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[0]).toBe(
+      "apply_personal_oi",
+    );
   });
 
   it("shows a zh-CN error and does not create when the operational identity id is missing", async () => {
@@ -886,7 +922,9 @@ describe("daibai team onboarding surface", () => {
 
     host.querySelector<HTMLButtonElement>('[data-team-oi-open="apply_personal_oi"]')?.click();
     expect(apply).toHaveBeenCalledTimes(1);
-    expect(apply.mock.calls[0]?.[0]).toBe("apply_personal_oi");
+    expect((apply.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0]?.[0]).toBe(
+      "apply_personal_oi",
+    );
   });
 });
 

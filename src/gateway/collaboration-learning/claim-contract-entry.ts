@@ -461,7 +461,7 @@ export type ApplyCollaborationBoardClaimParams = {
  */
 export async function applyCollaborationBoardClaim(
   params: ApplyCollaborationBoardClaimParams,
-): Promise<{ task: Task; item: GroupBoardClaimItem }> {
+): Promise<{ task: GovernedTask; item: GroupBoardClaimItem }> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
   // T45: stop / partial_success classification runs under the control lock below.

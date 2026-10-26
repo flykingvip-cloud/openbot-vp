@@ -7,12 +7,12 @@
  * no location.reload recovery; never auto-submit 立即支付 / payment password.
  */
 
+import { releaseStaleHumanTakeoverForAgent } from "../agents/sandbox/account-computer-stream.js";
 import {
   AccountBrowserSerialDenied,
   claimActiveBrowserDispatch,
   releaseActiveBrowserDispatch,
 } from "../site-capability/desk.js";
-import { releaseStaleHumanTakeoverForAgent } from "../agents/sandbox/account-computer-stream.js";
 import {
   BROWSER_PLAN_ONCE_PHASE_GATES,
   resolvePlanOncePhaseGates,

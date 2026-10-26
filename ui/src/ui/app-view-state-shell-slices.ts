@@ -78,6 +78,8 @@ export type AppViewWorkbenchState = {
   workbenchHeaderProfileMenuOpen?: boolean;
   workbenchSecuritySettingsTab?: WorkbenchSecuritySettingsTab;
   workbenchSystemSettingsSelectedGroupId?: string | null;
+  /** Sticky artifact ids whose workspace preview miss was noted. */
+  artifactPreviewMissIds?: string[];
   /** Phase 3：协作小组四块投影（含成员贡献度） */
   workbenchCollaborationGroupProjection?:
     | import("./ports/employee/semantic/collaboration-group-read-model.ts").CollaborationGroupProjection

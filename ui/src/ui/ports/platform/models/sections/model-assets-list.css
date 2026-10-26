@@ -166,17 +166,23 @@
   gap: 4px;
 }
 
-.platform-model-assets-surface .platform-model-assets-table .platform-model-assets-table__col-health {
+.platform-model-assets-surface
+  .platform-model-assets-table
+  .platform-model-assets-table__col-health {
   min-width: 72px;
   white-space: nowrap;
 }
 
-.platform-model-assets-surface .platform-model-assets-table .platform-model-assets-table__col-provider {
+.platform-model-assets-surface
+  .platform-model-assets-table
+  .platform-model-assets-table__col-provider {
   min-width: 132px;
   max-width: 200px;
 }
 
-.platform-model-assets-surface .platform-model-assets-table .platform-model-assets-table__col-action {
+.platform-model-assets-surface
+  .platform-model-assets-table
+  .platform-model-assets-table__col-action {
   min-width: 88px;
 }
 

@@ -128,14 +128,16 @@ describe("capability version catalog", () => {
         catalog,
       }),
     ).toEqual({ ok: false, reason: UPGRADE_REASON_SEMVER });
-    expect(
-      assessCapabilityUpgrade({
-        capabilityId: "cap-1",
-        currentVersion: "1.2.0",
-        targetVersion: "2.0.0",
-        catalog,
-      }).reason,
-    ).toBe("incompatible: registry lifecycle is draft");
+    const draftUpgrade = assessCapabilityUpgrade({
+      capabilityId: "cap-1",
+      currentVersion: "1.2.0",
+      targetVersion: "2.0.0",
+      catalog,
+    });
+    expect(draftUpgrade).toMatchObject({
+      ok: false,
+      reason: "incompatible: registry lifecycle is draft",
+    });
     expect(
       assessCapabilityUpgrade({
         capabilityId: "cap-1",

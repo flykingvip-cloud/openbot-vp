@@ -370,7 +370,7 @@ describe("buildWorkbenchHomeModelFromState", () => {
           { id: namedUuid, name: "市场助手" },
         ],
       } as AgentsListResult,
-      sessionsResult: { count: 0, sessions: [] } as SessionsListResult,
+      sessionsResult: { count: 0, sessions: [] } as unknown as SessionsListResult,
       sessionSeenAt: {},
       activeSessionKey: "main",
       teamObjects: {},

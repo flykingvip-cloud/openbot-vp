@@ -116,9 +116,11 @@ describe("rpc tenant scope (P1.1)", () => {
 
     expect(capture.calls[0]?.ok).toBe(true);
     const nodes =
-      (capture.calls[0]?.payload as {
-        nodes?: Array<{ nodeId: string; connected: boolean; paired: boolean }>;
-      })?.nodes ?? [];
+      (
+        capture.calls[0]?.payload as {
+          nodes?: Array<{ nodeId: string; connected: boolean; paired: boolean }>;
+        }
+      )?.nodes ?? [];
     expect(nodes).toHaveLength(1);
     expect(nodes[0]?.nodeId).toBe("node-live");
     expect(nodes[0]?.connected).toBe(true);
@@ -169,9 +171,11 @@ describe("rpc tenant scope (P1.1)", () => {
 
     expect(capture.calls[0]?.ok).toBe(true);
     const nodes =
-      (capture.calls[0]?.payload as {
-        nodes?: Array<{ nodeId: string; connected: boolean; paired: boolean }>;
-      })?.nodes ?? [];
+      (
+        capture.calls[0]?.payload as {
+          nodes?: Array<{ nodeId: string; connected: boolean; paired: boolean }>;
+        }
+      )?.nodes ?? [];
     expect(nodes).toHaveLength(1);
     expect(nodes[0]?.nodeId).toBe("node-live");
     expect(nodes[0]?.connected).toBe(true);

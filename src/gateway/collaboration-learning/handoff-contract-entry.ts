@@ -296,7 +296,7 @@ export async function approveCollaborationTaskHandoffContract(
 
 export async function applyCollaborationTaskHandoffContract(
   params: HandoffContractStepParams,
-): Promise<Task> {
+): Promise<GovernedTask> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg);
   await refuseIfTaskStopped({ groupId: params.groupId, taskId: params.taskId, cfg });

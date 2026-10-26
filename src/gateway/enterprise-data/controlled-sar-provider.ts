@@ -11,15 +11,12 @@
  */
 
 import { randomUUID } from "node:crypto";
+import type { SiteRunResult } from "../../site-capability/result.js";
 import {
   getDefaultSiteCapabilityRuntime,
   type SiteCapabilityRuntime,
 } from "../../site-capability/runtime.js";
-import type { SiteRunResult } from "../../site-capability/result.js";
-import type {
-  SarGovernanceProvider,
-  SarGovernanceProviderInput,
-} from "./sar-governance-bridge.js";
+import type { SarGovernanceProvider, SarGovernanceProviderInput } from "./sar-governance-bridge.js";
 import type { ScopeEvaluationResult } from "./types.js";
 
 export type ControlledSarProviderOptions = {

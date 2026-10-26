@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { resetAccountBrowserCoordinatorForTests } from "../../site-capability/coordinator.js";
 import {
   getActiveAccountBrowserDesk,
   resetActiveAccountBrowserDeskForTests,
 } from "../../site-capability/desk.js";
-import { resetAccountBrowserCoordinatorForTests } from "../../site-capability/coordinator.js";
 import { runWithAccountBrowserSerial } from "./browser-tool.account-serial.js";
 
 describe("runWithAccountBrowserSerial", () => {

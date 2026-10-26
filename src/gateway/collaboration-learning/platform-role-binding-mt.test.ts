@@ -38,6 +38,7 @@ import {
   selfAdvanceDoesNotAutoCompleteTask,
   selfAdvanceRequiresPerTickReauth,
 } from "../collaboration-dispatch/self-advance.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   bindDeliveryActor,
   isMappedDeliveryIdentity,
@@ -163,7 +164,7 @@ async function useIsolationRoot(opts?: {
       },
     },
   } as OpenBotConfig;
-  setRuntimeConfigSnapshot(cfg, path.join(root, "openbot.json"));
+  setRuntimeConfigSnapshot(cfg);
   return { root, cfg, tenantsRoot };
 }
 
@@ -359,7 +360,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
     });
     expect(proposed.status).toBe("proposed");
 
-    const mid = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const mid = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(mid?.ownerMemberId).toBe(alpha.bots[0].id);
     expect(mid?.responsibility?.owner).toBe(alpha.bots[0].id);
 
@@ -371,7 +372,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
       actorType: "bot",
       cfg,
     });
-    const afterAccept = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const afterAccept = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(afterAccept?.responsibility?.owner).toBe(alpha.bots[0].id);
 
     await approveCollaborationTaskHandoffContract({
@@ -382,7 +383,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
       actorType: "human",
       cfg,
     });
-    const afterApprove = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const afterApprove = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(afterApprove?.responsibility?.owner).toBe(alpha.bots[0].id);
 
     const applied = await applyCollaborationTaskHandoffContract({
@@ -577,7 +578,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
       }),
     ).rejects.toThrow();
 
-    const persisted = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const persisted = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(persisted?.responsibility?.owner).toBe(alpha.bots[1].id);
   });
 

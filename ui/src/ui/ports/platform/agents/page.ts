@@ -169,7 +169,7 @@ const expandedBindingDetailIds = new Set<string>();
 type BindingMutationHost = {
   scopes: readonly string[] | null;
   connected: boolean;
-  request: ((method: string, params: unknown) => Promise<unknown>) | null;
+  request: (<T>(method: string, params: unknown) => Promise<T>) | null;
   refresh: () => unknown;
 };
 

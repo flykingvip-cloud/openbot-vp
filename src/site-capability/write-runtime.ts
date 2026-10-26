@@ -467,7 +467,10 @@ export class WriteExtensionRuntime {
         );
       }
       if (reserved.kind === "confirmed") {
-        const receipt = this.options.site.observe(ready.binding.bindingId, ready.args.idempotencyKey);
+        const receipt = this.options.site.observe(
+          ready.binding.bindingId,
+          ready.args.idempotencyKey,
+        );
         if (receipt && receipt.contentDigest === reserved.confirmation.contentDigest) {
           return this.echoConfirmed(ready, started, reserved.confirmation, receipt);
         }

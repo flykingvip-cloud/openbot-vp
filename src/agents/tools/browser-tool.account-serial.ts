@@ -7,12 +7,12 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { ensureAccountBrowserCoordinator } from "../../site-capability/coordinator.js";
 import {
   AccountBrowserSerialDenied,
   claimActiveBrowserDispatch,
   releaseActiveBrowserDispatch,
 } from "../../site-capability/desk.js";
-import { ensureAccountBrowserCoordinator } from "../../site-capability/coordinator.js";
 import { releaseStaleHumanTakeoverForAgent } from "../sandbox/account-computer-stream.js";
 
 /** Mutating / page-driving actions that must share the account-browser desk. */

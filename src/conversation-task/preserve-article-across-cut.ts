@@ -210,7 +210,11 @@ export function findLastPreservableArticleExtract(
     }
     const toolName = messageToolName(msg);
     const source: PreservedArticleExtract["source"] =
-      toolName === "web_fetch" ? "web_fetch" : toolName === "exec" || toolName === "bash" ? "exec" : "exec";
+      toolName === "web_fetch"
+        ? "web_fetch"
+        : toolName === "exec" || toolName === "bash"
+          ? "exec"
+          : "exec";
     const urls = urlsInText(text);
     return {
       url: urls.find((u) => /mp\.weixin\.qq\.com/i.test(u)) ?? urls[0],

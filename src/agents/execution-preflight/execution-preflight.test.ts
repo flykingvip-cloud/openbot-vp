@@ -101,7 +101,7 @@ describe("execution preflight", () => {
   });
 
   it("routes PDF→PPT / 做成 PPT utterances to cyber-ppt via expanded triggers", () => {
-    const skills = [
+    const skills: PreflightSkillInput[] = [
       {
         name: "pptx",
         frontmatter: {

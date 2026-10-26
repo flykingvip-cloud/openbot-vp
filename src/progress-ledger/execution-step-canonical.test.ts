@@ -125,7 +125,7 @@ describe("WP-06 execution-step-canonical", () => {
   it("compat-read fail-closed: invalid Step status must not fall back to payload identity", () => {
     expect(() =>
       compatReadCanonicalFieldsFromPayload(
-        { logicalActionId: "authoritative", status: "invalid" },
+        { logicalActionId: "authoritative", status: "invalid" as "completed" }, // intentionally invalid for fail-closed read
         {
           logicalActionId: "payload-override",
           status: "completed",

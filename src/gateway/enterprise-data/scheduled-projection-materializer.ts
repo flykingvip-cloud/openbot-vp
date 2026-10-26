@@ -11,9 +11,9 @@ import {
   resolveTenantsRoot,
   TENANT_ENTERPRISE_DATA_FILE,
 } from "../tenant-store-paths.js";
+import { getProcessControlledSarProvider } from "./controlled-sar-provider.js";
 import { listEnterpriseKnowledgeProjectionBindings } from "./enterprise-knowledge-projection-binding-store.js";
 import { isImplementedMaterializationMode } from "./knowledge-publication.js";
-import { getProcessControlledSarProvider } from "./controlled-sar-provider.js";
 import { runProjectionMaterialization } from "./projection-materializer.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import { loadEnterpriseDataStore, saveEnterpriseDataStore } from "./store.js";

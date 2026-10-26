@@ -244,6 +244,9 @@ describe("P4 self_advance contracts", () => {
     }
     expect(result.advanced).toBe(false);
     expect(result.execMode).toBe("plan_nudge");
+    if (result.advanced) {
+      return;
+    }
     expect(result.reason).toBe("plan_gate_unconfirmed");
     expect(result.eligibility.allowed).toBe(true);
   });

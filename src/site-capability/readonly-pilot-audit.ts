@@ -168,7 +168,9 @@ export async function buildReadonlyPilotAuditEvidence(input: {
       continue;
     }
     const station =
-      task.stationId === "bulletin" ? input.harness.stations.bulletin : input.harness.stations.inbox;
+      task.stationId === "bulletin"
+        ? input.harness.stations.bulletin
+        : input.harness.stations.inbox;
     const comparison = await comparePilotRead({
       harness: input.harness,
       principal: input.harness.principal,
@@ -182,7 +184,8 @@ export async function buildReadonlyPilotAuditEvidence(input: {
 
   // Live path is not wired in this delivery; fixture evidence never upgrades to met.
   const r5Status: SarR5Status = SAR_R5_STATUS_FIXTURE_ONLY;
-  const allCorrect = comparisons.length > 0 && comparisons.every((c) => c.correctnessAtLeastGenericBrowser);
+  const allCorrect =
+    comparisons.length > 0 && comparisons.every((c) => c.correctnessAtLeastGenericBrowser);
   const summary = allCorrect
     ? `Protocol/fixture comparison: SAR correctness ≥ generic browser on ${comparisons.length} station(s); cost deltas are harness_step_clock (${SAR_PILOT_STEP_MS}ms/op), not live RTT. R5 status: ${r5Status}.`
     : `Protocol/fixture comparison incomplete or correctness bar not met. R5 status: ${r5Status}.`;

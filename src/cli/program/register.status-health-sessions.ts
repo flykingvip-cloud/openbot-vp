@@ -20,11 +20,7 @@ function resolveVerbose(opts: { verbose?: boolean; debug?: boolean }): boolean {
 function parseTimeoutMs(timeout: unknown): number | null | undefined {
   const parsed = parsePositiveIntOrUndefined(timeout);
   if (timeout !== undefined && parsed === undefined) {
-    reportCliError(
-      defaultRuntime,
-      "usage",
-      "--timeout must be a positive integer (milliseconds)",
-    );
+    reportCliError(defaultRuntime, "usage", "--timeout must be a positive integer (milliseconds)");
     return null;
   }
   return parsed;

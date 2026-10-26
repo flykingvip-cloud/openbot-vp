@@ -71,11 +71,13 @@ describe("declareWorkspaceRelativePath", () => {
       relativePath: "campaigns/october/article.html",
       kind: "mapped",
     });
-    expect(
-      declareWorkspaceRelativePath(`${GATEWAY_ROOT}/campaigns/october/article.html`, {
-        trustedRoots: roots,
-      })?.relativePath,
-    ).toBe("campaigns/october/article.html");
+    const mapped = declareWorkspaceRelativePath(`${GATEWAY_ROOT}/campaigns/october/article.html`, {
+      trustedRoots: roots,
+    });
+    expect(mapped.ok).toBe(true);
+    if (mapped.ok) {
+      expect(mapped.relativePath).toBe("campaigns/october/article.html");
+    }
   });
 
   it("does not reduce an unmappable absolute path to its basename", () => {

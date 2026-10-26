@@ -137,7 +137,7 @@ function authority(cfg: OpenBotConfig): RuntimeAuthority {
   return createRuntimeAuthority({
     snapshot,
     episodeId: "ep_s3",
-    tenant: { tenantId: "001", trust: "explicit" },
+    tenant: { tenantId: "001", trust: "membership" },
     groupId: "grp_s3",
     profile: "personal_local",
     cfg,
@@ -147,8 +147,8 @@ function authority(cfg: OpenBotConfig): RuntimeAuthority {
 const seedTask = {
   taskId: "task-s3-1",
   title: "S3 deliverable",
-  status: "open",
-} as Task;
+  status: "ready",
+} as unknown as Task;
 
 const SID_V1 = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 const SID_V2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";

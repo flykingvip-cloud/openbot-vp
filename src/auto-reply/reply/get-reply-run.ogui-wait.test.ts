@@ -11,12 +11,13 @@ import { loadSessionStore, updateSessionStore } from "../../config/sessions/stor
 
 const { isEmbeddedPiRunActiveMock, runReplyAgentMock } = vi.hoisted(() => ({
   isEmbeddedPiRunActiveMock: vi.fn(() => false),
-  runReplyAgentMock: vi.fn(async () => ({ text: "agent-ran" })),
+  runReplyAgentMock: vi.fn(async (..._args: unknown[]) => ({ text: "agent-ran" })),
 }));
 
 vi.mock("../../agents/pi-embedded.js", () => ({
   abortEmbeddedPiRun: vi.fn().mockReturnValue(false),
-  isEmbeddedPiRunActive: (...args: unknown[]) => isEmbeddedPiRunActiveMock(...args),
+  isEmbeddedPiRunActive: (...args: unknown[]) =>
+    isEmbeddedPiRunActiveMock(...(args as Parameters<typeof isEmbeddedPiRunActiveMock>)),
   isEmbeddedPiRunStreaming: vi.fn().mockReturnValue(false),
   resolveEmbeddedSessionLane: vi.fn().mockReturnValue("session:ogui"),
 }));
@@ -305,7 +306,9 @@ describe("runPreparedReply OGUI ingress", () => {
     ].join("\n");
     const result = await runPreparedReply(replyParams({ storePath, text: answer }));
     expect(result).toEqual({ text: "agent-ran" });
-    const call = runReplyAgentMock.mock.calls[0]?.[0] as {
+    const call = (
+      runReplyAgentMock.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>
+    )[0]?.[0] as {
       followupRun?: { run?: { oguiDecisionRun?: { resumeRef?: string; decisionId?: string } } };
     };
     expect(call.followupRun?.run?.oguiDecisionRun?.resumeRef).toBe(issued.resumeRef);

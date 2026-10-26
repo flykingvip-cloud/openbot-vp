@@ -1582,7 +1582,7 @@ describe("Mode B board-tied kickoff multi-participant", () => {
         groupMemoryRefs: { latestCapsuleIds: [] },
         updatedAtMs: 0,
       },
-    } as CollaborationDispatchScope;
+    } as unknown as CollaborationDispatchScope;
   }
 
   test("default off", async () => {
