@@ -34,3 +34,9 @@ entrypoint adapter (chat|gateway_agent|cron|cli|collab)
 - Entry: `ensureChatTurnTaskOutcome` at `agent-runner-execution` turn start; `recordRunnerTurnOutcome` requires taskId (no `run:` invent).
 
 - R85: recover tip monotonic; handler-independent ack; contribution count flags + always rebuild; commandLog in commit bundle; requiredScope mandatory; correction binds callerSubjectRef; runner success closes with not_required acceptance/delivery.
+
+## askOutcome P1（attempt 诚实归因 + confirm-no-id）
+
+- `attempt.ts` 末：pattern `success` 在未证实 run 失败时为 `null`（不当成功）；技能 **仍调用** `recordLifecycleSkillsLoadedOnRun`，run 级 `outcome=null` 时跳过 prompt-named-use 成功写入、**不**转 failure；工具级按 `toolMetas` 证据记录。本批 **不做** 验收后回填（正样本可能减少）。
+- `confirmPendingTurnDelivery`：三 id 皆缺时 fail-soft + 固定事件 `confirm_skipped_no_locator_ids` 诊断；不猜 session pending、不清 pending。有定位键时路径不变（含 #89 hydrate）。
+- 不动 hydrate / consumer-boot；不在 attempt 末读另一命名空间 TaskOutcome tip。

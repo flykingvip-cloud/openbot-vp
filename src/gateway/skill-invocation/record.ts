@@ -605,7 +605,8 @@ export function recordLifecycleSkillsLoadedOnRun(params: {
   agentId: string;
   runId: string;
   skillNames: string[];
-  outcome: "success" | "failure" | "cancelled";
+  /** null = run-level outcome unconfirmed — keep tool attribution; skip prompt-named-use success. */
+  outcome: "success" | "failure" | "cancelled" | null;
   latencyMs?: number;
   sessionKey?: string | null;
   tenantId?: string | null;
@@ -657,10 +658,12 @@ export function recordLifecycleSkillsLoadedOnRun(params: {
 
   // Prompt-only named-use is OFF by default (unreliable). Opt-in:
   // OPENBOT_PROMPT_NAMED_USE_ATTRIBUTION=1
+  // askOutcome P1: when run-level outcome is unconfirmed (null), do not invent
+  // prompt-named-use success or convert unknown into failure.
   const promptNamedUseEnabled =
     process.env.OPENBOT_PROMPT_NAMED_USE_ATTRIBUTION === "1" ||
     process.env.OPENBOT_PROMPT_NAMED_USE_ATTRIBUTION === "true";
-  if (!promptNamedUseEnabled) {
+  if (!promptNamedUseEnabled || params.outcome == null) {
     return recorded;
   }
 

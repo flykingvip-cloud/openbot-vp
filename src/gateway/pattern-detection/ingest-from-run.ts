@@ -39,7 +39,12 @@ export function ingestPatternSampleFromRun(
     runId: input.runId ?? null,
     sessionKey: input.sessionKey ?? null,
     inputStructureHash: structureHashFromIo(toolOutline, "input"),
-    outputStructureHash: structureHashFromIo(input.success === false ? "error" : "ok", "output"),
+    // structureHash collapses content words; use a heading for unknown so it does
+    // not share the judged ok/error cluster. true/false keep prior single-token shape.
+    outputStructureHash: structureHashFromIo(
+      input.success == null ? "# run-outcome-unknown" : !input.success ? "error" : "ok",
+      "output",
+    ),
     toolTraceHash: structureHashFromToolTrace(toolsUsed),
     toolsUsed,
     success: input.success ?? null,
