@@ -1,14 +1,14 @@
 /**
  * WL2 (CAP-03/04) execution-evidence bindings for PR #80 work line 2 + U1 stop.
  *
- * PASS rows map to enforced behavior. U2/U3 platform-gap rows remain it.todo.
- * Do not delete L3 stop/resume adapters.
+ * PASS rows map to enforced behavior. U3 IDEMPOTENT/RESUME forced in this file.
+ * L3 markers retired (T36); behavior proofs via U1–U3 entries.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
-import { afterEach, describe, expect, it, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   clearConfigCache,
   clearRuntimeConfigSnapshot,
@@ -24,7 +24,18 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { readOperatingStateAuthEpoch } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
+import {
+  claimWakeOpRunning,
+  confirmWakeOpCompleted,
+  markWakeOpUnknown,
+  mintWakeOpRecoverySubject,
+  producePlatformNoneVerification,
+  readWakeOpRecord,
+  releaseWakeOpForRetry,
+  wakeOpIdempotencyKey,
+} from "../collaboration-dispatch/wake-op-ledger.js";
 import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { markCollaborationBoardItemInProgress } from "./claim-contract-entry.js";
@@ -35,8 +46,12 @@ import {
   approveCollaborationTaskHandoffContract,
   proposeCollaborationTaskHandoffContract,
 } from "./handoff-contract-entry.js";
-import { SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE } from "./self-advance-entry.js";
-import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+  writeGroupOperatingState,
+} from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import {
   canRequestTaskStop,
@@ -45,7 +60,7 @@ import {
   TaskStoppedError,
 } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
-import { WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE } from "./wake-contract-entry.js";
+import { listCollaborationWakeEvents } from "./wake-contract-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -168,6 +183,31 @@ async function seedTask(params: { cfg: OpenBotConfig; taskId: string; groupId?: 
   return { objectStorage };
 }
 
+async function writeAuthOsForTest(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}) {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    writeKind: "auth",
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as Parameters<typeof writeGroupOperatingState>[0]["state"] & { authEpoch: number },
+  });
+  return nextEpoch;
+}
+
 describe("WL2 CAP-03/04 evidence bindings", () => {
   test("WL2-REVOKE-ACTION-01: revoke-before-submit blocks privileged bind (T-E5(1))", () => {
     const active = {
@@ -247,9 +287,9 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(persisted?.responsibility?.owner).toBe(tenant.bots[1].id);
   });
 
-  test("L3 adapters retained: self-advance/wake entry markers (do not delete stop/resume path)", () => {
-    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
-    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+  test("L3 residual cleanup: self-advance/wake entries remain behavioral (markers deleted)", () => {
+    expect(typeof runCollaborationSelfAdvance).toBe("function");
+    expect(typeof listCollaborationWakeEvents).toBe("function");
   });
 
   test("platform inventory: collaboration.task.stop RPC registered (U1)", async () => {
@@ -918,7 +958,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     revoked.memberRoleMap = []; // strip all mapped members (coordinator still mapped via governance)
     // Also clear coordinator so bot-exec / bot-coord duty targets fail recheck.
     revoked.governance = { ownerUserId: tenant.employees[0].id, coordinatorBotId: "" };
-    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
 
     const auth = await recheckCurrentDispatchAuthorization({
       groupId,
@@ -995,7 +1035,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       governance: { ownerUserId: tenant.employees[0].id, coordinatorBotId: "" },
     });
     revoked.memberRoleMap = [];
-    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
 
     const auth = await recheckCurrentDispatchAuthorization({
       groupId,
@@ -1128,7 +1168,451 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(consume.dispatched).toBe(true);
   });
 
-  // Wake resume / payload idempotency across stop — U3.
-  it.todo("WL2-WAKE-IDEMPOTENT-01: duplicate wake payload yields single side-effect");
-  it.todo("WL2-WAKE-RESUME-01: stop→resume→wake preserves work without double-write");
+  // Wake resume / payload idempotency — U3 (persistent op ledger; not memory-only).
+  test("WL2-WAKE-IDEMPOTENT-01: duplicate/concurrent wake payload yields single side-effect", async () => {
+    const { cfg } = await useIsolationRoot({ wakeContract: true });
+    const groupId = tenant.groupId;
+    const taskId = "task-wl2-wake-idempotent";
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    await seedTask({ cfg, taskId, groupId });
+
+    const state = makeOperatingState({
+      groupId,
+      governance: { coordinatorBotId: tenant.bots[0].id, ownerUserId: tenant.employees[0].id },
+    });
+    state.memberRoleMap = [
+      {
+        memberId: tenant.employees[0].id,
+        memberKind: "human",
+        governanceRole: "owner",
+        collaborationRole: null,
+        status: "active",
+      },
+      {
+        memberId: tenant.bots[0].id,
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({ fileStore, groupId, state });
+
+    const now = Date.now();
+    const snapshot = createRoundPolicySnapshot(resolveGroupPolicyInput({ operatingState: state }), {
+      now,
+      idGen: () => generatePolicySnapshotId(now),
+    });
+    const authority = createRuntimeAuthority({
+      snapshot,
+      episodeId: episodeIdForClientRun(`task-wake:${groupId}:${taskId}`),
+      tenant: resolveAuthorityTenantForEntry({
+        preferred: null,
+        groupTenantId: resolveCollaborationGroupTenantId(groupId),
+      }),
+      groupId,
+      profile: resolveSecurityProfile(cfg).profile,
+      cfg,
+    });
+
+    const request = {
+      groupId,
+      fromAgentId: "system:group_task_heartbeat",
+      toAgentIds: [tenant.bots[0].id],
+      source: "nudge" as const,
+      taskId,
+      itemId: "item-idempotent",
+      reason: "idempotent-a",
+    };
+    const opKey = wakeOpIdempotencyKey(request);
+    expect(opKey.length).toBeGreaterThan(0);
+
+    let dispatchedCalls = 0;
+    const dispatcher = async () => {
+      dispatchedCalls += 1;
+      // Hold briefly so concurrent consumers race the claim.
+      await new Promise((r) => setTimeout(r, 30));
+      return { ok: true as const, roundId: "round-idempotent-1" };
+    };
+
+    const [a, b] = await Promise.all([
+      consumeWakeForRoundDispatch({
+        authority,
+        cfg,
+        writeMode: "execute",
+        roundDispatcher: dispatcher,
+        request,
+      }),
+      consumeWakeForRoundDispatch({
+        authority,
+        cfg,
+        writeMode: "execute",
+        roundDispatcher: dispatcher,
+        request: { ...request, reason: "idempotent-b" },
+      }),
+    ]);
+
+    expect(dispatchedCalls).toBe(1);
+    const winners = [a, b].filter((r) => r.dispatched && !r.reused);
+    const reused = [a, b].filter((r) => r.reused || r.reason === "wake_op_in_flight");
+    expect(winners.length + reused.length).toBe(2);
+    expect(winners.length).toBe(1);
+    expect(winners[0]?.roundId).toBe("round-idempotent-1");
+
+    // Sequential duplicate: must reuse completed, no second side effect.
+    const again = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: dispatcher,
+      request: { ...request, reason: "idempotent-c" },
+    });
+    expect(dispatchedCalls).toBe(1);
+    expect(again.reused).toBe(true);
+    expect(again.reason).toBe("idempotent_reuse");
+    expect(again.roundId).toBe("round-idempotent-1");
+    expect(again.opKey).toBe(opKey);
+
+    const persisted = await readWakeOpRecord({ authority, opKey });
+    expect(persisted?.status).toBe("completed");
+    expect(persisted?.roundId).toBe("round-idempotent-1");
+  });
+
+  test("WL2-WAKE-RESUME-01: interrupt/resume rechecks stop+auth; unknown no blind re-run; failed recovers", async () => {
+    const { cfg } = await useIsolationRoot({ wakeContract: true });
+    const groupId = tenant.groupId;
+    const taskId = "task-wl2-wake-resume";
+    const { fileStore, objectStorage } = createWorkspaceCollaborationStores(cfg);
+    await seedTask({ cfg, taskId, groupId });
+
+    const state = makeOperatingState({
+      groupId,
+      governance: { coordinatorBotId: tenant.bots[0].id, ownerUserId: tenant.employees[0].id },
+    });
+    state.memberRoleMap = [
+      {
+        memberId: tenant.employees[0].id,
+        memberKind: "human",
+        governanceRole: "owner",
+        collaborationRole: null,
+        status: "active",
+      },
+      {
+        memberId: tenant.bots[0].id,
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({ fileStore, groupId, state });
+
+    const now = Date.now();
+    const snapshot = createRoundPolicySnapshot(resolveGroupPolicyInput({ operatingState: state }), {
+      now,
+      idGen: () => generatePolicySnapshotId(now),
+    });
+    const authority = createRuntimeAuthority({
+      snapshot,
+      episodeId: episodeIdForClientRun(`task-wake:${groupId}:${taskId}`),
+      tenant: resolveAuthorityTenantForEntry({
+        preferred: null,
+        groupTenantId: resolveCollaborationGroupTenantId(groupId),
+      }),
+      groupId,
+      profile: resolveSecurityProfile(cfg).profile,
+      cfg,
+    });
+
+    const request = {
+      groupId,
+      fromAgentId: "system:group_task_heartbeat",
+      toAgentIds: [tenant.bots[0].id],
+      source: "self_advance" as const,
+      taskId,
+      itemId: "item-resume",
+      reason: "resume-1",
+    };
+    const opKey = wakeOpIdempotencyKey(request);
+
+    // --- A: interrupt before consume (no durable state) → first consume still works ---
+    let calls = 0;
+    const first = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "round-resume-first" };
+      },
+      request,
+    });
+    expect(first.dispatched).toBe(true);
+    expect(calls).toBe(1);
+
+    // Reset ledger for remaining sub-scenarios via a distinct itemId.
+    const reqB = { ...request, itemId: "item-resume-mid" };
+    const opKeyB = wakeOpIdempotencyKey(reqB);
+
+    // --- B: interrupt during execute (throw) → unknown; resume must not blind re-run ---
+    const mid = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        calls += 1;
+        throw new Error("simulated crash mid-dispatch");
+      },
+      request: reqB,
+    });
+    expect(mid.dispatched).toBe(false);
+    expect(mid.reason).toContain("dispatch_threw");
+    expect(mid.wakeOp?.status).toBe("unknown");
+    const afterCrash = await readWakeOpRecord({ authority, opKey: opKeyB });
+    expect(afterCrash?.status).toBe("unknown");
+
+    let blindCalls = 0;
+    const blind = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        blindCalls += 1;
+        return { ok: true, roundId: "should-not" };
+      },
+      request: reqB,
+    });
+    expect(blindCalls).toBe(0);
+    expect(blind.reason).toBe("wake_op_unknown");
+    expect(blind.dispatched).toBe(false);
+
+    // --- B2: release gates — refuse untrusted / running dual-write; require minted subject + verification ---
+    const refuseNoActor = await releaseWakeOpForRetry({
+      authority,
+      opKey: opKeyB,
+      cfg,
+      detail: "verbal_only",
+      externalEffectVerified: "none",
+      verificationId: "unused",
+      subject: { actorId: "", identitySource: "runtime" } as never,
+    });
+    expect(refuseNoActor.ok).toBe(false);
+    if (refuseNoActor.ok) {
+      throw new Error("expected operator_identity_not_trusted");
+    }
+    expect(refuseNoActor.reason).toBe("operator_identity_not_trusted");
+
+    const runningClaim = await claimWakeOpRunning({
+      authority,
+      keyInput: { ...reqB, itemId: "item-resume-running-gate" },
+      cfg,
+    });
+    expect(runningClaim.action).toBe("proceed");
+    const runningVerify = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: runningClaim.opKey,
+      attemptId:
+        (await readWakeOpRecord({ authority, opKey: runningClaim.opKey }))?.executionAttemptId ??
+        "x",
+      probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
+    });
+    expect(runningVerify.ok).toBe(true);
+    if (!runningVerify.ok) {
+      throw new Error("setup");
+    }
+    const refuseRunning = await releaseWakeOpForRetry({
+      authority,
+      opKey: runningClaim.opKey,
+      cfg,
+      detail: "would_dual_write",
+      externalEffectVerified: "none",
+      verificationId: runningVerify.record.verificationId,
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "release_for_retry",
+        groupId,
+        taskId,
+      }),
+    });
+    expect(refuseRunning.ok).toBe(false);
+    if (refuseRunning.ok) {
+      throw new Error("expected running refused");
+    }
+    expect(refuseRunning.reason).toBe("status_running_keep_or_mark_unknown");
+
+    // Resume recheck stop + auth (U1/U2 positions), then release for retry — work not permanently lost.
+    const stopped = await requestCollaborationTaskStop({
+      groupId,
+      taskId,
+      actor: tenant.employees[0].id,
+      actorType: "human",
+      reason: "resume-stop-gate",
+      cfg,
+    });
+    expect(stopped.stopControl.status).toBe("accepted");
+
+    // While stopped, even release-then-consume must refuse via stop preflight.
+    const releaseVerify = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: opKeyB,
+      attemptId: (await readWakeOpRecord({ authority, opKey: opKeyB }))?.executionAttemptId ?? "x",
+      probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
+    });
+    expect(releaseVerify.ok).toBe(true);
+    if (!releaseVerify.ok) {
+      throw new Error("setup");
+    }
+    const releasedWhileStopped = await releaseWakeOpForRetry({
+      authority,
+      opKey: opKeyB,
+      cfg,
+      detail: "operator_verified_external_effect_none",
+      externalEffectVerified: "none",
+      verificationId: releaseVerify.record.verificationId,
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "release_for_retry",
+        groupId,
+        taskId,
+      }),
+    });
+    expect(releasedWhileStopped.ok).toBe(true);
+    if (!releasedWhileStopped.ok) {
+      throw new Error("expected release ok");
+    }
+    expect(releasedWhileStopped.record.status).toBe("failed");
+    expect(releasedWhileStopped.record.releasedBy).toBe(tenant.employees[0].id);
+    expect(releasedWhileStopped.record.externalEffectVerified).toBe("none");
+    expect(releasedWhileStopped.record.externalEffectCheck?.opId).toBe(opKeyB);
+    expect(releasedWhileStopped.record.externalEffectCheck?.outcome).toBe("none");
+
+    const whileStopped = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        blindCalls += 1;
+        return { ok: true, roundId: "stopped-no" };
+      },
+      request: reqB,
+    });
+    expect(whileStopped.reason).toBe("task_stopped");
+    expect(blindCalls).toBe(0);
+
+    // Clear stop for recovery path (drop stopControl from persisted task).
+    const task = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    expect(task).toBeTruthy();
+    const cleared = { ...(task as Record<string, unknown>) };
+    delete cleared.stopControl;
+    await objectStorage.writeObject(groupId, "task", taskId, cleared as Task);
+
+    // Auth still mapped — failed status allows retry after recheck.
+    const recovered = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        blindCalls += 1;
+        return { ok: true, roundId: "round-resume-recovered" };
+      },
+      request: reqB,
+    });
+    expect(recovered.reason).not.toBe("task_stopped");
+    expect(recovered.reason).not.toBe("auth_revoked");
+    expect(recovered.reason).not.toBe("wake_op_unknown");
+    expect(blindCalls).toBe(1);
+    expect(recovered.dispatched).toBe(true);
+    expect(recovered.roundId).toBe("round-resume-recovered");
+
+    // --- C: execute happened but receipt not written (stuck running) → unknown path ---
+    const reqC = { ...request, itemId: "item-resume-receipt" };
+    const opKeyC = wakeOpIdempotencyKey(reqC);
+    // Seed a running record as if crash after side effect before completed mark.
+    const seeded = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        // Claim happens before dispatcher; mark unknown to model receipt-gap after effect.
+        return { ok: true, roundId: "round-receipt-gap" };
+      },
+      request: reqC,
+    });
+    expect(seeded.dispatched).toBe(true);
+    // Force unknown (receipt missing model): overwrite completed → unknown without clearing roundId proof path.
+    await markWakeOpUnknown({
+      authority,
+      opKey: opKeyC,
+      cfg,
+      detail: "receipt_missing_after_effect",
+    });
+
+    // Verbal / mismatched roundId must not mint completed.
+    const verbalConfirm = await confirmWakeOpCompleted({
+      authority,
+      opKey: opKeyC,
+      roundId: "oral-claim-no-receipt",
+      cfg,
+      detail: "verbal",
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "confirm_completed",
+        groupId,
+        taskId,
+        taskApproverIds: [tenant.employees[0].id],
+      }),
+    });
+    expect(verbalConfirm.ok).toBe(false);
+    if (verbalConfirm.ok) {
+      throw new Error("expected round_id_mismatch");
+    }
+    expect(verbalConfirm.reason).toBe("round_id_mismatch");
+
+    // Can confirm complete only against prior ledger receipt → reuse; must not dispatch again.
+    let receiptCalls = 0;
+    const confirmed = await confirmWakeOpCompleted({
+      authority,
+      opKey: opKeyC,
+      roundId: "round-receipt-gap",
+      cfg,
+      detail: "receipt_recovered",
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "confirm_completed",
+        groupId,
+        taskId,
+        taskApproverIds: [tenant.employees[0].id],
+      }),
+    });
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) {
+      throw new Error("expected confirm ok");
+    }
+    expect(confirmed.record.status).toBe("completed");
+    expect(confirmed.record.confirmedBy).toBe(tenant.employees[0].id);
+    const reuseAfterConfirm = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        receiptCalls += 1;
+        return { ok: true, roundId: "dup" };
+      },
+      request: reqC,
+    });
+    expect(receiptCalls).toBe(0);
+    expect(reuseAfterConfirm.reused).toBe(true);
+    expect(reuseAfterConfirm.roundId).toBe("round-receipt-gap");
+
+    // Key scope sanity: reason excluded from op key.
+    expect(opKey).toBe(
+      wakeOpIdempotencyKey({ ...request, reason: "different-reason-not-in-key" } as typeof request),
+    );
+  });
 });

@@ -15,12 +15,46 @@ import {
 } from "./task-state-machine.js";
 import type { TaskStopControl } from "./task-stop-control.js";
 
+/** T41/T43: authoritative dispatch eligibility claim on the task control record. */
+export type TaskDispatchClaim = {
+  /**
+   * Unconfusable lease id minted at commit (T43). take/clear must compare this —
+   * opKey alone is not a generation token (same op may retry with a new claim).
+   */
+  claimId: string;
+  opKey: string;
+  controlEpoch: number;
+  /**
+   * T51: snapshot of OS authEpoch at commit. take/commit compare live OS authEpoch
+   * so revoke is on a shared version plane — not fingerprint alone.
+   */
+  authEpoch: number;
+  authFingerprint: string;
+  committedAtMs: number;
+  /** committed = eligible; taken = leased for external dispatch (CAS take). */
+  phase: "committed" | "taken";
+  takenAtMs?: number;
+  /** Optional bind to wake-op executionAttemptId when known at commit. */
+  executionAttemptId?: string;
+};
+
 export type GovernedTask = Task & {
   governanceState?: CollaborationTaskState;
   responsibility?: TaskResponsibility;
   handoffs?: TaskHandoff[];
   /** U1 task-level stop; written by collaboration.task.stop on this authority object. */
   stopControl?: TaskStopControl | null;
+  /**
+   * M3: comparable generation for stop (and future auth-linked bumps).
+   * Incremented when stop is accepted so dispatch eligibility snapshots go stale.
+   * Shared version token for T41 expected-version CAS with dispatchClaim.
+   */
+  controlEpoch?: number;
+  /**
+   * T41 M3: dispatch eligibility claim linearized on the task authority record.
+   * Cleared when stop bumps controlEpoch; taken before external dispatcher.
+   */
+  dispatchClaim?: TaskDispatchClaim | null;
 };
 
 export class InvalidTaskHandoffError extends Error {
@@ -190,12 +224,14 @@ export function normalizeTaskHandoff(input: {
   completedArtifacts?: readonly string[];
   assumptions?: readonly string[];
   blockers?: readonly string[];
+  handoffId?: string;
 }): TaskHandoff {
   const from = compactId(input.from);
   const to = compactId(input.to);
   const reason = compactId(input.reason);
   const remainingWork = compactId(input.remainingWork);
   const acceptanceCriteria = uniqueIds([...input.acceptanceCriteria]);
+  const handoffId = compactId(input.handoffId) || undefined;
   if (!from || !to) {
     throw new InvalidTaskHandoffError("handoff requires from and to");
   }
@@ -221,6 +257,7 @@ export function normalizeTaskHandoff(input: {
     assumptions: uniqueIds([...(input.assumptions ?? [])]),
     blockers: uniqueIds([...(input.blockers ?? [])]),
     acceptanceCriteria,
+    ...(handoffId ? { handoffId } : {}),
   };
 }
 

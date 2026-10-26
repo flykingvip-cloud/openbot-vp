@@ -8,6 +8,7 @@
 import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { applyTaskStopUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import { asGovernedTask, type GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   assertTaskNotStopped,
@@ -160,12 +161,19 @@ export async function requestCollaborationTaskStop(
     // Default unknown: in-flight external effects may already have escaped.
     externalEffect: params.externalEffect ?? "unknown",
   });
-  const updated: GovernedTask = {
-    ...governed,
+  // T41/T42: under shared task-control lock — bump controlEpoch, clear dispatchClaim,
+  // persist stop patch onto the *live* task (no stale whole-object merge).
+  const updated = await applyTaskStopUnderControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
     stopControl,
-    updatedAtMs: params.nowMs ?? Date.now(),
     updatedBy: actorId,
-  };
-  await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
-  return { task: updated, stopControl, alreadyStopped: false };
+    updatedAtMs: params.nowMs ?? Date.now(),
+    cfg,
+  });
+  const persistedStop = readTaskStopControl(updated);
+  if (!persistedStop) {
+    throw new TaskStopEntryError("stop_persist_failed", "stop did not persist under control lock");
+  }
+  return { task: updated, stopControl: persistedStop, alreadyStopped: false };
 }

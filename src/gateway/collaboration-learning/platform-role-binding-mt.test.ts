@@ -52,7 +52,7 @@ import {
   proposeCollaborationTaskHandoffContract,
   resolveHandoffGovernanceActor,
 } from "./handoff-contract-entry.js";
-import { SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE } from "./self-advance-entry.js";
+import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
 import {
   resolveCollaborationTenantResolution,
@@ -60,7 +60,7 @@ import {
   isAclSafeTenantTrust,
   resolveAuthorityTenantForEntry,
 } from "./trusted-tenant.js";
-import { WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE } from "./wake-contract-entry.js";
+import { listCollaborationWakeEvents } from "./wake-contract-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -600,11 +600,12 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
     });
     expect(cfg.collaboration?.task?.selfAdvance?.mode ?? "dry_run").toBe("dry_run");
     expect(cfg.collaboration?.task?.selfAdvance?.executeGroupAllowlist ?? []).toEqual([]);
-    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
     expect(selfAdvanceRequiresPerTickReauth()).toBe(true);
     expect(selfAdvanceDeliveryRequiresConfirmedPlan()).toBe(true);
     expect(selfAdvanceDoesNotAutoCompleteTask()).toBe(true);
-    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+    // L3: behavior anchors (markers retired) — entry still exports production adapters.
+    expect(typeof runCollaborationSelfAdvance).toBe("function");
+    expect(typeof listCollaborationWakeEvents).toBe("function");
   });
 
   test("T09-B2: displayName claim alone does not authenticate write actor", () => {
