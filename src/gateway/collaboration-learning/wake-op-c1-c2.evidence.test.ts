@@ -231,14 +231,19 @@ async function platformVerifyNone(params: {
   opKey: string;
   checkedAtMs?: number;
   source?: string;
+  attemptId?: string;
 }) {
   const nowMs = params.checkedAtMs ?? Date.now();
+  const opRec = await readWakeOpRecord({ authority: params.authority, opKey: params.opKey });
+  const attemptId =
+    opRec?.executionAttemptId?.trim() || params.attemptId?.trim() || "missing-attempt";
   const produced = await producePlatformNoneVerification({
     authority: params.authority,
     cfg: params.cfg,
     groupId: params.groupId,
     taskId: params.taskId,
     opKey: params.opKey,
+    attemptId,
     nowMs,
     probe: async () => ({ source: params.source ?? "side_effect_probe", outcome: "none" as const }),
   });
@@ -637,6 +642,7 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       groupId: ctx.groupId,
       taskId: ctx.taskId,
       opKey: "other-task-other-op",
+      attemptId: "synthetic-wrong-op-attempt",
       nowMs: now,
       probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
     });
@@ -666,6 +672,9 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       groupId: ctx.groupId,
       taskId: ctx.taskId,
       opKey: ctx.opKey,
+      attemptId:
+        (await readWakeOpRecord({ authority: ctx.authority, opKey: ctx.opKey }))
+          ?.executionAttemptId ?? "x",
       nowMs: now - 31 * 60 * 1000,
       probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
     });
@@ -695,6 +704,9 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       groupId: ctx.groupId,
       taskId: ctx.taskId,
       opKey: ctx.opKey,
+      attemptId:
+        (await readWakeOpRecord({ authority: ctx.authority, opKey: ctx.opKey }))
+          ?.executionAttemptId ?? "x",
       nowMs: now,
       probe: async () => null,
     });

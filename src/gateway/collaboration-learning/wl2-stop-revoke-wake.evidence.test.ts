@@ -1384,6 +1384,9 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       groupId,
       taskId,
       opKey: runningClaim.opKey,
+      attemptId:
+        (await readWakeOpRecord({ authority, opKey: runningClaim.opKey }))?.executionAttemptId ??
+        "x",
       probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
     });
     expect(runningVerify.ok).toBe(true);
@@ -1428,6 +1431,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       groupId,
       taskId,
       opKey: opKeyB,
+      attemptId: (await readWakeOpRecord({ authority, opKey: opKeyB }))?.executionAttemptId ?? "x",
       probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
     });
     expect(releaseVerify.ok).toBe(true);

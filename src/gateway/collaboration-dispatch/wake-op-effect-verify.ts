@@ -1,14 +1,21 @@
 /**
- * T36 M2 — controlled external-effect verification for wake-op unknown recovery.
+ * T36/T37 M2 — controlled external-effect verification for wake-op unknown recovery.
  *
  * Callers must NOT unlock release by self-filling externalEffectCheck fields.
- * A controlled verifier reads locatable receipts / external state (or records an
- * authorized human attestation) and persists a verification bound to
- * tenant + task + op + attempt. Actions without reliable verify stay `unknown`
- * and forbid auto-retry.
+ * A controlled verifier / registry-selected adapter reads locatable receipts /
+ * external state (or records an authorized human attestation) and persists a
+ * verification bound to tenant + group + task + op + **executionAttemptId**.
+ *
+ * T37: attemptId MUST come from the current wake-op operation record. Caller-
+ * supplied free strings are not an authentication of "this attempt". Release
+ * binds verification.attemptId to the op's current executionAttemptId.
  *
  * Human attestation stores basis/scope/responsible subject and MUST NOT claim
  * platformAutoProved.
+ *
+ * Production composition: select adapters by operation type via
+ * {@link producePlatformNoneVerificationViaAdapter}. The probe-callback form
+ * remains DI for tests; it is not the production trusted evidence chain.
  */
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -32,6 +39,7 @@ export type ExternalEffectVerificationRecord = Readonly<{
   groupId: string;
   taskId: string;
   opKey: string;
+  /** Bound to WakeOpRecord.executionAttemptId at produce time. */
   attemptId: string;
   outcome: "none";
   kind: ExternalEffectVerificationKind;
@@ -99,25 +107,111 @@ async function persistVerification(
   return record;
 }
 
+/** Minimal op fields adapters need (loaded by composition root from ledger). */
+export type WakeOpEffectVerifyOpSnapshot = Readonly<{
+  opKey: string;
+  groupId: string;
+  taskId?: string;
+  source: string;
+  status: string;
+  executionAttemptId?: string;
+}>;
+
+/** Context passed to a trusted verification adapter. */
+export type WakeOpEffectVerifyContext = Readonly<{
+  authority: RuntimeAuthority;
+  record: WakeOpEffectVerifyOpSnapshot;
+  groupId: string;
+  taskId: string;
+  opKey: string;
+  attemptId: string;
+  nowMs: number;
+}>;
+
+/**
+ * Trusted adapter: reads and validates receipts / external state for a specific
+ * operation type. Returning null means capability unavailable → keep unknown.
+ */
+export type WakeOpEffectVerifyAdapter = Readonly<{
+  /** Operation `source` (or type key) this adapter is allowed to verify. */
+  operationType: string;
+  verifyNone: (
+    ctx: WakeOpEffectVerifyContext,
+  ) => Promise<{ source: string; outcome: "none" } | null>;
+}>;
+
+export type WakeOpEffectVerifyAdapterRegistry = ReadonlyArray<WakeOpEffectVerifyAdapter>;
+
+export function selectWakeOpVerifyAdapter(
+  registry: WakeOpEffectVerifyAdapterRegistry,
+  operationType: string,
+): WakeOpEffectVerifyAdapter | null {
+  const key = compact(operationType);
+  if (!key) {
+    return null;
+  }
+  return registry.find((a) => compact(a.operationType) === key) ?? null;
+}
+
+/**
+ * Test/stub adapter that actually reads a fixture receipt file and only proves
+ * none when the file asserts outcome none for the matching opKey+attemptId.
+ */
+export function createFixtureReceiptNoneAdapter(params: {
+  operationType: string;
+  receiptFilePath: string;
+}): WakeOpEffectVerifyAdapter {
+  return {
+    operationType: params.operationType,
+    verifyNone: async (ctx) => {
+      try {
+        const raw = await fs.readFile(params.receiptFilePath, "utf8");
+        const parsed = JSON.parse(raw) as {
+          opKey?: string;
+          attemptId?: string;
+          outcome?: string;
+          source?: string;
+        };
+        if (compact(parsed.opKey) !== ctx.opKey) {
+          return null;
+        }
+        if (compact(parsed.attemptId) !== ctx.attemptId) {
+          return null;
+        }
+        if (parsed.outcome !== "none") {
+          return null;
+        }
+        const source = compact(parsed.source) || params.receiptFilePath;
+        return { source, outcome: "none" };
+      } catch {
+        return null;
+      }
+    },
+  };
+}
+
 export type ProducePlatformNoneVerificationParams = {
   authority: RuntimeAuthority;
   cfg?: OpenBotConfig;
   groupId: string;
   taskId: string;
   opKey: string;
-  attemptId?: string;
+  /**
+   * MUST equal the current WakeOpRecord.executionAttemptId.
+   * Prefer {@link producePlatformNoneVerificationViaAdapter} which loads it.
+   */
+  attemptId: string;
   nowMs?: number;
   /**
-   * Controlled probe: return locatable source id when external effect is
-   * confirmed absent. Return null when verify capability is unavailable
-   * (caller must keep unknown — no auto-retry).
+   * DI / test probe only — NOT the production trusted evidence chain.
+   * Production must use registry-selected adapters that read receipts.
    */
   probe: () => Promise<{ source: string; outcome: "none" } | null>;
 };
 
 /**
- * Platform path: read locatable receipt / external state via probe.
- * Does not accept caller-supplied outcome as fact — probe result is the basis.
+ * DI helper: probe callback path. Prefer adapter registry for composition root.
+ * attemptId is required (no Date.now fallback) and should come from the op record.
  */
 export async function producePlatformNoneVerification(
   params: ProducePlatformNoneVerificationParams,
@@ -125,8 +219,12 @@ export async function producePlatformNoneVerification(
   const opKey = compact(params.opKey);
   const groupId = compact(params.groupId);
   const taskId = compact(params.taskId);
+  const attemptId = compact(params.attemptId);
   if (!opKey || !groupId || !taskId) {
     return { ok: false, reason: "missing_verification_scope" };
+  }
+  if (!attemptId) {
+    return { ok: false, reason: "missing_execution_attempt" };
   }
   let probed: { source: string; outcome: "none" } | null;
   try {
@@ -150,7 +248,85 @@ export async function producePlatformNoneVerification(
     groupId,
     taskId,
     opKey,
-    attemptId: compact(params.attemptId) || `attempt:${nowMs}`,
+    attemptId,
+    outcome: "none",
+    kind: "platform_receipt",
+    source: compact(probed.source),
+    checkedAtMs: nowMs,
+    platformAutoProved: true,
+  };
+  await persistVerification(params.authority, params.cfg, record);
+  return { ok: true, record };
+}
+
+/**
+ * Composition-root path: load current op record, select adapter by operation
+ * type, adapter reads receipts. No adapter → keep unknown.
+ * attemptId always comes from the operation record.
+ */
+export async function producePlatformNoneVerificationViaAdapter(params: {
+  authority: RuntimeAuthority;
+  cfg?: OpenBotConfig;
+  /** Current wake-op snapshot from ledger (composition root loads it). */
+  op: WakeOpEffectVerifyOpSnapshot;
+  registry: WakeOpEffectVerifyAdapterRegistry;
+  nowMs?: number;
+}): Promise<
+  { ok: true; record: ExternalEffectVerificationRecord } | { ok: false; reason: string }
+> {
+  const wake = params.op;
+  const opKey = compact(wake.opKey);
+  if (!opKey) {
+    return { ok: false, reason: "missing_verification_scope" };
+  }
+  if (wake.status !== "unknown") {
+    return { ok: false, reason: `op_status_${wake.status}` };
+  }
+  const attemptId = compact(wake.executionAttemptId);
+  if (!attemptId) {
+    return { ok: false, reason: "missing_execution_attempt" };
+  }
+  const groupId = compact(wake.groupId);
+  const taskId = compact(wake.taskId);
+  if (!groupId || !taskId) {
+    return { ok: false, reason: "missing_verification_scope" };
+  }
+  const adapter = selectWakeOpVerifyAdapter(params.registry, wake.source);
+  if (!adapter) {
+    return { ok: false, reason: "verify_capability_unavailable" };
+  }
+  const nowMs = params.nowMs ?? Date.now();
+  const ctx: WakeOpEffectVerifyContext = {
+    authority: params.authority,
+    record: wake,
+    groupId,
+    taskId,
+    opKey,
+    attemptId,
+    nowMs,
+  };
+  let probed: { source: string; outcome: "none" } | null;
+  try {
+    probed = await adapter.verifyNone(ctx);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `adapter_failed:${error instanceof Error ? error.message.slice(0, 80) : "error"}`,
+    };
+  }
+  if (!probed) {
+    return { ok: false, reason: "verify_capability_unavailable" };
+  }
+  if (probed.outcome !== "none" || !compact(probed.source)) {
+    return { ok: false, reason: "effect_check_contradictory_outcome" };
+  }
+  const record: ExternalEffectVerificationRecord = {
+    verificationId: randomUUID(),
+    tenantId: params.authority.tenantId,
+    groupId,
+    taskId,
+    opKey,
+    attemptId,
     outcome: "none",
     kind: "platform_receipt",
     source: compact(probed.source),
@@ -168,7 +344,8 @@ export type ProduceHumanNoneAttestationParams = {
   groupId: string;
   taskId: string;
   opKey: string;
-  attemptId?: string;
+  /** MUST equal current WakeOpRecord.executionAttemptId. */
+  attemptId: string;
   basis: string;
   scope: string;
   nowMs?: number;
@@ -192,8 +369,12 @@ export async function produceHumanNoneAttestation(
   const opKey = compact(params.opKey);
   const groupId = compact(params.groupId);
   const taskId = compact(params.taskId);
+  const attemptId = compact(params.attemptId);
   if (!basis || !scope || !opKey || !groupId || !taskId) {
     return { ok: false, reason: "missing_human_attestation_fields" };
+  }
+  if (!attemptId) {
+    return { ok: false, reason: "missing_execution_attempt" };
   }
   if (params.subject.groupId !== groupId || params.subject.taskId !== taskId) {
     return { ok: false, reason: "subject_scope_mismatch" };
@@ -205,7 +386,7 @@ export async function produceHumanNoneAttestation(
     groupId,
     taskId,
     opKey,
-    attemptId: compact(params.attemptId) || `attempt:${nowMs}`,
+    attemptId,
     outcome: "none",
     kind: "human_attestation",
     source: "human_attestation",
@@ -225,13 +406,16 @@ export type BindVerificationForReleaseParams = {
   opKey: string;
   groupId: string;
   taskId: string;
+  /** Current WakeOpRecord.executionAttemptId — must match verification.attemptId. */
+  currentAttemptId: string;
+  tenantId?: string | null;
   nowMs: number;
   maxAgeMs?: number;
 };
 
 /**
  * Load + bind a stored verification for release. Rejects missing / wrong op /
- * stale / contradictory / scope mismatch. Does not accept caller-built checks.
+ * wrong attempt / stale / contradictory / scope mismatch.
  */
 export async function bindVerificationForRelease(
   params: BindVerificationForReleaseParams,
@@ -254,6 +438,18 @@ export async function bindVerificationForRelease(
   }
   if (compact(stored.taskId) !== compact(params.taskId)) {
     return { ok: false, reason: "verification_task_mismatch" };
+  }
+  const currentAttemptId = compact(params.currentAttemptId);
+  if (!currentAttemptId) {
+    return { ok: false, reason: "missing_execution_attempt" };
+  }
+  if (compact(stored.attemptId) !== currentAttemptId) {
+    return { ok: false, reason: "effect_check_attempt_mismatch" };
+  }
+  if (params.tenantId != null && stored.tenantId != null) {
+    if (compact(String(stored.tenantId)) !== compact(String(params.tenantId))) {
+      return { ok: false, reason: "verification_tenant_mismatch" };
+    }
   }
   if (stored.outcome !== "none") {
     return { ok: false, reason: "effect_check_contradictory_outcome" };

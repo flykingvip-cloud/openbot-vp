@@ -21,6 +21,7 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-op-effect-verify.js";
 import {
   claimWakeOpRunning,
   markWakeOpCompleted,
@@ -38,7 +39,10 @@ import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { requestCollaborationTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
 import {
+  WAKE_OP_RECOVERY_IDENTITY_MODE,
   confirmWakeOpCompletedAuthorized,
+  createInternalLibraryRecoveryExecContext,
+  producePlatformNoneVerificationAtRoot,
   releaseWakeOpForRetryAuthorized,
   resolveWakeOpRecoverySubjectForAction,
 } from "./wake-op-recovery-entry.js";
@@ -202,6 +206,18 @@ function opKeyFor(taskId: string, itemId: string) {
   );
 }
 
+async function currentAttemptId(
+  authority: Parameters<typeof readWakeOpRecord>[0]["authority"],
+  opKey: string,
+): Promise<string> {
+  const rec = await readWakeOpRecord({ authority, opKey });
+  const id = rec?.executionAttemptId?.trim() ?? "";
+  if (!id) {
+    throw new Error(`missing executionAttemptId for ${opKey}`);
+  }
+  return id;
+}
+
 async function waitRunning(
   authority: Parameters<typeof readWakeOpRecord>[0]["authority"],
   opKey: string,
@@ -281,6 +297,7 @@ describe("T36 M1 trusted authorization", () => {
       groupId,
       taskId,
       opKey: claimed.opKey,
+      attemptId: await currentAttemptId(authority, claimed.opKey),
       probe: async () => ({ source: "probe", outcome: "none" }),
     });
     expect(ver.ok).toBe(true);
@@ -348,6 +365,7 @@ describe("T36 M2 trusted verification", () => {
       groupId,
       taskId,
       opKey: claimed.opKey,
+      attemptId: await currentAttemptId(authority, claimed.opKey),
       basis: "operator inspected external ticket XYZ",
       scope: `tenant:${tenant.tenantId}/task:${taskId}/op:${claimed.opKey}`,
     });
@@ -406,6 +424,7 @@ describe("T36 M2 trusted verification", () => {
           groupId,
           taskId,
           opKey: claimed2.opKey,
+          attemptId: await currentAttemptId(authority, claimed2.opKey),
           probe: async () => ({ source: "probe", outcome: "none" }),
         });
         if (!v.ok) {
@@ -596,6 +615,7 @@ describe("T36 M3 stop/revoke × dispatch races", () => {
       groupId,
       taskId,
       opKey: claimed.opKey,
+      attemptId: await currentAttemptId(authority, claimed.opKey),
       probe: async () => ({ source: "probe", outcome: "none" }),
     });
     expect(ver.ok).toBe(true);
@@ -634,5 +654,325 @@ describe("T36 M3 stop/revoke × dispatch races", () => {
     if (b.ok) {
       expect(final?.status).toBe("completed");
     }
+  });
+});
+
+describe("T37 M2 attempt binding (fail-first)", () => {
+  test("M2-ATTEMPT-01: attempt A none cannot release attempt B; only B-bound verification unlocks", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-t37-attempt";
+    const { authority, groupId } = await seed({ cfg, taskId, itemId: "att" });
+    const keyInput = {
+      groupId,
+      source: "nudge" as const,
+      fromAgentId: "system:group_task_heartbeat",
+      toAgentIds: [tenant.bot0],
+      taskId,
+      itemId: "att-1",
+    };
+
+    // Attempt A
+    const claimA = await claimWakeOpRunning({ authority, cfg, keyInput });
+    expect(claimA.action).toBe("proceed");
+    const attemptA = claimA.record?.executionAttemptId;
+    expect(attemptA).toBeTruthy();
+    await markWakeOpUnknown({ authority, opKey: claimA.opKey, cfg, detail: "A uncertain" });
+
+    const verA = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: claimA.opKey,
+      attemptId: await currentAttemptId(authority, claimA.opKey),
+      probe: async () => ({ source: "probe-A", outcome: "none" }),
+    });
+    expect(verA.ok).toBe(true);
+    if (!verA.ok) {
+      throw new Error("verA");
+    }
+    expect(verA.record.attemptId).toBe(attemptA);
+
+    const releaseA = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: claimA.opKey,
+      actorId: tenant.owner,
+      verificationId: verA.record.verificationId,
+      cfg,
+    });
+    expect(releaseA.ok).toBe(true);
+    if (!releaseA.ok) {
+      throw new Error("releaseA");
+    }
+    expect(releaseA.record.status).toBe("failed");
+
+    // Attempt B: claim after failed → new executionAttemptId → unknown
+    const claimB = await claimWakeOpRunning({ authority, cfg, keyInput });
+    expect(claimB.action).toBe("proceed");
+    const attemptB = claimB.record?.executionAttemptId;
+    expect(attemptB).toBeTruthy();
+    expect(attemptB).not.toBe(attemptA);
+    await markWakeOpUnknown({ authority, opKey: claimB.opKey, cfg, detail: "B uncertain" });
+
+    // Using A's verification to release B MUST reject + state unchanged
+    const reuseA = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: claimB.opKey,
+      actorId: tenant.owner,
+      verificationId: verA.record.verificationId,
+      cfg,
+    });
+    expect(reuseA.ok).toBe(false);
+    expect((reuseA as { reason: string }).reason).toBe("effect_check_attempt_mismatch");
+    expect((await readWakeOpRecord({ authority, opKey: claimB.opKey }))?.status).toBe("unknown");
+    expect((await readWakeOpRecord({ authority, opKey: claimB.opKey }))?.executionAttemptId).toBe(
+      attemptB,
+    );
+
+    // Only verification bound to B may allow recovery
+    const verB = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: claimB.opKey,
+      attemptId: await currentAttemptId(authority, claimB.opKey),
+      probe: async () => ({ source: "probe-B", outcome: "none" }),
+    });
+    expect(verB.ok).toBe(true);
+    if (!verB.ok) {
+      throw new Error("verB");
+    }
+    expect(verB.record.attemptId).toBe(attemptB);
+
+    const releaseB = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: claimB.opKey,
+      actorId: tenant.owner,
+      verificationId: verB.record.verificationId,
+      cfg,
+    });
+    expect(releaseB.ok).toBe(true);
+    if (!releaseB.ok) {
+      throw new Error("releaseB");
+    }
+    expect(releaseB.record.status).toBe("failed");
+  });
+});
+
+describe("T37 M1 subject source boundary", () => {
+  test("M1-BRAND-01: Symbol.for forged brand rejected; identity mode is internal-library", async () => {
+    expect(WAKE_OP_RECOVERY_IDENTITY_MODE).toBe("internal_library_not_e2e_authenticated");
+
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-t37-m1-brand";
+    const { authority, groupId } = await seed({ cfg, taskId, itemId: "m1b" });
+    const claimed = await claimWakeOpRunning({
+      authority,
+      cfg,
+      keyInput: {
+        groupId,
+        source: "nudge",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "m1b-u",
+      },
+    });
+    await markWakeOpUnknown({ authority, opKey: claimed.opKey, cfg });
+
+    const FORGE_BRAND = Symbol.for("openbot.WakeOpRecoverySubject");
+    const forged = {
+      actorId: tenant.owner,
+      action: "release_for_retry" as const,
+      groupId,
+      taskId,
+      taskApproverIds: [] as string[],
+      mintedAtMs: Date.now(),
+      [FORGE_BRAND]: true as const,
+    };
+    const forgedRelease = await releaseWakeOpForRetry({
+      authority,
+      opKey: claimed.opKey,
+      cfg,
+      externalEffectVerified: "none",
+      verificationId: "x",
+      subject: forged as never,
+    });
+    expect(forgedRelease.ok).toBe(false);
+    expect((forgedRelease as { reason: string }).reason).toBe("operator_identity_not_trusted");
+    expect((await readWakeOpRecord({ authority, opKey: claimed.opKey }))?.status).toBe("unknown");
+
+    // actorId-only path cannot claim e2e authentication — exec context is labeled internal
+    const exec = await createInternalLibraryRecoveryExecContext({
+      groupId,
+      taskId,
+      actorId: tenant.owner,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(exec.ok).toBe(true);
+    if (!exec.ok) {
+      throw new Error("exec");
+    }
+    expect(exec.exec.identityProvenance).toBe("caller_asserted_internal");
+    expect(exec.exec.identityMode).toBe("internal_library_not_e2e_authenticated");
+
+    // Symbol.for forged object is not a valid exec context either
+    const forgedExec = {
+      actorId: tenant.owner,
+      groupId,
+      taskId,
+      action: "release_for_retry" as const,
+      identityProvenance: "caller_asserted_internal" as const,
+      identityMode: WAKE_OP_RECOVERY_IDENTITY_MODE,
+      [Symbol.for("openbot.WakeOpRecoveryExecContext")]: true,
+    };
+    const forgedExecRelease = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: claimed.opKey,
+      exec: forgedExec as never,
+      verificationId: "x",
+      cfg,
+    });
+    expect(forgedExecRelease.ok).toBe(false);
+    expect((forgedExecRelease as { reason: string }).reason).toBe("operator_identity_not_trusted");
+  });
+});
+
+describe("T37 M2 trusted verifier adapters", () => {
+  test("M2-ADAPTER-01: registry adapter reads fixture receipt; arbitrary probe is not production root; no adapter keeps unknown", async () => {
+    const { cfg, root } = await useIsolationRoot();
+    const taskId = "task-t37-adapter";
+    const { authority, groupId } = await seed({ cfg, taskId, itemId: "adp" });
+    const claimed = await claimWakeOpRunning({
+      authority,
+      cfg,
+      keyInput: {
+        groupId,
+        source: "nudge",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "adp-1",
+      },
+    });
+    await markWakeOpUnknown({ authority, opKey: claimed.opKey, cfg });
+    const attemptId = await currentAttemptId(authority, claimed.opKey);
+
+    // Empty registry → capability unavailable
+    const noAdapter = await producePlatformNoneVerificationAtRoot({
+      authority,
+      opKey: claimed.opKey,
+      registry: [],
+      cfg,
+    });
+    expect(noAdapter.ok).toBe(false);
+    expect((noAdapter as { reason: string }).reason).toBe("verify_capability_unavailable");
+    expect((await readWakeOpRecord({ authority, opKey: claimed.opKey }))?.status).toBe("unknown");
+
+    // Wrong opType in registry → unavailable
+    const wrongType = await producePlatformNoneVerificationAtRoot({
+      authority,
+      opKey: claimed.opKey,
+      registry: [
+        createFixtureReceiptNoneAdapter({
+          operationType: "other-source",
+          receiptFilePath: "/dev/null",
+        }),
+      ],
+      cfg,
+    });
+    expect(wrongType.ok).toBe(false);
+    expect((wrongType as { reason: string }).reason).toBe("verify_capability_unavailable");
+
+    // Fixture receipt adapter that actually reads the file
+    const receiptPath = `${root}/fixture-receipt-none.json`;
+    await fs.writeFile(
+      receiptPath,
+      JSON.stringify({
+        opKey: claimed.opKey,
+        attemptId,
+        outcome: "none",
+        source: receiptPath,
+      }),
+      "utf8",
+    );
+    const registry = [
+      createFixtureReceiptNoneAdapter({ operationType: "nudge", receiptFilePath: receiptPath }),
+    ];
+    const okVer = await producePlatformNoneVerificationAtRoot({
+      authority,
+      opKey: claimed.opKey,
+      registry,
+      cfg,
+    });
+    expect(okVer.ok).toBe(true);
+    if (!okVer.ok) {
+      throw new Error("okVer");
+    }
+    expect(okVer.record.platformAutoProved).toBe(true);
+    expect(okVer.record.attemptId).toBe(attemptId);
+    expect(okVer.record.source).toBe(receiptPath);
+
+    // Stale attempt in fixture → adapter returns null → unavailable
+    await fs.writeFile(
+      receiptPath,
+      JSON.stringify({
+        opKey: claimed.opKey,
+        attemptId: "stale-other-attempt",
+        outcome: "none",
+        source: receiptPath,
+      }),
+      "utf8",
+    );
+    const stale = await producePlatformNoneVerificationAtRoot({
+      authority,
+      opKey: claimed.opKey,
+      registry,
+      cfg,
+    });
+    expect(stale.ok).toBe(false);
+    expect((stale as { reason: string }).reason).toBe("verify_capability_unavailable");
+
+    // Positive release with correct fixture
+    await fs.writeFile(
+      receiptPath,
+      JSON.stringify({
+        opKey: claimed.opKey,
+        attemptId,
+        outcome: "none",
+        source: receiptPath,
+      }),
+      "utf8",
+    );
+    const ver2 = await producePlatformNoneVerificationAtRoot({
+      authority,
+      opKey: claimed.opKey,
+      registry,
+      cfg,
+    });
+    expect(ver2.ok).toBe(true);
+    if (!ver2.ok) {
+      throw new Error("ver2");
+    }
+    const released = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: claimed.opKey,
+      actorId: tenant.owner,
+      verificationId: ver2.record.verificationId,
+      cfg,
+    });
+    expect(released.ok).toBe(true);
   });
 });

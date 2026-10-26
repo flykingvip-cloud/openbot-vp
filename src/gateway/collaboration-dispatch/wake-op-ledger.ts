@@ -21,7 +21,7 @@
  *
  * Memory-only dedup is forbidden as the sole proof of correctness.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
@@ -66,10 +66,16 @@ export {
 } from "./wake-op-recovery-gate.js";
 export {
   bindVerificationForRelease,
+  createFixtureReceiptNoneAdapter,
   produceHumanNoneAttestation,
   producePlatformNoneVerification,
+  producePlatformNoneVerificationViaAdapter,
   readExternalEffectVerification,
+  selectWakeOpVerifyAdapter,
+  type WakeOpEffectVerifyAdapter,
+  type WakeOpEffectVerifyAdapterRegistry,
 } from "./wake-op-effect-verify.js";
+export { WAKE_OP_RECOVERY_IDENTITY_MODE } from "./wake-op-recovery-gate.js";
 export const WAKE_OP_PROCESSING_STATUSES = [
   "accepted",
   "running",
@@ -99,6 +105,12 @@ export type WakeOpRecord = Readonly<{
   externalEffectCheck?: ExternalEffectCheckRecord;
   /** Audit: who confirmed unknown→completed from a prior receipt. */
   confirmedBy?: string;
+  /**
+   * T37: current wake-op execution attempt id. Assigned at claim (new or
+   * retry-from-failed). Verification for release MUST bind this id from the
+   * operation record — not a caller-supplied free string.
+   */
+  executionAttemptId?: string;
   /**
    * M3: dispatch eligibility commit (linearization point). Written under the
    * wake-op lock after stop+auth recheck; holds controlEpoch + auth fingerprint
@@ -317,6 +329,12 @@ export async function claimWakeOpRunning(params: {
           detail: "retry_after_failed",
           updatedAtMs: nowMs,
           roundId: undefined,
+          // New execution attempt — prior attempt's none-proof must not unlock this one.
+          executionAttemptId: randomUUID(),
+          releasedBy: undefined,
+          externalEffectVerified: undefined,
+          externalEffectCheck: undefined,
+          dispatchEligibility: undefined,
         };
         await writeJsonDurable(file, next);
         return { action: "proceed", opKey, record: next };
@@ -336,6 +354,7 @@ export async function claimWakeOpRunning(params: {
       fromAgentId: compact(params.keyInput.fromAgentId),
       toAgentIds,
       status: "running",
+      executionAttemptId: randomUUID(),
       createdAtMs: nowMs,
       updatedAtMs: nowMs,
     };
@@ -629,12 +648,22 @@ export async function releaseWakeOpForRetry(params: {
     return { ok: false, reason: "external_effect_not_verified" };
   }
   const nowMs = params.nowMs ?? Date.now();
+  const currentBefore = await readWakeOpRecord({ authority: params.authority, opKey });
+  if (!currentBefore) {
+    return { ok: false, reason: "missing_record" };
+  }
+  const currentAttemptId = compact(currentBefore.executionAttemptId);
+  if (!currentAttemptId) {
+    return { ok: false, reason: "missing_execution_attempt" };
+  }
   const bound = await bindVerificationForRelease({
     authority: params.authority,
     verificationId: params.verificationId,
     opKey,
     groupId: trusted.subject.groupId,
     taskId: trusted.subject.taskId,
+    currentAttemptId,
+    tenantId: params.authority.tenantId,
     nowMs,
   });
   if (!bound.ok) {
@@ -653,6 +682,10 @@ export async function releaseWakeOpForRetry(params: {
     // dual write eligibility. Operator must verify effect, keep/mark unknown,
     // then release only from unknown with externalEffectVerified none.
     if (current.status !== "unknown") {
+      return current;
+    }
+    // Attempt must still match the verification binding (no silent attempt bump).
+    if (compact(current.executionAttemptId) !== currentAttemptId) {
       return current;
     }
     // Prior/late receipt on ledger → re-check; confirm path, not blind release.

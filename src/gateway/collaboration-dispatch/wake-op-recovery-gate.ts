@@ -37,11 +37,21 @@ export type TrustedWakeOpOperator = Readonly<{
   identitySource: "runtime";
 }>;
 
-const SUBJECT_BRAND: unique symbol = Symbol.for("openbot.WakeOpRecoverySubject");
+/**
+ * Module-private brand (NOT Symbol.for). Symbol.for forge is rejected by
+ * {@link isWakeOpRecoverySubject}. Brand = misuse prevention only — not an
+ * authentication proof. End-to-end caller identity requires gateway session
+ * wiring (not claimed here).
+ */
+const SUBJECT_BRAND: unique symbol = Symbol("openbot.WakeOpRecoverySubject");
+
+/** Reachability until production auth composition is wired. */
+export const WAKE_OP_RECOVERY_IDENTITY_MODE = "internal_library_not_e2e_authenticated" as const;
 
 /**
- * Minted recovery subject. Only {@link mintWakeOpRecoverySubject} produces this.
- * Plain objects with identitySource:"runtime" are refused at runtime.
+ * Minted recovery subject. Only the composition-root mint produces this.
+ * Plain objects / Symbol.for forgeries are refused at runtime.
+ * Brand does NOT prove the caller is actorId — see WAKE_OP_RECOVERY_IDENTITY_MODE.
  */
 export type WakeOpRecoverySubject = Readonly<{
   actorId: string;
@@ -62,7 +72,11 @@ export function isWakeOpRecoverySubject(value: unknown): value is WakeOpRecovery
   );
 }
 
-/** Internal mint — composition root / recovery entry only. */
+/**
+ * Internal mint — composition root only. Prefer
+ * wake-op-recovery-entry test harness / trusted exec context.
+ * Do not treat a successful mint as proof the network caller is actorId.
+ */
 export function mintWakeOpRecoverySubject(params: {
   actorId: string;
   action: WakeOpRecoveryAction;
