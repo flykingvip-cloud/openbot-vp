@@ -13,6 +13,7 @@ import {
   classifyTaskCapability,
   resolveExecutionRoutingFromCapabilityPlan,
   type ContextEstimateParts,
+  type ModalityExecutorWiring,
   type TaskCapabilityPlan,
   type CapabilityExecutionSurface,
   type CapabilityPlanOutcomeClaim,
@@ -32,6 +33,8 @@ export type ChildTaskAorReorderInput = {
   catalog?: readonly ModelProfile[];
   modelContextWindows?: Readonly<Record<string, number>>;
   contextParts?: ContextEstimateParts;
+  /** Optional image/music wiring (defaults unwired). */
+  executorWiring?: ModalityExecutorWiring;
 };
 
 export type ChildTaskAorReorderResult = {
@@ -92,6 +95,7 @@ export function reorderAuthorizedModelsForChildTask(
     preferredModelOrderFromAuth: preferredFromAuth,
     modelContextWindows: input.modelContextWindows,
     ...(input.contextParts ? { contextParts: input.contextParts } : {}),
+    ...(input.executorWiring ? { executorWiring: input.executorWiring } : {}),
   });
 
   const routing = resolveExecutionRoutingFromCapabilityPlan({

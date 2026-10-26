@@ -7,6 +7,7 @@ import {
 import {
   buildTaskCapabilityPlan,
   resolveExecutionRoutingFromCapabilityPlan,
+  type ModalityExecutorWiring,
 } from "./task-capability-plan.js";
 
 /**
@@ -94,5 +95,29 @@ describe("consumeCapabilityRoutingResult (four-entry surface)", () => {
     expect(line).toContain("status=executor_unwired");
     expect(line).toContain("textReturnedAllowed=true");
     expect(line).toContain("targetModalityCompleted=false");
+  });
+});
+
+describe("consumeCapabilityRoutingResult (wired image/music)", () => {
+  const wired: ModalityExecutorWiring = {
+    imageGeneration: true,
+    audioMusicGeneration: true,
+    audioTts: false,
+    audioUnderstanding: false,
+  };
+
+  it("wired image plan: status ok but still not completed at routing stage", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "画一张产品海报",
+      authorizedModelIds: ["openai/gpt-5.4"],
+      executorWiring: wired,
+    });
+    const routing = resolveExecutionRoutingFromCapabilityPlan({ capabilityPlan: plan });
+    const consumed = consumeCapabilityRoutingResult(routing);
+    expect(consumed.executionSurface.status).toBe("ok");
+    expect(consumed.executionSurface.allowedModality).toBe("image_generation");
+    expect(consumed.executionSurface.targetModalityCompleted).toBe(false);
+    expect(consumed.capabilityOutcome?.targetModalityCompleted).toBe(false);
+    expect(consumed.executionSurface.incompleteModalities).toEqual([]);
   });
 });

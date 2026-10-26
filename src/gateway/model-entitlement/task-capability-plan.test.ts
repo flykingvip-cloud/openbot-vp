@@ -8,6 +8,8 @@ import {
   resolveCapabilityExecutionSurface,
   resolveCapabilityPlanOutcomeClaim,
   resolveExecutionRoutingFromCapabilityPlan,
+  resolveModalityExecutorWiring,
+  type ModalityExecutorWiring,
 } from "./task-capability-plan.js";
 
 describe("classifyTaskCapability (P0/P1)", () => {
@@ -247,5 +249,60 @@ describe("plan ≠ completion (routing ok leaves targetModalityCompleted false)"
     expect(surface.status).toBe("ok");
     expect(surface.targetModalityCompleted).toBe(false);
     expect(surface.textReturnedAllowed).toBe(true);
+  });
+});
+
+describe("config-gated image/music executor wiring (MJ/Suno path)", () => {
+  const wired: ModalityExecutorWiring = {
+    imageGeneration: true,
+    audioMusicGeneration: true,
+    audioTts: false,
+    audioUnderstanding: false,
+  };
+
+  it("wires image_generation when executorWiring.imageGeneration is true", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "用 midjourney 画一张产品海报",
+      authorizedModelIds: ["openai/gpt-5.4"],
+      executorWiring: wired,
+    });
+    expect(plan.categoryId).toBe("design.image");
+    expect(plan.executor).toBe("image_generation");
+    expect(plan.failure.kind).toBe("none");
+    const claim = resolveCapabilityPlanOutcomeClaim(plan);
+    expect(claim.allowedModality).toBe("image_generation");
+    expect(claim.forbiddenSuccessModalities).toEqual([]);
+    const surface = resolveCapabilityExecutionSurface(claim);
+    expect(surface.status).toBe("ok");
+    expect(surface.targetModalityCompleted).toBe(false);
+    expect(surface.textReturnedAllowed).toBe(true);
+  });
+
+  it("wires audio_music_generation for suno keywords when music wiring is true", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "用 suno 写一段配乐",
+      authorizedModelIds: ["openai/gpt-5.4"],
+      executorWiring: wired,
+    });
+    expect(plan.categoryId).toBe("audio.music_gen");
+    expect(plan.executor).toBe("audio_music_generation");
+    expect(plan.failure.kind).toBe("none");
+    const surface = resolveCapabilityExecutionSurface(resolveCapabilityPlanOutcomeClaim(plan));
+    expect(surface.status).toBe("ok");
+    expect(surface.targetModalityCompleted).toBe(false);
+  });
+
+  it("keeps unwired when wiring omitted (default)", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "generate an illustration poster",
+      authorizedModelIds: ["openai/gpt-5.4"],
+    });
+    expect(plan.failure.kind).toBe("executor_unwired");
+    expect(plan.executor).toBe("chat_model");
+  });
+
+  it("resolveModalityExecutorWiring stays false without config", () => {
+    expect(resolveModalityExecutorWiring(undefined).imageGeneration).toBe(false);
+    expect(resolveModalityExecutorWiring(undefined).audioMusicGeneration).toBe(false);
   });
 });
