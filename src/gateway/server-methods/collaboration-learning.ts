@@ -572,7 +572,6 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       !assertValidParams(
         params,
         validateCollaborationTaskAdminDailySummaryParams,
-        validateCollaborationTaskTrySelfAdvanceParams,
         "collaboration.task.adminDailySummary",
         respond,
       )

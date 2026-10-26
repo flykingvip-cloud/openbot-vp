@@ -178,11 +178,17 @@ export function startGroupTaskHeartbeatScheduler(
 
   const clearTimer = () => {
     if (timer) {
-      clearInterval(timer);
+      clearTimeout(timer);
       timer = null;
     }
   };
 
+  // Recursive setTimeout (not setInterval): Floor Runtime v2.1 §2.2 (a) forbids
+  // setInterval inside collaboration-dispatch (R3 periodic timers).
+  //
+  // Re-arm ONLY via armTimer() (clear-then-schedule). The previous pattern
+  // scheduled the next timeout in `finally` without clearing; if updateConfig
+  // armed a timer while a tick was in flight, `finally` queued a second chain.
   const armTimer = () => {
     clearTimer();
     if (stopped) {
@@ -191,14 +197,23 @@ export function startGroupTaskHeartbeatScheduler(
     if (!resolveGroupTaskHeartbeatSchedulerEnabled(cfg)) {
       return;
     }
-    const interval = Math.max(
-      1_000,
-      opts.pollIntervalMs ?? resolveGroupTaskHeartbeatScanIntervalMs(cfg),
-    );
-    timer = setInterval(() => {
-      void runTick({ force: false }).catch((err) => {
-        log.error(`group-task-heartbeat tick failed: ${String(err)}`);
-      });
+    // Explicit pollIntervalMs is a test/ops override (may be <1s). Production
+    // path keeps a 1s floor when reading scanIntervalMs from config.
+    const interval =
+      opts.pollIntervalMs != null
+        ? Math.max(1, opts.pollIntervalMs)
+        : Math.max(1_000, resolveGroupTaskHeartbeatScanIntervalMs(cfg));
+    timer = setTimeout(() => {
+      void runTick({ force: false })
+        .catch((err) => {
+          log.error(`group-task-heartbeat tick failed: ${String(err)}`);
+        })
+        .finally(() => {
+          if (stopped) {
+            return;
+          }
+          armTimer();
+        });
     }, interval);
     timer.unref?.();
   };
@@ -305,6 +320,15 @@ export function startGroupTaskHeartbeatScheduler(
         return;
       }
       cfg = nextCfg;
+      // If a tick is in flight, do not arm here — its `finally` calls armTimer()
+      // with the updated cfg. Arming now would schedule a timer that can fire
+      // before the in-flight tick finishes (duplicate chain / overlapping fire).
+      if (inFlight) {
+        if (!resolveGroupTaskHeartbeatSchedulerEnabled(cfg)) {
+          clearTimer();
+        }
+        return;
+      }
       armTimer();
     },
     runTickNow: (tickOpts) => runTick(tickOpts),

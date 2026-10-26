@@ -989,3 +989,59 @@ describe("PPT / deliverable intent vs last_speaker sticky", () => {
     expect(isExplicitPptOrDeliverableIntent("请分析一下市场")).toBe(false);
   });
 });
+
+describe("missing/empty agentId selection (preferSkill path)", () => {
+  test("empty agentId bots do not throw and do not match skill by id", () => {
+    const scope = withSkillIncubatorBot(createScope("deliver"));
+    // Whitespace / empty ids normalize to null; (id ?? "").includes("skill") must not throw.
+    scope.bots.unshift(createBot({ agentId: "", name: "无名号", updatedAt: 1 }));
+    scope.bots.unshift(createBot({ agentId: "   ", name: "空白号", updatedAt: 2 }));
+    scope.members?.bots.push(
+      { agentId: "", name: "无名号", status: "active" },
+      { agentId: "   ", name: "空白号", status: "active" },
+    );
+    if (scope.operatingState) {
+      scope.operatingState.collaborationPolicy.openDiscussionWithoutMention = false;
+      scope.operatingState.governance.coordinatorBotId = null;
+    }
+    scope.coordinatorBotId = null;
+
+    expect(() =>
+      decideParticipantsForTest({
+        message: "请做一份路演 PPTX 演示文稿",
+        scope,
+        roundId: "round-empty-agentid-ppt",
+      }),
+    ).not.toThrow();
+
+    const decision = decideParticipantsForTest({
+      message: "请做一份路演 PPTX 演示文稿",
+      scope,
+      roundId: "round-empty-agentid-ppt-2",
+    });
+    expect(decision.executionBots.map((bot) => bot.agentId)).toEqual(["bot-skill"]);
+    expect(decision.primaryQueue).toEqual(["bot-skill"]);
+  });
+
+  test("missing agentId does not crash unmentioned greet selection", () => {
+    const scope = createScope("explore");
+    scope.bots.unshift(createBot({ agentId: "", name: "幽灵", updatedAt: 1 }));
+    scope.members?.bots.push({ agentId: "", name: "幽灵", status: "active" });
+
+    expect(() =>
+      decideParticipantsForTest({
+        message: "大家好",
+        scope,
+        roundId: "round-empty-agentid-greet",
+      }),
+    ).not.toThrow();
+
+    const decision = decideParticipantsForTest({
+      message: "大家好",
+      scope,
+      roundId: "round-empty-agentid-greet-2",
+    });
+    expect(decision.executionBots.length).toBeGreaterThan(0);
+    expect(decision.executionBots.every((bot) => Boolean(bot.agentId?.trim()))).toBe(true);
+  });
+});
