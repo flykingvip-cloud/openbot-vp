@@ -313,9 +313,9 @@ export async function runAgentTurnWithFallback(params: {
       ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
       ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
     })
-      .then(() =>
-        syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId),
-      )
+      .then(async () => {
+        await syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId);
+      })
       .catch((error: unknown) => {
         // Evolution / TaskOutcome write must stay observable. The user-facing
         // reply path is already decided and is not rewritten here.

@@ -1,5 +1,12 @@
 import { newFencingToken, TaskOutcomeResultService } from "../result-service.js";
-import type { AcceptanceEvidence, AttemptResult, RunResult, TrustedScope } from "../types.js";
+import type {
+  AcceptanceEvidence,
+  AttemptResult,
+  RunResult,
+  SubmitFailure,
+  TaskOutcomeRecord,
+  TrustedScope,
+} from "../types.js";
 
 /**
  * Chat entry adapter: creates/restores taskId; never invents task-level success
@@ -14,7 +21,7 @@ export class ChatTaskOutcomeAdapter {
     taskContractVersion: string;
     restoreIfExists?: boolean;
     commandId?: string;
-  }) {
+  }): { ok: true; record: TaskOutcomeRecord; fencingToken: string } | SubmitFailure {
     const existing = this.service.get(params.taskId);
     if (existing) {
       const mismatch = this.service.assertScope(params.taskId, params.scope);

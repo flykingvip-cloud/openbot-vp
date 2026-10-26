@@ -5,6 +5,7 @@ import { applyTransition, evidenceStillValid, scopeIdOf } from "./transitions.js
 import type {
   OutcomeOutboxEvent,
   OutcomeEventType,
+  SubmitFailure,
   SubmitResult,
   SubmitTransition,
   TaskOutcomeRecord,
@@ -154,7 +155,7 @@ export class TaskOutcomeResultService {
       }
     }
 
-    if ("expectedVersion" in transition && transition.type !== "create") {
+    if ("expectedVersion" in transition) {
       if (!current) {
         return { ok: false, code: "not_found", message: `task ${taskId} not found` };
       }
@@ -301,7 +302,7 @@ export class TaskOutcomeResultService {
     return { ok: true, record, createdEvents: events };
   }
 
-  assertScope(taskId: string, scope: TrustedScope): SubmitResult | null {
+  assertScope(taskId: string, scope: TrustedScope): SubmitFailure | null {
     const cur = this.store.loadTask(taskId);
     if (!cur) {
       return null;

@@ -437,18 +437,34 @@ describe("R85g: top-level dispatchReplyFromConfig integration", () => {
     expect(taskIds.size).toBe(2);
 
     for (const row of positives) {
-      const record = store.loadTask(row.taskId);
+      const taskId = row.taskId;
+      if (!taskId) {
+        throw new Error("expected evolution row taskId");
+      }
+      const record = store.loadTask(taskId);
       expect(record?.lifecycle).toBe("closed");
       expect(record?.taskJudgement).toBe("success");
       expect(record?.delivery.status).toBe("delivered");
-      expect(record?.deliveryId).toBeTruthy();
-      expect(peekAwaitingDelivery({ deliveryId: record!.deliveryId! })).toBeUndefined();
+      const deliveryId = record?.deliveryId;
+      expect(deliveryId).toBeTruthy();
+      if (!deliveryId) {
+        throw new Error("expected deliveryId");
+      }
+      expect(peekAwaitingDelivery({ deliveryId })).toBeUndefined();
     }
 
     // Identities must not cross-wire: each deliveryId binds to its own task only.
-    const [t0, t1] = [...taskIds];
-    const r0 = store.loadTask(t0)!;
-    const r1 = store.loadTask(t1)!;
+    const idList = [...taskIds];
+    const t0 = idList[0];
+    const t1 = idList[1];
+    if (t0 === undefined || t1 === undefined) {
+      throw new Error("expected two task ids");
+    }
+    const r0 = store.loadTask(t0);
+    const r1 = store.loadTask(t1);
+    if (!r0 || !r1) {
+      throw new Error("expected both task records");
+    }
     expect(r0.deliveryId).not.toBe(r1.deliveryId);
     expect(r0.taskId).not.toBe(r1.taskId);
   });

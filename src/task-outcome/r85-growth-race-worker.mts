@@ -4,10 +4,14 @@ import type { OpenBotConfig } from "../config/config.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
 import type { TaskOutcomeRecord } from "./types.js";
 
-const agentDir = process.argv[2]!;
-const recordPath = process.argv[3]!;
-const barrier = process.argv[4]!;
-const id = process.argv[5]!;
+const agentDir = process.argv[2];
+const recordPath = process.argv[3];
+const barrier = process.argv[4];
+const id = process.argv[5];
+
+if (!agentDir || !recordPath || !barrier || !id) {
+  throw new Error("r85-growth-race-worker: missing argv (agentDir, recordPath, barrier, id)");
+}
 
 while (!fs.existsSync(barrier)) {
   // busy wait

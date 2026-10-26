@@ -1,13 +1,17 @@
 import fs from "node:fs";
-import { DurableTaskOutcomeStore } from "./store.js";
 import { TaskOutcomeResultService } from "./result-service.js";
+import { DurableTaskOutcomeStore } from "./store.js";
 import type { TrustedScope } from "./types.js";
 
-const root = process.argv[2]!;
+const root = process.argv[2];
 const expected = Number(process.argv[3]);
-const fencing = process.argv[4]!;
-const barrier = process.argv[5]!;
-const id = process.argv[6]!;
+const fencing = process.argv[4];
+const barrier = process.argv[5];
+const id = process.argv[6];
+
+if (!root || !fencing || !barrier || !id || Number.isNaN(expected)) {
+  throw new Error("r83-race-worker: missing argv (root, expectedVersion, fencing, barrier, id)");
+}
 
 const scope: TrustedScope = {
   kind: "personal",
