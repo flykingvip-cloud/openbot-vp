@@ -58,7 +58,7 @@ entrypoint adapter 实例方法
 | collab | claim-contract ensureCollab | group:item:claim | claim 面 | apply | claim 面 | wiring.test claim/apply |
 | chat | 既有 ensureChat | tip | 既有 | 既有 | 既有 | 既有 |
 
-**诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander：本提交仍含热路径声明；紧随 restore 提交恢复为模块路径 only。
+**诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander 已恢复为模块路径 only（交付树无异 owner 热路径声明）。
 
 **登记（验收未翻盘前）**：入口持久来源修复通过；cron／followup 部分接线通过；W1 全入口与恢复身份未完成。**未 merge / 未部署 / 未开 W2**。
 

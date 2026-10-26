@@ -9786,22 +9786,6 @@ landingStreams:
       - docs/design/task-outcome/call-chain-and-replacements.md
       - docs/notes/askOutcome-p0-baseline.md
       - src/task-outcome/**
-      # W1 remediation temp lander (hot entry wiring); restore after this commit
-      - src/auto-reply/reply/followup-runner.ts
-      - src/auto-reply/reply/queue/enqueue.ts
-      - src/auto-reply/reply/queue/types.ts
-      - src/cron/isolated-agent/run.ts
-      - src/cron/isolated-agent/run.task-outcome-closeout.test.ts
-      - src/cron/isolated-agent/run.test-harness.ts
-      - src/cron/service/state.ts
-      - src/cron/service/timer.ts
-      - src/task-outcome/followup-closeout.test.ts
-      - src/cron/types.ts
-      - src/gateway/protocol/schema/cron.ts
-      - src/gateway/server-cron.ts
-      - src/commands/agent.ts
-      - src/gateway/server-methods/agent.ts
-      - src/gateway/collaboration-learning/claim-contract-entry.ts
     canLandWith:
       - p1-task-driven-aor-scoring
       - askOutcome-p0-r83-remediation
@@ -9809,7 +9793,6 @@ landingStreams:
       task: askOutcome-p0-task-outcome-contract
       owner: executor-acceptance
       purpose: TaskOutcome unified durable replayable judgement (askOutcome P0)
-      tempLanderNote: W1 remediation hot-entry paths; next commit restores module-only
   - id: p1-task-driven-aor-scoring
     landingPolicy: serial
     paths:
