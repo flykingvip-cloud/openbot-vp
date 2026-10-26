@@ -3,8 +3,8 @@
  * P3 任务 13 — resolveEmployeeModelGate 的 AOR 选路路径。
  *
  * 验证：`aor_enhanced` + 套餐含 aorExecution 时，gate 在 EffectiveModelSet 内
- * 给出 `preferredModelOrder`（保集合重排）；`native` 模式下不产生 AOR 顺序；
- * allowlist 行为与 P1 一致。
+ * 给出 `preferredModelOrder`（保集合重排）；`native` 不做 AOR 重排，但仍可因
+ * P0 能力计划写出可执行顺序（allowlist 序）；allowlist 行为与 P1 一致。
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -150,7 +150,7 @@ describe("resolveEmployeeModelGate — AOR 选路（P3）", () => {
     expect(result.preferredModelOrder?.[0]).toBe("api-proxy-deepseek/cheap");
   });
 
-  it("native 模式不产出 AOR preferredModelOrder", async () => {
+  it("native 不做 AOR 重排，但仍可有 capability-plan preferredModelOrder", async () => {
     await seedEntitlementAndGrant();
     const result = await resolveEmployeeModelGate({
       cfg: makeCfg("native"),
@@ -158,7 +158,16 @@ describe("resolveEmployeeModelGate — AOR 选路（P3）", () => {
       gatewayClientSessionDomain: "employee",
       ...storeOpts(),
     });
-    expect(result.preferredModelOrder).toBeUndefined();
+    // native: no AOR selection / routing explanation
+    expect(result.aorRouting).toBeUndefined();
+    expect(result.aorFeedback).toBeUndefined();
+    // P0 capability plan still emits an executable order (allowlist order, not AOR reshuffle)
+    expect(result.capabilityPlan).toBeDefined();
+    expect(result.preferredModelOrder).toEqual(result.allowlist);
+    expect(result.preferredModelOrder).toEqual([
+      "api-proxy-deepseek/cheap",
+      "api-proxy-deepseek/premium",
+    ]);
   });
 
   it("aor_enhanced 无 aorExecution 时使用默认 balanced Policy 排序", async () => {
