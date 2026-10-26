@@ -9620,6 +9620,7 @@ tasks:
       - src/gateway/collaboration-dispatch/task-runtime.ts
       - src/gateway/collaboration-learning.ts
       - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
       - src/gateway/collaboration-dispatch/effective-policy.ts
       - src/gateway/collaboration-dispatch/task-control-cas.ts
       - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
@@ -9959,6 +9960,7 @@ landingStreams:
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/protocol/schema/protocol-schemas.ts
       - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
       - src/gateway/collaboration-dispatch/effective-policy.ts
       - src/gateway/collaboration-dispatch/task-control-cas.ts
       - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts

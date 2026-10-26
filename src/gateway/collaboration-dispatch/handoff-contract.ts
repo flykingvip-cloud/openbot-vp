@@ -545,12 +545,14 @@ export type HandoffLiveApplyDecision =
   | { kind: "conflict"; detail: string; responsibility: TaskResponsibility };
 
 /**
- * T45/T47: classify whether an approved handoff may still change live responsibility.
+ * T45/T47/T48: classify whether an approved handoff may still change live responsibility.
  *
  * Idempotent ONLY when the same handoffId is already in task history (contract identity).
  * Live responsibility happening to equal `toId` is `already_at_target` — never "already applied".
  * `baseHistoryLen` binds duty-chain version so A→B→A then replay of an old contract conflicts.
- * Ledger/status `applied` without history may still `apply` to repair projection.
+ * Ledger/status `applied` without history may still repair projection — but ONLY after the same
+ * owner/reviewer/approver/executor `from` checks as a fresh apply. Applied proves the contract
+ * reached apply once; it does not prove live responsibility is still safe to re-project.
  */
 export function classifyHandoffApplyAgainstLive(params: {
   contract: HandoffContract;
@@ -585,13 +587,8 @@ export function classifyHandoffApplyAgainstLive(params: {
     };
   }
 
-  // Same contract already applied in ledger but history/projection missing → repair path.
-  if (params.contract.status === "applied") {
-    return {
-      kind: "apply",
-      responsibility: nextResponsibility(liveResp, params.contract),
-    };
-  }
+  // T48: do NOT short-circuit on status===applied. Missing history may repair only when
+  // live still satisfies the same from-preconditions as a fresh apply; otherwise conflict.
 
   const fromId = compact(params.contract.from.agentId);
   const toId = compact(params.contract.to.agentId);

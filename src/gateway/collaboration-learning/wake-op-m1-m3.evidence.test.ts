@@ -15,6 +15,10 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
 import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-event-key.js";
+import {
+  applyApprovedHandoff,
+  loadHandoffContract,
+} from "../collaboration-dispatch/handoff-contract.js";
 import { resolveGroupPolicyInput } from "../collaboration-dispatch/resolve-effective-policy.js";
 import {
   createRoundPolicySnapshot,
@@ -3179,5 +3183,323 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
     );
     expect(final.stopControl?.status).toBe("accepted");
     expect(final.assignedMemberIds ?? []).not.toContain(tenant.admin);
+  });
+
+  test("M3-BIZ-H3 applied ledger + no history + live from mismatch must conflict", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-h3";
+    const { objectStorage, groupId, authority } = await seed({ cfg, taskId, itemId: "biz-h3" });
+
+    const proposed = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.bot0,
+      kind: "owner_transfer",
+      remainingWork: "h3-applied-recover",
+      acceptanceCriteria: ["owner bot0"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    expect(proposed.baseHistoryLen).toBe(0);
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+
+    // Ledger reaches applied without entry writing task history (partial apply).
+    const approved = await loadHandoffContract(authority, {
+      taskId,
+      handoffId: proposed.handoffId,
+    });
+    expect(approved?.status).toBe("approved");
+    const liveBefore = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const ledgerApplied = await applyApprovedHandoff(authority, approved!, liveBefore, { cfg });
+    expect(ledgerApplied.ok).toBe(true);
+    const afterLedger = await loadHandoffContract(authority, {
+      taskId,
+      handoffId: proposed.handoffId,
+    });
+    expect(afterLedger?.status).toBe("applied");
+
+    // Other legitimate entry changed owner; history still empty (same baseHistoryLen=0).
+    await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId,
+      cfg,
+      buildPatch: (live) => {
+        const g = asGovernedTask(live);
+        return {
+          ownerMemberId: tenant.admin,
+          responsibility: {
+            ...(g.responsibility ?? {
+              owner: tenant.coordinator,
+              executors: [tenant.bot0],
+              reviewers: [],
+              approvers: [tenant.approver],
+            }),
+            owner: tenant.admin,
+          },
+          handoffs: g.handoffs ?? [],
+          updatedAtMs: Date.now(),
+          updatedBy: tenant.admin,
+        };
+      },
+    });
+
+    await expect(
+      applyCollaborationTaskHandoffContract({
+        groupId,
+        taskId,
+        handoffId: proposed.handoffId,
+        actor: tenant.owner,
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      name: "HandoffContractEntryError",
+      code: "responsibility_conflict",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.responsibility?.owner).toBe(tenant.admin);
+    expect((final.handoffs ?? []).map((h) => h.handoffId)).not.toContain(proposed.handoffId);
+  });
+
+  test("M3-BIZ-H4 applied + same history len + other-entry duty change must conflict", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-h4";
+    const { objectStorage, groupId, authority } = await seed({ cfg, taskId, itemId: "biz-h4" });
+
+    // Seed one prior history entry so baseHistoryLen will be 1 (same len later).
+    await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId,
+      cfg,
+      buildPatch: (live) => {
+        const g = asGovernedTask(live);
+        return {
+          handoffs: [
+            {
+              taskId,
+              from: tenant.bot0,
+              to: tenant.admin,
+              reason: "continue",
+              remainingWork: "prior",
+              acceptanceCriteria: ["prior"],
+              completedArtifacts: [],
+              assumptions: [],
+              blockers: [],
+              handoffId: "prior-h4-history",
+            },
+          ],
+          responsibility: {
+            ...(g.responsibility ?? {
+              owner: tenant.coordinator,
+              executors: [tenant.bot0],
+              reviewers: [],
+              approvers: [tenant.approver],
+            }),
+            executors: [tenant.admin],
+          },
+          assignedMemberIds: [tenant.admin],
+          updatedAtMs: Date.now(),
+          updatedBy: tenant.admin,
+        };
+      },
+    });
+
+    const proposed = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.bot0,
+      kind: "owner_transfer",
+      remainingWork: "h4-same-len",
+      acceptanceCriteria: ["owner bot0"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    expect(proposed.baseHistoryLen).toBe(1);
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: proposed.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+
+    const approved = await loadHandoffContract(authority, {
+      taskId,
+      handoffId: proposed.handoffId,
+    });
+    const liveBefore = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect((liveBefore.handoffs ?? []).length).toBe(1);
+    const ledgerApplied = await applyApprovedHandoff(authority, approved!, liveBefore, { cfg });
+    expect(ledgerApplied.ok).toBe(true);
+
+    // Other entry changes owner; history length stays 1 (matches baseHistoryLen).
+    await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId,
+      cfg,
+      buildPatch: (live) => {
+        const g = asGovernedTask(live);
+        expect((g.handoffs ?? []).length).toBe(1);
+        return {
+          ownerMemberId: tenant.admin,
+          responsibility: {
+            ...(g.responsibility ?? {
+              owner: tenant.coordinator,
+              executors: [tenant.admin],
+              reviewers: [],
+              approvers: [tenant.approver],
+            }),
+            owner: tenant.admin,
+          },
+          handoffs: g.handoffs ?? [],
+          updatedAtMs: Date.now(),
+          updatedBy: tenant.admin,
+        };
+      },
+    });
+
+    await expect(
+      applyCollaborationTaskHandoffContract({
+        groupId,
+        taskId,
+        handoffId: proposed.handoffId,
+        actor: tenant.owner,
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      name: "HandoffContractEntryError",
+      code: "responsibility_conflict",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.responsibility?.owner).toBe(tenant.admin);
+    expect((final.handoffs ?? []).length).toBe(1);
+    expect((final.handoffs ?? []).map((h) => h.handoffId)).not.toContain(proposed.handoffId);
+  });
+
+  test("M3-BIZ-R4 old handoff history must not block new applied claim repair", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-r4";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-r4" });
+
+    // Old unrelated handoff where claimant appears as from (before this board apply).
+    await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId,
+      cfg,
+      buildPatch: (live) => {
+        const g = asGovernedTask(live);
+        return {
+          handoffs: [
+            {
+              taskId,
+              from: tenant.admin,
+              to: tenant.bot0,
+              reason: "continue",
+              remainingWork: "old-away",
+              acceptanceCriteria: ["old"],
+              completedArtifacts: [],
+              assumptions: [],
+              blockers: [],
+              handoffId: "old-admin-away",
+            },
+          ],
+          updatedAtMs: Date.now(),
+          updatedBy: tenant.admin,
+          responsibility: g.responsibility,
+          assignedMemberIds: g.assignedMemberIds,
+        };
+      },
+    });
+
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId,
+      remainingWork: "r4 chapter",
+      acceptanceCriteria: ["sources"],
+      intendedClaimantIds: [tenant.admin],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      claimantId: tenant.admin,
+      cfg,
+    });
+
+    await expect(
+      applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: published.itemId,
+        actor: tenant.admin,
+        cfg,
+        _testAfterBoardAppliedBeforeTaskPatch: async () => {
+          throw new Error("injected_task_write_failure_r4");
+        },
+      }),
+    ).rejects.toThrow(/injected_task_write_failure_r4/);
+
+    const boardAfterPartial = await loadCollaborationBoardClaimItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      cfg,
+    });
+    expect(boardAfterPartial?.status).toBe("applied");
+    expect(boardAfterPartial?.applyBaseHistoryLen).toBe(1);
+    const rev1 = boardAfterPartial!.revision;
+
+    const mid = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(mid.assignedMemberIds ?? []).not.toContain(tenant.admin);
+
+    // Retry must repair despite old from===admin history (before this apply baseline).
+    const repaired = await applyCollaborationBoardClaim({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      actor: tenant.admin,
+      cfg,
+    });
+    expect(repaired.item.status).toBe("applied");
+    expect(repaired.item.revision).toBe(rev1);
+    expect(repaired.task.assignedMemberIds).toContain(tenant.admin);
+    expect(repaired.task.responsibility?.executors).toContain(tenant.admin);
   });
 });

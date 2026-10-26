@@ -528,9 +528,13 @@ export async function applyCollaborationBoardClaim(
           .filter(Boolean);
         const executors = (liveGoverned.responsibility?.executors ?? []).map((s) => s.trim());
         const alreadyProjected = assigned.includes(claimantId) || executors.includes(claimantId);
-        const handedOffAway = (liveGoverned.handoffs ?? []).some(
-          (h) => (h.from ?? "").trim() === claimantId,
-        );
+        // T48: only history after THIS board apply's baseline can supersede the claim.
+        // Arbitrary older h.from===claimantId must not block a legitimate new applied repair.
+        const handoffs = liveGoverned.handoffs ?? [];
+        const baseLen = existing.applyBaseHistoryLen;
+        const subsequent =
+          typeof baseLen === "number" && baseLen >= 0 ? handoffs.slice(baseLen) : handoffs;
+        const handedOffAway = subsequent.some((h) => (h.from ?? "").trim() === claimantId);
         if (!alreadyProjected && handedOffAway) {
           throw new ClaimContractEntryError(
             "stale_applied_claim_superseded",
