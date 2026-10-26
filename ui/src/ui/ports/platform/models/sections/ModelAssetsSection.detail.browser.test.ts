@@ -21,7 +21,7 @@ function asset(overrides: Partial<ModelAsset> = {}): ModelAsset {
     source: "configured",
     inputModalities: ["text"],
     outputModalities: ["text"],
-    capabilities: ["tools"],
+    capabilities: ["tool_use"],
     costTier: "medium",
     health: "degraded",
     healthBasis: "live_probe_failed",

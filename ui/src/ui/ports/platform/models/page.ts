@@ -6,8 +6,9 @@ import {
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { selectPlatformModelsActions } from "./actions.ts";
 import { buildPlatformModelsVM } from "./adapter.ts";
+import { previewRoutingDecisionViaService } from "./admission/routing-decision-service.ts";
 import { ensureCapabilityVerificationLifecycle } from "./admission/verification-service.ts";
-import { previewRoutingDecision } from "./routing-decision-preview.ts";
+import type { RoutingDecisionPreview } from "./routing-decision-preview.ts";
 import {
   renderModelsAorBanditPanel,
   renderModelsAorLiveCodingEvidence,
@@ -92,7 +93,7 @@ function renderModelsTabBar(activeTab: ModelsTabId) {
 
 let modelsSnapshotAutoLoadTriggered = false;
 let modelsSnapshotAutoLoadTimer: number | null = null;
-let lastRoutingPreview: ReturnType<typeof previewRoutingDecision> | null = null;
+let lastRoutingPreview: RoutingDecisionPreview | null = null;
 export function getLastRoutingPreviewForTest() {
   return lastRoutingPreview;
 }
@@ -244,10 +245,14 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                   compat: vm.compat?.legacyModelsVM ?? null,
                   routingPreview: lastRoutingPreview,
                   onSimulateRouting: (input) => {
-                    lastRoutingPreview = previewRoutingDecision({
+                    lastRoutingPreview = previewRoutingDecisionViaService({
                       request: {
                         taskProfileId: input.taskProfileId,
                         planId: input.planId,
+                        taskText: input.taskText ?? input.sampleInput,
+                        outputType: input.outputType,
+                        budget: input.budget,
+                        requiredCapabilities: input.requiredCapabilities,
                       },
                       candidates: vm.assets.models,
                     });

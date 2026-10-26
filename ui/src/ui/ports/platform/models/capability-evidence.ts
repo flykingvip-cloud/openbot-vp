@@ -34,6 +34,8 @@ export type CapabilityEvidenceItem = {
   failureReason?: string;
   /** Test / probe version that produced this evidence. */
   testVersion?: string;
+  /** Optional quality score from specialized evaluation (0–1). */
+  qualityScore?: number;
 };
 
 export type CapabilityEvidenceSummary = {

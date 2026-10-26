@@ -14,8 +14,13 @@ import {
   startCapabilityVerification,
 } from "../admission/controller.ts";
 import { statusLabel as capabilityStatusLabel } from "../capability-evidence.ts";
+import { assetMatchesRequiredCapabilities, capabilityLabel } from "../capability-ids.ts";
 import { resolveExecutorPathLabel } from "../executor-path-labels.ts";
-import { listVerificationTasks, setExecutorCallTypeArchive } from "../model-admission-store.ts";
+import {
+  getModelAdmission,
+  listVerificationTasks,
+  setExecutorCallTypeArchive,
+} from "../model-admission-store.ts";
 import {
   importAssetIntoPool as commitPoolImport,
   saveEndpointThenAllowlistVerified,
@@ -29,6 +34,12 @@ import {
   markModelConnectionVerified,
 } from "../model-connection-gate.ts";
 import { formatOperatorProbeMessage } from "../probe-operator-message.ts";
+import {
+  SPECIALIZED_EVAL_BACKEND_STATUS,
+  buildSpecializedEvalDisplay,
+  formatQualityScore,
+  runDemoSpecializedEval,
+} from "../specialized-eval.ts";
 import type {
   LegacyPlatformModelsVM,
   ModelAsset,
@@ -523,6 +534,7 @@ function renderCapabilityMatrix(asset: ModelAsset) {
           ? `${asset.capabilities.join(", ")}（待确认，非已验证）`
           : "未声明",
       )}
+      ${renderSpecializedEvalPanel(asset)}
       ${renderVerificationHistory(matrix)}
     `;
   }
@@ -535,12 +547,19 @@ function renderCapabilityMatrix(asset: ModelAsset) {
             <span
               >${item.statusLabel} · ${item.sourceNote ?? item.sourceLabel}${
                 item.failureReason ? ` — ${item.failureReason}` : ""
-              }${item.testVersion ? ` · ${item.testVersion}` : ""}</span
+              }${item.testVersion ? ` · 测试版本 ${item.testVersion}` : ""}${
+                item.isSpecializedEval && item.verifiedAtLabel ? ` · ${item.verifiedAtLabel}` : ""
+              }${
+                item.isSpecializedEval && item.qualityScore != null
+                  ? ` · 质量评分 ${formatQualityScore(item.qualityScore)}`
+                  : ""
+              }</span
             >
           </div>
         `,
       )}
     </div>
+    ${renderSpecializedEvalPanel(asset)}
     ${renderVerificationHistory(matrix)}
   `;
 }
@@ -603,6 +622,76 @@ async function runFormalCapabilityVerification(asset: ModelAsset) {
   requestPlatformSurfaceRerender();
 }
 
+function renderSpecializedEvalPanel(asset: ModelAsset) {
+  const admission = getModelAdmission(asset.modelId);
+  const rows = buildSpecializedEvalDisplay({
+    formal: asset.capabilityEvidence ?? admission.capabilityEvidence ?? [],
+    demo: admission.demoCapabilityEvidence,
+  });
+  return html`
+    <details class="model-assets-drawer__fold card-follow--sm" data-testid="specialized-eval-panel" open>
+      <summary class="model-assets-drawer__fold-title">专项评测</summary>
+      <div class="muted card-follow--xs">
+        展示质量评分的测试版本与时间。正式专项评测后端状态：${SPECIALIZED_EVAL_BACKEND_STATUS === "not_wired" ? "尚未接入" : SPECIALIZED_EVAL_BACKEND_STATUS}。
+      </div>
+      ${
+        rows.length === 0
+          ? html`
+              <div class="muted card-follow--xs" data-testid="specialized-eval-empty">暂无专项评测记录</div>
+            `
+          : html`
+              <div class="model-assets-drawer__kv-stack card-follow--xs">
+                ${rows.map(
+                  (row) => html`
+                    <div
+                      class="model-assets-drawer__kv-row"
+                      data-testid="specialized-eval-row"
+                      data-capability-id=${row.id}
+                      data-demo=${row.isDemo ? "true" : "false"}
+                    >
+                      <span class="muted">${row.label}${row.isDemo ? " · 演示" : ""}</span>
+                      <span
+                        >${row.status} · 测试版本 ${row.testVersion ?? "—"} · ${row.verifiedAtLabel} · 质量评分 ${row.qualityScoreLabel}${
+                          row.isDemo ? " · 模拟结果，不代表真实能力" : ""
+                        }</span
+                      >
+                    </div>
+                  `,
+                )}
+              </div>
+            `
+      }
+      <div class="row row--tight card-follow--xs">
+        <button
+          class="btn btn--sm"
+          type="button"
+          disabled
+          title="专项评测尚未接入后端，正式结果不可写入"
+          data-testid="specialized-eval-formal-disabled"
+        >
+          运行专项评测（尚未接入）
+        </button>
+        <button
+          class="btn btn--sm"
+          type="button"
+          title="仅写入演示区，不进入正式 verified / 路由准入"
+          data-testid="specialized-eval-demo-run"
+          @click=${() => {
+            const ids = (asset.capabilityEvidence ?? []).map((item) => item.id).filter(Boolean);
+            runDemoSpecializedEval({
+              modelRef: asset.modelId,
+              capabilityIds: ids.length ? ids : ["coding", "tool_use"],
+            });
+            requestPlatformSurfaceRerender();
+          }}
+        >
+          演示专项评测
+        </button>
+      </div>
+    </details>
+  `;
+}
+
 function renderCapabilitySummary(
   capabilities: string[],
   evidence?: ModelAsset["capabilityEvidence"],
@@ -644,7 +733,7 @@ function renderCapabilitySummary(
     <div class="chip-row platform-model-assets-table__chips">
       ${visible.map(
         (capability) => html`<span class="chip platform-capability-chip--suggested"
-          >${capability} · 待确认</span
+          >${capabilityLabel(capability)} · 待确认</span
         >`,
       )}
       ${rest > 0 ? html`<span class="chip">+${rest}</span>` : nothing}
@@ -853,9 +942,7 @@ function matchesFilters(asset: ModelAsset, filterState: ModelAssetFilterState) {
   }
   if (
     filterState.capabilities.length > 0 &&
-    !filterState.capabilities.every((capability) =>
-      asset.capabilities.includes(capability as never),
-    )
+    !assetMatchesRequiredCapabilities(asset.capabilities, filterState.capabilities)
   ) {
     return false;
   }

@@ -37,7 +37,8 @@ export type ModelAsset = {
   source: "configured" | "referenced" | "discovered";
   inputModalities: Array<"text" | "image" | "audio" | "video" | "multimodal">;
   outputModalities: Array<"text" | "image" | "audio" | "video">;
-  capabilities: Array<"reasoning" | "vision" | "code" | "tools" | "stream" | "long_context">;
+  /** Canonical capability tags (coding/tool_use). Legacy code/tools are normalized at ingest. */
+  capabilities: Array<"reasoning" | "vision" | "coding" | "tool_use" | "stream" | "long_context">;
   /**
    * Capability evidence with source + verification status.
    * Inferred tags land as status=suggested; never treat as verified.

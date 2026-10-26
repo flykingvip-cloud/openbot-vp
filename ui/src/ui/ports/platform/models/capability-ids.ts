@@ -63,3 +63,27 @@ export function capabilityLabel(id: string): string {
   }
   return id;
 }
+
+/** True when the asset capability list covers `required` after legacy→canonical mapping. */
+export function assetHasCapability(
+  assetCapabilities: readonly string[],
+  required: string,
+): boolean {
+  const want = toCanonicalCapabilityId(required);
+  if (!want) {
+    return assetCapabilities.some((c) => c.trim().toLowerCase() === required.trim().toLowerCase());
+  }
+  const have = new Set(normalizeCapabilityIds([...assetCapabilities]));
+  return have.has(want);
+}
+
+/** Every required tag must be present on the asset (both sides normalized). */
+export function assetMatchesRequiredCapabilities(
+  assetCapabilities: readonly string[],
+  required: readonly string[],
+): boolean {
+  if (!required.length) {
+    return true;
+  }
+  return required.every((cap) => assetHasCapability(assetCapabilities, cap));
+}

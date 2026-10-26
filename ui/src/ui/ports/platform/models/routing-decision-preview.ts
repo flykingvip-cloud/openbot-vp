@@ -15,8 +15,10 @@ export type RoutingPreviewRequest = {
   planId?: string;
   outputType?: "text" | "image" | "music" | "audio";
   budget?: "low" | "medium" | "high";
-  /** Required verified capabilities for this task. */
+  /** Required verified capabilities for this task (legacy code/tools accepted). */
   requiredCapabilities?: string[];
+  /** Optional minimum context window for the task. */
+  minContextWindow?: number;
 };
 
 export type RoutingPreviewExclusion = {
@@ -29,6 +31,7 @@ export type RoutingPreviewExclusion = {
     | "context_insufficient"
     | "verification_expired"
     | "health"
+    | "budget"
     | "other";
 };
 
@@ -36,6 +39,8 @@ export type RoutingDecisionPreview = {
   requestId: string;
   taskCategory: string;
   executorPath: string;
+  /** Actual selected executor model identity when available. */
+  selectedExecutor?: string | null;
   selectedModelId: string | null;
   primary: string[];
   fallback: string[];
@@ -45,6 +50,10 @@ export type RoutingDecisionPreview = {
   dryRun: true;
   /** Explicit demo flag — never claim backend decision. */
   uiDemo: true;
+  /** Normalized required capabilities used for this preview. */
+  requiredCapabilities: CanonicalCapabilityId[];
+  budget?: "low" | "medium" | "high";
+  outputType?: "text" | "image" | "music" | "audio";
 };
 
 function detectTaskCategory(req: RoutingPreviewRequest): string {
@@ -56,7 +65,7 @@ function detectTaskCategory(req: RoutingPreviewRequest): string {
   if (req.outputType === "music" || text.includes("music") || text.includes("suno")) {
     return "music_generation";
   }
-  if (text.includes("code") || text.includes("coding")) {
+  if (text.includes("code") || text.includes("coding") || text.includes("refactor")) {
     return "coding";
   }
   if (text.includes("reason")) {
@@ -88,6 +97,22 @@ function requiredForCategory(category: string): CanonicalCapabilityId[] {
   return normalizeCapabilityIds([]);
 }
 
+function budgetAllows(asset: ModelAsset, budget?: "low" | "medium" | "high"): boolean {
+  if (!budget) {
+    return true;
+  }
+  if (asset.costTier === "unknown") {
+    return true;
+  }
+  if (budget === "low") {
+    return asset.costTier === "low";
+  }
+  if (budget === "medium") {
+    return asset.costTier === "low" || asset.costTier === "medium";
+  }
+  return true;
+}
+
 export function previewRoutingDecision(params: {
   request: RoutingPreviewRequest;
   candidates: ModelAsset[];
@@ -99,6 +124,7 @@ export function previewRoutingDecision(params: {
   ]);
   const excluded: RoutingPreviewExclusion[] = [];
   const eligible: ModelAsset[] = [];
+  const minContext = params.request.minContextWindow;
 
   for (const asset of params.candidates) {
     const admission = getModelAdmission(asset.modelId);
@@ -117,6 +143,26 @@ export function previewRoutingDecision(params: {
         modelId: asset.modelId,
         reason: "运行健康不可用",
         code: "health",
+      });
+      continue;
+    }
+    if (!budgetAllows(asset, params.request.budget)) {
+      excluded.push({
+        modelId: asset.modelId,
+        reason: `预算 ${params.request.budget} 不匹配成本档 ${asset.costTier}`,
+        code: "budget",
+      });
+      continue;
+    }
+    if (
+      minContext != null &&
+      minContext > 0 &&
+      (asset.contextWindow == null || asset.contextWindow < minContext)
+    ) {
+      excluded.push({
+        modelId: asset.modelId,
+        reason: `上下文不足：需要 ≥${minContext}，当前 ${asset.contextWindow ?? "未知"}`,
+        code: "context_insufficient",
       });
       continue;
     }
@@ -152,20 +198,25 @@ export function previewRoutingDecision(params: {
 
   const primary = eligible.slice(0, 1).map((a) => a.modelId);
   const fallback = eligible.slice(1, 4).map((a) => a.modelId);
+  const selected = primary[0] ?? null;
 
   return {
     requestId: `preview_${Date.now().toString(36)}`,
     taskCategory: category,
     executorPath: executorPathForCategory(category),
-    selectedModelId: primary[0] ?? null,
+    selectedExecutor: selected ? `${executorPathForCategory(category)} · ${selected}` : null,
+    selectedModelId: selected,
     primary,
     fallback,
     excluded,
-    decisionReason: primary[0]
+    decisionReason: selected
       ? `按任务类别 ${category} 选择已验证且允许自动路由的模型（界面演示，非后端决策）`
       : `没有满足已验证能力要求的可路由模型（类别 ${category}；界面演示，非后端决策）`,
     dryRun: true,
     uiDemo: true,
+    requiredCapabilities: required,
+    ...(params.request.budget ? { budget: params.request.budget } : {}),
+    ...(params.request.outputType ? { outputType: params.request.outputType } : {}),
   };
 }
 

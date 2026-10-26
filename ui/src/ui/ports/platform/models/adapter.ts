@@ -1,6 +1,7 @@
 import type { PlatformPortReadModel } from "../semantic/platform-read-model.ts";
 import type { ModelsVM as LegacyModelsVM } from "../view-models/types.ts";
 import { suggestedEvidenceFromInferred } from "./capability-evidence.ts";
+import { assetMatchesRequiredCapabilities } from "./capability-ids.ts";
 import { resolveExecutorPathLabel } from "./executor-path-labels.ts";
 import { getModelAdmission } from "./model-admission-store.ts";
 import {
@@ -360,14 +361,15 @@ function inferCapabilities(params: {
   if (params.reasoning || modelId.includes("reason")) {
     capabilities.add("reasoning");
   }
+  // Canonical IDs aligned with backend catalog (coding / tool_use).
   if (params.supportsTools) {
-    capabilities.add("tools");
+    capabilities.add("tool_use");
   }
   if (params.inputModalities.includes("image") || modelId.includes("vision")) {
     capabilities.add("vision");
   }
   if (modelId.includes("code") || params.providerId.toLowerCase().includes("deepseek")) {
-    capabilities.add("code");
+    capabilities.add("coding");
   }
   if (modelId.includes("realtime") || modelId.includes("stream")) {
     capabilities.add("stream");
@@ -380,7 +382,7 @@ function inferCapabilities(params: {
 
 function inferTaskTags(asset: ModelAsset) {
   const tags = new Set<string>();
-  if (asset.capabilities.includes("code")) {
+  if (asset.capabilities.includes("coding")) {
     tags.add("coding");
   }
   if (asset.capabilities.includes("reasoning")) {
@@ -3292,8 +3294,9 @@ function buildRoutingConflicts(
       !assets.some(
         (asset) =>
           policy.candidates.primary.concat(policy.candidates.fallback).includes(asset.modelId) &&
-          policy.constraints.requiredCapabilities?.every((capability) =>
-            asset.capabilities.includes(capability as never),
+          assetMatchesRequiredCapabilities(
+            asset.capabilities,
+            policy.constraints.requiredCapabilities ?? [],
           ),
       )
     ) {

@@ -362,7 +362,7 @@ describe("platform models adapter", () => {
           rankingMode: "bandit",
           maxCostPerRequest: 0.2,
           maxLatencyMs: 3000,
-          requiredCapabilities: ["code"],
+          requiredCapabilities: ["coding"],
           requiredHealth: "healthy",
           scope: { tenantIds: ["tenant-a"], userSegments: [], agentIds: [] },
         },

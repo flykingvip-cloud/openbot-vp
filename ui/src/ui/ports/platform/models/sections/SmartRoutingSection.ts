@@ -1,6 +1,7 @@
 import { html } from "lit";
 import { formatCost } from "../../../../views/usage-metrics.ts";
 import { requestPlatformSurfaceRerender } from "../../shared/surface.ts";
+import { capabilityLabel, normalizeCapabilityIds } from "../capability-ids.ts";
 import type { RoutingDecisionPreview } from "../routing-decision-preview.ts";
 import type {
   LegacyPlatformModelsVM,
@@ -46,6 +47,20 @@ const DEFAULT_ROUTING_FILTER_STATE: RoutingFilterState = {
   selectedPolicyId: null,
   selectedExplanationId: null,
 };
+
+type TrialMatchFormState = {
+  taskText: string;
+  outputType: "" | "text" | "image" | "music" | "audio";
+  budget: "" | "low" | "medium" | "high";
+};
+
+const DEFAULT_TRIAL_MATCH_STATE: TrialMatchFormState = {
+  taskText: "",
+  outputType: "",
+  budget: "",
+};
+
+let trialMatchState: TrialMatchFormState = { ...DEFAULT_TRIAL_MATCH_STATE };
 
 let routingFilterState: RoutingFilterState = { ...DEFAULT_ROUTING_FILTER_STATE };
 let lastRoutingContextKey = "";
@@ -1327,24 +1342,134 @@ function renderRoutingFilterBar(vm: ModelRoutingVM, resultCount: number) {
   `;
 }
 
+function renderTrialMatchForm(
+  selectedPolicy: RoutingPolicy | null,
+  onSimulateRouting: SmartRoutingSectionProps["onSimulateRouting"],
+) {
+  const required = normalizeCapabilityIds(selectedPolicy?.constraints.requiredCapabilities ?? []);
+  return html`
+    <div class="card-follow--sm" data-testid="routing-trial-match-form">
+      <div class="card-title">试配任务</div>
+      <div class="callout warn card-follow--xs" data-testid="routing-trial-match-banner">
+        界面演示，非后端决策 · 尚未接入后端决策接口 · 干跑不调用生成模型
+      </div>
+      <div class="row row--tight row--wrap card-follow--xs">
+        <label class="field">
+          <span class="field-label">任务描述</span>
+          <textarea
+            rows="2"
+            .value=${trialMatchState.taskText}
+            placeholder="例如：重构这段代码并补充测试"
+            data-testid="routing-trial-task-text"
+            @input=${(event: Event) => {
+              trialMatchState = {
+                ...trialMatchState,
+                taskText: (event.target as HTMLTextAreaElement).value,
+              };
+              requestPlatformSurfaceRerender();
+            }}
+          ></textarea>
+        </label>
+        <label class="field">
+          <span class="field-label">输出类型</span>
+          <select
+            data-testid="routing-trial-output-type"
+            .value=${trialMatchState.outputType}
+            @change=${(event: Event) => {
+              trialMatchState = {
+                ...trialMatchState,
+                outputType: (event.target as HTMLSelectElement)
+                  .value as TrialMatchFormState["outputType"],
+              };
+              requestPlatformSurfaceRerender();
+            }}
+          >
+            <option value="">跟随策略／文本</option>
+            <option value="text">文本</option>
+            <option value="image">图片</option>
+            <option value="music">音乐</option>
+            <option value="audio">音频</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">预算</span>
+          <select
+            data-testid="routing-trial-budget"
+            .value=${trialMatchState.budget}
+            @change=${(event: Event) => {
+              trialMatchState = {
+                ...trialMatchState,
+                budget: (event.target as HTMLSelectElement).value as TrialMatchFormState["budget"],
+              };
+              requestPlatformSurfaceRerender();
+            }}
+          >
+            <option value="">不限</option>
+            <option value="low">低</option>
+            <option value="medium">中</option>
+            <option value="high">高</option>
+          </select>
+        </label>
+      </div>
+      <div class="muted card-follow--xs">
+        策略要求能力（规范 ID）：${
+          required.length
+            ? required.map((id) => `${capabilityLabel(id)} (${id})`).join("、")
+            : "无（将按任务类别推断）"
+        }
+      </div>
+      <div class="row row--tight card-follow--xs">
+        <button
+          class="btn btn--primary"
+          type="button"
+          ?disabled=${!onSimulateRouting || !selectedPolicy}
+          title=${
+            onSimulateRouting && selectedPolicy
+              ? "干跑决策预览，不调用生成模型（界面演示，非后端决策）"
+              : "试配能力待接入或未选择策略"
+          }
+          data-testid="routing-trial-run"
+          @click=${() =>
+            selectedPolicy
+              ? onSimulateRouting?.({
+                  taskProfileId: selectedPolicy.taskProfileId,
+                  planId: selectedPolicy.planId,
+                  taskText: trialMatchState.taskText || undefined,
+                  outputType: trialMatchState.outputType || undefined,
+                  budget: trialMatchState.budget || undefined,
+                  requiredCapabilities: selectedPolicy.constraints.requiredCapabilities,
+                  sampleInput: trialMatchState.taskText || undefined,
+                })
+              : undefined}
+        >
+          试配预览
+        </button>
+      </div>
+    </div>
+  `;
+}
+
 function renderRoutingDecisionPreviewPanel(preview: RoutingDecisionPreview | null | undefined) {
   if (!preview) {
     return html`
       <div class="callout info card-follow--sm" data-testid="routing-decision-preview-empty">
-        试配任务：界面演示，非后端决策。点击「模拟请求」仅做前端干跑，不调用生成模型，也不代表真实智能路由结果。
+        填写上方试配任务后点击「试配预览」。结果仅为界面演示，非后端决策，不代表真实智能路由。
       </div>
     `;
   }
   return html`
     <div class="card-follow--sm" data-testid="routing-decision-preview">
       <div class="card-title">试配结果（界面演示，非后端决策）</div>
-      <div class="muted card-follow--xs">模拟结果，不代表真实能力／真实路由 · requestId ${preview.requestId}</div>
+      <div class="muted card-follow--xs">
+        模拟结果，不代表真实能力／真实路由 · 尚未接入后端决策 · requestId ${preview.requestId}
+      </div>
       <div class="model-assets-drawer__kv-stack card-follow--xs">
         <div class="model-assets-drawer__kv-row">
           <span class="muted">任务类别</span><span>${preview.taskCategory}</span>
         </div>
         <div class="model-assets-drawer__kv-row">
-          <span class="muted">执行路径</span><span>${preview.executorPath}</span>
+          <span class="muted">执行器</span
+          ><span>${preview.selectedExecutor ?? preview.executorPath}</span>
         </div>
         <div class="model-assets-drawer__kv-row">
           <span class="muted">主模型</span
@@ -1355,6 +1480,18 @@ function renderRoutingDecisionPreviewPanel(preview: RoutingDecisionPreview | nul
           ><span>${preview.fallback.join(", ") || "无"}</span>
         </div>
         <div class="model-assets-drawer__kv-row">
+          <span class="muted">要求能力</span
+          ><span
+            >${
+              preview.requiredCapabilities?.length
+                ? preview.requiredCapabilities
+                    .map((id) => `${capabilityLabel(id)} (${id})`)
+                    .join("、")
+                : "无"
+            }</span
+          >
+        </div>
+        <div class="model-assets-drawer__kv-row">
           <span class="muted">决策说明</span><span>${preview.decisionReason}</span>
         </div>
       </div>
@@ -1362,7 +1499,7 @@ function renderRoutingDecisionPreviewPanel(preview: RoutingDecisionPreview | nul
         preview.excluded.length
           ? html`
               <div class="card-follow--xs">
-                <div class="muted">被排除的模型</div>
+                <div class="muted">被排除的模型及原因</div>
                 <ul data-testid="routing-preview-exclusions">
                   ${preview.excluded.map(
                     (item) => html`
@@ -1397,6 +1534,10 @@ export type SmartRoutingSectionProps = {
     taskProfileId: string;
     planId?: string;
     sampleInput?: string;
+    taskText?: string;
+    outputType?: "text" | "image" | "music" | "audio";
+    budget?: "low" | "medium" | "high";
+    requiredCapabilities?: string[];
   }) => void;
   onSetDefaultPrimary?: (modelRef: string | null) => void;
   onSetDefaultFallbacks?: (fallbacks: string[]) => void;
@@ -1496,14 +1637,19 @@ export function renderSmartRoutingSection(props: SmartRoutingSectionProps) {
             ?disabled=${!onSimulateRouting || !selectedPolicy}
             title=${
               onSimulateRouting && selectedPolicy
-                ? "干跑决策预览，不调用生成模型"
-                : "模拟能力待接入"
+                ? "干跑决策预览，不调用生成模型（界面演示，非后端决策）"
+                : "试配能力待接入"
             }
             @click=${() =>
               selectedPolicy
                 ? onSimulateRouting?.({
                     taskProfileId: selectedPolicy.taskProfileId,
                     planId: selectedPolicy.planId,
+                    taskText: trialMatchState.taskText || undefined,
+                    outputType: trialMatchState.outputType || undefined,
+                    budget: trialMatchState.budget || undefined,
+                    requiredCapabilities: selectedPolicy.constraints.requiredCapabilities,
+                    sampleInput: trialMatchState.taskText || undefined,
                   })
                 : undefined}
           >
@@ -1513,6 +1659,7 @@ export function renderSmartRoutingSection(props: SmartRoutingSectionProps) {
         </div>
       </div>
       ${renderRoutingSummary(vm)}
+      ${renderTrialMatchForm(selectedPolicy, onSimulateRouting)}
       ${renderRoutingDecisionPreviewPanel(routingPreview)}
     </section>
     ${

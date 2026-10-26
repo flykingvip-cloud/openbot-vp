@@ -10,6 +10,7 @@ import {
   type CapabilityEvidenceSummary,
 } from "../capability-evidence.ts";
 import type { CapabilityVerificationTask } from "../model-admission-store.ts";
+import { formatVerifiedAt } from "../specialized-eval.ts";
 
 export type CapabilityMatrixRow = {
   id: string;
@@ -22,6 +23,9 @@ export type CapabilityMatrixRow = {
   verifiedAt?: number;
   expiresAt?: number;
   testVersion?: string;
+  qualityScore?: number;
+  verifiedAtLabel?: string;
+  isSpecializedEval: boolean;
   isSuggested: boolean;
   isVerified: boolean;
   isExpired: boolean;
@@ -48,6 +52,9 @@ export function buildCapabilityMatrixRows(
     verifiedAt: item.verifiedAt,
     expiresAt: item.expiresAt,
     testVersion: item.testVersion,
+    qualityScore: item.qualityScore,
+    verifiedAtLabel: formatVerifiedAt(item.verifiedAt),
+    isSpecializedEval: item.source === "specialized_eval",
     isSuggested:
       item.status === "suggested" ||
       item.status === "untested" ||
