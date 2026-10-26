@@ -21,16 +21,19 @@ import {
   type CanonicalCapabilityId,
 } from "../capability-ids.ts";
 import {
+  clearVerificationTaskLive,
   currentExecutionGeneration,
   getModelAdmission,
   getVerificationTask,
   listVerificationTasks,
+  markVerificationTaskLive,
   mergeFormalCapabilityEvidence,
   nextExecutionGeneration,
   saveVerificationTask,
   setAutoRoutingAdmission,
   type CapabilityVerificationTask,
 } from "../model-admission-store.ts";
+import { getCurrentConfigFingerprint } from "../model-connection-gate.ts";
 import type {
   BatchVerificationRequest,
   BatchVerificationResponse,
@@ -63,7 +66,8 @@ export type LocalProtocolAdapterOptions = {
   resolveConnectionOk?: (modelRef: string, fingerprint?: string) => boolean;
   /**
    * Current config fingerprint for the model (finish-time check).
-   * Defaults to admission.connectionFingerprint.
+   * Defaults to getCurrentConfigFingerprint (published from config snapshot),
+   * NOT admission.connectionFingerprint (last verified identity).
    */
   resolveCurrentFingerprint?: (modelRef: string) => string | undefined;
   /** Called whenever a task reaches a terminal or interrupted state (UI refresh). */
@@ -258,7 +262,7 @@ export function createLocalProtocolVerificationService(
   const runner = options.runner ?? createDefaultProtocolRunner(options.resolveConnectionOk);
   const resolveCurrentFingerprint =
     options.resolveCurrentFingerprint ??
-    ((modelRef: string) => getModelAdmission(modelRef).connectionFingerprint);
+    ((modelRef: string) => getCurrentConfigFingerprint(modelRef));
 
   function notifySettled(task: CapabilityVerificationTask) {
     try {
@@ -305,7 +309,8 @@ export function createLocalProtocolVerificationService(
     if (!latest) {
       return;
     }
-    if (latest.status === "cancelled" || latest.status === "interrupted") {
+    // Refuse late arrivals after any terminal state (cancel / interrupt / timeout / prior finish).
+    if (latest.status !== "queued" && latest.status !== "running") {
       return;
     }
 
@@ -375,6 +380,7 @@ export function createLocalProtocolVerificationService(
       ...(opts?.fromPendingTimeout && stillPending ? { error: "检查超时，未得到终态" } : {}),
     };
     saveVerificationTask(done);
+    clearVerificationTaskLive(taskId);
 
     const currentFp = resolveCurrentFingerprint(modelRef);
     const taskFp = requestFingerprint ?? latest.configFingerprint;
@@ -404,7 +410,7 @@ export function createLocalProtocolVerificationService(
 
   function finishWithError(taskId: string, message: string) {
     const latest = getVerificationTask(taskId);
-    if (!latest || latest.status === "cancelled" || latest.status === "interrupted") {
+    if (!latest || (latest.status !== "queued" && latest.status !== "running")) {
       return;
     }
     const failed: CapabilityVerificationTask = {
@@ -423,6 +429,7 @@ export function createLocalProtocolVerificationService(
       })),
     };
     saveVerificationTask(failed);
+    clearVerificationTaskLive(taskId);
     // Errors must not write formal failed over existing evidence.
     notifySettled(failed);
   }
@@ -447,6 +454,7 @@ export function createLocalProtocolVerificationService(
       executionGeneration,
     };
     saveVerificationTask(queued);
+    markVerificationTaskLive(taskId);
 
     const run = () => {
       const current = getVerificationTask(taskId);
@@ -478,22 +486,42 @@ export function createLocalProtocolVerificationService(
       }
 
       if (isPromiseLike<ProtocolCheckOutcome[]>(checked)) {
+        // Timeout covers the entire runner.check() Promise lifecycle, not only
+        // outcomes that already returned status "pending".
+        let runnerTerminal = false;
+        const settleOutcomes = (outcomes: ProtocolCheckOutcome[]) => {
+          if (runnerTerminal) {
+            return;
+          }
+          runnerTerminal = true;
+          finishWithOutcomes(
+            taskId,
+            modelRef,
+            mode,
+            req.configFingerprint,
+            executionGeneration,
+            outcomes,
+          );
+        };
+        const settleError = (message: string) => {
+          if (runnerTerminal) {
+            return;
+          }
+          runnerTerminal = true;
+          finishWithError(taskId, message);
+        };
+        // Wall-clock timeout must not go through the settle `schedule` hook:
+        // tests often inject a zero-delay microtask scheduler for run(), which
+        // would fire the timeout before a rejecting Promise settles.
+        defaultSchedule(() => {
+          settleError("检查超时，runner 未在时限内返回终态");
+        }, pendingTimeoutMs);
         void checked.then(
           (outcomes) => {
-            finishWithOutcomes(
-              taskId,
-              modelRef,
-              mode,
-              req.configFingerprint,
-              executionGeneration,
-              outcomes,
-            );
+            settleOutcomes(outcomes);
           },
           (err: unknown) => {
-            finishWithError(
-              taskId,
-              err instanceof Error ? err.message : `协议检查异步异常: ${String(err)}`,
-            );
+            settleError(err instanceof Error ? err.message : `协议检查异步异常: ${String(err)}`);
           },
         );
         return;
@@ -533,6 +561,7 @@ export function createLocalProtocolVerificationService(
     if (task.status === "queued" || task.status === "running") {
       const next = { ...task, status: "cancelled" as const, updatedAt: Date.now() };
       saveVerificationTask(next);
+      clearVerificationTaskLive(task.taskId);
       notifySettled(next);
       return next;
     }

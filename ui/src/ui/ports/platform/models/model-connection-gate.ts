@@ -11,6 +11,29 @@ const sessionVerified = new Map<string, string>();
 /** Track which modelRefs already triggered expiry this session to avoid loops. */
 const expiredForMismatch = new Set<string>();
 
+/**
+ * Current config fingerprints from the loaded snapshot / form (NOT last verified).
+ * admission.connectionFingerprint is the last successful verification identity and
+ * is intentionally retained on mismatch to show "stale"; finish-time checks must
+ * compare against this published current config version instead.
+ */
+const currentConfigFingerprints = new Map<string, string>();
+
+/** Publish the live config fingerprint for a model (adapter / form). */
+export function publishCurrentConfigFingerprint(modelRef: string, fingerprint: string) {
+  const key = modelRef.trim();
+  const fp = fingerprint.trim();
+  if (!key || !fp) {
+    return;
+  }
+  currentConfigFingerprints.set(key, fp);
+}
+
+/** Read the published current config fingerprint (undefined if snapshot never mapped). */
+export function getCurrentConfigFingerprint(modelRef: string): string | undefined {
+  return currentConfigFingerprints.get(modelRef.trim());
+}
+
 export type ConnectionFingerprintInput = {
   modelId: string;
   /** Endpoint / base URL when known. */
@@ -97,6 +120,7 @@ export function markModelConnectionVerified(
 export function __resetModelConnectionSessionForTest() {
   sessionVerified.clear();
   expiredForMismatch.clear();
+  currentConfigFingerprints.clear();
 }
 
 type ConnectionAsset = Pick<ModelAsset, "modelId" | "healthBasis"> & {

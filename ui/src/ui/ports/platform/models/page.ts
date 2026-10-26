@@ -6,6 +6,7 @@ import {
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { selectPlatformModelsActions } from "./actions.ts";
 import { buildPlatformModelsVM } from "./adapter.ts";
+import { ensureCapabilityVerificationLifecycle } from "./admission/verification-service.ts";
 import { previewRoutingDecision } from "./routing-decision-preview.ts";
 import {
   renderModelsAorBanditPanel,
@@ -125,6 +126,9 @@ function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
 }
 
 export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
+  // Page lifecycle: recover orphaned verification tasks from a prior refresh.
+  // Live in-page tasks are preserved; opening a detail drawer does not re-enter here alone.
+  ensureCapabilityVerificationLifecycle();
   maybeAutoTriggerModelsSnapshot(props);
   let vm: ReturnType<typeof buildPlatformModelsVM>;
   try {

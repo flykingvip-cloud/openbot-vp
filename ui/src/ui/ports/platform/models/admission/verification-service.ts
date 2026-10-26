@@ -4,6 +4,10 @@
  */
 
 import { requestOpenBotAppRerender } from "../../../../request-app-rerender.ts";
+import {
+  __clearLiveVerificationTasksForTest,
+  interruptOrphanedInFlightVerificationTasks,
+} from "../model-admission-store.ts";
 import { hasSuccessfulModelConnection } from "../model-connection-gate.ts";
 import {
   createDemoCapabilityVerificationService,
@@ -69,6 +73,25 @@ function buildUnavailableService(): CapabilityVerificationService {
   };
 }
 
+/**
+ * Recover orphaned in-flight tasks left by a prior page/session.
+ * Live tasks registered in this process are left alone (opening a detail
+ * drawer must not globally interrupt everything).
+ */
+function recoverOrphanedInFlightOnInit() {
+  const interrupted = interruptOrphanedInFlightVerificationTasks(
+    "已中断，可重试（页面刷新或执行上下文丢失）",
+  );
+  if (interrupted.length > 0) {
+    try {
+      requestOpenBotAppRerender();
+    } catch {
+      // ignore missing app host in unit tests
+    }
+  }
+  return interrupted;
+}
+
 export function createCapabilityVerificationService(
   options: VerificationServiceRegistryOptions = {},
 ): CapabilityVerificationService {
@@ -91,8 +114,36 @@ export function createCapabilityVerificationService(
 export function getCapabilityVerificationService(): CapabilityVerificationService {
   if (!activeService) {
     activeService = createCapabilityVerificationService({ mode: activeMode });
+    // First materialization after page load / process start: orphan prior-page tasks.
+    recoverOrphanedInFlightOnInit();
   }
   return activeService;
+}
+
+/**
+ * Page / models-surface init hook.
+ * Ensures the formal service exists and prior-page orphaned tasks are interrupted.
+ * Safe to call on every models surface render: live tasks started in this process
+ * are preserved; only orphaned queued/running rows are interrupted.
+ * Callers do not need to invoke recover helpers manually.
+ */
+export function ensureCapabilityVerificationLifecycle(): {
+  interruptedCount: number;
+} {
+  // Orphan recovery first so the returned count reflects this init pass even when
+  // getCapabilityVerificationService also recovers on first create.
+  const interrupted = interruptOrphanedInFlightVerificationTasks(
+    "已中断，可重试（页面刷新或执行上下文丢失）",
+  );
+  getCapabilityVerificationService();
+  if (interrupted.length > 0) {
+    try {
+      requestOpenBotAppRerender();
+    } catch {
+      // ignore missing app host in unit tests
+    }
+  }
+  return { interruptedCount: interrupted.length };
 }
 
 export function setCapabilityVerificationService(
@@ -110,12 +161,16 @@ export function configureCapabilityVerificationService(
 ) {
   activeMode = options.mode ?? "local_protocol";
   activeService = createCapabilityVerificationService(options);
+  // Replacing the service drops in-memory timers; orphan non-live persisted rows.
+  recoverOrphanedInFlightOnInit();
   return activeService;
 }
 
 export function __resetCapabilityVerificationServiceForTest() {
   activeService = null;
   activeMode = "local_protocol";
+  // Simulate process/page death: live task registry does not survive refresh.
+  __clearLiveVerificationTasksForTest();
 }
 
 export {

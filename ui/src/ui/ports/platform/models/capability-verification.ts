@@ -20,6 +20,7 @@ import type { DemoSimulateOptions } from "./admission/demo-adapter.ts";
 import {
   configureCapabilityVerificationService,
   createDemoCapabilityVerificationService,
+  ensureCapabilityVerificationLifecycle,
   getCapabilityVerificationService,
   setCapabilityVerificationService,
   __resetCapabilityVerificationServiceForTest,
@@ -111,6 +112,7 @@ export {
   cancelCapabilityVerification,
   configureCapabilityVerificationService,
   discoverModelCapabilities,
+  ensureCapabilityVerificationLifecycle,
   listModelVerificationTasks,
   queryCapabilityVerificationTask,
   recoverActiveVerificationTask,

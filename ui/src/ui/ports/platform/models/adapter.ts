@@ -3,7 +3,10 @@ import type { ModelsVM as LegacyModelsVM } from "../view-models/types.ts";
 import { suggestedEvidenceFromInferred } from "./capability-evidence.ts";
 import { resolveExecutorPathLabel } from "./executor-path-labels.ts";
 import { getModelAdmission } from "./model-admission-store.ts";
-import { buildConnectionFingerprint } from "./model-connection-gate.ts";
+import {
+  buildConnectionFingerprint,
+  publishCurrentConfigFingerprint,
+} from "./model-connection-gate.ts";
 import type { PlatformModelsManagementSnapshot } from "./snapshot-types.ts";
 import type {
   GovernanceInsight,
@@ -600,6 +603,9 @@ function modelAssetFromSourceEntry(
     baseUrl: entry.baseUrl ?? null,
     api: entry.api ?? null,
   });
+  // Publish live config identity for verification finish-time stale checks.
+  // Must not use admission.connectionFingerprint (last verified) as "current".
+  publishCurrentConfigFingerprint(modelRef, connectionFingerprint);
   // Backend admission RPCs are not wired yet — do NOT surface localStorage drafts
   // as platform-effective "允许" / "可参与".
   const admissionControlsAvailable = false;

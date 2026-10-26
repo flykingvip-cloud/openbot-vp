@@ -8,6 +8,7 @@ import { verifiedCapabilityIds } from "./capability-evidence.ts";
 import {
   cancelCapabilityVerificationTask,
   createCapabilityVerificationTask,
+  ensureCapabilityVerificationLifecycle,
   expireCapabilityEvidenceForModel,
   getVerificationTask,
   listVerificationTasks,
@@ -22,13 +23,16 @@ import {
   __resetModelAdmissionStoreForTest,
   getModelAdmission,
   interruptInFlightVerificationTasks,
+  isVerificationTaskLive,
   saveVerificationTask,
   upsertModelAdmission,
 } from "./model-admission-store.ts";
 import {
   __resetModelConnectionSessionForTest,
   buildConnectionFingerprint,
+  getCurrentConfigFingerprint,
   markModelConnectionVerified,
+  publishCurrentConfigFingerprint,
 } from "./model-connection-gate.ts";
 
 describe("batch2 formal capability verification", () => {
@@ -565,5 +569,201 @@ describe("batch2 formal capability verification", () => {
     expect(out).toHaveLength(1);
     expect(out[0]?.status).toBe("interrupted");
     expect(listVerificationTasks("private/stuck")[0]?.status).toBe("interrupted");
+  });
+
+  it("service/page init recovers orphans without manually calling recover helper", () => {
+    saveVerificationTask({
+      taskId: "cvt_orphan_init",
+      modelRef: "private/orphan-init",
+      capabilityIds: ["text_chat"],
+      status: "running",
+      createdAt: 1,
+      updatedAt: 1,
+      configFingerprint: "fp-orphan",
+      executionGeneration: 1,
+    });
+    // Not marked live → prior page leftover. Init must interrupt it.
+    const { interruptedCount } = ensureCapabilityVerificationLifecycle();
+    expect(interruptedCount).toBeGreaterThanOrEqual(1);
+    expect(getVerificationTask("cvt_orphan_init")?.status).toBe("interrupted");
+    expect(getVerificationTask("cvt_orphan_init")?.error).toMatch(/已中断|可重试/);
+  });
+
+  it("init preserves live in-page tasks and only interrupts orphans", async () => {
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        settleDelayMs: 999_999,
+        schedule: () => {
+          /* hold live task in queued/running */
+        },
+        resolveConnectionOk: () => true,
+      },
+    });
+    const { task: live } = await startCapabilityVerification({
+      modelRef: "private/live-keep",
+      capabilityIds: ["text_chat"],
+      configFingerprint: "fp-live",
+    });
+    expect(isVerificationTaskLive(live.taskId)).toBe(true);
+    expect(["queued", "running"]).toContain(live.status);
+
+    saveVerificationTask({
+      taskId: "cvt_orphan_other",
+      modelRef: "private/orphan-other",
+      capabilityIds: ["text_chat"],
+      status: "running",
+      createdAt: 1,
+      updatedAt: 1,
+      configFingerprint: "fp-other",
+      executionGeneration: 1,
+    });
+
+    // Mimic re-entering models surface / opening another detail — must not kill live.
+    const { interruptedCount } = ensureCapabilityVerificationLifecycle();
+    expect(interruptedCount).toBeGreaterThanOrEqual(1);
+    expect(getVerificationTask(live.taskId)?.status).toMatch(/queued|running/);
+    expect(isVerificationTaskLive(live.taskId)).toBe(true);
+    expect(getVerificationTask("cvt_orphan_other")?.status).toBe("interrupted");
+  });
+
+  it("never-resolving runner Promise times out to a terminal state", async () => {
+    const settled: string[] = [];
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        pendingTimeoutMs: 40,
+        runner: {
+          check() {
+            return new Promise(() => {});
+          },
+        },
+        onTaskSettled: (t) => {
+          settled.push(t.status);
+        },
+      },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/hang",
+      capabilityIds: ["text_chat"],
+    });
+    expect(["queued", "running"]).toContain(task.status);
+    await new Promise((r) => setTimeout(r, 80));
+    const done = getVerificationTask(task.taskId);
+    expect(done?.status).toBe("failed");
+    expect(done?.error).toMatch(/超时/);
+    expect(settled).toContain("failed");
+  });
+
+  it("late success after runner Promise timeout does not overwrite terminal state or formal evidence", async () => {
+    let release!: (value: unknown) => void;
+    const hanging = new Promise((resolve) => {
+      release = resolve;
+    });
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        pendingTimeoutMs: 40,
+        runner: {
+          check() {
+            return hanging.then(() => [
+              {
+                capabilityId: "text_chat",
+                status: "passed",
+                testVersion: "late-pass",
+                sourceNote: "too late",
+              },
+            ]);
+          },
+        },
+      },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/late",
+      capabilityIds: ["text_chat"],
+      configFingerprint: "fp-late",
+    });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(getVerificationTask(task.taskId)?.status).toBe("failed");
+
+    release(undefined);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getVerificationTask(task.taskId)?.status).toBe("failed");
+    expect(verifiedCapabilityIds(getModelAdmission("private/late").capabilityEvidence)).toEqual([]);
+  });
+
+  it("default service + real config publish race: stale finish does not write formal evidence", async () => {
+    const oldFp = buildConnectionFingerprint({
+      modelId: "private/cfg-race",
+      providerId: "private",
+      baseUrl: "https://old.example",
+      api: "openai-completions",
+    });
+    const newFp = buildConnectionFingerprint({
+      modelId: "private/cfg-race",
+      providerId: "private",
+      baseUrl: "https://new.example",
+      api: "openai-completions",
+    });
+    expect(oldFp).not.toBe(newFp);
+
+    // Publish current config from snapshot (adapter path) — not admission verified fp.
+    publishCurrentConfigFingerprint("private/cfg-race", oldFp);
+    markModelConnectionVerified("private/cfg-race", oldFp);
+    expect(getCurrentConfigFingerprint("private/cfg-race")).toBe(oldFp);
+    expect(getModelAdmission("private/cfg-race").connectionFingerprint).toBe(oldFp);
+
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // Default service: NO resolveCurrentFingerprint injection.
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        settleDelayMs: 0,
+        schedule: (work) => {
+          void gate.then(work);
+        },
+        resolveConnectionOk: () => true,
+        runner: {
+          check() {
+            return [
+              {
+                capabilityId: "text_chat",
+                status: "passed",
+                testVersion: "old-endpoint-run",
+                sourceNote: "old endpoint",
+              },
+            ];
+          },
+        },
+      },
+    });
+
+    const { task: oldTask } = await startCapabilityVerification({
+      modelRef: "private/cfg-race",
+      capabilityIds: ["text_chat"],
+      configFingerprint: oldFp,
+    });
+    expect(oldTask.status).toBe("queued");
+
+    // Real config change flow: snapshot publishes new fingerprint; expiry keeps
+    // admission.connectionFingerprint as the OLD verified identity for stale UI.
+    publishCurrentConfigFingerprint("private/cfg-race", newFp);
+    expireCapabilityEvidenceForModel("private/cfg-race", "配置指纹已变更，需重新验证");
+    expect(getModelAdmission("private/cfg-race").connectionFingerprint).toBe(oldFp);
+    expect(getCurrentConfigFingerprint("private/cfg-race")).toBe(newFp);
+
+    release();
+    await new Promise((r) => setTimeout(r, 30));
+
+    const finished = getVerificationTask(oldTask.taskId);
+    expect(finished?.status).toBe("succeeded");
+    expect(finished?.error).toMatch(/指纹|历史/);
+    expect(verifiedCapabilityIds(getModelAdmission("private/cfg-race").capabilityEvidence)).toEqual(
+      [],
+    );
   });
 });

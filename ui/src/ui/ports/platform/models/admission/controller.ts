@@ -8,7 +8,7 @@ import type { CanonicalCapabilityId } from "../capability-ids.ts";
 import type { CapabilityVerificationTask } from "../model-admission-store.ts";
 import {
   expireFormalCapabilityEvidence,
-  interruptInFlightVerificationTasks,
+  interruptOrphanedInFlightVerificationTasks,
 } from "../model-admission-store.ts";
 import type {
   CreateVerificationTaskRequest,
@@ -18,6 +18,7 @@ import type {
 } from "./verification-contract.ts";
 import type { CreateVerificationTaskResponse } from "./verification-contract.ts";
 import {
+  ensureCapabilityVerificationLifecycle,
   getCapabilityVerificationService,
   type DemoSimulateOptions,
 } from "./verification-service.ts";
@@ -127,13 +128,15 @@ export function expireModelCapabilityEvidence(modelRef: string, reason: string) 
 
 /**
  * Refresh recovery: in-flight local tasks cannot resume (timers/Promises are gone).
- * Mark them interrupted ("已中断，可重试") so the UI never hangs on "验证中".
+ * Marks ORPHANED tasks interrupted ("已中断，可重试") so the UI never hangs on "验证中".
+ * Live tasks started in this page/process are left alone — opening a detail drawer
+ * must not globally interrupt every model's running verification.
  * Returns the interrupted task for this model, else the most recent history row.
  */
 export async function recoverActiveVerificationTask(
   modelRef: string,
 ): Promise<CapabilityVerificationTask | null> {
-  const interrupted = interruptInFlightVerificationTasks(
+  const interrupted = interruptOrphanedInFlightVerificationTasks(
     "已中断，可重试（页面刷新或执行上下文丢失）",
   );
   if (interrupted.length > 0) {
@@ -143,3 +146,5 @@ export async function recoverActiveVerificationTask(
   const forModel = interrupted.find((t) => t.modelRef === modelRef.trim());
   return forModel ?? tasks[0] ?? null;
 }
+
+export { ensureCapabilityVerificationLifecycle };

@@ -150,9 +150,29 @@ let memoryTasks: TaskStoreShape = {};
 /** Per-model execution generation (memory). */
 const executionGenerationByModel: Record<string, number> = {};
 
+/** Task ids started in the current page/service process (not orphans from a prior refresh). */
+const liveVerificationTaskIds = new Set<string>();
+
+export function markVerificationTaskLive(taskId: string) {
+  liveVerificationTaskIds.add(taskId);
+}
+
+export function clearVerificationTaskLive(taskId: string) {
+  liveVerificationTaskIds.delete(taskId);
+}
+
+export function isVerificationTaskLive(taskId: string): boolean {
+  return liveVerificationTaskIds.has(taskId);
+}
+
+export function __clearLiveVerificationTasksForTest() {
+  liveVerificationTaskIds.clear();
+}
+
 export function __resetModelAdmissionStoreForTest() {
   memoryStore = {};
   memoryTasks = {};
+  liveVerificationTaskIds.clear();
   for (const key of Object.keys(executionGenerationByModel)) {
     delete executionGenerationByModel[key];
   }
@@ -368,15 +388,38 @@ export function currentExecutionGeneration(modelRef: string): number {
 /**
  * Mark queued/running tasks as interrupted after refresh or service restart.
  * Memory timers/Promises are gone; leaving them "running" would hang forever.
+ * Prefer interruptOrphanedInFlightVerificationTasks so live page tasks survive.
  */
 export function interruptInFlightVerificationTasks(
   reason = "已中断，可重试（页面刷新或执行上下文丢失）",
+): CapabilityVerificationTask[] {
+  return interruptMatchingInFlightVerificationTasks(() => true, reason);
+}
+
+/**
+ * Interrupt only persisted in-flight tasks that are NOT live in this process.
+ * Use on page/service init after refresh: prior-page orphans end; current-page
+ * running tasks (registered via markVerificationTaskLive) keep going.
+ * Do not call the full interrupt when merely opening a model detail drawer.
+ */
+export function interruptOrphanedInFlightVerificationTasks(
+  reason = "已中断，可重试（页面刷新或执行上下文丢失）",
+): CapabilityVerificationTask[] {
+  return interruptMatchingInFlightVerificationTasks(
+    (taskId) => !liveVerificationTaskIds.has(taskId),
+    reason,
+  );
+}
+
+function interruptMatchingInFlightVerificationTasks(
+  shouldInterrupt: (taskId: string) => boolean,
+  reason: string,
 ): CapabilityVerificationTask[] {
   const store = { ...memoryTasks, ...readTasks() };
   memoryTasks = store;
   const out: CapabilityVerificationTask[] = [];
   for (const task of Object.values(store)) {
-    if (task.status === "queued" || task.status === "running") {
+    if ((task.status === "queued" || task.status === "running") && shouldInterrupt(task.taskId)) {
       const next: CapabilityVerificationTask = {
         ...task,
         status: "interrupted",
@@ -384,6 +427,7 @@ export function interruptInFlightVerificationTasks(
         updatedAt: Date.now(),
       };
       store[task.taskId] = next;
+      liveVerificationTaskIds.delete(task.taskId);
       out.push({ ...next });
     }
   }
