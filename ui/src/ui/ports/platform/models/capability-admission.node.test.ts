@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import type { PlatformPortReadModel } from "../semantic/platform-read-model.ts";
+import { buildPlatformModelsVM } from "./adapter.ts";
 import { suggestedEvidenceFromInferred, verifiedCapabilityIds } from "./capability-evidence.ts";
 import { normalizeCapabilityIds, toCanonicalCapabilityId } from "./capability-ids.ts";
 import {
@@ -12,6 +14,7 @@ import { assertNoNativeMidjourneyClaim, resolveExecutorPathLabel } from "./execu
 import {
   __resetModelAdmissionStoreForTest,
   getModelAdmission,
+  isStubOrDemoEvidence,
   setAutoRoutingAdmission,
   setExecutorCallTypeArchive,
   setTenantSelectable,
@@ -417,6 +420,251 @@ describe("routing decision preview", () => {
     expect(preview.selectedModelId).toBeNull();
     expect(preview.excluded[0]?.code).toBe("auto_routing_disabled");
     expect(preview.uiDemo).toBe(true);
+  });
+});
+
+describe("legacy stub evidence upgrade migration", () => {
+  const STORAGE_KEY = "openbot.platform.modelAdmission.v1";
+
+  function installMemoryLocalStorage() {
+    const map = new Map<string, string>();
+    const storage: Storage = {
+      get length() {
+        return map.size;
+      },
+      clear() {
+        map.clear();
+      },
+      getItem(key: string) {
+        return map.has(key) ? (map.get(key) as string) : null;
+      },
+      setItem(key: string, value: string) {
+        map.set(key, String(value));
+      },
+      removeItem(key: string) {
+        map.delete(key);
+      },
+      key(index: number) {
+        return Array.from(map.keys())[index] ?? null;
+      },
+    };
+    Object.defineProperty(globalThis, "localStorage", {
+      value: storage,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  beforeEach(() => {
+    installMemoryLocalStorage();
+    __resetModelAdmissionStoreForTest();
+  });
+
+  afterEach(() => {
+    __resetModelAdmissionStoreForTest();
+    Reflect.deleteProperty(globalThis, "localStorage");
+  });
+
+  function seedLegacyStubLocalStorage(modelRef: string) {
+    const legacy = {
+      [modelRef]: {
+        modelRef,
+        tenantSelectable: false,
+        autoRouting: "disabled",
+        autoRoutingTaskCategories: [],
+        capabilityEvidence: [
+          {
+            id: "text_chat",
+            label: "text_chat",
+            source: "protocol_probe",
+            status: "passed",
+            verifiedAt: 1_700_000_000_000,
+            testVersion: "stub-v1",
+            sourceNote: "基础协议探测",
+          },
+          {
+            id: "tool_use",
+            label: "tool_use",
+            source: "protocol_probe",
+            status: "failed",
+            verifiedAt: 1_700_000_000_000,
+            testVersion: "stub-v1",
+            sourceNote: "stub",
+            failureReason: "tool_use 专项检查失败",
+          },
+          {
+            id: "coding",
+            label: "coding",
+            source: "protocol_probe",
+            status: "passed",
+            verifiedAt: 1_700_000_000_100,
+            // Genuine formal evidence from a real probe — must be retained.
+          },
+        ],
+        updatedAt: 1_700_000_000_000,
+      },
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+  }
+
+  it("moves legacy stub-v1 rows out of formal evidence on read and keeps real formal", () => {
+    const modelRef = "deepseek/deepseek-chat";
+    seedLegacyStubLocalStorage(modelRef);
+
+    const first = getModelAdmission(modelRef);
+    expect(first.capabilityEvidence.map((i) => i.id)).toEqual(["coding"]);
+    expect(first.capabilityEvidence[0]?.status).toBe("passed");
+    expect(first.capabilityEvidence.every((i) => !isStubOrDemoEvidence(i))).toBe(true);
+    expect(verifiedCapabilityIds(first.capabilityEvidence)).toEqual(["coding"]);
+    expect(verifiedCapabilityIds(first.capabilityEvidence)).not.toContain("text_chat");
+
+    expect(first.demoCapabilityEvidence?.map((i) => i.id).toSorted()).toEqual([
+      "text_chat",
+      "tool_use",
+    ]);
+    expect(first.demoCapabilityEvidence?.every((i) => i.testVersion === "stub-v1")).toBe(true);
+
+    // Refresh / second read — migration persists; formal stays clean without clearing browser.
+    const second = getModelAdmission(modelRef);
+    expect(verifiedCapabilityIds(second.capabilityEvidence)).toEqual(["coding"]);
+    expect(second.demoCapabilityEvidence?.map((i) => i.id).toSorted()).toEqual([
+      "text_chat",
+      "tool_use",
+    ]);
+
+    const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<
+      string,
+      {
+        capabilityEvidence: Array<{ id: string; testVersion?: string }>;
+        demoCapabilityEvidence?: Array<{ id: string }>;
+      }
+    >;
+    expect(persisted[modelRef]?.capabilityEvidence.map((i) => i.id)).toEqual(["coding"]);
+    expect(persisted[modelRef]?.capabilityEvidence.some((i) => i.testVersion === "stub-v1")).toBe(
+      false,
+    );
+    expect(persisted[modelRef]?.demoCapabilityEvidence?.map((i) => i.id).toSorted()).toEqual([
+      "text_chat",
+      "tool_use",
+    ]);
+  });
+
+  it("keeps stub results out of formal verified set when reading model assets after upgrade", () => {
+    const modelRef = "deepseek/deepseek-chat";
+    seedLegacyStubLocalStorage(modelRef);
+
+    const readModel = {
+      currentTenantId: "tenant-a",
+      currentTenantLabel: "Tenant A",
+      knownTenantIds: ["tenant-a"],
+      tenantDirectory: [{ tenantId: "tenant-a", label: "Tenant A" }],
+      enterpriseDirectory: [],
+      agentDirectory: [],
+      modelDirectory: [],
+      gatewayCatalogModels: [
+        {
+          providerId: "deepseek",
+          modelId: "deepseek-chat",
+          name: "DeepSeek Chat",
+          contextWindow: 64000,
+        },
+      ],
+      taskPlanDirectory: [],
+      routingPolicyDirectory: [],
+      gatewayCatalogCount: 1,
+      defaultModelPrimary: "deepseek/deepseek-chat",
+      defaultModelFallbacks: [],
+      defaultImageModelPrimary: null,
+      allowlistedModelRefs: ["deepseek/deepseek-chat"],
+      allowlistEntries: [{ modelRef: "deepseek/deepseek-chat", alias: "DeepSeek" }],
+      aliasCount: 1,
+      providerHealthDirectory: [],
+      agentCount: 0,
+      featureMethodCount: 0,
+      channelCount: 0,
+      channelIds: [],
+      accountCount: 0,
+      connectedAccountCount: 0,
+      nodeCount: 0,
+      presenceCount: 0,
+      runtimeHosts: [],
+      sessionsCount: 0,
+      totalTokens: 0,
+      totalCost: 0,
+      missingCostEntries: 0,
+      currentUsageOverview: {
+        sessionCount: 0,
+        totalTokens: 0,
+        totalCost: 0,
+        totalMessages: 0,
+        errorCount: 0,
+        errorRate: 0,
+        avgLatencyMs: null,
+        peakErrorDayLabel: null,
+        topModelLabel: null,
+        topAgentId: null,
+        activeAgentCount: 0,
+        activeChannelCount: 0,
+        dailyCalls: [],
+        dailyCost: [],
+        updatedAt: null,
+      },
+      modelMode: "merge",
+      configuredProviderCount: 1,
+      providerIds: ["deepseek"],
+      configuredModelCount: 0,
+      configuredModelIds: [],
+      installedCapabilityCount: 0,
+      attentionItems: [],
+      currentVersion: "2026.3.9",
+      latestVersion: "2026.3.9",
+      hasUpdateAvailable: false,
+      cronEnabled: null,
+      cronNextAt: null,
+      operatorUser: "ops@example.com",
+      operatorRole: "super_admin",
+      latestInvite: null,
+    } as PlatformPortReadModel;
+
+    const vm = buildPlatformModelsVM({ readModel, legacyModelsVM: null });
+    const asset = vm.assets.models.find((m) => m.modelId === modelRef);
+    expect(asset).toBeTruthy();
+    const formalVerified = verifiedCapabilityIds(asset?.capabilityEvidence ?? []);
+    expect(formalVerified).toContain("coding");
+    expect(formalVerified).not.toContain("text_chat");
+    expect(formalVerified).not.toContain("tool_use");
+    expect((asset?.capabilityEvidence ?? []).some((i) => i.testVersion === "stub-v1")).toBe(false);
+
+    const refreshed = buildPlatformModelsVM({ readModel, legacyModelsVM: null });
+    const again = refreshed.assets.models.find((m) => m.modelId === modelRef);
+    expect(verifiedCapabilityIds(again?.capabilityEvidence ?? [])).toEqual(
+      expect.arrayContaining(["coding"]),
+    );
+    expect(verifiedCapabilityIds(again?.capabilityEvidence ?? [])).not.toContain("text_chat");
+  });
+
+  it("keeps formal verified clean after page-refresh-like memory clear (localStorage kept)", () => {
+    const modelRef = "deepseek/deepseek-chat";
+    seedLegacyStubLocalStorage(modelRef);
+    const migrated = getModelAdmission(modelRef);
+    expect(verifiedCapabilityIds(migrated.capabilityEvidence)).toEqual(["coding"]);
+
+    const persisted = localStorage.getItem(STORAGE_KEY);
+    expect(persisted).toBeTruthy();
+
+    // Simulate browser refresh: in-memory store wiped, migrated localStorage retained.
+    __resetModelAdmissionStoreForTest();
+    localStorage.setItem(STORAGE_KEY, persisted!);
+
+    const afterRefresh = getModelAdmission(modelRef);
+    expect(verifiedCapabilityIds(afterRefresh.capabilityEvidence)).toEqual(["coding"]);
+    expect(afterRefresh.capabilityEvidence.some((i) => i.testVersion === "stub-v1")).toBe(false);
+    expect(afterRefresh.demoCapabilityEvidence?.map((i) => i.id).toSorted()).toEqual([
+      "text_chat",
+      "tool_use",
+    ]);
+    // No admin clear of browser data required — re-read stays migrated.
+    expect(verifiedCapabilityIds(afterRefresh.capabilityEvidence)).not.toContain("text_chat");
   });
 });
 

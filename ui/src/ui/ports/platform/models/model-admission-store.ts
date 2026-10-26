@@ -7,6 +7,8 @@
  *
  * Formal capabilityEvidence is for real verification results only.
  * demoCapabilityEvidence is isolated UI-demo output and never feeds verified sets.
+ * On read, legacy stub-v1 / stub-sourced rows left in capabilityEvidence are
+ * migrated into demoCapabilityEvidence and persisted (no admin clear required).
  */
 
 import type { CapabilityEvidenceItem } from "./capability-evidence.ts";
@@ -149,9 +151,87 @@ function defaultRecord(modelRef: string): ModelAdmissionRecord {
   };
 }
 
+/** Identify legacy stub / UI-demo evidence that must not stay in formal archive. */
+export function isStubOrDemoEvidence(item: CapabilityEvidenceItem): boolean {
+  const version = (item.testVersion ?? "").trim().toLowerCase();
+  if (version.startsWith("stub") || version.includes("stub-")) {
+    return true;
+  }
+  const note = `${item.sourceNote ?? ""} ${item.failureReason ?? ""}`.toLowerCase();
+  if (/\bstub\b|模拟|演示/.test(note)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Move stub/demo rows out of capabilityEvidence into demoCapabilityEvidence.
+ * Preserves genuine formal evidence. Idempotent.
+ */
+export function migrateStubEvidenceOutOfFormal(record: ModelAdmissionRecord): {
+  record: ModelAdmissionRecord;
+  changed: boolean;
+} {
+  const formal: CapabilityEvidenceItem[] = [];
+  const demoted: CapabilityEvidenceItem[] = [];
+  for (const item of record.capabilityEvidence ?? []) {
+    if (isStubOrDemoEvidence(item)) {
+      demoted.push(item);
+    } else {
+      formal.push(item);
+    }
+  }
+  if (demoted.length === 0) {
+    return { record, changed: false };
+  }
+  const demoById = new Map((record.demoCapabilityEvidence ?? []).map((item) => [item.id, item]));
+  for (const item of demoted) {
+    // Existing demo entries (new write path) win over demoted legacy duplicates.
+    if (!demoById.has(item.id)) {
+      demoById.set(item.id, item);
+    }
+  }
+  return {
+    record: {
+      ...record,
+      capabilityEvidence: formal,
+      demoCapabilityEvidence: Array.from(demoById.values()),
+    },
+    changed: true,
+  };
+}
+
+function migrateLoadedStore(store: StoreShape): StoreShape {
+  let changed = false;
+  const next: StoreShape = {};
+  for (const [key, raw] of Object.entries(store)) {
+    if (!raw || typeof raw !== "object") {
+      continue;
+    }
+    const base = {
+      ...defaultRecord(key),
+      ...raw,
+      modelRef: typeof raw.modelRef === "string" ? raw.modelRef : key,
+      capabilityEvidence: Array.isArray(raw.capabilityEvidence) ? raw.capabilityEvidence : [],
+      ...(Array.isArray(raw.demoCapabilityEvidence)
+        ? { demoCapabilityEvidence: raw.demoCapabilityEvidence }
+        : {}),
+    } satisfies ModelAdmissionRecord;
+    const migrated = migrateStubEvidenceOutOfFormal(base);
+    next[key] = migrated.record;
+    if (migrated.changed) {
+      changed = true;
+    }
+  }
+  if (changed) {
+    writeStore(next);
+  }
+  return next;
+}
+
 export function getModelAdmission(modelRef: string): ModelAdmissionRecord {
   const key = modelRef.trim();
-  const store = { ...memoryStore, ...readStore() };
+  const store = migrateLoadedStore({ ...memoryStore, ...readStore() });
   memoryStore = store;
   return store[key] ? { ...store[key] } : defaultRecord(key);
 }
@@ -161,14 +241,15 @@ export function upsertModelAdmission(
   patch: Partial<Omit<ModelAdmissionRecord, "modelRef">>,
 ): ModelAdmissionRecord {
   const key = modelRef.trim();
-  const store = { ...memoryStore, ...readStore() };
+  const store = migrateLoadedStore({ ...memoryStore, ...readStore() });
   const prev = store[key] ?? defaultRecord(key);
-  const next: ModelAdmissionRecord = {
+  const drafted: ModelAdmissionRecord = {
     ...prev,
     ...patch,
     modelRef: key,
     updatedAt: Date.now(),
   };
+  const { record: next } = migrateStubEvidenceOutOfFormal(drafted);
   store[key] = next;
   writeStore(store);
   return { ...next };
