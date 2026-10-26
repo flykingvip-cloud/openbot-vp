@@ -6,7 +6,10 @@
 import { requestOpenBotAppRerender } from "../../../../request-app-rerender.ts";
 import type { CanonicalCapabilityId } from "../capability-ids.ts";
 import type { CapabilityVerificationTask } from "../model-admission-store.ts";
-import { expireFormalCapabilityEvidence } from "../model-admission-store.ts";
+import {
+  expireFormalCapabilityEvidence,
+  interruptInFlightVerificationTasks,
+} from "../model-admission-store.ts";
 import type {
   CreateVerificationTaskRequest,
   DiscoverCapabilitiesResponse,
@@ -122,11 +125,21 @@ export function expireModelCapabilityEvidence(modelRef: string, reason: string) 
   return expireFormalCapabilityEvidence(modelRef, reason);
 }
 
-/** Latest non-terminal or most recent task for a model (refresh recovery). */
+/**
+ * Refresh recovery: in-flight local tasks cannot resume (timers/Promises are gone).
+ * Mark them interrupted ("已中断，可重试") so the UI never hangs on "验证中".
+ * Returns the interrupted task for this model, else the most recent history row.
+ */
 export async function recoverActiveVerificationTask(
   modelRef: string,
 ): Promise<CapabilityVerificationTask | null> {
+  const interrupted = interruptInFlightVerificationTasks(
+    "已中断，可重试（页面刷新或执行上下文丢失）",
+  );
+  if (interrupted.length > 0) {
+    requestOpenBotAppRerender();
+  }
   const tasks = await listModelVerificationTasks(modelRef);
-  const active = tasks.find((t) => t.status === "queued" || t.status === "running");
-  return active ?? tasks[0] ?? null;
+  const forModel = interrupted.find((t) => t.modelRef === modelRef.trim());
+  return forModel ?? tasks[0] ?? null;
 }

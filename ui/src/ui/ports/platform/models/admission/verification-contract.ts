@@ -97,13 +97,23 @@ export type BatchVerificationResponse = {
  */
 export type ProtocolCheckOutcome = {
   capabilityId: CanonicalCapabilityId;
-  status: "passed" | "failed" | "pending";
+  /**
+   * passed/failed = actual check ran.
+   * pending = still in flight (needs poll/timeout).
+   * untested = not requested to run.
+   * checker_unavailable = runner cannot execute this check yet (must not write formal failed).
+   */
+  status: "passed" | "failed" | "pending" | "untested" | "checker_unavailable";
   failureReason?: string;
-  /** True when image/music returned a job id but no artifact yet. */
+  /** True when image/music returned a job id but no artifact yet (after a real submit). */
   artifactMissing?: boolean;
   testVersion?: string;
   sourceNote?: string;
   expiresAt?: number;
+  /** Preserve original probe time when reusing an existing connection result. */
+  verifiedAt?: number;
+  /** When true, merge must keep existing formal evidence identity if still valid. */
+  reuseExistingEvidence?: boolean;
 };
 
 export type ProtocolCheckContext = {

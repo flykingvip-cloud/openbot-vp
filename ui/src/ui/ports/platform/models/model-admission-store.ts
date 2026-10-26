@@ -52,14 +52,30 @@ export type CapabilityVerificationTask = {
   taskId: string;
   modelRef: string;
   capabilityIds: CanonicalCapabilityId[];
-  status: "queued" | "running" | "succeeded" | "failed" | "cancelled" | "partial";
+  status:
+    | "queued"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "cancelled"
+    | "partial"
+    /** In-flight execution lost (refresh / service restart); safe to retry. */
+    | "interrupted";
   createdAt: number;
   updatedAt: number;
-  /** Per-capability outcomes once finished. */
+  /** Per-capability outcomes once finished (or historical stale outcomes). */
   results?: CapabilityEvidenceItem[];
   error?: string;
   /** Estimated call budget hint shown near the button. */
   estimatedCalls?: number;
+  /** Config fingerprint captured at create time; finish must still match. */
+  configFingerprint?: string;
+  /**
+   * Monotonic per-model execution version at create time.
+   * A later task for the same modelRef bumps this; older finishes must not
+   * overwrite newer formal evidence.
+   */
+  executionGeneration?: number;
 };
 
 const STORAGE_KEY = "openbot.platform.modelAdmission.v1";
@@ -131,9 +147,15 @@ function writeTasks(store: TaskStoreShape) {
 let memoryStore: StoreShape = {};
 let memoryTasks: TaskStoreShape = {};
 
+/** Per-model execution generation (memory). */
+const executionGenerationByModel: Record<string, number> = {};
+
 export function __resetModelAdmissionStoreForTest() {
   memoryStore = {};
   memoryTasks = {};
+  for (const key of Object.keys(executionGenerationByModel)) {
+    delete executionGenerationByModel[key];
+  }
   if (canUseStorage()) {
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TASK_STORAGE_KEY);
@@ -323,6 +345,100 @@ export function saveVerificationTask(task: CapabilityVerificationTask) {
   store[task.taskId] = task;
   writeTasks(store);
   return { ...task };
+}
+
+export function __resetExecutionGenerationsForTest() {
+  for (const key of Object.keys(executionGenerationByModel)) {
+    delete executionGenerationByModel[key];
+  }
+}
+
+/** Allocate next execution generation for a modelRef (create-time). */
+export function nextExecutionGeneration(modelRef: string): number {
+  const key = modelRef.trim();
+  const next = (executionGenerationByModel[key] ?? 0) + 1;
+  executionGenerationByModel[key] = next;
+  return next;
+}
+
+export function currentExecutionGeneration(modelRef: string): number {
+  return executionGenerationByModel[modelRef.trim()] ?? 0;
+}
+
+/**
+ * Mark queued/running tasks as interrupted after refresh or service restart.
+ * Memory timers/Promises are gone; leaving them "running" would hang forever.
+ */
+export function interruptInFlightVerificationTasks(
+  reason = "已中断，可重试（页面刷新或执行上下文丢失）",
+): CapabilityVerificationTask[] {
+  const store = { ...memoryTasks, ...readTasks() };
+  memoryTasks = store;
+  const out: CapabilityVerificationTask[] = [];
+  for (const task of Object.values(store)) {
+    if (task.status === "queued" || task.status === "running") {
+      const next: CapabilityVerificationTask = {
+        ...task,
+        status: "interrupted",
+        error: reason,
+        updatedAt: Date.now(),
+      };
+      store[task.taskId] = next;
+      out.push({ ...next });
+    }
+  }
+  if (out.length > 0) {
+    writeTasks(store);
+  }
+  return out;
+}
+
+/**
+ * Merge formal evidence carefully:
+ * - untested / checker_unavailable / pending never overwrite existing valid evidence
+ * - reuseExistingEvidence keeps prior passed identity (verifiedAt / testVersion)
+ * - actual passed/failed replace by capability id
+ */
+export function mergeFormalCapabilityEvidence(
+  modelRef: string,
+  results: CapabilityEvidenceItem[],
+  opts?: {
+    reuseHints?: Partial<
+      Record<string, { verifiedAt?: number; testVersion?: string; sourceNote?: string }>
+    >;
+  },
+): ModelAdmissionRecord {
+  const admission = getModelAdmission(modelRef);
+  const byId = new Map(admission.capabilityEvidence.map((item) => [item.id, item]));
+  for (const item of results) {
+    if (
+      item.status === "untested" ||
+      item.status === "checker_unavailable" ||
+      item.status === "pending"
+    ) {
+      // Do not clobber existing passed/failed/expired evidence.
+      if (!byId.has(item.id)) {
+        byId.set(item.id, item);
+      }
+      continue;
+    }
+    const hint = opts?.reuseHints?.[item.id];
+    const prev = byId.get(item.id);
+    if (hint && prev?.status === "passed" && item.status === "passed") {
+      byId.set(item.id, {
+        ...prev,
+        ...item,
+        verifiedAt: hint.verifiedAt ?? prev.verifiedAt,
+        testVersion: hint.testVersion ?? prev.testVersion,
+        sourceNote: hint.sourceNote ?? item.sourceNote ?? prev.sourceNote,
+      });
+      continue;
+    }
+    byId.set(item.id, item);
+  }
+  return upsertModelAdmission(modelRef, {
+    capabilityEvidence: Array.from(byId.values()),
+  });
 }
 
 export function autoRoutingLabel(value: AutoRoutingAdmission): string {

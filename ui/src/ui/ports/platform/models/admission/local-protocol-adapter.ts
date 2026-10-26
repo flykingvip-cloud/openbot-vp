@@ -4,6 +4,13 @@
  * Produces formal evidence only from CapabilityCheckRunner outcomes.
  * Does not call paid Midjourney/Suno/etc. APIs — inject a runner for tests
  * or use the default structural runner (connection-backed text_chat only).
+ *
+ * Batch-2 authenticity:
+ * - Unexecuted checks → checker_unavailable / untested (never formal failed).
+ * - Sync/async runner errors → terminal task status + UI notify.
+ * - Refresh loses timers → interrupt in-flight tasks (no infinite running).
+ * - Results bind configFingerprint + executionGeneration; stale finishes
+ *   stay in history only and do not update formal evidence.
  */
 
 import type { CapabilityEvidenceItem } from "../capability-evidence.ts";
@@ -14,12 +21,14 @@ import {
   type CanonicalCapabilityId,
 } from "../capability-ids.ts";
 import {
+  currentExecutionGeneration,
   getModelAdmission,
   getVerificationTask,
   listVerificationTasks,
+  mergeFormalCapabilityEvidence,
+  nextExecutionGeneration,
   saveVerificationTask,
   setAutoRoutingAdmission,
-  upsertModelAdmission,
   type CapabilityVerificationTask,
 } from "../model-admission-store.ts";
 import type {
@@ -44,14 +53,26 @@ import type {
 export type LocalProtocolAdapterOptions = {
   runner?: CapabilityCheckRunner;
   /**
-   * Async delay before completing a task (ms). 0 = complete on next microtask.
-   * Tests pass 0 and optionally a custom scheduler.
+   * Async delay before completing a task (ms). 0 = complete on next microtask
+   * (or inline when using defaultSchedule).
    */
   settleDelayMs?: number;
   /** Optional scheduler for tests (receives work to run later). */
   schedule?: (work: () => void, delayMs: number) => void;
   /** Provide connectionOk lookup by modelRef + fingerprint. */
   resolveConnectionOk?: (modelRef: string, fingerprint?: string) => boolean;
+  /**
+   * Current config fingerprint for the model (finish-time check).
+   * Defaults to admission.connectionFingerprint.
+   */
+  resolveCurrentFingerprint?: (modelRef: string) => string | undefined;
+  /** Called whenever a task reaches a terminal or interrupted state (UI refresh). */
+  onTaskSettled?: (task: CapabilityVerificationTask) => void;
+  /**
+   * When runner returns pending outcomes, wait this long then finalize as
+   * checker_unavailable with a timeout note. Default 30s; tests inject smaller.
+   */
+  pendingTimeoutMs?: number;
 };
 
 function newTaskId(): string {
@@ -66,9 +87,16 @@ function defaultSchedule(work: () => void, delayMs: number) {
   setTimeout(work, delayMs);
 }
 
+function isPromiseLike<T>(value: unknown): value is Promise<T> {
+  return (
+    !!value && typeof value === "object" && typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 /**
- * Default runner: formal text_chat may pass when connectionOk; tool_use /
- * image / music never invent passes without an injected specialized runner.
+ * Default runner: formal text_chat may pass when connectionOk (reusing probe
+ * identity). tool_use / image / music are checker_unavailable — not failed —
+ * until a specialized runner actually executes them.
  */
 export function createDefaultProtocolRunner(
   resolveConnectionOk?: (modelRef: string, fingerprint?: string) => boolean,
@@ -77,15 +105,24 @@ export function createDefaultProtocolRunner(
     check(ctx: ProtocolCheckContext): ProtocolCheckOutcome[] {
       const connectionOk =
         ctx.connectionOk ?? resolveConnectionOk?.(ctx.modelRef, ctx.configFingerprint) ?? false;
+      const admission = getModelAdmission(ctx.modelRef);
       return ctx.capabilityIds.map((id) => {
         if (id === "text_chat") {
           if (connectionOk) {
+            const existing = admission.capabilityEvidence.find(
+              (item) => item.id === "text_chat" && item.status === "passed",
+            );
+            const verifiedAt = existing?.verifiedAt ?? admission.connectionVerifiedAt ?? undefined;
             return {
               capabilityId: id,
               status: "passed" as const,
-              testVersion: "local-protocol-v1",
-              sourceNote: "连接协议探测通过（指纹绑定）",
-              expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+              testVersion: existing?.testVersion ?? "local-protocol-v1",
+              sourceNote: existing
+                ? "复用已通过的连接协议探测（指纹绑定）"
+                : "连接协议探测通过（指纹绑定）",
+              verifiedAt,
+              expiresAt: existing?.expiresAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000,
+              reuseExistingEvidence: Boolean(existing),
             };
           }
           return {
@@ -98,25 +135,29 @@ export function createDefaultProtocolRunner(
         if (id === "tool_use") {
           return {
             capabilityId: id,
-            status: "failed" as const,
-            failureReason: "连接成功不等于工具调用可用；专项协议检查尚未返回工具请求/回传证据",
+            status: "checker_unavailable" as const,
+            failureReason:
+              "工具调用专项检查器尚未接入；连接成功不等于工具可用，未执行检查不记正式失败",
             testVersion: "local-protocol-v1",
+            sourceNote: "检查器不可用",
           };
         }
         if (id === "image_generation" || id === "music_generation") {
           return {
             capabilityId: id,
-            status: "failed" as const,
-            failureReason: "仅返回 taskId，尚无有效产物，不能标记为目标模态完成",
-            artifactMissing: true,
+            status: "checker_unavailable" as const,
+            failureReason:
+              "图片／音乐专项检查器尚未接入，未向生成服务提交请求；不能把未检查记为失败或产物缺失",
             testVersion: "local-protocol-v1",
+            sourceNote: "检查器不可用",
           };
         }
         return {
           capabilityId: id,
-          status: "failed" as const,
-          failureReason: "专项协议检查未提供该能力的正式证据",
+          status: "untested" as const,
+          failureReason: "该能力未纳入本次协议检查范围",
           testVersion: "local-protocol-v1",
+          sourceNote: "未测试",
         };
       });
     },
@@ -128,30 +169,37 @@ function outcomeToEvidence(
   mode: VerificationMode,
 ): CapabilityEvidenceItem {
   const source = mode === "specialized_eval" ? "specialized_eval" : "protocol_probe";
-  const status =
-    outcome.status === "passed" ? "passed" : outcome.status === "pending" ? "pending" : "failed";
+  let status: CapabilityEvidenceItem["status"];
+  switch (outcome.status) {
+    case "passed":
+      status = "passed";
+      break;
+    case "failed":
+      status = "failed";
+      break;
+    case "pending":
+      status = "pending";
+      break;
+    case "checker_unavailable":
+      status = "checker_unavailable";
+      break;
+    case "untested":
+    default:
+      status = "untested";
+      break;
+  }
   return {
     id: outcome.capabilityId,
     label: capabilityLabel(outcome.capabilityId),
     source,
     status,
-    verifiedAt: status === "passed" || status === "failed" ? Date.now() : undefined,
+    verifiedAt:
+      outcome.verifiedAt ?? (status === "passed" || status === "failed" ? Date.now() : undefined),
     testVersion: outcome.testVersion ?? "local-protocol-v1",
     sourceNote: outcome.sourceNote,
     failureReason: outcome.failureReason,
     expiresAt: outcome.expiresAt,
   };
-}
-
-function mergeFormalEvidence(modelRef: string, results: CapabilityEvidenceItem[]) {
-  const admission = getModelAdmission(modelRef);
-  const byId = new Map(admission.capabilityEvidence.map((item) => [item.id, item]));
-  for (const item of results) {
-    byId.set(item.id, item);
-  }
-  upsertModelAdmission(modelRef, {
-    capabilityEvidence: Array.from(byId.values()),
-  });
 }
 
 function summarizeTaskStatus(
@@ -160,6 +208,10 @@ function summarizeTaskStatus(
   const failed = results.filter((r) => r.status === "failed").length;
   const passed = results.filter((r) => r.status === "passed").length;
   const pending = results.filter((r) => r.status === "pending").length;
+  const incomplete = results.filter(
+    (r) =>
+      r.status === "checker_unavailable" || r.status === "untested" || r.status === "suggested",
+  ).length;
   if (pending > 0) {
     return "running";
   }
@@ -169,7 +221,32 @@ function summarizeTaskStatus(
   if (failed > 0) {
     return "failed";
   }
-  return "succeeded";
+  if (passed > 0 && incomplete > 0) {
+    return "partial";
+  }
+  if (passed > 0) {
+    return "succeeded";
+  }
+  // Only unavailable/untested — not an actual failure.
+  return "partial";
+}
+
+function buildReuseHints(
+  outcomes: ProtocolCheckOutcome[],
+): Partial<Record<string, { verifiedAt?: number; testVersion?: string; sourceNote?: string }>> {
+  const hints: Partial<
+    Record<string, { verifiedAt?: number; testVersion?: string; sourceNote?: string }>
+  > = {};
+  for (const outcome of outcomes) {
+    if (outcome.reuseExistingEvidence && outcome.status === "passed") {
+      hints[outcome.capabilityId] = {
+        verifiedAt: outcome.verifiedAt,
+        testVersion: outcome.testVersion,
+        sourceNote: outcome.sourceNote,
+      };
+    }
+  }
+  return hints;
 }
 
 export function createLocalProtocolVerificationService(
@@ -177,7 +254,19 @@ export function createLocalProtocolVerificationService(
 ): CapabilityVerificationService {
   const settleDelayMs = options.settleDelayMs ?? 0;
   const schedule = options.schedule ?? defaultSchedule;
+  const pendingTimeoutMs = options.pendingTimeoutMs ?? 30_000;
   const runner = options.runner ?? createDefaultProtocolRunner(options.resolveConnectionOk);
+  const resolveCurrentFingerprint =
+    options.resolveCurrentFingerprint ??
+    ((modelRef: string) => getModelAdmission(modelRef).connectionFingerprint);
+
+  function notifySettled(task: CapabilityVerificationTask) {
+    try {
+      options.onTaskSettled?.(task);
+    } catch {
+      // UI notify must not break persistence.
+    }
+  }
 
   function discoverCapabilities(req: DiscoverCapabilitiesRequest): DiscoverCapabilitiesResponse {
     const declared = normalizeCapabilityIds(req.declaredCapabilities ?? []);
@@ -203,6 +292,141 @@ export function createLocalProtocolVerificationService(
     };
   }
 
+  function finishWithOutcomes(
+    taskId: string,
+    modelRef: string,
+    mode: VerificationMode,
+    requestFingerprint: string | undefined,
+    executionGeneration: number,
+    outcomes: ProtocolCheckOutcome[],
+    opts?: { fromPendingTimeout?: boolean },
+  ) {
+    const latest = getVerificationTask(taskId);
+    if (!latest) {
+      return;
+    }
+    if (latest.status === "cancelled" || latest.status === "interrupted") {
+      return;
+    }
+
+    const results = outcomes.map((o) => outcomeToEvidence(o, mode));
+    const stillPending = results.some((r) => r.status === "pending");
+    if (stillPending && !opts?.fromPendingTimeout) {
+      // Persist running snapshot; schedule timeout to force a terminal state.
+      const running: CapabilityVerificationTask = {
+        ...latest,
+        status: "running",
+        results,
+        updatedAt: Date.now(),
+        configFingerprint: requestFingerprint ?? latest.configFingerprint,
+        executionGeneration,
+      };
+      saveVerificationTask(running);
+      schedule(() => {
+        const timedOut = results.map((r) =>
+          r.status === "pending"
+            ? {
+                ...r,
+                status: "checker_unavailable" as const,
+                failureReason: r.failureReason ?? "检查超时，未得到终态（检查器未返回）",
+                sourceNote: "pending 超时",
+              }
+            : r,
+        );
+        // Re-enter as timeout finalization (no further pending wait).
+        finishWithOutcomes(
+          taskId,
+          modelRef,
+          mode,
+          requestFingerprint,
+          executionGeneration,
+          timedOut.map((r) => ({
+            capabilityId: r.id,
+            status:
+              r.status === "passed"
+                ? "passed"
+                : r.status === "failed"
+                  ? "failed"
+                  : r.status === "checker_unavailable"
+                    ? "checker_unavailable"
+                    : r.status === "untested"
+                      ? "untested"
+                      : "pending",
+            failureReason: r.failureReason,
+            testVersion: r.testVersion,
+            sourceNote: r.sourceNote,
+            expiresAt: r.expiresAt,
+            verifiedAt: r.verifiedAt,
+          })),
+          { fromPendingTimeout: true },
+        );
+      }, pendingTimeoutMs);
+      return;
+    }
+
+    const status = summarizeTaskStatus(results);
+    const done: CapabilityVerificationTask = {
+      ...latest,
+      status,
+      results,
+      updatedAt: Date.now(),
+      configFingerprint: requestFingerprint ?? latest.configFingerprint,
+      executionGeneration,
+      ...(opts?.fromPendingTimeout && stillPending ? { error: "检查超时，未得到终态" } : {}),
+    };
+    saveVerificationTask(done);
+
+    const currentFp = resolveCurrentFingerprint(modelRef);
+    const taskFp = requestFingerprint ?? latest.configFingerprint;
+    const fingerprintStale = Boolean(taskFp && currentFp && taskFp !== currentFp);
+    const generationStale = executionGeneration < currentExecutionGeneration(modelRef);
+
+    if (fingerprintStale || generationStale) {
+      // Keep results on the task (history) but do not update formal evidence.
+      const stale: CapabilityVerificationTask = {
+        ...done,
+        error:
+          done.error ??
+          (fingerprintStale
+            ? "配置指纹已变更，结果仅保留在历史中，未更新正式证据"
+            : "已被更新的验证任务取代，结果仅保留在历史中，未更新正式证据"),
+      };
+      saveVerificationTask(stale);
+      notifySettled(stale);
+      return;
+    }
+
+    mergeFormalCapabilityEvidence(modelRef, results, {
+      reuseHints: buildReuseHints(outcomes),
+    });
+    notifySettled(done);
+  }
+
+  function finishWithError(taskId: string, message: string) {
+    const latest = getVerificationTask(taskId);
+    if (!latest || latest.status === "cancelled" || latest.status === "interrupted") {
+      return;
+    }
+    const failed: CapabilityVerificationTask = {
+      ...latest,
+      status: "failed",
+      error: message,
+      updatedAt: Date.now(),
+      results: (latest.capabilityIds ?? []).map((id) => ({
+        id,
+        label: capabilityLabel(id),
+        source: "protocol_probe" as const,
+        status: "untested" as const,
+        failureReason: message,
+        testVersion: "local-protocol-v1",
+        sourceNote: "执行异常，未完成检查",
+      })),
+    };
+    saveVerificationTask(failed);
+    // Errors must not write formal failed over existing evidence.
+    notifySettled(failed);
+  }
+
   function createVerificationTask(
     req: CreateVerificationTaskRequest,
   ): CreateVerificationTaskResponse {
@@ -210,6 +434,7 @@ export function createLocalProtocolVerificationService(
     const mode: VerificationMode = req.mode ?? "protocol_probe";
     const now = Date.now();
     const taskId = newTaskId();
+    const executionGeneration = nextExecutionGeneration(modelRef);
     const queued: CapabilityVerificationTask = {
       taskId,
       modelRef,
@@ -218,30 +443,14 @@ export function createLocalProtocolVerificationService(
       createdAt: now,
       updatedAt: now,
       estimatedCalls: req.estimatedCalls ?? req.capabilityIds.length,
+      configFingerprint: req.configFingerprint,
+      executionGeneration,
     };
     saveVerificationTask(queued);
 
-    const finishWithOutcomes = (outcomes: ProtocolCheckOutcome[]) => {
-      const latest = getVerificationTask(taskId);
-      if (!latest || latest.status === "cancelled") {
-        return;
-      }
-      const results = outcomes.map((o) => outcomeToEvidence(o, mode));
-      const status = summarizeTaskStatus(results);
-      const done: CapabilityVerificationTask = {
-        ...latest,
-        status,
-        results,
-        updatedAt: Date.now(),
-      };
-      saveVerificationTask(done);
-      // Formal only — never write demoCapabilityEvidence here.
-      mergeFormalEvidence(modelRef, results);
-    };
-
     const run = () => {
       const current = getVerificationTask(taskId);
-      if (!current || current.status === "cancelled") {
+      if (!current || current.status === "cancelled" || current.status === "interrupted") {
         return;
       }
       const running: CapabilityVerificationTask = {
@@ -251,21 +460,55 @@ export function createLocalProtocolVerificationService(
       };
       saveVerificationTask(running);
 
-      const checked = runner.check({
-        modelRef,
-        mode,
-        configFingerprint: req.configFingerprint,
-        connectionOk: options.resolveConnectionOk?.(modelRef, req.configFingerprint),
-        capabilityIds: req.capabilityIds,
-      });
-      if (checked && typeof (checked as Promise<unknown>).then === "function") {
-        void (checked as Promise<ProtocolCheckOutcome[]>).then(finishWithOutcomes);
+      let checked: ProtocolCheckOutcome[] | Promise<ProtocolCheckOutcome[]>;
+      try {
+        checked = runner.check({
+          modelRef,
+          mode,
+          configFingerprint: req.configFingerprint,
+          connectionOk: options.resolveConnectionOk?.(modelRef, req.configFingerprint),
+          capabilityIds: req.capabilityIds,
+        });
+      } catch (err) {
+        finishWithError(
+          taskId,
+          err instanceof Error ? err.message : `协议检查同步异常: ${String(err)}`,
+        );
         return;
       }
-      finishWithOutcomes(checked as ProtocolCheckOutcome[]);
+
+      if (isPromiseLike<ProtocolCheckOutcome[]>(checked)) {
+        void checked.then(
+          (outcomes) => {
+            finishWithOutcomes(
+              taskId,
+              modelRef,
+              mode,
+              req.configFingerprint,
+              executionGeneration,
+              outcomes,
+            );
+          },
+          (err: unknown) => {
+            finishWithError(
+              taskId,
+              err instanceof Error ? err.message : `协议检查异步异常: ${String(err)}`,
+            );
+          },
+        );
+        return;
+      }
+      finishWithOutcomes(
+        taskId,
+        modelRef,
+        mode,
+        req.configFingerprint,
+        executionGeneration,
+        checked,
+      );
     };
 
-    // settleDelayMs <= 0: run inline so sync callers/tests observe completed formal evidence.
+    // settleDelayMs <= 0 with defaultSchedule: run inline so sync callers observe results.
     if (settleDelayMs <= 0 && schedule === defaultSchedule) {
       run();
     } else {
@@ -290,13 +533,13 @@ export function createLocalProtocolVerificationService(
     if (task.status === "queued" || task.status === "running") {
       const next = { ...task, status: "cancelled" as const, updatedAt: Date.now() };
       saveVerificationTask(next);
+      notifySettled(next);
       return next;
     }
     return task;
   }
 
   function setRoutingEligibility(req: SetRoutingEligibilityRequest): SetRoutingEligibilityResponse {
-    // Backend admission RPC not wired — persist draft only, never claim applied.
     setAutoRoutingAdmission(req.modelRef, req.autoRouting, {
       reason: req.reason ?? "本地草稿，后端准入尚未接入",
       taskCategories: req.taskCategories,
@@ -347,9 +590,10 @@ export function createInjectedProtocolRunner(
         }
         return {
           capabilityId: id,
-          status: "failed" as const,
-          failureReason: "注入 runner 未提供该能力结果",
+          status: "checker_unavailable" as const,
+          failureReason: "注入 runner 未提供该能力结果（未执行，不记正式失败）",
           testVersion: "injected-protocol-v1",
+          sourceNote: "检查器不可用",
         };
       });
     },

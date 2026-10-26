@@ -3,6 +3,7 @@
  * Default: local_protocol (formal). Demo is opt-in and isolated.
  */
 
+import { requestOpenBotAppRerender } from "../../../../request-app-rerender.ts";
 import { hasSuccessfulModelConnection } from "../model-connection-gate.ts";
 import {
   createDemoCapabilityVerificationService,
@@ -82,6 +83,7 @@ export function createCapabilityVerificationService(
   return createLocalProtocolVerificationService({
     ...local,
     resolveConnectionOk: local.resolveConnectionOk ?? defaultResolveConnectionOk,
+    onTaskSettled: local.onTaskSettled ?? (() => requestOpenBotAppRerender()),
   });
 }
 

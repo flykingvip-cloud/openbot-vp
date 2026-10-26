@@ -21,6 +21,8 @@ import {
 import {
   __resetModelAdmissionStoreForTest,
   getModelAdmission,
+  interruptInFlightVerificationTasks,
+  saveVerificationTask,
   upsertModelAdmission,
 } from "./model-admission-store.ts";
 import {
@@ -40,7 +42,7 @@ describe("batch2 formal capability verification", () => {
     __resetCapabilityVerificationServiceForTest();
   });
 
-  it("connection ok but tool_use fails — formal partial evidence", async () => {
+  it("connection ok + tool checker unavailable — does not write formal tool failure", async () => {
     const fp = buildConnectionFingerprint({
       modelId: "private/demo",
       providerId: "private",
@@ -63,12 +65,84 @@ describe("batch2 formal capability verification", () => {
     expect(authority).toBe("formal");
     expect(task.status).toBe("partial");
     expect(task.results?.find((r) => r.id === "text_chat")?.status).toBe("passed");
-    expect(task.results?.find((r) => r.id === "tool_use")?.status).toBe("failed");
-    expect(task.results?.find((r) => r.id === "tool_use")?.failureReason).toMatch(/工具/);
+    expect(task.results?.find((r) => r.id === "tool_use")?.status).toBe("checker_unavailable");
+    expect(task.results?.find((r) => r.id === "tool_use")?.failureReason).toMatch(/未执行|检查器/);
 
     const admission = getModelAdmission("private/demo");
     expect(verifiedCapabilityIds(admission.capabilityEvidence)).toEqual(["text_chat"]);
+    expect(admission.capabilityEvidence.find((e) => e.id === "tool_use")?.status).not.toBe(
+      "failed",
+    );
     expect(admission.demoCapabilityEvidence ?? []).toEqual([]);
+  });
+
+  it("unexecuted image/music check must not overwrite existing passed evidence", async () => {
+    upsertModelAdmission("private/img", {
+      capabilityEvidence: [
+        {
+          id: "image_generation",
+          label: "image_generation",
+          source: "specialized_eval",
+          status: "passed",
+          verifiedAt: 1_700_000_000_000,
+          testVersion: "real-eval-v1",
+          sourceNote: "此前专项评测通过",
+        },
+      ],
+    });
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: { resolveConnectionOk: () => true },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/img",
+      capabilityIds: ["image_generation", "music_generation"],
+    });
+    expect(task.results?.every((r) => r.status === "checker_unavailable")).toBe(true);
+    const admission = getModelAdmission("private/img");
+    const image = admission.capabilityEvidence.find((e) => e.id === "image_generation");
+    expect(image?.status).toBe("passed");
+    expect(image?.verifiedAt).toBe(1_700_000_000_000);
+    expect(image?.testVersion).toBe("real-eval-v1");
+    expect(verifiedCapabilityIds(admission.capabilityEvidence)).toEqual(["image_generation"]);
+  });
+
+  it("reuses text_chat connection probe identity (verifiedAt) across re-checks", async () => {
+    const fp = buildConnectionFingerprint({
+      modelId: "private/reuse",
+      baseUrl: "https://api.example",
+    });
+    const originalVerifiedAt = 1_650_000_000_000;
+    upsertModelAdmission("private/reuse", {
+      connectionFingerprint: fp,
+      connectionVerifiedAt: originalVerifiedAt,
+      capabilityEvidence: [
+        {
+          id: "text_chat",
+          label: "text_chat",
+          source: "protocol_probe",
+          status: "passed",
+          verifiedAt: originalVerifiedAt,
+          testVersion: "local-protocol-v1",
+          sourceNote: "连接协议探测通过（指纹绑定）",
+        },
+      ],
+    });
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: { resolveConnectionOk: () => true },
+    });
+    await startCapabilityVerification({
+      modelRef: "private/reuse",
+      capabilityIds: ["text_chat"],
+      configFingerprint: fp,
+    });
+    const again = getModelAdmission("private/reuse").capabilityEvidence.find(
+      (e) => e.id === "text_chat",
+    );
+    expect(again?.status).toBe("passed");
+    expect(again?.verifiedAt).toBe(originalVerifiedAt);
+    expect(again?.sourceNote).toMatch(/复用/);
   });
 
   it("endpoint change expires formal evidence; old probe cannot keep success", () => {
@@ -97,23 +171,6 @@ describe("batch2 formal capability verification", () => {
     expect(admission.capabilityEvidence[0]?.status).toBe("expired");
     expect(admission.autoRouting).toBe("restricted");
     expect(verifiedCapabilityIds(admission.capabilityEvidence)).toEqual([]);
-  });
-
-  it("image/music taskId-only (no artifact) fails formally", async () => {
-    configureCapabilityVerificationService({
-      mode: "local_protocol",
-      local: { resolveConnectionOk: () => true },
-    });
-    const { task } = await startCapabilityVerification({
-      modelRef: "private/img",
-      capabilityIds: ["image_generation", "music_generation"],
-    });
-    expect(task.status).toBe("failed");
-    for (const r of task.results ?? []) {
-      expect(r.status).toBe("failed");
-      expect(r.failureReason).toMatch(/taskId|产物/);
-    }
-    expect(verifiedCapabilityIds(getModelAdmission("private/img").capabilityEvidence)).toEqual([]);
   });
 
   it("batch partial success never marks whole batch routing-eligible", async () => {
@@ -147,7 +204,6 @@ describe("batch2 formal capability verification", () => {
     expect(summary.failedModelRefs).toEqual(["private/b"]);
     expect(summary.batchRoutingEligible).toBe(false);
 
-    // One success must not flip either model's platform routing to eligible.
     const routeA = await setModelRoutingEligibility({
       modelRef: "private/a",
       autoRouting: "eligible",
@@ -156,11 +212,15 @@ describe("batch2 formal capability verification", () => {
     expect(routeA.message).toMatch(/尚未接入|草稿/);
   });
 
-  it("persists taskId and recovers after refresh", async () => {
+  it("refresh recovery interrupts in-flight tasks after destroying service/scheduler", async () => {
+    const scheduled: Array<() => void> = [];
     configureCapabilityVerificationService({
       mode: "local_protocol",
       local: {
-        settleDelayMs: 50,
+        settleDelayMs: 999_999,
+        schedule: (work) => {
+          scheduled.push(work);
+        },
         resolveConnectionOk: () => true,
       },
     });
@@ -168,20 +228,262 @@ describe("batch2 formal capability verification", () => {
       modelRef: "private/async",
       capabilityIds: ["text_chat"],
     });
-    expect(["queued", "running", "succeeded"]).toContain(task.status);
-    const restored = getVerificationTask(task.taskId);
-    expect(restored?.taskId).toBe(task.taskId);
-    expect(listVerificationTasks("private/async").some((t) => t.taskId === task.taskId)).toBe(true);
+    expect(["queued", "running"]).toContain(task.status);
+    expect(getVerificationTask(task.taskId)?.taskId).toBe(task.taskId);
+
+    // Simulate refresh: destroy service + abandon schedulers (do not run scheduled work).
+    __resetCapabilityVerificationServiceForTest();
+    scheduled.length = 0;
 
     const recovered = await recoverActiveVerificationTask("private/async");
     expect(recovered?.taskId).toBe(task.taskId);
+    expect(recovered?.status).toBe("interrupted");
+    expect(recovered?.error).toMatch(/已中断|可重试/);
+    expect(getVerificationTask(task.taskId)?.status).toBe("interrupted");
 
-    // Wait for settle if still in flight.
-    if (task.status === "queued" || task.status === "running") {
-      await new Promise((r) => setTimeout(r, 80));
-    }
+    // Late ghost work must not revive formal evidence after interrupt.
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: { resolveConnectionOk: () => true },
+    });
+    expect(verifiedCapabilityIds(getModelAdmission("private/async").capabilityEvidence)).toEqual(
+      [],
+    );
+  });
+
+  it("sync runner throw becomes terminal failed without formal evidence overwrite", async () => {
+    upsertModelAdmission("private/sync-err", {
+      capabilityEvidence: [
+        {
+          id: "text_chat",
+          label: "text_chat",
+          source: "protocol_probe",
+          status: "passed",
+          verifiedAt: 42,
+          testVersion: "keep-me",
+        },
+      ],
+    });
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        runner: {
+          check() {
+            throw new Error("boom-sync");
+          },
+        },
+      },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/sync-err",
+      capabilityIds: ["text_chat"],
+    });
+    expect(task.status).toBe("failed");
+    expect(task.error).toMatch(/boom-sync/);
+    expect(getModelAdmission("private/sync-err").capabilityEvidence[0]?.status).toBe("passed");
+    expect(getModelAdmission("private/sync-err").capabilityEvidence[0]?.verifiedAt).toBe(42);
+  });
+
+  it("promise reject becomes terminal failed and notifies onTaskSettled", async () => {
+    const settled: string[] = [];
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        settleDelayMs: 0,
+        schedule: (work) => {
+          queueMicrotask(work);
+        },
+        runner: {
+          check() {
+            return Promise.reject(new Error("boom-async"));
+          },
+        },
+        onTaskSettled: (t) => {
+          settled.push(`${t.taskId}:${t.status}`);
+        },
+      },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/async-err",
+      capabilityIds: ["text_chat"],
+    });
+    expect(["queued", "running"]).toContain(task.status);
+    await new Promise((r) => setTimeout(r, 20));
     const done = getVerificationTask(task.taskId);
-    expect(done?.status).toBe("succeeded");
+    expect(done?.status).toBe("failed");
+    expect(done?.error).toMatch(/boom-async/);
+    expect(settled.some((s) => s.endsWith(":failed"))).toBe(true);
+  });
+
+  it("long-running pending outcomes time out to a terminal state", async () => {
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        pendingTimeoutMs: 30,
+        runner: {
+          check() {
+            return [
+              {
+                capabilityId: "tool_use",
+                status: "pending",
+                testVersion: "pending-v1",
+                sourceNote: "waiting",
+              },
+            ];
+          },
+        },
+      },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/pending",
+      capabilityIds: ["tool_use"],
+    });
+    expect(task.status).toBe("running");
+    await new Promise((r) => setTimeout(r, 60));
+    const done = getVerificationTask(task.taskId);
+    expect(done?.status).toBe("partial");
+    expect(done?.results?.[0]?.status).toBe("checker_unavailable");
+    expect(done?.results?.[0]?.failureReason).toMatch(/超时/);
+  });
+
+  it("async completion notifies UI callback after settle", async () => {
+    const settledStatuses: string[] = [];
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        settleDelayMs: 20,
+        resolveConnectionOk: () => true,
+        onTaskSettled: (t) => {
+          settledStatuses.push(t.status);
+        },
+      },
+    });
+    const { task } = await startCapabilityVerification({
+      modelRef: "private/notify",
+      capabilityIds: ["text_chat"],
+    });
+    expect(["queued", "running"]).toContain(task.status);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(getVerificationTask(task.taskId)?.status).toBe("succeeded");
+    expect(settledStatuses).toContain("succeeded");
+  });
+
+  it("stale task delayed success after config change does not update formal evidence", async () => {
+    const oldFp = "fp-old";
+    const newFp = "fp-new";
+    let currentFp = oldFp;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    configureCapabilityVerificationService({
+      mode: "local_protocol",
+      local: {
+        settleDelayMs: 0,
+        schedule: (work) => {
+          void gate.then(work);
+        },
+        resolveConnectionOk: () => true,
+        resolveCurrentFingerprint: () => currentFp,
+        runner: {
+          check() {
+            return [
+              {
+                capabilityId: "text_chat",
+                status: "passed",
+                testVersion: "stale-run",
+                sourceNote: "old endpoint",
+              },
+            ];
+          },
+        },
+      },
+    });
+
+    const { task: oldTask } = await startCapabilityVerification({
+      modelRef: "private/race",
+      capabilityIds: ["text_chat"],
+      configFingerprint: oldFp,
+    });
+    expect(oldTask.status).toBe("queued");
+
+    // Config changes while old task is in flight; expire prior evidence.
+    currentFp = newFp;
+    upsertModelAdmission("private/race", {
+      connectionFingerprint: newFp,
+      capabilityEvidence: [],
+    });
+
+    release();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const finished = getVerificationTask(oldTask.taskId);
+    expect(finished?.status).toBe("succeeded");
+    expect(finished?.error).toMatch(/指纹|历史/);
+    expect(verifiedCapabilityIds(getModelAdmission("private/race").capabilityEvidence)).toEqual([]);
+  });
+
+  it("newer task finishing first: older task must not overwrite formal evidence", async () => {
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>((resolve) => {
+      releaseOld = resolve;
+    });
+    // Execution order: newer runs first (microtask), older runs after release.
+    const versionsByExecOrder = ["run-2", "run-1"];
+    let exec = 0;
+    let scheduled = 0;
+    const stamped = createLocalProtocolVerificationService({
+      settleDelayMs: 0,
+      schedule: (work) => {
+        scheduled += 1;
+        if (scheduled === 1) {
+          void oldGate.then(work);
+          return;
+        }
+        queueMicrotask(work);
+      },
+      resolveCurrentFingerprint: () => "fp-stable",
+      runner: {
+        check() {
+          const v = versionsByExecOrder[exec++] ?? "run-unknown";
+          return [
+            {
+              capabilityId: "text_chat",
+              status: "passed",
+              testVersion: v,
+              sourceNote: `from-${v}`,
+              verifiedAt: v === "run-1" ? 111 : 222,
+            },
+          ];
+        },
+      },
+    });
+
+    const older = stamped.createVerificationTask({
+      modelRef: "private/gen",
+      capabilityIds: ["text_chat"],
+      configFingerprint: "fp-stable",
+    });
+    const newer = stamped.createVerificationTask({
+      modelRef: "private/gen",
+      capabilityIds: ["text_chat"],
+      configFingerprint: "fp-stable",
+    });
+    expect(older.task.executionGeneration).toBe(1);
+    expect(newer.task.executionGeneration).toBe(2);
+
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getVerificationTask(newer.task.taskId)?.status).toBe("succeeded");
+    expect(getModelAdmission("private/gen").capabilityEvidence[0]?.testVersion).toBe("run-2");
+
+    releaseOld();
+    await new Promise((r) => setTimeout(r, 20));
+    const oldDone = getVerificationTask(older.task.taskId);
+    expect(oldDone?.status).toBe("succeeded");
+    expect(oldDone?.error).toMatch(/取代|历史/);
+    expect(getModelAdmission("private/gen").capabilityEvidence[0]?.testVersion).toBe("run-2");
+    expect(getModelAdmission("private/gen").capabilityEvidence[0]?.verifiedAt).toBe(222);
   });
 
   it("cancel leaves task cancelled and does not write passed evidence", async () => {
@@ -246,5 +548,22 @@ describe("batch2 formal capability verification", () => {
     expect(verifiedCapabilityIds(getModelAdmission("private/tools").capabilityEvidence)).toEqual([
       "tool_use",
     ]);
+  });
+
+  it("interruptInFlightVerificationTasks marks persisted running rows", () => {
+    saveVerificationTask({
+      taskId: "cvt_stuck",
+      modelRef: "private/stuck",
+      capabilityIds: ["text_chat"],
+      status: "running",
+      createdAt: 1,
+      updatedAt: 1,
+      configFingerprint: "fp",
+      executionGeneration: 1,
+    });
+    const out = interruptInFlightVerificationTasks();
+    expect(out).toHaveLength(1);
+    expect(out[0]?.status).toBe("interrupted");
+    expect(listVerificationTasks("private/stuck")[0]?.status).toBe("interrupted");
   });
 });

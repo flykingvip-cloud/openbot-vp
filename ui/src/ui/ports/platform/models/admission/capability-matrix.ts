@@ -48,7 +48,10 @@ export function buildCapabilityMatrixRows(
     verifiedAt: item.verifiedAt,
     expiresAt: item.expiresAt,
     testVersion: item.testVersion,
-    isSuggested: item.status === "suggested" || item.status === "untested",
+    isSuggested:
+      item.status === "suggested" ||
+      item.status === "untested" ||
+      item.status === "checker_unavailable",
     isVerified: item.status === "passed",
     isExpired: item.status === "expired",
   }));
@@ -82,6 +85,8 @@ export function verificationTaskStatusLabel(status: CapabilityVerificationTask["
       return "已取消";
     case "partial":
       return "部分通过";
+    case "interrupted":
+      return "已中断，可重试";
   }
 }
 

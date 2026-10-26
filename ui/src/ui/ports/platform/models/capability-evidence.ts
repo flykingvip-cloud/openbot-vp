@@ -18,7 +18,9 @@ export type CapabilityVerificationStatus =
   | "suggested"
   | "passed"
   | "failed"
-  | "expired";
+  | "expired"
+  /** Checker was not executed / not available — must not overwrite valid evidence. */
+  | "checker_unavailable";
 
 export type CapabilityEvidenceItem = {
   id: CanonicalCapabilityId;
@@ -73,6 +75,8 @@ export function statusLabel(status: CapabilityVerificationStatus): string {
       return "未通过";
     case "expired":
       return "已过期";
+    case "checker_unavailable":
+      return "检查器不可用";
   }
 }
 
@@ -109,6 +113,8 @@ export function summarizeCapabilityEvidence(
       summary.expired.push(item);
     } else if (item.status === "suggested" || item.status === "pending") {
       summary.suggested.push(item);
+    } else if (item.status === "checker_unavailable") {
+      summary.untested.push(item);
     } else {
       summary.untested.push(item);
     }
