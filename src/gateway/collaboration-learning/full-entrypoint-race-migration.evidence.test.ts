@@ -1,7 +1,7 @@
 /**
  * T34 A1/A2/A3 — full-entrypoint stop↔wake-revoke races + caller migration inventory.
- * L3 adapters remain until A1–A3 all PASS with delete-after proof; this file closes
- * named race gaps beyond CMD-5 partial U1-BOUND-RACE / REVOKE-HB / IDEMPOTENT.
+ * T36 L3: marker constants deleted; migration matrix asserts U1–U3 behavior.
+ * This file closes named race gaps beyond CMD-5 partial U1-BOUND-RACE / REVOKE-HB / IDEMPOTENT.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -29,15 +29,12 @@ import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-roun
 import { resolveSecurityProfile } from "../security-profile.js";
 import { markCollaborationBoardItemInProgress } from "./claim-contract-entry.js";
 import { proposeCollaborationTaskHandoffContract } from "./handoff-contract-entry.js";
-import {
-  SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE,
-  runCollaborationSelfAdvance,
-} from "./self-advance-entry.js";
+import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { requestCollaborationTaskStop, TaskStoppedError } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
-import { WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE } from "./wake-contract-entry.js";
+import { listCollaborationWakeEvents } from "./wake-contract-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -490,8 +487,8 @@ describe("T34 A2 caller migration inventory + A3 old-write reachability", () => 
       },
       {
         file: "src/gateway/collaboration-learning/wake-contract-entry.ts",
-        mustMatch: /WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE/,
-        role: "wake entry list/whoWokeWhom read-only (L3 adapter marker)",
+        mustMatch: /listCollaborationWakeEvents[\s\S]*listWakeEvents/,
+        role: "wake entry list delegates to read-only listWakeEvents (no write)",
         l3Only: false,
       },
       {
@@ -542,15 +539,24 @@ describe("T34 A2 caller migration inventory + A3 old-write reachability", () => 
       expect(text, row.role).toMatch(row.mustMatch);
       expect(row.l3Only, `${row.role} must not be L3-only write authority`).toBe(false);
     }
-    // Contractual L3 anchors still present — deletion not authorized by this inventory alone.
-    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
-    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+    // L3 markers deleted (T36); behavior entries remain.
+    expect(typeof runCollaborationSelfAdvance).toBe("function");
+    expect(typeof listCollaborationWakeEvents).toBe("function");
   });
 
-  test("A2-L3-ANCHORS-01: deleting markers would drop contractual tests — retain until delete PR", () => {
-    // Evidence: multiple suites assert these markers (WL2 + platform-role-binding-mt).
-    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
-    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+  test("A2-L3-CLEANUP-01: marker constants removed; behavior assertions retained", async () => {
+    const sa = await fs.readFile(
+      path.join(process.cwd(), "src/gateway/collaboration-learning/self-advance-entry.ts"),
+      "utf8",
+    );
+    const wake = await fs.readFile(
+      path.join(process.cwd(), "src/gateway/collaboration-learning/wake-contract-entry.ts"),
+      "utf8",
+    );
+    expect(sa).not.toMatch(/SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE/);
+    expect(wake).not.toMatch(/WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE/);
+    expect(sa).toMatch(/assertPersistedTaskNotStopped/);
+    expect(wake).toMatch(/listCollaborationWakeEvents/);
   });
 
   test("A3-PAUSE-RESUME-ABSENT-01: collaboration.task.pause/resume not registered on this tip", async () => {

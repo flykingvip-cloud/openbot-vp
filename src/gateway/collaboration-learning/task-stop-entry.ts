@@ -160,9 +160,15 @@ export async function requestCollaborationTaskStop(
     // Default unknown: in-flight external effects may already have escaped.
     externalEffect: params.externalEffect ?? "unknown",
   });
+  // M3: bump comparable control epoch so dispatch eligibility snapshots go stale.
+  const priorEpoch =
+    typeof (governed as { controlEpoch?: unknown }).controlEpoch === "number"
+      ? Number((governed as { controlEpoch?: number }).controlEpoch)
+      : 0;
   const updated: GovernedTask = {
     ...governed,
     stopControl,
+    controlEpoch: priorEpoch + 1,
     updatedAtMs: params.nowMs ?? Date.now(),
     updatedBy: actorId,
   };

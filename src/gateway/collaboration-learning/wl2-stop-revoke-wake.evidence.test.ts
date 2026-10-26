@@ -2,7 +2,7 @@
  * WL2 (CAP-03/04) execution-evidence bindings for PR #80 work line 2 + U1 stop.
  *
  * PASS rows map to enforced behavior. U3 IDEMPOTENT/RESUME forced in this file.
- * Do not delete L3 stop/resume adapters.
+ * L3 markers retired (T36); behavior proofs via U1–U3 entries.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -29,6 +29,8 @@ import {
   claimWakeOpRunning,
   confirmWakeOpCompleted,
   markWakeOpUnknown,
+  mintWakeOpRecoverySubject,
+  producePlatformNoneVerification,
   readWakeOpRecord,
   releaseWakeOpForRetry,
   wakeOpIdempotencyKey,
@@ -43,7 +45,7 @@ import {
   approveCollaborationTaskHandoffContract,
   proposeCollaborationTaskHandoffContract,
 } from "./handoff-contract-entry.js";
-import { SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE } from "./self-advance-entry.js";
+import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import {
@@ -53,7 +55,7 @@ import {
   TaskStoppedError,
 } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
-import { WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE } from "./wake-contract-entry.js";
+import { listCollaborationWakeEvents } from "./wake-contract-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -255,9 +257,9 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(persisted?.responsibility?.owner).toBe(tenant.bots[1].id);
   });
 
-  test("L3 adapters retained: self-advance/wake entry markers (do not delete stop/resume path)", () => {
-    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
-    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+  test("L3 residual cleanup: self-advance/wake entries remain behavioral (markers deleted)", () => {
+    expect(typeof runCollaborationSelfAdvance).toBe("function");
+    expect(typeof listCollaborationWakeEvents).toBe("function");
   });
 
   test("platform inventory: collaboration.task.stop RPC registered (U1)", async () => {
@@ -1354,27 +1356,21 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(blind.reason).toBe("wake_op_unknown");
     expect(blind.dispatched).toBe(false);
 
-    // --- B2: release gates — refuse verbal-only / running dual-write; require verified none + audit ---
+    // --- B2: release gates — refuse untrusted / running dual-write; require minted subject + verification ---
     const refuseNoActor = await releaseWakeOpForRetry({
       authority,
       opKey: opKeyB,
       cfg,
       detail: "verbal_only",
       externalEffectVerified: "none",
-      externalEffectCheck: {
-        source: "side_effect_probe",
-        opId: opKeyB,
-        checkedAtMs: Date.now(),
-        outcome: "none",
-      },
-      operator: { actorId: "", identitySource: "runtime" },
-      operatingState: state,
+      verificationId: "unused",
+      subject: { actorId: "", identitySource: "runtime" } as never,
     });
     expect(refuseNoActor.ok).toBe(false);
     if (refuseNoActor.ok) {
-      throw new Error("expected missing_operator_actor_id");
+      throw new Error("expected operator_identity_not_trusted");
     }
-    expect(refuseNoActor.reason).toBe("missing_operator_actor_id");
+    expect(refuseNoActor.reason).toBe("operator_identity_not_trusted");
 
     const runningClaim = await claimWakeOpRunning({
       authority,
@@ -1382,20 +1378,31 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       cfg,
     });
     expect(runningClaim.action).toBe("proceed");
+    const runningVerify = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: runningClaim.opKey,
+      probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
+    });
+    expect(runningVerify.ok).toBe(true);
+    if (!runningVerify.ok) {
+      throw new Error("setup");
+    }
     const refuseRunning = await releaseWakeOpForRetry({
       authority,
       opKey: runningClaim.opKey,
       cfg,
       detail: "would_dual_write",
       externalEffectVerified: "none",
-      externalEffectCheck: {
-        source: "side_effect_probe",
-        opId: runningClaim.opKey,
-        checkedAtMs: Date.now(),
-        outcome: "none",
-      },
-      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
-      operatingState: state,
+      verificationId: runningVerify.record.verificationId,
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "release_for_retry",
+        groupId,
+        taskId,
+      }),
     });
     expect(refuseRunning.ok).toBe(false);
     if (refuseRunning.ok) {
@@ -1415,21 +1422,31 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(stopped.stopControl.status).toBe("accepted");
 
     // While stopped, even release-then-consume must refuse via stop preflight.
-    // Release requires verified externalEffect none + releasedBy (not verbal clear-state).
+    const releaseVerify = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: opKeyB,
+      probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
+    });
+    expect(releaseVerify.ok).toBe(true);
+    if (!releaseVerify.ok) {
+      throw new Error("setup");
+    }
     const releasedWhileStopped = await releaseWakeOpForRetry({
       authority,
       opKey: opKeyB,
       cfg,
       detail: "operator_verified_external_effect_none",
       externalEffectVerified: "none",
-      externalEffectCheck: {
-        source: "side_effect_probe",
-        opId: opKeyB,
-        checkedAtMs: Date.now(),
-        outcome: "none",
-      },
-      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
-      operatingState: state,
+      verificationId: releaseVerify.record.verificationId,
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "release_for_retry",
+        groupId,
+        taskId,
+      }),
     });
     expect(releasedWhileStopped.ok).toBe(true);
     if (!releasedWhileStopped.ok) {
@@ -1509,9 +1526,13 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       roundId: "oral-claim-no-receipt",
       cfg,
       detail: "verbal",
-      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
-      operatingState: state,
-      taskApproverIds: [tenant.employees[0].id],
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "confirm_completed",
+        groupId,
+        taskId,
+        taskApproverIds: [tenant.employees[0].id],
+      }),
     });
     expect(verbalConfirm.ok).toBe(false);
     if (verbalConfirm.ok) {
@@ -1527,9 +1548,13 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       roundId: "round-receipt-gap",
       cfg,
       detail: "receipt_recovered",
-      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
-      operatingState: state,
-      taskApproverIds: [tenant.employees[0].id],
+      subject: mintWakeOpRecoverySubject({
+        actorId: tenant.employees[0].id,
+        action: "confirm_completed",
+        groupId,
+        taskId,
+        taskApproverIds: [tenant.employees[0].id],
+      }),
     });
     expect(confirmed.ok).toBe(true);
     if (!confirmed.ok) {

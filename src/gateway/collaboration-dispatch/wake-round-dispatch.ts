@@ -17,7 +17,10 @@
  */
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
-import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+} from "../collaboration-learning/shared.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
@@ -32,10 +35,13 @@ import {
 } from "./wake-contract.js";
 import {
   claimWakeOpRunning,
+  commitWakeOpDispatchEligibility,
   inspectWakeOp,
+  isDispatchEligibilityCurrent,
   markWakeOpCompleted,
   markWakeOpFailed,
   markWakeOpUnknown,
+  wakeOpAuthFingerprint,
   wakeOpIdempotencyKey,
   type WakeOpRecord,
 } from "./wake-op-ledger.js";
@@ -212,10 +218,18 @@ export type ConsumeWakeRoundDispatchParams = {
   skipRoundDispatch?: boolean;
   nowMs?: number;
   /**
-   * Test-only barrier after durable claim, before pre-dispatch stop/auth recheck.
-   * Production callers omit this. Closes TOCTOU windows under controlled races.
+   * Test-only barrier after durable claim, before eligibility commit (M3 order 1).
+   * Production callers omit this.
    */
   _testAfterClaimBarrier?: () => Promise<void>;
+  /**
+   * Test-only barrier after eligibility commit, before external dispatch (M3 order 2).
+   */
+  _testAfterEligibilityBarrier?: () => Promise<void>;
+  /**
+   * Test-only barrier after external dispatcher returns ok, before receipt write (M3 order 3).
+   */
+  _testAfterExternalBeforeReceiptBarrier?: () => Promise<void>;
 };
 
 export type ConsumeWakeRoundDispatchResult = Readonly<{
@@ -384,42 +398,62 @@ export async function consumeWakeForRoundDispatch(
     };
   }
 
-  // Test seam: allow stop/revoke to land after claim, before recheck+dispatch.
+  let wakeOp: WakeOpRecord | undefined = claimed.record ?? undefined;
+
+  // M3 order-1 seam: after claim, before eligibility commit.
   if (params._testAfterClaimBarrier) {
     await params._testAfterClaimBarrier();
   }
 
-  // A1 TOCTOU close: re-check stop + auth after claim, before any side-effect dispatch.
-  if (stoppedTaskId) {
-    try {
-      const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
-      const current = await objectStorage.readObject<Task>(request.groupId, "task", stoppedTaskId);
-      if (current && isTaskStopAccepted(asGovernedTask(current))) {
-        const failed = await markWakeOpFailed({
-          authority: params.authority,
-          opKey: claimed.opKey,
-          cfg: params.cfg,
-          nowMs: params.nowMs,
-          detail: "task_stopped_after_claim",
-        });
-        return {
-          outcome: "recorded",
-          dispatched: false,
-          gate: emptyGate(),
-          reason: "task_stopped",
-          wakeEvent: undefined,
-          roundId: undefined,
-          dispatcherPresent: false,
-          opKey: claimed.opKey,
-          wakeOp: failed ?? claimed.record ?? undefined,
-          reused: false,
-        };
-      }
-    } catch {
-      // store read failure: fall through; do not invent stop
-    }
-  }
+  // M3 linearization point: commit dispatch eligibility under wake-op lock after
+  // stop+auth recheck. Does not hold the lock across external I/O.
+  let eligibilityControlEpoch = 0;
+  let eligibilityAuthFingerprint = "";
   {
+    let stoppedAfterClaim = false;
+    if (stoppedTaskId) {
+      try {
+        const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+        const current = await objectStorage.readObject<Task>(
+          request.groupId,
+          "task",
+          stoppedTaskId,
+        );
+        if (current && isTaskStopAccepted(asGovernedTask(current))) {
+          stoppedAfterClaim = true;
+        } else if (current) {
+          const governed = asGovernedTask(current);
+          eligibilityControlEpoch =
+            typeof governed.controlEpoch === "number" && Number.isFinite(governed.controlEpoch)
+              ? Number(governed.controlEpoch)
+              : 0;
+        }
+      } catch {
+        // store read failure: fall through; do not invent stop
+      }
+    }
+    if (stoppedAfterClaim) {
+      const failed = await markWakeOpFailed({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail: "task_stopped_after_claim",
+      });
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason: "task_stopped",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey: claimed.opKey,
+        wakeOp: failed ?? claimed.record ?? undefined,
+        reused: false,
+      };
+    }
+
     const auth = await recheckCurrentDispatchAuthorization({
       groupId: request.groupId,
       taskId: request.taskId,
@@ -447,6 +481,150 @@ export async function consumeWakeForRoundDispatch(
         reused: false,
       };
     }
+
+    try {
+      const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+      const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+      eligibilityAuthFingerprint = wakeOpAuthFingerprint(os, request.toAgentIds);
+    } catch {
+      eligibilityAuthFingerprint = "os_unreadable";
+    }
+
+    const eligible = await commitWakeOpDispatchEligibility({
+      authority: params.authority,
+      opKey: claimed.opKey,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+      controlEpoch: eligibilityControlEpoch,
+      authFingerprint: eligibilityAuthFingerprint,
+    });
+    if (!eligible?.dispatchEligibility) {
+      const failed = await markWakeOpFailed({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail: "eligibility_commit_failed",
+      });
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason: "eligibility_commit_failed",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey: claimed.opKey,
+        wakeOp: failed ?? claimed.record ?? undefined,
+        reused: false,
+      };
+    }
+    wakeOp = eligible;
+  }
+
+  // M3 order-2 seam: after eligibility commit, before external request.
+  if (params._testAfterEligibilityBarrier) {
+    await params._testAfterEligibilityBarrier();
+  }
+
+  // Post-eligibility: if stop/auth advanced, do not dispatch. Record in-flight/unknown
+  // (external request not yet sent — no silent success). Expired holders cannot complete.
+  {
+    let stopAfterEligibility = false;
+    let currentEpoch = eligibilityControlEpoch;
+    if (stoppedTaskId) {
+      try {
+        const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+        const current = await objectStorage.readObject<Task>(
+          request.groupId,
+          "task",
+          stoppedTaskId,
+        );
+        if (current) {
+          const governed = asGovernedTask(current);
+          currentEpoch =
+            typeof governed.controlEpoch === "number" && Number.isFinite(governed.controlEpoch)
+              ? Number(governed.controlEpoch)
+              : 0;
+          if (isTaskStopAccepted(governed)) {
+            stopAfterEligibility = true;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    let authFp = eligibilityAuthFingerprint;
+    try {
+      const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+      const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+      authFp = wakeOpAuthFingerprint(os, request.toAgentIds);
+    } catch {
+      // keep prior
+    }
+    const auth = await recheckCurrentDispatchAuthorization({
+      groupId: request.groupId,
+      taskId: request.taskId,
+      targetActorIds: request.toAgentIds,
+      cfg: params.cfg,
+    });
+    const eligibilityStillValid =
+      !stopAfterEligibility &&
+      auth.ok &&
+      isDispatchEligibilityCurrent({
+        eligibility: wakeOp?.dispatchEligibility,
+        controlEpoch: currentEpoch,
+        authFingerprint: authFp,
+      });
+    if (!eligibilityStillValid) {
+      const detail = stopAfterEligibility
+        ? "stop_after_eligibility_before_external"
+        : !auth.ok
+          ? "auth_revoked_after_eligibility"
+          : "eligibility_stale_before_external";
+      // External request not sent: mark unknown (in-flight uncertainty) when stop
+      // interrupted an eligible holder; auth revoke → failed (clear refuse).
+      if (stopAfterEligibility) {
+        const unknown = await markWakeOpUnknown({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail,
+        });
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: emptyGate(),
+          reason: "task_stopped_in_flight",
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+          opKey: claimed.opKey,
+          wakeOp: unknown ?? wakeOp,
+          reused: false,
+        };
+      }
+      const failed = await markWakeOpFailed({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail,
+      });
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason: !auth.ok ? "auth_revoked" : "eligibility_stale",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey: claimed.opKey,
+        wakeOp: failed ?? wakeOp,
+        reused: false,
+      };
+    }
   }
 
   const gate = evaluateWakeRoundDispatchGate({
@@ -468,26 +646,88 @@ export async function consumeWakeForRoundDispatch(
   let dispatched = false;
   let reason = gate.reason;
   let roundId: string | undefined;
-  let wakeOp: WakeOpRecord | undefined = claimed.record ?? undefined;
 
   if (gate.allowed && dispatcherPresent && dispatcher) {
     try {
       const result = await dispatcher(request);
       if (result.ok && compact(result.roundId)) {
-        outcome = "dispatched";
-        dispatched = true;
-        roundId = compact(result.roundId);
-        reason = result.detail ? `dispatched:${result.detail}` : `dispatched:${request.source}`;
-        const completed = await markWakeOpCompleted({
-          authority: params.authority,
-          opKey: claimed.opKey,
-          roundId,
-          cfg: params.cfg,
-          nowMs: params.nowMs,
-          detail: reason,
+        // M3 order-3 seam: external sent, receipt not yet written.
+        if (params._testAfterExternalBeforeReceiptBarrier) {
+          await params._testAfterExternalBeforeReceiptBarrier();
+        }
+        // Re-validate eligibility before durable success receipt. If stop/revoke
+        // advanced after the external call, keep unknown/in-flight — do not
+        // silently complete as success (expired holder).
+        let receiptEpoch = eligibilityControlEpoch;
+        let receiptAuthFp = eligibilityAuthFingerprint;
+        let stopAfterExternal = false;
+        if (stoppedTaskId) {
+          try {
+            const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+            const current = await objectStorage.readObject<Task>(
+              request.groupId,
+              "task",
+              stoppedTaskId,
+            );
+            if (current) {
+              const governed = asGovernedTask(current);
+              receiptEpoch =
+                typeof governed.controlEpoch === "number" && Number.isFinite(governed.controlEpoch)
+                  ? Number(governed.controlEpoch)
+                  : 0;
+              if (isTaskStopAccepted(governed)) {
+                stopAfterExternal = true;
+              }
+            }
+          } catch {
+            // ignore
+          }
+        }
+        try {
+          const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+          const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
+          receiptAuthFp = wakeOpAuthFingerprint(os, request.toAgentIds);
+        } catch {
+          // keep
+        }
+        const mayComplete = isDispatchEligibilityCurrent({
+          eligibility: wakeOp?.dispatchEligibility,
+          controlEpoch: receiptEpoch,
+          authFingerprint: receiptAuthFp,
         });
-        if (completed) {
-          wakeOp = completed;
+        if (!mayComplete || stopAfterExternal) {
+          reason = stopAfterExternal
+            ? "external_sent_stop_before_receipt"
+            : "external_sent_eligibility_stale_before_receipt";
+          const unknown = await markWakeOpUnknown({
+            authority: params.authority,
+            opKey: claimed.opKey,
+            cfg: params.cfg,
+            nowMs: params.nowMs,
+            detail: reason,
+          });
+          if (unknown) {
+            wakeOp = unknown;
+          }
+          outcome = "recorded";
+          dispatched = false;
+          roundId = undefined;
+        } else {
+          outcome = "dispatched";
+          dispatched = true;
+          roundId = compact(result.roundId);
+          reason = result.detail ? `dispatched:${result.detail}` : `dispatched:${request.source}`;
+          const completed = await markWakeOpCompleted({
+            authority: params.authority,
+            opKey: claimed.opKey,
+            roundId,
+            cfg: params.cfg,
+            nowMs: params.nowMs,
+            detail: reason,
+          });
+          if (completed) {
+            wakeOp = completed;
+          }
         }
       } else {
         reason = result.ok ? "dispatch_missing_round_id" : `dispatch_failed:${result.reason}`;

@@ -21,6 +21,11 @@ export type GovernedTask = Task & {
   handoffs?: TaskHandoff[];
   /** U1 task-level stop; written by collaboration.task.stop on this authority object. */
   stopControl?: TaskStopControl | null;
+  /**
+   * M3: comparable generation for stop (and future auth-linked bumps).
+   * Incremented when stop is accepted so dispatch eligibility snapshots go stale.
+   */
+  controlEpoch?: number;
 };
 
 export class InvalidTaskHandoffError extends Error {
