@@ -393,6 +393,7 @@ describe("routing decision preview", () => {
     createCapabilityVerificationTask({
       modelRef: "private/a",
       capabilityIds: ["coding"],
+      simulate: {}, // demo isolation — must not unlock formal verified
     });
 
     const preview = previewRoutingDecision({

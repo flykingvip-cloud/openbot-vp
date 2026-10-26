@@ -5,15 +5,24 @@ import "./model-assets-drawer.css";
 import "./model-assets-list.css";
 import { requestPlatformSurfaceRerender } from "../../shared/surface.ts";
 import type { PlatformModelsActions } from "../actions.ts";
+import {
+  buildCapabilityMatrixView,
+  verificationTaskStatusLabel,
+} from "../admission/capability-matrix.ts";
+import {
+  cancelCapabilityVerification,
+  startCapabilityVerification,
+} from "../admission/controller.ts";
 import { statusLabel as capabilityStatusLabel } from "../capability-evidence.ts";
 import { resolveExecutorPathLabel } from "../executor-path-labels.ts";
-import { setExecutorCallTypeArchive } from "../model-admission-store.ts";
+import { listVerificationTasks, setExecutorCallTypeArchive } from "../model-admission-store.ts";
 import {
   importAssetIntoPool as commitPoolImport,
   saveEndpointThenAllowlistVerified,
 } from "../model-asset-actions.ts";
 import { autoRoutingAdmissionLabel, tenantSelectableLabel } from "../model-asset-presentation.ts";
 import {
+  buildConnectionFingerprint,
   hasSuccessfulModelConnection,
   isConnectionVerificationStale,
   isManagedPoolModel,
@@ -501,28 +510,97 @@ function renderCapabilityMatrix(asset: ModelAsset) {
     asset.capabilityEvidence && asset.capabilityEvidence.length > 0
       ? asset.capabilityEvidence
       : null;
+  const tasks = listVerificationTasks(asset.modelId);
+  const matrix = buildCapabilityMatrixView({
+    evidence: evidence ?? [],
+    tasks,
+  });
   if (!evidence) {
-    return renderDrawerKvRow(
-      "能力（建议）",
-      asset.capabilities.length ? `${asset.capabilities.join(", ")}（待确认，非已验证）` : "未声明",
-    );
+    return html`
+      ${renderDrawerKvRow(
+        "能力（建议）",
+        asset.capabilities.length
+          ? `${asset.capabilities.join(", ")}（待确认，非已验证）`
+          : "未声明",
+      )}
+      ${renderVerificationHistory(matrix)}
+    `;
   }
   return html`
     <div class="model-assets-drawer__kv-stack" data-testid="capability-matrix">
-      ${evidence.map(
+      ${matrix.rows.map(
         (item) => html`
-          <div class="model-assets-drawer__kv-row">
+          <div class="model-assets-drawer__kv-row" data-capability-id=${item.id}>
             <span class="muted">${item.label}</span>
             <span
-              >${capabilityStatusLabel(item.status)} · ${item.sourceNote ?? item.source}${
+              >${item.statusLabel} · ${item.sourceNote ?? item.sourceLabel}${
                 item.failureReason ? ` — ${item.failureReason}` : ""
-              }</span
+              }${item.testVersion ? ` · ${item.testVersion}` : ""}</span
             >
           </div>
         `,
       )}
     </div>
+    ${renderVerificationHistory(matrix)}
   `;
+}
+
+function renderVerificationHistory(matrix: ReturnType<typeof buildCapabilityMatrixView>) {
+  if (matrix.history.length === 0 && !matrix.activeTask) {
+    return html``;
+  }
+  return html`
+    <details class="model-assets-drawer__fold card-follow--sm" data-testid="verification-history" open>
+      <summary class="model-assets-drawer__fold-title">验证记录</summary>
+      <div class="model-assets-drawer__kv-stack">
+        ${
+          matrix.activeTask
+            ? html`
+                <div class="callout info card-follow--xs" data-testid="verification-active-task">
+                  进行中：${matrix.activeTask.taskId} ·
+                  ${verificationTaskStatusLabel(matrix.activeTask.status)}
+                </div>
+              `
+            : ""
+        }
+        ${matrix.history.slice(0, 5).map(
+          (task) => html`
+            <div class="model-assets-drawer__kv-row" data-testid="verification-task-row" data-task-id=${task.taskId}>
+              <span class="muted">${task.taskId}</span>
+              <span
+                >${verificationTaskStatusLabel(task.status)} ·
+                ${(task.capabilityIds ?? []).join(", ")}${
+                  task.error ? ` — ${task.error}` : ""
+                }</span
+              >
+            </div>
+          `,
+        )}
+      </div>
+    </details>
+  `;
+}
+
+async function runFormalCapabilityVerification(asset: ModelAsset) {
+  const fingerprint = buildConnectionFingerprint({
+    modelId: asset.modelId,
+    providerId: asset.providerId,
+    baseUrl: asset.baseUrl,
+    api: asset.api,
+  });
+  const capabilityIds = (asset.capabilityEvidence ?? [])
+    .map((item) => item.id)
+    .filter((id): id is NonNullable<typeof id> => Boolean(id));
+  const ids =
+    capabilityIds.length > 0
+      ? (capabilityIds as import("../capability-ids.ts").CanonicalCapabilityId[])
+      : (["text_chat", "tool_use"] as import("../capability-ids.ts").CanonicalCapabilityId[]);
+  await startCapabilityVerification({
+    modelRef: asset.modelId,
+    capabilityIds: ids,
+    configFingerprint: fingerprint,
+  });
+  requestPlatformSurfaceRerender();
 }
 
 function renderCapabilitySummary(
@@ -1499,10 +1577,38 @@ function renderDrawerActionSection(params: {
           class="btn btn--sm"
           type="button"
           data-testid="model-drawer-verify-capabilities"
-          ?disabled=${true}
-          title="能力验证服务尚未接入；第一批不提供会污染正式证据的模拟入口"
+          ?disabled=${!canManage}
+          title="发起正式协议探测（local_protocol）；不调用付费 Midjourney/Suno API"
+          @click=${() => void runFormalCapabilityVerification(selectedModel)}
         >
-          验证能力（尚未接入）
+          验证能力
+        </button>
+        <button
+          class="btn btn--sm"
+          type="button"
+          data-testid="model-drawer-cancel-verification"
+          title="取消进行中的验证任务"
+          @click=${() => {
+            const active = listVerificationTasks(selectedModel.modelId).find(
+              (t) => t.status === "queued" || t.status === "running",
+            );
+            if (active) {
+              void cancelCapabilityVerification(active.taskId).then(() =>
+                requestPlatformSurfaceRerender(),
+              );
+            }
+          }}
+        >
+          取消验证
+        </button>
+        <button
+          class="btn btn--sm"
+          type="button"
+          data-testid="model-drawer-retry-verification"
+          title="重试最近一次验证"
+          @click=${() => void runFormalCapabilityVerification(selectedModel)}
+        >
+          重试验证
         </button>
         <button
           class="btn btn--sm"
