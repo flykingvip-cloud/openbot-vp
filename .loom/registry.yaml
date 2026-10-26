@@ -9782,7 +9782,7 @@ tasks:
       - src/commands/agent/model-governance.test.ts
       - src/commands/agent/model-governance.fallback.test.ts
       - .loom/registry.yaml
-    state: active
+    state: landed
     sessions: []
     ownerHistory: []
     since: 2026-10-26
@@ -9819,49 +9819,12 @@ landingStreams:
     landingPolicy: serial
     paths:
       - .loom/registry.yaml
-      - packages/aor-core/src/parser.ts
-      - packages/aor-core/src/parser.test.ts
-      - packages/aor-core/src/selector.ts
-      - packages/aor-core/src/selector.test.ts
-      - packages/aor-core/src/task-types.ts
-      - packages/aor-core/src/types.ts
-      - src/agents/subagent-spawn.ts
-      - src/auto-reply/reply/agent-runner-execution.ts
-      - src/auto-reply/reply/followup-runner.ts
-      - src/cron/isolated-agent/run.ts
-      - src/gateway/model-entitlement/employee-model-gate.ts
-      - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
-      - src/gateway/model-entitlement/task-capability-plan.ts
-      - src/gateway/model-entitlement/task-capability-plan.test.ts
-      - src/gateway/model-entitlement/run-context-estimate.ts
-      - src/gateway/model-entitlement/run-context-estimate.test.ts
-      - src/gateway/model-entitlement/child-task-aor-reorder.ts
-      - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
-      - src/gateway/model-entitlement/capability-entry-consume.ts
-      - src/gateway/model-entitlement/capability-entry-consume.test.ts
-      - src/task-outcome/types.ts
-      - src/gateway/governance/spawn-snapshot-handoff.ts
-      - src/gateway/governance/decision.ts
-      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
-      - src/gateway/model-entitlement/child-spawn-capability-routing.test.ts
-      - src/task-outcome/capability-modality.ts
-      - src/task-outcome/capability-modality.test.ts
-      - src/task-outcome/runtime-from-runner.ts
-      - src/task-outcome/runtime-from-runner.test.ts
-      - src/task-outcome/transitions.ts
-      - src/task-outcome/result-service.ts
-      - src/task-outcome/entrypoints/chat.ts
-      - src/commands/agent/model-governance.test.ts
-      - src/commands/agent/model-governance.fallback.test.ts
-    canLandWith:
-      - askOutcome-p0-task-outcome-contract
-      - askOutcome-p0-r83-remediation
-      - p0a-p0-task-capability-plan
+    canLandWith: []
     metadata:
       task: p1-task-driven-aor-scoring
       owner: grok-bot
       reviewAfter: "2026-11-30"
-      convergeNote: after-merge trim hot paths; sharedPaths landers remain authoritative
+      convergeNote: post-#86 landed; hot paths trimmed; sharedPaths landers remain authoritative
       purpose: P1 current-task-driven AOR scoring, CJK/parent quality, full context
         constraints, executor_unwired outcome claims
   - id: askOutcome-p0-r83-remediation
@@ -9871,8 +9834,7 @@ landingStreams:
       - docs/design/task-outcome/contract.md
       - docs/design/task-outcome/call-chain-and-replacements.md
       - src/task-outcome/**
-    canLandWith:
-      - p1-task-driven-aor-scoring
+    canLandWith: []
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
@@ -9903,8 +9865,7 @@ landingStreams:
       - src/task-outcome/entrypoints/collab.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
-    canLandWith:
-      - p1-task-driven-aor-scoring
+    canLandWith: []
     metadata:
       task: askOutcome-p0-task-outcome-contract
       owner: executor-acceptance
@@ -9926,8 +9887,7 @@ landingStreams:
       - src/gateway/user-operational-identity-execution.p0a.test.ts
       - src/gateway/user-operational-identity-social-execution.ts
       - src/gateway/user-operational-identity-social-execution.p0a.test.ts
-    canLandWith:
-      - p1-task-driven-aor-scoring
+    canLandWith: []
     metadata:
       task: p0a-p0-task-capability-plan
       owner: grok-bot
