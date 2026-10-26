@@ -66,6 +66,7 @@ import {
   loadCollaborationBoardClaimItem,
   publishCollaborationBoardItem,
 } from "./claim-contract-entry.js";
+import { isMappedDeliveryIdentity } from "./delivery-actor-binding.js";
 import {
   acceptCollaborationTaskHandoffContract,
   applyCollaborationTaskHandoffContract,
@@ -74,7 +75,12 @@ import {
 } from "./handoff-contract-entry.js";
 import {
   createWorkspaceCollaborationStores,
+  groupAuthLockDir,
   readGroupOperatingState,
+  operatingStateAuthContentEqual,
+  readOperatingStateAuthSurface,
+  resolveGroupOperatingStateAuthLockDir,
+  withGroupAuthLock,
   writeGroupOperatingState,
 } from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
@@ -275,6 +281,31 @@ async function waitRunning(
   throw new Error(`op not running: ${opKey}`);
 }
 
+async function writeAuthOsForTest(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}) {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    writeKind: "auth",
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as Parameters<typeof writeGroupOperatingState>[0]["state"] & { authEpoch: number },
+  });
+  return nextEpoch;
+}
+
 describe("T36 M1 trusted authorization", () => {
   test("M1-FORGE-01: forge identitySource/subject/approver cannot unlock; revoke refuses; owner ok", async () => {
     const { cfg } = await useIsolationRoot();
@@ -316,9 +347,10 @@ describe("T36 M1 trusted authorization", () => {
     expect(forgedApprover.ok).toBe(false);
 
     const { fileStore } = createWorkspaceCollaborationStores(cfg);
-    await writeGroupOperatingState({
+    await writeAuthOsForTest({
       fileStore,
       groupId,
+      cfg,
       state: buildState({ revokeOwner: true }),
     });
     const revoked = await releaseWakeOpForRetryAuthorized({
@@ -333,7 +365,7 @@ describe("T36 M1 trusted authorization", () => {
     expect(revoked.ok).toBe(false);
     expect((await readWakeOpRecord({ authority, opKey: claimed.opKey }))?.status).toBe("unknown");
 
-    await writeGroupOperatingState({ fileStore, groupId, state: buildState() });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: buildState() });
     const ver = await producePlatformNoneVerification({
       authority,
       cfg,
@@ -888,7 +920,7 @@ describe("T38 M3 fail-open + pre-eligibility barrier", () => {
       coordinatorBotId: tenant.coordinator,
       ownerUserId: tenant.owner,
     };
-    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
     release();
     const wake = await wakeP;
     expect(calls).toBe(0);
@@ -1778,7 +1810,7 @@ describe("T43 M3 claim lifecycle (committed/taken recovery + claimId bind)", () 
     revoked.memberRoleMap = (revoked.memberRoleMap ?? []).map((row) =>
       row.memberId === tenant.bot0 ? { ...row, status: "revoked" as const } : row,
     );
-    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
 
     release();
     const wake = await wakeP;
@@ -1794,7 +1826,7 @@ describe("T43 M3 claim lifecycle (committed/taken recovery + claimId bind)", () 
     expect(afterA.dispatchClaim).toBeFalsy();
 
     // Restore auth; op B must be able to advance.
-    await writeGroupOperatingState({ fileStore, groupId, state: buildState() });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: buildState() });
     let callsB = 0;
     const wakeB = await consumeWakeForRoundDispatch({
       authority,
@@ -4196,9 +4228,12 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
       // Take won the race before revoke: claim was taken then cleared by revoke.
       expect(takeResult.claim.phase).toBe("taken");
     } else {
-      expect(["auth_epoch_mismatch", "claim_missing", "epoch_mismatch", "claim_id_mismatch"]).toContain(
-        takeResult.reason,
-      );
+      expect([
+        "auth_epoch_mismatch",
+        "claim_missing",
+        "epoch_mismatch",
+        "claim_id_mismatch",
+      ]).toContain(takeResult.reason);
     }
 
     // Fresh take on B with pre-revoke claim must fail after group auth change.
@@ -4268,5 +4303,243 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
         } as never,
       }),
     ).rejects.toThrow(/invalid authEpoch/);
+  });
+
+  test("M3-AUTH-3b: business write without authEpoch cannot restore revoked member", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-3b";
+    const { fileStore, groupId } = await seed({ cfg, taskId, itemId: "auth3b" });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    expect(isMappedDeliveryIdentity(os0, tenant.bot0)).toBe(true);
+
+    // Capture a business-shaped snapshot that still lists bot0, then strip authEpoch.
+    const staleWithMember = {
+      ...(os0 as NonNullable<typeof os0>),
+      activeContext: {
+        ...(os0 as NonNullable<typeof os0>).activeContext,
+        summary: "biz-no-epoch-restore-member",
+      },
+      updatedAtMs: Date.now(),
+    };
+    const noEpochSnapshot = { ...staleWithMember };
+    delete (noEpochSnapshot as { authEpoch?: number }).authEpoch;
+
+    const revoked = await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskId],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    expect(revoked.authEpoch).toBe(readOperatingStateAuthEpoch(os0) + 1);
+    expect(isMappedDeliveryIdentity(revoked.operatingState, tenant.bot0)).toBe(false);
+
+    // Old caller: no authEpoch field → must NOT restore bot0 under the same version.
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      cfg,
+      state: noEpochSnapshot as typeof staleWithMember,
+    });
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(revoked.authEpoch);
+    expect((finalOs?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(false);
+    expect(finalOs?.activeContext?.summary).toBe("biz-no-epoch-restore-member");
+  });
+
+  test("M3-AUTH-3c: business write cannot restore old owner/admin/coordinator", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-3c";
+    const { fileStore, groupId } = await seed({ cfg, taskId, itemId: "auth3c" });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const staleGov = {
+      ...(os0 as NonNullable<typeof os0>),
+      activeContext: {
+        ...(os0 as NonNullable<typeof os0>).activeContext,
+        summary: "biz-restore-governance",
+      },
+      updatedAtMs: Date.now(),
+    };
+
+    const newOwner = `${tenant.tenantId}/emp-owner-new`;
+    const newAdmin = `${tenant.tenantId}/emp-admin-new`;
+    const newCoord = `${tenant.tenantId}/bot-coord-new`;
+    const revoked = await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskId],
+      mutate: (state) => ({
+        ...state,
+        governance: {
+          ...state.governance,
+          ownerUserId: newOwner,
+          adminUserIds: [newAdmin],
+          coordinatorBotId: newCoord,
+        },
+      }),
+    });
+    expect(revoked.operatingState.governance.ownerUserId).toBe(newOwner);
+    expect(revoked.operatingState.governance.adminUserIds).toEqual([newAdmin]);
+    expect(revoked.operatingState.governance.coordinatorBotId).toBe(newCoord);
+
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      cfg,
+      state: {
+        ...staleGov,
+        // even with matching or lower epoch, governance must stay at live
+        authEpoch: readOperatingStateAuthEpoch(os0),
+      } as typeof staleGov & { authEpoch: number },
+    });
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(revoked.authEpoch);
+    expect(finalOs?.governance?.ownerUserId).toBe(newOwner);
+    expect(finalOs?.governance?.adminUserIds).toEqual([newAdmin]);
+    expect(finalOs?.governance?.coordinatorBotId).toBe(newCoord);
+    expect(finalOs?.governance?.ownerUserId).not.toBe(tenant.owner);
+    expect(finalOs?.governance?.adminUserIds).not.toContain(tenant.admin);
+    expect(finalOs?.governance?.coordinatorBotId).not.toBe(tenant.coordinator);
+    expect(isMappedDeliveryIdentity(finalOs, newCoord)).toBe(true);
+    expect(finalOs?.activeContext?.summary).toBe("biz-restore-governance");
+  });
+
+  test("M3-AUTH-3d: same-epoch auth content change refused; business update succeeds", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-3d";
+    const { fileStore, groupId } = await seed({ cfg, taskId, itemId: "auth3d" });
+    const live = await readGroupOperatingState({ fileStore, groupId });
+    const liveEpoch = readOperatingStateAuthEpoch(live);
+    const liveSurface = readOperatingStateAuthSurface(live);
+    expect(liveSurface).not.toBeNull();
+
+    await expect(
+      writeGroupOperatingState({
+        fileStore,
+        groupId,
+        cfg,
+        writeKind: "auth",
+        state: {
+          ...(live as NonNullable<typeof live>),
+          authEpoch: liveEpoch,
+          memberRoleMap: (live?.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+          updatedAtMs: Date.now(),
+        } as never,
+      }),
+    ).rejects.toThrow(/same authEpoch.*authorization content/);
+
+    // Idempotent same-epoch auth write with identical content must succeed.
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      cfg,
+      writeKind: "auth",
+      state: {
+        ...(live as NonNullable<typeof live>),
+        authEpoch: liveEpoch,
+        updatedAtMs: Date.now(),
+      } as never,
+    });
+
+    // Legitimate non-auth business update still succeeds and keeps auth surface.
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      cfg,
+      state: {
+        ...(live as NonNullable<typeof live>),
+        authEpoch: liveEpoch,
+        activeContext: {
+          ...(live as NonNullable<typeof live>).activeContext,
+          summary: "legit-business-update",
+        },
+        updatedAtMs: Date.now(),
+      } as never,
+    });
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(finalOs?.activeContext?.summary).toBe("legit-business-update");
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(liveEpoch);
+    expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(true);
+    expect(
+      operatingStateAuthContentEqual(liveSurface, readOperatingStateAuthSurface(finalOs)),
+    ).toBe(true);
+  });
+
+  test("M3-AUTH-3e: custom cfg / fileStore / baseDir share one auth lock path", async () => {
+    const { cfg } = await useIsolationRoot();
+    const stores = createWorkspaceCollaborationStores(cfg);
+    const groupId = tenant.groupId;
+    await writeGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupId,
+      cfg,
+      state: buildState(),
+    });
+
+    const viaCfg = resolveGroupOperatingStateAuthLockDir({ groupId, cfg });
+    const viaStore = resolveGroupOperatingStateAuthLockDir({
+      groupId,
+      fileStore: stores.fileStore,
+    });
+    const viaBase = resolveGroupOperatingStateAuthLockDir({
+      groupId,
+      baseDir: stores.groupRootDir,
+      fileStore: stores.fileStore,
+    });
+    const viaExplicit = resolveGroupOperatingStateAuthLockDir({
+      groupId,
+      groupRootDir: stores.groupRootDir,
+    });
+    const viaHelper = groupAuthLockDir({
+      groupId,
+      groupRootDir: stores.groupRootDir,
+    });
+    expect(viaCfg).toBe(viaHelper);
+    expect(viaStore).toBe(viaHelper);
+    expect(viaBase).toBe(viaHelper);
+    expect(viaExplicit).toBe(viaHelper);
+
+    // Same physical OS: holding the cfg-derived lock serializes a fileStore-only writer.
+    let writerEntered = false;
+    let releaseHold!: () => void;
+    const holdGate = new Promise<void>((resolve) => {
+      releaseHold = resolve;
+    });
+    const holdP = withGroupAuthLock({
+      groupId,
+      groupRootDir: stores.groupRootDir,
+      cfg,
+      fn: async () => {
+        await holdGate;
+      },
+    });
+    // Give the holder time to acquire.
+    await new Promise((r) => setTimeout(r, 30));
+    const writeP = writeGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupId,
+      state: {
+        ...buildState(),
+        activeContext: {
+          ...buildState().activeContext,
+          summary: "lock-path-serialized",
+        },
+        updatedAtMs: Date.now(),
+      },
+      _testAfterLiveReadBarrier: async () => {
+        writerEntered = true;
+      },
+    });
+    await new Promise((r) => setTimeout(r, 80));
+    expect(writerEntered).toBe(false);
+    releaseHold();
+    await holdP;
+    await writeP;
+    expect(writerEntered).toBe(true);
+    const finalOs = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
+    expect(finalOs?.activeContext?.summary).toBe("lock-path-serialized");
   });
 });

@@ -24,6 +24,7 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { readOperatingStateAuthEpoch } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import {
   claimWakeOpRunning,
@@ -46,7 +47,11 @@ import {
   proposeCollaborationTaskHandoffContract,
 } from "./handoff-contract-entry.js";
 import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
-import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+  writeGroupOperatingState,
+} from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import {
   canRequestTaskStop,
@@ -176,6 +181,31 @@ async function seedTask(params: { cfg: OpenBotConfig; taskId: string; groupId?: 
     updatedAtMs: 1,
   } as Task);
   return { objectStorage };
+}
+
+async function writeAuthOsForTest(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}) {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    writeKind: "auth",
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as Parameters<typeof writeGroupOperatingState>[0]["state"] & { authEpoch: number },
+  });
+  return nextEpoch;
 }
 
 describe("WL2 CAP-03/04 evidence bindings", () => {
@@ -928,7 +958,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     revoked.memberRoleMap = []; // strip all mapped members (coordinator still mapped via governance)
     // Also clear coordinator so bot-exec / bot-coord duty targets fail recheck.
     revoked.governance = { ownerUserId: tenant.employees[0].id, coordinatorBotId: "" };
-    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
 
     const auth = await recheckCurrentDispatchAuthorization({
       groupId,
@@ -1005,7 +1035,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       governance: { ownerUserId: tenant.employees[0].id, coordinatorBotId: "" },
     });
     revoked.memberRoleMap = [];
-    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
 
     const auth = await recheckCurrentDispatchAuthorization({
       groupId,

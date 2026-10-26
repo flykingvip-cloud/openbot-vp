@@ -23,6 +23,7 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { readOperatingStateAuthEpoch } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import { readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
 import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-round-dispatch.js";
@@ -30,7 +31,11 @@ import { resolveSecurityProfile } from "../security-profile.js";
 import { markCollaborationBoardItemInProgress } from "./claim-contract-entry.js";
 import { proposeCollaborationTaskHandoffContract } from "./handoff-contract-entry.js";
 import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
-import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+  writeGroupOperatingState,
+} from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { requestCollaborationTaskStop, TaskStoppedError } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
@@ -171,6 +176,31 @@ function wakeReq(taskId: string, itemId: string) {
   };
 }
 
+async function writeAuthOsForTest(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}) {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    writeKind: "auth",
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as Parameters<typeof writeGroupOperatingState>[0]["state"] & { authEpoch: number },
+  });
+  return nextEpoch;
+}
+
 describe("T34 A1 full-entrypoint races", () => {
   test("A1-RACE-STOP-WAKE-01: stop after claim / before dispatch → no side-effect (TOCTOU closed)", async () => {
     const { cfg } = await useIsolationRoot();
@@ -273,7 +303,7 @@ describe("T34 A1 full-entrypoint races", () => {
       governance: { ownerUserId: tenant.owner, coordinatorBotId: "" },
     });
     revoked.memberRoleMap = [];
-    await writeGroupOperatingState({ fileStore, groupId: tenant.groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId: tenant.groupId, cfg, state: revoked });
     const auth = await recheckCurrentDispatchAuthorization({
       groupId: tenant.groupId,
       taskId,

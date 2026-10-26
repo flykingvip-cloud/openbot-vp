@@ -23,6 +23,7 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { readOperatingStateAuthEpoch } from "../collaboration-dispatch/task-control-cas.js";
 import {
   canConfirmWakeOpCompleted as canConfirmFromGate,
   canPerformWakeOpRecovery,
@@ -37,7 +38,11 @@ import {
   releaseWakeOpForRetry,
 } from "../collaboration-dispatch/wake-op-ledger.js";
 import { resolveSecurityProfile } from "../security-profile.js";
-import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+  writeGroupOperatingState,
+} from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { canRequestTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
@@ -278,6 +283,31 @@ function mintConfirmSubject(
   });
 }
 
+async function writeAuthOsForTest(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}) {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    writeKind: "auth",
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as Parameters<typeof writeGroupOperatingState>[0]["state"] & { authEpoch: number },
+  });
+  return nextEpoch;
+}
+
 describe("T34 C1/C2 wake-op release/confirm", () => {
   test("C1-PERM-DISTINCTION-01: stop ≠ release ≠ confirm", () => {
     const state = buildState();
@@ -418,9 +448,10 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
 
     // Revoke owner in durable OS, then entry must refuse (state unchanged).
     const { fileStore } = createWorkspaceCollaborationStores(cfg);
-    await writeGroupOperatingState({
+    await writeAuthOsForTest({
       fileStore,
       groupId: ctx.groupId,
+      cfg,
       state: buildState({ revokeOwner: true }),
     });
     const revoked = await releaseWakeOpForRetryAuthorized({
@@ -443,7 +474,7 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     expect(afterDenies?.releasedBy).toBeUndefined();
 
     // Restore OS; legitimate owner + controlled verification unlocks.
-    await writeGroupOperatingState({ fileStore, groupId: ctx.groupId, state: buildState() });
+    await writeAuthOsForTest({ fileStore, groupId: ctx.groupId, cfg, state: buildState() });
     const verification = await platformVerifyNone({
       authority: ctx.authority,
       cfg,
@@ -575,7 +606,7 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     revokedState.memberRoleMap = revokedState.memberRoleMap.map((row) =>
       row.memberId === tenant.approver ? { ...row, status: "revoked" } : row,
     );
-    await writeGroupOperatingState({ fileStore, groupId: ctx.groupId, state: revokedState });
+    await writeAuthOsForTest({ fileStore, groupId: ctx.groupId, cfg, state: revokedState });
     const revoked = await confirmWakeOpCompletedAuthorized({
       authority: ctx.authority,
       groupId: ctx.groupId,
@@ -595,7 +626,7 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     expect(afterDenies?.status).toBe("unknown");
     expect(afterDenies?.confirmedBy).toBeUndefined();
 
-    await writeGroupOperatingState({ fileStore, groupId: ctx.groupId, state: buildState() });
+    await writeAuthOsForTest({ fileStore, groupId: ctx.groupId, cfg, state: buildState() });
     const ok = await confirmWakeOpCompletedAuthorized({
       authority: ctx.authority,
       groupId: ctx.groupId,

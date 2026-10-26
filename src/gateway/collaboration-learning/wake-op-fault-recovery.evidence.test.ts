@@ -30,6 +30,7 @@ import {
   withRoundLock,
 } from "../collaboration-dispatch/round-store-io.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { readOperatingStateAuthEpoch } from "../collaboration-dispatch/task-control-cas.js";
 import {
   claimWakeOpRunning,
   inspectWakeOp,
@@ -43,7 +44,11 @@ import {
 } from "../collaboration-dispatch/wake-op-ledger.js";
 import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveSecurityProfile } from "../security-profile.js";
-import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+  writeGroupOperatingState,
+} from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { requestCollaborationTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
@@ -246,6 +251,31 @@ process.exit(1);
   return { status: result.status };
 }
 
+async function writeAuthOsForTest(params: {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupId: string;
+  state: Parameters<typeof writeGroupOperatingState>[0]["state"];
+  cfg?: OpenBotConfig;
+}) {
+  const live = await readGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+  });
+  const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+  await writeGroupOperatingState({
+    fileStore: params.fileStore,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    writeKind: "auth",
+    state: {
+      ...params.state,
+      authEpoch: nextEpoch,
+      updatedAtMs: Date.now(),
+    } as Parameters<typeof writeGroupOperatingState>[0]["state"] & { authEpoch: number },
+  });
+  return nextEpoch;
+}
+
 describe("T34-B wake-op / lock fault recovery (isolation)", () => {
   test("B-PROCESS-EXIT-01: child writes completed then exits; parent reload reuses — no duplicate dispatch", async () => {
     const { cfg } = await useIsolationRoot();
@@ -400,7 +430,7 @@ describe("T34-B wake-op / lock fault recovery (isolation)", () => {
       governance: { ownerUserId: tenant.owner, coordinatorBotId: "" },
     });
     revoked.memberRoleMap = [];
-    await writeGroupOperatingState({ fileStore, groupId: tenant.groupId, state: revoked });
+    await writeAuthOsForTest({ fileStore, groupId: tenant.groupId, cfg, state: revoked });
 
     const authBlocked = await consumeWakeForRoundDispatch({
       authority,
