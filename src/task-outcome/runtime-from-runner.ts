@@ -2,6 +2,10 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
+import {
+  assessTargetModalityAcceptance,
+  capabilityModalityFromClaim,
+} from "./capability-modality.js";
 import { GROWTH_EVOLUTION_CONSUMER_ID, OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
@@ -9,6 +13,7 @@ import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { scopeIdOf } from "./transitions.js";
 import type { CloseReasonCode, TaskOutcomeRecord, TrustedScope } from "./types.js";
+export { assessTargetModalityAcceptance } from "./capability-modality.js";
 
 function scopeIdSafe(scope: TrustedScope): string {
   return scopeIdOf(scope);
@@ -55,6 +60,22 @@ export type RunnerTurnOutcomeInput = {
   allowRetry?: boolean;
   /** Process placeholder / interim reply — never closes as success. */
   processPlaceholder?: boolean;
+  /**
+   * P1: capability-plan outcome claim from resolveExecutionRoutingFromCapabilityPlan.
+   * Chat replies must never be recorded as image/music (or other forbidden) modality success.
+   */
+  capabilityOutcome?: {
+    planFailureKind: string;
+    allowedModality: string;
+    forbiddenSuccessModalities: readonly string[];
+    detail?: string;
+    /** Structured: explanatory text may be returned. */
+    textReturnedAllowed?: boolean;
+    /** Structured: image/music (target modality) actually completed. */
+    targetModalityCompleted?: boolean;
+    status?: string;
+    incompleteModalities?: readonly string[];
+  };
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -89,6 +110,21 @@ function defaultScope(tenantId?: string): TrustedScope {
     subjectRef: "runner",
     authzScopeRef: "agent-runner",
   };
+}
+
+
+/** True when trusted run evidence may advance routing_ok/incomplete → completed. */
+function canMarkCompletedFromTrustedRun(
+  modality: NonNullable<TaskOutcomeRecord["capabilityModality"]>,
+): boolean {
+  if (modality.targetModalityCompleted) {
+    return false;
+  }
+  const blocked = new Set(["executor_unwired", "no_executable_candidates", "unsupported"]);
+  if (blocked.has(modality.executionStatus) || blocked.has(modality.planFailureKind)) {
+    return false;
+  }
+  return true;
 }
 
 function drainGrowthEvolution(
@@ -139,6 +175,8 @@ export function drainPendingGrowthEvolution(
 /**
  * Production chat-runner hot path into unified TaskOutcome.
  * Evolution publish goes only through OutcomeConsumerRuntime drain (no direct bypass).
+ * P1: capabilityOutcome claims persist as capabilityModality; executor_unwired cannot
+ * be upgraded to target-modality success; trusted success may mark modality completed.
  */
 export async function recordRunnerTurnOutcome(
   cfg: OpenBotConfig,
@@ -269,8 +307,73 @@ export async function recordRunnerTurnOutcome(
   }
   // processPlaceholder: attempt recorded; acceptance/delivery stay pending.
 
+  // P1: persist structured capabilityModality (and reasonDetail mirror) so
+  // acceptance can refuse upgrading executor_unwired into target-modality success.
+  let record = res.record;
+  const claim = input.capabilityOutcome;
+  if (claim) {
+    const modality = capabilityModalityFromClaim(claim);
+    const detail = [
+      `capability_plan_failure=${claim.planFailureKind}`,
+      `allowed_modality=${claim.allowedModality}`,
+      `forbidden_success_modalities=${(claim.forbiddenSuccessModalities ?? []).join(",")}`,
+      claim.textReturnedAllowed !== undefined
+        ? `text_returned_allowed=${claim.textReturnedAllowed}`
+        : null,
+      claim.targetModalityCompleted !== undefined
+        ? `target_modality_completed=${claim.targetModalityCompleted}`
+        : null,
+      claim.status ? `capability_status=${claim.status}` : null,
+      claim.detail,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const patched: TaskOutcomeRecord = {
+      ...record,
+      capabilityModality: modality,
+      reasonDetail: [record.reasonDetail, detail].filter(Boolean).join(" | "),
+      updatedAt: new Date().toISOString(),
+    };
+    store.saveTask(patched);
+    record = patched;
+    // Defense: structured assessor must refuse target-modality success for unwired.
+    const assessed = assessTargetModalityAcceptance(record.capabilityModality);
+    if (
+      claim.status === "executor_unwired" ||
+      claim.planFailureKind === "executor_unwired" ||
+      claim.targetModalityCompleted === false
+    ) {
+      if (assessed.targetModalitySucceeded) {
+        throw new Error("capability modality acceptance upgraded unexpectedly");
+      }
+    }
+
+    // Production: after trusted run success, mark target modality completed from
+    // run evidence so formal set_acceptance can pass. Blocked statuses refuse.
+    if (
+      input.success &&
+      record.capabilityModality &&
+      canMarkCompletedFromTrustedRun(record.capabilityModality)
+    ) {
+      const markRes = chat.markTargetModalityCompleted(
+        taskId,
+        record.outcomeVersion,
+        fencingToken,
+        {
+          kind: "run_completed",
+          digestOrRef: `run:${input.runId}`,
+          detail: "trusted_runner_turn_success",
+        },
+        { scope, commandId: `mark-modality:${taskId}:${input.runId}` },
+      );
+      if (markRes.ok) {
+        record = markRes.record;
+      }
+    }
+  }
+
   const evolution = drainGrowthEvolution(cfg, agentId, store);
-  return { record: res.record, evolution };
+  return { record, evolution };
 }
 
 /**

@@ -67,9 +67,15 @@ import {
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
 import { isHookDispatchSessionKey } from "../../gateway/hook-surface-session.js";
 import { resolveKnowledgeGatewayClientForAgentRun } from "../../gateway/knowledge/agent-run-gateway-client.js";
+import {
+  consumeCapabilityRoutingResult,
+  formatCapabilityExecutionSurfaceLog,
+} from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
+import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -81,6 +87,7 @@ import {
   isExternalHookSession,
 } from "../../security/external-content.js";
 import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
+import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
 import { isWorkbenchOnlyLegacyCronDelivery } from "../delivery-surfaces.js";
@@ -851,12 +858,21 @@ export async function runCronIsolatedAgentTurn(params: {
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
       let cronSlotHeld = false;
-      let modelGate: EmployeeModelGateResult = {};
+      let modelGate: EmployeeModelGateResult | undefined;
       let cronAuthorizationId: string | undefined;
+      const runContextEstimate = buildRunContextEstimateParts({
+        taskText: promptText,
+        sessionEntry: cronSession.sessionEntry,
+      });
       const runSlot = await tryAcquireEnterpriseAgentRun({
         runId: cronRunId,
         agentId,
-        modelGateInput: { cfg: cfgWithAgentDefaults, agentId, taskText: promptText },
+        modelGateInput: {
+          cfg: cfgWithAgentDefaults,
+          agentId,
+          taskText: promptText,
+          contextParts: runContextEstimate.contextParts,
+        },
       });
       if (!runSlot.skipped && !runSlot.acquired) {
         throw new Error(runSlot.message);
@@ -867,18 +883,46 @@ export async function runCronIsolatedAgentTurn(params: {
         if (runSlot.modelGate) {
           modelGate = runSlot.modelGate;
           commercialCreditReporting =
-            runSlot.modelGate.creditReporting ?? commercialCreditReporting;
+            runSlot.modelGate?.creditReporting ?? commercialCreditReporting;
         }
       }
       const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-        allowlist: modelGate.allowlist,
-        preferredModelOrder: modelGate.preferredModelOrder,
-        capabilityPlan: modelGate.capabilityPlan,
+        allowlist: modelGate?.allowlist,
+        preferredModelOrder: modelGate?.preferredModelOrder,
+        capabilityPlan: modelGate?.capabilityPlan,
       });
+      const consumedCapability = consumeCapabilityRoutingResult({
+        planFailure: executionRouting.planFailure,
+        outcomeClaim: executionRouting.outcomeClaim,
+        executionSurface: executionRouting.executionSurface,
+        capabilityPlan: executionRouting.capabilityPlan,
+      });
+      // Structured surface kept for TaskOutcome; do not void outcomeClaim.
+      if (consumedCapability.executionSurface.status !== "ok") {
+        logWarn(
+          `[cron:${params.job.id}] ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
+        );
+      }
+      // Persist structured claim when modality is incomplete / unwired / blocked —
+      // do not invent image/music success from a later text reply.
+      if (
+        consumedCapability.capabilityOutcome &&
+        consumedCapability.executionSurface.status !== "ok"
+      ) {
+        void recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
+          success: consumedCapability.executionSurface.targetModalityCompleted,
+          runId: cronRunId,
+          ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
+          capabilityOutcome: consumedCapability.capabilityOutcome,
+        });
+      }
+      if (executionRouting.planFailure.kind === "no_executable_candidates") {
+        throw new Error(executionRouting.planFailure.message);
+      }
       const embeddedModelGovernance = resolveEmbeddedModelGovernance({
         gateStatus: cronSlotHeld ? "acquired" : "skipped",
         allowlist: executionRouting.allowlist,
-        tenantId: modelGate.tenantId,
+        tenantId: modelGate?.tenantId,
         commercialAuthorizationId: cronAuthorizationId,
       });
       const parentSnapshot = buildRunModelSetSnapshot({
@@ -886,8 +930,13 @@ export async function runCronIsolatedAgentTurn(params: {
         allowlist: executionRouting.allowlist,
         governanceMode: embeddedModelGovernance.governanceMode,
         commercialAuthorizationId: cronAuthorizationId,
-        tenantId: modelGate.tenantId,
+        tenantId: modelGate?.tenantId,
         preferredModelOrder: executionRouting.preferredModelOrder,
+        platformModelsMode:
+          modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
+        ...(modelGate?.effectiveRouting?.selectorStrategy
+          ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
+          : {}),
         // P4-1: parent billing context for child runs (acquired gate only).
         creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
       });
@@ -1003,7 +1052,9 @@ export async function runCronIsolatedAgentTurn(params: {
             const candidateRuntimeId = `${providerOverride}/${modelOverride}`;
             if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
               const tenantId =
-                modelGate.tenantId?.trim() || modelGate.creditReporting?.enterpriseId?.trim() || "";
+                modelGate?.tenantId?.trim() ||
+                modelGate?.creditReporting?.enterpriseId?.trim() ||
+                "";
               if (!tenantId) {
                 throw new Error(
                   "Enterprise BYOK model selected but managed tenantId could not be resolved",

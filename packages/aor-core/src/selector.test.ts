@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { defaultModelCatalog } from "./catalog.js";
-import { NoCandidateError, estimateCostUsd, rankModels, selectModel } from "./selector.js";
+import {
+  NoCandidateError,
+  estimateCostUsd,
+  qualityFor,
+  rankModels,
+  selectModel,
+} from "./selector.js";
 import type { ModelProfile } from "./types.js";
 
 const costProfile = { expectedInputTokens: 1_000_000, expectedOutputTokens: 1_000_000 };
@@ -118,5 +124,40 @@ describe("estimateCostUsd", () => {
       expectedOutputTokens: 1_000_000,
     });
     expect(cost).toBeCloseTo(90, 5);
+  });
+});
+
+describe("qualityFor parent inheritance (P1)", () => {
+  it("inherits coding score for coding.refactor when exact key missing", () => {
+    const strongCoding: ModelProfile = {
+      ref: { provider: "a", id: "strong-coding" },
+      cost: { inputPerMtok: 10, outputPerMtok: 10 },
+      taskTypeScores: { coding: 0.95 },
+    };
+    const weakOnlySummarize: ModelProfile = {
+      ref: { provider: "b", id: "summarizer" },
+      cost: { inputPerMtok: 1, outputPerMtok: 1 },
+      taskTypeScores: { summarization: 0.99 },
+    };
+    expect(qualityFor(strongCoding, "coding.refactor")).toBe(0.95);
+    expect(qualityFor(weakOnlySummarize, "coding.refactor")).toBe(0.5);
+
+    const ranked = rankModels({
+      taskType: "coding.refactor",
+      strategy: "best_quality",
+      candidates: [weakOnlySummarize, strongCoding],
+      costProfile,
+    });
+    expect(ranked[0].model).toEqual({ provider: "a", id: "strong-coding" });
+    expect(ranked[0].qualityScore).toBe(0.95);
+  });
+
+  it("prefers exact coding.refactor over parent coding when both present", () => {
+    const model: ModelProfile = {
+      ref: { provider: "a", id: "m" },
+      cost: { inputPerMtok: 1, outputPerMtok: 1 },
+      taskTypeScores: { coding: 0.7, "coding.refactor": 0.92 },
+    };
+    expect(qualityFor(model, "coding.refactor")).toBe(0.92);
   });
 });

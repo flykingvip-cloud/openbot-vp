@@ -10,7 +10,12 @@ import {
 const acquired = {
   status: "acquired" as const,
   authorizationDecisionId: "auth-1",
-  modelGate: { tenantId: "tenant-a", allowlist: ["openai/gpt-5"], preferredModelOrder: ["x/y"] },
+  modelGate: {
+    tenantId: "tenant-a",
+    allowlist: ["openai/gpt-5"],
+    preferredModelOrder: ["x/y"],
+    effectiveRouting: { mode: "native" as const, selectorStrategy: "balanced" as const },
+  },
 };
 
 describe("agent command model governance", () => {
@@ -103,7 +108,14 @@ describe("agent command model governance", () => {
     it("tenantId falls back to the gate's resolved enterprise, not the client", () => {
       expect(
         resolveAgentCommandModelGovernance(
-          { status: "acquired", enterpriseId: "ent-7", modelGate: { allowlist: [] } },
+          {
+            status: "acquired",
+            enterpriseId: "ent-7",
+            modelGate: {
+              allowlist: [],
+              effectiveRouting: { mode: "native" as const, selectorStrategy: "balanced" as const },
+            },
+          },
           {},
         ).governanceContext,
       ).toEqual({ tenantId: "ent-7" });

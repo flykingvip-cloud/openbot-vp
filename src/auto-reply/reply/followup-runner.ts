@@ -29,11 +29,18 @@ import {
   rememberRunModelSet,
   snapshotCreditReportingFromGate,
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
+import {
+  consumeCapabilityRoutingResult,
+  formatCapabilityExecutionSurfaceLog,
+} from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
+import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
+import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
@@ -209,6 +216,8 @@ export function createFollowupRunner(params: {
       let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
       let fallbackProvider = queued.run.provider;
       let fallbackModel = queued.run.model;
+      let modelGate: EmployeeModelGateResult | undefined;
+      let consumedCapability: ReturnType<typeof consumeCapabilityRoutingResult> | undefined;
       const activeSessionEntry =
         (sessionKey ? sessionStore?.[sessionKey] : undefined) ?? sessionEntry;
       let bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
@@ -217,14 +226,19 @@ export function createFollowupRunner(params: {
       try {
         // P5（model-entitlement-chain §6.5）：协作小组 / followup 多 bot 回合按 bot 归属席位
         // 接入 Commercial Runtime 统一闸口（P0）。
+        const runContextEstimate = buildRunContextEstimateParts({
+          taskText: queued.prompt,
+          sessionEntry: activeSessionEntry,
+          extraSystemPrompt: queued.run.extraSystemPrompt,
+        });
         const modelGateInput = {
           cfg: queued.run.config,
           agentId: queued.run.agentId,
           gatewayClientUser: queued.run.gatewayClientUser,
           gatewayClientSessionDomain: queued.run.gatewayClientSessionDomain,
           taskText: queued.prompt,
+          contextParts: runContextEstimate.contextParts,
         };
-        let modelGate: EmployeeModelGateResult = {};
         let followupAuthorizationId: string | undefined;
         const runSlot = await tryAcquireEnterpriseAgentRun({
           runId,
@@ -244,14 +258,36 @@ export function createFollowupRunner(params: {
           followupAuthorizationId = runSlot.authorizationDecisionId;
         }
         const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate.allowlist,
-          preferredModelOrder: modelGate.preferredModelOrder,
-          capabilityPlan: modelGate.capabilityPlan,
+          allowlist: modelGate?.allowlist,
+          preferredModelOrder: modelGate?.preferredModelOrder,
+          capabilityPlan: modelGate?.capabilityPlan,
         });
+        // Structured surface: do not void outcomeClaim. Text may return; image/music stay incomplete.
+        consumedCapability = consumeCapabilityRoutingResult({
+          planFailure: executionRouting.planFailure,
+          outcomeClaim: executionRouting.outcomeClaim,
+          executionSurface: executionRouting.executionSurface,
+          capabilityPlan: executionRouting.capabilityPlan,
+        });
+        logVerbose(
+          `followup ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
+        );
+        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+          if (consumedCapability.capabilityOutcome && queued.run.agentId) {
+            void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
+              success: false,
+              runId,
+              ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
+              capabilityOutcome: consumedCapability.capabilityOutcome,
+            });
+          }
+          logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
+          return;
+        }
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: followupSlotHeld ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           commercialAuthorizationId: followupAuthorizationId,
         });
         const parentSnapshot = buildRunModelSetSnapshot({
@@ -259,8 +295,13 @@ export function createFollowupRunner(params: {
           allowlist: executionRouting.allowlist,
           governanceMode: embeddedModelGovernance.governanceMode,
           commercialAuthorizationId: followupAuthorizationId,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           preferredModelOrder: executionRouting.preferredModelOrder,
+          platformModelsMode:
+            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
+          ...(modelGate?.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
+            : {}),
           // P4-1: parent billing context for child runs (acquired gate only).
           creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
         });
@@ -299,8 +340,8 @@ export function createFollowupRunner(params: {
               const candidateRuntimeId = `${provider}/${model}`;
               if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
                 const tenantId =
-                  modelGate.tenantId?.trim() ||
-                  modelGate.creditReporting?.enterpriseId?.trim() ||
+                  modelGate?.tenantId?.trim() ||
+                  modelGate?.creditReporting?.enterpriseId?.trim() ||
                   "";
                 if (!tenantId) {
                   throw new Error(
@@ -436,12 +477,12 @@ export function createFollowupRunner(params: {
 
         // Mirror chat path: durable Credits/providerCost outbox for enterprise runs.
         // Outer provider/model stay as selected (may be ent/...), so BYOK ledger skips platform debit.
-        if (modelGate.creditReporting && hasNonzeroUsage(runResult.meta?.agentMeta?.usage)) {
+        if (modelGate?.creditReporting && hasNonzeroUsage(runResult.meta?.agentMeta?.usage)) {
           try {
             const tokenUsage = normalizeUsage(runResult.meta?.agentMeta?.usage);
             const usagePayload = buildCommercialRunCreditUsageInput({
-              enterpriseId: modelGate.creditReporting.enterpriseId,
-              policyId: modelGate.creditReporting.policyId,
+              enterpriseId: modelGate?.creditReporting.enterpriseId,
+              policyId: modelGate?.creditReporting.policyId,
               runId,
               provider: fallbackProvider,
               model: fallbackModel,
@@ -491,6 +532,19 @@ export function createFollowupRunner(params: {
         });
       }
 
+      if (
+        consumedCapability?.capabilityOutcome &&
+        queued.run.agentId &&
+        consumedCapability.executionSurface.status !== "ok"
+      ) {
+        void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
+          // Explanatory text may have returned; never invent image/music success.
+          success: consumedCapability.executionSurface.textReturnedAllowed,
+          runId,
+          ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
+          capabilityOutcome: consumedCapability.capabilityOutcome,
+        });
+      }
       const payloadArray = runResult.payloads ?? [];
       if (payloadArray.length === 0) {
         return;

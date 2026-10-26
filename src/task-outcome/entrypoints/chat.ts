@@ -123,6 +123,40 @@ export class ChatTaskOutcomeAdapter {
     );
   }
 
+  /**
+   * Controlled path: mark target modality completed from real execution evidence.
+   * Refuses executor_unwired. Does not set acceptance by itself.
+   */
+  markTargetModalityCompleted(
+    taskId: string,
+    expectedVersion: number,
+    fencingToken: string,
+    evidence: {
+      kind: "execution_artifact" | "run_completed" | "acceptance_artifact";
+      digestOrRef: string;
+      detail?: string;
+    },
+    opts: { scope: TrustedScope; commandId?: string },
+  ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
+    return this.service.submit(
+      taskId,
+      {
+        type: "mark_target_modality_completed",
+        expectedVersion,
+        fencingToken,
+        evidence,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
+  }
+
   setDelivery(
     taskId: string,
     expectedVersion: number,

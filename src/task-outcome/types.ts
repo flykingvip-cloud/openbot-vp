@@ -4,6 +4,8 @@
  * Durable terminals: success | failure | cancelled only.
  */
 
+import type { CapabilityModalitySnapshot } from "./capability-modality.js";
+
 export const TASK_OUTCOME_SCHEMA_VERSION = "1.0.0" as const;
 export const JUDGEMENT_POLICY_VERSION = "1.0.0" as const;
 
@@ -127,6 +129,13 @@ export type TaskOutcomeRecord = {
   runs: RunResult[];
   reasonCode?: CloseReasonCode;
   reasonDetail?: string;
+  /**
+   * Structured capability modality (P1). Acceptance must consume this; do not
+   * upgrade executor_unwired / incomplete into target-modality success from
+   * reasonDetail strings alone.
+   * Reuses CapabilityModalitySnapshot so persist / assess / transitions stay aligned.
+   */
+  capabilityModality?: CapabilityModalitySnapshot;
   outcomeVersion: number;
   previousOutcomeVersion?: number;
   revisionKind?: "new_execution" | "correction";
@@ -230,6 +239,21 @@ export type SubmitTransition =
       acceptance: AcceptanceGate;
       delivery: DeliveryGate;
       decisiveRunStatus?: DecisiveRunStatus;
+    }
+  | {
+      /**
+       * Controlled path: mark target modality completed from real execution evidence.
+       * Refuses executor_unwired / no_executable_candidates / unsupported.
+       * Does not set acceptance — callers must still submit set_acceptance.
+       */
+      type: "mark_target_modality_completed";
+      expectedVersion: number;
+      fencingToken: string;
+      evidence: {
+        kind: "execution_artifact" | "run_completed" | "acceptance_artifact";
+        digestOrRef: string;
+        detail?: string;
+      };
     };
 
 export type SubmitFailure = {

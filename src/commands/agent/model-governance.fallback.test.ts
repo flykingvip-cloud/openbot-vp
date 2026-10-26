@@ -81,7 +81,11 @@ describe("agent command gate → runWithModelFallback governance", () => {
       {
         status: "acquired",
         authorizationDecisionId: "auth-9",
-        modelGate: { tenantId: "tenant-z", allowlist: [] },
+        modelGate: {
+          tenantId: "tenant-z",
+          allowlist: [],
+          effectiveRouting: { mode: "native" as const, selectorStrategy: "balanced" as const },
+        },
       },
       {},
       createExecutionIdentityContext({ platformUserId: "emp-z" }),

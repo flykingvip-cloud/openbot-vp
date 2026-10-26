@@ -62,6 +62,11 @@ function attemptFingerprint(record: TaskOutcomeRecord): string {
         reasonCode: record.reasonCode ?? null,
         lifecycle: record.lifecycle,
         taskJudgement: record.taskJudgement,
+        // P1: modality mark must not be treated as a no-op fingerprint.
+        capabilityModalityExecutionStatus: record.capabilityModality?.executionStatus ?? null,
+        capabilityModalityTargetCompleted:
+          record.capabilityModality?.targetModalityCompleted ?? null,
+        reasonDetail: record.reasonDetail ?? null,
       }),
     )
     .digest("hex");
@@ -375,6 +380,19 @@ function isSameEffect(current: TaskOutcomeRecord, transition: SubmitTransition):
     return true;
   }
   return false;
+}
+
+function semanticallyEqualForIdempotency(a: TaskOutcomeRecord, b: TaskOutcomeRecord): boolean {
+  return (
+    a.lifecycle === b.lifecycle &&
+    a.taskJudgement === b.taskJudgement &&
+    a.acceptance.status === b.acceptance.status &&
+    a.delivery.status === b.delivery.status &&
+    a.decisiveRunId === b.decisiveRunId &&
+    a.reasonCode === b.reasonCode &&
+    a.capabilityModality?.executionStatus === b.capabilityModality?.executionStatus &&
+    a.capabilityModality?.targetModalityCompleted === b.capabilityModality?.targetModalityCompleted
+  );
 }
 
 export function newFencingToken(): string {

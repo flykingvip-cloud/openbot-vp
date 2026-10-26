@@ -1,3 +1,4 @@
+import { assessTargetModalityAcceptance } from "./capability-modality.js";
 import { deriveLifecycle, projectTaskJudgement } from "./judge.js";
 import type {
   AcceptanceEvidence,
@@ -119,11 +120,76 @@ export function applyTransition(
       if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
         return { record: current, illegal: "stale_fencing" };
       }
+      // Formal acceptance: refuse target success when structured modality is incomplete
+      // / executor_unwired. Missing modality stays legacy-compatible (allow).
+      if (
+        transition.acceptance.status === "passed" ||
+        transition.acceptance.status === "not_required"
+      ) {
+        const modality = current.capabilityModality;
+        if (modality) {
+          const assessed = assessTargetModalityAcceptance(modality);
+          if (!assessed.targetModalitySucceeded) {
+            return {
+              record: current,
+              illegal: `target_modality_not_accepted:${assessed.reason}`,
+            };
+          }
+        }
+      }
       stopRecovery = !transition.allowRetry && transition.acceptance.status === "failed";
       next = {
         ...next,
         acceptance: transition.acceptance,
         acceptanceEvidence: transition.evidence ?? current.acceptanceEvidence,
+      };
+      break;
+    }
+    case "mark_target_modality_completed": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      const modality = current.capabilityModality;
+      if (!modality) {
+        return { record: current, illegal: "missing_capability_modality" };
+      }
+      const digest = transition.evidence?.digestOrRef?.trim() ?? "";
+      if (!digest) {
+        return { record: current, illegal: "missing_execution_evidence" };
+      }
+      if (
+        modality.executionStatus === "executor_unwired" ||
+        modality.planFailureKind === "executor_unwired"
+      ) {
+        return { record: current, illegal: "cannot_complete_executor_unwired" };
+      }
+      if (
+        modality.executionStatus === "no_executable_candidates" ||
+        modality.planFailureKind === "no_executable_candidates"
+      ) {
+        return { record: current, illegal: "cannot_complete_no_executable_candidates" };
+      }
+      if (
+        modality.executionStatus === "unsupported" ||
+        modality.planFailureKind === "unsupported"
+      ) {
+        return { record: current, illegal: "cannot_complete_unsupported" };
+      }
+      const { incompleteReason: _dropIncomplete, ...modalityRest } = modality;
+      next = {
+        ...next,
+        capabilityModality: {
+          ...modalityRest,
+          executionStatus: "completed",
+          targetModalityCompleted: true,
+        },
+        reasonDetail: [
+          current.reasonDetail,
+          `target_modality_completed_via=${transition.evidence.kind}:${digest}`,
+          transition.evidence.detail,
+        ]
+          .filter(Boolean)
+          .join(" | "),
       };
       break;
     }

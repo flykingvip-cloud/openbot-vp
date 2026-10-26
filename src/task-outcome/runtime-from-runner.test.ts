@@ -5,11 +5,14 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { readEvolutionTaskOutcomes } from "../gateway/agent-growth/evolution-task-outcomes.js";
 import { readOperationalMetrics } from "../gateway/agent-growth/operational-metrics-store.js";
+import { assessTargetModalityAcceptance } from "./capability-modality.js";
 import {
   CHAT_TURN_CONTRACT_V1,
   resolveChatTurnCloseGates,
   resolveTurnTaskContract,
 } from "./chat-entry.js";
+import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
+import { TaskOutcomeResultService } from "./result-service.js";
 import { TASK_OUTCOME_STORE_DIRNAME, recordRunnerTurnOutcome } from "./runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 
@@ -124,5 +127,227 @@ describe("recordRunnerTurnOutcome", () => {
     expect(out.record.taskJudgement).toBe("cancelled");
     expect(out.record.reasonCode).toBe("user_cancelled");
     expect(out.evolution.written).toBe(false);
+  });
+
+  it("P1: executor_unwired claim reaches durable reasonDetail; chat cannot claim image success", async () => {
+    const taskId = "chat:bot:sess:run-unwired";
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-unwired",
+      taskId,
+      capabilityOutcome: {
+        planFailureKind: "executor_unwired",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: ["image_generation", "audio_music_generation"],
+        detail: "Executor image_generation is not wired",
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "executor_unwired",
+        incompleteModalities: ["image_generation", "audio_music_generation"],
+      },
+    });
+    expect(out.record.reasonDetail).toContain("executor_unwired");
+    expect(out.record.reasonDetail).toContain("image_generation");
+    expect(out.record.reasonDetail).toContain("text_returned_allowed=true");
+    expect(out.record.reasonDetail).toContain("target_modality_completed=false");
+    expect(out.record.reasonDetail).toContain("allowed_modality=chat_model");
+    expect(out.record.taskJudgement).toBe("incomplete");
+    expect(out.record.reasonDetail).not.toMatch(/image_generation.*success/i);
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const persisted = store.loadTask(taskId);
+    expect(persisted?.reasonDetail).toContain("forbidden_success_modalities=image_generation");
+    expect(persisted?.capabilityModality?.executionStatus).toBe("executor_unwired");
+    expect(persisted?.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(persisted?.capabilityModality?.textReturnedAllowed).toBe(true);
+    const assessed = assessTargetModalityAcceptance(persisted?.capabilityModality);
+    expect(assessed.targetModalitySucceeded).toBe(false);
+    expect(assessed.reason).toBe("executor_unwired");
+  });
+
+  it("P1: plan-ok + trusted run success marks modality completed in production path", async () => {
+    const taskId = "chat:bot:sess:run-plan-ok";
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-plan-ok",
+      taskId,
+      capabilityOutcome: {
+        planFailureKind: "none",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: [],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "ok",
+        incompleteModalities: [],
+        detail: "routing_executable_not_completed",
+      },
+    });
+    expect(out.record.capabilityModality?.executionStatus).toBe("completed");
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(true);
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const persisted = store.loadTask(taskId);
+    expect(
+      assessTargetModalityAcceptance(persisted?.capabilityModality).targetModalitySucceeded,
+    ).toBe(true);
+  });
+});
+
+describe("formal acceptance enforces capability modality (via service)", () => {
+  let agentDir = "";
+  let cfg: OpenBotConfig;
+
+  beforeEach(() => {
+    agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-to-accept-"));
+    cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+  });
+
+  afterEach(() => {
+    fs.rmSync(agentDir, { recursive: true, force: true });
+  });
+
+  it("setAcceptance(passed) refuses executor_unwired via actual transition", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-refuse-unwired",
+      taskId: "chat:bot:sess:run-refuse-unwired",
+      capabilityOutcome: {
+        planFailureKind: "executor_unwired",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: ["image_generation"],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "executor_unwired",
+        incompleteModalities: ["image_generation"],
+      },
+    });
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const taskId = out.record.taskId;
+    const ft = out.record.fencingToken;
+    expect(ft).toBeTruthy();
+    const refused = chat.setAcceptance(
+      taskId,
+      out.record.outcomeVersion,
+      ft!,
+      { status: "passed" },
+      { allowRetry: false, scope: out.record.scope },
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) {
+      return;
+    }
+    expect(refused.code).toBe("illegal_transition");
+    expect(refused.message).toContain("target_modality_not_accepted");
+    expect(refused.message).toContain("executor_unwired");
+    const persisted = store.loadTask(taskId);
+    expect(persisted?.acceptance.status).toBe("pending");
+    expect(persisted?.capabilityModality?.executionStatus).toBe("executor_unwired");
+  });
+
+  it("markTargetModalityCompleted refuses executor_unwired", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-mark-unwired",
+      taskId: "chat:bot:sess:run-mark-unwired",
+      capabilityOutcome: {
+        planFailureKind: "executor_unwired",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: ["image_generation"],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "executor_unwired",
+        incompleteModalities: ["image_generation"],
+      },
+    });
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const mark = chat.markTargetModalityCompleted(
+      out.record.taskId,
+      out.record.outcomeVersion,
+      out.record.fencingToken!,
+      { kind: "execution_artifact", digestOrRef: "sha256:fake" },
+      { scope: out.record.scope },
+    );
+    expect(mark.ok).toBe(false);
+    if (mark.ok) {
+      return;
+    }
+    expect(mark.message).toContain("cannot_complete_executor_unwired");
+  });
+
+  it("integration: production runner success → formal acceptance passes without manual mark", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-prod-accept",
+      taskId: "chat:bot:sess:run-prod-accept",
+      capabilityOutcome: {
+        planFailureKind: "none",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: [],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "ok",
+        incompleteModalities: [],
+        detail: "routing_executable_not_completed",
+      },
+    });
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(true);
+    expect(out.record.capabilityModality?.executionStatus).toBe("completed");
+    expect(out.record.reasonDetail).toContain(
+      "target_modality_completed_via=run_completed:run:run-prod-accept",
+    );
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const passed = chat.setAcceptance(
+      out.record.taskId,
+      out.record.outcomeVersion,
+      out.record.fencingToken!,
+      { status: "passed" },
+      { allowRetry: false, scope: out.record.scope },
+    );
+    expect(passed.ok).toBe(true);
+    if (!passed.ok) {
+      return;
+    }
+    expect(passed.record.acceptance.status).toBe("passed");
+  });
+
+  it("integration: executor_unwired stays incomplete; formal acceptance still refused after runner success", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-prod-unwired-refuse",
+      taskId: "chat:bot:sess:run-prod-unwired-refuse",
+      capabilityOutcome: {
+        planFailureKind: "executor_unwired",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: ["image_generation"],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "executor_unwired",
+        incompleteModalities: ["image_generation"],
+      },
+    });
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(out.record.capabilityModality?.executionStatus).toBe("executor_unwired");
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const refused = chat.setAcceptance(
+      out.record.taskId,
+      out.record.outcomeVersion,
+      out.record.fencingToken!,
+      { status: "passed" },
+      { allowRetry: false, scope: out.record.scope },
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) {
+      return;
+    }
+    expect(refused.message).toContain("target_modality_not_accepted");
   });
 });

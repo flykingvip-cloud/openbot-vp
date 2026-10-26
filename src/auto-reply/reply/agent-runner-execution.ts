@@ -57,9 +57,15 @@ import {
   recordAorRoutingExplanation,
   recordAorRunFeedback,
 } from "../../gateway/model-entitlement/aor-feedback.js";
+import {
+  consumeCapabilityRoutingResult,
+  type CapabilityOutcomeForTurn,
+} from "../../gateway/model-entitlement/capability-entry-consume.js";
 import { type EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
+import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -207,7 +213,8 @@ export async function runAgentTurnWithFallback(params: {
   let growthToolTotal = 0;
   let growthToolSucceeded = 0;
   const growthStartedAt = Date.now();
-  let modelGate: EmployeeModelGateResult = {};
+  let modelGate: EmployeeModelGateResult | undefined;
+  let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
   const recordGrowthToolResult = (isError: boolean): void => {
     growthToolTotal += 1;
     if (!isError) {
@@ -271,7 +278,7 @@ export async function runAgentTurnWithFallback(params: {
     const toolsSucceeded = growthToolSucceeded;
     growthToolTotal = 0;
     growthToolSucceeded = 0;
-    const tenantId = modelGate.tenantId?.trim();
+    const tenantId = modelGate?.tenantId?.trim();
     // askOutcome R83: requires entry taskId; never invent run:${runId} at finish.
     if (!chatOutcomeTaskId || !chatOutcomeScope) {
       reportEvolutionOutcomeWriteFailure({
@@ -304,6 +311,7 @@ export async function runAgentTurnWithFallback(params: {
       scope: chatOutcomeScope,
       latencyMs: Math.max(0, Date.now() - growthStartedAt),
       ...(tenantId ? { tenantId } : {}),
+      ...(capabilityOutcomeForTurn ? { capabilityOutcome: capabilityOutcomeForTurn } : {}),
       ...(failureReason ? { failureReason } : {}),
       ...(opts?.failureDetail ? { failureDetail: opts.failureDetail } : {}),
       ...(opts?.acceptance ? { acceptance: opts.acceptance } : {}),
@@ -464,6 +472,11 @@ export async function runAgentTurnWithFallback(params: {
           params.followupRun.run.gatewayClientPlatformUserId ??
           params.sessionCtx.GatewayClientPlatformUserId;
         // Commercial Runtime 统一闸口（P0）：model gate + 并发占槽 + 订阅 snapshot。
+        const runContextEstimate = buildRunContextEstimateParts({
+          taskText: params.commandBody,
+          sessionEntry: params.getActiveSessionEntry(),
+          extraSystemPrompt: params.followupRun.run.extraSystemPrompt,
+        });
         const modelGateInput = {
           cfg: params.followupRun.run.config,
           agentId: params.followupRun.run.agentId,
@@ -471,6 +484,7 @@ export async function runAgentTurnWithFallback(params: {
           gatewayClientSessionDomain: runGatewayClientSessionDomain,
           gatewayClientPlatformUserId: runGatewayClientPlatformUserId,
           taskText: params.commandBody,
+          contextParts: runContextEstimate.contextParts,
           ...(params.sessionCtx.CollaborationGroupOwnerEntitlement
             ? {
                 collaborationGroupOwnerEntitlement:
@@ -515,14 +529,32 @@ export async function runAgentTurnWithFallback(params: {
           : undefined;
         // P3-1: explicit mode (default shadow) + preexisting hard-filter when allowlist is an array.
         const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate.allowlist,
-          preferredModelOrder: modelGate.preferredModelOrder,
-          capabilityPlan: modelGate.capabilityPlan,
+          allowlist: modelGate?.allowlist,
+          preferredModelOrder: modelGate?.preferredModelOrder,
+          capabilityPlan: modelGate?.capabilityPlan,
         });
+        const consumedCapability = consumeCapabilityRoutingResult({
+          planFailure: executionRouting.planFailure,
+          outcomeClaim: executionRouting.outcomeClaim,
+          executionSurface: executionRouting.executionSurface,
+          capabilityPlan: executionRouting.capabilityPlan,
+        });
+        if (consumedCapability.capabilityOutcome) {
+          capabilityOutcomeForTurn = consumedCapability.capabilityOutcome;
+        }
+        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+          recordGrowthTaskOutcome(false);
+          return {
+            kind: "final",
+            payload: {
+              text: executionRouting.planFailure.message,
+            },
+          };
+        }
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: enterpriseRunSlotHeld ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           commercialAuthorizationId: commercialAuthDecisionId,
           actorId,
         });
@@ -531,9 +563,15 @@ export async function runAgentTurnWithFallback(params: {
           allowlist: executionRouting.allowlist,
           governanceMode: embeddedModelGovernance.governanceMode,
           commercialAuthorizationId: commercialAuthDecisionId,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           actorId,
           preferredModelOrder: executionRouting.preferredModelOrder,
+          platformModelsMode:
+            modelGate?.effectiveRouting?.mode ??
+            resolvePlatformModelsMode(params.followupRun.run.config),
+          ...(modelGate?.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
+            : {}),
           // P4-1: parent billing context for child runs, only while this run holds the gate.
           creditReporting: enterpriseRunSlotHeld
             ? snapshotCreditReportingFromGate({
@@ -769,7 +807,7 @@ export async function runAgentTurnWithFallback(params: {
                     ?.tenantId ??
                   params.sessionCtx.GatewayClientSessionEnterpriseId ??
                   params.sessionCtx.CollaborationTenantId ??
-                  modelGate.tenantId ??
+                  modelGate?.tenantId ??
                   null,
                 storeRoot: defaultShadowStoreRoot(),
                 cronStorePath: resolveCronStorePath(params.followupRun.run.config.cron?.store),
@@ -975,30 +1013,30 @@ export async function runAgentTurnWithFallback(params: {
           : [];
         // P3 任务 14：aor_enhanced 下运行完成后回写 bandit 学习信号（仅在启用 bandit 时）。
         // 用量计费沿用既有 usage 事件，不在此重复计费。
-        if (modelGate.aorFeedback) {
+        if (modelGate?.aorFeedback) {
           recordAorRunFeedback({
-            banditStatePath: modelGate.aorFeedback.banditStatePath,
+            banditStatePath: modelGate?.aorFeedback.banditStatePath,
             provider: fallbackResult.provider,
             model: fallbackResult.model,
-            taskTypeId: modelGate.aorFeedback.taskTypeId,
+            taskTypeId: modelGate?.aorFeedback.taskTypeId,
           });
         }
         // P3 收口：写入 AOR 路由解释审计日志（投影 loadAuditExplanations 读取同一文件）。
-        if (modelGate.aorRouting) {
+        if (modelGate?.aorRouting) {
           const selectedKey = `${fallbackResult.provider}/${fallbackResult.model}`;
-          const explanation = modelGate.aorRouting.explanationByModelId[selectedKey];
+          const explanation = modelGate?.aorRouting.explanationByModelId[selectedKey];
           recordAorRoutingExplanation({
-            auditLogPath: modelGate.aorRouting.auditLogPath,
+            auditLogPath: modelGate?.aorRouting.auditLogPath,
             runId,
-            taskTypeId: modelGate.aorRouting.taskTypeId,
-            strategy: modelGate.aorRouting.strategy,
+            taskTypeId: modelGate?.aorRouting.taskTypeId,
+            strategy: modelGate?.aorRouting.strategy,
             provider: fallbackResult.provider,
             model: fallbackResult.model,
             ...(explanation ? { reason: explanation.reason, score: explanation.score } : {}),
           });
         }
         // V2 Phase 3：Credits 计量（ledger + ai_credits 用量双写）。
-        if (modelGate.creditReporting) {
+        if (modelGate?.creditReporting) {
           const tokenUsage = normalizeUsage(runResult.meta?.agentMeta?.usage);
           const creditUserId =
             params.sessionCtx.CollaborationGroupOwnerEntitlement?.userEmail?.trim() ||
@@ -1006,8 +1044,8 @@ export async function runAgentTurnWithFallback(params: {
             params.sessionCtx.GatewayClientUser;
           void recordCreditUsage(
             buildCommercialRunCreditUsageInput({
-              enterpriseId: modelGate.creditReporting.enterpriseId,
-              policyId: modelGate.creditReporting.policyId,
+              enterpriseId: modelGate?.creditReporting.enterpriseId,
+              policyId: modelGate?.creditReporting.policyId,
               runId,
               provider: fallbackResult.provider,
               model: fallbackResult.model,
@@ -1066,7 +1104,7 @@ export async function runAgentTurnWithFallback(params: {
           return {
             kind: "final",
             payload: {
-              text: `⚠️ ${buildModelEntitlementEmptyUserMessage(modelGate.entitlementHint)}`,
+              text: `⚠️ ${buildModelEntitlementEmptyUserMessage(modelGate?.entitlementHint)}`,
             },
           };
         }
@@ -1220,7 +1258,7 @@ export async function runAgentTurnWithFallback(params: {
             recordHonestCapabilityGap({
               runId,
               agentId: params.followupRun.run.agentId ?? null,
-              tenantId: modelGate.tenantId?.trim() || null,
+              tenantId: modelGate?.tenantId?.trim() || null,
               sessionKey: params.followupRun.run.sessionKey ?? null,
               chatType: params.sessionCtx.ChatType ?? null,
               reason: isContextOverflow ? "context_overflow" : "unresolved_run_error",
