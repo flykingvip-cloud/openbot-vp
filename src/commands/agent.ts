@@ -118,6 +118,15 @@ import {
 import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "./agent/delivery.js";
+import {
+  ensureCliTurnTaskOutcome,
+  ensureGatewayAgentTurnTaskOutcome,
+} from "../task-outcome/entrypoint-ensure.js";
+import {
+  recordRunnerTurnOutcome,
+  type RunnerTurnFailureReason,
+} from "../task-outcome/runtime-from-runner.js";
+import type { TrustedScope } from "../task-outcome/types.js";
 import { resolveAgentCommandModelGovernance } from "./agent/model-governance.js";
 import { resolveAgentRunContext } from "./agent/run-context.js";
 import { updateSessionStoreAfterAgentRun } from "./agent/session-store.js";
@@ -885,6 +894,86 @@ async function agentCommandInternal(
   // Model allowlists for the child still come from the parent snapshot.
   let commercialGate: AgentCommandCommercialGateResult | undefined;
 
+  // askOutcome W1: CLI / gateway_agent production tip (skip nested subagent lane).
+  const agentOutcomeEntrypoint =
+    isSubagentLane ? undefined : opts.governanceEntry === "E2" ? "gateway_agent" : "cli";
+  let agentOutcomeTaskId: string | undefined;
+  let agentOutcomeScope: TrustedScope | undefined;
+  let agentOutcomeCloseoutDone = false;
+  let agentOutcomeSuccess: boolean | undefined;
+  let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
+  let agentOutcomeFailureDetail: string | undefined;
+  const agentOutcomeStartedAt = Date.now();
+  if (agentOutcomeEntrypoint) {
+    const subjectRaw = (
+      opts.gatewayClientPlatformUserId ??
+      opts.gatewayClientUser ??
+      (agentOutcomeEntrypoint === "cli" ? "cli-operator" : "gateway-agent")
+    )
+      .toString()
+      .trim();
+    const subjectRef =
+      subjectRaw.startsWith("platform-user:") || subjectRaw.includes(":")
+        ? subjectRaw
+        : `subject:${subjectRaw}`;
+    const tenantId =
+      opts.gatewayClientSessionTenantId?.trim() ||
+      opts.executionIdentity?.enterpriseId?.trim() ||
+      undefined;
+    const opened =
+      agentOutcomeEntrypoint === "cli"
+        ? ensureCliTurnTaskOutcome(cfg, {
+            agentId: sessionAgentId,
+            runId,
+            subjectRef,
+            ...(tenantId ? { tenantId } : {}),
+          })
+        : ensureGatewayAgentTurnTaskOutcome(cfg, {
+            agentId: sessionAgentId,
+            runId,
+            subjectRef,
+            ...(tenantId ? { tenantId } : {}),
+          });
+    if (opened.ok) {
+      agentOutcomeTaskId = opened.taskId;
+      agentOutcomeScope = opened.scope;
+    }
+  }
+
+  const submitAgentOutcomeCloseout = async () => {
+    if (agentOutcomeCloseoutDone || !agentOutcomeEntrypoint) {
+      return;
+    }
+    if (!agentOutcomeTaskId || !agentOutcomeScope) {
+      return;
+    }
+    if (agentOutcomeSuccess === undefined && agentOutcomeFailureReason === undefined) {
+      return;
+    }
+    agentOutcomeCloseoutDone = true;
+    const success = agentOutcomeSuccess === true;
+    try {
+      await recordRunnerTurnOutcome(cfg, sessionAgentId, {
+        success,
+        runId,
+        taskId: agentOutcomeTaskId,
+        scope: agentOutcomeScope,
+        entrypoint: agentOutcomeEntrypoint,
+        latencyMs: Math.max(0, Date.now() - agentOutcomeStartedAt),
+        ...(success
+          ? {}
+          : {
+              failureReason: agentOutcomeFailureReason ?? ("run_failed" as const),
+              ...(agentOutcomeFailureDetail ? { failureDetail: agentOutcomeFailureDetail } : {}),
+            }),
+      });
+    } catch (err) {
+      console.error(
+        `[agent] unified recordRunnerTurnOutcome failed for ${agentOutcomeEntrypoint}: ${String(err)}`,
+      );
+    }
+  };
+
   try {
     if (opts.deliver === true) {
       const sendPolicy = resolveSendPolicy({
@@ -895,6 +984,9 @@ async function agentCommandInternal(
         chatType: sessionEntry?.chatType,
       });
       if (sendPolicy === "deny") {
+        agentOutcomeSuccess = false;
+        agentOutcomeFailureReason = "authz_denied";
+        agentOutcomeFailureDetail = "send blocked by session policy";
         throw new Error("send blocked by session policy");
       }
     }
@@ -908,6 +1000,9 @@ async function agentCommandInternal(
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
     });
     if (commercialGate.status === "denied") {
+      agentOutcomeSuccess = false;
+      agentOutcomeFailureReason = "authz_denied";
+      agentOutcomeFailureDetail = commercialGate.message;
       throw new Error(commercialGate.message);
     }
     let commandExecutionRouting:
@@ -1079,7 +1174,8 @@ async function agentCommandInternal(
         },
       };
 
-      return await deliverAgentCommandResult({
+      agentOutcomeSuccess = true;
+    return await deliverAgentCommandResult({
         cfg,
         deps,
         runtime,
@@ -1496,6 +1592,7 @@ async function agentCommandInternal(
     }
 
     const payloads = result.payloads ?? [];
+    agentOutcomeSuccess = true;
     return await deliverAgentCommandResult({
       cfg,
       deps,
@@ -1506,12 +1603,29 @@ async function agentCommandInternal(
       result,
       payloads,
     });
+  } catch (err) {
+    if (agentOutcomeSuccess === undefined) {
+      agentOutcomeSuccess = false;
+      const msg = String(err);
+      if (opts.abortSignal?.aborted) {
+        agentOutcomeFailureReason = "user_cancelled";
+      } else if (agentOutcomeFailureReason === undefined) {
+        agentOutcomeFailureReason = /denied|blocked|authz|policy/i.test(msg)
+          ? "authz_denied"
+          : "run_failed";
+      }
+      if (!agentOutcomeFailureDetail) {
+        agentOutcomeFailureDetail = msg;
+      }
+    }
+    throw err;
   } finally {
     if (commercialRunSlotHeld) {
       void releaseAgentCommandCommercialRun(runId);
       forgetRunModelSet(runId);
     }
     clearAgentRunContext(runId);
+    await submitAgentOutcomeCloseout();
   }
 }
 

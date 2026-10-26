@@ -9786,7 +9786,7 @@ landingStreams:
       - docs/design/task-outcome/call-chain-and-replacements.md
       - docs/notes/askOutcome-p0-baseline.md
       - src/task-outcome/**
-      # W1 remediation temp lander (hot entry wiring); restore before merge
+      # W1 remediation temp lander (hot entry wiring); restore after this commit
       - src/auto-reply/reply/followup-runner.ts
       - src/auto-reply/reply/queue/enqueue.ts
       - src/auto-reply/reply/queue/types.ts
@@ -9809,7 +9809,7 @@ landingStreams:
       task: askOutcome-p0-task-outcome-contract
       owner: executor-acceptance
       purpose: TaskOutcome unified durable replayable judgement (askOutcome P0)
-      tempLanderNote: W1 remediation hot-entry paths; restore after P1 commits
+      tempLanderNote: W1 remediation hot-entry paths; next commit restores module-only
   - id: p1-task-driven-aor-scoring
     landingPolicy: serial
     paths:
