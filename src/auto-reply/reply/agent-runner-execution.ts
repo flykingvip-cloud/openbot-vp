@@ -441,16 +441,11 @@ export async function runAgentTurnWithFallback(params: {
           tenantId: modelGate.tenantId,
           actorId,
           preferredModelOrder: executionRouting.preferredModelOrder,
-          platformModelsMode: resolvePlatformModelsMode(params.followupRun.run.config),
-          ...(typeof modelGate.aorRouting?.strategy === "string" &&
-          ["cheapest", "best_quality", "balanced", "bandit"].includes(modelGate.aorRouting.strategy)
-            ? {
-                selectorStrategy: modelGate.aorRouting.strategy as
-                  | "cheapest"
-                  | "best_quality"
-                  | "balanced"
-                  | "bandit",
-              }
+          platformModelsMode:
+            modelGate.effectiveRouting?.mode ??
+            resolvePlatformModelsMode(params.followupRun.run.config),
+          ...(modelGate.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate.effectiveRouting.selectorStrategy }
             : {}),
           // P4-1: parent billing context for child runs, only while this run holds the gate.
           creditReporting: enterpriseRunSlotHeld

@@ -126,6 +126,14 @@ export type EmployeeModelGateResult = {
     auditLogPath: string;
     explanationByModelId: Record<string, { reason: string; score: number }>;
   };
+  /**
+   * Always-populated effective routing for governance snapshot inheritance.
+   * Independent of enableRoutingExplanations / auditLogPath / aorRouting.
+   */
+  effectiveRouting: {
+    mode: "native" | "aor_enhanced";
+    selectorStrategy: "cheapest" | "best_quality" | "balanced" | "bandit";
+  };
   creditReporting?: {
     enterpriseId: string;
     policyId: string;
@@ -292,13 +300,19 @@ export async function resolveEmployeeModelGate(
   const enforce = managed.enforce;
   const scope = managed.scope;
 
+  // Always expose effective routing (mode from trusted config; strategy default until policy resolves).
+  const earlyRouting = {
+    mode,
+    selectorStrategy: "balanced" as const,
+  };
+
   // 3) Non-managed + enforce off + native → skip (personal path).
   if (!managedCandidate && configuredEnforce === "off" && mode !== "aor_enhanced") {
-    return {};
+    return { effectiveRouting: earlyRouting };
   }
   if (!managedCandidate && !resolved) {
     // Personal / unknown: fail-open (no allowlist force).
-    return {};
+    return { effectiveRouting: earlyRouting };
   }
 
   // 4) Managed candidate but identity unresolved → unconditional fail-closed zero egress.
@@ -306,6 +320,7 @@ export async function resolveEmployeeModelGate(
   if (managedCandidate && !resolved) {
     return {
       allowlist: [],
+      effectiveRouting: earlyRouting,
       entitlementHint: {
         isCollaborationGroupOwner: false,
         enterpriseModelCount: 0,
@@ -318,7 +333,7 @@ export async function resolveEmployeeModelGate(
   }
 
   if (!resolved) {
-    return {};
+    return { effectiveRouting: earlyRouting };
   }
 
   if (managed.appliedManagedDefaults && managed.unsafeConfigWarning) {
@@ -452,6 +467,14 @@ export async function resolveEmployeeModelGate(
   let preferredModelOrder: string[] | undefined;
   let aorFeedback: EmployeeModelGateResult["aorFeedback"];
   let aorRouting: EmployeeModelGateResult["aorRouting"];
+  // Effective strategy for snapshot inheritance — never gated on explanation/audit.
+  let effectiveSelectorStrategy: EmployeeModelGateResult["effectiveRouting"]["selectorStrategy"] =
+    resolvedPolicy.selectorStrategy === "cheapest" ||
+    resolvedPolicy.selectorStrategy === "best_quality" ||
+    resolvedPolicy.selectorStrategy === "balanced" ||
+    resolvedPolicy.selectorStrategy === "bandit"
+      ? resolvedPolicy.selectorStrategy
+      : "balanced";
   if (mode === "aor_enhanced" && effectiveModelIdsForRun.length > 0) {
     const aorExecution =
       binding?.aorExecution || resolvedPolicy.selectorStrategy
@@ -494,6 +517,15 @@ export async function resolveEmployeeModelGate(
       });
       if (selection.strategy !== "native") {
         preferredModelOrder = selection.orderedModelIds;
+      }
+      // Persist the strategy that actually drove selection (or the configured one).
+      if (
+        aorExecution.selectorStrategy === "cheapest" ||
+        aorExecution.selectorStrategy === "best_quality" ||
+        aorExecution.selectorStrategy === "balanced" ||
+        aorExecution.selectorStrategy === "bandit"
+      ) {
+        effectiveSelectorStrategy = aorExecution.selectorStrategy;
       }
       const aorCfg = resolvePlatformModelsConfig(input.cfg ?? ({} as OpenBotConfig)).aor;
       if (aorCfg.enableBandit && aorCfg.banditStatePath) {
@@ -570,6 +602,10 @@ export async function resolveEmployeeModelGate(
     ...(capabilityPlan ? { capabilityPlan } : {}),
     ...(aorFeedback ? { aorFeedback } : {}),
     ...(aorRouting ? { aorRouting } : {}),
+    effectiveRouting: {
+      mode,
+      selectorStrategy: effectiveSelectorStrategy,
+    },
     ...(creditReporting ? { creditReporting } : {}),
     ...(seatEntitlementProfileId ? { seatEntitlementProfileId } : {}),
     ...(allowlist !== undefined

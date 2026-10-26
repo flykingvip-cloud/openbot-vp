@@ -9739,6 +9739,10 @@ tasks:
       - src/task-outcome/capability-modality.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
+      - src/task-outcome/transitions.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/result-service.test.ts
+      - src/task-outcome/entrypoints/chat.ts
       - .loom/registry.yaml
     state: active
     sessions: []
@@ -9779,6 +9783,10 @@ landingStreams:
       - src/task-outcome/capability-modality.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
+      - src/task-outcome/transitions.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/result-service.test.ts
+      - src/task-outcome/entrypoints/chat.ts
     canLandWith: []
     metadata:
       task: p1-task-driven-aor-scoring

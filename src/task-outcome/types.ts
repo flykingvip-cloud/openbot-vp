@@ -235,6 +235,21 @@ export type SubmitTransition =
       acceptance: AcceptanceGate;
       delivery: DeliveryGate;
       decisiveRunStatus?: DecisiveRunStatus;
+    }
+  | {
+      /**
+       * Controlled path: mark target modality completed from real execution evidence.
+       * Refuses executor_unwired / no_executable_candidates / unsupported.
+       * Does not set acceptance — callers must still submit set_acceptance.
+       */
+      type: "mark_target_modality_completed";
+      expectedVersion: number;
+      fencingToken: string;
+      evidence: {
+        kind: "execution_artifact" | "run_completed" | "acceptance_artifact";
+        digestOrRef: string;
+        detail?: string;
+      };
     };
 
 export type SubmitResult =

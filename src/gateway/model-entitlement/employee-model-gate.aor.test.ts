@@ -58,7 +58,9 @@ vi.mock("../resource-catalog/models-catalog-store.js", async (importOriginal) =>
   };
 });
 
+import { buildRunModelSetSnapshot } from "../governance/spawn-snapshot-handoff.js";
 import { resolveKnowledgeSourceContext } from "../knowledge/context.js";
+import { planChildSpawnCapabilityRouting } from "./child-spawn-capability-routing.js";
 import { resolveEmployeeModelGate } from "./employee-model-gate.js";
 import { upsertEnterpriseModelEntitlement } from "./enterprise-model-entitlement-store.js";
 import { upsertPlanVersionModelBinding } from "./plan-version-model-binding-store.js";
@@ -74,9 +76,21 @@ const MODELS = {
   },
 };
 
-function makeCfg(mode: "native" | "aor_enhanced", enforce = "missing-allow"): OpenBotConfig {
+function makeCfg(
+  mode: "native" | "aor_enhanced",
+  enforce = "missing-allow",
+  aor?: { enableRoutingExplanations?: boolean; auditLogPath?: string },
+): OpenBotConfig {
   return {
-    gateway: { platform: { models: { mode, entitlement: { enforce } } } },
+    gateway: {
+      platform: {
+        models: {
+          mode,
+          entitlement: { enforce },
+          ...(aor ? { aor } : {}),
+        },
+      },
+    },
     models: { providers: MODELS },
   } as unknown as OpenBotConfig;
 }
@@ -274,5 +288,129 @@ describe("resolveEmployeeModelGate — AOR 选路（P3）", () => {
       "api-proxy-deepseek/cheap",
       "api-proxy-deepseek/premium",
     ]);
+  });
+
+  it("P1: explanations off — effectiveRouting still cheapest; child inherits via snapshot", async () => {
+    await seedEntitlementAndGrant();
+    await upsertPlanVersionModelBinding(
+      {
+        planVersionId: "pv-1",
+        allowedModelIds: ["api-proxy-deepseek/cheap", "api-proxy-deepseek/premium"],
+        aorExecution: {
+          taskTypeId: "summarization",
+          selectorStrategy: "cheapest",
+          evaluatorMode: "content",
+        },
+      },
+      storeOpts().planVersionBindingStorePath,
+    );
+
+    const gate = await resolveEmployeeModelGate({
+      cfg: makeCfg("aor_enhanced", "missing-allow", {
+        enableRoutingExplanations: false,
+        // no auditLogPath — aorRouting must stay absent
+      }),
+      gatewayClientUser: "user@acme.test",
+      gatewayClientSessionDomain: "employee",
+      ...storeOpts(),
+    });
+
+    expect(gate.aorRouting).toBeUndefined();
+    expect(gate.effectiveRouting).toEqual({
+      mode: "aor_enhanced",
+      selectorStrategy: "cheapest",
+    });
+
+    const parentSnapshot = buildRunModelSetSnapshot({
+      runId: "parent-explanations-off",
+      allowlist: gate.allowlist ?? [],
+      preferredModelOrder: gate.preferredModelOrder,
+      platformModelsMode: gate.effectiveRouting.mode,
+      selectorStrategy: gate.effectiveRouting.selectorStrategy,
+    });
+    expect(parentSnapshot?.effectiveModelSet?.selectorStrategy).toBe("cheapest");
+    expect(parentSnapshot?.effectiveModelSet?.platformModelsMode).toBe("aor_enhanced");
+
+    const planned = planChildSpawnCapabilityRouting({
+      cfg: makeCfg("native"), // trusted cfg would not invent aor; snapshot must win
+      taskText: "summarize this note",
+      parentSnapshot,
+      authorizedModelIds: gate.allowlist ?? [],
+      parentPreferredModelOrder: gate.preferredModelOrder,
+      catalog: [
+        {
+          ref: { provider: "api-proxy-deepseek", id: "cheap" },
+          cost: { inputPerMtok: 0.1, outputPerMtok: 0.2 },
+          taskTypeScores: { summarization: 0.7 },
+        },
+        {
+          ref: { provider: "api-proxy-deepseek", id: "premium" },
+          cost: { inputPerMtok: 10, outputPerMtok: 20 },
+          taskTypeScores: { summarization: 0.9 },
+        },
+      ],
+    });
+    expect(planned.inherited.mode).toBe("aor_enhanced");
+    expect(planned.inherited.selectorStrategy).toBe("cheapest");
+    expect(planned.inherited.source).toBe("parent_snapshot");
+    // cheapest → cheap first even though premium scores higher on summarization
+    expect(planned.preferredModelOrder[0]).toBe("api-proxy-deepseek/cheap");
+  });
+
+  it("P1: explanations off — best_quality still inherited by child", async () => {
+    await seedEntitlementAndGrant();
+    await upsertPlanVersionModelBinding(
+      {
+        planVersionId: "pv-1",
+        allowedModelIds: ["api-proxy-deepseek/cheap", "api-proxy-deepseek/premium"],
+        aorExecution: {
+          taskTypeId: "summarization",
+          selectorStrategy: "best_quality",
+          evaluatorMode: "content",
+        },
+      },
+      storeOpts().planVersionBindingStorePath,
+    );
+
+    const gate = await resolveEmployeeModelGate({
+      cfg: makeCfg("aor_enhanced", "missing-allow", { enableRoutingExplanations: false }),
+      gatewayClientUser: "user@acme.test",
+      gatewayClientSessionDomain: "employee",
+      taskText: "帮我重构这段支付回调",
+      ...storeOpts(),
+    });
+
+    expect(gate.aorRouting).toBeUndefined();
+    expect(gate.effectiveRouting.selectorStrategy).toBe("best_quality");
+    expect(gate.effectiveRouting.mode).toBe("aor_enhanced");
+
+    const parentSnapshot = buildRunModelSetSnapshot({
+      runId: "parent-bq-off",
+      allowlist: gate.allowlist ?? [],
+      preferredModelOrder: gate.preferredModelOrder,
+      platformModelsMode: gate.effectiveRouting.mode,
+      selectorStrategy: gate.effectiveRouting.selectorStrategy,
+    });
+    const planned = planChildSpawnCapabilityRouting({
+      cfg: makeCfg("native"),
+      taskText: "帮我重构这段支付回调",
+      parentSnapshot,
+      authorizedModelIds: gate.allowlist ?? [],
+      parentPreferredModelOrder: gate.preferredModelOrder,
+      catalog: [
+        {
+          ref: { provider: "api-proxy-deepseek", id: "cheap" },
+          cost: { inputPerMtok: 0.1, outputPerMtok: 0.2 },
+          taskTypeScores: { tool_use: 0.75 },
+        },
+        {
+          ref: { provider: "api-proxy-deepseek", id: "premium" },
+          cost: { inputPerMtok: 10, outputPerMtok: 20 },
+          taskTypeScores: { coding: 0.8, reasoning: 0.85 },
+        },
+      ],
+    });
+    expect(planned.inherited.selectorStrategy).toBe("best_quality");
+    expect(planned.preferredModelOrder[0]).toBe("api-proxy-deepseek/premium");
   });
 });

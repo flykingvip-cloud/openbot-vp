@@ -932,16 +932,10 @@ export async function runCronIsolatedAgentTurn(params: {
         commercialAuthorizationId: cronAuthorizationId,
         tenantId: modelGate.tenantId,
         preferredModelOrder: executionRouting.preferredModelOrder,
-        platformModelsMode: resolvePlatformModelsMode(cfgWithAgentDefaults),
-        ...(typeof modelGate.aorRouting?.strategy === "string" &&
-        ["cheapest", "best_quality", "balanced", "bandit"].includes(modelGate.aorRouting.strategy)
-          ? {
-              selectorStrategy: modelGate.aorRouting.strategy as
-                | "cheapest"
-                | "best_quality"
-                | "balanced"
-                | "bandit",
-            }
+        platformModelsMode:
+          modelGate.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
+        ...(modelGate.effectiveRouting?.selectorStrategy
+          ? { selectorStrategy: modelGate.effectiveRouting.selectorStrategy }
           : {}),
         // P4-1: parent billing context for child runs (acquired gate only).
         creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,

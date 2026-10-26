@@ -297,16 +297,10 @@ export function createFollowupRunner(params: {
           commercialAuthorizationId: followupAuthorizationId,
           tenantId: modelGate.tenantId,
           preferredModelOrder: executionRouting.preferredModelOrder,
-          platformModelsMode: resolvePlatformModelsMode(queued.run.config),
-          ...(typeof modelGate.aorRouting?.strategy === "string" &&
-          ["cheapest", "best_quality", "balanced", "bandit"].includes(modelGate.aorRouting.strategy)
-            ? {
-                selectorStrategy: modelGate.aorRouting.strategy as
-                  | "cheapest"
-                  | "best_quality"
-                  | "balanced"
-                  | "bandit",
-              }
+          platformModelsMode:
+            modelGate.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
+          ...(modelGate.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate.effectiveRouting.selectorStrategy }
             : {}),
           // P4-1: parent billing context for child runs (acquired gate only).
           creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,

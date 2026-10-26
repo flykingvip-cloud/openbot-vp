@@ -246,7 +246,9 @@ function semanticallyEqualForIdempotency(a: TaskOutcomeRecord, b: TaskOutcomeRec
     a.acceptance.status === b.acceptance.status &&
     a.delivery.status === b.delivery.status &&
     a.decisiveRunId === b.decisiveRunId &&
-    a.reasonCode === b.reasonCode
+    a.reasonCode === b.reasonCode &&
+    a.capabilityModality?.executionStatus === b.capabilityModality?.executionStatus &&
+    a.capabilityModality?.targetModalityCompleted === b.capabilityModality?.targetModalityCompleted
   );
 }
 
