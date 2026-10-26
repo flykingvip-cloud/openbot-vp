@@ -65,17 +65,28 @@ export {
   validateExternalEffectNoneCheck,
 } from "./wake-op-recovery-gate.js";
 export {
+  WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES,
   bindVerificationForRelease,
+  buildDeclaredWakeOpVerifyAdapterRegistry,
+  createDurableAuthorityReceiptNoneAdapter,
   createFixtureReceiptNoneAdapter,
+  isWakeOpDeclaredVerifyCapableSource,
   produceHumanNoneAttestation,
   producePlatformNoneVerification,
   producePlatformNoneVerificationViaAdapter,
   readExternalEffectVerification,
+  readWakeOpDurableEffectReceipt,
   selectWakeOpVerifyAdapter,
+  writeWakeOpDurableEffectReceipt,
+  type WakeOpDurableEffectReceipt,
   type WakeOpEffectVerifyAdapter,
   type WakeOpEffectVerifyAdapterRegistry,
 } from "./wake-op-effect-verify.js";
-export { WAKE_OP_RECOVERY_IDENTITY_MODE } from "./wake-op-recovery-gate.js";
+export {
+  WAKE_OP_RECOVERY_IDENTITY_MODE,
+  WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY,
+  WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY,
+} from "./wake-op-recovery-gate.js";
 export const WAKE_OP_PROCESSING_STATUSES = [
   "accepted",
   "running",

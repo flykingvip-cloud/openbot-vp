@@ -16,6 +16,11 @@
  * Production composition: select adapters by operation type via
  * {@link producePlatformNoneVerificationViaAdapter}. The probe-callback form
  * remains DI for tests; it is not the production trusted evidence chain.
+ *
+ * W3: Declared-capable sources use durable authority-namespace receipts via
+ * {@link buildDeclaredWakeOpVerifyAdapterRegistry}. Fixture adapters prove the
+ * mechanism only — fixture pass ≠ production wiring. Undeclared sources stay
+ * verify_capability_unavailable / unknown; no automatic side-effect retry.
  */
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -156,6 +161,8 @@ export function selectWakeOpVerifyAdapter(
 /**
  * Test/stub adapter that actually reads a fixture receipt file and only proves
  * none when the file asserts outcome none for the matching opKey+attemptId.
+ * Fixture path injection is NOT the declared production registry — see
+ * {@link buildDeclaredWakeOpVerifyAdapterRegistry}.
  */
 export function createFixtureReceiptNoneAdapter(params: {
   operationType: string;
@@ -188,6 +195,152 @@ export function createFixtureReceiptNoneAdapter(params: {
       }
     },
   };
+}
+
+/**
+ * Sources this build **declares** as verify-capable via durable authority receipts.
+ * All other wake-op sources are explicit OOS for platform auto-prove — keep unknown,
+ * return verify_capability_unavailable, and do NOT auto-retry side effects.
+ * Do NOT extrapolate "all production receipt adapters are ready".
+ */
+export const WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES = ["nudge"] as const;
+export type WakeOpDeclaredVerifyCapableSource =
+  (typeof WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES)[number];
+
+export function isWakeOpDeclaredVerifyCapableSource(source: string): boolean {
+  const key = compact(source);
+  return (WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES as readonly string[]).includes(key);
+}
+
+export type WakeOpDurableEffectReceipt = Readonly<{
+  opKey: string;
+  attemptId: string;
+  operationType: string;
+  outcome: "none";
+  source: string;
+  writtenAtMs: number;
+}>;
+
+function effectReceiptsDir(authority: RuntimeAuthority): string {
+  return path.join(authority.namespace.root, "wake-op-effect-receipts");
+}
+
+function effectReceiptFile(dir: string, opKey: string, attemptId: string): string {
+  const digest = createHash("sha256").update(`${opKey}\0${attemptId}`).digest("hex");
+  return path.join(dir, `${digest}.json`);
+}
+
+/**
+ * Persist a durable effect receipt under the runtime authority namespace.
+ * Composition / probes write here; declared adapters read here (not caller paths).
+ */
+export async function writeWakeOpDurableEffectReceipt(params: {
+  authority: RuntimeAuthority;
+  cfg?: OpenBotConfig;
+  opKey: string;
+  attemptId: string;
+  operationType: string;
+  outcome: "none";
+  source: string;
+  nowMs?: number;
+}): Promise<{ ok: true; record: WakeOpDurableEffectReceipt } | { ok: false; reason: string }> {
+  const opKey = compact(params.opKey);
+  const attemptId = compact(params.attemptId);
+  const operationType = compact(params.operationType);
+  const source = compact(params.source);
+  if (!opKey || !attemptId || !operationType || !source) {
+    return { ok: false, reason: "missing_durable_receipt_fields" };
+  }
+  if (params.outcome !== "none") {
+    return { ok: false, reason: "effect_check_contradictory_outcome" };
+  }
+  const dir = effectReceiptsDir(params.authority);
+  assertCollaborationRuntimeWritable(dir, params.cfg);
+  await fs.mkdir(dir, { recursive: true });
+  const record: WakeOpDurableEffectReceipt = {
+    opKey,
+    attemptId,
+    operationType,
+    outcome: "none",
+    source,
+    writtenAtMs: params.nowMs ?? Date.now(),
+  };
+  const file = effectReceiptFile(dir, opKey, attemptId);
+  const stem = createHash("sha256").update(`${opKey}\0${attemptId}`).digest("hex").slice(0, 32);
+  await withRoundLock(dir, stem, async () => {
+    await writeJsonDurable(file, record);
+  });
+  return { ok: true, record };
+}
+
+export async function readWakeOpDurableEffectReceipt(params: {
+  authority: RuntimeAuthority;
+  opKey: string;
+  attemptId: string;
+}): Promise<WakeOpDurableEffectReceipt | null> {
+  const opKey = compact(params.opKey);
+  const attemptId = compact(params.attemptId);
+  if (!opKey || !attemptId) {
+    return null;
+  }
+  const file = effectReceiptFile(effectReceiptsDir(params.authority), opKey, attemptId);
+  try {
+    const raw = await fs.readFile(file, "utf8");
+    const parsed = JSON.parse(raw) as WakeOpDurableEffectReceipt;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    if (compact(parsed.opKey) !== opKey || compact(parsed.attemptId) !== attemptId) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Declared production adapter: reads durable receipts from the authority namespace.
+ * Caller-supplied fixture file paths are intentionally not accepted.
+ */
+export function createDurableAuthorityReceiptNoneAdapter(params: {
+  operationType: string;
+}): WakeOpEffectVerifyAdapter {
+  const operationType = compact(params.operationType);
+  return {
+    operationType,
+    verifyNone: async (ctx) => {
+      if (compact(ctx.record.source) !== operationType) {
+        return null;
+      }
+      const receipt = await readWakeOpDurableEffectReceipt({
+        authority: ctx.authority,
+        opKey: ctx.opKey,
+        attemptId: ctx.attemptId,
+      });
+      if (!receipt) {
+        return null;
+      }
+      if (compact(receipt.operationType) !== operationType) {
+        return null;
+      }
+      if (receipt.outcome !== "none") {
+        return null;
+      }
+      const source = compact(receipt.source) || `durable:${operationType}`;
+      return { source, outcome: "none" };
+    },
+  };
+}
+
+/**
+ * Registry for sources this build declares verify-capable.
+ * Undeclared sources have no adapter → verify_capability_unavailable.
+ */
+export function buildDeclaredWakeOpVerifyAdapterRegistry(): WakeOpEffectVerifyAdapterRegistry {
+  return WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES.map((operationType) =>
+    createDurableAuthorityReceiptNoneAdapter({ operationType }),
+  );
 }
 
 export type ProducePlatformNoneVerificationParams = {

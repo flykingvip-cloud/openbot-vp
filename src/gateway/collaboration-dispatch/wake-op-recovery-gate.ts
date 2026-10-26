@@ -45,13 +45,33 @@ export type TrustedWakeOpOperator = Readonly<{
  */
 const SUBJECT_BRAND: unique symbol = Symbol("openbot.WakeOpRecoverySubject");
 
-/** Reachability until production auth composition is wired. */
-export const WAKE_OP_RECOVERY_IDENTITY_MODE = "internal_library_not_e2e_authenticated" as const;
+/**
+ * Production identity mode: actorId minted from a branded gateway/session handle.
+ * Bare actorId / caller_asserted_internal MUST NOT claim this mode.
+ */
+export const WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY = "gateway_session_authenticated" as const;
+
+/**
+ * Test-only / internal-library identity mode. NOT e2e authenticated.
+ * Fixtures and DI may use this; production gateway composition must not.
+ */
+export const WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY =
+  "internal_library_not_e2e_authenticated" as const;
+
+/**
+ * @deprecated Alias of {@link WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY}.
+ * Kept so transitional callers keep compiling; do NOT treat as production e2e.
+ */
+export const WAKE_OP_RECOVERY_IDENTITY_MODE = WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY;
+
+export type WakeOpRecoveryIdentityMode =
+  | typeof WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY
+  | typeof WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY;
 
 /**
  * Minted recovery subject. Only the composition-root mint produces this.
  * Plain objects / Symbol.for forgeries are refused at runtime.
- * Brand does NOT prove the caller is actorId — see WAKE_OP_RECOVERY_IDENTITY_MODE.
+ * Brand does NOT prove the caller is actorId — gateway_session provenance does.
  */
 export type WakeOpRecoverySubject = Readonly<{
   actorId: string;

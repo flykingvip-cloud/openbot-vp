@@ -47,7 +47,13 @@ import {
   buildAcceptedTaskStopControl,
   TaskStoppedError,
 } from "../collaboration-dispatch/task-stop-control.js";
-import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-op-effect-verify.js";
+import {
+  WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES,
+  buildDeclaredWakeOpVerifyAdapterRegistry,
+  createFixtureReceiptNoneAdapter,
+  isWakeOpDeclaredVerifyCapableSource,
+  writeWakeOpDurableEffectReceipt,
+} from "../collaboration-dispatch/wake-op-effect-verify.js";
 import {
   claimWakeOpRunning,
   markWakeOpCompleted,
@@ -95,8 +101,14 @@ import { requestCollaborationTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
 import {
   WAKE_OP_RECOVERY_IDENTITY_MODE,
+  WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY,
+  WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY,
   confirmWakeOpCompletedAuthorized,
+  createGatewaySessionRecoveryExecContext,
   createInternalLibraryRecoveryExecContext,
+  mintWakeOpTrustedGatewaySessionForTests,
+  mintWakeOpTrustedGatewaySessionFromPlatformAuth,
+  produceDeclaredPlatformNoneVerificationAtRoot,
   producePlatformNoneVerificationAtRoot,
   releaseWakeOpForRetryAuthorized,
   resolveWakeOpRecoverySubjectForAction,
@@ -1166,8 +1178,10 @@ describe("T37 M2 attempt binding (fail-first)", () => {
 });
 
 describe("T37 M1 subject source boundary", () => {
-  test("M1-BRAND-01: Symbol.for forged brand rejected; identity mode is internal-library", async () => {
-    expect(WAKE_OP_RECOVERY_IDENTITY_MODE).toBe("internal_library_not_e2e_authenticated");
+  test("M1-BRAND-01: Symbol.for forged brand rejected; internal-library demoted to test-only", async () => {
+    expect(WAKE_OP_RECOVERY_IDENTITY_MODE).toBe(WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY);
+    expect(WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY).toBe("internal_library_not_e2e_authenticated");
+    expect(WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY).toBe("gateway_session_authenticated");
 
     const { cfg } = await useIsolationRoot();
     const taskId = "task-t37-m1-brand";
@@ -1221,7 +1235,10 @@ describe("T37 M1 subject source boundary", () => {
       throw new Error("exec");
     }
     expect(exec.exec.identityProvenance).toBe("caller_asserted_internal");
-    expect(exec.exec.identityMode).toBe("internal_library_not_e2e_authenticated");
+    expect(exec.exec.identityMode).toBe(WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY);
+    // Must not claim gateway e2e mode on bare-actorId / internal-library path
+    expect(exec.exec.identityMode).not.toBe(WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY);
+    expect(exec.exec.identityProvenance).not.toBe("gateway_session");
 
     // Symbol.for forged object is not a valid exec context either
     const forgedExec = {
@@ -5144,5 +5161,374 @@ describe("W1 AUTH production entry close (roster CAS + stale sync)", () => {
     expect(readOperatingStateAuthEpoch(finalOs)).toBeGreaterThan(auth0);
     // Late business write after auth may land summary; either way auth must hold.
     expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(true);
+  });
+});
+
+describe("W2 M1 trusted gateway-session identity wiring", () => {
+  test("W2-M1-01: gateway session mint → release ok; conflicting actorId refused; revoke refuses; brand forge still refused", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-w2-m1";
+    const { authority, groupId, fileStore } = await seed({ cfg, taskId, itemId: "w2m1" });
+    const claimed = await claimWakeOpRunning({
+      authority,
+      cfg,
+      keyInput: {
+        groupId,
+        source: "nudge",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "w2m1-u",
+      },
+    });
+    await markWakeOpUnknown({ authority, opKey: claimed.opKey, cfg });
+    const attemptId = await currentAttemptId(authority, claimed.opKey);
+
+    // Suspended / missing platform auth → refuse mint
+    const suspended = mintWakeOpTrustedGatewaySessionFromPlatformAuth({
+      userId: tenant.owner,
+      userStatus: "suspended",
+      sessionKind: "member",
+      sessionId: "sess-suspended",
+    });
+    expect(suspended.ok).toBe(false);
+
+    const platformMint = mintWakeOpTrustedGatewaySessionFromPlatformAuth({
+      userId: tenant.owner,
+      userStatus: "active",
+      sessionKind: "member",
+      sessionId: "sess-owner-1",
+    });
+    expect(platformMint.ok).toBe(true);
+    if (!platformMint.ok) {
+      throw new Error("platformMint");
+    }
+    expect(platformMint.session.mintSource).toBe("platform_auth_context");
+    expect(platformMint.session.authenticatedUserId).toBe(tenant.owner);
+
+    // Symbol.for forged session handle rejected
+    const forgedSession = {
+      authenticatedUserId: tenant.owner,
+      sessionStatus: "active" as const,
+      sessionKind: "member",
+      sessionId: "x",
+      mintSource: "platform_auth_context" as const,
+      [Symbol.for("openbot.WakeOpTrustedGatewaySession")]: true,
+    };
+    const forgedExec = await createGatewaySessionRecoveryExecContext({
+      session: forgedSession as never,
+      groupId,
+      taskId,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(forgedExec.ok).toBe(false);
+    expect((forgedExec as { reason: string }).reason).toBe("operator_identity_not_trusted");
+
+    // Conflicting bare actorId cannot override session identity
+    const conflict = await createGatewaySessionRecoveryExecContext({
+      session: platformMint.session,
+      groupId,
+      taskId,
+      action: "release_for_retry",
+      actorId: tenant.admin,
+      cfg,
+    });
+    expect(conflict.ok).toBe(false);
+    expect((conflict as { reason: string }).reason).toBe("operator_identity_not_trusted");
+
+    const exec = await createGatewaySessionRecoveryExecContext({
+      session: platformMint.session,
+      groupId,
+      taskId,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(exec.ok).toBe(true);
+    if (!exec.ok) {
+      throw new Error("exec");
+    }
+    expect(exec.exec.identityProvenance).toBe("gateway_session");
+    expect(exec.exec.identityMode).toBe(WAKE_OP_RECOVERY_IDENTITY_MODE_GATEWAY);
+    expect(exec.exec.actorId).toBe(tenant.owner);
+
+    const ver = await producePlatformNoneVerification({
+      authority,
+      cfg,
+      groupId,
+      taskId,
+      opKey: claimed.opKey,
+      attemptId,
+      probe: async () => ({ source: "probe", outcome: "none" }),
+    });
+    expect(ver.ok).toBe(true);
+    if (!ver.ok) {
+      throw new Error("ver");
+    }
+
+    // Revoke owner → gateway exec refuses; status unchanged
+    await writeAuthOsForTest({
+      fileStore,
+      groupId,
+      cfg,
+      state: buildState({ revokeOwner: true }),
+    });
+    const revokedExec = await createGatewaySessionRecoveryExecContext({
+      session: platformMint.session,
+      groupId,
+      taskId,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(revokedExec.ok).toBe(false);
+    expect((revokedExec as { reason: string }).reason).toBe("release_forbidden");
+    expect((await readWakeOpRecord({ authority, opKey: claimed.opKey }))?.status).toBe("unknown");
+
+    // Restore owner → gateway session release succeeds
+    await writeAuthOsForTest({ fileStore, groupId, cfg, state: buildState() });
+    const okExec = await createGatewaySessionRecoveryExecContext({
+      session: platformMint.session,
+      groupId,
+      taskId,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(okExec.ok).toBe(true);
+    if (!okExec.ok) {
+      throw new Error("okExec");
+    }
+    const released = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: claimed.opKey,
+      exec: okExec.exec,
+      verificationId: ver.record.verificationId,
+      cfg,
+    });
+    expect(released.ok).toBe(true);
+    if (!released.ok) {
+      throw new Error("released");
+    }
+    expect(released.record.status).toBe("failed");
+    expect(released.record.releasedBy).toBe(tenant.owner);
+
+    // Internal-library / test harness cannot claim gateway_session mode
+    const testSess = mintWakeOpTrustedGatewaySessionForTests({ userId: tenant.owner });
+    expect(testSess.ok).toBe(true);
+    if (!testSess.ok) {
+      throw new Error("testSess");
+    }
+    expect(testSess.session.mintSource).toBe("test_only");
+    const lib = await createInternalLibraryRecoveryExecContext({
+      groupId,
+      taskId,
+      actorId: tenant.owner,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(lib.ok).toBe(true);
+    if (!lib.ok) {
+      throw new Error("lib");
+    }
+    expect(lib.exec.identityMode).toBe(WAKE_OP_RECOVERY_IDENTITY_MODE_TEST_ONLY);
+    expect(lib.exec.identityProvenance).toBe("caller_asserted_internal");
+  });
+});
+
+describe("W3 M2 verify capability boundary", () => {
+  test("W3-M2-01: declared durable adapter verifies nudge; undeclared keeps unknown; no auto side-effect; human still non-auto", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-w3-m2";
+    const { authority, groupId } = await seed({ cfg, taskId, itemId: "w3m2" });
+
+    expect(WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES).toEqual(["nudge"]);
+    expect(isWakeOpDeclaredVerifyCapableSource("nudge")).toBe(true);
+    expect(isWakeOpDeclaredVerifyCapableSource("self_advance")).toBe(false);
+    expect(isWakeOpDeclaredVerifyCapableSource("escalate")).toBe(false);
+
+    // Undeclared source (self_advance) → capability unavailable; status stays unknown
+    const undeclaredClaim = await claimWakeOpRunning({
+      authority,
+      cfg,
+      keyInput: {
+        groupId,
+        source: "self_advance",
+        fromAgentId: "system:self_advance",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "w3m2-sa",
+      },
+    });
+    await markWakeOpUnknown({ authority, opKey: undeclaredClaim.opKey, cfg });
+    const undeclared = await produceDeclaredPlatformNoneVerificationAtRoot({
+      authority,
+      opKey: undeclaredClaim.opKey,
+      cfg,
+    });
+    expect(undeclared.ok).toBe(false);
+    expect((undeclared as { reason: string }).reason).toBe("verify_capability_unavailable");
+    expect((await readWakeOpRecord({ authority, opKey: undeclaredClaim.opKey }))?.status).toBe(
+      "unknown",
+    );
+    // No automatic release / side-effect retry when capability unavailable
+    const autoRefuse = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: undeclaredClaim.opKey,
+      actorId: tenant.owner,
+      verificationId: "caller-invented",
+      cfg,
+    });
+    expect(autoRefuse.ok).toBe(false);
+    expect((await readWakeOpRecord({ authority, opKey: undeclaredClaim.opKey }))?.status).toBe(
+      "unknown",
+    );
+
+    // Declared source (nudge) without durable receipt → unavailable
+    const nudgeClaim = await claimWakeOpRunning({
+      authority,
+      cfg,
+      keyInput: {
+        groupId,
+        source: "nudge",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "w3m2-nudge",
+      },
+    });
+    await markWakeOpUnknown({ authority, opKey: nudgeClaim.opKey, cfg });
+    const attemptId = await currentAttemptId(authority, nudgeClaim.opKey);
+    const missingReceipt = await produceDeclaredPlatformNoneVerificationAtRoot({
+      authority,
+      opKey: nudgeClaim.opKey,
+      cfg,
+    });
+    expect(missingReceipt.ok).toBe(false);
+    expect((missingReceipt as { reason: string }).reason).toBe("verify_capability_unavailable");
+    expect((await readWakeOpRecord({ authority, opKey: nudgeClaim.opKey }))?.status).toBe(
+      "unknown",
+    );
+
+    // Stale attempt durable receipt → unavailable
+    await writeWakeOpDurableEffectReceipt({
+      authority,
+      cfg,
+      opKey: nudgeClaim.opKey,
+      attemptId: "stale-attempt-other",
+      operationType: "nudge",
+      outcome: "none",
+      source: "durable:nudge:stale",
+    });
+    const stale = await produceDeclaredPlatformNoneVerificationAtRoot({
+      authority,
+      opKey: nudgeClaim.opKey,
+      cfg,
+    });
+    expect(stale.ok).toBe(false);
+    expect((stale as { reason: string }).reason).toBe("verify_capability_unavailable");
+
+    // Correct durable receipt → declared adapter proves none
+    await writeWakeOpDurableEffectReceipt({
+      authority,
+      cfg,
+      opKey: nudgeClaim.opKey,
+      attemptId,
+      operationType: "nudge",
+      outcome: "none",
+      source: "durable:nudge:ok",
+    });
+    const declaredReg = buildDeclaredWakeOpVerifyAdapterRegistry();
+    expect(declaredReg.map((a) => a.operationType)).toEqual(["nudge"]);
+    // Fixture adapter ≠ declared production registry (different construction)
+    const fixtureReg = [
+      createFixtureReceiptNoneAdapter({
+        operationType: "nudge",
+        receiptFilePath: "/tmp/not-declared-production.json",
+      }),
+    ];
+    expect(declaredReg[0]).not.toBe(fixtureReg[0]);
+
+    const okVer = await produceDeclaredPlatformNoneVerificationAtRoot({
+      authority,
+      opKey: nudgeClaim.opKey,
+      cfg,
+    });
+    expect(okVer.ok).toBe(true);
+    if (!okVer.ok) {
+      throw new Error("okVer");
+    }
+    expect(okVer.record.platformAutoProved).toBe(true);
+    expect(okVer.record.attemptId).toBe(attemptId);
+    expect(okVer.record.source).toBe("durable:nudge:ok");
+
+    const sessionMint = mintWakeOpTrustedGatewaySessionForTests({ userId: tenant.owner });
+    expect(sessionMint.ok).toBe(true);
+    if (!sessionMint.ok) {
+      throw new Error("sessionMint");
+    }
+    const exec = await createGatewaySessionRecoveryExecContext({
+      session: sessionMint.session,
+      groupId,
+      taskId,
+      action: "release_for_retry",
+      cfg,
+    });
+    expect(exec.ok).toBe(true);
+    if (!exec.ok) {
+      throw new Error("exec");
+    }
+    const released = await releaseWakeOpForRetryAuthorized({
+      authority,
+      groupId,
+      taskId,
+      opKey: nudgeClaim.opKey,
+      exec: exec.exec,
+      verificationId: okVer.record.verificationId,
+      cfg,
+    });
+    expect(released.ok).toBe(true);
+
+    // Human attestation path still platformAutoProved===false (separate claim)
+    const humanClaim = await claimWakeOpRunning({
+      authority,
+      cfg,
+      keyInput: {
+        groupId,
+        source: "nudge",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "w3m2-human",
+      },
+    });
+    await markWakeOpUnknown({ authority, opKey: humanClaim.opKey, cfg });
+    const humanAttempt = await currentAttemptId(authority, humanClaim.opKey);
+    const subject = mintWakeOpRecoverySubject({
+      actorId: tenant.owner,
+      action: "release_for_retry",
+      groupId,
+      taskId,
+      taskApproverIds: [],
+    });
+    const human = await produceHumanNoneAttestation({
+      authority,
+      cfg,
+      subject,
+      groupId,
+      taskId,
+      opKey: humanClaim.opKey,
+      attemptId: humanAttempt,
+      basis: "manual review of channel",
+      scope: `op:${humanClaim.opKey}`,
+    });
+    expect(human.ok).toBe(true);
+    if (!human.ok) {
+      throw new Error("human");
+    }
+    expect(human.record.platformAutoProved).toBe(false);
+    expect(human.record.kind).toBe("human_attestation");
   });
 });
