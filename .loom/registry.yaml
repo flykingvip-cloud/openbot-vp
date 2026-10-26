@@ -9710,9 +9710,12 @@ tasks:
     owner: executor-acceptance
     intent:
       - R83 P0 persist CAS consumer chat-wire remediation
+      - R85b no-evidence-no-success growth-bridge failure-attribution
     paths:
       - src/task-outcome/**
       - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/agent-runner.ts
+      - src/gateway/server.impl.ts
       - docs/design/task-outcome/**
       - .loom/registry.yaml
     state: active
@@ -9738,11 +9741,13 @@ landingStreams:
       - docs/design/task-outcome/call-chain-and-replacements.md
       - src/task-outcome/**
       - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/agent-runner.ts
+      - src/gateway/server.impl.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
-      purpose: R83 P0 persist/CAS/consumer/chat-wire remediation after #83
+      purpose: R83/R85b TaskOutcome persist/CAS/consumer/chat-wire; no-evidence-no-success
 
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
@@ -22599,6 +22604,14 @@ sharedPaths:
   - glob: src/auto-reply/reply/agent-runner-execution.ts
     landerTask: askOutcome-p0-r83-remediation
     reason: R83 entry taskId wire (ensureChatTurnTaskOutcome at turn start). Temporary lander; restore to evolution-loop-fix after land.
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/agent-runner.ts
+    landerTask: askOutcome-p0-r83-remediation
+    reason: R85b block process-placeholder success and wire chat-turn close gates. Temporary lander; restore to ZH_SCRATCHPAD_PREAMBLE after land.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server.impl.ts
+    landerTask: askOutcome-p0-r83-remediation
+    reason: R85b boot hook for pending growth-evolution drain. Temporary lander; restore to COLLAB_S4_HEARTBEAT_SCHEDULER after land.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok

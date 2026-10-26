@@ -101,3 +101,39 @@ export function ensureChatTurnTaskOutcome(
     record: opened.record,
   };
 }
+
+/** Chat turn contract id used when waiving external acceptance. */
+export const CHAT_TURN_CONTRACT_V1 = "chat_turn_contract_v1";
+
+/**
+ * Resolve close gates from the chat-turn task contract (not runtime fallback).
+ * Standard chat turns do not require an external acceptance validator; final
+ * visible delivery still needs an explicit delivery receipt id.
+ */
+export function resolveChatTurnCloseGates(params: {
+  deliveryId: string;
+  /** When true, waive delivery channel (rare; prefer delivered with receipt). */
+  waiveDelivery?: boolean;
+}): {
+  acceptance: { status: "not_required"; reason: string };
+  delivery: { status: "delivered" } | { status: "not_required"; reason: string };
+  deliveryId: string;
+} {
+  const deliveryId = params.deliveryId.trim();
+  if (!deliveryId) {
+    throw new Error("resolveChatTurnCloseGates requires deliveryId receipt");
+  }
+  return {
+    acceptance: {
+      status: "not_required",
+      reason: `${CHAT_TURN_CONTRACT_V1}:no_external_acceptance`,
+    },
+    delivery: params.waiveDelivery
+      ? {
+          status: "not_required",
+          reason: `${CHAT_TURN_CONTRACT_V1}:delivery_waived`,
+        }
+      : { status: "delivered" },
+    deliveryId,
+  };
+}

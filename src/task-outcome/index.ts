@@ -10,7 +10,14 @@ export { GatewayAgentTaskOutcomeAdapter } from "./entrypoints/gateway-agent.js";
 export { CronTaskOutcomeAdapter } from "./entrypoints/cron.js";
 export { CliTaskOutcomeAdapter } from "./entrypoints/cli.js";
 export { CollabTaskOutcomeAdapter } from "./entrypoints/collab.js";
-export { recordRunnerTurnOutcome, TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
+export {
+  recordRunnerTurnOutcome,
+  drainPendingGrowthEvolution,
+  TASK_OUTCOME_STORE_DIRNAME,
+  type GrowthOutcomeCommitOpts,
+  type RunnerTurnFailureReason,
+  type RunnerTurnOutcomeInput,
+} from "./runtime-from-runner.js";
 
 export {
   OutcomeConsumerRuntime,
@@ -18,5 +25,14 @@ export {
   SKILL_CONSUMER_ID,
   MODE_CONSUMER_ID,
 } from "./consumers.js";
-export { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
+export {
+  publishEvolutionFromTaskOutcome,
+  readEffectiveEvolutionTaskOutcomes,
+} from "./growth-bridge.js";
+export {
+  recoverTaskOutcomeConsumersAtGatewayBoot,
+  drainAllAgentsPendingGrowth,
+  startTaskOutcomeRuntimeDrain,
+  stopTaskOutcomeRuntimeDrainForTests,
+} from "./consumer-boot.js";
 export * from "./chat-entry.js";

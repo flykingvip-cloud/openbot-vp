@@ -27,6 +27,8 @@ import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
+import { resolveChatTurnCloseGates } from "../../task-outcome/chat-entry.js";
+import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import {
@@ -440,12 +442,12 @@ export async function runReplyAgent(params: {
     // P2: ensure growth outcome is committed even if later delivery work throws
     // between classify-success and commit (or after a deferred commit site).
     let growthOutcomeCommitted = false;
-    const commitGrowthOutcome = (success: boolean) => {
+    const commitGrowthOutcome = (success: boolean, opts?: GrowthOutcomeCommitOpts) => {
       if (growthOutcomeCommitted) {
         return;
       }
       growthOutcomeCommitted = true;
-      commitGrowthOutcomeRaw(success);
+      commitGrowthOutcomeRaw(success, opts);
     };
 
     if (
@@ -576,7 +578,26 @@ export async function runReplyAgent(params: {
         reactionDelivered: Boolean(runResult.didSendReaction),
       });
       const growth = classifySilentTurnGrowthOutcome(decision);
-      commitGrowthOutcome(growth.success);
+      if (decision.reason === "user_aborted") {
+        commitGrowthOutcome(false, {
+          failureReason: "user_cancelled",
+          failureDetail: "user_aborted",
+        });
+      } else if (growth.success) {
+        const gates = resolveChatTurnCloseGates({
+          deliveryId: `delivery:${outcomeRunId}:${decision.reason}`,
+        });
+        commitGrowthOutcome(true, {
+          acceptance: gates.acceptance,
+          delivery: gates.delivery,
+          deliveryId: gates.deliveryId,
+        });
+      } else {
+        commitGrowthOutcome(false, {
+          failureReason: "run_failed",
+          failureDetail: decision.reason,
+        });
+      }
       if (!decision.emit) {
         return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
       }
@@ -742,15 +763,28 @@ export async function runReplyAgent(params: {
         : undefined;
       if (!fallbackText) {
         // Language gate filtered all replies with nothing to show — not a success, do not close gaps.
-        commitGrowthOutcome(false);
+        commitGrowthOutcome(false, {
+          failureReason: "user_filtered",
+          failureDetail: "language_gate_empty",
+        });
         return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
       }
-      commitGrowthOutcome(true);
+      // Process placeholder is not final delivery — leave incomplete (no evolution positive).
+      commitGrowthOutcome(true, { processPlaceholder: true });
       return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
     }
 
-    // Visible delivery past language gate — single growth success commit for this turn.
-    commitGrowthOutcome(true);
+    // Visible delivery past language gate — close only with resolved chat-turn contract gates.
+    {
+      const gates = resolveChatTurnCloseGates({
+        deliveryId: `delivery:${outcomeRunId}:visible`,
+      });
+      commitGrowthOutcome(true, {
+        acceptance: gates.acceptance,
+        delivery: gates.delivery,
+        deliveryId: gates.deliveryId,
+      });
+    }
     try {
       const usedIds = (runResult.toolMetas ?? [])
         .map((row) => row.toolName)

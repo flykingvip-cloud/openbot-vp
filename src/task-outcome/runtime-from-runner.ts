@@ -27,7 +27,7 @@ export type RunnerTurnFailureReason =
   | "other";
 
 export type RunnerTurnOutcomeInput = {
-  /** When true, only records attempt/run and leaves awaiting_acceptance. */
+  /** When true, records attempt/run as succeeded; does NOT invent acceptance/delivery. */
   success: boolean;
   runId: string;
   toolsTotal?: number;
@@ -40,7 +40,10 @@ export type RunnerTurnOutcomeInput = {
   /** Structured failure — required when success=false. Defaults to run_failed. */
   failureReason?: RunnerTurnFailureReason;
   failureDetail?: string;
-  /** Optional acceptance/delivery close when the caller already has receipts. */
+  /**
+   * Explicit acceptance/delivery only. Missing → leave pending (incomplete).
+   * `not_required` is allowed only when a resolved task contract supplies the reason.
+   */
   acceptance?:
     | { status: "pending" | "passed" | "failed" }
     | { status: "not_required"; reason: string };
@@ -50,6 +53,19 @@ export type RunnerTurnOutcomeInput = {
   deliveryId?: string;
   acceptanceEvidence?: import("./types.js").AcceptanceEvidence[];
   allowRetry?: boolean;
+  /** Process placeholder / interim reply — never closes as success. */
+  processPlaceholder?: boolean;
+};
+
+export type GrowthOutcomeCommitOpts = {
+  failureReason?: RunnerTurnFailureReason;
+  failureDetail?: string;
+  acceptance?: RunnerTurnOutcomeInput["acceptance"];
+  delivery?: RunnerTurnOutcomeInput["delivery"];
+  deliveryId?: string;
+  acceptanceEvidence?: import("./types.js").AcceptanceEvidence[];
+  allowRetry?: boolean;
+  processPlaceholder?: boolean;
 };
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
@@ -79,7 +95,7 @@ function drainGrowthEvolution(
   cfg: OpenBotConfig,
   agentId: string,
   store: DurableTaskOutcomeStore,
-): { written: boolean; reason: string } {
+): { written: boolean; reason: string; processed: number; deferred: number } {
   let written = false;
   let reason = "no_closed_events";
   const runtime = new OutcomeConsumerRuntime(store, {
@@ -99,8 +115,25 @@ function drainGrowthEvolution(
       },
     ],
   });
-  runtime.drain((taskId) => store.loadTask(taskId));
-  return { written, reason };
+  const drained = runtime.drain((taskId) => store.loadTask(taskId));
+  return {
+    written,
+    reason,
+    processed: drained.processed,
+    deferred: drained.deferred,
+  };
+}
+
+/**
+ * Drain pending TaskOutcome outbox → growth evolution for one agent.
+ * Safe to call from boot or a runtime timer without a user turn.
+ */
+export function drainPendingGrowthEvolution(
+  cfg: OpenBotConfig,
+  agentId: string,
+): { written: boolean; reason: string; processed: number; deferred: number } {
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
+  return drainGrowthEvolution(cfg, agentId, store);
 }
 
 /**
@@ -192,49 +225,49 @@ export async function recordRunnerTurnOutcome(
     if (!res.ok) {
       throw new Error(`task-outcome fail_closed failed: ${res.code}`);
     }
-  } else {
-    const acceptance =
-      input.acceptance ??
-      ({
-        status: "not_required",
-        reason: "runner_turn_no_external_acceptance",
-      } as const);
-    res = chat.setAcceptance(taskId, res.record.outcomeVersion, fencingToken, acceptance, {
-      allowRetry: input.allowRetry ?? true,
-      evidence: input.acceptanceEvidence ?? [
-        {
-          validatorId: "agent-runner-execution",
-          validatorVersion: "1.0.0",
-          scope: scopeIdSafe(scope),
-          artifactDigestOrReceiptRef: `run:${input.runId}`,
-          taskContractVersion: "1.0.0",
-          executionVersion: String(res.record.outcomeVersion),
-        },
-      ],
-      scope,
-      commandId: `accept:${taskId}:${input.runId}`,
-    });
-    if (!res.ok) {
-      throw new Error(`task-outcome set_acceptance failed: ${res.code}`);
+  } else if (!input.processPlaceholder) {
+    // R85b: never invent not_required. Only apply gates the caller explicitly resolved.
+    if (input.acceptance) {
+      const evidence =
+        input.acceptanceEvidence ??
+        (input.acceptance.status === "passed" || input.acceptance.status === "not_required"
+          ? [
+              {
+                validatorId: "agent-runner-execution",
+                validatorVersion: "1.0.0",
+                scope: scopeIdSafe(scope),
+                artifactDigestOrReceiptRef: input.deliveryId ?? `receipt:${taskId}:${input.runId}`,
+                taskContractVersion: "1.0.0",
+                executionVersion: String(res.record.outcomeVersion),
+              },
+            ]
+          : undefined);
+      res = chat.setAcceptance(taskId, res.record.outcomeVersion, fencingToken, input.acceptance, {
+        allowRetry: input.allowRetry ?? true,
+        evidence,
+        scope,
+        commandId: `accept:${taskId}:${input.runId}`,
+      });
+      if (!res.ok) {
+        throw new Error(`task-outcome set_acceptance failed: ${res.code}`);
+      }
     }
-    const delivery =
-      input.delivery ??
-      ({
-        status: "not_required",
-        reason: "runner_turn_inline_delivery",
-      } as const);
-    res = chat.setDelivery(
-      taskId,
-      res.record.outcomeVersion,
-      fencingToken,
-      delivery,
-      input.deliveryId ?? `delivery:${input.runId}`,
-      { scope, commandId: `delivery:${taskId}:${input.runId}` },
-    );
-    if (!res.ok) {
-      throw new Error(`task-outcome set_delivery failed: ${res.code}`);
+    if (input.delivery) {
+      res = chat.setDelivery(
+        taskId,
+        res.record.outcomeVersion,
+        fencingToken,
+        input.delivery,
+        input.deliveryId ?? `delivery:${input.runId}`,
+        { scope, commandId: `delivery:${taskId}:${input.runId}` },
+      );
+      if (!res.ok) {
+        throw new Error(`task-outcome set_delivery failed: ${res.code}`);
+      }
     }
+    // Missing acceptance and/or delivery → remain pending / incomplete (no evolution positive).
   }
+  // processPlaceholder: attempt recorded; acceptance/delivery stay pending.
 
   const evolution = drainGrowthEvolution(cfg, agentId, store);
   return { record: res.record, evolution };

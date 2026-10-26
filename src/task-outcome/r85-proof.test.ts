@@ -336,7 +336,7 @@ describe("r85 recover / consumer / authz proofs", () => {
     }
   });
 
-  it("runner success ends closed/success with entry taskId", async () => {
+  it("bare runner success stays incomplete without acceptance/delivery", async () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-ok",
@@ -347,6 +347,62 @@ describe("r85 recover / consumer / authz proofs", () => {
       tenantId: undefined,
     });
     expect(out.record.taskId).toBe("chat:bot:sess:run-ok");
+    expect(out.record.lifecycle).not.toBe("closed");
+    expect(out.record.taskJudgement).toBe("incomplete");
+    expect(out.evolution.written).toBe(false);
+  });
+
+  it("process placeholder does not close as success or publish positive", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-ph",
+      taskId: "chat:bot:sess:run-ph",
+      scope,
+      processPlaceholder: true,
+    });
+    expect(out.record.lifecycle).not.toBe("closed");
+    expect(out.record.taskJudgement).toBe("incomplete");
+    expect(out.evolution.written).toBe(false);
+  });
+
+  it("contract waive acceptance + delivered receipt closes success", async () => {
+    const { resolveChatTurnCloseGates } = await import("./chat-entry.js");
+    const gates = resolveChatTurnCloseGates({ deliveryId: "delivery:run-contract" });
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-contract",
+      taskId: "chat:bot:sess:run-contract",
+      scope,
+      acceptance: gates.acceptance,
+      delivery: gates.delivery,
+      deliveryId: gates.deliveryId,
+    });
+    expect(out.record.lifecycle).toBe("closed");
+    expect(out.record.taskJudgement).toBe("success");
+    expect(out.record.acceptance.status).toBe("not_required");
+    expect(out.record.delivery.status).toBe("delivered");
+  });
+
+  it("acceptance passed + delivery receipt closes success", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-acc",
+      taskId: "chat:bot:sess:run-acc",
+      scope,
+      acceptance: { status: "passed" },
+      delivery: { status: "delivered" },
+      deliveryId: "delivery:run-acc",
+      acceptanceEvidence: [
+        {
+          validatorId: "t",
+          validatorVersion: "1",
+          scope: "personal:u1",
+          artifactDigestOrReceiptRef: "artifact:1",
+          taskContractVersion: "1.0.0",
+          executionVersion: "2",
+        },
+      ],
+    });
     expect(out.record.lifecycle).toBe("closed");
     expect(out.record.taskJudgement).toBe("success");
   });
