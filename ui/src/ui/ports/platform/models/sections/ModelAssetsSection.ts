@@ -6,13 +6,13 @@ import "./model-assets-list.css";
 import { requestPlatformSurfaceRerender } from "../../shared/surface.ts";
 import type { PlatformModelsActions } from "../actions.ts";
 import { statusLabel as capabilityStatusLabel } from "../capability-evidence.ts";
-import { createCapabilityVerificationTask } from "../capability-verification.ts";
 import { resolveExecutorPathLabel } from "../executor-path-labels.ts";
-import { autoRoutingLabel } from "../model-admission-store.ts";
+import { setExecutorCallTypeArchive } from "../model-admission-store.ts";
 import {
   importAssetIntoPool as commitPoolImport,
   saveEndpointThenAllowlistVerified,
 } from "../model-asset-actions.ts";
+import { autoRoutingAdmissionLabel, tenantSelectableLabel } from "../model-asset-presentation.ts";
 import {
   hasSuccessfulModelConnection,
   isConnectionVerificationStale,
@@ -345,7 +345,13 @@ async function commitAddedModels(
   }
   const { allowlisted } = await saveEndpointThenAllowlistVerified({
     inputs,
-    add: (input) => actions.onAddModel(input),
+    add: (input) => {
+      actions.onAddModel(input);
+      // callType is platform capability archive metadata — not ModelDefinitionSchema.
+      if (input.callType) {
+        setExecutorCallTypeArchive(`${input.providerId}/${input.modelId}`, input.callType);
+      }
+    },
     save: () => actions.onSaveConfig(),
     allowlist: (modelRef, name) => actions.onUpsertAllowlistEntry(modelRef, name),
     verify: (modelRef) => {
@@ -1139,21 +1145,11 @@ function renderModelDetailDrawer(params: {
   actions: PlatformModelsActions;
   canManage: boolean;
   onToggleRecommendationPool?: (modelId: string, nextValue: boolean) => void;
-  onToggleTenantSelectable?: (modelId: string, nextValue: boolean) => void;
-  onToggleAutoRouting?: (modelId: string, nextValue: boolean) => void;
   onNavigateTab: (tab: OverviewNavigateTab, context?: PlatformModelsTabContext) => void;
   context?: PlatformModelsTabContext;
 }) {
-  const {
-    selectedModel,
-    actions,
-    canManage,
-    onToggleRecommendationPool,
-    onToggleTenantSelectable,
-    onToggleAutoRouting,
-    onNavigateTab,
-    context,
-  } = params;
+  const { selectedModel, actions, canManage, onToggleRecommendationPool, onNavigateTab, context } =
+    params;
   if (!selectedModel) {
     return html``;
   }
@@ -1212,8 +1208,6 @@ function renderModelDetailDrawer(params: {
             actions,
             canManage,
             onToggleRecommendationPool,
-            onToggleTenantSelectable,
-            onToggleAutoRouting,
             onNavigateTab,
           })}
 
@@ -1221,10 +1215,10 @@ function renderModelDetailDrawer(params: {
             <summary class="model-assets-drawer__fold-title">接入信息</summary>
             <div class="model-assets-drawer__kv-stack">
               ${renderDrawerKvRow("推荐池（入池）", selectedModel.inRecommendationPool ? "已加入" : "未加入")}
-              ${renderDrawerKvRow("租户可选", selectedModel.tenantSelectable ? "允许" : "不允许")}
+              ${renderDrawerKvRow("租户可选", tenantSelectableLabel(selectedModel))}
               ${renderDrawerKvRow(
                 "自动路由",
-                `${autoRoutingLabel(selectedModel.autoRouting ?? "disabled")}${
+                `${autoRoutingAdmissionLabel(selectedModel)}${
                   selectedModel.autoRoutingReason ? ` · ${selectedModel.autoRoutingReason}` : ""
                 }`,
               )}
@@ -1436,19 +1430,9 @@ function renderDrawerActionSection(params: {
   actions: PlatformModelsActions;
   canManage: boolean;
   onToggleRecommendationPool?: (modelId: string, nextValue: boolean) => void;
-  onToggleTenantSelectable?: (modelId: string, nextValue: boolean) => void;
-  onToggleAutoRouting?: (modelId: string, nextValue: boolean) => void;
   onNavigateTab: (tab: OverviewNavigateTab, context?: PlatformModelsTabContext) => void;
 }) {
-  const {
-    selectedModel,
-    actions,
-    canManage,
-    onToggleRecommendationPool,
-    onToggleTenantSelectable,
-    onToggleAutoRouting,
-    onNavigateTab,
-  } = params;
+  const { selectedModel, actions, canManage, onToggleRecommendationPool, onNavigateTab } = params;
   return html`
     <section
       class="model-assets-drawer__section model-assets-drawer__section--full model-assets-drawer__section--actions"
@@ -1496,44 +1480,29 @@ function renderDrawerActionSection(params: {
         <button
           class="btn btn--sm"
           type="button"
-          ?disabled=${!onToggleTenantSelectable}
-          title="租户可选与推荐池／allowlist 独立"
-          @click=${() => onToggleTenantSelectable?.(selectedModel.modelId, !selectedModel.tenantSelectable)}
+          ?disabled=${true}
+          title="租户可选准入尚未接入后端，当前不可操作"
+          data-testid="model-drawer-tenant-selectable"
         >
-          ${selectedModel.tenantSelectable ? "禁止租户选择" : "允许租户选择"}
+          允许租户选择（尚未接入）
         </button>
         <button
           class="btn btn--sm"
           type="button"
           data-testid="model-drawer-auto-routing"
-          ?disabled=${!onToggleAutoRouting}
-          title="允许自动路由；未验证能力的模型仍会被决策预览排除"
-          @click=${() =>
-            onToggleAutoRouting?.(
-              selectedModel.modelId,
-              (selectedModel.autoRouting ?? "disabled") !== "eligible",
-            )}
+          ?disabled=${true}
+          title="自动路由准入尚未接入后端，当前不可操作"
         >
-          ${(selectedModel.autoRouting ?? "disabled") === "eligible" ? "关闭自动路由" : "启用自动路由"}
+          启用自动路由（尚未接入）
         </button>
         <button
           class="btn btn--sm"
           type="button"
           data-testid="model-drawer-verify-capabilities"
-          ?disabled=${!canManage}
-          title="预计调用约 2～4 次（stub，不产生真实费用）"
-          @click=${() => {
-            createCapabilityVerificationTask({
-              modelRef: selectedModel.modelId,
-              capabilityIds: ["text_chat", "tool_use"],
-              mode: "protocol_probe",
-              // Demo: connection-style text passes, tools fail — acceptance scenario.
-              simulate: { failIds: ["tool_use"] },
-            });
-            requestPlatformSurfaceRerender();
-          }}
+          ?disabled=${true}
+          title="能力验证服务尚未接入；第一批不提供会污染正式证据的模拟入口"
         >
-          验证能力
+          验证能力（尚未接入）
         </button>
         <button
           class="btn btn--sm"
@@ -2413,8 +2382,6 @@ export type ModelAssetsSectionProps = {
   onNavigateTab: (tab: OverviewNavigateTab, context?: PlatformModelsTabContext) => void;
   context?: PlatformModelsTabContext;
   onToggleRecommendationPool?: (modelId: string, nextValue: boolean) => void;
-  onToggleTenantSelectable?: (modelId: string, nextValue: boolean) => void;
-  onToggleAutoRouting?: (modelId: string, nextValue: boolean) => void;
   /**
    * True while the models-management snapshot has not resolved yet (initial
    * fetch pending or in flight). Used to render a loading placeholder instead
@@ -2540,17 +2507,8 @@ function renderPendingConnectSection(params: {
 }
 
 export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
-  const {
-    vm,
-    actions,
-    compat,
-    onNavigateTab,
-    context,
-    onToggleRecommendationPool,
-    onToggleTenantSelectable,
-    onToggleAutoRouting,
-    loading,
-  } = props;
+  const { vm, actions, compat, onNavigateTab, context, onToggleRecommendationPool, loading } =
+    props;
   ensureFilterDefaults(vm.defaultSort);
   syncModelAssetsContext(context);
   // While the first snapshot is still loading and we have no models yet, show a
@@ -2753,8 +2711,6 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
       actions,
       canManage,
       onToggleRecommendationPool,
-      onToggleTenantSelectable,
-      onToggleAutoRouting,
       onNavigateTab,
       context,
     })}

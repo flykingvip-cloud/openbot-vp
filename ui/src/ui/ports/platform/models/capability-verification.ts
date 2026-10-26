@@ -1,6 +1,10 @@
 /**
- * Capability verification task API (frontend stub).
- * Shapes match the planned backend contract; persistence is local until RPCs land.
+ * Capability verification task API.
+ *
+ * Frontend stub for batch-2/3 UX. Stub/demo outcomes write ONLY to
+ * demoCapabilityEvidence and must never enter formal verified sets or
+ * platform admission judgments. Real protocol_probe results will use a
+ * backend taskId once the verification RPC lands.
  */
 
 import {
@@ -9,6 +13,7 @@ import {
 } from "./capability-evidence.ts";
 import type { CanonicalCapabilityId } from "./capability-ids.ts";
 import {
+  expireFormalCapabilityEvidence,
   getVerificationTask,
   listVerificationTasks,
   saveVerificationTask,
@@ -22,7 +27,10 @@ export type CreateVerificationInput = {
   capabilityIds: CanonicalCapabilityId[];
   /** protocol_probe = cheap connectivity; specialized_eval = quality suite. */
   mode?: "protocol_probe" | "specialized_eval";
-  /** Simulate outcomes for UI acceptance without calling paid APIs. */
+  /**
+   * Simulate outcomes for UI demos without calling paid APIs.
+   * Results always land in demoCapabilityEvidence, never formal evidence.
+   */
   simulate?: {
     /** Capabilities that should fail (e.g. tool_use while text_chat passes). */
     failIds?: CanonicalCapabilityId[];
@@ -47,17 +55,15 @@ function evidenceFor(
     source,
     status,
     verifiedAt: status === "passed" || status === "failed" ? Date.now() : undefined,
-    testVersion: "stub-v1",
+    testVersion: "stub-v1-demo",
+    sourceNote: extra?.sourceNote ?? "模拟结果，不代表真实能力",
     ...extra,
   };
 }
 
 /**
- * Create an async verification task. Completes synchronously in the stub with
- * deterministic simulate hooks so UI can cover:
- * - connection ok but tool_use failed
- * - image/music taskId-only (no artifact)
- * - partial batch success
+ * Create an async verification task (frontend stub).
+ * Completes synchronously. Demo results are isolated from formal evidence.
  */
 export function createCapabilityVerificationTask(
   input: CreateVerificationInput,
@@ -73,19 +79,19 @@ export function createCapabilityVerificationTask(
   const results: CapabilityEvidenceItem[] = input.capabilityIds.map((id) => {
     if (failIds.has(id)) {
       return evidenceFor(id, "failed", source, {
-        failureReason: `${id} 专项检查失败（连接成功不等于能力可用）`,
-        sourceNote: "stub",
+        failureReason: `${id} 专项检查失败（连接成功不等于能力可用）· 模拟结果，不代表真实能力`,
+        sourceNote: "模拟结果，不代表真实能力",
       });
     }
     if (noArtifactIds.has(id)) {
       return evidenceFor(id, "failed", source, {
-        failureReason: "仅返回 taskId，尚无有效产物，不能标记为目标模态完成",
-        sourceNote: "stub-no-artifact",
+        failureReason:
+          "仅返回 taskId，尚无有效产物，不能标记为目标模态完成 · 模拟结果，不代表真实能力",
+        sourceNote: "模拟结果，不代表真实能力",
       });
     }
-    // text_chat / generic protocol success
     return evidenceFor(id, "passed", source, {
-      sourceNote: mode === "protocol_probe" ? "基础协议探测" : "专项评测",
+      sourceNote: "模拟结果，不代表真实能力",
       expiresAt: now + 7 * 24 * 60 * 60 * 1000,
     });
   });
@@ -108,17 +114,18 @@ export function createCapabilityVerificationTask(
     updatedAt: now,
     results,
     estimatedCalls: input.capabilityIds.length,
+    error: "界面演示 stub — 非真实验证，不代表真实能力",
   };
   saveVerificationTask(task);
 
-  // Merge into admission evidence (passed/failed overwrite suggested for same id).
+  // Demo isolation: never merge into formal capabilityEvidence.
   const admission = getModelAdmission(task.modelRef);
-  const byId = new Map(admission.capabilityEvidence.map((item) => [item.id, item]));
+  const byId = new Map((admission.demoCapabilityEvidence ?? []).map((item) => [item.id, item]));
   for (const item of results) {
     byId.set(item.id, item);
   }
   upsertModelAdmission(task.modelRef, {
-    capabilityEvidence: Array.from(byId.values()),
+    demoCapabilityEvidence: Array.from(byId.values()),
   });
 
   return task;
@@ -147,22 +154,7 @@ export function refreshCapabilityVerificationTask(
 
 export { listVerificationTasks, getVerificationTask };
 
-/** Expire evidence when connection fingerprint changes. */
+/** Expire formal evidence when connection fingerprint changes. */
 export function expireCapabilityEvidenceForModel(modelRef: string, reason: string) {
-  const admission = getModelAdmission(modelRef);
-  const next = admission.capabilityEvidence.map((item) =>
-    item.status === "passed"
-      ? {
-          ...item,
-          status: "expired" as const,
-          failureReason: reason,
-        }
-      : item,
-  );
-  // Also force auto-routing off when evidence expires.
-  upsertModelAdmission(modelRef, {
-    capabilityEvidence: next,
-    autoRouting: admission.autoRouting === "eligible" ? "restricted" : admission.autoRouting,
-    autoRoutingReason: admission.autoRouting === "eligible" ? reason : admission.autoRoutingReason,
-  });
+  return expireFormalCapabilityEvidence(modelRef, reason);
 }

@@ -1331,14 +1331,14 @@ function renderRoutingDecisionPreviewPanel(preview: RoutingDecisionPreview | nul
   if (!preview) {
     return html`
       <div class="callout info card-follow--sm" data-testid="routing-decision-preview-empty">
-        试配任务：点击「模拟请求」获取干跑决策预览（不调用生成模型）。未验证能力的模型会被排除。
+        试配任务：界面演示，非后端决策。点击「模拟请求」仅做前端干跑，不调用生成模型，也不代表真实智能路由结果。
       </div>
     `;
   }
   return html`
     <div class="card-follow--sm" data-testid="routing-decision-preview">
-      <div class="card-title">试配结果（干跑预览）</div>
-      <div class="muted card-follow--xs">未调用生成模型 · requestId ${preview.requestId}</div>
+      <div class="card-title">试配结果（界面演示，非后端决策）</div>
+      <div class="muted card-follow--xs">模拟结果，不代表真实能力／真实路由 · requestId ${preview.requestId}</div>
       <div class="model-assets-drawer__kv-stack card-follow--xs">
         <div class="model-assets-drawer__kv-row">
           <span class="muted">任务类别</span><span>${preview.taskCategory}</span>

@@ -582,7 +582,7 @@ function modelAssetFromSourceEntry(
   const modelRef = `${entry.providerId}/${entry.modelId}`;
   const admission = getModelAdmission(modelRef);
   const suggested = suggestedEvidenceFromInferred(capabilities);
-  // Prefer persisted verification evidence; keep suggested for ids not yet tested.
+  // Formal evidence only — never merge demoCapabilityEvidence into verified display.
   const evidenceById = new Map(suggested.map((item) => [item.id, item]));
   for (const item of admission.capabilityEvidence) {
     evidenceById.set(item.id, item);
@@ -592,6 +592,7 @@ function modelAssetFromSourceEntry(
     modelId: entry.modelId,
     providerId: entry.providerId,
     outputModalities,
+    callType: admission.executorCallType,
   });
   const connectionFingerprint = buildConnectionFingerprint({
     modelId: modelRef,
@@ -599,8 +600,10 @@ function modelAssetFromSourceEntry(
     baseUrl: entry.baseUrl ?? null,
     api: entry.api ?? null,
   });
-  // tenantSelectable / autoRouting come from admission store — NOT derived from allowlist/health.
-  const tenantSelectable = admission.tenantSelectable;
+  // Backend admission RPCs are not wired yet — do NOT surface localStorage drafts
+  // as platform-effective "允许" / "可参与".
+  const admissionControlsAvailable = false;
+  const tenantSelectable = false;
   const asset: ModelAsset = {
     modelId: modelRef,
     providerId: entry.providerId,
@@ -634,9 +637,10 @@ function modelAssetFromSourceEntry(
     taskTags: [],
     inRecommendationPool,
     tenantSelectable,
-    autoRouting: admission.autoRouting,
-    ...(admission.autoRoutingReason ? { autoRoutingReason: admission.autoRoutingReason } : {}),
-    autoRoutingTaskCategories: admission.autoRoutingTaskCategories,
+    admissionControlsAvailable,
+    autoRouting: "disabled",
+    autoRoutingReason: "后端准入未接入",
+    autoRoutingTaskCategories: [],
   };
   asset.taskTags = inferTaskTags(asset);
   return asset;

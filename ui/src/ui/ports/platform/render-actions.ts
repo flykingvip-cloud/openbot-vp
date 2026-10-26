@@ -52,6 +52,7 @@ import type {
 } from "./capabilities/enterprise-submissions-types.ts";
 import { refreshCapabilityGovernanceSnapshot } from "./capability-governance-gateway.ts";
 import { getOrCreateCapabilityGovernanceViewState } from "./capability-governance-state.ts";
+import { buildPlatformModelDefinitionEntry } from "./models/platform-model-definition.ts";
 
 // Module-level discovery dispatcher with npm + GitHub adapters pre-registered.
 const discoveryDispatcher = new DiscoveryDispatcher([npmAdapter, githubTopicAdapter]);
@@ -102,7 +103,10 @@ export type PlatformModelAddInput = {
   inputModes: Array<"text" | "image">;
   reasoning: boolean;
   apiKey: string;
-  /** Optional call type for executor path labeling. */
+  /**
+   * Executor call type for the platform capability archive / UI labels only.
+   * Must NOT be written into models.providers.*.models[] (ModelDefinitionSchema.strict()).
+   */
   callType?: "text_chat" | "image_generation" | "music_generation";
 };
 
@@ -628,33 +632,16 @@ export function createPlatformPortActions({
         }
         const existingProvider = currentProviderConfig(configRuntime, providerId) ?? {};
         const existingModels = currentProviderModels(configRuntime, providerId);
-        const knownContext =
-          input.contextWindow != null &&
-          Number.isFinite(input.contextWindow) &&
-          input.contextWindow > 0
-            ? Math.floor(input.contextWindow)
-            : null;
-        const knownMaxTokens =
-          input.maxTokens != null && Number.isFinite(input.maxTokens) && input.maxTokens > 0
-            ? Math.floor(input.maxTokens)
-            : null;
-        const nextModel = {
-          id: modelId,
-          name: input.name.trim() || modelId,
+        // callType stays out of the model entry — platform capability archive only.
+        const nextModel = buildPlatformModelDefinitionEntry({
+          modelId,
+          name: input.name,
           api: normalizeModelApi(input.api),
           reasoning: input.reasoning,
-          input: input.inputModes.length > 0 ? input.inputModes : ["text"],
-          cost: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-          },
-          // Only persist known values — unknown stays omitted (not fake 128k/8k).
-          ...(knownContext != null ? { contextWindow: knownContext } : {}),
-          ...(knownMaxTokens != null ? { maxTokens: knownMaxTokens } : {}),
-          ...(input.callType ? { callType: input.callType } : {}),
-        };
+          inputModes: input.inputModes,
+          contextWindow: input.contextWindow,
+          maxTokens: input.maxTokens,
+        });
         const nextProvider = {
           ...existingProvider,
           baseUrl:
@@ -784,25 +771,15 @@ export function createPlatformPortActions({
         }
         const existingProvider = currentProviderConfig(configRuntime, providerId) ?? {};
         const existingModels = currentProviderModels(configRuntime, providerId);
-        const nextModel = {
-          id: modelId,
-          name: input.name.trim() || modelId,
+        const nextModel = buildPlatformModelDefinitionEntry({
+          modelId,
+          name: input.name,
           api: normalizeModelApi(input.api),
           reasoning: input.reasoning,
-          input: input.inputModes.length > 0 ? input.inputModes : ["text"],
-          cost: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-          },
-          ...(input.contextWindow != null && Number(input.contextWindow) > 0
-            ? { contextWindow: Math.floor(Number(input.contextWindow)) }
-            : {}),
-          ...(input.maxTokens != null && Number(input.maxTokens) > 0
-            ? { maxTokens: Math.floor(Number(input.maxTokens)) }
-            : {}),
-        };
+          inputModes: input.inputModes,
+          contextWindow: input.contextWindow,
+          maxTokens: input.maxTokens,
+        });
         const nextProvider = {
           ...existingProvider,
           baseUrl:

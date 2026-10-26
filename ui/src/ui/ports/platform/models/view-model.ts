@@ -88,7 +88,13 @@ export type ModelAsset = {
   taskTags: string[];
   inRecommendationPool: boolean;
   tenantSelectable: boolean;
-  /** Independent of allowlist / recommendation pool. */
+  /**
+   * False until backend tenant/auto-routing admission RPCs land.
+   * When false, UI must show "尚未接入" and must not treat local draft flags
+   * as platform-effective admission.
+   */
+  admissionControlsAvailable?: boolean;
+  /** Independent of allowlist / recommendation pool. Backend fact only when available. */
   autoRouting?: AutoRoutingAdmission;
   autoRoutingReason?: string;
   autoRoutingTaskCategories?: string[];

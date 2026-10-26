@@ -1,7 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  __resetModelAdmissionStoreForTest,
+  getModelAdmission,
+  upsertModelAdmission,
+} from "./model-admission-store.ts";
+import {
   __resetModelConnectionSessionForTest,
+  buildConnectionFingerprint,
   hasSuccessfulModelConnection,
+  isConnectionVerificationStale,
   isManagedPoolModel,
   markModelConnectionVerified,
 } from "./model-connection-gate.ts";
@@ -29,6 +36,7 @@ function asset(overrides: Partial<ModelAsset> = {}): ModelAsset {
 describe("model connection gate", () => {
   beforeEach(() => {
     __resetModelConnectionSessionForTest();
+    __resetModelAdmissionStoreForTest();
   });
 
   it("keeps config-inferred models out of the managed pool", () => {
@@ -57,9 +65,25 @@ describe("model connection gate", () => {
   });
 
   it("treats a model probed in this session as connected", () => {
-    const row = asset({ source: "configured", healthBasis: "config_inferred" });
+    const row = asset({
+      source: "configured",
+      healthBasis: "config_inferred",
+      baseUrl: "https://api.example",
+      api: "openai-completions",
+      connectionFingerprint: buildConnectionFingerprint({
+        modelId: "private/qwen",
+        providerId: "private",
+        baseUrl: "https://api.example",
+        api: "openai-completions",
+      }),
+    });
     expect(isManagedPoolModel(row)).toBe(false);
-    markModelConnectionVerified(row.modelId);
+    markModelConnectionVerified(row.modelId, {
+      modelId: row.modelId,
+      providerId: row.providerId,
+      baseUrl: row.baseUrl,
+      api: row.api,
+    });
     expect(isManagedPoolModel(row)).toBe(true);
   });
 
@@ -67,5 +91,45 @@ describe("model connection gate", () => {
     expect(hasSuccessfulModelConnection(asset({ healthBasis: "live_probe_failed" }))).toBe(false);
     expect(hasSuccessfulModelConnection(asset({ healthBasis: "auth_missing" }))).toBe(false);
     expect(hasSuccessfulModelConnection(asset({ healthBasis: "catalog_missing" }))).toBe(false);
+  });
+
+  it("keeps old liveProbe from unlocking success after endpoint fingerprint changes", () => {
+    const modelId = "private/qwen";
+    markModelConnectionVerified(modelId, {
+      modelId,
+      providerId: "private",
+      baseUrl: "https://old.example",
+      api: "openai-completions",
+    });
+    upsertModelAdmission(modelId, {
+      capabilityEvidence: [
+        {
+          id: "text_chat",
+          label: "text_chat",
+          source: "protocol_probe",
+          status: "passed",
+          verifiedAt: Date.now(),
+        },
+      ],
+    });
+
+    const changed = asset({
+      modelId,
+      providerId: "private",
+      baseUrl: "https://new.example",
+      api: "openai-completions",
+      connectionFingerprint: buildConnectionFingerprint({
+        modelId,
+        providerId: "private",
+        baseUrl: "https://new.example",
+        api: "openai-completions",
+      }),
+      liveProbe: { status: "ok", source: "profile", label: "retained-old-ok" },
+      healthBasis: "live_probe_ok",
+    });
+
+    expect(hasSuccessfulModelConnection(changed)).toBe(false);
+    expect(isConnectionVerificationStale(changed)).toBe(true);
+    expect(getModelAdmission(modelId).capabilityEvidence[0]?.status).toBe("expired");
   });
 });

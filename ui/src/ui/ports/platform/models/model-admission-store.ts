@@ -1,11 +1,17 @@
 /**
- * Frontend admission store (stub until backend persistence lands).
- * Separates: connection success, pool membership, tenant selectable, auto-routing.
- * Persists to localStorage so refresh can restore routing eligibility + verification tasks.
+ * Frontend admission / draft store.
+ *
+ * Formal platform admission (tenant selectable, auto-routing eligibility) must come
+ * from backend facts. Until those RPCs land, local tenant/autoRouting values are
+ * DRAFT ONLY and must not be rendered as platform-effective status.
+ *
+ * Formal capabilityEvidence is for real verification results only.
+ * demoCapabilityEvidence is isolated UI-demo output and never feeds verified sets.
  */
 
 import type { CapabilityEvidenceItem } from "./capability-evidence.ts";
 import type { CanonicalCapabilityId } from "./capability-ids.ts";
+import type { PlatformModelCallType } from "./platform-model-definition.ts";
 
 export type AutoRoutingAdmission = "disabled" | "eligible" | "restricted" | "paused";
 
@@ -14,14 +20,29 @@ export type ModelAdmissionRecord = {
   /** Fingerprint of endpoint/protocol/modelId at last successful connection. */
   connectionFingerprint?: string;
   connectionVerifiedAt?: number;
-  /** Explicit tenant-selectable flag — independent of allowlist/recommendation pool. */
+  /**
+   * Local draft only — not platform-effective until backend admission RPC lands.
+   * UI must not display this as "允许" / live tenant policy.
+   */
   tenantSelectable: boolean;
+  /**
+   * Local draft only — not platform-effective until backend admission RPC lands.
+   * UI must not display draft "eligible" as live auto-routing admission.
+   */
   autoRouting: AutoRoutingAdmission;
   /** Task categories this model may auto-route into when eligible. */
   autoRoutingTaskCategories: string[];
   /** Why auto-routing is restricted / paused. */
   autoRoutingReason?: string;
+  /** Platform capability archive: executor call type (not ModelDefinitionSchema). */
+  executorCallType?: PlatformModelCallType;
+  /** Formal verification evidence only (never stub/demo results). */
   capabilityEvidence: CapabilityEvidenceItem[];
+  /**
+   * Isolated UI-demo verification results. Must not enter verifiedCapabilityIds
+   * or formal admission judgments.
+   */
+  demoCapabilityEvidence?: CapabilityEvidenceItem[];
   updatedAt: number;
 };
 
@@ -157,6 +178,36 @@ export function setTenantSelectable(modelRef: string, nextValue: boolean) {
   return upsertModelAdmission(modelRef, { tenantSelectable: nextValue });
 }
 
+/** Persist executor call type into the platform capability archive (not model config). */
+export function setExecutorCallTypeArchive(
+  modelRef: string,
+  callType: PlatformModelCallType | undefined,
+) {
+  return upsertModelAdmission(modelRef, callType ? { executorCallType: callType } : {});
+}
+
+/**
+ * Expire formal capability evidence and restrict draft auto-routing when config changes.
+ * Does not touch demoCapabilityEvidence.
+ */
+export function expireFormalCapabilityEvidence(modelRef: string, reason: string) {
+  const admission = getModelAdmission(modelRef);
+  const next = admission.capabilityEvidence.map((item) =>
+    item.status === "passed"
+      ? {
+          ...item,
+          status: "expired" as const,
+          failureReason: reason,
+        }
+      : item,
+  );
+  return upsertModelAdmission(modelRef, {
+    capabilityEvidence: next,
+    autoRouting: admission.autoRouting === "eligible" ? "restricted" : admission.autoRouting,
+    autoRoutingReason: admission.autoRouting === "eligible" ? reason : admission.autoRoutingReason,
+  });
+}
+
 export function setAutoRoutingAdmission(
   modelRef: string,
   autoRouting: AutoRoutingAdmission,
@@ -204,4 +255,9 @@ export function autoRoutingLabel(value: AutoRoutingAdmission): string {
     case "paused":
       return "暂停";
   }
+}
+
+/** Formal UI label when backend admission RPC is not wired. */
+export function backendAdmissionUnavailableLabel(): string {
+  return "尚未接入";
 }

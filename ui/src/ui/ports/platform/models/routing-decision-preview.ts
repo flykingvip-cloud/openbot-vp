@@ -1,6 +1,7 @@
 /**
- * Task routing decision preview (frontend stub).
- * Default does NOT call generation models — explanation only.
+ * Task routing decision preview (frontend UI demo stub).
+ * Interface demonstration only — NOT a backend routing decision.
+ * Default does NOT call generation models.
  */
 
 import { verifiedCapabilityIds } from "./capability-evidence.ts";
@@ -40,8 +41,10 @@ export type RoutingDecisionPreview = {
   fallback: string[];
   excluded: RoutingPreviewExclusion[];
   decisionReason: string;
-  /** Stub marker so UI can show "预览（未调用生成模型）". */
+  /** Stub marker: UI must label as 界面演示，非后端决策. */
   dryRun: true;
+  /** Explicit demo flag — never claim backend decision. */
+  uiDemo: true;
 };
 
 function detectTaskCategory(req: RoutingPreviewRequest): string {
@@ -159,9 +162,10 @@ export function previewRoutingDecision(params: {
     fallback,
     excluded,
     decisionReason: primary[0]
-      ? `按任务类别 ${category} 选择已验证且允许自动路由的模型（干跑预览，未调用生成模型）`
-      : `没有满足已验证能力要求的可路由模型（类别 ${category}）`,
+      ? `按任务类别 ${category} 选择已验证且允许自动路由的模型（界面演示，非后端决策）`
+      : `没有满足已验证能力要求的可路由模型（类别 ${category}；界面演示，非后端决策）`,
     dryRun: true,
+    uiDemo: true,
   };
 }
 
