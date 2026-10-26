@@ -71,8 +71,27 @@ describe("renderDataDirectoryPanel", () => {
       ),
       container,
     );
-    expect(container.textContent).toContain("忘记此条记忆");
+    expect(container.textContent).toContain("删除此记忆文件");
+    const forgetBtn = Array.from(container.querySelectorAll("button")).find((button) =>
+      (button.textContent ?? "").includes("删除此记忆文件"),
+    );
+    expect(forgetBtn?.getAttribute("title")).toBe(
+      "仅删除所选文件，不会清除其他来源中的相同内容，也不保证立即停止相关召回",
+    );
     expect(container.textContent).toContain("撤销授权");
     expect(container.textContent).toContain("shared/knowledge/a");
+  });
+
+  it("shows file-delete success copy from state", () => {
+    const container = document.createElement("div");
+    render(
+      renderDataDirectoryPanel({} as never, {
+        mode: "local",
+        forgetMemoryMessage: "已删除所选记忆文件",
+      }),
+      container,
+    );
+    expect(container.textContent).toContain("已删除所选记忆文件");
+    expect(container.textContent).not.toContain("已删除指定记忆条目");
   });
 });
