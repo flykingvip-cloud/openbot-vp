@@ -1,12 +1,12 @@
 # Collab S5 — Limited self-advance with per-tick reauth + dry-run (FINAL v3)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **mode default dry_run**; **executeGroupAllowlist default []**; L1 `botMaySelfAdvanceWithoutHuman` **false** |
-| Spec | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S5 + expert hard conditions |
-| Depends | **P0 #731**, **S1 #734**, **S2 #735**, **S3 #737**, **S4 #739** (tip `686792f037…`) |
-| Code | `self-advance.ts`, `self-advance-entry.ts`, `collab-s5-limited-self-advance.test.ts` |
+| Field   | Value                                                                                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Date    | 2026-10-15 Asia/Shanghai                                                                                                 |
+| Status  | Code ready; **mode default dry_run**; **executeGroupAllowlist default []**; L1 `botMaySelfAdvanceWithoutHuman` **false** |
+| Spec    | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S5 + expert hard conditions                                            |
+| Depends | **P0 #731**, **S1 #734**, **S2 #735**, **S3 #737**, **S4 #739** (tip `686792f037…`)                                      |
+| Code    | `self-advance.ts`, `self-advance-entry.ts`, `collab-s5-limited-self-advance.test.ts`                                     |
 
 ## Scope
 
@@ -19,13 +19,13 @@
 
 ## Config (defaults stay safe)
 
-| Key | Default | Tip gray |
-| --- | --- | --- |
-| `task.selfAdvance.mode` | **dry_run** | `execute` only when authorized |
-| `task.selfAdvance.executeGroupAllowlist` | `[]` | scoped `001/grp-…` |
-| L2 `botMaySelfAdvanceWithoutHuman` | **false** (platform L1) | per-group operatingState |
-| `wakeContract` / allowlist | false / `[]` | needed for wake on execute |
-| claim / challenge / LIVE / Floor | unchanged OFF | **not** opened here |
+| Key                                      | Default                 | Tip gray                       |
+| ---------------------------------------- | ----------------------- | ------------------------------ |
+| `task.selfAdvance.mode`                  | **dry_run**             | `execute` only when authorized |
+| `task.selfAdvance.executeGroupAllowlist` | `[]`                    | scoped `001/grp-…`             |
+| L2 `botMaySelfAdvanceWithoutHuman`       | **false** (platform L1) | per-group operatingState       |
+| `wakeContract` / allowlist               | false / `[]`            | needed for wake on execute     |
+| claim / challenge / LIVE / Floor         | unchanged OFF           | **not** opened here            |
 
 **Does not** open production gray writes. LIVE / Floor untouched. No second orchestrator. Does **not** default `botMaySelfAdvanceWithoutHuman=true`.
 

@@ -9,20 +9,20 @@
 
 ## 1. 计划前提 vs 代码实证
 
-| 计划主张 | 当前代码事实 | 判定 |
-| --- | --- | --- |
-| Fabric 默认关闭 | `isFabricEnabled` 需 env 或 `gateway.fabric.enabled===true`；注释明确 OFF by default | 成立 |
-| Fabric 可只比较决策 | `check()` / `replayDecision()` / `dryRunDiff` / `isRelaxation` 存在；replay 注明不重跑副作用工具 | 成立（WP-04 技术可行） |
-| Fabric 已注入 Gateway | `server.impl.ts` 安装 provider，未启用时返回 null | 成立 |
-| 编排 live invoke 冻结 | `ORCHESTRATION_LIVE_INVOKE = false`（types.ts 常量） | 成立 |
-| 编排四开关默认关；readonly 默认开 | `feature.ts`：四 env 默认关；`isReadonlyInvokeEnabled` 除非显式 0/false | 成立（计划已警示，不能说编排全 dormant） |
-| constitutional scaffold / 非 enforce | `RUNTIME_SCAFFOLD_BOUNDARY.scaffoldOnly=true`, `enforce=false`, `liveInvoke=false` | 成立 |
-| `recoverPendingHandoffTxns` 缺生产接线 | 非测试源码仅见 `handoff-contract.ts` 定义；startup 有 `recoverPendingDeliveries`，未见 handoff recover 调用 | 缺口仍在 → WP-02 有真实工作 |
-| completion-hold 偏进程内 | `completion-hold.ts` 注释/结构指向 in-memory receipt | 成立 → WP-01/06 需证明持久化，不可假定已完成 |
-| 进化 Phase1 surface 仅两项 | `PHASE1_SURFACES = working-dna + skill-installation` | 成立 → WP-09/10 扩 surface 需另评审 |
-| 治理默认 assist | `DEFAULT_MODE = "assist"` | 成立 |
-| SBOM 可复用但非权属结论 | CycloneDX 1.6，1600 components，timestamp 2026-10-08，cdxgen 12.8.5；LICENSE 仍为 MIT | 成立 → WP-12 可并行审计，不可改 LICENSE |
-| 计划落库目录尚不存在 | 本轮已复制到 `.kiro/specs/delivery-reliability-evidence-program/`（未提交） | WP-00 文档落库可行 |
+| 计划主张                               | 当前代码事实                                                                                                | 判定                                         |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Fabric 默认关闭                        | `isFabricEnabled` 需 env 或 `gateway.fabric.enabled===true`；注释明确 OFF by default                        | 成立                                         |
+| Fabric 可只比较决策                    | `check()` / `replayDecision()` / `dryRunDiff` / `isRelaxation` 存在；replay 注明不重跑副作用工具            | 成立（WP-04 技术可行）                       |
+| Fabric 已注入 Gateway                  | `server.impl.ts` 安装 provider，未启用时返回 null                                                           | 成立                                         |
+| 编排 live invoke 冻结                  | `ORCHESTRATION_LIVE_INVOKE = false`（types.ts 常量）                                                        | 成立                                         |
+| 编排四开关默认关；readonly 默认开      | `feature.ts`：四 env 默认关；`isReadonlyInvokeEnabled` 除非显式 0/false                                     | 成立（计划已警示，不能说编排全 dormant）     |
+| constitutional scaffold / 非 enforce   | `RUNTIME_SCAFFOLD_BOUNDARY.scaffoldOnly=true`, `enforce=false`, `liveInvoke=false`                          | 成立                                         |
+| `recoverPendingHandoffTxns` 缺生产接线 | 非测试源码仅见 `handoff-contract.ts` 定义；startup 有 `recoverPendingDeliveries`，未见 handoff recover 调用 | 缺口仍在 → WP-02 有真实工作                  |
+| completion-hold 偏进程内               | `completion-hold.ts` 注释/结构指向 in-memory receipt                                                        | 成立 → WP-01/06 需证明持久化，不可假定已完成 |
+| 进化 Phase1 surface 仅两项             | `PHASE1_SURFACES = working-dna + skill-installation`                                                        | 成立 → WP-09/10 扩 surface 需另评审          |
+| 治理默认 assist                        | `DEFAULT_MODE = "assist"`                                                                                   | 成立                                         |
+| SBOM 可复用但非权属结论                | CycloneDX 1.6，1600 components，timestamp 2026-10-08，cdxgen 12.8.5；LICENSE 仍为 MIT                       | 成立 → WP-12 可并行审计，不可改 LICENSE      |
+| 计划落库目录尚不存在                   | 本轮已复制到 `.kiro/specs/delivery-reliability-evidence-program/`（未提交）                                 | WP-00 文档落库可行                           |
 
 ## 2. 架构三条硬约束 — 与计划一致性
 
@@ -46,21 +46,21 @@ Loom 在计划热点上存在大量 active 重叠（节选）：
 
 ## 4. 工作包逐项核准
 
-| ID | 技术可行性 | 归属可行性 | 核准 |
-| --- | --- | --- | --- |
-| WP-00 | 高：基线/矩阵/ADR/试点草案 | 已登记计划目录；不改运行代码 | **APPROVE**（仅文档与 E0 证据） |
-| WP-01 | 中高：合同可复用 turn-completion/preflight；需证明持久化 | 触碰 attempt/turn-completion/preflight 热点 | **CONDITIONAL** — 先精确路径清单 + 接管 |
-| WP-02 | 高：恢复函数已存在但未接线 | collaboration-dispatch 热点极密 | **CONDITIONAL** |
-| WP-03 | 中：legacy + context-compiler 双轨属实 | context-compiler 多 owner | **CONDITIONAL** |
-| WP-04 | 高：check/replay/dryRunDiff 已具备 | 需与 kiro-fabric 协调只读探针 | **CONDITIONAL** |
-| WP-05 | 中：入口收敛可行，但不得双执行 | fabric + 工具入口多 owner | **CONDITIONAL**；写操作另依赖 WP-07 |
-| WP-06 | 中：需在既有实体上增量；orch live 仍冻 | task-orchestration 归属需确认 | **CONDITIONAL**；勿新建平行 DB |
-| WP-07 | 中：适配器能力不齐，unknown_outcome 流程需新建 | 外发/订单相关需隔离端点 | **CONDITIONAL**；禁止真实客户故障实验 |
-| WP-08 | 中：强制点可落 preflight；scaffold 禁改布尔充数 | 与 constitutional-activation 重叠 | **CONDITIONAL**；需 enforce ADR + 前任核验 |
-| WP-09 | 中高：evolution-core 统计/surface 边界清楚 | evolution-core 已有专项 | **CONDITIONAL** |
-| WP-10 | 中：机制可建；无业务样本则收益只能 unknown | 依赖业务负责人与数据授权（未冻结） | **CONDITIONAL**；无样本不宣称 IMPROVED |
-| WP-11 | 依赖全部 G 门槛 | 集成 lander 未定 | **DEFER** 至前置 ACCEPTED |
-| WP-12 | 高：审计方法清晰；SBOM 可起步 | 不改 LICENSE；法律结论外置 | **APPROVE_PARALLEL**（盘点/清单 only） |
+| ID    | 技术可行性                                               | 归属可行性                                  | 核准                                       |
+| ----- | -------------------------------------------------------- | ------------------------------------------- | ------------------------------------------ |
+| WP-00 | 高：基线/矩阵/ADR/试点草案                               | 已登记计划目录；不改运行代码                | **APPROVE**（仅文档与 E0 证据）            |
+| WP-01 | 中高：合同可复用 turn-completion/preflight；需证明持久化 | 触碰 attempt/turn-completion/preflight 热点 | **CONDITIONAL** — 先精确路径清单 + 接管    |
+| WP-02 | 高：恢复函数已存在但未接线                               | collaboration-dispatch 热点极密             | **CONDITIONAL**                            |
+| WP-03 | 中：legacy + context-compiler 双轨属实                   | context-compiler 多 owner                   | **CONDITIONAL**                            |
+| WP-04 | 高：check/replay/dryRunDiff 已具备                       | 需与 kiro-fabric 协调只读探针               | **CONDITIONAL**                            |
+| WP-05 | 中：入口收敛可行，但不得双执行                           | fabric + 工具入口多 owner                   | **CONDITIONAL**；写操作另依赖 WP-07        |
+| WP-06 | 中：需在既有实体上增量；orch live 仍冻                   | task-orchestration 归属需确认               | **CONDITIONAL**；勿新建平行 DB             |
+| WP-07 | 中：适配器能力不齐，unknown_outcome 流程需新建           | 外发/订单相关需隔离端点                     | **CONDITIONAL**；禁止真实客户故障实验      |
+| WP-08 | 中：强制点可落 preflight；scaffold 禁改布尔充数          | 与 constitutional-activation 重叠           | **CONDITIONAL**；需 enforce ADR + 前任核验 |
+| WP-09 | 中高：evolution-core 统计/surface 边界清楚               | evolution-core 已有专项                     | **CONDITIONAL**                            |
+| WP-10 | 中：机制可建；无业务样本则收益只能 unknown               | 依赖业务负责人与数据授权（未冻结）          | **CONDITIONAL**；无样本不宣称 IMPROVED     |
+| WP-11 | 依赖全部 G 门槛                                          | 集成 lander 未定                            | **DEFER** 至前置 ACCEPTED                  |
+| WP-12 | 高：审计方法清晰；SBOM 可起步                            | 不改 LICENSE；法律结论外置                  | **APPROVE_PARALLEL**（盘点/清单 only）     |
 
 ## 5. 已知不可行 / 必须修订的执行方式
 

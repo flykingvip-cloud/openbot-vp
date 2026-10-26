@@ -1,12 +1,12 @@
 # Collab S2 — Plan gate on all delivery exec paths (FINAL v3)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **flags default OFF** — tip gray needs explicit allowlist |
-| Spec | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S2 + §A mapping |
-| Depends | **P0 #731**, **S1 #734** (tip `18bdbc58…`) |
-| Code | `plan-gate-exec.ts`, `self-advance.ts` (delivery vs plan_nudge), `executor-private-todolist.ts` (bag ACL), `collab-s2-plan-gate-all-paths.test.ts` |
+| Field   | Value                                                                                                                                              |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date    | 2026-10-15 Asia/Shanghai                                                                                                                           |
+| Status  | Code ready; **flags default OFF** — tip gray needs explicit allowlist                                                                              |
+| Spec    | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S2 + §A mapping                                                                                  |
+| Depends | **P0 #731**, **S1 #734** (tip `18bdbc58…`)                                                                                                         |
+| Code    | `plan-gate-exec.ts`, `self-advance.ts` (delivery vs plan_nudge), `executor-private-todolist.ts` (bag ACL), `collab-s2-plan-gate-all-paths.test.ts` |
 
 ## Scope
 
@@ -20,13 +20,13 @@
 
 ## Flags (stay OFF in this PR)
 
-| Flag | Default | Tip gray enable |
-| --- | --- | --- |
-| `collaboration.task.claimContract` | false | Prefer scoped `001/grp-…` after P0 |
-| `collaboration.task.wakeContract` | false | Unchanged |
-| `collaboration.task.challengeWindow` | false | Unchanged (S1) |
-| `collaboration.runtimeNamespace` | false | Unchanged (N2 unsigned) |
-| `botMaySelfAdvanceWithoutHuman` | false | **S5 only** — this PR does not flip |
+| Flag                                 | Default | Tip gray enable                     |
+| ------------------------------------ | ------- | ----------------------------------- |
+| `collaboration.task.claimContract`   | false   | Prefer scoped `001/grp-…` after P0  |
+| `collaboration.task.wakeContract`    | false   | Unchanged                           |
+| `collaboration.task.challengeWindow` | false   | Unchanged (S1)                      |
+| `collaboration.runtimeNamespace`     | false   | Unchanged (N2 unsigned)             |
+| `botMaySelfAdvanceWithoutHuman`      | false   | **S5 only** — this PR does not flip |
 
 **Does not** open production gray writes. LIVE / Floor untouched.
 

@@ -47,7 +47,13 @@ export function clampTimeoutMs(value) {
  * Flags proven against a stalled subresource on Chrome 156 headless=new.
  * `--virtual-time-budget` is intentionally absent.
  */
-export function buildChromePrintArgs({ htmlPath, outPath, userDataDir, timeoutMs, blockRemoteHosts }) {
+export function buildChromePrintArgs({
+  htmlPath,
+  outPath,
+  userDataDir,
+  timeoutMs,
+  blockRemoteHosts,
+}) {
   const args = [
     "--headless=new",
     "--disable-gpu",

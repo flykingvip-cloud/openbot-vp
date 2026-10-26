@@ -7,13 +7,13 @@
 
 ## 交付对照（FINAL §3.4）
 
-| # | 工程项 | 实现 |
-| --- | --- | --- |
-| P3.1 | 灰组开 `wakeContract` | `wakeContractGroupAllowlist`；样本组 `grp-daniel-hhd-gmail-com-upbeyond`（文档示例，本 PR **不**写入生产配置） |
-| P3.2 | 可选 `assistantMentionDispatch` | 仍默认 OFF；仅资格 / same-round peer_ask，**不**默认新回合风暴（`assistantInlineAtCreatesRound()===false`） |
-| P3.3 | **group task heartbeat** | `group-task-heartbeat.ts`：默认 30min 扫 board → nudge；连续 2 次无响应 → `escalate` 至 `coordinatorBotId` 或群主 |
-| P3.4 | 管理播报（可选） | `buildAdminDailySummaryMessage` / RPC `adminDailySummary`：一条 C0/C1 摘要，非刷屏 |
-| — | whoWokeWhom 可审计 | nudge / escalate 写入 wake 账本；既有 `whoWokeWhom` RPC |
+| #    | 工程项                          | 实现                                                                                                              |
+| ---- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| P3.1 | 灰组开 `wakeContract`           | `wakeContractGroupAllowlist`；样本组 `grp-daniel-hhd-gmail-com-upbeyond`（文档示例，本 PR **不**写入生产配置）    |
+| P3.2 | 可选 `assistantMentionDispatch` | 仍默认 OFF；仅资格 / same-round peer_ask，**不**默认新回合风暴（`assistantInlineAtCreatesRound()===false`）       |
+| P3.3 | **group task heartbeat**        | `group-task-heartbeat.ts`：默认 30min 扫 board → nudge；连续 2 次无响应 → `escalate` 至 `coordinatorBotId` 或群主 |
+| P3.4 | 管理播报（可选）                | `buildAdminDailySummaryMessage` / RPC `adminDailySummary`：一条 C0/C1 摘要，非刷屏                                |
+| —    | whoWokeWhom 可审计              | nudge / escalate 写入 wake 账本；既有 `whoWokeWhom` RPC                                                           |
 
 ## 灰开（ops-only）
 
@@ -60,11 +60,11 @@ cron/RPC tick（force 可跳过间隔）
 
 RPC：
 
-| Method | 说明 |
-| --- | --- |
+| Method                                     | 说明              |
+| ------------------------------------------ | ----------------- |
 | `collaboration.task.runGroupTaskHeartbeat` | 执行一次心跳 tick |
-| `collaboration.task.adminDailySummary` | 一条管理日摘要 |
-| `collaboration.task.whoWokeWhom` | 既有：谁唤醒了谁 |
+| `collaboration.task.adminDailySummary`     | 一条管理日摘要    |
+| `collaboration.task.whoWokeWhom`           | 既有：谁唤醒了谁  |
 
 ## 验收步骤
 
@@ -87,13 +87,13 @@ RPC：
 
 ## 风险与 LIVE
 
-| 项 | 说明 |
-| --- | --- |
-| LIVE 授权 | **不需要**（默认旗 OFF；不改生产配置；不写入 allowlist 到 LIVE） |
-| claim allowlist | **未改动**（另需用户授权） |
-| 风险 | 灰开后 nudge/escalate 会写 wake 账本；误配 allowlist 仅影响所列组 |
-| 回滚 | 移除 allowlist 条目 |
-| 不做 | Floor / P4 self_advance 生产调用方 / 全局开旗 / 第二编排器 / gmood2008 推送 |
+| 项              | 说明                                                                        |
+| --------------- | --------------------------------------------------------------------------- |
+| LIVE 授权       | **不需要**（默认旗 OFF；不改生产配置；不写入 allowlist 到 LIVE）            |
+| claim allowlist | **未改动**（另需用户授权）                                                  |
+| 风险            | 灰开后 nudge/escalate 会写 wake 账本；误配 allowlist 仅影响所列组           |
+| 回滚            | 移除 allowlist 条目                                                         |
+| 不做            | Floor / P4 self_advance 生产调用方 / 全局开旗 / 第二编排器 / gmood2008 推送 |
 
 ## 与 P1/P2 关系
 

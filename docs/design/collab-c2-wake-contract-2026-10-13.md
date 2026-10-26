@@ -22,24 +22,24 @@ Depends on **C0/C1** (merged via #667 @ `88e35ea0a08`).
 
 ## Inventory-first (AS-IS)
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| Human `chat.send` + structured `mentions` | EXISTS | Opens decideParticipants rounds |
-| Assistant inline `@` in reply text | EXISTS | Does **not** create rounds |
-| HandoffContract / ClaimContract | EXISTS (flag-off) | C2 best-effort wake hooks on propose / claim / return |
-| Episode event types | EXISTS | Fixed orchestration union — not extended |
-| Named wake ledger | **was MISSING** | This PR adds `<ns>/wake-events/` |
+| Surface                                   | Status            | Note                                                  |
+| ----------------------------------------- | ----------------- | ----------------------------------------------------- |
+| Human `chat.send` + structured `mentions` | EXISTS            | Opens decideParticipants rounds                       |
+| Assistant inline `@` in reply text        | EXISTS            | Does **not** create rounds                            |
+| HandoffContract / ClaimContract           | EXISTS (flag-off) | C2 best-effort wake hooks on propose / claim / return |
+| Episode event types                       | EXISTS            | Fixed orchestration union — not extended              |
+| Named wake ledger                         | **was MISSING**   | This PR adds `<ns>/wake-events/`                      |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| Flag `collaboration.task.wakeContract` | Default OFF; writes fail-closed |
-| Flag `collaboration.task.assistantMentionDispatch` | Default OFF; gate only |
-| `wake-contract.ts` | record / list / whoWokeWhom / stitch_only / observe assistant `@` |
-| Hooks | claimBoardItem / returnBoardItemSubmission / proposeHandoff best-effort |
-| Freeze | `assistantInlineAtCreatesRound()===false` |
-| Design doc | This file |
+| Surface                                            | Behavior                                                                |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| Flag `collaboration.task.wakeContract`             | Default OFF; writes fail-closed                                         |
+| Flag `collaboration.task.assistantMentionDispatch` | Default OFF; gate only                                                  |
+| `wake-contract.ts`                                 | record / list / whoWokeWhom / stitch_only / observe assistant `@`       |
+| Hooks                                              | claimBoardItem / returnBoardItemSubmission / proposeHandoff best-effort |
+| Freeze                                             | `assistantInlineAtCreatesRound()===false`                               |
+| Design doc                                         | This file                                                               |
 
 ## Explicit non-goals
 

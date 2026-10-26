@@ -27,11 +27,11 @@ OAuth 路径图：[references/oauth-path.md](references/oauth-path.md)
 
 与 `renderGithubPersonalForm` 一致：
 
-| UI 标签 | 写入 | 必填 |
-|---------|------|------|
-| 显示名称 | displayName（`oauth.start`） | 建议 |
-| GitHub 用户名 | 表单 credentialHandleId 位；真 OAuth **可留空** | 否 |
-| 提交 | 「授权绑定」/「重新认证」 | — |
+| UI 标签       | 写入                                            | 必填 |
+| ------------- | ----------------------------------------------- | ---- |
+| 显示名称      | displayName（`oauth.start`）                    | 建议 |
+| GitHub 用户名 | 表单 credentialHandleId 位；真 OAuth **可留空** | 否   |
+| 提交          | 「授权绑定」/「重新认证」                       | —    |
 
 运营动作（catalog，绑后）：`create_issue`、`create_pull_request`、`comment`。  
 数字人授权：另调 `oi-grant-owned-bots`，不要混进本 bind。

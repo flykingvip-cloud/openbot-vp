@@ -37,13 +37,13 @@ refreshEvidence: ".kiro/specs/constitutional-governance-state-convergence/eviden
 
 ## 反误读（必读）
 
-| 误读 | 正确读法 |
-| ---- | -------- |
-| `#170 BOUNDED_RETENTION_APPROVED` = Phase D 整体 GO | 只批准保留已合入、默认关、当时未热路径接线的有界表面；**不**推翻 Phase C NO-GO；**不**批准开旗、接线、部署 |
-| `#271 C1–C3 已合入` = runtime-enabled 或 production-proven | 实现是 **default-off**；C4（开旗/生产部署）仍禁止；观察接线 ≠ 执行启用 |
-| `#689 H1 文档` = H1 实现已批准合入 | 文档三件套已合入；实现需单独授权 |
-| `#694` 或账本 seq 127 = Gate/Path/Fabric/live invoke 已批准 | `#694` 为 **open Draft + governance hold**，未合入；账本 LIVE tip 只描述交付，不是宪法 GO |
-| 过期的 2026-09-27 `current-state.md` / 矩阵仍「跟上主干」 | 本文件与 `…-matrix-2026-10-14.json` 才是刷新后的当前叙述；09-27 矩阵保留为冻结历史证据 |
+| 误读                                                        | 正确读法                                                                                                   |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `#170 BOUNDED_RETENTION_APPROVED` = Phase D 整体 GO         | 只批准保留已合入、默认关、当时未热路径接线的有界表面；**不**推翻 Phase C NO-GO；**不**批准开旗、接线、部署 |
+| `#271 C1–C3 已合入` = runtime-enabled 或 production-proven  | 实现是 **default-off**；C4（开旗/生产部署）仍禁止；观察接线 ≠ 执行启用                                     |
+| `#689 H1 文档` = H1 实现已批准合入                          | 文档三件套已合入；实现需单独授权                                                                           |
+| `#694` 或账本 seq 127 = Gate/Path/Fabric/live invoke 已批准 | `#694` 为 **open Draft + governance hold**，未合入；账本 LIVE tip 只描述交付，不是宪法 GO                  |
+| 过期的 2026-09-27 `current-state.md` / 矩阵仍「跟上主干」   | 本文件与 `…-matrix-2026-10-14.json` 才是刷新后的当前叙述；09-27 矩阵保留为冻结历史证据                     |
 
 ## 1. Phase A 当前状态
 
@@ -95,22 +95,22 @@ Phase C 这次接受本身不授权整段 Phase D、真实 Path 的生产执行�
 
 ### 5.1 截至 2026-09-27 已登记的 Phase D 组件（仍有效）
 
-| 组件                       | 整体  | 切片设计           | 切片实现              | 授权文件 / 实现摘要 |
-| -------------------------- | ----- | ------------------ | --------------------- | ------------------- |
-| constitutional-conformance | no-go | bounded-authorized | landed                | #62 脚手架 |
-| constitutional-registry    | no-go | bounded-authorized | landed                | #62 |
-| constitutional-runtime     | no-go | bounded-authorized | landed                | #62（非 façade） |
-| constitutional-contracts   | no-go | bounded-authorized | landed                | #58 |
+| 组件                       | 整体  | 切片设计           | 切片实现              | 授权文件 / 实现摘要                         |
+| -------------------------- | ----- | ------------------ | --------------------- | ------------------------------------------- |
+| constitutional-conformance | no-go | bounded-authorized | landed                | #62 脚手架                                  |
+| constitutional-registry    | no-go | bounded-authorized | landed                | #62                                         |
+| constitutional-runtime     | no-go | bounded-authorized | landed                | #62（非 façade）                            |
+| constitutional-contracts   | no-go | bounded-authorized | landed                | #58                                         |
 | runtime façade             | no-go | bounded-authorized | landed                | #60 影子门面；另见 §5.2 `#271` 旁挂观察接线 |
-| Path select                | no-go | bounded-authorized | landed                | #74 / #77 |
-| Path report                | no-go | bounded-authorized | landed                | #59 |
-| bounded execute opt-in     | no-go | bounded-authorized | landed                | #108 / #111 |
-| P8c shadow compare         | no-go | bounded-authorized | authorized-not-landed | #119；实现未找到 |
-| Path-Gate owner track      | no-go | bounded-authorized | docs-only             | #101 |
-| orchestration shadow       | no-go | not-found          | not-found             | B2 不升为 Phase D 切片 |
-| ORCHESTRATION_LIVE_INVOKE  | no-go | not-found          | not-found             | 常量仍 false |
-| Fabric                     | no-go | not-found          | not-found             | `FABRIC_DEFAULT_ON = false` |
-| Gate tightening            | no-go | not-found          | not-found             | `readyToTighten` 固定 false |
+| Path select                | no-go | bounded-authorized | landed                | #74 / #77                                   |
+| Path report                | no-go | bounded-authorized | landed                | #59                                         |
+| bounded execute opt-in     | no-go | bounded-authorized | landed                | #108 / #111                                 |
+| P8c shadow compare         | no-go | bounded-authorized | authorized-not-landed | #119；实现未找到                            |
+| Path-Gate owner track      | no-go | bounded-authorized | docs-only             | #101                                        |
+| orchestration shadow       | no-go | not-found          | not-found             | B2 不升为 Phase D 切片                      |
+| ORCHESTRATION_LIVE_INVOKE  | no-go | not-found          | not-found             | 常量仍 false                                |
+| Fabric                     | no-go | not-found          | not-found             | `FABRIC_DEFAULT_ON = false`                 |
+| Gate tightening            | no-go | not-found          | not-found             | `readyToTighten` 固定 false                 |
 
 Path select 附加有界刀（#103/#104、#106/#107）仍不构成整体授权。
 
@@ -118,13 +118,13 @@ Path select 附加有界刀（#103/#104、#106/#107）仍不构成整体授权�
 
 以下包在 2026-09-27 权威矩阵的 14 个 Phase D 组件列表之外（或更新既有行的附加切片）。它们已由本刷新吸收进 SoT；**均不** 翻转 `phaseDOverallGovernanceAuthorization`。
 
-| 包 | PR | 状态 | 天花板（claim ceiling） | 明确不授权 |
-| -- | -- | ---- | ----------------------- | ---------- |
-| Phase D bounded retention 批准 | #170 MERGED `cdcf9a0a…` | docs/governance | code-present、default-off、not-runtime-enabled、not-production-proven；Owner `SUPERSEDE_PHASE_C_BOUNDED` 仅保留表面 | 继续 Phase D 开发、接线、开旗、live execute、Fabric default-on、部署、生产使用 |
-| Checkpoint B cycle-2 | #204 MERGED `364c2e81…` + closeout #213 MERGED `966372cc…` | docs；`AGREE_SHADOW_WIRING` | `checkpointCImplementationAuthorized=true` **仅**允许新建 default-off 实现任务；`runtimeEnabled=false` | 开旗、生产接线、SELECT/EXECUTE、部署、production-proven |
-| Checkpoint C1–C3 实现 | #271 MERGED `d0a485eb…` | code-present + default-off 接线 | 旁挂 `observeConstitutionalRuntimeShadow`；default-off | C4 开旗/生产部署；enforce；live invoke |
-| H1 热路径 façade observe 文档三件套 | #689 MERGED `43ed4241…` | docs-only | 书面范围/验收/开工令；default-off observe 设计 | Gate/Path 收紧、enforce、live invoke、Fabric default-on、H1 实现代码 |
-| H1 热路径 façade observe 实现（ACP 一处） | #694 **OPEN Draft**（governance hold） | **未合入** | PR 自称天花板 `runtime-enabled (observe-only)` — **在合入并单独授权前不得记入 SoT 为已启用**；当前 SoT 记为 open / not-landed | 在状态未收敛且无单独用户授权前 **禁止 Ready/merge**；不合入不等于已批准 |
+| 包                                        | PR                                                         | 状态                            | 天花板（claim ceiling）                                                                                                       | 明确不授权                                                                     |
+| ----------------------------------------- | ---------------------------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Phase D bounded retention 批准            | #170 MERGED `cdcf9a0a…`                                    | docs/governance                 | code-present、default-off、not-runtime-enabled、not-production-proven；Owner `SUPERSEDE_PHASE_C_BOUNDED` 仅保留表面           | 继续 Phase D 开发、接线、开旗、live execute、Fabric default-on、部署、生产使用 |
+| Checkpoint B cycle-2                      | #204 MERGED `364c2e81…` + closeout #213 MERGED `966372cc…` | docs；`AGREE_SHADOW_WIRING`     | `checkpointCImplementationAuthorized=true` **仅**允许新建 default-off 实现任务；`runtimeEnabled=false`                        | 开旗、生产接线、SELECT/EXECUTE、部署、production-proven                        |
+| Checkpoint C1–C3 实现                     | #271 MERGED `d0a485eb…`                                    | code-present + default-off 接线 | 旁挂 `observeConstitutionalRuntimeShadow`；default-off                                                                        | C4 开旗/生产部署；enforce；live invoke                                         |
+| H1 热路径 façade observe 文档三件套       | #689 MERGED `43ed4241…`                                    | docs-only                       | 书面范围/验收/开工令；default-off observe 设计                                                                                | Gate/Path 收紧、enforce、live invoke、Fabric default-on、H1 实现代码           |
+| H1 热路径 façade observe 实现（ACP 一处） | #694 **OPEN Draft**（governance hold）                     | **未合入**                      | PR 自称天花板 `runtime-enabled (observe-only)` — **在合入并单独授权前不得记入 SoT 为已启用**；当前 SoT 记为 open / not-landed | 在状态未收敛且无单独用户授权前 **禁止 Ready/merge**；不合入不等于已批准        |
 
 `constitutional-governance-closure`（模型调用入口 E15–E19 等）是另一套「治理」叙事，名称易与宪法治理混淆；**不是** 本 SoT 的 Phase D 整体授权，也不改写上表。
 

@@ -15,18 +15,18 @@ Repo：`upbeyond/openbot`
    - 发布：必须含 `tweet.write` 才开放 `publish_post` / `reply_comment`
 4. Secrets 只在 secret store（`kind=oauth_token`，`metadata.scope`）；永不进聊天 / EffectiveAccess 投影。
 5. 数字人授权仍走 `oi-grant-owned-bots` / `grants.upsert`（grant 侧也会按 scope 过滤发布动作）。
-6. **本实现是后续其他个人社媒设置的可复用模板**（目录改 oauth → UI 共用 oauth 表单 → adapter 接线 → scope 门禁 → skill 改 oauth.*）。
+6. **本实现是后续其他个人社媒设置的可复用模板**（目录改 oauth → UI 共用 oauth 表单 → adapter 接线 → scope 门禁 → skill 改 oauth.\*）。
 
 ## 实现要点
 
-| 层 | 变更 |
-|----|------|
-| Catalog | `user-operational-identity-providers.ts`：`x-twitter` → oauth |
+| 层           | 变更                                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------------------ |
+| Catalog      | `user-operational-identity-providers.ts`：`x-twitter` → oauth                                          |
 | OAuth 运行时 | `user-operational-identity-oauth.ts`：`adapter_authorization_code` + PKCE；回调走 adapter.exchangeCode |
-| Scope 门禁 | `user-operational-identity-x-twitter-scope.ts`；execution deny + grants.upsert 过滤 |
-| UI | `workbench-operational-identity-forms.ts`：`renderOauthPersonalForm` 支持 `x-twitter` |
-| Skill | `oi-bind-x-twitter` → oauth 路径（对齐 `oi-bind-github-personal`） |
-| 编排 | `oi-orchestrate-personal-identity` catalog-map 更新 |
+| Scope 门禁   | `user-operational-identity-x-twitter-scope.ts`；execution deny + grants.upsert 过滤                    |
+| UI           | `workbench-operational-identity-forms.ts`：`renderOauthPersonalForm` 支持 `x-twitter`                  |
+| Skill        | `oi-bind-x-twitter` → oauth 路径（对齐 `oi-bind-github-personal`）                                     |
+| 编排         | `oi-orchestrate-personal-identity` catalog-map 更新                                                    |
 
 ## Env
 

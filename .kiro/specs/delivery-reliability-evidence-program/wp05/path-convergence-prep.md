@@ -17,16 +17,16 @@
 
 优先：无外部业务写、已有只读适配或强只读语义。
 
-| 候选 ID | 工具 / surface | 代码锚点 | 外部业务写？ | 试点优先级 | 备注 |
-| --- | --- | --- | --- | --- | --- |
-| P1 | `memory_search`（orch readonly） | `invokeReadonlySurface` memory 分支（`readonly-invoke.ts` L145–164）；`createMemorySearchTool` | 无业务外写（检索）；**UNKNOWN**：是否触达可写记忆索引副作用 | 高 | orch 已声明不写 Progress Ledger |
-| P2 | `web_fetch` / `web_search`（`web_read`） | 同文件 L166–194 | 只读 HTTP；**非** outbound message | 高 | 依赖网络策略；比较时注意 SSRF 既有边界 |
-| P3 | `skill_snapshot`（skill surface） | `resolveCronSkillsSnapshot`（L196–207） | 读快照；无远端写 | 中 | 非典型「工具执行」，适合策略绑定演练 |
-| P4 | HTTP `memory_get` / `memory_search` | `tools-invoke-http.ts` `MEMORY_TOOL_NAMES` | 同 P1 | 中 | 入口已鉴权假设不可推广（Fabric probes 警告） |
-| 排除 | `exec` / shell 类 | Fabric `EXEC_CLASS`（`probes.ts`） | 可改机器状态 | 否（首迁） | 可留在 WP-04 比较实验室，不进 WP-05 收敛 |
-| 排除 | `outbound_message` / `external_write` / `broadcast` | `ExecutionSurface`（`types.ts`） | 是 | 否 | 等 WP-07 |
-| 排除 | `browser` / `node_exec` | orch flags 默认 off | 高风险副作用 | 否 | |
-| 排除 | `sessions_spawn` | `spawn-table.ts` | 递归/子代理 | 否 | |
+| 候选 ID | 工具 / surface                                      | 代码锚点                                                                                       | 外部业务写？                                                | 试点优先级 | 备注                                         |
+| ------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------- | -------------------------------------------- |
+| P1      | `memory_search`（orch readonly）                    | `invokeReadonlySurface` memory 分支（`readonly-invoke.ts` L145–164）；`createMemorySearchTool` | 无业务外写（检索）；**UNKNOWN**：是否触达可写记忆索引副作用 | 高         | orch 已声明不写 Progress Ledger              |
+| P2      | `web_fetch` / `web_search`（`web_read`）            | 同文件 L166–194                                                                                | 只读 HTTP；**非** outbound message                          | 高         | 依赖网络策略；比较时注意 SSRF 既有边界       |
+| P3      | `skill_snapshot`（skill surface）                   | `resolveCronSkillsSnapshot`（L196–207）                                                        | 读快照；无远端写                                            | 中         | 非典型「工具执行」，适合策略绑定演练         |
+| P4      | HTTP `memory_get` / `memory_search`                 | `tools-invoke-http.ts` `MEMORY_TOOL_NAMES`                                                     | 同 P1                                                       | 中         | 入口已鉴权假设不可推广（Fabric probes 警告） |
+| 排除    | `exec` / shell 类                                   | Fabric `EXEC_CLASS`（`probes.ts`）                                                             | 可改机器状态                                                | 否（首迁） | 可留在 WP-04 比较实验室，不进 WP-05 收敛     |
+| 排除    | `outbound_message` / `external_write` / `broadcast` | `ExecutionSurface`（`types.ts`）                                                               | 是                                                          | 否         | 等 WP-07                                     |
+| 排除    | `browser` / `node_exec`                             | orch flags 默认 off                                                                            | 高风险副作用                                                | 否         |                                              |
+| 排除    | `sessions_spawn`                                    | `spawn-table.ts`                                                                               | 递归/子代理                                                 | 否         |                                              |
 
 **建议首迁故事：** 在 **服务端** 对「已选 surface=memory|web_read」的只读动作，请求开始时绑定 `path=legacy|fabric` + `actionId` + `policyVersion`，全程单路径；Fabric 路径仍调用原工具强制边界（现有 tool execute），**禁止** Fabric→loopback→再 Fabric。
 
@@ -63,19 +63,19 @@ onRequestStart(req):
 
 诚实未知保留 UNKNOWN。
 
-| 入口 | 建议 | 理由 |
-| --- | --- | --- |
+| 入口                                                    | 建议                            | 理由                              |
+| ------------------------------------------------------- | ------------------------------- | --------------------------------- |
 | `orchestration_plane` readonly（memory/web_read/skill） | **migrate-candidate（第一刀）** | 已有只读 invoke；live invoke 冻结 |
-| `fabric_control_plane` | keep（实验室） | 已是 Fabric；用于比较而非「迁移」 |
-| `http_tools_invoke` memory_* | migrate-candidate（第二刀） | 需证明与 orch 路径不双执行 |
-| `interactive_chat` 全工具表 | keep（暂） | 面过大；UNKNOWN 耦合 |
-| `cron` | UNKNOWN | 未完成策略绑定盘点 |
-| `subagent` | keep / out-of-scope 初轮 | spawn 深度与递归风险 |
-| `node_host` / `browser` | out-of-scope 初轮 | flag 默认 off + 副作用 |
-| `core_channels` / `extension_channels` 外发 | out-of-scope → WP-07 | 外部写 |
-| `collab_group` | keep | 交接/责任链优先 WP-02 |
-| `constitutional_shadow` | out-of-scope | 不选路径 |
-| `org_bus_steward` | UNKNOWN | E0 已标 partial |
+| `fabric_control_plane`                                  | keep（实验室）                  | 已是 Fabric；用于比较而非「迁移」 |
+| `http_tools_invoke` memory\_\*                          | migrate-candidate（第二刀）     | 需证明与 orch 路径不双执行        |
+| `interactive_chat` 全工具表                             | keep（暂）                      | 面过大；UNKNOWN 耦合              |
+| `cron`                                                  | UNKNOWN                         | 未完成策略绑定盘点                |
+| `subagent`                                              | keep / out-of-scope 初轮        | spawn 深度与递归风险              |
+| `node_host` / `browser`                                 | out-of-scope 初轮               | flag 默认 off + 副作用            |
+| `core_channels` / `extension_channels` 外发             | out-of-scope → WP-07            | 外部写                            |
+| `collab_group`                                          | keep                            | 交接/责任链优先 WP-02             |
+| `constitutional_shadow`                                 | out-of-scope                    | 不选路径                          |
+| `org_bus_steward`                                       | UNKNOWN                         | E0 已标 partial                   |
 
 ## 5. 与 WP-04 / WP-07 依赖
 

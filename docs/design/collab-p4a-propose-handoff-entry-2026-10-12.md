@@ -13,13 +13,13 @@ refused the `collaboration.task.handoff` shortcut when the flag is on.
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
+| Surface                             | Behavior                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
 | `collaboration.task.proposeHandoff` | Flag-on → `proposeHandoff`. Flag-off → refuse (`HandoffContractFlagOffError`) |
-| `collaboration.task.acceptHandoff` | Flag-on → `acceptHandoff` |
-| `collaboration.task.approveHandoff` | Flag-on → `approveHandoff` (human default for owner_transfer) |
-| `collaboration.task.applyHandoff` | Flag-on → `applyApprovedHandoff` + sync learning task store |
-| `collaboration.task.handoff` | Unchanged: flag-off shortcut; flag-on still `HandoffContractRequiredError` |
+| `collaboration.task.acceptHandoff`  | Flag-on → `acceptHandoff`                                                     |
+| `collaboration.task.approveHandoff` | Flag-on → `approveHandoff` (human default for owner_transfer)                 |
+| `collaboration.task.applyHandoff`   | Flag-on → `applyApprovedHandoff` + sync learning task store                   |
+| `collaboration.task.handoff`        | Unchanged: flag-off shortcut; flag-on still `HandoffContractRequiredError`    |
 
 Composition root: `src/gateway/collaboration-learning/handoff-contract-entry.ts`
 (reuses `createRuntimeAuthority` + existing contract APIs only).

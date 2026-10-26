@@ -7,11 +7,11 @@
 
 ## 1. 物化范围
 
-| 模式 | 现网 | 本阶段 |
-| --- | --- | --- |
-| `on_demand` | `ensureOnDemandProjectionsMaterialized` | 继续只跑这个模式 |
-| `scheduled` | `tickScheduledProjectionMaterialization` | 继续只跑这个模式。这是唯一的调度器 |
-| `event_driven` | 可以保存 | 仍然只保存。没有调度器，不把枚举说成已实现 |
+| 模式           | 现网                                     | 本阶段                                     |
+| -------------- | ---------------------------------------- | ------------------------------------------ |
+| `on_demand`    | `ensureOnDemandProjectionsMaterialized`  | 继续只跑这个模式                           |
+| `scheduled`    | `tickScheduledProjectionMaterialization` | 继续只跑这个模式。这是唯一的调度器         |
+| `event_driven` | 可以保存                                 | 仍然只保存。没有调度器，不把枚举说成已实现 |
 
 物化仍要求投影 `lifecycle === "active"`、绑定 `enabled`、恰好一条 `sourceActions`。动作必须能在关联的 `DataCapability.actionRefs` 上对上，不能从能力反推来源。
 

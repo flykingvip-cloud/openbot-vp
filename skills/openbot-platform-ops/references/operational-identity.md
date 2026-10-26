@@ -44,7 +44,6 @@ Never use `exec`, env-var SMTP hacks, or invented RPC.
 - Social cloud bind skills (**S3**, all `path_unstable`): `oi-bind-xiaohongshu` / `oi-bind-douyin` / `oi-bind-weibo` / `oi-bind-bilibili` / `oi-bind-zhihu` / `oi-bind-kuaishou` / `oi-bind-x-twitter` → `credentials.bind` (social_account); design: `docs/design/oi-intelligent-bind-s3-social-2026-10-13.md`
 - Personal WeChat personal-account bind (**S4**, **non_cloud_primary** / 非云电脑主路径): `oi-bind-wechat-personal` → delegates `wechat-personal-worker-setup`; writeback via `user-operational-identity.wechat-personal.*` only (status / qr.start / qr.wait / bind-existing); never credentials.bind / oauth; design: `docs/design/oi-intelligent-bind-s4-wechat-personal-2026-10-13.md`
 
-
 ## Content marketing vs identity
 
 - Identity bind/execute → this playbook + `user_operational_identity`

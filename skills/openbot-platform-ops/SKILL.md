@@ -33,11 +33,11 @@ User request
       NO and high risk / ADMIN → escalator (explain limit, offer support path)
 ```
 
-| Mode          | When                                                                                                | Action                                                     |
-| ------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Mode          | When                                                                                                                    | Action                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | **Solver**    | Tool exists (`knowledge_source`, `user_operational_identity`, `cron`, `schedule`, `guidance_event`, `skill_asset_save`) | Call tool; follow confirm policy                           |
-| **Guide**     | No tool; UI wizard exists                                                                           | Load `user-guidance-protocol`; lazy-load reference YAML/MD |
-| **Escalator** | ADMIN, cross-tenant, irreversible without ownership                                                 | Refuse automation; document next human step                |
+| **Guide**     | No tool; UI wizard exists                                                                                               | Load `user-guidance-protocol`; lazy-load reference YAML/MD |
+| **Escalator** | ADMIN, cross-tenant, irreversible without ownership                                                                     | Refuse automation; document next human step                |
 
 ## Tool priority matrix
 

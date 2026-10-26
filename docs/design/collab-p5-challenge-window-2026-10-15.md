@@ -5,16 +5,16 @@
 
 ## What this ships (FINAL §1.3 动作1 + §1.4 L-Deploy + §3.6)
 
-| Item | Behavior |
-| --- | --- |
+| Item                                 | Behavior                                                                                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `collaboration.task.challengeWindow` | Feature flag (default **false**). When true, `publishBoardItem` requires a resolved\|skipped window **or** `skipChallengeWindow: true` |
-| Exactly 1 challenger (蓝) | `openChallengeWindow({ challengerId })` — refuses challenger === lead |
-| Critique | `recordChallengeCritique` issues: `acceptance_gap` \| `scope_drift` \| `role_mismatch` + comment; only designated 蓝 |
-| 主答决议 | `resolveChallengeWindow` → `absorb` \| `reject` with reason (optional revised draft on absorb) |
-| Ledger | Append-only `<ns>/challenge-windows/<taskId>.jsonl`; quality best-effort on resolve; `drivesAdmission: false` |
-| Intent path | `materializeIntentToBoardItem` → `needs_challenge` when flag ON and no window/skip |
-| Per-item 可关 | `skipChallengeWindow` on publish, or `skipChallengeWindow` ledger record |
-| RPC | `openChallengeWindow` / `recordChallengeCritique` / `resolveChallengeWindow` / `skipChallengeWindow` / `listChallengeWindows` |
+| Exactly 1 challenger (蓝)            | `openChallengeWindow({ challengerId })` — refuses challenger === lead                                                                  |
+| Critique                             | `recordChallengeCritique` issues: `acceptance_gap` \| `scope_drift` \| `role_mismatch` + comment; only designated 蓝                   |
+| 主答决议                             | `resolveChallengeWindow` → `absorb` \| `reject` with reason (optional revised draft on absorb)                                         |
+| Ledger                               | Append-only `<ns>/challenge-windows/<taskId>.jsonl`; quality best-effort on resolve; `drivesAdmission: false`                          |
+| Intent path                          | `materializeIntentToBoardItem` → `needs_challenge` when flag ON and no window/skip                                                     |
+| Per-item 可关                        | `skipChallengeWindow` on publish, or `skipChallengeWindow` ledger record                                                               |
+| RPC                                  | `openChallengeWindow` / `recordChallengeCritique` / `resolveChallengeWindow` / `skipChallengeWindow` / `listChallengeWindows`          |
 
 Not full-group debate. Does not invent a second orchestrator — wires into existing `publishBoardItem` / intent-materialize.
 

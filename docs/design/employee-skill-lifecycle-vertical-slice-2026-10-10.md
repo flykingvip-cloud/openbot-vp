@@ -14,16 +14,16 @@
 
 独立验收只凭本文件判断「切片设计是否可执行」。下面这些事实写在本文里，避免验收时再去翻未合入分支。
 
-| 项 | 本文采用的值 |
-| --- | --- |
-| D0 | **A，已冻结。** B/C/D 不适用。公开仓 `https://github.com/CopilotKit/OpenBot` 的 `save_skill` / `skills.yaml` / Intelligence Learning 不进入本切片 |
-| 分析 | 本私有仓 PR #545，标题「Docs: 员工端技能进化通道现状分析」，draft，未合入。分支 `cursor/employee-skill-lifecycle-analysis-05dc`。文件 `docs/design/employee-skill-lifecycle-channel-2026-10-10.md` |
-| 方案 | 本私有仓 PR #546，标题「Docs: 员工端技能生命周期方案（D0=A 已冻结，实施仍暂缓）」，draft，未合入。分支 `cursor/employee-skill-lifecycle-opt-plan-aa8c`。文件 `docs/design/employee-skill-lifecycle-channel-optimization-plan-2026-10-10.md` 与 `docs/design/target-codebase-evidence-2026-10-10.md` |
-| 独立验收结论 | #545 / #546 **有条件通过（文档阶段）**。允许写本切片设计与验收勾选。禁止据此宣称闸门 A 已通过 |
-| 调查基线 | `93ce9df262b3666d83f64c559a5e7801e6bde089`。它是 #545 与方案初稿相对当时 `main` 的 base。源码行为描述以该 SHA 为准 |
-| 撰写时的 `origin/main` | `833fb81bbc6e0cf12b98249c988d2f89a3fe52ab`（#544，`UI: 连接成功后才进入模型池，并接通企业自建提供方`）。相对调查基线只多这一笔。撰写时对 §3 所列技能路径做 `git diff 93ce9df… 833fb81bb`，结果为空。因此这些路径上的符号，调查基线与撰写时主干一致 |
-| 生产部署版本 | **待核实。** 不得把调查基线或撰写时的 `main` 写成生产版本 |
-| 公开仓同号 #545 | 编号撞车，另一仓库、另一主题。公开仓对 `employee-install`、`skill-lifecycle-store`、`runtime-binding-sync`、`install-pack-to-robot` 为 0 命中，这是预期 |
+| 项                     | 本文采用的值                                                                                                                                                                                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D0                     | **A，已冻结。** B/C/D 不适用。公开仓 `https://github.com/CopilotKit/OpenBot` 的 `save_skill` / `skills.yaml` / Intelligence Learning 不进入本切片                                                                                                                                                   |
+| 分析                   | 本私有仓 PR #545，标题「Docs: 员工端技能进化通道现状分析」，draft，未合入。分支 `cursor/employee-skill-lifecycle-analysis-05dc`。文件 `docs/design/employee-skill-lifecycle-channel-2026-10-10.md`                                                                                                  |
+| 方案                   | 本私有仓 PR #546，标题「Docs: 员工端技能生命周期方案（D0=A 已冻结，实施仍暂缓）」，draft，未合入。分支 `cursor/employee-skill-lifecycle-opt-plan-aa8c`。文件 `docs/design/employee-skill-lifecycle-channel-optimization-plan-2026-10-10.md` 与 `docs/design/target-codebase-evidence-2026-10-10.md` |
+| 独立验收结论           | #545 / #546 **有条件通过（文档阶段）**。允许写本切片设计与验收勾选。禁止据此宣称闸门 A 已通过                                                                                                                                                                                                       |
+| 调查基线               | `93ce9df262b3666d83f64c559a5e7801e6bde089`。它是 #545 与方案初稿相对当时 `main` 的 base。源码行为描述以该 SHA 为准                                                                                                                                                                                  |
+| 撰写时的 `origin/main` | `833fb81bbc6e0cf12b98249c988d2f89a3fe52ab`（#544，`UI: 连接成功后才进入模型池，并接通企业自建提供方`）。相对调查基线只多这一笔。撰写时对 §3 所列技能路径做 `git diff 93ce9df… 833fb81bb`，结果为空。因此这些路径上的符号，调查基线与撰写时主干一致                                                  |
+| 生产部署版本           | **待核实。** 不得把调查基线或撰写时的 `main` 写成生产版本                                                                                                                                                                                                                                           |
+| 公开仓同号 #545        | 编号撞车，另一仓库、另一主题。公开仓对 `employee-install`、`skill-lifecycle-store`、`runtime-binding-sync`、`install-pack-to-robot` 为 0 命中，这是预期                                                                                                                                             |
 
 行号只对「调查基线与撰写时 `main` 上无 diff」的那些文件有效。开工前若这些文件相对调查基线出现 diff，行号作废，以符号名为准，并先完成 §6 的差异清单。
 
@@ -59,13 +59,13 @@
 
 ### 2.1 主切片（能产生下一轮 loader 证据）
 
-| 项 | 取值 |
-| --- | --- |
-| 技能 | 一条员工技能资产。lifecycle 属于 `EXECUTABLE_LIFECYCLES`：`private` / `reviewing` / `approved` / `published`。`assetType` 属于 `EXECUTABLE_ASSET_TYPES`：`capability`、`workflow`、`prompt`、`template`、`agent`、`tool`、`mcp`。`knowledge` 排除 |
-| 机器人 | 一个稳定的 `agentId`。五步都用这一个 id |
-| 运行入口 | 带该 `agentId` 的下一次 `resolveEmbeddedRunSkillEntries`（`src/agents/pi-embedded-runner/skills-runtime.ts`）。它会合并 `loadSkillExecutionBindingEntries`，来源标记为 `openbot-lifecycle-binding` |
-| 投影文件 | `CONFIG_DIR/skill-execution-bindings/<agentId>/ob-asset-<skillId>/SKILL.md`。前缀常量是 `SKILL_EXECUTION_BINDING_PREFIX`（`src/gateway/skill-execution-binding/types.ts`）。默认 `CONFIG_DIR` 为 `~/.openbot` |
-| 撤销入口 | `robot-skills.remove` → `removeRobotSkillAsset` |
+| 项       | 取值                                                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 技能     | 一条员工技能资产。lifecycle 属于 `EXECUTABLE_LIFECYCLES`：`private` / `reviewing` / `approved` / `published`。`assetType` 属于 `EXECUTABLE_ASSET_TYPES`：`capability`、`workflow`、`prompt`、`template`、`agent`、`tool`、`mcp`。`knowledge` 排除 |
+| 机器人   | 一个稳定的 `agentId`。五步都用这一个 id                                                                                                                                                                                                           |
+| 运行入口 | 带该 `agentId` 的下一次 `resolveEmbeddedRunSkillEntries`（`src/agents/pi-embedded-runner/skills-runtime.ts`）。它会合并 `loadSkillExecutionBindingEntries`，来源标记为 `openbot-lifecycle-binding`                                                |
+| 投影文件 | `CONFIG_DIR/skill-execution-bindings/<agentId>/ob-asset-<skillId>/SKILL.md`。前缀常量是 `SKILL_EXECUTION_BINDING_PREFIX`（`src/gateway/skill-execution-binding/types.ts`）。默认 `CONFIG_DIR` 为 `~/.openbot`                                     |
+| 撤销入口 | `robot-skills.remove` → `removeRobotSkillAsset`                                                                                                                                                                                                   |
 
 「创建」若得到 `draft` / `rejected` / `retired`，主切片的运行步期望是**下一轮看不见**。要走到正向运行，创建之后先用现有 RPC `personal-skills.finalize-draft`（`finalizeDraftSkill`）把 lifecycle 升到 `private`，再进入授权/安装。本切片不新增 finalize 规则，只把这次已有 RPC 记在创建步的记录里。
 
@@ -260,25 +260,25 @@
 
 ### 4.1 三行的含义（验收笔记用词）
 
-| 层 | 笔记允许的值 | 从哪里读（现有数据，不新写字段） | 禁止的推断 |
-| --- | --- | --- | --- |
-| 安装关系 | `requested` / `linked` / `absent` | 主切片：`robotRelations` 中该 `(agentId, skillId)`。对照入口：`employee-install.json` 的 `request.status`，原样另记，不升级成技能关系 | 关系 `linked` 或请求 `installed` 推出投影 `ready`、绑定 `synced`、可用性 `ready` |
-| 执行投影 | `pending` / `ready` / `failed` / `not_materialized` | `SyncSkillExecutionBindingResult.action` 与 `reason`；投影路径 `CONFIG_DIR/skill-execution-bindings/<agentId>/ob-asset-<skillId>/SKILL.md`。对照入口固定 `not_materialized` | 同一次 RPC 里文件刚写好，就记成下一轮 `ready` |
-| 运行时绑定 | `not_required` / `pending` / `synced` / `failed` | `syncInstallToRuntime` 的 `synced` 与 `reason`。主切片在未调用该函数时记 `not_required` 或 `pending`（见 §3.3.1），不记 `synced` | 用投影目录存在推出绑定已同步；用 warn 日志的缺失推出成功 |
+| 层         | 笔记允许的值                                        | 从哪里读（现有数据，不新写字段）                                                                                                                                            | 禁止的推断                                                                       |
+| ---------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 安装关系   | `requested` / `linked` / `absent`                   | 主切片：`robotRelations` 中该 `(agentId, skillId)`。对照入口：`employee-install.json` 的 `request.status`，原样另记，不升级成技能关系                                       | 关系 `linked` 或请求 `installed` 推出投影 `ready`、绑定 `synced`、可用性 `ready` |
+| 执行投影   | `pending` / `ready` / `failed` / `not_materialized` | `SyncSkillExecutionBindingResult.action` 与 `reason`；投影路径 `CONFIG_DIR/skill-execution-bindings/<agentId>/ob-asset-<skillId>/SKILL.md`。对照入口固定 `not_materialized` | 同一次 RPC 里文件刚写好，就记成下一轮 `ready`                                    |
+| 运行时绑定 | `not_required` / `pending` / `synced` / `failed`    | `syncInstallToRuntime` 的 `synced` 与 `reason`。主切片在未调用该函数时记 `not_required` 或 `pending`（见 §3.3.1），不记 `synced`                                            | 用投影目录存在推出绑定已同步；用 warn 日志的缺失推出成功                         |
 
 可用性 `ready` / `degraded` / `failed` 只出现在验收笔记的结论栏，不要求写回 gateway。`ready` 还要 §3.4 的下一次 loader 证据。投影 `ready` 且绑定失败时，笔记用 `degraded`，文案写明原因，不写「安装成功」。
 
 ### 4.2 空白记录表（执行时填写，本轮留空）
 
-| 步 | 安装关系 | 执行投影 | 运行时绑定 | 结论栏（仅笔记） | 失败原因原文 |
-| --- | --- | --- | --- | --- | --- |
-| 创建或选择 |  |  |  |  |  |
-| 保存 |  |  |  |  |  |
-| 授权/安装（主切片） |  |  |  |  |  |
-| 授权/安装（对照 employee-install） |  |  |  |  |  |
-| 运行（下一次 loader） |  |  |  |  |  |
-| 撤销 |  |  |  |  |  |
-| 撤销后的下一次 loader |  |  |  |  |  |
+| 步                                 | 安装关系 | 执行投影 | 运行时绑定 | 结论栏（仅笔记） | 失败原因原文 |
+| ---------------------------------- | -------- | -------- | ---------- | ---------------- | ------------ |
+| 创建或选择                         |          |          |            |                  |              |
+| 保存                               |          |          |            |                  |              |
+| 授权/安装（主切片）                |          |          |            |                  |              |
+| 授权/安装（对照 employee-install） |          |          |            |                  |              |
+| 运行（下一次 loader）              |          |          |            |                  |              |
+| 撤销                               |          |          |            |                  |              |
+| 撤销后的下一次 loader              |          |          |            |                  |              |
 
 幂等补行：对同一机器人、同一技能再执行一次 `robot-skills.install` 后，关系仍是一条，`ob-asset-<skillId>` 目录仍是一份。终态三行与第一次成功后的笔记一致。出现第二条 `robotRelations` 或第二份仍被 loader 加载的投影，幂等失败。
 
@@ -327,11 +327,11 @@
 
 ## 6. 闸门映射
 
-| 闸门 | 本文所处位置 | 通过本文不能得出的结论 |
-| --- | --- | --- |
-| A 基线确认 | D0=A 已冻结。四个调查基线 permalink 见证据索引与 #546。撰写时主干比调查基线多 #544，且 §3 技能路径 diff 为空。生产版本 **待核实** | 闸门 A 已通过。调查基线是当前生产事实 |
+| 闸门                   | 本文所处位置                                                                                                                          | 通过本文不能得出的结论                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| A 基线确认             | D0=A 已冻结。四个调查基线 permalink 见证据索引与 #546。撰写时主干比调查基线多 #544，且 §3 技能路径 diff 为空。生产版本 **待核实**     | 闸门 A 已通过。调查基线是当前生产事实                                  |
 | B 状态机与失败语义冻结 | 本文使用 D5 的分层记录方式做验收笔记。D5/D9 在 #546 §7 仍是未勾选的决定。本文不附上「四层字段如何映射进现有授权与工具筛选」的实施说明 | 闸门 B 已通过。可以改产品里的分层状态，或把 `installed` 的写入时机改掉 |
-| C 端到端集成验收 | 本文给出切片五步与 §5.2。§5.2 未勾。#546 §6 矩阵是切片执行通过之后的全量矩阵，不是本文件的勾选对象 | 闸门 C 已通过。员工端安装已经验收完成。可以扩对外文档或孵化指标 |
+| C 端到端集成验收       | 本文给出切片五步与 §5.2。§5.2 未勾。#546 §6 矩阵是切片执行通过之后的全量矩阵，不是本文件的勾选对象                                    | 闸门 C 已通过。员工端安装已经验收完成。可以扩对外文档或孵化指标        |
 
 ### 6.1 实施前义务
 

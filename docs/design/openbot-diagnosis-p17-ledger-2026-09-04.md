@@ -12,15 +12,15 @@ Machine: [ledger JSON](/design/openbot-diagnosis-p17-ledger-2026-09-04.json)
 
 ## 逐项
 
-| 身份                          | SHA            | 来源                                                 | 证据                                                                        | 结论                              |
-| ----------------------------- | -------------- | ---------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------- |
-| candidate                     | `330d92207478` | `git rev-parse origin/main`（已 `git fetch origin`） | #940 merge                                                                  | 等于最新 origin/main              |
-| origin/main                   | `330d92207478` | 同上                                                 | #940 在 #938/#939 之后                                                      | 唯一 candidate 基线               |
-| LIVE                          | `457057ba2adb` | 运行容器 `/app/dist/build-info.json`                 | `builtAt=2026-09-04T05:23:54.951Z`                                          | 唯一运行事实；是 origin/main 祖先 |
-| ledger 开放行 seq 60          | `457057ba2adb` | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`                   | #940 / `d48aff7310`；`liveFrom=2026-09-04T05:55:49Z`；`no provenance-sha-*` | 与 LIVE 一致；**keep**            |
-| ledger seq 59                 | `3d03d3b4df91` | 同上，已 `liveTo=2026-09-04T05:55:49Z`               | 已关闭                                                                      | historical；**不得写成 Latest**   |
-| RELEASE_RECORD Latest cutover | `37cc40e51f46` | `RELEASE_RECORD.md` Source revision                  | seq 54 / `2026-09-02T09:50:59Z`                                             | **仍落后**                        |
-| provenance                    | missing        | `git tag` / `git ls-remote`                          | 仅有 `provenance/sha-37cc40e51f46`                                          | **不可证明**                      |
+| 身份                          | SHA            | 来源                                                                                                      | 证据                                                                        | 结论                              |
+| ----------------------------- | -------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------- |
+| candidate                     | `330d92207478` | `git rev-parse origin/main`（已 `git fetch origin`）                                                      | #940 merge                                                                  | 等于最新 origin/main              |
+| origin/main                   | `330d92207478` | 同上                                                                                                      | #940 在 #938/#939 之后                                                      | 唯一 candidate 基线               |
+| LIVE                          | `457057ba2adb` | 运行容器 `/app/dist/build-info.json`                                                                      | `builtAt=2026-09-04T05:23:54.951Z`                                          | 唯一运行事实；是 origin/main 祖先 |
+| ledger 开放行 seq 60          | `457057ba2adb` | `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` | #940 / `d48aff7310`；`liveFrom=2026-09-04T05:55:49Z`；`no provenance-sha-*` | 与 LIVE 一致；**keep**            |
+| ledger seq 59                 | `3d03d3b4df91` | 同上，已 `liveTo=2026-09-04T05:55:49Z`                                                                    | 已关闭                                                                      | historical；**不得写成 Latest**   |
+| RELEASE_RECORD Latest cutover | `37cc40e51f46` | `RELEASE_RECORD.md` Source revision                                                                       | seq 54 / `2026-09-02T09:50:59Z`                                             | **仍落后**                        |
+| provenance                    | missing        | `git tag` / `git ls-remote`                                                                               | 仅有 `provenance/sha-37cc40e51f46`                                          | **不可证明**                      |
 
 Forward-only：`allow`。LIVE ⊂ candidate 且 LIVE ⊂ origin/main。
 

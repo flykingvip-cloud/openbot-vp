@@ -46,15 +46,15 @@ product_code: false
 
 ## 1. 环境
 
-| 身份 | commit / 状态 | 这次怎么用 |
-| --- | --- | --- |
-| 观测当时的纯 `origin/main` | `041dfd8826ee5d9854e5d3aefc46ec90dd94fc15` | 含 #553。不含 #565，不含 #567。不是 live HEAD |
-| #553 | `17e11f1549531f2fc50c1d3b4417e8beff64f858`，已合入上述 tip | 分层字段 `relation` / `projection` / `runtimeBinding` 来自这条已合入的回报。不能把 #553 在主干上的存在写成闸门 C 通过 |
-| #565 | GitHub **OPEN**，未合入 `main` | 只存在于 overlay 的第二次 merge。共享 token + 设备握手、无顶层 `user`、`pairedDeviceId` → `ownerId` 是这条未合入改动上的现场 |
-| #567 | GitHub **OPEN**，未合入 `main` | 只存在于 overlay 的第一次 merge。`node --require tsx/cjs` 导入 `resolveEmbeddedRunSkillEntries` 成功，是这条未合入改动上的现场 |
-| 实际 live HEAD | `d9960b3167d77bd1466e8ea718ebcb7d5124e7f7` | 临时 Mac worktree：`041dfd882…` + merge #567 + merge #565。可逆。不是产品默认。本仓库对象库没有这个 SHA，身份来自性能评测的现场报告 |
-| HK LIVE | `65564d30b25a41f49866f96e0efed9caacd80a9b` | 不是这次。RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f` |
-| 撰写时的 `origin/main` | `f43330f00792a585df40f9be2cf27b4fad2f6e8b`（#562） | 观测 tip 之后只多了 #562 那份文档。仍不含 #565 / #567。撰写时的主干不是 live HEAD |
+| 身份                       | commit / 状态                                              | 这次怎么用                                                                                                                          |
+| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 观测当时的纯 `origin/main` | `041dfd8826ee5d9854e5d3aefc46ec90dd94fc15`                 | 含 #553。不含 #565，不含 #567。不是 live HEAD                                                                                       |
+| #553                       | `17e11f1549531f2fc50c1d3b4417e8beff64f858`，已合入上述 tip | 分层字段 `relation` / `projection` / `runtimeBinding` 来自这条已合入的回报。不能把 #553 在主干上的存在写成闸门 C 通过               |
+| #565                       | GitHub **OPEN**，未合入 `main`                             | 只存在于 overlay 的第二次 merge。共享 token + 设备握手、无顶层 `user`、`pairedDeviceId` → `ownerId` 是这条未合入改动上的现场        |
+| #567                       | GitHub **OPEN**，未合入 `main`                             | 只存在于 overlay 的第一次 merge。`node --require tsx/cjs` 导入 `resolveEmbeddedRunSkillEntries` 成功，是这条未合入改动上的现场      |
+| 实际 live HEAD             | `d9960b3167d77bd1466e8ea718ebcb7d5124e7f7`                 | 临时 Mac worktree：`041dfd882…` + merge #567 + merge #565。可逆。不是产品默认。本仓库对象库没有这个 SHA，身份来自性能评测的现场报告 |
+| HK LIVE                    | `65564d30b25a41f49866f96e0efed9caacd80a9b`                 | 不是这次。RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f`                                      |
+| 撰写时的 `origin/main`     | `f43330f00792a585df40f9be2cf27b4fad2f6e8b`（#562）         | 观测 tip 之后只多了 #562 那份文档。仍不含 #565 / #567。撰写时的主干不是 live HEAD                                                   |
 
 健康检查为 live。health live 不是 §5.2 的「真实执行上下文可见」。
 
@@ -67,25 +67,25 @@ product_code: false
 3. **认证：** 共享 token + 设备握手。连接没有顶层 `user`。个人资产主人走 `pairedDeviceId` → `ownerId`。这是 overlay 里的 #565。纯主干上的 `resolvePersonalAssetOwnerIdentities` 仍只收集平台用户 id 与邮箱，不读 `pairedDeviceId`。
 4. **清理：** 跑完后已删除。下面的 `skillId` 是这次记录的键，不是仍留在 gateway 上的资产。
 
-| 键 | 值 |
-| --- | --- |
+| 键      | 值                                 |
+| ------- | ---------------------------------- |
 | agentId | `agt-daniel-hhd-gmail-com-nchn5ey` |
 | skillId | `skill_702b024b2d39`（事后已删除） |
-| 投影名 | `ob-asset-skill_702b024b2d39` |
+| 投影名  | `ob-asset-skill_702b024b2d39`      |
 
 ## 3. §4.2 三层记录
 
 表结构与 #549 §4.2 一致。可用性只写在结论栏。关系、投影、绑定分开记。主切片的下一次 loader 与对照入口的 loader 分开记。同一次安装 RPC 里的 `{ skill }` 或刚写的文件，不充当下一次 `resolveEmbeddedRunSkillEntries`。
 
-| 步 | 安装关系 | 执行投影 | 运行时绑定 | 结论栏（仅笔记） | 失败原因原文 |
-| --- | --- | --- | --- | --- | --- |
-| 创建或选择 | 先保存 draft。第一次因缺少 `sourceAgentId` 失败；补上之后保存成功，再定稿 | 定稿前的 draft 没有被记成可执行投影 | 本步报告未单列绑定 | 定稿结果：`private`，`v1.0.0`。留下 `skillId=skill_702b024b2d39`。draft 不是后来被 loader 看见的终态 | 第一次：`sourceAgentId` required。报告没有另打印类名 |
-| 保存 | `personal-skills.detail` 与保存结果一致。读的是个人技能资产，不是 `employee-install.json` | 本步报告未单列新投影 | 本步报告未单列绑定 | 再读 PASS | 第一次失败文案见上一行。成功路径没有失败文案 |
-| 授权/安装（主切片 `robot-skills.install`） | `linked` | `ready` / action `materialised`。名字 `ob-asset-skill_702b024b2d39` | **未同步。** role `auxiliary`，state `failed`，`synced: false` | 三行取值彼此独立。关系 linked 与投影 ready 没有把绑定写成 `synced` | `membership-not-found` |
-| 授权/安装（对照 `employee-install`） | 请求状态 `installed`。这是安装请求，不是主切片的 `robotRelations` | `not_materialized` | 未同步。`synced` 不是 true | `executable: false`，`availability: failed`，`nextStep: runtime-binding-failed`。随后的 loader 仍看不到该技能。**installed ≠ ready** | `membership-not-found` |
-| 运行（主切片下一次 loader） | 本步报告未给出关系变化 | 下一次 `resolveEmbeddedRunSkillEntries` 看见 `ob-asset-skill_702b024b2d39` | 绑定仍是上一行的 `synced: false`。loader 看见投影，不把绑定升级成 `synced` | 来源 `openbot-lifecycle-binding`。证据是安装返回之后的另一次调用 | 无。导入本身已成功，见第 2 节 |
-| 撤销（`robot-skills.remove`） | `absent` | 投影已移除 | 不把安装时的 `synced: false` 沿用成撤销通过 | 关系消失且投影移除。这还不是下一轮 loader | 无失败文案。响应里的成功标志没有被单独当成下一轮证据 |
-| 撤销后的下一次 loader | 关系保持 absent | 该名字不再被加载 | 绑定 synced 仍未通过，且本步不需要它来证明名字消失 | 下一次 `resolveEmbeddedRunSkillEntries` 对该名字 **hitCount=0** | 无 |
+| 步                                         | 安装关系                                                                                  | 执行投影                                                                   | 运行时绑定                                                                 | 结论栏（仅笔记）                                                                                                                     | 失败原因原文                                         |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| 创建或选择                                 | 先保存 draft。第一次因缺少 `sourceAgentId` 失败；补上之后保存成功，再定稿                 | 定稿前的 draft 没有被记成可执行投影                                        | 本步报告未单列绑定                                                         | 定稿结果：`private`，`v1.0.0`。留下 `skillId=skill_702b024b2d39`。draft 不是后来被 loader 看见的终态                                 | 第一次：`sourceAgentId` required。报告没有另打印类名 |
+| 保存                                       | `personal-skills.detail` 与保存结果一致。读的是个人技能资产，不是 `employee-install.json` | 本步报告未单列新投影                                                       | 本步报告未单列绑定                                                         | 再读 PASS                                                                                                                            | 第一次失败文案见上一行。成功路径没有失败文案         |
+| 授权/安装（主切片 `robot-skills.install`） | `linked`                                                                                  | `ready` / action `materialised`。名字 `ob-asset-skill_702b024b2d39`        | **未同步。** role `auxiliary`，state `failed`，`synced: false`             | 三行取值彼此独立。关系 linked 与投影 ready 没有把绑定写成 `synced`                                                                   | `membership-not-found`                               |
+| 授权/安装（对照 `employee-install`）       | 请求状态 `installed`。这是安装请求，不是主切片的 `robotRelations`                         | `not_materialized`                                                         | 未同步。`synced` 不是 true                                                 | `executable: false`，`availability: failed`，`nextStep: runtime-binding-failed`。随后的 loader 仍看不到该技能。**installed ≠ ready** | `membership-not-found`                               |
+| 运行（主切片下一次 loader）                | 本步报告未给出关系变化                                                                    | 下一次 `resolveEmbeddedRunSkillEntries` 看见 `ob-asset-skill_702b024b2d39` | 绑定仍是上一行的 `synced: false`。loader 看见投影，不把绑定升级成 `synced` | 来源 `openbot-lifecycle-binding`。证据是安装返回之后的另一次调用                                                                     | 无。导入本身已成功，见第 2 节                        |
+| 撤销（`robot-skills.remove`）              | `absent`                                                                                  | 投影已移除                                                                 | 不把安装时的 `synced: false` 沿用成撤销通过                                | 关系消失且投影移除。这还不是下一轮 loader                                                                                            | 无失败文案。响应里的成功标志没有被单独当成下一轮证据 |
+| 撤销后的下一次 loader                      | 关系保持 absent                                                                           | 该名字不再被加载                                                           | 绑定 synced 仍未通过，且本步不需要它来证明名字消失                         | 下一次 `resolveEmbeddedRunSkillEntries` 对该名字 **hitCount=0**                                                                      | 无                                                   |
 
 幂等补行：报告没有对同一机器人、同一技能做第二次 `robot-skills.install`。不记幂等通过。并发未测。
 

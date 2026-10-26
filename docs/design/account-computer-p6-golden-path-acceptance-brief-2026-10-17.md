@@ -17,13 +17,13 @@ Hand-back label (locked): **「交给AI」** (`computerHandBack`). Not「交还�
 
 ## Automated coverage
 
-| Layer | File | Role |
-|---|---|---|
-| **Golden stitch (new)** | `src/agents/sandbox/account-computer-login-golden-path.test.ts` | Fixture DOM contract + Form→fill→handoff→给AI→await_return |
-| P5a form/fill | `secure-form.test.ts`, `secure-form-fill-host.test.ts` | Pending form, fill zeroize, domain fail-closed |
-| P5b handoff | `secure-form.handoff.test.ts`, `secure-form-handoff-wait.test.ts` | handoff_active, releaseControl → handoff_returned |
-| UI 给AI | `secure-form-card.test.ts`, `account-computer-preview.test.ts`, `takeover-after-yield.test.ts` | Hint copy, handBack→releaseControl, YIELDED resume |
-| P6a Docker honesty | `account-worker-driver.test.ts` | Dual flags default off; gated Docker e2e |
+| Layer                   | File                                                                                           | Role                                                       |
+| ----------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Golden stitch (new)** | `src/agents/sandbox/account-computer-login-golden-path.test.ts`                                | Fixture DOM contract + Form→fill→handoff→给AI→await_return |
+| P5a form/fill           | `secure-form.test.ts`, `secure-form-fill-host.test.ts`                                         | Pending form, fill zeroize, domain fail-closed             |
+| P5b handoff             | `secure-form.handoff.test.ts`, `secure-form-handoff-wait.test.ts`                              | handoff_active, releaseControl → handoff_returned          |
+| UI 给AI                 | `secure-form-card.test.ts`, `account-computer-preview.test.ts`, `takeover-after-yield.test.ts` | Hint copy, handBack→releaseControl, YIELDED resume         |
+| P6a Docker honesty      | `account-worker-driver.test.ts`                                                                | Dual flags default off; gated Docker e2e                   |
 
 ## Commands (Mac worktree)
 
@@ -63,25 +63,25 @@ OPENBOT_ACCOUNT_WORKER_DOCKER_E2E=1 pnpm exec vitest run --config vitest.config.
 
 ## What this does / does not claim
 
-| Claims | Does not claim |
-|---|---|
-| Fixture login success marker works | Real IdP / SSO / passkey against a third-party site |
-| Fill path zeroizes secrets in receipt | Live Account Worker Docker browser filled the fixture |
-| Handoff hint defaults to「交给AI」; releaseControl wakes await_return | Dual flags flipped ON |
+| Claims                                                                | Does not claim                                        |
+| --------------------------------------------------------------------- | ----------------------------------------------------- |
+| Fixture login success marker works                                    | Real IdP / SSO / passkey against a third-party site   |
+| Fill path zeroizes secrets in receipt                                 | Live Account Worker Docker browser filled the fixture |
+| Handoff hint defaults to「交给AI」; releaseControl wakes await_return | Dual flags flipped ON                                 |
 
 ## Results recorded (implementer Mac, 2026-10-17 Asia/Shanghai)
 
-| Suite | Command scope | Result |
-|---|---|---|
-| Golden-path | `account-computer-login-golden-path.test.ts` | **4/4 PASS** |
+| Suite             | Command scope                                       | Result         |
+| ----------------- | --------------------------------------------------- | -------------- |
+| Golden-path       | `account-computer-login-golden-path.test.ts`        | **4/4 PASS**   |
 | Layered + UI pack | 11 files (golden + secure-form + handoff + UI 给AI) | **99/99 PASS** |
 
 Base main SHA: `3ae936cce1ffb31c0b16ea6d7f29420f831e27b2`.
 
 ## Suggested 本机验收 focus
 
-1. Tip SHA contains P6a (`3ae936cce` ancestor) + this golden-path test.  
-2. Golden-path vitest **PASS**.  
-3. zh-CN `computerHandBack === "交给AI"`.  
-4. Flags still default-off in code/tests.  
+1. Tip SHA contains P6a (`3ae936cce` ancestor) + this golden-path test.
+2. Golden-path vitest **PASS**.
+3. zh-CN `computerHandBack === "交给AI"`.
+4. Flags still default-off in code/tests.
 5. Do **not** require live third-party login for this brief.

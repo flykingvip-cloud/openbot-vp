@@ -16,16 +16,16 @@ skill: oi-bind-douyin
 
 ## E2E 尝试（2026-10-19）
 
-| 序 | 步骤 | 环境 | 结果 |
-|----|------|------|------|
-| 1 | 确认公开入口 `https://developer.open-douyin.com/` / `https://open.douyin.com/` | Mac worktree | ok（public_docs） |
-| 2 | 云电脑登录开放平台 → 取 Token → bind | Cloud PC | **阻断**：无云电脑会话 |
-| 3 | `credentials.bind`（accountHandle + accessToken） | gateway | **未执行**（无真实凭证） |
-| 4 | 个人授权页 douyin=active | 产品 UI | **未达** |
+| 序  | 步骤                                                                           | 环境         | 结果                     |
+| --- | ------------------------------------------------------------------------------ | ------------ | ------------------------ |
+| 1   | 确认公开入口 `https://developer.open-douyin.com/` / `https://open.douyin.com/` | Mac worktree | ok（public_docs）        |
+| 2   | 云电脑登录开放平台 → 取 Token → bind                                           | Cloud PC     | **阻断**：无云电脑会话   |
+| 3   | `credentials.bind`（accountHandle + accessToken）                              | gateway      | **未执行**（无真实凭证） |
+| 4   | 个人授权页 douyin=active                                                       | 产品 UI      | **未达**                 |
 
 ## 失败点 / 阻断
 
-- Cloud PC 不可用；无合规 Token。  
+- Cloud PC 不可用；无合规 Token。
 - Cookie vs Token 合规性仍标 path_unstable（见 path-map）。
 
 ## 翻旗前置（尚未满足）

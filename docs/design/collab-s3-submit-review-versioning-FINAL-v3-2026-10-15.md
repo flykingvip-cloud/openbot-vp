@@ -1,12 +1,12 @@
 # Collab S3 — Version-bound submit / accept / return (FINAL v3)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **flags default OFF** — tip gray needs explicit allowlist |
-| Spec | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S3 + expert hard requirements |
-| Depends | **P0 #731**, **S1 #734**, **S2 #735** (tip `4772926fcd…`) |
-| Code | `claim-contract.ts` (submit/accept/return), `submit-review-versioning.ts`, `collab-s3-submit-review-versioning.test.ts` |
+| Field   | Value                                                                                                                   |
+| ------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Date    | 2026-10-15 Asia/Shanghai                                                                                                |
+| Status  | Code ready; **flags default OFF** — tip gray needs explicit allowlist                                                   |
+| Spec    | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S3 + expert hard requirements                                         |
+| Depends | **P0 #731**, **S1 #734**, **S2 #735** (tip `4772926fcd…`)                                                               |
+| Code    | `claim-contract.ts` (submit/accept/return), `submit-review-versioning.ts`, `collab-s3-submit-review-versioning.test.ts` |
 
 ## Scope
 
@@ -20,13 +20,13 @@
 
 ## Flags (stay OFF in this PR)
 
-| Flag | Default | Tip gray enable |
-| --- | --- | --- |
-| `collaboration.task.claimContract` | false | Prefer scoped `001/grp-…` after P0 |
-| `collaboration.task.wakeContract` | false | Unchanged |
-| `collaboration.task.challengeWindow` | false | Unchanged |
-| `collaboration.runtimeNamespace` | false | Unchanged (N2 unsigned) |
-| `botMaySelfAdvanceWithoutHuman` | false | **S5 only** |
+| Flag                                 | Default | Tip gray enable                    |
+| ------------------------------------ | ------- | ---------------------------------- |
+| `collaboration.task.claimContract`   | false   | Prefer scoped `001/grp-…` after P0 |
+| `collaboration.task.wakeContract`    | false   | Unchanged                          |
+| `collaboration.task.challengeWindow` | false   | Unchanged                          |
+| `collaboration.runtimeNamespace`     | false   | Unchanged (N2 unsigned)            |
+| `botMaySelfAdvanceWithoutHuman`      | false   | **S5 only**                        |
 
 **Does not** open production gray writes. LIVE / Floor untouched. No second orchestrator.
 

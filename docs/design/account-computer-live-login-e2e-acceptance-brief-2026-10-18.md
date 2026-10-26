@@ -11,13 +11,13 @@ P6 fixture golden-path (#793) used **mocked** CDP fill. This brief covers the ne
 
 ## Default demo IdP (no Brian personal credentials)
 
-| Item | Default |
-|---|---|
-| URL | `https://authenticationtest.com/simpleFormAuth/` |
-| Host | `authenticationtest.com` |
-| E-Mail | `simpleForm@authenticationtest.com` (printed on the page) |
-| Password | `pa$$w0rd` (printed on the page) |
-| Success | URL matches `loginSuccess`; body contains `Success! You are now logged in` |
+| Item     | Default                                                                    |
+| -------- | -------------------------------------------------------------------------- |
+| URL      | `https://authenticationtest.com/simpleFormAuth/`                           |
+| Host     | `authenticationtest.com`                                                   |
+| E-Mail   | `simpleForm@authenticationtest.com` (printed on the page)                  |
+| Password | `pa$$w0rd` (printed on the page)                                           |
+| Success  | URL matches `loginSuccess`; body contains `Success! You are now logged in` |
 
 These credentials are **public documentation on the IdP**, not secrets. Override with env when pointing at staging (never commit staging secrets).
 
@@ -25,23 +25,23 @@ These credentials are **public documentation on the IdP**, not secrets. Override
 
 ## Gate / env
 
-| Env | Role |
-|---|---|
-| `OPENBOT_ACCOUNT_LIVE_LOGIN_E2E=1` | Enable the live Chromium case (required) |
-| `OPENBOT_ACCOUNT_LIVE_LOGIN_URL` | Optional login page URL |
-| `OPENBOT_ACCOUNT_LIVE_LOGIN_HOST` | Optional expected host (else derived from URL) |
-| `OPENBOT_ACCOUNT_LIVE_LOGIN_USER` / `_PASSWORD` | Optional overrides |
-| `OPENBOT_ACCOUNT_LIVE_LOGIN_EMAIL_SELECTOR` / `_PASSWORD_SELECTOR` / `_SUBMIT_SELECTOR` | Optional CSS selectors |
-| `OPENBOT_ACCOUNT_LIVE_LOGIN_SUCCESS_URL_RE` | Optional success URL regexp (default `loginSuccess`) |
+| Env                                                                                     | Role                                                 |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `OPENBOT_ACCOUNT_LIVE_LOGIN_E2E=1`                                                      | Enable the live Chromium case (required)             |
+| `OPENBOT_ACCOUNT_LIVE_LOGIN_URL`                                                        | Optional login page URL                              |
+| `OPENBOT_ACCOUNT_LIVE_LOGIN_HOST`                                                       | Optional expected host (else derived from URL)       |
+| `OPENBOT_ACCOUNT_LIVE_LOGIN_USER` / `_PASSWORD`                                         | Optional overrides                                   |
+| `OPENBOT_ACCOUNT_LIVE_LOGIN_EMAIL_SELECTOR` / `_PASSWORD_SELECTOR` / `_SUBMIT_SELECTOR` | Optional CSS selectors                               |
+| `OPENBOT_ACCOUNT_LIVE_LOGIN_SUCCESS_URL_RE`                                             | Optional success URL regexp (default `loginSuccess`) |
 
 Ungated default suite: brief + gate contract only (no network). Live case uses `describe.runIf(gate)`.
 
 ## Automated coverage
 
-| File | Role |
-|---|---|
+| File                                                     | Role                                         |
+| -------------------------------------------------------- | -------------------------------------------- |
 | `src/agents/sandbox/account-computer-live-login.test.ts` | Gate doc + live Chromium fill + handoff→给AI |
-| (existing) `account-computer-login-golden-path.test.ts` | Fixture + mocked fill (unchanged) |
+| (existing) `account-computer-login-golden-path.test.ts`  | Fixture + mocked fill (unchanged)            |
 
 ## Commands (Mac worktree)
 
@@ -62,19 +62,19 @@ Requires local Google Chrome (`playwright-core` `channel: "chrome"`). Does **not
 
 ## What this does / does not claim
 
-| Claims | Does not claim |
-|---|---|
-| Real Chromium CDP reachable; fill host peeks account CDP port | Account Worker Docker browser filled the page |
-| Production `createSecureFormFillDeps` filled `#email`/`#password` | Corporate Okta/Azure AD/WeChat SSO |
-| Site submit → public demo success page | Passkey / QR / captcha takeover |
-| Handoff instruction uses **「交给AI」**; `releaseControl` wakes `await_return` | Dual-flag / personal_local policy change |
-| Receipts / broadcasts do not echo password or VNC secret | Production device signed cutover |
+| Claims                                                                         | Does not claim                                |
+| ------------------------------------------------------------------------------ | --------------------------------------------- |
+| Real Chromium CDP reachable; fill host peeks account CDP port                  | Account Worker Docker browser filled the page |
+| Production `createSecureFormFillDeps` filled `#email`/`#password`              | Corporate Okta/Azure AD/WeChat SSO            |
+| Site submit → public demo success page                                         | Passkey / QR / captcha takeover               |
+| Handoff instruction uses **「交给AI」**; `releaseControl` wakes `await_return` | Dual-flag / personal_local policy change      |
+| Receipts / broadcasts do not echo password or VNC secret                       | Production device signed cutover              |
 
 ## Suggested 本机验收 focus
 
-1. Tip contains this brief + `account-computer-live-login.test.ts`.  
-2. Ungated vitest **PASS** (brief/gate only).  
-3. With `OPENBOT_ACCOUNT_LIVE_LOGIN_E2E=1`, live case **PASS** on this Mac.  
-4. zh-CN hand-back remains **「交给AI」** (not the retired hand-back label).  
-5. No secrets committed; demo defaults match the public IdP page.  
+1. Tip contains this brief + `account-computer-live-login.test.ts`.
+2. Ungated vitest **PASS** (brief/gate only).
+3. With `OPENBOT_ACCOUNT_LIVE_LOGIN_E2E=1`, live case **PASS** on this Mac.
+4. zh-CN hand-back remains **「交给AI」** (not the retired hand-back label).
+5. No secrets committed; demo defaults match the public IdP page.
 6. Do **not** require Brian personal IdP credentials for this brief.
