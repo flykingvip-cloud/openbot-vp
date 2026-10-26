@@ -31,15 +31,20 @@ import {
   confirmWakeOpCompleted,
   markWakeOpCompleted,
   markWakeOpUnknown,
+  mintWakeOpRecoverySubject,
+  producePlatformNoneVerification,
   readWakeOpRecord,
   releaseWakeOpForRetry,
-  type TrustedWakeOpOperator,
 } from "../collaboration-dispatch/wake-op-ledger.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { canRequestTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
+import {
+  confirmWakeOpCompletedAuthorized,
+  releaseWakeOpForRetryAuthorized,
+} from "./wake-op-recovery-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -218,16 +223,54 @@ async function seedUnknownOp(params: { cfg: OpenBotConfig; itemId: string; withR
   return { authority, opKey, state, taskId, groupId, objectStorage, approvers: [tenant.approver] };
 }
 
-function noneCheck(
-  opKey: string,
-  overrides: Partial<{ source: string; opId: string; checkedAtMs: number; outcome: "none" }> = {},
+async function platformVerifyNone(params: {
+  authority: import("../collaboration-dispatch/runtime-authority.js").RuntimeAuthority;
+  cfg: OpenBotConfig;
+  groupId: string;
+  taskId: string;
+  opKey: string;
+  checkedAtMs?: number;
+  source?: string;
+}) {
+  const nowMs = params.checkedAtMs ?? Date.now();
+  const produced = await producePlatformNoneVerification({
+    authority: params.authority,
+    cfg: params.cfg,
+    groupId: params.groupId,
+    taskId: params.taskId,
+    opKey: params.opKey,
+    nowMs,
+    probe: async () => ({ source: params.source ?? "side_effect_probe", outcome: "none" as const }),
+  });
+  if (!produced.ok) {
+    throw new Error(`verify failed: ${produced.reason}`);
+  }
+  return produced.record;
+}
+
+function mintReleaseSubject(actorId: string, groupId: string, taskId: string) {
+  return mintWakeOpRecoverySubject({
+    actorId,
+    action: "release_for_retry",
+    groupId,
+    taskId,
+    taskApproverIds: [tenant.approver],
+  });
+}
+
+function mintConfirmSubject(
+  actorId: string,
+  groupId: string,
+  taskId: string,
+  approvers?: string[],
 ) {
-  return {
-    source: overrides.source ?? "side_effect_probe",
-    opId: overrides.opId ?? opKey,
-    checkedAtMs: overrides.checkedAtMs ?? Date.now(),
-    outcome: (overrides.outcome ?? "none") as "none",
-  };
+  return mintWakeOpRecoverySubject({
+    actorId,
+    action: "confirm_completed",
+    groupId,
+    taskId,
+    taskApproverIds: approvers ?? [tenant.approver],
+  });
 }
 
 describe("T34 C1/C2 wake-op release/confirm", () => {
@@ -293,45 +336,59 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     const before = await readWakeOpRecord({ authority: ctx.authority, opKey: ctx.opKey });
     expect(before?.status).toBe("unknown");
 
-    const forged = await releaseWakeOpForRetry({
+    // M1: self-constructed identitySource / plain operator object cannot unlock.
+    const forgedDeclared = await releaseWakeOpForRetry({
       authority: ctx.authority,
       opKey: ctx.opKey,
       cfg,
       externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey),
-      // Forged: non-runtime identity source even with a plausible actor id.
-      operator: { actorId: tenant.owner, identitySource: "declared" } as TrustedWakeOpOperator,
-      operatingState: ctx.state,
+      verificationId: "unused",
+      subject: { actorId: tenant.owner, identitySource: "declared" } as never,
     });
-    expect(forged.ok).toBe(false);
-    if (forged.ok) {
-      throw new Error("expected forged reject");
+    expect(forgedDeclared.ok).toBe(false);
+    if (forgedDeclared.ok) {
+      throw new Error("expected forged declared reject");
     }
-    expect(forged.reason).toBe("operator_identity_not_trusted");
+    expect(forgedDeclared.reason).toBe("operator_identity_not_trusted");
 
-    const forgedRuntime = await releaseWakeOpForRetry({
+    const forgedRuntimeTag = await releaseWakeOpForRetry({
       authority: ctx.authority,
       opKey: ctx.opKey,
       cfg,
       externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey),
-      operator: { actorId: "forged-operator-id", identitySource: "runtime" },
-      operatingState: ctx.state,
+      verificationId: "unused",
+      subject: { actorId: tenant.owner, identitySource: "runtime" } as never,
     });
-    expect(forgedRuntime.ok).toBe(false);
-    if (forgedRuntime.ok) {
-      throw new Error("expected forged runtime reject");
+    expect(forgedRuntimeTag.ok).toBe(false);
+    if (forgedRuntimeTag.ok) {
+      throw new Error("expected forged runtime tag reject");
     }
-    expect(forgedRuntime.reason).toBe("release_forbidden");
+    expect(forgedRuntimeTag.reason).toBe("operator_identity_not_trusted");
 
-    const cross = await releaseWakeOpForRetry({
+    // Forged subject id via controlled entry (loads OS — not caller state).
+    const forgedSubject = await releaseWakeOpForRetryAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
+      actorId: "forged-operator-id",
+      verificationId: "unused",
       cfg,
-      externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey),
-      operator: { actorId: tenant.crossOwner, identitySource: "runtime" },
-      operatingState: ctx.state,
+    });
+    expect(forgedSubject.ok).toBe(false);
+    if (forgedSubject.ok) {
+      throw new Error("expected forged subject reject");
+    }
+    expect(forgedSubject.reason).toBe("release_forbidden");
+
+    const cross = await releaseWakeOpForRetryAuthorized({
+      authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      actorId: tenant.crossOwner,
+      verificationId: "unused",
+      cfg,
     });
     expect(cross.ok).toBe(false);
     if (cross.ok) {
@@ -339,15 +396,14 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(cross.reason).toBe("release_forbidden");
 
-    const unauthorized = await releaseWakeOpForRetry({
+    const unauthorized = await releaseWakeOpForRetryAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
+      actorId: tenant.admin,
+      verificationId: "unused",
       cfg,
-      externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey),
-      // Admin can stop but must NOT release.
-      operator: { actorId: tenant.admin, identitySource: "runtime" },
-      operatingState: ctx.state,
     });
     expect(unauthorized.ok).toBe(false);
     if (unauthorized.ok) {
@@ -355,15 +411,21 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(unauthorized.reason).toBe("release_forbidden");
 
-    const revokedState = buildState({ revokeOwner: true });
-    const revoked = await releaseWakeOpForRetry({
+    // Revoke owner in durable OS, then entry must refuse (state unchanged).
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    await writeGroupOperatingState({
+      fileStore,
+      groupId: ctx.groupId,
+      state: buildState({ revokeOwner: true }),
+    });
+    const revoked = await releaseWakeOpForRetryAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
+      actorId: tenant.owner,
+      verificationId: "unused",
       cfg,
-      externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: revokedState,
     });
     expect(revoked.ok).toBe(false);
     if (revoked.ok) {
@@ -375,14 +437,23 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     expect(afterDenies?.status).toBe("unknown");
     expect(afterDenies?.releasedBy).toBeUndefined();
 
-    const ok = await releaseWakeOpForRetry({
+    // Restore OS; legitimate owner + controlled verification unlocks.
+    await writeGroupOperatingState({ fileStore, groupId: ctx.groupId, state: buildState() });
+    const verification = await platformVerifyNone({
       authority: ctx.authority,
-      opKey: ctx.opKey,
       cfg,
-      externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+    });
+    const ok = await releaseWakeOpForRetryAuthorized({
+      authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      actorId: tenant.owner,
+      verificationId: verification.verificationId,
+      cfg,
     });
     expect(ok.ok).toBe(true);
     if (!ok.ok) {
@@ -409,9 +480,7 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       opKey: ctx.opKey,
       roundId: "round-c1-confirm",
       cfg,
-      operator: { actorId: tenant.approver, identitySource: "declared" } as TrustedWakeOpOperator,
-      operatingState: ctx.state,
-      taskApproverIds: ctx.approvers,
+      subject: { actorId: tenant.approver, identitySource: "declared" } as never,
     });
     expect(forged.ok).toBe(false);
     if (forged.ok) {
@@ -419,14 +488,27 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(forged.reason).toBe("operator_identity_not_trusted");
 
-    const cross = await confirmWakeOpCompleted({
+    const forgedRuntime = await confirmWakeOpCompleted({
       authority: ctx.authority,
       opKey: ctx.opKey,
       roundId: "round-c1-confirm",
       cfg,
-      operator: { actorId: tenant.crossOwner, identitySource: "runtime" },
-      operatingState: ctx.state,
-      taskApproverIds: ctx.approvers,
+      subject: { actorId: tenant.approver, identitySource: "runtime" } as never,
+    });
+    expect(forgedRuntime.ok).toBe(false);
+    if (forgedRuntime.ok) {
+      throw new Error("expected forged runtime reject");
+    }
+    expect(forgedRuntime.reason).toBe("operator_identity_not_trusted");
+
+    const cross = await confirmWakeOpCompletedAuthorized({
+      authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      roundId: "round-c1-confirm",
+      actorId: tenant.crossOwner,
+      cfg,
     });
     expect(cross.ok).toBe(false);
     if (cross.ok) {
@@ -434,15 +516,14 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(cross.reason).toBe("confirm_forbidden");
 
-    // Owner can release but is NOT approver → confirm forbidden.
-    const ownerNotApprover = await confirmWakeOpCompleted({
+    const ownerNotApprover = await confirmWakeOpCompletedAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
       roundId: "round-c1-confirm",
+      actorId: tenant.owner,
       cfg,
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
-      taskApproverIds: ctx.approvers,
     });
     expect(ownerNotApprover.ok).toBe(false);
     if (ownerNotApprover.ok) {
@@ -450,19 +531,54 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(ownerNotApprover.reason).toBe("confirm_forbidden");
 
-    const revokedState = buildState({ revokeOwner: true });
-    // Revoke the approver row.
-    revokedState.memberRoleMap = revokedState.memberRoleMap.map((row) =>
-      row.memberId === tenant.approver ? { ...row, status: "revoked" } : row,
-    );
-    const revoked = await confirmWakeOpCompleted({
+    // Forge approver list: minted subject with forged approvers cannot be created via entry;
+    // direct mint with forged list still requires brand — entry loads task approvers.
+    // Forge approver list on an offline-minted subject — execute reloads task approvers and refuses.
+    const forgedApproverList = mintConfirmSubject(tenant.member, ctx.groupId, ctx.taskId, [
+      tenant.member,
+    ]);
+    const forgedList = await confirmWakeOpCompleted({
       authority: ctx.authority,
       opKey: ctx.opKey,
       roundId: "round-c1-confirm",
       cfg,
-      operator: { actorId: tenant.approver, identitySource: "runtime" },
-      operatingState: revokedState,
-      taskApproverIds: ctx.approvers,
+      subject: forgedApproverList,
+    });
+    expect(forgedList.ok).toBe(false);
+    if (forgedList.ok) {
+      throw new Error("expected forged approver-list refuse at execute");
+    }
+    expect(forgedList.reason).toBe("confirm_forbidden");
+
+    const viaEntry = await confirmWakeOpCompletedAuthorized({
+      authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      roundId: "round-c1-confirm",
+      actorId: tenant.member,
+      cfg,
+    });
+    expect(viaEntry.ok).toBe(false);
+    if (viaEntry.ok) {
+      throw new Error("expected forged approver-list path refuse via entry");
+    }
+    expect(viaEntry.reason).toBe("confirm_forbidden");
+
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    const revokedState = buildState();
+    revokedState.memberRoleMap = revokedState.memberRoleMap.map((row) =>
+      row.memberId === tenant.approver ? { ...row, status: "revoked" } : row,
+    );
+    await writeGroupOperatingState({ fileStore, groupId: ctx.groupId, state: revokedState });
+    const revoked = await confirmWakeOpCompletedAuthorized({
+      authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      roundId: "round-c1-confirm",
+      actorId: tenant.approver,
+      cfg,
     });
     expect(revoked.ok).toBe(false);
     if (revoked.ok) {
@@ -474,14 +590,15 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     expect(afterDenies?.status).toBe("unknown");
     expect(afterDenies?.confirmedBy).toBeUndefined();
 
-    const ok = await confirmWakeOpCompleted({
+    await writeGroupOperatingState({ fileStore, groupId: ctx.groupId, state: buildState() });
+    const ok = await confirmWakeOpCompletedAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
       roundId: "round-c1-confirm",
+      actorId: tenant.approver,
       cfg,
-      operator: { actorId: tenant.approver, identitySource: "runtime" },
-      operatingState: ctx.state,
-      taskApproverIds: ctx.approvers,
     });
     expect(ok.ok).toBe(true);
     if (!ok.ok) {
@@ -491,37 +608,50 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     expect(ok.record.confirmedBy).toBe(tenant.approver);
   });
 
-  test("C2-EFFECT-CHECK-01: missing/wrong-op/expired/contradictory/declaration-alone refuse; stay unknown", async () => {
+  test("C2-EFFECT-CHECK-01: self-filled / missing/wrong-op/expired/contradictory refuse; stay unknown", async () => {
     const { cfg } = await useIsolationRoot();
     const ctx = await seedUnknownOp({ cfg, itemId: "c2-effect" });
     const now = Date.now();
+    const subject = mintReleaseSubject(tenant.owner, ctx.groupId, ctx.taskId);
 
-    // Declaration alone: TypeScript requires check, but empty/invalid fields model "declaration only".
-    const missing = await releaseWakeOpForRetry({
+    // Self-filled verificationId that was never produced by controlled verifier.
+    const selfFilled = await releaseWakeOpForRetry({
       authority: ctx.authority,
       opKey: ctx.opKey,
       cfg,
       nowMs: now,
       externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey, { source: "" }),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
+      verificationId: "caller-invented-verification",
+      subject,
     });
-    expect(missing.ok).toBe(false);
-    if (missing.ok) {
-      throw new Error("expected missing source");
+    expect(selfFilled.ok).toBe(false);
+    if (selfFilled.ok) {
+      throw new Error("expected self-filled reject");
     }
-    expect(missing.reason).toBe("missing_effect_check_source");
+    expect(selfFilled.reason).toBe("missing_external_effect_verification");
 
+    // Wrong op: verification bound to a different opKey.
+    const wrongOpVer = await producePlatformNoneVerification({
+      authority: ctx.authority,
+      cfg,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: "other-task-other-op",
+      nowMs: now,
+      probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
+    });
+    expect(wrongOpVer.ok).toBe(true);
+    if (!wrongOpVer.ok) {
+      throw new Error("setup");
+    }
     const wrongOp = await releaseWakeOpForRetry({
       authority: ctx.authority,
       opKey: ctx.opKey,
       cfg,
       nowMs: now,
       externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey, { opId: "other-task-other-op" }),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
+      verificationId: wrongOpVer.record.verificationId,
+      subject,
     });
     expect(wrongOp.ok).toBe(false);
     if (wrongOp.ok) {
@@ -529,15 +659,28 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(wrongOp.reason).toBe("effect_check_op_mismatch");
 
+    // Expired verification.
+    const expiredVer = await producePlatformNoneVerification({
+      authority: ctx.authority,
+      cfg,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      nowMs: now - 31 * 60 * 1000,
+      probe: async () => ({ source: "side_effect_probe", outcome: "none" }),
+    });
+    expect(expiredVer.ok).toBe(true);
+    if (!expiredVer.ok) {
+      throw new Error("setup");
+    }
     const expired = await releaseWakeOpForRetry({
       authority: ctx.authority,
       opKey: ctx.opKey,
       cfg,
       nowMs: now,
       externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey, { checkedAtMs: now - 31 * 60 * 1000 }),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
+      verificationId: expiredVer.record.verificationId,
+      subject,
     });
     expect(expired.ok).toBe(false);
     if (expired.ok) {
@@ -545,43 +688,46 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     }
     expect(expired.reason).toBe("effect_check_expired");
 
-    const contradictory = await releaseWakeOpForRetry({
+    // Probe refuses / unavailable → keep unknown (no auto-retry).
+    const unavailable = await producePlatformNoneVerification({
       authority: ctx.authority,
-      opKey: ctx.opKey,
       cfg,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
       nowMs: now,
-      externalEffectVerified: "none",
-      externalEffectCheck: {
-        ...noneCheck(ctx.opKey),
-        outcome: "occurred",
-      } as ReturnType<typeof noneCheck>,
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
+      probe: async () => null,
     });
-    expect(contradictory.ok).toBe(false);
-    if (contradictory.ok) {
-      throw new Error("expected contradictory");
+    expect(unavailable.ok).toBe(false);
+    if (unavailable.ok) {
+      throw new Error("expected unavailable");
     }
-    expect(contradictory.reason).toBe("effect_check_contradictory_outcome");
+    expect(unavailable.reason).toBe("verify_capability_unavailable");
 
     const still = await readWakeOpRecord({ authority: ctx.authority, opKey: ctx.opKey });
     expect(still?.status).toBe("unknown");
 
-    // Human escalation checkbox ≠ fact: keep unknown when check cannot be validated.
-    // (Already covered by missing source.) Authorized owner with valid check can release.
+    // Trusted platform verification positive path.
+    const okVer = await platformVerifyNone({
+      authority: ctx.authority,
+      cfg,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+      checkedAtMs: now - 1000,
+    });
     const ok = await releaseWakeOpForRetry({
       authority: ctx.authority,
       opKey: ctx.opKey,
       cfg,
       nowMs: now,
       externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx.opKey, { checkedAtMs: now - 1000 }),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
+      verificationId: okVer.verificationId,
+      subject,
     });
     expect(ok.ok).toBe(true);
     if (!ok.ok) {
-      throw new Error("expected valid check release");
+      throw new Error("expected valid verification release");
     }
     expect(ok.record.externalEffectCheck?.checkedAtMs).toBe(now - 1000);
   });
@@ -590,15 +736,14 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
     const { cfg } = await useIsolationRoot();
     const ctx = await seedUnknownOp({ cfg, itemId: "c2-no-rerun" });
 
-    // No prior receipt → confirm refused; state stays unknown (no auto-rerun).
-    const noReceipt = await confirmWakeOpCompleted({
+    const noReceipt = await confirmWakeOpCompletedAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
       roundId: "invented-round",
+      actorId: tenant.approver,
       cfg,
-      operator: { actorId: tenant.approver, identitySource: "runtime" },
-      operatingState: ctx.state,
-      taskApproverIds: ctx.approvers,
     });
     expect(noReceipt.ok).toBe(false);
     if (noReceipt.ok) {
@@ -609,8 +754,13 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       "unknown",
     );
 
-    // Evidence collected, then late completion appears → release must refuse.
-    const check = noneCheck(ctx.opKey);
+    const verification = await platformVerifyNone({
+      authority: ctx.authority,
+      cfg,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
+      opKey: ctx.opKey,
+    });
     await markWakeOpCompleted({
       authority: ctx.authority,
       opKey: ctx.opKey,
@@ -618,14 +768,14 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       cfg,
       detail: "late_receipt_after_probe",
     });
-    const late = await releaseWakeOpForRetry({
+    const late = await releaseWakeOpForRetryAuthorized({
       authority: ctx.authority,
+      groupId: ctx.groupId,
+      taskId: ctx.taskId,
       opKey: ctx.opKey,
+      actorId: tenant.owner,
+      verificationId: verification.verificationId,
       cfg,
-      externalEffectVerified: "none",
-      externalEffectCheck: check,
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx.state,
     });
     expect(late.ok).toBe(false);
     if (late.ok) {
@@ -636,20 +786,26 @@ describe("T34 C1/C2 wake-op release/confirm", () => {
       "completed",
     );
 
-    // Prior receipt on unknown (gap model) → release refuses; use confirm instead.
     const ctx2 = await seedUnknownOp({
       cfg,
       itemId: "c2-prior-receipt",
       withRoundId: "round-prior",
     });
-    const prior = await releaseWakeOpForRetry({
+    const verification2 = await platformVerifyNone({
       authority: ctx2.authority,
-      opKey: ctx2.opKey,
       cfg,
-      externalEffectVerified: "none",
-      externalEffectCheck: noneCheck(ctx2.opKey),
-      operator: { actorId: tenant.owner, identitySource: "runtime" },
-      operatingState: ctx2.state,
+      groupId: ctx2.groupId,
+      taskId: ctx2.taskId,
+      opKey: ctx2.opKey,
+    });
+    const prior = await releaseWakeOpForRetryAuthorized({
+      authority: ctx2.authority,
+      groupId: ctx2.groupId,
+      taskId: ctx2.taskId,
+      opKey: ctx2.opKey,
+      actorId: tenant.owner,
+      verificationId: verification2.verificationId,
+      cfg,
     });
     expect(prior.ok).toBe(false);
     if (prior.ok) {

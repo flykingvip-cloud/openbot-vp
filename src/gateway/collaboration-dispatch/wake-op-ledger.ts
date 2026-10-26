@@ -13,31 +13,35 @@
  *   - completed: reuse result; never re-dispatch
  *   - running / unknown / accepted: do not blind re-run
  *   - failed: retry allowed after U1 stop + U2 auth recheck
- *   - releaseWakeOpForRetry: unknown→failed only when trusted runtime operator passes
- *     release_for_retry Gate (≠ canRequestTaskStop), externalEffectVerified==="none"
- *     bound to a verifiable check record, and no prior/late receipt on the ledger.
- *     Refuses running/accepted. Does not dispatch.
- *   - confirmWakeOpCompleted: unknown→completed only when trusted runtime operator
- *     passes confirm_completed Gate (≠ stop/release), params.roundId matches prior
- *     ledger receipt; verbal/unmatched stay unknown (no auto-rerun).
+ *   - releaseWakeOpForRetry: unknown→failed only with minted WakeOpRecoverySubject
+ *     (controlled entry) + stored verificationId (M1/M2). externalEffectVerified==="none"
+ *     bound to verifier record; no prior/late receipt. Refuses running/accepted.
+ *   - confirmWakeOpCompleted: unknown→completed only with minted subject
+ *     (confirm_completed) + params.roundId matching prior ledger receipt.
  *
  * Memory-only dedup is forbidden as the sole proof of correctness.
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+} from "../collaboration-learning/shared.js";
 import { withRoundLock, writeJsonDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
+import { bindVerificationForRelease } from "./wake-op-effect-verify.js";
 import {
   canConfirmWakeOpCompleted,
   canReleaseWakeOpForRetry,
-  resolveTrustedWakeOpOperator,
-  validateExternalEffectNoneCheck,
+  resolveWakeOpRecoverySubject,
   type ExternalEffectCheckRecord,
   type TrustedWakeOpOperator,
   type WakeOpRecoveryAuthState,
+  type WakeOpRecoverySubject,
 } from "./wake-op-recovery-gate.js";
 
 export type {
@@ -45,16 +49,27 @@ export type {
   TrustedWakeOpOperator,
   WakeOpRecoveryAction,
   WakeOpRecoveryAuthState,
+  WakeOpRecoverySubject,
 } from "./wake-op-recovery-gate.js";
+export type { ExternalEffectVerificationRecord } from "./wake-op-effect-verify.js";
 export {
   canConfirmWakeOpCompleted,
   canPerformWakeOpRecovery,
   canReleaseWakeOpForRetry,
   EXTERNAL_EFFECT_CHECK_MAX_AGE_MS,
   isActiveRecoveryIdentity,
+  isWakeOpRecoverySubject,
+  mintWakeOpRecoverySubject,
   resolveTrustedWakeOpOperator,
+  resolveWakeOpRecoverySubject,
   validateExternalEffectNoneCheck,
 } from "./wake-op-recovery-gate.js";
+export {
+  bindVerificationForRelease,
+  produceHumanNoneAttestation,
+  producePlatformNoneVerification,
+  readExternalEffectVerification,
+} from "./wake-op-effect-verify.js";
 export const WAKE_OP_PROCESSING_STATUSES = [
   "accepted",
   "running",
@@ -84,6 +99,16 @@ export type WakeOpRecord = Readonly<{
   externalEffectCheck?: ExternalEffectCheckRecord;
   /** Audit: who confirmed unknown→completed from a prior receipt. */
   confirmedBy?: string;
+  /**
+   * M3: dispatch eligibility commit (linearization point). Written under the
+   * wake-op lock after stop+auth recheck; holds controlEpoch + auth fingerprint
+   * so expired holders cannot complete after stop/revoke once the lock releases.
+   */
+  dispatchEligibility?: {
+    committedAtMs: number;
+    controlEpoch: number;
+    authFingerprint: string;
+  };
   createdAtMs: number;
   updatedAtMs: number;
 }>;
@@ -449,45 +474,173 @@ export type ConfirmWakeOpResult =
  * Caller must still recheck U1 stop + U2 auth on the subsequent consume.
  * Does not itself dispatch.
  */
+
+/** M3: fingerprint of target actors' auth rows for eligibility binding. */
+
+async function loadRecoveryAuthContext(params: {
+  groupId: string;
+  taskId: string;
+  cfg?: OpenBotConfig;
+}): Promise<{
+  operatingState: WakeOpRecoveryAuthState;
+  taskApproverIds: string[];
+} | null> {
+  const groupId = compact(params.groupId);
+  const taskId = compact(params.taskId);
+  if (!groupId || !taskId) {
+    return null;
+  }
+  const { fileStore, objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+  const operatingState = await readGroupOperatingState({ fileStore, groupId });
+  const task = await objectStorage.readObject<Task>(groupId, "task", taskId);
+  const raw = (task as { responsibility?: { approvers?: unknown } } | null)?.responsibility
+    ?.approvers;
+  const taskApproverIds = Array.isArray(raw)
+    ? raw.map((id) => compact(typeof id === "string" ? id : "")).filter(Boolean)
+    : [];
+  return { operatingState, taskApproverIds };
+}
+
+export function wakeOpAuthFingerprint(
+  state: WakeOpRecoveryAuthState,
+  targetActorIds: readonly string[],
+): string {
+  const rows = (state?.memberRoleMap ?? [])
+    .map((row) => {
+      const id = compact(row.memberId);
+      if (!id) {
+        return "";
+      }
+      if (targetActorIds.length > 0 && !targetActorIds.map(compact).includes(id)) {
+        return "";
+      }
+      return `${id}:${compact(row.status).toLowerCase() || "active"}`;
+    })
+    .filter(Boolean)
+    .toSorted();
+  return createHash("sha256").update(rows.join("|")).digest("hex").slice(0, 32);
+}
+
+export type CommitDispatchEligibilityParams = {
+  authority: RuntimeAuthority;
+  opKey: string;
+  cfg?: OpenBotConfig;
+  nowMs?: number;
+  controlEpoch: number;
+  authFingerprint: string;
+};
+
+/**
+ * M3 linearization point: under wake-op lock, commit dispatch eligibility with
+ * the observed controlEpoch + auth fingerprint. Does not hold the lock across
+ * external I/O.
+ */
+export async function commitWakeOpDispatchEligibility(
+  params: CommitDispatchEligibilityParams,
+): Promise<WakeOpRecord | null> {
+  const nowMs = params.nowMs ?? Date.now();
+  return updateWakeOp(params, (current) => {
+    if (!current) {
+      return null;
+    }
+    if (current.status !== "running") {
+      return current;
+    }
+    return {
+      ...current,
+      dispatchEligibility: {
+        committedAtMs: nowMs,
+        controlEpoch: params.controlEpoch,
+        authFingerprint: compact(params.authFingerprint),
+      },
+      updatedAtMs: nowMs,
+    };
+  });
+}
+
+/**
+ * M3: after lock release, refuse successful completion when stop/auth epoch
+ * advanced past the eligibility snapshot (expired holder).
+ */
+export function isDispatchEligibilityCurrent(params: {
+  eligibility: WakeOpRecord["dispatchEligibility"] | undefined;
+  controlEpoch: number;
+  authFingerprint: string;
+}): boolean {
+  const el = params.eligibility;
+  if (!el) {
+    return false;
+  }
+  if (el.controlEpoch !== params.controlEpoch) {
+    return false;
+  }
+  if (compact(el.authFingerprint) !== compact(params.authFingerprint)) {
+    return false;
+  }
+  return true;
+}
+
 export async function releaseWakeOpForRetry(params: {
   authority: RuntimeAuthority;
   opKey: string;
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
-  /** Only allowed value: must match externalEffectCheck.outcome. */
+  /** Only allowed value: must match verification outcome. */
   externalEffectVerified: "none";
-  /** Verifiable check record bound to the "none" claim. */
-  externalEffectCheck: ExternalEffectCheckRecord;
-  /** Trusted runtime identity for the operator (not a free-form claim). */
-  operator: TrustedWakeOpOperator;
-  /** Current tenant/group operating state for Gate. */
-  operatingState: WakeOpRecoveryAuthState;
+  /**
+   * M2: id of a verification record produced by the controlled verifier.
+   * Caller-filled externalEffectCheck fields are NOT accepted as facts.
+   */
+  verificationId: string;
+  /**
+   * M1: minted recovery subject from the controlled entry.
+   * Self-constructed identitySource / actorId tags are refused.
+   */
+  subject: WakeOpRecoverySubject;
 }): Promise<ReleaseWakeOpResult> {
   const opKey = compact(params.opKey);
   if (!opKey) {
     return { ok: false, reason: "missing_op_key" };
   }
-  const trusted = resolveTrustedWakeOpOperator(params.operator);
+  const trusted = resolveWakeOpRecoverySubject(params.subject, "release_for_retry");
   if (!trusted.ok) {
     return trusted;
   }
-  const releasedBy = trusted.actorId;
-  if (!canReleaseWakeOpForRetry({ actorId: releasedBy, operatingState: params.operatingState })) {
+  const releasedBy = trusted.subject.actorId;
+  // Execute-time recheck against durable OS (not caller-supplied / stale mint snapshot).
+  const authCtx = await loadRecoveryAuthContext({
+    groupId: trusted.subject.groupId,
+    taskId: trusted.subject.taskId,
+    cfg: params.cfg,
+  });
+  if (!authCtx) {
+    return { ok: false, reason: "missing_task_scope" };
+  }
+  if (
+    !canReleaseWakeOpForRetry({
+      actorId: releasedBy,
+      operatingState: authCtx.operatingState,
+    })
+  ) {
     return { ok: false, reason: "release_forbidden" };
   }
   if (params.externalEffectVerified !== "none") {
     return { ok: false, reason: "external_effect_not_verified" };
   }
   const nowMs = params.nowMs ?? Date.now();
-  const check = validateExternalEffectNoneCheck({
+  const bound = await bindVerificationForRelease({
+    authority: params.authority,
+    verificationId: params.verificationId,
     opKey,
-    check: params.externalEffectCheck,
+    groupId: trusted.subject.groupId,
+    taskId: trusted.subject.taskId,
     nowMs,
   });
-  if (!check.ok) {
-    return check;
+  if (!bound.ok) {
+    return bound;
   }
+  const check = bound.auditCheck;
   const updated = await updateWakeOp(params, (current) => {
     if (!current) {
       return null;
@@ -512,7 +665,7 @@ export async function releaseWakeOpForRetry(params: {
       detail: params.detail ?? "released_for_retry",
       releasedBy,
       externalEffectVerified: "none",
-      externalEffectCheck: check.check,
+      externalEffectCheck: check,
       updatedAtMs: nowMs,
       roundId: undefined,
     };
@@ -539,19 +692,13 @@ export async function releaseWakeOpForRetry(params: {
     updated.releasedBy !== releasedBy ||
     updated.externalEffectVerified !== "none" ||
     !updated.externalEffectCheck ||
-    updated.externalEffectCheck.opId !== check.check.opId
+    updated.externalEffectCheck.opId !== check.opId
   ) {
     return { ok: false, reason: "release_audit_incomplete" };
   }
   return { ok: true, record: updated };
 }
 
-/**
- * Promote unknown → completed only from a verifiable prior receipt on the ledger
- * (existing.roundId must match params.roundId). Verbal / unmatched stay unknown
- * (no auto-rerun). C1: trusted runtime operator + confirm_completed Gate
- * (≠ stop / release). Does not invent completed without receipt evidence.
- */
 export async function confirmWakeOpCompleted(params: {
   authority: RuntimeAuthority;
   opKey: string;
@@ -559,12 +706,8 @@ export async function confirmWakeOpCompleted(params: {
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
-  /** Trusted runtime identity for the confirmer. */
-  operator: TrustedWakeOpOperator;
-  /** Current tenant/group operating state for Gate. */
-  operatingState: WakeOpRecoveryAuthState;
-  /** Task-scoped approvers; confirm requires membership in this list. */
-  taskApproverIds?: readonly string[] | null;
+  /** M1: minted recovery subject (confirm_completed). */
+  subject: WakeOpRecoverySubject;
 }): Promise<ConfirmWakeOpResult> {
   const opKey = compact(params.opKey);
   const roundId = compact(params.roundId);
@@ -574,16 +717,26 @@ export async function confirmWakeOpCompleted(params: {
   if (!roundId) {
     return { ok: false, reason: "missing_round_id" };
   }
-  const trusted = resolveTrustedWakeOpOperator(params.operator);
+  const trusted = resolveWakeOpRecoverySubject(params.subject, "confirm_completed");
   if (!trusted.ok) {
     return trusted;
   }
-  const confirmedBy = trusted.actorId;
+  const confirmedBy = trusted.subject.actorId;
+  // Execute-time: reload task approvers + OS — forged approver lists on a minted
+  // subject cannot unlock (M1).
+  const authCtx = await loadRecoveryAuthContext({
+    groupId: trusted.subject.groupId,
+    taskId: trusted.subject.taskId,
+    cfg: params.cfg,
+  });
+  if (!authCtx) {
+    return { ok: false, reason: "missing_task_scope" };
+  }
   if (
     !canConfirmWakeOpCompleted({
       actorId: confirmedBy,
-      operatingState: params.operatingState,
-      taskApproverIds: params.taskApproverIds,
+      operatingState: authCtx.operatingState,
+      taskApproverIds: authCtx.taskApproverIds,
     })
   ) {
     return { ok: false, reason: "confirm_forbidden" };
