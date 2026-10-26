@@ -26,6 +26,7 @@ import {
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import {
+  claimWakeOpRunning,
   confirmWakeOpCompleted,
   markWakeOpUnknown,
   readWakeOpRecord,
@@ -1353,6 +1354,41 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(blind.reason).toBe("wake_op_unknown");
     expect(blind.dispatched).toBe(false);
 
+    // --- B2: release gates — refuse verbal-only / running dual-write; require verified none + audit ---
+    const refuseNoActor = await releaseWakeOpForRetry({
+      authority,
+      opKey: opKeyB,
+      cfg,
+      detail: "verbal_only",
+      externalEffectVerified: "none",
+      releasedBy: "",
+    });
+    expect(refuseNoActor.ok).toBe(false);
+    if (refuseNoActor.ok) {
+      throw new Error("expected missing_released_by");
+    }
+    expect(refuseNoActor.reason).toBe("missing_released_by");
+
+    const runningClaim = await claimWakeOpRunning({
+      authority,
+      keyInput: { ...reqB, itemId: "item-resume-running-gate" },
+      cfg,
+    });
+    expect(runningClaim.action).toBe("proceed");
+    const refuseRunning = await releaseWakeOpForRetry({
+      authority,
+      opKey: runningClaim.opKey,
+      cfg,
+      detail: "would_dual_write",
+      externalEffectVerified: "none",
+      releasedBy: tenant.employees[0].id,
+    });
+    expect(refuseRunning.ok).toBe(false);
+    if (refuseRunning.ok) {
+      throw new Error("expected running refused");
+    }
+    expect(refuseRunning.reason).toBe("status_running_keep_or_mark_unknown");
+
     // Resume recheck stop + auth (U1/U2 positions), then release for retry — work not permanently lost.
     const stopped = await requestCollaborationTaskStop({
       groupId,
@@ -1365,17 +1401,22 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(stopped.stopControl.status).toBe("accepted");
 
     // While stopped, even release-then-consume must refuse via stop preflight.
+    // Release requires verified externalEffect none + releasedBy (not verbal clear-state).
     const releasedWhileStopped = await releaseWakeOpForRetry({
       authority,
       opKey: opKeyB,
       cfg,
-      detail: "operator_confirmed_no_effect",
+      detail: "operator_verified_external_effect_none",
+      externalEffectVerified: "none",
+      releasedBy: tenant.employees[0].id,
     });
     expect(releasedWhileStopped.ok).toBe(true);
     if (!releasedWhileStopped.ok) {
       throw new Error("expected release ok");
     }
     expect(releasedWhileStopped.record.status).toBe("failed");
+    expect(releasedWhileStopped.record.releasedBy).toBe(tenant.employees[0].id);
+    expect(releasedWhileStopped.record.externalEffectVerified).toBe("none");
 
     const whileStopped = await consumeWakeForRoundDispatch({
       authority,
@@ -1437,7 +1478,23 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       cfg,
       detail: "receipt_missing_after_effect",
     });
-    // Can confirm complete → reuse; must not dispatch again.
+
+    // Verbal / mismatched roundId must not mint completed.
+    const verbalConfirm = await confirmWakeOpCompleted({
+      authority,
+      opKey: opKeyC,
+      roundId: "oral-claim-no-receipt",
+      cfg,
+      detail: "verbal",
+      confirmedBy: tenant.employees[0].id,
+    });
+    expect(verbalConfirm.ok).toBe(false);
+    if (verbalConfirm.ok) {
+      throw new Error("expected round_id_mismatch");
+    }
+    expect(verbalConfirm.reason).toBe("round_id_mismatch");
+
+    // Can confirm complete only against prior ledger receipt → reuse; must not dispatch again.
     let receiptCalls = 0;
     const confirmed = await confirmWakeOpCompleted({
       authority,
@@ -1445,8 +1502,14 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       roundId: "round-receipt-gap",
       cfg,
       detail: "receipt_recovered",
+      confirmedBy: tenant.employees[0].id,
     });
-    expect(confirmed?.status).toBe("completed");
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) {
+      throw new Error("expected confirm ok");
+    }
+    expect(confirmed.record.status).toBe("completed");
+    expect(confirmed.record.confirmedBy).toBe(tenant.employees[0].id);
     const reuseAfterConfirm = await consumeWakeForRoundDispatch({
       authority,
       cfg,

@@ -13,8 +13,11 @@
  *   - completed: reuse result; never re-dispatch
  *   - running / unknown / accepted: do not blind re-run
  *   - failed: retry allowed after U1 stop + U2 auth recheck
- *   - releaseWakeOpForRetry: explicit recovery from unknown/running→failed so
- *     legitimate work is not permanently lost after a failed/interrupted run
+ *   - releaseWakeOpForRetry: unknown→failed only when externalEffectVerified==="none"
+ *     + releasedBy audit; refuses running/accepted (old exec may still hold write
+ *     eligibility — mark unknown first, verify none, then release). Does not dispatch.
+ *   - confirmWakeOpCompleted: unknown→completed only when params.roundId matches the
+ *     ledger's prior roundId receipt + confirmedBy audit; verbal/unmatched refused.
  *
  * Memory-only dedup is forbidden as the sole proof of correctness.
  */
@@ -46,6 +49,12 @@ export type WakeOpRecord = Readonly<{
   status: WakeOpProcessingStatus;
   roundId?: string;
   detail?: string;
+  /** Audit: who released unknown→failed (resume). */
+  releasedBy?: string;
+  /** Audit: required "none" proof when released. */
+  externalEffectVerified?: "none";
+  /** Audit: who confirmed unknown→completed from a prior receipt. */
+  confirmedBy?: string;
   createdAtMs: number;
   updatedAtMs: number;
 }>;
@@ -345,9 +354,17 @@ export type ReleaseWakeOpResult =
   | { ok: true; record: WakeOpRecord }
   | { ok: false; reason: string };
 
+export type ConfirmWakeOpResult =
+  | { ok: true; record: WakeOpRecord }
+  | { ok: false; reason: string };
+
 /**
- * Explicit resume recovery: unknown/running → failed so a later consume may retry.
- * Caller must have already rechecked stop + current auth. Does not itself dispatch.
+ * Explicit resume recovery: unknown → failed so a later consume may retry.
+ * Requires externalEffectVerified==="none" (old exec must not still hold write
+ * eligibility) and releasedBy for audit. Refuses running/accepted — if old
+ * execution may still be running, keep unknown or leave running suppressed.
+ * Caller must still recheck U1 stop + U2 auth on the subsequent consume.
+ * Does not itself dispatch.
  */
 export async function releaseWakeOpForRetry(params: {
   authority: RuntimeAuthority;
@@ -355,10 +372,21 @@ export async function releaseWakeOpForRetry(params: {
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
+  /** Only allowed value: operator verified no concurrent/external write effect. */
+  externalEffectVerified: "none";
+  /** Audit actor who authorized the release. */
+  releasedBy: string;
 }): Promise<ReleaseWakeOpResult> {
   const opKey = compact(params.opKey);
   if (!opKey) {
     return { ok: false, reason: "missing_op_key" };
+  }
+  const releasedBy = compact(params.releasedBy);
+  if (!releasedBy) {
+    return { ok: false, reason: "missing_released_by" };
+  }
+  if (params.externalEffectVerified !== "none") {
+    return { ok: false, reason: "external_effect_not_verified" };
   }
   const nowMs = params.nowMs ?? Date.now();
   const updated = await updateWakeOp(params, (current) => {
@@ -368,17 +396,18 @@ export async function releaseWakeOpForRetry(params: {
     if (current.status === "completed") {
       return current;
     }
-    if (
-      current.status !== "unknown" &&
-      current.status !== "running" &&
-      current.status !== "accepted"
-    ) {
+    // Refuse running/accepted: releasing while old may still run would grant
+    // dual write eligibility. Operator must verify effect, keep/mark unknown,
+    // then release only from unknown with externalEffectVerified none.
+    if (current.status !== "unknown") {
       return current;
     }
     return {
       ...current,
       status: "failed",
       detail: params.detail ?? "released_for_retry",
+      releasedBy,
+      externalEffectVerified: "none",
       updatedAtMs: nowMs,
       roundId: undefined,
     };
@@ -389,13 +418,26 @@ export async function releaseWakeOpForRetry(params: {
   if (updated.status === "completed") {
     return { ok: false, reason: "already_completed" };
   }
+  if (updated.status === "running") {
+    return { ok: false, reason: "status_running_keep_or_mark_unknown" };
+  }
+  if (updated.status === "accepted") {
+    return { ok: false, reason: "status_accepted_in_flight" };
+  }
   if (updated.status !== "failed") {
     return { ok: false, reason: `status_${updated.status}` };
+  }
+  if (updated.releasedBy !== releasedBy || updated.externalEffectVerified !== "none") {
+    return { ok: false, reason: "release_audit_incomplete" };
   }
   return { ok: true, record: updated };
 }
 
-/** When a completed receipt can be confirmed after an uncertain run, promote to completed. */
+/**
+ * Promote unknown → completed only from a verifiable prior receipt on the ledger
+ * (existing.roundId must match params.roundId). Verbal / unmatched roundId refused.
+ * Requires confirmedBy audit. Does not invent completed without receipt evidence.
+ */
 export async function confirmWakeOpCompleted(params: {
   authority: RuntimeAuthority;
   opKey: string;
@@ -403,6 +445,63 @@ export async function confirmWakeOpCompleted(params: {
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
-}): Promise<WakeOpRecord | null> {
-  return markWakeOpCompleted({ ...params, detail: params.detail ?? "confirmed_completed" });
+  /** Audit actor who confirmed against a verifiable receipt. */
+  confirmedBy: string;
+}): Promise<ConfirmWakeOpResult> {
+  const opKey = compact(params.opKey);
+  const roundId = compact(params.roundId);
+  const confirmedBy = compact(params.confirmedBy);
+  if (!opKey) {
+    return { ok: false, reason: "missing_op_key" };
+  }
+  if (!roundId) {
+    return { ok: false, reason: "missing_round_id" };
+  }
+  if (!confirmedBy) {
+    return { ok: false, reason: "missing_confirmed_by" };
+  }
+  const nowMs = params.nowMs ?? Date.now();
+  const updated = await updateWakeOp(
+    { authority: params.authority, opKey, cfg: params.cfg, nowMs },
+    (current) => {
+      if (!current) {
+        return null;
+      }
+      if (current.status !== "unknown") {
+        return current;
+      }
+      const prior = compact(current.roundId);
+      if (!prior || prior !== roundId) {
+        return current;
+      }
+      return {
+        ...current,
+        status: "completed",
+        roundId,
+        detail: params.detail ?? "confirmed_completed",
+        confirmedBy,
+        updatedAtMs: nowMs,
+      };
+    },
+  );
+  if (!updated) {
+    return { ok: false, reason: "missing_record" };
+  }
+  if (updated.status !== "completed") {
+    if (updated.status !== "unknown") {
+      return { ok: false, reason: `status_${updated.status}` };
+    }
+    const prior = compact(updated.roundId);
+    if (!prior) {
+      return { ok: false, reason: "no_prior_receipt_on_ledger" };
+    }
+    if (prior !== roundId) {
+      return { ok: false, reason: "round_id_mismatch" };
+    }
+    return { ok: false, reason: "confirm_refused" };
+  }
+  if (updated.confirmedBy !== confirmedBy || compact(updated.roundId) !== roundId) {
+    return { ok: false, reason: "confirm_audit_incomplete" };
+  }
+  return { ok: true, record: updated };
 }
