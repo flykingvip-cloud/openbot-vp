@@ -2,24 +2,49 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
+import { GROWTH_EVOLUTION_CONSUMER_ID, OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
-import type { TaskOutcomeRecord, TrustedScope } from "./types.js";
+import type { CloseReasonCode, TaskOutcomeRecord, TrustedScope } from "./types.js";
 
 export const TASK_OUTCOME_STORE_DIRNAME = "task-outcomes";
 
+export type RunnerTurnFailureReason =
+  | "run_failed"
+  | "user_cancelled"
+  | "provider_fault"
+  | "user_filtered"
+  | "timeout"
+  | "authz_denied"
+  | "prepare_failed"
+  | "other";
+
 export type RunnerTurnOutcomeInput = {
+  /** When true, only records attempt/run and leaves awaiting_acceptance. */
   success: boolean;
   runId: string;
   toolsTotal?: number;
   toolsSucceeded?: number;
   latencyMs?: number;
   tenantId?: string;
-  /** Stable task id; defaults to `run:${runId}` for this turn. */
+  /** Required stable task id from entry; do not invent from runId when provided. */
   taskId?: string;
   scope?: TrustedScope;
+  /** Structured failure — required when success=false. Defaults to run_failed. */
+  failureReason?: RunnerTurnFailureReason;
+  failureDetail?: string;
+  /** Optional acceptance/delivery close when the caller already has receipts. */
+  acceptance?:
+    | { status: "pending" | "passed" | "failed" }
+    | { status: "not_required"; reason: string };
+  delivery?:
+    | { status: "pending" | "blocked" | "delivered" | "delivery_unknown" | "failed" }
+    | { status: "not_required"; reason: string };
+  deliveryId?: string;
+  acceptanceEvidence?: import("./types.js").AcceptanceEvidence[];
+  allowRetry?: boolean;
 };
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
@@ -45,15 +70,37 @@ function defaultScope(tenantId?: string): TrustedScope {
   };
 }
 
+function drainGrowthEvolution(
+  cfg: OpenBotConfig,
+  agentId: string,
+  store: DurableTaskOutcomeStore,
+): { written: boolean; reason: string } {
+  let written = false;
+  let reason = "no_closed_events";
+  const runtime = new OutcomeConsumerRuntime(store, {
+    consumerId: GROWTH_EVOLUTION_CONSUMER_ID,
+    handlers: [
+      {
+        consumerId: "growth-evolution-bridge",
+        onEvent: (_event, record) => {
+          const pub = publishEvolutionFromTaskOutcome(cfg, agentId, record);
+          if (pub.written) {
+            written = true;
+            reason = pub.reason;
+          } else if (!written) {
+            reason = pub.reason;
+          }
+        },
+      },
+    ],
+  });
+  runtime.drain((taskId) => store.loadTask(taskId));
+  return { written, reason };
+}
+
 /**
  * Production chat-runner hot path into unified TaskOutcome.
- *
- * - Always persists attempt/run on durable TaskOutcome under the agent dir.
- * - Run failure → close as acceptance failed (stop) → growth-bridge may publish a negative.
- * - Run success → leave `awaiting_acceptance` (incomplete); does **not** invent task success
- *   or append an evolution success sample.
- * - Tool counters always update via `recordToolOutcomes`; task-level operational counters are
- *   deferred until a later acceptance/delivery close (P0 stops inventing success).
+ * Evolution publish goes only through OutcomeConsumerRuntime drain (no direct bypass).
  */
 export async function recordRunnerTurnOutcome(
   cfg: OpenBotConfig,
@@ -79,6 +126,7 @@ export async function recordRunnerTurnOutcome(
     taskId,
     scope,
     taskContractVersion: "1.0.0",
+    commandId: `create:${taskId}`,
   });
   if (!opened.ok) {
     throw new Error(`task-outcome open failed: ${"code" in opened ? opened.code : "unknown"}`);
@@ -117,26 +165,49 @@ export async function recordRunnerTurnOutcome(
       fencingToken,
       status: runStatus,
     },
+    { scope, commandId: `attempt:${taskId}:${input.runId}` },
   );
   if (!res.ok) {
     throw new Error(`task-outcome record_attempt failed: ${res.code}`);
   }
 
   if (!input.success) {
-    // Close as capability failure — do not invent success.
-    res = chat.setAcceptance(
-      taskId,
-      res.record.outcomeVersion,
+    const reason = (input.failureReason ?? "run_failed") as CloseReasonCode;
+    res = chat.failClosed(taskId, res.record.outcomeVersion, reason as RunnerTurnFailureReason, {
       fencingToken,
-      { status: "failed" },
-      { allowRetry: false },
-    );
+      reasonDetail: input.failureDetail,
+      scope,
+      commandId: `fail:${taskId}:${input.runId}`,
+    });
+    if (!res.ok) {
+      throw new Error(`task-outcome fail_closed failed: ${res.code}`);
+    }
+  } else if (input.acceptance) {
+    res = chat.setAcceptance(taskId, res.record.outcomeVersion, fencingToken, input.acceptance, {
+      allowRetry: input.allowRetry ?? true,
+      evidence: input.acceptanceEvidence,
+      scope,
+      commandId: `accept:${taskId}:${input.runId}`,
+    });
     if (!res.ok) {
       throw new Error(`task-outcome set_acceptance failed: ${res.code}`);
     }
+    if (input.delivery && res.ok) {
+      res = chat.setDelivery(
+        taskId,
+        res.record.outcomeVersion,
+        fencingToken,
+        input.delivery,
+        input.deliveryId,
+        { scope, commandId: `delivery:${taskId}:${input.runId}` },
+      );
+      if (!res.ok) {
+        throw new Error(`task-outcome set_delivery failed: ${res.code}`);
+      }
+    }
   }
-  // success: leave acceptance pending → awaiting_acceptance → incomplete (no evolution success)
+  // bare success with no acceptance/delivery: leave awaiting_acceptance
 
-  const evolution = publishEvolutionFromTaskOutcome(cfg, agentId, res.record);
+  const evolution = drainGrowthEvolution(cfg, agentId, store);
   return { record: res.record, evolution };
 }

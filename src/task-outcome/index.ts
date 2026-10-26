@@ -11,3 +11,11 @@ export { CronTaskOutcomeAdapter } from "./entrypoints/cron.js";
 export { CliTaskOutcomeAdapter } from "./entrypoints/cli.js";
 export { CollabTaskOutcomeAdapter } from "./entrypoints/collab.js";
 export { recordRunnerTurnOutcome, TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
+
+export {
+  OutcomeConsumerRuntime,
+  GROWTH_EVOLUTION_CONSUMER_ID,
+  SKILL_CONSUMER_ID,
+  MODE_CONSUMER_ID,
+} from "./consumers.js";
+export { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";

@@ -199,6 +199,31 @@ export function applyTransition(
       }
       break;
     }
+
+    case "fail_closed": {
+      if (
+        current.fencingToken &&
+        transition.fencingToken &&
+        transition.fencingToken !== current.fencingToken
+      ) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        reasonCode: transition.reasonCode,
+        reasonDetail: transition.reasonDetail,
+        lifecycle: "closed",
+        taskJudgement: transition.reasonCode === "user_cancelled" ? "cancelled" : "failure",
+      };
+      // force closed below
+      stopRecovery = true;
+      prepareFailed =
+        transition.reasonCode === "prepare_failed" ||
+        transition.reasonCode === "preflight_rejected";
+      cancelRequested = transition.reasonCode === "user_cancelled";
+      break;
+    }
+
     default:
       return { record: current, illegal: "illegal_transition" };
   }
@@ -207,6 +232,10 @@ export function applyTransition(
     next.lifecycle = "closed";
     next.taskJudgement = "failure";
     next.reasonCode = "delivery_unconfirmed_close";
+  } else if (transition.type === "fail_closed") {
+    next.lifecycle = "closed";
+    next.taskJudgement = transition.reasonCode === "user_cancelled" ? "cancelled" : "failure";
+    next.reasonCode = transition.reasonCode;
   } else {
     const lifecycle = deriveLifecycle({
       cancelRequested,

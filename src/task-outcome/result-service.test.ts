@@ -25,7 +25,10 @@ describe("TaskOutcome result service + durable consume", () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "task-outcome-"));
     store = new DurableTaskOutcomeStore(root);
-    service = new TaskOutcomeResultService({ store });
+    service = new TaskOutcomeResultService({
+      store,
+      correctionAllowlist: ["reviewer-1", "ops", "auditor"],
+    });
   });
 
   afterEach(() => {

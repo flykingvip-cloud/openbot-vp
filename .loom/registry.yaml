@@ -9705,7 +9705,43 @@ tasks:
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
+
+  - id: askOutcome-p0-r83-remediation
+    owner: executor-acceptance
+    intent:
+      - R83 P0 persist CAS consumer chat-wire remediation
+    paths:
+      - src/task-outcome/**
+      - docs/design/task-outcome/**
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: askoutcome-p0-r83-20261026
+        taskId: askOutcome-p0-r83-remediation
+        ide: cursor-local
+        agent: executor-acceptance
+        status: active
+        lastSignalAt: 2026-10-26T05:14:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+
 landingStreams:
+
+  - id: askOutcome-p0-r83-remediation
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/contract.md
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - src/task-outcome/**
+    canLandWith: []
+    metadata:
+      task: askOutcome-p0-r83-remediation
+      owner: executor-acceptance
+      purpose: R83 P0 persist/CAS/consumer/chat-wire remediation after #83
+
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
     paths:
@@ -21627,8 +21663,8 @@ landingStreams:
       owner: cursor-deliverable-path
 sharedPaths:
   - glob: src/task-outcome/**
-    landerTask: askOutcome-p0-task-outcome-contract
-    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with pi-sdk-family-migration-v3.
+    landerTask: askOutcome-p0-r83-remediation
+    reason: R83 remediation of TaskOutcome persist/CAS/consumer; resolves src/** overlap with pi-sdk-family-migration-v3.
     reviewAfter: 2026-11-30
   - glob: src/gateway/collaboration-dispatch/claim-contract.ts
     landerTask: collab-p1-artifact-accept-loop:grok-bot

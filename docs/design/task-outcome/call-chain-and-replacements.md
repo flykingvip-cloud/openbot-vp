@@ -22,3 +22,11 @@ entrypoint adapter (chat|gateway_agent|cron|cli|collab)
 生产热路径：`agent-runner-execution.recordGrowthTaskOutcome` → `recordRunnerTurnOutcome` → `ChatTaskOutcomeAdapter` / `TaskOutcomeResultService` → 仅在 closed+eligible 时 `publishEvolutionFromTaskOutcome`。run 成功保持 `awaiting_acceptance`（incomplete），不发明任务成功。
 
 热文件 `agent-runner-execution.ts` 的 loom `sharedPaths` lander 仍归 `openbot-evolution-loop-fix:cursor-grok`；本任务只拥有 `src/task-outcome/**`（含 `runtime-from-runner`）。
+
+## R83 remediation (post #83)
+
+- Persist: `commitBundle` publishes one commit then materializes tip + immutable `versions/` snapshot + outbox; reopen replays unapplied commits.
+- Concurrency: per-task exclusive lock in `withTaskLock` around version check + commit (proven by two OS processes).
+- Consume: `OutcomeConsumerRuntime` durable projection; evolution publish only via drain handlers (no runner bypass).
+- Failure attribution: `fail_closed` with structured `reasonCode` (not boolean→acceptance_failed).
+- commandId digest idempotency; correction allowlist; restore scope/subject checks.

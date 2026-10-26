@@ -53,7 +53,7 @@ describe("recordRunnerTurnOutcome", () => {
     });
     expect(out.record.lifecycle).toBe("closed");
     expect(out.record.taskJudgement).toBe("failure");
-    expect(out.record.reasonCode).toBe("acceptance_failed_stop");
+    expect(out.record.reasonCode).toBe("run_failed");
     expect(out.evolution.written).toBe(true);
     expect(out.evolution.reason).toBe("published");
 

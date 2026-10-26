@@ -15,6 +15,8 @@ export type ResultServiceOptions = {
   store: DurableTaskOutcomeStore;
   submittedBy?: string;
   now?: () => Date;
+  /** Trusted correction principals (subject refs). Empty = corrections rejected. */
+  correctionAllowlist?: ReadonlySet<string> | readonly string[];
 };
 
 function eventIdFor(taskId: string, outcomeVersion: number, eventType: OutcomeEventType): string {
@@ -33,40 +35,111 @@ function outboxEvent(record: TaskOutcomeRecord, eventType: OutcomeEventType): Ou
     eventType,
     scopeKind: record.scope.kind,
     scopeId: scopeIdOf(record.scope),
-    payloadRef: `task:${record.taskId}@${record.outcomeVersion}`,
+    // Point at immutable version snapshot, not mutable tip.
+    payloadRef: `version:${record.taskId}@${record.outcomeVersion}`,
     createdAt: record.updatedAt,
   };
+}
+
+function digestTransition(taskId: string, transition: SubmitTransition): string {
+  return createHash("sha256").update(JSON.stringify({ taskId, transition })).digest("hex");
+}
+
+function attemptFingerprint(record: TaskOutcomeRecord): string {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        attempts: record.attempts,
+        runs: record.runs,
+        acceptance: record.acceptance,
+        acceptanceEvidence: record.acceptanceEvidence ?? [],
+        delivery: record.delivery,
+        deliveryId: record.deliveryId ?? null,
+        fencingToken: record.fencingToken ?? null,
+        leaseEpoch: record.leaseEpoch ?? 0,
+        decisiveRunId: record.decisiveRunId ?? null,
+        reasonCode: record.reasonCode ?? null,
+        lifecycle: record.lifecycle,
+        taskJudgement: record.taskJudgement,
+      }),
+    )
+    .digest("hex");
 }
 
 export class TaskOutcomeResultService {
   private readonly store: DurableTaskOutcomeStore;
   private readonly submittedBy: string;
   private readonly now: () => Date;
+  private readonly correctionAllowlist: Set<string>;
 
   constructor(opts: ResultServiceOptions) {
     this.store = opts.store;
     this.submittedBy = opts.submittedBy ?? "task-outcome-result-service";
     this.now = opts.now ?? (() => new Date());
+    this.correctionAllowlist = new Set(
+      opts.correctionAllowlist ? [...opts.correctionAllowlist] : [],
+    );
   }
 
   get(taskId: string): TaskOutcomeRecord | undefined {
     return this.store.loadTask(taskId);
   }
 
+  getVersion(taskId: string, version: number): TaskOutcomeRecord | undefined {
+    return this.store.loadTaskVersion(taskId, version);
+  }
+
   /**
-   * Idempotent submit: identical transition payload at same expectedVersion
-   * returns the same stored record without bumping version.
+   * Idempotent submit under per-task exclusive lock + single commit boundary.
+   * Optional commandId: same id+digest replays; same id different digest → command_conflict.
    */
-  submit(taskId: string, transition: SubmitTransition): SubmitResult {
+  submit(
+    taskId: string,
+    transition: SubmitTransition,
+    opts?: { commandId?: string; requiredScope?: TrustedScope },
+  ): SubmitResult {
+    return this.store.withTaskLock(taskId, () => this.submitLocked(taskId, transition, opts));
+  }
+
+  private submitLocked(
+    taskId: string,
+    transition: SubmitTransition,
+    opts?: { commandId?: string; requiredScope?: TrustedScope },
+  ): SubmitResult {
     const current = this.store.loadTask(taskId);
     const nowIso = this.now().toISOString();
+
+    if (opts?.requiredScope && current) {
+      const mismatch = this.assertScope(taskId, opts.requiredScope);
+      if (mismatch) {
+        return mismatch;
+      }
+    }
+
+    if (opts?.commandId) {
+      const digest = digestTransition(taskId, transition);
+      const prior = this.store.loadCommand(opts.commandId);
+      if (prior) {
+        if (prior.digest !== digest) {
+          return {
+            ok: false,
+            code: "command_conflict",
+            message: `commandId ${opts.commandId} reused with different payload`,
+            current,
+          };
+        }
+        const tip = this.store.loadTask(prior.taskId);
+        if (tip) {
+          return { ok: true, record: tip, createdEvents: [] };
+        }
+      }
+    }
 
     if ("expectedVersion" in transition && transition.type !== "create") {
       if (!current) {
         return { ok: false, code: "not_found", message: `task ${taskId} not found` };
       }
       if (current.outcomeVersion !== transition.expectedVersion) {
-        // Idempotent replay: if transition would yield same semantic state already applied
         if (
           current.outcomeVersion > transition.expectedVersion &&
           isSameEffect(current, transition)
@@ -88,7 +161,15 @@ export class TaskOutcomeResultService {
           ok: false,
           code: "unauthorized_correction",
           message: "correction requires authorizedBy and previousOutcomeVersion",
-          current: current,
+          current,
+        };
+      }
+      if (!this.correctionAllowlist.has(transition.authorizedBy)) {
+        return {
+          ok: false,
+          code: "unauthorized_correction",
+          message: "authorizedBy is not in trusted correction allowlist",
+          current,
         };
       }
       if (!current || current.outcomeVersion !== transition.previousOutcomeVersion) {
@@ -99,15 +180,6 @@ export class TaskOutcomeResultService {
           current,
         };
       }
-    }
-
-    if (
-      transition.type === "set_acceptance" &&
-      transition.evidence &&
-      current?.acceptanceEvidence &&
-      !evidenceStillValid(transition.evidence, transition.evidence[0]?.artifactDigestOrReceiptRef)
-    ) {
-      // no-op check placeholder
     }
 
     const applied = applyTransition(current, taskId, transition, nowIso, this.submittedBy);
@@ -146,16 +218,14 @@ export class TaskOutcomeResultService {
       revisionKind: transition.type === "correction" ? "correction" : "new_execution",
     } satisfies TaskOutcomeRecord;
 
-    // Same-submit idempotency: hash last transition effect
     if (
       current &&
-      semanticallyEqualForIdempotency(current, record) &&
-      transition.type !== "create"
+      transition.type !== "create" &&
+      attemptFingerprint(current) === attemptFingerprint(record)
     ) {
       return { ok: true, record: current, createdEvents: [] };
     }
 
-    const events: OutcomeOutboxEvent[] = [];
     const eventType: OutcomeEventType =
       transition.type === "create"
         ? "task.created"
@@ -164,13 +234,30 @@ export class TaskOutcomeResultService {
           : record.lifecycle === "closed"
             ? "task.closed"
             : "task.state_changed";
-    events.push(outboxEvent(record, eventType));
+    const events: OutcomeOutboxEvent[] = [outboxEvent(record, eventType)];
 
-    // Persist task + outbox (same logical transaction via sequential atomic writes;
-    // recovery replays pending outbox).
-    this.store.saveTask(record);
-    for (const ev of events) {
-      this.store.appendOutbox(ev);
+    const expectedVersion = transition.type === "create" ? 0 : (current?.outcomeVersion ?? 0);
+    const committed = this.store.commitBundle({
+      taskId,
+      expectedVersion,
+      record,
+      events,
+    });
+    if (!committed.ok) {
+      return {
+        ok: false,
+        code: "version_conflict",
+        message: "commit lost race under lock",
+        current: committed.current,
+      };
+    }
+
+    if (opts?.commandId) {
+      this.store.saveCommand(opts.commandId, {
+        digest: digestTransition(taskId, transition),
+        taskId,
+        outcomeVersion: record.outcomeVersion,
+      });
     }
 
     return { ok: true, record, createdEvents: events };
@@ -189,29 +276,41 @@ export class TaskOutcomeResultService {
         current: cur,
       };
     }
+    if (cur.scope.subjectRef !== scope.subjectRef) {
+      return {
+        ok: false,
+        code: "scope_mismatch",
+        message: "trusted subject mismatch",
+        current: cur,
+      };
+    }
     return null;
   }
 
-  /** Invalidate acceptance when artifact digest changes. */
   invalidateAcceptanceIfArtifactChanged(
     taskId: string,
     newDigest: string,
     expectedVersion: number,
     fencingToken: string,
+    opts?: { requiredScope?: TrustedScope; commandId?: string },
   ): SubmitResult {
     const cur = this.store.loadTask(taskId);
     if (!cur) {
       return { ok: false, code: "not_found", message: "missing" };
     }
     if (!evidenceStillValid(cur.acceptanceEvidence, newDigest)) {
-      return this.submit(taskId, {
-        type: "set_acceptance",
-        acceptance: { status: "pending" },
-        evidence: [],
-        allowRetry: true,
-        expectedVersion,
-        fencingToken,
-      });
+      return this.submit(
+        taskId,
+        {
+          type: "set_acceptance",
+          acceptance: { status: "pending" },
+          evidence: [],
+          allowRetry: true,
+          expectedVersion,
+          fencingToken,
+        },
+        opts,
+      );
     }
     return { ok: true, record: cur, createdEvents: [] };
   }
@@ -237,17 +336,6 @@ function isSameEffect(current: TaskOutcomeRecord, transition: SubmitTransition):
     return true;
   }
   return false;
-}
-
-function semanticallyEqualForIdempotency(a: TaskOutcomeRecord, b: TaskOutcomeRecord): boolean {
-  return (
-    a.lifecycle === b.lifecycle &&
-    a.taskJudgement === b.taskJudgement &&
-    a.acceptance.status === b.acceptance.status &&
-    a.delivery.status === b.delivery.status &&
-    a.decisiveRunId === b.decisiveRunId &&
-    a.reasonCode === b.reasonCode
-  );
 }
 
 export function newFencingToken(): string {
