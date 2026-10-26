@@ -72,7 +72,7 @@ describe("collaboration governance actions controller", () => {
     });
   });
 
-  it("dispatches an explicit task handoff contract", async () => {
+  it("dispatches proposeHandoff for an explicit task handoff (T09-B1)", async () => {
     const { state, request } = createState();
 
     await transitionCollaborationGovernanceObject(state, {
@@ -89,14 +89,14 @@ describe("collaboration governance actions controller", () => {
       },
     });
 
-    expect(request).toHaveBeenNthCalledWith(1, "collaboration.task.handoff", {
+    expect(request).toHaveBeenNthCalledWith(1, "collaboration.task.proposeHandoff", {
       groupId: "grp_product",
       taskId: "task-1",
       from: "bot-main",
       to: "bot-reviewer",
-      reason: "need_specialist",
       remainingWork: "Finish the rollout checklist",
       acceptanceCriteria: ["checklist reviewed"],
+      kind: "continue",
       completedArtifacts: ["notes.md"],
     });
     expect(request).toHaveBeenNthCalledWith(2, "collaboration.learning.snapshot", {

@@ -33,6 +33,11 @@ import {
   resolveDeliveryAclActor,
   type DeliveryActorClient,
 } from "../../gateway/collaboration-learning/delivery-actor-binding.js";
+import {
+  assertPersistedTaskNotStopped,
+  TaskStoppedError,
+} from "../../gateway/collaboration-learning/task-stop-entry.js";
+import { labelCollaborationIoTenant } from "../../gateway/collaboration-learning/trusted-tenant.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { stringEnum } from "../schema/typebox.js";
 import { asToolParams, jsonResult, readStringParam, type AnyAgentTool } from "./common.js";
@@ -246,6 +251,9 @@ function mapEntryError(error: unknown) {
   if (error instanceof ClaimContractEntryError) {
     return failResult(error.code, error.message);
   }
+  if (error instanceof TaskStoppedError) {
+    return failResult(error.code, error.message);
+  }
   if (error instanceof Error) {
     const unbound = error.message.includes("actor_not_authenticated");
     if (unbound) {
@@ -374,6 +382,14 @@ export function createCollaborationBoardTool(options?: {
       const itemId =
         readStringParam(params, "itemId") || readStringParam(params, "boardItemId") || undefined;
 
+      if (isWriteAction(action) && taskId) {
+        try {
+          await assertPersistedTaskNotStopped({ groupId, taskId, cfg });
+        } catch (error) {
+          return mapEntryError(error);
+        }
+      }
+
       try {
         if (action === "list_items") {
           if (!taskId) {
@@ -382,7 +398,7 @@ export function createCollaborationBoardTool(options?: {
           const items = await listItems({
             groupId,
             taskId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, items });
@@ -395,7 +411,7 @@ export function createCollaborationBoardTool(options?: {
           const progress = await getMemberProgress({
             groupId,
             taskId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, progress });
@@ -411,7 +427,7 @@ export function createCollaborationBoardTool(options?: {
             taskId,
             todolistId,
             actor: actorId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, todolist });
@@ -451,7 +467,7 @@ export function createCollaborationBoardTool(options?: {
             steps,
             actor: actorId,
             ownerMemberId: actorId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({
@@ -473,7 +489,7 @@ export function createCollaborationBoardTool(options?: {
             taskId,
             itemId,
             actor: actorId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, item });
@@ -500,7 +516,7 @@ export function createCollaborationBoardTool(options?: {
             artifactVersion,
             submissionSummary,
             actor: actorId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, item });
@@ -546,7 +562,7 @@ export function createCollaborationBoardTool(options?: {
             proxyForActorId,
             proxyBasis,
             actor: actorId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, item });
@@ -570,7 +586,7 @@ export function createCollaborationBoardTool(options?: {
             expectedSubmissionId,
             reason,
             actor: actorId,
-            tenant: tenantId ? { tenantId, trust: "actor_fallback" } : null,
+            tenant: labelCollaborationIoTenant(tenantId),
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, item });

@@ -15,7 +15,6 @@ import {
 } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import { evaluateGovernanceGate } from "../collaboration-dispatch/governance-gate.js";
-import { hashEffectiveCollaborationPolicy } from "../collaboration-dispatch/policy-compiler-hash.js";
 import {
   observeGovernanceLanePolicyHashDivergence,
   resolveGovernanceLaneActor,
@@ -31,18 +30,16 @@ import {
   isSingleGroupUnattendedTarget,
 } from "../collaboration-dispatch/single-group-unattended.js";
 import {
-  applyTaskHandoff,
   asGovernedTask,
   assertDeliverableCommit,
   assertTaskMayComplete,
   HandoffContractRequiredError,
-  isCollabTaskHandoffContractEnabled,
   nextGovernedTaskFields,
-  normalizeTaskHandoff,
   resolveBlockedAgentIdsFromHandoffs,
   resolveTaskResponsibility,
   type GovernedTask,
 } from "../collaboration-dispatch/task-runtime.js";
+import { assertTaskNotStopped } from "../collaboration-dispatch/task-stop-control.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
@@ -80,6 +77,7 @@ export async function transitionCollaborationTask(params: {
   if (!current) {
     throw new Error(`task not found: ${params.taskId}`);
   }
+  assertTaskNotStopped(asGovernedTask(current));
   const operatingState = await readGroupOperatingState({
     fileStore,
     groupId: params.groupId,
@@ -196,94 +194,29 @@ export async function handoffCollaborationTask(params: {
   blockers?: string[];
   actor?: string;
 }): Promise<Task> {
-  const {
-    fileStore,
-    groupStorage,
-    learningStorage,
-    memoryStorage,
-    metadataStorage,
-    objectStorage,
-  } = createWorkspaceCollaborationStores();
+  const { fileStore, objectStorage } = createWorkspaceCollaborationStores();
   const current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
   if (!current) {
     throw new Error(`task not found: ${params.taskId}`);
   }
-  const operatingState = await readGroupOperatingState({
+  // Touch operating-state read so missing group storage still fails the same way
+  // before the retired shortcut would have mutated (keeps not-found / IO semantics).
+  await readGroupOperatingState({
     fileStore,
     groupId: params.groupId,
   });
-  const effective = compileGroupEffectivePolicy({ operatingState });
-  const cfg = loadConfig();
-  observeGovernanceLanePolicyHashDivergence({
-    operatingState,
-    legacyOverlay: null,
-    cfg,
-  });
-  const governed = asGovernedTask(current);
-  const responsibility = resolveTaskResponsibility({
-    task: governed,
-    effective,
-    actor: params.actor,
-    ownerUserId: operatingState?.governance.ownerUserId,
-    coordinatorBotId: operatingState?.governance.coordinatorBotId,
-    memberRoleMap: operatingState?.memberRoleMap,
-  });
-  // P1 seam: when handoffContract is on, never call the owner_transfer shortcut.
-  // Responsibility changes must go through proposeHandoff → acceptHandoff →
-  // approveHandoff → applyApprovedHandoff. This single-shot RPC cannot complete
-  // receiver accept + governance approve, so fail closed with a clear pointer.
-  if (isCollabTaskHandoffContractEnabled(cfg)) {
-    throw new HandoffContractRequiredError();
-  }
-  const handoff = normalizeTaskHandoff({
-    taskId: params.taskId,
-    from: params.from,
-    to: params.to,
-    reason: params.reason,
-    remainingWork: params.remainingWork,
-    acceptanceCriteria: params.acceptanceCriteria,
-    completedArtifacts: params.completedArtifacts,
-    assumptions: params.assumptions,
-    blockers: params.blockers,
-  });
-  const next = applyTaskHandoff({ task: governed, handoff, responsibility, cfg });
-  const now = Date.now();
-  const governanceFields = nextGovernedTaskFields({
-    task: governed,
-    liveStatus: current.status,
-    responsibility: next.responsibility,
-    handoffs: next.handoffs,
-  });
-  const updated: GovernedTask = {
-    ...current,
-    ...governanceFields,
-    updatedBy: params.actor ?? current.updatedBy,
-    updatedAtMs: now,
-  };
-  await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
-  await syncGroupOperatingState({
-    fileStore,
-    groupStorage,
-    metadataStorage,
-    memoryStorage,
-    learningStorage,
-    objectStorage,
-    groupId: params.groupId,
-  });
-  recordCollaborationQualityBestEffort({
-    groupId: params.groupId,
-    ...(resolveCollaborationGroupTenantId(params.groupId)
-      ? { tenantId: resolveCollaborationGroupTenantId(params.groupId)! }
-      : {}),
-    event: "handoff",
-    outcome: "completed",
-    agentId: handoff.from,
-    taskId: params.taskId,
-    artifacts: handoff.completedArtifacts,
-    handoff: { from: handoff.from, to: handoff.to, reason: handoff.reason },
-    effectivePolicyHash: hashEffectiveCollaborationPolicy(effective),
-  });
-  return updated;
+  void params.from;
+  void params.to;
+  void params.reason;
+  void params.remainingWork;
+  void params.acceptanceCriteria;
+  void params.completedArtifacts;
+  void params.assumptions;
+  void params.blockers;
+  void params.actor;
+  // T09-B1: collaboration.task.handoff shortcut retired — never mutates responsibility
+  // whether handoffContract is on or off. Sole writer: contract propose→accept→approve→apply.
+  throw new HandoffContractRequiredError();
 }
 
 export async function transitionCollaborationDeliverable(params: {

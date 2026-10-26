@@ -30,6 +30,7 @@ import {
   snapshotCreditReportingFromGate,
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
+import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -221,6 +222,7 @@ export function createFollowupRunner(params: {
           agentId: queued.run.agentId,
           gatewayClientUser: queued.run.gatewayClientUser,
           gatewayClientSessionDomain: queued.run.gatewayClientSessionDomain,
+          taskText: queued.prompt,
         };
         let modelGate: EmployeeModelGateResult = {};
         let followupAuthorizationId: string | undefined;
@@ -241,19 +243,24 @@ export function createFollowupRunner(params: {
           followupSlotHeld = true;
           followupAuthorizationId = runSlot.authorizationDecisionId;
         }
+        const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
+          allowlist: modelGate.allowlist,
+          preferredModelOrder: modelGate.preferredModelOrder,
+          capabilityPlan: modelGate.capabilityPlan,
+        });
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: followupSlotHeld ? "acquired" : "skipped",
-          allowlist: modelGate.allowlist,
+          allowlist: executionRouting.allowlist,
           tenantId: modelGate.tenantId,
           commercialAuthorizationId: followupAuthorizationId,
         });
         const parentSnapshot = buildRunModelSetSnapshot({
           runId,
-          allowlist: modelGate.allowlist,
+          allowlist: executionRouting.allowlist,
           governanceMode: embeddedModelGovernance.governanceMode,
           commercialAuthorizationId: followupAuthorizationId,
           tenantId: modelGate.tenantId,
-          preferredModelOrder: modelGate.preferredModelOrder,
+          preferredModelOrder: executionRouting.preferredModelOrder,
           // P4-1: parent billing context for child runs (acquired gate only).
           creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
         });
@@ -266,8 +273,8 @@ export function createFollowupRunner(params: {
             provider: queued.run.provider,
             model: queued.run.model,
             ...embeddedModelGovernance,
-            ...(modelGate.preferredModelOrder
-              ? { preferredModelOrder: modelGate.preferredModelOrder }
+            ...(executionRouting.preferredModelOrder
+              ? { preferredModelOrder: executionRouting.preferredModelOrder }
               : {}),
             runId,
             agentDir: queued.run.agentDir,

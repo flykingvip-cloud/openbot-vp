@@ -13,11 +13,14 @@ import {
   applyGovernanceAfterLiveTransition,
   mapLiveStatusToGovernance,
 } from "./task-state-machine.js";
+import type { TaskStopControl } from "./task-stop-control.js";
 
 export type GovernedTask = Task & {
   governanceState?: CollaborationTaskState;
   responsibility?: TaskResponsibility;
   handoffs?: TaskHandoff[];
+  /** U1 task-level stop; written by collaboration.task.stop on this authority object. */
+  stopControl?: TaskStopControl | null;
 };
 
 export class InvalidTaskHandoffError extends Error {
@@ -35,14 +38,14 @@ export class MissingTaskDeliverableError extends Error {
 }
 
 /**
- * Flag-on refusal: the owner_transfer shortcut must not change responsibility.
- * Flag-off (default) never throws this.
+ * Shortcut refusal: applyTaskHandoff / collaboration.task.handoff must not change
+ * responsibility whether handoffContract is on or off (T09-B1 retirement).
  */
 export class HandoffContractRequiredError extends Error {
   readonly code = "HANDOFF_CONTRACT_REQUIRED";
   constructor() {
     super(
-      "collaboration.task.handoffContract is enabled; owner and responsibility changes require proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff (contract API). The applyTaskHandoff / collaboration.task.handoff shortcut is refused",
+      "owner and responsibility changes require proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff (contract API). The applyTaskHandoff / collaboration.task.handoff shortcut is retired and refused (flag-off no longer mutates)",
     );
     this.name = "HandoffContractRequiredError";
   }
@@ -110,6 +113,7 @@ export function asGovernedTask(task: Task): GovernedTask {
     governanceState: extra.governanceState ?? mapLiveStatusToGovernance(task.status),
     ...(extra.responsibility ? { responsibility: extra.responsibility } : {}),
     handoffs: extra.handoffs ?? [],
+    ...(extra.stopControl ? { stopControl: extra.stopControl } : {}),
   };
 }
 
@@ -224,34 +228,13 @@ export function applyTaskHandoff(params: {
   task: GovernedTask;
   handoff: TaskHandoff;
   responsibility: TaskResponsibility;
-  /** Explicit config. Omitted calls load the runtime config; default flag is false. */
+  /** Explicit config retained for call-site compatibility; ignored — shortcut always refuses. */
   cfg?: OpenBotConfig;
 }): { responsibility: TaskResponsibility; handoffs: TaskHandoff[] } {
-  // P1-B③: flag-on forbids the owner_transfer shortcut (and any responsibility
-  // mutation) before HandoffContract events. Flag-off keeps the body below.
-  if (isCollabTaskHandoffContractEnabled(params.cfg)) {
-    throw new HandoffContractRequiredError();
-  }
-  const onGraph = new Set([params.responsibility.owner, ...params.responsibility.executors]);
-  if (!onGraph.has(params.handoff.from)) {
-    throw new InvalidTaskHandoffError("handoff from is not on the responsibility graph");
-  }
-  const transferOwner = params.handoff.reason === "owner_transfer";
-  const owner = transferOwner ? params.handoff.to : params.responsibility.owner;
-  const executors = transferOwner
-    ? uniqueIds(params.responsibility.executors)
-    : uniqueIds([
-        params.handoff.to,
-        ...params.responsibility.executors.filter((id) => id !== params.handoff.from),
-      ]);
-  return {
-    responsibility: {
-      ...params.responsibility,
-      owner,
-      executors,
-    },
-    handoffs: [...(params.task.handoffs ?? []), params.handoff],
-  };
+  // T09-B1: shortcut retired. Flag-off must not keep a live responsibility mutator.
+  // Sole writer: applyApprovedHandoff after propose → accept → approve (handoffContract on).
+  void params;
+  throw new HandoffContractRequiredError();
 }
 
 const COUNTED_DELIVERABLE_STATUSES = new Set(["submitted", "in_review", "approved", "published"]);

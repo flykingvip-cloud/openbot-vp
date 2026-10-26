@@ -34,6 +34,12 @@ Composition root: `src/gateway/collaboration-learning/handoff-contract-entry.ts`
 
 1. Diff wires production RPC entry only; reuses `handoff-contract.ts` APIs; no second handoff system / Floor live / multi-beat / task board / RCIS.
 2. Default `collaboration.task.handoffContract` stays OFF.
-3. Flag-off: `collaboration.task.handoff` shortcut still mutates; propose/accept/approve/apply refuse with flag-off error.
+3. Flag-off (historical): shortcut once mutated; **T09-B1**: shortcut refused; propose/accept/approve/apply still refuse until flag on.
 4. Flag-on: propose→accept→approve→apply updates learning task owner; shortcut still refused.
 5. No HA / LIVE router / Path B deploy / tip-prompt rules.
+
+## T09-B1 retirement note (2026-10-25 Asia/Shanghai)
+
+The flag-off `collaboration.task.handoff` / `applyTaskHandoff` shortcut **no longer mutates** responsibility.
+UI and organizers use `collaboration.task.proposeHandoff` (then accept → approve → apply) when `collaboration.task.handoffContract` is explicitly enabled.
+Platform default remains flag-off (no silent LIVE). Historical statements above that claim flag-off shortcut still mutates are **superseded**.

@@ -60,6 +60,7 @@ import {
 } from "../../gateway/model-entitlement/aor-feedback.js";
 import { type EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
+import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -347,6 +348,7 @@ export async function runAgentTurnWithFallback(params: {
           gatewayClientUser: runGatewayClientUser,
           gatewayClientSessionDomain: runGatewayClientSessionDomain,
           gatewayClientPlatformUserId: runGatewayClientPlatformUserId,
+          taskText: params.commandBody,
           ...(params.sessionCtx.CollaborationGroupOwnerEntitlement
             ? {
                 collaborationGroupOwnerEntitlement:
@@ -387,21 +389,26 @@ export async function runAgentTurnWithFallback(params: {
           ? `platform-user:${runGatewayClientPlatformUserId.trim()}`
           : undefined;
         // P3-1: explicit mode (default shadow) + preexisting hard-filter when allowlist is an array.
+        const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
+          allowlist: modelGate.allowlist,
+          preferredModelOrder: modelGate.preferredModelOrder,
+          capabilityPlan: modelGate.capabilityPlan,
+        });
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: enterpriseRunSlotHeld ? "acquired" : "skipped",
-          allowlist: modelGate.allowlist,
+          allowlist: executionRouting.allowlist,
           tenantId: modelGate.tenantId,
           commercialAuthorizationId: commercialAuthDecisionId,
           actorId,
         });
         const parentSnapshot = buildRunModelSetSnapshot({
           runId,
-          allowlist: modelGate.allowlist,
+          allowlist: executionRouting.allowlist,
           governanceMode: embeddedModelGovernance.governanceMode,
           commercialAuthorizationId: commercialAuthDecisionId,
           tenantId: modelGate.tenantId,
           actorId,
-          preferredModelOrder: modelGate.preferredModelOrder,
+          preferredModelOrder: executionRouting.preferredModelOrder,
           // P4-1: parent billing context for child runs, only while this run holds the gate.
           creditReporting: enterpriseRunSlotHeld
             ? snapshotCreditReportingFromGate({
@@ -419,8 +426,8 @@ export async function runAgentTurnWithFallback(params: {
         const fallbackResult = await runWithModelFallback({
           ...resolveModelFallbackOptions(params.followupRun.run),
           ...embeddedModelGovernance,
-          ...(modelGate.preferredModelOrder
-            ? { preferredModelOrder: modelGate.preferredModelOrder }
+          ...(executionRouting.preferredModelOrder
+            ? { preferredModelOrder: executionRouting.preferredModelOrder }
             : {}),
           runId,
           run: (provider, model, runOptions) => {

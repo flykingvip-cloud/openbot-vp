@@ -332,7 +332,7 @@ tasks:
     since: 2026-10-19
     metadata: {}
   - id: collab-p1-artifact-accept-loop:grok-bot
-    owner: grok-bot
+    owner: 协作小组
     intent:
       - P1 collaboration_board accept/return + submit wake reviewer (artifact
         bind / 验收回路) under claimContract + wakeContract allowlists
@@ -351,9 +351,20 @@ tasks:
         ide: cursor
         agent: grok-bot
         status: active
-        lastSignalAt: 2026-10-20T00:23:32.322Z
+        lastSignalAt: 2026-10-25T14:25:07.533Z
         metadata: {}
-    ownerHistory: []
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: collab-p1-artifact-accept-loop:grok-bot
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:07.533Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: grok-bot
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:07.533Z
+        via: confirmed
     since: 2026-10-19
     metadata: {}
   - id: formal-root-write-preview-same:cursor-grok
@@ -441,7 +452,7 @@ tasks:
     since: 2026-10-19
     metadata: {}
   - id: collab-p0-board-exec-tools:grok-bot
-    owner: grok-bot
+    owner: 协作小组
     intent:
       - P0-1 executor collaboration_board agent tool for markInProgress /
         submitForReview / proposeTodolist under claimContract gray allowlist
@@ -454,8 +465,19 @@ tasks:
       - src/agents/sandbox/constants.ts
       - src/gateway/collaboration-dispatch/claim-contract.ts
     state: active
-    sessions: []
-    ownerHistory: []
+    sessions:
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: collab-p0-board-exec-tools:grok-bot
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:11.124Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: grok-bot
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:11.124Z
+        via: confirmed
     since: 2026-10-19
     metadata: {}
   - id: unify-seat-write-preview-root:cursor-grok
@@ -753,7 +775,7 @@ tasks:
     metadata:
       role: owner
   - id: collab-s5-limited-self-advance
-    owner: grok-bot
+    owner: 协作小组
     intent:
       - FINAL v3 S5 limited self-advance per-tick reauth + dry-run defaults
     paths:
@@ -768,12 +790,23 @@ tasks:
       - src/gateway/collaboration-dispatch/collab-s5-limited-self-advance.test.ts
       - src/gateway/collaboration-learning/self-advance-entry.ts
     state: active
-    sessions: []
-    ownerHistory: []
+    sessions:
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: collab-s5-limited-self-advance
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:10.405Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: grok-bot
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:10.405Z
+        via: confirmed
     metadata:
       role: owner
   - id: collab-s2-plan-gate-all-paths
-    owner: grok-bot
+    owner: 协作小组
     intent:
       - FINAL v3 S2 plan gate on all delivery exec paths incl. applied
         self-advance
@@ -788,8 +821,19 @@ tasks:
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-dispatch/collab-s2-plan-gate-all-paths.test.ts
     state: active
-    sessions: []
-    ownerHistory: []
+    sessions:
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: collab-s2-plan-gate-all-paths
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:08.250Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: grok-bot
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:08.250Z
+        via: confirmed
     metadata:
       role: owner
   - id: collab-s1-board-challenge
@@ -809,7 +853,7 @@ tasks:
     metadata:
       role: owner
   - id: collab-p5-challenge-window
-    owner: grok-bot
+    owner: 协作小组
     intent:
       - P5 deploy quality gate single-challenger challenge window
     paths:
@@ -832,8 +876,19 @@ tasks:
       - src/gateway/server-methods-list.ts
       - src/gateway/server-methods/collaboration-learning.ts
     state: active
-    sessions: []
-    ownerHistory: []
+    sessions:
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: collab-p5-challenge-window
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:08.956Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: grok-bot
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:08.956Z
+        via: confirmed
     metadata:
       role: owner
   - id: collab-p3-wake-heartbeat
@@ -865,7 +920,7 @@ tasks:
     metadata:
       role: owner
   - id: collab-p1-shared-board-fact
-    owner: grok-bot
+    owner: 协作小组
     intent:
       - P1 shared board fact gray allowlist and intent materialize
     paths:
@@ -885,8 +940,19 @@ tasks:
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/protocol/schema/collaboration.ts
     state: active
-    sessions: []
-    ownerHistory: []
+    sessions:
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: collab-p1-shared-board-fact
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:09.677Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: grok-bot
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:09.677Z
+        via: confirmed
     metadata:
       role: owner
   - id: wechat-draft-sandbox-guidance:cursor-wechat-sandbox-9804
@@ -2218,7 +2284,7 @@ tasks:
     ownerHistory: []
     metadata: {}
   - id: tenant-context-propagation:kiro
-    owner: cursor-fable
+    owner: 协作小组
     intent: []
     paths:
       - .kiro/specs/tenant-context-propagation/**
@@ -2292,7 +2358,7 @@ tasks:
         agent: kiro
         status: active
         worktree: /Users/daniel/AI项目/openbot-tenant-context-propagation
-        lastSignalAt: 2026-07-12T10:44:49.437Z
+        lastSignalAt: 2026-10-25T14:25:12.539Z
         metadata:
           branch: kiro/tenant-context-propagation
           provisionId: 7b05add3-1f03-43ce-98fe-d7be1277ffca
@@ -2301,7 +2367,18 @@ tasks:
               kind: branch_created
             - ts: 2026-07-12T10:44:49.438Z
               kind: worktree_created
-    ownerHistory: []
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: tenant-context-propagation:kiro
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:12.539Z
+        metadata: {}
+    ownerHistory:
+      - fromOwner: cursor-fable
+        toOwner: 协作小组
+        at: 2026-10-25T14:25:12.539Z
+        via: confirmed
     since: 2026-07-12
     metadata:
       spec: tenant-context-propagation
@@ -9468,7 +9545,211 @@ tasks:
     ownerHistory: []
     since: 2026-10-24
     metadata: {}
+  - id: platform-role-binding-mt:协作小组
+    owner: 协作小组
+    intent:
+      - platform-dynamic-role-binding
+      - multi-tenant-acl
+    paths:
+      - src/gateway/collaboration-learning/trusted-tenant.ts
+      - src/gateway/collaboration-learning/trusted-tenant.test.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.test.ts
+      - src/gateway/collaboration-learning/handoff-contract-entry.ts
+      - src/gateway/collaboration-learning/handoff-contract-entry.test.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.test.ts
+      - src/gateway/collaboration-learning/todolist-acl-rpc.ts
+      - src/gateway/collaboration-learning/todolist-acl-rpc.test.ts
+      - src/gateway/collaboration-learning/platform-role-binding-mt.test.ts
+      - src/gateway/collaboration-learning/self-advance-entry.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/agents/tools/collaboration-board-tool.test.ts
+      - src/gateway/context-scope/authorize.ts
+      - src/gateway/context-scope/authorize.test.ts
+      - src/gateway/collaboration-dispatch/self-advance.ts
+      - src/gateway/collaboration-dispatch/self-advance.test.ts
+      - src/gateway/collaboration-dispatch/task-runtime.ts
+      - src/gateway/collaboration-dispatch/task-runtime.test.ts
+      - src/gateway/collaboration-dispatch/handoff-invariant.test.ts
+      - src/gateway/collaboration-learning/state-machine.ts
+      - src/config/schema.help.ts
+      - src/config/types.collaboration.ts
+      - ui/src/ui/controllers/collaboration-governance-actions.ts
+      - ui/src/ui/controllers/collaboration-governance-actions.node.test.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/gateway/collaboration-dispatch/collab-edge.ts
+    state: active
+    sessions:
+      - id: 1cb70112-2e92-41b9-9e76-fae503fb63f1
+        taskId: platform-role-binding-mt:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-25T14:25:11.841Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-25
+    metadata: {}
+  - id: u1-unified-task-stop:协作小组
+    owner: 协作小组
+    intent:
+      - u1-unified-task-stop
+      - wl2-stop-control
+    paths:
+      - src/gateway/collaboration-dispatch/task-stop-control.ts
+      - src/gateway/collaboration-dispatch/task-stop-control.test.ts
+      - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
+      - src/gateway/collaboration-learning/task-stop-entry.ts
+      - src/gateway/collaboration-learning/task-stop-entry.test.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/handoff-contract-entry.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/self-advance-entry.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/collaboration-dispatch/task-runtime.ts
+      - src/gateway/collaboration-learning.ts
+    state: active
+    sessions:
+      - id: t30u-u1-boundary-20261026
+        taskId: u1-unified-task-stop:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-26T02:32:53.093Z
+        metadata:
+          org: 协作小组
+          executor: 协作小组
+          t30u: true
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: u2-background-revoke-recheck:协作小组
+    owner: 协作小组
+    intent:
+      - u2-background-revoke-recheck
+      - wl2-revoke-wake-hb
+    paths:
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+    state: active
+    sessions:
+      - id: t30u-u2-revoke-20261026
+        taskId: u2-background-revoke-recheck:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-26T02:32:53.093Z
+        metadata:
+          org: 协作小组
+          executor: 协作小组
+          t30u: true
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: u3-wake-idempotent-resume:协作小组
+    owner: 协作小组
+    intent:
+      - u3-wake-idempotent-resume
+      - wl2-wake-idempotent-resume
+    paths:
+      - src/gateway/collaboration-dispatch/wake-contract.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/gateway/collaboration-learning/task-stop-entry.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+    state: ready
+    sessions:
+      - id: t29u-u3-1792978430
+        taskId: u3-wake-idempotent-resume:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-26T01:33:51.109Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
 landingStreams:
+
+  - id: p0a-p0-task-capability-plan
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/agents/subagent-spawn.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/commands/agent.ts
+      - src/commands/agent/commercial-run-gate.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/user-operational-identity-execution.ts
+      - src/gateway/user-operational-identity-execution.p0a.test.ts
+      - src/gateway/user-operational-identity-social-execution.ts
+      - src/gateway/user-operational-identity-social-execution.p0a.test.ts
+    canLandWith: []
+    metadata:
+      task: p0a-p0-task-capability-plan
+      owner: grok-bot
+      purpose: P0a unsupported social contract + P0 task capability plan inside authorized set
+  - id: u1-unified-task-stop
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/collaboration-dispatch/task-stop-control.ts
+      - src/gateway/collaboration-dispatch/task-stop-control.test.ts
+      - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
+      - src/gateway/collaboration-learning/task-stop-entry.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/handoff-contract-entry.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/self-advance-entry.ts
+      - src/gateway/collaboration-learning/state-machine.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/task-runtime.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+    canLandWith:
+      - COLLAB_RESIDUAL_B_TOOL_LOOP
+      - batch2-reliable-confirm-cards
+      - collab-p1-artifact-accept-loop:grok-bot
+      - collab-p0-wake-dispatch:grok-bot
+      - collab-p0-board-exec-tools:grok-bot
+      - COLLAB_TODOLIST_ACL_RPC
+      - COLLAB_P4A_PROPOSE_HANDOFF_ENTRY
+      - COLLAB_S5_LIMITED_SELF_ADVANCE
+      - batch3-version-permission
+      - batch5-single-group-unattended
+      - FLOOR_P1_B_HANDOFF_CONTRACT
+      - MRR
+    metadata:
+      task: u1-unified-task-stop:协作小组
+      owner: 协作小组
+      purpose: U1 unified task stop control — shared stopControl on task authority + entry guards
   - id: COLLAB_RESIDUAL_B_TOOL_LOOP
     landingPolicy: serial
     paths:
@@ -9757,12 +10038,13 @@ landingStreams:
     metadata:
       task: strip-ohbe-from-openbot-vp
       owner: cursor-cloud
-      purpose: Path B machine ledger SoT lives in openbot-vp deploy/production/releases.jsonl.
-        First-match so restore/cutover delivery files land together. OHBE is a separate
-        project and is not the openbot-vp Path B append target.
-      historicalLedger: deploy/production/releases.jsonl was briefly removed then restored
-        as Path B SoT (seq seed through 144 tip 9a8e91d19e89). Do not append Path B rows
-        to harness-Benchmark-Engine going forward.
+      purpose: Path B machine ledger SoT lives in openbot-vp
+        deploy/production/releases.jsonl. First-match so restore/cutover
+        delivery files land together. OHBE is a separate project and is not the
+        openbot-vp Path B append target.
+      historicalLedger: deploy/production/releases.jsonl was briefly removed then
+        restored as Path B SoT (seq seed through 144 tip 9a8e91d19e89). Do not
+        append Path B rows to harness-Benchmark-Engine going forward.
   - id: batch8-skill-gates
     landingPolicy: serial
     paths:
@@ -18799,6 +19081,7 @@ landingStreams:
       - CDUI
       - LDRG
       - CHAT_HISTORY_P0_IMAGE_OMIT
+      - u1-unified-task-stop
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE

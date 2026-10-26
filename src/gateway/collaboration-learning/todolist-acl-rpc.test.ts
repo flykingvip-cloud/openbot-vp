@@ -932,4 +932,124 @@ describe("owner-decision delivery is independent of plan creation", () => {
     expect(confirmed.version).toBe(revised.version);
     expect(confirmed.steps[0]?.title).toBe("修订后步骤");
   });
+
+  test("D6b: revoked coordinator cannot list historyReloadable delivery rows", async () => {
+    const { cfg } = await useConfig();
+    await seedTask();
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId: seed.taskId,
+      remainingWork: "交付私有计划",
+      acceptanceCriteria: ["含来源"],
+      actor: "bot-secretary",
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId: seed.taskId,
+      itemId: published.itemId,
+      claimantId: "bot-analyst",
+      cfg,
+    });
+    await applyCollaborationBoardClaim({
+      groupId,
+      taskId: seed.taskId,
+      itemId: published.itemId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    const state = makeOperatingState({
+      groupId,
+      governance: { coordinatorBotId: "bot-coord" },
+    });
+    state.memberRoleMap = [
+      {
+        memberId: "bot-coord",
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+      {
+        memberId: "bot-analyst",
+        memberKind: "bot",
+        governanceRole: "member",
+        collaborationRole: null,
+        status: "active",
+      },
+    ];
+    await writeGroupOperatingState({ fileStore, groupId, state });
+
+    const proposed = await proposeCollaborationTodolist({
+      groupId,
+      taskId: seed.taskId,
+      boardItemId: published.itemId,
+      ownerMemberId: "bot-analyst",
+      steps: [{ title: SECRET_STEP }],
+      actor: "bot-analyst",
+      cfg,
+    });
+    const delivered = await retryCollaborationOwnerDecisionDelivery({
+      groupId,
+      taskId: seed.taskId,
+      todolistId: proposed.todolist.todolistId,
+      expectedVersion: proposed.todolist.version,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(delivered.cardDelivery.historyReloadable).toBe(true);
+
+    const beforeRevoke = await listCollaborationOwnerDecisionDeliveries({
+      groupId,
+      taskId: seed.taskId,
+      actor: "bot-coord",
+      cfg,
+    });
+    expect(beforeRevoke.some((row) => row.todolistId === proposed.todolist.todolistId)).toBe(true);
+
+    const removed = await readGroupOperatingState({ fileStore, groupId });
+    removed!.memberRoleMap = removed!.memberRoleMap.map((row) =>
+      row.memberId === "bot-coord" ? { ...row, status: "removed" } : row,
+    );
+    await writeGroupOperatingState({ fileStore, groupId, state: removed! });
+
+    await expect(
+      getCollaborationTodolist({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: proposed.todolist.todolistId,
+        actor: "bot-coord",
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+
+    await expect(
+      retryCollaborationOwnerDecisionDelivery({
+        groupId,
+        taskId: seed.taskId,
+        todolistId: proposed.todolist.todolistId,
+        expectedVersion: proposed.todolist.version,
+        actor: "bot-coord",
+        cfg,
+      }),
+    ).rejects.toMatchObject({ code: "forbidden" });
+
+    const afterRevoke = await listCollaborationOwnerDecisionDeliveries({
+      groupId,
+      taskId: seed.taskId,
+      actor: "bot-coord",
+      cfg,
+    });
+    expect(afterRevoke.some((row) => row.todolistId === proposed.todolist.todolistId)).toBe(false);
+    expect(JSON.stringify(afterRevoke)).not.toContain(SECRET_STEP);
+
+    const stillOwner = await listCollaborationOwnerDecisionDeliveries({
+      groupId,
+      taskId: seed.taskId,
+      actor: "bot-analyst",
+      cfg,
+    });
+    expect(stillOwner.some((row) => row.todolistId === proposed.todolist.todolistId)).toBe(true);
+  });
 });

@@ -2,8 +2,13 @@
  * C2 follow-up — production read-only entry for Wake Contract ledger.
  *
  * listWakeEvents / whoWokeWhom do not require wakeContract flag (observe AS-IS).
- * Writers stay on chat.send hook + claim/handoff paths; this entry does not write.
+ * Writers stay on chat.send hook + claim/handoff paths; list/whoWokeWhom do not write.
+ * Heartbeat may emit wakes only via wake-contract writers (flag/allowlist), not a fork.
+ *
+ * T09-B3: full-entrypoint stop + wake-revoke concurrency remain 待测 (see T10 close table).
  */
+export const WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE = true as const;
+
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-event-key.js";
@@ -32,7 +37,10 @@ import {
   readGroupOperatingState,
   resolveCollaborationGroupTenantId,
 } from "./shared.js";
-import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "./trusted-tenant.js";
 
 async function buildWakeAuthority(params: {
   groupId: string;
@@ -51,10 +59,10 @@ async function buildWakeAuthority(params: {
     idGen: () => generatePolicySnapshotId(now),
   });
   const groupTenantId = resolveCollaborationGroupTenantId(params.groupId);
-  const tenant: CollaborationTenantResolution = params.tenant ?? {
-    tenantId: groupTenantId,
-    trust: groupTenantId ? "actor_fallback" : "none",
-  };
+  const tenant: CollaborationTenantResolution = resolveAuthorityTenantForEntry({
+    preferred: params.tenant,
+    groupTenantId,
+  });
   const profile = resolveSecurityProfile(params.cfg).profile;
   const episodeSeed = params.taskId
     ? `task-wake:${params.groupId}:${params.taskId}`

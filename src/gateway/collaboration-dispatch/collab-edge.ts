@@ -71,7 +71,13 @@ export function stripCollabEdgeDirectives(text: string): string {
 /**
  * Resolve a `to=` value (agentId, display name, or `@name`) to a group bot agentId.
  * Bots only see display names in chat, so name targets must work end-to-end.
+ *
+ * T09-B2: name / byName resolution is **mention routing only** — never an
+ * authorization, ACL membership, or write grant. Write paths must still pass
+ * resolveDeliveryAclActor / resolveTrustedTodolistAcl / Governance Gate.
  */
+export const COLLAB_EDGE_NAME_RESOLVE_IS_NOT_ACL = true as const;
+
 export function createCollabEdgeTargetResolver(
   bots: ReadonlyArray<{ agentId: string; name?: string | null }>,
 ): (raw: string) => string | null {

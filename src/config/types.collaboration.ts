@@ -113,8 +113,9 @@ export type CollaborationConfig = {
   /**
    * Floor Runtime v2.1 §5.6 / §2.10 P1-B③ flag `collab.task.handoffContract`
    * (default false). When true, owner and responsibility changes go through
-   * HandoffContract (accept + approve, then applyApprovedHandoff). When false,
-   * the existing task handoff path is unchanged.
+   * HandoffContract (accept + approve, then applyApprovedHandoff). The legacy
+   * applyTaskHandoff / collaboration.task.handoff shortcut is retired and never
+   * mutates responsibility (T09-B1), including when this flag is false.
    */
   task?: CollaborationTaskConfig;
   /**

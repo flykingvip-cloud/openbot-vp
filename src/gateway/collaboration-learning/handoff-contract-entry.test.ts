@@ -1,6 +1,6 @@
 /**
  * P4a — production entry onto existing proposeHandoff* APIs.
- * Flag-off keeps collaboration.task.handoff / handoffCollaborationTask shortcut.
+ * Flag-off refuses contract entry; shortcut also refuses (T09-B1).
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -110,7 +110,7 @@ const seed: Task = {
 };
 
 describe("P4a handoff contract production entry", () => {
-  test("flag-off: propose entry refuses; shortcut handoffCollaborationTask still mutates", async () => {
+  test("flag-off: propose entry refuses; shortcut handoffCollaborationTask also refuses", async () => {
     const { cfg } = await useConfig(false);
     await seedTask(groupId, seed);
 
@@ -126,18 +126,23 @@ describe("P4a handoff contract production entry", () => {
       }),
     ).rejects.toBeInstanceOf(HandoffContractFlagOffError);
 
-    const updated = await handoffCollaborationTask({
-      groupId,
-      taskId: seed.taskId,
-      from: "bot-a",
-      to: "bot-b",
-      reason: "owner_transfer",
-      remainingWork: "finish the review",
-      acceptanceCriteria: ["signed off"],
-      actor: "bot-a",
-    });
-    expect(updated.ownerMemberId).toBe("bot-b");
-    expect(updated.responsibility?.owner).toBe("bot-b");
+    await expect(
+      handoffCollaborationTask({
+        groupId,
+        taskId: seed.taskId,
+        from: "bot-a",
+        to: "bot-b",
+        reason: "owner_transfer",
+        remainingWork: "finish the review",
+        acceptanceCriteria: ["signed off"],
+        actor: "bot-a",
+      }),
+    ).rejects.toThrow(/proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff/);
+
+    const { objectStorage } = createWorkspaceCollaborationStores();
+    const persisted = await objectStorage.readObject<Task>(groupId, "task", seed.taskId);
+    expect(persisted?.ownerMemberId).toBe("bot-a");
+    expect(persisted?.responsibility?.owner ?? "bot-a").toBe("bot-a");
   });
 
   test("flag-on: propose→accept→approve→apply closes loop and updates learning task store", async () => {

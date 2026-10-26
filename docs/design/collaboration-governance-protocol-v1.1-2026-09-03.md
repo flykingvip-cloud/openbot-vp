@@ -136,7 +136,7 @@ live `Task.status` 仍是 `draft / ready / in_progress / blocked / review / comp
 
 live 写路径保持 `packages/collaboration-core` Task SM 权威。每次 live status 变更后，`applyGovernanceAfterLiveTransition` 先算出 overlay 目标，再经 `transitionGovernanceTask` 走最短合法 hop（例如 live `in_progress → completed` 会经过 `REVIEW → READY → DELIVERED`）。这不是替换 live Task SM。
 
-任务交接必须带 `TaskHandoff`（已完成产物、剩余工作、假设、阻塞、验收条件），经 `collaboration.task.handoff` 落账，不能靠聊天记录推断。`reason === "owner_transfer"` 是唯一改 Owner 的交接。  
+任务交接必须带 `TaskHandoff`（已完成产物、剩余工作、假设、阻塞、验收条件），经 HandoffContract（`proposeHandoff`→accept→approve→apply）落账；历史捷径 RPC `collaboration.task.handoff` 已退役，不能靠聊天记录推断。`reason === "owner_transfer"` 是唯一改 Owner 的交接。  
 `task_driven` 完成前必须有已提交的关联交付物；交付物批准/发布走 Governance Gate。
 
 ## Governance Gate

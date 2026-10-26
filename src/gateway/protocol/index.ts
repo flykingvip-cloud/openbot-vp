@@ -103,6 +103,7 @@ import {
   type CollaborationTaskBlockBoardItemParams,
   type CollaborationTaskUnblockBoardItemParams,
   type CollaborationTaskCancelBoardItemParams,
+  type CollaborationTaskStopParams,
   type CollaborationTaskRecordPeerReviewParams,
   type CollaborationTaskListPeerReviewsParams,
   type CollaborationTaskOpenChallengeWindowParams,
@@ -137,6 +138,7 @@ import {
   CollaborationTaskBlockBoardItemParamsSchema,
   CollaborationTaskUnblockBoardItemParamsSchema,
   CollaborationTaskCancelBoardItemParamsSchema,
+  CollaborationTaskStopParamsSchema,
   CollaborationTaskRecordPeerReviewParamsSchema,
   CollaborationTaskListPeerReviewsParamsSchema,
   CollaborationTaskOpenChallengeWindowParamsSchema,
@@ -647,6 +649,9 @@ export const validateCollaborationTaskUnblockBoardItemParams =
   );
 export const validateCollaborationTaskCancelBoardItemParams =
   ajv.compile<CollaborationTaskCancelBoardItemParams>(CollaborationTaskCancelBoardItemParamsSchema);
+export const validateCollaborationTaskStopParams = ajv.compile<CollaborationTaskStopParams>(
+  CollaborationTaskStopParamsSchema,
+);
 export const validateCollaborationTaskRecordPeerReviewParams =
   ajv.compile<CollaborationTaskRecordPeerReviewParams>(
     CollaborationTaskRecordPeerReviewParamsSchema,

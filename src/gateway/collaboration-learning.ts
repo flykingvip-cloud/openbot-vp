@@ -125,3 +125,14 @@ export {
 } from "./collaboration-learning/wake-contract-entry.js";
 
 export { runCollaborationSelfAdvance } from "./collaboration-learning/self-advance-entry.js";
+
+export {
+  requestCollaborationTaskStop,
+  assertPersistedTaskNotStopped,
+  canRequestTaskStop,
+  TaskStopEntryError,
+  TaskStoppedError,
+  assertTaskNotStopped,
+  isTaskStopAccepted,
+  readTaskStopControl,
+} from "./collaboration-learning/task-stop-entry.js";

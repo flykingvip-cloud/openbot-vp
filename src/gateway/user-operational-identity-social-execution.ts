@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { UserOperationalIdentityExecutionPayload } from "./user-operational-identity-execution.js";
 import { isSimulatedUserOperationalIdentityCredentialSecret } from "./user-operational-identity-secrets.js";
 import type {
@@ -70,7 +70,22 @@ export async function executeUserOperationalIdentitySocialAction(params: {
     stringValue(params.payload.title) ||
     "OpenBot operational identity action";
 
+  const implemented =
+    (params.provider === "weibo" && params.action === "post_status") ||
+    (params.provider === "x-twitter" && params.action === "post_tweet");
+
   if (simulated) {
+    if (!implemented) {
+      return {
+        unsupported: true,
+        simulated: true,
+        provider: params.provider,
+        action: params.action,
+        code: "USER_IDENTITY_ACTION_UNSUPPORTED",
+        message: `Action ${params.action} is not supported for ${params.provider}.`,
+        preview: text,
+      };
+    }
     return {
       simulated: true,
       provider: params.provider,
@@ -99,12 +114,14 @@ export async function executeUserOperationalIdentitySocialAction(params: {
     return { simulated: false, ...result };
   }
 
+  // P0a: unimplemented actions must not look like accepted success.
   return {
+    unsupported: true,
     simulated: false,
     provider: params.provider,
     action: params.action,
-    referenceId: randomUUID(),
-    message: `Action ${params.action} accepted for ${params.provider}.`,
+    code: "USER_IDENTITY_ACTION_UNSUPPORTED",
+    message: `Action ${params.action} is not supported for ${params.provider}.`,
     preview: text,
   };
 }

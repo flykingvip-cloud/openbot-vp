@@ -69,6 +69,7 @@ import { isHookDispatchSessionKey } from "../../gateway/hook-surface-session.js"
 import { resolveKnowledgeGatewayClientForAgentRun } from "../../gateway/knowledge/agent-run-gateway-client.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
+import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -855,7 +856,7 @@ export async function runCronIsolatedAgentTurn(params: {
       const runSlot = await tryAcquireEnterpriseAgentRun({
         runId: cronRunId,
         agentId,
-        modelGateInput: { cfg: cfgWithAgentDefaults, agentId },
+        modelGateInput: { cfg: cfgWithAgentDefaults, agentId, taskText: promptText },
       });
       if (!runSlot.skipped && !runSlot.acquired) {
         throw new Error(runSlot.message);
@@ -869,19 +870,24 @@ export async function runCronIsolatedAgentTurn(params: {
             runSlot.modelGate.creditReporting ?? commercialCreditReporting;
         }
       }
+      const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
+        allowlist: modelGate.allowlist,
+        preferredModelOrder: modelGate.preferredModelOrder,
+        capabilityPlan: modelGate.capabilityPlan,
+      });
       const embeddedModelGovernance = resolveEmbeddedModelGovernance({
         gateStatus: cronSlotHeld ? "acquired" : "skipped",
-        allowlist: modelGate.allowlist,
+        allowlist: executionRouting.allowlist,
         tenantId: modelGate.tenantId,
         commercialAuthorizationId: cronAuthorizationId,
       });
       const parentSnapshot = buildRunModelSetSnapshot({
         runId: cronRunId,
-        allowlist: modelGate.allowlist,
+        allowlist: executionRouting.allowlist,
         governanceMode: embeddedModelGovernance.governanceMode,
         commercialAuthorizationId: cronAuthorizationId,
         tenantId: modelGate.tenantId,
-        preferredModelOrder: modelGate.preferredModelOrder,
+        preferredModelOrder: executionRouting.preferredModelOrder,
         // P4-1: parent billing context for child runs (acquired gate only).
         creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
       });
@@ -894,8 +900,8 @@ export async function runCronIsolatedAgentTurn(params: {
           provider,
           model,
           ...embeddedModelGovernance,
-          ...(modelGate.preferredModelOrder
-            ? { preferredModelOrder: modelGate.preferredModelOrder }
+          ...(executionRouting.preferredModelOrder
+            ? { preferredModelOrder: executionRouting.preferredModelOrder }
             : {}),
           runId: cronSession.sessionEntry.sessionId,
           agentDir,

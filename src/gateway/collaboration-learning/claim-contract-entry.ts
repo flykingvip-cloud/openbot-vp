@@ -103,7 +103,11 @@ import {
   resolveCollaborationGroupTenantId,
   syncGroupOperatingState,
 } from "./shared.js";
-import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import { assertPersistedTaskNotStopped } from "./task-stop-entry.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "./trusted-tenant.js";
 
 export { oralDispatchCreatesBoardFact };
 export { freeChatIsTodolist, todolistIsGroupSharedBoardSubrecord };
@@ -172,10 +176,10 @@ async function buildClaimAuthority(params: {
     idGen: () => generatePolicySnapshotId(now),
   });
   const groupTenantId = resolveCollaborationGroupTenantId(params.groupId);
-  const tenant: CollaborationTenantResolution = params.tenant ?? {
-    tenantId: groupTenantId,
-    trust: groupTenantId ? "actor_fallback" : "none",
-  };
+  const tenant: CollaborationTenantResolution = resolveAuthorityTenantForEntry({
+    preferred: params.tenant,
+    groupTenantId,
+  });
   const profile = resolveSecurityProfile(params.cfg).profile;
   const authority = createRuntimeAuthority({
     snapshot,
@@ -329,6 +333,11 @@ export async function publishCollaborationBoardItem(
 ): Promise<GroupBoardClaimItem> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const { authority, stores } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -390,6 +399,11 @@ export async function claimCollaborationBoardItem(
 ): Promise<GroupBoardClaimItem> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const { authority } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -433,6 +447,11 @@ export async function applyCollaborationBoardClaim(
 ): Promise<{ task: Task; item: GroupBoardClaimItem }> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const { authority, stores, operatingState } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -587,6 +606,11 @@ async function mutateProgress(
 ): Promise<GroupBoardClaimItem> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const { authority } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -637,6 +661,11 @@ export async function submitCollaborationBoardItemForReview(params: {
   // Falls back to board publishedBy inside submitBoardItemForReview when null.
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const { authority, operatingState } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -985,6 +1014,11 @@ export async function proposeCollaborationTodolist(params: {
 }): Promise<ProposeCollaborationTodolistResult> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const ownerMemberId = params.ownerMemberId?.trim() || params.actor?.trim();
   if (!ownerMemberId) {
     throw new ClaimContractEntryError("owner_required", "ownerMemberId / actor is required");
@@ -1170,7 +1204,9 @@ export async function listCollaborationOwnerDecisionDeliveries(params: {
       }
       readable.set(key, canRead);
     }
-    if (canRead || row.historyReloadable) {
+    // D6b: historyReloadable describes redraw eligibility for an already-authorized
+    // viewer; it must not bypass current access re-check after revocation.
+    if (canRead) {
       visible.push(row);
     }
   }
@@ -1195,6 +1231,11 @@ export async function confirmCollaborationTodolist(params: {
   const cfg = params.cfg ?? loadConfig();
   ignoreRequestAcl(params);
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const confirmerId = boundRuntimeActor({
     actor: params.actor,
     requested: params.confirmerId,
@@ -1259,6 +1300,11 @@ export async function reviseCollaborationTodolist(params: {
   const cfg = params.cfg ?? loadConfig();
   ignoreRequestAcl(params);
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+  });
   const reviserId = boundRuntimeActor({
     actor: params.actor,
     requested: params.reviserId,

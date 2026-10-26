@@ -39,6 +39,8 @@ export async function acquireAgentCommandCommercialRun(input: {
   sessionAgentId: string;
   enterpriseId?: string;
   gatewayClientUser?: string;
+  /** Current task text for per-task capability planning (P0). */
+  taskText?: string;
   /** Caller's entry (`E2` ingress / `E3` CLI / `E6` subagent), stamped on the envelope only. */
   entry?: AgentCommandGovernanceEntry | "E6";
 }): Promise<AgentCommandCommercialGateResult> {
@@ -52,6 +54,7 @@ export async function acquireAgentCommandCommercialRun(input: {
       cfg,
       agentId: input.sessionAgentId,
       ...(enterpriseId ? { enterpriseIdHint: enterpriseId } : {}),
+      ...(input.taskText !== undefined ? { taskText: input.taskText } : {}),
       // all-bot-runs (managed default) resolves seat from agentId when no employee session.
       ...(input.gatewayClientUser
         ? {

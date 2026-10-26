@@ -1067,3 +1067,24 @@ export const CollaborationDecisionDraftUpdateParamsSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+
+export type CollaborationTaskStopParams = {
+  groupId: string;
+  taskId: string;
+  reason?: string;
+  inFlightAbort?: "none" | "best_effort";
+  externalEffect?: "none" | "happened" | "unknown";
+};
+
+export const CollaborationTaskStopParamsSchema = Type.Object(
+  {
+    groupId: NonEmptyString,
+    taskId: NonEmptyString,
+    reason: Type.Optional(NonEmptyString),
+    inFlightAbort: Type.Optional(Type.Union([Type.Literal("none"), Type.Literal("best_effort")])),
+    externalEffect: Type.Optional(
+      Type.Union([Type.Literal("none"), Type.Literal("happened"), Type.Literal("unknown")]),
+    ),
+  },
+  { additionalProperties: false },
+);

@@ -25,8 +25,10 @@
  */
 import fs from "node:fs/promises";
 import path from "node:path";
+import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
 import {
   boardClaimsDir,
   type BoardClaimStatus,
@@ -47,6 +49,9 @@ import {
   runSingleGroupUnattendedTick,
   type UnattendedTickResult,
 } from "./single-group-unattended.js";
+import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
+import { asGovernedTask } from "./task-runtime.js";
+import { isTaskStopAccepted } from "./task-stop-control.js";
 import {
   isCollabTaskWakeContractEnabled,
   listWakeEvents,
@@ -777,6 +782,41 @@ function resolveEscalateTargets(options?: GroupTaskHeartbeatOptions): string[] {
  * Mode B claim-first bridge for unclaimed → persist state.
  * Does **not** append transcript / fake completion.
  */
+
+async function isPersistedTaskStopped(params: {
+  groupId: string;
+  taskId: string;
+  cfg?: OpenBotConfig;
+}): Promise<boolean> {
+  const taskId = params.taskId.trim();
+  if (!taskId) {
+    return false;
+  }
+  try {
+    const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+    const current = await objectStorage.readObject<Task>(params.groupId, "task", taskId);
+    return Boolean(current && isTaskStopAccepted(asGovernedTask(current)));
+  } catch {
+    return false;
+  }
+}
+
+/** U2 sibling of stop preflight: refuse HB wake emit when targets/duty revoked. */
+async function isPersistedDispatchAuthRevoked(params: {
+  groupId: string;
+  taskId: string;
+  targetActorIds: readonly string[];
+  cfg?: OpenBotConfig;
+}): Promise<boolean> {
+  const auth = await recheckCurrentDispatchAuthorization({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    targetActorIds: params.targetActorIds,
+    cfg: params.cfg,
+  });
+  return !auth.ok;
+}
+
 export async function runGroupTaskHeartbeat(
   authority: RuntimeAuthority,
   input: { groupId: string },
@@ -868,6 +908,34 @@ export async function runGroupTaskHeartbeat(
 
     if (decision.action === "nudge") {
       if (!dryRun && !unattendedTarget) {
+        if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg })) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: prior?.lastEscalateAt,
+            lastFingerprint: progressFingerprint(item),
+            lastStatus: item.status,
+          };
+          continue;
+        }
+        // U2: auth recheck at same position as U1 stop (does not replace stop).
+        if (
+          await isPersistedDispatchAuthRevoked({
+            groupId,
+            taskId: item.taskId,
+            targetActorIds: decision.toAgentIds,
+            cfg,
+          })
+        ) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: prior?.lastEscalateAt,
+            lastFingerprint: progressFingerprint(item),
+            lastStatus: item.status,
+          };
+          continue;
+        }
         const selfAdvanceWriteMode = resolveSelfAdvanceWriteMode(cfg, groupId, tenantId);
         const consume = await consumeWakeForRoundDispatch({
           authority,
@@ -903,6 +971,34 @@ export async function runGroupTaskHeartbeat(
 
     if (decision.action === "escalate") {
       if (!dryRun && !unattendedTarget) {
+        if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg })) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: prior?.lastEscalateAt,
+            lastFingerprint: progressFingerprint(item),
+            lastStatus: item.status,
+          };
+          continue;
+        }
+        // U2: auth recheck at same position as U1 stop (does not replace stop).
+        if (
+          await isPersistedDispatchAuthRevoked({
+            groupId,
+            taskId: item.taskId,
+            targetActorIds: decision.toAgentIds,
+            cfg,
+          })
+        ) {
+          nextItems[item.itemId] = {
+            consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
+            lastNudgeAt: prior?.lastNudgeAt,
+            lastEscalateAt: prior?.lastEscalateAt,
+            lastFingerprint: progressFingerprint(item),
+            lastStatus: item.status,
+          };
+          continue;
+        }
         const selfAdvanceWriteMode = resolveSelfAdvanceWriteMode(cfg, groupId, tenantId);
         const consume = await consumeWakeForRoundDispatch({
           authority,

@@ -12,6 +12,9 @@ vi.mock("../employee-workbench-scope.js", () => ({
 }));
 
 const {
+  isAclSafeTenantTrust,
+  labelCollaborationIoTenant,
+  resolveAuthorityTenantForEntry,
   resolveCollaborationTenantResolution,
   resolveMembershipTenantIdForAcl,
   resolveTrustedCollaborationTenantId,
@@ -64,5 +67,38 @@ describe("trusted-tenant multi-surface fail-closed", () => {
     resolveTenantContext.mockResolvedValue(null);
     resolveEmployeeWorkbenchActor.mockResolvedValue({ tenantId: "actor-tenant" });
     expect(await resolveTrustedCollaborationTenantId({} as never)).toBe("actor-tenant");
+  });
+
+  it("labelCollaborationIoTenant never claims membership", () => {
+    expect(labelCollaborationIoTenant("t1")).toEqual({ tenantId: "t1", trust: "actor_fallback" });
+    expect(labelCollaborationIoTenant(null)).toEqual({ tenantId: null, trust: "none" });
+    expect(isAclSafeTenantTrust(labelCollaborationIoTenant("t1").trust)).toBe(false);
+  });
+
+  it("resolveAuthorityTenantForEntry prefers membership label from caller", () => {
+    expect(
+      resolveAuthorityTenantForEntry({
+        preferred: { tenantId: "acme", trust: "membership" },
+        groupTenantId: "group-owned",
+      }),
+    ).toEqual({ tenantId: "acme", trust: "membership" });
+  });
+
+  it("resolveAuthorityTenantForEntry group fallback is I/O only (not ACL membership)", () => {
+    const labeled = resolveAuthorityTenantForEntry({
+      preferred: null,
+      groupTenantId: "group-owned",
+    });
+    expect(labeled).toEqual({ tenantId: "group-owned", trust: "actor_fallback" });
+    expect(isAclSafeTenantTrust(labeled.trust)).toBe(false);
+  });
+
+  it("resolveAuthorityTenantForEntry does not upgrade actor_fallback to membership", () => {
+    expect(
+      resolveAuthorityTenantForEntry({
+        preferred: { tenantId: "hint", trust: "actor_fallback" },
+        groupTenantId: "group-owned",
+      }),
+    ).toEqual({ tenantId: "hint", trust: "actor_fallback" });
   });
 });
