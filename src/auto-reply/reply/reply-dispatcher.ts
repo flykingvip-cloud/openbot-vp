@@ -21,6 +21,15 @@ type ReplyDispatchDeliverer = (
   info: { kind: ReplyDispatchKind },
 ) => Promise<void>;
 
+/** R85e: outcome of one completed deliver() (success or throw). */
+export type ReplyDeliveryOutcome = {
+  kind: ReplyDispatchKind;
+  ok: boolean;
+  error?: string;
+};
+
+type ReplyDeliveryResultHandler = (outcome: ReplyDeliveryOutcome) => void | Promise<void>;
+
 const DEFAULT_HUMAN_DELAY_MIN_MS = 800;
 const DEFAULT_HUMAN_DELAY_MAX_MS = 2500;
 
@@ -53,6 +62,11 @@ export type ReplyDispatcherOptions = {
   onError?: ReplyDispatchErrorHandler;
   // AIDEV-NOTE: onSkip lets channels detect silent/empty drops (e.g. Telegram empty-response fallback).
   onSkip?: ReplyDispatchSkipHandler;
+  /**
+   * R85e: called after each deliver() settles (ok or throw).
+   * Use this (or getDeliveryOutcomes) to confirm TaskOutcome — enqueue is not a receipt.
+   */
+  onDeliveryResult?: ReplyDeliveryResultHandler;
   /** Human-like delay between block replies for natural rhythm. */
   humanDelay?: HumanDelayConfig;
 };
@@ -80,6 +94,8 @@ export type ReplyDispatcher = {
   waitForIdle: () => Promise<void>;
   getQueuedCounts: () => Record<ReplyDispatchKind, number>;
   markComplete: () => void;
+  /** R85e: settled deliver() outcomes in enqueue order (tool/block/final). */
+  getDeliveryOutcomes?: () => readonly ReplyDeliveryOutcome[];
 };
 
 type NormalizeReplyPayloadInternalOptions = Pick<
@@ -119,6 +135,8 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
     block: 0,
     final: 0,
   };
+  // R85e: record actual deliver() settlements (enqueue alone is not a receipt).
+  const deliveryOutcomes: ReplyDeliveryOutcome[] = [];
 
   // Register this dispatcher globally for gateway restart coordination.
   const { unregister } = registerDispatcher({
@@ -158,9 +176,24 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
         // Safe: deliver is called inside an async .then() callback, so even a synchronous
         // throw becomes a rejection that flows through .catch()/.finally(), ensuring cleanup.
         await options.deliver(normalized, { kind });
+        const outcome: ReplyDeliveryOutcome = { kind, ok: true };
+        deliveryOutcomes.push(outcome);
+        try {
+          await options.onDeliveryResult?.(outcome);
+        } catch {
+          // delivery-result side effects must not fail the send chain
+        }
       })
-      .catch((err) => {
+      .catch(async (err) => {
+        const error = err instanceof Error ? err.message : String(err);
+        const outcome: ReplyDeliveryOutcome = { kind, ok: false, error };
+        deliveryOutcomes.push(outcome);
         options.onError?.(err, { kind });
+        try {
+          await options.onDeliveryResult?.(outcome);
+        } catch {
+          // delivery-result side effects must not break dispatcher cleanup
+        }
       })
       .finally(() => {
         pending -= 1;
@@ -207,6 +240,7 @@ export function createReplyDispatcher(options: ReplyDispatcherOptions): ReplyDis
     waitForIdle: () => sendChain,
     getQueuedCounts: () => ({ ...queuedCounts }),
     markComplete,
+    getDeliveryOutcomes: () => deliveryOutcomes.slice(),
   };
 }
 

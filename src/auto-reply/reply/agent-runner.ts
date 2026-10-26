@@ -848,17 +848,28 @@ export async function runReplyAgent(params: {
           resolveAgentDir(followupRun.run.config, growthAgentId),
           TASK_OUTCOME_STORE_DIRNAME,
         );
+        const pendingTaskId = chatTurnTaskId({
+          agentId: growthAgentId,
+          runId: outcomeRunId,
+          sessionKey,
+        });
         registerAwaitingDelivery({
-          taskId: chatTurnTaskId({
-            agentId: growthAgentId,
-            runId: outcomeRunId,
-            sessionKey,
-          }),
+          taskId: pendingTaskId,
           deliveryId,
           agentId: growthAgentId,
           runId: outcomeRunId,
           persistRoot,
         });
+        // R85e: publish stable ids through shared ref so dispatch confirm
+        // can locate the task when replyOptions.runId is omitted.
+        if (opts?.pendingTurnDeliveryRef) {
+          opts.pendingTurnDeliveryRef.current = {
+            runId: outcomeRunId,
+            deliveryId,
+            taskId: pendingTaskId,
+            agentId: growthAgentId,
+          };
+        }
       }
     }
     try {

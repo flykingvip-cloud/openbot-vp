@@ -70,6 +70,9 @@ const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
 async function confirmPendingTurnDelivery(params: {
   cfg: OpenBotConfig;
   runId?: string;
+  /** Stable ids from prepare — required when runId is omitted. */
+  deliveryId?: string;
+  taskId?: string;
   /** Session key used to resolve agentDir when runId is missing after restart. */
   sessionKey?: string;
   /** Aggregated required-delivery status (AND). enqueue_only alone → delivery_unknown. */
@@ -77,6 +80,8 @@ async function confirmPendingTurnDelivery(params: {
   error?: string;
 }): Promise<void> {
   const runId = params.runId?.trim() || undefined;
+  const deliveryId = params.deliveryId?.trim() || undefined;
+  const taskId = params.taskId?.trim() || undefined;
   const sessionKey = params.sessionKey?.trim() || undefined;
   let persistRoot: string | undefined;
   if (sessionKey) {
@@ -84,14 +89,18 @@ async function confirmPendingTurnDelivery(params: {
     persistRoot = path.join(resolveAgentDir(params.cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
   }
 
+  // R85e: persistRoot alone cannot locate a record — need runId / deliveryId / taskId.
+  if (!runId && !deliveryId && !taskId) {
+    return;
+  }
+
   const lookup = {
     ...(runId ? { runId } : {}),
+    ...(deliveryId ? { deliveryId } : {}),
+    ...(taskId ? { taskId } : {}),
     ...(persistRoot ? { persistRoot } : {}),
   };
-  const pending =
-    Object.keys(lookup).length > 0
-      ? peekAwaitingDelivery(runId && !persistRoot ? runId : lookup)
-      : undefined;
+  const pending = peekAwaitingDelivery(lookup);
   if (!pending) {
     return;
   }
@@ -102,12 +111,16 @@ async function confirmPendingTurnDelivery(params: {
       status: params.status,
       ...(params.error ? { failureDetail: params.error } : {}),
     });
-    resolveAndTakeAwaitingDelivery({
-      runId: pending.runId,
-      deliveryId: pending.deliveryId,
-      taskId: pending.taskId,
-      ...(persistRoot ? { persistRoot } : {}),
-    });
+    // R85e: unknown is not terminal — keep durable association for later verify.
+    // Only clear after delivered / failed (or explicit abandon elsewhere).
+    if (params.status === "delivered" || params.status === "failed") {
+      resolveAndTakeAwaitingDelivery({
+        runId: pending.runId,
+        deliveryId: pending.deliveryId,
+        taskId: pending.taskId,
+        ...(persistRoot ? { persistRoot } : {}),
+      });
+    }
   } catch (err) {
     logVerbose(
       `dispatch-from-config: delivery confirm failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -419,6 +432,13 @@ export async function dispatchReplyFromConfig(params: {
 
   markProcessing();
 
+  // R85e: shared slot so agent-runner can publish deliveryId/taskId across options spreads.
+  const pendingTurnDeliveryRef =
+    params.replyOptions?.pendingTurnDeliveryRef ??
+    ({ current: undefined } as NonNullable<
+      NonNullable<typeof params.replyOptions>["pendingTurnDeliveryRef"]
+    >);
+
   try {
     const fastAbort = await tryFastAbortFromMessage({ ctx, cfg: effectiveCfg });
     if (fastAbort.handled) {
@@ -552,6 +572,7 @@ export async function dispatchReplyFromConfig(params: {
       ctx,
       {
         ...params.replyOptions,
+        pendingTurnDeliveryRef,
         typingPolicy: typing.typingPolicy,
         suppressTyping: typing.suppressTyping,
         onToolResult: (payload: ReplyPayload) => {
@@ -775,18 +796,76 @@ export async function dispatchReplyFromConfig(params: {
     }
 
     // Apply channel send result to TaskOutcome delivery (prepare left it pending).
-    // R85d: AND aggregate — any required failure fails; enqueue_only ≠ delivered.
+    // R85e: enqueue_only → delivery_unknown (keep pending); wait for real deliver()
+    // settlements on the dispatcher, then AND-aggregate and clear only on terminal.
     {
       const sendAttempted =
         replies.length > 0 || (blockCount > 0 && Boolean(accumulatedBlockText.trim()));
       if (sendAttempted) {
+        const pendingIds = pendingTurnDeliveryRef.current;
+        const confirmIds = {
+          runId: params.replyOptions?.runId ?? pendingIds?.runId,
+          deliveryId: pendingIds?.deliveryId,
+          taskId: pendingIds?.taskId,
+          sessionKey: sessionKey ?? ctx.SessionKey,
+        };
+
+        const enqueuedOnly = requiredDeliveryAttempts.some((a) => a.source === "enqueue_only");
+        if (enqueuedOnly) {
+          // Intermediate: record unknown without clearing association.
+          const interim = resolveRequiredDeliveryConfirmStatus(requiredDeliveryAttempts);
+          if (interim === "delivery_unknown" || interim === "failed") {
+            const firstErr = requiredDeliveryAttempts.find((a) => !a.ok)?.error;
+            await confirmPendingTurnDelivery({
+              cfg: effectiveCfg,
+              ...confirmIds,
+              status: interim === "failed" ? "failed" : "delivery_unknown",
+              error:
+                interim === "failed"
+                  ? (firstErr ?? "channel_send_failed_or_not_queued")
+                  : (firstErr ?? "enqueue_only_not_a_send_receipt"),
+            });
+          }
+
+          // Wait for actual dispatcher deliver() callbacks to settle.
+          try {
+            await dispatcher.waitForIdle();
+          } catch (err) {
+            logVerbose(
+              `dispatch-from-config: waitForIdle before delivery confirm failed: ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+
+          const finalOutcomes =
+            typeof dispatcher.getDeliveryOutcomes === "function"
+              ? dispatcher.getDeliveryOutcomes().filter((o) => o.kind === "final")
+              : [];
+          if (finalOutcomes.length > 0) {
+            const keptDelivers = requiredDeliveryAttempts.filter((a) => a.source === "deliver");
+            const enqueueFails = requiredDeliveryAttempts.filter(
+              (a) => a.source === "enqueue_only" && !a.ok,
+            );
+            requiredDeliveryAttempts.length = 0;
+            requiredDeliveryAttempts.push(
+              ...keptDelivers,
+              ...finalOutcomes.map((o) => ({
+                source: "deliver" as const,
+                ok: o.ok,
+                ...(o.error ? { error: o.error } : {}),
+              })),
+              ...enqueueFails,
+            );
+          }
+        }
+
         const confirmStatus = resolveRequiredDeliveryConfirmStatus(requiredDeliveryAttempts);
         if (confirmStatus !== "none") {
           const firstErr = requiredDeliveryAttempts.find((a) => !a.ok)?.error;
           await confirmPendingTurnDelivery({
             cfg: effectiveCfg,
-            runId: params.replyOptions?.runId,
-            sessionKey: sessionKey ?? ctx.SessionKey,
+            ...confirmIds,
             status: confirmStatus,
             error:
               confirmStatus === "delivered"
@@ -832,13 +911,18 @@ export async function dispatchReplyFromConfig(params: {
     markIdle("message_completed");
     return { queuedFinal, counts };
   } catch (err) {
-    await confirmPendingTurnDelivery({
-      cfg: effectiveCfg,
-      runId: params.replyOptions?.runId,
-      sessionKey: sessionKey ?? ctx.SessionKey,
-      status: "failed",
-      error: err instanceof Error ? err.message : String(err),
-    });
+    {
+      const pendingIds = pendingTurnDeliveryRef?.current;
+      await confirmPendingTurnDelivery({
+        cfg: effectiveCfg,
+        runId: params.replyOptions?.runId ?? pendingIds?.runId,
+        deliveryId: pendingIds?.deliveryId,
+        taskId: pendingIds?.taskId,
+        sessionKey: sessionKey ?? ctx.SessionKey,
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     recordProcessed("error", { error: String(err) });
     markIdle("message_error");
     throw err;

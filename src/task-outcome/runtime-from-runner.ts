@@ -321,16 +321,25 @@ export async function confirmRunnerTurnDelivery(
     };
   }
 
-  // Already recorded same delivery terminal — idempotent.
+  // Already recorded delivered/failed — idempotent (do not reopen).
   if (
     record.deliveryId === deliveryId &&
-    (record.delivery.status === "delivered" ||
-      record.delivery.status === "failed" ||
-      record.delivery.status === "delivery_unknown")
+    (record.delivery.status === "delivered" || record.delivery.status === "failed")
   ) {
     return {
       record,
       evolution: { written: false, reason: "delivery_already_terminal" },
+    };
+  }
+  // Same unknown status — idempotent; still allow later upgrade to delivered/failed.
+  if (
+    record.deliveryId === deliveryId &&
+    record.delivery.status === "delivery_unknown" &&
+    input.status === "delivery_unknown"
+  ) {
+    return {
+      record,
+      evolution: { written: false, reason: "delivery_already_unknown" },
     };
   }
 

@@ -1,11 +1,13 @@
 /**
- * R85d: aggregate required channel deliveries with AND semantics.
+ * R85d/R85e: aggregate required channel deliveries with AND semantics.
  * Enqueue-only success is NOT treated as delivered.
+ * Mixed deliver-ok + enqueue_only (or unknown) stays delivery_unknown —
+ * a single actual success must not mask other unconfirmed required items.
  */
 
 export type RequiredDeliveryAttempt =
   | {
-      /** Actual channel deliver result (e.g. routeReply). */
+      /** Actual channel deliver result (e.g. routeReply / dispatcher deliver()). */
       source: "deliver";
       ok: boolean;
       error?: string;
@@ -21,9 +23,9 @@ export type RequiredDeliveryConfirmStatus = "delivered" | "failed" | "delivery_u
 
 /**
  * Combine required delivery attempts:
- * - any actual deliver failure → failed (OR must not mask)
- * - all actual delivers ok (and no enqueue_only failure) → delivered
- * - only enqueue_only successes → delivery_unknown (enqueue ≠ send success)
+ * - any explicit failure (deliver or enqueue) → failed
+ * - any remaining enqueue_only (even if ok) → delivery_unknown
+ * - only when EVERY attempt is an actual deliver success → delivered
  * - empty → none
  */
 export function resolveRequiredDeliveryConfirmStatus(
@@ -32,18 +34,15 @@ export function resolveRequiredDeliveryConfirmStatus(
   if (attempts.length === 0) {
     return "none";
   }
-  const deliver = attempts.filter((a) => a.source === "deliver");
-  const enqueueOnly = attempts.filter((a) => a.source === "enqueue_only");
-
-  if (deliver.some((a) => !a.ok) || enqueueOnly.some((a) => !a.ok)) {
+  if (attempts.some((a) => !a.ok)) {
     return "failed";
   }
-  if (deliver.length > 0 && deliver.every((a) => a.ok)) {
-    return "delivered";
-  }
-  // Required targets only reached enqueue — not a send receipt.
-  if (enqueueOnly.length > 0) {
+  // R85e: success + enqueue_only / unknown must NOT collapse to delivered.
+  if (attempts.some((a) => a.source === "enqueue_only")) {
     return "delivery_unknown";
   }
-  return "none";
+  if (attempts.every((a) => a.source === "deliver" && a.ok)) {
+    return "delivered";
+  }
+  return "delivery_unknown";
 }

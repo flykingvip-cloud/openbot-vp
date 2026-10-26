@@ -9713,11 +9713,14 @@ tasks:
       - R85b no-evidence-no-success growth-bridge failure-attribution
       - R85c contract-gated acceptance send-confirm delivery effective DNA reads
       - R85d deliver-AND durable-pending execution-no-chat-waive DNA observation fields
+      - R85e real-deliver-callback unknown-keeps-pending id-threading AND-no-early-success
     paths:
       - src/task-outcome/**
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/reply-dispatcher.ts
+      - src/auto-reply/types.ts
       - src/gateway/server.impl.ts
       - src/gateway/evolution-control/adapters/working-dna.ts
       - docs/design/task-outcome/**
@@ -9747,13 +9750,15 @@ landingStreams:
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/dispatch-from-config.ts
+      - src/auto-reply/reply/reply-dispatcher.ts
+      - src/auto-reply/types.ts
       - src/gateway/server.impl.ts
       - src/gateway/evolution-control/adapters/working-dna.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
-      purpose: R83/R85b/R85c/R85d TaskOutcome deliver-AND durable-pending DNA observation fields
+      purpose: R83/R85b/R85c/R85d/R85e TaskOutcome real-deliver-callback AND id-threading
 
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
