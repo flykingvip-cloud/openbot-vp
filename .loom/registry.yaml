@@ -9684,8 +9684,59 @@ tasks:
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
+  - id: askOutcome-p0-task-outcome-contract
+    owner: executor-acceptance
+    intent:
+      - TaskOutcome unified durable replayable judgement
+    paths:
+      - src/task-outcome/**
+      - docs/design/task-outcome/**
+      - docs/notes/askOutcome-p0-baseline.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: askoutcome-p0-local-20261026
+        taskId: askOutcome-p0-task-outcome-contract
+        ide: cursor-local
+        agent: executor-acceptance
+        status: active
+        lastSignalAt: 2026-10-26T04:17:05.253Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
 landingStreams:
-
+  - id: askOutcome-p0-task-outcome-contract
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/contract.md
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - docs/notes/askOutcome-p0-baseline.md
+      - src/task-outcome/types.ts
+      - src/task-outcome/judge.ts
+      - src/task-outcome/judge.test.ts
+      - src/task-outcome/eligibility.ts
+      - src/task-outcome/transitions.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/result-service.test.ts
+      - src/task-outcome/consumers.ts
+      - src/task-outcome/growth-bridge.ts
+      - src/task-outcome/growth-bridge.test.ts
+      - src/task-outcome/index.ts
+      - src/task-outcome/entrypoints/chat.ts
+      - src/task-outcome/entrypoints/gateway-agent.ts
+      - src/task-outcome/entrypoints/cron.ts
+      - src/task-outcome/entrypoints/cli.ts
+      - src/task-outcome/entrypoints/collab.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+    canLandWith: []
+    metadata:
+      task: askOutcome-p0-task-outcome-contract
+      owner: executor-acceptance
+      purpose: TaskOutcome unified durable replayable judgement (askOutcome P0)
   - id: p0a-p0-task-capability-plan
     landingPolicy: serial
     paths:
@@ -9707,7 +9758,8 @@ landingStreams:
     metadata:
       task: p0a-p0-task-capability-plan
       owner: grok-bot
-      purpose: P0a unsupported social contract + P0 task capability plan inside authorized set
+      purpose: P0a unsupported social contract + P0 task capability plan inside
+        authorized set
   - id: u1-unified-task-stop
     landingPolicy: serial
     paths:
@@ -9749,7 +9801,8 @@ landingStreams:
     metadata:
       task: u1-unified-task-stop:协作小组
       owner: 协作小组
-      purpose: U1 unified task stop control — shared stopControl on task authority + entry guards
+      purpose: U1 unified task stop control — shared stopControl on task authority +
+        entry guards
   - id: COLLAB_RESIDUAL_B_TOOL_LOOP
     landingPolicy: serial
     paths:
@@ -21573,6 +21626,10 @@ landingStreams:
       task: deliverable-path-locator
       owner: cursor-deliverable-path
 sharedPaths:
+  - glob: src/task-outcome/**
+    landerTask: askOutcome-p0-task-outcome-contract
+    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with pi-sdk-family-migration-v3.
+    reviewAfter: 2026-11-30
   - glob: src/gateway/collaboration-dispatch/claim-contract.ts
     landerTask: collab-p1-artifact-accept-loop:grok-bot
     reason: P1 submit wake reviewer + keep artifactVersion bind; exact-file land by
@@ -22503,8 +22560,8 @@ sharedPaths:
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
-    reason: Observable evolution outcome write failure. Resolves hot-file overlap.
-    reviewAfter: 2026-10-11
+    reason: Hot-file lander restored to evolution-loop-fix after askOutcome P0 wired recordGrowthTaskOutcome → recordRunnerTurnOutcome (call site owned here; TaskOutcome module stays askOutcome-p0).
+    reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
     reason: Runner write-failure observability test.
