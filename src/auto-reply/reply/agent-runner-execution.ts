@@ -70,7 +70,12 @@ import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.js";
-import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
+import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
+import {
+  recordRunnerTurnOutcome,
+  type GrowthOutcomeCommitOpts,
+  type RunnerTurnFailureReason,
+} from "../../task-outcome/runtime-from-runner.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
@@ -121,8 +126,13 @@ export type AgentRunLoopResult =
       /**
        * Commit growth/operational outcome after delivery classification.
        * Must be called exactly once on the success path (agent-runner).
+       * Pass explicit acceptance/delivery from a resolved contract to close success;
+       * bare success or processPlaceholder leaves the task incomplete.
        */
-      commitGrowthOutcome: (success: boolean) => void;
+      commitGrowthOutcome: (
+        success: boolean,
+        opts?: GrowthOutcomeCommitOpts,
+      ) => void | Promise<void>;
     }
   | { kind: "final"; payload: ReplyPayload };
 
@@ -162,6 +172,41 @@ export async function runAgentTurnWithFallback(params: {
   const directlySentBlockKeys = new Set<string>();
 
   const runId = params.opts?.runId ?? crypto.randomUUID();
+  // askOutcome R83：入口创建/恢复真实 taskId（禁止收尾用 runId 补造）。
+  const growthAgentIdForEntry = params.followupRun.run.agentId;
+  let chatOutcomeTaskId: string | undefined;
+  let chatOutcomeScope: import("../../task-outcome/types.js").TrustedScope | undefined;
+  if (!params.isHeartbeat && growthAgentIdForEntry) {
+    const subjectRef = (
+      params.followupRun.run.gatewayClientPlatformUserId ??
+      params.sessionCtx.GatewayClientPlatformUserId ??
+      params.followupRun.run.gatewayClientUser ??
+      params.sessionCtx.GatewayClientUser ??
+      params.sessionKey ??
+      "anonymous"
+    )
+      .toString()
+      .trim();
+    const tenantId =
+      params.followupRun.run.executionIdentity?.enterpriseId?.trim() ||
+      params.followupRun.run.executionIdentity?.collaborationOwnerEntitlement?.tenantId?.trim() ||
+      undefined;
+    const opened = ensureChatTurnTaskOutcome(params.followupRun.run.config, {
+      agentId: growthAgentIdForEntry,
+      runId,
+      sessionKey: params.sessionKey,
+      subjectRef: subjectRef.startsWith("platform-user:")
+        ? subjectRef
+        : subjectRef.includes(":")
+          ? subjectRef
+          : `subject:${subjectRef}`,
+      ...(tenantId ? { tenantId } : {}),
+    });
+    if (opened.ok) {
+      chatOutcomeTaskId = opened.taskId;
+      chatOutcomeScope = opened.scope;
+    }
+  }
   // askOutcome P0：turn 收尾走统一 TaskOutcome（fire-and-forget，绝不影响回复）。
   // 心跳不算任务；run 成功不再直接记任务成功 / evolution success（挂起验收）。
   // 工具成功率仍在 turn 内内存累加、收尾一次落盘。
@@ -176,7 +221,52 @@ export async function runAgentTurnWithFallback(params: {
       growthToolSucceeded += 1;
     }
   };
-  const recordGrowthTaskOutcome = (success: boolean): void => {
+  const classifyFailureReason = (opts?: {
+    aborted?: boolean;
+    authzDenied?: boolean;
+    languageFiltered?: boolean;
+    providerFault?: boolean;
+    timeout?: boolean;
+    prepareFailed?: boolean;
+    message?: string;
+    explicit?: RunnerTurnFailureReason;
+  }): RunnerTurnFailureReason => {
+    if (opts?.explicit) {
+      return opts.explicit;
+    }
+    if (opts?.aborted || params.opts?.abortSignal?.aborted) {
+      return "user_cancelled";
+    }
+    if (opts?.authzDenied) {
+      return "authz_denied";
+    }
+    if (opts?.languageFiltered) {
+      return "user_filtered";
+    }
+    if (opts?.prepareFailed) {
+      return "prepare_failed";
+    }
+    if (opts?.timeout || /timeout|ETIMEDOUT|timed out/i.test(opts?.message ?? "")) {
+      return "timeout";
+    }
+    if (opts?.providerFault) {
+      return "provider_fault";
+    }
+    return "run_failed";
+  };
+
+  const recordGrowthTaskOutcome = (
+    success: boolean,
+    opts?: GrowthOutcomeCommitOpts & {
+      aborted?: boolean;
+      authzDenied?: boolean;
+      languageFiltered?: boolean;
+      providerFault?: boolean;
+      timeout?: boolean;
+      prepareFailed?: boolean;
+      errorMessage?: string;
+    },
+  ): void | Promise<void> => {
     if (params.isHeartbeat) {
       return;
     }
@@ -189,19 +279,51 @@ export async function runAgentTurnWithFallback(params: {
     growthToolTotal = 0;
     growthToolSucceeded = 0;
     const tenantId = modelGate?.tenantId?.trim();
-    // askOutcome P0: durable TaskOutcome first; do not invent task success from turn success.
-    void recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
+    // askOutcome R83: requires entry taskId; never invent run:${runId} at finish.
+    if (!chatOutcomeTaskId || !chatOutcomeScope) {
+      reportEvolutionOutcomeWriteFailure({
+        runId,
+        agentId: growthAgentId,
+        tenantId: tenantId ?? null,
+        taskId: null,
+        reason: "chat_entry_task_missing",
+      });
+      return;
+    }
+    const failureReason = !success
+      ? classifyFailureReason({
+          explicit: opts?.failureReason,
+          aborted: opts?.aborted,
+          authzDenied: opts?.authzDenied,
+          languageFiltered: opts?.languageFiltered,
+          providerFault: opts?.providerFault,
+          timeout: opts?.timeout,
+          prepareFailed: opts?.prepareFailed,
+          message: opts?.errorMessage ?? opts?.failureDetail,
+        })
+      : undefined;
+    return recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
       success,
       toolsTotal,
       toolsSucceeded,
       runId,
+      taskId: chatOutcomeTaskId,
+      scope: chatOutcomeScope,
       latencyMs: Math.max(0, Date.now() - growthStartedAt),
       ...(tenantId ? { tenantId } : {}),
       ...(capabilityOutcomeForTurn ? { capabilityOutcome: capabilityOutcomeForTurn } : {}),
+      ...(failureReason ? { failureReason } : {}),
+      ...(opts?.failureDetail ? { failureDetail: opts.failureDetail } : {}),
+      ...(opts?.acceptance ? { acceptance: opts.acceptance } : {}),
+      ...(opts?.delivery ? { delivery: opts.delivery } : {}),
+      ...(opts?.deliveryId ? { deliveryId: opts.deliveryId } : {}),
+      ...(opts?.acceptanceEvidence ? { acceptanceEvidence: opts.acceptanceEvidence } : {}),
+      ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
+      ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
     })
-      .then(() =>
-        syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId),
-      )
+      .then(async () => {
+        await syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId);
+      })
       .catch((error: unknown) => {
         // Evolution / TaskOutcome write must stay observable. The user-facing
         // reply path is already decided and is not rewritten here.
@@ -209,7 +331,7 @@ export async function runAgentTurnWithFallback(params: {
           runId,
           agentId: growthAgentId,
           tenantId: tenantId ?? null,
-          taskId: `run:${runId}`,
+          taskId: chatOutcomeTaskId ?? null,
           reason: error instanceof Error ? error.message : "evolution_outcome_write_failed",
         });
       });
@@ -379,7 +501,10 @@ export async function runAgentTurnWithFallback(params: {
             modelGateInput,
           });
           if (!runSlot.skipped && !runSlot.acquired) {
-            recordGrowthTaskOutcome(false);
+            void recordGrowthTaskOutcome(false, {
+              authzDenied: true,
+              failureDetail: "enterprise_run_slot_denied",
+            });
             return {
               kind: "final",
               payload: {
@@ -1121,7 +1246,13 @@ export async function runAgentTurnWithFallback(params: {
                 ? "这一轮没能完成回复。请再试一次，或 @ 对应助手。"
                 : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
 
-        recordGrowthTaskOutcome(false);
+        void recordGrowthTaskOutcome(false, {
+          aborted: Boolean(params.opts?.abortSignal?.aborted),
+          providerFault: isTransientHttp || isInfraStartupFailure,
+          prepareFailed: isInfraStartupFailure,
+          errorMessage: message,
+          failureDetail: trimmedMessage.slice(0, 200),
+        });
         if (!params.opts?.abortSignal?.aborted && !isInfraStartupFailure && !isTransientHttp) {
           try {
             recordHonestCapabilityGap({
@@ -1157,7 +1288,10 @@ export async function runAgentTurnWithFallback(params: {
       isContextOverflowError(finalEmbeddedError.message) &&
       !hasPayloadText
     ) {
-      recordGrowthTaskOutcome(false);
+      void recordGrowthTaskOutcome(false, {
+        failureReason: "run_failed",
+        failureDetail: "context_overflow",
+      });
       return {
         kind: "final",
         payload: {

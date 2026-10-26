@@ -1,5 +1,12 @@
 import { newFencingToken, TaskOutcomeResultService } from "../result-service.js";
-import type { AcceptanceEvidence, AttemptResult, RunResult, TrustedScope } from "../types.js";
+import type {
+  AcceptanceEvidence,
+  AttemptResult,
+  RunResult,
+  SubmitFailure,
+  TaskOutcomeRecord,
+  TrustedScope,
+} from "../types.js";
 
 /**
  * Chat entry adapter: creates/restores taskId; never invents task-level success
@@ -13,15 +20,13 @@ export class ChatTaskOutcomeAdapter {
     scope: TrustedScope;
     taskContractVersion: string;
     restoreIfExists?: boolean;
-  }) {
+    commandId?: string;
+  }): { ok: true; record: TaskOutcomeRecord; fencingToken: string } | SubmitFailure {
     const existing = this.service.get(params.taskId);
     if (existing) {
-      if (params.restoreIfExists) {
-        return {
-          ok: true as const,
-          record: existing,
-          fencingToken: existing.fencingToken ?? newFencingToken(),
-        };
+      const mismatch = this.service.assertScope(params.taskId, params.scope);
+      if (mismatch) {
+        return mismatch;
       }
       return {
         ok: true as const,
@@ -30,26 +35,32 @@ export class ChatTaskOutcomeAdapter {
       };
     }
     const fencingToken = newFencingToken();
-    const res = this.service.submit(params.taskId, {
-      type: "create",
-      entrypoint: "chat",
-      scope: params.scope,
-      taskContractVersion: params.taskContractVersion,
-    });
+    const res = this.service.submit(
+      params.taskId,
+      {
+        type: "create",
+        entrypoint: "chat",
+        scope: params.scope,
+        taskContractVersion: params.taskContractVersion,
+      },
+      { commandId: params.commandId, requiredScope: params.scope },
+    );
     if (!res.ok) {
       return res;
     }
-    // bind fencing on first attempt path
     return { ok: true as const, record: res.record, fencingToken };
   }
 
-  /** preflight only inherits/validates — reject without forging run/attempt */
-  rejectBeforePreflight(taskId: string, reasonDetail: string) {
-    return this.service.submit(taskId, {
-      type: "prepare_failed",
-      reasonCode: "preflight_rejected",
-      reasonDetail,
-    });
+  rejectBeforePreflight(taskId: string, reasonDetail: string, scope: TrustedScope) {
+    return this.service.submit(
+      taskId,
+      {
+        type: "prepare_failed",
+        reasonCode: "preflight_rejected",
+        reasonDetail,
+      },
+      { requiredScope: scope },
+    );
   }
 
   recordAttempt(
@@ -58,17 +69,28 @@ export class ChatTaskOutcomeAdapter {
     fencingToken: string,
     attempt: AttemptResult,
     run: RunResult,
+    opts?: { scope: TrustedScope; commandId?: string },
   ) {
-    return this.service.submit(taskId, {
-      type: "record_attempt",
-      attempt,
-      run: { ...run, fencingToken },
-      expectedVersion,
-      fencingToken,
-    });
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
+    return this.service.submit(
+      taskId,
+      {
+        type: "record_attempt",
+        attempt,
+        run: { ...run, fencingToken },
+        expectedVersion,
+        fencingToken,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
   }
 
-  /** Message placeholder observations must NOT call set_delivery(delivered). */
   observePlaceholderMessage(_taskId: string, _messageId: string): void {
     // intentionally no TaskOutcome mutation
   }
@@ -80,16 +102,25 @@ export class ChatTaskOutcomeAdapter {
     acceptance:
       | { status: "pending" | "passed" | "failed" }
       | { status: "not_required"; reason: string },
-    opts: { allowRetry: boolean; evidence?: AcceptanceEvidence[] },
+    opts: {
+      allowRetry: boolean;
+      evidence?: AcceptanceEvidence[];
+      scope: TrustedScope;
+      commandId?: string;
+    },
   ) {
-    return this.service.submit(taskId, {
-      type: "set_acceptance",
-      acceptance,
-      evidence: opts.evidence,
-      allowRetry: opts.allowRetry,
-      expectedVersion,
-      fencingToken,
-    });
+    return this.service.submit(
+      taskId,
+      {
+        type: "set_acceptance",
+        acceptance,
+        evidence: opts.evidence,
+        allowRetry: opts.allowRetry,
+        expectedVersion,
+        fencingToken,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
   }
 
   /**
@@ -105,13 +136,25 @@ export class ChatTaskOutcomeAdapter {
       digestOrRef: string;
       detail?: string;
     },
+    opts: { scope: TrustedScope; commandId?: string },
   ) {
-    return this.service.submit(taskId, {
-      type: "mark_target_modality_completed",
-      expectedVersion,
-      fencingToken,
-      evidence,
-    });
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
+    return this.service.submit(
+      taskId,
+      {
+        type: "mark_target_modality_completed",
+        expectedVersion,
+        fencingToken,
+        evidence,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
   }
 
   setDelivery(
@@ -122,21 +165,89 @@ export class ChatTaskOutcomeAdapter {
       | { status: "pending" | "blocked" | "delivered" | "delivery_unknown" | "failed" }
       | { status: "not_required"; reason: string },
     deliveryId?: string,
+    opts?: { scope: TrustedScope; commandId?: string },
   ) {
-    return this.service.submit(taskId, {
-      type: "set_delivery",
-      delivery,
-      deliveryId,
-      expectedVersion,
-      fencingToken,
-    });
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
+    return this.service.submit(
+      taskId,
+      {
+        type: "set_delivery",
+        delivery,
+        deliveryId,
+        expectedVersion,
+        fencingToken,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
   }
 
-  cancel(taskId: string, expectedVersion: number, fencingToken?: string) {
-    return this.service.submit(taskId, {
-      type: "cancel",
-      expectedVersion,
-      fencingToken,
-    });
+  cancel(
+    taskId: string,
+    expectedVersion: number,
+    fencingToken?: string,
+    opts?: { scope: TrustedScope; commandId?: string; reasonDetail?: string },
+  ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
+    return this.service.submit(
+      taskId,
+      {
+        type: "cancel",
+        expectedVersion,
+        fencingToken,
+        reasonDetail: opts.reasonDetail,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
+  }
+
+  failClosed(
+    taskId: string,
+    expectedVersion: number,
+    reasonCode:
+      | "run_failed"
+      | "user_cancelled"
+      | "provider_fault"
+      | "user_filtered"
+      | "timeout"
+      | "authz_denied"
+      | "prepare_failed"
+      | "other",
+    opts?: {
+      fencingToken?: string;
+      reasonDetail?: string;
+      scope: TrustedScope;
+      commandId?: string;
+    },
+  ) {
+    if (!opts?.scope) {
+      return {
+        ok: false as const,
+        code: "scope_mismatch" as const,
+        message: "requiredScope is mandatory for existing tasks",
+      };
+    }
+    return this.service.submit(
+      taskId,
+      {
+        type: "fail_closed",
+        reasonCode,
+        reasonDetail: opts.reasonDetail,
+        expectedVersion,
+        fencingToken: opts.fencingToken,
+      },
+      { requiredScope: opts.scope, commandId: opts.commandId },
+    );
   }
 }

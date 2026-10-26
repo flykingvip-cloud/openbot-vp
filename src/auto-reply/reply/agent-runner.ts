@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
@@ -27,6 +28,16 @@ import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
+import {
+  chatTurnTaskId,
+  resolveChatTurnCloseGates,
+  resolveTurnContractFromRunMeta,
+} from "../../task-outcome/chat-entry.js";
+import { registerAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
+import {
+  TASK_OUTCOME_STORE_DIRNAME,
+  type GrowthOutcomeCommitOpts,
+} from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import {
@@ -440,12 +451,21 @@ export async function runReplyAgent(params: {
     // P2: ensure growth outcome is committed even if later delivery work throws
     // between classify-success and commit (or after a deferred commit site).
     let growthOutcomeCommitted = false;
-    const commitGrowthOutcome = (success: boolean) => {
+    const commitGrowthOutcome = (
+      success: boolean,
+      opts?: GrowthOutcomeCommitOpts,
+    ): void | Promise<void> => {
       if (growthOutcomeCommitted) {
         return;
       }
       growthOutcomeCommitted = true;
-      commitGrowthOutcomeRaw(success);
+      return commitGrowthOutcomeRaw(success, opts);
+    };
+
+    const resolveTurnContractFromRun = () => {
+      // R85f: classify from preflight intent (validatorsRequired / decisionCode /
+      // intentClass / primarySkill). Never use Boolean(hookDelivery).
+      return resolveTurnContractFromRunMeta(runResult.meta);
     };
 
     if (
@@ -576,7 +596,33 @@ export async function runReplyAgent(params: {
         reactionDelivered: Boolean(runResult.didSendReaction),
       });
       const growth = classifySilentTurnGrowthOutcome(decision);
-      commitGrowthOutcome(growth.success);
+      if (decision.reason === "user_aborted") {
+        void commitGrowthOutcome(false, {
+          failureReason: "user_cancelled",
+          failureDetail: "user_aborted",
+        });
+      } else if (growth.success) {
+        // Silent success means delivery already happened in-run (messaging tool /
+        // block stream / reaction). Confirm delivered from resolved contract only.
+        const contract = resolveTurnContractFromRun();
+        const deliveryId = `delivery:${outcomeRunId}:${decision.reason}`;
+        const gates = resolveChatTurnCloseGates({
+          deliveryId,
+          contract,
+          deliveryPhase: "delivered",
+          acceptanceVerified: contract.acceptanceVerified === true,
+        });
+        void commitGrowthOutcome(true, {
+          acceptance: gates.acceptance,
+          delivery: gates.delivery,
+          deliveryId: gates.deliveryId,
+        });
+      } else {
+        void commitGrowthOutcome(false, {
+          failureReason: "run_failed",
+          failureDetail: decision.reason,
+        });
+      }
       if (!decision.emit) {
         return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
       }
@@ -742,15 +788,64 @@ export async function runReplyAgent(params: {
         : undefined;
       if (!fallbackText) {
         // Language gate filtered all replies with nothing to show — not a success, do not close gaps.
-        commitGrowthOutcome(false);
+        void commitGrowthOutcome(false, {
+          failureReason: "user_filtered",
+          failureDetail: "language_gate_empty",
+        });
         return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
       }
-      commitGrowthOutcome(true);
+      // Process placeholder is not final delivery — leave incomplete (no evolution positive).
+      void commitGrowthOutcome(true, { processPlaceholder: true });
       return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
     }
 
-    // Visible delivery past language gate — single growth success commit for this turn.
-    commitGrowthOutcome(true);
+    // Visible reply prepared — acceptance from pinned contract; delivery stays
+    // awaiting until dispatch confirms the channel send (not "prepared" = delivered).
+    {
+      const contract = resolveTurnContractFromRun();
+      const deliveryId = `delivery:${outcomeRunId}:visible`;
+      const gates = resolveChatTurnCloseGates({
+        deliveryId,
+        contract,
+        deliveryPhase: "awaiting",
+        acceptanceVerified: contract.acceptanceVerified === true,
+      });
+      // Await prepare so confirm cannot race ahead of the pending write.
+      await commitGrowthOutcome(true, {
+        acceptance: gates.acceptance,
+        delivery: gates.delivery,
+        deliveryId: gates.deliveryId,
+      });
+      const growthAgentId = followupRun.run.agentId?.trim();
+      if (growthAgentId) {
+        const persistRoot = path.join(
+          resolveAgentDir(followupRun.run.config, growthAgentId),
+          TASK_OUTCOME_STORE_DIRNAME,
+        );
+        const pendingTaskId = chatTurnTaskId({
+          agentId: growthAgentId,
+          runId: outcomeRunId,
+          sessionKey,
+        });
+        registerAwaitingDelivery({
+          taskId: pendingTaskId,
+          deliveryId,
+          agentId: growthAgentId,
+          runId: outcomeRunId,
+          persistRoot,
+        });
+        // R85e: publish stable ids through shared ref so dispatch confirm
+        // can locate the task when replyOptions.runId is omitted.
+        if (opts?.pendingTurnDeliveryRef) {
+          opts.pendingTurnDeliveryRef.current = {
+            runId: outcomeRunId,
+            deliveryId,
+            taskId: pendingTaskId,
+            agentId: growthAgentId,
+          };
+        }
+      }
+    }
     try {
       const usedIds = (runResult.toolMetas ?? [])
         .map((row) => row.toolName)

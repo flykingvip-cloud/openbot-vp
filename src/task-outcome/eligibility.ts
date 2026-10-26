@@ -55,12 +55,22 @@ export function computeEvaluationEligibility(record: TaskOutcomeRecord): Evaluat
         attribution: "prepare",
       };
     case "acceptance_failed_stop":
+    case "run_failed":
       return {
         countsSkillSuccessRate: true,
         countsGrowthNegative: true,
         countsModelStability: false,
         learningValue: "high",
         attribution: "capability",
+      };
+    case "timeout":
+    case "user_filtered":
+      return {
+        countsSkillSuccessRate: false,
+        countsGrowthNegative: false,
+        countsModelStability: false,
+        learningValue: "low",
+        attribution: "other",
       };
     case "accepted_and_delivered":
       return {

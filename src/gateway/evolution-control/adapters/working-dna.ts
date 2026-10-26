@@ -10,10 +10,8 @@ import {
 } from "@openbot/evolution-core";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { writeJsonAtomic } from "../../../infra/json-files.js";
-import {
-  EVOLUTION_TASK_OUTCOMES_FILENAME,
-  readEvolutionTaskOutcomes,
-} from "../../agent-growth/evolution-task-outcomes.js";
+import { readEffectiveEvolutionTaskOutcomes } from "../../../task-outcome/growth-bridge.js";
+import { EVOLUTION_TASK_OUTCOMES_FILENAME } from "../../agent-growth/evolution-task-outcomes.js";
 import {
   applyWorkingStyleDelta,
   DEFAULT_WORKING_STYLE,
@@ -37,6 +35,7 @@ export const WORKING_DNA_TASK_OUTCOMES_FILENAME = EVOLUTION_TASK_OUTCOMES_FILENA
 
 export type WorkingDnaTaskOutcome = CohortOutcome & {
   agentId: string;
+  taskId?: string;
 };
 
 export type WorkingDnaObservationPort = {
@@ -79,9 +78,36 @@ function enrichWorkingDnaCohort(
 export function createFileWorkingDnaObservationPort(cfg: OpenBotConfig): WorkingDnaObservationPort {
   return {
     listTaskOutcomes(filter) {
-      return readEvolutionTaskOutcomes(cfg, filter.agentId).filter((row) => {
-        return row.occurredAt >= filter.startedAtMs && row.occurredAt <= filter.endedAtMs;
-      });
+      // Production reads the effective projection (highest non-revoked version per task).
+      return readEffectiveEvolutionTaskOutcomes(cfg, filter.agentId)
+        .filter((row) => {
+          return row.occurredAt >= filter.startedAtMs && row.occurredAt <= filter.endedAtMs;
+        })
+        .map((row) => ({
+          agentId: row.agentId,
+          occurredAt: row.occurredAt,
+          succeeded: row.succeeded,
+          ...(row.tenantId ? { tenantId: row.tenantId } : {}),
+          ...(row.experimentId ? { experimentId: row.experimentId } : {}),
+          ...(row.applicationId ? { applicationId: row.applicationId } : {}),
+          ...(row.taskId ? { taskId: row.taskId } : {}),
+          ...(row.runId ? { runId: row.runId } : {}),
+          // R85d: preserve evaluation evidence for experiment metrics.
+          ...(row.cohortRef ? { cohortRef: row.cohortRef } : {}),
+          ...(typeof row.latencyMs === "number" && Number.isFinite(row.latencyMs)
+            ? { latencyMs: row.latencyMs }
+            : {}),
+          ...(typeof row.securityViolation === "boolean"
+            ? { securityViolation: row.securityViolation }
+            : {}),
+          ...(typeof row.humanTakeover === "boolean" ? { humanTakeover: row.humanTakeover } : {}),
+          ...(typeof row.suspectedAuthorizationBypass === "boolean"
+            ? { suspectedAuthorizationBypass: row.suspectedAuthorizationBypass }
+            : {}),
+          ...(row.crossTenantContamination !== undefined
+            ? { crossTenantContamination: row.crossTenantContamination }
+            : {}),
+        }));
     },
   };
 }

@@ -6,6 +6,11 @@ import type { OpenBotConfig } from "../config/config.js";
 import { readEvolutionTaskOutcomes } from "../gateway/agent-growth/evolution-task-outcomes.js";
 import { readOperationalMetrics } from "../gateway/agent-growth/operational-metrics-store.js";
 import { assessTargetModalityAcceptance } from "./capability-modality.js";
+import {
+  CHAT_TURN_CONTRACT_V1,
+  resolveChatTurnCloseGates,
+  resolveTurnTaskContract,
+} from "./chat-entry.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { TaskOutcomeResultService } from "./result-service.js";
 import { TASK_OUTCOME_STORE_DIRNAME, recordRunnerTurnOutcome } from "./runtime-from-runner.js";
@@ -24,14 +29,16 @@ describe("recordRunnerTurnOutcome", () => {
     fs.rmSync(agentDir, { recursive: true, force: true });
   });
 
-  it("does not invent task success or evolution sample on run success", async () => {
+  it("does not invent task success or evolution sample on bare run success", async () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-ok",
+      taskId: "chat:bot:sess:run-ok",
       toolsTotal: 2,
       toolsSucceeded: 2,
     });
-    expect(out.record.lifecycle).toBe("awaiting_acceptance");
+    expect(out.record.taskId).toBe("chat:bot:sess:run-ok");
+    expect(out.record.lifecycle).not.toBe("closed");
     expect(out.record.taskJudgement).toBe("incomplete");
     expect(out.evolution.written).toBe(false);
     expect(readEvolutionTaskOutcomes(cfg, "bot")).toHaveLength(0);
@@ -42,35 +49,92 @@ describe("recordRunnerTurnOutcome", () => {
     expect(metrics.tasksTotal).toBe(0);
 
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
-    const persisted = store.loadTask("run:run-ok");
-    expect(persisted?.lifecycle).toBe("awaiting_acceptance");
+    const persisted = store.loadTask("chat:bot:sess:run-ok");
+    expect(persisted?.lifecycle).not.toBe("closed");
+    expect(persisted?.taskJudgement).toBe("incomplete");
+    expect(persisted?.acceptance.status).toBe("pending");
+    expect(persisted?.delivery.status).toBe("pending");
+  });
+
+  it("process placeholder does not close success or publish positive", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-ph",
+      taskId: "chat:bot:sess:run-ph",
+      processPlaceholder: true,
+    });
+    expect(out.record.lifecycle).not.toBe("closed");
+    expect(out.record.taskJudgement).toBe("incomplete");
+    expect(out.evolution.written).toBe(false);
+    expect(readEvolutionTaskOutcomes(cfg, "bot")).toHaveLength(0);
+  });
+
+  it("closes success when contract waives acceptance and delivery has receipt", async () => {
+    const gates = resolveChatTurnCloseGates({
+      deliveryId: "delivery:run-ok-final",
+      contract: resolveTurnTaskContract({
+        explicitChatTurn: true,
+        contractId: CHAT_TURN_CONTRACT_V1,
+      }),
+      deliveryPhase: "delivered",
+    });
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-ok-final",
+      taskId: "chat:bot:sess:run-ok-final",
+      acceptance: gates.acceptance,
+      delivery: gates.delivery,
+      deliveryId: gates.deliveryId,
+    });
+    expect(out.record.lifecycle).toBe("closed");
+    expect(out.record.taskJudgement).toBe("success");
+    expect(out.record.acceptance.status).toBe("not_required");
+    expect(out.record.delivery.status).toBe("delivered");
   });
 
   it("closes run failure and may publish a growth negative", async () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: false,
       runId: "run-fail",
+      taskId: "chat:bot:sess:run-fail",
       toolsTotal: 1,
       toolsSucceeded: 0,
       tenantId: "t1",
+      failureReason: "run_failed",
     });
     expect(out.record.lifecycle).toBe("closed");
     expect(out.record.taskJudgement).toBe("failure");
-    expect(out.record.reasonCode).toBe("acceptance_failed_stop");
+    expect(out.record.reasonCode).toBe("run_failed");
     expect(out.evolution.written).toBe(true);
     expect(out.evolution.reason).toBe("published");
 
     const rows = readEvolutionTaskOutcomes(cfg, "bot");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.succeeded).toBe(false);
-    expect(rows[0]?.taskId).toBe("run:run-fail");
+    expect(rows[0]?.taskId).toBe("chat:bot:sess:run-fail");
     expect(rows[0]?.tenantId).toBe("t1");
   });
 
+  it("user_cancelled does not count as capability failure sample", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: false,
+      runId: "run-cancel",
+      taskId: "chat:bot:sess:run-cancel",
+      failureReason: "user_cancelled",
+      tenantId: "t1",
+    });
+    expect(out.record.lifecycle).toBe("closed");
+    expect(out.record.taskJudgement).toBe("cancelled");
+    expect(out.record.reasonCode).toBe("user_cancelled");
+    expect(out.evolution.written).toBe(false);
+  });
+
   it("P1: executor_unwired claim reaches durable reasonDetail; chat cannot claim image success", async () => {
+    const taskId = "chat:bot:sess:run-unwired";
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-unwired",
+      taskId,
       capabilityOutcome: {
         planFailureKind: "executor_unwired",
         allowedModality: "chat_model",
@@ -87,27 +151,26 @@ describe("recordRunnerTurnOutcome", () => {
     expect(out.record.reasonDetail).toContain("text_returned_allowed=true");
     expect(out.record.reasonDetail).toContain("target_modality_completed=false");
     expect(out.record.reasonDetail).toContain("allowed_modality=chat_model");
-    // Still not inventing task success — awaiting acceptance.
     expect(out.record.taskJudgement).toBe("incomplete");
     expect(out.record.reasonDetail).not.toMatch(/image_generation.*success/i);
 
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
-    const persisted = store.loadTask("run:run-unwired");
+    const persisted = store.loadTask(taskId);
     expect(persisted?.reasonDetail).toContain("forbidden_success_modalities=image_generation");
-    // Structured modality must survive persist+reload.
     expect(persisted?.capabilityModality?.executionStatus).toBe("executor_unwired");
     expect(persisted?.capabilityModality?.targetModalityCompleted).toBe(false);
     expect(persisted?.capabilityModality?.textReturnedAllowed).toBe(true);
-    // Acceptance consumer: cannot upgrade executor_unwired into target-modality success.
     const assessed = assessTargetModalityAcceptance(persisted?.capabilityModality);
     expect(assessed.targetModalitySucceeded).toBe(false);
     expect(assessed.reason).toBe("executor_unwired");
   });
 
   it("P1: plan-ok + trusted run success marks modality completed in production path", async () => {
+    const taskId = "chat:bot:sess:run-plan-ok";
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-plan-ok",
+      taskId,
       capabilityOutcome: {
         planFailureKind: "none",
         allowedModality: "chat_model",
@@ -119,11 +182,10 @@ describe("recordRunnerTurnOutcome", () => {
         detail: "routing_executable_not_completed",
       },
     });
-    // Production runner wires markTargetModalityCompleted after trusted success.
     expect(out.record.capabilityModality?.executionStatus).toBe("completed");
     expect(out.record.capabilityModality?.targetModalityCompleted).toBe(true);
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
-    const persisted = store.loadTask("run:run-plan-ok");
+    const persisted = store.loadTask(taskId);
     expect(
       assessTargetModalityAcceptance(persisted?.capabilityModality).targetModalitySucceeded,
     ).toBe(true);
@@ -147,6 +209,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-refuse-unwired",
+      taskId: "chat:bot:sess:run-refuse-unwired",
       capabilityOutcome: {
         planFailureKind: "executor_unwired",
         allowedModality: "chat_model",
@@ -168,7 +231,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
       out.record.outcomeVersion,
       ft!,
       { status: "passed" },
-      { allowRetry: false },
+      { allowRetry: false, scope: out.record.scope },
     );
     expect(refused.ok).toBe(false);
     if (refused.ok) {
@@ -177,7 +240,6 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     expect(refused.code).toBe("illegal_transition");
     expect(refused.message).toContain("target_modality_not_accepted");
     expect(refused.message).toContain("executor_unwired");
-    // Record unchanged — still awaiting acceptance / incomplete.
     const persisted = store.loadTask(taskId);
     expect(persisted?.acceptance.status).toBe("pending");
     expect(persisted?.capabilityModality?.executionStatus).toBe("executor_unwired");
@@ -187,6 +249,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-mark-unwired",
+      taskId: "chat:bot:sess:run-mark-unwired",
       capabilityOutcome: {
         planFailureKind: "executor_unwired",
         allowedModality: "chat_model",
@@ -205,6 +268,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
       out.record.outcomeVersion,
       out.record.fencingToken!,
       { kind: "execution_artifact", digestOrRef: "sha256:fake" },
+      { scope: out.record.scope },
     );
     expect(mark.ok).toBe(false);
     if (mark.ok) {
@@ -217,6 +281,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-prod-accept",
+      taskId: "chat:bot:sess:run-prod-accept",
       capabilityOutcome: {
         planFailureKind: "none",
         allowedModality: "chat_model",
@@ -228,7 +293,6 @@ describe("formal acceptance enforces capability modality (via service)", () => {
         detail: "routing_executable_not_completed",
       },
     });
-    // Production path must have marked completed from run evidence.
     expect(out.record.capabilityModality?.targetModalityCompleted).toBe(true);
     expect(out.record.capabilityModality?.executionStatus).toBe("completed");
     expect(out.record.reasonDetail).toContain(
@@ -243,7 +307,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
       out.record.outcomeVersion,
       out.record.fencingToken!,
       { status: "passed" },
-      { allowRetry: false },
+      { allowRetry: false, scope: out.record.scope },
     );
     expect(passed.ok).toBe(true);
     if (!passed.ok) {
@@ -256,6 +320,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-prod-unwired-refuse",
+      taskId: "chat:bot:sess:run-prod-unwired-refuse",
       capabilityOutcome: {
         planFailureKind: "executor_unwired",
         allowedModality: "chat_model",
@@ -277,7 +342,7 @@ describe("formal acceptance enforces capability modality (via service)", () => {
       out.record.outcomeVersion,
       out.record.fencingToken!,
       { status: "passed" },
-      { allowRetry: false },
+      { allowRetry: false, scope: out.record.scope },
     );
     expect(refused.ok).toBe(false);
     if (refused.ok) {

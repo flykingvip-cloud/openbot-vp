@@ -91,6 +91,19 @@ export type GetReplyOptions = {
    * Soft hint for UI / observability; does not write private memory to GROUP_PUBLIC.
    */
   collabKnowledgeRecoveryHint?: string;
+  /**
+   * R85e: mutable slot filled by agent-runner when a turn registers awaiting delivery.
+   * Dispatch reads `.current` after getReply so deliveryId/taskId reach send confirm
+   * even when replyOptions.runId is omitted (shared object survives options spreads).
+   */
+  pendingTurnDeliveryRef?: {
+    current?: {
+      runId: string;
+      deliveryId: string;
+      taskId: string;
+      agentId: string;
+    };
+  };
 };
 
 export type ReplyPayload = {
