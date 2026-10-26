@@ -296,7 +296,7 @@ export function buildWorkbenchDataDirectoryActionHandlers(params: {
       requestRender();
       try {
         await state.client.request("data.memory.forget", { agentId, memoryKey });
-        state.workbenchForgetMemoryMessage = "已删除指定记忆条目。";
+        state.workbenchForgetMemoryMessage = "已删除所选记忆文件";
         state.workbenchForgetMemoryKey = "";
       } catch (error) {
         state.workbenchForgetMemoryMessage = String(error);

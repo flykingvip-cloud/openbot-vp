@@ -332,11 +332,11 @@ export function renderMemoryCenterPanel(
                 <button
                   type="button"
                   class="btn btn--danger"
-                  title="从本机移除后，机器人将不再使用该记忆"
+                  title="仅删除所选文件，不会清除其他来源中的相同内容，也不保证立即停止相关召回"
                   ?disabled=${state.busy || !state.selectedKey}
                   @click=${() => void settings.onMemoryCenterForget?.()}
                 >
-                  ${state.busy ? "处理中…" : "忘记这条记忆"}
+                  ${state.busy ? "处理中…" : "删除此记忆文件"}
                 </button>
               </div>
             `
