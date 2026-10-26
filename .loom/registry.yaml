@@ -9712,6 +9712,7 @@ tasks:
       - R83 P0 persist CAS consumer chat-wire remediation
       - R85b no-evidence-no-success growth-bridge failure-attribution
       - R85c contract-gated acceptance send-confirm delivery effective DNA reads
+      - R85d deliver-AND durable-pending execution-no-chat-waive DNA observation fields
     paths:
       - src/task-outcome/**
       - src/auto-reply/reply/agent-runner-execution.ts
@@ -9752,7 +9753,7 @@ landingStreams:
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
-      purpose: R83/R85b/R85c TaskOutcome contract gates, send-confirm delivery, effective DNA reads
+      purpose: R83/R85b/R85c/R85d TaskOutcome deliver-AND durable-pending DNA observation fields
 
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
@@ -22146,7 +22147,7 @@ sharedPaths:
       kiro-data-governance is the sole owner of the S01/S02 semantic gate CR.
   - glob: src/auto-reply/reply/dispatch-from-config.ts
     landerTask: askOutcome-p0-r83-remediation
-    reason: "R85c temporary lander: wire delivery confirm after real send callback.
+    reason: "R85d temporary lander: AND delivery confirm + durable pending resolve.
       Restore to constitutional-governance-web-read-shadow:grok-bot after land."
   - glob: .kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance.md
     landerTask: kiro-data-governance-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance
@@ -22540,7 +22541,7 @@ sharedPaths:
     reviewAfter: 2026-10-07
   - glob: src/gateway/evolution-control/adapters/working-dna.ts
     landerTask: askOutcome-p0-r83-remediation
-    reason: "R85c temporary lander: switch observation port to readEffectiveEvolutionTaskOutcomes. Restore to openbot-evolution-unification:cursor-evolution after land."
+    reason: "R85d temporary lander: preserve cohort/latency/security/humanTakeover on effective DNA reads. Restore to openbot-evolution-unification:cursor-evolution after land."
     reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/**
     landerTask: openbot-evolution-unification:cursor-evolution

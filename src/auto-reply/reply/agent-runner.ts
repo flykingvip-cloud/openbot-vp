@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { resolveAgentDir } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
@@ -34,7 +35,10 @@ import {
   resolveTurnTaskContract,
 } from "../../task-outcome/chat-entry.js";
 import { registerAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
-import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
+import {
+  TASK_OUTCOME_STORE_DIRNAME,
+  type GrowthOutcomeCommitOpts,
+} from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import {
@@ -469,11 +473,23 @@ export async function runReplyAgent(params: {
           ?.map((row) => row.validatorId?.trim())
           .filter((id): id is string => Boolean(id)) ?? [];
       const acceptanceVerified = hookDelivery?.decisionCode === "delivery_receipt_verified";
+      // R85d: classification from entry/preflight — do NOT treat "no validators"
+      // as chat waiver. Execution preflight (hookDelivery present) without
+      // validators stays kind=execution → acceptance pending.
+      const executionPreflight = Boolean(hookDelivery) || validatorsRequired;
+      if (executionPreflight) {
+        return resolveTurnTaskContract({
+          kind: "execution",
+          validatorsRequired,
+          requiredValidators,
+          acceptanceVerified,
+        });
+      }
       return resolveTurnTaskContract({
-        explicitChatTurn: !validatorsRequired,
-        ...(validatorsRequired ? {} : { contractId: CHAT_TURN_CONTRACT_V1 }),
-        validatorsRequired,
-        requiredValidators,
+        explicitChatTurn: true,
+        contractId: CHAT_TURN_CONTRACT_V1,
+        validatorsRequired: false,
+        requiredValidators: [],
         acceptanceVerified,
       });
     };
@@ -828,6 +844,10 @@ export async function runReplyAgent(params: {
       });
       const growthAgentId = followupRun.run.agentId?.trim();
       if (growthAgentId) {
+        const persistRoot = path.join(
+          resolveAgentDir(followupRun.run.config, growthAgentId),
+          TASK_OUTCOME_STORE_DIRNAME,
+        );
         registerAwaitingDelivery({
           taskId: chatTurnTaskId({
             agentId: growthAgentId,
@@ -837,6 +857,7 @@ export async function runReplyAgent(params: {
           deliveryId,
           agentId: growthAgentId,
           runId: outcomeRunId,
+          persistRoot,
         });
       }
     }

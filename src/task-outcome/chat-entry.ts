@@ -162,13 +162,17 @@ export function resolveTurnTaskContract(params: {
       id: params.contractId?.trim() || `${params.kind}_contract`,
       version: params.contractVersion?.trim() || "1.0.0",
       kind: params.kind,
+      // Execution/code/document/external_action with empty validators stay that kind
+      // (acceptance remains pending — never auto-downgrade to chat_turn waiver).
       requiredValidators: validators,
     };
   }
   const id = params.contractId?.trim() || "";
+  // R85d: chat waiver requires an *explicit* chat signal — absence of validators
+  // alone must NOT invent chat_turn / not_required.
   const explicitChat =
     params.explicitChatTurn === true || id === CHAT_TURN_CONTRACT_V1 || params.kind === "chat_turn";
-  if (explicitChat) {
+  if (explicitChat && !validatorsRequired) {
     return {
       id: CHAT_TURN_CONTRACT_V1,
       version: params.contractVersion?.trim() || "1",

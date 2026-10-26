@@ -23,8 +23,15 @@ export {
   registerAwaitingDelivery,
   peekAwaitingDelivery,
   takeAwaitingDelivery,
+  resolveAndTakeAwaitingDelivery,
+  hydrateAwaitingDeliveriesFromDisk,
   clearAwaitingDeliveriesForTests,
 } from "./pending-delivery.js";
+export {
+  resolveRequiredDeliveryConfirmStatus,
+  type RequiredDeliveryAttempt,
+  type RequiredDeliveryConfirmStatus,
+} from "./delivery-confirm.js";
 
 export {
   OutcomeConsumerRuntime,

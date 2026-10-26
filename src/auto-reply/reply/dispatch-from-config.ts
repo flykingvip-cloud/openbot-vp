@@ -1,4 +1,5 @@
-import { resolveSessionAgentId } from "../../agents/agent-scope.js";
+import path from "node:path";
+import { resolveAgentDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import {
   loadSessionStore,
@@ -39,8 +40,18 @@ import {
   observeOrchestrationConsider,
   observeWebReadShadowFromChat,
 } from "../../task-orchestration/gateway-hook.js";
-import { peekAwaitingDelivery, takeAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
-import { confirmRunnerTurnDelivery } from "../../task-outcome/runtime-from-runner.js";
+import {
+  resolveRequiredDeliveryConfirmStatus,
+  type RequiredDeliveryAttempt,
+} from "../../task-outcome/delivery-confirm.js";
+import {
+  peekAwaitingDelivery,
+  resolveAndTakeAwaitingDelivery,
+} from "../../task-outcome/pending-delivery.js";
+import {
+  confirmRunnerTurnDelivery,
+  TASK_OUTCOME_STORE_DIRNAME,
+} from "../../task-outcome/runtime-from-runner.js";
 import { maybeApplyTtsToPayload, normalizeTtsAutoMode, resolveTtsConfig } from "../../tts/tts.js";
 import { INTERNAL_MESSAGE_CHANNEL, normalizeMessageChannel } from "../../utils/message-channel.js";
 import { getReplyFromConfig } from "../reply.js";
@@ -59,14 +70,28 @@ const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
 async function confirmPendingTurnDelivery(params: {
   cfg: OpenBotConfig;
   runId?: string;
-  ok: boolean;
+  /** Session key used to resolve agentDir when runId is missing after restart. */
+  sessionKey?: string;
+  /** Aggregated required-delivery status (AND). enqueue_only alone → delivery_unknown. */
+  status: "delivered" | "failed" | "delivery_unknown";
   error?: string;
 }): Promise<void> {
-  const runId = params.runId?.trim();
-  if (!runId) {
-    return;
+  const runId = params.runId?.trim() || undefined;
+  const sessionKey = params.sessionKey?.trim() || undefined;
+  let persistRoot: string | undefined;
+  if (sessionKey) {
+    const agentId = resolveSessionAgentId({ sessionKey, config: params.cfg });
+    persistRoot = path.join(resolveAgentDir(params.cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
   }
-  const pending = peekAwaitingDelivery(runId);
+
+  const lookup = {
+    ...(runId ? { runId } : {}),
+    ...(persistRoot ? { persistRoot } : {}),
+  };
+  const pending =
+    Object.keys(lookup).length > 0
+      ? peekAwaitingDelivery(runId && !persistRoot ? runId : lookup)
+      : undefined;
   if (!pending) {
     return;
   }
@@ -74,10 +99,15 @@ async function confirmPendingTurnDelivery(params: {
     await confirmRunnerTurnDelivery(params.cfg, pending.agentId, {
       taskId: pending.taskId,
       deliveryId: pending.deliveryId,
-      status: params.ok ? "delivered" : "failed",
+      status: params.status,
       ...(params.error ? { failureDetail: params.error } : {}),
     });
-    takeAwaitingDelivery(runId);
+    resolveAndTakeAwaitingDelivery({
+      runId: pending.runId,
+      deliveryId: pending.deliveryId,
+      taskId: pending.taskId,
+      ...(persistRoot ? { persistRoot } : {}),
+    });
   } catch (err) {
     logVerbose(
       `dispatch-from-config: delivery confirm failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -613,6 +643,8 @@ export async function dispatchReplyFromConfig(params: {
 
     let queuedFinal = false;
     let routedFinalCount = 0;
+    // R85d: record each required delivery attempt; aggregate with AND (not OR).
+    const requiredDeliveryAttempts: RequiredDeliveryAttempt[] = [];
     for (const reply of replies) {
       // Suppress reasoning payloads from channel delivery — channels using this
       // generic dispatch path do not have a dedicated reasoning lane.
@@ -628,7 +660,7 @@ export async function dispatchReplyFromConfig(params: {
         ttsAuto: sessionTtsAuto,
       });
       if (shouldRouteToOriginating && originatingChannel && originatingTo) {
-        // Route final reply to originating channel.
+        // Route final reply to originating channel — actual deliver receipt.
         const result = await routeReply({
           payload: ttsReply,
           channel: originatingChannel,
@@ -646,12 +678,30 @@ export async function dispatchReplyFromConfig(params: {
             `dispatch-from-config: route-reply (final) failed: ${result.error ?? "unknown error"}`,
           );
         }
-        queuedFinal = result.ok || queuedFinal;
+        requiredDeliveryAttempts.push({
+          source: "deliver",
+          ok: result.ok,
+          ...(result.error ? { error: result.error } : {}),
+        });
+        // queuedFinal remains a dispatcher hint; delivery confirm uses AND aggregate.
+        queuedFinal = result.ok && (queuedFinal || requiredDeliveryAttempts.length === 1);
+        if (!result.ok) {
+          queuedFinal = false;
+        } else if (requiredDeliveryAttempts.every((a) => a.ok)) {
+          queuedFinal = true;
+        }
         if (result.ok) {
           routedFinalCount += 1;
         }
       } else {
-        queuedFinal = dispatcher.sendFinalReply(ttsReply) || queuedFinal;
+        // Dispatcher enqueue is NOT a send receipt.
+        const didQueue = dispatcher.sendFinalReply(ttsReply);
+        requiredDeliveryAttempts.push({
+          source: "enqueue_only",
+          ok: didQueue,
+          ...(didQueue ? {} : { error: "final_reply_not_queued" }),
+        });
+        queuedFinal = didQueue && requiredDeliveryAttempts.every((a) => a.ok);
       }
     }
 
@@ -682,11 +732,17 @@ export async function dispatchReplyFromConfig(params: {
             isGroup,
             groupId,
           });
-          queuedFinal = result.ok || queuedFinal;
+          requiredDeliveryAttempts.push({
+            source: "deliver",
+            ok: result.ok,
+            ...(result.error ? { error: result.error } : {}),
+          });
+          queuedFinal = result.ok && requiredDeliveryAttempts.every((a) => a.ok);
           if (result.ok) {
             routedFinalCount += 1;
           }
           if (!result.ok) {
+            queuedFinal = false;
             logVerbose(
               `dispatch-from-config: route-reply (buffered-final) failed: ${result.error ?? "unknown error"}`,
             );
@@ -698,9 +754,20 @@ export async function dispatchReplyFromConfig(params: {
             audioAsVoice: ttsSyntheticReply.audioAsVoice,
           };
           const didQueue = dispatcher.sendFinalReply(ttsOnlyPayload);
-          queuedFinal = didQueue || queuedFinal;
+          requiredDeliveryAttempts.push({
+            source: "enqueue_only",
+            ok: didQueue,
+            ...(didQueue ? {} : { error: "tts_final_not_queued" }),
+          });
+          queuedFinal = didQueue && requiredDeliveryAttempts.every((a) => a.ok);
         }
       } catch (err) {
+        requiredDeliveryAttempts.push({
+          source: "deliver",
+          ok: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        queuedFinal = false;
         logVerbose(
           `dispatch-from-config: accumulated block TTS failed: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -708,16 +775,28 @@ export async function dispatchReplyFromConfig(params: {
     }
 
     // Apply channel send result to TaskOutcome delivery (prepare left it pending).
+    // R85d: AND aggregate — any required failure fails; enqueue_only ≠ delivered.
     {
       const sendAttempted =
         replies.length > 0 || (blockCount > 0 && Boolean(accumulatedBlockText.trim()));
       if (sendAttempted) {
-        await confirmPendingTurnDelivery({
-          cfg: effectiveCfg,
-          runId: params.replyOptions?.runId,
-          ok: queuedFinal,
-          error: queuedFinal ? undefined : "channel_send_failed_or_not_queued",
-        });
+        const confirmStatus = resolveRequiredDeliveryConfirmStatus(requiredDeliveryAttempts);
+        if (confirmStatus !== "none") {
+          const firstErr = requiredDeliveryAttempts.find((a) => !a.ok)?.error;
+          await confirmPendingTurnDelivery({
+            cfg: effectiveCfg,
+            runId: params.replyOptions?.runId,
+            sessionKey: sessionKey ?? ctx.SessionKey,
+            status: confirmStatus,
+            error:
+              confirmStatus === "delivered"
+                ? undefined
+                : (firstErr ??
+                  (confirmStatus === "delivery_unknown"
+                    ? "enqueue_only_not_a_send_receipt"
+                    : "channel_send_failed_or_not_queued")),
+          });
+        }
       }
     }
 
@@ -756,7 +835,8 @@ export async function dispatchReplyFromConfig(params: {
     await confirmPendingTurnDelivery({
       cfg: effectiveCfg,
       runId: params.replyOptions?.runId,
-      ok: false,
+      sessionKey: sessionKey ?? ctx.SessionKey,
+      status: "failed",
       error: err instanceof Error ? err.message : String(err),
     });
     recordProcessed("error", { error: String(err) });

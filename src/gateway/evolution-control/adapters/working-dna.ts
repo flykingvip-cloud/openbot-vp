@@ -35,6 +35,7 @@ export const WORKING_DNA_TASK_OUTCOMES_FILENAME = EVOLUTION_TASK_OUTCOMES_FILENA
 
 export type WorkingDnaTaskOutcome = CohortOutcome & {
   agentId: string;
+  taskId?: string;
 };
 
 export type WorkingDnaObservationPort = {
@@ -91,6 +92,18 @@ export function createFileWorkingDnaObservationPort(cfg: OpenBotConfig): Working
           ...(row.applicationId ? { applicationId: row.applicationId } : {}),
           ...(row.taskId ? { taskId: row.taskId } : {}),
           ...(row.runId ? { runId: row.runId } : {}),
+          // R85d: preserve evaluation evidence for experiment metrics.
+          ...(row.cohortRef ? { cohortRef: row.cohortRef } : {}),
+          ...(typeof row.latencyMs === "number" && Number.isFinite(row.latencyMs)
+            ? { latencyMs: row.latencyMs }
+            : {}),
+          ...(typeof row.securityViolation === "boolean"
+            ? { securityViolation: row.securityViolation }
+            : {}),
+          ...(typeof row.humanTakeover === "boolean" ? { humanTakeover: row.humanTakeover } : {}),
+          ...(typeof row.suspectedAuthorizationBypass === "boolean"
+            ? { suspectedAuthorizationBypass: row.suspectedAuthorizationBypass }
+            : {}),
           ...(row.crossTenantContamination !== undefined
             ? { crossTenantContamination: row.crossTenantContamination }
             : {}),
