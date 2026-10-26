@@ -9724,6 +9724,12 @@ tasks:
       - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
       - src/gateway/model-entitlement/task-capability-plan.ts
       - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/run-context-estimate.ts
+      - src/gateway/model-entitlement/run-context-estimate.test.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
       - .loom/registry.yaml
@@ -9751,6 +9757,12 @@ landingStreams:
       - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
       - src/gateway/model-entitlement/task-capability-plan.ts
       - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/run-context-estimate.ts
+      - src/gateway/model-entitlement/run-context-estimate.test.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
     canLandWith: []

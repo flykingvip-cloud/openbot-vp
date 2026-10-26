@@ -5,6 +5,7 @@ import {
   classifyTaskCapability,
   estimateTaskContextTokens,
   filterExecutableModelIds,
+  resolveCapabilityExecutionSurface,
   resolveCapabilityPlanOutcomeClaim,
   resolveExecutionRoutingFromCapabilityPlan,
 } from "./task-capability-plan.js";
@@ -203,5 +204,33 @@ describe("buildTaskCapabilityPlan (P0/P1)", () => {
     expect(plan.contextEstimate?.totalRequiredTokens).toBeGreaterThan(2000);
     expect(plan.executableModelIds).toEqual(["b/large"]);
     expect(plan.preferredModelOrder).not.toContain("a/small");
+  });
+});
+
+describe("estimateInsufficient + executionSurface (NEEDS WORK)", () => {
+  it("P1 NEEDS WORK: estimateInsufficient when unknownParts present even if tokens > 0", () => {
+    const est = estimateTaskContextTokens({
+      taskText: "hello world this has tokens",
+      unknownParts: ["history", "tools"],
+    });
+    expect(est.estimatedInputTokens).toBeGreaterThan(0);
+    expect(est.estimateIncomplete).toBe(true);
+    expect(est.estimateInsufficient).toBe(true);
+    expect(est.unknownParts).toEqual(["history", "tools"]);
+  });
+
+  it("P1 NEEDS WORK: executionSurface distinguishes text vs unwired modality", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "画一张产品海报",
+      authorizedModelIds: ["openai/gpt-5.4"],
+    });
+    const claim = resolveCapabilityPlanOutcomeClaim(plan);
+    const surface = resolveCapabilityExecutionSurface(claim);
+    expect(surface.textReturnedAllowed).toBe(true);
+    expect(surface.targetModalityCompleted).toBe(false);
+    expect(surface.status).toBe("executor_unwired");
+    const routing = resolveExecutionRoutingFromCapabilityPlan({ capabilityPlan: plan });
+    expect(routing.executionSurface?.targetModalityCompleted).toBe(false);
+    expect(routing.executionSurface?.textReturnedAllowed).toBe(true);
   });
 });

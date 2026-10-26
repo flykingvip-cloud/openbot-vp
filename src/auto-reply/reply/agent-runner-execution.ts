@@ -57,8 +57,13 @@ import {
   recordAorRoutingExplanation,
   recordAorRunFeedback,
 } from "../../gateway/model-entitlement/aor-feedback.js";
+import {
+  consumeCapabilityRoutingResult,
+  type CapabilityOutcomeForTurn,
+} from "../../gateway/model-entitlement/capability-entry-consume.js";
 import { type EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
+import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
 import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
@@ -163,14 +168,7 @@ export async function runAgentTurnWithFallback(params: {
   let growthToolSucceeded = 0;
   const growthStartedAt = Date.now();
   let modelGate: EmployeeModelGateResult = {};
-  let capabilityOutcomeForTurn:
-    | {
-        planFailureKind: string;
-        allowedModality: string;
-        forbiddenSuccessModalities: readonly string[];
-        detail?: string;
-      }
-    | undefined;
+  let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
   const recordGrowthToolResult = (isError: boolean): void => {
     growthToolTotal += 1;
     if (!isError) {
@@ -351,6 +349,11 @@ export async function runAgentTurnWithFallback(params: {
           params.followupRun.run.gatewayClientPlatformUserId ??
           params.sessionCtx.GatewayClientPlatformUserId;
         // Commercial Runtime 统一闸口（P0）：model gate + 并发占槽 + 订阅 snapshot。
+        const runContextEstimate = buildRunContextEstimateParts({
+          taskText: params.commandBody,
+          sessionEntry: params.getActiveSessionEntry(),
+          extraSystemPrompt: params.followupRun.run.extraSystemPrompt,
+        });
         const modelGateInput = {
           cfg: params.followupRun.run.config,
           agentId: params.followupRun.run.agentId,
@@ -358,6 +361,7 @@ export async function runAgentTurnWithFallback(params: {
           gatewayClientSessionDomain: runGatewayClientSessionDomain,
           gatewayClientPlatformUserId: runGatewayClientPlatformUserId,
           taskText: params.commandBody,
+          contextParts: runContextEstimate.contextParts,
           ...(params.sessionCtx.CollaborationGroupOwnerEntitlement
             ? {
                 collaborationGroupOwnerEntitlement:
@@ -403,18 +407,14 @@ export async function runAgentTurnWithFallback(params: {
           preferredModelOrder: modelGate.preferredModelOrder,
           capabilityPlan: modelGate.capabilityPlan,
         });
-        if (executionRouting.outcomeClaim) {
-          capabilityOutcomeForTurn = {
-            planFailureKind: executionRouting.outcomeClaim.planFailure.kind,
-            allowedModality: executionRouting.outcomeClaim.allowedModality,
-            forbiddenSuccessModalities: executionRouting.outcomeClaim.forbiddenSuccessModalities,
-            ...(executionRouting.planFailure.kind === "executor_unwired"
-              ? { detail: executionRouting.planFailure.message }
-              : executionRouting.planFailure.kind === "no_executable_candidates" ||
-                  executionRouting.planFailure.kind === "unsupported"
-                ? { detail: executionRouting.planFailure.message }
-                : {}),
-          };
+        const consumedCapability = consumeCapabilityRoutingResult({
+          planFailure: executionRouting.planFailure,
+          outcomeClaim: executionRouting.outcomeClaim,
+          executionSurface: executionRouting.executionSurface,
+          capabilityPlan: executionRouting.capabilityPlan,
+        });
+        if (consumedCapability.capabilityOutcome) {
+          capabilityOutcomeForTurn = consumedCapability.capabilityOutcome;
         }
         if (executionRouting.planFailure.kind === "no_executable_candidates") {
           recordGrowthTaskOutcome(false);

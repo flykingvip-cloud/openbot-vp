@@ -205,6 +205,9 @@ export function estimateInputTokensFromText(taskText: string | undefined | null)
   return Math.max(1, Math.ceil(cjk / 2 + other / 4));
 }
 
+/** Context part whose tokens could not be observed at the call site. */
+export type ContextEstimateUnknownPart = "history" | "systemPrompt" | "tools" | "attachments";
+
 /** Parts that contribute to a full context / executable-capacity estimate (P1). */
 export type ContextEstimateParts = {
   taskText?: string | null;
@@ -214,6 +217,11 @@ export type ContextEstimateParts = {
   attachmentsText?: string | null;
   /** Reserved tokens for model output; default 1024. */
   outputReserveTokens?: number;
+  /**
+   * Parts that were not available when building the estimate. Presence marks the
+   * estimate incomplete even when other parts yield a non-zero token total.
+   */
+  unknownParts?: readonly ContextEstimateUnknownPart[];
 };
 
 export type ContextEstimateResult = {
@@ -230,7 +238,15 @@ export type ContextEstimateResult = {
     outputReserve: number;
   };
   reasons: string[];
-  /** True when no substantive input parts were provided. */
+  /** Parts marked unavailable at the call site. */
+  unknownParts: ContextEstimateUnknownPart[];
+  /** True when one or more context parts could not be observed. */
+  estimateIncomplete: boolean;
+  /**
+   * True when the estimate is not trustworthy for capacity decisions:
+   * either no substantive input tokens, or incomplete/unknown parts.
+   * Must not be reduced to "token total === 0" alone.
+   */
   estimateInsufficient: boolean;
 };
 
@@ -248,12 +264,29 @@ export function estimateTaskContextTokens(parts: ContextEstimateParts = {}): Con
       ? Math.max(0, Math.floor(parts.outputReserveTokens))
       : DEFAULT_OUTPUT_RESERVE_TOKENS;
   const estimatedInputTokens = taskText + history + systemPrompt + tools + attachments;
-  const estimateInsufficient = estimatedInputTokens === 0;
+  const unknownParts = [
+    ...new Set(
+      (parts.unknownParts ?? []).filter(
+        (part): part is ContextEstimateUnknownPart =>
+          part === "history" ||
+          part === "systemPrompt" ||
+          part === "tools" ||
+          part === "attachments",
+      ),
+    ),
+  ];
+  const estimateIncomplete = unknownParts.length > 0;
+  // Insufficient ≠ "token total is zero" alone: incomplete/unknown parts also
+  // make the estimate untrustworthy for capacity claims.
+  const estimateInsufficient = estimatedInputTokens === 0 || estimateIncomplete;
   const reasons: string[] = [];
-  if (estimateInsufficient) {
+  if (estimatedInputTokens === 0) {
     reasons.push(
       "estimate_insufficient: no history/system/tools/attachments/task tokens; output reserve still applied",
     );
+  }
+  if (estimateIncomplete) {
+    reasons.push(`estimate_incomplete: unknownParts=${unknownParts.join(",")}`);
   }
   reasons.push(
     `context_breakdown task=${taskText} history=${history} system=${systemPrompt} tools=${tools} attachments=${attachments} outputReserve=${outputReserve}`,
@@ -271,6 +304,8 @@ export function estimateTaskContextTokens(parts: ContextEstimateParts = {}): Con
       outputReserve,
     },
     reasons,
+    unknownParts,
+    estimateIncomplete,
     estimateInsufficient,
   };
 }
@@ -425,6 +460,8 @@ export function buildTaskCapabilityPlan(params: {
             reasons: [
               `legacy_estimatedInputTokens=${Math.max(0, Math.floor(params.estimatedInputTokens))}`,
             ],
+            unknownParts: [],
+            estimateIncomplete: false,
             estimateInsufficient: Math.max(0, Math.floor(params.estimatedInputTokens)) === 0,
           }
         : estimateTaskContextTokens({ taskText: params.taskText }));
@@ -547,6 +584,63 @@ export function resolveCapabilityPlanOutcomeClaim(
 }
 
 /**
+ * Structured cross-entry surface for capability-plan outcomes.
+ * Distinguishes "explanatory text may be returned" from "image/music
+ * (or other unwired modality) generation completed".
+ */
+export type CapabilityExecutionSurface = {
+  /** Whether a chat/text reply path is allowed for this plan. */
+  textReturnedAllowed: boolean;
+  /**
+   * True only when the plan's target modality actually completed.
+   * For executor_unwired image/music, this stays false even if text is returned.
+   */
+  targetModalityCompleted: boolean;
+  allowedModality: ExecutorKind;
+  incompleteModalities: ExecutorKind[];
+  planFailureKind: CapabilityPlanFailure["kind"];
+  /** Machine-readable status; not a free-form success claim. */
+  status: "ok" | "executor_unwired" | "no_executable_candidates" | "unsupported";
+  detail?: string;
+};
+
+export function resolveCapabilityExecutionSurface(
+  claim: CapabilityPlanOutcomeClaim,
+): CapabilityExecutionSurface {
+  const kind = claim.planFailure.kind;
+  if (kind === "executor_unwired") {
+    return {
+      textReturnedAllowed: true,
+      targetModalityCompleted: false,
+      allowedModality: claim.allowedModality,
+      incompleteModalities: [...claim.forbiddenSuccessModalities],
+      planFailureKind: kind,
+      status: "executor_unwired",
+      detail: claim.planFailure.message,
+    };
+  }
+  if (kind === "no_executable_candidates" || kind === "unsupported") {
+    return {
+      textReturnedAllowed: false,
+      targetModalityCompleted: false,
+      allowedModality: claim.allowedModality,
+      incompleteModalities: [...claim.forbiddenSuccessModalities],
+      planFailureKind: kind,
+      status: kind,
+      detail: claim.planFailure.message,
+    };
+  }
+  return {
+    textReturnedAllowed: true,
+    targetModalityCompleted: true,
+    allowedModality: claim.allowedModality,
+    incompleteModalities: [],
+    planFailureKind: "none",
+    status: "ok",
+  };
+}
+
+/**
  * Maps a gate result (+ optional plan) onto runWithModelFallback inputs.
  * When a plan exists, the run allowlist becomes the executable set (not merely
  * a reorder of the full authorized set). Over-context models cannot re-enter
@@ -562,6 +656,7 @@ export function resolveExecutionRoutingFromCapabilityPlan(params: {
   capabilityPlan?: TaskCapabilityPlan;
   planFailure: CapabilityPlanFailure;
   outcomeClaim?: CapabilityPlanOutcomeClaim;
+  executionSurface?: CapabilityExecutionSurface;
 } {
   const plan = params.capabilityPlan;
   if (!plan) {
@@ -574,6 +669,7 @@ export function resolveExecutionRoutingFromCapabilityPlan(params: {
     };
   }
   const outcomeClaim = resolveCapabilityPlanOutcomeClaim(plan);
+  const executionSurface = resolveCapabilityExecutionSurface(outcomeClaim);
   return {
     allowlist: [...plan.executableModelIds],
     ...(plan.preferredModelOrder.length > 0
@@ -582,5 +678,6 @@ export function resolveExecutionRoutingFromCapabilityPlan(params: {
     capabilityPlan: plan,
     planFailure: plan.failure,
     outcomeClaim,
+    executionSurface,
   };
 }

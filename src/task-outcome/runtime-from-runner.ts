@@ -29,6 +29,12 @@ export type RunnerTurnOutcomeInput = {
     allowedModality: string;
     forbiddenSuccessModalities: readonly string[];
     detail?: string;
+    /** Structured: explanatory text may be returned. */
+    textReturnedAllowed?: boolean;
+    /** Structured: image/music (target modality) actually completed. */
+    targetModalityCompleted?: boolean;
+    status?: string;
+    incompleteModalities?: readonly string[];
   };
 };
 
@@ -151,11 +157,23 @@ export async function recordRunnerTurnOutcome(
   // replies cannot later be mistaken for image/music generation success.
   let record = res.record;
   const claim = input.capabilityOutcome;
-  if (claim && claim.forbiddenSuccessModalities.length > 0) {
+  if (
+    claim &&
+    (claim.forbiddenSuccessModalities.length > 0 ||
+      claim.targetModalityCompleted === false ||
+      claim.status === "executor_unwired")
+  ) {
     const detail = [
       `capability_plan_failure=${claim.planFailureKind}`,
       `allowed_modality=${claim.allowedModality}`,
       `forbidden_success_modalities=${claim.forbiddenSuccessModalities.join(",")}`,
+      claim.textReturnedAllowed !== undefined
+        ? `text_returned_allowed=${claim.textReturnedAllowed}`
+        : null,
+      claim.targetModalityCompleted !== undefined
+        ? `target_modality_completed=${claim.targetModalityCompleted}`
+        : null,
+      claim.status ? `capability_status=${claim.status}` : null,
       claim.detail,
     ]
       .filter(Boolean)

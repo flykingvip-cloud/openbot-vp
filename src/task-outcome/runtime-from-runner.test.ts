@@ -73,10 +73,16 @@ describe("recordRunnerTurnOutcome", () => {
         allowedModality: "chat_model",
         forbiddenSuccessModalities: ["image_generation", "audio_music_generation"],
         detail: "Executor image_generation is not wired",
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "executor_unwired",
+        incompleteModalities: ["image_generation", "audio_music_generation"],
       },
     });
     expect(out.record.reasonDetail).toContain("executor_unwired");
     expect(out.record.reasonDetail).toContain("image_generation");
+    expect(out.record.reasonDetail).toContain("text_returned_allowed=true");
+    expect(out.record.reasonDetail).toContain("target_modality_completed=false");
     expect(out.record.reasonDetail).toContain("allowed_modality=chat_model");
     // Still not inventing task success — awaiting acceptance.
     expect(out.record.taskJudgement).toBe("incomplete");

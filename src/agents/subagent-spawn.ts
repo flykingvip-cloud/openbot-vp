@@ -17,10 +17,11 @@ import {
   snapshotForChildModelHandoff,
   stageSpawnGovernanceSnapshot,
 } from "../gateway/governance/spawn-snapshot-handoff.js";
-import {
-  buildTaskCapabilityPlan,
-  resolveExecutionRoutingFromCapabilityPlan,
-} from "../gateway/model-entitlement/task-capability-plan.js";
+import { resourceCatalogToAorProfiles } from "../gateway/model-entitlement/aor-catalog-adapter.js";
+import { consumeCapabilityRoutingResult } from "../gateway/model-entitlement/capability-entry-consume.js";
+import { reorderAuthorizedModelsForChildTask } from "../gateway/model-entitlement/child-task-aor-reorder.js";
+import { buildRunContextEstimateParts } from "../gateway/model-entitlement/run-context-estimate.js";
+import { listResourceModelCatalog } from "../gateway/resource-catalog/models-catalog-store.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import {
   isValidAgentId,
@@ -123,6 +124,26 @@ export type SpawnSubagentResult = {
     totalBytes: number;
     files: Array<{ name: string; bytes: number; sha256: string }>;
     relDir: string;
+  };
+  /**
+   * Structured capability surface for the child task plan. Distinguishes
+   * explanatory text-returned from image/music generation completed.
+   * Never omit by voiding outcomeClaim at the spawn site.
+   */
+  capabilityExecutionSurface?: {
+    textReturnedAllowed: boolean;
+    targetModalityCompleted: boolean;
+    status: string;
+    allowedModality: string;
+    incompleteModalities: readonly string[];
+    planFailureKind: string;
+    detail?: string;
+  };
+  /** Child-task AOR reorder summary (authorized set unchanged). */
+  childCapabilityPlan?: {
+    categoryId: string;
+    preferredModelOrder: readonly string[];
+    allowlist: readonly string[];
   };
 };
 
@@ -622,22 +643,64 @@ export async function spawnSubagentDirect(
   let childGovernanceSnapshot = snapshotForChildModelHandoff(parentModelSet);
   // P0: rebuild per-task capability plan from the child task within the parent
   // authorized/executable allowlist — classification must not expand rights.
+  let childCapabilitySurface: SpawnSubagentResult["capabilityExecutionSurface"] = undefined;
+  let childCapabilityPlanSummary: SpawnSubagentResult["childCapabilityPlan"] = undefined;
   if (childGovernanceSnapshot?.effectiveModelSet?.allowlist) {
     const parentAllowlist = childGovernanceSnapshot.effectiveModelSet.allowlist;
-    const childPlan = buildTaskCapabilityPlan({
+    // Re-rank inside parent allowlist by child task category — do not inherit parent AOR order.
+    const catalogEntries = await listResourceModelCatalog();
+    const { profiles } = resourceCatalogToAorProfiles(catalogEntries);
+    const modelContextWindows: Record<string, number> = {};
+    for (const entry of catalogEntries) {
+      if (typeof entry.contextWindow === "number" && entry.contextWindow > 0) {
+        modelContextWindows[entry.modelId] = entry.contextWindow;
+      }
+    }
+    const attachmentSummary =
+      attachmentsReceipt && attachmentsReceipt.files.length > 0
+        ? attachmentsReceipt.files.map((f) => `${f.name}:${f.bytes}`).join("\n")
+        : undefined;
+    const runContextEstimate = buildRunContextEstimateParts({
+      taskText: task,
+      extraSystemPrompt: childSystemPrompt,
+      attachmentsText: attachmentSummary,
+      attachmentsKnown: true,
+      toolsKnown: true,
+      toolsText: "",
+    });
+    const childReorder = reorderAuthorizedModelsForChildTask({
       taskText: task,
       authorizedModelIds: parentAllowlist,
-      preferredModelOrderFromAuth:
+      parentPreferredModelOrder:
         childGovernanceSnapshot.effectiveModelSet.preferredModelOrder ?? parentAllowlist,
+      mode: "aor_enhanced",
+      catalog: profiles,
+      modelContextWindows,
+      contextParts: runContextEstimate.contextParts,
     });
-    const childRouting = resolveExecutionRoutingFromCapabilityPlan({
-      allowlist: parentAllowlist,
-      preferredModelOrder: childGovernanceSnapshot.effectiveModelSet.preferredModelOrder,
-      capabilityPlan: childPlan,
+    const consumedCapability = consumeCapabilityRoutingResult({
+      planFailure: childReorder.planFailure,
+      outcomeClaim: childReorder.outcomeClaim,
+      executionSurface: childReorder.executionSurface,
+      capabilityPlan: childReorder.capabilityPlan,
     });
-    // outcomeClaim / planFailure stay on childRouting for executors; never expand allowlist.
-    void childRouting.outcomeClaim;
-    if (childRouting.planFailure.kind === "no_executable_candidates") {
+    childCapabilitySurface = {
+      textReturnedAllowed: consumedCapability.executionSurface.textReturnedAllowed,
+      targetModalityCompleted: consumedCapability.executionSurface.targetModalityCompleted,
+      status: consumedCapability.executionSurface.status,
+      allowedModality: consumedCapability.executionSurface.allowedModality,
+      incompleteModalities: consumedCapability.executionSurface.incompleteModalities,
+      planFailureKind: consumedCapability.executionSurface.planFailureKind,
+      ...(consumedCapability.executionSurface.detail
+        ? { detail: consumedCapability.executionSurface.detail }
+        : {}),
+    };
+    childCapabilityPlanSummary = {
+      categoryId: childReorder.categoryId,
+      preferredModelOrder: childReorder.preferredModelOrder,
+      allowlist: childReorder.allowlist,
+    };
+    if (childReorder.planFailure.kind === "no_executable_candidates") {
       discardStagedSpawnExecutionIdentity(childIdem);
       discardStagedSpawnGovernanceSnapshot(childIdem);
       await cleanupProvisionalSession(childSessionKey, {
@@ -646,15 +709,17 @@ export async function spawnSubagentDirect(
       });
       return {
         status: "error" as const,
-        error: childRouting.planFailure.message,
+        error: childReorder.planFailure.message,
+        capabilityExecutionSurface: childCapabilitySurface,
+        childCapabilityPlan: childCapabilityPlanSummary,
       };
     }
     childGovernanceSnapshot = {
       ...childGovernanceSnapshot,
       effectiveModelSet: {
-        allowlist: childRouting.allowlist ?? [...parentAllowlist],
-        ...(childRouting.preferredModelOrder
-          ? { preferredModelOrder: childRouting.preferredModelOrder }
+        allowlist: [...childReorder.allowlist],
+        ...(childReorder.preferredModelOrder.length > 0
+          ? { preferredModelOrder: [...childReorder.preferredModelOrder] }
           : {}),
       },
     };
@@ -845,5 +910,7 @@ export async function spawnSubagentDirect(
     note,
     modelApplied: resolvedModel ? modelApplied : undefined,
     attachments: attachmentsReceipt,
+    ...(childCapabilitySurface ? { capabilityExecutionSurface: childCapabilitySurface } : {}),
+    ...(childCapabilityPlanSummary ? { childCapabilityPlan: childCapabilityPlanSummary } : {}),
   };
 }
