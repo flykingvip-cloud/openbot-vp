@@ -199,6 +199,8 @@ export async function proposeCollaborationTaskHandoffContract(
   const toRole: ResponsibilityRole =
     params.toRole ?? (kind === "owner_transfer" ? "owner" : "executor");
   const proposedBy = params.proposedBy?.trim() || params.actor?.trim() || params.from.trim();
+  const liveGoverned = asGovernedTask(current);
+  const baseHistoryLen = (liveGoverned.handoffs ?? []).length;
   return unwrap(
     await proposeHandoff(
       authority,
@@ -214,6 +216,7 @@ export async function proposeCollaborationTaskHandoffContract(
         blockers: params.blockers,
         requiresApproval: params.requiresApproval,
         proposedBy,
+        baseHistoryLen,
       },
       { cfg },
     ),
@@ -339,10 +342,12 @@ export async function applyCollaborationTaskHandoffContract(
         ...liveGoverned,
         responsibility: liveGoverned.responsibility,
       };
+      const liveHandoffs = liveGoverned.handoffs ?? [];
       const decision = classifyHandoffApplyAgainstLive({
         contract,
-        live: liveHandoffTask,
-        historyHandoffIds: (liveGoverned.handoffs ?? []).map((h) => h.handoffId),
+        live: { ...liveHandoffTask, handoffs: liveHandoffs },
+        historyHandoffIds: liveHandoffs.map((h) => h.handoffId),
+        liveHistoryLen: liveHandoffs.length,
       });
       if (decision.kind === "conflict") {
         throw new HandoffContractEntryError(
@@ -350,12 +355,18 @@ export async function applyCollaborationTaskHandoffContract(
           `stale handoff ${contract.handoffId} refused: ${decision.detail}`,
         );
       }
-      // Idempotent / already-at-target: refuse blind retry mutate (T-E5 / WL2).
-      // Distinct from conflict — live already reflects this handoff.
+      // Live equals target without this handoffId proof — independent reconcile, NOT applied.
+      if (decision.kind === "already_at_target") {
+        throw new HandoffContractEntryError(
+          "target_matches_unproven",
+          `handoff ${contract.handoffId} not proven applied: ${decision.detail}`,
+        );
+      }
+      // Same handoffId already in history — true idempotent; refuse blind retry mutate.
       if (decision.kind === "idempotent") {
         throw new HandoffContractEntryError(
           "already_applied",
-          `handoff ${contract.handoffId} already reflected on live task; refusing blind retry mutate`,
+          `handoff ${contract.handoffId} already in task history; refusing blind retry mutate`,
         );
       }
       const history = normalizeTaskHandoff({

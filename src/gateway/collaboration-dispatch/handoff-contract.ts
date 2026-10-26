@@ -82,10 +82,16 @@ export type HandoffContract = Readonly<{
   approvedAt?: number;
   appliedAt?: number;
   expiresAt?: number;
+  /**
+   * T47: responsibility-chain precondition — handoffs[] length observed at propose.
+   * Apply refuses when live history length diverges (A→B→A then replay old contract).
+   */
+  baseHistoryLen?: number;
 }>;
 
 export type HandoffTask = Task & {
   responsibility?: TaskResponsibility;
+  handoffs?: TaskHandoff[];
 };
 
 export type HandoffResult<T> =
@@ -107,6 +113,8 @@ export type ProposeHandoffInput = {
   requiresApproval?: HandoffApproval;
   expiresAt?: number;
   handoffId?: string;
+  /** T47: snapshot of task.handoffs length at propose (duty-chain version). */
+  baseHistoryLen?: number;
   /**
    * Optional chat text carrying an `ogui-answer` fence (Form P0 submit).
    * When `collaboration.task.oguiHandoffProjection` is ON, a legal fence is
@@ -529,17 +537,27 @@ export function applyHandoffContractToResponsibility(
 export type HandoffLiveApplyDecision =
   | { kind: "apply"; responsibility: TaskResponsibility }
   | { kind: "idempotent"; responsibility: TaskResponsibility }
+  | {
+      kind: "already_at_target";
+      responsibility: TaskResponsibility;
+      detail: string;
+    }
   | { kind: "conflict"; detail: string; responsibility: TaskResponsibility };
 
 /**
- * T45: classify whether an approved handoff may still change live responsibility.
- * Old contracts whose expected `from` no longer matches live must conflict — not overwrite.
- * History keyed by handoffId is treated as idempotent.
+ * T45/T47: classify whether an approved handoff may still change live responsibility.
+ *
+ * Idempotent ONLY when the same handoffId is already in task history (contract identity).
+ * Live responsibility happening to equal `toId` is `already_at_target` — never "already applied".
+ * `baseHistoryLen` binds duty-chain version so A→B→A then replay of an old contract conflicts.
+ * Ledger/status `applied` without history may still `apply` to repair projection.
  */
 export function classifyHandoffApplyAgainstLive(params: {
   contract: HandoffContract;
   live: HandoffTask;
   historyHandoffIds?: ReadonlySet<string> | readonly (string | undefined | null)[];
+  /** Live task.handoffs length (duty-chain version). */
+  liveHistoryLen?: number;
 }): HandoffLiveApplyDecision {
   const liveResp = responsibilityOf(params.live);
   const handoffId = compact(params.contract.handoffId);
@@ -552,6 +570,29 @@ export function classifyHandoffApplyAgainstLive(params: {
     return { kind: "idempotent", responsibility: liveResp };
   }
 
+  const liveHistoryLen =
+    typeof params.liveHistoryLen === "number"
+      ? params.liveHistoryLen
+      : Array.isArray(params.live.handoffs)
+        ? params.live.handoffs.length
+        : idSet.size;
+  const baseHistoryLen = params.contract.baseHistoryLen;
+  if (typeof baseHistoryLen === "number" && liveHistoryLen !== baseHistoryLen) {
+    return {
+      kind: "conflict",
+      detail: `expected handoff history length ${baseHistoryLen}, live ${liveHistoryLen}`,
+      responsibility: liveResp,
+    };
+  }
+
+  // Same contract already applied in ledger but history/projection missing → repair path.
+  if (params.contract.status === "applied") {
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
   const fromId = compact(params.contract.from.agentId);
   const toId = compact(params.contract.to.agentId);
   const role = params.contract.to.responsibilityRole;
@@ -559,7 +600,11 @@ export function classifyHandoffApplyAgainstLive(params: {
 
   if (isOwnerMove) {
     if (compact(liveResp.owner) === toId) {
-      return { kind: "idempotent", responsibility: liveResp };
+      return {
+        kind: "already_at_target",
+        detail: `live owner already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
+        responsibility: liveResp,
+      };
     }
     if (compact(liveResp.owner) !== fromId) {
       return {
@@ -576,7 +621,11 @@ export function classifyHandoffApplyAgainstLive(params: {
 
   if (role === "reviewer") {
     if (compact(liveResp.reviewer) === toId) {
-      return { kind: "idempotent", responsibility: liveResp };
+      return {
+        kind: "already_at_target",
+        detail: `live reviewer already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
+        responsibility: liveResp,
+      };
     }
     if (liveResp.reviewer && compact(liveResp.reviewer) !== fromId) {
       return {
@@ -593,7 +642,11 @@ export function classifyHandoffApplyAgainstLive(params: {
 
   if (role === "approver") {
     if (compact(liveResp.approver) === toId) {
-      return { kind: "idempotent", responsibility: liveResp };
+      return {
+        kind: "already_at_target",
+        detail: `live approver already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
+        responsibility: liveResp,
+      };
     }
     if (liveResp.approver && compact(liveResp.approver) !== fromId) {
       return {
@@ -608,10 +661,14 @@ export function classifyHandoffApplyAgainstLive(params: {
     };
   }
 
-  // continue / evidence / executor role: from must still be an executor (or already transferred).
+  // continue / evidence / executor role
   const executors = new Set(liveResp.executors.map((id) => compact(id)).filter(Boolean));
   if (executors.has(toId) && !executors.has(fromId)) {
-    return { kind: "idempotent", responsibility: liveResp };
+    return {
+      kind: "already_at_target",
+      detail: `live executors already include ${toId} without ${fromId}; handoff ${handoffId || "(missing)"} not in history`,
+      responsibility: liveResp,
+    };
   }
   if (!executors.has(fromId)) {
     return {
@@ -880,6 +937,7 @@ export async function proposeHandoff(
     proposedBy: compact(input.proposedBy) || fromId,
     proposedAt: at,
     ...(typeof input.expiresAt === "number" ? { expiresAt: input.expiresAt } : {}),
+    ...(typeof input.baseHistoryLen === "number" ? { baseHistoryLen: input.baseHistoryLen } : {}),
   };
   const handoffsDir = authority.namespace.handoffsDir;
   const stem = safeStem(taskId)!;

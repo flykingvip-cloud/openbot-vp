@@ -442,6 +442,11 @@ export type ApplyCollaborationBoardClaimParams = {
   cfg?: OpenBotConfig;
   /** Test-only: after outside read, before control-lock write. */
   _testAfterTaskReadBarrier?: () => Promise<void>;
+  /**
+   * Test-only: after board applyClaim succeeds (status=applied) and before the
+   * task patch is returned — simulates board durable / task write failure.
+   */
+  _testAfterBoardAppliedBeforeTaskPatch?: () => Promise<void>;
 };
 
 /**
@@ -508,7 +513,9 @@ export async function applyCollaborationBoardClaim(
       let item: GroupBoardClaimItem;
 
       if (existing?.status === "applied") {
-        // Idempotent recovery: board durable; finish / re-seed task side from live.
+        // Idempotent recovery: board durable. Repair task projection only when the
+        // claim is still the legitimate assignee — never re-grant after a later
+        // handoff removed the claimant, and never re-seed over a newer responsibility.
         const claimantId = (existing.claimantId ?? "").trim();
         if (!claimantId) {
           throw new ClaimContractEntryError(
@@ -516,22 +523,54 @@ export async function applyCollaborationBoardClaim(
             "applied board item has no claimantId",
           );
         }
-        const merged = Array.from(
-          new Set(
-            [...(liveGoverned.assignedMemberIds ?? []), claimantId]
-              .map((s) => s.trim())
-              .filter(Boolean),
-          ),
+        const assigned = (liveGoverned.assignedMemberIds ?? [])
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const executors = (liveGoverned.responsibility?.executors ?? []).map((s) => s.trim());
+        const alreadyProjected = assigned.includes(claimantId) || executors.includes(claimantId);
+        const handedOffAway = (liveGoverned.handoffs ?? []).some(
+          (h) => (h.from ?? "").trim() === claimantId,
         );
-        responsibility = seedTaskResponsibility({
-          task: { ...liveGoverned, assignedMemberIds: merged },
-          effective: authority.policy.effective,
-          actor: claimantId,
-          nominatedOwnerId: (liveGoverned.ownerMemberId ?? "").trim() || undefined,
-          memberRoleMap: operatingState?.memberRoleMap ?? undefined,
-        });
-        assignedMemberIds = merged;
-        item = existing;
+        if (!alreadyProjected && handedOffAway) {
+          throw new ClaimContractEntryError(
+            "stale_applied_claim_superseded",
+            `board item ${params.itemId} is applied for ${claimantId}, but a later handoff moved responsibility away; refusing to re-grant`,
+          );
+        }
+        if (alreadyProjected) {
+          // Task already reflects claimant — keep live responsibility (do not re-seed).
+          assignedMemberIds = assigned;
+          responsibility =
+            liveGoverned.responsibility ??
+            seedTaskResponsibility({
+              task: liveGoverned,
+              effective: authority.policy.effective,
+              actor: claimantId,
+              nominatedOwnerId: (liveGoverned.ownerMemberId ?? "").trim() || undefined,
+              memberRoleMap: operatingState?.memberRoleMap ?? undefined,
+            });
+          item = existing;
+        } else {
+          // Partial success repair: board applied, task never projected claimant.
+          const merged = Array.from(new Set([...assigned, claimantId]));
+          const baseResp =
+            liveGoverned.responsibility ??
+            seedTaskResponsibility({
+              task: { ...liveGoverned, assignedMemberIds: merged },
+              effective: authority.policy.effective,
+              actor: claimantId,
+              nominatedOwnerId: (liveGoverned.ownerMemberId ?? "").trim() || undefined,
+              memberRoleMap: operatingState?.memberRoleMap ?? undefined,
+            });
+          responsibility = {
+            ...baseResp,
+            executors: Array.from(
+              new Set([...(baseResp.executors ?? []).map((s) => s.trim()), claimantId]),
+            ).filter(Boolean),
+          };
+          assignedMemberIds = merged;
+          item = existing;
+        }
       } else {
         const applied = unwrap(
           await applyClaim(
@@ -543,6 +582,9 @@ export async function applyCollaborationBoardClaim(
           ),
           "applyClaim",
         );
+        if (params._testAfterBoardAppliedBeforeTaskPatch) {
+          await params._testAfterBoardAppliedBeforeTaskPatch();
+        }
         assignedMemberIds = applied.assignedMemberIds;
         responsibility = applied.responsibility;
         item = applied.item;

@@ -2715,4 +2715,469 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
     expect(final.status).toBe("in_progress");
     expect(final.completedAtMs).toBeFalsy();
   });
+
+  test("M3-BIZ-H1 different handoff same target must NOT already_applied", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-h1";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-h1" });
+
+    const first = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.bot0,
+      kind: "owner_transfer",
+      remainingWork: "h1-first",
+      acceptanceCriteria: ["owner bot0"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: first.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: first.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+    await applyCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: first.handoffId,
+      actor: tenant.owner,
+      cfg,
+    });
+
+    const second = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.bot0,
+      kind: "owner_transfer",
+      remainingWork: "h1-second-same-target",
+      acceptanceCriteria: ["still bot0"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    expect(second.handoffId).not.toBe(first.handoffId);
+    expect(second.baseHistoryLen).toBe(1);
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: second.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: second.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+
+    let caught: { name?: string; code?: string } | undefined;
+    try {
+      await applyCollaborationTaskHandoffContract({
+        groupId,
+        taskId,
+        handoffId: second.handoffId,
+        actor: tenant.owner,
+        cfg,
+      });
+    } catch (err) {
+      caught = err as { name?: string; code?: string };
+    }
+    expect(caught?.name).toBe("HandoffContractEntryError");
+    expect(caught?.code).toBeDefined();
+    expect(caught?.code).not.toBe("already_applied");
+    expect(["target_matches_unproven", "responsibility_conflict"]).toContain(caught?.code);
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.responsibility?.owner).toBe(tenant.bot0);
+    const historyIds = (final.handoffs ?? []).map((h) => h.handoffId).filter(Boolean);
+    expect(historyIds).toContain(first.handoffId);
+    expect(historyIds).not.toContain(second.handoffId);
+  });
+
+  test("M3-BIZ-H2 A→B→A then replay old approved contract must conflict", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-h2";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-h2" });
+
+    // Old contract A→B proposed while history empty (baseHistoryLen=0).
+    const old = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.bot0,
+      kind: "owner_transfer",
+      remainingWork: "h2-old",
+      acceptanceCriteria: ["old"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    expect(old.baseHistoryLen).toBe(0);
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: old.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: old.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+
+    // Intervening A→admin→A (applied), advancing duty-chain version.
+    const mid = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.coordinator,
+      to: tenant.admin,
+      kind: "owner_transfer",
+      remainingWork: "h2-mid",
+      acceptanceCriteria: ["mid"],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: mid.handoffId,
+      actor: tenant.admin,
+      actorType: "human",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: mid.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+    await applyCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: mid.handoffId,
+      actor: tenant.owner,
+      cfg,
+    });
+
+    const back = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.admin,
+      to: tenant.coordinator,
+      kind: "owner_transfer",
+      remainingWork: "h2-back",
+      acceptanceCriteria: ["back"],
+      actor: tenant.admin,
+      cfg,
+    });
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: back.handoffId,
+      actor: tenant.coordinator,
+      actorType: "bot",
+      cfg,
+    });
+    await approveCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: back.handoffId,
+      actor: tenant.owner,
+      actorType: "human",
+      cfg,
+    });
+    await applyCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: back.handoffId,
+      actor: tenant.owner,
+      cfg,
+    });
+
+    const afterLoop = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(afterLoop.responsibility?.owner).toBe(tenant.coordinator);
+    expect((afterLoop.handoffs ?? []).length).toBe(2);
+
+    // Replay old A→B: fromId matches again, but baseHistoryLen=0 ≠ live 2.
+    await expect(
+      applyCollaborationTaskHandoffContract({
+        groupId,
+        taskId,
+        handoffId: old.handoffId,
+        actor: tenant.owner,
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      name: "HandoffContractEntryError",
+      code: "responsibility_conflict",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.responsibility?.owner).toBe(tenant.coordinator);
+    expect((final.handoffs ?? []).map((h) => h.handoffId)).not.toContain(old.handoffId);
+  });
+
+  test("M3-BIZ-R1 board applied + task fail → retry projects without re-applying board", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-r1";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-r1" });
+
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId,
+      remainingWork: "r1 chapter",
+      acceptanceCriteria: ["sources"],
+      intendedClaimantIds: [tenant.admin],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      claimantId: tenant.admin,
+      cfg,
+    });
+
+    await expect(
+      applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: published.itemId,
+        actor: tenant.admin,
+        cfg,
+        _testAfterBoardAppliedBeforeTaskPatch: async () => {
+          throw new Error("injected_task_write_failure");
+        },
+      }),
+    ).rejects.toThrow(/injected_task_write_failure/);
+
+    const boardAfterPartial = await loadCollaborationBoardClaimItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      cfg,
+    });
+    expect(boardAfterPartial?.status).toBe("applied");
+    expect(boardAfterPartial?.revision).toBeTypeOf("number");
+    const rev1 = boardAfterPartial!.revision;
+
+    const mid = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(mid.assignedMemberIds ?? []).not.toContain(tenant.admin);
+
+    const repaired = await applyCollaborationBoardClaim({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      actor: tenant.admin,
+      cfg,
+    });
+    expect(repaired.item.status).toBe("applied");
+    expect(repaired.item.revision).toBe(rev1); // board not re-mutated
+    expect(repaired.task.assignedMemberIds).toContain(tenant.admin);
+    expect(repaired.task.responsibility?.executors).toContain(tenant.admin);
+
+    const boardFinal = await loadCollaborationBoardClaimItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      cfg,
+    });
+    expect(boardFinal?.revision).toBe(rev1);
+  });
+
+  test("M3-BIZ-R2 later handoff must not re-grant old applied claimant on recover", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-r2";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-r2" });
+
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId,
+      remainingWork: "r2 chapter",
+      acceptanceCriteria: ["sources"],
+      intendedClaimantIds: [tenant.admin],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      claimantId: tenant.admin,
+      cfg,
+    });
+    await applyCollaborationBoardClaim({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      actor: tenant.admin,
+      cfg,
+    });
+
+    // Subsequent executor handoff moves work away from admin (from=admin → bot0).
+    const moved = await proposeCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      from: tenant.admin,
+      to: tenant.bot0,
+      kind: "continue",
+      fromRole: "executor",
+      toRole: "executor",
+      remainingWork: "r2-moved",
+      acceptanceCriteria: ["moved"],
+      actor: tenant.admin,
+      cfg,
+    });
+    await acceptCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: moved.handoffId,
+      actor: tenant.bot0,
+      actorType: "bot",
+      cfg,
+    });
+    // continue/executor may not need human approve — try approve if required
+    try {
+      await approveCollaborationTaskHandoffContract({
+        groupId,
+        taskId,
+        handoffId: moved.handoffId,
+        actor: tenant.owner,
+        actorType: "human",
+        cfg,
+      });
+    } catch {
+      // approval may be none
+    }
+    await applyCollaborationTaskHandoffContract({
+      groupId,
+      taskId,
+      handoffId: moved.handoffId,
+      actor: tenant.owner,
+      cfg,
+    });
+
+    const afterMove = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(afterMove.responsibility?.executors ?? []).not.toContain(tenant.admin);
+    expect(afterMove.assignedMemberIds ?? []).not.toContain(tenant.admin);
+
+    await expect(
+      applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: published.itemId,
+        actor: tenant.admin,
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      name: "ClaimContractEntryError",
+      code: "stale_applied_claim_superseded",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.assignedMemberIds ?? []).not.toContain(tenant.admin);
+    expect(final.responsibility?.executors ?? []).not.toContain(tenant.admin);
+  });
+
+  test("M3-BIZ-R3 stopped + board applied keeps partial_success; not a recovery pass", async () => {
+    const { cfg } = await useBizCfg();
+    const taskId = "task-m3-biz-r3";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "biz-r3" });
+
+    const published = await publishCollaborationBoardItem({
+      groupId,
+      taskId,
+      remainingWork: "r3 chapter",
+      acceptanceCriteria: ["sources"],
+      intendedClaimantIds: [tenant.admin],
+      actor: tenant.coordinator,
+      cfg,
+    });
+    await claimCollaborationBoardItem({
+      groupId,
+      taskId,
+      itemId: published.itemId,
+      claimantId: tenant.admin,
+      cfg,
+    });
+    await expect(
+      applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: published.itemId,
+        actor: tenant.admin,
+        cfg,
+        _testAfterBoardAppliedBeforeTaskPatch: async () => {
+          throw new Error("injected_before_task");
+        },
+      }),
+    ).rejects.toThrow(/injected_before_task/);
+
+    const stopControl = buildAcceptedTaskStopControl({
+      requestedBy: tenant.owner,
+      reason: "r3-stop-after-partial",
+      externalEffect: "none",
+      requestedAtMs: 55,
+    });
+    await applyTaskStopUnderControlLock({
+      groupId,
+      taskId,
+      stopControl,
+      updatedBy: tenant.owner,
+      updatedAtMs: 55,
+      cfg,
+    });
+
+    await expect(
+      applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: published.itemId,
+        actor: tenant.admin,
+        cfg,
+      }),
+    ).rejects.toMatchObject({
+      name: "ClaimContractEntryError",
+      code: "partial_success_board_applied_task_stopped",
+    });
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.stopControl?.status).toBe("accepted");
+    expect(final.assignedMemberIds ?? []).not.toContain(tenant.admin);
+  });
 });
