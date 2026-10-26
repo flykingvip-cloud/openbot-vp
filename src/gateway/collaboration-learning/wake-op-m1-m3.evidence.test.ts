@@ -22,6 +22,7 @@ import {
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
+  applyBusinessTaskPatchUnderControlLock,
   applyTaskStopUnderControlLock,
   casClearTaskDispatchClaimForOp,
   casCommitTaskDispatchEligibility,
@@ -30,7 +31,10 @@ import {
 } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
-import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-stop-control.js";
+import {
+  buildAcceptedTaskStopControl,
+  TaskStoppedError,
+} from "../collaboration-dispatch/task-stop-control.js";
 import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-op-effect-verify.js";
 import {
   claimWakeOpRunning,
@@ -52,6 +56,7 @@ import {
   writeGroupOperatingState,
 } from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
+import { transitionCollaborationTask } from "./state-machine.js";
 import { requestCollaborationTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
 import {
@@ -2083,5 +2088,280 @@ describe("T43 M3 claim lifecycle (committed/taken recovery + claimId bind)", () 
     const rec2 = await readWakeOpRecord({ authority, opKey: wake.opKey! });
     expect(rec2?.status).toBe("completed");
     expect(rec2?.roundId).toBe("life-e-round");
+  });
+});
+
+describe("T44 M3 other task writers under control lock", () => {
+  test("M3-WRITERS-0 tip hazard: stale {...current} spread drops live stopControl/claim", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-writers-0";
+    const { objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "writers-0",
+    });
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const stale = { ...before, status: "in_progress" as const, updatedAtMs: 1 };
+
+    const stopControl = buildAcceptedTaskStopControl({
+      requestedBy: tenant.owner,
+      reason: "writers-0-stop",
+      externalEffect: "none",
+      requestedAtMs: 50,
+    });
+    await applyTaskStopUnderControlLock({
+      groupId,
+      taskId,
+      stopControl,
+      updatedBy: tenant.owner,
+      updatedAtMs: 50,
+      cfg,
+    });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    // Re-seed claim path: stop cleared claim; commit after would need unstopped.
+    // For hazard demo, write a synthetic claim onto a fresh non-stop task via direct
+    // fields then show stale spread wiping them — use a second task.
+    const taskId2 = "task-m3-writers-0b";
+    await objectStorage.writeObject(groupId, "task", taskId2, {
+      ...before,
+      taskId: taskId2,
+      controlEpoch: 3,
+      dispatchClaim: {
+        claimId: "claim-hazard",
+        opKey: opKeyFor(taskId2, "hazard"),
+        controlEpoch: 3,
+        authFingerprint: wakeOpAuthFingerprint(os, [tenant.bot0]),
+        committedAtMs: 10,
+        phase: "committed",
+      },
+      stopControl: {
+        status: "accepted",
+        requestedBy: tenant.owner,
+        requestedAtMs: 11,
+        inFlightAbort: "best_effort",
+        externalEffect: "none",
+      },
+      updatedAtMs: 11,
+    } as never);
+    const live = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId2)) as never,
+    );
+    expect(live.stopControl?.status).toBe("accepted");
+    expect(live.dispatchClaim?.claimId).toBe("claim-hazard");
+
+    // Tip-era business writer pattern (must remain a documented failing pattern).
+    const buggy: typeof live = {
+      ...stale,
+      taskId: taskId2,
+      status: "blocked",
+      updatedAtMs: 99,
+      updatedBy: tenant.admin,
+    } as never;
+    await objectStorage.writeObject(groupId, "task", taskId2, buggy as never);
+    const afterBug = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId2)) as never,
+    );
+    // Prove lost-update: control fields gone (this is the red tip hazard).
+    expect(afterBug.stopControl).toBeFalsy();
+    expect(afterBug.dispatchClaim).toBeFalsy();
+    expect(afterBug.controlEpoch ?? 0).toBe(0);
+    expect(afterBug.status).toBe("blocked");
+
+    // Helper repair path: start from restored live-with-control + business patch.
+    await objectStorage.writeObject(groupId, "task", taskId2, live as never);
+    const patched = await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId: taskId2,
+      cfg,
+      refuseIfStopped: false, // allow patch while stopped to show field preserve
+      buildPatch: () => ({
+        status: "blocked",
+        updatedAtMs: 100,
+        updatedBy: tenant.admin,
+      }),
+    });
+    expect(patched.status).toBe("blocked");
+    expect(patched.stopControl?.status).toBe("accepted");
+    expect(patched.dispatchClaim?.claimId).toBe("claim-hazard");
+    expect(patched.controlEpoch).toBe(3);
+  });
+
+  test("M3-WRITERS-A transition vs concurrent stop — must refuse (not wipe stop)", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-writers-a";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "writers-a" });
+
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let hitRead!: () => void;
+    const readHit = new Promise<void>((r) => {
+      hitRead = r;
+    });
+
+    const transitionP = transitionCollaborationTask({
+      groupId,
+      taskId,
+      toStatus: "blocked",
+      actor: tenant.owner,
+      cfg,
+      _testAfterTaskReadBarrier: async () => {
+        hitRead();
+        await barrier;
+      },
+    });
+
+    await readHit;
+    const stopControl = buildAcceptedTaskStopControl({
+      requestedBy: tenant.owner,
+      reason: "writers-a",
+      externalEffect: "none",
+      requestedAtMs: 77,
+    });
+    await applyTaskStopUnderControlLock({
+      groupId,
+      taskId,
+      stopControl,
+      updatedBy: tenant.owner,
+      updatedAtMs: 77,
+      cfg,
+    });
+    release();
+
+    await expect(transitionP).rejects.toBeInstanceOf(TaskStoppedError);
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.stopControl?.status).toBe("accepted");
+    expect(final.stopControl?.reason).toBe("writers-a");
+    expect(final.status).toBe("in_progress"); // business write did not land
+    expect(final.controlEpoch).toBeGreaterThan(0);
+  });
+
+  test("M3-WRITERS-B transition vs concurrent claim — must keep dispatchClaim + apply status", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-writers-b";
+    const { objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "writers-b",
+    });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const opA = opKeyFor(taskId, "writers-b-op");
+
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let hitRead!: () => void;
+    const readHit = new Promise<void>((r) => {
+      hitRead = r;
+    });
+
+    const transitionP = transitionCollaborationTask({
+      groupId,
+      taskId,
+      toStatus: "blocked",
+      actor: tenant.owner,
+      cfg,
+      _testAfterTaskReadBarrier: async () => {
+        hitRead();
+        await barrier;
+      },
+    });
+
+    await readHit;
+    const commit = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opA,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 120,
+    });
+    expect(commit.ok).toBe(true);
+    if (!commit.ok) {
+      throw new Error("commit must succeed");
+    }
+    const claimId = commit.claim.claimId;
+    release();
+
+    const updated = await transitionP;
+    expect(updated.status).toBe("blocked");
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.status).toBe("blocked");
+    expect(final.dispatchClaim?.claimId).toBe(claimId);
+    expect(final.dispatchClaim?.opKey).toBe(opA);
+    expect(final.dispatchClaim?.phase).toBe("committed");
+    expect(final.controlEpoch).toBe(epoch);
+    expect(final.stopControl).toBeFalsy();
+  });
+
+  test("M3-WRITERS-C business patch under lock must not drop control when patch omits them", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-writers-c";
+    const { objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "writers-c",
+    });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const commit = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "writers-c"),
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 5,
+    });
+    expect(commit.ok).toBe(true);
+    if (!commit.ok) {
+      throw new Error("commit");
+    }
+
+    // Simulate handoff/claim-entry style patch that only spreads business fields.
+    const patched = await applyBusinessTaskPatchUnderControlLock({
+      groupId,
+      taskId,
+      cfg,
+      buildPatch: (live) => ({
+        // Deliberately include undefined control keys as a hostile patch.
+        stopControl: undefined,
+        controlEpoch: 0,
+        dispatchClaim: undefined,
+        status: "blocked",
+        title: "writers-c-patched",
+        updatedAtMs: 88,
+        updatedBy: tenant.admin,
+        ownerMemberId: live.ownerMemberId,
+      }),
+    });
+
+    expect(patched.title).toBe("writers-c-patched");
+    expect(patched.status).toBe("blocked");
+    expect(patched.dispatchClaim?.claimId).toBe(commit.claim.claimId);
+    expect(patched.controlEpoch).toBe(epoch);
+    expect(patched.stopControl).toBeFalsy();
   });
 });

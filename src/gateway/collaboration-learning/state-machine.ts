@@ -29,6 +29,7 @@ import {
   guardUnattendedFinalize,
   isSingleGroupUnattendedTarget,
 } from "../collaboration-dispatch/single-group-unattended.js";
+import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import {
   asGovernedTask,
   assertDeliverableCommit,
@@ -37,7 +38,6 @@ import {
   nextGovernedTaskFields,
   resolveBlockedAgentIdsFromHandoffs,
   resolveTaskResponsibility,
-  type GovernedTask,
 } from "../collaboration-dispatch/task-runtime.js";
 import { assertTaskNotStopped } from "../collaboration-dispatch/task-stop-control.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";
@@ -64,6 +64,9 @@ export async function transitionCollaborationTask(params: {
   taskId: string;
   toStatus: TaskStatus;
   actor?: string;
+  cfg?: ReturnType<typeof loadConfig>;
+  /** Test-only: after outside read / prechecks, before control-lock write. */
+  _testAfterTaskReadBarrier?: () => Promise<void>;
 }): Promise<Task> {
   const {
     fileStore,
@@ -149,24 +152,45 @@ export async function transitionCollaborationTask(params: {
       deliverables,
     });
   }
-  const machine = new TaskStateMachine();
-  const status = machine.transition(current.status, params.toStatus, params.actor);
-  const now = Date.now();
-  const governanceFields = nextGovernedTaskFields({
-    task: governed,
-    liveStatus: status,
-    responsibility,
+  // Intent from outside read (gates already passed). Persist under task control lock
+  // so concurrent stop/claim cannot be lost to `{...stale, ...fields}` (T44).
+  if (params._testAfterTaskReadBarrier) {
+    await params._testAfterTaskReadBarrier();
+  }
+  const writeCfg = params.cfg ?? cfg;
+  const updated = await applyBusinessTaskPatchUnderControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg: writeCfg,
+    refuseIfStopped: true,
+    buildPatch: (live) => {
+      const machine = new TaskStateMachine();
+      const status = machine.transition(live.status, params.toStatus, params.actor);
+      const now = Date.now();
+      const liveGoverned = asGovernedTask(live);
+      const liveResponsibility = resolveTaskResponsibility({
+        task: liveGoverned,
+        effective,
+        actor: params.actor,
+        ownerUserId: operatingState?.governance.ownerUserId,
+        coordinatorBotId: operatingState?.governance.coordinatorBotId,
+        memberRoleMap: operatingState?.memberRoleMap,
+      });
+      const governanceFields = nextGovernedTaskFields({
+        task: liveGoverned,
+        liveStatus: status,
+        responsibility: liveResponsibility,
+      });
+      return {
+        ...governanceFields,
+        status,
+        startedAtMs: status === "in_progress" ? (live.startedAtMs ?? now) : live.startedAtMs,
+        completedAtMs: status === "completed" ? now : live.completedAtMs,
+        updatedBy: params.actor ?? live.updatedBy,
+        updatedAtMs: now,
+      };
+    },
   });
-  const updated: GovernedTask = {
-    ...current,
-    ...governanceFields,
-    status,
-    startedAtMs: status === "in_progress" ? (current.startedAtMs ?? now) : current.startedAtMs,
-    completedAtMs: status === "completed" ? now : current.completedAtMs,
-    updatedBy: params.actor ?? current.updatedBy,
-    updatedAtMs: now,
-  };
-  await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
   await syncGroupOperatingState({
     fileStore,
     groupStorage,

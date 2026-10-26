@@ -81,11 +81,8 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
-import {
-  asGovernedTask,
-  nextGovernedTaskFields,
-  type GovernedTask,
-} from "../collaboration-dispatch/task-runtime.js";
+import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import { asGovernedTask, nextGovernedTaskFields } from "../collaboration-dispatch/task-runtime.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
   confirmationConsumedDelivery,
@@ -435,6 +432,8 @@ export type ApplyCollaborationBoardClaimParams = {
   actor?: string;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
+  /** Test-only: after outside read, before control-lock write. */
+  _testAfterTaskReadBarrier?: () => Promise<void>;
 };
 
 /**
@@ -477,21 +476,31 @@ export async function applyCollaborationBoardClaim(
     ),
     "applyClaim",
   );
-  const governanceFields = nextGovernedTaskFields({
-    task: governed,
-    liveStatus: current.status,
-    responsibility: applied.responsibility,
-    handoffs: governed.handoffs ?? [],
+  if (params._testAfterTaskReadBarrier) {
+    await params._testAfterTaskReadBarrier();
+  }
+  const updated = await applyBusinessTaskPatchUnderControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    refuseIfStopped: true,
+    buildPatch: (live) => {
+      const now = Date.now();
+      const liveGoverned = asGovernedTask(live);
+      const governanceFields = nextGovernedTaskFields({
+        task: liveGoverned,
+        liveStatus: live.status,
+        responsibility: applied.responsibility,
+        handoffs: liveGoverned.handoffs ?? governed.handoffs ?? [],
+      });
+      return {
+        ...governanceFields,
+        assignedMemberIds: applied.assignedMemberIds,
+        updatedBy: params.actor ?? applied.item.claimantId ?? live.updatedBy,
+        updatedAtMs: now,
+      };
+    },
   });
-  const now = Date.now();
-  const updated: GovernedTask = {
-    ...current,
-    ...governanceFields,
-    assignedMemberIds: applied.assignedMemberIds,
-    updatedBy: params.actor ?? applied.item.claimantId ?? current.updatedBy,
-    updatedAtMs: now,
-  };
-  await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
   await syncGroupOperatingState({
     fileStore: stores.fileStore,
     groupStorage: stores.groupStorage,

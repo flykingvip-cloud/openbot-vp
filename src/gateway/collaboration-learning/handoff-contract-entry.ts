@@ -31,12 +31,12 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import {
   asGovernedTask,
   isCollabTaskHandoffContractEnabled,
   nextGovernedTaskFields,
   normalizeTaskHandoff,
-  type GovernedTask,
 } from "../collaboration-dispatch/task-runtime.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
@@ -227,6 +227,8 @@ export type HandoffContractStepParams = {
   actorType?: "human" | "bot";
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
+  /** Test-only: after outside read, before control-lock write. */
+  _testAfterTaskReadBarrier?: () => Promise<void>;
 };
 
 export async function acceptCollaborationTaskHandoffContract(
@@ -344,20 +346,31 @@ export async function applyCollaborationTaskHandoffContract(
     assumptions: [...contract.assumptions],
     blockers: [...contract.blockers],
   });
-  const governanceFields = nextGovernedTaskFields({
-    task: governed,
-    liveStatus: current.status,
-    responsibility,
-    handoffs: [...(governed.handoffs ?? []), history],
+  const handoffsNext = [...(governed.handoffs ?? []), history];
+  if (params._testAfterTaskReadBarrier) {
+    await params._testAfterTaskReadBarrier();
+  }
+  const updated = await applyBusinessTaskPatchUnderControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    refuseIfStopped: true,
+    buildPatch: (live) => {
+      const now = Date.now();
+      const liveGoverned = asGovernedTask(live);
+      const governanceFields = nextGovernedTaskFields({
+        task: liveGoverned,
+        liveStatus: live.status,
+        responsibility,
+        handoffs: handoffsNext,
+      });
+      return {
+        ...governanceFields,
+        updatedBy: params.actor ?? live.updatedBy,
+        updatedAtMs: now,
+      };
+    },
   });
-  const now = Date.now();
-  const updated: GovernedTask = {
-    ...current,
-    ...governanceFields,
-    updatedBy: params.actor ?? current.updatedBy,
-    updatedAtMs: now,
-  };
-  await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
   await syncGroupOperatingState({
     fileStore: stores.fileStore,
     groupStorage: stores.groupStorage,

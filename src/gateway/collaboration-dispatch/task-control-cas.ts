@@ -1,5 +1,6 @@
 /**
- * T41/T42/T43 M3 — shared control-version CAS for stop vs dispatch eligibility.
+ * T41/T42/T43/T44 M3 — shared control-version CAS for stop vs dispatch eligibility
+ * and business task writers (preserve stopControl/controlEpoch/dispatchClaim).
  *
  * Linearization point: task authority record under a per-task control lock.
  * - stop bumps controlEpoch and clears any dispatchClaim
@@ -32,7 +33,7 @@ import {
 } from "../collaboration-learning/shared.js";
 import { withRoundLock } from "./round-store-io.js";
 import { asGovernedTask, type GovernedTask, type TaskDispatchClaim } from "./task-runtime.js";
-import { isTaskStopAccepted } from "./task-stop-control.js";
+import { assertTaskNotStopped, isTaskStopAccepted } from "./task-stop-control.js";
 import { wakeOpAuthFingerprint } from "./wake-op-ledger.js";
 
 const LOCK_RETRY_MS = 20;
@@ -579,6 +580,62 @@ export async function applyTaskStopUnderControlLock(params: {
       };
       await objectStorage.writeObject(params.groupId, "task", params.taskId, next);
       return next;
+    },
+  });
+}
+
+/**
+ * T44: business writers (state-machine / handoff apply / board claim apply) must
+ * not clobber stopControl / controlEpoch / dispatchClaim via `{...stale, ...fields}`.
+ *
+ * Under the shared task control lock: re-read live task, optionally refuse if
+ * stopped, apply only the business patch, and **always** keep control fields from
+ * the live record (never from an outside snapshot or the patch object).
+ */
+export async function applyBusinessTaskPatchUnderControlLock(params: {
+  groupId: string;
+  taskId: string;
+  cfg?: OpenBotConfig;
+  /** Default true — business writes refuse once stop is accepted on the live record. */
+  refuseIfStopped?: boolean;
+  /**
+   * Build business fields from the live task under the lock.
+   * Control fields in the return value are ignored; live stop/epoch/claim win.
+   */
+  buildPatch: (live: GovernedTask) => Partial<GovernedTask> | Promise<Partial<GovernedTask>>;
+  /** Test-only: after live read under lock, before write (rare; prefer outer barrier). */
+  _testAfterLiveReadBarrier?: () => Promise<void>;
+}): Promise<GovernedTask> {
+  const cfg = params.cfg ?? loadConfig();
+  const refuseIfStopped = params.refuseIfStopped !== false;
+  return withTaskControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    fn: async () => {
+      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+      const current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+      if (!current) {
+        throw new Error(`task not found under control lock: ${params.taskId}`);
+      }
+      const live = asGovernedTask(current);
+      if (params._testAfterLiveReadBarrier) {
+        await params._testAfterLiveReadBarrier();
+      }
+      if (refuseIfStopped) {
+        assertTaskNotStopped(live);
+      }
+      const patch = await params.buildPatch(live);
+      // Explicitly preserve control plane — never trust patch / stale spread.
+      const updated: GovernedTask = {
+        ...live,
+        ...patch,
+        stopControl: live.stopControl,
+        controlEpoch: live.controlEpoch,
+        dispatchClaim: live.dispatchClaim,
+      };
+      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+      return updated;
     },
   });
 }
