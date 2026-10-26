@@ -54,9 +54,12 @@ export const resolveCronDeliveryPlanMock = createMock();
 export const resolveDeliveryTargetMock = createMock();
 export const surfaceCronJobResultMock = createMock();
 
+export const resolveAgentDirMock = createMock();
+resolveAgentDirMock.mockReturnValue("/tmp/agent-dir");
+
 vi.mock("../../agents/agent-scope.js", () => ({
   resolveAgentConfig: resolveAgentConfigMock,
-  resolveAgentDir: vi.fn().mockReturnValue("/tmp/agent-dir"),
+  resolveAgentDir: resolveAgentDirMock,
   resolveAgentModelFallbacksOverride: resolveAgentModelFallbacksOverrideMock,
   resolveAgentWorkspaceDir: vi.fn().mockReturnValue("/tmp/workspace"),
   resolveDefaultAgentId: vi.fn().mockReturnValue("default"),
@@ -288,13 +291,14 @@ function makeDefaultEmbeddedResult() {
 
 export function resetRunCronIsolatedAgentTurnHarness(): void {
   vi.clearAllMocks();
+  resolveAgentDirMock.mockReturnValue("/tmp/agent-dir");
 
   buildWorkspaceSkillSnapshotMock.mockReturnValue({
     prompt: "<available_skills></available_skills>",
     resolvedSkills: [],
     version: 42,
   });
-  resolveAgentConfigMock.mockReturnValue(undefined);
+  resolveAgentConfigMock.mockReturnValue({ agentDir: "/tmp/agent-dir" });
   resolveAgentModelFallbacksOverrideMock.mockReturnValue(undefined);
   resolveAgentSkillsFilterMock.mockReturnValue(undefined);
 

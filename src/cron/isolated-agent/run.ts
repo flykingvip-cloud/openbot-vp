@@ -792,6 +792,10 @@ export async function runCronIsolatedAgentTurn(params: {
   });
   const cronOutcomeTaskId = cronOutcomeOpened.ok ? cronOutcomeOpened.taskId : undefined;
   const cronOutcomeScope = cronOutcomeOpened.ok ? cronOutcomeOpened.scope : undefined;
+  let cronCapabilityOutcome:
+    | import("../../task-outcome/runtime-from-runner.js").RunnerTurnOutcomeInput["capabilityOutcome"]
+    | undefined;
+  let cronOutcomeCloseoutDone = false;
   if (!cronOutcomeOpened.ok) {
     logWarn(
       `[cron:${params.job.id}] task-outcome entry failed: ${cronOutcomeOpened.code} ${cronOutcomeOpened.message}`,
@@ -863,6 +867,53 @@ export async function runCronIsolatedAgentTurn(params: {
         logWarn(`[cron:${params.job.id}] progress ledger finish failed: ${String(err)}`);
       }
     }
+    // askOutcome W1: unified closeout — ordinary success/error/cancel, not only capability branches.
+    // tip runId is per-execution (sessionId:startedAt); taskId stays fire-stable across retries.
+    if (!cronOutcomeCloseoutDone && cronOutcomeTaskId && cronOutcomeScope) {
+      cronOutcomeCloseoutDone = true;
+      const aborted = isAborted();
+      const ok = settled.status === "ok" && !aborted;
+      const failureReason = aborted
+        ? ("user_cancelled" as const)
+        : settled.status === "error"
+          ? ("run_failed" as const)
+          : settled.status === "skipped"
+            ? ("other" as const)
+            : undefined;
+      const tipRunId = `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+      try {
+        await recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
+          success: ok,
+          runId: tipRunId,
+          taskId: cronOutcomeTaskId,
+          scope: cronOutcomeScope,
+          entrypoint: "cron",
+          latencyMs: Math.max(0, runEndedAt - runStartedAt),
+          ...(failureReason
+            ? {
+                failureReason,
+                failureDetail: settled.error ?? (aborted ? abortReason() : undefined),
+              }
+            : {}),
+          // Real delivery evidence only; never invent not_required.
+          ...(result.delivered === true
+            ? {
+                delivery: { status: "delivered" as const },
+                deliveryId: `cron:${params.job.id}:${cronFireId}`,
+              }
+            : result.delivered === false
+              ? { delivery: { status: "failed" as const } }
+              : {}),
+          ...(cronCapabilityOutcome ? { capabilityOutcome: cronCapabilityOutcome } : {}),
+        });
+      } catch (err) {
+        logWarn(`[cron:${params.job.id}] unified recordRunnerTurnOutcome failed: ${String(err)}`);
+      }
+    } else if (!cronOutcomeCloseoutDone && (!cronOutcomeTaskId || !cronOutcomeScope)) {
+      logWarn(
+        `[cron:${params.job.id}] skip unified recordRunnerTurnOutcome: missing cron task entry`,
+      );
+    }
     return settled;
   };
   try {
@@ -933,25 +984,9 @@ export async function runCronIsolatedAgentTurn(params: {
           `[cron:${params.job.id}] ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
         );
       }
-      // Persist structured claim when modality is incomplete / unwired / blocked —
-      // do not invent image/music success from a later text reply.
-      if (
-        consumedCapability.capabilityOutcome &&
-        consumedCapability.executionSurface.status !== "ok"
-      ) {
-        if (cronOutcomeTaskId && cronOutcomeScope) {
-          void recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
-            success: consumedCapability.executionSurface.targetModalityCompleted,
-            runId: cronRunId,
-            taskId: cronOutcomeTaskId,
-            scope: cronOutcomeScope,
-            entrypoint: "cron",
-            ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
-            capabilityOutcome: consumedCapability.capabilityOutcome,
-          });
-        } else {
-          logWarn(`[cron:${params.job.id}] skip recordRunnerTurnOutcome: missing cron task entry`);
-        }
+      // Defer TaskOutcome write to completeRun unified closeout (attach claim there).
+      if (consumedCapability.capabilityOutcome) {
+        cronCapabilityOutcome = consumedCapability.capabilityOutcome;
       }
       if (executionRouting.planFailure.kind === "no_executable_candidates") {
         throw new Error(executionRouting.planFailure.message);

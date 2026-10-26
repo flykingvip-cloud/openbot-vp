@@ -170,6 +170,58 @@ export function createFollowupRunner(params: {
       queued.followupItemId?.trim() || (queued.followupItemId = crypto.randomUUID());
     let followupOutcomeTaskId: string | undefined;
     let followupOutcomeScope: import("../../task-outcome/types.js").TrustedScope | undefined;
+    let followupCapabilityOutcome:
+      | import("../../task-outcome/runtime-from-runner.js").RunnerTurnOutcomeInput["capabilityOutcome"]
+      | undefined;
+    let followupRunSucceeded: boolean | undefined;
+    let followupFailureReason:
+      | import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason
+      | undefined;
+    let followupFailureDetail: string | undefined;
+    let followupOutcomeCloseoutDone = false;
+    const submitFollowupOutcomeCloseout = async (overrides?: {
+      success?: boolean;
+      failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
+      failureDetail?: string;
+      force?: boolean;
+    }) => {
+      if (followupOutcomeCloseoutDone) {
+        return;
+      }
+      if (!followupOutcomeTaskId || !followupOutcomeScope || !queued.run.agentId) {
+        return;
+      }
+      // Skip non-run early exits (ogui pause/ack, empty queue path, etc.) unless forced.
+      const shouldClose =
+        overrides?.force === true ||
+        overrides?.success !== undefined ||
+        followupRunSucceeded !== undefined ||
+        followupFailureReason !== undefined ||
+        followupCapabilityOutcome !== undefined;
+      if (!shouldClose) {
+        return;
+      }
+      followupOutcomeCloseoutDone = true;
+      const success = overrides?.success ?? followupRunSucceeded ?? false;
+      const failureReason = overrides?.failureReason ?? followupFailureReason;
+      const failureDetail = overrides?.failureDetail ?? followupFailureDetail;
+      // tip runId stays agent correlation; taskId is stable followupItemId child.
+      try {
+        await recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
+          success,
+          runId,
+          taskId: followupOutcomeTaskId,
+          scope: followupOutcomeScope,
+          entrypoint: "chat",
+          ...(failureReason && !success
+            ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
+            : {}),
+          ...(followupCapabilityOutcome ? { capabilityOutcome: followupCapabilityOutcome } : {}),
+        });
+      } catch (err) {
+        logVerbose(`followup unified recordRunnerTurnOutcome failed: ${String(err)}`);
+      }
+    };
     if (queued.run.agentId) {
       const subjectRaw = (
         queued.run.gatewayClientPlatformUserId ??
@@ -315,19 +367,14 @@ export function createFollowupRunner(params: {
           `followup ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
         );
         if (executionRouting.planFailure.kind === "no_executable_candidates") {
-          if (consumedCapability.capabilityOutcome && queued.run.agentId) {
-            if (followupOutcomeTaskId && followupOutcomeScope) {
-              void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
-                success: false,
-                runId,
-                taskId: followupOutcomeTaskId,
-                scope: followupOutcomeScope,
-                entrypoint: "chat",
-                ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
-                capabilityOutcome: consumedCapability.capabilityOutcome,
-              });
-            }
+          if (consumedCapability.capabilityOutcome) {
+            followupCapabilityOutcome = consumedCapability.capabilityOutcome;
           }
+          await submitFollowupOutcomeCloseout({
+            success: false,
+            failureReason: "prepare_failed",
+            failureDetail: executionRouting.planFailure.message,
+          });
           logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
           return;
         }
@@ -552,6 +599,9 @@ export function createFollowupRunner(params: {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         defaultRuntime.error?.(`Followup agent failed before reply: ${message}`);
+        followupRunSucceeded = false;
+        followupFailureReason = "run_failed";
+        followupFailureDetail = message;
         return;
       }
 
@@ -579,24 +629,11 @@ export function createFollowupRunner(params: {
         });
       }
 
-      if (
-        consumedCapability?.capabilityOutcome &&
-        queued.run.agentId &&
-        consumedCapability.executionSurface.status !== "ok"
-      ) {
-        if (followupOutcomeTaskId && followupOutcomeScope) {
-          void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
-            // Explanatory text may have returned; never invent image/music success.
-            success: consumedCapability.executionSurface.textReturnedAllowed,
-            runId,
-            taskId: followupOutcomeTaskId,
-            scope: followupOutcomeScope,
-            entrypoint: "chat",
-            ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
-            capabilityOutcome: consumedCapability.capabilityOutcome,
-          });
-        }
+      if (consumedCapability?.capabilityOutcome) {
+        followupCapabilityOutcome = consumedCapability.capabilityOutcome;
       }
+      // Ordinary run finished the embedded turn; unified closeout in finally records tip.
+      followupRunSucceeded = true;
       const payloadArray = runResult.payloads ?? [];
       if (payloadArray.length === 0) {
         return;
@@ -676,7 +713,16 @@ export function createFollowupRunner(params: {
       }
 
       await sendFollowupPayloads(finalPayloads, queued);
+    } catch (err) {
+      followupRunSucceeded = false;
+      followupFailureReason = "run_failed";
+      followupFailureDetail = err instanceof Error ? err.message : String(err);
+      // Do not rethrow: followup drain must continue; typing cleanup runs in finally.
+      defaultRuntime.error?.(`Followup turn failed: ${followupFailureDetail}`);
     } finally {
+      // askOutcome W1: unified closeout for ordinary success / preflight fail / exception.
+      // Missing evidence → leave acceptance/delivery pending (no invent not_required).
+      await submitFollowupOutcomeCloseout();
       if (oguiResume && !oguiResumeSettled) {
         await releaseOguiDecisionResume({
           storePath: oguiResume.storePath,

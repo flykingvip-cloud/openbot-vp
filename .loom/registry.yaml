@@ -9791,8 +9791,11 @@ landingStreams:
       - src/auto-reply/reply/queue/enqueue.ts
       - src/auto-reply/reply/queue/types.ts
       - src/cron/isolated-agent/run.ts
+      - src/cron/isolated-agent/run.task-outcome-closeout.test.ts
+      - src/cron/isolated-agent/run.test-harness.ts
       - src/cron/service/state.ts
       - src/cron/service/timer.ts
+      - src/task-outcome/followup-closeout.test.ts
       - src/cron/types.ts
       - src/gateway/protocol/schema/cron.ts
       - src/gateway/server-cron.ts
