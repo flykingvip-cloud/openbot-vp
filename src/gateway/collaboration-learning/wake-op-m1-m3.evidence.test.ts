@@ -657,6 +657,206 @@ describe("T36 M3 stop/revoke × dispatch races", () => {
   });
 });
 
+describe("T38 M3 fail-open + pre-eligibility barrier", () => {
+  test("M3-FO-01: eligibility committed, task read fails before dispatch → calls=0; diagnostic reason", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-fo-01";
+    const { authority } = await seed({ cfg, taskId, itemId: "fo1" });
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testForcePostEligibilityTaskReadError: () =>
+        new Error("simulated task control read failure"),
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "fo1"),
+    });
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("task_control_unreadable");
+    const rec = await readWakeOpRecord({ authority, opKey: opKeyFor(taskId, "fo1") });
+    expect(rec?.status).toBe("unknown");
+    expect(rec?.detail).toContain("task_control_unreadable");
+  });
+
+  test("M3-FO-02: auth source unreadable before dispatch → no prior fingerprint reuse; reason; no side effects", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-fo-02";
+    const { authority } = await seed({ cfg, taskId, itemId: "fo2" });
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testForcePostEligibilityAuthSourceReadError: () =>
+        new Error("simulated operating-state read failure"),
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "fo2"),
+    });
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("auth_source_unreadable");
+    const rec = await readWakeOpRecord({ authority, opKey: opKeyFor(taskId, "fo2") });
+    expect(rec?.status).toBe("failed");
+    expect(rec?.detail).toContain("auth_source_unreadable");
+    // No successful dispatch side effect / no completed receipt.
+    expect(rec?.status).not.toBe("completed");
+    expect(rec?.roundId).toBeFalsy();
+  });
+
+  test("M3-FO-03: missing task after eligibility ≠ default not-stopped; calls=0; distinct reason", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-fo-03";
+    const { authority, objectStorage, groupId } = await seed({ cfg, taskId, itemId: "fo3" });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterEligibilityBarrier: () => barrier,
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "fo3"),
+    });
+    const opKey = opKeyFor(taskId, "fo3");
+    for (let i = 0; i < 200; i += 1) {
+      const rec = await readWakeOpRecord({ authority, opKey });
+      if (rec?.dispatchEligibility) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect((await readWakeOpRecord({ authority, opKey }))?.dispatchEligibility).toBeTruthy();
+    // Delete task so post-eligibility read returns null (missing ≠ not-stopped).
+    await objectStorage.deleteObject(groupId, "task", taskId);
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("task_missing");
+    expect((await readWakeOpRecord({ authority, opKey }))?.status).toBe("unknown");
+  });
+
+  test("M3-4: after control read before eligibility commit — stop → eligibility must not win; calls=0", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-4";
+    const { authority } = await seed({ cfg, taskId, itemId: "i4" });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered = false;
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterControlReadBeforeEligibilityBarrier: async () => {
+        entered = true;
+        await barrier;
+      },
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "no" };
+      },
+      request: wakeReq(taskId, "i4"),
+    });
+    const opKey = opKeyFor(taskId, "i4");
+    for (let i = 0; i < 200; i += 1) {
+      if (entered) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(entered).toBe(true);
+    // Stop after control read, before eligibility commit.
+    const stopped = await requestCollaborationTaskStop({
+      groupId: tenant.groupId,
+      taskId,
+      actor: tenant.owner,
+      reason: "m3-4",
+      externalEffect: "none",
+      cfg,
+    });
+    expect(stopped.stopControl.status).toBe("accepted");
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("task_stopped");
+    const rec = await readWakeOpRecord({ authority, opKey });
+    expect(rec?.status).toBe("failed");
+    // Eligibility must not have won (no committed eligibility that then dispatched).
+    expect(rec?.dispatchEligibility).toBeFalsy();
+  });
+
+  test("M3-4b: after control read before eligibility — revoke → no dispatch; eligibility not won", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-4b";
+    const { authority, fileStore, groupId } = await seed({ cfg, taskId, itemId: "i4b" });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered = false;
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterControlReadBeforeEligibilityBarrier: async () => {
+        entered = true;
+        await barrier;
+      },
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "no" };
+      },
+      request: wakeReq(taskId, "i4b"),
+    });
+    const opKey = opKeyFor(taskId, "i4b");
+    for (let i = 0; i < 200; i += 1) {
+      if (entered) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(entered).toBe(true);
+    // Strip mapped membership (status:"revoked" alone is still mapped by id).
+    const revoked = buildState();
+    revoked.memberRoleMap = (revoked.memberRoleMap ?? []).filter(
+      (row) => row.memberId !== tenant.bot0,
+    );
+    revoked.governance = {
+      ...revoked.governance,
+      coordinatorBotId: tenant.coordinator,
+      ownerUserId: tenant.owner,
+    };
+    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("auth_revoked");
+    const rec = await readWakeOpRecord({ authority, opKey });
+    expect(rec?.status).toBe("failed");
+    expect(rec?.dispatchEligibility).toBeFalsy();
+  });
+});
+
 describe("T37 M2 attempt binding (fail-first)", () => {
   test("M2-ATTEMPT-01: attempt A none cannot release attempt B; only B-bound verification unlocks", async () => {
     const { cfg } = await useIsolationRoot();
