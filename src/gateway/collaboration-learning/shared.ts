@@ -890,10 +890,16 @@ async function persistGroupOperatingStateUnlocked(params: {
 }
 
 /**
- * Resolve the group-root used for the OS auth lock so it matches the physical
- * OS file location (T53). Prefer explicit baseDir / groupRootDir, then the
- * fileStore's primary root, then cfg-derived stores — never a bare default
- * that ignores the caller's fileStore/cfg.
+ * Resolve the group-root used for the OS auth lock.
+ *
+ * Priority when a single coherent root is supplied: baseDir → groupRootDir →
+ * fileStore.primaryGroupRootDir → cfg-derived stores.
+ *
+ * Boundary (T54): `path.resolve` normalizes `.` / `..` / separators only — it does
+ * **not** collapse symlink / bind-mount physical aliases. When more than one
+ * explicit root source is provided and the resolved strings disagree, refuse
+ * rather than silently locking a different tree than the OS file. Do not read
+ * this as "any same-inode OS shares one lock".
  */
 export function resolveOperatingStateAuthLockRoot(params: {
   baseDir?: string;
@@ -901,17 +907,28 @@ export function resolveOperatingStateAuthLockRoot(params: {
   fileStore?: ReturnType<typeof createGroupFileStore>;
   cfg?: ReturnType<typeof loadConfig>;
 }): string {
+  const sources: Array<{ label: string; root: string }> = [];
   if (typeof params.baseDir === "string" && params.baseDir.trim()) {
-    return path.resolve(params.baseDir);
+    sources.push({ label: "baseDir", root: path.resolve(params.baseDir) });
   }
   if (typeof params.groupRootDir === "string" && params.groupRootDir.trim()) {
-    return path.resolve(params.groupRootDir);
+    sources.push({ label: "groupRootDir", root: path.resolve(params.groupRootDir) });
   }
   const fromStore = params.fileStore?.primaryGroupRootDir;
   if (typeof fromStore === "string" && fromStore.trim()) {
-    return path.resolve(fromStore);
+    sources.push({ label: "fileStore.primaryGroupRootDir", root: path.resolve(fromStore) });
   }
-  return createWorkspaceCollaborationStores(params.cfg).groupRootDir;
+  if (sources.length === 0) {
+    return createWorkspaceCollaborationStores(params.cfg).groupRootDir;
+  }
+  const unique = [...new Set(sources.map((entry) => entry.root))];
+  if (unique.length > 1) {
+    const detail = sources.map((entry) => `${entry.label}=${entry.root}`).join("; ");
+    throw new Error(
+      `operating-state auth lock root conflict (path.resolve strings differ; symlink aliases are not unified): ${detail}`,
+    );
+  }
+  return unique[0];
 }
 
 /** Full auth-lock directory for a group OS writer (same physical OS ⇒ same lock). */
@@ -948,7 +965,7 @@ export async function writeGroupOperatingState(params: {
   alreadyHoldingAuthLock?: boolean;
   /** Test-only: after live re-read under lock, before merge/write. */
   _testAfterLiveReadBarrier?: () => Promise<void>;
-}): Promise<void> {
+}): Promise<GatewayCollaborationGroupOperatingState & { authEpoch: number }> {
   const writeKind = params.writeKind ?? "business";
   const run = async () => {
     const live = await readGroupOperatingState({
@@ -970,10 +987,10 @@ export async function writeGroupOperatingState(params: {
       state: merged,
       baseDir: params.baseDir,
     });
+    return merged;
   };
   if (params.alreadyHoldingAuthLock) {
-    await run();
-    return;
+    return await run();
   }
   const groupRootDir = resolveOperatingStateAuthLockRoot({
     baseDir: params.baseDir,
@@ -981,11 +998,96 @@ export async function writeGroupOperatingState(params: {
     fileStore: params.fileStore,
     cfg: params.cfg,
   });
-  await withGroupAuthLock({
+  return await withGroupAuthLock({
     groupId: params.groupId,
     groupRootDir,
     cfg: params.cfg,
     fn: run,
+  });
+}
+
+/**
+ * T54: persist a sync-built OS draft under the unified auth lock.
+ * - Business fields always come from `desired`.
+ * - Authorization surface is taken from trusted profile/members projection in
+ *   `desired`. When it differs from live, write as auth and bump authEpoch.
+ * - Returns the **actually persisted** state (never the pre-merge draft).
+ */
+export async function commitSyncedGroupOperatingState(params: {
+  fileStore: ReturnType<typeof createGroupFileStore>;
+  groupId: string;
+  desired: GatewayCollaborationGroupOperatingState & { authEpoch?: number };
+  baseDir?: string;
+  groupRootDir?: string;
+  cfg?: ReturnType<typeof loadConfig>;
+}): Promise<GatewayCollaborationGroupOperatingState & { authEpoch: number }> {
+  const groupRootDir = resolveOperatingStateAuthLockRoot({
+    baseDir: params.baseDir,
+    groupRootDir: params.groupRootDir,
+    fileStore: params.fileStore,
+    cfg: params.cfg,
+  });
+  return withGroupAuthLock({
+    groupId: params.groupId,
+    groupRootDir,
+    cfg: params.cfg,
+    fn: async () => {
+      const live = await readGroupOperatingState({
+        fileStore: params.fileStore,
+        groupId: params.groupId,
+        baseDir: params.baseDir,
+      });
+      const desiredSurface = readOperatingStateAuthSurface(params.desired);
+      const liveSurface = readOperatingStateAuthSurface(live);
+      const authContentChanged =
+        !live || !operatingStateAuthContentEqual(desiredSurface, liveSurface);
+      if (!live) {
+        return await writeGroupOperatingState({
+          fileStore: params.fileStore,
+          groupId: params.groupId,
+          state: params.desired,
+          baseDir: params.baseDir,
+          groupRootDir,
+          cfg: params.cfg,
+          writeKind: "business",
+          alreadyHoldingAuthLock: true,
+        });
+      }
+      if (authContentChanged) {
+        const nextEpoch = readOperatingStateAuthEpoch(live) + 1;
+        const authIncoming: GatewayCollaborationGroupOperatingState & { authEpoch: number } = {
+          ...params.desired,
+          authEpoch: nextEpoch,
+          memberRoleMap: params.desired.memberRoleMap,
+          governance: {
+            ...params.desired.governance,
+            ownerUserId: params.desired.governance?.ownerUserId ?? null,
+            adminUserIds: [...(params.desired.governance?.adminUserIds ?? [])],
+            coordinatorBotId: params.desired.governance?.coordinatorBotId ?? null,
+          },
+        };
+        return await writeGroupOperatingState({
+          fileStore: params.fileStore,
+          groupId: params.groupId,
+          state: authIncoming,
+          baseDir: params.baseDir,
+          groupRootDir,
+          cfg: params.cfg,
+          writeKind: "auth",
+          alreadyHoldingAuthLock: true,
+        });
+      }
+      return await writeGroupOperatingState({
+        fileStore: params.fileStore,
+        groupId: params.groupId,
+        state: params.desired,
+        baseDir: params.baseDir,
+        groupRootDir,
+        cfg: params.cfg,
+        writeKind: "business",
+        alreadyHoldingAuthLock: true,
+      });
+    },
   });
 }
 
@@ -1057,7 +1159,13 @@ export async function syncGroupOperatingState(params: {
     bootstrapMemory?.updatedAtMs ?? 0,
   );
   const adminUserIds = members
-    .filter((member) => member.memberKind === "human" && member.governanceRole === "admin")
+    .filter(
+      (member) =>
+        member.memberKind === "human" &&
+        member.governanceRole === "admin" &&
+        member.status !== "removed" &&
+        member.status !== "revoked",
+    )
     .map((member) => normalizeValue(member.userId))
     .filter(Boolean) as string[];
   const state = (await import("./policy-revision-carry.js")).carryPolicyRevision(existingState, {
@@ -1095,18 +1203,21 @@ export async function syncGroupOperatingState(params: {
       entersWaitingForHumanAfterVisibleTurnsExhausted: true,
       ...existingState?.collaborationPolicy,
     },
-    memberRoleMap: members.map((member) => ({
-      memberId: member.memberId,
-      memberKind: member.memberKind,
-      label:
-        normalizeValue(member.name) ??
-        normalizeValue(member.userId) ??
-        normalizeValue(member.agentId) ??
-        null,
-      governanceRole: member.governanceRole,
-      collaborationRole: member.collaborationRole ?? null,
-      status: member.status,
-    })),
+    // Auth surface: omit removed/revoked so leave/revoke cannot linger as mapped.
+    memberRoleMap: members
+      .filter((member) => member.status !== "removed" && member.status !== "revoked")
+      .map((member) => ({
+        memberId: member.memberId,
+        memberKind: member.memberKind,
+        label:
+          normalizeValue(member.name) ??
+          normalizeValue(member.userId) ??
+          normalizeValue(member.agentId) ??
+          null,
+        governanceRole: member.governanceRole,
+        collaborationRole: member.collaborationRole ?? null,
+        status: member.status,
+      })),
     activeContext: {
       currentOperatingPhase: phase,
       currentMission: activeMission,
@@ -1148,17 +1259,18 @@ export async function syncGroupOperatingState(params: {
     },
     updatedAtMs: Date.now(),
   });
-  await writeGroupOperatingState({
+  // T54: business vs auth split under unified lock; return persisted result (not draft).
+  const persisted = await commitSyncedGroupOperatingState({
     fileStore: params.fileStore,
     groupId: params.groupId,
-    state,
+    desired: state,
   });
   const { syncGroupCharter } = await import("./group-charter.js");
   const { charter, changed: charterChangedFlag } = await syncGroupCharter({
     fileStore: params.fileStore,
     groupStorage: params.groupStorage,
     groupId: params.groupId,
-    operatingState: state,
+    operatingState: persisted,
   });
   const previousPhase = existingState?.activeContext.currentOperatingPhase;
   if (charterChangedFlag || previousPhase !== phase) {
@@ -1188,7 +1300,7 @@ export async function syncGroupOperatingState(params: {
       });
     }
   }
-  return state;
+  return persisted;
 }
 
 export function buildMembersFromEmbeddedProfile(

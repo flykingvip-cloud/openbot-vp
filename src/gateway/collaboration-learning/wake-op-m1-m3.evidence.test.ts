@@ -7,6 +7,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
+import type { CollaborationMember } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   clearConfigCache,
@@ -74,12 +75,15 @@ import {
   proposeCollaborationTaskHandoffContract,
 } from "./handoff-contract-entry.js";
 import {
+  commitSyncedGroupOperatingState,
   createWorkspaceCollaborationStores,
   groupAuthLockDir,
   readGroupOperatingState,
   operatingStateAuthContentEqual,
   readOperatingStateAuthSurface,
   resolveGroupOperatingStateAuthLockDir,
+  resolveOperatingStateAuthLockRoot,
+  syncGroupOperatingState,
   withGroupAuthLock,
   writeGroupOperatingState,
 } from "./shared.js";
@@ -4541,5 +4545,350 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
     expect(writerEntered).toBe(true);
     const finalOs = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
     expect(finalOs?.activeContext?.summary).toBe("lock-path-serialized");
+  });
+
+  test("M3-AUTH-3f: conflicting explicit groupRootDir vs fileStore lock root is refused", async () => {
+    const { cfg } = await useIsolationRoot();
+    const stores = createWorkspaceCollaborationStores(cfg);
+    const groupId = tenant.groupId;
+    const otherRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-t54-other-root-"));
+    tempDirs.push(otherRoot);
+
+    expect(() =>
+      resolveOperatingStateAuthLockRoot({
+        groupRootDir: otherRoot,
+        fileStore: stores.fileStore,
+      }),
+    ).toThrow(/auth lock root conflict/);
+
+    await expect(
+      writeGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupId,
+        groupRootDir: otherRoot,
+        cfg,
+        state: buildState(),
+      }),
+    ).rejects.toThrow(/auth lock root conflict/);
+
+    // Boundary honesty: path.resolve does not unify symlink aliases. Passing the
+    // symlink path and the real path as two explicit sources is a conflict when
+    // their resolved strings differ — we do not claim same-inode ⇒ same lock.
+    const linkRoot = path.join(otherRoot, "link-to-primary");
+    try {
+      await fs.symlink(stores.groupRootDir, linkRoot);
+      const resolvedLink = path.resolve(linkRoot);
+      const resolvedPrimary = path.resolve(stores.groupRootDir);
+      if (resolvedLink !== resolvedPrimary) {
+        expect(() =>
+          resolveOperatingStateAuthLockRoot({
+            groupRootDir: linkRoot,
+            fileStore: stores.fileStore,
+          }),
+        ).toThrow(/auth lock root conflict/);
+      }
+    } catch (err) {
+      // Some CI hosts disallow symlink; still covered by the string-conflict case above.
+      if ((err as NodeJS.ErrnoException).code !== "EPERM") {
+        throw err;
+      }
+    }
+  });
+});
+
+describe("T54 M3 AUTH sync production entry (syncGroupOperatingState)", () => {
+  function rosterMembers(overrides?: {
+    omitBot0?: boolean;
+    bot0Removed?: boolean;
+    ownerUserId?: string;
+    coordinatorBotId?: string;
+    adminUserId?: string;
+  }): CollaborationMember[] {
+    const owner = overrides?.ownerUserId ?? tenant.owner;
+    const admin = overrides?.adminUserId ?? tenant.admin;
+    const coordinator = overrides?.coordinatorBotId ?? tenant.coordinator;
+    const rows: CollaborationMember[] = [
+      {
+        memberId: owner,
+        memberKind: "human",
+        userId: owner,
+        governanceRole: "owner",
+        status: "active",
+        updatedAtMs: 1,
+      },
+      {
+        memberId: admin,
+        memberKind: "human",
+        userId: admin,
+        governanceRole: "admin",
+        status: "active",
+        updatedAtMs: 1,
+      },
+      {
+        memberId: tenant.approver,
+        memberKind: "human",
+        userId: tenant.approver,
+        governanceRole: "member",
+        status: "active",
+        updatedAtMs: 1,
+      },
+      {
+        memberId: coordinator,
+        memberKind: "bot",
+        agentId: coordinator,
+        governanceRole: "member",
+        status: "active",
+        updatedAtMs: 1,
+      },
+    ];
+    if (!overrides?.omitBot0) {
+      rows.push({
+        memberId: tenant.bot0,
+        memberKind: "bot",
+        agentId: tenant.bot0,
+        governanceRole: "member",
+        status: overrides?.bot0Removed ? "removed" : "active",
+        updatedAtMs: 1,
+      });
+    }
+    return rows;
+  }
+
+  async function seedSyncSources(params: {
+    cfg: OpenBotConfig;
+    taskId: string;
+    members?: CollaborationMember[];
+    ownerUserId?: string;
+    coordinatorBotId?: string;
+  }) {
+    const stores = createWorkspaceCollaborationStores(params.cfg);
+    const groupId = tenant.groupId;
+    const ownerUserId = params.ownerUserId ?? tenant.owner;
+    const coordinatorBotId = params.coordinatorBotId ?? tenant.coordinator;
+    const members = params.members ?? rosterMembers();
+    await stores.groupStorage.writeProfile({
+      groupId,
+      groupCode: groupId,
+      displayName: "t54-sync-auth",
+      ownerUserId,
+      coordinatorBotId,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    });
+    await stores.groupStorage.writeMembers(groupId, members);
+    const seeded = await seed({ cfg: params.cfg, taskId: params.taskId, itemId: "t54" });
+    return { ...seeded, stores, ownerUserId, coordinatorBotId };
+  }
+
+  test("M3-AUTH-SYNC-1: remove member then sync — OS + auth check drop privilege", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-sync-1";
+    const { fileStore, groupId, stores } = await seedSyncSources({ cfg, taskId });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const auth0 = readOperatingStateAuthEpoch(os0);
+    expect(isMappedDeliveryIdentity(os0, tenant.bot0)).toBe(true);
+
+    // Production leave/update shape: member marked removed (or omitted). Use removed.
+    await stores.groupStorage.writeMembers(groupId, rosterMembers({ bot0Removed: true }));
+
+    const returned = await syncGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupStorage: stores.groupStorage,
+      metadataStorage: stores.metadataStorage,
+      memoryStorage: stores.memoryStorage,
+      learningStorage: stores.learningStorage,
+      objectStorage: stores.objectStorage,
+      groupId,
+    });
+
+    expect((returned.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect(isMappedDeliveryIdentity(returned, tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(returned)).toBe(auth0 + 1);
+
+    const persisted = await readGroupOperatingState({ fileStore, groupId });
+    expect((persisted?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect(isMappedDeliveryIdentity(persisted, tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(persisted)).toBe(auth0 + 1);
+
+    const recheck = await recheckCurrentDispatchAuthorization({
+      groupId,
+      taskId,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(recheck.ok).toBe(false);
+    expect(recheck.reason).toBe("auth_revoked");
+  });
+
+  test("M3-AUTH-SYNC-2: owner/coordinator change — return, persist, authEpoch agree", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-sync-2";
+    const newOwner = `${tenant.tenantId}/emp-owner-sync2`;
+    const newCoord = `${tenant.tenantId}/bot-coord-sync2`;
+    const { fileStore, groupId, stores } = await seedSyncSources({ cfg, taskId });
+    const auth0 = readOperatingStateAuthEpoch(
+      await readGroupOperatingState({ fileStore, groupId }),
+    );
+
+    await stores.groupStorage.writeProfile({
+      groupId,
+      groupCode: groupId,
+      displayName: "t54-sync-auth",
+      ownerUserId: newOwner,
+      coordinatorBotId: newCoord,
+      createdAtMs: 1,
+      updatedAtMs: Date.now(),
+    });
+    await stores.groupStorage.writeMembers(
+      groupId,
+      rosterMembers({ ownerUserId: newOwner, coordinatorBotId: newCoord }),
+    );
+
+    const returned = await syncGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupStorage: stores.groupStorage,
+      metadataStorage: stores.metadataStorage,
+      memoryStorage: stores.memoryStorage,
+      learningStorage: stores.learningStorage,
+      objectStorage: stores.objectStorage,
+      groupId,
+    });
+
+    expect(returned.governance.ownerUserId).toBe(newOwner);
+    expect(returned.governance.coordinatorBotId).toBe(newCoord);
+    expect(readOperatingStateAuthEpoch(returned)).toBe(auth0 + 1);
+
+    const persisted = await readGroupOperatingState({ fileStore, groupId });
+    expect(persisted?.governance?.ownerUserId).toBe(newOwner);
+    expect(persisted?.governance?.coordinatorBotId).toBe(newCoord);
+    expect(readOperatingStateAuthEpoch(persisted)).toBe(auth0 + 1);
+    expect(
+      operatingStateAuthContentEqual(
+        readOperatingStateAuthSurface(returned),
+        readOperatingStateAuthSurface(persisted),
+      ),
+    ).toBe(true);
+    expect(isMappedDeliveryIdentity(persisted, newCoord)).toBe(true);
+  });
+
+  test("M3-AUTH-SYNC-3: legal auth sync vs concurrent stale business write", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-sync-3";
+    const { fileStore, groupId, stores } = await seedSyncSources({ cfg, taskId });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const auth0 = readOperatingStateAuthEpoch(os0);
+    const staleBusiness = {
+      ...(os0 as NonNullable<typeof os0>),
+      activeContext: {
+        ...(os0 as NonNullable<typeof os0>).activeContext,
+        summary: "stale-biz-during-sync-auth",
+      },
+      updatedAtMs: Date.now(),
+    };
+
+    await stores.groupStorage.writeMembers(groupId, rosterMembers({ omitBot0: true }));
+
+    // Concurrent: production sync auth update + stale business snapshot that still lists bot0.
+    const [returned] = await Promise.all([
+      syncGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupStorage: stores.groupStorage,
+        metadataStorage: stores.metadataStorage,
+        memoryStorage: stores.memoryStorage,
+        learningStorage: stores.learningStorage,
+        objectStorage: stores.objectStorage,
+        groupId,
+      }),
+      writeGroupOperatingState({
+        fileStore,
+        groupId,
+        cfg,
+        state: staleBusiness as typeof staleBusiness & { authEpoch?: number },
+      }),
+    ]);
+
+    let finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect((returned.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect((finalOs?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(finalOs)).toBeGreaterThan(auth0);
+
+    // Sequenced follow-up: after auth sync landed, a late stale business write must keep
+    // business fields while refusing to roll back the new auth surface.
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      cfg,
+      state: {
+        ...staleBusiness,
+        activeContext: {
+          ...staleBusiness.activeContext,
+          summary: "stale-biz-after-sync-auth",
+        },
+        updatedAtMs: Date.now(),
+      } as typeof staleBusiness & { authEpoch?: number },
+    });
+    finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(finalOs?.activeContext?.summary).toBe("stale-biz-after-sync-auth");
+    expect((finalOs?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    expect(isMappedDeliveryIdentity(finalOs, tenant.bot0)).toBe(false);
+    expect(readOperatingStateAuthEpoch(finalOs)).toBeGreaterThan(auth0);
+  });
+
+  test("M3-AUTH-SYNC-4: sync return value matches persisted OS", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-sync-4";
+    const { fileStore, groupId, stores } = await seedSyncSources({ cfg, taskId });
+
+    await stores.groupStorage.writeMembers(groupId, rosterMembers({ omitBot0: true }));
+    const returned = await syncGroupOperatingState({
+      fileStore: stores.fileStore,
+      groupStorage: stores.groupStorage,
+      metadataStorage: stores.metadataStorage,
+      memoryStorage: stores.memoryStorage,
+      learningStorage: stores.learningStorage,
+      objectStorage: stores.objectStorage,
+      groupId,
+    });
+    const persisted = await readGroupOperatingState({ fileStore, groupId });
+    expect(persisted).not.toBeNull();
+    expect(readOperatingStateAuthEpoch(returned)).toBe(readOperatingStateAuthEpoch(persisted));
+    expect(
+      operatingStateAuthContentEqual(
+        readOperatingStateAuthSurface(returned),
+        readOperatingStateAuthSurface(persisted),
+      ),
+    ).toBe(true);
+    expect(returned.activeContext?.currentOperatingPhase).toBe(
+      persisted?.activeContext?.currentOperatingPhase,
+    );
+    expect(returned.governance.ownerUserId).toBe(persisted?.governance?.ownerUserId);
+    expect((returned.memberRoleMap ?? []).map((r) => r.memberId).toSorted()).toEqual(
+      (persisted?.memberRoleMap ?? []).map((r) => r.memberId).toSorted(),
+    );
+
+    // commitSynced helper itself returns the persisted merge result.
+    const again = await commitSyncedGroupOperatingState({
+      fileStore,
+      groupId,
+      desired: {
+        ...(persisted as NonNullable<typeof persisted>),
+        activeContext: {
+          ...(persisted as NonNullable<typeof persisted>).activeContext,
+          summary: "sync4-business-only",
+        },
+        updatedAtMs: Date.now(),
+      },
+    });
+    const after = await readGroupOperatingState({ fileStore, groupId });
+    expect(again.activeContext?.summary).toBe("sync4-business-only");
+    expect(after?.activeContext?.summary).toBe("sync4-business-only");
+    expect(readOperatingStateAuthEpoch(again)).toBe(readOperatingStateAuthEpoch(after));
+    expect(
+      operatingStateAuthContentEqual(
+        readOperatingStateAuthSurface(again),
+        readOperatingStateAuthSurface(after),
+      ),
+    ).toBe(true);
   });
 });
