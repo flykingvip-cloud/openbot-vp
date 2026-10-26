@@ -9690,7 +9690,6 @@ tasks:
       - TaskOutcome unified durable replayable judgement
     paths:
       - src/task-outcome/**
-      - src/auto-reply/reply/agent-runner-execution.ts
       - docs/design/task-outcome/**
       - docs/notes/askOutcome-p0-baseline.md
       - .loom/registry.yaml
@@ -9733,7 +9732,6 @@ landingStreams:
       - src/task-outcome/entrypoints/collab.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
-      - src/auto-reply/reply/agent-runner-execution.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-task-outcome-contract
@@ -22561,8 +22559,8 @@ sharedPaths:
     reason: Ingest ownership proof tests. Resolves src/** overlap.
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
-    landerTask: askOutcome-p0-task-outcome-contract
-    reason: askOutcome P0 wire recordGrowthTaskOutcome → recordRunnerTurnOutcome (TaskOutcome hot path). Temporary lander claim; review with evolution-loop-fix after acceptance close.
+    landerTask: openbot-evolution-loop-fix:cursor-grok
+    reason: Hot-file lander restored to evolution-loop-fix after askOutcome P0 wired recordGrowthTaskOutcome → recordRunnerTurnOutcome (call site owned here; TaskOutcome module stays askOutcome-p0).
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok

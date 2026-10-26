@@ -20,3 +20,5 @@ entrypoint adapter (chat|gateway_agent|cron|cli|collab)
 | operational-metrics-store 内 append | `operational-metrics-store.ts` | 热路径不再经此 append 任务成功；工具计数仍用 `recordToolOutcomes` |
 
 生产热路径：`agent-runner-execution.recordGrowthTaskOutcome` → `recordRunnerTurnOutcome` → `ChatTaskOutcomeAdapter` / `TaskOutcomeResultService` → 仅在 closed+eligible 时 `publishEvolutionFromTaskOutcome`。run 成功保持 `awaiting_acceptance`（incomplete），不发明任务成功。
+
+热文件 `agent-runner-execution.ts` 的 loom `sharedPaths` lander 仍归 `openbot-evolution-loop-fix:cursor-grok`；本任务只拥有 `src/task-outcome/**`（含 `runtime-from-runner`）。
