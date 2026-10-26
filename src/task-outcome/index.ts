@@ -10,3 +10,4 @@ export { GatewayAgentTaskOutcomeAdapter } from "./entrypoints/gateway-agent.js";
 export { CronTaskOutcomeAdapter } from "./entrypoints/cron.js";
 export { CliTaskOutcomeAdapter } from "./entrypoints/cli.js";
 export { CollabTaskOutcomeAdapter } from "./entrypoints/collab.js";
+export { recordRunnerTurnOutcome, TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";

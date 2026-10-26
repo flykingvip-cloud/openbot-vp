@@ -9690,6 +9690,7 @@ tasks:
       - TaskOutcome unified durable replayable judgement
     paths:
       - src/task-outcome/**
+      - src/auto-reply/reply/agent-runner-execution.ts
       - docs/design/task-outcome/**
       - docs/notes/askOutcome-p0-baseline.md
       - .loom/registry.yaml
@@ -9730,6 +9731,9 @@ landingStreams:
       - src/task-outcome/entrypoints/cron.ts
       - src/task-outcome/entrypoints/cli.ts
       - src/task-outcome/entrypoints/collab.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-task-outcome-contract
@@ -22557,9 +22561,9 @@ sharedPaths:
     reason: Ingest ownership proof tests. Resolves src/** overlap.
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
-    landerTask: openbot-evolution-loop-fix:cursor-grok
-    reason: Observable evolution outcome write failure. Resolves hot-file overlap.
-    reviewAfter: 2026-10-11
+    landerTask: askOutcome-p0-task-outcome-contract
+    reason: askOutcome P0 wire recordGrowthTaskOutcome → recordRunnerTurnOutcome (TaskOutcome hot path). Temporary lander claim; review with evolution-loop-fix after acceptance close.
+    reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
     reason: Runner write-failure observability test.

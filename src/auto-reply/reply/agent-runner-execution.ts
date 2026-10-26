@@ -39,7 +39,6 @@ import { createConversationTurnToolObserver } from "../../conversation-task/ledg
 import { defaultShadowStoreRoot } from "../../conversation-task/runtime-bootstrap.js";
 import { resolveCronStorePath } from "../../cron/store.js";
 import { syncRobotGrowthFromOperationalMetrics } from "../../gateway/agent-growth/operational-growth.js";
-import { recordRunOutcome } from "../../gateway/agent-growth/operational-metrics-store.js";
 import {
   releaseEnterpriseAgentRun,
   tryAcquireEnterpriseAgentRun,
@@ -65,6 +64,7 @@ import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.js";
+import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import {
   isMarkdownCapableMessageChannel,
   resolveMessageChannel,
@@ -156,10 +156,9 @@ export async function runAgentTurnWithFallback(params: {
   const directlySentBlockKeys = new Set<string>();
 
   const runId = params.opts?.runId ?? crypto.randomUUID();
-  // Agent Growth OS（P2 12.x）：记录任务结果到运营指标累加器（fire-and-forget，绝不影响回复）。
-  // 心跳不算任务；turn 级成功/失败作为 operationalScore 的 v1 task 信号。
-  //
-  // 工具成功率（0.30 权重）在 turn 内内存累加、收尾时一次落盘，避免逐次工具调用写盘。
+  // askOutcome P0：turn 收尾走统一 TaskOutcome（fire-and-forget，绝不影响回复）。
+  // 心跳不算任务；run 成功不再直接记任务成功 / evolution success（挂起验收）。
+  // 工具成功率仍在 turn 内内存累加、收尾一次落盘。
   let growthToolTotal = 0;
   let growthToolSucceeded = 0;
   const growthStartedAt = Date.now();
@@ -183,7 +182,8 @@ export async function runAgentTurnWithFallback(params: {
     growthToolTotal = 0;
     growthToolSucceeded = 0;
     const tenantId = modelGate.tenantId?.trim();
-    void recordRunOutcome(params.followupRun.run.config, growthAgentId, {
+    // askOutcome P0: durable TaskOutcome first; do not invent task success from turn success.
+    void recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
       success,
       toolsTotal,
       toolsSucceeded,
@@ -195,13 +195,13 @@ export async function runAgentTurnWithFallback(params: {
         syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId),
       )
       .catch((error: unknown) => {
-        // Evolution sample write must stay observable. The user-facing task
-        // outcome is already decided and is not rewritten here.
+        // Evolution / TaskOutcome write must stay observable. The user-facing
+        // reply path is already decided and is not rewritten here.
         reportEvolutionOutcomeWriteFailure({
           runId,
           agentId: growthAgentId,
           tenantId: tenantId ?? null,
-          taskId: null,
+          taskId: `run:${runId}`,
           reason: error instanceof Error ? error.message : "evolution_outcome_write_failed",
         });
       });
