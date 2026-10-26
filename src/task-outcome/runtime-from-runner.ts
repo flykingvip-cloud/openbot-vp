@@ -20,6 +20,16 @@ export type RunnerTurnOutcomeInput = {
   /** Stable task id; defaults to `run:${runId}` for this turn. */
   taskId?: string;
   scope?: TrustedScope;
+  /**
+   * P1: capability-plan outcome claim from resolveExecutionRoutingFromCapabilityPlan.
+   * Chat replies must never be recorded as image/music (or other forbidden) modality success.
+   */
+  capabilityOutcome?: {
+    planFailureKind: string;
+    allowedModality: string;
+    forbiddenSuccessModalities: readonly string[];
+    detail?: string;
+  };
 };
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
@@ -137,6 +147,28 @@ export async function recordRunnerTurnOutcome(
   }
   // success: leave acceptance pending → awaiting_acceptance → incomplete (no evolution success)
 
-  const evolution = publishEvolutionFromTaskOutcome(cfg, agentId, res.record);
-  return { record: res.record, evolution };
+  // P1: propagate executor_unwired / modality claim onto durable reasonDetail so chat
+  // replies cannot later be mistaken for image/music generation success.
+  let record = res.record;
+  const claim = input.capabilityOutcome;
+  if (claim && claim.forbiddenSuccessModalities.length > 0) {
+    const detail = [
+      `capability_plan_failure=${claim.planFailureKind}`,
+      `allowed_modality=${claim.allowedModality}`,
+      `forbidden_success_modalities=${claim.forbiddenSuccessModalities.join(",")}`,
+      claim.detail,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const patched: TaskOutcomeRecord = {
+      ...record,
+      reasonDetail: [record.reasonDetail, detail].filter(Boolean).join(" | "),
+      updatedAt: new Date().toISOString(),
+    };
+    store.saveTask(patched);
+    record = patched;
+  }
+
+  const evolution = publishEvolutionFromTaskOutcome(cfg, agentId, record);
+  return { record, evolution };
 }

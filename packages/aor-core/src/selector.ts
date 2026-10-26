@@ -40,9 +40,30 @@ function sameRef(a: ModelRef, b: ModelRef): boolean {
   );
 }
 
-function qualityFor(model: ModelProfile, taskType: TaskTypeId): number {
-  const score = model.taskTypeScores[taskType];
-  return typeof score === "number" ? score : 0.5;
+/**
+ * Resolve quality for a task type with parent-id inheritance.
+ * e.g. coding.refactor → coding → 0.5 default.
+ * Exported so gateway/catalog adapters can unit-test discriminative ranking.
+ */
+export function qualityFor(model: ModelProfile, taskType: TaskTypeId): number {
+  const exact = model.taskTypeScores[taskType];
+  if (typeof exact === "number" && Number.isFinite(exact)) {
+    return exact;
+  }
+  // Walk dotted parents: coding.refactor → coding; design.image → design
+  let cursor = taskType;
+  while (true) {
+    const dot = cursor.lastIndexOf(".");
+    if (dot <= 0) {
+      break;
+    }
+    cursor = cursor.slice(0, dot);
+    const parentScore = model.taskTypeScores[cursor];
+    if (typeof parentScore === "number" && Number.isFinite(parentScore)) {
+      return parentScore;
+    }
+  }
+  return 0.5;
 }
 
 class NoCandidateError extends Error {}

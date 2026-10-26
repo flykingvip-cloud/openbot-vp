@@ -42,7 +42,13 @@ import { resolveManagedTenantEntitlementPolicy } from "./managed-tenant-enforce.
 import { getPlanVersionModelBinding } from "./plan-version-model-binding-store.js";
 import { resolveAgentRunEntitlementScope } from "./resolve-agent-run-scope.js";
 import { resolveEffectiveModelSet } from "./resolve-effective-model-set.js";
-import { buildTaskCapabilityPlan, type TaskCapabilityPlan } from "./task-capability-plan.js";
+import {
+  buildTaskCapabilityPlan,
+  classifyTaskCapability,
+  estimateTaskContextTokens,
+  type ContextEstimateParts,
+  type TaskCapabilityPlan,
+} from "./task-capability-plan.js";
 
 export type EmployeeEntitlementScopeOverride = {
   tenantId: string;
@@ -62,12 +68,19 @@ export type EmployeeModelGateInput = {
   /** 调用方已知的 enterpriseId（商业闸口传入时优先 managed 信号）。 */
   enterpriseIdHint?: string;
   /**
-   * Current user/task text for per-task capability planning (P0).
+   * Current user/task text for per-task capability planning (P0/P1).
    * Classification never expands entitlement; plan is built after auth.
+   * When classificationSource is task_text, the category drives AOR scoring
+   * instead of the package-static taskTypeId.
    */
   taskText?: string;
   /** Optional override for context filtering; defaults to a text-length estimate. */
   estimatedInputTokens?: number;
+  /**
+   * Full context parts for executable-capacity filtering (P1): history, system
+   * prompt, tools, attachments, and output reserve. Merged with taskText.
+   */
+  contextParts?: ContextEstimateParts;
   entitlementStorePath?: string;
   seatGrantStorePath?: string;
   planVersionBindingStorePath?: string;
@@ -418,6 +431,24 @@ export async function resolveEmployeeModelGate(
 
   const effectiveModelIdsForRun = allowlist !== undefined ? allowlist : effective.allowedModelIds;
 
+  // P1: classify current task before AOR so identified categories drive scoring.
+  // Package-static taskTypeId remains the fallback when classification is heuristic_default.
+  // Classification never expands the authorized set.
+  const taskClassification = classifyTaskCapability(input.taskText);
+  const packageTaskTypeId = binding?.aorExecution?.taskTypeId?.trim() || "default";
+  const taskTypeIdForAor =
+    taskClassification.classificationSource === "task_text"
+      ? taskClassification.categoryId
+      : packageTaskTypeId;
+
+  const contextEstimate =
+    input.estimatedInputTokens !== undefined && !input.contextParts
+      ? undefined
+      : estimateTaskContextTokens({
+          ...input.contextParts,
+          taskText: input.contextParts?.taskText ?? input.taskText,
+        });
+
   let preferredModelOrder: string[] | undefined;
   let aorFeedback: EmployeeModelGateResult["aorFeedback"];
   let aorRouting: EmployeeModelGateResult["aorRouting"];
@@ -425,7 +456,7 @@ export async function resolveEmployeeModelGate(
     const aorExecution =
       binding?.aorExecution || resolvedPolicy.selectorStrategy
         ? {
-            taskTypeId: binding?.aorExecution?.taskTypeId?.trim() || "default",
+            taskTypeId: taskTypeIdForAor,
             selectorStrategy: resolvedPolicy.selectorStrategy,
             evaluatorMode: binding?.aorExecution?.evaluatorMode?.trim() || "content",
           }
@@ -443,11 +474,23 @@ export async function resolveEmployeeModelGate(
           }),
         );
       }
+      const costProfile = contextEstimate
+        ? {
+            expectedInputTokens: Math.max(1, contextEstimate.estimatedInputTokens),
+            expectedOutputTokens: Math.max(1, contextEstimate.outputReserveTokens),
+          }
+        : input.estimatedInputTokens !== undefined
+          ? {
+              expectedInputTokens: Math.max(1, Math.floor(input.estimatedInputTokens)),
+              expectedOutputTokens: 1024,
+            }
+          : undefined;
       const selection = selectModelOrderWithinEffectiveSet({
         mode,
         effectiveModelIds: effectiveModelIdsForRun,
         aorExecution,
         catalog: profiles,
+        ...(costProfile ? { costProfile } : {}),
       });
       if (selection.strategy !== "native") {
         preferredModelOrder = selection.orderedModelIds;
@@ -493,11 +536,21 @@ export async function resolveEmployeeModelGate(
       authorizedModelIds: allowlist,
       preferredModelOrderFromAuth: preferredModelOrder ?? allowlist,
       modelContextWindows,
-      ...(input.estimatedInputTokens !== undefined
-        ? { estimatedInputTokens: input.estimatedInputTokens }
-        : {}),
+      ...(input.contextParts
+        ? {
+            contextParts: {
+              ...input.contextParts,
+              taskText: input.contextParts.taskText ?? input.taskText,
+            },
+          }
+        : input.estimatedInputTokens !== undefined
+          ? { estimatedInputTokens: input.estimatedInputTokens }
+          : contextEstimate
+            ? { contextEstimate }
+            : {}),
     });
     // Prefer the executable order for downstream consumers; authorized set stays on allowlist.
+    // Over-context models are dropped here and cannot re-enter via AOR preferred order.
     if (capabilityPlan.preferredModelOrder.length > 0) {
       preferredModelOrder = capabilityPlan.preferredModelOrder;
     } else if (capabilityPlan.failure.kind === "no_executable_candidates") {

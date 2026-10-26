@@ -9705,7 +9705,60 @@ tasks:
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
+  - id: p1-task-driven-aor-scoring
+    owner: grok-bot
+    intent:
+      - P1 task-driven AOR scoring
+    paths:
+      - packages/aor-core/src/parser.ts
+      - packages/aor-core/src/parser.test.ts
+      - packages/aor-core/src/selector.ts
+      - packages/aor-core/src/selector.test.ts
+      - packages/aor-core/src/task-types.ts
+      - packages/aor-core/src/types.ts
+      - src/agents/subagent-spawn.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - .loom/registry.yaml
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
 landingStreams:
+  - id: p1-task-driven-aor-scoring
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - packages/aor-core/src/parser.ts
+      - packages/aor-core/src/parser.test.ts
+      - packages/aor-core/src/selector.ts
+      - packages/aor-core/src/selector.test.ts
+      - packages/aor-core/src/task-types.ts
+      - packages/aor-core/src/types.ts
+      - src/agents/subagent-spawn.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+    canLandWith: []
+    metadata:
+      task: p1-task-driven-aor-scoring
+      owner: grok-bot
+      purpose: P1 current-task-driven AOR scoring, CJK/parent quality, full context
+        constraints, executor_unwired outcome claims
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
     paths:
@@ -21628,7 +21681,8 @@ landingStreams:
 sharedPaths:
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
-    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with pi-sdk-family-migration-v3.
+    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with
+      pi-sdk-family-migration-v3.
     reviewAfter: 2026-11-30
   - glob: src/gateway/collaboration-dispatch/claim-contract.ts
     landerTask: collab-p1-artifact-accept-loop:grok-bot
@@ -22560,7 +22614,9 @@ sharedPaths:
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
-    reason: Hot-file lander restored to evolution-loop-fix after askOutcome P0 wired recordGrowthTaskOutcome → recordRunnerTurnOutcome (call site owned here; TaskOutcome module stays askOutcome-p0).
+    reason: Hot-file lander restored to evolution-loop-fix after askOutcome P0 wired
+      recordGrowthTaskOutcome → recordRunnerTurnOutcome (call site owned here;
+      TaskOutcome module stays askOutcome-p0).
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok

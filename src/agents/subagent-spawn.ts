@@ -635,6 +635,20 @@ export async function spawnSubagentDirect(
       preferredModelOrder: childGovernanceSnapshot.effectiveModelSet.preferredModelOrder,
       capabilityPlan: childPlan,
     });
+    // outcomeClaim / planFailure stay on childRouting for executors; never expand allowlist.
+    void childRouting.outcomeClaim;
+    if (childRouting.planFailure.kind === "no_executable_candidates") {
+      discardStagedSpawnExecutionIdentity(childIdem);
+      discardStagedSpawnGovernanceSnapshot(childIdem);
+      await cleanupProvisionalSession(childSessionKey, {
+        emitLifecycleHooks: threadBindingReady,
+        deleteTranscript: true,
+      });
+      return {
+        status: "error" as const,
+        error: childRouting.planFailure.message,
+      };
+    }
     childGovernanceSnapshot = {
       ...childGovernanceSnapshot,
       effectiveModelSet: {

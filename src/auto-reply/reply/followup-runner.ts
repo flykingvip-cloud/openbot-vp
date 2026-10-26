@@ -248,6 +248,13 @@ export function createFollowupRunner(params: {
           preferredModelOrder: modelGate.preferredModelOrder,
           capabilityPlan: modelGate.capabilityPlan,
         });
+        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+          logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
+          return;
+        }
+        // outcomeClaim travels on executionRouting; chat modality success is forbidden
+        // for unwired executors (image/music) — followup does not invent modality success.
+        void executionRouting.outcomeClaim;
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: followupSlotHeld ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,

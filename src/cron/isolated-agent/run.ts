@@ -875,6 +875,10 @@ export async function runCronIsolatedAgentTurn(params: {
         preferredModelOrder: modelGate.preferredModelOrder,
         capabilityPlan: modelGate.capabilityPlan,
       });
+      if (executionRouting.planFailure.kind === "no_executable_candidates") {
+        throw new Error(executionRouting.planFailure.message);
+      }
+      void executionRouting.outcomeClaim;
       const embeddedModelGovernance = resolveEmbeddedModelGovernance({
         gateStatus: cronSlotHeld ? "acquired" : "skipped",
         allowlist: executionRouting.allowlist,

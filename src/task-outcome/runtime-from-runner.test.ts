@@ -63,4 +63,27 @@ describe("recordRunnerTurnOutcome", () => {
     expect(rows[0]?.taskId).toBe("run:run-fail");
     expect(rows[0]?.tenantId).toBe("t1");
   });
+
+  it("P1: executor_unwired claim reaches durable reasonDetail; chat cannot claim image success", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-unwired",
+      capabilityOutcome: {
+        planFailureKind: "executor_unwired",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: ["image_generation", "audio_music_generation"],
+        detail: "Executor image_generation is not wired",
+      },
+    });
+    expect(out.record.reasonDetail).toContain("executor_unwired");
+    expect(out.record.reasonDetail).toContain("image_generation");
+    expect(out.record.reasonDetail).toContain("allowed_modality=chat_model");
+    // Still not inventing task success — awaiting acceptance.
+    expect(out.record.taskJudgement).toBe("incomplete");
+    expect(out.record.reasonDetail).not.toMatch(/image_generation.*success/i);
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const persisted = store.loadTask("run:run-unwired");
+    expect(persisted?.reasonDetail).toContain("forbidden_success_modalities=image_generation");
+  });
 });

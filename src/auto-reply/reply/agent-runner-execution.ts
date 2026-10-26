@@ -163,6 +163,14 @@ export async function runAgentTurnWithFallback(params: {
   let growthToolSucceeded = 0;
   const growthStartedAt = Date.now();
   let modelGate: EmployeeModelGateResult = {};
+  let capabilityOutcomeForTurn:
+    | {
+        planFailureKind: string;
+        allowedModality: string;
+        forbiddenSuccessModalities: readonly string[];
+        detail?: string;
+      }
+    | undefined;
   const recordGrowthToolResult = (isError: boolean): void => {
     growthToolTotal += 1;
     if (!isError) {
@@ -190,6 +198,7 @@ export async function runAgentTurnWithFallback(params: {
       runId,
       latencyMs: Math.max(0, Date.now() - growthStartedAt),
       ...(tenantId ? { tenantId } : {}),
+      ...(capabilityOutcomeForTurn ? { capabilityOutcome: capabilityOutcomeForTurn } : {}),
     })
       .then(() =>
         syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId),
@@ -394,6 +403,28 @@ export async function runAgentTurnWithFallback(params: {
           preferredModelOrder: modelGate.preferredModelOrder,
           capabilityPlan: modelGate.capabilityPlan,
         });
+        if (executionRouting.outcomeClaim) {
+          capabilityOutcomeForTurn = {
+            planFailureKind: executionRouting.outcomeClaim.planFailure.kind,
+            allowedModality: executionRouting.outcomeClaim.allowedModality,
+            forbiddenSuccessModalities: executionRouting.outcomeClaim.forbiddenSuccessModalities,
+            ...(executionRouting.planFailure.kind === "executor_unwired"
+              ? { detail: executionRouting.planFailure.message }
+              : executionRouting.planFailure.kind === "no_executable_candidates" ||
+                  executionRouting.planFailure.kind === "unsupported"
+                ? { detail: executionRouting.planFailure.message }
+                : {}),
+          };
+        }
+        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+          recordGrowthTaskOutcome(false);
+          return {
+            kind: "final",
+            payload: {
+              text: executionRouting.planFailure.message,
+            },
+          };
+        }
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: enterpriseRunSlotHeld ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,
