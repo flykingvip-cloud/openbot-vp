@@ -23,7 +23,9 @@ import {
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
   applyTaskStopUnderControlLock,
+  casClearTaskDispatchClaimForOp,
   casCommitTaskDispatchEligibility,
+  casReleaseUnconsumedCommittedClaim,
   casTakeTaskDispatchEligibility,
 } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
@@ -33,6 +35,7 @@ import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-
 import {
   claimWakeOpRunning,
   markWakeOpCompleted,
+  markWakeOpFailed,
   markWakeOpUnknown,
   mintWakeOpRecoverySubject,
   produceHumanNoneAttestation,
@@ -1475,6 +1478,7 @@ describe("T41 M3 shared control-version CAS", () => {
       groupId,
       taskId,
       opKey: opKeyFor(taskId, "cas3"),
+      claimId: "no-claim-after-stop",
       targetActorIds: [tenant.bot0],
       cfg,
     });
@@ -1591,6 +1595,7 @@ describe("T42 M3 stop patch + single claim write", () => {
     }
     expect(first.claim.opKey).toBe(opA);
     expect(first.claim.phase).toBe("committed");
+    expect(first.claim.claimId?.length).toBeGreaterThan(8);
 
     const second = await casCommitTaskDispatchEligibility({
       groupId,
@@ -1641,10 +1646,14 @@ describe("T42 M3 stop patch + single claim write", () => {
       nowMs: 10,
     });
     expect(committed.ok).toBe(true);
+    if (!committed.ok) {
+      throw new Error("commit must succeed");
+    }
     const taken = await casTakeTaskDispatchEligibility({
       groupId,
       taskId,
       opKey: opA,
+      claimId: committed.claim.claimId,
       targetActorIds: [tenant.bot0],
       cfg,
       nowMs: 20,
@@ -1694,5 +1703,385 @@ describe("T42 M3 stop patch + single claim write", () => {
     expect(final.dispatchClaim?.opKey).toBe(opA);
     expect(final.dispatchClaim?.phase).toBe("taken");
     expect(final.dispatchClaim?.takenAtMs).toBe(20);
+  });
+});
+
+describe("T43 M3 claim lifecycle (committed/taken recovery + claimId bind)", () => {
+  test("M3-LIFE-A commit then auth change refuses take — release unconsumed; op B can proceed", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-life-a";
+    const { authority, objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "life-a",
+    });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterEligibilityBarrier: () => barrier,
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "life-a-must-not-run" };
+      },
+      request: wakeReq(taskId, "life-a"),
+    });
+    const opA = opKeyFor(taskId, "life-a");
+    for (let i = 0; i < 200; i += 1) {
+      const rec = await readWakeOpRecord({ authority, opKey: opA });
+      if (rec?.dispatchEligibility) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect((await readWakeOpRecord({ authority, opKey: opA }))?.dispatchEligibility).toBeTruthy();
+    const mid = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(mid.dispatchClaim?.phase).toBe("committed");
+    const claimIdA = mid.dispatchClaim?.claimId;
+    expect(claimIdA).toBeTruthy();
+
+    // Auth change after commit, before take.
+    const revoked = buildState({ revokeApprover: false });
+    // Revoke the target bot so fingerprint changes.
+    revoked.memberRoleMap = (revoked.memberRoleMap ?? []).map((row) =>
+      row.memberId === tenant.bot0 ? { ...row, status: "revoked" as const } : row,
+    );
+    await writeGroupOperatingState({ fileStore, groupId, state: revoked });
+
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(["auth_revoked", "eligibility_take_rejected", "auth_source_unreadable"]).toContain(
+      wake.reason,
+    );
+    // Unconsumed committed claim must not permanently block.
+    const afterA = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(afterA.dispatchClaim).toBeFalsy();
+
+    // Restore auth; op B must be able to advance.
+    await writeGroupOperatingState({ fileStore, groupId, state: buildState() });
+    let callsB = 0;
+    const wakeB = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        callsB += 1;
+        return { ok: true, roundId: "life-a-op-b" };
+      },
+      request: wakeReq(taskId, "life-a-b"),
+    });
+    expect(wakeB.reason).not.toBe("eligibility_cas_rejected");
+    expect(callsB).toBe(1);
+    expect(wakeB.dispatched).toBe(true);
+    const afterB = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    // take+finally should have cleared B's claim too
+    expect(afterB.dispatchClaim).toBeFalsy();
+  });
+
+  test("M3-LIFE-B wake-op mirror fails after task claim commit — release; no permanent block; no dispatch", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-life-b";
+    const { authority, objectStorage, groupId } = await seed({
+      cfg,
+      taskId,
+      itemId: "life-b",
+    });
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testForceEligibilityMirrorFailure: true,
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "life-b-must-not" };
+      },
+      request: wakeReq(taskId, "life-b"),
+    });
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("eligibility_commit_failed");
+    const after = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(after.dispatchClaim).toBeFalsy();
+
+    // Recovery: another op can commit/dispatch (not permanently blocked; not a re-run of A).
+    let calls2 = 0;
+    const wake2 = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        calls2 += 1;
+        return { ok: true, roundId: "life-b-recover" };
+      },
+      request: wakeReq(taskId, "life-b-2"),
+    });
+    expect(calls2).toBe(1);
+    expect(wake2.dispatched).toBe(true);
+  });
+
+  test("M3-LIFE-C process exit between commit and take — recovery releases committed only; taken refuses", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-life-c";
+    const { authority, objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "life-c",
+    });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    // Simulate: wake claimed + task claim committed, then process died before take.
+    const claimed = await claimWakeOpRunning({
+      authority,
+      cfg,
+      nowMs: 10,
+      keyInput: {
+        groupId,
+        source: "nudge",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [tenant.bot0],
+        taskId,
+        itemId: "life-c",
+      },
+    });
+    expect(claimed.action).toBe("proceed");
+    const attemptId = claimed.record?.executionAttemptId;
+    expect(attemptId).toBeTruthy();
+    const committed = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: claimed.opKey,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      executionAttemptId: attemptId,
+      cfg,
+      nowMs: 20,
+    });
+    expect(committed.ok).toBe(true);
+    if (!committed.ok) {
+      throw new Error("commit");
+    }
+    const claimId = committed.claim.claimId;
+    expect(committed.claim.phase).toBe("committed");
+    expect(committed.claim.executionAttemptId).toBe(attemptId);
+
+    // Crash recovery of wake-op: mark failed (proves attempt did not consume / no receipt).
+    await markWakeOpFailed({
+      authority,
+      opKey: claimed.opKey,
+      cfg,
+      nowMs: 30,
+      detail: "process_exit_before_take",
+    });
+    // Deterministic release: phase still committed + claimId + associated failed attempt.
+    const released = await casReleaseUnconsumedCommittedClaim({
+      groupId,
+      taskId,
+      opKey: claimed.opKey,
+      claimId,
+      cfg,
+      nowMs: 40,
+    });
+    expect(released.released).toBe(true);
+    expect(
+      asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never)
+        .dispatchClaim,
+    ).toBeFalsy();
+
+    // Taken must NOT be released by the same helper (no timeout auto re-run).
+    const committed2 = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "life-c-taken"),
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 50,
+    });
+    expect(committed2.ok).toBe(true);
+    if (!committed2.ok) {
+      throw new Error("commit2");
+    }
+    const taken = await casTakeTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: committed2.claim.opKey,
+      claimId: committed2.claim.claimId,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 60,
+    });
+    expect(taken.ok).toBe(true);
+    const refuse = await casReleaseUnconsumedCommittedClaim({
+      groupId,
+      taskId,
+      opKey: committed2.claim.opKey,
+      claimId: committed2.claim.claimId,
+      cfg,
+      nowMs: 70,
+    });
+    expect(refuse.released).toBe(false);
+    expect(refuse.reason).toBe("phase_taken");
+    expect(
+      asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never)
+        .dispatchClaim?.phase,
+    ).toBe("taken");
+
+    // Cleanup for isolation: clear with matching claimId (simulates proper finally).
+    await casClearTaskDispatchClaimForOp({
+      groupId,
+      taskId,
+      opKey: committed2.claim.opKey,
+      claimId: committed2.claim.claimId,
+      cfg,
+      nowMs: 80,
+    });
+  });
+
+  test("M3-LIFE-D barrier: stale clear must not drop newer same-op claim (claimId bind)", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-life-d";
+    const { objectStorage, groupId, fileStore } = await seed({
+      cfg,
+      taskId,
+      itemId: "life-d",
+    });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const opKey = opKeyFor(taskId, "life-d");
+
+    const first = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 1,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      throw new Error("first");
+    }
+    const oldClaimId = first.claim.claimId;
+
+    // Old attempt enters teardown; meanwhile new attempt establishes a new claim.
+    const released = await casReleaseUnconsumedCommittedClaim({
+      groupId,
+      taskId,
+      opKey,
+      claimId: oldClaimId,
+      cfg,
+      nowMs: 2,
+    });
+    expect(released.released).toBe(true);
+
+    const second = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 3,
+    });
+    expect(second.ok).toBe(true);
+    if (!second.ok) {
+      throw new Error("second");
+    }
+    const newClaimId = second.claim.claimId;
+    expect(newClaimId).not.toBe(oldClaimId);
+
+    // Stale clear with old claimId must leave the new claim intact.
+    const stale = await casClearTaskDispatchClaimForOp({
+      groupId,
+      taskId,
+      opKey,
+      claimId: oldClaimId,
+      cfg,
+      nowMs: 4,
+    });
+    expect(stale.cleared).toBe(false);
+    expect(stale.reason).toBe("claim_id_mismatch");
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.dispatchClaim?.claimId).toBe(newClaimId);
+    expect(final.dispatchClaim?.phase).toBe("committed");
+  });
+
+  test("M3-LIFE-E completed + receipt + clear failure — no second dispatch; original result kept", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-life-e";
+    const { authority, objectStorage, groupId } = await seed({
+      cfg,
+      taskId,
+      itemId: "life-e",
+    });
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testForceClaimClearError: () => new Error("forced_clear_failure"),
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "life-e-round" };
+      },
+      request: wakeReq(taskId, "life-e"),
+    });
+    expect(calls).toBe(1);
+    expect(wake.dispatched).toBe(true);
+    expect(wake.outcome).toBe("dispatched");
+    const rec = await readWakeOpRecord({ authority, opKey: wake.opKey! });
+    expect(rec?.status).toBe("completed");
+    expect(rec?.roundId).toBe("life-e-round");
+    // Clear failed → claim may remain taken; must not invite blind re-dispatch.
+    const task = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(task.dispatchClaim?.phase).toBe("taken");
+
+    let calls2 = 0;
+    const again = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        calls2 += 1;
+        return { ok: true, roundId: "life-e-second" };
+      },
+      request: wakeReq(taskId, "life-e"),
+    });
+    expect(calls2).toBe(0);
+    // Reuse of completed reports dispatched:true with reused:true — no new side effect.
+    expect(again.reused).toBe(true);
+    expect(again.dispatched).toBe(true);
+    const rec2 = await readWakeOpRecord({ authority, opKey: wake.opKey! });
+    expect(rec2?.status).toBe("completed");
+    expect(rec2?.roundId).toBe("life-e-round");
   });
 });

@@ -26,6 +26,7 @@ import type { RuntimeAuthority } from "./runtime-authority.js";
 import {
   casClearTaskDispatchClaimForOp,
   casCommitTaskDispatchEligibility,
+  casReleaseUnconsumedCommittedClaim,
   casTakeTaskDispatchEligibility,
 } from "./task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
@@ -46,6 +47,7 @@ import {
   markWakeOpCompleted,
   markWakeOpFailed,
   markWakeOpUnknown,
+  readWakeOpRecord,
   wakeOpAuthFingerprint,
   wakeOpIdempotencyKey,
   type WakeOpRecord,
@@ -266,6 +268,16 @@ export type ConsumeWakeRoundDispatchParams = {
    * (recheckCurrentDispatchAuthorization must not ok:true; no claim).
    */
   _testForcePreClaimAuthOsReadError?: Error | (() => Error);
+  /**
+   * Test-only: after task CAS commit succeeds, force wake-op eligibility mirror
+   * to fail (simulate mirror write failure with task claim already committed).
+   */
+  _testForceEligibilityMirrorFailure?: boolean | Error | (() => Error);
+  /**
+   * Test-only: force claim clear in finally to throw (cleanup must not mask
+   * completed/unknown outcome or trigger a second dispatch).
+   */
+  _testForceClaimClearError?: Error | (() => Error);
 };
 
 export type ConsumeWakeRoundDispatchResult = Readonly<{
@@ -466,8 +478,12 @@ export async function consumeWakeForRoundDispatch(
   let eligibilityTaskObserved = false;
   /** T41: task-authority CAS commit succeeded (take required before dispatcher). */
   let taskEligibilityCasCommitted = false;
+  /** T43: claimId from successful commit — bind take/clear/release. */
+  let taskDispatchClaimId = "";
   /** T42: take succeeded — clear this op's claim when the attempt finishes (single-claim). */
   let taskDispatchClaimTaken = false;
+  /** T43: committed but not taken — must release on abandon paths (not only finally-after-take). */
+  let taskDispatchClaimNeedsRelease = false;
   {
     let stoppedAfterClaim = false;
     let taskControlUnreadableAfterClaim = false;
@@ -753,6 +769,7 @@ export async function consumeWakeForRoundDispatch(
         expectedControlEpoch: eligibilityControlEpoch,
         authFingerprint: eligibilityAuthFingerprint,
         targetActorIds: request.toAgentIds,
+        executionAttemptId: claimed.record?.executionAttemptId,
         cfg: params.cfg,
         nowMs: params.nowMs,
       });
@@ -809,6 +826,50 @@ export async function consumeWakeForRoundDispatch(
         };
       }
       taskEligibilityCasCommitted = true;
+      taskDispatchClaimId = cas.claim.claimId;
+      taskDispatchClaimNeedsRelease = true;
+    }
+
+    // T43: simulate wake-op mirror failure after task claim already committed.
+    if (params._testForceEligibilityMirrorFailure && taskEligibilityCasCommitted) {
+      const forced = params._testForceEligibilityMirrorFailure;
+      const err =
+        typeof forced === "function"
+          ? forced()
+          : forced instanceof Error
+            ? forced
+            : new Error("forced_eligibility_mirror_failure");
+      void err;
+      const failed = await markWakeOpFailed({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail: "eligibility_mirror_failed",
+      });
+      if (stoppedTaskId && taskDispatchClaimNeedsRelease && taskDispatchClaimId) {
+        taskDispatchClaimNeedsRelease = false;
+        await casReleaseUnconsumedCommittedClaim({
+          groupId: request.groupId,
+          taskId: stoppedTaskId,
+          opKey: claimed.opKey,
+          claimId: taskDispatchClaimId,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+        });
+      }
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason: "eligibility_commit_failed",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey: claimed.opKey,
+        wakeOp: failed ?? claimed.record ?? undefined,
+        reused: false,
+      };
     }
 
     const eligible = await commitWakeOpDispatchEligibility({
@@ -827,6 +888,18 @@ export async function consumeWakeForRoundDispatch(
         nowMs: params.nowMs,
         detail: "eligibility_commit_failed",
       });
+      // T43: task claim may already be committed — release unconsumed so others are not stuck.
+      if (stoppedTaskId && taskDispatchClaimNeedsRelease && taskDispatchClaimId) {
+        taskDispatchClaimNeedsRelease = false;
+        await casReleaseUnconsumedCommittedClaim({
+          groupId: request.groupId,
+          taskId: stoppedTaskId,
+          opKey: claimed.opKey,
+          claimId: taskDispatchClaimId,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+        });
+      }
       return {
         outcome: "recorded",
         dispatched: false,
@@ -856,12 +929,26 @@ export async function consumeWakeForRoundDispatch(
       groupId: request.groupId,
       taskId: stoppedTaskId,
       opKey: claimed.opKey,
+      claimId: taskDispatchClaimId,
       targetActorIds: request.toAgentIds,
       cfg: params.cfg,
       nowMs: params.nowMs,
     });
     if (!take.ok) {
       const detail = `task_eligibility_take_failed:${take.reason}:${take.detail}`;
+      // T43: take refused before consumption — release committed claim (helper no-ops if
+      // already cleared by stop, or refuses if somehow taken). Never timeout-infer.
+      if (taskDispatchClaimNeedsRelease && taskDispatchClaimId) {
+        taskDispatchClaimNeedsRelease = false;
+        await casReleaseUnconsumedCommittedClaim({
+          groupId: request.groupId,
+          taskId: stoppedTaskId,
+          opKey: claimed.opKey,
+          claimId: taskDispatchClaimId,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+        });
+      }
       if (
         take.reason === "task_stopped" ||
         take.reason === "epoch_mismatch" ||
@@ -935,6 +1022,7 @@ export async function consumeWakeForRoundDispatch(
       };
     }
     taskDispatchClaimTaken = true;
+    taskDispatchClaimNeedsRelease = false;
   }
 
   try {
@@ -1327,16 +1415,59 @@ export async function consumeWakeForRoundDispatch(
     };
   } finally {
     // Single-claim: release this op's taken lease so a later op can commit.
-    // Stop may already have cleared it; clear is idempotent for opKey match.
-    if (taskDispatchClaimTaken && stoppedTaskId) {
+    // T43: clear is claimId-bound (stale finally must not clear a newer same-op claim).
+    // Clear failures must be diagnosable but must NOT mask completed/unknown results
+    // or cause the caller to believe external action did not happen.
+    if (taskDispatchClaimTaken && stoppedTaskId && taskDispatchClaimId) {
       taskDispatchClaimTaken = false;
-      await casClearTaskDispatchClaimForOp({
-        groupId: request.groupId,
-        taskId: stoppedTaskId,
-        opKey: claimed.opKey,
-        cfg: params.cfg,
-        nowMs: params.nowMs,
-      });
+      try {
+        let clearError: unknown;
+        if (params._testForceClaimClearError) {
+          const forced = params._testForceClaimClearError;
+          clearError = typeof forced === "function" ? forced() : forced;
+        } else {
+          try {
+            await casClearTaskDispatchClaimForOp({
+              groupId: request.groupId,
+              taskId: stoppedTaskId,
+              opKey: claimed.opKey,
+              claimId: taskDispatchClaimId,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+            });
+          } catch (err) {
+            clearError = err;
+          }
+        }
+        if (clearError !== undefined) {
+          // Preserve original outcome. Never downgrade completed/failed/unknown.
+          try {
+            const current = await readWakeOpRecord({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+            });
+            const status = current?.status;
+            if (status === "completed" || status === "failed" || status === "unknown") {
+              void clearError;
+            } else {
+              await markWakeOpUnknown({
+                authority: params.authority,
+                opKey: claimed.opKey,
+                cfg: params.cfg,
+                nowMs: params.nowMs,
+                detail: `claim_clear_failed_after_attempt:${
+                  clearError instanceof Error ? clearError.message : "non_error_clear_failure"
+                }`,
+              });
+            }
+          } catch {
+            // best-effort diagnostic only
+          }
+        }
+      } catch {
+        // best-effort: never mask the try-block result via finally control-flow
+      }
     }
   }
 }

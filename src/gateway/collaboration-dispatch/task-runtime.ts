@@ -15,8 +15,13 @@ import {
 } from "./task-state-machine.js";
 import type { TaskStopControl } from "./task-stop-control.js";
 
-/** T41: authoritative dispatch eligibility claim on the task control record. */
+/** T41/T43: authoritative dispatch eligibility claim on the task control record. */
 export type TaskDispatchClaim = {
+  /**
+   * Unconfusable lease id minted at commit (T43). take/clear must compare this —
+   * opKey alone is not a generation token (same op may retry with a new claim).
+   */
+  claimId: string;
   opKey: string;
   controlEpoch: number;
   authFingerprint: string;
@@ -24,6 +29,8 @@ export type TaskDispatchClaim = {
   /** committed = eligible; taken = leased for external dispatch (CAS take). */
   phase: "committed" | "taken";
   takenAtMs?: number;
+  /** Optional bind to wake-op executionAttemptId when known at commit. */
+  executionAttemptId?: string;
 };
 
 export type GovernedTask = Task & {

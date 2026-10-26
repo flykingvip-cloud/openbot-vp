@@ -1,11 +1,15 @@
 /**
- * T41/T42 M3 — shared control-version CAS for stop vs dispatch eligibility.
+ * T41/T42/T43 M3 — shared control-version CAS for stop vs dispatch eligibility.
  *
  * Linearization point: task authority record under a per-task control lock.
  * - stop bumps controlEpoch and clears any dispatchClaim
  * - eligibility commit is expected-version CAS on controlEpoch (+ auth fingerprint)
  *   under a **single-claim** model (one valid claim per task; same-op retry must not
  *   reset taken → committed)
+ * - each claim carries an unconfusable claimId (generation token); take/clear compare it
+ * - committed-but-not-taken may be released only when phase is still committed + claimId
+ *   matches (prove unconsumed via wake-op/attempt association — never by timeout alone)
+ * - taken leases must not be auto-released by timeout; clear requires matching claimId
  * - external dispatch must CAS-take the claim before invoking the dispatcher
  *
  * Auth revoke is **not** on this shared version plane: commit/take re-check the live
@@ -15,7 +19,7 @@
  * Wake-op dispatchEligibility remains an audit/mirror; the task claim is authoritative.
  * Wakes without a persisted task authority record stay wake-op-only (no task CAS).
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
@@ -79,6 +83,8 @@ export type CasCommitTaskDispatchEligibilityParams = {
   nowMs?: number;
   /** Optional target actors for live auth fingerprint re-check inside the CAS. */
   targetActorIds?: readonly string[];
+  /** Optional wake-op executionAttemptId to bind into the claim at commit. */
+  executionAttemptId?: string;
 };
 
 export type CasCommitTaskDispatchEligibilityResult =
@@ -202,12 +208,15 @@ export async function casCommitTaskDispatchEligibility(
         }
       }
 
+      const attempt = compact(params.executionAttemptId) || undefined;
       const claim: TaskDispatchClaim = {
+        claimId: randomUUID(),
         opKey,
         controlEpoch: liveEpoch,
         authFingerprint: wantFp,
         committedAtMs: nowMs,
         phase: "committed",
+        ...(attempt ? { executionAttemptId: attempt } : {}),
       };
       const updated: GovernedTask = {
         ...governed,
@@ -226,6 +235,8 @@ export type CasTakeTaskDispatchEligibilityParams = {
   groupId: string;
   taskId: string;
   opKey: string;
+  /** Must match the claimId returned by commit (generation bind). */
+  claimId: string;
   cfg?: OpenBotConfig;
   nowMs?: number;
   targetActorIds?: readonly string[];
@@ -240,6 +251,7 @@ export type CasTakeTaskDispatchEligibilityResult =
         | "task_stopped"
         | "claim_missing"
         | "claim_op_mismatch"
+        | "claim_id_mismatch"
         | "epoch_mismatch"
         | "auth_fingerprint_mismatch"
         | "auth_source_unreadable"
@@ -307,6 +319,15 @@ export async function casTakeTaskDispatchEligibility(
           task: governed,
         };
       }
+      const wantClaimId = compact(params.claimId);
+      if (!wantClaimId || compact(claim.claimId) !== wantClaimId) {
+        return {
+          ok: false,
+          reason: "claim_id_mismatch",
+          detail: `dispatchClaim claimId mismatch: ${claim.claimId ?? "<missing>"} vs ${wantClaimId || "<missing>"}`,
+          task: governed,
+        };
+      }
       const liveEpoch = readControlEpoch(governed);
       if (liveEpoch !== claim.controlEpoch) {
         return {
@@ -371,20 +392,25 @@ export async function casTakeTaskDispatchEligibility(
 
 /**
  * After a taken lease finishes (dispatcher returned/threw, or take won but
- * dispatch was refused before the external call), clear this op's claim so a
- * later op can commit under the single-claim model. No-op if missing/mismatched.
+ * dispatch was refused before the external call), clear this claim by claimId
+ * so a later op can commit under the single-claim model.
+ * T43: opKey alone is insufficient — a stale finally must not clear a newer
+ * same-op claim. No-op if missing / op mismatch / claimId mismatch.
  * Does not bump controlEpoch (stop remains the version bump).
  */
 export async function casClearTaskDispatchClaimForOp(params: {
   groupId: string;
   taskId: string;
   opKey: string;
+  /** Generation token from commit/take — required for clear. */
+  claimId: string;
   cfg?: OpenBotConfig;
   nowMs?: number;
-}): Promise<{ cleared: boolean; task: GovernedTask | null }> {
+}): Promise<{ cleared: boolean; reason?: string; task: GovernedTask | null }> {
   const cfg = params.cfg ?? loadConfig();
   const nowMs = params.nowMs ?? Date.now();
   const opKey = compact(params.opKey);
+  const claimId = compact(params.claimId);
   return withTaskControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -395,15 +421,21 @@ export async function casClearTaskDispatchClaimForOp(params: {
         const { objectStorage } = createWorkspaceCollaborationStores(cfg);
         current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
       } catch {
-        return { cleared: false, task: null };
+        return { cleared: false, reason: "task_unreadable", task: null };
       }
       if (!current) {
-        return { cleared: false, task: null };
+        return { cleared: false, reason: "task_missing", task: null };
       }
       const governed = asGovernedTask(current);
       const claim = governed.dispatchClaim;
-      if (!claim || compact(claim.opKey) !== opKey) {
-        return { cleared: false, task: governed };
+      if (!claim) {
+        return { cleared: false, reason: "claim_missing", task: governed };
+      }
+      if (compact(claim.opKey) !== opKey) {
+        return { cleared: false, reason: "op_mismatch", task: governed };
+      }
+      if (!claimId || compact(claim.claimId) !== claimId) {
+        return { cleared: false, reason: "claim_id_mismatch", task: governed };
       }
       const updated: GovernedTask = {
         ...governed,
@@ -413,6 +445,81 @@ export async function casClearTaskDispatchClaimForOp(params: {
       const { objectStorage } = createWorkspaceCollaborationStores(cfg);
       await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
       return { cleared: true, task: updated };
+    },
+  });
+}
+
+/**
+ * T43 recovery: release a **committed** (not taken) claim when the caller can
+ * prove it was never consumed — typically via associated wake-op/attempt state
+ * (failed / unknown / mirror never completed) plus matching claimId.
+ *
+ * Refuses taken leases (must not auto-rerun on timeout alone — use receipt or
+ * keep unknown). Does not bump controlEpoch.
+ */
+export async function casReleaseUnconsumedCommittedClaim(params: {
+  groupId: string;
+  taskId: string;
+  opKey: string;
+  claimId: string;
+  cfg?: OpenBotConfig;
+  nowMs?: number;
+}): Promise<{
+  released: boolean;
+  reason?:
+    | "task_missing"
+    | "task_unreadable"
+    | "claim_missing"
+    | "op_mismatch"
+    | "claim_id_mismatch"
+    | "phase_taken"
+    | "claim_id_required";
+  task: GovernedTask | null;
+}> {
+  const cfg = params.cfg ?? loadConfig();
+  const nowMs = params.nowMs ?? Date.now();
+  const opKey = compact(params.opKey);
+  const claimId = compact(params.claimId);
+  if (!claimId) {
+    return { released: false, reason: "claim_id_required", task: null };
+  }
+  return withTaskControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    fn: async () => {
+      let current: Task | null;
+      try {
+        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+        current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+      } catch {
+        return { released: false, reason: "task_unreadable", task: null };
+      }
+      if (!current) {
+        return { released: false, reason: "task_missing", task: null };
+      }
+      const governed = asGovernedTask(current);
+      const claim = governed.dispatchClaim;
+      if (!claim) {
+        return { released: false, reason: "claim_missing", task: governed };
+      }
+      if (compact(claim.opKey) !== opKey) {
+        return { released: false, reason: "op_mismatch", task: governed };
+      }
+      if (compact(claim.claimId) !== claimId) {
+        return { released: false, reason: "claim_id_mismatch", task: governed };
+      }
+      if (claim.phase === "taken") {
+        return { released: false, reason: "phase_taken", task: governed };
+      }
+      const updated: GovernedTask = {
+        ...governed,
+        dispatchClaim: undefined,
+        updatedAtMs: nowMs,
+      };
+      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+      return { released: true, task: updated };
     },
   });
 }
