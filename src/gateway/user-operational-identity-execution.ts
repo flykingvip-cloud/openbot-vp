@@ -581,6 +581,38 @@ export async function executeUserOperationalIdentityAction(params: {
       throw new Error(`Provider ${params.provider} does not support execution yet.`);
     }
 
+    if (output.unsupported === true) {
+      const message =
+        typeof output.message === "string" && output.message.trim()
+          ? output.message.trim()
+          : `Action ${params.action} is not supported for ${params.provider}.`;
+      if (params.audit !== false) {
+        recordUserOperationalIdentityUsageEvent({
+          store: params.store,
+          ownerId: params.ownerId,
+          identityId: params.identity.identityId,
+          provider: params.identity.provider,
+          agentId: params.agentId,
+          action: params.action,
+          result: "denied",
+          denialCode: "USER_IDENTITY_ACTION_UNSUPPORTED",
+          sessionKey: params.sessionKey,
+          nowIso: params.nowIso,
+          summary: buildUserOperationalIdentityUsageSummary({
+            provider: params.provider,
+            action: params.action,
+            payload: params.payload,
+            output,
+          }),
+        });
+      }
+      return {
+        ok: false,
+        code: "USER_IDENTITY_ACTION_UNSUPPORTED",
+        message,
+      };
+    }
+
     if (params.audit !== false) {
       const summary = buildUserOperationalIdentityUsageSummary({
         provider: params.provider,

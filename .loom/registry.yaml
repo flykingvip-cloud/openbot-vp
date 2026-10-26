@@ -9685,6 +9685,29 @@ tasks:
     since: 2026-10-26
     metadata: {}
 landingStreams:
+
+  - id: p0a-p0-task-capability-plan
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/agents/subagent-spawn.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/commands/agent.ts
+      - src/commands/agent/commercial-run-gate.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/user-operational-identity-execution.ts
+      - src/gateway/user-operational-identity-execution.p0a.test.ts
+      - src/gateway/user-operational-identity-social-execution.ts
+      - src/gateway/user-operational-identity-social-execution.p0a.test.ts
+    canLandWith: []
+    metadata:
+      task: p0a-p0-task-capability-plan
+      owner: grok-bot
+      purpose: P0a unsupported social contract + P0 task capability plan inside authorized set
   - id: u1-unified-task-stop
     landingPolicy: serial
     paths:

@@ -115,6 +115,7 @@ import {
   type AgentCommandCommercialGateResult,
   releaseAgentCommandCommercialRun,
 } from "./agent/commercial-run-gate.js";
+import { resolveExecutionRoutingFromCapabilityPlan } from "../gateway/model-entitlement/task-capability-plan.js";
 import { recordAgentCommandCreditUsage } from "./agent/credit-usage.js";
 import { deliverAgentCommandResult } from "./agent/delivery.js";
 import { resolveAgentCommandModelGovernance } from "./agent/model-governance.js";
@@ -903,11 +904,15 @@ async function agentCommandInternal(
       sessionAgentId,
       gatewayClientUser: opts.gatewayClientUser,
       enterpriseId: opts.gatewayClientSessionTenantId,
+      taskText: opts.message ?? body,
       ...(isSubagentLane ? { entry: "E6" as const } : opts.governanceEntry ? { entry: opts.governanceEntry } : {}),
     });
     if (commercialGate.status === "denied") {
       throw new Error(commercialGate.message);
     }
+    let commandExecutionRouting:
+      | ReturnType<typeof resolveExecutionRoutingFromCapabilityPlan>
+      | undefined;
     if (commercialGate.status === "acquired") {
       commercialRunSlotHeld = true;
       if (!isSubagentLane) {
@@ -916,14 +921,19 @@ async function agentCommandInternal(
           process.env,
           opts.executionIdentity,
         );
+        commandExecutionRouting = resolveExecutionRoutingFromCapabilityPlan({
+          allowlist: modelGovernance.entitlementAllowlist,
+          preferredModelOrder: commercialGate.modelGate?.preferredModelOrder,
+          capabilityPlan: commercialGate.modelGate?.capabilityPlan,
+        });
         const parentSnapshot = buildRunModelSetSnapshot({
           runId,
-          allowlist: modelGovernance.entitlementAllowlist,
+          allowlist: commandExecutionRouting.allowlist,
           governanceMode: modelGovernance.governanceMode,
           commercialAuthorizationId: modelGovernance.governanceContext?.commercialAuthorizationId,
           tenantId: modelGovernance.governanceContext?.tenantId,
           actorId: modelGovernance.governanceContext?.actorId,
-          preferredModelOrder: commercialGate.modelGate?.preferredModelOrder,
+          preferredModelOrder: commandExecutionRouting.preferredModelOrder,
           // P4-1: parent billing context for child runs (this branch: gate acquired).
           creditReporting: snapshotCreditReportingFromGate(commercialGate),
         });
@@ -1335,6 +1345,12 @@ async function agentCommandInternal(
         model,
         runId,
       });
+      const commandModelGovernance = resolveAgentCommandModelGovernance(
+        isSubagentLane ? undefined : commercialGate,
+        process.env,
+        opts.executionIdentity,
+        opts.governanceEntry,
+      );
       const fallbackResult = await runWithModelFallback({
         cfg,
         provider,
@@ -1344,12 +1360,13 @@ async function agentCommandInternal(
         fallbacksOverride: effectiveFallbacksOverride,
         // legacy when the gate skipped (no enterprise scope); otherwise
         // OPENBOT_GOVERNANCE_AGENT_COMMAND_MODEL_MODE (default shadow: record only).
-        ...resolveAgentCommandModelGovernance(
-          isSubagentLane ? undefined : commercialGate,
-          process.env,
-          opts.executionIdentity,
-          opts.governanceEntry,
-        ),
+        ...commandModelGovernance,
+        ...(commandExecutionRouting?.allowlist !== undefined
+          ? { entitlementAllowlist: commandExecutionRouting.allowlist }
+          : {}),
+        ...(commandExecutionRouting?.preferredModelOrder
+          ? { preferredModelOrder: commandExecutionRouting.preferredModelOrder }
+          : {}),
         run: (providerOverride, modelOverride, runOptions) => {
           const isFallbackRetry = fallbackAttemptIndex > 0;
           fallbackAttemptIndex += 1;

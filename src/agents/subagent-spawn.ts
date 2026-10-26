@@ -17,6 +17,10 @@ import {
   snapshotForChildModelHandoff,
   stageSpawnGovernanceSnapshot,
 } from "../gateway/governance/spawn-snapshot-handoff.js";
+import {
+  buildTaskCapabilityPlan,
+  resolveExecutionRoutingFromCapabilityPlan,
+} from "../gateway/model-entitlement/task-capability-plan.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import {
   isValidAgentId,
@@ -614,7 +618,33 @@ export async function spawnSubagentDirect(
   stageSpawnExecutionIdentity(childIdem, ctx.executionIdentity);
   // Stage only a looked-up parent set. A miss must not become an empty snapshot
   // (that used to be recorded as allow).
-  const childGovernanceSnapshot = snapshotForChildModelHandoff(lookupRunModelSet(ctx.parentRunId));
+  const parentModelSet = lookupRunModelSet(ctx.parentRunId);
+  let childGovernanceSnapshot = snapshotForChildModelHandoff(parentModelSet);
+  // P0: rebuild per-task capability plan from the child task within the parent
+  // authorized/executable allowlist — classification must not expand rights.
+  if (childGovernanceSnapshot?.effectiveModelSet?.allowlist) {
+    const parentAllowlist = childGovernanceSnapshot.effectiveModelSet.allowlist;
+    const childPlan = buildTaskCapabilityPlan({
+      taskText: task,
+      authorizedModelIds: parentAllowlist,
+      preferredModelOrderFromAuth:
+        childGovernanceSnapshot.effectiveModelSet.preferredModelOrder ?? parentAllowlist,
+    });
+    const childRouting = resolveExecutionRoutingFromCapabilityPlan({
+      allowlist: parentAllowlist,
+      preferredModelOrder: childGovernanceSnapshot.effectiveModelSet.preferredModelOrder,
+      capabilityPlan: childPlan,
+    });
+    childGovernanceSnapshot = {
+      ...childGovernanceSnapshot,
+      effectiveModelSet: {
+        allowlist: childRouting.allowlist ?? [...parentAllowlist],
+        ...(childRouting.preferredModelOrder
+          ? { preferredModelOrder: childRouting.preferredModelOrder }
+          : {}),
+      },
+    };
+  }
   if (childGovernanceSnapshot) {
     stageSpawnGovernanceSnapshot(childIdem, childGovernanceSnapshot);
   }

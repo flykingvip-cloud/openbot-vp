@@ -42,6 +42,7 @@ import { resolveManagedTenantEntitlementPolicy } from "./managed-tenant-enforce.
 import { getPlanVersionModelBinding } from "./plan-version-model-binding-store.js";
 import { resolveAgentRunEntitlementScope } from "./resolve-agent-run-scope.js";
 import { resolveEffectiveModelSet } from "./resolve-effective-model-set.js";
+import { buildTaskCapabilityPlan, type TaskCapabilityPlan } from "./task-capability-plan.js";
 
 export type EmployeeEntitlementScopeOverride = {
   tenantId: string;
@@ -60,6 +61,13 @@ export type EmployeeModelGateInput = {
   agentId?: string;
   /** 调用方已知的 enterpriseId（商业闸口传入时优先 managed 信号）。 */
   enterpriseIdHint?: string;
+  /**
+   * Current user/task text for per-task capability planning (P0).
+   * Classification never expands entitlement; plan is built after auth.
+   */
+  taskText?: string;
+  /** Optional override for context filtering; defaults to a text-length estimate. */
+  estimatedInputTokens?: number;
   entitlementStorePath?: string;
   seatGrantStorePath?: string;
   planVersionBindingStorePath?: string;
@@ -93,6 +101,8 @@ export type EmployeeModelGateResult = {
   allowlist?: string[];
   entitlementHint?: EmployeeModelGateEntitlementHint;
   preferredModelOrder?: string[];
+  /** P0 per-task plan inside the authorized set (optional when no allowlist). */
+  capabilityPlan?: TaskCapabilityPlan;
   aorFeedback?: {
     taskTypeId: string;
     banditStatePath: string;
@@ -469,6 +479,32 @@ export async function resolveEmployeeModelGate(
     }
   }
 
+  let capabilityPlan: TaskCapabilityPlan | undefined;
+  if (allowlist !== undefined) {
+    const catalogEntriesForPlan = await listResourceModelCatalog(input.modelCatalogPath);
+    const modelContextWindows: Record<string, number> = {};
+    for (const entry of catalogEntriesForPlan) {
+      if (typeof entry.contextWindow === "number" && entry.contextWindow > 0) {
+        modelContextWindows[entry.modelId] = entry.contextWindow;
+      }
+    }
+    capabilityPlan = buildTaskCapabilityPlan({
+      taskText: input.taskText,
+      authorizedModelIds: allowlist,
+      preferredModelOrderFromAuth: preferredModelOrder ?? allowlist,
+      modelContextWindows,
+      ...(input.estimatedInputTokens !== undefined
+        ? { estimatedInputTokens: input.estimatedInputTokens }
+        : {}),
+    });
+    // Prefer the executable order for downstream consumers; authorized set stays on allowlist.
+    if (capabilityPlan.preferredModelOrder.length > 0) {
+      preferredModelOrder = capabilityPlan.preferredModelOrder;
+    } else if (capabilityPlan.failure.kind === "no_executable_candidates") {
+      preferredModelOrder = [];
+    }
+  }
+
   const tierProfileFilteredEmpty =
     allowlist !== undefined &&
     allowlist.length === 0 &&
@@ -478,6 +514,7 @@ export async function resolveEmployeeModelGate(
     ...(resolved?.tenantId ? { tenantId: resolved.tenantId } : {}),
     ...(allowlist !== undefined ? { allowlist } : {}),
     ...(preferredModelOrder ? { preferredModelOrder } : {}),
+    ...(capabilityPlan ? { capabilityPlan } : {}),
     ...(aorFeedback ? { aorFeedback } : {}),
     ...(aorRouting ? { aorRouting } : {}),
     ...(creditReporting ? { creditReporting } : {}),
