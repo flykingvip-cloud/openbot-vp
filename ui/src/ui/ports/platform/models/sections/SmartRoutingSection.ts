@@ -1,6 +1,7 @@
 import { html } from "lit";
 import { formatCost } from "../../../../views/usage-metrics.ts";
 import { requestPlatformSurfaceRerender } from "../../shared/surface.ts";
+import type { RoutingDecisionPreview } from "../routing-decision-preview.ts";
 import type {
   LegacyPlatformModelsVM,
   ModelRoutingVM,
@@ -1326,11 +1327,69 @@ function renderRoutingFilterBar(vm: ModelRoutingVM, resultCount: number) {
   `;
 }
 
+function renderRoutingDecisionPreviewPanel(preview: RoutingDecisionPreview | null | undefined) {
+  if (!preview) {
+    return html`
+      <div class="callout info card-follow--sm" data-testid="routing-decision-preview-empty">
+        试配任务：点击「模拟请求」获取干跑决策预览（不调用生成模型）。未验证能力的模型会被排除。
+      </div>
+    `;
+  }
+  return html`
+    <div class="card-follow--sm" data-testid="routing-decision-preview">
+      <div class="card-title">试配结果（干跑预览）</div>
+      <div class="muted card-follow--xs">未调用生成模型 · requestId ${preview.requestId}</div>
+      <div class="model-assets-drawer__kv-stack card-follow--xs">
+        <div class="model-assets-drawer__kv-row">
+          <span class="muted">任务类别</span><span>${preview.taskCategory}</span>
+        </div>
+        <div class="model-assets-drawer__kv-row">
+          <span class="muted">执行路径</span><span>${preview.executorPath}</span>
+        </div>
+        <div class="model-assets-drawer__kv-row">
+          <span class="muted">主模型</span
+          ><span>${preview.primary.join(", ") || "无"}</span>
+        </div>
+        <div class="model-assets-drawer__kv-row">
+          <span class="muted">回退候选</span
+          ><span>${preview.fallback.join(", ") || "无"}</span>
+        </div>
+        <div class="model-assets-drawer__kv-row">
+          <span class="muted">决策说明</span><span>${preview.decisionReason}</span>
+        </div>
+      </div>
+      ${
+        preview.excluded.length
+          ? html`
+              <div class="card-follow--xs">
+                <div class="muted">被排除的模型</div>
+                <ul data-testid="routing-preview-exclusions">
+                  ${preview.excluded.map(
+                    (item) => html`
+                      <li>
+                        <code>${item.modelId}</code> · ${item.reason}
+                        <span class="chip">${item.code}</span>
+                      </li>
+                    `,
+                  )}
+                </ul>
+              </div>
+            `
+          : html`
+              <div class="muted card-follow--xs">无排除项</div>
+            `
+      }
+    </div>
+  `;
+}
+
 export type SmartRoutingSectionProps = {
   vm: ModelRoutingVM;
   onNavigateTab: (tab: SmartRoutingNavigateTab, context?: PlatformModelsTabContext) => void;
   context?: PlatformModelsTabContext;
   compat?: LegacyPlatformModelsVM | null;
+  /** Dry-run decision preview from backend stub / real decision API. */
+  routingPreview?: RoutingDecisionPreview | null;
   onEditPolicy?: (policyId: string) => void;
   onDuplicatePolicy?: (policy: RoutingPolicy) => void;
   onUpdatePolicyStatus?: (policyId: string, nextStatus: "active" | "draft" | "disabled") => void;
@@ -1365,6 +1424,7 @@ export function renderSmartRoutingSection(props: SmartRoutingSectionProps) {
     onNavigateTab,
     context,
     compat,
+    routingPreview,
     onEditPolicy,
     onDuplicatePolicy,
     onUpdatePolicyStatus,
@@ -1434,7 +1494,11 @@ export function renderSmartRoutingSection(props: SmartRoutingSectionProps) {
             class="btn btn--primary"
             type="button"
             ?disabled=${!onSimulateRouting || !selectedPolicy}
-            title=${onSimulateRouting && selectedPolicy ? "" : "模拟能力待接入"}
+            title=${
+              onSimulateRouting && selectedPolicy
+                ? "干跑决策预览，不调用生成模型"
+                : "模拟能力待接入"
+            }
             @click=${() =>
               selectedPolicy
                 ? onSimulateRouting?.({
@@ -1449,6 +1513,7 @@ export function renderSmartRoutingSection(props: SmartRoutingSectionProps) {
         </div>
       </div>
       ${renderRoutingSummary(vm)}
+      ${renderRoutingDecisionPreviewPanel(routingPreview)}
     </section>
     ${
       context?.actionHint
