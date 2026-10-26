@@ -26,7 +26,7 @@ entrypoint adapter 实例方法
 生产热路径（**已接线、有调用证据**）：
 
 1. **chat / gateway 对话 turn**：`agent-runner-execution` → `ensureChatTurnTaskOutcome`（`ChatTaskOutcomeAdapter.createOrRestore`，持久 `entrypoint: "chat"`）→ 收尾 `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome` → 按调用方传入的 acceptance/delivery 门闩推进；**不**在 runner 内发明 `not_required`。
-2. **#89 hydrate**：gateway boot → `hydrateAllAgentsAwaitingDeliveries` / `bootTaskOutcomeConsumers`（`consumer-boot.ts` + `pending-delivery.ts`）。
+2. **#89 hydrate**：gateway boot → `hydrateAllAgentsAwaitingDeliveries` / `recoverTaskOutcomeConsumersAtGatewayBoot`（`consumer-boot.ts` + `pending-delivery.ts`）。
 3. **#94 attempt**：`attempt.ts` 末 pattern `success=null`（未证实失败时）；技能仍调 `recordLifecycleSkillsLoadedOnRun`，run 级 `outcome=null` 时跳过 prompt-named-use **成功**写入、不转 failure；工具级按 `toolMetas`。`confirmPendingTurnDelivery` 三 id 皆缺 → fail-soft + `confirm_skipped_no_locator_ids`。
 
 ## 入口适配器现状（W0 核验；W1 待修）
