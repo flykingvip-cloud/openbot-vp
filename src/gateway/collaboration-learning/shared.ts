@@ -1,5 +1,8 @@
+import { createHash } from "node:crypto";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { withRoundLock } from "../collaboration-dispatch/round-store-io.js";
 import type {
   BotParticipationProfile,
   CapsuleConfidentialityScope,
@@ -670,6 +673,99 @@ export function deriveOperatingPhase(params: {
   return "explore";
 }
 
+/** T52: OS auth version SoT field; absent / non-finite / negative ⇒ 0 (migrate, do not invent). */
+export function readOperatingStateAuthEpoch(
+  state: { authEpoch?: number } | null | undefined,
+): number {
+  if (typeof state?.authEpoch !== "number" || !Number.isFinite(state.authEpoch)) {
+    return 0;
+  }
+  if (state.authEpoch < 0) {
+    return 0;
+  }
+  return Math.floor(state.authEpoch);
+}
+
+/** Directory for per-group OS auth lock (serializes auth writes + eligibility auth checks). */
+export function groupAuthLockDir(params: { groupId: string; groupRootDir: string }): string {
+  return path.join(resolveGroupWorkspacePath(params.groupRootDir, params.groupId), "os-auth");
+}
+
+function lockStemForGroupAuth(groupId: string): string {
+  return createHash("sha256")
+    .update(`group-auth:${groupId.trim()}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+/**
+ * T52: group-level auth lock. Lock order vs task control: **auth → task** (never reverse).
+ * Do not hold while awaiting external HTTP.
+ */
+export async function withGroupAuthLock<T>(params: {
+  groupId: string;
+  groupRootDir?: string;
+  cfg?: ReturnType<typeof loadConfig>;
+  fn: () => T | Promise<T>;
+}): Promise<T> {
+  const groupRootDir =
+    params.groupRootDir ?? createWorkspaceCollaborationStores(params.cfg).groupRootDir;
+  const dir = groupAuthLockDir({ groupId: params.groupId, groupRootDir });
+  fsSync.mkdirSync(dir, { recursive: true });
+  return withRoundLock(dir, lockStemForGroupAuth(params.groupId), params.fn);
+}
+
+export type GroupOperatingStateWriteKind = "business" | "auth";
+
+/**
+ * Merge policy for OS writes (T52):
+ * - auth: must not roll back authEpoch; abnormal explicit values refuse
+ * - business: never decrease authEpoch; stale lower-epoch snapshots preserve live
+ *   authEpoch + memberRoleMap; unaware writers (no authEpoch field) keep live epoch
+ */
+export function mergeOperatingStateAuthPolicy(params: {
+  live: GatewayCollaborationGroupOperatingState | null;
+  incoming: GatewayCollaborationGroupOperatingState & { authEpoch?: number };
+  writeKind: GroupOperatingStateWriteKind;
+}): GatewayCollaborationGroupOperatingState & { authEpoch: number } {
+  const live = params.live;
+  const incoming = params.incoming;
+  const liveEpoch = readOperatingStateAuthEpoch(live);
+  const rawIncoming = (incoming as { authEpoch?: unknown }).authEpoch;
+  const hasIncomingEpoch = typeof rawIncoming === "number";
+
+  if (params.writeKind === "auth") {
+    if (hasIncomingEpoch && (!Number.isFinite(rawIncoming) || (rawIncoming as number) < 0)) {
+      throw new Error(`invalid authEpoch for auth write: ${String(rawIncoming)}`);
+    }
+    const incomingEpoch = readOperatingStateAuthEpoch(incoming);
+    if (incomingEpoch < liveEpoch) {
+      throw new Error(
+        `auth write would roll back authEpoch ${liveEpoch} → ${incomingEpoch}`,
+      );
+    }
+    return { ...incoming, authEpoch: incomingEpoch };
+  }
+
+  // business
+  if (!live) {
+    const epoch = hasIncomingEpoch ? readOperatingStateAuthEpoch(incoming) : 0;
+    return { ...incoming, authEpoch: epoch };
+  }
+  if (hasIncomingEpoch && readOperatingStateAuthEpoch(incoming) < liveEpoch) {
+    // Stale snapshot — preserve authorization fields + version from live.
+    return {
+      ...incoming,
+      authEpoch: liveEpoch,
+      memberRoleMap: live.memberRoleMap,
+    };
+  }
+  return {
+    ...incoming,
+    authEpoch: Math.max(liveEpoch, hasIncomingEpoch ? readOperatingStateAuthEpoch(incoming) : liveEpoch),
+  };
+}
+
 export async function readGroupOperatingState(params: {
   fileStore: ReturnType<typeof createGroupFileStore>;
   groupId: string;
@@ -682,17 +778,69 @@ export async function readGroupOperatingState(params: {
   });
 }
 
-export async function writeGroupOperatingState(params: {
+async function persistGroupOperatingStateUnlocked(params: {
   fileStore: ReturnType<typeof createGroupFileStore>;
   groupId: string;
   state: GatewayCollaborationGroupOperatingState;
   baseDir?: string;
-}) {
+}): Promise<void> {
   await params.fileStore.writeGroupFile({
     groupId: params.groupId,
     filename: GROUP_OPERATING_STATE_FILENAME,
     data: params.state,
     baseDir: params.baseDir,
+  });
+}
+
+/**
+ * T52: all OS writers converge here. Under group auth lock: re-read live, apply
+ * auth merge policy, then persist. Auth-intent writers pass writeKind:"auth".
+ * Callers already holding withGroupAuthLock must set alreadyHoldingAuthLock.
+ */
+export async function writeGroupOperatingState(params: {
+  fileStore: ReturnType<typeof createGroupFileStore>;
+  groupId: string;
+  state: GatewayCollaborationGroupOperatingState;
+  baseDir?: string;
+  /** Default "business" — preserves auth fields/version against stale rollback. */
+  writeKind?: GroupOperatingStateWriteKind;
+  /** Caller already holds withGroupAuthLock for this group (non-reentrant lock). */
+  alreadyHoldingAuthLock?: boolean;
+  /** Test-only: after live re-read under lock, before merge/write. */
+  _testAfterLiveReadBarrier?: () => Promise<void>;
+}): Promise<void> {
+  const writeKind = params.writeKind ?? "business";
+  const run = async () => {
+    const live = await readGroupOperatingState({
+      fileStore: params.fileStore,
+      groupId: params.groupId,
+      baseDir: params.baseDir,
+    });
+    if (params._testAfterLiveReadBarrier) {
+      await params._testAfterLiveReadBarrier();
+    }
+    const merged = mergeOperatingStateAuthPolicy({
+      live,
+      incoming: params.state as GatewayCollaborationGroupOperatingState & { authEpoch?: number },
+      writeKind,
+    });
+    await persistGroupOperatingStateUnlocked({
+      fileStore: params.fileStore,
+      groupId: params.groupId,
+      state: merged,
+      baseDir: params.baseDir,
+    });
+  };
+  if (params.alreadyHoldingAuthLock) {
+    await run();
+    return;
+  }
+  const groupRootDir =
+    params.baseDir ?? createWorkspaceCollaborationStores().groupRootDir;
+  await withGroupAuthLock({
+    groupId: params.groupId,
+    groupRootDir,
+    fn: run,
   });
 }
 

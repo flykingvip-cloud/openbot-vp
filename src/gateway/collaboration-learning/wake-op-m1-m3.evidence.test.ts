@@ -3967,4 +3967,306 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
     }
     expect(["auth_epoch_mismatch", "auth_fingerprint_mismatch"]).toContain(casAfterChild.reason);
   });
+
+  test("M3-AUTH-1: concurrent revoke A+B both retained (stable counterexample)", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-1";
+    const { fileStore, groupId } = await seed({ cfg, taskId, itemId: "auth1" });
+    // Ensure both A (bot0) and B (admin) are present to revoke independently.
+    await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [],
+      mutate: (state) => {
+        const map = [...(state.memberRoleMap ?? [])];
+        for (const id of [tenant.bot0, tenant.admin]) {
+          if (!map.some((r) => r.memberId === id)) {
+            map.push({
+              memberId: id,
+              memberKind: id === tenant.bot0 ? "bot" : "human",
+              governanceRole: id === tenant.admin ? "admin" : "member",
+              collaborationRole: null,
+              status: "active",
+            });
+          }
+        }
+        return { ...state, memberRoleMap: map };
+      },
+    });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const auth0 = readOperatingStateAuthEpoch(os0);
+    expect((os0?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(true);
+    expect((os0?.memberRoleMap ?? []).some((r) => r.memberId === tenant.admin)).toBe(true);
+
+    let releaseWrites!: () => void;
+    const bothReadGate = new Promise<void>((r) => {
+      releaseWrites = r;
+    });
+    let reads = 0;
+    const noteRead = async () => {
+      reads += 1;
+      if (reads >= 2) {
+        // both observed the pre-lock snapshot; allow lock/re-read/write to proceed
+      }
+      await bothReadGate;
+    };
+
+    const revokeA = applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [],
+      _testAfterInitialReadBeforeLock: noteRead,
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    const revokeB = applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [],
+      _testAfterInitialReadBeforeLock: noteRead,
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.admin),
+      }),
+    });
+
+    for (let i = 0; i < 400; i += 1) {
+      if (reads >= 2) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(reads).toBe(2);
+    releaseWrites();
+    const [ra, rb] = await Promise.all([revokeA, revokeB]);
+
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    const finalAuth = readOperatingStateAuthEpoch(finalOs);
+    const ids = new Set((finalOs?.memberRoleMap ?? []).map((r) => r.memberId));
+    // Both revokes must be retained — not last-writer-wins on a stale snapshot.
+    expect(ids.has(tenant.bot0)).toBe(false);
+    expect(ids.has(tenant.admin)).toBe(false);
+    // Version advance is explainable: two serialized bumps from the same baseline.
+    expect(finalAuth).toBe(auth0 + 2);
+    expect(new Set([ra.authEpoch, rb.authEpoch])).toEqual(new Set([auth0 + 1, auth0 + 2]));
+    expect(Math.max(ra.authEpoch, rb.authEpoch)).toBe(finalAuth);
+  });
+
+  test("M3-AUTH-2: take OS-read→taken submit atomic vs revoke; multi-task same group", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskA = "task-m3-auth-2a";
+    const taskB = "task-m3-auth-2b";
+    const { fileStore, groupId, objectStorage } = await seed({
+      cfg,
+      taskId: taskA,
+      itemId: "auth2a",
+    });
+    await objectStorage.writeObject(groupId, "task", taskB, {
+      taskId: taskB,
+      groupId,
+      title: "t52-b",
+      status: "in_progress",
+      ownerMemberId: tenant.coordinator,
+      assignedMemberIds: [tenant.bot0],
+      responsibility: {
+        owner: tenant.coordinator,
+        executors: [tenant.bot0],
+        reviewers: [],
+        approvers: [tenant.approver],
+      },
+      controlEpoch: 0,
+      createdAtMs: 1,
+      updatedAtMs: 1,
+    } as Task);
+
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os0, [tenant.bot0]);
+    const auth0 = readOperatingStateAuthEpoch(os0);
+
+    const commitA = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId: taskA,
+      opKey: opKeyFor(taskA, "auth2a"),
+      expectedControlEpoch: 0,
+      expectedAuthEpoch: auth0,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(commitA.ok).toBe(true);
+    if (!commitA.ok) {
+      throw new Error("commit A required");
+    }
+    const commitB = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId: taskB,
+      opKey: opKeyFor(taskB, "auth2b"),
+      expectedControlEpoch: 0,
+      expectedAuthEpoch: auth0,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(commitB.ok).toBe(true);
+    if (!commitB.ok) {
+      throw new Error("commit B required");
+    }
+
+    let releaseTake!: () => void;
+    const takeBarrier = new Promise<void>((r) => {
+      releaseTake = r;
+    });
+    let takeEntered = false;
+    let revokeStarted = false;
+    let revokeFinishedBeforeTakeWrite = false;
+
+    const takeP = casTakeTaskDispatchEligibility({
+      groupId,
+      taskId: taskA,
+      opKey: opKeyFor(taskA, "auth2a"),
+      claimId: commitA.claim.claimId,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      _testAfterOsReadBarrier: async () => {
+        takeEntered = true;
+        // While take holds auth+task locks after OS read, revoke must not complete
+        // an OS auth write (unified boundary). Signal and wait.
+        await takeBarrier;
+        // If revoke already finished its OS write while we sat on the barrier,
+        // the auth lock was NOT covering this critical section (regression).
+        if (revokeStarted && revokeFinishedBeforeTakeWrite) {
+          // observed below via flag; take will still re-check? No — snapshot already read.
+          // With the fix, revoke cannot finish until we release.
+        }
+      },
+    });
+
+    for (let i = 0; i < 400; i += 1) {
+      if (takeEntered) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(takeEntered).toBe(true);
+
+    revokeStarted = true;
+    const revokeP = applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskA, taskB],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    // Give revoke a chance to race; with auth lock it must block until take releases.
+    await new Promise((r) => setTimeout(r, 80));
+    const osMid = await readGroupOperatingState({ fileStore, groupId });
+    // Revoke must not have written yet (still authEpoch == auth0) while take holds the lock.
+    expect(readOperatingStateAuthEpoch(osMid)).toBe(auth0);
+    revokeFinishedBeforeTakeWrite = readOperatingStateAuthEpoch(osMid) > auth0;
+
+    releaseTake();
+    const [takeResult, revokeResult] = await Promise.all([takeP, revokeP]);
+
+    // Take completed under the pre-revoke epoch (legitimately first), then revoke advanced.
+    // OR take refused if revoke won the auth lock first — both are valid linearizations.
+    // Illegal: revoke OS write between take's OS read and taken write while take still succeeds
+    // with the stale snapshot. We already asserted mid-barrier OS was unchanged.
+    expect(revokeFinishedBeforeTakeWrite).toBe(false);
+    expect(revokeResult.authEpoch).toBeGreaterThan(auth0);
+
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(revokeResult.authEpoch);
+    expect((finalOs?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+
+    // Both tasks affected by the same group auth change: outstanding claims cleared / epochs bumped.
+    const finalA = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskA)) as never,
+    );
+    const finalB = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskB)) as never,
+    );
+    expect(finalA.dispatchClaim).toBeFalsy();
+    expect(finalB.dispatchClaim).toBeFalsy();
+
+    if (takeResult.ok) {
+      // Take won the race before revoke: claim was taken then cleared by revoke.
+      expect(takeResult.claim.phase).toBe("taken");
+    } else {
+      expect(["auth_epoch_mismatch", "claim_missing", "epoch_mismatch", "claim_id_mismatch"]).toContain(
+        takeResult.reason,
+      );
+    }
+
+    // Fresh take on B with pre-revoke claim must fail after group auth change.
+    const takeB = await casTakeTaskDispatchEligibility({
+      groupId,
+      taskId: taskB,
+      opKey: opKeyFor(taskB, "auth2b"),
+      claimId: commitB.claim.claimId,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(takeB.ok).toBe(false);
+  });
+
+  test("M3-AUTH-3: stale OS business write cannot roll back authEpoch / member auth", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-auth-3";
+    const { fileStore, groupId } = await seed({ cfg, taskId, itemId: "auth3" });
+    const os0 = await readGroupOperatingState({ fileStore, groupId });
+    const auth0 = readOperatingStateAuthEpoch(os0);
+    const staleSnapshot = {
+      ...(os0 as NonNullable<typeof os0>),
+      activeContext: {
+        ...(os0 as NonNullable<typeof os0>).activeContext,
+        summary: "stale-business-summary",
+      },
+    };
+
+    const revoked = await applyAuthRevokeSharedCas({
+      groupId,
+      cfg,
+      invalidateTaskIds: [taskId],
+      mutate: (state) => ({
+        ...state,
+        memberRoleMap: (state.memberRoleMap ?? []).filter((row) => row.memberId !== tenant.bot0),
+      }),
+    });
+    expect(revoked.authEpoch).toBe(auth0 + 1);
+    const afterRevoke = await readGroupOperatingState({ fileStore, groupId });
+    expect((afterRevoke?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+
+    // Stale business write carrying old authEpoch + old memberRoleMap must not roll back.
+    await writeGroupOperatingState({
+      fileStore,
+      groupId,
+      state: {
+        ...staleSnapshot,
+        authEpoch: auth0,
+        updatedAtMs: Date.now(),
+      } as typeof staleSnapshot & { authEpoch: number },
+    });
+    const finalOs = await readGroupOperatingState({ fileStore, groupId });
+    expect(readOperatingStateAuthEpoch(finalOs)).toBe(revoked.authEpoch);
+    expect((finalOs?.memberRoleMap ?? []).some((r) => r.memberId === tenant.bot0)).toBe(false);
+    // Business field from stale may apply, but auth fields stay at live.
+    expect(finalOs?.activeContext?.summary).toBe("stale-business-summary");
+
+    // Abnormal authEpoch on auth write must refuse (not silently become legal).
+    await expect(
+      writeGroupOperatingState({
+        fileStore,
+        groupId,
+        writeKind: "auth",
+        state: {
+          ...(finalOs as NonNullable<typeof finalOs>),
+          authEpoch: Number.NaN,
+        } as never,
+      }),
+    ).rejects.toThrow(/invalid authEpoch/);
+  });
 });

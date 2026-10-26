@@ -1,5 +1,5 @@
 /**
- * T41/T42/T43/T44/T51 M3 — shared control-version CAS for stop vs dispatch eligibility,
+ * T41/T42/T43/T44/T51/T52 M3 — shared control-version CAS for stop vs dispatch eligibility,
  * business task writers, and auth revoke (preserve stopControl/controlEpoch/dispatchClaim).
  *
  * Linearization point: task authority record under a per-task control lock.
@@ -12,10 +12,12 @@
  * - taken leases must not be auto-released by timeout; clear requires matching claimId
  * - external dispatch must CAS-take the claim before invoking the dispatcher
  *
- * T51 Auth revoke **is** on a shared version plane: OS `authEpoch` is the unique auth
- * version source; claims snapshot it; commit/take refuse on authEpoch mismatch even when
- * fingerprint is held constant. Shared revoke writers bump authEpoch, then clear (and
- * optionally bump controlEpoch on) outstanding task claims under the same task lock.
+ * T51/T52 Auth revoke on shared version plane: OS `authEpoch` is the unique auth version
+ * source; claims snapshot it; commit/take refuse on authEpoch mismatch even when
+ * fingerprint is held constant. T52: group auth lock serializes OS auth writes with
+ * commit/take auth reads + eligibility submit (lock order: **auth → task**). Concurrent
+ * revokes re-read under the auth lock so member mutations compose. OS writers converge
+ * through writeGroupOperatingState auth merge (business cannot roll back authEpoch).
  *
  * Wake-op dispatchEligibility remains an audit/mirror; the task claim is authoritative.
  * Wakes without a persisted task authority record stay wake-op-only (no task CAS).
@@ -30,14 +32,18 @@ import type { GatewayCollaborationGroupOperatingState } from "../collaboration-l
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
+  readOperatingStateAuthEpoch,
   resolveGroupWorkspacePath,
+  withGroupAuthLock,
   writeGroupOperatingState,
 } from "../collaboration-learning/shared.js";
 
-/** T51: OS auth version lives on the durable operating-state object (field authEpoch). */
+/** T51/T52: OS auth version lives on the durable operating-state object (field authEpoch). */
 export type OperatingStateWithAuthEpoch = GatewayCollaborationGroupOperatingState & {
   authEpoch?: number;
 };
+
+export { readOperatingStateAuthEpoch, withGroupAuthLock };
 import { withRoundLock } from "./round-store-io.js";
 import { asGovernedTask, type GovernedTask, type TaskDispatchClaim } from "./task-runtime.js";
 import { assertTaskNotStopped, isTaskStopAccepted } from "./task-stop-control.js";
@@ -52,15 +58,6 @@ function compact(value: string | null | undefined): string {
 function readControlEpoch(task: GovernedTask): number {
   return typeof task.controlEpoch === "number" && Number.isFinite(task.controlEpoch)
     ? Number(task.controlEpoch)
-    : 0;
-}
-
-/** OS authEpoch SoT; absent ⇒ 0. */
-export function readOperatingStateAuthEpoch(
-  state: { authEpoch?: number } | null | undefined,
-): number {
-  return typeof state?.authEpoch === "number" && Number.isFinite(state.authEpoch)
-    ? Number(state.authEpoch)
     : 0;
 }
 
@@ -119,6 +116,11 @@ export type CasCommitTaskDispatchEligibilityParams = {
    * constant artificially.
    */
   _testForceLiveAuthFingerprint?: string;
+  /**
+   * Test-only: after OS authEpoch read under auth+task locks, before claim write.
+   * Used to prove revoke cannot interleave between auth read and eligibility submit.
+   */
+  _testAfterOsReadBarrier?: () => Promise<void>;
 };
 
 export type CasCommitTaskDispatchEligibilityResult =
@@ -156,7 +158,12 @@ export async function casCommitTaskDispatchEligibility(
       : 0;
   const wantFp = compact(params.authFingerprint);
 
-  return withTaskControlLock({
+  // T52: auth lock wraps OS auth read + eligibility submit (order: auth → task).
+  return withGroupAuthLock({
+    groupId: params.groupId,
+    cfg,
+    fn: async () =>
+      withTaskControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
@@ -218,6 +225,9 @@ export async function casCommitTaskDispatchEligibility(
           detail: `auth source unreadable during eligibility CAS: ${String(error)}`,
           task: governed,
         };
+      }
+      if (params._testAfterOsReadBarrier) {
+        await params._testAfterOsReadBarrier();
       }
       if (liveAuthEpoch !== expectedAuth) {
         return {
@@ -285,6 +295,7 @@ export async function casCommitTaskDispatchEligibility(
       await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
       return { ok: true, task: updated, claim };
     },
+  }),
   });
 }
 
@@ -299,6 +310,11 @@ export type CasTakeTaskDispatchEligibilityParams = {
   targetActorIds?: readonly string[];
   /** Test-only: force live fingerprint string (M3-REV-3 constant-fp proof). */
   _testForceLiveAuthFingerprint?: string;
+  /**
+   * Test-only: after OS authEpoch read under auth+task locks, before taken write.
+   * Proves revoke cannot slip an OS write between auth check and eligibility submit.
+   */
+  _testAfterOsReadBarrier?: () => Promise<void>;
 };
 
 export type CasTakeTaskDispatchEligibilityResult =
@@ -335,7 +351,12 @@ export async function casTakeTaskDispatchEligibility(
   const nowMs = params.nowMs ?? Date.now();
   const opKey = compact(params.opKey);
 
-  return withTaskControlLock({
+  // T52: auth lock wraps OS auth read + take submit (order: auth → task).
+  return withGroupAuthLock({
+    groupId: params.groupId,
+    cfg,
+    fn: async () =>
+      withTaskControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
@@ -429,6 +450,9 @@ export async function casTakeTaskDispatchEligibility(
           task: governed,
         };
       }
+      if (params._testAfterOsReadBarrier) {
+        await params._testAfterOsReadBarrier();
+      }
       if (liveAuthEpoch !== readClaimAuthEpoch(claim)) {
         return {
           ok: false,
@@ -465,6 +489,7 @@ export async function casTakeTaskDispatchEligibility(
       await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
       return { ok: true, task: updated, claim: taken };
     },
+  }),
   });
 }
 
@@ -720,17 +745,19 @@ export async function applyBusinessTaskPatchUnderControlLock(params: {
 /** Test helper: brief yield so concurrent lock contenders can interleave. */
 
 /**
- * T51: shared auth-revoke writer.
+ * T51/T52: shared auth-revoke writer under the **group auth lock**.
  *
- * 1) Mutate OS (member map / role / duty bindings), then bump OS `authEpoch`
- *    (unique auth version SoT) and persist.
- * 2) For each invalidateTaskId, under the **same** task control lock used by
- *    eligibility CAS: clear outstanding dispatchClaim and (by default) bump
- *    controlEpoch so revoke linearizes with stop/eligibility on the task plane.
+ * 1) Under group auth lock: re-read OS → mutate → bump `authEpoch` → persist
+ *    (writeKind:"auth"). Concurrent revokes serialize here and each re-reads,
+ *    so member mutations compose (A+B both retained).
+ * 2) Still holding auth lock, for each invalidateTaskId under task control lock
+ *    (order auth → task): clear dispatchClaim and (by default) bump controlEpoch.
  *
- * Call this (or an equivalent that bumps authEpoch before mapping changes) from
- * production revoke / membership / duty-change paths. Plain `writeGroupOperatingState`
- * without an authEpoch bump does **not** participate in the shared version plane.
+ * Commit/take take the same auth lock around OS auth read + eligibility submit,
+ * so revoke cannot interleave an OS write between those two steps.
+ *
+ * Call this from production revoke / membership / duty-change paths. Plain
+ * business `writeGroupOperatingState` cannot roll back authEpoch (T52 merge).
  */
 export async function applyAuthRevokeSharedCas(params: {
   groupId: string;
@@ -749,6 +776,16 @@ export async function applyAuthRevokeSharedCas(params: {
    * interrupt unconsumed eligibility on the stop/eligibility version plane).
    */
   bumpTaskControlEpoch?: boolean;
+  /**
+   * Test-only: after an initial OS read **outside** the auth lock (both
+   * concurrent revokes can observe the same stale snapshot), before acquiring
+   * the lock / re-read / write. Stable counterexample for lost concurrent revoke.
+   */
+  _testAfterInitialReadBeforeLock?: (
+    state: OperatingStateWithAuthEpoch,
+  ) => void | Promise<void>;
+  /** Test-only: after re-read under auth lock, before mutate/write. */
+  _testAfterOsReadUnderLock?: (state: OperatingStateWithAuthEpoch) => void | Promise<void>;
 }): Promise<{
   authEpoch: number;
   operatingState: OperatingStateWithAuthEpoch;
@@ -761,73 +798,97 @@ export async function applyAuthRevokeSharedCas(params: {
   const cfg = params.cfg ?? loadConfig();
   const nowMs = params.nowMs ?? Date.now();
   const bumpTask = params.bumpTaskControlEpoch !== false;
-  const { fileStore } = createWorkspaceCollaborationStores(cfg);
-  const current = await readGroupOperatingState({
-    fileStore,
-    groupId: params.groupId,
-  });
-  if (!current) {
-    throw new Error(`operating state missing for auth revoke: ${params.groupId}`);
-  }
-  const mutated = params.mutate(current);
-  const nextAuth = readOperatingStateAuthEpoch(mutated) + 1;
-  // If mutate already advanced authEpoch, keep the higher bump once.
-  const prior = readOperatingStateAuthEpoch(current);
-  const authEpoch = Math.max(nextAuth, prior + 1);
-  const operatingState: OperatingStateWithAuthEpoch = {
-    ...mutated,
-    authEpoch,
-    updatedAtMs: nowMs,
-  };
-  await writeGroupOperatingState({
-    fileStore,
-    groupId: params.groupId,
-    state: operatingState,
-  });
+  const { fileStore, groupRootDir } = createWorkspaceCollaborationStores(cfg);
 
-  const invalidatedTasks: Array<{
-    taskId: string;
-    controlEpoch: number;
-    clearedClaim: boolean;
-  }> = [];
-  for (const rawId of params.invalidateTaskIds ?? []) {
-    const taskId = compact(rawId);
-    if (!taskId) {
-      continue;
-    }
-    const result = await withTaskControlLock({
+  if (params._testAfterInitialReadBeforeLock) {
+    const snap = await readGroupOperatingState({
+      fileStore,
       groupId: params.groupId,
-      taskId,
-      cfg,
-      fn: async () => {
-        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-        const task = await objectStorage.readObject<Task>(params.groupId, "task", taskId);
-        if (!task) {
-          return null;
-        }
-        const governed = asGovernedTask(task);
-        const clearedClaim = Boolean(governed.dispatchClaim);
-        const priorEpoch = readControlEpoch(governed);
-        const nextEpoch = bumpTask ? priorEpoch + 1 : priorEpoch;
-        const updated: GovernedTask = {
-          ...governed,
-          controlEpoch: nextEpoch,
-          dispatchClaim: undefined,
-          updatedAtMs: nowMs,
-        };
-        await objectStorage.writeObject(params.groupId, "task", taskId, updated);
-        return {
-          taskId,
-          controlEpoch: nextEpoch,
-          clearedClaim,
-        };
-      },
     });
-    if (result) {
-      invalidatedTasks.push(result);
+    if (!snap) {
+      throw new Error(`operating state missing for auth revoke: ${params.groupId}`);
     }
+    await params._testAfterInitialReadBeforeLock(snap as OperatingStateWithAuthEpoch);
   }
-  return { authEpoch, operatingState, invalidatedTasks };
+
+  return withGroupAuthLock({
+    groupId: params.groupId,
+    groupRootDir,
+    cfg,
+    fn: async () => {
+      const current = await readGroupOperatingState({
+        fileStore,
+        groupId: params.groupId,
+      });
+      if (!current) {
+        throw new Error(`operating state missing for auth revoke: ${params.groupId}`);
+      }
+      if (params._testAfterOsReadUnderLock) {
+        await params._testAfterOsReadUnderLock(current as OperatingStateWithAuthEpoch);
+      }
+      const mutated = params.mutate(current as OperatingStateWithAuthEpoch);
+      const prior = readOperatingStateAuthEpoch(current);
+      const nextAuth = readOperatingStateAuthEpoch(mutated) + 1;
+      // If mutate already advanced authEpoch, keep the higher bump once.
+      const authEpoch = Math.max(nextAuth, prior + 1);
+      const operatingState: OperatingStateWithAuthEpoch = {
+        ...mutated,
+        authEpoch,
+        updatedAtMs: nowMs,
+      };
+      await writeGroupOperatingState({
+        fileStore,
+        groupId: params.groupId,
+        state: operatingState,
+        writeKind: "auth",
+        alreadyHoldingAuthLock: true,
+      });
+
+      const invalidatedTasks: Array<{
+        taskId: string;
+        controlEpoch: number;
+        clearedClaim: boolean;
+      }> = [];
+      for (const rawId of params.invalidateTaskIds ?? []) {
+        const taskId = compact(rawId);
+        if (!taskId) {
+          continue;
+        }
+        const result = await withTaskControlLock({
+          groupId: params.groupId,
+          taskId,
+          cfg,
+          fn: async () => {
+            const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+            const task = await objectStorage.readObject<Task>(params.groupId, "task", taskId);
+            if (!task) {
+              return null;
+            }
+            const governed = asGovernedTask(task);
+            const clearedClaim = Boolean(governed.dispatchClaim);
+            const priorEpoch = readControlEpoch(governed);
+            const nextEpoch = bumpTask ? priorEpoch + 1 : priorEpoch;
+            const updated: GovernedTask = {
+              ...governed,
+              controlEpoch: nextEpoch,
+              dispatchClaim: undefined,
+              updatedAtMs: nowMs,
+            };
+            await objectStorage.writeObject(params.groupId, "task", taskId, updated);
+            return {
+              taskId,
+              controlEpoch: nextEpoch,
+              clearedClaim,
+            };
+          },
+        });
+        if (result) {
+          invalidatedTasks.push(result);
+        }
+      }
+      return { authEpoch, operatingState, invalidatedTasks };
+    },
+  });
 }
 
 export function _testTaskControlCasYieldMs(): number {
