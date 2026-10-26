@@ -19260,6 +19260,7 @@ landingStreams:
       - src/telegram/sticker-cache.ts
       - scripts/check-isolation-fail-closed.mjs
       - scripts/memory-platform-audit.mjs
+      - scripts/memory-platform-audit.d.mts
       - scripts/memory-platform-recovery.mjs
       - scripts/governance/shadow-decisions-report.ts
       - scripts/__tests__/governance/shadow-decisions-report.test.ts
