@@ -11,7 +11,10 @@
  */
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
-import { isMappedDeliveryIdentity } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  hasDeliveryMembershipSurface,
+  isMappedDeliveryIdentity,
+} from "../collaboration-learning/delivery-actor-binding.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -49,19 +52,6 @@ function uniqueMappedCandidates(ids: readonly string[]): string[] {
     out.push(id);
   }
   return out;
-}
-
-function hasMembershipSurface(state: Parameters<typeof isMappedDeliveryIdentity>[0]): boolean {
-  if (!state) {
-    return false;
-  }
-  if (compact(state.governance?.coordinatorBotId)) {
-    return true;
-  }
-  if (compact(state.governance?.ownerUserId)) {
-    return true;
-  }
-  return (state.memberRoleMap?.length ?? 0) > 0;
 }
 
 /**
@@ -125,7 +115,7 @@ export async function recheckCurrentDispatchAuthorization(params: {
     }
   }
 
-  const membershipSurface = hasMembershipSurface(operatingState);
+  const membershipSurface = hasDeliveryMembershipSurface(operatingState);
   if (dutyCandidates.length === 0 && !membershipSurface) {
     return { ok: true };
   }

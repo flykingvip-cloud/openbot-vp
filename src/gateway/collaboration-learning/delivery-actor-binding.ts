@@ -27,7 +27,7 @@ export type DeliveryActorClient = {
 };
 
 export type DeliveryMembershipSource = {
-  governance?: { coordinatorBotId?: string | null } | null;
+  governance?: { coordinatorBotId?: string | null; ownerUserId?: string | null } | null;
   memberRoleMap?: ReadonlyArray<{ memberId?: string | null }> | null;
 } | null;
 
@@ -70,6 +70,25 @@ export function authenticatedSessionSubjects(client: DeliveryActorClient | null)
  * member, coordinator, or publisher. A missing operating-state row is not
  * privileged by itself; publisher ids are passed in by the caller when known.
  */
+
+/**
+ * True when operating state exposes a membership surface (coordinator, owner,
+ * or memberRoleMap rows). Used by dispatch auth recheck to decide whether to
+ * enforce mapping without reading governance fields in collaboration-dispatch.
+ */
+export function hasDeliveryMembershipSurface(state: DeliveryMembershipSource): boolean {
+  if (!state) {
+    return false;
+  }
+  if ((state.governance?.coordinatorBotId ?? "").trim()) {
+    return true;
+  }
+  if ((state.governance?.ownerUserId ?? "").trim()) {
+    return true;
+  }
+  return (state.memberRoleMap?.length ?? 0) > 0;
+}
+
 export function isMappedDeliveryIdentity(
   state: DeliveryMembershipSource,
   actorId: string,

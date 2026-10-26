@@ -368,9 +368,33 @@ describe("collaboration.learning.snapshot handler", () => {
     expect(operatingState.activeContext?.currentOperatingPhase).toBe("decide");
   });
 
-  it("persists an explicit task handoff contract", async () => {
+  it("refuses retired collaboration.task.handoff shortcut without mutating responsibility", async () => {
+    // T09-B1: shortcut is retired. Formal success path is covered by
+    // src/gateway/collaboration-learning/handoff-contract-entry.test.ts
+    // (proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff).
     const respond = vi.fn();
     const { collaborationLearningHandlers } = await import("./collaboration-learning.js");
+    const tasksPath = path.join(
+      workspaceDir,
+      "collaboration",
+      "groups",
+      encodeURIComponent("grp_product"),
+      "tasks.json",
+    );
+    const beforeRaw = await fs.readFile(tasksPath, "utf8");
+    const beforeTasks = JSON.parse(beforeRaw) as {
+      tasks: Array<{
+        taskId: string;
+        ownerMemberId?: string;
+        assignedMemberIds?: string[];
+        responsibility?: { owner?: string; executors?: string[] };
+        handoffs?: unknown[];
+        status?: string;
+        updatedAtMs?: number;
+      }>;
+    };
+    const beforeTask = beforeTasks.tasks.find((entry) => entry.taskId === "task-2");
+    expect(beforeTask).toBeDefined();
 
     await collaborationLearningHandlers["collaboration.task.handoff"]({
       req: {} as never,
@@ -392,30 +416,41 @@ describe("collaboration.learning.snapshot handler", () => {
       isWebchatConnect: () => false,
     });
 
+    expect(respond).toHaveBeenCalledTimes(1);
     expect(respond).toHaveBeenCalledWith(
-      true,
-      expect.objectContaining({
-        task: expect.objectContaining({
-          taskId: "task-2",
-          status: "ready",
-          ownerMemberId: "group",
-          assignedMemberIds: ["bot-main"],
-          responsibility: expect.objectContaining({
-            owner: "group",
-            executors: ["bot-main"],
-          }),
-          handoffs: [
-            expect.objectContaining({
-              from: "operator-1",
-              to: "bot-main",
-              remainingWork: "Finish the rollout checklist",
-              acceptanceCriteria: ["checklist reviewed"],
-            }),
-          ],
-        }),
-      }),
+      false,
       undefined,
+      expect.objectContaining({
+        code: "INVALID_REQUEST",
+        message: expect.stringMatching(
+          /proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff/,
+        ),
+      }),
     );
+    expect(String(respond.mock.calls[0]?.[2]?.message ?? "")).toMatch(
+      /shortcut is retired and refused/,
+    );
+
+    const afterRaw = await fs.readFile(tasksPath, "utf8");
+    expect(afterRaw).toBe(beforeRaw);
+    const afterTasks = JSON.parse(afterRaw) as typeof beforeTasks;
+    const afterTask = afterTasks.tasks.find((entry) => entry.taskId === "task-2");
+    expect(afterTask).toEqual(beforeTask);
+    expect(afterTask?.ownerMemberId).toBe(beforeTask?.ownerMemberId);
+    expect(afterTask?.assignedMemberIds).toEqual(beforeTask?.assignedMemberIds);
+    expect(afterTask?.responsibility).toEqual(beforeTask?.responsibility);
+    expect(afterTask?.handoffs ?? []).toEqual(beforeTask?.handoffs ?? []);
+
+    const groupDir = path.join(
+      workspaceDir,
+      "collaboration",
+      "groups",
+      encodeURIComponent("grp_product"),
+    );
+    const entries = await fs.readdir(groupDir);
+    expect(entries.filter((name) => /handoff/i.test(name))).toEqual([]);
+    const wakePath = path.join(groupDir, "wake-events.json");
+    await expect(fs.access(wakePath)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("rejects invalid deliverable transitions", async () => {
@@ -584,5 +619,102 @@ describe("collaboration.learning.snapshot handler", () => {
         message: expect.stringContaining("not editable outside draft status"),
       }),
     );
+  });
+});
+
+describe("collaboration.task.adminDailySummary params gate", () => {
+  beforeEach(async () => {
+    workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-admin-daily-"));
+    previousStateDir = process.env.OPENBOT_STATE_DIR;
+    process.env.OPENBOT_STATE_DIR = workspaceDir;
+    const groupDir = path.join(
+      workspaceDir,
+      "collaboration",
+      "groups",
+      encodeURIComponent("grp_product"),
+    );
+    await fs.mkdir(groupDir, { recursive: true });
+  });
+
+  afterEach(async () => {
+    if (previousStateDir === undefined) {
+      delete process.env.OPENBOT_STATE_DIR;
+    } else {
+      process.env.OPENBOT_STATE_DIR = previousStateDir;
+    }
+    await fs.rm(workspaceDir, { recursive: true, force: true });
+    workspaceDir = "";
+  });
+
+  it("rejects invalid params (missing groupId) via respond, not throw", async () => {
+    const respond = vi.fn();
+    const { collaborationLearningHandlers } = await import("./collaboration-learning.js");
+
+    await collaborationLearningHandlers["collaboration.task.adminDailySummary"]({
+      req: {} as never,
+      params: {},
+      respond: respond as never,
+      context: {} as never,
+      client: null,
+      isWebchatConnect: () => false,
+    });
+
+    expect(respond).toHaveBeenCalledTimes(1);
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("invalid collaboration.task.adminDailySummary params"),
+      }),
+    );
+  });
+
+  it("rejects wrong-shaped params (extra required fields from sibling schema)", async () => {
+    const respond = vi.fn();
+    const { collaborationLearningHandlers } = await import("./collaboration-learning.js");
+
+    // trySelfAdvance shape must not be required; adminDailySummary only needs groupId.
+    // Passing actorId alone (no groupId) is still invalid for adminDailySummary.
+    await collaborationLearningHandlers["collaboration.task.adminDailySummary"]({
+      req: {} as never,
+      params: { actorId: "bot:analyst" },
+      respond: respond as never,
+      context: {} as never,
+      client: null,
+      isWebchatConnect: () => false,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      false,
+      undefined,
+      expect.objectContaining({
+        message: expect.stringContaining("invalid collaboration.task.adminDailySummary params"),
+      }),
+    );
+  });
+
+  it("accepts valid { groupId } and reaches handler body (not params rejection)", async () => {
+    const respond = vi.fn();
+    const { collaborationLearningHandlers } = await import("./collaboration-learning.js");
+
+    await collaborationLearningHandlers["collaboration.task.adminDailySummary"]({
+      req: {} as never,
+      params: { groupId: "grp_product" },
+      respond: respond as never,
+      context: {} as never,
+      client: { connect: { user: "operator-1" } } as never,
+      isWebchatConnect: () => false,
+    });
+
+    expect(respond).toHaveBeenCalledTimes(1);
+    const [ok, payload, err] = respond.mock.calls[0] as [boolean, unknown, { message?: string }?];
+    // Must not be the params-gate failure (wrong validator / broken respond wiring).
+    if (!ok) {
+      expect(err?.message ?? "").not.toContain(
+        "invalid collaboration.task.adminDailySummary params",
+      );
+    } else {
+      expect(payload).toEqual(expect.objectContaining({ message: expect.any(String) }));
+    }
   });
 });
