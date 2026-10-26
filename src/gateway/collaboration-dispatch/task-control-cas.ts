@@ -1,12 +1,19 @@
 /**
- * T41 M3 — shared control-version CAS for stop/revoke vs dispatch eligibility.
+ * T41/T42 M3 — shared control-version CAS for stop vs dispatch eligibility.
  *
  * Linearization point: task authority record under a per-task control lock.
  * - stop bumps controlEpoch and clears any dispatchClaim
  * - eligibility commit is expected-version CAS on controlEpoch (+ auth fingerprint)
+ *   under a **single-claim** model (one valid claim per task; same-op retry must not
+ *   reset taken → committed)
  * - external dispatch must CAS-take the claim before invoking the dispatcher
  *
+ * Auth revoke is **not** on this shared version plane: commit/take re-check the live
+ * auth fingerprint under the lock (refuse on mismatch). That is a fingerprint
+ * condition, not OS+task single-file / shared-epoch adjudication with member revoke.
+ *
  * Wake-op dispatchEligibility remains an audit/mirror; the task claim is authoritative.
+ * Wakes without a persisted task authority record stay wake-op-only (no task CAS).
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -84,14 +91,16 @@ export type CasCommitTaskDispatchEligibilityResult =
         | "epoch_mismatch"
         | "auth_fingerprint_mismatch"
         | "auth_source_unreadable"
-        | "task_control_unreadable";
+        | "task_control_unreadable"
+        | "claim_held";
       detail: string;
       task?: GovernedTask | null;
     };
 
 /**
  * Expected-version CAS: under task control lock, commit dispatchClaim on the
- * task authority record iff controlEpoch still equals expected and task is not stopped.
+ * task authority record iff controlEpoch still equals expected, task is not stopped,
+ * and no other valid claim is held (single-claim model).
  */
 export async function casCommitTaskDispatchEligibility(
   params: CasCommitTaskDispatchEligibilityParams,
@@ -140,8 +149,9 @@ export async function casCommitTaskDispatchEligibility(
         };
       }
 
-      // Re-read auth fingerprint under the same lock window so revoke racing
-      // after the caller's observation cannot be stamped as eligible.
+      // Re-read auth fingerprint under the same lock window so a revoke that
+      // raced after the caller's observation cannot be stamped as eligible.
+      // (Fingerprint condition only — revoke writes are not on this task CAS.)
       let liveFp = wantFp;
       if (params.targetActorIds && params.targetActorIds.length > 0) {
         try {
@@ -166,6 +176,29 @@ export async function casCommitTaskDispatchEligibility(
             detail: "auth fingerprint changed before eligibility CAS commit",
             task: governed,
           };
+        }
+      }
+
+      // Single-claim model: one valid claim per task. Do not overwrite another op's
+      // committed/taken claim; same-op retry must not reset taken → committed.
+      const existing = governed.dispatchClaim;
+      if (existing) {
+        const existingOp = compact(existing.opKey);
+        if (existingOp && existingOp !== opKey) {
+          return {
+            ok: false,
+            reason: "claim_held",
+            detail: `task already holds dispatchClaim for op ${existing.opKey} (phase=${existing.phase})`,
+            task: governed,
+          };
+        }
+        if (existingOp === opKey && existing.phase === "taken") {
+          // Idempotent: keep taken; never reset to committed.
+          return { ok: true, task: governed, claim: existing };
+        }
+        if (existingOp === opKey && existing.phase === "committed") {
+          // Idempotent same-op retry of committed claim.
+          return { ok: true, task: governed, claim: existing };
         }
       }
 
@@ -218,8 +251,9 @@ export type CasTakeTaskDispatchEligibilityResult =
 
 /**
  * Before external dispatcher: CAS-take the task dispatchClaim with unoverwritable
- * version condition (epoch + fingerprint still match). Stop/revoke that advanced
- * the shared version causes take to fail — dispatcher must not run.
+ * version condition (epoch + fingerprint still match). Stop that advanced
+ * controlEpoch (or a fingerprint mismatch from live revoke recheck) causes take
+ * to fail — dispatcher must not run. Revoke itself is not a shared-epoch writer.
  */
 export async function casTakeTaskDispatchEligibility(
   params: CasTakeTaskDispatchEligibilityParams,
@@ -336,35 +370,91 @@ export async function casTakeTaskDispatchEligibility(
 }
 
 /**
+ * After a taken lease finishes (dispatcher returned/threw, or take won but
+ * dispatch was refused before the external call), clear this op's claim so a
+ * later op can commit under the single-claim model. No-op if missing/mismatched.
+ * Does not bump controlEpoch (stop remains the version bump).
+ */
+export async function casClearTaskDispatchClaimForOp(params: {
+  groupId: string;
+  taskId: string;
+  opKey: string;
+  cfg?: OpenBotConfig;
+  nowMs?: number;
+}): Promise<{ cleared: boolean; task: GovernedTask | null }> {
+  const cfg = params.cfg ?? loadConfig();
+  const nowMs = params.nowMs ?? Date.now();
+  const opKey = compact(params.opKey);
+  return withTaskControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    fn: async () => {
+      let current: Task | null;
+      try {
+        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+        current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+      } catch {
+        return { cleared: false, task: null };
+      }
+      if (!current) {
+        return { cleared: false, task: null };
+      }
+      const governed = asGovernedTask(current);
+      const claim = governed.dispatchClaim;
+      if (!claim || compact(claim.opKey) !== opKey) {
+        return { cleared: false, task: governed };
+      }
+      const updated: GovernedTask = {
+        ...governed,
+        dispatchClaim: undefined,
+        updatedAtMs: nowMs,
+      };
+      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+      return { cleared: true, task: updated };
+    },
+  });
+}
+
+/**
  * Stop path helper: under the shared task control lock, accept stop, bump
  * controlEpoch, and clear any dispatchClaim so outstanding eligibility loses CAS.
+ *
+ * T42: accepts **only** the stop patch (stopControl + operator + time). The lock
+ * re-reads the live task and patches control fields onto that latest record —
+ * never merge a whole stale task snapshot from outside the lock.
  */
 export async function applyTaskStopUnderControlLock(params: {
   groupId: string;
   taskId: string;
-  updated: GovernedTask;
+  stopControl: NonNullable<GovernedTask["stopControl"]>;
+  updatedBy: string;
+  updatedAtMs?: number;
   cfg?: OpenBotConfig;
 }): Promise<GovernedTask> {
   const cfg = params.cfg ?? loadConfig();
+  const updatedAtMs = params.updatedAtMs ?? Date.now();
+  const updatedBy = compact(params.updatedBy) || params.updatedBy;
   return withTaskControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
     fn: async () => {
       const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-      // Re-read under lock to serialize vs eligibility CAS.
+      // Re-read under lock to serialize vs eligibility CAS / other writers.
       const current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
       if (!current) {
         throw new Error(`task not found under control lock: ${params.taskId}`);
       }
       const governed = asGovernedTask(current);
       if (isTaskStopAccepted(governed)) {
-        // Already stopped — still clear any stale claim.
+        // Already stopped — still clear any stale claim; keep live business fields.
         if (governed.dispatchClaim) {
           const cleared: GovernedTask = {
             ...governed,
             dispatchClaim: undefined,
-            updatedAtMs: params.updated.updatedAtMs ?? Date.now(),
+            updatedAtMs,
           };
           await objectStorage.writeObject(params.groupId, "task", params.taskId, cleared);
           return cleared;
@@ -374,13 +464,11 @@ export async function applyTaskStopUnderControlLock(params: {
       const priorEpoch = readControlEpoch(governed);
       const next: GovernedTask = {
         ...governed,
-        ...params.updated,
-        // Preserve identity fields from live read; apply stop from caller.
-        stopControl: params.updated.stopControl,
+        stopControl: params.stopControl,
         controlEpoch: priorEpoch + 1,
         dispatchClaim: undefined,
-        updatedAtMs: params.updated.updatedAtMs ?? Date.now(),
-        updatedBy: params.updated.updatedBy,
+        updatedAtMs,
+        updatedBy,
       };
       await objectStorage.writeObject(params.groupId, "task", params.taskId, next);
       return next;

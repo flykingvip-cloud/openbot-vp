@@ -161,18 +161,14 @@ export async function requestCollaborationTaskStop(
     // Default unknown: in-flight external effects may already have escaped.
     externalEffect: params.externalEffect ?? "unknown",
   });
-  // T41: under shared task-control lock — bump controlEpoch, clear dispatchClaim,
-  // persist stop. Linearizes vs eligibility CAS (expected-version).
-  const draft: GovernedTask = {
-    ...governed,
-    stopControl,
-    updatedAtMs: params.nowMs ?? Date.now(),
-    updatedBy: actorId,
-  };
+  // T41/T42: under shared task-control lock — bump controlEpoch, clear dispatchClaim,
+  // persist stop patch onto the *live* task (no stale whole-object merge).
   const updated = await applyTaskStopUnderControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
-    updated: draft,
+    stopControl,
+    updatedBy: actorId,
+    updatedAtMs: params.nowMs ?? Date.now(),
     cfg,
   });
   const persistedStop = readTaskStopControl(updated);

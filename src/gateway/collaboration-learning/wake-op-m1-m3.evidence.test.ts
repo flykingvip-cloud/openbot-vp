@@ -22,11 +22,13 @@ import {
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
+  applyTaskStopUnderControlLock,
   casCommitTaskDispatchEligibility,
   casTakeTaskDispatchEligibility,
 } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
+import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-stop-control.js";
 import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-op-effect-verify.js";
 import {
   claimWakeOpRunning,
@@ -1477,5 +1479,220 @@ describe("T41 M3 shared control-version CAS", () => {
       cfg,
     });
     expect(take.ok).toBe(false);
+  });
+});
+
+describe("T42 M3 stop patch + single claim write", () => {
+  test("M3-WRITE-A stop under lock must not clobber newer business fields with stale snapshot", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-write-a";
+    const { objectStorage, groupId } = await seed({ cfg, taskId, itemId: "write-a" });
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    // Simulate entry reading old task outside the lock…
+    const staleSnapshot = {
+      ...before,
+      status: "in_progress" as const,
+      responsibility: {
+        owner: tenant.coordinator,
+        executors: [tenant.bot0],
+        reviewers: [],
+        approvers: [tenant.approver],
+      },
+      ownerMemberId: tenant.coordinator,
+      assignedMemberIds: [tenant.bot0],
+      updatedAtMs: 1,
+      updatedBy: tenant.owner,
+    };
+    // …then another writer updates responsibility/status before stop acquires the lock.
+    const liveBusiness = {
+      ...before,
+      status: "blocked" as const,
+      responsibility: {
+        owner: tenant.admin,
+        executors: [tenant.approver],
+        reviewers: [tenant.bot0],
+        approvers: [tenant.owner],
+      },
+      ownerMemberId: tenant.admin,
+      assignedMemberIds: [tenant.approver],
+      updatedAtMs: 42,
+      updatedBy: tenant.admin,
+      title: "live-after-stale-read",
+    };
+    await objectStorage.writeObject(groupId, "task", taskId, liveBusiness as never);
+
+    const stopControl = buildAcceptedTaskStopControl({
+      requestedBy: tenant.owner,
+      reason: "m3-write-a",
+      externalEffect: "none",
+      requestedAtMs: 99,
+    });
+    // Entry previously held staleSnapshot outside the lock; helper now takes only
+    // the stop patch and patches onto the live task under the lock.
+    void staleSnapshot; // retained to document the pre-lock stale read in the scenario
+    const stopped = await applyTaskStopUnderControlLock({
+      groupId,
+      taskId,
+      stopControl,
+      updatedBy: tenant.owner,
+      updatedAtMs: 99,
+      cfg,
+    });
+
+    expect(stopped.stopControl?.status).toBe("accepted");
+    expect(stopped.stopControl?.requestedBy).toBe(tenant.owner);
+    // Latest business fields must survive; stale snapshot must not win.
+    expect(stopped.status).toBe("blocked");
+    expect(stopped.ownerMemberId).toBe(tenant.admin);
+    expect(stopped.assignedMemberIds).toEqual([tenant.approver]);
+    expect(stopped.responsibility?.owner).toBe(tenant.admin);
+    expect(stopped.title).toBe("live-after-stale-read");
+    expect(stopped.controlEpoch).toBeGreaterThan(
+      typeof before.controlEpoch === "number" ? before.controlEpoch : 0,
+    );
+    expect(stopped.dispatchClaim).toBeFalsy();
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.status).toBe("blocked");
+    expect(final.ownerMemberId).toBe(tenant.admin);
+    expect(final.stopControl?.status).toBe("accepted");
+  });
+
+  test("M3-WRITE-B two different ops same epoch — second commit must not overwrite first claim", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-write-b";
+    const { objectStorage, groupId, fileStore } = await seed({ cfg, taskId, itemId: "write-b" });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const opA = opKeyFor(taskId, "write-b-op-a");
+    const opB = opKeyFor(taskId, "write-b-op-b");
+
+    const first = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opA,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 100,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      throw new Error("first commit must succeed");
+    }
+    expect(first.claim.opKey).toBe(opA);
+    expect(first.claim.phase).toBe("committed");
+
+    const second = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opB,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 200,
+    });
+    // Single-claim model: other op must be refused; first claim remains.
+    expect(second.ok).toBe(false);
+    if (second.ok) {
+      throw new Error("second commit must not silently overwrite");
+    }
+    expect(["claim_held", "claim_conflict", "epoch_mismatch"]).toContain(second.reason);
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.dispatchClaim?.opKey).toBe(opA);
+    expect(final.dispatchClaim?.phase).toBe("committed");
+    expect(final.dispatchClaim?.committedAtMs).toBe(100);
+  });
+
+  test("M3-WRITE-C after taken, re-commit (same or other op) must not reset to committed", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-write-c";
+    const { objectStorage, groupId, fileStore } = await seed({ cfg, taskId, itemId: "write-c" });
+    const os = await readGroupOperatingState({ fileStore, groupId });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const epoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+    const opA = opKeyFor(taskId, "write-c-op-a");
+    const opB = opKeyFor(taskId, "write-c-op-b");
+
+    const committed = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opA,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 10,
+    });
+    expect(committed.ok).toBe(true);
+    const taken = await casTakeTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opA,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 20,
+    });
+    expect(taken.ok).toBe(true);
+    if (!taken.ok) {
+      throw new Error("take must succeed");
+    }
+    expect(taken.claim.phase).toBe("taken");
+
+    const sameOpRetry = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opA,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 30,
+    });
+    // Same op must not reset taken → committed (idempotent keep taken OR refuse).
+    if (sameOpRetry.ok) {
+      expect(sameOpRetry.claim.phase).toBe("taken");
+      expect(sameOpRetry.claim.opKey).toBe(opA);
+    } else {
+      expect(["claim_held", "claim_conflict", "already_taken"]).toContain(sameOpRetry.reason);
+    }
+
+    const otherOp = await casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opB,
+      expectedControlEpoch: epoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      nowMs: 40,
+    });
+    expect(otherOp.ok).toBe(false);
+    if (otherOp.ok) {
+      throw new Error("other op must not overwrite taken");
+    }
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(final.dispatchClaim?.opKey).toBe(opA);
+    expect(final.dispatchClaim?.phase).toBe("taken");
+    expect(final.dispatchClaim?.takenAtMs).toBe(20);
   });
 });
