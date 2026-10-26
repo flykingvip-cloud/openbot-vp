@@ -104,7 +104,7 @@ describe("recordRunnerTurnOutcome", () => {
     expect(assessed.reason).toBe("executor_unwired");
   });
 
-  it("P1: plan-ok routing claim persists structured incomplete modality", async () => {
+  it("P1: plan-ok + trusted run success marks modality completed in production path", async () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-plan-ok",
@@ -119,13 +119,14 @@ describe("recordRunnerTurnOutcome", () => {
         detail: "routing_executable_not_completed",
       },
     });
-    expect(out.record.capabilityModality?.executionStatus).toBe("routing_ok");
-    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    // Production runner wires markTargetModalityCompleted after trusted success.
+    expect(out.record.capabilityModality?.executionStatus).toBe("completed");
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(true);
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
     const persisted = store.loadTask("run:run-plan-ok");
     expect(
       assessTargetModalityAcceptance(persisted?.capabilityModality).targetModalitySucceeded,
-    ).toBe(false);
+    ).toBe(true);
   });
 });
 
@@ -212,10 +213,10 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     expect(mark.message).toContain("cannot_complete_executor_unwired");
   });
 
-  it("controlled mark + setAcceptance: routing_ok becomes target success only after evidence", async () => {
+  it("integration: production runner success → formal acceptance passes without manual mark", async () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
-      runId: "run-mark-then-pass",
+      runId: "run-prod-accept",
       capabilityOutcome: {
         planFailureKind: "none",
         allowedModality: "chat_model",
@@ -227,39 +228,61 @@ describe("formal acceptance enforces capability modality (via service)", () => {
         detail: "routing_executable_not_completed",
       },
     });
+    // Production path must have marked completed from run evidence.
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(true);
+    expect(out.record.capabilityModality?.executionStatus).toBe("completed");
+    expect(out.record.reasonDetail).toContain(
+      "target_modality_completed_via=run_completed:run:run-prod-accept",
+    );
+
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
     const service = new TaskOutcomeResultService({ store });
     const chat = new ChatTaskOutcomeAdapter(service);
-    const taskId = out.record.taskId;
-    const ft = out.record.fencingToken!;
-    let v = out.record.outcomeVersion;
-
-    // Before mark: formal acceptance must refuse incomplete modality.
-    const early = chat.setAcceptance(taskId, v, ft, { status: "passed" }, { allowRetry: false });
-    expect(early.ok).toBe(false);
-    if (early.ok) {
-      return;
-    }
-    expect(early.message).toContain("target_modality_not_accepted");
-
-    const marked = chat.markTargetModalityCompleted(taskId, v, ft, {
-      kind: "run_completed",
-      digestOrRef: `run:${out.record.decisiveRunId ?? "run-mark-then-pass"}`,
-      detail: "real_execution_evidence",
-    });
-    expect(marked.ok).toBe(true);
-    if (!marked.ok) {
-      return;
-    }
-    expect(marked.record.capabilityModality?.targetModalityCompleted).toBe(true);
-    expect(marked.record.capabilityModality?.executionStatus).toBe("completed");
-    v = marked.record.outcomeVersion;
-
-    const passed = chat.setAcceptance(taskId, v, ft, { status: "passed" }, { allowRetry: false });
+    const passed = chat.setAcceptance(
+      out.record.taskId,
+      out.record.outcomeVersion,
+      out.record.fencingToken!,
+      { status: "passed" },
+      { allowRetry: false },
+    );
     expect(passed.ok).toBe(true);
     if (!passed.ok) {
       return;
     }
     expect(passed.record.acceptance.status).toBe("passed");
+  });
+
+  it("integration: executor_unwired stays incomplete; formal acceptance still refused after runner success", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-prod-unwired-refuse",
+      capabilityOutcome: {
+        planFailureKind: "executor_unwired",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: ["image_generation"],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "executor_unwired",
+        incompleteModalities: ["image_generation"],
+      },
+    });
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(out.record.capabilityModality?.executionStatus).toBe("executor_unwired");
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const refused = chat.setAcceptance(
+      out.record.taskId,
+      out.record.outcomeVersion,
+      out.record.fencingToken!,
+      { status: "passed" },
+      { allowRetry: false },
+    );
+    expect(refused.ok).toBe(false);
+    if (refused.ok) {
+      return;
+    }
+    expect(refused.message).toContain("target_modality_not_accepted");
   });
 });

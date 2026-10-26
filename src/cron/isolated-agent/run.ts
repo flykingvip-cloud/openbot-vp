@@ -858,7 +858,7 @@ export async function runCronIsolatedAgentTurn(params: {
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
       let cronSlotHeld = false;
-      let modelGate: EmployeeModelGateResult = {};
+      let modelGate: EmployeeModelGateResult | undefined;
       let cronAuthorizationId: string | undefined;
       const runContextEstimate = buildRunContextEstimateParts({
         taskText: promptText,
@@ -883,13 +883,13 @@ export async function runCronIsolatedAgentTurn(params: {
         if (runSlot.modelGate) {
           modelGate = runSlot.modelGate;
           commercialCreditReporting =
-            runSlot.modelGate.creditReporting ?? commercialCreditReporting;
+            runSlot.modelGate?.creditReporting ?? commercialCreditReporting;
         }
       }
       const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-        allowlist: modelGate.allowlist,
-        preferredModelOrder: modelGate.preferredModelOrder,
-        capabilityPlan: modelGate.capabilityPlan,
+        allowlist: modelGate?.allowlist,
+        preferredModelOrder: modelGate?.preferredModelOrder,
+        capabilityPlan: modelGate?.capabilityPlan,
       });
       const consumedCapability = consumeCapabilityRoutingResult({
         planFailure: executionRouting.planFailure,
@@ -912,7 +912,7 @@ export async function runCronIsolatedAgentTurn(params: {
         void recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
           success: consumedCapability.executionSurface.targetModalityCompleted,
           runId: cronRunId,
-          ...(modelGate.tenantId?.trim() ? { tenantId: modelGate.tenantId.trim() } : {}),
+          ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
           capabilityOutcome: consumedCapability.capabilityOutcome,
         });
       }
@@ -922,7 +922,7 @@ export async function runCronIsolatedAgentTurn(params: {
       const embeddedModelGovernance = resolveEmbeddedModelGovernance({
         gateStatus: cronSlotHeld ? "acquired" : "skipped",
         allowlist: executionRouting.allowlist,
-        tenantId: modelGate.tenantId,
+        tenantId: modelGate?.tenantId,
         commercialAuthorizationId: cronAuthorizationId,
       });
       const parentSnapshot = buildRunModelSetSnapshot({
@@ -930,12 +930,12 @@ export async function runCronIsolatedAgentTurn(params: {
         allowlist: executionRouting.allowlist,
         governanceMode: embeddedModelGovernance.governanceMode,
         commercialAuthorizationId: cronAuthorizationId,
-        tenantId: modelGate.tenantId,
+        tenantId: modelGate?.tenantId,
         preferredModelOrder: executionRouting.preferredModelOrder,
         platformModelsMode:
-          modelGate.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
-        ...(modelGate.effectiveRouting?.selectorStrategy
-          ? { selectorStrategy: modelGate.effectiveRouting.selectorStrategy }
+          modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
+        ...(modelGate?.effectiveRouting?.selectorStrategy
+          ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
           : {}),
         // P4-1: parent billing context for child runs (acquired gate only).
         creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
@@ -1052,7 +1052,9 @@ export async function runCronIsolatedAgentTurn(params: {
             const candidateRuntimeId = `${providerOverride}/${modelOverride}`;
             if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
               const tenantId =
-                modelGate.tenantId?.trim() || modelGate.creditReporting?.enterpriseId?.trim() || "";
+                modelGate?.tenantId?.trim() ||
+                modelGate?.creditReporting?.enterpriseId?.trim() ||
+                "";
               if (!tenantId) {
                 throw new Error(
                   "Enterprise BYOK model selected but managed tenantId could not be resolved",

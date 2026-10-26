@@ -216,7 +216,7 @@ export function createFollowupRunner(params: {
       let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
       let fallbackProvider = queued.run.provider;
       let fallbackModel = queued.run.model;
-      let modelGate: EmployeeModelGateResult = {};
+      let modelGate: EmployeeModelGateResult | undefined;
       let consumedCapability: ReturnType<typeof consumeCapabilityRoutingResult> | undefined;
       const activeSessionEntry =
         (sessionKey ? sessionStore?.[sessionKey] : undefined) ?? sessionEntry;
@@ -258,9 +258,9 @@ export function createFollowupRunner(params: {
           followupAuthorizationId = runSlot.authorizationDecisionId;
         }
         const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate.allowlist,
-          preferredModelOrder: modelGate.preferredModelOrder,
-          capabilityPlan: modelGate.capabilityPlan,
+          allowlist: modelGate?.allowlist,
+          preferredModelOrder: modelGate?.preferredModelOrder,
+          capabilityPlan: modelGate?.capabilityPlan,
         });
         // Structured surface: do not void outcomeClaim. Text may return; image/music stay incomplete.
         consumedCapability = consumeCapabilityRoutingResult({
@@ -277,7 +277,7 @@ export function createFollowupRunner(params: {
             void recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
               success: false,
               runId,
-              ...(modelGate.tenantId?.trim() ? { tenantId: modelGate.tenantId.trim() } : {}),
+              ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
               capabilityOutcome: consumedCapability.capabilityOutcome,
             });
           }
@@ -287,7 +287,7 @@ export function createFollowupRunner(params: {
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: followupSlotHeld ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           commercialAuthorizationId: followupAuthorizationId,
         });
         const parentSnapshot = buildRunModelSetSnapshot({
@@ -295,12 +295,12 @@ export function createFollowupRunner(params: {
           allowlist: executionRouting.allowlist,
           governanceMode: embeddedModelGovernance.governanceMode,
           commercialAuthorizationId: followupAuthorizationId,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           preferredModelOrder: executionRouting.preferredModelOrder,
           platformModelsMode:
-            modelGate.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
-          ...(modelGate.effectiveRouting?.selectorStrategy
-            ? { selectorStrategy: modelGate.effectiveRouting.selectorStrategy }
+            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
+          ...(modelGate?.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
             : {}),
           // P4-1: parent billing context for child runs (acquired gate only).
           creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
@@ -340,8 +340,8 @@ export function createFollowupRunner(params: {
               const candidateRuntimeId = `${provider}/${model}`;
               if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
                 const tenantId =
-                  modelGate.tenantId?.trim() ||
-                  modelGate.creditReporting?.enterpriseId?.trim() ||
+                  modelGate?.tenantId?.trim() ||
+                  modelGate?.creditReporting?.enterpriseId?.trim() ||
                   "";
                 if (!tenantId) {
                   throw new Error(
@@ -477,12 +477,12 @@ export function createFollowupRunner(params: {
 
         // Mirror chat path: durable Credits/providerCost outbox for enterprise runs.
         // Outer provider/model stay as selected (may be ent/...), so BYOK ledger skips platform debit.
-        if (modelGate.creditReporting && hasNonzeroUsage(runResult.meta?.agentMeta?.usage)) {
+        if (modelGate?.creditReporting && hasNonzeroUsage(runResult.meta?.agentMeta?.usage)) {
           try {
             const tokenUsage = normalizeUsage(runResult.meta?.agentMeta?.usage);
             const usagePayload = buildCommercialRunCreditUsageInput({
-              enterpriseId: modelGate.creditReporting.enterpriseId,
-              policyId: modelGate.creditReporting.policyId,
+              enterpriseId: modelGate?.creditReporting.enterpriseId,
+              policyId: modelGate?.creditReporting.policyId,
               runId,
               provider: fallbackProvider,
               model: fallbackModel,
@@ -541,7 +541,7 @@ export function createFollowupRunner(params: {
           // Explanatory text may have returned; never invent image/music success.
           success: consumedCapability.executionSurface.textReturnedAllowed,
           runId,
-          ...(modelGate.tenantId?.trim() ? { tenantId: modelGate.tenantId.trim() } : {}),
+          ...(modelGate?.tenantId?.trim() ? { tenantId: modelGate?.tenantId.trim() } : {}),
           capabilityOutcome: consumedCapability.capabilityOutcome,
         });
       }

@@ -4,6 +4,8 @@
  * Durable terminals: success | failure | cancelled only.
  */
 
+import type { CapabilityModalitySnapshot } from "./capability-modality.js";
+
 export const TASK_OUTCOME_SCHEMA_VERSION = "1.0.0" as const;
 export const JUDGEMENT_POLICY_VERSION = "1.0.0" as const;
 
@@ -128,17 +130,9 @@ export type TaskOutcomeRecord = {
    * Structured capability modality (P1). Acceptance must consume this; do not
    * upgrade executor_unwired / incomplete into target-modality success from
    * reasonDetail strings alone.
+   * Reuses CapabilityModalitySnapshot so persist / assess / transitions stay aligned.
    */
-  capabilityModality?: {
-    targetModality: string;
-    executionStatus: string;
-    targetModalityCompleted: boolean;
-    textReturnedAllowed: boolean;
-    incompleteModalities: string[];
-    incompleteReason?: string;
-    planFailureKind: string;
-    forbiddenSuccessModalities?: string[];
-  };
+  capabilityModality?: CapabilityModalitySnapshot;
   outcomeVersion: number;
   previousOutcomeVersion?: number;
   revisionKind?: "new_execution" | "correction";

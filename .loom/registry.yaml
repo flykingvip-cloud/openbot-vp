@@ -9743,6 +9743,8 @@ tasks:
       - src/task-outcome/result-service.ts
       - src/task-outcome/result-service.test.ts
       - src/task-outcome/entrypoints/chat.ts
+      - src/commands/agent/model-governance.test.ts
+      - src/commands/agent/model-governance.fallback.test.ts
       - .loom/registry.yaml
     state: active
     sessions: []
@@ -9787,6 +9789,8 @@ landingStreams:
       - src/task-outcome/result-service.ts
       - src/task-outcome/result-service.test.ts
       - src/task-outcome/entrypoints/chat.ts
+      - src/commands/agent/model-governance.test.ts
+      - src/commands/agent/model-governance.fallback.test.ts
     canLandWith: []
     metadata:
       task: p1-task-driven-aor-scoring

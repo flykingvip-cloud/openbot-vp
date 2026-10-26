@@ -66,6 +66,20 @@ function defaultScope(tenantId?: string): TrustedScope {
   };
 }
 
+/** True when trusted run evidence may advance routing_ok/incomplete → completed. */
+function canMarkCompletedFromTrustedRun(
+  modality: NonNullable<TaskOutcomeRecord["capabilityModality"]>,
+): boolean {
+  if (modality.targetModalityCompleted) {
+    return false;
+  }
+  const blocked = new Set(["executor_unwired", "no_executable_candidates", "unsupported"]);
+  if (blocked.has(modality.executionStatus) || blocked.has(modality.planFailureKind)) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Production chat-runner hot path into unified TaskOutcome.
  *
@@ -75,6 +89,8 @@ function defaultScope(tenantId?: string): TrustedScope {
  *   or append an evolution success sample.
  * - Tool counters always update via `recordToolOutcomes`; task-level operational counters are
  *   deferred until a later acceptance/delivery close (P0 stops inventing success).
+ * - On trusted success with a non-blocked capability modality, calls markTargetModalityCompleted
+ *   from run evidence so formal acceptance can pass.
  */
 export async function recordRunnerTurnOutcome(
   cfg: OpenBotConfig,
@@ -196,6 +212,28 @@ export async function recordRunnerTurnOutcome(
     ) {
       if (assessed.targetModalitySucceeded) {
         throw new Error("capability modality acceptance upgraded unexpectedly");
+      }
+    }
+
+    // Production: after trusted run success, mark target modality completed from
+    // run evidence so formal set_acceptance can pass. Blocked statuses refuse.
+    if (
+      input.success &&
+      record.capabilityModality &&
+      canMarkCompletedFromTrustedRun(record.capabilityModality)
+    ) {
+      const markRes = chat.markTargetModalityCompleted(
+        taskId,
+        record.outcomeVersion,
+        fencingToken,
+        {
+          kind: "run_completed",
+          digestOrRef: `run:${input.runId}`,
+          detail: "trusted_runner_turn_success",
+        },
+      );
+      if (markRes.ok) {
+        record = markRes.record;
       }
     }
   }
