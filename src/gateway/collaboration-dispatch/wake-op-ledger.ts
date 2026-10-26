@@ -136,26 +136,54 @@ function lockStem(opKey: string): string {
   return createHash("sha256").update(opKey).digest("hex").slice(0, 32);
 }
 
-async function readJsonFile(file: string): Promise<WakeOpRecord | null> {
+type WakeOpFileRead =
+  | { state: "missing" }
+  | { state: "ok"; record: WakeOpRecord }
+  | { state: "corrupt"; detail: string };
+
+/**
+ * Distinguish missing vs corrupt. Corrupt must not be treated as absent
+ * (B: no silent overwrite of damaged state).
+ */
+async function readWakeOpFile(file: string): Promise<WakeOpFileRead> {
+  let raw: string;
   try {
-    const raw = await fs.readFile(file, "utf8");
-    const parsed = JSON.parse(raw) as WakeOpRecord;
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      typeof parsed.opKey !== "string" ||
-      typeof parsed.status !== "string" ||
-      !(WAKE_OP_PROCESSING_STATUSES as readonly string[]).includes(parsed.status)
-    ) {
-      return null;
-    }
-    return parsed;
+    raw = await fs.readFile(file, "utf8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return null;
+      return { state: "missing" };
     }
-    return null;
+    return { state: "corrupt", detail: `read_error:${(error as Error).message ?? "unknown"}` };
   }
+  if (!raw.trim()) {
+    return { state: "corrupt", detail: "empty_file" };
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch (error) {
+    return { state: "corrupt", detail: `json_parse:${(error as Error).message ?? "invalid"}` };
+  }
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    typeof (parsed as WakeOpRecord).opKey !== "string" ||
+    typeof (parsed as WakeOpRecord).status !== "string" ||
+    !(WAKE_OP_PROCESSING_STATUSES as readonly string[]).includes((parsed as WakeOpRecord).status)
+  ) {
+    return { state: "corrupt", detail: "invalid_shape" };
+  }
+  return { state: "ok", record: parsed as WakeOpRecord };
+}
+
+async function readJsonFile(file: string): Promise<WakeOpRecord | null> {
+  const result = await readWakeOpFile(file);
+  return result.state === "ok" ? result.record : null;
+}
+
+/** Absolute path of the durable wake-op record file (tests / recovery tooling). */
+export function wakeOpRecordPath(authority: RuntimeAuthority, opKey: string): string {
+  return wakeOpFile(wakeOpsDir(authority), compact(opKey));
 }
 
 export async function readWakeOpRecord(params: {
@@ -171,14 +199,26 @@ export async function readWakeOpRecord(params: {
   return readJsonFile(wakeOpFile(dir, opKey));
 }
 
+/** Detailed read for recovery: missing vs ok vs corrupt. */
+export async function readWakeOpRecordDetailed(params: {
+  authority: RuntimeAuthority;
+  opKey: string;
+}): Promise<WakeOpFileRead> {
+  const opKey = compact(params.opKey);
+  if (!opKey) {
+    return { state: "missing" };
+  }
+  return readWakeOpFile(wakeOpFile(wakeOpsDir(params.authority), opKey));
+}
+
 export type InspectWakeOpResult =
   | { action: "proceed"; opKey: string; record: WakeOpRecord | null }
   | { action: "reuse"; opKey: string; record: WakeOpRecord }
   | {
       action: "suppress";
       opKey: string;
-      record: WakeOpRecord;
-      reason: "wake_op_in_flight" | "wake_op_unknown";
+      record: WakeOpRecord | null;
+      reason: "wake_op_in_flight" | "wake_op_unknown" | "wake_op_corrupt";
     };
 
 /**
@@ -193,10 +233,14 @@ export async function inspectWakeOp(params: {
   if (!opKey) {
     return { action: "proceed", opKey: "missing", record: null };
   }
-  const existing = await readWakeOpRecord({ authority: params.authority, opKey });
-  if (!existing) {
+  const detailed = await readWakeOpRecordDetailed({ authority: params.authority, opKey });
+  if (detailed.state === "corrupt") {
+    return { action: "suppress", opKey, record: null, reason: "wake_op_corrupt" };
+  }
+  if (detailed.state === "missing") {
     return { action: "proceed", opKey, record: null };
   }
+  const existing = detailed.record;
   if (existing.status === "completed") {
     return { action: "reuse", opKey, record: existing };
   }
@@ -231,8 +275,13 @@ export async function claimWakeOpRunning(params: {
   const toAgentIds = params.keyInput.toAgentIds.map((id) => compact(id)).filter(Boolean);
 
   return withRoundLock(dir, lockStem(opKey), async () => {
-    const existing = await readJsonFile(file);
-    if (existing) {
+    const read = await readWakeOpFile(file);
+    if (read.state === "corrupt") {
+      // B: refuse to silently overwrite damaged state.
+      return { action: "suppress", opKey, record: null, reason: "wake_op_corrupt" };
+    }
+    if (read.state === "ok") {
+      const existing = read.record;
       if (existing.status === "completed") {
         return { action: "reuse", opKey, record: existing };
       }
@@ -288,7 +337,12 @@ async function updateWakeOp(
   await fs.mkdir(dir, { recursive: true });
   const file = wakeOpFile(dir, opKey);
   return withRoundLock(dir, lockStem(opKey), async () => {
-    const current = await readJsonFile(file);
+    const read = await readWakeOpFile(file);
+    if (read.state === "corrupt") {
+      // B: do not invent a replacement over damaged bytes.
+      return null;
+    }
+    const current = read.state === "ok" ? read.record : null;
     const next = mutator(current);
     if (!next) {
       return current;
