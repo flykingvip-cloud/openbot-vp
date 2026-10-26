@@ -67,7 +67,8 @@ import { resolveRunTypingPolicy } from "./typing-policy.js";
 
 const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
 
-async function confirmPendingTurnDelivery(params: {
+/** Production delivery confirm — exported so tests use this path, not a copy. */
+export async function confirmPendingTurnDelivery(params: {
   cfg: OpenBotConfig;
   runId?: string;
   /** Stable ids from prepare — required when runId is omitted. */

@@ -9714,8 +9714,10 @@ tasks:
       - R85c contract-gated acceptance send-confirm delivery effective DNA reads
       - R85d deliver-AND durable-pending execution-no-chat-waive DNA observation fields
       - R85e real-deliver-callback unknown-keeps-pending id-threading AND-no-early-success
+      - R85f classify-from-preflight-intent not-hookDelivery-presence production-entry-proof
     paths:
       - src/task-outcome/**
+      - src/agents/execution-preflight/hook-delivery.ts
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/dispatch-from-config.ts
@@ -9747,6 +9749,7 @@ landingStreams:
       - docs/design/task-outcome/contract.md
       - docs/design/task-outcome/call-chain-and-replacements.md
       - src/task-outcome/**
+      - src/agents/execution-preflight/hook-delivery.ts
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/auto-reply/reply/agent-runner.ts
       - src/auto-reply/reply/dispatch-from-config.ts
@@ -9758,7 +9761,7 @@ landingStreams:
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
-      purpose: R83/R85b/R85c/R85d/R85e TaskOutcome real-deliver-callback AND id-threading
+      purpose: R83/R85b/R85c/R85d/R85e/R85f TaskOutcome classify-from-intent production-entry
 
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial

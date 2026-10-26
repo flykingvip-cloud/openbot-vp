@@ -29,10 +29,9 @@ import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
 import {
-  CHAT_TURN_CONTRACT_V1,
   chatTurnTaskId,
   resolveChatTurnCloseGates,
-  resolveTurnTaskContract,
+  resolveTurnContractFromRunMeta,
 } from "../../task-outcome/chat-entry.js";
 import { registerAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
 import {
@@ -464,34 +463,9 @@ export async function runReplyAgent(params: {
     };
 
     const resolveTurnContractFromRun = () => {
-      const hookDelivery = runResult.meta?.hookDelivery;
-      const validatorsRequired =
-        runResult.meta?.hookValidatorsRequired === true ||
-        hookDelivery?.validatorsRequired === true;
-      const requiredValidators =
-        hookDelivery?.validatorReceipts
-          ?.map((row) => row.validatorId?.trim())
-          .filter((id): id is string => Boolean(id)) ?? [];
-      const acceptanceVerified = hookDelivery?.decisionCode === "delivery_receipt_verified";
-      // R85d: classification from entry/preflight — do NOT treat "no validators"
-      // as chat waiver. Execution preflight (hookDelivery present) without
-      // validators stays kind=execution → acceptance pending.
-      const executionPreflight = Boolean(hookDelivery) || validatorsRequired;
-      if (executionPreflight) {
-        return resolveTurnTaskContract({
-          kind: "execution",
-          validatorsRequired,
-          requiredValidators,
-          acceptanceVerified,
-        });
-      }
-      return resolveTurnTaskContract({
-        explicitChatTurn: true,
-        contractId: CHAT_TURN_CONTRACT_V1,
-        validatorsRequired: false,
-        requiredValidators: [],
-        acceptanceVerified,
-      });
+      // R85f: classify from preflight intent (validatorsRequired / decisionCode /
+      // intentClass / primarySkill). Never use Boolean(hookDelivery).
+      return resolveTurnContractFromRunMeta(runResult.meta);
     };
 
     if (

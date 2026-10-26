@@ -119,6 +119,81 @@ export type ResolvedTurnTaskContract = {
   requiredValidators: readonly string[];
 };
 
+/**
+ * R85f: classify a turn close contract from embedded-run meta / preflight intent.
+ * Never uses "hookDelivery object present" as execution proof.
+ *
+ * Matrix:
+ * - validators required / primarySkill / non-chat intentClass → execution
+ * - chat/retrieve (or unset intent) + decisionCode not_required → chat_turn waive
+ * - otherwise → unknown (acceptance stays pending)
+ */
+export type RunMetaForTurnContract = {
+  hookDelivery?: {
+    validatorsRequired?: boolean;
+    decisionCode?: string;
+    validatorReceipts?: ReadonlyArray<{ validatorId?: string | null }>;
+    intentClass?: string;
+    primarySkill?: string;
+  } | null;
+  hookValidatorsRequired?: boolean;
+};
+
+export function resolveTurnContractFromRunMeta(
+  meta: RunMetaForTurnContract | null | undefined,
+): ResolvedTurnTaskContract & { acceptanceVerified?: boolean } {
+  const hookDelivery = meta?.hookDelivery ?? undefined;
+  const validatorsRequired =
+    meta?.hookValidatorsRequired === true || hookDelivery?.validatorsRequired === true;
+  const requiredValidators =
+    hookDelivery?.validatorReceipts
+      ?.map((row) => row.validatorId?.trim())
+      .filter((id): id is string => Boolean(id)) ?? [];
+  const acceptanceVerified = hookDelivery?.decisionCode === "delivery_receipt_verified";
+
+  const primarySkill = hookDelivery?.primarySkill?.trim() ?? "";
+  const intentClass = hookDelivery?.intentClass?.trim() ?? "";
+  const nonChatIntent =
+    intentClass === "short_action" ||
+    intentClass === "multi_stage" ||
+    intentClass === "long_running";
+  // Real preflight intent — NOT Boolean(hookDelivery).
+  const executionIntent = validatorsRequired || Boolean(primarySkill) || nonChatIntent;
+
+  if (executionIntent) {
+    return resolveTurnTaskContract({
+      kind: "execution",
+      validatorsRequired,
+      requiredValidators,
+      acceptanceVerified,
+    });
+  }
+
+  // Explicit chat waiver only when preflight says validators are not required and
+  // intent is chat/retrieve (or legacy unset intent without execution signals).
+  if (
+    hookDelivery &&
+    !validatorsRequired &&
+    hookDelivery.decisionCode === "not_required" &&
+    (intentClass === "chat" || intentClass === "retrieve" || !intentClass)
+  ) {
+    return resolveTurnTaskContract({
+      explicitChatTurn: true,
+      contractId: CHAT_TURN_CONTRACT_V1,
+      validatorsRequired: false,
+      requiredValidators: [],
+      acceptanceVerified,
+    });
+  }
+
+  // Missing hookDelivery / unresolved classification → unknown (pending).
+  return resolveTurnTaskContract({
+    validatorsRequired,
+    requiredValidators,
+    acceptanceVerified,
+  });
+}
+
 export type DeliveryPhase =
   | "awaiting"
   | "delivered"
