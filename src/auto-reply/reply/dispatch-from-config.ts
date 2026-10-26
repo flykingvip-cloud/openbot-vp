@@ -39,6 +39,8 @@ import {
   observeOrchestrationConsider,
   observeWebReadShadowFromChat,
 } from "../../task-orchestration/gateway-hook.js";
+import { peekAwaitingDelivery, takeAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
+import { confirmRunnerTurnDelivery } from "../../task-outcome/runtime-from-runner.js";
 import { maybeApplyTtsToPayload, normalizeTtsAutoMode, resolveTtsConfig } from "../../tts/tts.js";
 import { INTERNAL_MESSAGE_CHANNEL, normalizeMessageChannel } from "../../utils/message-channel.js";
 import { getReplyFromConfig } from "../reply.js";
@@ -53,6 +55,36 @@ import { isRoutableChannel, routeReply } from "./route-reply.js";
 import { resolveRunTypingPolicy } from "./typing-policy.js";
 
 const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
+
+async function confirmPendingTurnDelivery(params: {
+  cfg: OpenBotConfig;
+  runId?: string;
+  ok: boolean;
+  error?: string;
+}): Promise<void> {
+  const runId = params.runId?.trim();
+  if (!runId) {
+    return;
+  }
+  const pending = peekAwaitingDelivery(runId);
+  if (!pending) {
+    return;
+  }
+  try {
+    await confirmRunnerTurnDelivery(params.cfg, pending.agentId, {
+      taskId: pending.taskId,
+      deliveryId: pending.deliveryId,
+      status: params.ok ? "delivered" : "failed",
+      ...(params.error ? { failureDetail: params.error } : {}),
+    });
+    takeAwaitingDelivery(runId);
+  } catch (err) {
+    logVerbose(
+      `dispatch-from-config: delivery confirm failed: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 const AUDIO_HEADER_RE = /^\[Audio\b/i;
 const normalizeMediaType = (value: string): string => value.split(";")[0]?.trim().toLowerCase();
 
@@ -675,6 +707,20 @@ export async function dispatchReplyFromConfig(params: {
       }
     }
 
+    // Apply channel send result to TaskOutcome delivery (prepare left it pending).
+    {
+      const sendAttempted =
+        replies.length > 0 || (blockCount > 0 && Boolean(accumulatedBlockText.trim()));
+      if (sendAttempted) {
+        await confirmPendingTurnDelivery({
+          cfg: effectiveCfg,
+          runId: params.replyOptions?.runId,
+          ok: queuedFinal,
+          error: queuedFinal ? undefined : "channel_send_failed_or_not_queued",
+        });
+      }
+    }
+
     const counts = dispatcher.getQueuedCounts();
     counts.final += routedFinalCount;
     const assistantReplyText = replies
@@ -707,6 +753,12 @@ export async function dispatchReplyFromConfig(params: {
     markIdle("message_completed");
     return { queuedFinal, counts };
   } catch (err) {
+    await confirmPendingTurnDelivery({
+      cfg: effectiveCfg,
+      runId: params.replyOptions?.runId,
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
     recordProcessed("error", { error: String(err) });
     markIdle("message_error");
     throw err;

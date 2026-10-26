@@ -105,35 +105,168 @@ export function ensureChatTurnTaskOutcome(
 /** Chat turn contract id used when waiving external acceptance. */
 export const CHAT_TURN_CONTRACT_V1 = "chat_turn_contract_v1";
 
+/** Version-pinned task close contract — never invent from runtime alone. */
+export type ResolvedTurnTaskContract = {
+  /** Stable contract id (e.g. chat_turn_contract_v1 or skill contract id). */
+  id: string;
+  version: string;
+  /**
+   * Classification from entry/preflight. Missing/unknown must NOT auto-downgrade
+   * to chat_turn waiver.
+   */
+  kind: "chat_turn" | "code" | "document" | "external_action" | "execution" | "unknown";
+  /** From skill/preflight; non-empty ⇒ acceptance cannot be waived. */
+  requiredValidators: readonly string[];
+};
+
+export type DeliveryPhase =
+  | "awaiting"
+  | "delivered"
+  | "failed"
+  | "delivery_unknown"
+  | "not_required";
+
 /**
- * Resolve close gates from the chat-turn task contract (not runtime fallback).
- * Standard chat turns do not require an external acceptance validator; final
- * visible delivery still needs an explicit delivery receipt id.
+ * Resolve a turn close contract from entry + preflight signals.
+ * Only explicit chat_turn with empty validators may waive external acceptance.
+ * Missing classification → kind "unknown" (acceptance stays pending).
+ */
+export function resolveTurnTaskContract(params: {
+  /** When true / id is CHAT_TURN_CONTRACT_V1 and no validators → chat_turn. */
+  explicitChatTurn?: boolean;
+  contractId?: string;
+  contractVersion?: string;
+  requiredValidators?: readonly string[];
+  /** True when execution preflight declared validators are required. */
+  validatorsRequired?: boolean;
+  /** Hook/preflight already verified acceptance receipts. */
+  acceptanceVerified?: boolean;
+  kind?: ResolvedTurnTaskContract["kind"];
+}): ResolvedTurnTaskContract & { acceptanceVerified?: boolean } {
+  const validators = [...(params.requiredValidators ?? [])].map((v) => v.trim()).filter(Boolean);
+  const validatorsRequired = Boolean(params.validatorsRequired) || validators.length > 0;
+  if (validatorsRequired) {
+    return {
+      id: params.contractId?.trim() || "execution_task_contract",
+      version: params.contractVersion?.trim() || "1.0.0",
+      kind:
+        params.kind && params.kind !== "chat_turn" && params.kind !== "unknown"
+          ? params.kind
+          : "execution",
+      requiredValidators: validators.length > 0 ? validators : ["preflight:validators_required"],
+      ...(params.acceptanceVerified ? { acceptanceVerified: true } : {}),
+    };
+  }
+  if (params.kind && params.kind !== "chat_turn" && params.kind !== "unknown") {
+    return {
+      id: params.contractId?.trim() || `${params.kind}_contract`,
+      version: params.contractVersion?.trim() || "1.0.0",
+      kind: params.kind,
+      requiredValidators: validators,
+    };
+  }
+  const id = params.contractId?.trim() || "";
+  const explicitChat =
+    params.explicitChatTurn === true || id === CHAT_TURN_CONTRACT_V1 || params.kind === "chat_turn";
+  if (explicitChat) {
+    return {
+      id: CHAT_TURN_CONTRACT_V1,
+      version: params.contractVersion?.trim() || "1",
+      kind: "chat_turn",
+      requiredValidators: [],
+    };
+  }
+  return {
+    id: id || "unresolved_task_contract",
+    version: params.contractVersion?.trim() || "0",
+    kind: "unknown",
+    requiredValidators: [],
+  };
+}
+
+export type ResolvedCloseGates = {
+  acceptance:
+    | { status: "pending" }
+    | { status: "passed" }
+    | { status: "failed" }
+    | { status: "not_required"; reason: string };
+  delivery:
+    | { status: "pending" }
+    | { status: "delivered" }
+    | { status: "failed" }
+    | { status: "delivery_unknown" }
+    | { status: "not_required"; reason: string };
+  deliveryId: string;
+};
+
+/**
+ * Resolve close gates from a version-pinned task contract (not runtime fallback).
+ * - chat_turn + empty validators → acceptance not_required
+ * - execution/code/document/external_action or requiredValidators → pending
+ *   (or passed when acceptanceVerified)
+ * - missing/unknown contract → acceptance pending (never auto chat waive)
+ * - deliveryPhase awaiting → pending (must not claim delivered before send)
  */
 export function resolveChatTurnCloseGates(params: {
   deliveryId: string;
-  /** When true, waive delivery channel (rare; prefer delivered with receipt). */
+  /** Resolved contract; null/undefined ⇒ unresolved ⇒ acceptance pending. */
+  contract?: ResolvedTurnTaskContract | null;
+  /** Prepare stage must use "awaiting"; only send callback may pass "delivered". */
+  deliveryPhase?: DeliveryPhase;
+  /** @deprecated prefer deliveryPhase */
   waiveDelivery?: boolean;
-}): {
-  acceptance: { status: "not_required"; reason: string };
-  delivery: { status: "delivered" } | { status: "not_required"; reason: string };
-  deliveryId: string;
-} {
+  /** When preflight already verified validators for this turn. */
+  acceptanceVerified?: boolean;
+}): ResolvedCloseGates {
   const deliveryId = params.deliveryId.trim();
   if (!deliveryId) {
     throw new Error("resolveChatTurnCloseGates requires deliveryId receipt");
   }
-  return {
-    acceptance: {
+
+  const contract = params.contract;
+  let acceptance: ResolvedCloseGates["acceptance"];
+  if (!contract || contract.kind === "unknown") {
+    acceptance = { status: "pending" };
+  } else if (contract.requiredValidators.length > 0 || contract.kind !== "chat_turn") {
+    if (params.acceptanceVerified) {
+      acceptance = { status: "passed" };
+    } else {
+      acceptance = { status: "pending" };
+    }
+  } else if (contract.id === CHAT_TURN_CONTRACT_V1 && contract.kind === "chat_turn") {
+    acceptance = {
       status: "not_required",
       reason: `${CHAT_TURN_CONTRACT_V1}:no_external_acceptance`,
-    },
-    delivery: params.waiveDelivery
-      ? {
-          status: "not_required",
-          reason: `${CHAT_TURN_CONTRACT_V1}:delivery_waived`,
-        }
-      : { status: "delivered" },
-    deliveryId,
-  };
+    };
+  } else {
+    acceptance = { status: "pending" };
+  }
+
+  const phase: DeliveryPhase = params.waiveDelivery
+    ? "not_required"
+    : (params.deliveryPhase ?? "awaiting");
+  let delivery: ResolvedCloseGates["delivery"];
+  switch (phase) {
+    case "delivered":
+      delivery = { status: "delivered" };
+      break;
+    case "failed":
+      delivery = { status: "failed" };
+      break;
+    case "delivery_unknown":
+      delivery = { status: "delivery_unknown" };
+      break;
+    case "not_required":
+      delivery = {
+        status: "not_required",
+        reason: `${contract?.id ?? "unresolved"}:delivery_waived`,
+      };
+      break;
+    case "awaiting":
+    default:
+      delivery = { status: "pending" };
+      break;
+  }
+
+  return { acceptance, delivery, deliveryId };
 }

@@ -12,12 +12,19 @@ export { CliTaskOutcomeAdapter } from "./entrypoints/cli.js";
 export { CollabTaskOutcomeAdapter } from "./entrypoints/collab.js";
 export {
   recordRunnerTurnOutcome,
+  confirmRunnerTurnDelivery,
   drainPendingGrowthEvolution,
   TASK_OUTCOME_STORE_DIRNAME,
   type GrowthOutcomeCommitOpts,
   type RunnerTurnFailureReason,
   type RunnerTurnOutcomeInput,
 } from "./runtime-from-runner.js";
+export {
+  registerAwaitingDelivery,
+  peekAwaitingDelivery,
+  takeAwaitingDelivery,
+  clearAwaitingDeliveriesForTests,
+} from "./pending-delivery.js";
 
 export {
   OutcomeConsumerRuntime,

@@ -5,7 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { readEvolutionTaskOutcomes } from "../gateway/agent-growth/evolution-task-outcomes.js";
 import { readOperationalMetrics } from "../gateway/agent-growth/operational-metrics-store.js";
-import { resolveChatTurnCloseGates } from "./chat-entry.js";
+import {
+  CHAT_TURN_CONTRACT_V1,
+  resolveChatTurnCloseGates,
+  resolveTurnTaskContract,
+} from "./chat-entry.js";
 import { TASK_OUTCOME_STORE_DIRNAME, recordRunnerTurnOutcome } from "./runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 
@@ -63,7 +67,14 @@ describe("recordRunnerTurnOutcome", () => {
   });
 
   it("closes success when contract waives acceptance and delivery has receipt", async () => {
-    const gates = resolveChatTurnCloseGates({ deliveryId: "delivery:run-ok-final" });
+    const gates = resolveChatTurnCloseGates({
+      deliveryId: "delivery:run-ok-final",
+      contract: resolveTurnTaskContract({
+        explicitChatTurn: true,
+        contractId: CHAT_TURN_CONTRACT_V1,
+      }),
+      deliveryPhase: "delivered",
+    });
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-ok-final",

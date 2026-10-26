@@ -123,7 +123,10 @@ export type AgentRunLoopResult =
        * Pass explicit acceptance/delivery from a resolved contract to close success;
        * bare success or processPlaceholder leaves the task incomplete.
        */
-      commitGrowthOutcome: (success: boolean, opts?: GrowthOutcomeCommitOpts) => void;
+      commitGrowthOutcome: (
+        success: boolean,
+        opts?: GrowthOutcomeCommitOpts,
+      ) => void | Promise<void>;
     }
   | { kind: "final"; payload: ReplyPayload };
 
@@ -256,7 +259,7 @@ export async function runAgentTurnWithFallback(params: {
       prepareFailed?: boolean;
       errorMessage?: string;
     },
-  ): void => {
+  ): void | Promise<void> => {
     if (params.isHeartbeat) {
       return;
     }
@@ -292,7 +295,7 @@ export async function runAgentTurnWithFallback(params: {
           message: opts?.errorMessage ?? opts?.failureDetail,
         })
       : undefined;
-    void recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
+    return recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
       success,
       toolsTotal,
       toolsSucceeded,
@@ -484,7 +487,7 @@ export async function runAgentTurnWithFallback(params: {
             modelGateInput,
           });
           if (!runSlot.skipped && !runSlot.acquired) {
-            recordGrowthTaskOutcome(false, {
+            void recordGrowthTaskOutcome(false, {
               authzDenied: true,
               failureDetail: "enterprise_run_slot_denied",
             });
@@ -1205,7 +1208,7 @@ export async function runAgentTurnWithFallback(params: {
                 ? "这一轮没能完成回复。请再试一次，或 @ 对应助手。"
                 : `⚠️ Agent failed before reply: ${trimmedMessage}.\nLogs: openbot logs --follow`;
 
-        recordGrowthTaskOutcome(false, {
+        void recordGrowthTaskOutcome(false, {
           aborted: Boolean(params.opts?.abortSignal?.aborted),
           providerFault: isTransientHttp || isInfraStartupFailure,
           prepareFailed: isInfraStartupFailure,
@@ -1247,7 +1250,7 @@ export async function runAgentTurnWithFallback(params: {
       isContextOverflowError(finalEmbeddedError.message) &&
       !hasPayloadText
     ) {
-      recordGrowthTaskOutcome(false, {
+      void recordGrowthTaskOutcome(false, {
         failureReason: "run_failed",
         failureDetail: "context_overflow",
       });

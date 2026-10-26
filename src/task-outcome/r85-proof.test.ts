@@ -366,8 +366,16 @@ describe("r85 recover / consumer / authz proofs", () => {
   });
 
   it("contract waive acceptance + delivered receipt closes success", async () => {
-    const { resolveChatTurnCloseGates } = await import("./chat-entry.js");
-    const gates = resolveChatTurnCloseGates({ deliveryId: "delivery:run-contract" });
+    const { CHAT_TURN_CONTRACT_V1, resolveChatTurnCloseGates, resolveTurnTaskContract } =
+      await import("./chat-entry.js");
+    const gates = resolveChatTurnCloseGates({
+      deliveryId: "delivery:run-contract",
+      contract: resolveTurnTaskContract({
+        explicitChatTurn: true,
+        contractId: CHAT_TURN_CONTRACT_V1,
+      }),
+      deliveryPhase: "delivered",
+    });
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-contract",

@@ -105,7 +105,21 @@ export function readEffectiveEvolutionTaskOutcomes(
   agentId: string,
 ): EvolutionWithKey[] {
   const filePath = resolveEvolutionTaskOutcomesPath(cfg, agentId);
-  const rows = readRawEvolutionLines(filePath).filter((r) => !r.revoked);
+  const raw = readRawEvolutionLines(filePath);
+  // Revoke markers are separate append-only rows; exclude the keys they revoke.
+  const revokedKeys = new Set<string>();
+  for (const row of raw) {
+    if (row.revoked && row.taskOutcomeKey) {
+      revokedKeys.add(row.taskOutcomeKey);
+    }
+  }
+  const rows = raw.filter((r) => {
+    if (r.revoked) {
+      return false;
+    }
+    const key = r.taskOutcomeKey ?? (r.taskId ? taskKey(r.taskId, r.outcomeVersion ?? 0) : "");
+    return !key || !revokedKeys.has(key);
+  });
   const best = new Map<string, EvolutionWithKey>();
   for (const row of rows) {
     const tid = row.taskId?.trim();
@@ -126,6 +140,50 @@ export function readEffectiveEvolutionTaskOutcomes(
  * Cross-process atomic idempotency on taskId@outcomeVersion; newer versions
  * revoke older samples for the same task so failure→success converges.
  */
+function revokeOlderSamplesLocked(
+  cfg: OpenBotConfig,
+  agentId: string,
+  filePath: string,
+  record: TaskOutcomeRecord,
+  existing: EvolutionWithKey[],
+  replacesKey: string,
+): number {
+  const olderKeys = new Set<string>();
+  for (const obj of existing) {
+    if (obj.revoked) {
+      continue;
+    }
+    if (obj.taskId !== record.taskId) {
+      continue;
+    }
+    const ver = obj.outcomeVersion ?? 0;
+    if (ver < record.outcomeVersion) {
+      olderKeys.add(obj.taskOutcomeKey ?? taskKey(record.taskId, ver));
+    }
+  }
+  let revoked = 0;
+  for (const oldKey of olderKeys) {
+    const alreadyRevoked = existing.some((r) => r.revoked && r.taskOutcomeKey === oldKey);
+    if (alreadyRevoked) {
+      continue;
+    }
+    const revokePayload: EvolutionWithKey = {
+      agentId,
+      occurredAt: Date.now(),
+      succeeded: false,
+      taskId: record.taskId,
+      taskOutcomeKey: oldKey,
+      revoked: true,
+      replacesTaskOutcomeKey: replacesKey,
+      tenantId:
+        record.scope.kind === "enterprise" ? record.scope.tenantId : scopeIdOf(record.scope),
+    };
+    appendEvolutionTaskOutcome(cfg, revokePayload);
+    revoked += 1;
+  }
+  return revoked;
+}
+
 export function publishEvolutionFromTaskOutcome(
   cfg: OpenBotConfig,
   agentId: string,
@@ -135,20 +193,36 @@ export function publishEvolutionFromTaskOutcome(
     return { written: false, reason: "incomplete_not_published" };
   }
   const eligibility = computeEvaluationEligibility(record);
-  if (record.taskJudgement === "cancelled") {
-    return { written: false, reason: "cancelled_excluded" };
-  }
-  if (!eligibility.countsSkillSuccessRate && record.taskJudgement === "failure") {
-    if (!eligibility.countsGrowthNegative && !eligibility.countsModelStability) {
-      return { written: false, reason: `excluded:${eligibility.attribution}` };
-    }
-  }
-  if (record.taskJudgement === "success" && !eligibility.countsSkillSuccessRate) {
-    return { written: false, reason: "success_not_eligible" };
-  }
-
   const filePath = resolveEvolutionTaskOutcomesPath(cfg, agentId);
   const key = taskKey(record.taskId, record.outcomeVersion);
+
+  const excludeReason = ((): string | null => {
+    if (record.taskJudgement === "cancelled") {
+      return "cancelled_excluded";
+    }
+    if (!eligibility.countsSkillSuccessRate && record.taskJudgement === "failure") {
+      if (!eligibility.countsGrowthNegative && !eligibility.countsModelStability) {
+        return `excluded:${eligibility.attribution}`;
+      }
+    }
+    if (record.taskJudgement === "success" && !eligibility.countsSkillSuccessRate) {
+      return "success_not_eligible";
+    }
+    return null;
+  })();
+
+  // Closed but not evaluation-eligible (cancel / filtered / etc.): still revoke
+  // older capability samples so failure→cancel corrections converge.
+  if (excludeReason) {
+    return withEvolutionFileLock(filePath, () => {
+      const existing = readRawEvolutionLines(filePath);
+      const revoked = revokeOlderSamplesLocked(cfg, agentId, filePath, record, existing, key);
+      return {
+        written: false,
+        reason: revoked > 0 ? `${excludeReason};revoked_older` : excludeReason,
+      };
+    });
+  }
 
   return withEvolutionFileLock(filePath, () => {
     const existing = readRawEvolutionLines(filePath);
@@ -162,6 +236,19 @@ export function publishEvolutionFromTaskOutcome(
       return { written: false, reason: "already_published" };
     }
 
+    // Newer version already published — do not re-contribute an older failure on replay.
+    const newer = existing.find(
+      (obj) =>
+        !obj.revoked &&
+        obj.taskId === record.taskId &&
+        (obj.outcomeVersion ?? 0) > record.outcomeVersion,
+    );
+    if (newer) {
+      return { written: false, reason: "superseded_by_newer" };
+    }
+
+    revokeOlderSamplesLocked(cfg, agentId, filePath, record, existing, key);
+
     const olderKeys = new Set<string>();
     for (const obj of existing) {
       if (obj.revoked) {
@@ -174,25 +261,6 @@ export function publishEvolutionFromTaskOutcome(
       if (ver < record.outcomeVersion) {
         olderKeys.add(obj.taskOutcomeKey ?? taskKey(record.taskId, ver));
       }
-    }
-
-    for (const oldKey of olderKeys) {
-      const alreadyRevoked = existing.some((r) => r.revoked && r.taskOutcomeKey === oldKey);
-      if (alreadyRevoked) {
-        continue;
-      }
-      const revokePayload: EvolutionWithKey = {
-        agentId,
-        occurredAt: Date.now(),
-        succeeded: false,
-        taskId: record.taskId,
-        taskOutcomeKey: oldKey,
-        revoked: true,
-        replacesTaskOutcomeKey: key,
-        tenantId:
-          record.scope.kind === "enterprise" ? record.scope.tenantId : scopeIdOf(record.scope),
-      };
-      appendEvolutionTaskOutcome(cfg, revokePayload);
     }
 
     const tenantId =

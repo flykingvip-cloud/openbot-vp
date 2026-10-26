@@ -10,10 +10,8 @@ import {
 } from "@openbot/evolution-core";
 import type { OpenBotConfig } from "../../../config/config.js";
 import { writeJsonAtomic } from "../../../infra/json-files.js";
-import {
-  EVOLUTION_TASK_OUTCOMES_FILENAME,
-  readEvolutionTaskOutcomes,
-} from "../../agent-growth/evolution-task-outcomes.js";
+import { readEffectiveEvolutionTaskOutcomes } from "../../../task-outcome/growth-bridge.js";
+import { EVOLUTION_TASK_OUTCOMES_FILENAME } from "../../agent-growth/evolution-task-outcomes.js";
 import {
   applyWorkingStyleDelta,
   DEFAULT_WORKING_STYLE,
@@ -79,9 +77,24 @@ function enrichWorkingDnaCohort(
 export function createFileWorkingDnaObservationPort(cfg: OpenBotConfig): WorkingDnaObservationPort {
   return {
     listTaskOutcomes(filter) {
-      return readEvolutionTaskOutcomes(cfg, filter.agentId).filter((row) => {
-        return row.occurredAt >= filter.startedAtMs && row.occurredAt <= filter.endedAtMs;
-      });
+      // Production reads the effective projection (highest non-revoked version per task).
+      return readEffectiveEvolutionTaskOutcomes(cfg, filter.agentId)
+        .filter((row) => {
+          return row.occurredAt >= filter.startedAtMs && row.occurredAt <= filter.endedAtMs;
+        })
+        .map((row) => ({
+          agentId: row.agentId,
+          occurredAt: row.occurredAt,
+          succeeded: row.succeeded,
+          ...(row.tenantId ? { tenantId: row.tenantId } : {}),
+          ...(row.experimentId ? { experimentId: row.experimentId } : {}),
+          ...(row.applicationId ? { applicationId: row.applicationId } : {}),
+          ...(row.taskId ? { taskId: row.taskId } : {}),
+          ...(row.runId ? { runId: row.runId } : {}),
+          ...(row.crossTenantContamination !== undefined
+            ? { crossTenantContamination: row.crossTenantContamination }
+            : {}),
+        }));
     },
   };
 }

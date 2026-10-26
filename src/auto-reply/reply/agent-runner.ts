@@ -27,7 +27,13 @@ import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { enforceVisibleReplyLanguage } from "../../shared/text/visible-reply-language.js";
 import { shapeAdmittedComplexTaskReply } from "../../task-orchestration/complex-task-loop.js";
-import { resolveChatTurnCloseGates } from "../../task-outcome/chat-entry.js";
+import {
+  CHAT_TURN_CONTRACT_V1,
+  chatTurnTaskId,
+  resolveChatTurnCloseGates,
+  resolveTurnTaskContract,
+} from "../../task-outcome/chat-entry.js";
+import { registerAwaitingDelivery } from "../../task-outcome/pending-delivery.js";
 import type { GrowthOutcomeCommitOpts } from "../../task-outcome/runtime-from-runner.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../utils/directive-tags.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
@@ -442,12 +448,34 @@ export async function runReplyAgent(params: {
     // P2: ensure growth outcome is committed even if later delivery work throws
     // between classify-success and commit (or after a deferred commit site).
     let growthOutcomeCommitted = false;
-    const commitGrowthOutcome = (success: boolean, opts?: GrowthOutcomeCommitOpts) => {
+    const commitGrowthOutcome = (
+      success: boolean,
+      opts?: GrowthOutcomeCommitOpts,
+    ): void | Promise<void> => {
       if (growthOutcomeCommitted) {
         return;
       }
       growthOutcomeCommitted = true;
-      commitGrowthOutcomeRaw(success, opts);
+      return commitGrowthOutcomeRaw(success, opts);
+    };
+
+    const resolveTurnContractFromRun = () => {
+      const hookDelivery = runResult.meta?.hookDelivery;
+      const validatorsRequired =
+        runResult.meta?.hookValidatorsRequired === true ||
+        hookDelivery?.validatorsRequired === true;
+      const requiredValidators =
+        hookDelivery?.validatorReceipts
+          ?.map((row) => row.validatorId?.trim())
+          .filter((id): id is string => Boolean(id)) ?? [];
+      const acceptanceVerified = hookDelivery?.decisionCode === "delivery_receipt_verified";
+      return resolveTurnTaskContract({
+        explicitChatTurn: !validatorsRequired,
+        ...(validatorsRequired ? {} : { contractId: CHAT_TURN_CONTRACT_V1 }),
+        validatorsRequired,
+        requiredValidators,
+        acceptanceVerified,
+      });
     };
 
     if (
@@ -579,21 +607,28 @@ export async function runReplyAgent(params: {
       });
       const growth = classifySilentTurnGrowthOutcome(decision);
       if (decision.reason === "user_aborted") {
-        commitGrowthOutcome(false, {
+        void commitGrowthOutcome(false, {
           failureReason: "user_cancelled",
           failureDetail: "user_aborted",
         });
       } else if (growth.success) {
+        // Silent success means delivery already happened in-run (messaging tool /
+        // block stream / reaction). Confirm delivered from resolved contract only.
+        const contract = resolveTurnContractFromRun();
+        const deliveryId = `delivery:${outcomeRunId}:${decision.reason}`;
         const gates = resolveChatTurnCloseGates({
-          deliveryId: `delivery:${outcomeRunId}:${decision.reason}`,
+          deliveryId,
+          contract,
+          deliveryPhase: "delivered",
+          acceptanceVerified: contract.acceptanceVerified === true,
         });
-        commitGrowthOutcome(true, {
+        void commitGrowthOutcome(true, {
           acceptance: gates.acceptance,
           delivery: gates.delivery,
           deliveryId: gates.deliveryId,
         });
       } else {
-        commitGrowthOutcome(false, {
+        void commitGrowthOutcome(false, {
           failureReason: "run_failed",
           failureDetail: decision.reason,
         });
@@ -763,27 +798,47 @@ export async function runReplyAgent(params: {
         : undefined;
       if (!fallbackText) {
         // Language gate filtered all replies with nothing to show — not a success, do not close gaps.
-        commitGrowthOutcome(false, {
+        void commitGrowthOutcome(false, {
           failureReason: "user_filtered",
           failureDetail: "language_gate_empty",
         });
         return finalizeWithFollowup(undefined, queueKey, runFollowupTurn);
       }
       // Process placeholder is not final delivery — leave incomplete (no evolution positive).
-      commitGrowthOutcome(true, { processPlaceholder: true });
+      void commitGrowthOutcome(true, { processPlaceholder: true });
       return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
     }
 
-    // Visible delivery past language gate — close only with resolved chat-turn contract gates.
+    // Visible reply prepared — acceptance from pinned contract; delivery stays
+    // awaiting until dispatch confirms the channel send (not "prepared" = delivered).
     {
+      const contract = resolveTurnContractFromRun();
+      const deliveryId = `delivery:${outcomeRunId}:visible`;
       const gates = resolveChatTurnCloseGates({
-        deliveryId: `delivery:${outcomeRunId}:visible`,
+        deliveryId,
+        contract,
+        deliveryPhase: "awaiting",
+        acceptanceVerified: contract.acceptanceVerified === true,
       });
-      commitGrowthOutcome(true, {
+      // Await prepare so confirm cannot race ahead of the pending write.
+      await commitGrowthOutcome(true, {
         acceptance: gates.acceptance,
         delivery: gates.delivery,
         deliveryId: gates.deliveryId,
       });
+      const growthAgentId = followupRun.run.agentId?.trim();
+      if (growthAgentId) {
+        registerAwaitingDelivery({
+          taskId: chatTurnTaskId({
+            agentId: growthAgentId,
+            runId: outcomeRunId,
+            sessionKey,
+          }),
+          deliveryId,
+          agentId: growthAgentId,
+          runId: outcomeRunId,
+        });
+      }
     }
     try {
       const usedIds = (runResult.toolMetas ?? [])

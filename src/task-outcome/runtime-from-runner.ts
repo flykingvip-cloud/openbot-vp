@@ -272,3 +272,92 @@ export async function recordRunnerTurnOutcome(
   const evolution = drainGrowthEvolution(cfg, agentId, store);
   return { record: res.record, evolution };
 }
+
+/**
+ * Apply channel send result to a turn that was prepared with delivery pending.
+ * Prepare must leave delivery=pending; only this (or equivalent) may set delivered.
+ */
+export async function confirmRunnerTurnDelivery(
+  cfg: OpenBotConfig,
+  agentId: string,
+  input: {
+    taskId: string;
+    deliveryId: string;
+    status: "delivered" | "failed" | "delivery_unknown";
+    scope?: TrustedScope;
+    failureDetail?: string;
+  },
+): Promise<{ record: TaskOutcomeRecord; evolution: { written: boolean; reason: string } }> {
+  const taskId = input.taskId.trim();
+  if (!taskId) {
+    throw new Error("confirmRunnerTurnDelivery requires taskId");
+  }
+  const deliveryId = input.deliveryId.trim();
+  if (!deliveryId) {
+    throw new Error("confirmRunnerTurnDelivery requires deliveryId");
+  }
+
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
+  const service = new TaskOutcomeResultService({
+    store,
+    submittedBy: "agent-runner-delivery-confirm",
+  });
+  const chat = new ChatTaskOutcomeAdapter(service);
+
+  // Brief retry: prepare commit may still be flushing when dispatch confirms.
+  let record = store.loadTask(taskId);
+  for (let i = 0; i < 20 && !record; i += 1) {
+    await new Promise((r) => setTimeout(r, 25));
+    record = store.loadTask(taskId);
+  }
+  if (!record) {
+    throw new Error(`confirmRunnerTurnDelivery: task not found: ${taskId}`);
+  }
+
+  if (record.lifecycle === "closed") {
+    return {
+      record,
+      evolution: { written: false, reason: "already_closed" },
+    };
+  }
+
+  // Already recorded same delivery terminal — idempotent.
+  if (
+    record.deliveryId === deliveryId &&
+    (record.delivery.status === "delivered" ||
+      record.delivery.status === "failed" ||
+      record.delivery.status === "delivery_unknown")
+  ) {
+    return {
+      record,
+      evolution: { written: false, reason: "delivery_already_terminal" },
+    };
+  }
+
+  const scope = input.scope ?? record.scope;
+  const fencingToken = record.fencingToken || newFencingToken();
+  const deliveryGate =
+    input.status === "delivered"
+      ? ({ status: "delivered" } as const)
+      : input.status === "failed"
+        ? ({ status: "failed" } as const)
+        : ({ status: "delivery_unknown" } as const);
+
+  const res = chat.setDelivery(
+    taskId,
+    record.outcomeVersion,
+    fencingToken,
+    deliveryGate,
+    deliveryId,
+    {
+      scope,
+      commandId: `delivery-confirm:${taskId}:${deliveryId}:${input.status}`,
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`confirmRunnerTurnDelivery set_delivery failed: ${res.code}`);
+  }
+
+  const evolution = drainGrowthEvolution(cfg, agentId, store);
+  return { record: res.record, evolution };
+}

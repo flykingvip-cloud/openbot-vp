@@ -9711,11 +9711,14 @@ tasks:
     intent:
       - R83 P0 persist CAS consumer chat-wire remediation
       - R85b no-evidence-no-success growth-bridge failure-attribution
+      - R85c contract-gated acceptance send-confirm delivery effective DNA reads
     paths:
       - src/task-outcome/**
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/auto-reply/reply/agent-runner.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
       - src/gateway/server.impl.ts
+      - src/gateway/evolution-control/adapters/working-dna.ts
       - docs/design/task-outcome/**
       - .loom/registry.yaml
     state: active
@@ -9742,12 +9745,14 @@ landingStreams:
       - src/task-outcome/**
       - src/auto-reply/reply/agent-runner-execution.ts
       - src/auto-reply/reply/agent-runner.ts
+      - src/auto-reply/reply/dispatch-from-config.ts
       - src/gateway/server.impl.ts
+      - src/gateway/evolution-control/adapters/working-dna.ts
     canLandWith: []
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
-      purpose: R83/R85b TaskOutcome persist/CAS/consumer/chat-wire; no-evidence-no-success
+      purpose: R83/R85b/R85c TaskOutcome contract gates, send-confirm delivery, effective DNA reads
 
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
@@ -22140,13 +22145,9 @@ sharedPaths:
       overrides broad memory-workspace-platform-remediation globs.
       kiro-data-governance is the sole owner of the S01/S02 semantic gate CR.
   - glob: src/auto-reply/reply/dispatch-from-config.ts
-    landerTask: constitutional-governance-web-read-shadow:grok-bot
-    reason: "CTR Owner release (OWNER_RELEASE_AND_LANDER_PROXY):
-      conversation-task-runtime:kiro-conversation-task-runtime releases this
-      exact file to constitutional-governance-web-read-shadow:grok-bot as sole
-      sharedPath lander; authorize grok-bot as kiro-loom lander proxy for this
-      Registry land only. Transfer of prior CTR lander (do not retain competing
-      lander). Phase B B2 web-read shadow wiring."
+    landerTask: askOutcome-p0-r83-remediation
+    reason: "R85c temporary lander: wire delivery confirm after real send callback.
+      Restore to constitutional-governance-web-read-shadow:grok-bot after land."
   - glob: .kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance.md
     landerTask: kiro-data-governance-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance
     reason: Batch 26 / S01+S02 personal-local residual acceptance handoff authored
@@ -22537,6 +22538,10 @@ sharedPaths:
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Evolution core package; sole lander cursor-evolution.
     reviewAfter: 2026-10-07
+  - glob: src/gateway/evolution-control/adapters/working-dna.ts
+    landerTask: askOutcome-p0-r83-remediation
+    reason: "R85c temporary lander: switch observation port to readEffectiveEvolutionTaskOutcomes. Restore to openbot-evolution-unification:cursor-evolution after land."
+    reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/**
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Evolution control plane; sole lander cursor-evolution.
@@ -22603,11 +22608,11 @@ sharedPaths:
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
     landerTask: askOutcome-p0-r83-remediation
-    reason: R83 entry taskId wire (ensureChatTurnTaskOutcome at turn start). Temporary lander; restore to evolution-loop-fix after land.
+    reason: R83/R85c entry taskId wire + decisive status cancel/excluded revoke path. Temporary lander; restore to evolution-loop-fix after land.
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner.ts
     landerTask: askOutcome-p0-r83-remediation
-    reason: R85b block process-placeholder success and wire chat-turn close gates. Temporary lander; restore to ZH_SCRATCHPAD_PREAMBLE after land.
+    reason: R85b/R85c chat-turn close gates + contract-gated acceptance + awaiting delivery prepare. Temporary lander; restore to ZH_SCRATCHPAD_PREAMBLE after land.
     reviewAfter: 2026-11-30
   - glob: src/gateway/server.impl.ts
     landerTask: askOutcome-p0-r83-remediation
