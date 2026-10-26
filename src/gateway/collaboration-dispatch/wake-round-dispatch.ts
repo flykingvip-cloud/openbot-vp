@@ -211,6 +211,11 @@ export type ConsumeWakeRoundDispatchParams = {
   /** Skip dispatch attempt even when gate allows (tests). */
   skipRoundDispatch?: boolean;
   nowMs?: number;
+  /**
+   * Test-only barrier after durable claim, before pre-dispatch stop/auth recheck.
+   * Production callers omit this. Closes TOCTOU windows under controlled races.
+   */
+  _testAfterClaimBarrier?: () => Promise<void>;
 };
 
 export type ConsumeWakeRoundDispatchResult = Readonly<{
@@ -377,6 +382,71 @@ export async function consumeWakeForRoundDispatch(
       wakeOp: claimed.record,
       reused: false,
     };
+  }
+
+  // Test seam: allow stop/revoke to land after claim, before recheck+dispatch.
+  if (params._testAfterClaimBarrier) {
+    await params._testAfterClaimBarrier();
+  }
+
+  // A1 TOCTOU close: re-check stop + auth after claim, before any side-effect dispatch.
+  if (stoppedTaskId) {
+    try {
+      const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+      const current = await objectStorage.readObject<Task>(request.groupId, "task", stoppedTaskId);
+      if (current && isTaskStopAccepted(asGovernedTask(current))) {
+        const failed = await markWakeOpFailed({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail: "task_stopped_after_claim",
+        });
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: emptyGate(),
+          reason: "task_stopped",
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+          opKey: claimed.opKey,
+          wakeOp: failed ?? claimed.record ?? undefined,
+          reused: false,
+        };
+      }
+    } catch {
+      // store read failure: fall through; do not invent stop
+    }
+  }
+  {
+    const auth = await recheckCurrentDispatchAuthorization({
+      groupId: request.groupId,
+      taskId: request.taskId,
+      targetActorIds: request.toAgentIds,
+      cfg: params.cfg,
+    });
+    if (!auth.ok) {
+      const failed = await markWakeOpFailed({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail: "auth_revoked_after_claim",
+      });
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason: "auth_revoked",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey: claimed.opKey,
+        wakeOp: failed ?? claimed.record ?? undefined,
+        reused: false,
+      };
+    }
   }
 
   const gate = evaluateWakeRoundDispatchGate({

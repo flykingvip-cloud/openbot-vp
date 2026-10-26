@@ -9937,6 +9937,7 @@ landingStreams:
       - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/full-entrypoint-race-migration.evidence.test.ts
       - src/gateway/collaboration-learning/handoff-contract-entry.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/self-advance-entry.ts
