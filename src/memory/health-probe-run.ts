@@ -42,7 +42,7 @@ export async function runOpsHealthProbe(
   for (const agentInput of params.agents) {
     const resolved = {
       ...agentInput,
-      backend: agentInput.backend ?? params.backend ?? "builtin",
+      backend: agentInput.backend ?? params.backend ?? "unknown",
     };
     for (const watchPath of listAgentProbeWatchPaths(resolved)) {
       watchPaths.add(watchPath);
@@ -55,7 +55,7 @@ export async function runOpsHealthProbe(
       for (const agentInput of params.agents) {
         const result = probe.probeAgent({
           ...agentInput,
-          backend: agentInput.backend ?? params.backend ?? "builtin",
+          backend: agentInput.backend ?? params.backend ?? "unknown",
         });
         agentResults.push(result.agent);
       }
