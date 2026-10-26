@@ -9765,10 +9765,6 @@ tasks:
       - src/task-outcome/**
       - docs/design/task-outcome/**
       - .loom/registry.yaml
-      - src/auto-reply/reply/dispatch-from-config.ts
-      - src/agents/pi-embedded-runner/run/attempt.ts
-      - src/gateway/skill-invocation/**
-      - src/gateway/pattern-detection/ingest-from-run.ts
     state: active
     sessions:
       - id: askoutcome-p0-r83-20261026
@@ -9782,23 +9778,6 @@ tasks:
     since: 2026-10-26
     metadata: {}
 landingStreams:
-  - id: askOutcome-p0-r83-remediation
-    landingPolicy: serial
-    paths:
-      - .loom/registry.yaml
-      - docs/design/task-outcome/contract.md
-      - docs/design/task-outcome/call-chain-and-replacements.md
-      - src/task-outcome/**
-      - src/auto-reply/reply/dispatch-from-config.ts
-      - src/agents/pi-embedded-runner/run/attempt.ts
-      - src/gateway/skill-invocation/**
-      - src/gateway/pattern-detection/ingest-from-run.ts
-    canLandWith: []
-    metadata:
-      task: askOutcome-p0-r83-remediation
-      owner: executor-acceptance
-      purpose: "askOutcome P1 temp: attempt attribution + confirm-no-id; stream front for
-        first-match; restore/slim paths before final delivery"
   - id: p1-task-driven-aor-scoring
     landingPolicy: serial
     paths:
@@ -9848,6 +9827,19 @@ landingStreams:
       convergeNote: after-merge trim hot paths; sharedPaths landers remain authoritative
       purpose: P1 current-task-driven AOR scoring, CJK/parent quality, full context
         constraints, executor_unwired outcome claims
+  - id: askOutcome-p0-r83-remediation
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/contract.md
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - src/task-outcome/**
+    canLandWith:
+      - p1-task-driven-aor-scoring
+    metadata:
+      task: askOutcome-p0-r83-remediation
+      owner: executor-acceptance
+      purpose: R83/R85 TaskOutcome module land; hot-file temp landers restored pre-merge
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
     paths:
@@ -21870,14 +21862,18 @@ sharedPaths:
     reason: Companion test for the Phase 0 observation bridge. Resolves src/**
       overlap with pi-sdk-family-migration-v3:cursor.
   - glob: src/agents/pi-embedded-runner/run/attempt.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: "askOutcome P1 temporary lander: attempt end-of-run attribution honesty
-      (pattern null + skill skip-success). Predecessor
-      constitutional-runtime-shadow-wiring-implementation:kiro-constitutional-activation
-      remains the permanent owner; reviewAfter expiry does NOT void that claim.
-      Restore to constitutional-runtime-shadow-wiring-implementation:kiro-constitutional-activation
-      before final delivery. No dual-owner; no WIP overwrite."
-    reviewAfter: 2026-11-02
+    landerTask: constitutional-runtime-shadow-wiring-implementation:kiro-constitutional-activation
+    reason: Human-approved 2026-09-06 verify-then-take from
+      daibai-super-steward:kiro-daibai and pi-sdk-family-migration-v3:cursor.
+      Exact-file Phase 0 Skill/Tool observation. Predecessor path lists and
+      src/** are unchanged. Codex-approved 2026-09-29 exact-file
+      verify-then-take. Predecessor execution-router-phase0 remains intact and
+      retains all other paths. Existing broad src/**, src/agents/**,
+      execution-preflight/** and pi-embedded-runner/** task declarations remain
+      unchanged. No dirty WIP was found in predecessor worktrees. Transfer is
+      limited to Checkpoint C default-off shadow wiring and tests. No flag
+      enable, deploy, SELECT or EXECUTE authorization.
+    reviewAfter: 2026-10-06
   - glob: src/agents/pi-embedded-runner/run/execution-router-baselines.ts
     landerTask: execution-router-phase0
     reason: New Phase 0 Skill/Tool baseline helpers for attempt.ts. Resolves src/**
@@ -22238,11 +22234,13 @@ sharedPaths:
       overrides broad memory-workspace-platform-remediation globs.
       kiro-data-governance is the sole owner of the S01/S02 semantic gate CR.
   - glob: src/auto-reply/reply/dispatch-from-config.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: "askOutcome P1 temporary lander: confirm-no-id diagnostic log only.
-      Predecessor constitutional-governance-web-read-shadow:grok-bot remains the
-      permanent owner. Restore to constitutional-governance-web-read-shadow:grok-bot
-      before final delivery. No dual-owner; no WIP overwrite."
+    landerTask: constitutional-governance-web-read-shadow:grok-bot
+    reason: "CTR Owner release (OWNER_RELEASE_AND_LANDER_PROXY):
+      conversation-task-runtime:kiro-conversation-task-runtime releases this
+      exact file to constitutional-governance-web-read-shadow:grok-bot as sole
+      sharedPath lander; authorize grok-bot as kiro-loom lander proxy for this
+      Registry land only. Transfer of prior CTR lander (do not retain competing
+      lander). Phase B B2 web-read shadow wiring."
   - glob: .kiro/specs/memory-workspace-platform-remediation/codex-handoff-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance.md
     landerTask: kiro-data-governance-phase1b-item7-batch26-s01-s02-personal-local-residual-acceptance
     reason: Batch 26 / S01+S02 personal-local residual acceptance handoff authored
@@ -22762,13 +22760,10 @@ sharedPaths:
     reason: Existing governance SoT lander grok-evolution-closure. RC integration only.
     reviewAfter: 2026-10-07
   - glob: src/gateway/skill-invocation/**
-    landerTask: askOutcome-p0-r83-remediation
-    reason: "askOutcome P1 temporary lander: allow recordLifecycleSkillsLoadedOnRun
-      outcome=null (skip prompt-named-use success; keep tool attribution).
-      Predecessor evolution-runtime-closure remains permanent owner; expired
-      reviewAfter does NOT void it. Restore to evolution-runtime-closure before
-      final delivery."
-    reviewAfter: 2026-11-02
+    landerTask: evolution-runtime-closure
+    reason: Existing skill-invocation lander grok-evolution-closure. RC integration
+      only.
+    reviewAfter: 2026-10-07
   - glob: src/gateway/skill-execution-binding/sync.ts
     landerTask: evolution-runtime-closure
     reason: Existing binding lander grok-evolution-closure. RC integration only.
@@ -22838,12 +22833,6 @@ sharedPaths:
     landerTask: loom-workspace-orchestrator:kiro-loom
     reason: Global loom registry. RC only appended cursor-evolution task and path
       landers.
-  - glob: src/gateway/pattern-detection/ingest-from-run.ts
-    landerTask: askOutcome-p0-r83-remediation
-    reason: "askOutcome P1 temporary lander: null success output fingerprint must
-      not cluster as ok/error. Restore/remove this exact glob before final delivery;
-      no permanent transfer of pattern-detection."
-    reviewAfter: 2026-11-02
   - glob: src/gateway/pattern-detection/working-dna-proposal.ts
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Working DNA proposal production path from operational observations.
