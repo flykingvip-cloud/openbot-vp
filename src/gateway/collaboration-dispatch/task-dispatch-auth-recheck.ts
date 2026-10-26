@@ -20,7 +20,7 @@ import { asGovernedTask } from "./task-runtime.js";
 
 export type DispatchAuthRecheckFailure = {
   ok: false;
-  reason: "auth_revoked";
+  reason: "auth_revoked" | "auth_source_unreadable";
   revokedActorIds: string[];
   detail: string;
 };
@@ -73,6 +73,11 @@ export async function recheckCurrentDispatchAuthorization(params: {
   taskId?: string | null;
   targetActorIds?: readonly string[] | null;
   cfg?: OpenBotConfig;
+  /**
+   * Test-only: force operating-state membership read to throw.
+   * Production callers omit this. Must not be treated as ok:true.
+   */
+  _testForceOperatingStateReadError?: Error | (() => Error);
 }): Promise<DispatchAuthRecheckResult> {
   const groupId = compact(params.groupId);
   if (!groupId) {
@@ -82,10 +87,21 @@ export async function recheckCurrentDispatchAuthorization(params: {
   const { fileStore, objectStorage } = createWorkspaceCollaborationStores(params.cfg);
   let operatingState: Parameters<typeof isMappedDeliveryIdentity>[0] = null;
   try {
+    if (params._testForceOperatingStateReadError) {
+      const forced = params._testForceOperatingStateReadError;
+      throw typeof forced === "function" ? forced() : forced;
+    }
     operatingState = await readGroupOperatingState({ fileStore, groupId });
-  } catch {
-    // Unreadable membership cannot prove a revoke for non-ACL paths.
-    return { ok: true };
+  } catch (err) {
+    // Unreadable membership cannot prove revoke OR continued authorization.
+    // Fail closed: refuse / unknown — never ok:true (T39/T40 residual).
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      reason: "auth_source_unreadable",
+      revokedActorIds: [],
+      detail: `operating_state_unreadable:${message}`,
+    };
   }
 
   const targetCandidates = uniqueMappedCandidates(params.targetActorIds ?? []);

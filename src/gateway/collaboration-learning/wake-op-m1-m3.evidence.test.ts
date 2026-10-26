@@ -21,6 +21,7 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
 import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-op-effect-verify.js";
 import {
   claimWakeOpRunning,
@@ -854,6 +855,124 @@ describe("T38 M3 fail-open + pre-eligibility barrier", () => {
     const rec = await readWakeOpRecord({ authority, opKey });
     expect(rec?.status).toBe("failed");
     expect(rec?.dispatchEligibility).toBeFalsy();
+  });
+});
+
+describe("T40 M3 residual: recheck OS fail-closed + pre-claim task catch", () => {
+  test("M3-R-01: recheckCurrentDispatchAuthorization OS unreadable → not ok:true; diagnostic", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-r-01";
+    await seed({ cfg, taskId, itemId: "r01" });
+    const auth = await recheckCurrentDispatchAuthorization({
+      groupId: tenant.groupId,
+      taskId,
+      targetActorIds: [tenant.bot0],
+      cfg,
+      _testForceOperatingStateReadError: () => new Error("simulated OS unreadable for recheck"),
+    });
+    expect(auth.ok).toBe(false);
+    if (auth.ok) {
+      throw new Error("expected refuse");
+    }
+    expect(auth.reason).toBe("auth_source_unreadable");
+    expect(auth.detail).toContain("operating_state_unreadable");
+    expect(auth.detail).toContain("simulated OS unreadable");
+  });
+
+  test("M3-R-01b: pre-claim auth OS unreadable → no claim; reason; calls=0", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-r-01b";
+    const { authority } = await seed({ cfg, taskId, itemId: "r01b" });
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testForcePreClaimAuthOsReadError: () => new Error("simulated pre-claim OS unreadable"),
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "r01b"),
+    });
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("auth_source_unreadable");
+    // Pre-claim refuse: durable claim must not have proceeded to running.
+    const rec = await readWakeOpRecord({ authority, opKey: opKeyFor(taskId, "r01b") });
+    expect(rec?.status === "running").toBe(false);
+    expect(rec?.status).not.toBe("completed");
+  });
+
+  test("M3-R-02: pre-claim task read throw → refuse before claim; ≠ never-observed null", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-r-02";
+    const { authority } = await seed({ cfg, taskId, itemId: "r02" });
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testForcePreClaimTaskReadError: () =>
+        new Error("simulated pre-claim task control read failure"),
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "r02"),
+    });
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("task_control_unreadable");
+    const rec = await readWakeOpRecord({ authority, opKey: opKeyFor(taskId, "r02") });
+    expect(rec?.status === "running").toBe(false);
+    expect(rec?.status).not.toBe("completed");
+  });
+
+  test("M3-R-02b: never-observed null task (no throw) still distinct — not task_control_unreadable from catch", async () => {
+    const { cfg } = await useIsolationRoot();
+    // Seed OS + authority but omit writing the task object → pre-claim read returns null.
+    const groupId = tenant.groupId;
+    const { fileStore, objectStorage } = createWorkspaceCollaborationStores(cfg);
+    await writeGroupOperatingState({ fileStore, groupId, state: buildState() });
+    const now = Date.now();
+    const snapshot = createRoundPolicySnapshot(
+      resolveGroupPolicyInput({ operatingState: buildState() }),
+      {
+        now,
+        idGen: () => generatePolicySnapshotId(now),
+      },
+    );
+    const authority = createRuntimeAuthority({
+      snapshot,
+      episodeId: episodeIdForClientRun(`task-wake:${groupId}:task-m3-r-02b`),
+      tenant: resolveAuthorityTenantForEntry({
+        preferred: null,
+        groupTenantId: resolveCollaborationGroupTenantId(groupId),
+      }),
+      groupId,
+      profile: resolveSecurityProfile(cfg).profile,
+      cfg,
+    });
+    void objectStorage;
+    let calls = 0;
+    const wake = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "round-null-task-ok" };
+      },
+      request: wakeReq("task-m3-r-02b-missing", "r02b"),
+    });
+    // Never-observed null must not be classified as task_control_unreadable (throw path).
+    expect(wake.reason).not.toBe("task_control_unreadable");
+    // May dispatch (compatible with wakes that have no task object) or fail for other reasons,
+    // but the throw-path reason must stay reserved.
+    if (wake.dispatched) {
+      expect(calls).toBe(1);
+    }
   });
 });
 

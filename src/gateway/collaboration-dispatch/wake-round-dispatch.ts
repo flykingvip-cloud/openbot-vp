@@ -245,6 +245,16 @@ export type ConsumeWakeRoundDispatchParams = {
    * gate to throw (must not keep the prior fingerprint).
    */
   _testForcePostEligibilityAuthSourceReadError?: Error | (() => Error);
+  /**
+   * Test-only: force task control read in the pre-claim U1 stop check to throw
+   * (must refuse / unknown — must not silently fall through into claim).
+   */
+  _testForcePreClaimTaskReadError?: Error | (() => Error);
+  /**
+   * Test-only: force operating-state read inside pre-claim auth recheck to throw
+   * (recheckCurrentDispatchAuthorization must not ok:true; no claim).
+   */
+  _testForcePreClaimAuthOsReadError?: Error | (() => Error);
 };
 
 export type ConsumeWakeRoundDispatchResult = Readonly<{
@@ -333,6 +343,10 @@ export async function consumeWakeForRoundDispatch(
   const stoppedTaskId = compact(request.taskId);
   if (stoppedTaskId) {
     try {
+      if (params._testForcePreClaimTaskReadError) {
+        const forced = params._testForcePreClaimTaskReadError;
+        throw typeof forced === "function" ? forced() : forced;
+      }
       const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
       const current = await objectStorage.readObject<Task>(request.groupId, "task", stoppedTaskId);
       if (current && isTaskStopAccepted(asGovernedTask(current))) {
@@ -348,8 +362,20 @@ export async function consumeWakeForRoundDispatch(
           reused: false,
         };
       }
+      // null / absent task: never-observed → do not invent stop; distinct from throw.
     } catch {
-      // store read failure: fall through; do not invent stop
+      // store read failure: refuse before claim (≠ never-observed null).
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason: "task_control_unreadable",
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey,
+        reused: false,
+      };
     }
   }
 
@@ -361,13 +387,14 @@ export async function consumeWakeForRoundDispatch(
       taskId: request.taskId,
       targetActorIds: request.toAgentIds,
       cfg: params.cfg,
+      _testForceOperatingStateReadError: params._testForcePreClaimAuthOsReadError,
     });
     if (!auth.ok) {
       return {
         outcome: "recorded",
         dispatched: false,
         gate: emptyGate(),
-        reason: "auth_revoked",
+        reason: auth.reason,
         wakeEvent: undefined,
         roundId: undefined,
         dispatcherPresent: false,
@@ -510,13 +537,13 @@ export async function consumeWakeForRoundDispatch(
         opKey: claimed.opKey,
         cfg: params.cfg,
         nowMs: params.nowMs,
-        detail: "auth_revoked_after_claim",
+        detail: `${auth.reason}_after_claim`,
       });
       return {
         outcome: "recorded",
         dispatched: false,
         gate: emptyGate(),
-        reason: "auth_revoked",
+        reason: auth.reason,
         wakeEvent: undefined,
         roundId: undefined,
         dispatcherPresent: false,
@@ -653,13 +680,13 @@ export async function consumeWakeForRoundDispatch(
           opKey: claimed.opKey,
           cfg: params.cfg,
           nowMs: params.nowMs,
-          detail: "auth_revoked_before_eligibility_commit",
+          detail: `${authBeforeCommit.reason}_before_eligibility_commit`,
         });
         return {
           outcome: "recorded",
           dispatched: false,
           gate: emptyGate(),
-          reason: "auth_revoked",
+          reason: authBeforeCommit.reason,
           wakeEvent: undefined,
           roundId: undefined,
           dispatcherPresent: false,
@@ -856,10 +883,10 @@ export async function consumeWakeForRoundDispatch(
       const detail = stopAfterEligibility
         ? "stop_after_eligibility_before_external"
         : !auth.ok
-          ? "auth_revoked_after_eligibility"
+          ? `${auth.reason}_after_eligibility`
           : "eligibility_stale_before_external";
       // External request not sent: mark unknown (in-flight uncertainty) when stop
-      // interrupted an eligible holder; auth revoke → failed (clear refuse).
+      // interrupted an eligible holder; auth revoke / auth-source unreadable → failed.
       if (stopAfterEligibility) {
         const unknown = await markWakeOpUnknown({
           authority: params.authority,
@@ -892,7 +919,7 @@ export async function consumeWakeForRoundDispatch(
         outcome: "recorded",
         dispatched: false,
         gate: emptyGate(),
-        reason: !auth.ok ? "auth_revoked" : "eligibility_stale",
+        reason: !auth.ok ? auth.reason : "eligibility_stale",
         wakeEvent: undefined,
         roundId: undefined,
         dispatcherPresent: false,
@@ -937,7 +964,9 @@ export async function consumeWakeForRoundDispatch(
         let receiptEpoch = eligibilityControlEpoch;
         let receiptAuthFp = eligibilityAuthFingerprint;
         let stopAfterExternal = false;
-        let receiptControlUnreadable = false;
+        let receiptTaskMissing = false;
+        let receiptTaskUnreadable = false;
+        let receiptAuthUnreadable = false;
         if (stoppedTaskId) {
           try {
             const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
@@ -957,10 +986,10 @@ export async function consumeWakeForRoundDispatch(
               }
             } else if (eligibilityTaskObserved) {
               // Observed at eligibility; missing before receipt → cannot prove control.
-              receiptControlUnreadable = true;
+              receiptTaskMissing = true;
             }
           } catch {
-            receiptControlUnreadable = true;
+            receiptTaskUnreadable = true;
           }
         }
         try {
@@ -968,9 +997,11 @@ export async function consumeWakeForRoundDispatch(
           const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
           receiptAuthFp = wakeOpAuthFingerprint(os, request.toAgentIds);
         } catch {
-          receiptControlUnreadable = true;
+          receiptAuthUnreadable = true;
           receiptAuthFp = "";
         }
+        const receiptControlUnreadable =
+          receiptTaskMissing || receiptTaskUnreadable || receiptAuthUnreadable;
         const mayComplete =
           !receiptControlUnreadable &&
           isDispatchEligibilityCurrent({
@@ -981,9 +1012,13 @@ export async function consumeWakeForRoundDispatch(
         if (!mayComplete || stopAfterExternal) {
           reason = stopAfterExternal
             ? "external_sent_stop_before_receipt"
-            : receiptControlUnreadable
-              ? "external_sent_control_unreadable_before_receipt"
-              : "external_sent_eligibility_stale_before_receipt";
+            : receiptTaskMissing
+              ? "external_sent_task_missing_before_receipt"
+              : receiptTaskUnreadable
+                ? "external_sent_task_control_unreadable_before_receipt"
+                : receiptAuthUnreadable
+                  ? "external_sent_auth_source_unreadable_before_receipt"
+                  : "external_sent_eligibility_stale_before_receipt";
           const unknown = await markWakeOpUnknown({
             authority: params.authority,
             opKey: claimed.opKey,
