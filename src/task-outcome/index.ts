@@ -45,6 +45,7 @@ export {
 } from "./growth-bridge.js";
 export {
   recoverTaskOutcomeConsumersAtGatewayBoot,
+  hydrateAllAgentsAwaitingDeliveries,
   drainAllAgentsPendingGrowth,
   startTaskOutcomeRuntimeDrain,
   stopTaskOutcomeRuntimeDrainForTests,
