@@ -220,8 +220,12 @@ describe("noVNC observer bootstrap", () => {
     expect(action("chrome", "-", "tk.Tk", "OpenBot Desktop", "0x1")).toBe("launch -");
     expect(action("chrome", "-", "chromium.Chromium", "OpenBot", "0x2")).toBe("raise 0x2");
     expect(action("chrome", "0x0002", "chromium.Chromium", "OpenBot", "0x2")).toBe("raise 0x2");
-    expect(action("files", "0x9", "thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe("raise 0x3");
-    expect(action("files", "0x3", "thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe("raise 0x3");
+    expect(action("files", "0x9", "thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe(
+      "raise 0x3",
+    );
+    expect(action("files", "0x3", "thunar.Thunar", "openbot-home - Thunar", "0x3")).toBe(
+      "raise 0x3",
+    );
     expect(action("files", "-", "Thunar", "Thunar", "0x6")).toBe("raise 0x6");
     expect(action("files", "-", "tk.Tk", "文件", "0x7")).toBe("launch -");
     expect(action("terminal", "-", "xterm.XTerm", "终端", "0x4")).toBe("raise 0x4");

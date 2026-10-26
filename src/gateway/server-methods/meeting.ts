@@ -4,6 +4,7 @@ import {
   buildMeetingConfirmResumeContinuation,
   consumeMeetingApprovalConfirmation,
   invalidateMeetingApprovalConfirmations,
+  issueMeetingApprovalConfirmation,
   meetingApprovalConfirmationDetail,
   reissueMeetingApprovalConfirmation,
 } from "../../organization/meeting-confirmation.js";

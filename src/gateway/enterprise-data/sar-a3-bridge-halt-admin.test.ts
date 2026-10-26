@@ -7,7 +7,6 @@
 import fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SiteRunResult } from "../../site-capability/result.js";
-import type { GatewayRequestHandler } from "../server-methods/types.js";
 import { upsertConnectorAction } from "./connector-action-store.js";
 import { invokeEnterpriseDataAction } from "./data-gateway.js";
 import { upsertDataSource } from "./data-source-store.js";
@@ -15,10 +14,10 @@ import {
   GOVERNANCE_ADMIN_REQUIRED_MESSAGE,
   createTrustedExecutionContextForTest,
 } from "./enterprise-data-seat-context.js";
+import { registerRuntimeHandler } from "./runtime-registry.js";
 import { listSarAdminAuditEvents } from "./sar-admin-audit.js";
 import { evaluateSarExecutionHalt } from "./sar-execution-halt.js";
 import type { SarGovernanceProvider } from "./sar-governance-bridge.js";
-import { registerRuntimeHandler } from "./runtime-registry.js";
 import { upsertScopePolicy } from "./scope-policy-store.js";
 import { upsertSeatActionGrant } from "./seat-action-grant-store.js";
 import {
@@ -222,7 +221,7 @@ async function callHandler(
     return result;
   }
   const handlers = createEnterpriseDataSarAdminHandlers(withStore);
-  const handler = handlers[method] as GatewayRequestHandler;
+  const handler = handlers[method];
   let ok = false;
   let payload: Record<string, unknown> | undefined;
   let error: { message?: string; details?: { code?: string } } | undefined;
@@ -291,7 +290,8 @@ describe("A3 SAR bridge/halt admin product RPC", () => {
 
     const listed = await callHandler("enterprise-data.sar.bridges.list", {}, store);
     expect(listed.ok).toBe(true);
-    expect((listed.payload?.bridges as unknown[]).length).toBe(1);
+    const bridges = listed.payload?.bridges;
+    expect(Array.isArray(bridges) ? bridges.length : 0).toBe(1);
 
     const audits = listSarAdminAuditEvents({ store, tenantId, action: "bridge_upsert" });
     expect(audits).toHaveLength(1);
@@ -304,7 +304,10 @@ describe("A3 SAR bridge/halt admin product RPC", () => {
 
   it("unauthorized non-admin is rejected before mutation", async () => {
     requireAdminTenantMock.mockImplementation(async ({ respond }) => {
-      respond(false, undefined, { code: "INVALID_REQUEST", message: GOVERNANCE_ADMIN_REQUIRED_MESSAGE });
+      respond(false, undefined, {
+        code: "INVALID_REQUEST",
+        message: GOVERNANCE_ADMIN_REQUIRED_MESSAGE,
+      });
       return null;
     });
     resolveBillingScopeMock.mockResolvedValue(memberScope());
@@ -364,6 +367,7 @@ describe("A3 SAR bridge/halt admin product RPC", () => {
       context,
       ref: actionRef,
       sourceId,
+      nowIso: new Date().toISOString(),
       sarProvider: provider,
     });
     expect(before.ok).toBe(true);
@@ -406,6 +410,7 @@ describe("A3 SAR bridge/halt admin product RPC", () => {
       context,
       ref: actionRef,
       sourceId,
+      nowIso: new Date().toISOString(),
       sarProvider: provider,
     });
     expect(blocked.ok).toBe(false);
@@ -417,22 +422,22 @@ describe("A3 SAR bridge/halt admin product RPC", () => {
     }
     expect(calls).toHaveLength(1);
 
-    const haltId = (halted.payload?.halt as { haltId: string }).haltId;
-    const resumed = await callHandler(
-      "enterprise-data.sar.halts.clear",
-      { haltId },
-      store,
-    );
+    const halt = halted.payload?.halt as { haltId: string } | undefined;
+    expect(halt).toBeTruthy();
+    const haltId = halt!.haltId;
+    const resumed = await callHandler("enterprise-data.sar.halts.clear", { haltId }, store);
     expect(resumed.ok).toBe(true);
     expect(resumed.payload?.resumed).toBe(true);
     expect(resumed.payload?.inFlightSideEffectsWithdrawn).toBe(false);
-    expect((resumed.payload?.audit as { action: string }).action).toBe("halt_clear");
+    const audit = resumed.payload?.audit as { action: string } | undefined;
+    expect(audit?.action).toBe("halt_clear");
 
     const after = await invokeEnterpriseDataAction({
       store,
       context,
       ref: actionRef,
       sourceId,
+      nowIso: new Date().toISOString(),
       sarProvider: provider,
     });
     expect(after.ok).toBe(true);
@@ -441,13 +446,16 @@ describe("A3 SAR bridge/halt admin product RPC", () => {
     const auditList = await callHandler("enterprise-data.sar.admin-audit.list", {}, store);
     expect(auditList.ok).toBe(true);
     const events = auditList.payload?.events as Array<{ action: string }>;
-    const actions = events.map((e) => e.action).sort();
-    expect(actions).toEqual(["bridge_upsert", "halt_clear", "halt_set"].sort());
+    const actions = events.map((e) => e.action).toSorted();
+    expect(actions).toEqual(["bridge_upsert", "halt_clear", "halt_set"].toSorted());
   });
 
   it("unauthorized halt set is rejected", async () => {
     requireAdminTenantMock.mockImplementation(async ({ respond }) => {
-      respond(false, undefined, { code: "INVALID_REQUEST", message: GOVERNANCE_ADMIN_REQUIRED_MESSAGE });
+      respond(false, undefined, {
+        code: "INVALID_REQUEST",
+        message: GOVERNANCE_ADMIN_REQUIRED_MESSAGE,
+      });
       return null;
     });
     const store = seedWebsiteStore();

@@ -491,7 +491,7 @@ describe("runPreparedReply inbound depth router", () => {
     });
     const filter = vi.mocked(ensureSkillSnapshot).mock.calls[0]?.[0]?.skillFilter as string[];
     for (const name of STEWARD_REQUIRED_SKILLS) {
-      if (name !== "weather") {
+      if ((name as string) !== "weather") {
         expect(filter).not.toContain(name);
       }
     }

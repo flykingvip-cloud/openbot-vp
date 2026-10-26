@@ -57,7 +57,11 @@ function tempStoreRoot(): string {
   return root;
 }
 
-function harness(options?: { storeRoot?: string; store?: WriteRecheckStore; concurrency?: "reject" | "queue" }) {
+function harness(options?: {
+  storeRoot?: string;
+  store?: WriteRecheckStore;
+  concurrency?: "reject" | "queue";
+}) {
   const authority = new SarExecutionAuthority(memoryEpochStore());
   authority.boot();
   disposers.push(() => authority.dispose());
@@ -157,13 +161,15 @@ describe("R4 write ledger partition + persistence", () => {
     expect(again.data).toMatchObject({ idempotent: true, replayed: false });
     expect(site.applyCount).toBe(2);
 
-    expect(writeLedgerKey({
-      tenantId: PRINCIPAL_A.tenantId,
-      userId: PRINCIPAL_A.userId,
-      bindingId: BINDING_A,
-      capabilityId: SAR_DRAFT_NOTE_CREATE_ID,
-      idempotencyKey: SHARED_IDEMPOTENCY,
-    })).not.toBe(
+    expect(
+      writeLedgerKey({
+        tenantId: PRINCIPAL_A.tenantId,
+        userId: PRINCIPAL_A.userId,
+        bindingId: BINDING_A,
+        capabilityId: SAR_DRAFT_NOTE_CREATE_ID,
+        idempotencyKey: SHARED_IDEMPOTENCY,
+      }),
+    ).not.toBe(
       writeLedgerKey({
         tenantId: PRINCIPAL_B.tenantId,
         userId: PRINCIPAL_B.userId,
@@ -204,7 +210,11 @@ describe("R4 write ledger partition + persistence", () => {
     expect(site.applyCount).toBe(1);
     expect(site.maxConcurrent).toBe(1);
     const noteFirst = first.data as { noteId: string; contentDigest: string };
-    const noteSecond = second.data as { noteId: string; contentDigest: string; idempotent?: boolean };
+    const noteSecond = second.data as {
+      noteId: string;
+      contentDigest: string;
+      idempotent?: boolean;
+    };
     expect(noteSecond.noteId).toBe(noteFirst.noteId);
     expect(noteSecond.contentDigest).toBe(noteFirst.contentDigest);
     expect(noteSecond.idempotent === true || noteSecond.noteId === noteFirst.noteId).toBe(true);
@@ -225,9 +235,9 @@ describe("R4 write ledger partition + persistence", () => {
 
     const onDisk = loadWriteLedgerSnapshot(storeRoot);
     expect(onDisk.schemaVersion).toBe(1);
-    expect(onDisk.entries.some((e) => e.status === "confirmed" && e.idempotencyKey === "persist-key-r4")).toBe(
-      true,
-    );
+    expect(
+      onDisk.entries.some((e) => e.status === "confirmed" && e.idempotencyKey === "persist-key-r4"),
+    ).toBe(true);
     expect(fs.existsSync(path.join(storeRoot, "write-ledger.json"))).toBe(true);
     expect(storeRoot).toContain("sar-r4-ledger-");
 

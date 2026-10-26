@@ -223,8 +223,7 @@ export const SURFACE_MATRIX_ROWS: readonly SurfaceMatrixRow[] = Object.freeze([
   }),
 ]);
 
-export const SURFACE_MATRIX_NOTE =
-  "矩阵只描述 SaaS full 的含与不含。full 是唯一默认运营路径。";
+export const SURFACE_MATRIX_NOTE = "矩阵只描述 SaaS full 的含与不含。full 是唯一默认运营路径。";
 
 export type ReleaseWindowRow = {
   id: string;

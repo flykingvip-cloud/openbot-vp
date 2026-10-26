@@ -252,9 +252,7 @@ describe("R3 learning asset persistence", () => {
       return;
     }
     // Evidence comes from the controllable fixture port — not an external enterprise site.
-    expect(runtime.readEvidence(explored.evidence.evidenceRef)?.runId).toBe(
-      explored.result.runId,
-    );
+    expect(runtime.readEvidence(explored.evidence.evidenceRef)?.runId).toBe(explored.result.runId);
     expect(explored.result.status).toBe("succeeded");
     expect(explored.evidence.completeness).toBe("complete");
 
@@ -290,10 +288,11 @@ describe("R3 learning asset persistence", () => {
     }
     expect(secondDraft.draft.draftId).toBe("draft_r3_evidence_b");
     expect(restarted.draftCount()).toBe(2);
-    expect(loadLearningSnapshot(storeRoot).drafts.map((d) => d.draftId).toSorted()).toEqual([
-      "draft_r3_evidence",
-      "draft_r3_evidence_b",
-    ]);
+    expect(
+      loadLearningSnapshot(storeRoot)
+        .drafts.map((d) => d.draftId)
+        .toSorted(),
+    ).toEqual(["draft_r3_evidence", "draft_r3_evidence_b"]);
   });
 
   it("rejects empty / whitespace reviewer on validate and accept (no empty-string bypass)", async () => {

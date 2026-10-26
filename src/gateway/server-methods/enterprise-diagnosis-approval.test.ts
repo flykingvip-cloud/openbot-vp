@@ -9,7 +9,7 @@ import {
   enterpriseDiagnosisApprovalHandlers,
   setEnterpriseDiagnosisApprovalDepsForTests,
 } from "./enterprise-diagnosis-approval.js";
-import type { GatewayClient, GatewayRequestHandler } from "./types.js";
+import type { GatewayClient } from "./types.js";
 
 const METHOD = ENTERPRISE_DIAGNOSIS_APPROVAL_DECIDE_METHOD;
 

@@ -121,7 +121,7 @@ describe("platform.diagnosis.approval.decide registration", () => {
         "grant-1",
         {
           grantId: "grant-1",
-          status: "REQUESTED" as const,
+          status: "REQUESTED" as "REQUESTED" | "APPROVED" | "DENIED",
           approverRole: "platform" as const,
           targetTenant: "tenant-a",
         },

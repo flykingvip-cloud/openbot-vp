@@ -149,6 +149,7 @@ describe("P4b claim contract production entry", () => {
         itemId: "item_1",
         actor: "coord",
         reason: "needs revision",
+        expectedSubmissionId: "sub_missing",
         cfg,
       }),
     ).rejects.toBeInstanceOf(ClaimContractFlagOffError);

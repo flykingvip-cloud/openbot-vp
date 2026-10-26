@@ -818,7 +818,7 @@ components:
           type: integer
         checksum:
           type: string
-          description: sha256 hex, optional sha256: prefix
+          description: "sha256 hex, optional sha256: prefix"
         readUrl:
           type: string
           description: Loopback or allowlisted HTTPS. OpenBot pulls. Not written to the audit log.

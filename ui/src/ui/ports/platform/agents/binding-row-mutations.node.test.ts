@@ -11,6 +11,7 @@ import {
   disableBindingMutation,
   promoteBindingMutation,
   requestBindingRowMutation,
+  type BindingMutationRequester,
   BINDING_PRIMARY_ROUTING_PRIORITY,
   BINDING_UPDATE_PRIORITY_METHOD,
   BINDING_UPDATE_STATE_METHOD,
@@ -127,7 +128,10 @@ describe("binding row mutation contract", () => {
     const row = binding({ bindingId: "binding-active" });
     const mutation = disableBindingMutation(row);
     const request = vi.fn(async () => ({ binding: { ...row, bindingState: "active" as const } }));
-    const result = await requestBindingRowMutation(request, mutation);
+    const result = await requestBindingRowMutation(
+      request as BindingMutationRequester["request"],
+      mutation,
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toContain("不一致");
@@ -251,7 +255,11 @@ describe("platform agents binding rows", () => {
       request,
     });
     button(container, "binding-active", "binding-row-disable")?.click();
-    expect(request.mock.calls.some((call) => call[0] === BINDING_UPDATE_STATE_METHOD)).toBe(false);
+    expect(
+      (request.mock.calls as unknown as Array<[string, unknown]>).some(
+        (call) => call[0] === BINDING_UPDATE_STATE_METHOD,
+      ),
+    ).toBe(false);
   });
 
   it("changes load strategy for one binding from the detail card", async () => {
@@ -356,7 +364,9 @@ describe("platform agents binding rows", () => {
     await vi.waitFor(() => {
       render(renderPlatformAgentsSurface(props), container);
       expect(
-        request.mock.calls.filter((call) => call[0] === "agent-runtime.binding.batch-set-state"),
+        (request.mock.calls as unknown as Array<[string, unknown]>).filter(
+          (call) => call[0] === "agent-runtime.binding.batch-set-state",
+        ),
       ).toHaveLength(1);
       expect(container.textContent).toContain("已应用 1 条，拒绝 1 条");
     });
@@ -366,7 +376,9 @@ describe("platform agents binding rows", () => {
     });
     expect(container.textContent).toContain("unknown binding");
     expect(
-      request.mock.calls.filter((call) => call[0] === "agent-runtime.update-binding-state"),
+      (request.mock.calls as unknown as Array<[string, unknown]>).filter(
+        (call) => call[0] === "agent-runtime.update-binding-state",
+      ),
     ).toHaveLength(0);
   });
 
@@ -404,12 +416,14 @@ describe("platform agents binding rows", () => {
       expect(container.textContent).toContain("没有可自动修复的项");
       expect(container.textContent).toContain("no safe version target");
     });
-    const fixCalls = request.mock.calls.filter(
+    const fixCalls = (request.mock.calls as unknown as Array<[string, unknown]>).filter(
       (call) => call[0] === "agent-runtime.governance.fix",
     );
     expect(fixCalls).toHaveLength(1);
     expect(
-      request.mock.calls.some((call) => call[0] === "agent-runtime.update-binding-state"),
+      (request.mock.calls as unknown as Array<[string, unknown]>).some(
+        (call) => call[0] === "agent-runtime.update-binding-state",
+      ),
     ).toBe(false);
   });
 
@@ -490,10 +504,14 @@ describe("platform agents binding rows", () => {
       capabilityVersion: "1.3.0",
     });
     expect(
-      request.mock.calls.filter((call) => call[0] === "agent-runtime.binding.upgrade"),
+      (request.mock.calls as unknown as Array<[string, unknown]>).filter(
+        (call) => call[0] === "agent-runtime.binding.upgrade",
+      ),
     ).toHaveLength(1);
     expect(
-      request.mock.calls.some((call) => call[0] === "agent-runtime.update-binding-state"),
+      (request.mock.calls as unknown as Array<[string, unknown]>).some(
+        (call) => call[0] === "agent-runtime.update-binding-state",
+      ),
     ).toBe(false);
   });
 
@@ -537,9 +555,11 @@ describe("platform agents binding rows", () => {
     version!.dispatchEvent(new Event("change", { bubbles: true }));
     render(renderPlatformAgentsSurface(props), container);
     container.querySelector<HTMLButtonElement>('[data-testid="binding-bulk-upgrade"]')?.click();
-    expect(request.mock.calls.some((call) => call[0] === "agent-runtime.binding.upgrade")).toBe(
-      false,
-    );
+    expect(
+      (request.mock.calls as unknown as Array<[string, unknown]>).some(
+        (call) => call[0] === "agent-runtime.binding.upgrade",
+      ),
+    ).toBe(false);
   });
 
   it("saves policy numbers with locked units and global fallback mode", async () => {

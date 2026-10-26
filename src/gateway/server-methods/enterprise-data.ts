@@ -139,7 +139,8 @@ const enterpriseDataM4Handlers = createEnterpriseDataM4Handlers(withEnterpriseDa
 const enterpriseDataM5Handlers = createEnterpriseDataM5Handlers(withEnterpriseDataStore);
 const enterpriseDataM6Handlers = createEnterpriseDataM6Handlers(withEnterpriseDataStore);
 const enterpriseDataAssetHandlers = createEnterpriseDataAssetHandlers(withEnterpriseDataStore);
-const enterpriseDataSarAdminHandlers = createEnterpriseDataSarAdminHandlers(withEnterpriseDataStore);
+const enterpriseDataSarAdminHandlers =
+  createEnterpriseDataSarAdminHandlers(withEnterpriseDataStore);
 const enterpriseDataSemanticHandlers = createEnterpriseDataSemanticHandlers();
 const enterpriseDataPlannerHandlers = createEnterpriseDataPlannerHandlers();
 const enterpriseDataEventHandlers = createEnterpriseDataEventHandlers();

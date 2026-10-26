@@ -10,7 +10,10 @@
 import fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LookupFn } from "../../infra/net/ssrf.js";
-import { SarExecutionAuthority, memoryEpochStore } from "../../site-capability/execution-authority.js";
+import {
+  SarExecutionAuthority,
+  memoryEpochStore,
+} from "../../site-capability/execution-authority.js";
 import {
   SiteCapabilityRuntime,
   type SiteCapabilityRecord,
@@ -21,22 +24,25 @@ import {
   ControllableTestSite,
   createTestSitePort,
 } from "../../site-capability/test-site.js";
-import type { GatewayRequestHandler, GatewayRequestHandlerOptions } from "../server-methods/types.js";
+import type {
+  GatewayRequestHandler,
+  GatewayRequestHandlerOptions,
+} from "../server-methods/types.js";
 import { upsertConnectorAction } from "./connector-action-store.js";
-import { registerCallerAccountBinding } from "./data-asset-linkage.js";
 import {
   createControlledSarProvider,
   getProcessControlledSarProvider,
   resetProcessControlledSarProviderForTests,
   setProcessControlledSarRuntimeForTests,
 } from "./controlled-sar-provider.js";
+import { registerCallerAccountBinding } from "./data-asset-linkage.js";
+import { upsertDataCapability } from "./data-capability-store.js";
+import { upsertDataSource } from "./data-source-store.js";
 import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
 import {
   listEnterpriseKnowledgeProjectionBindings,
   upsertEnterpriseKnowledgeProjectionBinding,
 } from "./enterprise-knowledge-projection-binding-store.js";
-import { upsertDataCapability } from "./data-capability-store.js";
-import { upsertDataSource } from "./data-source-store.js";
 import { listKnowledgeFeedItems } from "./knowledge-feed-item-store.js";
 import { upsertEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import { registerRuntimeHandler } from "./runtime-registry.js";
@@ -105,9 +111,7 @@ const capabilityId = "fixture.sar.a1.public.query";
 const sarVersion = "1.0.0";
 const artifactDigest = "sha256:fixture-a1-public-1";
 
-const publicLookup = (async () => [
-  { address: "93.184.216.34", family: 4 },
-]) as unknown as LookupFn;
+const publicLookup = (async () => [{ address: "93.184.216.34", family: 4 }]) as unknown as LookupFn;
 
 const adminScope = {
   enterpriseId: tenantId,
@@ -261,6 +265,7 @@ function buildControllableRuntime(): {
     { op: "capture_result", fields: ["query", "items"] },
   ];
   const record: SiteCapabilityRecord = {
+    lifecycle: "approved",
     manifest: {
       schemaVersion: "1",
       id: capabilityId,
@@ -525,11 +530,15 @@ describe("A1 production entry path via projection-materializer.run", () => {
     }).find((row) => row.generatorVersion === "a1-test");
     expect(binding?.bindingId).toBeTruthy();
 
-    const response = await invokeHandler(m4Handlers, "enterprise-data.projection-materializer.run", {
-      tenantId,
-      bindingId: binding!.bindingId,
-      input: { query: "widget" },
-    });
+    const response = await invokeHandler(
+      m4Handlers,
+      "enterprise-data.projection-materializer.run",
+      {
+        tenantId,
+        bindingId: binding!.bindingId,
+        input: { query: "widget" },
+      },
+    );
     expect(response.ok).toBe(true);
     const result = response.payload?.result as {
       feedItem?: { title?: string; objectId?: string };
@@ -562,7 +571,10 @@ describe("A1 wiring honesty checks", () => {
       new URL("./scheduled-projection-materializer.ts", import.meta.url),
       "utf8",
     );
-    const provider = fs.readFileSync(new URL("./controlled-sar-provider.ts", import.meta.url), "utf8");
+    const provider = fs.readFileSync(
+      new URL("./controlled-sar-provider.ts", import.meta.url),
+      "utf8",
+    );
     expect(m1).toContain("getProcessControlledSarProvider");
     expect(m4).toContain("getProcessControlledSarProvider");
     expect(onDemand).toContain("getProcessControlledSarProvider");

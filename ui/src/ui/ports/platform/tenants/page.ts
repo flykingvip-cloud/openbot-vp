@@ -80,7 +80,7 @@ type TenantLifecycleHost = {
   scopes: readonly string[] | null;
   connected: boolean;
   canManagePlatform: boolean;
-  request: ((method: string, params: unknown) => Promise<unknown>) | null;
+  request: (<T>(method: string, params: unknown) => Promise<T>) | null;
 };
 let tenantLifecycleHost: TenantLifecycleHost = {
   scopes: null,

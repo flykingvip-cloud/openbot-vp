@@ -159,9 +159,11 @@ describe("workbench stage", () => {
     expect(exit?.getAttribute("aria-label")).toBe(t("chat.computerExitFullscreen"));
     expect(actions?.firstElementChild).toBe(exit);
     expect(memberTool).not.toBeNull();
-    expect(exit?.compareDocumentPosition(memberTool!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(
+      memberTool &&
+        exit &&
+        exit.compareDocumentPosition(memberTool) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     exit?.click();
     expect(onExitComputerFullscreen).toHaveBeenCalledTimes(1);
 

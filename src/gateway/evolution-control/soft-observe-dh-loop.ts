@@ -184,12 +184,7 @@ export function classifySoftObserveDhStep(
 
   // After a passed drill the proposal returns to EXPERIMENTING; re-apply canary.
   // evaluateExperiment often stays "inconclusive" until drill runs (rollback_drill_not_run).
-  if (
-    proposal.status === "EXPERIMENTING" &&
-    passedDrill &&
-    !appliedAfterDrill &&
-    experiment.result !== "regressed"
-  ) {
+  if (proposal.status === "EXPERIMENTING" && passedDrill && !appliedAfterDrill) {
     return {
       proposalId: proposal.proposalId,
       step: "reapply_canary",
@@ -234,12 +229,7 @@ export function classifySoftObserveDhStep(
   }
 
   // Verify post-drill canary application.
-  if (
-    proposal.status === "CANARY" &&
-    appliedAfterDrill &&
-    !proposal.verificationId &&
-    experiment.result !== "regressed"
-  ) {
+  if (proposal.status === "CANARY" && appliedAfterDrill && !proposal.verificationId) {
     return {
       proposalId: proposal.proposalId,
       step: "verify",
@@ -563,16 +553,14 @@ export async function runSoftObserveDhLoopTickSafely(): Promise<SoftObserveDhTic
     const plane = ensureEvolutionControlPlaneStarted();
     const result = await runSoftObserveDhLoopTick(plane);
     if (result.advanced > 0) {
-      logEvolutionLoop({
-        event: "evolution.promotion.accepted",
+      logEvolutionLoop("evolution.promotion.accepted", {
         reason: `soft_observe_dh_advanced:${result.advanced}`,
       });
     }
     return result;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logEvolutionLoop({
-      event: "evolution.promotion.rejected",
+    logEvolutionLoop("evolution.promotion.rejected", {
       reason: `soft_observe_dh_tick_error:${message.slice(0, 120)}`,
     });
     return { enabled: true, scanned: 0, advanced: 0, results: [] };

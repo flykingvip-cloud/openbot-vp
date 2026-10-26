@@ -10,7 +10,10 @@ import {
   requireResolvedEnterpriseAdminTenantId,
   resolveSessionCapabilityAccessActorId,
 } from "../enterprise-data/enterprise-data-seat-context.js";
-import { listSarAdminAuditEvents, recordSarAdminAudit } from "../enterprise-data/sar-admin-audit.js";
+import {
+  listSarAdminAuditEvents,
+  recordSarAdminAudit,
+} from "../enterprise-data/sar-admin-audit.js";
 import {
   clearSarExecutionHalt,
   evaluateSarExecutionHalt,
@@ -310,7 +313,10 @@ export function createEnterpriseDataSarAdminHandlers(
         const result = await withEnterpriseDataStore(tenantId, client, (store) => {
           const cleared = clearSarExecutionHalt({ store, tenantId, haltId });
           if (!cleared) {
-            throw new EnterpriseDataStoreError("SAR_HALT_NOT_FOUND", "SAR execution halt not found.");
+            throw new EnterpriseDataStoreError(
+              "SAR_HALT_NOT_FOUND",
+              "SAR execution halt not found.",
+            );
           }
           const audit = recordSarAdminAudit({
             store,

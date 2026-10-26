@@ -237,7 +237,10 @@ describe("设备平台连接", () => {
       expect(setCredential).toHaveBeenCalledWith("plat-1", SECRET, true);
     });
     expect(container.textContent).not.toContain(SECRET);
-    expect(container.querySelector("[data-testid='device-platform-secret']")?.value ?? "").toBe("");
+    expect(
+      container.querySelector<HTMLInputElement>("[data-testid='device-platform-secret']")?.value ??
+        "",
+    ).toBe("");
 
     const testButton = container.querySelector(
       "[data-testid='device-platform-test']",

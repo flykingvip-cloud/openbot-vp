@@ -82,7 +82,11 @@ describe("preserve-article-across-cut", () => {
     const cut = omitParkedPriorTurns(history, { enabled: true });
     expect(cut.length).toBeGreaterThanOrEqual(2);
     expect(cut[0]).toMatchObject({ contextCut: true });
-    const injected = cut[1] as { role?: string; preservedArticleExtract?: boolean; content?: unknown };
+    const injected = cut[1] as {
+      role?: string;
+      preservedArticleExtract?: boolean;
+      content?: unknown;
+    };
     expect(injected.role).toBe("system");
     expect(injected.preservedArticleExtract).toBe(true);
     const text = JSON.stringify(injected);

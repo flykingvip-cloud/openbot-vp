@@ -167,9 +167,12 @@ describe("resolvePreviewArtifactRecord (declared location)", () => {
       timestamp: "2026-10-17T00:00:00.000Z",
       content: [{ type: "text", text }],
     });
-    expect(artifact?.providerMetadata?.workspaceUnwritten).toBe(true);
-    expect(artifact?.providerMetadata?.previewUnavailable).toBe(true);
-    expect(artifact?.providerMetadata?.workspaceFilename).toBe("analysis/model-framework-v0.md");
+    const meta = artifact?.providerMetadata as
+      | { workspaceUnwritten?: boolean; previewUnavailable?: boolean; workspaceFilename?: string }
+      | undefined;
+    expect(meta?.workspaceUnwritten).toBe(true);
+    expect(meta?.previewUnavailable).toBe(true);
+    expect(meta?.workspaceFilename).toBe("analysis/model-framework-v0.md");
   });
 
   it("does not leave a retryable or conflicting declaration looking previewable", () => {

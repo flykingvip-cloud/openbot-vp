@@ -42,8 +42,10 @@ export const ALL_GOVERNANCE_APPROVAL_CATEGORIES = new Set<GovernanceApprovalCate
 
 export function isEmployeeCreatableGovernanceCategory(
   category: string,
-): category is GovernanceApprovalCategory {
-  return EMPLOYEE_CREATABLE_GOVERNANCE_CATEGORIES.has(category as GovernanceApprovalCategory);
+): category is "mcp_tool_mapping" | "oi_enrollment" | "pack_skill_review" {
+  return EMPLOYEE_CREATABLE_GOVERNANCE_CATEGORIES.has(
+    category as "mcp_tool_mapping" | "oi_enrollment" | "pack_skill_review",
+  );
 }
 
 export function buildMcpToolMappingSubjectId(mcpServer: string, mcpTool: string): string {

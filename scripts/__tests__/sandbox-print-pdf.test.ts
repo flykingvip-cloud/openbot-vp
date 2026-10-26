@@ -1,5 +1,12 @@
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -152,7 +159,9 @@ describe("printHtmlToPdf", () => {
     expect(trace).toContain("--no-sandbox");
     expect(trace).toContain("--disable-gpu");
     expect(trace).not.toContain("virtual-time-budget");
-    expect(trace).toContain("DBUS_SYSTEM_BUS_ADDRESS=unix:path=/tmp/openbot-print-pdf-no-system-bus");
+    expect(trace).toContain(
+      "DBUS_SYSTEM_BUS_ADDRESS=unix:path=/tmp/openbot-print-pdf-no-system-bus",
+    );
     expect(formatPrintResult(result)).toContain("print-pdf: ok");
   });
 
@@ -273,7 +282,9 @@ describe("real chrome under a stalled subresource", () => {
 
 function extractPdfText(pdfPath: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const child = spawn("pdftotext", ["-layout", pdfPath, "-"], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn("pdftotext", ["-layout", pdfPath, "-"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     let stdout = "";
     child.stdout?.on("data", (chunk) => {
       stdout += chunk.toString();

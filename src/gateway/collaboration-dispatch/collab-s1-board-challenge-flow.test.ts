@@ -121,7 +121,7 @@ function authority(cfg: OpenBotConfig, groupId: string, tenantId: string | null 
     snapshot,
     episodeId: "ep_s1",
     tenant: tenantId
-      ? { tenantId, trust: "trusted_runtime" as const }
+      ? { tenantId, trust: "membership" as const }
       : { tenantId: null, trust: "none" },
     groupId,
     profile: tenantId ? "managed_enterprise" : "personal_local",

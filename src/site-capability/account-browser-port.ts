@@ -10,9 +10,9 @@
 import type { Server } from "node:http";
 import { BROWSER_BRIDGES } from "../agents/sandbox/browser-bridges.js";
 import { setBridgeAuthForPort } from "../browser/bridge-auth-registry.js";
-import { browserSnapshot, type SnapshotAriaNode } from "../browser/client.js";
-import { browserNavigate } from "../browser/client-actions-core.js";
 import type { BrowserBridge } from "../browser/bridge-server.js";
+import { browserNavigate } from "../browser/client-actions-core.js";
+import { browserSnapshot, type SnapshotAriaNode } from "../browser/client.js";
 import type { BrowserServerState } from "../browser/server-context.js";
 import { TrustedOperationFault, type TrustedPagePort } from "./operations.js";
 
