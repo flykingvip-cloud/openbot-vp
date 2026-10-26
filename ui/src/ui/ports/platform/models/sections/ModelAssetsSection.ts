@@ -5,12 +5,17 @@ import "./model-assets-drawer.css";
 import "./model-assets-list.css";
 import { requestPlatformSurfaceRerender } from "../../shared/surface.ts";
 import type { PlatformModelsActions } from "../actions.ts";
+import { statusLabel as capabilityStatusLabel } from "../capability-evidence.ts";
+import { createCapabilityVerificationTask } from "../capability-verification.ts";
+import { resolveExecutorPathLabel } from "../executor-path-labels.ts";
+import { autoRoutingLabel } from "../model-admission-store.ts";
 import {
   importAssetIntoPool as commitPoolImport,
   saveEndpointThenAllowlistVerified,
 } from "../model-asset-actions.ts";
 import {
   hasSuccessfulModelConnection,
+  isConnectionVerificationStale,
   isManagedPoolModel,
   markModelConnectionVerified,
 } from "../model-connection-gate.ts";
@@ -31,9 +36,14 @@ function formText(data: FormData, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function formNumber(data: FormData, name: string, fallback: number) {
-  const value = Number(formText(data, name));
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+/** Empty / invalid → null (unknown). Never invent 128000 / 8192. */
+function formOptionalNumber(data: FormData, name: string): number | null {
+  const raw = formText(data, name);
+  if (!raw) {
+    return null;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
 }
 
 /**
@@ -63,20 +73,32 @@ export function buildBootstrapModelInput(form: HTMLFormElement) {
   if (!providerId || !modelId) {
     return null;
   }
+  const inputModesRaw = formText(data, "inputModes");
+  const inputModes = inputModesRaw
+    ? inputModesRaw
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item): item is "text" | "image" => item === "text" || item === "image")
+    : [];
+  const callTypeRaw = formText(data, "callType");
+  const callType =
+    callTypeRaw === "image_generation" ||
+    callTypeRaw === "music_generation" ||
+    callTypeRaw === "text_chat"
+      ? callTypeRaw
+      : undefined;
   return {
     providerId,
     baseUrl: activePanelField(form, "baseUrl"),
     modelId,
     name: formText(data, "name") || modelId,
     api: formText(data, "api") || "openai-responses",
-    contextWindow: formNumber(data, "contextWindow", 128000),
-    maxTokens: formNumber(data, "maxTokens", 8192),
-    inputModes: formText(data, "inputModes")
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item): item is "text" | "image" => item === "text" || item === "image"),
+    contextWindow: formOptionalNumber(data, "contextWindow"),
+    maxTokens: formOptionalNumber(data, "maxTokens"),
+    inputModes,
     reasoning: data.get("reasoning") === "on",
     apiKey: activePanelField(form, "apiKey"),
+    ...(callType ? { callType } : {}),
   };
 }
 
@@ -136,9 +158,9 @@ export function buildBootstrapModelInputs(
       modelId: selected[0].modelId,
       name: selected[0].modelId,
       api: "openai-responses",
-      contextWindow: 128000,
-      maxTokens: 8192,
-      inputModes: ["text"],
+      contextWindow: null,
+      maxTokens: null,
+      inputModes: [] as Array<"text" | "image">,
       reasoning: false,
       apiKey: activePanelField(form, "apiKey"),
     } satisfies NonNullable<ReturnType<typeof buildBootstrapModelInput>>);
@@ -278,9 +300,13 @@ function parseProbeSummaryForModel(
   return { ok: false, message: formatOperatorProbeMessage(error), latencyMs };
 }
 
-async function verifyModelCall(modelRef: string, actions: PlatformModelsActions) {
+async function verifyModelCall(
+  modelRef: string,
+  actions: PlatformModelsActions,
+  endpoint?: { providerId?: string; baseUrl?: string | null; api?: string | null },
+) {
   const slash = modelRef.indexOf("/");
-  const providerId = slash >= 0 ? modelRef.slice(0, slash) : "";
+  const providerId = endpoint?.providerId || (slash >= 0 ? modelRef.slice(0, slash) : "");
   modelVerificationState = {
     modelId: modelRef,
     phase: "probing",
@@ -293,7 +319,12 @@ async function verifyModelCall(modelRef: string, actions: PlatformModelsActions)
   });
   const parsed = parseProbeSummaryForModel(summary, modelRef);
   if (parsed.ok) {
-    markModelConnectionVerified(modelRef);
+    markModelConnectionVerified(modelRef, {
+      modelId: modelRef,
+      providerId,
+      baseUrl: endpoint?.baseUrl,
+      api: endpoint?.api,
+    });
   }
   modelVerificationState = {
     modelId: modelRef,
@@ -317,7 +348,14 @@ async function commitAddedModels(
     add: (input) => actions.onAddModel(input),
     save: () => actions.onSaveConfig(),
     allowlist: (modelRef, name) => actions.onUpsertAllowlistEntry(modelRef, name),
-    verify: (modelRef) => verifyModelCall(modelRef, actions),
+    verify: (modelRef) => {
+      const input = inputs.find((item) => `${item.providerId}/${item.modelId}` === modelRef);
+      return verifyModelCall(modelRef, actions, {
+        providerId: input?.providerId,
+        baseUrl: input?.baseUrl,
+        api: input?.api,
+      });
+    },
   });
   const focusRef =
     allowlisted[allowlisted.length - 1] ??
@@ -452,17 +490,79 @@ function costTierLabel(value: ModelAsset["costTier"]) {
   }
 }
 
-function renderCapabilitySummary(capabilities: string[]) {
-  if (capabilities.length === 0) {
+function renderCapabilityMatrix(asset: ModelAsset) {
+  const evidence =
+    asset.capabilityEvidence && asset.capabilityEvidence.length > 0
+      ? asset.capabilityEvidence
+      : null;
+  if (!evidence) {
+    return renderDrawerKvRow(
+      "能力（建议）",
+      asset.capabilities.length ? `${asset.capabilities.join(", ")}（待确认，非已验证）` : "未声明",
+    );
+  }
+  return html`
+    <div class="model-assets-drawer__kv-stack" data-testid="capability-matrix">
+      ${evidence.map(
+        (item) => html`
+          <div class="model-assets-drawer__kv-row">
+            <span class="muted">${item.label}</span>
+            <span
+              >${capabilityStatusLabel(item.status)} · ${item.sourceNote ?? item.source}${
+                item.failureReason ? ` — ${item.failureReason}` : ""
+              }</span
+            >
+          </div>
+        `,
+      )}
+    </div>
+  `;
+}
+
+function renderCapabilitySummary(
+  capabilities: string[],
+  evidence?: ModelAsset["capabilityEvidence"],
+) {
+  if ((!capabilities || capabilities.length === 0) && (!evidence || evidence.length === 0)) {
     return html`
       <span class="chip">未声明</span>
+    `;
+  }
+  if (evidence && evidence.length > 0) {
+    const visible = evidence.slice(0, 3);
+    const rest = evidence.length - visible.length;
+    return html`
+      <div class="chip-row platform-model-assets-table__chips">
+        ${visible.map((item) => {
+          const isVerified = item.status === "passed";
+          const isSuggested = item.status === "suggested" || item.status === "untested";
+          const tone = isVerified
+            ? "chip-ok"
+            : item.status === "failed"
+              ? "chip-danger"
+              : "chip platform-capability-chip--suggested";
+          const suffix = isSuggested
+            ? " · 待确认"
+            : isVerified
+              ? ""
+              : ` · ${capabilityStatusLabel(item.status)}`;
+          return html`<span class="chip ${tone}" title=${item.sourceNote ?? item.source}
+            >${item.label}${suffix}</span
+          >`;
+        })}
+        ${rest > 0 ? html`<span class="chip">+${rest}</span>` : nothing}
+      </div>
     `;
   }
   const visible = capabilities.slice(0, 3);
   const rest = capabilities.length - visible.length;
   return html`
     <div class="chip-row platform-model-assets-table__chips">
-      ${visible.map((capability) => html`<span class="chip">${capability}</span>`)}
+      ${visible.map(
+        (capability) => html`<span class="chip platform-capability-chip--suggested"
+          >${capability} · 待确认</span
+        >`,
+      )}
       ${rest > 0 ? html`<span class="chip">+${rest}</span>` : nothing}
     </div>
   `;
@@ -1040,6 +1140,7 @@ function renderModelDetailDrawer(params: {
   canManage: boolean;
   onToggleRecommendationPool?: (modelId: string, nextValue: boolean) => void;
   onToggleTenantSelectable?: (modelId: string, nextValue: boolean) => void;
+  onToggleAutoRouting?: (modelId: string, nextValue: boolean) => void;
   onNavigateTab: (tab: OverviewNavigateTab, context?: PlatformModelsTabContext) => void;
   context?: PlatformModelsTabContext;
 }) {
@@ -1049,6 +1150,7 @@ function renderModelDetailDrawer(params: {
     canManage,
     onToggleRecommendationPool,
     onToggleTenantSelectable,
+    onToggleAutoRouting,
     onNavigateTab,
     context,
   } = params;
@@ -1111,26 +1213,55 @@ function renderModelDetailDrawer(params: {
             canManage,
             onToggleRecommendationPool,
             onToggleTenantSelectable,
+            onToggleAutoRouting,
             onNavigateTab,
           })}
 
           <details class="model-assets-drawer__fold" data-testid="model-detail-basics">
-            <summary class="model-assets-drawer__fold-title">基础信息</summary>
+            <summary class="model-assets-drawer__fold-title">接入信息</summary>
             <div class="model-assets-drawer__kv-stack">
-              ${renderDrawerKvRow("推荐池", selectedModel.inRecommendationPool ? "已加入" : "未加入")}
+              ${renderDrawerKvRow("推荐池（入池）", selectedModel.inRecommendationPool ? "已加入" : "未加入")}
               ${renderDrawerKvRow("租户可选", selectedModel.tenantSelectable ? "允许" : "不允许")}
+              ${renderDrawerKvRow(
+                "自动路由",
+                `${autoRoutingLabel(selectedModel.autoRouting ?? "disabled")}${
+                  selectedModel.autoRoutingReason ? ` · ${selectedModel.autoRoutingReason}` : ""
+                }`,
+              )}
+              ${renderDrawerKvRow(
+                "执行路径",
+                selectedModel.executorPathBadge ??
+                  resolveExecutorPathLabel({
+                    modelId: selectedModel.modelId,
+                    providerId: selectedModel.providerId,
+                    outputModalities: selectedModel.outputModalities,
+                    taskTags: selectedModel.taskTags,
+                  }).badge,
+              )}
+              ${
+                isConnectionVerificationStale(selectedModel)
+                  ? html`
+                      <div class="callout warn card-follow--xs">配置已变更，需重新验证连接</div>
+                    `
+                  : ""
+              }
             </div>
           </details>
 
-          <details class="model-assets-drawer__fold">
-            <summary class="model-assets-drawer__fold-title">能力画像</summary>
+          <details class="model-assets-drawer__fold" open>
+            <summary class="model-assets-drawer__fold-title">能力档案</summary>
             <div class="model-assets-drawer__kv-stack">
               ${renderDrawerKvRow(
                 "输入 / 输出",
-                `${selectedModel.inputModalities.join(", ")} → ${selectedModel.outputModalities.join(", ")}`,
+                `${selectedModel.inputModalities.join(", ") || "未知"} → ${selectedModel.outputModalities.join(", ") || "未知"}`,
               )}
-              ${renderDrawerKvRow("能力", selectedModel.capabilities.join(", ") || "未声明")}
-              ${renderDrawerKvRow("上下文窗口", contextWindowLabel(selectedModel.contextWindow))}
+              ${renderCapabilityMatrix(selectedModel)}
+              ${renderDrawerKvRow(
+                "上下文窗口",
+                selectedModel.contextWindow
+                  ? `${contextWindowLabel(selectedModel.contextWindow)}（${selectedModel.contextWindowSource === "unknown" ? "来源待确认" : (selectedModel.contextWindowSource ?? "catalog")}）`
+                  : "未知／待确认",
+              )}
               ${renderDrawerKvRow(
                 "最大输出",
                 selectedModel.maxOutputTokens ? String(selectedModel.maxOutputTokens) : "未知",
@@ -1220,7 +1351,11 @@ function renderModelDetailDrawer(params: {
 }
 
 async function verifyPendingModel(asset: ModelAsset, actions: PlatformModelsActions) {
-  await verifyModelCall(asset.modelId, actions);
+  await verifyModelCall(asset.modelId, actions, {
+    providerId: asset.providerId,
+    baseUrl: asset.baseUrl,
+    api: asset.api,
+  });
 }
 
 async function importPendingModel(asset: ModelAsset, actions: PlatformModelsActions) {
@@ -1282,7 +1417,12 @@ function renderModelVerificationSection(
           class="btn btn--sm btn--primary"
           type="button"
           ?disabled=${!canManage || !actions.onProbeHealth || phase === "probing"}
-          @click=${() => void verifyModelCall(selectedModel.modelId, actions)}
+          @click=${() =>
+            void verifyModelCall(selectedModel.modelId, actions, {
+              providerId: selectedModel.providerId,
+              baseUrl: selectedModel.baseUrl,
+              api: selectedModel.api,
+            })}
         >
           ${phase === "probing" ? "测试中…" : "重新测试调用"}
         </button>
@@ -1297,6 +1437,7 @@ function renderDrawerActionSection(params: {
   canManage: boolean;
   onToggleRecommendationPool?: (modelId: string, nextValue: boolean) => void;
   onToggleTenantSelectable?: (modelId: string, nextValue: boolean) => void;
+  onToggleAutoRouting?: (modelId: string, nextValue: boolean) => void;
   onNavigateTab: (tab: OverviewNavigateTab, context?: PlatformModelsTabContext) => void;
 }) {
   const {
@@ -1305,6 +1446,7 @@ function renderDrawerActionSection(params: {
     canManage,
     onToggleRecommendationPool,
     onToggleTenantSelectable,
+    onToggleAutoRouting,
     onNavigateTab,
   } = params;
   return html`
@@ -1355,10 +1497,43 @@ function renderDrawerActionSection(params: {
           class="btn btn--sm"
           type="button"
           ?disabled=${!onToggleTenantSelectable}
-          title=${onToggleTenantSelectable ? "" : "当前仍是只读推导值，独立配置源待定义"}
+          title="租户可选与推荐池／allowlist 独立"
           @click=${() => onToggleTenantSelectable?.(selectedModel.modelId, !selectedModel.tenantSelectable)}
         >
           ${selectedModel.tenantSelectable ? "禁止租户选择" : "允许租户选择"}
+        </button>
+        <button
+          class="btn btn--sm"
+          type="button"
+          data-testid="model-drawer-auto-routing"
+          ?disabled=${!onToggleAutoRouting}
+          title="允许自动路由；未验证能力的模型仍会被决策预览排除"
+          @click=${() =>
+            onToggleAutoRouting?.(
+              selectedModel.modelId,
+              (selectedModel.autoRouting ?? "disabled") !== "eligible",
+            )}
+        >
+          ${(selectedModel.autoRouting ?? "disabled") === "eligible" ? "关闭自动路由" : "启用自动路由"}
+        </button>
+        <button
+          class="btn btn--sm"
+          type="button"
+          data-testid="model-drawer-verify-capabilities"
+          ?disabled=${!canManage}
+          title="预计调用约 2～4 次（stub，不产生真实费用）"
+          @click=${() => {
+            createCapabilityVerificationTask({
+              modelRef: selectedModel.modelId,
+              capabilityIds: ["text_chat", "tool_use"],
+              mode: "protocol_probe",
+              // Demo: connection-style text passes, tools fail — acceptance scenario.
+              simulate: { failIds: ["tool_use"] },
+            });
+            requestPlatformSurfaceRerender();
+          }}
+        >
+          验证能力
         </button>
         <button
           class="btn btn--sm"
@@ -1497,41 +1672,65 @@ function renderBootstrapEntry(params: {
             <input name="baseUrl" placeholder="已有 provider 可留空继承" ?disabled=${!canManage} />
           </label>
           <label class="field">
-            <span>输入类型</span>
+            <span>调用类型</span>
+            <select name="callType" ?disabled=${!canManage}>
+              <option value="text_chat">文本对话</option>
+              <option value="image_generation">图片生成 · Stepfun</option>
+              <option value="music_generation">音乐生成 · Suno 兼容</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>输入类型（未知可留空）</span>
             <input
               name="inputModes"
-              value="text"
-              placeholder="text,image"
+              value=""
+              placeholder="待确认，例如 text,image"
               ?disabled=${!canManage}
             />
           </label>
           <label class="field">
-            <span>上下文窗口</span>
+            <span>上下文窗口（未知可留空）</span>
             <input
               name="contextWindow"
               type="number"
               min="1"
-              value="128000"
+              value=""
+              placeholder="待确认建议值，勿填臆造默认"
               ?disabled=${!canManage}
             />
           </label>
           <label class="field">
-            <span>最大输出</span>
-            <input name="maxTokens" type="number" min="1" value="8192" ?disabled=${!canManage} />
+            <span>最大输出（未知可留空）</span>
+            <input
+              name="maxTokens"
+              type="number"
+              min="1"
+              value=""
+              placeholder="待确认"
+              ?disabled=${!canManage}
+            />
           </label>
           <label class="field">
-            <span>推理能力</span>
+            <span>推理能力（声明，非验证）</span>
             <span class="row row--field-height">
               <input name="reasoning" type="checkbox" ?disabled=${!canManage} />
-              <span class="muted">支持 reasoning / thinking</span>
+              <span class="muted">仅作建议标签，不会标为已验证</span>
             </span>
           </label>
+        </div>
+        <div class="callout card-follow--sm">
+          图片生成实际执行路径为 Stepfun；音乐为 Suno 兼容端点。输入 Midjourney 关键词不会显示为已接入原生 Midjourney。
         </div>
         <div class="row row--end row--tight card-follow--sm">
           <button class="btn btn--sm" type="button" @click=${() => onNavigateTab("usageAnalytics")}>
             查看使用分析结构
           </button>
-          <button class="btn btn--primary" type="submit" ?disabled=${!canManage}>验证并入池</button>
+          <button class="btn" type="submit" name="intent" value="save" ?disabled=${!canManage}>
+            保存配置
+          </button>
+          <button class="btn btn--primary" type="submit" name="intent" value="verify" ?disabled=${!canManage}>
+            验证连接
+          </button>
         </div>
       </form>
       <div class="callout card-follow">
@@ -2154,22 +2353,26 @@ function renderAddModelWorkbench(params: {
                 `,
               )}
 
-              <!-- Hidden form fields -->
+              <!-- Hidden identity fields; params stay unknown until catalog/admin confirms. -->
               <input type="hidden" name="providerId" />
               <input type="hidden" name="name" />
               <input type="hidden" name="modelId" />
               <input type="hidden" name="api" value="openai-responses" />
-              <input type="hidden" name="inputModes" value="text" />
-              <input type="hidden" name="contextWindow" value="128000" />
-              <input type="hidden" name="maxTokens" value="8192" />
+              <input type="hidden" name="inputModes" value="" />
+              <input type="hidden" name="contextWindow" value="" />
+              <input type="hidden" name="maxTokens" value="" />
+              <input type="hidden" name="callType" value="text_chat" />
               <input type="hidden" name="reasoning" />
 
               <div class="row row--end row--tight row--footer">
                 <button class="btn btn--sm" type="button" @click=${closeAddModelDialog}>
                   取消
                 </button>
-                <button class="btn btn--primary" type="submit" ?disabled=${!canManage}>
-                  验证并入池
+                <button class="btn" type="submit" name="intent" value="save" ?disabled=${!canManage}>
+                  保存配置
+                </button>
+                <button class="btn btn--primary" type="submit" name="intent" value="verify" ?disabled=${!canManage}>
+                  验证连接
                 </button>
               </div>
             </div>
@@ -2211,6 +2414,7 @@ export type ModelAssetsSectionProps = {
   context?: PlatformModelsTabContext;
   onToggleRecommendationPool?: (modelId: string, nextValue: boolean) => void;
   onToggleTenantSelectable?: (modelId: string, nextValue: boolean) => void;
+  onToggleAutoRouting?: (modelId: string, nextValue: boolean) => void;
   /**
    * True while the models-management snapshot has not resolved yet (initial
    * fetch pending or in flight). Used to render a loading placeholder instead
@@ -2344,6 +2548,7 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
     context,
     onToggleRecommendationPool,
     onToggleTenantSelectable,
+    onToggleAutoRouting,
     loading,
   } = props;
   ensureFilterDefaults(vm.defaultSort);
@@ -2489,7 +2694,7 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
                           </div>
                         </td>
                         <td class="platform-model-assets-table__col-capability">
-                          ${renderCapabilitySummary(asset.capabilities)}
+                          ${renderCapabilitySummary(asset.capabilities, asset.capabilityEvidence)}
                         </td>
                         <td class="platform-model-assets-table__col-context">
                           <div
@@ -2549,6 +2754,7 @@ export function renderModelAssetsSection(props: ModelAssetsSectionProps) {
       canManage,
       onToggleRecommendationPool,
       onToggleTenantSelectable,
+      onToggleAutoRouting,
       onNavigateTab,
       context,
     })}

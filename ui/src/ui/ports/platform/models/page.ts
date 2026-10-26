@@ -6,6 +6,8 @@ import {
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { selectPlatformModelsActions } from "./actions.ts";
 import { buildPlatformModelsVM } from "./adapter.ts";
+import { setAutoRoutingAdmission, setTenantSelectable } from "./model-admission-store.ts";
+import { previewRoutingDecision } from "./routing-decision-preview.ts";
 import {
   renderModelsAorBanditPanel,
   renderModelsAorLiveCodingEvidence,
@@ -90,6 +92,10 @@ function renderModelsTabBar(activeTab: ModelsTabId) {
 
 let modelsSnapshotAutoLoadTriggered = false;
 let modelsSnapshotAutoLoadTimer: number | null = null;
+let lastRoutingPreview: ReturnType<typeof previewRoutingDecision> | null = null;
+export function getLastRoutingPreviewForTest() {
+  return lastRoutingPreview;
+}
 
 function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
   if (modelsSnapshotAutoLoadTriggered) {
@@ -199,6 +205,7 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 props.readModel.modelsManagementLoading === true ||
                 (!props.readModel.modelsManagementSnapshot &&
                   !props.readModel.modelsManagementError),
+              // 推荐池 = allowlist（入池／可被推荐），与租户可选、自动路由分开。
               onToggleRecommendationPool: (modelId, nextValue) => {
                 if (nextValue) {
                   actions.onUpsertAllowlistEntry(modelId, null);
@@ -207,13 +214,20 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 }
                 void actions.onSaveConfig?.();
               },
+              // 租户可选：独立 admission 状态，不再写同一套 allowlist。
               onToggleTenantSelectable: (modelId, nextValue) => {
-                if (nextValue) {
-                  actions.onUpsertAllowlistEntry(modelId, null);
-                } else {
-                  actions.onRemoveAllowlistEntry(modelId);
-                }
-                void actions.onSaveConfig?.();
+                setTenantSelectable(modelId, nextValue);
+                requestOpenBotAppRerender();
+              },
+              onToggleAutoRouting: (modelId, nextValue) => {
+                setAutoRoutingAdmission(
+                  modelId,
+                  nextValue ? "eligible" : "disabled",
+                  nextValue
+                    ? { reason: undefined, taskCategories: [] }
+                    : { reason: "管理员关闭自动路由" },
+                );
+                requestOpenBotAppRerender();
               },
             })}
           `
@@ -238,6 +252,17 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                   onNavigateTab,
                   context: activeModelsContext,
                   compat: vm.compat?.legacyModelsVM ?? null,
+                  routingPreview: lastRoutingPreview,
+                  onSimulateRouting: (input) => {
+                    lastRoutingPreview = previewRoutingDecision({
+                      request: {
+                        taskProfileId: input.taskProfileId,
+                        planId: input.planId,
+                      },
+                      candidates: vm.assets.models,
+                    });
+                    requestOpenBotAppRerender();
+                  },
                   onSetDefaultPrimary: actions.onSetDefaultPrimary,
                   onSetDefaultFallbacks: actions.onSetDefaultFallbacks,
                   onSetDefaultImagePrimary: actions.onSetDefaultImagePrimary,

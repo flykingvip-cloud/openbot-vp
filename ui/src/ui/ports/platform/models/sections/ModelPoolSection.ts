@@ -8,9 +8,14 @@ function formText(form: FormData, name: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function formNumber(form: FormData, name: string, fallback: number) {
-  const parsed = Number(formText(form, name));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+/** Empty / invalid → null (unknown). Never invent 128000 / 8192. */
+function formOptionalNumber(form: FormData, name: string): number | null {
+  const raw = formText(form, name);
+  if (!raw) {
+    return null;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
 function formModelInput(form: HTMLFormElement): PlatformModelAddInput | null {
@@ -20,10 +25,13 @@ function formModelInput(form: HTMLFormElement): PlatformModelAddInput | null {
   if (!providerId || !modelId) {
     return null;
   }
-  const inputModes = formText(data, "inputModes")
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item): item is "text" | "image" => item === "text" || item === "image");
+  const inputModesRaw = formText(data, "inputModes");
+  const inputModes = inputModesRaw
+    ? inputModesRaw
+        .split(",")
+        .map((item) => item.trim())
+        .filter((item): item is "text" | "image" => item === "text" || item === "image")
+    : [];
   return {
     providerId,
     apiKey: formText(data, "apiKey"),
@@ -31,8 +39,8 @@ function formModelInput(form: HTMLFormElement): PlatformModelAddInput | null {
     modelId,
     name: formText(data, "name") || modelId,
     api: formText(data, "api") || "openai-responses",
-    contextWindow: formNumber(data, "contextWindow", 128000),
-    maxTokens: formNumber(data, "maxTokens", 8192),
+    contextWindow: formOptionalNumber(data, "contextWindow"),
+    maxTokens: formOptionalNumber(data, "maxTokens"),
     inputModes,
     reasoning: data.get("reasoning") === "on",
   };
@@ -163,27 +171,35 @@ export function renderModelPoolSection(
             />
           </label>
           <label class="field">
-            <span>输入类型</span>
+            <span>输入类型（待确认）</span>
             <input
               name="inputModes"
-              value="text"
-              placeholder="text,image"
+              value=""
+              placeholder="未知，例如 text 或 text,image"
               ?disabled=${!vm.canManage}
             />
           </label>
           <label class="field">
-            <span>上下文窗口</span>
+            <span>上下文窗口（待确认）</span>
             <input
               name="contextWindow"
               type="number"
               min="1"
-              value="128000"
+              value=""
+              placeholder="未知，勿填臆造默认"
               ?disabled=${!vm.canManage}
             />
           </label>
           <label class="field">
-            <span>最大输出</span>
-            <input name="maxTokens" type="number" min="1" value="8192" ?disabled=${!vm.canManage} />
+            <span>最大输出（待确认）</span>
+            <input
+              name="maxTokens"
+              type="number"
+              min="1"
+              value=""
+              placeholder="未知"
+              ?disabled=${!vm.canManage}
+            />
           </label>
           <label class="field">
             <span>推理能力</span>

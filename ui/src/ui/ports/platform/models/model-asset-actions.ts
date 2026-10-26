@@ -64,7 +64,12 @@ export async function importAssetIntoPool(params: {
   });
   actions.onUpsertAllowlistEntry(asset.modelId, asset.displayName);
   await actions.onSaveConfig?.();
-  markModelConnectionVerified(asset.modelId);
+  markModelConnectionVerified(asset.modelId, {
+    modelId: asset.modelId,
+    providerId: asset.providerId,
+    baseUrl: asset.baseUrl,
+    api: asset.api,
+  });
   return true;
 }
 
@@ -92,7 +97,13 @@ export async function saveEndpointThenAllowlistVerified<
     if (await verify(modelRef)) {
       allowlisted.push(modelRef);
       allowlist(modelRef, input.name);
-      markModelConnectionVerified(modelRef);
+      const endpoint = input as T & { baseUrl?: string; api?: string };
+      markModelConnectionVerified(modelRef, {
+        modelId: modelRef,
+        providerId: input.providerId,
+        baseUrl: endpoint.baseUrl,
+        api: endpoint.api,
+      });
     }
   }
   if (allowlisted.length > 0) {

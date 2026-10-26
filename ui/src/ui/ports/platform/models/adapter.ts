@@ -1,5 +1,9 @@
 import type { PlatformPortReadModel } from "../semantic/platform-read-model.ts";
 import type { ModelsVM as LegacyModelsVM } from "../view-models/types.ts";
+import { suggestedEvidenceFromInferred } from "./capability-evidence.ts";
+import { resolveExecutorPathLabel } from "./executor-path-labels.ts";
+import { getModelAdmission } from "./model-admission-store.ts";
+import { buildConnectionFingerprint } from "./model-connection-gate.ts";
 import type { PlatformModelsManagementSnapshot } from "./snapshot-types.ts";
 import type {
   GovernanceInsight,
@@ -336,6 +340,10 @@ function inferOutputModalities(
   return ["text"];
 }
 
+/**
+ * Suggest capabilities from name / provider / metadata.
+ * Results are NOT verified — callers must attach capabilityEvidence with status=suggested.
+ */
 function inferCapabilities(params: {
   modelId: string;
   providerId: string;
@@ -571,8 +579,30 @@ function modelAssetFromSourceEntry(
     supportsTools: entry.supportsTools,
   });
   const prices = costTierPrice(costTier);
+  const modelRef = `${entry.providerId}/${entry.modelId}`;
+  const admission = getModelAdmission(modelRef);
+  const suggested = suggestedEvidenceFromInferred(capabilities);
+  // Prefer persisted verification evidence; keep suggested for ids not yet tested.
+  const evidenceById = new Map(suggested.map((item) => [item.id, item]));
+  for (const item of admission.capabilityEvidence) {
+    evidenceById.set(item.id, item);
+  }
+  const capabilityEvidence = Array.from(evidenceById.values());
+  const executor = resolveExecutorPathLabel({
+    modelId: entry.modelId,
+    providerId: entry.providerId,
+    outputModalities,
+  });
+  const connectionFingerprint = buildConnectionFingerprint({
+    modelId: modelRef,
+    providerId: entry.providerId,
+    baseUrl: entry.baseUrl ?? null,
+    api: entry.api ?? null,
+  });
+  // tenantSelectable / autoRouting come from admission store — NOT derived from allowlist/health.
+  const tenantSelectable = admission.tenantSelectable;
   const asset: ModelAsset = {
-    modelId: `${entry.providerId}/${entry.modelId}`,
+    modelId: modelRef,
     providerId: entry.providerId,
     providerName: entry.providerId,
     displayName: entry.name ?? entry.modelId,
@@ -580,8 +610,18 @@ function modelAssetFromSourceEntry(
     inputModalities,
     outputModalities,
     capabilities,
-    ...(entry.contextWindow ? { contextWindow: entry.contextWindow } : {}),
-    ...(entry.maxTokens ? { maxOutputTokens: entry.maxTokens } : {}),
+    capabilityEvidence,
+    executorPathBadge: executor.badge,
+    executorPathDetail: executor.detail,
+    connectionFingerprint,
+    ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+    ...(entry.api ? { api: entry.api } : {}),
+    ...(entry.contextWindow
+      ? { contextWindow: entry.contextWindow, contextWindowSource: "catalog" as const }
+      : { contextWindowSource: "unknown" as const }),
+    ...(entry.maxTokens
+      ? { maxOutputTokens: entry.maxTokens, maxOutputTokensSource: "catalog" as const }
+      : { maxOutputTokensSource: "unknown" as const }),
     costTier,
     ...(prices ? { inputPrice: prices.input, outputPrice: prices.output } : {}),
     health,
@@ -593,7 +633,10 @@ function modelAssetFromSourceEntry(
       : {}),
     taskTags: [],
     inRecommendationPool,
-    tenantSelectable: entry.discoveredOnly ? false : health === "healthy",
+    tenantSelectable,
+    autoRouting: admission.autoRouting,
+    ...(admission.autoRoutingReason ? { autoRoutingReason: admission.autoRoutingReason } : {}),
+    autoRoutingTaskCategories: admission.autoRoutingTaskCategories,
   };
   asset.taskTags = inferTaskTags(asset);
   return asset;

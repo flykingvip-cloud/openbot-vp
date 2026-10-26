@@ -96,11 +96,14 @@ export type PlatformModelAddInput = {
   modelId: string;
   name: string;
   api: string;
-  contextWindow: number;
-  maxTokens: number;
+  /** Omit or null when unknown — do not invent 128k/8k defaults. */
+  contextWindow?: number | null;
+  maxTokens?: number | null;
   inputModes: Array<"text" | "image">;
   reasoning: boolean;
   apiKey: string;
+  /** Optional call type for executor path labeling. */
+  callType?: "text_chat" | "image_generation" | "music_generation";
 };
 
 export type PlatformModelProviderUpdateInput = {
@@ -183,10 +186,6 @@ function modelEntryId(entry: unknown): string | null {
 function normalizeModelApi(value: string) {
   const trimmed = value.trim();
   return trimmed || "openai-responses";
-}
-
-function normalizePositiveInteger(value: number, fallback: number) {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
 
 function defaultsModelValue(config: ConfigRuntimeView, key: "model" | "imageModel") {
@@ -629,6 +628,16 @@ export function createPlatformPortActions({
         }
         const existingProvider = currentProviderConfig(configRuntime, providerId) ?? {};
         const existingModels = currentProviderModels(configRuntime, providerId);
+        const knownContext =
+          input.contextWindow != null &&
+          Number.isFinite(input.contextWindow) &&
+          input.contextWindow > 0
+            ? Math.floor(input.contextWindow)
+            : null;
+        const knownMaxTokens =
+          input.maxTokens != null && Number.isFinite(input.maxTokens) && input.maxTokens > 0
+            ? Math.floor(input.maxTokens)
+            : null;
         const nextModel = {
           id: modelId,
           name: input.name.trim() || modelId,
@@ -641,8 +650,10 @@ export function createPlatformPortActions({
             cacheRead: 0,
             cacheWrite: 0,
           },
-          contextWindow: normalizePositiveInteger(input.contextWindow, 128000),
-          maxTokens: normalizePositiveInteger(input.maxTokens, 8192),
+          // Only persist known values — unknown stays omitted (not fake 128k/8k).
+          ...(knownContext != null ? { contextWindow: knownContext } : {}),
+          ...(knownMaxTokens != null ? { maxTokens: knownMaxTokens } : {}),
+          ...(input.callType ? { callType: input.callType } : {}),
         };
         const nextProvider = {
           ...existingProvider,
@@ -693,8 +704,9 @@ export function createPlatformPortActions({
             cacheRead: 0,
             cacheWrite: 0,
           },
-          contextWindow: normalizePositiveInteger(input.contextWindow ?? 128000, 128000),
-          maxTokens: 8192,
+          ...(input.contextWindow != null && Number(input.contextWindow) > 0
+            ? { contextWindow: Math.floor(Number(input.contextWindow)) }
+            : {}),
         };
         const nextProvider = {
           ...existingProvider,
@@ -784,8 +796,12 @@ export function createPlatformPortActions({
             cacheRead: 0,
             cacheWrite: 0,
           },
-          contextWindow: normalizePositiveInteger(input.contextWindow, 128000),
-          maxTokens: normalizePositiveInteger(input.maxTokens, 8192),
+          ...(input.contextWindow != null && Number(input.contextWindow) > 0
+            ? { contextWindow: Math.floor(Number(input.contextWindow)) }
+            : {}),
+          ...(input.maxTokens != null && Number(input.maxTokens) > 0
+            ? { maxTokens: Math.floor(Number(input.maxTokens)) }
+            : {}),
         };
         const nextProvider = {
           ...existingProvider,
