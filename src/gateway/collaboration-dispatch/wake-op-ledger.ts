@@ -13,11 +13,13 @@
  *   - completed: reuse result; never re-dispatch
  *   - running / unknown / accepted: do not blind re-run
  *   - failed: retry allowed after U1 stop + U2 auth recheck
- *   - releaseWakeOpForRetry: unknown→failed only when externalEffectVerified==="none"
- *     + releasedBy audit; refuses running/accepted (old exec may still hold write
- *     eligibility — mark unknown first, verify none, then release). Does not dispatch.
- *   - confirmWakeOpCompleted: unknown→completed only when params.roundId matches the
- *     ledger's prior roundId receipt + confirmedBy audit; verbal/unmatched refused.
+ *   - releaseWakeOpForRetry: unknown→failed only when trusted runtime operator passes
+ *     release_for_retry Gate (≠ canRequestTaskStop), externalEffectVerified==="none"
+ *     bound to a verifiable check record, and no prior/late receipt on the ledger.
+ *     Refuses running/accepted. Does not dispatch.
+ *   - confirmWakeOpCompleted: unknown→completed only when trusted runtime operator
+ *     passes confirm_completed Gate (≠ stop/release), params.roundId matches prior
+ *     ledger receipt; verbal/unmatched stay unknown (no auto-rerun).
  *
  * Memory-only dedup is forbidden as the sole proof of correctness.
  */
@@ -28,6 +30,31 @@ import type { OpenBotConfig } from "../../config/types.js";
 import { withRoundLock, writeJsonDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
+import {
+  canConfirmWakeOpCompleted,
+  canReleaseWakeOpForRetry,
+  resolveTrustedWakeOpOperator,
+  validateExternalEffectNoneCheck,
+  type ExternalEffectCheckRecord,
+  type TrustedWakeOpOperator,
+  type WakeOpRecoveryAuthState,
+} from "./wake-op-recovery-gate.js";
+
+export type {
+  ExternalEffectCheckRecord,
+  TrustedWakeOpOperator,
+  WakeOpRecoveryAction,
+  WakeOpRecoveryAuthState,
+} from "./wake-op-recovery-gate.js";
+export {
+  canConfirmWakeOpCompleted,
+  canPerformWakeOpRecovery,
+  canReleaseWakeOpForRetry,
+  EXTERNAL_EFFECT_CHECK_MAX_AGE_MS,
+  isActiveRecoveryIdentity,
+  resolveTrustedWakeOpOperator,
+  validateExternalEffectNoneCheck,
+} from "./wake-op-recovery-gate.js";
 export const WAKE_OP_PROCESSING_STATUSES = [
   "accepted",
   "running",
@@ -49,10 +76,12 @@ export type WakeOpRecord = Readonly<{
   status: WakeOpProcessingStatus;
   roundId?: string;
   detail?: string;
-  /** Audit: who released unknown→failed (resume). */
+  /** Audit: who released unknown→failed (resume) — trusted runtime actor. */
   releasedBy?: string;
   /** Audit: required "none" proof when released. */
   externalEffectVerified?: "none";
+  /** Verifiable check record bound to externalEffectVerified:"none". */
+  externalEffectCheck?: ExternalEffectCheckRecord;
   /** Audit: who confirmed unknown→completed from a prior receipt. */
   confirmedBy?: string;
   createdAtMs: number;
@@ -360,9 +389,9 @@ export type ConfirmWakeOpResult =
 
 /**
  * Explicit resume recovery: unknown → failed so a later consume may retry.
- * Requires externalEffectVerified==="none" (old exec must not still hold write
- * eligibility) and releasedBy for audit. Refuses running/accepted — if old
- * execution may still be running, keep unknown or leave running suppressed.
+ * C1: trusted runtime operator + release_for_retry Gate (≠ canRequestTaskStop).
+ * C2: externalEffectVerified:"none" must bind externalEffectCheck (source/op/time).
+ * Late receipt: completed or prior roundId on ledger → refuse (re-check; use confirm).
  * Caller must still recheck U1 stop + U2 auth on the subsequent consume.
  * Does not itself dispatch.
  */
@@ -372,27 +401,44 @@ export async function releaseWakeOpForRetry(params: {
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
-  /** Only allowed value: operator verified no concurrent/external write effect. */
+  /** Only allowed value: must match externalEffectCheck.outcome. */
   externalEffectVerified: "none";
-  /** Audit actor who authorized the release. */
-  releasedBy: string;
+  /** Verifiable check record bound to the "none" claim. */
+  externalEffectCheck: ExternalEffectCheckRecord;
+  /** Trusted runtime identity for the operator (not a free-form claim). */
+  operator: TrustedWakeOpOperator;
+  /** Current tenant/group operating state for Gate. */
+  operatingState: WakeOpRecoveryAuthState;
 }): Promise<ReleaseWakeOpResult> {
   const opKey = compact(params.opKey);
   if (!opKey) {
     return { ok: false, reason: "missing_op_key" };
   }
-  const releasedBy = compact(params.releasedBy);
-  if (!releasedBy) {
-    return { ok: false, reason: "missing_released_by" };
+  const trusted = resolveTrustedWakeOpOperator(params.operator);
+  if (!trusted.ok) {
+    return trusted;
+  }
+  const releasedBy = trusted.actorId;
+  if (!canReleaseWakeOpForRetry({ actorId: releasedBy, operatingState: params.operatingState })) {
+    return { ok: false, reason: "release_forbidden" };
   }
   if (params.externalEffectVerified !== "none") {
     return { ok: false, reason: "external_effect_not_verified" };
   }
   const nowMs = params.nowMs ?? Date.now();
+  const check = validateExternalEffectNoneCheck({
+    opKey,
+    check: params.externalEffectCheck,
+    nowMs,
+  });
+  if (!check.ok) {
+    return check;
+  }
   const updated = await updateWakeOp(params, (current) => {
     if (!current) {
       return null;
     }
+    // Late receipt: completion appeared after evidence collection — do not retry.
     if (current.status === "completed") {
       return current;
     }
@@ -402,12 +448,17 @@ export async function releaseWakeOpForRetry(params: {
     if (current.status !== "unknown") {
       return current;
     }
+    // Prior/late receipt on ledger → re-check; confirm path, not blind release.
+    if (compact(current.roundId)) {
+      return current;
+    }
     return {
       ...current,
       status: "failed",
       detail: params.detail ?? "released_for_retry",
       releasedBy,
       externalEffectVerified: "none",
+      externalEffectCheck: check.check,
       updatedAtMs: nowMs,
       roundId: undefined,
     };
@@ -416,7 +467,7 @@ export async function releaseWakeOpForRetry(params: {
     return { ok: false, reason: "missing_record" };
   }
   if (updated.status === "completed") {
-    return { ok: false, reason: "already_completed" };
+    return { ok: false, reason: "late_receipt_completed" };
   }
   if (updated.status === "running") {
     return { ok: false, reason: "status_running_keep_or_mark_unknown" };
@@ -424,10 +475,18 @@ export async function releaseWakeOpForRetry(params: {
   if (updated.status === "accepted") {
     return { ok: false, reason: "status_accepted_in_flight" };
   }
+  if (updated.status === "unknown" && compact(updated.roundId)) {
+    return { ok: false, reason: "prior_receipt_recheck_use_confirm" };
+  }
   if (updated.status !== "failed") {
     return { ok: false, reason: `status_${updated.status}` };
   }
-  if (updated.releasedBy !== releasedBy || updated.externalEffectVerified !== "none") {
+  if (
+    updated.releasedBy !== releasedBy ||
+    updated.externalEffectVerified !== "none" ||
+    !updated.externalEffectCheck ||
+    updated.externalEffectCheck.opId !== check.check.opId
+  ) {
     return { ok: false, reason: "release_audit_incomplete" };
   }
   return { ok: true, record: updated };
@@ -435,8 +494,9 @@ export async function releaseWakeOpForRetry(params: {
 
 /**
  * Promote unknown → completed only from a verifiable prior receipt on the ledger
- * (existing.roundId must match params.roundId). Verbal / unmatched roundId refused.
- * Requires confirmedBy audit. Does not invent completed without receipt evidence.
+ * (existing.roundId must match params.roundId). Verbal / unmatched stay unknown
+ * (no auto-rerun). C1: trusted runtime operator + confirm_completed Gate
+ * (≠ stop / release). Does not invent completed without receipt evidence.
  */
 export async function confirmWakeOpCompleted(params: {
   authority: RuntimeAuthority;
@@ -445,20 +505,34 @@ export async function confirmWakeOpCompleted(params: {
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
-  /** Audit actor who confirmed against a verifiable receipt. */
-  confirmedBy: string;
+  /** Trusted runtime identity for the confirmer. */
+  operator: TrustedWakeOpOperator;
+  /** Current tenant/group operating state for Gate. */
+  operatingState: WakeOpRecoveryAuthState;
+  /** Task-scoped approvers; confirm requires membership in this list. */
+  taskApproverIds?: readonly string[] | null;
 }): Promise<ConfirmWakeOpResult> {
   const opKey = compact(params.opKey);
   const roundId = compact(params.roundId);
-  const confirmedBy = compact(params.confirmedBy);
   if (!opKey) {
     return { ok: false, reason: "missing_op_key" };
   }
   if (!roundId) {
     return { ok: false, reason: "missing_round_id" };
   }
-  if (!confirmedBy) {
-    return { ok: false, reason: "missing_confirmed_by" };
+  const trusted = resolveTrustedWakeOpOperator(params.operator);
+  if (!trusted.ok) {
+    return trusted;
+  }
+  const confirmedBy = trusted.actorId;
+  if (
+    !canConfirmWakeOpCompleted({
+      actorId: confirmedBy,
+      operatingState: params.operatingState,
+      taskApproverIds: params.taskApproverIds,
+    })
+  ) {
+    return { ok: false, reason: "confirm_forbidden" };
   }
   const nowMs = params.nowMs ?? Date.now();
   const updated = await updateWakeOp(

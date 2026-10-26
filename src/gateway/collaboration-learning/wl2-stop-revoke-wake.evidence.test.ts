@@ -1361,13 +1361,20 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       cfg,
       detail: "verbal_only",
       externalEffectVerified: "none",
-      releasedBy: "",
+      externalEffectCheck: {
+        source: "side_effect_probe",
+        opId: opKeyB,
+        checkedAtMs: Date.now(),
+        outcome: "none",
+      },
+      operator: { actorId: "", identitySource: "runtime" },
+      operatingState: state,
     });
     expect(refuseNoActor.ok).toBe(false);
     if (refuseNoActor.ok) {
-      throw new Error("expected missing_released_by");
+      throw new Error("expected missing_operator_actor_id");
     }
-    expect(refuseNoActor.reason).toBe("missing_released_by");
+    expect(refuseNoActor.reason).toBe("missing_operator_actor_id");
 
     const runningClaim = await claimWakeOpRunning({
       authority,
@@ -1381,7 +1388,14 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       cfg,
       detail: "would_dual_write",
       externalEffectVerified: "none",
-      releasedBy: tenant.employees[0].id,
+      externalEffectCheck: {
+        source: "side_effect_probe",
+        opId: runningClaim.opKey,
+        checkedAtMs: Date.now(),
+        outcome: "none",
+      },
+      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
+      operatingState: state,
     });
     expect(refuseRunning.ok).toBe(false);
     if (refuseRunning.ok) {
@@ -1408,7 +1422,14 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       cfg,
       detail: "operator_verified_external_effect_none",
       externalEffectVerified: "none",
-      releasedBy: tenant.employees[0].id,
+      externalEffectCheck: {
+        source: "side_effect_probe",
+        opId: opKeyB,
+        checkedAtMs: Date.now(),
+        outcome: "none",
+      },
+      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
+      operatingState: state,
     });
     expect(releasedWhileStopped.ok).toBe(true);
     if (!releasedWhileStopped.ok) {
@@ -1417,6 +1438,8 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     expect(releasedWhileStopped.record.status).toBe("failed");
     expect(releasedWhileStopped.record.releasedBy).toBe(tenant.employees[0].id);
     expect(releasedWhileStopped.record.externalEffectVerified).toBe("none");
+    expect(releasedWhileStopped.record.externalEffectCheck?.opId).toBe(opKeyB);
+    expect(releasedWhileStopped.record.externalEffectCheck?.outcome).toBe("none");
 
     const whileStopped = await consumeWakeForRoundDispatch({
       authority,
@@ -1486,7 +1509,9 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       roundId: "oral-claim-no-receipt",
       cfg,
       detail: "verbal",
-      confirmedBy: tenant.employees[0].id,
+      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
+      operatingState: state,
+      taskApproverIds: [tenant.employees[0].id],
     });
     expect(verbalConfirm.ok).toBe(false);
     if (verbalConfirm.ok) {
@@ -1502,7 +1527,9 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       roundId: "round-receipt-gap",
       cfg,
       detail: "receipt_recovered",
-      confirmedBy: tenant.employees[0].id,
+      operator: { actorId: tenant.employees[0].id, identitySource: "runtime" },
+      operatingState: state,
+      taskApproverIds: [tenant.employees[0].id],
     });
     expect(confirmed.ok).toBe(true);
     if (!confirmed.ok) {
