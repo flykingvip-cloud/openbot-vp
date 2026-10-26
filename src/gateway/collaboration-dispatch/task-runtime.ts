@@ -13,11 +13,14 @@ import {
   applyGovernanceAfterLiveTransition,
   mapLiveStatusToGovernance,
 } from "./task-state-machine.js";
+import type { TaskStopControl } from "./task-stop-control.js";
 
 export type GovernedTask = Task & {
   governanceState?: CollaborationTaskState;
   responsibility?: TaskResponsibility;
   handoffs?: TaskHandoff[];
+  /** U1 task-level stop; written by collaboration.task.stop on this authority object. */
+  stopControl?: TaskStopControl | null;
 };
 
 export class InvalidTaskHandoffError extends Error {
@@ -110,6 +113,7 @@ export function asGovernedTask(task: Task): GovernedTask {
     governanceState: extra.governanceState ?? mapLiveStatusToGovernance(task.status),
     ...(extra.responsibility ? { responsibility: extra.responsibility } : {}),
     handoffs: extra.handoffs ?? [],
+    ...(extra.stopControl ? { stopControl: extra.stopControl } : {}),
   };
 }
 

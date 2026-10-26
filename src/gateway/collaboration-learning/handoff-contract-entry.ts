@@ -45,6 +45,7 @@ import {
   resolveCollaborationGroupTenantId,
   syncGroupOperatingState,
 } from "./shared.js";
+import { assertPersistedTaskNotStopped } from "./task-stop-entry.js";
 import {
   resolveAuthorityTenantForEntry,
   type CollaborationTenantResolution,
@@ -142,6 +143,14 @@ function requireFlag(cfg: OpenBotConfig): void {
   }
 }
 
+async function refuseIfTaskStopped(params: {
+  groupId: string;
+  taskId: string;
+  cfg: OpenBotConfig;
+}): Promise<void> {
+  await assertPersistedTaskNotStopped(params);
+}
+
 export type ProposeCollaborationTaskHandoffContractParams = {
   groupId: string;
   taskId: string;
@@ -167,6 +176,7 @@ export async function proposeCollaborationTaskHandoffContract(
 ): Promise<HandoffContract> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg);
+  await refuseIfTaskStopped({ groupId: params.groupId, taskId: params.taskId, cfg });
   const { authority, stores } = await buildHandoffAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -224,6 +234,7 @@ export async function acceptCollaborationTaskHandoffContract(
 ): Promise<HandoffContract> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg);
+  await refuseIfTaskStopped({ groupId: params.groupId, taskId: params.taskId, cfg });
   const { authority } = await buildHandoffAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -252,6 +263,7 @@ export async function approveCollaborationTaskHandoffContract(
 ): Promise<HandoffContract> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg);
+  await refuseIfTaskStopped({ groupId: params.groupId, taskId: params.taskId, cfg });
   const { authority } = await buildHandoffAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -280,6 +292,7 @@ export async function applyCollaborationTaskHandoffContract(
 ): Promise<Task> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg);
+  await refuseIfTaskStopped({ groupId: params.groupId, taskId: params.taskId, cfg });
   const { authority, stores } = await buildHandoffAuthority({
     groupId: params.groupId,
     taskId: params.taskId,

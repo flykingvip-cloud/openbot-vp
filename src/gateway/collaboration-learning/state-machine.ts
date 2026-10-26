@@ -39,6 +39,7 @@ import {
   resolveTaskResponsibility,
   type GovernedTask,
 } from "../collaboration-dispatch/task-runtime.js";
+import { assertTaskNotStopped } from "../collaboration-dispatch/task-stop-control.js";
 import { recordCollaborationQualityBestEffort } from "../collaboration-ledger/writer.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
@@ -76,6 +77,7 @@ export async function transitionCollaborationTask(params: {
   if (!current) {
     throw new Error(`task not found: ${params.taskId}`);
   }
+  assertTaskNotStopped(asGovernedTask(current));
   const operatingState = await readGroupOperatingState({
     fileStore,
     groupId: params.groupId,

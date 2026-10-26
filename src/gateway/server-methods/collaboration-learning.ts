@@ -46,6 +46,7 @@ import {
   transitionCollaborationDeliverable,
   transitionCollaborationReview,
   transitionCollaborationTask,
+  requestCollaborationTaskStop,
   updateCollaborationDecisionDraft,
 } from "../collaboration-learning.js";
 import {
@@ -91,6 +92,7 @@ import {
   validateCollaborationTaskBlockBoardItemParams,
   validateCollaborationTaskUnblockBoardItemParams,
   validateCollaborationTaskCancelBoardItemParams,
+  validateCollaborationTaskStopParams,
   validateCollaborationTaskListWakeEventsParams,
   validateCollaborationTaskWhoWokeWhomParams,
   validateCollaborationTaskRunGroupTaskHeartbeatParams,
@@ -1124,6 +1126,44 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         tenant,
       });
       respond(true, { item }, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+        ),
+      );
+    }
+  },
+  "collaboration.task.stop": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskStopParams,
+        "collaboration.task.stop",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const result = await requestCollaborationTaskStop({
+        ...params,
+        actor: await resolveDeliveryAclActor(client, params.groupId),
+        tenant,
+      });
+      respond(
+        true,
+        {
+          task: result.task,
+          stopControl: result.stopControl,
+          alreadyStopped: result.alreadyStopped,
+        },
+        undefined,
+      );
     } catch (error) {
       respond(
         false,

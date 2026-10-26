@@ -33,6 +33,10 @@ import {
   resolveDeliveryAclActor,
   type DeliveryActorClient,
 } from "../../gateway/collaboration-learning/delivery-actor-binding.js";
+import {
+  assertPersistedTaskNotStopped,
+  TaskStoppedError,
+} from "../../gateway/collaboration-learning/task-stop-entry.js";
 import { labelCollaborationIoTenant } from "../../gateway/collaboration-learning/trusted-tenant.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { stringEnum } from "../schema/typebox.js";
@@ -247,6 +251,9 @@ function mapEntryError(error: unknown) {
   if (error instanceof ClaimContractEntryError) {
     return failResult(error.code, error.message);
   }
+  if (error instanceof TaskStoppedError) {
+    return failResult(error.code, error.message);
+  }
   if (error instanceof Error) {
     const unbound = error.message.includes("actor_not_authenticated");
     if (unbound) {
@@ -374,6 +381,14 @@ export function createCollaborationBoardTool(options?: {
       const taskId = readStringParam(params, "taskId");
       const itemId =
         readStringParam(params, "itemId") || readStringParam(params, "boardItemId") || undefined;
+
+      if (isWriteAction(action) && taskId) {
+        try {
+          await assertPersistedTaskNotStopped({ groupId, taskId, cfg });
+        } catch (error) {
+          return mapEntryError(error);
+        }
+      }
 
       try {
         if (action === "list_items") {

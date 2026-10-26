@@ -12,16 +12,20 @@
  * resolves the legacy group runtime dir. No LIVE/gray flag changes.
  */
 import path from "node:path";
+import type { Task } from "@openbot/collaboration-core";
 import { resolveCoreToolCapability } from "../../agents/tool-catalog.js";
 import { normalizeToolName } from "../../agents/tool-policy.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { resolveLegacyGroupRuntimeFactPaths } from "../collaboration-learning/collaboration-paths.js";
+import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
 import type { ExecutionTaskBag } from "./executor-private-todolist.js";
 import {
   scheduleDurableToolSideEffect,
   type CollaborationPrivateRunBag,
 } from "./private-run-bag.js";
 import { resolveCollaborationRuntimeFactPaths } from "./runtime-namespace.js";
+import { asGovernedTask } from "./task-runtime.js";
+import { isTaskStopAccepted } from "./task-stop-control.js";
 
 export type DeliveryToolSideEffectSchedule = {
   ledgerDir: string;
@@ -83,12 +87,37 @@ export async function runDeliveryToolSideEffect<T>(params: {
   schedule?: DeliveryToolSideEffectSchedule | null;
   toolName: string;
   cfg?: OpenBotConfig;
+  /** Optional group scope for U1 stop preflight on queued side-effect runs. */
+  groupId?: string | null;
   bag?: CollaborationPrivateRunBag;
   run: () => Promise<T>;
 }): Promise<{ skipped: true; key: string } | { skipped: false; value: T }> {
   const toolName = params.toolName.trim();
   if (!params.schedule || !isSideEffectingDeliveryTool(toolName)) {
     return { skipped: false, value: await params.run() };
+  }
+  const bagGroup =
+    typeof params.bag === "object" && params.bag && "groupContextPointer" in params.bag
+      ? String(
+          (params.bag as { groupContextPointer?: { groupId?: string } }).groupContextPointer
+            ?.groupId ?? "",
+        ).trim()
+      : "";
+  const groupId = params.groupId?.trim() || bagGroup;
+  const taskId = params.schedule.taskId.trim();
+  if (groupId && taskId) {
+    try {
+      const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+      const current = await objectStorage.readObject<Task>(groupId, "task", taskId);
+      if (current && isTaskStopAccepted(asGovernedTask(current))) {
+        return {
+          skipped: true,
+          key: `task-stopped:${taskId}:${normalizeToolName(toolName)}`,
+        };
+      }
+    } catch {
+      // store read failure must not widen execution; fall through to durable claim
+    }
   }
   const scheduled = await scheduleDurableToolSideEffect({
     ledgerDir: params.schedule.ledgerDir,

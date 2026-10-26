@@ -9577,7 +9577,6 @@ tasks:
       - src/config/types.collaboration.ts
       - ui/src/ui/controllers/collaboration-governance-actions.ts
       - ui/src/ui/controllers/collaboration-governance-actions.node.test.ts
-
       - src/gateway/collaboration-learning/wake-contract-entry.ts
       - src/gateway/collaboration-dispatch/collab-edge.ts
     state: active
@@ -9592,7 +9591,133 @@ tasks:
     ownerHistory: []
     since: 2026-10-25
     metadata: {}
+  - id: u1-unified-task-stop:协作小组
+    owner: 协作小组
+    intent:
+      - u1-unified-task-stop
+      - wl2-stop-control
+    paths:
+      - src/gateway/collaboration-dispatch/task-stop-control.ts
+      - src/gateway/collaboration-dispatch/task-stop-control.test.ts
+      - src/gateway/collaboration-learning/task-stop-entry.ts
+      - src/gateway/collaboration-learning/task-stop-entry.test.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/handoff-contract-entry.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/self-advance-entry.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/collaboration-dispatch/task-runtime.ts
+      - src/gateway/collaboration-learning.ts
+    state: active
+    sessions:
+      - id: t29u-u1-1792978422
+        taskId: u1-unified-task-stop:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-26T01:33:43.118Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: u2-background-revoke-recheck:协作小组
+    owner: 协作小组
+    intent:
+      - u2-background-revoke-recheck
+      - wl2-revoke-wake-hb
+    paths:
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+    state: ready
+    sessions:
+      - id: t29u-u2-1792978429
+        taskId: u2-background-revoke-recheck:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-26T01:33:50.357Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: u3-wake-idempotent-resume:协作小组
+    owner: 协作小组
+    intent:
+      - u3-wake-idempotent-resume
+      - wl2-wake-idempotent-resume
+    paths:
+      - src/gateway/collaboration-dispatch/wake-contract.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/gateway/collaboration-learning/wake-contract-entry.ts
+      - src/gateway/collaboration-learning/task-stop-entry.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+    state: ready
+    sessions:
+      - id: t29u-u3-1792978430
+        taskId: u3-wake-idempotent-resume:协作小组
+        ide: cursor
+        agent: 协作小组
+        status: active
+        lastSignalAt: 2026-10-26T01:33:51.109Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
 landingStreams:
+  - id: u1-unified-task-stop
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/collaboration-dispatch/task-stop-control.ts
+      - src/gateway/collaboration-dispatch/task-stop-control.test.ts
+      - src/gateway/collaboration-learning/task-stop-entry.ts
+      - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/handoff-contract-entry.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/self-advance-entry.ts
+      - src/gateway/collaboration-learning/state-machine.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/task-runtime.ts
+      - src/gateway/collaboration-dispatch/delivery-tool-side-effect.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+    canLandWith:
+      - COLLAB_RESIDUAL_B_TOOL_LOOP
+      - batch2-reliable-confirm-cards
+      - collab-p1-artifact-accept-loop:grok-bot
+      - collab-p0-wake-dispatch:grok-bot
+      - collab-p0-board-exec-tools:grok-bot
+      - COLLAB_TODOLIST_ACL_RPC
+      - COLLAB_P4A_PROPOSE_HANDOFF_ENTRY
+      - COLLAB_S5_LIMITED_SELF_ADVANCE
+      - batch3-version-permission
+      - batch5-single-group-unattended
+      - FLOOR_P1_B_HANDOFF_CONTRACT
+      - MRR
+    metadata:
+      task: u1-unified-task-stop:协作小组
+      owner: 协作小组
+      purpose: U1 unified task stop control — shared stopControl on task authority + entry guards
   - id: COLLAB_RESIDUAL_B_TOOL_LOOP
     landingPolicy: serial
     paths:

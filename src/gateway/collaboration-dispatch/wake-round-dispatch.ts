@@ -15,9 +15,13 @@
  * Default global OFF: hangs on existing wake + selfAdvance allowlists.
  * No LIVE / Floor / multi-beat flips.
  */
+import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
+import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
+import { asGovernedTask } from "./task-runtime.js";
+import { isTaskStopAccepted } from "./task-stop-control.js";
 import {
   isCollabTaskWakeContractEnabled,
   recordWakeEvent,
@@ -222,6 +226,33 @@ export async function consumeWakeForRoundDispatch(
     fromAgentId: compact(params.request.fromAgentId),
     toAgentIds: params.request.toAgentIds.map((id) => compact(id)).filter(Boolean),
   };
+
+  const stoppedTaskId = compact(request.taskId);
+  if (stoppedTaskId) {
+    try {
+      const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+      const current = await objectStorage.readObject<Task>(request.groupId, "task", stoppedTaskId);
+      if (current && isTaskStopAccepted(asGovernedTask(current))) {
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: evaluateWakeRoundDispatchGate({
+            source: request.source,
+            groupId: request.groupId,
+            tenantId: request.tenantId,
+            cfg: params.cfg,
+            writeMode: params.writeMode,
+          }),
+          reason: "task_stopped",
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+        };
+      }
+    } catch {
+      // store read failure: fall through; do not invent stop
+    }
+  }
 
   const gate = evaluateWakeRoundDispatchGate({
     source: request.source,

@@ -23,6 +23,7 @@ import {
   readGroupOperatingState,
   resolveCollaborationGroupTenantId,
 } from "./shared.js";
+import { assertPersistedTaskNotStopped } from "./task-stop-entry.js";
 import {
   resolveAuthorityTenantForEntry,
   type CollaborationTenantResolution,
@@ -84,11 +85,22 @@ export async function runCollaborationSelfAdvance(params: {
   fromAgentId?: string;
 }): Promise<SelfAdvanceResult> {
   const cfg = params.cfg ?? loadConfig();
-  const { authority, mission } = await buildSelfAdvanceAuthority({
+  const { authority, mission, operatingState } = await buildSelfAdvanceAuthority({
     groupId: params.groupId,
     cfg,
     tenant: params.tenant,
   });
+  const currentTaskId =
+    (
+      operatingState as { activeContext?: { currentTaskId?: string | null } } | null
+    )?.activeContext?.currentTaskId?.trim() || "";
+  if (currentTaskId) {
+    await assertPersistedTaskNotStopped({
+      groupId: params.groupId,
+      taskId: currentTaskId,
+      cfg,
+    });
+  }
   return trySelfAdvance(authority, {
     cfg,
     actorId: params.actorId,
