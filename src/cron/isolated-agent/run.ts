@@ -75,6 +75,7 @@ import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/em
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
 import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -931,6 +932,17 @@ export async function runCronIsolatedAgentTurn(params: {
         commercialAuthorizationId: cronAuthorizationId,
         tenantId: modelGate.tenantId,
         preferredModelOrder: executionRouting.preferredModelOrder,
+        platformModelsMode: resolvePlatformModelsMode(cfgWithAgentDefaults),
+        ...(typeof modelGate.aorRouting?.strategy === "string" &&
+        ["cheapest", "best_quality", "balanced", "bandit"].includes(modelGate.aorRouting.strategy)
+          ? {
+              selectorStrategy: modelGate.aorRouting.strategy as
+                | "cheapest"
+                | "best_quality"
+                | "balanced"
+                | "bandit",
+            }
+          : {}),
         // P4-1: parent billing context for child runs (acquired gate only).
         creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
       });

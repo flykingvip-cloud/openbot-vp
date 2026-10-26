@@ -124,6 +124,21 @@ export type TaskOutcomeRecord = {
   runs: RunResult[];
   reasonCode?: CloseReasonCode;
   reasonDetail?: string;
+  /**
+   * Structured capability modality (P1). Acceptance must consume this; do not
+   * upgrade executor_unwired / incomplete into target-modality success from
+   * reasonDetail strings alone.
+   */
+  capabilityModality?: {
+    targetModality: string;
+    executionStatus: string;
+    targetModalityCompleted: boolean;
+    textReturnedAllowed: boolean;
+    incompleteModalities: string[];
+    incompleteReason?: string;
+    planFailureKind: string;
+    forbiddenSuccessModalities?: string[];
+  };
   outcomeVersion: number;
   previousOutcomeVersion?: number;
   revisionKind?: "new_execution" | "correction";

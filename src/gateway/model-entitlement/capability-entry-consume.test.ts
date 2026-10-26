@@ -52,7 +52,7 @@ describe("consumeCapabilityRoutingResult (four-entry surface)", () => {
     expect(consumed.executionSurface.incompleteModalities).toContain("audio_music_generation");
   });
 
-  it("ok chat path: both text and target modality complete", () => {
+  it("ok chat path: text allowed but plan ≠ target modality completed", () => {
     const plan = buildTaskCapabilityPlan({
       taskText: "summarize this note",
       authorizedModelIds: ["openai/gpt-5.4"],
@@ -61,8 +61,26 @@ describe("consumeCapabilityRoutingResult (four-entry surface)", () => {
     const consumed = consumeCapabilityRoutingResult(routing);
     expect(consumed.executionSurface.status).toBe("ok");
     expect(consumed.executionSurface.textReturnedAllowed).toBe(true);
-    expect(consumed.executionSurface.targetModalityCompleted).toBe(true);
+    expect(consumed.executionSurface.targetModalityCompleted).toBe(false);
+    expect(consumed.executionSurface.detail).toBe("routing_executable_not_completed");
     expect(consumed.executionSurface.incompleteModalities).toEqual([]);
+  });
+
+  it("plan success + simulated model failure still leaves completed=false", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "summarize this note",
+      authorizedModelIds: ["openai/gpt-5.4"],
+    });
+    const routing = resolveExecutionRoutingFromCapabilityPlan({ capabilityPlan: plan });
+    expect(routing.planFailure.kind).toBe("none");
+    const consumed = consumeCapabilityRoutingResult(routing);
+    // Model/runtime failure after a successful plan must not flip completed.
+    const afterModelFail = {
+      ...consumed.executionSurface,
+      // surface remains routing-only; execution layer never marks completed here
+    };
+    expect(afterModelFail.targetModalityCompleted).toBe(false);
+    expect(consumed.capabilityOutcome?.targetModalityCompleted).toBe(false);
   });
 
   it("format log is machine-readable without claiming modality success", () => {

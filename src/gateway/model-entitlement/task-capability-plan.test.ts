@@ -234,3 +234,18 @@ describe("estimateInsufficient + executionSurface (NEEDS WORK)", () => {
     expect(routing.executionSurface?.textReturnedAllowed).toBe(true);
   });
 });
+
+describe("plan ≠ completion (routing ok leaves targetModalityCompleted false)", () => {
+  it("ok chat plan is executable but not completed", () => {
+    const plan = buildTaskCapabilityPlan({
+      taskText: "summarize this note",
+      authorizedModelIds: ["openai/gpt-5.4"],
+    });
+    expect(plan.failure.kind).toBe("none");
+    const claim = resolveCapabilityPlanOutcomeClaim(plan);
+    const surface = resolveCapabilityExecutionSurface(claim);
+    expect(surface.status).toBe("ok");
+    expect(surface.targetModalityCompleted).toBe(false);
+    expect(surface.textReturnedAllowed).toBe(true);
+  });
+});

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OpenBotConfig } from "../config/config.js";
 import { readEvolutionTaskOutcomes } from "../gateway/agent-growth/evolution-task-outcomes.js";
 import { readOperationalMetrics } from "../gateway/agent-growth/operational-metrics-store.js";
+import { assessTargetModalityAcceptance } from "./capability-modality.js";
 import { TASK_OUTCOME_STORE_DIRNAME, recordRunnerTurnOutcome } from "./runtime-from-runner.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 
@@ -91,5 +92,37 @@ describe("recordRunnerTurnOutcome", () => {
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
     const persisted = store.loadTask("run:run-unwired");
     expect(persisted?.reasonDetail).toContain("forbidden_success_modalities=image_generation");
+    // Structured modality must survive persist+reload.
+    expect(persisted?.capabilityModality?.executionStatus).toBe("executor_unwired");
+    expect(persisted?.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(persisted?.capabilityModality?.textReturnedAllowed).toBe(true);
+    // Acceptance consumer: cannot upgrade executor_unwired into target-modality success.
+    const assessed = assessTargetModalityAcceptance(persisted?.capabilityModality);
+    expect(assessed.targetModalitySucceeded).toBe(false);
+    expect(assessed.reason).toBe("executor_unwired");
+  });
+
+  it("P1: plan-ok routing claim persists structured incomplete modality", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-plan-ok",
+      capabilityOutcome: {
+        planFailureKind: "none",
+        allowedModality: "chat_model",
+        forbiddenSuccessModalities: [],
+        textReturnedAllowed: true,
+        targetModalityCompleted: false,
+        status: "ok",
+        incompleteModalities: [],
+        detail: "routing_executable_not_completed",
+      },
+    });
+    expect(out.record.capabilityModality?.executionStatus).toBe("routing_ok");
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const persisted = store.loadTask("run:run-plan-ok");
+    expect(
+      assessTargetModalityAcceptance(persisted?.capabilityModality).targetModalitySucceeded,
+    ).toBe(false);
   });
 });

@@ -71,11 +71,12 @@ export function consumeCapabilityRoutingResult(params: {
       ? resolveCapabilityExecutionSurface(claim)
       : ({
           textReturnedAllowed: true,
-          targetModalityCompleted: true,
+          targetModalityCompleted: false,
           allowedModality: "chat_model",
           incompleteModalities: [],
           planFailureKind: "none",
           status: "ok",
+          detail: "routing_executable_not_completed",
         } satisfies CapabilityExecutionSurface));
   const planFailure = params.planFailure ?? claim?.planFailure ?? { kind: "none" as const };
   return {

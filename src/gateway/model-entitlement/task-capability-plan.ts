@@ -592,8 +592,10 @@ export type CapabilityExecutionSurface = {
   /** Whether a chat/text reply path is allowed for this plan. */
   textReturnedAllowed: boolean;
   /**
-   * True only when the plan's target modality actually completed.
-   * For executor_unwired image/music, this stays false even if text is returned.
+   * True only after real execution/artifacts/acceptance completed the target
+   * modality. Routing-stage plans must leave this false even when status is ok
+   * (plan ≠ completion). For executor_unwired image/music, stays false even if
+   * explanatory text is returned.
    */
   targetModalityCompleted: boolean;
   allowedModality: ExecutorKind;
@@ -630,13 +632,16 @@ export function resolveCapabilityExecutionSurface(
       detail: claim.planFailure.message,
     };
   }
+  // Routing-ok only: the plan is executable, but target modality has NOT completed
+  // until real execution / artifacts / acceptance update the surface.
   return {
     textReturnedAllowed: true,
-    targetModalityCompleted: true,
+    targetModalityCompleted: false,
     allowedModality: claim.allowedModality,
     incompleteModalities: [],
     planFailureKind: "none",
     status: "ok",
+    detail: "routing_executable_not_completed",
   };
 }
 

@@ -9730,6 +9730,13 @@ tasks:
       - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
       - src/gateway/model-entitlement/capability-entry-consume.ts
       - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/task-outcome/types.ts
+      - src/gateway/governance/spawn-snapshot-handoff.ts
+      - src/gateway/governance/decision.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.test.ts
+      - src/task-outcome/capability-modality.ts
+      - src/task-outcome/capability-modality.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
       - .loom/registry.yaml
@@ -9763,6 +9770,13 @@ landingStreams:
       - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
       - src/gateway/model-entitlement/capability-entry-consume.ts
       - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/task-outcome/types.ts
+      - src/gateway/governance/spawn-snapshot-handoff.ts
+      - src/gateway/governance/decision.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.test.ts
+      - src/task-outcome/capability-modality.ts
+      - src/task-outcome/capability-modality.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
     canLandWith: []
@@ -9795,6 +9809,10 @@ landingStreams:
       - src/task-outcome/entrypoints/cron.ts
       - src/task-outcome/entrypoints/cli.ts
       - src/task-outcome/entrypoints/collab.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.test.ts
+      - src/task-outcome/capability-modality.ts
+      - src/task-outcome/capability-modality.test.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
     canLandWith: []

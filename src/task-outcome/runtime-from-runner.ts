@@ -2,11 +2,16 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
+import {
+  assessTargetModalityAcceptance,
+  capabilityModalityFromClaim,
+} from "./capability-modality.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import type { TaskOutcomeRecord, TrustedScope } from "./types.js";
+export { assessTargetModalityAcceptance } from "./capability-modality.js";
 
 export const TASK_OUTCOME_STORE_DIRNAME = "task-outcomes";
 
@@ -153,20 +158,16 @@ export async function recordRunnerTurnOutcome(
   }
   // success: leave acceptance pending → awaiting_acceptance → incomplete (no evolution success)
 
-  // P1: propagate executor_unwired / modality claim onto durable reasonDetail so chat
-  // replies cannot later be mistaken for image/music generation success.
+  // P1: persist structured capabilityModality (and reasonDetail mirror) so
+  // acceptance can refuse upgrading executor_unwired into target-modality success.
   let record = res.record;
   const claim = input.capabilityOutcome;
-  if (
-    claim &&
-    (claim.forbiddenSuccessModalities.length > 0 ||
-      claim.targetModalityCompleted === false ||
-      claim.status === "executor_unwired")
-  ) {
+  if (claim) {
+    const modality = capabilityModalityFromClaim(claim);
     const detail = [
       `capability_plan_failure=${claim.planFailureKind}`,
       `allowed_modality=${claim.allowedModality}`,
-      `forbidden_success_modalities=${claim.forbiddenSuccessModalities.join(",")}`,
+      `forbidden_success_modalities=${(claim.forbiddenSuccessModalities ?? []).join(",")}`,
       claim.textReturnedAllowed !== undefined
         ? `text_returned_allowed=${claim.textReturnedAllowed}`
         : null,
@@ -180,11 +181,23 @@ export async function recordRunnerTurnOutcome(
       .join("; ");
     const patched: TaskOutcomeRecord = {
       ...record,
+      capabilityModality: modality,
       reasonDetail: [record.reasonDetail, detail].filter(Boolean).join(" | "),
       updatedAt: new Date().toISOString(),
     };
     store.saveTask(patched);
     record = patched;
+    // Defense: structured assessor must refuse target-modality success for unwired.
+    const assessed = assessTargetModalityAcceptance(record.capabilityModality);
+    if (
+      claim.status === "executor_unwired" ||
+      claim.planFailureKind === "executor_unwired" ||
+      claim.targetModalityCompleted === false
+    ) {
+      if (assessed.targetModalitySucceeded) {
+        throw new Error("capability modality acceptance upgraded unexpectedly");
+      }
+    }
   }
 
   const evolution = publishEvolutionFromTaskOutcome(cfg, agentId, record);

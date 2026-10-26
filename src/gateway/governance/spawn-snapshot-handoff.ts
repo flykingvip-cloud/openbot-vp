@@ -127,6 +127,34 @@ function persistStagedAccountHandoff(
  * Saves the parent run's already-resolved model set. Callers pass a snapshot built
  * from the gate result; this does not authorize a model.
  */
+
+function copyEffectiveModelSetExtras(
+  src: RunGovernanceSnapshot["effectiveModelSet"] | undefined,
+): Pick<
+  NonNullable<RunGovernanceSnapshot["effectiveModelSet"]>,
+  "preferredModelOrder" | "platformModelsMode" | "selectorStrategy"
+> {
+  const out: Pick<
+    NonNullable<RunGovernanceSnapshot["effectiveModelSet"]>,
+    "preferredModelOrder" | "platformModelsMode" | "selectorStrategy"
+  > = {};
+  if (src?.preferredModelOrder) {
+    out.preferredModelOrder = [...src.preferredModelOrder];
+  }
+  if (src?.platformModelsMode === "native" || src?.platformModelsMode === "aor_enhanced") {
+    out.platformModelsMode = src.platformModelsMode;
+  }
+  if (
+    src?.selectorStrategy === "cheapest" ||
+    src?.selectorStrategy === "best_quality" ||
+    src?.selectorStrategy === "balanced" ||
+    src?.selectorStrategy === "bandit"
+  ) {
+    out.selectorStrategy = src.selectorStrategy;
+  }
+  return out;
+}
+
 export function rememberRunModelSet(runId: string, snapshot: RunGovernanceSnapshot): void {
   const key = runId.trim();
   const allowlist = snapshot.effectiveModelSet?.allowlist;
@@ -137,9 +165,7 @@ export function rememberRunModelSet(runId: string, snapshot: RunGovernanceSnapsh
     ...snapshot,
     effectiveModelSet: {
       allowlist: [...allowlist],
-      ...(snapshot.effectiveModelSet?.preferredModelOrder
-        ? { preferredModelOrder: [...snapshot.effectiveModelSet.preferredModelOrder] }
-        : {}),
+      ...copyEffectiveModelSetExtras(snapshot.effectiveModelSet),
     },
   });
 }
@@ -177,9 +203,7 @@ function copyModelSetSnapshot(snapshot: RunGovernanceSnapshot): RunGovernanceSna
     ...snapshot,
     effectiveModelSet: {
       allowlist: [...allowlist],
-      ...(snapshot.effectiveModelSet?.preferredModelOrder
-        ? { preferredModelOrder: [...snapshot.effectiveModelSet.preferredModelOrder] }
-        : {}),
+      ...copyEffectiveModelSetExtras(snapshot.effectiveModelSet),
     },
   };
 }
@@ -298,6 +322,8 @@ export function buildRunModelSetSnapshot(params: {
   tenantId?: string;
   actorId?: string;
   preferredModelOrder?: readonly string[];
+  platformModelsMode?: "native" | "aor_enhanced";
+  selectorStrategy?: "cheapest" | "best_quality" | "balanced" | "bandit";
   creditReporting?: RunCreditReporting;
   now?: string;
 }): RunGovernanceSnapshot | undefined {
@@ -317,6 +343,15 @@ export function buildRunModelSetSnapshot(params: {
       allowlist: [...params.allowlist],
       ...(params.preferredModelOrder
         ? { preferredModelOrder: [...params.preferredModelOrder] }
+        : {}),
+      ...(params.platformModelsMode === "native" || params.platformModelsMode === "aor_enhanced"
+        ? { platformModelsMode: params.platformModelsMode }
+        : {}),
+      ...(params.selectorStrategy === "cheapest" ||
+      params.selectorStrategy === "best_quality" ||
+      params.selectorStrategy === "balanced" ||
+      params.selectorStrategy === "bandit"
+        ? { selectorStrategy: params.selectorStrategy }
         : {}),
     },
     ...(commercialAuthorizationId ? { commercialAuthorizationId } : {}),
@@ -350,9 +385,7 @@ export function snapshotForChildModelHandoff(
     decisions: [],
     effectiveModelSet: {
       allowlist: [...allowlist],
-      ...(parent.effectiveModelSet?.preferredModelOrder
-        ? { preferredModelOrder: [...parent.effectiveModelSet.preferredModelOrder] }
-        : {}),
+      ...copyEffectiveModelSetExtras(parent.effectiveModelSet),
     },
     ...(parent.commercialAuthorizationId
       ? { commercialAuthorizationId: parent.commercialAuthorizationId }
