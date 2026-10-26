@@ -347,13 +347,17 @@ export { createAdapterBundle } from "./adapters/factory.js";
 export { PlaceholderGraphStore } from "./adapters/graph.js";
 export type {
   LocalMetadataBootstrapResult,
+  LocalMetadataReadonlyOpenFailureCode,
+  LocalMetadataReadonlyOpenResult,
   LocalMetadataStoreConfig,
   LocalMetadataTables,
 } from "./adapters/local-metadata.js";
 export {
   buildLocalMetadataSchema,
+  LOCAL_METADATA_SCHEMA_VERSION,
   LOCAL_METADATA_TABLES,
   LocalMetadataStore,
+  openLocalMetadataStoreReadonly,
 } from "./adapters/local-metadata.js";
 export { PlaceholderMetadataStore } from "./adapters/metadata.js";
 export type {
