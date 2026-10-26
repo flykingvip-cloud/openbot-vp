@@ -112,9 +112,10 @@ export type WakeOpRecord = Readonly<{
    */
   executionAttemptId?: string;
   /**
-   * M3: dispatch eligibility commit (linearization point). Written under the
-   * wake-op lock after stop+auth recheck; holds controlEpoch + auth fingerprint
-   * so expired holders cannot complete after stop/revoke once the lock releases.
+   * M3/T41: wake-op mirror of dispatch eligibility. Authoritative linearization
+   * is the task-authority dispatchClaim CAS (task-control-cas.ts). This field
+   * still holds controlEpoch + auth fingerprint under the wake-op lock for
+   * audit / isDispatchEligibilityCurrent defense-in-depth.
    */
   dispatchEligibility?: {
     committedAtMs: number;
@@ -550,9 +551,9 @@ export type CommitDispatchEligibilityParams = {
 };
 
 /**
- * M3 linearization point: under wake-op lock, commit dispatch eligibility with
- * the observed controlEpoch + auth fingerprint. Does not hold the lock across
- * external I/O.
+ * M3/T41: mirror eligibility onto the wake-op record under wake-op lock.
+ * Call only after task-authority casCommitTaskDispatchEligibility succeeds
+ * when a task stop surface was observed. Does not hold the lock across I/O.
  */
 export async function commitWakeOpDispatchEligibility(
   params: CommitDispatchEligibilityParams,

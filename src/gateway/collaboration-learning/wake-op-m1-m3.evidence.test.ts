@@ -21,7 +21,12 @@ import {
   generatePolicySnapshotId,
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import {
+  casCommitTaskDispatchEligibility,
+  casTakeTaskDispatchEligibility,
+} from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
+import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import { createFixtureReceiptNoneAdapter } from "../collaboration-dispatch/wake-op-effect-verify.js";
 import {
   claimWakeOpRunning,
@@ -32,10 +37,15 @@ import {
   producePlatformNoneVerification,
   readWakeOpRecord,
   releaseWakeOpForRetry,
+  wakeOpAuthFingerprint,
 } from "../collaboration-dispatch/wake-op-ledger.js";
 import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveSecurityProfile } from "../security-profile.js";
-import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+  writeGroupOperatingState,
+} from "./shared.js";
 import { resolveCollaborationGroupTenantId } from "./shared.js";
 import { requestCollaborationTaskStop } from "./task-stop-entry.js";
 import { resolveAuthorityTenantForEntry } from "./trusted-tenant.js";
@@ -1293,5 +1303,179 @@ describe("T37 M2 trusted verifier adapters", () => {
       cfg,
     });
     expect(released.ok).toBe(true);
+  });
+});
+
+describe("T41 M3 shared control-version CAS", () => {
+  test("M3-CAS-1: after pre-commit recheck, stop before task CAS → CAS rejects; no eligibility; calls=0", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-cas-1";
+    const { authority, objectStorage, groupId } = await seed({ cfg, taskId, itemId: "cas1" });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let entered = false;
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterRecheckBeforeTaskCasBarrier: async () => {
+        entered = true;
+        await barrier;
+      },
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "cas1"),
+    });
+    const opKey = opKeyFor(taskId, "cas1");
+    for (let i = 0; i < 200; i += 1) {
+      if (entered) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(entered).toBe(true);
+    // Stop AFTER second control recheck completed, BEFORE shared task CAS.
+    await requestCollaborationTaskStop({
+      groupId: tenant.groupId,
+      taskId,
+      actor: tenant.owner,
+      reason: "m3-cas-1",
+      externalEffect: "none",
+      cfg,
+    });
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("task_stopped");
+    const rec = await readWakeOpRecord({ authority, opKey });
+    expect(rec?.status).toBe("failed");
+    // Eligibility must not win on wake-op mirror.
+    expect(rec?.dispatchEligibility).toBeFalsy();
+    // Task authoritative claim must be absent (CAS lost to stop).
+    const task = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(task.dispatchClaim).toBeFalsy();
+    expect(task.controlEpoch).toBeGreaterThan(0);
+  });
+
+  test("M3-CAS-2: eligibility CAS committed, then stop, then take before dispatcher → calls=0", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-cas-2";
+    const { authority, objectStorage, groupId } = await seed({ cfg, taskId, itemId: "cas2" });
+    let release!: () => void;
+    const barrier = new Promise<void>((r) => {
+      release = r;
+    });
+    let calls = 0;
+    const wakeP = consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      _testAfterEligibilityBarrier: () => barrier,
+      roundDispatcher: async () => {
+        calls += 1;
+        return { ok: true, roundId: "must-not-run" };
+      },
+      request: wakeReq(taskId, "cas2"),
+    });
+    const opKey = opKeyFor(taskId, "cas2");
+    for (let i = 0; i < 200; i += 1) {
+      const rec = await readWakeOpRecord({ authority, opKey });
+      if (rec?.dispatchEligibility) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect((await readWakeOpRecord({ authority, opKey }))?.dispatchEligibility).toBeTruthy();
+    const mid = asGovernedTask((await objectStorage.readObject(groupId, "task", taskId)) as never);
+    expect(mid.dispatchClaim?.phase).toBe("committed");
+    await requestCollaborationTaskStop({
+      groupId: tenant.groupId,
+      taskId,
+      actor: tenant.owner,
+      reason: "m3-cas-2",
+      externalEffect: "none",
+      cfg,
+    });
+    const afterStop = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    expect(afterStop.dispatchClaim).toBeFalsy();
+    expect(afterStop.controlEpoch).toBeGreaterThan(mid.controlEpoch ?? 0);
+    release();
+    const wake = await wakeP;
+    expect(calls).toBe(0);
+    expect(wake.dispatched).toBe(false);
+    expect(wake.reason).toBe("task_stopped_in_flight");
+    expect((await readWakeOpRecord({ authority, opKey }))?.status).toBe("unknown");
+  });
+
+  test("M3-CAS-3: concurrent stop vs eligibility CAS — shared version adjudicates; exactly one coherent winner", async () => {
+    const { cfg } = await useIsolationRoot();
+    const taskId = "task-m3-cas-3";
+    const { objectStorage, groupId, fileStore } = await seed({ cfg, taskId, itemId: "cas3" });
+    const os = await readGroupOperatingState({
+      fileStore,
+      groupId,
+    });
+    const fp = wakeOpAuthFingerprint(os, [tenant.bot0]);
+    const before = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    const expectedEpoch = typeof before.controlEpoch === "number" ? before.controlEpoch : 0;
+
+    const stopP = requestCollaborationTaskStop({
+      groupId,
+      taskId,
+      actor: tenant.owner,
+      reason: "m3-cas-3-concurrent",
+      externalEffect: "none",
+      cfg,
+    });
+    const casP = casCommitTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "cas3"),
+      expectedControlEpoch: expectedEpoch,
+      authFingerprint: fp,
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    const [stopResult, casResult] = await Promise.all([stopP, casP]);
+
+    const final = asGovernedTask(
+      (await objectStorage.readObject(groupId, "task", taskId)) as never,
+    );
+    // Stop always eventually accepted (or already); CAS either commits at expected epoch or rejects.
+    expect(stopResult.stopControl.status).toBe("accepted");
+    if (casResult.ok) {
+      // Eligibility won the lock first: claim at expected epoch, then stop bumped epoch and cleared claim.
+      expect(final.dispatchClaim).toBeFalsy();
+      expect(final.controlEpoch).toBeGreaterThan(expectedEpoch);
+      expect(casResult.claim.controlEpoch).toBe(expectedEpoch);
+    } else {
+      // Stop won first (or CAS lost expected-version): claim absent; CAS refused.
+      expect(casResult.ok).toBe(false);
+      expect(["task_stopped", "epoch_mismatch"]).toContain(casResult.reason);
+      expect(final.dispatchClaim).toBeFalsy();
+      expect(final.controlEpoch).toBeGreaterThan(expectedEpoch);
+    }
+    // No stuck "committed" claim that could still be taken after stop.
+    if (final.dispatchClaim) {
+      expect(final.dispatchClaim.controlEpoch).toBe(final.controlEpoch);
+    }
+    const take = await casTakeTaskDispatchEligibility({
+      groupId,
+      taskId,
+      opKey: opKeyFor(taskId, "cas3"),
+      targetActorIds: [tenant.bot0],
+      cfg,
+    });
+    expect(take.ok).toBe(false);
   });
 });

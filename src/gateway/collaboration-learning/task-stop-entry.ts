@@ -8,6 +8,7 @@
 import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { applyTaskStopUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import { asGovernedTask, type GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   assertTaskNotStopped,
@@ -160,18 +161,23 @@ export async function requestCollaborationTaskStop(
     // Default unknown: in-flight external effects may already have escaped.
     externalEffect: params.externalEffect ?? "unknown",
   });
-  // M3: bump comparable control epoch so dispatch eligibility snapshots go stale.
-  const priorEpoch =
-    typeof (governed as { controlEpoch?: unknown }).controlEpoch === "number"
-      ? Number((governed as { controlEpoch?: number }).controlEpoch)
-      : 0;
-  const updated: GovernedTask = {
+  // T41: under shared task-control lock — bump controlEpoch, clear dispatchClaim,
+  // persist stop. Linearizes vs eligibility CAS (expected-version).
+  const draft: GovernedTask = {
     ...governed,
     stopControl,
-    controlEpoch: priorEpoch + 1,
     updatedAtMs: params.nowMs ?? Date.now(),
     updatedBy: actorId,
   };
-  await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
-  return { task: updated, stopControl, alreadyStopped: false };
+  const updated = await applyTaskStopUnderControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    updated: draft,
+    cfg,
+  });
+  const persistedStop = readTaskStopControl(updated);
+  if (!persistedStop) {
+    throw new TaskStopEntryError("stop_persist_failed", "stop did not persist under control lock");
+  }
+  return { task: updated, stopControl: persistedStop, alreadyStopped: false };
 }

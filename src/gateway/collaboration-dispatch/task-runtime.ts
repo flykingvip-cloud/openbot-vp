@@ -15,6 +15,17 @@ import {
 } from "./task-state-machine.js";
 import type { TaskStopControl } from "./task-stop-control.js";
 
+/** T41: authoritative dispatch eligibility claim on the task control record. */
+export type TaskDispatchClaim = {
+  opKey: string;
+  controlEpoch: number;
+  authFingerprint: string;
+  committedAtMs: number;
+  /** committed = eligible; taken = leased for external dispatch (CAS take). */
+  phase: "committed" | "taken";
+  takenAtMs?: number;
+};
+
 export type GovernedTask = Task & {
   governanceState?: CollaborationTaskState;
   responsibility?: TaskResponsibility;
@@ -24,8 +35,14 @@ export type GovernedTask = Task & {
   /**
    * M3: comparable generation for stop (and future auth-linked bumps).
    * Incremented when stop is accepted so dispatch eligibility snapshots go stale.
+   * Shared version token for T41 expected-version CAS with dispatchClaim.
    */
   controlEpoch?: number;
+  /**
+   * T41 M3: dispatch eligibility claim linearized on the task authority record.
+   * Cleared when stop bumps controlEpoch; taken before external dispatcher.
+   */
+  dispatchClaim?: TaskDispatchClaim | null;
 };
 
 export class InvalidTaskHandoffError extends Error {

@@ -23,6 +23,10 @@ import {
 } from "../collaboration-learning/shared.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
+import {
+  casCommitTaskDispatchEligibility,
+  casTakeTaskDispatchEligibility,
+} from "./task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "./task-dispatch-auth-recheck.js";
 import { asGovernedTask } from "./task-runtime.js";
 import { isTaskStopAccepted } from "./task-stop-control.js";
@@ -228,7 +232,13 @@ export type ConsumeWakeRoundDispatchParams = {
    */
   _testAfterControlReadBeforeEligibilityBarrier?: () => Promise<void>;
   /**
+   * Test-only barrier after pre-commit recheck completes, immediately before the
+   * shared task expected-version CAS (T41). Stop/revoke here must make CAS fail.
+   */
+  _testAfterRecheckBeforeTaskCasBarrier?: () => Promise<void>;
+  /**
    * Test-only barrier after eligibility commit, before external dispatch (M3 order 2).
+   * T41: CAS take runs after this barrier — stop/revoke here must refuse take.
    */
   _testAfterEligibilityBarrier?: () => Promise<void>;
   /**
@@ -453,6 +463,8 @@ export async function consumeWakeForRoundDispatch(
   let eligibilityAuthFingerprint = "";
   /** True when a task record was observed for stop/epoch (distinct from missing). */
   let eligibilityTaskObserved = false;
+  /** T41: task-authority CAS commit succeeded (take required before dispatcher). */
+  let taskEligibilityCasCommitted = false;
   {
     let stoppedAfterClaim = false;
     let taskControlUnreadableAfterClaim = false;
@@ -722,6 +734,79 @@ export async function consumeWakeForRoundDispatch(
       }
     }
 
+    // T41: shared expected-version CAS on the task authority record BEFORE wake-op
+    // mirror. Stop/revoke that advanced controlEpoch (or auth fingerprint) loses here.
+    if (params._testAfterRecheckBeforeTaskCasBarrier) {
+      await params._testAfterRecheckBeforeTaskCasBarrier();
+    }
+    // Shared CAS only when a task authority record was observed (stop surface exists).
+    // taskId-without-task (legacy / no stop plane) keeps wake-op-only eligibility.
+    if (stoppedTaskId && eligibilityTaskObserved) {
+      const cas = await casCommitTaskDispatchEligibility({
+        groupId: request.groupId,
+        taskId: stoppedTaskId,
+        opKey: claimed.opKey,
+        expectedControlEpoch: eligibilityControlEpoch,
+        authFingerprint: eligibilityAuthFingerprint,
+        targetActorIds: request.toAgentIds,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+      });
+      if (!cas.ok) {
+        const detail = `task_eligibility_cas_failed:${cas.reason}:${cas.detail}`;
+        const isStop = cas.reason === "task_stopped" || cas.reason === "epoch_mismatch";
+        const isAuth =
+          cas.reason === "auth_fingerprint_mismatch" || cas.reason === "auth_source_unreadable";
+        if (cas.reason === "task_control_unreadable" || cas.reason === "task_missing") {
+          const unknown = await markWakeOpUnknown({
+            authority: params.authority,
+            opKey: claimed.opKey,
+            cfg: params.cfg,
+            nowMs: params.nowMs,
+            detail,
+          });
+          return {
+            outcome: "recorded",
+            dispatched: false,
+            gate: emptyGate(),
+            reason: cas.reason,
+            wakeEvent: undefined,
+            roundId: undefined,
+            dispatcherPresent: false,
+            opKey: claimed.opKey,
+            wakeOp: unknown ?? claimed.record ?? undefined,
+            reused: false,
+          };
+        }
+        const failed = await markWakeOpFailed({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail,
+        });
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: emptyGate(),
+          reason: isStop
+            ? "task_stopped"
+            : isAuth
+              ? cas.reason === "auth_source_unreadable"
+                ? "auth_source_unreadable"
+                : "auth_revoked"
+              : "eligibility_cas_rejected",
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+          opKey: claimed.opKey,
+          wakeOp: failed ?? claimed.record ?? undefined,
+          reused: false,
+        };
+      }
+      taskEligibilityCasCommitted = true;
+    }
+
     const eligible = await commitWakeOpDispatchEligibility({
       authority: params.authority,
       opKey: claimed.opKey,
@@ -759,9 +844,95 @@ export async function consumeWakeForRoundDispatch(
     await params._testAfterEligibilityBarrier();
   }
 
-  // Post-eligibility: if stop/auth advanced, do not dispatch. Record in-flight/unknown
-  // (external request not yet sent — no silent success). Expired holders cannot complete.
-  // Control-state read failures must refuse / stay uncertain — never keep old epoch/fp.
+  // T41: CAS-take task dispatchClaim (unoverwritable version condition) before any
+  // external dispatcher call. Stop/revoke that advanced the shared version refuses take.
+  if (stoppedTaskId && taskEligibilityCasCommitted) {
+    const take = await casTakeTaskDispatchEligibility({
+      groupId: request.groupId,
+      taskId: stoppedTaskId,
+      opKey: claimed.opKey,
+      targetActorIds: request.toAgentIds,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+    });
+    if (!take.ok) {
+      const detail = `task_eligibility_take_failed:${take.reason}:${take.detail}`;
+      if (
+        take.reason === "task_stopped" ||
+        take.reason === "epoch_mismatch" ||
+        take.reason === "claim_missing"
+      ) {
+        const unknown = await markWakeOpUnknown({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail,
+        });
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: emptyGate(),
+          reason: "task_stopped_in_flight",
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+          opKey: claimed.opKey,
+          wakeOp: unknown ?? wakeOp,
+          reused: false,
+        };
+      }
+      if (take.reason === "task_control_unreadable" || take.reason === "task_missing") {
+        const unknown = await markWakeOpUnknown({
+          authority: params.authority,
+          opKey: claimed.opKey,
+          cfg: params.cfg,
+          nowMs: params.nowMs,
+          detail,
+        });
+        return {
+          outcome: "recorded",
+          dispatched: false,
+          gate: emptyGate(),
+          reason: take.reason,
+          wakeEvent: undefined,
+          roundId: undefined,
+          dispatcherPresent: false,
+          opKey: claimed.opKey,
+          wakeOp: unknown ?? wakeOp,
+          reused: false,
+        };
+      }
+      const failed = await markWakeOpFailed({
+        authority: params.authority,
+        opKey: claimed.opKey,
+        cfg: params.cfg,
+        nowMs: params.nowMs,
+        detail,
+      });
+      const reason =
+        take.reason === "auth_source_unreadable"
+          ? "auth_source_unreadable"
+          : take.reason === "auth_fingerprint_mismatch"
+            ? "auth_revoked"
+            : "eligibility_take_rejected";
+      return {
+        outcome: "recorded",
+        dispatched: false,
+        gate: emptyGate(),
+        reason,
+        wakeEvent: undefined,
+        roundId: undefined,
+        dispatcherPresent: false,
+        opKey: claimed.opKey,
+        wakeOp: failed ?? wakeOp,
+        reused: false,
+      };
+    }
+  }
+
+  // Post-eligibility defense-in-depth (FO unreadable paths + wake-op snapshot check).
+  // Shared-version adjudication for stop/revoke is the CAS take above — not another recheck.
   {
     let stopAfterEligibility = false;
     let currentEpoch = eligibilityControlEpoch;
