@@ -9781,6 +9781,13 @@ tasks:
       - src/config/zod-schema.agent-defaults.ts
       - src/config/schema.help.ts
       - src/config/schema.labels.ts
+      - src/task-outcome/modality-artifact-evidence.ts
+      - src/task-outcome/modality-artifact-evidence.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.executor-wiring.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
     state: active
     sessions: []
     ownerHistory: []
@@ -9891,6 +9898,13 @@ landingStreams:
       - src/config/zod-schema.agent-defaults.ts
       - src/config/schema.help.ts
       - src/config/schema.labels.ts
+      - src/task-outcome/modality-artifact-evidence.ts
+      - src/task-outcome/modality-artifact-evidence.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.executor-wiring.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
     canLandWith: []
     metadata:
       task: mj-suno-executor-wiring
