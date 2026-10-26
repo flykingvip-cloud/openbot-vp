@@ -30,3 +30,5 @@ entrypoint adapter (chat|gateway_agent|cron|cli|collab)
 - Consume: `OutcomeConsumerRuntime` durable projection; evolution publish only via drain handlers (no runner bypass).
 - Failure attribution: `fail_closed` with structured `reasonCode` (not boolean→acceptance_failed).
 - commandId digest idempotency; correction allowlist; restore scope/subject checks.
+
+- Entry: `ensureChatTurnTaskOutcome` at `agent-runner-execution` turn start; `recordRunnerTurnOutcome` requires taskId (no `run:` invent).

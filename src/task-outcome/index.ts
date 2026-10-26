@@ -19,3 +19,4 @@ export {
   MODE_CONSUMER_ID,
 } from "./consumers.js";
 export { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
+export * from "./chat-entry.js";

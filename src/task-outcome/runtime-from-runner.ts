@@ -119,7 +119,12 @@ export async function recordRunnerTurnOutcome(
     submittedBy: "agent-runner-execution",
   });
   const chat = new ChatTaskOutcomeAdapter(service);
-  const taskId = input.taskId?.trim() || `run:${input.runId}`;
+  const taskId = input.taskId?.trim();
+  if (!taskId) {
+    throw new Error(
+      "recordRunnerTurnOutcome requires taskId from chat entry (ensureChatTurnTaskOutcome); refusing runId invent",
+    );
+  }
   const scope = input.scope ?? defaultScope(input.tenantId);
 
   const opened = chat.createOrRestore({

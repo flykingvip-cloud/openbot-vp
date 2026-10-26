@@ -64,6 +64,7 @@ import { logVerbose } from "../../globals.js";
 import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.js";
+import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
 import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import {
   isMarkdownCapableMessageChannel,
@@ -156,6 +157,41 @@ export async function runAgentTurnWithFallback(params: {
   const directlySentBlockKeys = new Set<string>();
 
   const runId = params.opts?.runId ?? crypto.randomUUID();
+  // askOutcome R83：入口创建/恢复真实 taskId（禁止收尾用 runId 补造）。
+  const growthAgentIdForEntry = params.followupRun.run.agentId;
+  let chatOutcomeTaskId: string | undefined;
+  let chatOutcomeScope: import("../../task-outcome/types.js").TrustedScope | undefined;
+  if (!params.isHeartbeat && growthAgentIdForEntry) {
+    const subjectRef = (
+      params.followupRun.run.gatewayClientPlatformUserId ??
+      params.sessionCtx.GatewayClientPlatformUserId ??
+      params.followupRun.run.gatewayClientUser ??
+      params.sessionCtx.GatewayClientUser ??
+      params.sessionKey ??
+      "anonymous"
+    )
+      .toString()
+      .trim();
+    const tenantId =
+      params.followupRun.run.executionIdentity?.enterpriseId?.trim() ||
+      params.followupRun.run.executionIdentity?.collaborationOwnerEntitlement?.tenantId?.trim() ||
+      undefined;
+    const opened = ensureChatTurnTaskOutcome(params.followupRun.run.config, {
+      agentId: growthAgentIdForEntry,
+      runId,
+      sessionKey: params.sessionKey,
+      subjectRef: subjectRef.startsWith("platform-user:")
+        ? subjectRef
+        : subjectRef.includes(":")
+          ? subjectRef
+          : `subject:${subjectRef}`,
+      ...(tenantId ? { tenantId } : {}),
+    });
+    if (opened.ok) {
+      chatOutcomeTaskId = opened.taskId;
+      chatOutcomeScope = opened.scope;
+    }
+  }
   // askOutcome P0：turn 收尾走统一 TaskOutcome（fire-and-forget，绝不影响回复）。
   // 心跳不算任务；run 成功不再直接记任务成功 / evolution success（挂起验收）。
   // 工具成功率仍在 turn 内内存累加、收尾一次落盘。
@@ -182,14 +218,27 @@ export async function runAgentTurnWithFallback(params: {
     growthToolTotal = 0;
     growthToolSucceeded = 0;
     const tenantId = modelGate.tenantId?.trim();
-    // askOutcome P0: durable TaskOutcome first; do not invent task success from turn success.
+    // askOutcome R83: requires entry taskId; never invent run:${runId} at finish.
+    if (!chatOutcomeTaskId || !chatOutcomeScope) {
+      reportEvolutionOutcomeWriteFailure({
+        runId,
+        agentId: growthAgentId,
+        tenantId: tenantId ?? null,
+        taskId: null,
+        reason: "chat_entry_task_missing",
+      });
+      return;
+    }
     void recordRunnerTurnOutcome(params.followupRun.run.config, growthAgentId, {
       success,
       toolsTotal,
       toolsSucceeded,
       runId,
+      taskId: chatOutcomeTaskId,
+      scope: chatOutcomeScope,
       latencyMs: Math.max(0, Date.now() - growthStartedAt),
       ...(tenantId ? { tenantId } : {}),
+      ...(!success ? { failureReason: "run_failed" as const } : {}),
     })
       .then(() =>
         syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId),
@@ -201,7 +250,7 @@ export async function runAgentTurnWithFallback(params: {
           runId,
           agentId: growthAgentId,
           tenantId: tenantId ?? null,
-          taskId: `run:${runId}`,
+          taskId: chatOutcomeTaskId ?? null,
           reason: error instanceof Error ? error.message : "evolution_outcome_write_failed",
         });
       });

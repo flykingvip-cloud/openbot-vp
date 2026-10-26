@@ -25,6 +25,7 @@ describe("recordRunnerTurnOutcome", () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: true,
       runId: "run-ok",
+      taskId: "chat:bot:sess:run-ok",
       toolsTotal: 2,
       toolsSucceeded: 2,
     });
@@ -39,7 +40,7 @@ describe("recordRunnerTurnOutcome", () => {
     expect(metrics.tasksTotal).toBe(0);
 
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
-    const persisted = store.loadTask("run:run-ok");
+    const persisted = store.loadTask("chat:bot:sess:run-ok");
     expect(persisted?.lifecycle).toBe("awaiting_acceptance");
   });
 
@@ -47,6 +48,7 @@ describe("recordRunnerTurnOutcome", () => {
     const out = await recordRunnerTurnOutcome(cfg, "bot", {
       success: false,
       runId: "run-fail",
+      taskId: "chat:bot:sess:run-fail",
       toolsTotal: 1,
       toolsSucceeded: 0,
       tenantId: "t1",
@@ -60,7 +62,7 @@ describe("recordRunnerTurnOutcome", () => {
     const rows = readEvolutionTaskOutcomes(cfg, "bot");
     expect(rows).toHaveLength(1);
     expect(rows[0]?.succeeded).toBe(false);
-    expect(rows[0]?.taskId).toBe("run:run-fail");
+    expect(rows[0]?.taskId).toBe("chat:bot:sess:run-fail");
     expect(rows[0]?.tenantId).toBe("t1");
   });
 });
