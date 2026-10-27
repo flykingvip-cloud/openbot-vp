@@ -22,6 +22,7 @@ import {
   type CapabilityCheckRunner,
 } from "./protocol-runner.js";
 import {
+  finalizeVerificationTaskIfInFlight,
   getCurrentExecutionGeneration,
   getModelAdmission,
   getVerificationTask,
@@ -171,29 +172,29 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
     executionGeneration: number,
     outcomes: ProtocolCheckOutcome[],
   ) {
-    const latest = await getVerificationTask(taskId, storePath);
-    if (!latest) {
-      return;
-    }
-    // Refuse late arrivals after cancel / interrupt / prior terminal finish.
-    if (latest.status !== "queued" && latest.status !== "running") {
-      return;
-    }
-
     const results = outcomes.map((o) => outcomeToEvidence(o, mode));
     const status = summarizeTaskStatus(results);
-    const done: CapabilityVerificationTask = {
-      ...latest,
-      status,
-      results,
-      updatedAt: Date.now(),
-      configFingerprint: requestFingerprint ?? latest.configFingerprint,
-      executionGeneration,
-    };
-    await saveVerificationTask(done, storePath);
+
+    // Atomic vs cancel/interrupt: only transition while still in-flight.
+    const done = await finalizeVerificationTaskIfInFlight(
+      taskId,
+      (latest) => ({
+        ...latest,
+        status,
+        results,
+        updatedAt: Date.now(),
+        configFingerprint: requestFingerprint ?? latest.configFingerprint,
+        executionGeneration,
+      }),
+      storePath,
+    );
+    if (!done) {
+      // Cancel / interrupt / prior terminal already won — do not pollute evidence.
+      return;
+    }
 
     const currentFp = await resolveFingerprintNow(modelRef);
-    const taskFp = requestFingerprint ?? latest.configFingerprint;
+    const taskFp = requestFingerprint ?? done.configFingerprint;
     const fingerprintStale = Boolean(taskFp && currentFp && taskFp !== currentFp);
     const currentGen = await getCurrentExecutionGeneration(modelRef, storePath);
     const generationStale = executionGeneration < currentGen;
@@ -211,21 +212,6 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
       return;
     }
 
-    // Re-check cancel one more time under the same generation before merge.
-    const preMerge = await getVerificationTask(taskId, storePath);
-    if (
-      !preMerge ||
-      (preMerge.status !== "succeeded" &&
-        preMerge.status !== "failed" &&
-        preMerge.status !== "partial")
-    ) {
-      return;
-    }
-    // If somehow cancelled between save and merge, do not pollute.
-    // (cancel only applies to queued/running; we already wrote terminal status.
-    //  Guard: if a concurrent cancel raced before our terminal save, latest was
-    //  non-running and we returned earlier. Here we only merge mergeable formal
-    //  passed/failed.)
     const mergeable = results.filter(
       (item) => item.status === "passed" || item.status === "failed",
     );
@@ -244,26 +230,25 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
     capabilityIds: CanonicalCapabilityId[],
     message: string,
   ) {
-    const latest = await getVerificationTask(taskId, storePath);
-    if (!latest || (latest.status !== "queued" && latest.status !== "running")) {
-      return;
-    }
-    const failed: CapabilityVerificationTask = {
-      ...latest,
-      status: "failed",
-      error: message,
-      updatedAt: Date.now(),
-      results: capabilityIds.map((id) => ({
-        id,
-        label: capabilityLabel(id),
-        source: "protocol_probe",
-        status: "untested",
-        failureReason: message,
-        testVersion: "gateway-protocol-v1",
-        sourceNote: "执行异常，未完成检查",
-      })),
-    };
-    await saveVerificationTask(failed, storePath);
+    await finalizeVerificationTaskIfInFlight(
+      taskId,
+      (latest) => ({
+        ...latest,
+        status: "failed",
+        error: message,
+        updatedAt: Date.now(),
+        results: capabilityIds.map((id) => ({
+          id,
+          label: capabilityLabel(id),
+          source: "protocol_probe" as const,
+          status: "untested" as const,
+          failureReason: message,
+          testVersion: "gateway-protocol-v1",
+          sourceNote: "执行异常，未完成检查",
+        })),
+      }),
+      storePath,
+    );
   }
 
   function runInBackground(
@@ -275,16 +260,19 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
     executionGeneration: number,
   ) {
     const work = (async () => {
-      const current = await getVerificationTask(taskId, storePath);
-      if (!current || current.status === "cancelled" || current.status === "interrupted") {
+      const running = await finalizeVerificationTaskIfInFlight(
+        taskId,
+        (current) => ({
+          ...current,
+          status: "running",
+          updatedAt: Date.now(),
+        }),
+        storePath,
+      );
+      if (!running) {
+        // Cancelled / interrupted before start — abandon.
         return;
       }
-      const running: CapabilityVerificationTask = {
-        ...current,
-        status: "running",
-        updatedAt: Date.now(),
-      };
-      await saveVerificationTask(running, storePath);
 
       let runnerTerminal = false;
       const settleOutcomes = async (outcomes: ProtocolCheckOutcome[]) => {
@@ -309,8 +297,9 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
         await finishWithError(taskId, capabilityIds, message);
       };
 
+      let timeoutTimer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => {
+        timeoutTimer = setTimeout(() => {
           reject(new Error("检查超时，runner 未在时限内返回终态"));
         }, runnerTimeoutMs);
       });
@@ -329,8 +318,14 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
           ),
           timeout,
         ]);
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+        }
         await settleOutcomes(checked);
       } catch (err) {
+        if (timeoutTimer) {
+          clearTimeout(timeoutTimer);
+        }
         await settleError(err instanceof Error ? err.message : String(err));
       }
     })().finally(() => {
