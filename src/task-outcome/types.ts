@@ -88,7 +88,10 @@ export type TaskContractKind =
   | "execution"
   | "unknown";
 
-/** W3: tip-durable task-type contract identity for acceptance. */
+/**
+ * W3: tip-durable task-type contract (same fields as chat-entry ResolvedTurnTaskContract).
+ * Acceptance gates reuse resolveTurnTaskContract / resolveChatTurnCloseGates — do not fork.
+ */
 export type TaskContractIdentity = {
   id: string;
   version: string;
@@ -135,11 +138,13 @@ export type TaskOutcomeRecord = {
   parentTaskId?: string;
   parentChild?: ParentChildContract;
   /**
-   * W3: durable task-type contract identity for acceptance (never invent not_required).
+   * W3: durable contract identity on tip; set_acceptance(not_required) refused when
+   * kind≠chat_turn or validators present (gates still resolved via chat-entry).
    */
   taskContract?: TaskContractIdentity;
   /**
-   * W3: task-level total budget projection (tighten-only; exhaust → budget_exceeded).
+   * W3: tip projection of supervisor D-BUDGET (not a new ledger/prealloc/scheduler).
+   * Exhaust → fail_closed(budget_exceeded); eligibility attribution=budget.
    */
   budget?: TaskBudgetState;
   entrypoint: Entrypoint;

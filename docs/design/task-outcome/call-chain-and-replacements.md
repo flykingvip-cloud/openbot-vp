@@ -3,7 +3,7 @@
 > W0（基线与证据收敛）修订：对齐 main tip 合入身份（#85 / #89 / #94），去掉过时「runner success → not_required 关闭」表述。
 > W1（跨入口任务身份与唯一结果）**已合入** [#98](https://github.com/flykingvip-cloud/openbot-vp/pull/98) squash → main `b6c60550`：稳定身份 / 统一收尾 / 真实入口接线。
 > W2（消费者与技能/模式统一消费链）**已合入** [#99](https://github.com/flykingvip-cloud/openbot-vp/pull/99) squash → main `f3a19e08`：A–C tip+eligibility 消费 / attempt 回填 / cancelled 不计负样本；D 旁路仅 inventory。
-> **W3（任务类型验收与总预算）开工中**：A tip `taskContract` + `assessAcceptanceByTaskType`（禁止发明 `not_required`）；B tip `budget` 任务级总预算（tighten-only / spend / `budget_exceeded` fail_closed + eligibility attribution=budget）。**未 merge / 未部署 / 未开 W4**。
+> **W3（任务类型验收与总预算）收紧中**：A tip `taskContract` + 复用 `chat-entry` 门闩（禁止发明 `not_required`）；B tip `budget` 投影复用 supervisor D-BUDGET（非新账本）。**未 merge / 未部署 / 未开 W4**。
 
 ## 已核实合入（gh，勿口述）
 
@@ -29,7 +29,7 @@ entrypoint adapter 实例方法
   →（仅 closed + eligible）growth-bridge → appendEvolutionTaskOutcome
   →（W2）skill-quality / mode-quality handlers（tip+eligibility；cancelled 只进 cancelledCount）
   →（W2）attempt 正样本回填 confirmPatternOutcomeByRunId / skill task_outcome_confirmed
-  →（W3）taskContract 任务类型验收；budget 任务级总预算（exhaust → budget_exceeded）
+  →（W3）tip taskContract（门闩复用 chat-entry）；tip budget 投影（复用 supervisor D-BUDGET；exhaust → budget_exceeded）
 ```
 
 生产热路径（**已接线、有调用证据**）：
@@ -67,7 +67,9 @@ entrypoint adapter 实例方法
 
 **诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander 已恢复为模块路径 only（交付树无异 owner 热路径声明）。
 
-**登记**：W1 已合入 `b6c60550`；W2 已合入 `f3a19e08`；W3 实现中（任务类型验收 + 任务级总预算）。诚实缺口仍含 gateway/server-methods/agent、collab 其它 board RPC、cron 冷启动 hydrate、子 agent lane 跳过；W3 未把 supervisor `SupervisedTask.budget` 热路径接到 tip（模块投影可证，生产接线属后续）。**未 merge W3 / 未部署 / 未开 W4**。D 旁路 inventory 仍在，本轮不退役。
+**登记**：W1 已合入 `b6c60550`；W2 已合入 `f3a19e08`；W3 收紧（验收复用 chat-entry；预算投影复用 D-BUDGET；已删平行 task-type-acceptance）。诚实缺口仍含 gateway/server-methods/agent、collab 其它 board RPC、cron 冷启动 hydrate、子 agent lane 跳过；W3 未把 supervisor 热路径自动扣 tip（提供 `projectTipBudgetFromSupervisor`，生产接线属后续）。**未 merge W3 / 未部署 / 未开 W4**。D 旁路 inventory 仍在，本轮不退役。
+
+**既有超时/重试/回退/用量（W3 inventory，不另起）**：`CloseReasonCode.timeout` + eligibility；supervisor `retry.nextStop`（iterations/cost/duration）；agents `model-fallback`；gateway billing / enterprise-model budget-gate。任务总预算 tip 只做投影与关闭归因，不替代上述机制。
 
 ## 关闭语义（R85b 起；取代过时句）
 
@@ -112,4 +114,4 @@ entrypoint adapter 实例方法
 - R85：recover tip；handler-independent ack；contribution flags；commandLog；requiredScope；correction 绑 callerSubjectRef；**关闭门闩由契约/调用方解析，非 runner 成功即 not_required**。
 - P1（#94）：见上文 attempt / confirm-no-id。
 - W2：`quality-handlers`（skill/mode）+ `attempt-backfill`；cancelled 投影可证；evolution 旁路仅 inventory。
-- W3：`task-type-acceptance` + `budget`（tip `taskContract`/`budget`；`budget_exceeded`；禁止发明 `not_required`）。
+- W3：复用 `chat-entry` 验收门闩 + tip `taskContract` 拒发明；`budget.ts` 投影 supervisor D-BUDGET（`budget_exceeded` eligibility）。

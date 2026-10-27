@@ -1,5 +1,5 @@
 /**
- * W3: 任务类型验收 + 任务级总预算（可证测试）
+ * W3: 任务类型验收（复用 chat-entry）+ 任务级总预算 tip 投影（复用 supervisor D-BUDGET）
  */
 import fs from "node:fs";
 import os from "node:os";
@@ -10,17 +10,18 @@ import {
   applySpendAndAssess,
   assessTaskBudgetExhaustion,
   buildTaskBudgetState,
+  projectTipBudgetFromSupervisor,
   resolveEffectiveTaskBudget,
 } from "./budget.js";
+import {
+  CHAT_TURN_CONTRACT_V1,
+  resolveChatTurnCloseGates,
+  resolveTurnTaskContract,
+} from "./chat-entry.js";
 import { computeEvaluationEligibility } from "./eligibility.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
-import {
-  assessAcceptanceByTaskType,
-  buildTaskContractIdentity,
-  isInventedNotRequiredSuccess,
-} from "./task-type-acceptance.js";
 import type { TrustedScope } from "./types.js";
 
 const scope: TrustedScope = {
@@ -30,46 +31,61 @@ const scope: TrustedScope = {
   authzScopeRef: "s",
 };
 
-describe("W3 task-type acceptance", () => {
-  it("A1: chat_turn + empty validators → not_required with reason", () => {
-    const contract = buildTaskContractIdentity({ explicitChatTurn: true });
-    const gate = assessAcceptanceByTaskType({ contract });
-    expect(gate).toEqual({
-      status: "not_required",
-      reason: "chat_turn_contract_v1:no_external_acceptance",
+describe("W3 task-type acceptance (reuse chat-entry)", () => {
+  it("A1: chat_turn + empty validators → not_required via resolveChatTurnCloseGates", () => {
+    const contract = resolveTurnTaskContract({ explicitChatTurn: true });
+    expect(contract).toEqual({
+      id: CHAT_TURN_CONTRACT_V1,
+      version: "1",
+      kind: "chat_turn",
+      requiredValidators: [],
     });
-    expect(isInventedNotRequiredSuccess({ contract, acceptance: gate })).toBe(false);
+    const gates = resolveChatTurnCloseGates({
+      deliveryId: "d-a1",
+      contract,
+      deliveryPhase: "awaiting",
+    });
+    expect(gates.acceptance).toEqual({
+      status: "not_required",
+      reason: `${CHAT_TURN_CONTRACT_V1}:no_external_acceptance`,
+    });
   });
 
   it("A2: execution / code / unknown never invent not_required", () => {
     const cases = [
-      buildTaskContractIdentity({ kind: "execution" }),
-      buildTaskContractIdentity({ kind: "code" }),
-      buildTaskContractIdentity({ kind: "document" }),
-      buildTaskContractIdentity({ kind: "external_action" }),
-      buildTaskContractIdentity({}), // unknown
+      resolveTurnTaskContract({ kind: "execution" }),
+      resolveTurnTaskContract({ kind: "code" }),
+      resolveTurnTaskContract({ kind: "document" }),
+      resolveTurnTaskContract({ kind: "external_action" }),
+      resolveTurnTaskContract({}), // unknown
     ];
     for (const c of cases) {
-      const gate = assessAcceptanceByTaskType({ contract: c });
-      expect(gate.status).toBe("pending");
-      expect(
-        isInventedNotRequiredSuccess({
-          contract: c,
-          acceptance: { status: "not_required", reason: "shortcut" },
-        }),
-      ).toBe(true);
+      const gates = resolveChatTurnCloseGates({
+        deliveryId: "d-a2",
+        contract: c,
+        deliveryPhase: "awaiting",
+      });
+      expect(gates.acceptance.status).toBe("pending");
     }
   });
 
   it("A3: requiredValidators → pending unless acceptanceVerified", () => {
-    const contract = buildTaskContractIdentity({
+    const contract = resolveTurnTaskContract({
       kind: "execution",
       requiredValidators: ["artifact_sha"],
     });
-    expect(assessAcceptanceByTaskType({ contract }).status).toBe("pending");
-    expect(assessAcceptanceByTaskType({ contract, acceptanceVerified: true }).status).toBe(
-      "passed",
-    );
+    expect(
+      resolveChatTurnCloseGates({ deliveryId: "d-a3", contract, deliveryPhase: "awaiting" })
+        .acceptance.status,
+    ).toBe("pending");
+    expect(
+      resolveChatTurnCloseGates({
+        deliveryId: "d-a3b",
+        contract,
+        deliveryPhase: "awaiting",
+        acceptanceVerified: true,
+      }).acceptance.status,
+    ).toBe("passed");
   });
 
   it("A4: tip refuses invented not_required for non-chat_turn contract", () => {
@@ -87,11 +103,17 @@ describe("W3 task-type acceptance", () => {
       if (!opened.ok) {
         return;
       }
+      const resolved = resolveTurnTaskContract({ kind: "execution" });
       const setContract = service.submit(
         "t-acc",
         {
           type: "set_task_contract",
-          taskContract: buildTaskContractIdentity({ kind: "execution" }),
+          taskContract: {
+            id: resolved.id,
+            version: resolved.version,
+            kind: resolved.kind,
+            requiredValidators: resolved.requiredValidators,
+          },
           expectedVersion: opened.record.outcomeVersion,
           fencingToken: opened.fencingToken,
         },
@@ -124,8 +146,8 @@ describe("W3 task-type acceptance", () => {
   });
 });
 
-describe("W3 task-level total budget (pure)", () => {
-  it("B1: resolveEffectiveTaskBudget tighten-only", () => {
+describe("W3 task-level total budget (reuse supervisor D-BUDGET)", () => {
+  it("B1: resolveEffectiveTaskBudget delegates tighten-only", () => {
     const ceiling = { maxIterations: 10, maxCostUsd: 50, maxDurationMinutes: 120 };
     expect(resolveEffectiveTaskBudget(ceiling, { maxCostUsd: 5 })).toEqual({
       maxIterations: 10,
@@ -136,7 +158,7 @@ describe("W3 task-level total budget (pure)", () => {
     expect(resolveEffectiveTaskBudget(ceiling)).toEqual(ceiling);
   });
 
-  it("B2: accumulate + exhaust iterations / cost / duration", () => {
+  it("B2: accumulate + exhaust iterations / cost / duration (mirror nextStop arms)", () => {
     const base = buildTaskBudgetState({
       ceiling: { maxIterations: 2, maxCostUsd: 1, maxDurationMinutes: 1 },
     });
@@ -150,6 +172,18 @@ describe("W3 task-level total budget (pure)", () => {
 
     const started = accumulateTaskBudgetSpend(base, { iterations: 0, costUsd: 0.01 }, 0);
     expect(assessTaskBudgetExhaustion(started, 61_000)?.dimension).toBe("duration");
+  });
+
+  it("B2b: projectTipBudgetFromSupervisor preserves spend snapshot", () => {
+    const tip = projectTipBudgetFromSupervisor({
+      limits: { maxIterations: 5, maxCostUsd: 5, maxDurationMinutes: 30 },
+      spentCostUsd: 1.25,
+      startedAtMs: 100,
+      iterationCount: 2,
+    });
+    expect(tip.spentCostUsd).toBe(1.25);
+    expect(tip.iterationCount).toBe(2);
+    expect(tip.maxIterations).toBe(5);
   });
 });
 
@@ -249,7 +283,7 @@ describe("W3 task-level total budget (tip + eligibility)", () => {
   it("B4: create can embed budget + taskContract on tip", () => {
     const store = new DurableTaskOutcomeStore(agentDir);
     const service = new TaskOutcomeResultService({ store, submittedBy: "w3" });
-    const contract = buildTaskContractIdentity({ kind: "code", requiredValidators: ["lint"] });
+    const resolved = resolveTurnTaskContract({ kind: "code", requiredValidators: ["lint"] });
     const budget = buildTaskBudgetState({ taskLimits: { maxIterations: 2 } });
     const res = service.submit(
       "t-create",
@@ -257,8 +291,13 @@ describe("W3 task-level total budget (tip + eligibility)", () => {
         type: "create",
         entrypoint: "chat",
         scope,
-        taskContractVersion: contract.version,
-        taskContract: contract,
+        taskContractVersion: resolved.version,
+        taskContract: {
+          id: resolved.id,
+          version: resolved.version,
+          kind: resolved.kind,
+          requiredValidators: resolved.requiredValidators,
+        },
         budget,
       },
       { requiredScope: scope },
@@ -269,8 +308,12 @@ describe("W3 task-level total budget (tip + eligibility)", () => {
     }
     expect(res.record.taskContract?.kind).toBe("code");
     expect(res.record.budget?.maxIterations).toBe(2);
-    expect(assessAcceptanceByTaskType({ contract: res.record.taskContract }).status).toBe(
-      "pending",
-    );
+    expect(
+      resolveChatTurnCloseGates({
+        deliveryId: "d-b4",
+        contract: res.record.taskContract!,
+        deliveryPhase: "awaiting",
+      }).acceptance.status,
+    ).toBe("pending");
   });
 });

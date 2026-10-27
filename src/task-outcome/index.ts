@@ -84,15 +84,11 @@ export {
   assessTaskBudgetExhaustion,
   buildTaskBudgetState,
   ensureTaskBudgetStarted,
+  projectTipBudgetFromSupervisor,
   resolveEffectiveTaskBudget,
   type TaskBudgetExhaustion,
   type TaskBudgetLimits,
   type TaskBudgetState,
 } from "./budget.js";
-export {
-  CHAT_TURN_CONTRACT_ID,
-  assessAcceptanceByTaskType,
-  buildTaskContractIdentity,
-  isInventedNotRequiredSuccess,
-  type AssessAcceptanceByTaskTypeInput,
-} from "./task-type-acceptance.js";
+// W3 acceptance: reuse chat-entry (CHAT_TURN_CONTRACT_V1 / resolveTurnTaskContract /
+// resolveChatTurnCloseGates) — do not re-export a parallel task-type-acceptance module.
