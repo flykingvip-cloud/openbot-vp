@@ -9847,9 +9847,9 @@ tasks:
     ownerHistory: []
     since: 2026-10-26
     metadata:
-      reviewAfter: "2026-11-30"
-      note: config-gated IMAGE_EXECUTOR_WIRED / AUDIO_MUSIC_WIRED; no merge/deploy in this PR
-
+      reviewAfter: 2026-11-30
+      note: config-gated IMAGE_EXECUTOR_WIRED / AUDIO_MUSIC_WIRED; no merge/deploy in
+        this PR
   - id: askOutcome-p0-r83-remediation
     owner: executor-acceptance
     intent:
@@ -9927,9 +9927,11 @@ tasks:
     ownerHistory: []
     since: 2026-10-27
     metadata:
-      purpose: "#91 retrospective ownership claim (capability admission / verification stub / routing preview)"
+      purpose: "#91 retrospective ownership claim (capability admission / verification
+        stub / routing preview)"
       pr: "91"
-      note: code already on main; registry-only claim; CHANGELOG.md left to existing owners; #100 should drop overlapping UI paths on rebase
+      note: code already on main; registry-only claim; CHANGELOG.md left to existing
+        owners;
   - id: platform-models-real-verification-rpc
     owner: grok-bot
     intent: []
@@ -9960,11 +9962,56 @@ tasks:
     ownerHistory: []
     since: 2026-10-27
     metadata:
-      purpose: "#91 leftover real gateway models.admission verification/decision RPC (landed via #107)"
+      purpose: "#91 leftover real gateway models.admission verification/decision RPC
+        (landed via #107)"
       pr: "107"
       convergeNote: after-merge trim hot-path declarations once landed
-      reviewAfter: "2026-11-30"
+      reviewAfter: 2026-11-30
+  - id: team-real-collab-loop:f1f3
+    owner: 协作对话验收测试
+    intent:
+      - F1 task activation+NL confirm; F2 team deliverable receipt; F3
+        readiness+ENAMETOOLONG; avoid formal-root twin
+    paths:
+      - src/gateway/collaboration-learning/activate-collaboration-task.ts
+      - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
+      - src/gateway/collaboration-learning/chat-plan-confirm.ts
+      - src/gateway/collaboration-learning/chat-plan-confirm.test.ts
+      - src/gateway/collaboration-learning/member-dispatch-readiness.ts
+      - src/gateway/collaboration-learning/member-dispatch-readiness.test.ts
+      - src/gateway/collaboration-learning/team-deliverable-submit.ts
+      - src/gateway/collaboration-learning/team-deliverable-submit.test.ts
+      - src/gateway/server-methods/collaboration-task-activation.ts
+      - src/gateway/server-methods/collaboration-task-activation.pack.ts
+      - src/gateway/server-methods/collaboration-task-activation.pack.test.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/command-log-path.test.ts
+      - docs/notes/team-real-collab-activation-confirm-deliverable-2026-10-27.md
+      - .loom/registry.yaml
+      - src/gateway/server-methods/packs/registry.ts
+      - src/gateway/server-methods/packs/manifest.ts
+    state: active
+    sessions:
+      - id: team-real-f1f3-20261027191957
+        taskId: team-real-collab-loop:f1f3
+        ide: cursor
+        agent: 协作对话验收测试
+        status: active
+        lastSignalAt: 2026-10-27T11:41:07.197Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-27
+    metadata: {}
 landingStreams:
+  - id: team-real-collab-loop-f1f3
+    landingPolicy: parallel
+    paths:
+      - docs/notes/team-real-collab-activation-confirm-deliverable-2026-10-27.md
+    canLandWith: []
+    metadata:
+      task: team-real-collab-loop:f1f3
+      owner: 协作对话验收测试
+      purpose: TEAM-REAL F1-F3 activation/confirm/deliverable/readiness notes
   - id: p1-task-driven-aor-scoring
     landingPolicy: serial
     paths:
@@ -10014,9 +10061,9 @@ landingStreams:
     metadata:
       task: mj-suno-executor-wiring
       owner: grok-bot
-      reviewAfter: "2026-11-30"
-      purpose: Midjourney/Stepfun image_gen and Suno music_gen executor wiring (config-gated)
-
+      reviewAfter: 2026-11-30
+      purpose: Midjourney/Stepfun image_gen and Suno music_gen executor wiring
+        (config-gated)
   - id: platform-models-real-verification-rpc
     landingPolicy: parallel
     paths:
@@ -10025,11 +10072,10 @@ landingStreams:
     metadata:
       task: platform-models-real-verification-rpc
       owner: grok-bot
-      reviewAfter: "2026-11-30"
+      reviewAfter: 2026-11-30
       convergeNote: post-#107 landed; hot paths trimmed; sharedPaths landers remain
         authoritative
       purpose: "#91 leftover real gateway models.admission verification/decision RPC"
-
   - id: askOutcome-p0-r83-remediation
     landingPolicy: serial
     paths:
