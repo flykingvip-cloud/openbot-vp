@@ -2,6 +2,7 @@ import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
+import { applySpendAndAssess, assessTaskBudgetExhaustion, buildTaskBudgetState } from "./budget.js";
 import {
   assessTargetModalityAcceptance,
   capabilityModalityFromClaim,
@@ -92,6 +93,13 @@ export type RunnerTurnOutcomeInput = {
   modalityArtifacts?: readonly ModalityExecutionArtifact[];
   /** Explicit completion evidence; overrides artifact/run defaults when set. */
   modalityCompletionEvidence?: ModalityCompletionEvidence;
+  /**
+   * W3 wrap-up: optional USD spend for this attempt (reuses tip budget projection).
+   * When omitted, only iterationCount += 1 is charged on the chat runner path.
+   */
+  costUsd?: number;
+  /** Optional tighten-only tip budget limits (applied on first ensure). */
+  budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -142,11 +150,11 @@ function canMarkCompletedFromTrustedRun(
   return true;
 }
 
-function drainGrowthEvolution(
+async function drainGrowthEvolution(
   cfg: OpenBotConfig,
   agentId: string,
   store: DurableTaskOutcomeStore,
-): { written: boolean; reason: string; processed: number; deferred: number } {
+): Promise<{ written: boolean; reason: string; processed: number; deferred: number }> {
   let written = false;
   let reason = "no_closed_events";
   const runtime = new OutcomeConsumerRuntime(store, {
@@ -167,11 +175,11 @@ function drainGrowthEvolution(
       // W2: skill/mode consume tip+eligibility (not run terminal alone); skill also backfills attempt.
       createSkillQualityHandler(store, { agentId }),
       createModeQualityHandler(store, { agentId }),
-      // W4: injected exposure → outcome_verified only on closed+eligible success; then curation.
-      createExperienceVerifiedHandler(store, { agentId }),
+      // W4 wrap-up: tip exposure + adopted only → outcome_verified; no agentId pending guess.
+      createExperienceVerifiedHandler(store),
     ],
   });
-  const drained = runtime.drain((taskId) => store.loadTask(taskId));
+  const drained = await runtime.drain((taskId) => store.loadTask(taskId));
   return {
     written,
     reason,
@@ -184,12 +192,12 @@ function drainGrowthEvolution(
  * Drain pending TaskOutcome outbox → growth evolution for one agent.
  * Safe to call from boot or a runtime timer without a user turn.
  */
-export function drainPendingGrowthEvolution(
+export async function drainPendingGrowthEvolution(
   cfg: OpenBotConfig,
   agentId: string,
-): { written: boolean; reason: string; processed: number; deferred: number } {
+): Promise<{ written: boolean; reason: string; processed: number; deferred: number }> {
   const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
-  return drainGrowthEvolution(cfg, agentId, store);
+  return await drainGrowthEvolution(cfg, agentId, store);
 }
 
 /**
@@ -236,13 +244,64 @@ export async function recordRunnerTurnOutcome(
   }
 
   const fencingToken = opened.fencingToken || newFencingToken();
+
+  // W3 wrap-up: one production path — ensure tip budget, charge this attempt, stop on exhaust.
+  // Reuses budget.ts projection of supervisor D-BUDGET (not a new ledger).
+  let tipRecord = opened.record;
+  if (!tipRecord.budget) {
+    const ensured = service.submit(
+      taskId,
+      {
+        type: "set_budget",
+        budget: buildTaskBudgetState({ taskLimits: input.budgetLimits }),
+        expectedVersion: tipRecord.outcomeVersion,
+        fencingToken,
+      },
+      { requiredScope: scope, commandId: `budget-ensure:${taskId}` },
+    );
+    if (!ensured.ok) {
+      throw new Error(`task-outcome set_budget failed: ${ensured.code}`);
+    }
+    tipRecord = ensured.record;
+  } else if (input.budgetLimits) {
+    // Tighten-only replace when caller passes limits and tip already has budget.
+    const tightened = buildTaskBudgetState({
+      ceiling: {
+        maxIterations: tipRecord.budget.maxIterations,
+        maxCostUsd: tipRecord.budget.maxCostUsd,
+        maxDurationMinutes: tipRecord.budget.maxDurationMinutes,
+      },
+      taskLimits: input.budgetLimits,
+    });
+    const replaced = service.submit(
+      taskId,
+      {
+        type: "set_budget",
+        budget: {
+          ...tightened,
+          spentCostUsd: tipRecord.budget.spentCostUsd,
+          iterationCount: tipRecord.budget.iterationCount,
+          ...(tipRecord.budget.startedAtMs != null
+            ? { startedAtMs: tipRecord.budget.startedAtMs }
+            : {}),
+        },
+        expectedVersion: tipRecord.outcomeVersion,
+        fencingToken,
+      },
+      { requiredScope: scope, commandId: `budget-tighten:${taskId}` },
+    );
+    if (replaced.ok) {
+      tipRecord = replaced.record;
+    }
+  }
+
   const attemptId = `att:${input.runId}`;
   const runStatus = input.success ? ("succeeded" as const) : ("failed" as const);
   const attemptStatus = input.success ? ("succeeded" as const) : ("failed" as const);
 
   let res = chat.recordAttempt(
     taskId,
-    opened.record.outcomeVersion,
+    tipRecord.outcomeVersion,
     fencingToken,
     {
       attemptId,
@@ -272,6 +331,50 @@ export async function recordRunnerTurnOutcome(
   );
   if (!res.ok) {
     throw new Error(`task-outcome record_attempt failed: ${res.code}`);
+  }
+
+  // Charge this attempt against tip budget (same taskId across retries).
+  if (res.record.budget && res.record.lifecycle !== "closed") {
+    const costUsd =
+      typeof input.costUsd === "number" && Number.isFinite(input.costUsd) && input.costUsd > 0
+        ? input.costUsd
+        : undefined;
+    const spent = service.submit(
+      taskId,
+      {
+        type: "accumulate_budget_spend",
+        iterations: 1,
+        ...(costUsd != null ? { costUsd } : {}),
+        expectedVersion: res.record.outcomeVersion,
+        fencingToken,
+        nowMs: Date.now(),
+      },
+      { requiredScope: scope, commandId: `budget-spend:${taskId}:${input.runId}` },
+    );
+    if (!spent.ok) {
+      throw new Error(`task-outcome accumulate_budget_spend failed: ${spent.code}`);
+    }
+    res = spent;
+    const exhaustion =
+      res.record.budget != null
+        ? assessTaskBudgetExhaustion(res.record.budget)
+        : applySpendAndAssess(buildTaskBudgetState({}), {
+            iterations: 1,
+            ...(costUsd != null ? { costUsd } : {}),
+          }).exhaustion;
+    if (exhaustion && res.record.lifecycle !== "closed") {
+      const closed = chat.failClosed(taskId, res.record.outcomeVersion, "budget_exceeded", {
+        fencingToken,
+        reasonDetail: exhaustion.detail,
+        scope,
+        commandId: `budget-exceeded:${taskId}:${input.runId}`,
+      });
+      if (!closed.ok) {
+        throw new Error(`task-outcome fail_closed budget_exceeded failed: ${closed.code}`);
+      }
+      const evolution = await drainGrowthEvolution(cfg, agentId, store);
+      return { record: closed.record, evolution };
+    }
   }
 
   if (!input.success) {
@@ -401,7 +504,7 @@ export async function recordRunnerTurnOutcome(
     }
   }
 
-  const evolution = drainGrowthEvolution(cfg, agentId, store);
+  const evolution = await drainGrowthEvolution(cfg, agentId, store);
   return { record, evolution };
 }
 
@@ -499,6 +602,6 @@ export async function confirmRunnerTurnDelivery(
     throw new Error(`confirmRunnerTurnDelivery set_delivery failed: ${res.code}`);
   }
 
-  const evolution = drainGrowthEvolution(cfg, agentId, store);
+  const evolution = await drainGrowthEvolution(cfg, agentId, store);
   return { record: res.record, evolution };
 }
