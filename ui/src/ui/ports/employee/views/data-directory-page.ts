@@ -233,7 +233,7 @@ export function renderDataDirectoryPanel(
           <button
             type="button"
             class="btn"
-            title="仅删除所选文件，不会清除其他来源中的相同内容，也不保证立即停止相关召回"
+            title="仅删除工作区已索引记忆语料中的所选文件（MEMORY.md / memory/**），不会清除会话或其他来源中的相同内容，也不保证立即停止相关召回"
             ?disabled=${state.forgetMemoryBusy}
             @click=${() => void settings.onForgetMemoryEntry?.()}
           >

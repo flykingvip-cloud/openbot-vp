@@ -2781,6 +2781,14 @@ tasks:
       - src/gateway/server-methods/memory-center-access.ts
       - src/gateway/server-methods/memory-center-access.test.ts
       - src/gateway/server-methods/memory-list-o4-status-view.test.ts
+      - src/gateway/server-methods/memory-list.ts
+      - src/gateway/server-methods/memory-list.test.ts
+      - src/gateway/server-methods/memory-forget-gateway-isolation.test.ts
+      - src/memory/memory-batch1-o8-baseline.test.ts
+      - src/memory/memory-batch1-o8-baseline-v2.test.ts
+      - src/memory/memory-batch1-o8-baseline-v3.test.ts
+      - ui/src/ui/ports/employee/views/data-directory-page.ts
+      - ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
       - src/gateway/server-methods/data.ts
       - src/gateway/server-methods/agents.ts
       - ui/src/ui/ports/employee/views/memory-center-page.ts
@@ -19614,6 +19622,14 @@ landingStreams:
       - src/gateway/server-methods/memory-center-access.ts
       - src/gateway/server-methods/memory-center-access.test.ts
       - src/gateway/server-methods/memory-list-o4-status-view.test.ts
+      - src/gateway/server-methods/memory-list.ts
+      - src/gateway/server-methods/memory-list.test.ts
+      - src/gateway/server-methods/memory-forget-gateway-isolation.test.ts
+      - src/memory/memory-batch1-o8-baseline.test.ts
+      - src/memory/memory-batch1-o8-baseline-v2.test.ts
+      - src/memory/memory-batch1-o8-baseline-v3.test.ts
+      - ui/src/ui/ports/employee/views/data-directory-page.ts
+      - ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
       - src/gateway/server-methods/data.ts
       - src/gateway/server-methods/agents.ts
       - src/gateway/server-methods.ts

@@ -412,11 +412,10 @@ describe("O8 v3 layered memory baseline", () => {
     // --- Layer: helper-integration / data-layer — S4 forget via forgetMemoryEntry (NOT gateway handler chain) ---
     {
       const phrase = "O8V3ForgetSourceToken";
-      const memoryDir = path.join(layout.dataRoot, "agents", "main", "memory", "agent");
-      fs.mkdirSync(memoryDir, { recursive: true });
-      const memoryKey = "o8-v3-forget.md";
-      fs.writeFileSync(path.join(memoryDir, memoryKey), `${phrase}\n`, "utf8");
-      // Distinct control source
+      // DS path1: target file under workspace/memory; control stays in MEMORY.md
+      const memoryKey = "memory/o8-v3-forget.md";
+      fs.mkdirSync(path.join(layout.workspace, "memory"), { recursive: true });
+      fs.writeFileSync(path.join(layout.workspace, memoryKey), `${phrase}\n`, "utf8");
       fs.writeFileSync(path.join(layout.workspace, "MEMORY.md"), `control-${phrase}\n`, "utf8");
       const cfg = createCfg(layout);
       const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });

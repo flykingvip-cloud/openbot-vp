@@ -426,7 +426,7 @@ export function renderMemoryCenterPanel(
                 <button
                   type="button"
                   class="btn btn--danger"
-                  title="仅删除所选文件，不会清除其他来源中的相同内容，也不保证立即停止相关召回"
+                  title="仅删除工作区已索引记忆语料中的所选文件（MEMORY.md / memory/**），不会清除会话或其他来源中的相同内容，也不保证立即停止相关召回"
                   ?disabled=${state.busy || !state.selectedKey}
                   @click=${() => void settings.onMemoryCenterForget?.()}
                 >

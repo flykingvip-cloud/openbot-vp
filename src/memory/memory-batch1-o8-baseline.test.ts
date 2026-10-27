@@ -462,14 +462,11 @@ describe("O8 memory batch1 isolation baseline", () => {
       const restore = applyIsolationEnv(forgetLayout);
       cleanups.push(restore);
       writeIsolationConfig(forgetLayout);
-      const memoryDir = path.join(forgetLayout.dataRoot, "agents", "main", "memory", "agent");
-      fs.mkdirSync(memoryDir, { recursive: true });
-      const memoryKey = `upsilon-forget-${repeat}.md`;
-      const memoryFile = path.join(memoryDir, memoryKey);
+      // DS path1: forget targets workspace-indexed corpus (MEMORY.md), not DS memory/agent
+      const memoryKey = "MEMORY.md";
+      const memoryFile = path.join(forgetLayout.workspace, memoryKey);
       const phrase = `UpsilonForgetUniqueToken-${repeat}`;
       fs.writeFileSync(memoryFile, `${phrase}\n`, "utf8");
-      // Also index via manager workspace MEMORY.md for recall residual check
-      fs.writeFileSync(path.join(forgetLayout.workspace, "MEMORY.md"), `${phrase}\n`, "utf8");
       const cfg = createCfg(forgetLayout);
       const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
       if (!resolved.cogniweave) {
@@ -511,7 +508,7 @@ describe("O8 memory batch1 isolation baseline", () => {
           beforeHits: before.map((h) => h.path),
           afterImmediateHits: afterImmediate.map((h) => h.path),
           afterSearchSyncHits: afterSearchSync.map((h) => h.path),
-          note: "data.memory.forget path only deletes Data Space file; manager lifecycle not chained",
+          note: "DS path1: forgetMemoryEntry deletes workspace-indexed MEMORY.md; lifecycle still not chained",
         },
         requestSend: "untimed",
         correctAdoption: "untimed",
