@@ -9,8 +9,8 @@
  *  - retrieved：从存储读出
  *  - injected：真正进入系统提示词（曝光；≠ 有效复用）
  *  - adopted：有明确采用信号（注入 alone 不算）
- *  - outcome_verified：关联 TaskOutcome closed+eligible 成功后才计
- * 策展阈值只认 outcome_verified，不认提示词曝光。
+ *  - outcome_verified：closed+eligible **且**有采用证据的资产才计（共现≠有效）
+ * 策展阈值只认 outcome_verified，不认提示词曝光，也不认「成功任务中的曝光」。
  */
 
 import type { AgentLearningAsset } from "@openbot/collaboration-core";
@@ -343,6 +343,90 @@ export async function recordLearningReuse(params: {
     assetIds: params.assetIds,
     stage: "injected",
     atMs: params.atMs,
+  });
+}
+
+/**
+ * Adjust a stage counter by delta (e.g. -1 to revoke a prior outcome_verified
+ * after task.corrected). Propagates failures — for business paths only.
+ */
+export async function adjustLearningExperienceStage(params: {
+  scopeId: string;
+  assetIds: string[];
+  stage: LearningExperienceStage;
+  delta: number;
+  atMs?: number;
+}): Promise<void> {
+  const delta = Math.trunc(params.delta);
+  if (delta === 0) {
+    return;
+  }
+  const targets = new Set(params.assetIds.map((id) => id.trim()).filter(Boolean));
+  if (targets.size === 0) {
+    return;
+  }
+  await withLearningAssetLock(params.scopeId, async () => {
+    const { learningStorage } = createWorkspaceCollaborationStores();
+    const assets = await learningStorage.readLearningAssets(params.scopeId);
+    if (assets.length === 0) {
+      return;
+    }
+    const now = params.atMs ?? Date.now();
+    let changed = false;
+    const next = assets.map((asset) => {
+      if (!targets.has(asset.assetId)) {
+        return asset;
+      }
+      changed = true;
+      if (delta > 0) {
+        let bumped = asset;
+        for (let i = 0; i < delta; i += 1) {
+          bumped = bumpStageFields(bumped, params.stage, now);
+        }
+        return bumped;
+      }
+      // decrement
+      const steps = -delta;
+      if (params.stage === "outcome_verified") {
+        const cur = resolveOutcomeVerifiedCount(asset);
+        return {
+          ...asset,
+          outcomeVerifiedCount: Math.max(0, cur - steps),
+          updatedAt: now,
+        };
+      }
+      if (params.stage === "adopted") {
+        const cur = resolveAdoptedCount(asset);
+        return {
+          ...asset,
+          adoptedCount: Math.max(0, cur - steps),
+          updatedAt: now,
+        };
+      }
+      if (params.stage === "injected") {
+        const cur = resolveInjectedCount(asset);
+        const injectedCount = Math.max(0, cur - steps);
+        return {
+          ...asset,
+          injectedCount,
+          reuseCount: injectedCount,
+          updatedAt: now,
+        };
+      }
+      if (params.stage === "retrieved") {
+        const cur = resolveRetrievedCount(asset);
+        return {
+          ...asset,
+          retrievedCount: Math.max(0, cur - steps),
+          updatedAt: now,
+        };
+      }
+      return asset;
+    });
+    if (!changed) {
+      return;
+    }
+    await learningStorage.writeLearningAssets(params.scopeId, next);
   });
 }
 

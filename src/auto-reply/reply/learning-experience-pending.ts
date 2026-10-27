@@ -1,9 +1,10 @@
 /**
- * W4: in-process pending ledger linking prompt injection → later tip verification.
+ * W4 wrap-up: in-process pending ledger linking prompt injection → tip attach.
  *
- * Reuses nothing durable: a crash before tip close loses the link (honest gap).
- * Keyed by agentId (exposureKey). Concurrent turns for the same agent can clobber;
- * tip-durable experienceExposure (set when available) is preferred when present.
+ * Keyed by **runId / taskId** only (`run:<runId>` / `task:<taskId>`).
+ * Never keyed by agentId — concurrent turns for the same agent must not clobber.
+ * Prefer tip-durable `experienceExposure` once attached; without a reliable key, skip
+ * remember entirely (verification will no-op without tip exposure).
  */
 
 export type PendingLearningInjectionScope = {
@@ -20,13 +21,32 @@ export type PendingLearningInjection = {
 
 const pendingByKey = new Map<string, PendingLearningInjection>();
 
+/** Stable pending key from runId. Empty runId → undefined (do not remember). */
+export function learningExperienceRunKey(runId: string | null | undefined): string | undefined {
+  const id = runId?.trim();
+  return id ? `run:${id}` : undefined;
+}
+
+/** Stable pending key from taskId. Empty taskId → undefined. */
+export function learningExperienceTaskKey(taskId: string | null | undefined): string | undefined {
+  const id = taskId?.trim();
+  return id ? `task:${id}` : undefined;
+}
+
+/** True when key looks like a task-bound key (run:/task:), not a bare agentId. */
+export function isTaskBoundLearningExposureKey(key: string): boolean {
+  const k = key.trim();
+  return k.startsWith("run:") || k.startsWith("task:");
+}
+
 export function rememberPendingLearningInjection(params: {
   key: string;
   scopes: PendingLearningInjectionScope[];
   atMs?: number;
 }): void {
   const key = params.key.trim();
-  if (!key || params.scopes.length === 0) {
+  // Refuse agentId / bare keys — concurrent tasks would clobber.
+  if (!key || !isTaskBoundLearningExposureKey(key) || params.scopes.length === 0) {
     return;
   }
   const scopes = params.scopes
