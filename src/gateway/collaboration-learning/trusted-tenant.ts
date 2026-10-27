@@ -99,9 +99,10 @@ export function labelCollaborationIoTenant(
 
 /**
  * Label a verified background/service-execution tenant for managed ACL.
- * Call only from gateway composition roots that already re-checked durable
- * tenant+group ownership and the executing bot — never from client-supplied
- * tenant params alone, and never as a rename of actor_fallback → membership.
+ * Call only from gateway composition roots that already re-checked **active**
+ * durable tenant+group ownership (ownership SoT, not space list snapshot) and
+ * the executing bot — never from client-supplied tenant params alone, never
+ * from spaceTenant fallback, and never as a rename of actor_fallback → membership.
  */
 export function labelServiceExecutionTenant(
   tenantId: string | null | undefined,

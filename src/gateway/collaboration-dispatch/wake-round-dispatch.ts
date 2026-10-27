@@ -126,6 +126,16 @@ export type WakeRoundDispatchRequest = Readonly<{
   /** Explicit U3 idempotency key; when omitted, derived from request fields. */
   opKey?: string;
   /**
+   * Durable wake-op key after claim (composition roots inject before Mode B).
+   * Prefer this over inventing a new identity for deliverable binding.
+   */
+  wakeOpKey?: string | null;
+  /**
+   * Durable WakeOpRecord.executionAttemptId after claim. Binding.attemptId must
+   * equal this — never a freshly minted UUID that merely looks unique.
+   */
+  wakeExecutionAttemptId?: string | null;
+  /**
    * Plan-confirm advance binding. When set, final dispatch re-validates the
    * execution bag and prefers dispatchPrompt for the member run message.
    */
@@ -1579,7 +1589,17 @@ export async function consumeWakeForRoundDispatch(
       try {
         // Readiness already enforced before final CAS take (product wiring R1).
         externalDispatchInvoked = true;
-        const result = await dispatcher(request);
+        // Inject durable op/attempt identities so Mode B / deliverable binding
+        // bind to the claimed wake-op attempt — not a freshly minted UUID.
+        const durableAttempt =
+          compact(wakeOp?.executionAttemptId) || compact(claimed.record?.executionAttemptId) || "";
+        const dispatchRequest: WakeRoundDispatchRequest = {
+          ...request,
+          wakeOpKey: claimed.opKey,
+          wakeExecutionAttemptId: durableAttempt || request.wakeExecutionAttemptId || null,
+          opKey: request.opKey ?? claimed.opKey,
+        };
+        const result = await dispatcher(dispatchRequest);
         if (result.ok && compact(result.roundId)) {
           // M3 order-3 seam: external sent, receipt not yet written.
           if (params._testAfterExternalBeforeReceiptBarrier) {

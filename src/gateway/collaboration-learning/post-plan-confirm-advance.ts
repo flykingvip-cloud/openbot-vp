@@ -14,7 +14,6 @@
  * context pointer / confirmed step into the member run prompt, and passes an
  * unconfusable executionDeliverableBinding on the wake request (no process Map).
  */
-import { randomUUID } from "node:crypto";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { formatExecutionTaskBagForPrompt } from "../collaboration-dispatch/executor-private-todolist.js";
@@ -31,7 +30,10 @@ import {
   buildCollaborationExecutionTaskBag,
   listCollaborationBoardItems,
 } from "./claim-contract-entry.js";
-import { buildExecutionDeliverableBinding } from "./execution-deliverable-binding.js";
+import {
+  buildExecutionDeliverableBinding,
+  runIdFromWakeOpAttempt,
+} from "./execution-deliverable-binding.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
@@ -358,9 +360,18 @@ export async function triggerPostPlanConfirmAdvance(params: {
       };
     }
 
-    const runId = `wake_deliverable_${randomUUID()}`;
-    // attemptId is a distinct execution-attempt identity — never reuse opKey.
-    const attemptId = `wake_attempt_${randomUUID()}`;
+    // Bind to the durable wake-op attempt claimed by consumeWake — never mint a
+    // standalone UUID that pretends to be the execution identity.
+    const wakeOpKey = compact(req.wakeOpKey) || compact(req.opKey) || compact(advanceOpKey);
+    const attemptId = compact(req.wakeExecutionAttemptId);
+    if (!wakeOpKey || !attemptId) {
+      return { ok: false, reason: "wake_execution_attempt_required" };
+    }
+    const runId = runIdFromWakeOpAttempt({ opKey: wakeOpKey, attemptId });
+    const stepForBind = compact(step.stepId) || bagStepId;
+    if (!stepForBind) {
+      return { ok: false, reason: "execution_deliverable_step_required" };
+    }
     const executionDeliverableBinding = buildExecutionDeliverableBinding({
       tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? req.tenantId ?? null,
       groupId,
@@ -368,9 +379,11 @@ export async function triggerPostPlanConfirmAdvance(params: {
       boardItemId,
       todolistId,
       planVersion: confirmedVersion,
-      stepId: compact(step.stepId) || bagStepId,
+      stepId: stepForBind,
       runId,
       attemptId,
+      opKey: wakeOpKey,
+      agentId: claimant,
       source: "wake_dispatch",
     });
     if (!executionDeliverableBinding) {

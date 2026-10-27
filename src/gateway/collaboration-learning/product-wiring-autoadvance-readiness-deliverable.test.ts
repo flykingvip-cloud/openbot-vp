@@ -36,6 +36,7 @@ import {
 import * as claimEntry from "./claim-contract-entry.js";
 import {
   buildExecutionDeliverableBinding,
+  runIdFromWakeOpAttempt,
   type ExecutionDeliverableBinding,
 } from "./execution-deliverable-binding.js";
 import { triggerPostPlanConfirmAdvance } from "./post-plan-confirm-advance.js";
@@ -1058,6 +1059,18 @@ describe("R2 plan-confirm → real consumeWake → final dispatch revalidate", (
     expect(captured[0]?.binding?.planVersion).toBe(3);
     expect(captured[0]?.binding?.runId).toBeTruthy();
     expect(captured[0]?.binding?.groupId).toBe(groupId);
+    // R5: attempt/op/run come from durable wake-op claim — not wake_attempt_<uuid>.
+    expect(captured[0]?.binding?.attemptId).toBeTruthy();
+    expect(String(captured[0]?.binding?.attemptId)).not.toMatch(/^wake_attempt_/);
+    expect(captured[0]?.binding?.opKey).toBeTruthy();
+    expect(captured[0]?.binding?.stepId).toBe("step-a");
+    expect(captured[0]?.binding?.agentId).toBe(claimant);
+    expect(captured[0]?.binding?.runId).toBe(
+      runIdFromWakeOpAttempt({
+        opKey: String(captured[0]?.binding?.opKey),
+        attemptId: String(captured[0]?.binding?.attemptId),
+      }),
+    );
 
     // Revision AFTER pre-check bag, BEFORE final dispatch — use a fresh task/board
     // so wake opKey is not idempotent_reuse of the prior completed advance.
@@ -1505,5 +1518,132 @@ describe("R4 note — managed boot composition root lives in wake-round-dispatch
     // Real evidence: wake-round-dispatcher-boot.test.ts
     // (resolveModeBWakeRoundContext + production runBot + ACL on + service_execution).
     expect(true).toBe(true);
+  });
+});
+
+describe("R5 durable attempt + request/binding scope", () => {
+  it("normalize wake_dispatch without opKey/stepId refuses", async () => {
+    const { normalizeExecutionDeliverableBinding } =
+      await import("./execution-deliverable-binding.js");
+    expect(
+      normalizeExecutionDeliverableBinding({
+        groupId: "g",
+        taskId: "t",
+        boardItemId: "b",
+        todolistId: "td",
+        planVersion: 1,
+        runId: "run",
+        attemptId: "a1",
+        source: "wake_dispatch",
+      }),
+    ).toBeNull();
+    expect(
+      normalizeExecutionDeliverableBinding({
+        groupId: "g",
+        taskId: "t",
+        boardItemId: "b",
+        todolistId: "td",
+        planVersion: 1,
+        stepId: "s1",
+        runId: "run",
+        attemptId: "a1",
+        opKey: "op1",
+        source: "wake_dispatch",
+      }),
+    ).toMatchObject({ opKey: "op1", stepId: "s1", attemptId: "a1" });
+  });
+
+  it("same-op retry binding uses new attempt; old runId differs", () => {
+    const opKey = "plan_confirm_advance|g|t|b|td|v1|s|bot";
+    const attempt1 = "attempt-uuid-1";
+    const attempt2 = "attempt-uuid-2";
+    const run1 = runIdFromWakeOpAttempt({ opKey, attemptId: attempt1 });
+    const run2 = runIdFromWakeOpAttempt({ opKey, attemptId: attempt2 });
+    expect(run1).not.toBe(run2);
+    expect(run1).toContain(attempt1);
+    expect(run2).toContain(attempt2);
+    const bindOld = buildExecutionDeliverableBinding({
+      groupId: "g",
+      taskId: "t",
+      boardItemId: "b",
+      todolistId: "td",
+      planVersion: 1,
+      stepId: "s",
+      runId: run1,
+      attemptId: attempt1,
+      opKey,
+      agentId: "bot",
+      source: "wake_dispatch",
+    });
+    const bindNew = buildExecutionDeliverableBinding({
+      groupId: "g",
+      taskId: "t",
+      boardItemId: "b",
+      todolistId: "td",
+      planVersion: 1,
+      stepId: "s",
+      runId: run2,
+      attemptId: attempt2,
+      opKey,
+      agentId: "bot",
+      source: "wake_dispatch",
+    });
+    expect(bindOld?.attemptId).toBe(attempt1);
+    expect(bindNew?.attemptId).toBe(attempt2);
+    expect(bindOld?.runId).not.toBe(bindNew?.runId);
+  });
+
+  it("interleaved dual-task wrong binding agent refuses finalize", async () => {
+    const { cfg } = await useRoot();
+    const groupId = "grp_r5_agent_mismatch";
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: null,
+      profile: "personal_local",
+      cfg,
+    });
+    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    await stores.objectStorage.writeObject(groupId, "task", "task-a", {
+      taskId: "task-a",
+      groupId,
+      title: "task-a",
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+    } satisfies Task);
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
+      {
+        itemId: "board-a",
+        taskId: "task-a",
+        groupId,
+        status: "applied",
+        claimantId: "bot-exec",
+        title: "x",
+        remainingWork: "y",
+      },
+    ] as never);
+    const binding = buildExecutionDeliverableBinding({
+      groupId,
+      taskId: "task-a",
+      boardItemId: "board-a",
+      runId: "run-a",
+      agentId: "bot-OTHER",
+      source: "explicit_run",
+    });
+    const out = await finalizeMemberRunTeamDeliverable({
+      text: '<<DELIVERABLE title="A" file="notes/a.md">>\nbody\n<</DELIVERABLE>>',
+      agentId: "bot-exec",
+      binding,
+      trusted,
+      stores,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(out.outcome.ok).toBe(false);
+    if (!out.outcome.ok) {
+      expect(out.outcome.reason).toBe("execution_binding_agent_mismatch");
+    }
   });
 });

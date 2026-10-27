@@ -118,7 +118,10 @@ export async function executeModeBWakeRound(params: {
 }): Promise<WakeRoundDispatchResult> {
   const { request, context } = params;
   const leadBot = context.leadBot;
-  const roundId = `wake_${request.source}_${randomUUID()}`;
+  // Prefer durable binding.runId (derived from wake-op attempt) so the Mode B
+  // round identity matches the deliverable binding — do not invent a second UUID.
+  const boundRunId = compact(request.executionDeliverableBinding?.runId);
+  const roundId = boundRunId || `wake_${request.source}_${randomUUID()}`;
   const reason = compact(request.reason) || `wake:${request.source}`;
   const message =
     compact(request.dispatchPrompt) ||

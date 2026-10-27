@@ -8,10 +8,11 @@
  *
  * Reuses executeCollaborationRound via Mode B dispatcher — no second orchestrator.
  * runBot uses getReplyFromConfig (same E1 path as heartbeat), not chat.send.
- * R3/R4: when the reply contains DELIVERABLE, formal team submit uses
+ * R3–R5: when the reply contains DELIVERABLE, formal team submit uses
  * request.executionDeliverableBinding (no group+agent Map). Missing binding refuses.
- * Managed background auth uses service_execution (not actor_fallback / fake membership).
+ * Managed background auth uses service_execution only after active ownership SoT.
  * Space lookup is tenantId+groupId; lead bot has no bots[0] fallback.
+ * R5: request/bag/binding scope must align; attempt must still be current wake-op attempt.
  */
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
@@ -29,12 +30,16 @@ import type {
   CollaborationBotTarget,
   CollaborationDispatchScope,
 } from "./collaboration-dispatch/types.js";
+import { readWakeOpRecord } from "./collaboration-dispatch/wake-op-ledger.js";
 import {
   setWakeRoundDispatcher,
   type WakeRoundDispatchRequest,
 } from "./collaboration-dispatch/wake-round-dispatch.js";
 import { finalizeMemberRunTeamDeliverable } from "./collaboration-learning/chat-deliverable-team-submit.js";
-import { normalizeExecutionDeliverableBinding } from "./collaboration-learning/execution-deliverable-binding.js";
+import {
+  executionBindingScopeMismatch,
+  normalizeExecutionDeliverableBinding,
+} from "./collaboration-learning/execution-deliverable-binding.js";
 import { resolveCollaborationGroupTenantId } from "./collaboration-learning/shared.js";
 import { listGatewayCollaborationSpaces } from "./collaboration-learning/space-store.js";
 import {
@@ -126,21 +131,29 @@ export async function resolveModeBWakeRoundContext(
   }
   const space = matches[0];
 
-  // Re-verify durable ownership when a tenant was requested (fail closed on mismatch).
+  // R5: active ownership is the normative source for minting service_execution.
+  // Space list snapshot alone must NEVER authorize background managed writes.
+  let serviceTenant: CollaborationTenantResolution = { tenantId: null, trust: "none" };
+  let tenantId: string | null = null;
   if (requestTenantId) {
     const owned = resolveCollaborationGroupTenantId(groupId, requestTenantId);
     const spaceTenant = compact(space.tenantId);
-    if (owned && owned.toLowerCase() !== requestTenantId.toLowerCase()) {
+    if (!owned) {
+      // Missing / revoked / unreadable ownership → refuse (no spaceTenant fallback).
+      return null;
+    }
+    if (owned.toLowerCase() !== requestTenantId.toLowerCase()) {
       return null;
     }
     if (spaceTenant && spaceTenant.toLowerCase() !== requestTenantId.toLowerCase()) {
       return null;
     }
-    // When ownership SoT has an active record for a different binding, owned is null
-    // for this pair — refuse rather than fall through to another group.
-    if (!owned && !spaceTenant) {
-      return null;
-    }
+    tenantId = requestTenantId;
+    serviceTenant = labelServiceExecutionTenant(tenantId);
+  } else {
+    // personal_local without request tenant: namespace only, no ACL-safe service mint.
+    tenantId = compact(space.tenantId) || null;
+    serviceTenant = { tenantId: null, trust: "none" };
   }
 
   const sessionKey = toCollaborationSpaceSessionKey(groupId);
@@ -166,13 +179,6 @@ export async function resolveModeBWakeRoundContext(
     return null;
   }
 
-  const tenantId = requestTenantId || compact(space.tenantId) || null;
-
-  // Background service identity (not interactive membership, not actor_fallback).
-  const serviceTenant: CollaborationTenantResolution = tenantId
-    ? labelServiceExecutionTenant(tenantId)
-    : { tenantId: null, trust: "none" };
-
   const bindingAtResolve = normalizeExecutionDeliverableBinding(
     request.executionDeliverableBinding ?? null,
   );
@@ -180,13 +186,23 @@ export async function resolveModeBWakeRoundContext(
     // Incomplete production wake binding — refuse context rather than dispatch.
     return null;
   }
-  if (bindingAtResolve?.tenantId && tenantId) {
-    if (compact(bindingAtResolve.tenantId).toLowerCase() !== tenantId.toLowerCase()) {
+  if (bindingAtResolve) {
+    const scopeFail = executionBindingScopeMismatch({
+      binding: bindingAtResolve,
+      tenantId,
+      groupId,
+      taskId: request.taskId,
+      boardItemId: request.itemId,
+      todolistId: request.planConfirmBinding?.todolistId,
+      planVersion: request.planConfirmBinding?.confirmedVersion,
+      stepId: request.planConfirmBinding?.stepId,
+      agentId: leadBot.agentId,
+      attemptId: request.wakeExecutionAttemptId,
+      opKey: request.wakeOpKey ?? request.opKey,
+    });
+    if (scopeFail) {
       return null;
     }
-  }
-  if (bindingAtResolve && compact(bindingAtResolve.groupId).toLowerCase() !== groupKey) {
-    return null;
   }
 
   const scope: CollaborationDispatchScope = {
@@ -242,11 +258,56 @@ export async function resolveModeBWakeRoundContext(
           const binding = normalizeExecutionDeliverableBinding(
             request.executionDeliverableBinding ?? null,
           );
+          if (!binding) {
+            return {
+              text: `${text.trim()}\n\n团队成果未完成（execution_binding_required）。`,
+            };
+          }
+          const preScope = executionBindingScopeMismatch({
+            binding,
+            tenantId,
+            groupId,
+            taskId: request.taskId,
+            boardItemId: request.itemId,
+            todolistId: request.planConfirmBinding?.todolistId,
+            planVersion: request.planConfirmBinding?.confirmedVersion,
+            stepId: request.planConfirmBinding?.stepId,
+            agentId: bot.agentId,
+            attemptId: request.wakeExecutionAttemptId,
+            opKey: request.wakeOpKey ?? request.opKey,
+          });
+          if (preScope) {
+            return {
+              text: `${text.trim()}\n\n团队成果未完成（execution_binding_scope:${preScope}）。`,
+            };
+          }
+
+          // Stale / superseded attempt: isolate as non-current delivery (no formal write).
+          const opKey =
+            compact(binding.opKey) || compact(request.wakeOpKey) || compact(request.opKey);
+          const attemptId = compact(binding.attemptId);
+          if (opKey && attemptId) {
+            try {
+              const wakeRec = await readWakeOpRecord({ authority, opKey, cfg });
+              const currentAttempt = compact(wakeRec?.executionAttemptId);
+              if (!currentAttempt || currentAttempt !== attemptId) {
+                return {
+                  text: `${text.trim()}\n\n团队成果未完成（execution_attempt_not_current）。`,
+                };
+              }
+            } catch {
+              return {
+                text: `${text.trim()}\n\n团队成果未完成（execution_attempt_unreadable）。`,
+              };
+            }
+          }
+
           let deliverAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null =
             null;
           let deliverStores: ReturnType<typeof createTrustedGroupStores> | null = null;
           try {
             // Re-verify at composition root with service_execution tenant (ACL on).
+            // serviceTenant is only minted after active ownership above.
             deliverAuth = await authorizeTeamGroupResourceAccess({
               groupId,
               actor: bot.agentId,
