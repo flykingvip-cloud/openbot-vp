@@ -354,5 +354,56 @@ export function buildWorkbenchMemoryCenterActionHandlers(
         requestRender();
       }
     },
+    onMemoryCenterForgetFact: async () => {
+      const agentId = (state.workbenchMemoryCenterAgentId ?? "").trim();
+      const atomId = (state.workbenchMemoryCenterAtomId ?? "").trim();
+      if (!agentId || !atomId) {
+        state.workbenchMemoryCenterMessage = "请先选择要忘记的记忆要点。";
+        requestRender();
+        return;
+      }
+      if (!state.client || !state.connected) {
+        state.workbenchMemoryCenterMessage = "当前未连接到网关。";
+        requestRender();
+        return;
+      }
+      const confirmed = window.confirm(
+        "将 soft-forget 该记忆要点关联的全部来源（默认不永久清除/purge）。同一来源上的其他要点也会失去该来源。不会删除记忆文件入口。是否继续？",
+      );
+      if (!confirmed) {
+        return;
+      }
+      state.workbenchMemoryCenterBusy = true;
+      state.workbenchMemoryCenterMessage = null;
+      requestRender();
+      try {
+        const result: {
+          ok?: boolean;
+          sources?: Array<{ status?: string; sourceLocator?: string; error?: string }>;
+          error?: string;
+        } = await state.client.request("data.memory.forgetFact", {
+          agentId,
+          atomId,
+        });
+        const sources = Array.isArray(result?.sources) ? result.sources : [];
+        const forgotten = sources.filter((s) => s.status === "forgotten").length;
+        const failed = sources.filter((s) => s.status === "failed").length;
+        if (failed > 0 || result?.ok === false) {
+          state.workbenchMemoryCenterMessage =
+            result?.error?.trim() ||
+            `事实遗忘部分失败：成功 ${forgotten}，失败 ${failed}（共 ${sources.length} 个来源）`;
+        } else if (sources.length === 0) {
+          state.workbenchMemoryCenterMessage = "该记忆要点没有可忘记的关联来源。";
+        } else {
+          state.workbenchMemoryCenterMessage = `已 soft-forget 该事实的全部来源（${forgotten}）`;
+        }
+        await loadWorkbenchMemoryCenterEntries(state, agentId, requestRender);
+      } catch (error) {
+        state.workbenchMemoryCenterMessage = friendlyMemoryCenterError(error);
+      } finally {
+        state.workbenchMemoryCenterBusy = false;
+        requestRender();
+      }
+    },
   };
 }

@@ -360,6 +360,94 @@ export const dataHandlers: GatewayRequestHandlers = {
     respond(true, result);
   },
 
+  "data.memory.forgetFact": async ({ params, respond, client }) => {
+    if (rejectWhenManaged("data.memory.forgetFact", respond)) {
+      return;
+    }
+    const agentId = typeof params.agentId === "string" ? params.agentId.trim() : "";
+    const atomId = typeof params.atomId === "string" ? params.atomId.trim() : "";
+    const operationIdRaw = typeof params.operationId === "string" ? params.operationId.trim() : "";
+    const operationId = operationIdRaw || `fact-forget:${atomId}:${Date.now().toString(36)}`;
+    if (!agentId || !atomId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "agentId and atomId are required"),
+      );
+      return;
+    }
+    if (
+      !(await assertMemoryCenterAgentAccess({
+        client,
+        agentId,
+        respond,
+        method: "data.memory.forgetFact",
+      }))
+    ) {
+      return;
+    }
+    const actor = await Promise.resolve(resolveEmployeeWorkbenchActor(client)).catch(() => null);
+    const governance = actor?.tenantId
+      ? buildMemorySearchGovernanceFromCallEntry({
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          seatId: actor.currentSeatId,
+        })
+      : undefined;
+    const { manager } = await getMemorySearchManager({
+      cfg: loadConfig(),
+      agentId,
+      governance,
+    });
+    type FactForgetManager = {
+      forgetFact?: (input: {
+        atomId: string;
+        operationId: string;
+        reasonCode?: string;
+      }) => Promise<{
+        ok: boolean;
+        factRef: { atomId: string };
+        sources: Array<Record<string, unknown>>;
+        atomMissing?: boolean;
+        error?: string;
+      }>;
+    };
+    const typed = manager as FactForgetManager | null | undefined;
+    if (!typed || typeof typed.forgetFact !== "function") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "fact-level forget requires cogniweave memory backend"),
+      );
+      return;
+    }
+    try {
+      const result = await typed.forgetFact({
+        atomId,
+        operationId,
+        reasonCode:
+          typeof params.reasonCode === "string" && params.reasonCode.trim()
+            ? params.reasonCode.trim()
+            : "FACT_LEVEL_FORGET",
+      });
+      if (result.atomMissing) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "atom not found"));
+        return;
+      }
+      if (!result.ok) {
+        respond(
+          false,
+          result,
+          errorShape(ErrorCodes.UNAVAILABLE, result.error ?? "forgetFact failed"),
+        );
+        return;
+      }
+      respond(true, result);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
+  },
+
   "data.retention.summary": async ({ params, respond }) => {
     const cfg = loadConfig();
     const tenantId =

@@ -10128,6 +10128,7 @@ landingStreams:
       - src/gateway/collaboration-dispatch/task-control-cas.ts
       - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     canLandWith:
+      - ACL
       - COLLAB_RESIDUAL_B_TOOL_LOOP
       - batch2-reliable-confirm-cards
       - collab-p1-artifact-accept-loop:grok-bot
@@ -19495,6 +19496,14 @@ landingStreams:
       - src/memory/memory-center-atoms*
       - ui/src/ui/ports/employee/render-model-memory-center.ts
       - ui/src/ui/ports/employee/views/memory-center-page.ts
+      - src/memory/memory-fact-forget.ts
+      - src/memory/memory-fact-forget.test.ts
+      - src/memory/types.ts
+      - src/gateway/server-methods/memory-forget-fact-gateway-isolation.test.ts
+      - ui/src/ui/ports/employee/views/memory-center-page.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-contracts.ts
+      - docs/design/memory-fact-level-forget-mvp-2026-10-27.md
+      - docs/design/memory-fact-level-forget-assessment-2026-10-27.md
       - ui/src/ui/ports/enterprise/views/enterprise-retention-policy-surface.ts
       - ui/src/ui/ports/employee/views/employee-data-retention-summary-card.ts
       - docs/design/openbot-agent-context-lifecycle*
@@ -19511,7 +19520,9 @@ landingStreams:
       - src/memory/query-atoms-acl.test.ts
       - docs/design/openbot-system-sandbox-security*
       - .loom/registry.yaml
-    canLandWith: []
+    canLandWith:
+      - MRR
+      - u1-unified-task-stop
     metadata:
       legacyTitle: Agent Context Lifecycle And Security P1
       task: agent-context-lifecycle

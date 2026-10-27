@@ -622,6 +622,7 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "data.export.restore",
     "data.conversations.archive",
     "data.memory.forget",
+    "data.memory.forgetFact",
     "conversations.archive",
     "conversations.bindings.attachExecution",
     "conversations.close",

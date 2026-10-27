@@ -2522,6 +2522,80 @@ export class InMemoryCogniWeaveEngine implements CogniWeaveEngine {
     return this.applySourceLifecycle(input, "purged");
   }
 
+  /**
+   * Enumerate live source bindings for a fact (atomId) via source_object_links.
+   * Includes bindings linked directly to the atom and bindings linked to its
+   * current evidenceRefs. Does not invent locators or scan claim text.
+   */
+  async listLiveSourcesForAtom(atomId: string): Promise<
+    Array<{
+      sourceBindingId: string;
+      sourceIdentityId: string;
+      sourceLocator: string;
+      status: SourceLifecycleMode;
+    }>
+  > {
+    await this.ensureSourceLifecycleHydrated();
+    const id = atomId.trim();
+    if (!id) {
+      return [];
+    }
+    const bindingIds = new Set<string>();
+    for (const link of this.liveSourceObjectLinks({ objectType: "atom", objectId: id })) {
+      bindingIds.add(link.sourceBindingId);
+    }
+    const atom = await this.metadataStore.getAtom(id);
+    if (atom) {
+      for (const evidenceId of atom.provenance.evidenceRefs) {
+        for (const link of this.liveSourceObjectLinks({
+          objectType: "evidence",
+          objectId: evidenceId,
+        })) {
+          bindingIds.add(link.sourceBindingId);
+        }
+      }
+      // Lazy backfill: evidence may match bindings that have not yet materialized
+      // atom links (same path as forgetSource pre-unlink ensure*).
+      for (const binding of this.sourceBindings.values()) {
+        if (bindingIds.has(binding.id)) {
+          continue;
+        }
+        if (binding.status !== "active" && binding.status !== "archived") {
+          continue;
+        }
+        for (const evidenceId of atom.provenance.evidenceRefs) {
+          const evidence = await this.metadataStore.getEvidence(evidenceId);
+          if (evidence && this.evidenceMatchesBinding(evidence, binding)) {
+            bindingIds.add(binding.id);
+            break;
+          }
+        }
+      }
+    }
+    const out: Array<{
+      sourceBindingId: string;
+      sourceIdentityId: string;
+      sourceLocator: string;
+      status: SourceLifecycleMode;
+    }> = [];
+    for (const bindingId of bindingIds) {
+      const binding = this.sourceBindings.get(bindingId);
+      if (!binding) {
+        continue;
+      }
+      if (binding.status !== "active" && binding.status !== "archived") {
+        continue;
+      }
+      out.push({
+        sourceBindingId: binding.id,
+        sourceIdentityId: binding.sourceIdentityId,
+        sourceLocator: binding.sourceLocator,
+        status: binding.status,
+      });
+    }
+    return out.toSorted((a, b) => a.sourceBindingId.localeCompare(b.sourceBindingId));
+  }
+
   /** True when evidence is still eligible for retrieval given lifecycle bindings/links. */
   isEvidenceRetrievable(evidence: EvidenceRecord): boolean {
     const liveLinks = this.liveSourceObjectLinks({
