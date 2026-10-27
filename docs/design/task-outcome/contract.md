@@ -48,6 +48,12 @@
 
 `ParentChildContract`：`requiredChildTaskIds` / `optionalChildTaskIds` / `aggregation`，防止父子重复计同一指标（P0 保留字段与类型；聚合计算接口边界，P1 扩消费）。
 
+## 5.1 W3 任务类型验收与总预算
+
+- tip 可持久化 `taskContract`（kind / validators）；`assessAcceptanceByTaskType` 仅对显式 `chat_turn`+空验证器允许 `not_required`，禁止发明成功捷径。
+- tip 可持久化 `budget`（tighten-only 相对租户天花板）；耗尽 → `fail_closed(budget_exceeded)`，评价资格 attribution=`budget`（不计技能成功率/成长负样本）。
+- 非目标：W4 learning-recall 四态；W5 evolution-loop-log；supervisor 热路径全量接线；evolution 旁路退役。
+
 ## 6. 入口适配
 
 同一结果服务：`chat` / `gateway_agent` / `cron` / `cli` / `collab`。  
