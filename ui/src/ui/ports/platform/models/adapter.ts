@@ -1,5 +1,13 @@
 import type { PlatformPortReadModel } from "../semantic/platform-read-model.ts";
 import type { ModelsVM as LegacyModelsVM } from "../view-models/types.ts";
+import { suggestedEvidenceFromInferred } from "./capability-evidence.ts";
+import { assetMatchesRequiredCapabilities } from "./capability-ids.ts";
+import { resolveExecutorPathLabel } from "./executor-path-labels.ts";
+import { getModelAdmission } from "./model-admission-store.ts";
+import {
+  buildConnectionFingerprint,
+  publishCurrentConfigFingerprint,
+} from "./model-connection-gate.ts";
 import type { PlatformModelsManagementSnapshot } from "./snapshot-types.ts";
 import type {
   GovernanceInsight,
@@ -336,6 +344,10 @@ function inferOutputModalities(
   return ["text"];
 }
 
+/**
+ * Suggest capabilities from name / provider / metadata.
+ * Results are NOT verified — callers must attach capabilityEvidence with status=suggested.
+ */
 function inferCapabilities(params: {
   modelId: string;
   providerId: string;
@@ -349,14 +361,15 @@ function inferCapabilities(params: {
   if (params.reasoning || modelId.includes("reason")) {
     capabilities.add("reasoning");
   }
+  // Canonical IDs aligned with backend catalog (coding / tool_use).
   if (params.supportsTools) {
-    capabilities.add("tools");
+    capabilities.add("tool_use");
   }
   if (params.inputModalities.includes("image") || modelId.includes("vision")) {
     capabilities.add("vision");
   }
   if (modelId.includes("code") || params.providerId.toLowerCase().includes("deepseek")) {
-    capabilities.add("code");
+    capabilities.add("coding");
   }
   if (modelId.includes("realtime") || modelId.includes("stream")) {
     capabilities.add("stream");
@@ -369,7 +382,7 @@ function inferCapabilities(params: {
 
 function inferTaskTags(asset: ModelAsset) {
   const tags = new Set<string>();
-  if (asset.capabilities.includes("code")) {
+  if (asset.capabilities.includes("coding")) {
     tags.add("coding");
   }
   if (asset.capabilities.includes("reasoning")) {
@@ -571,8 +584,36 @@ function modelAssetFromSourceEntry(
     supportsTools: entry.supportsTools,
   });
   const prices = costTierPrice(costTier);
+  const modelRef = `${entry.providerId}/${entry.modelId}`;
+  const admission = getModelAdmission(modelRef);
+  const suggested = suggestedEvidenceFromInferred(capabilities);
+  // Formal evidence only — never merge demoCapabilityEvidence into verified display.
+  const evidenceById = new Map(suggested.map((item) => [item.id, item]));
+  for (const item of admission.capabilityEvidence) {
+    evidenceById.set(item.id, item);
+  }
+  const capabilityEvidence = Array.from(evidenceById.values());
+  const executor = resolveExecutorPathLabel({
+    modelId: entry.modelId,
+    providerId: entry.providerId,
+    outputModalities,
+    callType: admission.executorCallType,
+  });
+  const connectionFingerprint = buildConnectionFingerprint({
+    modelId: modelRef,
+    providerId: entry.providerId,
+    baseUrl: entry.baseUrl ?? null,
+    api: entry.api ?? null,
+  });
+  // Publish live config identity for verification finish-time stale checks.
+  // Must not use admission.connectionFingerprint (last verified) as "current".
+  publishCurrentConfigFingerprint(modelRef, connectionFingerprint);
+  // Backend admission RPCs are not wired yet — do NOT surface localStorage drafts
+  // as platform-effective "允许" / "可参与".
+  const admissionControlsAvailable = false;
+  const tenantSelectable = false;
   const asset: ModelAsset = {
-    modelId: `${entry.providerId}/${entry.modelId}`,
+    modelId: modelRef,
     providerId: entry.providerId,
     providerName: entry.providerId,
     displayName: entry.name ?? entry.modelId,
@@ -580,8 +621,18 @@ function modelAssetFromSourceEntry(
     inputModalities,
     outputModalities,
     capabilities,
-    ...(entry.contextWindow ? { contextWindow: entry.contextWindow } : {}),
-    ...(entry.maxTokens ? { maxOutputTokens: entry.maxTokens } : {}),
+    capabilityEvidence,
+    executorPathBadge: executor.badge,
+    executorPathDetail: executor.detail,
+    connectionFingerprint,
+    ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+    ...(entry.api ? { api: entry.api } : {}),
+    ...(entry.contextWindow
+      ? { contextWindow: entry.contextWindow, contextWindowSource: "catalog" as const }
+      : { contextWindowSource: "unknown" as const }),
+    ...(entry.maxTokens
+      ? { maxOutputTokens: entry.maxTokens, maxOutputTokensSource: "catalog" as const }
+      : { maxOutputTokensSource: "unknown" as const }),
     costTier,
     ...(prices ? { inputPrice: prices.input, outputPrice: prices.output } : {}),
     health,
@@ -593,7 +644,11 @@ function modelAssetFromSourceEntry(
       : {}),
     taskTags: [],
     inRecommendationPool,
-    tenantSelectable: entry.discoveredOnly ? false : health === "healthy",
+    tenantSelectable,
+    admissionControlsAvailable,
+    autoRouting: "disabled",
+    autoRoutingReason: "后端准入未接入",
+    autoRoutingTaskCategories: [],
   };
   asset.taskTags = inferTaskTags(asset);
   return asset;
@@ -3239,8 +3294,9 @@ function buildRoutingConflicts(
       !assets.some(
         (asset) =>
           policy.candidates.primary.concat(policy.candidates.fallback).includes(asset.modelId) &&
-          policy.constraints.requiredCapabilities?.every((capability) =>
-            asset.capabilities.includes(capability as never),
+          assetMatchesRequiredCapabilities(
+            asset.capabilities,
+            policy.constraints.requiredCapabilities ?? [],
           ),
       )
     ) {

@@ -88,8 +88,21 @@ describe("lifecycle + tenant selectable", () => {
     expect(resolveModelAssetLifecycleStage(baseAsset())).toBe("published");
   });
 
-  it("labels tenant selectable honestly when not published", () => {
-    const asset = baseAsset({ inRecommendationPool: false, tenantSelectable: false });
+  it("labels tenant selectable as 尚未接入 when backend admission is unavailable", () => {
+    const asset = baseAsset({
+      inRecommendationPool: true,
+      tenantSelectable: false,
+      admissionControlsAvailable: false,
+    });
+    expect(tenantSelectableLabel(asset)).toBe("尚未接入");
+  });
+
+  it("labels tenant selectable honestly when backend controls are available and not published", () => {
+    const asset = baseAsset({
+      inRecommendationPool: false,
+      tenantSelectable: false,
+      admissionControlsAvailable: true,
+    });
     expect(tenantSelectableLabel(asset)).toBe("未上架");
   });
 });

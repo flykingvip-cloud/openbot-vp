@@ -246,3 +246,10 @@
     max-width: none;
   }
 }
+
+/* Suggested / unverified capability tags — weaker than verified chips. */
+.platform-capability-chip--suggested {
+  opacity: 0.72;
+  border-style: dashed;
+  font-weight: 500;
+}
