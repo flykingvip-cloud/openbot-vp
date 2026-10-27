@@ -783,7 +783,7 @@ export async function startGatewayServer(
   if (!minimalTestGateway) {
     void (async () => {
       const logRecovery = log.child("task-outcome-consumer");
-      recoverTaskOutcomeConsumersAtGatewayBoot({
+      await recoverTaskOutcomeConsumersAtGatewayBoot({
         cfg: cfgAtStart,
         startRuntimeDrain: true,
         log: {
