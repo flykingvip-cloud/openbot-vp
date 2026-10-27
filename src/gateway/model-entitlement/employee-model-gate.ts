@@ -44,6 +44,7 @@ import { resolveAgentRunEntitlementScope } from "./resolve-agent-run-scope.js";
 import { resolveEffectiveModelSet } from "./resolve-effective-model-set.js";
 import {
   buildTaskCapabilityPlan,
+  resolveModalityExecutorWiring,
   classifyTaskCapability,
   estimateTaskContextTokens,
   type ContextEstimateParts,
@@ -568,6 +569,7 @@ export async function resolveEmployeeModelGate(
       authorizedModelIds: allowlist,
       preferredModelOrderFromAuth: preferredModelOrder ?? allowlist,
       modelContextWindows,
+      executorWiring: resolveModalityExecutorWiring(input.cfg),
       ...(input.contextParts
         ? {
             contextParts: {

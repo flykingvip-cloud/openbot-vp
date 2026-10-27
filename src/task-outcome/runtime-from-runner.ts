@@ -9,6 +9,11 @@ import {
 import { GROWTH_EVOLUTION_CONSUMER_ID, OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
+import {
+  resolveTrustedRunModalityCompletionEvidence,
+  type ModalityCompletionEvidence,
+  type ModalityExecutionArtifact,
+} from "./modality-artifact-evidence.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { scopeIdOf } from "./transitions.js";
@@ -76,6 +81,13 @@ export type RunnerTurnOutcomeInput = {
     status?: string;
     incompleteModalities?: readonly string[];
   };
+  /**
+   * Real generation artifacts from image_gen / music_gen for this turn.
+   * Required to mark image_generation / audio_music_generation completed.
+   */
+  modalityArtifacts?: readonly ModalityExecutionArtifact[];
+  /** Explicit completion evidence; overrides artifact/run defaults when set. */
+  modalityCompletionEvidence?: ModalityCompletionEvidence;
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -175,7 +187,8 @@ export function drainPendingGrowthEvolution(
  * Production chat-runner hot path into unified TaskOutcome.
  * Evolution publish goes only through OutcomeConsumerRuntime drain (no direct bypass).
  * P1: capabilityOutcome claims persist as capabilityModality; executor_unwired cannot
- * be upgraded to target-modality success; trusted success may mark modality completed.
+ * be upgraded to target-modality success; trusted success may mark modality completed
+ * (chat via run_completed; image/music only via execution_artifact evidence).
  */
 export async function recordRunnerTurnOutcome(
   cfg: OpenBotConfig,
@@ -348,25 +361,32 @@ export async function recordRunnerTurnOutcome(
     }
 
     // Production: after trusted run success, mark target modality completed from
-    // run evidence so formal set_acceptance can pass. Blocked statuses refuse.
+    // evidence so formal set_acceptance can pass. Artifact-backed modalities
+    // (image/music) require a real tool artifact path; chat may use run_completed.
+    // Blocked statuses (executor_unwired / …) refuse.
     if (
       input.success &&
       record.capabilityModality &&
       canMarkCompletedFromTrustedRun(record.capabilityModality)
     ) {
-      const markRes = chat.markTargetModalityCompleted(
-        taskId,
-        record.outcomeVersion,
-        fencingToken,
-        {
-          kind: "run_completed",
-          digestOrRef: `run:${input.runId}`,
-          detail: "trusted_runner_turn_success",
-        },
-        { scope, commandId: `mark-modality:${taskId}:${input.runId}` },
-      );
-      if (markRes.ok) {
-        record = markRes.record;
+      const evidence = resolveTrustedRunModalityCompletionEvidence({
+        targetModality: record.capabilityModality.targetModality,
+        success: input.success,
+        runId: input.runId,
+        explicitEvidence: input.modalityCompletionEvidence,
+        artifacts: input.modalityArtifacts,
+      });
+      if (evidence) {
+        const markRes = chat.markTargetModalityCompleted(
+          taskId,
+          record.outcomeVersion,
+          fencingToken,
+          evidence,
+          { scope, commandId: `mark-modality:${taskId}:${input.runId}` },
+        );
+        if (markRes.ok) {
+          record = markRes.record;
+        }
       }
     }
   }

@@ -6,6 +6,7 @@ import {
 } from "../infra/exec-approval-reply.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import type { PluginHookAfterToolCallEvent } from "../plugins/types.js";
+import { extractGenToolRelativePath } from "../task-outcome/modality-artifact-evidence.js";
 import { normalizeTextForComparison } from "./pi-embedded-helpers.js";
 import { isMessagingTool, isMessagingToolSendAction } from "./pi-embedded-messaging.js";
 import type {
@@ -551,6 +552,7 @@ export async function handleToolExecutionEnd(
     ctx.state.successfulCronAdds += 1;
   }
 
+  const genRelativePath = extractGenToolRelativePath(toolName, result);
   emitAgentEvent({
     runId: ctx.params.runId,
     stream: "tool",
@@ -561,6 +563,7 @@ export async function handleToolExecutionEnd(
       meta,
       isError: isToolError,
       result: sanitizedResult,
+      ...(genRelativePath ? { relativePath: genRelativePath } : {}),
     },
   });
   void ctx.params.onAgentEvent?.({
@@ -571,6 +574,7 @@ export async function handleToolExecutionEnd(
       toolCallId,
       meta,
       isError: isToolError,
+      ...(genRelativePath ? { relativePath: genRelativePath } : {}),
     },
   });
 

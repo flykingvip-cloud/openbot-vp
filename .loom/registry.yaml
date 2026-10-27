@@ -9789,6 +9789,51 @@ tasks:
     metadata:
       reviewAfter: "2026-11-30"
       convergeNote: after-merge trim hot-path declarations once landed
+
+  - id: mj-suno-executor-wiring
+    owner: grok-bot
+    intent:
+      - Wire Midjourney/image_generation and Suno/audio_music_generation from permanent executor_unwired to config-gated Stepfun image_gen and Suno music_gen tool paths
+      - Keep TTS/audio_understanding unwired; config-gated IMAGE_EXECUTOR_WIRED / AUDIO_MUSIC_WIRED only
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/executor-wiring.ts
+      - src/gateway/model-entitlement/executor-wiring.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/agents/image-generation-models.ts
+      - src/agents/image-generation-models.test.ts
+      - src/agents/music-generation-models.ts
+      - src/agents/music-generation-models.test.ts
+      - src/agents/tools/suno-music-tool.ts
+      - src/agents/tools/suno-music-tool.helpers.ts
+      - src/agents/tools/suno-music-tool.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/pi-embedded-subscribe.tools.ts
+      - src/config/types.agent-defaults.ts
+      - src/config/zod-schema.agent-defaults.ts
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/task-outcome/modality-artifact-evidence.ts
+      - src/task-outcome/modality-artifact-evidence.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.executor-wiring.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-26
+    metadata:
+      reviewAfter: "2026-11-30"
+      note: config-gated IMAGE_EXECUTOR_WIRED / AUDIO_MUSIC_WIRED; no merge/deploy in this PR
+
+
   - id: askOutcome-p0-r83-remediation
     owner: executor-acceptance
     intent:
@@ -9827,6 +9872,47 @@ landingStreams:
       convergeNote: post-#86 landed; hot paths trimmed; sharedPaths landers remain authoritative
       purpose: P1 current-task-driven AOR scoring, CJK/parent quality, full context
         constraints, executor_unwired outcome claims
+
+  - id: mj-suno-executor-wiring
+    landingPolicy: parallel
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/executor-wiring.ts
+      - src/gateway/model-entitlement/executor-wiring.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/agents/image-generation-models.ts
+      - src/agents/image-generation-models.test.ts
+      - src/agents/music-generation-models.ts
+      - src/agents/music-generation-models.test.ts
+      - src/agents/tools/suno-music-tool.ts
+      - src/agents/tools/suno-music-tool.helpers.ts
+      - src/agents/tools/suno-music-tool.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/pi-embedded-subscribe.tools.ts
+      - src/config/types.agent-defaults.ts
+      - src/config/zod-schema.agent-defaults.ts
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/task-outcome/modality-artifact-evidence.ts
+      - src/task-outcome/modality-artifact-evidence.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.executor-wiring.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+    canLandWith: []
+    metadata:
+      task: mj-suno-executor-wiring
+      owner: grok-bot
+      reviewAfter: "2026-11-30"
+      purpose: Midjourney/Stepfun image_gen and Suno music_gen executor wiring (config-gated)
+
+
   - id: askOutcome-p0-r83-remediation
     landingPolicy: serial
     paths:

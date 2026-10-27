@@ -16,6 +16,11 @@
  * outcome claims so chat replies cannot be recorded as image/music success.
  */
 
+import {
+  DEFAULT_MODALITY_EXECUTOR_WIRING,
+  type ModalityExecutorWiring,
+} from "./executor-wiring.js";
+
 export type TaskCategoryId =
   | "default"
   | "coding"
@@ -70,11 +75,6 @@ export type ClassifyTaskCapabilityResult = {
   reasons: string[];
   classificationSource: TaskCapabilityPlan["classificationSource"];
 };
-
-const IMAGE_EXECUTOR_WIRED = false;
-const AUDIO_MUSIC_WIRED = false;
-const AUDIO_TTS_WIRED = false;
-const AUDIO_UNDERSTANDING_WIRED = false;
 
 const DEFAULT_OUTPUT_RESERVE_TOKENS = 1024;
 
@@ -374,19 +374,22 @@ export function filterExecutableModelIds(params: {
   return { executableModelIds, excluded, keptUnknownWindow };
 }
 
-function isExecutorWired(executor: ExecutorKind): boolean {
+function isExecutorWired(
+  executor: ExecutorKind,
+  wiring: ModalityExecutorWiring = DEFAULT_MODALITY_EXECUTOR_WIRING,
+): boolean {
   switch (executor) {
     case "chat_model":
     case "composite":
       return true;
     case "image_generation":
-      return IMAGE_EXECUTOR_WIRED;
+      return wiring.imageGeneration;
     case "audio_music_generation":
-      return AUDIO_MUSIC_WIRED;
+      return wiring.audioMusicGeneration;
     case "audio_tts":
-      return AUDIO_TTS_WIRED;
+      return wiring.audioTts;
     case "audio_understanding":
-      return AUDIO_UNDERSTANDING_WIRED;
+      return wiring.audioUnderstanding;
     default:
       return false;
   }
@@ -428,6 +431,12 @@ export function buildTaskCapabilityPlan(params: {
   contextParts?: ContextEstimateParts;
   contextEstimate?: ContextEstimateResult;
   unknownContextWindowPolicy?: UnknownContextWindowPolicy;
+  /**
+   * Config-gated wiring for image/music (and reserved TTS/understanding).
+   * Defaults to all modality executors unwired so unconfigured installs keep
+   * executor_unwired behavior.
+   */
+  executorWiring?: ModalityExecutorWiring;
 }): TaskCapabilityPlan {
   const authorizedModelIds = [
     ...new Set(params.authorizedModelIds.map((id) => id.trim()).filter((id) => id.length > 0)),
@@ -484,7 +493,8 @@ export function buildTaskCapabilityPlan(params: {
   let executor = classification.executor;
   let failure: CapabilityPlanFailure = { kind: "none" };
 
-  if (!isExecutorWired(executor)) {
+  const wiring = params.executorWiring ?? DEFAULT_MODALITY_EXECUTOR_WIRING;
+  if (!isExecutorWired(executor, wiring)) {
     failure = {
       kind: "executor_unwired",
       executor,
@@ -686,3 +696,9 @@ export function resolveExecutionRoutingFromCapabilityPlan(params: {
     executionSurface,
   };
 }
+
+export type { ModalityExecutorWiring } from "./executor-wiring.js";
+export {
+  DEFAULT_MODALITY_EXECUTOR_WIRING,
+  resolveModalityExecutorWiring,
+} from "./executor-wiring.js";

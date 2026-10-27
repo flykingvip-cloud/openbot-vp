@@ -183,6 +183,11 @@ export type AgentDefaultsConfig = {
    * Distinct from `imageModel`, which is the vision/input slot.
    */
   imageGenerationModel?: AgentModelConfig;
+  /**
+   * Optional music-generation model and fallbacks (provider/model), e.g. Suno.
+   * Distinct from TTS.
+   */
+  musicGenerationModel?: AgentModelConfig;
   /** Optional PDF-capable model and fallbacks (provider/model). Accepts string or {primary,fallbacks}. */
   pdfModel?: AgentModelConfig;
   /** Maximum PDF file size in megabytes (default: 10). */

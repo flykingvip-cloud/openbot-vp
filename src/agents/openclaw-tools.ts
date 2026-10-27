@@ -54,6 +54,7 @@ import { createSiteCapabilityTools } from "./tools/site-capability-tools.js";
 import { createSkillAssetSaveTool } from "./tools/skill-asset-save-tool.js";
 import { createStepfunImageTool } from "./tools/stepfun-image-tool.js";
 import { createSubagentsTool } from "./tools/subagents-tool.js";
+import { createSunoMusicTool } from "./tools/suno-music-tool.js";
 import { createTenantUserNotifyTool } from "./tools/tenant-user-notify-tool.js";
 import { createTtsTool } from "./tools/tts-tool.js";
 import { createUserOperationalIdentityTool } from "./tools/user-operational-identity-tool.js";
@@ -179,6 +180,13 @@ export function createOpenClawTools(
             ? { root: options.sandboxRoot, bridge: options.sandboxFsBridge }
             : undefined,
         fsPolicy: options?.fsPolicy,
+      })
+    : null;
+  const sunoMusicTool = options?.agentDir?.trim()
+    ? createSunoMusicTool({
+        config: options?.config,
+        agentDir: options.agentDir,
+        workspaceDir,
       })
     : null;
   const pdfTool = options?.agentDir?.trim()
@@ -444,6 +452,7 @@ export function createOpenClawTools(
     ...(webSearchTool ? [webSearchTool] : []),
     ...(webFetchTool ? [webFetchTool] : []),
     ...(stepfunImageTool ? [stepfunImageTool] : imageTool ? [imageTool] : []),
+    ...(sunoMusicTool ? [sunoMusicTool] : []),
     ...(pdfTool ? [pdfTool] : []),
   ];
 

@@ -13,10 +13,14 @@ const KNOWN_IMAGE_GENERATION_MODEL_IDS = new Set([
   "gpt-image-1",
   "dall-e-2",
   "dall-e-3",
+  "midjourney",
+  "mj",
+  "mj-v6",
+  "mj-v7",
 ]);
 
 const GENERATION_TOKEN_RE =
-  /image-edit|image-gen|image_gen|text2image|text-to-image|\bt2i\b|dall-e|dalle|gpt-image|imagen|\bflux\b|stable-diffusion|sdxl/i;
+  /image-edit|image-gen|image_gen|text2image|text-to-image|\bt2i\b|dall-e|dalle|gpt-image|imagen|\bflux\b|stable-diffusion|sdxl|\bmidjourney\b|\bmj\b/i;
 
 const VISION_UNDERSTANDING_RE =
   /vision|\bvlm\b|(^|[/\-_])vl([/\-_]|$)|gemini|gpt-4o|claude|kimi|qwen[-_]?vl/i;
