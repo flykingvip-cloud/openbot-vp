@@ -106,6 +106,11 @@ export type RunnerTurnOutcomeInput = {
    * Merged onto tip before close/verify — never inferred from injected alone.
    */
   adoptedAssetIds?: readonly string[];
+  /**
+   * When true, skip closeout accumulate (mid-run pre-gate already charged this turn).
+   * Closeout still assesses exhaustion and may fail_closed.
+   */
+  skipBudgetCharge?: boolean;
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -119,10 +124,209 @@ export type GrowthOutcomeCommitOpts = {
   processPlaceholder?: boolean;
   /** Explicit learning adoption evidence — forwarded to tip; never guessed from inject. */
   adoptedAssetIds?: readonly string[];
+  /** Mid-run budget already charged — skip closeout accumulate. */
+  skipBudgetCharge?: boolean;
 };
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
   return path.join(resolveAgentDir(cfg, agentId), TASK_OUTCOME_STORE_DIRNAME);
+}
+
+export class TaskBudgetExceededError extends Error {
+  readonly exhaustion: import("./budget.js").TaskBudgetExhaustion;
+  readonly taskId: string;
+  constructor(taskId: string, exhaustion: import("./budget.js").TaskBudgetExhaustion) {
+    super(`task budget exceeded (${exhaustion.dimension}): ${exhaustion.detail}`);
+    this.name = "TaskBudgetExceededError";
+    this.taskId = taskId;
+    this.exhaustion = exhaustion;
+  }
+}
+
+export type RunnerBudgetGateResult =
+  | { allowed: true; record: TaskOutcomeRecord; fencingToken: string }
+  | {
+      allowed: false;
+      record: TaskOutcomeRecord;
+      fencingToken: string;
+      exhaustion: import("./budget.js").TaskBudgetExhaustion;
+    };
+
+function openRunnerBudgetContext(
+  cfg: OpenBotConfig,
+  agentId: string,
+  params: {
+    taskId: string;
+    scope: TrustedScope;
+    budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
+    /** Wall-clock task start; used when tip budget has no startedAtMs yet. */
+    startedAtMs?: number;
+  },
+): {
+  store: DurableTaskOutcomeStore;
+  service: TaskOutcomeResultService;
+  chat: ChatTaskOutcomeAdapter;
+  record: TaskOutcomeRecord;
+  fencingToken: string;
+} {
+  const store = new DurableTaskOutcomeStore(resolveStoreRoot(cfg, agentId));
+  const service = new TaskOutcomeResultService({ store, submittedBy: "runner-budget-gate" });
+  const chat = new ChatTaskOutcomeAdapter(service);
+  const existing = store.loadTask(params.taskId);
+  let record = existing;
+  let fencingToken = existing?.fencingToken || newFencingToken();
+  if (!record) {
+    const opened = chat.createOrRestore({
+      taskId: params.taskId,
+      scope: params.scope,
+      taskContractVersion: "1.0.0",
+      commandId: `budget-gate-open:${params.taskId}`,
+    });
+    if (!opened.ok) {
+      throw new Error(`task-outcome budget gate open failed: ${opened.code}`);
+    }
+    record = opened.record;
+    fencingToken = opened.fencingToken || fencingToken;
+  }
+  if (!record.budget) {
+    const startedAtMs = params.startedAtMs ?? Date.now();
+    const budget = {
+      ...buildTaskBudgetState({ taskLimits: params.budgetLimits }),
+      startedAtMs,
+    };
+    const ensured = service.submit(
+      params.taskId,
+      {
+        type: "set_budget",
+        budget,
+        expectedVersion: record.outcomeVersion,
+        fencingToken,
+      },
+      { requiredScope: params.scope, commandId: `budget-gate-ensure:${params.taskId}` },
+    );
+    if (!ensured.ok) {
+      throw new Error(`task-outcome budget gate ensure failed: ${ensured.code}`);
+    }
+    record = ensured.record;
+  } else if (record.budget.startedAtMs == null && params.startedAtMs != null) {
+    const patched = service.submit(
+      params.taskId,
+      {
+        type: "set_budget",
+        budget: { ...record.budget, startedAtMs: params.startedAtMs },
+        expectedVersion: record.outcomeVersion,
+        fencingToken,
+      },
+      { requiredScope: params.scope, commandId: `budget-gate-start:${params.taskId}` },
+    );
+    if (patched.ok) {
+      record = patched.record;
+    }
+  }
+  return { store, service, chat, record, fencingToken };
+}
+
+/**
+ * Pre-model-call gate: assess tip budget WITHOUT charging.
+ * Exhausted ⇒ allowed=false (caller must not invoke the model).
+ */
+export function assessRunnerTurnBudgetGate(
+  cfg: OpenBotConfig,
+  agentId: string,
+  params: {
+    taskId: string;
+    scope: TrustedScope;
+    budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
+    startedAtMs?: number;
+    nowMs?: number;
+  },
+): RunnerBudgetGateResult {
+  const ctx = openRunnerBudgetContext(cfg, agentId, params);
+  const nowMs = params.nowMs ?? Date.now();
+  const exhaustion =
+    ctx.record.budget != null ? assessTaskBudgetExhaustion(ctx.record.budget, nowMs) : null;
+  if (exhaustion) {
+    return {
+      allowed: false,
+      record: ctx.record,
+      fencingToken: ctx.fencingToken,
+      exhaustion,
+    };
+  }
+  return { allowed: true, record: ctx.record, fencingToken: ctx.fencingToken };
+}
+
+/**
+ * Post-model-call charge: accumulate real iterations/cost, then assess.
+ * If exhausted, fail_closed(budget_exceeded) so the next gate blocks.
+ */
+export function chargeRunnerTurnBudgetSpend(
+  cfg: OpenBotConfig,
+  agentId: string,
+  params: {
+    taskId: string;
+    scope: TrustedScope;
+    runId: string;
+    callSeq: number;
+    costUsd?: number;
+    iterations?: number;
+    nowMs?: number;
+  },
+): {
+  record: TaskOutcomeRecord;
+  exhaustion: import("./budget.js").TaskBudgetExhaustion | null;
+  closedForBudget: boolean;
+} {
+  const ctx = openRunnerBudgetContext(cfg, agentId, {
+    taskId: params.taskId,
+    scope: params.scope,
+  });
+  if (!ctx.record.budget || ctx.record.lifecycle === "closed") {
+    return { record: ctx.record, exhaustion: null, closedForBudget: false };
+  }
+  const nowMs = params.nowMs ?? Date.now();
+  const iterations =
+    typeof params.iterations === "number" && params.iterations > 0
+      ? Math.floor(params.iterations)
+      : 1;
+  const costUsd =
+    typeof params.costUsd === "number" && Number.isFinite(params.costUsd) && params.costUsd > 0
+      ? params.costUsd
+      : undefined;
+  const spent = ctx.service.submit(
+    params.taskId,
+    {
+      type: "accumulate_budget_spend",
+      iterations,
+      ...(costUsd != null ? { costUsd } : {}),
+      expectedVersion: ctx.record.outcomeVersion,
+      fencingToken: ctx.fencingToken,
+      nowMs,
+    },
+    {
+      requiredScope: params.scope,
+      commandId: `budget-spend:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+    },
+  );
+  if (!spent.ok) {
+    throw new Error(`task-outcome mid-run budget charge failed: ${spent.code}`);
+  }
+  let record = spent.record;
+  const exhaustion =
+    record.budget != null ? assessTaskBudgetExhaustion(record.budget, nowMs) : null;
+  if (exhaustion && record.lifecycle !== "closed") {
+    const closed = ctx.chat.failClosed(params.taskId, record.outcomeVersion, "budget_exceeded", {
+      fencingToken: ctx.fencingToken,
+      reasonDetail: exhaustion.detail,
+      scope: params.scope,
+      commandId: `budget-exceeded:${params.taskId}:${params.runId}:call:${params.callSeq}`,
+    });
+    if (!closed.ok) {
+      throw new Error(`task-outcome mid-run budget fail_closed failed: ${closed.code}`);
+    }
+    return { record: closed.record, exhaustion, closedForBudget: true };
+  }
+  return { record, exhaustion, closedForBudget: false };
 }
 
 function defaultScope(tenantId?: string): TrustedScope {
@@ -364,28 +568,30 @@ export async function recordRunnerTurnOutcome(
     throw new Error(`task-outcome record_attempt failed: ${res.code}`);
   }
 
-  // Charge this attempt against tip budget (same taskId across retries).
+  // Budget: mid-run pre-gate may already have charged; closeout only accumulates when asked.
   if (res.record.budget && res.record.lifecycle !== "closed") {
     const costUsd =
       typeof input.costUsd === "number" && Number.isFinite(input.costUsd) && input.costUsd > 0
         ? input.costUsd
         : undefined;
-    const spent = service.submit(
-      taskId,
-      {
-        type: "accumulate_budget_spend",
-        iterations: 1,
-        ...(costUsd != null ? { costUsd } : {}),
-        expectedVersion: res.record.outcomeVersion,
-        fencingToken,
-        nowMs: Date.now(),
-      },
-      { requiredScope: scope, commandId: `budget-spend:${taskId}:${input.runId}` },
-    );
-    if (!spent.ok) {
-      throw new Error(`task-outcome accumulate_budget_spend failed: ${spent.code}`);
+    if (!input.skipBudgetCharge) {
+      const spent = service.submit(
+        taskId,
+        {
+          type: "accumulate_budget_spend",
+          iterations: 1,
+          ...(costUsd != null ? { costUsd } : {}),
+          expectedVersion: res.record.outcomeVersion,
+          fencingToken,
+          nowMs: Date.now(),
+        },
+        { requiredScope: scope, commandId: `budget-spend:${taskId}:${input.runId}` },
+      );
+      if (!spent.ok) {
+        throw new Error(`task-outcome accumulate_budget_spend failed: ${spent.code}`);
+      }
+      res = spent;
     }
-    res = spent;
     const exhaustion =
       res.record.budget != null
         ? assessTaskBudgetExhaustion(res.record.budget)
