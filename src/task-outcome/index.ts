@@ -99,3 +99,10 @@ export {
   createExperienceVerifiedHandler,
   resolveExperienceVerificationPlan,
 } from "./experience-verified-handler.js";
+
+export {
+  attachAdoptedLearningAssetsToTask,
+  mergeAdoptedIntoExperienceExposure,
+  type AttachAdoptedLearningAssetsParams,
+  type AttachAdoptedLearningAssetsResult,
+} from "./learning-adoption.js";

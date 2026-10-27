@@ -6,7 +6,8 @@
 > W3（任务类型验收与总预算）**已合入** [#102](https://github.com/flykingvip-cloud/openbot-vp/pull/102) squash → main `f53e027b`。
 > W4（经验有效性与受控进化）**已合入** [#109](https://github.com/flykingvip-cloud/openbot-vp/pull/109) squash → main `b8ff8ea4`：曝光≠verified。
 > W5（结构与运行收尾）**日志有界**已合入 [#112](https://github.com/flykingvip-cloud/openbot-vp/pull/112) → main `23314d48`；**不**宣布 W0–W5 全部收尾。
-> **Wrap-up（本轮）**：修 W4 P1（任务级曝光 / 可等待落盘 / 共现≠有效）；W3 tip 预算最小生产接线（`recordRunnerTurnOutcome`）；矩阵改为四态。**未 merge / 未部署**。
+> **Wrap-up（#117）**：修 W4 P1；W3 tip 预算最小生产接线；矩阵四态。已合入 main `0513edd2`。
+> **Residual（本轮）**：W1 入口摸底（真实调用点）；非 chat 路径复用 tip.budget；adopted 上游显式 API；evolution 旁路仍 inventory。**未 merge / 未部署**。**不**宣布原计划完成。
 
 ## 已核实合入（gh，勿口述）
 
@@ -34,8 +35,8 @@ entrypoint adapter 实例方法
   →（仅 closed + eligible）growth-bridge → appendEvolutionTaskOutcome
   →（W2）skill-quality / mode-quality handlers（tip+eligibility；cancelled 只进 cancelledCount）
   →（W2）attempt 正样本回填 confirmPatternOutcomeByRunId / skill task_outcome_confirmed
-  →（W3）tip taskContract；tip budget 投影 + **chat runner 路径** `recordRunnerTurnOutcome` 累计/超限 `budget_exceeded`（其余路径未覆盖）
-  →（W4 wrap-up）tip experienceExposure（run/task 键）；成功+曝光=「成功任务中的曝光」；**adopted∩exposure** 才 outcome_verified→策展
+  →（W3+residual）tip taskContract；tip budget 投影 + **`recordRunnerTurnOutcome` 共用路径**（chat/cron/cli/collab/gateway_agent）累计/超限；`costUsd` 仅显式传入；无 USD 证据路径只计 iterations
+  →（W4+residual）tip experienceExposure（run/task 键）；成功+曝光=「成功任务中的曝光」；**`attachAdoptedLearningAssetsToTask` / `adoptedAssetIds` 显式** → adopted∩exposure 才 outcome_verified→策展（禁止注入猜测）
   →（W5）evolution-loop-log：进程内 captured 有界 ring（`EVOLUTION_LOOP_LOG_CAPTURE_MAX`）；console JSON 仍为生产观测
 ```
 
@@ -72,9 +73,14 @@ entrypoint adapter 实例方法
 | collab        | claim-contract ensureCollab | group:item:claim   | claim 面     | apply       | claim 面       | wiring.test claim/apply  |
 | chat          | 既有 ensureChat             | tip                | 既有         | 既有        | 既有           | 既有                     |
 
-**诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander 已恢复为模块路径 only（交付树无异 owner 热路径声明）。
+**W1 入口（residual 摸底）**：
 
-**登记**：W1–W5 合入 tip 见上表。Wrap-up 修 W4 P1 + W3 chat-runner 预算接线 + 四态矩阵。**不**另起主动记忆/容错/预算控制层。诚实缺口：evolution `recordRunOutcome` 旁路不退役；W1 遗留入口；W3 非 runner 路径未接 tip 预算；adopted 无自动推断；pending 仍进程内。**本 wrap-up PR 未 merge / 未部署**。
+- `gateway/server-methods/agent.ts`：**已接通**（`dispatchAgentRunFromGateway` → `agentCommandFromIngress` → `ensureGatewayAgentTurnTaskOutcome`）。
+- collab：**claim/apply** 经 `claim-contract-entry` ensureCollab + 收尾；其它 board RPC **复用 claim tip**，不另 invent 任务身份。
+- cron 冷启动：仍靠 tip store / gateway hydrate（跨进程无第二套身份）。
+- **子 agent lane**：`commands/agent` 对 `AGENT_LANE_SUBAGENT` **故意跳过** TaskOutcome（文档诚实登记，不算完成）。
+
+**登记**：W1–W5 + wrap-up #117 已合入。Residual：非 chat 入口复用同一 `recordRunnerTurnOutcome` tip.budget（iterations；`costUsd` 仅调用方显式传入）；`attachAdoptedLearningAssetsToTask` 显式 adopted（禁止注入猜测）；evolution `recordRunOutcome` **仍不退役**（缺：evolution-control RPC / canary 无 tip 生命周期证明）。pending 仍进程内。**本 residual PR 未 merge / 未部署**。
 
 **既有超时/重试/回退/用量（W3 inventory，不另起）**：`CloseReasonCode.timeout` + eligibility；supervisor `retry.nextStop`（iterations/cost/duration）；agents `model-fallback`；gateway billing / enterprise-model budget-gate。任务总预算 tip 只做投影与关闭归因，不替代上述机制。
 
@@ -93,16 +99,16 @@ entrypoint adapter 实例方法
 
 ## 旧路径分类（详见 W0 报告；不按函数名批量删除）
 
-| 写入                                                                                         | 文件                                     | 分类                       | 说明                                                                                                                      |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `appendEvolutionTaskOutcome`（growth-bridge）                                                | `growth-bridge.ts`                       | **已替换路径上的合法写入** | 仅统一结果 + 资格允许时；含 revoke                                                                                        |
-| `appendEvolutionTaskOutcome`（operational-metrics `recordTaskOutcome` / `recordRunOutcome`） | `operational-metrics-store.ts`           | **旁路仍在（W5 不退役）**  | 仍可直接记 succeeded；canary/working-dna / evolution-control RPC 仍调；退役条件=证明 tip/growth-bridge 已替代全部生产写入 |
-| `recordToolOutcomes`                                                                         | `operational-metrics-store.ts`           | **合法独立观测**           | 工具计数；非任务成功                                                                                                      |
-| `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome`                                        | `agent-runner-execution.ts`              | **已替换**                 | 热路径已切统一 TaskOutcome                                                                                                |
-| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun`                            | `attempt.ts`                             | **观测；#94 已阻误成功**   | 非任务 tip；W2 经 consumer `attempt-backfill` 在 closed+eligible 回填                                                     |
-| agent-runner 演化写失败可观测                                                                | `agent-runner-evolution-outcome.test.ts` | **合法独立观测**           | 保留                                                                                                                      |
-| `learning-recall` 注入累加 reuse                                                             | `learning-recall-context.ts`             | **W4 已替换语义**          | 注入=injected 曝光；策展改 outcome_verified；reuseCount 为 legacy 别名                                                    |
-| `evolution-loop-log` 进程内 `captured[]`                                                     | `evolution-loop-log.ts`                  | **W5 已收尾（有界）**      | ring `EVOLUTION_LOOP_LOG_CAPTURE_MAX`；生产仍靠 console JSON；非耐久账本                                                  |
+| 写入                                                                                         | 文件                                     | 分类                            | 说明                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `appendEvolutionTaskOutcome`（growth-bridge）                                                | `growth-bridge.ts`                       | **已替换路径上的合法写入**      | 仅统一结果 + 资格允许时；含 revoke                                                                                                                                                              |
+| `appendEvolutionTaskOutcome`（operational-metrics `recordTaskOutcome` / `recordRunOutcome`） | `operational-metrics-store.ts`           | **旁路仍在（residual 不退役）** | 仍可直接记 succeeded；**缺**：evolution-control RPC 与 canary/working-dna loop 无 tip 生命周期；working-dna **读**已走 growth-bridge `readEffective`；退役条件=上述写入全部改 tip→growth-bridge |
+| `recordToolOutcomes`                                                                         | `operational-metrics-store.ts`           | **合法独立观测**                | 工具计数；非任务成功                                                                                                                                                                            |
+| `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome`                                        | `agent-runner-execution.ts`              | **已替换**                      | 热路径已切统一 TaskOutcome                                                                                                                                                                      |
+| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun`                            | `attempt.ts`                             | **观测；#94 已阻误成功**        | 非任务 tip；W2 经 consumer `attempt-backfill` 在 closed+eligible 回填                                                                                                                           |
+| agent-runner 演化写失败可观测                                                                | `agent-runner-evolution-outcome.test.ts` | **合法独立观测**                | 保留                                                                                                                                                                                            |
+| `learning-recall` 注入累加 reuse                                                             | `learning-recall-context.ts`             | **W4 已替换语义**               | 注入=injected 曝光；策展改 outcome_verified；reuseCount 为 legacy 别名                                                                                                                          |
+| `evolution-loop-log` 进程内 `captured[]`                                                     | `evolution-loop-log.ts`                  | **W5 已收尾（有界）**           | ring `EVOLUTION_LOOP_LOG_CAPTURE_MAX`；生产仍靠 console JSON；非耐久账本                                                                                                                        |
 
 ## loom / 热文件（W0 登记）
 
@@ -131,22 +137,24 @@ entrypoint adapter 实例方法
 
 **禁止**把下列各项统一标成「收尾完成」或「原计划已完成」。日志有界（W5）可标行为已验证；其余按实态。
 
-| 阶段 | 主题            | main tip                     | 接口可用        | 生产接通                                      | 行为已验证                               | 未完成（诚实）                                                |
-| ---- | --------------- | ---------------------------- | --------------- | --------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
-| W0   | 基线与证据      | `1f698e37` #95               | 是              | n/a（文档）                                   | 文档分类                                 | 「已完成」仅限有调用证据入口                                  |
-| W1   | 跨入口身份/收尾 | `b6c60550` #98               | 是              | 部分入口                                      | 已接线入口测                             | server-methods/agent；collab 其它 RPC；子 agent               |
-| W2   | 技能/模式消费   | `f3a19e08` #99               | 是              | tip 消费链                                    | handlers 测                              | evolution 旁路仍 inventory                                    |
-| W3   | 验收与总预算    | `f53e027b` #102 + wrap-up    | 是（投影/门闩） | **一条**：`recordRunnerTurnOutcome` 累计/超限 | wrap-up 测：同 task 重试累计、超限停止   | supervisor 其它热路径；ParentChild；非 chat runner            |
-| W4   | 经验有效性      | `b8ff8ea4` #109 + wrap-up P1 | 是（四段字段）  | tip exposure + consumer                       | wrap-up：并发不串、落盘后 ack、共现≠策展 | adopted **无**自动推断；pending 仍进程内；无采用则不 verified |
-| W5   | 结构/矩阵       | `23314d48` #112              | 是              | loop-log 观测                                 | **有界 ring 行为已验证**                 | 旁路不退役；**不**宣布 W0–W5 全部收尾                         |
+| 阶段 | 主题            | main tip                     | 接口可用        | 生产接通                                                   | 行为已验证                                        | 未完成（诚实）                                                           |
+| ---- | --------------- | ---------------------------- | --------------- | ---------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
+| W0   | 基线与证据      | `1f698e37` #95               | 是              | n/a（文档）                                                | 文档分类                                          | 「已完成」仅限有调用证据入口                                             |
+| W1   | 跨入口身份/收尾 | `b6c60550` #98 + residual    | 是              | chat/cron/cli/gateway_agent/collab claim                   | 已接线入口测 + residual inventory                 | 子 agent **故意跳过**；collab 非 claim RPC 复用 tip；cron 冷启动 hydrate |
+| W2   | 技能/模式消费   | `f3a19e08` #99               | 是              | tip 消费链                                                 | handlers 测                                       | evolution 旁路仍 inventory                                               |
+| W3   | 验收与总预算    | `f53e027b` + #117 + residual | 是（投影/门闩） | **共用** `recordRunnerTurnOutcome`（含非 chat entrypoint） | residual：cron/cli/collab/gateway_agent 累计/超限 | mid-run 预检；ParentChild；无 USD 证据不计 cost；supervisor 旁路         |
+| W4   | 经验有效性      | `b8ff8ea4` + #117 + residual | 是（四段字段）  | tip exposure + **显式 adopted API**                        | residual：attach→adopted；无 adopted 不策展       | 生产采用方须显式传 id；pending 仍进程内；无自动推断                      |
+| W5   | 结构/矩阵       | `23314d48` #112 + residual   | 是              | loop-log 观测                                              | **有界 ring 行为已验证**                          | 旁路不退役（RPC/canary 无 tip）；**不**宣布原计划完成                    |
 
 **复用 / 断点 / 减少（wrap-up）**
 
-| 项      | 复用什么                                         | 修哪个断点                | 减少什么                                          |
-| ------- | ------------------------------------------------ | ------------------------- | ------------------------------------------------- |
-| W4 关联 | tip `experienceExposure`；`run:`/`task:` pending | agentId 并发串经验        | 禁止 agentId 猜测；无可靠关联则跳过验证           |
-| W4 落盘 | `recordLearningExperienceStage`（可等待）        | 先 ack 后写丢数           | drain await；失败不 markConsumed；correction 撤销 |
-| W4 口径 | 既有四段指标 + 策展阈值                          | 共现当有效                | Option A：无 adopted＝成功任务中的曝光；不策展    |
-| W3 预算 | `budget.ts` / supervisor D-BUDGET                | tip 有快照无执行限制      | 只接 chat `recordRunnerTurnOutcome`；不另造账本   |
-| W5 矩阵 | call-chain 表                                    | 假「全部收尾」            | 四态分列；日志有界单独通过                        |
-| 旁路    | growth-bridge                                    | `recordRunOutcome` 绕 tip | **不删除**（未证明替代）                          |
+| 项         | 复用什么                                         | 修哪个断点                | 减少什么                                                                |
+| ---------- | ------------------------------------------------ | ------------------------- | ----------------------------------------------------------------------- |
+| W4 关联    | tip `experienceExposure`；`run:`/`task:` pending | agentId 并发串经验        | 禁止 agentId 猜测；无可靠关联则跳过验证                                 |
+| W4 落盘    | `recordLearningExperienceStage`（可等待）        | 先 ack 后写丢数           | drain await；失败不 markConsumed；correction 撤销                       |
+| W4 口径    | 既有四段指标 + 策展阈值                          | 共现当有效                | Option A：无 adopted＝成功任务中的曝光；不策展                          |
+| W3 预算    | `budget.ts` / supervisor D-BUDGET                | tip 有快照无执行限制      | 共用 `recordRunnerTurnOutcome`（非 chat entrypoint 同路径）；不另造账本 |
+| W4 adopted | tip exposure + learning-recall stage             | 上游无显式 adopted        | `attachAdoptedLearningAssetsToTask`；禁止注入当采用                     |
+| W1 入口    | commands/agent + claim-contract + cron run       | 文档仍写「未改」          | 摸底：agent RPC 已接通；子 agent 故意跳过                               |
+| W5 矩阵    | call-chain 表                                    | 假「全部收尾」            | 四态分列；日志有界单独通过；不宣布原计划完成                            |
+| 旁路       | growth-bridge + working-dna readEffective        | `recordRunOutcome` 绕 tip | **不删除**：evolution-control RPC / canary 仍直接写                     |

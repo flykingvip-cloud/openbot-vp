@@ -80,6 +80,17 @@ function attemptFingerprint(record: TaskOutcomeRecord): string {
           botId: scope.botId,
           assetIds: [...scope.assetIds].toSorted(),
         })),
+        // Residual: explicit adopted / verifiedContribution changes must bump tip.
+        experienceAdoptedAssetIds: [
+          ...(record.experienceExposure?.adoptedAssetIds ?? []),
+        ].toSorted(),
+        experienceVerifiedContribution: record.experienceExposure?.verifiedContribution
+          ? {
+              eventId: record.experienceExposure.verifiedContribution.eventId,
+              outcomeVersion: record.experienceExposure.verifiedContribution.outcomeVersion,
+              assetIds: [...record.experienceExposure.verifiedContribution.assetIds].toSorted(),
+            }
+          : null,
       }),
     )
     .digest("hex");
