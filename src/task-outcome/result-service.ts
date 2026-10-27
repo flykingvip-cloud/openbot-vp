@@ -67,6 +67,13 @@ function attemptFingerprint(record: TaskOutcomeRecord): string {
         capabilityModalityTargetCompleted:
           record.capabilityModality?.targetModalityCompleted ?? null,
         reasonDetail: record.reasonDetail ?? null,
+        // W3: budget / taskContract must not be treated as no-op fingerprints.
+        taskContractKind: record.taskContract?.kind ?? null,
+        taskContractId: record.taskContract?.id ?? null,
+        budgetSpent: record.budget?.spentCostUsd ?? null,
+        budgetIterations: record.budget?.iterationCount ?? null,
+        budgetMaxCost: record.budget?.maxCostUsd ?? null,
+        budgetMaxIterations: record.budget?.maxIterations ?? null,
       }),
     )
     .digest("hex");

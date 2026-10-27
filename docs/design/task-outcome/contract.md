@@ -48,6 +48,17 @@
 
 `ParentChildContract`：`requiredChildTaskIds` / `optionalChildTaskIds` / `aggregation`，防止父子重复计同一指标（P0 保留字段与类型；聚合计算接口边界，P1 扩消费）。
 
+## 5.1 W3 任务类型验收与总预算（复用现有机制）
+
+| 问题 | 复用什么                                                                                                                    | 修哪个断点                                                                                                           | 减少什么                                                     |
+| ---- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 验收 | `chat-entry`：`resolveTurnTaskContract` / `resolveChatTurnCloseGates` / `CHAT_TURN_CONTRACT_V1`（生产 `agent-runner` 已用） | tip 持久化 `taskContract` + `set_acceptance(not_required)` 在非 chat_turn/有 validators 时 → `invented_not_required` | 删除平行 `task-type-acceptance` 模块；普通聊天不要求产物验证 |
+| 预算 | supervisor D-BUDGET：`DEFAULT_SUPERVISOR_BUDGET` / `resolveEffectiveBudget`；耗尽臂对齐 `retry.nextStop`                    | tip 投影 spend + `fail_closed(budget_exceeded)`；eligibility attribution=`budget`（不计技能/成长负样本）             | 不新增账本/预占/调度；不复制默认天花板与 tighten 逻辑        |
+
+既有收敛（本轮仅 inventory，不另起）：`CloseReasonCode.timeout` 已有 eligibility；supervisor `retry` / agents `model-fallback` / gateway billing usage limits 继续各自生效。
+
+非目标：W4 learning-recall；W5 evolution-loop-log；supervisor 热路径全量自动扣 tip；evolution 旁路退役。
+
 ## 6. 入口适配
 
 同一结果服务：`chat` / `gateway_agent` / `cron` / `cli` / `collab`。  

@@ -4,6 +4,7 @@
  * Durable terminals: success | failure | cancelled only.
  */
 
+import type { TaskBudgetState } from "./budget.js";
 import type { CapabilityModalitySnapshot } from "./capability-modality.js";
 
 export const TASK_OUTCOME_SCHEMA_VERSION = "1.0.0" as const;
@@ -79,6 +80,25 @@ export type AcceptanceEvidence = {
   executionVersion: string;
 };
 
+export type TaskContractKind =
+  | "chat_turn"
+  | "code"
+  | "document"
+  | "external_action"
+  | "execution"
+  | "unknown";
+
+/**
+ * W3: tip-durable task-type contract (same fields as chat-entry ResolvedTurnTaskContract).
+ * Acceptance gates reuse resolveTurnTaskContract / resolveChatTurnCloseGates — do not fork.
+ */
+export type TaskContractIdentity = {
+  id: string;
+  version: string;
+  kind: TaskContractKind;
+  requiredValidators: readonly string[];
+};
+
 export type ChildAggregationPolicy =
   | { strategy: "all_required" }
   | { strategy: "quorum"; requiredCount: number }
@@ -106,6 +126,7 @@ export type CloseReasonCode =
   | "run_failed"
   | "user_filtered"
   | "timeout"
+  | "budget_exceeded"
   | "other";
 
 export type TaskOutcomeRecord = {
@@ -116,6 +137,16 @@ export type TaskOutcomeRecord = {
   taskId: string;
   parentTaskId?: string;
   parentChild?: ParentChildContract;
+  /**
+   * W3: durable contract identity on tip; set_acceptance(not_required) refused when
+   * kind≠chat_turn or validators present (gates still resolved via chat-entry).
+   */
+  taskContract?: TaskContractIdentity;
+  /**
+   * W3: tip projection of supervisor D-BUDGET (not a new ledger/prealloc/scheduler).
+   * Exhaust → fail_closed(budget_exceeded); eligibility attribution=budget.
+   */
+  budget?: TaskBudgetState;
   entrypoint: Entrypoint;
   lifecycle: Lifecycle;
   decisiveRunStatus: DecisiveRunStatus;
@@ -179,6 +210,7 @@ export type EvaluationEligibility = {
     | "provider"
     | "delivery"
     | "prepare"
+    | "budget"
     | "other";
 };
 
@@ -189,6 +221,10 @@ export type SubmitTransition =
       scope: TrustedScope;
       taskContractVersion: string;
       parentTaskId?: string;
+      /** W3 optional tip contract identity. */
+      taskContract?: TaskContractIdentity;
+      /** W3 optional initial budget snapshot. */
+      budget?: TaskBudgetState;
     }
   | {
       type: "record_attempt";
@@ -247,6 +283,29 @@ export type SubmitTransition =
       decisiveRunStatus?: DecisiveRunStatus;
     }
   | {
+      /** W3: attach / replace tip task-type contract (acceptance identity). */
+      type: "set_task_contract";
+      taskContract: TaskContractIdentity;
+      expectedVersion: number;
+      fencingToken: string;
+    }
+  | {
+      /** W3: set or replace tip budget snapshot (limits + spend). */
+      type: "set_budget";
+      budget: TaskBudgetState;
+      expectedVersion: number;
+      fencingToken: string;
+    }
+  | {
+      /** W3: accumulate spend; tip updated; caller may then fail_closed on exhaustion. */
+      type: "accumulate_budget_spend";
+      costUsd?: number;
+      iterations?: number;
+      expectedVersion: number;
+      fencingToken: string;
+      nowMs?: number;
+    }
+  | {
       /**
        * Controlled path: mark target modality completed from real execution evidence.
        * Refuses executor_unwired / no_executable_candidates / unsupported.
@@ -281,3 +340,5 @@ export type SubmitFailure = {
 export type SubmitResult =
   | { ok: true; record: TaskOutcomeRecord; createdEvents: OutcomeOutboxEvent[] }
   | SubmitFailure;
+
+export type { TaskBudgetState, TaskBudgetLimits } from "./budget.js";

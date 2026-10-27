@@ -76,3 +76,19 @@ export {
   resolveAttemptBackfillJudgement,
   type AttemptBackfillResult,
 } from "./attempt-backfill.js";
+
+export {
+  DEFAULT_TASK_BUDGET_LIMITS,
+  accumulateTaskBudgetSpend,
+  applySpendAndAssess,
+  assessTaskBudgetExhaustion,
+  buildTaskBudgetState,
+  ensureTaskBudgetStarted,
+  projectTipBudgetFromSupervisor,
+  resolveEffectiveTaskBudget,
+  type TaskBudgetExhaustion,
+  type TaskBudgetLimits,
+  type TaskBudgetState,
+} from "./budget.js";
+// W3 acceptance: reuse chat-entry (CHAT_TURN_CONTRACT_V1 / resolveTurnTaskContract /
+// resolveChatTurnCloseGates) — do not re-export a parallel task-type-acceptance module.

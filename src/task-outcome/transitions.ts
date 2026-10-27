@@ -1,3 +1,4 @@
+import { accumulateTaskBudgetSpend } from "./budget.js";
 import { assessTargetModalityAcceptance } from "./capability-modality.js";
 import { deriveLifecycle, projectTaskJudgement } from "./judge.js";
 import type {
@@ -48,6 +49,8 @@ export function applyTransition(
       scope: transition.scope,
       taskId,
       ...(transition.parentTaskId?.trim() ? { parentTaskId: transition.parentTaskId.trim() } : {}),
+      ...(transition.taskContract ? { taskContract: transition.taskContract } : {}),
+      ...(transition.budget ? { budget: transition.budget } : {}),
       entrypoint: transition.entrypoint,
       lifecycle,
       decisiveRunStatus: "none",
@@ -121,6 +124,19 @@ export function applyTransition(
       if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
         return { record: current, illegal: "stale_fencing" };
       }
+      // W3: refuse invented not_required when tip carries a non-chat_turn contract.
+      if (transition.acceptance.status === "not_required" && current.taskContract) {
+        const kind = current.taskContract.kind;
+        const hasValidators = (current.taskContract.requiredValidators ?? []).some((v) =>
+          Boolean(v?.trim()),
+        );
+        if (kind !== "chat_turn" || hasValidators) {
+          return {
+            record: current,
+            illegal: `invented_not_required:kind=${kind}`,
+          };
+        }
+      }
       // Formal acceptance: refuse target success when structured modality is incomplete
       // / executor_unwired. Missing modality stays legacy-compatible (allow).
       if (
@@ -191,6 +207,46 @@ export function applyTransition(
         ]
           .filter(Boolean)
           .join(" | "),
+      };
+      break;
+    }
+    case "set_task_contract": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        taskContract: transition.taskContract,
+        // Keep legacy version string aligned when identity is set.
+        taskContractVersion: transition.taskContract.version || current.taskContractVersion,
+      };
+      break;
+    }
+    case "set_budget": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        budget: transition.budget,
+      };
+      break;
+    }
+    case "accumulate_budget_spend": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      if (!current.budget) {
+        return { record: current, illegal: "missing_budget" };
+      }
+      const nowMs = transition.nowMs ?? Date.parse(nowIso);
+      next = {
+        ...next,
+        budget: accumulateTaskBudgetSpend(
+          current.budget,
+          { costUsd: transition.costUsd, iterations: transition.iterations },
+          Number.isFinite(nowMs) ? nowMs : Date.now(),
+        ),
       };
       break;
     }
