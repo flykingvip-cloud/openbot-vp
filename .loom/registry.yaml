@@ -2766,6 +2766,8 @@ tasks:
       - src/memory/cogniweave-cloud-sync-drain.test.ts
       - src/memory/memory-center-atoms.ts
       - src/memory/memory-center-atoms.test.ts
+      - src/memory/memory-center-o4-readonly.ts
+      - src/memory/memory-center-o4-readonly.test.ts
       - src/memory/recall-deny-search-wrapper.ts
       - src/memory/search-manager.ts
       - src/data/memory-lifecycle.ts
@@ -2778,6 +2780,7 @@ tasks:
       - src/config/zod-schema.ts
       - src/gateway/server-methods/memory-center-access.ts
       - src/gateway/server-methods/memory-center-access.test.ts
+      - src/gateway/server-methods/memory-list-o4-status-view.test.ts
       - src/gateway/server-methods/data.ts
       - src/gateway/server-methods/agents.ts
       - ui/src/ui/ports/employee/views/memory-center-page.ts
@@ -19611,6 +19614,8 @@ landingStreams:
       - src/memory/cogniweave-cloud-sync-drain.test.ts
       - src/memory/memory-center-atoms.ts
       - src/memory/memory-center-atoms.test.ts
+      - src/memory/memory-center-o4-readonly.ts
+      - src/memory/memory-center-o4-readonly.test.ts
       - src/config/types.memory.ts
       - src/config/zod-schema.ts
       - src/data/memory-lifecycle.ts
@@ -19621,6 +19626,7 @@ landingStreams:
       - src/gateway/server-methods/conversations.ts
       - src/gateway/server-methods/memory-center-access.ts
       - src/gateway/server-methods/memory-center-access.test.ts
+      - src/gateway/server-methods/memory-list-o4-status-view.test.ts
       - src/gateway/server-methods/data.ts
       - src/gateway/server-methods/agents.ts
       - src/gateway/server-methods.ts
