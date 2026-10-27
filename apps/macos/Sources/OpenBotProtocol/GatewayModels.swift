@@ -29,6 +29,7 @@ public struct ConnectParams: Codable, Sendable {
     public let auth: [String: AnyCodable]?
     public let locale: String?
     public let useragent: String?
+    public let user: String?
     public let pagepath: String?
 
     public init(
@@ -45,6 +46,7 @@ public struct ConnectParams: Codable, Sendable {
         auth: [String: AnyCodable]?,
         locale: String?,
         useragent: String?,
+        user: String?,
         pagepath: String?)
     {
         self.minprotocol = minprotocol
@@ -60,6 +62,7 @@ public struct ConnectParams: Codable, Sendable {
         self.auth = auth
         self.locale = locale
         self.useragent = useragent
+        self.user = user
         self.pagepath = pagepath
     }
 
@@ -77,6 +80,7 @@ public struct ConnectParams: Codable, Sendable {
         case auth
         case locale
         case useragent = "userAgent"
+        case user
         case pagepath = "pagePath"
     }
 }
@@ -2040,6 +2044,9 @@ public struct OguiForm: Codable, Sendable {
     public let type: String?
     public let componentId: String
     public let title: String?
+    public let decisionId: String?
+    public let decisionVersion: Int?
+    public let allowCustom: Bool?
     public let fields: [[String: AnyCodable]]
     public let submitLabel: String?
     public let submit: [String: AnyCodable]?
@@ -2050,6 +2057,9 @@ public struct OguiForm: Codable, Sendable {
         type: String?,
         componentId: String,
         title: String?,
+        decisionId: String?,
+        decisionVersion: Int?,
+        allowCustom: Bool?,
         fields: [[String: AnyCodable]],
         submitLabel: String?,
         submit: [String: AnyCodable]?,
@@ -2059,6 +2069,9 @@ public struct OguiForm: Codable, Sendable {
         self.type = type
         self.componentId = componentId
         self.title = title
+        self.decisionId = decisionId
+        self.decisionVersion = decisionVersion
+        self.allowCustom = allowCustom
         self.fields = fields
         self.submitLabel = submitLabel
         self.submit = submit
@@ -2070,6 +2083,9 @@ public struct OguiForm: Codable, Sendable {
         case type
         case componentId = "component_id"
         case title
+        case decisionId = "decision_id"
+        case decisionVersion = "decision_version"
+        case allowCustom = "allow_custom"
         case fields
         case submitLabel = "submit_label"
         case submit
@@ -2116,20 +2132,29 @@ public struct OguiAnswer: Codable, Sendable {
     public let componentId: String
     public let submissionId: String
     public let answers: [String: AnyCodable]
+    public let answerMode: AnyCodable?
     public let submittedAt: String?
+    public let decisionId: String?
+    public let decisionVersion: Int?
 
     public init(
         schemaVersion: String,
         componentId: String,
         submissionId: String,
         answers: [String: AnyCodable],
-        submittedAt: String?)
+        answerMode: AnyCodable?,
+        submittedAt: String?,
+        decisionId: String?,
+        decisionVersion: Int?)
     {
         self.schemaVersion = schemaVersion
         self.componentId = componentId
         self.submissionId = submissionId
         self.answers = answers
+        self.answerMode = answerMode
         self.submittedAt = submittedAt
+        self.decisionId = decisionId
+        self.decisionVersion = decisionVersion
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -2137,7 +2162,10 @@ public struct OguiAnswer: Codable, Sendable {
         case componentId = "component_id"
         case submissionId = "submission_id"
         case answers
+        case answerMode = "answer_mode"
         case submittedAt = "submitted_at"
+        case decisionId = "decision_id"
+        case decisionVersion = "decision_version"
     }
 }
 
@@ -2703,8 +2731,14 @@ public struct CollaborationTaskPublishBoardItemParams: Codable, Sendable {
     public let remainingwork: String
     public let acceptancecriteria: [String]
     public let title: String?
+    public let goal: String?
+    public let constraints: [String]?
+    public let dueatms: Int?
+    public let suggestedrole: String?
     public let intendedclaimantids: [String]?
     public let publishedby: String?
+    public let challengewindowid: String?
+    public let skipchallengewindow: Bool?
 
     public init(
         groupid: String,
@@ -2712,16 +2746,28 @@ public struct CollaborationTaskPublishBoardItemParams: Codable, Sendable {
         remainingwork: String,
         acceptancecriteria: [String],
         title: String?,
+        goal: String?,
+        constraints: [String]?,
+        dueatms: Int?,
+        suggestedrole: String?,
         intendedclaimantids: [String]?,
-        publishedby: String?)
+        publishedby: String?,
+        challengewindowid: String?,
+        skipchallengewindow: Bool?)
     {
         self.groupid = groupid
         self.taskid = taskid
         self.remainingwork = remainingwork
         self.acceptancecriteria = acceptancecriteria
         self.title = title
+        self.goal = goal
+        self.constraints = constraints
+        self.dueatms = dueatms
+        self.suggestedrole = suggestedrole
         self.intendedclaimantids = intendedclaimantids
         self.publishedby = publishedby
+        self.challengewindowid = challengewindowid
+        self.skipchallengewindow = skipchallengewindow
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -2730,8 +2776,14 @@ public struct CollaborationTaskPublishBoardItemParams: Codable, Sendable {
         case remainingwork = "remainingWork"
         case acceptancecriteria = "acceptanceCriteria"
         case title
+        case goal
+        case constraints
+        case dueatms = "dueAtMs"
+        case suggestedrole = "suggestedRole"
         case intendedclaimantids = "intendedClaimantIds"
         case publishedby = "publishedBy"
+        case challengewindowid = "challengeWindowId"
+        case skipchallengewindow = "skipChallengeWindow"
     }
 }
 
@@ -2846,6 +2898,7 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
     public let taskid: String
     public let itemid: String
     public let submissionid: String
+    public let artifactversion: String
     public let submissionsummary: String?
 
     public init(
@@ -2853,12 +2906,14 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
         taskid: String,
         itemid: String,
         submissionid: String,
+        artifactversion: String,
         submissionsummary: String?)
     {
         self.groupid = groupid
         self.taskid = taskid
         self.itemid = itemid
         self.submissionid = submissionid
+        self.artifactversion = artifactversion
         self.submissionsummary = submissionsummary
     }
 
@@ -2867,6 +2922,7 @@ public struct CollaborationTaskSubmitForReviewParams: Codable, Sendable {
         case taskid = "taskId"
         case itemid = "itemId"
         case submissionid = "submissionId"
+        case artifactversion = "artifactVersion"
         case submissionsummary = "submissionSummary"
     }
 }
@@ -2875,21 +2931,41 @@ public struct CollaborationTaskAcceptSubmissionParams: Codable, Sendable {
     public let groupid: String
     public let taskid: String
     public let itemid: String
+    public let expectedsubmissionid: String
+    public let reason: String
+    public let checkedacceptancecriteria: [String]
+    public let proxyforactorid: String?
+    public let proxybasis: String?
 
     public init(
         groupid: String,
         taskid: String,
-        itemid: String)
+        itemid: String,
+        expectedsubmissionid: String,
+        reason: String,
+        checkedacceptancecriteria: [String],
+        proxyforactorid: String?,
+        proxybasis: String?)
     {
         self.groupid = groupid
         self.taskid = taskid
         self.itemid = itemid
+        self.expectedsubmissionid = expectedsubmissionid
+        self.reason = reason
+        self.checkedacceptancecriteria = checkedacceptancecriteria
+        self.proxyforactorid = proxyforactorid
+        self.proxybasis = proxybasis
     }
 
     private enum CodingKeys: String, CodingKey {
         case groupid = "groupId"
         case taskid = "taskId"
         case itemid = "itemId"
+        case expectedsubmissionid = "expectedSubmissionId"
+        case reason
+        case checkedacceptancecriteria = "checkedAcceptanceCriteria"
+        case proxyforactorid = "proxyForActorId"
+        case proxybasis = "proxyBasis"
     }
 }
 
@@ -2898,17 +2974,20 @@ public struct CollaborationTaskReturnSubmissionParams: Codable, Sendable {
     public let taskid: String
     public let itemid: String
     public let reason: String
+    public let expectedsubmissionid: String
 
     public init(
         groupid: String,
         taskid: String,
         itemid: String,
-        reason: String)
+        reason: String,
+        expectedsubmissionid: String)
     {
         self.groupid = groupid
         self.taskid = taskid
         self.itemid = itemid
         self.reason = reason
+        self.expectedsubmissionid = expectedsubmissionid
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -2916,6 +2995,7 @@ public struct CollaborationTaskReturnSubmissionParams: Codable, Sendable {
         case taskid = "taskId"
         case itemid = "itemId"
         case reason
+        case expectedsubmissionid = "expectedSubmissionId"
     }
 }
 
@@ -2942,6 +3022,88 @@ public struct CollaborationTaskBlockBoardItemParams: Codable, Sendable {
         case taskid = "taskId"
         case itemid = "itemId"
         case reason
+    }
+}
+
+public struct CollaborationTaskUnblockBoardItemParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let itemid: String
+    public let reason: String
+
+    public init(
+        groupid: String,
+        taskid: String,
+        itemid: String,
+        reason: String)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.itemid = itemid
+        self.reason = reason
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case itemid = "itemId"
+        case reason
+    }
+}
+
+public struct CollaborationTaskCancelBoardItemParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let itemid: String
+    public let reason: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        itemid: String,
+        reason: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.itemid = itemid
+        self.reason = reason
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case itemid = "itemId"
+        case reason
+    }
+}
+
+public struct CollaborationTaskStopParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let reason: String?
+    public let inflightabort: AnyCodable?
+    public let externaleffect: AnyCodable?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        reason: String?,
+        inflightabort: AnyCodable?,
+        externaleffect: AnyCodable?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.reason = reason
+        self.inflightabort = inflightabort
+        self.externaleffect = externaleffect
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case reason
+        case inflightabort = "inFlightAbort"
+        case externaleffect = "externalEffect"
     }
 }
 
@@ -3001,6 +3163,212 @@ public struct CollaborationTaskListPeerReviewsParams: Codable, Sendable {
     }
 }
 
+public struct CollaborationTaskOpenChallengeWindowParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let challengerid: String
+    public let remainingwork: String
+    public let acceptancecriteria: [String]
+    public let goal: String?
+    public let constraints: [String]?
+    public let suggestedrole: String?
+    public let title: String?
+    public let windowid: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        challengerid: String,
+        remainingwork: String,
+        acceptancecriteria: [String],
+        goal: String?,
+        constraints: [String]?,
+        suggestedrole: String?,
+        title: String?,
+        windowid: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.challengerid = challengerid
+        self.remainingwork = remainingwork
+        self.acceptancecriteria = acceptancecriteria
+        self.goal = goal
+        self.constraints = constraints
+        self.suggestedrole = suggestedrole
+        self.title = title
+        self.windowid = windowid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case challengerid = "challengerId"
+        case remainingwork = "remainingWork"
+        case acceptancecriteria = "acceptanceCriteria"
+        case goal
+        case constraints
+        case suggestedrole = "suggestedRole"
+        case title
+        case windowid = "windowId"
+    }
+}
+
+public struct CollaborationTaskRecordChallengeCritiqueParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let windowid: String
+    public let issues: [AnyCodable]
+    public let comment: String
+
+    public init(
+        groupid: String,
+        taskid: String,
+        windowid: String,
+        issues: [AnyCodable],
+        comment: String)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.windowid = windowid
+        self.issues = issues
+        self.comment = comment
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case windowid = "windowId"
+        case issues
+        case comment
+    }
+}
+
+public struct CollaborationTaskResolveChallengeWindowParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let windowid: String
+    public let decision: AnyCodable
+    public let reason: String
+    public let revisedgoal: String?
+    public let revisedremainingwork: String?
+    public let revisedacceptancecriteria: [String]?
+    public let revisedconstraints: [String]?
+    public let revisedsuggestedrole: String?
+    public let revisedtitle: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        windowid: String,
+        decision: AnyCodable,
+        reason: String,
+        revisedgoal: String?,
+        revisedremainingwork: String?,
+        revisedacceptancecriteria: [String]?,
+        revisedconstraints: [String]?,
+        revisedsuggestedrole: String?,
+        revisedtitle: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.windowid = windowid
+        self.decision = decision
+        self.reason = reason
+        self.revisedgoal = revisedgoal
+        self.revisedremainingwork = revisedremainingwork
+        self.revisedacceptancecriteria = revisedacceptancecriteria
+        self.revisedconstraints = revisedconstraints
+        self.revisedsuggestedrole = revisedsuggestedrole
+        self.revisedtitle = revisedtitle
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case windowid = "windowId"
+        case decision
+        case reason
+        case revisedgoal = "revisedGoal"
+        case revisedremainingwork = "revisedRemainingWork"
+        case revisedacceptancecriteria = "revisedAcceptanceCriteria"
+        case revisedconstraints = "revisedConstraints"
+        case revisedsuggestedrole = "revisedSuggestedRole"
+        case revisedtitle = "revisedTitle"
+    }
+}
+
+public struct CollaborationTaskSkipChallengeWindowParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let remainingwork: String
+    public let acceptancecriteria: [String]
+    public let skipreason: String
+    public let goal: String?
+    public let constraints: [String]?
+    public let suggestedrole: String?
+    public let title: String?
+    public let windowid: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        remainingwork: String,
+        acceptancecriteria: [String],
+        skipreason: String,
+        goal: String?,
+        constraints: [String]?,
+        suggestedrole: String?,
+        title: String?,
+        windowid: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.remainingwork = remainingwork
+        self.acceptancecriteria = acceptancecriteria
+        self.skipreason = skipreason
+        self.goal = goal
+        self.constraints = constraints
+        self.suggestedrole = suggestedrole
+        self.title = title
+        self.windowid = windowid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case remainingwork = "remainingWork"
+        case acceptancecriteria = "acceptanceCriteria"
+        case skipreason = "skipReason"
+        case goal
+        case constraints
+        case suggestedrole = "suggestedRole"
+        case title
+        case windowid = "windowId"
+    }
+}
+
+public struct CollaborationTaskListChallengeWindowsParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let windowid: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        windowid: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.windowid = windowid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case windowid = "windowId"
+    }
+}
+
 public struct CollaborationTaskListWakeEventsParams: Codable, Sendable {
     public let groupid: String
     public let taskid: String?
@@ -3034,6 +3402,306 @@ public struct CollaborationTaskWhoWokeWhomParams: Codable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case groupid = "groupId"
         case taskid = "taskId"
+    }
+}
+
+public struct CollaborationTaskRunGroupTaskHeartbeatParams: Codable, Sendable {
+    public let groupid: String
+    public let force: Bool?
+    public let coordinatorbotid: String?
+    public let groupownerid: String?
+
+    public init(
+        groupid: String,
+        force: Bool?,
+        coordinatorbotid: String?,
+        groupownerid: String?)
+    {
+        self.groupid = groupid
+        self.force = force
+        self.coordinatorbotid = coordinatorbotid
+        self.groupownerid = groupownerid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case force
+        case coordinatorbotid = "coordinatorBotId"
+        case groupownerid = "groupOwnerId"
+    }
+}
+
+public struct CollaborationTaskAdminDailySummaryParams: Codable, Sendable {
+    public let groupid: String
+
+    public init(
+        groupid: String)
+    {
+        self.groupid = groupid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+    }
+}
+
+public struct CollaborationTaskTrySelfAdvanceParams: Codable, Sendable {
+    public let groupid: String
+    public let actorid: String
+    public let dryrun: Bool?
+
+    public init(
+        groupid: String,
+        actorid: String,
+        dryrun: Bool?)
+    {
+        self.groupid = groupid
+        self.actorid = actorid
+        self.dryrun = dryrun
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case actorid = "actorId"
+        case dryrun = "dryRun"
+    }
+}
+
+public struct CollaborationTaskProposeTodolistParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let boarditemid: String
+    public let steps: [[String: AnyCodable]]
+    public let ownermemberid: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        boarditemid: String,
+        steps: [[String: AnyCodable]],
+        ownermemberid: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.boarditemid = boarditemid
+        self.steps = steps
+        self.ownermemberid = ownermemberid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case boarditemid = "boardItemId"
+        case steps
+        case ownermemberid = "ownerMemberId"
+    }
+}
+
+public struct CollaborationTaskRetryOwnerDecisionDeliveryParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let todolistid: String
+    public let expectedversion: Int?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        todolistid: String,
+        expectedversion: Int?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.todolistid = todolistid
+        self.expectedversion = expectedversion
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case todolistid = "todolistId"
+        case expectedversion = "expectedVersion"
+    }
+}
+
+public struct CollaborationTaskListOwnerDecisionDeliveriesParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String?
+
+    public init(
+        groupid: String,
+        taskid: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+    }
+}
+
+public struct CollaborationTaskConfirmTodolistParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let todolistid: String
+    public let expectedversion: Int?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        todolistid: String,
+        expectedversion: Int?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.todolistid = todolistid
+        self.expectedversion = expectedversion
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case todolistid = "todolistId"
+        case expectedversion = "expectedVersion"
+    }
+}
+
+public struct CollaborationTaskReviseTodolistParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let todolistid: String
+    public let reason: String
+    public let steps: [[String: AnyCodable]]?
+    public let expectedversion: Int?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        todolistid: String,
+        reason: String,
+        steps: [[String: AnyCodable]]?,
+        expectedversion: Int?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.todolistid = todolistid
+        self.reason = reason
+        self.steps = steps
+        self.expectedversion = expectedversion
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case todolistid = "todolistId"
+        case reason
+        case steps
+        case expectedversion = "expectedVersion"
+    }
+}
+
+public struct CollaborationTaskGetTodolistParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let todolistid: String
+
+    public init(
+        groupid: String,
+        taskid: String,
+        todolistid: String)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.todolistid = todolistid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case todolistid = "todolistId"
+    }
+}
+
+public struct CollaborationTaskListTodolistsParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let boarditemid: String?
+    public let ownermemberid: String?
+
+    public init(
+        groupid: String,
+        taskid: String,
+        boarditemid: String?,
+        ownermemberid: String?)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.boarditemid = boarditemid
+        self.ownermemberid = ownermemberid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case boarditemid = "boardItemId"
+        case ownermemberid = "ownerMemberId"
+    }
+}
+
+public struct CollaborationTaskBuildExecutionTaskBagParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let boarditemid: String
+    public let ownermemberid: String
+
+    public init(
+        groupid: String,
+        taskid: String,
+        boarditemid: String,
+        ownermemberid: String)
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.boarditemid = boarditemid
+        self.ownermemberid = ownermemberid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case boarditemid = "boardItemId"
+        case ownermemberid = "ownerMemberId"
+    }
+}
+
+public struct CollaborationTaskSignalInsightParams: Codable, Sendable {
+    public let groupid: String
+    public let taskid: String
+    public let boarditemid: String
+    public let insightsummary: String
+    public let toleadids: [String]
+
+    public init(
+        groupid: String,
+        taskid: String,
+        boarditemid: String,
+        insightsummary: String,
+        toleadids: [String])
+    {
+        self.groupid = groupid
+        self.taskid = taskid
+        self.boarditemid = boarditemid
+        self.insightsummary = insightsummary
+        self.toleadids = toleadids
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case groupid = "groupId"
+        case taskid = "taskId"
+        case boarditemid = "boardItemId"
+        case insightsummary = "insightSummary"
+        case toleadids = "toLeadIds"
     }
 }
 
@@ -3941,6 +4609,182 @@ public struct ModelsManagementAorStatusParams: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case enterpriseid = "enterpriseId"
+    }
+}
+
+public struct ModelsAdmissionDiscoverParams: Codable, Sendable {
+    public let modelref: String
+    public let declaredcapabilities: [String]?
+    public let calltype: String?
+
+    public init(
+        modelref: String,
+        declaredcapabilities: [String]?,
+        calltype: String?)
+    {
+        self.modelref = modelref
+        self.declaredcapabilities = declaredcapabilities
+        self.calltype = calltype
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case modelref = "modelRef"
+        case declaredcapabilities = "declaredCapabilities"
+        case calltype = "callType"
+    }
+}
+
+public struct ModelsAdmissionCreateVerificationParams: Codable, Sendable {
+    public let modelref: String
+    public let capabilityids: [String]
+    public let mode: AnyCodable?
+    public let configfingerprint: String?
+    public let estimatedcalls: Int?
+    public let connectionok: Bool?
+
+    public init(
+        modelref: String,
+        capabilityids: [String],
+        mode: AnyCodable?,
+        configfingerprint: String?,
+        estimatedcalls: Int?,
+        connectionok: Bool?)
+    {
+        self.modelref = modelref
+        self.capabilityids = capabilityids
+        self.mode = mode
+        self.configfingerprint = configfingerprint
+        self.estimatedcalls = estimatedcalls
+        self.connectionok = connectionok
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case modelref = "modelRef"
+        case capabilityids = "capabilityIds"
+        case mode
+        case configfingerprint = "configFingerprint"
+        case estimatedcalls = "estimatedCalls"
+        case connectionok = "connectionOk"
+    }
+}
+
+public struct ModelsAdmissionGetVerificationParams: Codable, Sendable {
+    public let taskid: String
+
+    public init(
+        taskid: String)
+    {
+        self.taskid = taskid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case taskid = "taskId"
+    }
+}
+
+public struct ModelsAdmissionListVerificationParams: Codable, Sendable {
+    public let modelref: String?
+
+    public init(
+        modelref: String?)
+    {
+        self.modelref = modelref
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case modelref = "modelRef"
+    }
+}
+
+public struct ModelsAdmissionCancelVerificationParams: Codable, Sendable {
+    public let taskid: String
+
+    public init(
+        taskid: String)
+    {
+        self.taskid = taskid
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case taskid = "taskId"
+    }
+}
+
+public struct ModelsAdmissionBatchVerificationParams: Codable, Sendable {
+    public let items: [ModelsAdmissionCreateVerificationParams]
+
+    public init(
+        items: [ModelsAdmissionCreateVerificationParams])
+    {
+        self.items = items
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case items
+    }
+}
+
+public struct ModelsAdmissionSetRoutingEligibilityParams: Codable, Sendable {
+    public let modelref: String
+    public let autorouting: AnyCodable
+    public let reason: String?
+    public let taskcategories: [String]?
+    public let tenantselectable: Bool?
+
+    public init(
+        modelref: String,
+        autorouting: AnyCodable,
+        reason: String?,
+        taskcategories: [String]?,
+        tenantselectable: Bool?)
+    {
+        self.modelref = modelref
+        self.autorouting = autorouting
+        self.reason = reason
+        self.taskcategories = taskcategories
+        self.tenantselectable = tenantselectable
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case modelref = "modelRef"
+        case autorouting = "autoRouting"
+        case reason
+        case taskcategories = "taskCategories"
+        case tenantselectable = "tenantSelectable"
+    }
+}
+
+public struct ModelsAdmissionGetModelParams: Codable, Sendable {
+    public let modelref: String
+
+    public init(
+        modelref: String)
+    {
+        self.modelref = modelref
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case modelref = "modelRef"
+    }
+}
+
+public struct ModelsAdmissionListModelsParams: Codable, Sendable {}
+
+public struct ModelsAdmissionPreviewRoutingParams: Codable, Sendable {
+    public let request: [String: AnyCodable]
+    public let candidates: [[String: AnyCodable]]
+
+    public init(
+        request: [String: AnyCodable],
+        candidates: [[String: AnyCodable]])
+    {
+        self.request = request
+        self.candidates = candidates
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case request
+        case candidates
     }
 }
 
@@ -5894,6 +6738,28 @@ public struct ChatHistoryParams: Codable, Sendable {
     }
 }
 
+public struct ChatGuideAppendParams: Codable, Sendable {
+    public let sessionkey: String
+    public let slot: String
+    public let state: [String: AnyCodable]?
+
+    public init(
+        sessionkey: String,
+        slot: String,
+        state: [String: AnyCodable]?)
+    {
+        self.sessionkey = sessionkey
+        self.slot = slot
+        self.state = state
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case sessionkey = "sessionKey"
+        case slot
+        case state
+    }
+}
+
 public struct ChatSendParams: Codable, Sendable {
     public let sessionkey: String
     public let message: String
@@ -6007,6 +6873,8 @@ public struct ChatInjectParams: Codable, Sendable {
     public let message: String
     public let label: String?
     public let peerdelivery: Bool?
+    public let peeroutbound: Bool?
+    public let sentto: [[String: AnyCodable]]?
     public let senderlabel: String?
     public let sourcesessionkey: String?
     public let sessionownerplatformuserid: String?
@@ -6020,6 +6888,8 @@ public struct ChatInjectParams: Codable, Sendable {
         message: String,
         label: String?,
         peerdelivery: Bool?,
+        peeroutbound: Bool?,
+        sentto: [[String: AnyCodable]]?,
         senderlabel: String?,
         sourcesessionkey: String?,
         sessionownerplatformuserid: String?,
@@ -6032,6 +6902,8 @@ public struct ChatInjectParams: Codable, Sendable {
         self.message = message
         self.label = label
         self.peerdelivery = peerdelivery
+        self.peeroutbound = peeroutbound
+        self.sentto = sentto
         self.senderlabel = senderlabel
         self.sourcesessionkey = sourcesessionkey
         self.sessionownerplatformuserid = sessionownerplatformuserid
@@ -6046,6 +6918,8 @@ public struct ChatInjectParams: Codable, Sendable {
         case message
         case label
         case peerdelivery = "peerDelivery"
+        case peeroutbound = "peerOutbound"
+        case sentto = "sentTo"
         case senderlabel = "senderLabel"
         case sourcesessionkey = "sourceSessionKey"
         case sessionownerplatformuserid = "sessionOwnerPlatformUserId"

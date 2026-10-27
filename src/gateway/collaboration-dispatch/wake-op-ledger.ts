@@ -78,6 +78,7 @@ export {
   readWakeOpDurableEffectReceipt,
   selectWakeOpVerifyAdapter,
   writeWakeOpDurableEffectReceipt,
+  writeNudgeNoExternalCallEffectReceipt,
   type WakeOpDurableEffectReceipt,
   type WakeOpEffectVerifyAdapter,
   type WakeOpEffectVerifyAdapterRegistry,

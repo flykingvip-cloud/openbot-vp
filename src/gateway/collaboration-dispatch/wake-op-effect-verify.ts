@@ -199,9 +199,13 @@ export function createFixtureReceiptNoneAdapter(params: {
 
 /**
  * Sources this build **declares** as verify-capable via durable authority receipts.
- * All other wake-op sources are explicit OOS for platform auto-prove — keep unknown,
- * return verify_capability_unavailable, and do NOT auto-retry side effects.
+ * Production write for `nudge` is wired in `consumeWakeForRoundDispatch` via
+ * {@link writeNudgeNoExternalCallEffectReceipt} — only when the Mode B dispatcher
+ * was never invoked for the attempt. All other wake-op sources stay OOS for
+ * platform auto-prove — keep unknown, return verify_capability_unavailable, and
+ * do NOT auto-retry side effects.
  * Do NOT extrapolate "all production receipt adapters are ready".
+ * Missing receipt must NEVER be treated as outcome none.
  */
 export const WAKE_OP_DECLARED_VERIFY_CAPABLE_SOURCES = ["nudge"] as const;
 export type WakeOpDeclaredVerifyCapableSource =
@@ -232,7 +236,8 @@ function effectReceiptFile(dir: string, opKey: string, attemptId: string): strin
 
 /**
  * Persist a durable effect receipt under the runtime authority namespace.
- * Composition / probes write here; declared adapters read here (not caller paths).
+ * Production nudge none-proofs write via {@link writeNudgeNoExternalCallEffectReceipt};
+ * tests/probes may call this directly. Declared adapters read here (not caller paths).
  */
 export async function writeWakeOpDurableEffectReceipt(params: {
   authority: RuntimeAuthority;
@@ -271,6 +276,53 @@ export async function writeWakeOpDurableEffectReceipt(params: {
     await writeJsonDurable(file, record);
   });
   return { ok: true, record };
+}
+
+/**
+ * Production writer for declared `nudge`: persist `outcome: "none"` only when the
+ * executor cites a concrete fact that the Mode B round dispatcher was **never
+ * invoked** for this attempt.
+ *
+ * ## Fact standard (sufficient to prove no external wake-round side effect)
+ * All of:
+ * 1. `source === "nudge"` for this attempt;
+ * 2. `claimWakeOpRunning` succeeded (attemptId bound on the op record);
+ * 3. `consumeWakeForRoundDispatch` never called the round dispatcher for this
+ *    attempt (pre-dispatch refuse/fail/unknown, gate refuse, or `no_consumer`).
+ *
+ * ## Not sufficient (do **not** write none — leave receipt missing)
+ * - Dispatcher was invoked (ok / fail / throw) — external effect may have landed;
+ * - Process crash / missing receipt — **absence of receipt ≠ none**;
+ * - Ledger status alone (`failed` / `unknown` / `completed`) without the
+ *   no-invoke fact;
+ * - Post-external `external_sent_*` unknown paths.
+ *
+ * Verify path stays fail-closed: missing receipt → `verify_capability_unavailable`.
+ */
+export async function writeNudgeNoExternalCallEffectReceipt(params: {
+  authority: RuntimeAuthority;
+  cfg?: OpenBotConfig;
+  source: string;
+  opKey: string;
+  attemptId: string | null | undefined;
+  /** Stable reason token from the executor path (e.g. task_stopped_after_claim). */
+  reason: string;
+  nowMs?: number;
+}): Promise<{ ok: true; record: WakeOpDurableEffectReceipt } | { ok: false; reason: string }> {
+  if (compact(params.source) !== "nudge") {
+    return { ok: false, reason: "not_declared_nudge_source" };
+  }
+  const reason = compact(params.reason) || "unspecified";
+  return writeWakeOpDurableEffectReceipt({
+    authority: params.authority,
+    cfg: params.cfg,
+    opKey: params.opKey,
+    attemptId: compact(params.attemptId),
+    operationType: "nudge",
+    outcome: "none",
+    source: `executor:nudge:no_external_call:${reason}`,
+    nowMs: params.nowMs,
+  });
 }
 
 export async function readWakeOpDurableEffectReceipt(params: {
