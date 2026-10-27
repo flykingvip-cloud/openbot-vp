@@ -186,7 +186,7 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
     expect(new DurableTaskOutcomeStore(root).loadTask("t-race")?.outcomeVersion).toBe(3);
   }, 25000);
 
-  it("durable projection exact counts after restart (success===1)", () => {
+  it("durable projection exact counts after restart (success===1)", async () => {
     const store = new DurableTaskOutcomeStore(root);
     const service = new TaskOutcomeResultService({ store });
     const chat = new ChatTaskOutcomeAdapter(service);
@@ -260,7 +260,7 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
     expect(del.ok).toBe(true);
 
     const c1 = new OutcomeConsumerRuntime(store);
-    c1.drain((id) => store.loadTask(id));
+    await c1.drain((id) => store.loadTask(id));
     expect(c1.getProjection().successCount).toBe(1);
     expect(c1.getProjection().failureCount).toBe(0);
 

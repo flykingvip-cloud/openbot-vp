@@ -233,6 +233,7 @@ export class ChatTaskOutcomeAdapter {
       | "timeout"
       | "authz_denied"
       | "prepare_failed"
+      | "budget_exceeded"
       | "other",
     opts?: {
       fencingToken?: string;

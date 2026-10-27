@@ -110,7 +110,7 @@ describe("W4 experience evolution A–C", () => {
     clearPendingLearningInjectionsForTests();
   });
 
-  it("A: tip success+eligible with exposure verifies; injection alone does not curate metric", () => {
+  it("A: exposure alone does not verify; adopted required; injection alone does not curate", () => {
     const exposureOnly = makeAsset({
       assetId: "exp",
       reuseCount: 5,
@@ -124,15 +124,27 @@ describe("W4 experience evolution A–C", () => {
       }),
     ).toEqual([]);
 
+    const exposureOnlyPlan = resolveExperienceVerificationPlan(
+      baseRecord({
+        experienceExposure: {
+          scopes: [{ scopeId: "grp-w4", botId: "bot-1", assetIds: ["exp"] }],
+          attachedAt: new Date().toISOString(),
+        },
+      }),
+    );
+    expect(exposureOnlyPlan.shouldVerify).toBe(false);
+    expect(exposureOnlyPlan.reason).toBe("exposure_on_success_not_verified");
+
     const record = baseRecord({
       experienceExposure: {
         scopes: [{ scopeId: "grp-w4", botId: "bot-1", assetIds: ["exp"] }],
         attachedAt: new Date().toISOString(),
+        adoptedAssetIds: ["exp"],
       },
     });
     const plan = resolveExperienceVerificationPlan(record);
     expect(plan.shouldVerify).toBe(true);
-    expect(plan.reason).toBe("tip_success_eligible");
+    expect(plan.reason).toBe("tip_success_eligible_adopted");
     expect(plan.scopes[0]?.assetIds).toEqual(["exp"]);
   });
 
@@ -169,28 +181,31 @@ describe("W4 experience evolution A–C", () => {
         experienceExposure: {
           scopes: [{ scopeId: "grp-w4", botId: "bot-1", assetIds: ["a1"] }],
           attachedAt: new Date().toISOString(),
+          adoptedAssetIds: ["a1"],
         },
       }),
     );
-    const applied = applyExperienceVerification(plan);
+    const applied = await applyExperienceVerification(plan);
     expect(applied.verifiedAssetIds).toEqual(["a1"]);
-
-    // stage write is async via safely; wait a tick
-    await new Promise((r) => setTimeout(r, 50));
     const stored = assetsByScope.get("grp-w4")?.[0];
     expect(stored?.outcomeVerifiedCount).toBe(1);
     expect(stored?.injectedCount).toBe(2);
   });
 
-  it("pending ledger remember/take is keyed and consumable", () => {
+  it("pending ledger remember/take is run-keyed and consumable; agentId refused", () => {
     rememberPendingLearningInjection({
       key: "agent-x",
       scopes: [{ scopeId: "grp-w4", botId: "bot-1", assetIds: ["a1", "a2"] }],
     });
-    expect(peekPendingLearningInjection("agent-x")?.scopes[0]?.assetIds).toEqual(["a1", "a2"]);
-    const taken = takePendingLearningInjection("agent-x");
-    expect(taken?.scopes[0]?.assetIds).toEqual(["a1", "a2"]);
     expect(peekPendingLearningInjection("agent-x")).toBeUndefined();
+    rememberPendingLearningInjection({
+      key: "run:r-w4",
+      scopes: [{ scopeId: "grp-w4", botId: "bot-1", assetIds: ["a1", "a2"] }],
+    });
+    expect(peekPendingLearningInjection("run:r-w4")?.scopes[0]?.assetIds).toEqual(["a1", "a2"]);
+    const taken = takePendingLearningInjection("run:r-w4");
+    expect(taken?.scopes[0]?.assetIds).toEqual(["a1", "a2"]);
+    expect(peekPendingLearningInjection("run:r-w4")).toBeUndefined();
   });
 
   it("set_experience_exposure persists on tip via result service", () => {

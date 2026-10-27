@@ -137,9 +137,23 @@ export type ExperienceExposureScope = {
 };
 
 export type ExperienceExposureState = {
-  /** Assets injected into the system prompt for this task (not yet verified). */
+  /** Assets injected into the system prompt for this task (exposure only). */
   scopes: ExperienceExposureScope[];
   attachedAt: string;
+  /**
+   * Wrap-up Option A: assets with **explicit adoption evidence** this turn.
+   * Only these may become outcome_verified / trigger validity curation.
+   * Tip success + exposure alone = 「成功任务中的曝光」, not validity.
+   */
+  adoptedAssetIds?: string[];
+  /**
+   * Last successful outcome_verified contribution (event idempotency + correction revoke).
+   */
+  verifiedContribution?: {
+    eventId: string;
+    outcomeVersion: number;
+    assetIds: string[];
+  };
 };
 
 export type TaskOutcomeRecord = {

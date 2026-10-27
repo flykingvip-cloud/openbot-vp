@@ -37,7 +37,7 @@ describe("TaskOutcome result service + durable consume", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("scenario A: tool success, acceptance pending, delivery blocked — incomplete, no success score", () => {
+  it("scenario A: tool success, acceptance pending, delivery blocked — incomplete, no success score", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-a",
@@ -90,7 +90,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(r3.record.taskJudgement).toBe("incomplete");
 
     const consumer = new OutcomeConsumerRuntime(store);
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().successCount).toBe(0);
   });
 
@@ -154,7 +154,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(el.attribution).toBe("capability");
   });
 
-  it("scenario C: fail then repair success counts once; history retained", () => {
+  it("scenario C: fail then repair success counts once; history retained", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-c",
@@ -221,7 +221,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(res.record.attempts.map((a) => a.attemptId)).toEqual(["a1", "a2"]);
 
     const consumer = new OutcomeConsumerRuntime(store);
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().successCount).toBe(1);
   });
 
@@ -300,7 +300,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(service.get("t-race")?.taskJudgement).toBe("cancelled");
   });
 
-  it("crash between consume update and ack: replay does not double-count", () => {
+  it("crash between consume update and ack: replay does not double-count", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-crash",
@@ -347,7 +347,7 @@ describe("TaskOutcome result service + durable consume", () => {
     // We mark contribution already at v; second apply with same version should not double.
     const again = store2.loadContribution(personalScope.personalDomainId, "t-crash");
     expect(again?.judgement).toBe("success");
-    consumer2.drain((id) => service2.get(id));
+    await consumer2.drain((id) => service2.get(id));
     // successCount from consumer2 starts 0; drain applies once
     expect(consumer2.getProjection().successCount).toBeLessThanOrEqual(1);
   });
@@ -370,7 +370,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(got?.taskJudgement).toBe("incomplete");
   });
 
-  it("correction v1 failure -> v2 success revokes old contribution", () => {
+  it("correction v1 failure -> v2 success revokes old contribution", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-fix",
@@ -393,7 +393,7 @@ describe("TaskOutcome result service + durable consume", () => {
       throw new Error("fail");
     }
     const consumer = new OutcomeConsumerRuntime(store);
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().failureCount).toBe(1);
 
     const corr = service.submit(
@@ -414,7 +414,7 @@ describe("TaskOutcome result service + durable consume", () => {
     if (!corr.ok) {
       return;
     }
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().failureCount).toBe(0);
     expect(consumer.getProjection().successCount).toBe(1);
   });
