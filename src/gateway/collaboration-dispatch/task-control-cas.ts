@@ -69,10 +69,21 @@ function readClaimAuthEpoch(claim: { authEpoch?: number } | null | undefined): n
     : 0;
 }
 
-/** Directory holding per-task control locks (shared by stop + eligibility CAS). */
-export function taskControlLockDir(params: { groupId: string; cfg?: OpenBotConfig }): string {
+/**
+ * Directory holding per-task control locks (shared by stop + eligibility CAS).
+ * When `groupRootDir` is provided (trusted tenant locator), locks live under that
+ * root — never re-derive from createWorkspaceCollaborationStores (host dual-root).
+ */
+export function taskControlLockDir(params: {
+  groupId: string;
+  cfg?: OpenBotConfig;
+  /** Trusted groups root (parent of groupLocator). Prefer over host default. */
+  groupRootDir?: string;
+}): string {
   const cfg = params.cfg ?? loadConfig();
-  const { groupRootDir } = createWorkspaceCollaborationStores(cfg);
+  const groupRootDir = params.groupRootDir?.trim()
+    ? path.resolve(params.groupRootDir)
+    : createWorkspaceCollaborationStores(cfg).groupRootDir;
   return path.join(resolveGroupWorkspacePath(groupRootDir, params.groupId), "task-control");
 }
 
@@ -87,9 +98,15 @@ export async function withTaskControlLock<T>(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
+  /** Trusted groups root — required for managed team SoT so lock matches task writes. */
+  groupRootDir?: string;
   fn: () => T | Promise<T>;
 }): Promise<T> {
-  const dir = taskControlLockDir({ groupId: params.groupId, cfg: params.cfg });
+  const dir = taskControlLockDir({
+    groupId: params.groupId,
+    cfg: params.cfg,
+    groupRootDir: params.groupRootDir,
+  });
   fs.mkdirSync(dir, { recursive: true });
   return withRoundLock(dir, lockStemForTask(params.taskId), params.fn);
 }
@@ -704,6 +721,13 @@ export async function applyBusinessTaskPatchUnderControlLock(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
+  /** Trusted groups root so the control lock matches tenant-scoped task writes. */
+  groupRootDir?: string;
+  /** Trusted object storage; when omitted, falls back to workspace stores (compat). */
+  objectStorage?: {
+    readObject: <T>(groupId: string, kind: string, id: string) => Promise<T | null>;
+    writeObject: (groupId: string, kind: string, id: string, value: unknown) => Promise<void>;
+  };
   /** Default true — business writes refuse once stop is accepted on the live record. */
   refuseIfStopped?: boolean;
   /**
@@ -720,8 +744,10 @@ export async function applyBusinessTaskPatchUnderControlLock(params: {
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
+    groupRootDir: params.groupRootDir,
     fn: async () => {
-      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+      const objectStorage =
+        params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
       const current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
       if (!current) {
         throw new Error(`task not found under control lock: ${params.taskId}`);

@@ -87,6 +87,7 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
+import { buildRuntimeNamespace } from "../collaboration-dispatch/runtime-namespace.js";
 import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
@@ -116,6 +117,12 @@ import {
   syncGroupOperatingState,
 } from "./shared.js";
 import { assertPersistedTaskNotStopped } from "./task-stop-entry.js";
+import {
+  resolveTeamDeliverableStores,
+  type TeamResourceAuthOk,
+  type TrustedGroupStores,
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+} from "./team-resource-auth.js";
 import {
   resolveAuthorityTenantForEntry,
   type CollaborationTenantResolution,
@@ -171,13 +178,81 @@ function tenantIdForClaimFlag(
   return resolveCollaborationGroupTenantId(groupId);
 }
 
+/**
+ * Trusted stores input for claim/board/plan/OS. When provided, task + board + lock
+ * + operating-state all use the same locator. Compat: omitting trusted falls back to
+ * createWorkspaceCollaborationStores (personal_local / legacy callers only).
+ * Managed team handlers MUST pass auth/trusted/stores — do not re-resolve host root.
+ */
+export type ClaimAuthorityTrustedInput = {
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
+};
+
+async function resolveClaimStores(params: {
+  groupId: string;
+  cfg: OpenBotConfig;
+  tenant?: CollaborationTenantResolution | null;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
+}): Promise<{
+  stores: TrustedGroupStores | ReturnType<typeof createWorkspaceCollaborationStores>;
+  groupLocator: string | null;
+  groupsRoot: string | null;
+  mode: "trusted" | "compat_workspace";
+}> {
+  if (params.stores?.groupsRoot && params.stores?.groupLocator) {
+    return {
+      stores: params.stores,
+      groupLocator: params.stores.groupLocator,
+      groupsRoot: params.stores.groupsRoot,
+      mode: "trusted",
+    };
+  }
+  if (params.auth || params.trusted) {
+    const resolved = resolveTeamDeliverableStores({
+      auth: params.auth,
+      trusted: params.trusted,
+      groupId: params.groupId,
+      cfg: params.cfg,
+      tenantId: params.auth?.tenantId ?? params.tenant?.tenantId ?? null,
+    });
+    if (!resolved.ok) {
+      throw new ClaimContractEntryError(
+        resolved.reason || TRUSTED_GROUP_LOCATOR_REQUIRED,
+        resolved.detail || "trusted group locator required for claim authority",
+      );
+    }
+    return {
+      stores: resolved,
+      groupLocator: resolved.groupLocator,
+      groupsRoot: resolved.groupsRoot,
+      mode: "trusted",
+    };
+  }
+  // Compat branch: legacy / personal_local callers without explicit trusted.
+  const stores = createWorkspaceCollaborationStores(params.cfg);
+  return {
+    stores,
+    groupLocator: null,
+    groupsRoot: stores.groupRootDir ?? null,
+    mode: "compat_workspace",
+  };
+}
+
 async function buildClaimAuthority(params: {
   groupId: string;
   taskId: string;
   cfg: OpenBotConfig;
   tenant?: CollaborationTenantResolution | null;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
 }) {
-  const stores = createWorkspaceCollaborationStores();
+  const resolved = await resolveClaimStores(params);
+  const stores = resolved.stores;
   const operatingState = await readGroupOperatingState({
     fileStore: stores.fileStore,
     groupId: params.groupId,
@@ -187,7 +262,10 @@ async function buildClaimAuthority(params: {
     now,
     idGen: () => generatePolicySnapshotId(now),
   });
-  const groupTenantId = resolveCollaborationGroupTenantId(params.groupId);
+  const groupTenantId =
+    params.auth?.tenantId ??
+    params.tenant?.tenantId ??
+    resolveCollaborationGroupTenantId(params.groupId);
   const tenant: CollaborationTenantResolution = resolveAuthorityTenantForEntry({
     preferred: params.tenant,
     groupTenantId,
@@ -201,7 +279,32 @@ async function buildClaimAuthority(params: {
     profile,
     cfg: params.cfg,
   });
-  return { authority, stores, operatingState };
+  // When trusted locator is present, force namespace onto the same SoT as task/OS/deliverable
+  // (createRuntimeAuthority may otherwise resolve personal_local / host dual-root).
+  if (resolved.groupLocator) {
+    const namespace = buildRuntimeNamespace({
+      profile,
+      tenantId: tenant.tenantId,
+      groupId: params.groupId,
+      groupLocator: resolved.groupLocator,
+    });
+    return {
+      authority: { ...authority, namespace },
+      stores,
+      operatingState,
+      groupRootDir: resolved.groupsRoot,
+      groupLocator: resolved.groupLocator,
+      mode: resolved.mode,
+    };
+  }
+  return {
+    authority,
+    stores,
+    operatingState,
+    groupRootDir: resolved.groupsRoot,
+    groupLocator: resolved.groupLocator,
+    mode: resolved.mode,
+  };
 }
 
 /**
@@ -336,6 +439,10 @@ export type PublishCollaborationBoardItemParams = {
   /** P5 per-item 可关. */
   skipChallengeWindow?: boolean;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 };
@@ -345,16 +452,20 @@ export async function publishCollaborationBoardItem(
 ): Promise<GroupBoardClaimItem> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
-  await assertPersistedTaskNotStopped({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-  });
   const { authority, stores } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
+  });
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    objectStorage: stores.objectStorage,
   });
   const current = await stores.objectStorage.readObject<Task>(
     params.groupId,
@@ -464,6 +575,10 @@ export type ClaimCollaborationBoardItemParams = {
   itemId: string;
   claimantId?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 };
@@ -473,16 +588,20 @@ export async function claimCollaborationBoardItem(
 ): Promise<GroupBoardClaimItem> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
-  await assertPersistedTaskNotStopped({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-  });
-  const { authority } = await buildClaimAuthority({
+  const { authority, stores } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
+  });
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    objectStorage: stores.objectStorage,
   });
   const claimantId = params.claimantId?.trim() || params.actor?.trim();
   if (!claimantId) {
@@ -537,6 +656,10 @@ export type ApplyCollaborationBoardClaimParams = {
   taskId: string;
   itemId: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
   /** Test-only: after outside read, before control-lock write. */
@@ -577,11 +700,14 @@ export async function applyCollaborationBoardClaim(
   // T45: stop / partial_success classification runs under the control lock below.
   // An early assertPersistedTaskNotStopped would collapse "board already applied +
   // task stopped" into generic TaskStoppedError and hide the recoverable signal.
-  const { authority, stores, operatingState } = await buildClaimAuthority({
+  const { authority, stores, operatingState, groupRootDir } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const current = await stores.objectStorage.readObject<Task>(
     params.groupId,
@@ -599,6 +725,8 @@ export async function applyCollaborationBoardClaim(
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
+    groupRootDir: groupRootDir ?? undefined,
+    objectStorage: stores.objectStorage,
     // Custom stop handling so board-already-applied + stopped is identifiable.
     refuseIfStopped: false,
     buildPatch: async (live) => {
@@ -756,6 +884,10 @@ export async function loadCollaborationBoardClaimItem(params: {
   groupId: string;
   taskId: string;
   itemId: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem | null> {
@@ -765,6 +897,9 @@ export async function loadCollaborationBoardClaimItem(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   return loadBoardClaimItem(authority, { taskId: params.taskId, itemId: params.itemId });
 }
@@ -773,6 +908,9 @@ export async function loadCollaborationBoardClaimItem(params: {
 export async function listCollaborationBoardItems(params: {
   groupId: string;
   taskId: string;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem[]> {
@@ -782,6 +920,9 @@ export async function listCollaborationBoardItems(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   return listBoardClaimItems(authority, { taskId: params.taskId });
 }
@@ -793,6 +934,10 @@ export async function listCollaborationBoardItems(params: {
 export async function getCollaborationBoardMemberProgress(params: {
   groupId: string;
   taskId: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<MemberProgressReport> {
@@ -802,6 +947,9 @@ export async function getCollaborationBoardMemberProgress(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const items = await listBoardClaimItems(authority, { taskId: params.taskId });
   const currentTaskId =
@@ -860,6 +1008,9 @@ async function mutateProgress(
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   return unwrap(await run(authority, cfg), step);
 }
@@ -869,6 +1020,10 @@ export async function markCollaborationBoardItemInProgress(params: {
   taskId: string;
   itemId: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem> {
@@ -894,6 +1049,10 @@ export async function submitCollaborationBoardItemForReview(params: {
   artifactVersion: string;
   submissionSummary?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem> {
@@ -915,6 +1074,9 @@ export async function submitCollaborationBoardItemForReview(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const coordinatorBotId = trustedCoordinatorBotId(operatingState);
   return unwrap(
@@ -980,6 +1142,10 @@ export async function returnCollaborationBoardItemSubmission(params: {
   /** S3: must match pending submissionId. */
   expectedSubmissionId: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem> {
@@ -1008,6 +1174,10 @@ export async function blockCollaborationBoardItem(params: {
   itemId: string;
   reason?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem> {
@@ -1035,6 +1205,10 @@ export async function unblockCollaborationBoardItem(params: {
   itemId: string;
   reason: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem> {
@@ -1066,6 +1240,10 @@ export async function cancelCollaborationBoardItem(params: {
   itemId: string;
   reason?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<GroupBoardClaimItem> {
@@ -1094,6 +1272,10 @@ export async function recordCollaborationBoardItemPeerReview(params: {
   verdict: PeerReviewVerdict;
   comment?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<PeerReviewEvent> {
@@ -1108,6 +1290,9 @@ export async function recordCollaborationBoardItemPeerReview(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const item = await loadBoardClaimItem(authority, {
     taskId: params.taskId,
@@ -1146,6 +1331,10 @@ export async function listCollaborationPeerReviews(params: {
   taskId: string;
   itemId?: string;
   submissionId?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<PeerReviewEvent[]> {
@@ -1155,6 +1344,9 @@ export async function listCollaborationPeerReviews(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   return listPeerReviews(authority, {
     taskId: params.taskId,
@@ -1185,6 +1377,9 @@ export async function materializeCollaborationIntentToBoard(params: {
   dueAtMs?: number;
   requireHumanConfirm?: boolean;
   humanConfirmed?: boolean;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<MaterializeIntentResult> {
@@ -1198,6 +1393,9 @@ export async function materializeCollaborationIntentToBoard(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const input: BoardIntentMaterializeInput = {
     message: params.message,
@@ -1238,9 +1436,16 @@ async function rememberDelivery(
   groupId: string,
   delivery: OwnerDecisionCardDelivery,
   cfg?: OpenBotConfig,
+  locator?: { groupRootDir?: string | null; groupLocator?: string | null },
 ): Promise<OwnerDecisionCardDelivery> {
   try {
-    return await recordOwnerDecisionDelivery({ groupId, delivery, cfg });
+    return await recordOwnerDecisionDelivery({
+      groupId,
+      delivery,
+      cfg,
+      groupRootDir: locator?.groupRootDir ?? undefined,
+      groupLocator: locator?.groupLocator ?? undefined,
+    });
   } catch {
     return normalizeOwnerDecisionDelivery({ ...delivery, deliveryTracked: false, retryable: true });
   }
@@ -1253,26 +1458,38 @@ export async function proposeCollaborationTodolist(params: {
   ownerMemberId?: string;
   steps: Array<{ title: string; detail?: string; stepId?: string }>;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ProposeCollaborationTodolistResult> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
-  await assertPersistedTaskNotStopped({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-  });
   const ownerMemberId = params.ownerMemberId?.trim() || params.actor?.trim();
   if (!ownerMemberId) {
     throw new ClaimContractEntryError("owner_required", "ownerMemberId / actor is required");
   }
-  const { authority } = await buildClaimAuthority({
+  const { authority, stores, groupRootDir, groupLocator } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
+  await assertPersistedTaskNotStopped({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    objectStorage: stores.objectStorage,
+  });
+  const trustedLocator = {
+    groupRootDir: groupRootDir ?? null,
+    groupLocator: groupLocator ?? null,
+  };
   const todolist = unwrapTodolist(
     await proposeTodolist(
       authority,
@@ -1296,6 +1513,8 @@ export async function proposeCollaborationTodolist(params: {
       todolist,
       authority,
       cfg,
+      groupRootDir: trustedLocator.groupRootDir ?? undefined,
+      groupLocator: trustedLocator.groupLocator ?? undefined,
     });
     cardDelivery = emitted.delivery;
   } catch (err) {
@@ -1311,6 +1530,7 @@ export async function proposeCollaborationTodolist(params: {
         userFacing: "delivery_failed_retryable",
       }),
       cfg,
+      trustedLocator,
     );
   }
   return { todolist, cardDelivery };
@@ -1326,6 +1546,10 @@ export async function retryCollaborationOwnerDecisionDelivery(params: {
   todolistId: string;
   expectedVersion?: number;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ProposeCollaborationTodolistResult> {
@@ -1383,6 +1607,9 @@ export async function retryCollaborationOwnerDecisionDelivery(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   try {
     const emitted = await emitOwnerDecisionCardForProposedTodolist({
@@ -1414,6 +1641,10 @@ export async function listCollaborationOwnerDecisionDeliveries(params: {
   groupId: string;
   taskId?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<OwnerDecisionCardDelivery[]> {
@@ -1469,17 +1700,16 @@ export async function confirmCollaborationTodolist(params: {
   authorizedConfirmerIds?: string[];
   /** Ignored. Coordinator comes from operating-state governance, not the request. */
   coordinatorBotId?: string | null;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ExecutorPrivateTodolist> {
   const cfg = params.cfg ?? loadConfig();
   ignoreRequestAcl(params);
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
-  await assertPersistedTaskNotStopped({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-  });
   const confirmerId = boundRuntimeActor({
     actor: params.actor,
     requested: params.confirmerId,
@@ -1487,11 +1717,21 @@ export async function confirmCollaborationTodolist(params: {
     missingMessage: "confirmerId / actor is required",
     mismatchCode: "confirmer_mismatch",
   });
-  const { authority, operatingState } = await buildClaimAuthority({
+  const { authority, stores, operatingState, groupRootDir, groupLocator } =
+    await buildClaimAuthority({
+      groupId: params.groupId,
+      taskId: params.taskId,
+      cfg,
+      tenant: params.tenant,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores: params.stores,
+    });
+  await assertPersistedTaskNotStopped({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
-    tenant: params.tenant,
+    objectStorage: stores.objectStorage,
   });
   const acl = await resolveTrustedAclForStoredTodolist({
     authority,
@@ -1517,6 +1757,8 @@ export async function confirmCollaborationTodolist(params: {
       groupId: params.groupId,
       cfg,
       delivery: confirmationConsumedDelivery(confirmed),
+      groupRootDir: groupRootDir ?? undefined,
+      groupLocator: groupLocator ?? undefined,
     });
   } catch {
     // Confirmation already committed. Tracking must not roll it back or repeat it.
@@ -1538,6 +1780,10 @@ export async function reviseCollaborationTodolist(params: {
   authorizedConfirmerIds?: string[];
   /** Ignored. See confirmCollaborationTodolist. */
   coordinatorBotId?: string | null;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ExecutorPrivateTodolist> {
@@ -1561,6 +1807,9 @@ export async function reviseCollaborationTodolist(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const acl = await resolveTrustedAclForStoredTodolist({
     authority,
@@ -1595,6 +1844,10 @@ export async function getCollaborationTodolist(params: {
   authorizedConfirmerIds?: string[];
   /** Ignored. See confirmCollaborationTodolist. */
   coordinatorBotId?: string | null;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ExecutorPrivateTodolist> {
@@ -1612,6 +1865,9 @@ export async function getCollaborationTodolist(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const todolist = await loadExecutorTodolist(authority, {
     taskId: params.taskId,
@@ -1652,6 +1908,10 @@ export async function listCollaborationTodolists(params: {
   authorizedConfirmerIds?: string[];
   /** Ignored. See confirmCollaborationTodolist. */
   coordinatorBotId?: string | null;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ExecutorPrivateTodolist[]> {
@@ -1669,6 +1929,9 @@ export async function listCollaborationTodolists(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const items = await listExecutorTodolists(authority, {
     taskId: params.taskId,
@@ -1708,6 +1971,10 @@ export async function buildCollaborationExecutionTaskBag(params: {
   /** Ignored. See confirmCollaborationTodolist. */
   coordinatorBotId?: string | null;
   requireDeliveryComplete?: boolean;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ExecutionTaskBag> {
@@ -1725,6 +1992,9 @@ export async function buildCollaborationExecutionTaskBag(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const acl = await resolveTrustedTodolistAcl({
     authority,
@@ -1753,6 +2023,10 @@ export async function signalCollaborationInsight(params: {
   toLeadIds: string[];
   fromMemberId?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<{ woke: boolean; wakeId?: string }> {
@@ -1766,6 +2040,9 @@ export async function signalCollaborationInsight(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   return unwrapTodolist(
     await signalInsight(
@@ -1816,6 +2093,10 @@ export async function openCollaborationChallengeWindow(params: {
   title?: string;
   windowId?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ChallengeWindowRecord> {
@@ -1829,6 +2110,9 @@ export async function openCollaborationChallengeWindow(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const result = await openChallengeWindow(
     authority,
@@ -1858,6 +2142,10 @@ export async function recordCollaborationChallengeCritique(params: {
   issues: ChallengeIssueKind[];
   comment: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ChallengeWindowRecord> {
@@ -1871,6 +2159,9 @@ export async function recordCollaborationChallengeCritique(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const result = await recordChallengeCritique(
     authority,
@@ -1900,6 +2191,10 @@ export async function resolveCollaborationChallengeWindow(params: {
   reason: string;
   revisedDraft?: ChallengeDraftSnapshot;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ChallengeWindowRecord> {
@@ -1913,6 +2208,9 @@ export async function resolveCollaborationChallengeWindow(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const result = await resolveChallengeWindow(
     authority,
@@ -1947,6 +2245,10 @@ export async function skipCollaborationChallengeWindow(params: {
   title?: string;
   windowId?: string;
   actor?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ChallengeWindowRecord> {
@@ -1960,6 +2262,9 @@ export async function skipCollaborationChallengeWindow(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   const result = await skipChallengeWindow(
     authority,
@@ -1989,6 +2294,10 @@ export async function listCollaborationChallengeWindows(params: {
   groupId: string;
   taskId: string;
   windowId?: string;
+  /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 }): Promise<ChallengeWindowRecord[]> {
@@ -1998,6 +2307,9 @@ export async function listCollaborationChallengeWindows(params: {
     taskId: params.taskId,
     cfg,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
   });
   return listChallengeWindows(authority, {
     taskId: params.taskId,

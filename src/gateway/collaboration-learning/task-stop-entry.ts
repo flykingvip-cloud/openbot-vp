@@ -91,9 +91,14 @@ export async function assertPersistedTaskNotStopped(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
+  /** Trusted object storage — avoid host dual-root re-resolve when provided. */
+  objectStorage?: {
+    readObject: <T>(groupId: string, kind: string, id: string) => Promise<T | null>;
+  };
 }): Promise<GovernedTask | null> {
   const cfg = params.cfg ?? loadConfig();
-  const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+  const objectStorage =
+    params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
   const current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
   if (!current) {
     return null;
