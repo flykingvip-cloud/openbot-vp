@@ -58,34 +58,16 @@ export type RoutingDecisionPreview = {
 
 /**
  * Priority (UI demo only):
- * 1. Explicit modality outputType (image / music / audio) wins over task text.
- * 2. Task text (and profile text) — CN + EN + mixed; when outputType === "text",
- *    do NOT promote image/music keywords from the text (conflict → text wins).
- * 3. Fall back to taskProfileId, else general_text.
+ * 1. Explicit modality outputType (image / music / audio) wins.
+ * 2. Task text ONLY (CN + EN + mixed). Never mix taskProfileId into this corpus.
+ *    When outputType === "text", do NOT promote image/music keywords from the text.
+ * 3. Only if task text cannot be recognized, fall back to taskProfileId, else general_text.
  */
 function matchesAny(haystack: string, needles: string[]): boolean {
   return needles.some((n) => haystack.includes(n));
 }
 
-function detectTaskCategory(req: RoutingPreviewRequest): string {
-  // Priority 1: explicit modality output type.
-  if (req.outputType === "image") {
-    return "image_generation";
-  }
-  if (req.outputType === "music") {
-    return "music_generation";
-  }
-  if (req.outputType === "audio") {
-    return "audio_understanding";
-  }
-
-  const raw = `${req.taskText ?? ""} ${req.taskProfileId ?? ""}`;
-  const lower = raw.toLowerCase();
-  // CJK keywords are case-invariant; keep both original and lower for EN tokens.
-  const corpus = `${raw} ${lower}`;
-
-  // Priority 2: task / profile text. outputType === "text" blocks modality promotion.
-  const allowModalityFromText = req.outputType !== "text";
+function classifyFromTextCorpus(corpus: string, allowModalityFromText: boolean): string | null {
   if (
     allowModalityFromText &&
     matchesAny(corpus, ["image", "midjourney", "海报", "配图", "图片", "画一张", "生成图"])
@@ -116,8 +98,31 @@ function detectTaskCategory(req: RoutingPreviewRequest): string {
   if (matchesAny(corpus, ["reason", "reasoning", "推理", "深度思考"])) {
     return "high_quality_reasoning";
   }
+  return null;
+}
 
-  // Priority 3: strategy profile id as category fallback.
+function detectTaskCategory(req: RoutingPreviewRequest): string {
+  // Priority 1: explicit modality output type.
+  if (req.outputType === "image") {
+    return "image_generation";
+  }
+  if (req.outputType === "music") {
+    return "music_generation";
+  }
+  if (req.outputType === "audio") {
+    return "audio_understanding";
+  }
+
+  // Priority 2: task text only — never concatenate taskProfileId here.
+  const rawText = req.taskText ?? "";
+  const textCorpus = `${rawText} ${rawText.toLowerCase()}`;
+  const allowModalityFromText = req.outputType !== "text";
+  const fromText = classifyFromTextCorpus(textCorpus, allowModalityFromText);
+  if (fromText) {
+    return fromText;
+  }
+
+  // Priority 3: strategy profile only when task text cannot be recognized.
   return req.taskProfileId?.trim() || "general_text";
 }
 

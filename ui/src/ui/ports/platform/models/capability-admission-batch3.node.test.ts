@@ -249,6 +249,24 @@ describe("batch3 Chinese / mixed task classification", () => {
     ).toBe("high_quality_reasoning");
   });
 
+  it("does not let image_generation profile override clear coding task text", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "重构这段代码并补充测试",
+        taskProfileId: "image_generation",
+      }),
+    ).toBe("coding");
+  });
+
+  it("does not let image_generation profile override clear music task text", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "写一段30秒配乐",
+        taskProfileId: "image_generation",
+      }),
+    ).toBe("music_generation");
+  });
+
   it("preview uses Chinese coding example for required capabilities", () => {
     __resetModelAdmissionStoreForTest();
     const preview = previewRoutingDecision({
