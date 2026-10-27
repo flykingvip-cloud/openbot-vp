@@ -283,6 +283,8 @@ export type TaskHandoff = {
   assumptions: string[];
   blockers: string[];
   acceptanceCriteria: string[];
+  /** T45: idempotent history append key (contract handoffId). */
+  handoffId?: string;
 };
 
 export type CollaborationTaskState =

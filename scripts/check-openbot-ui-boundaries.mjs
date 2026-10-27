@@ -3,26 +3,42 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(scriptDir, "..");
+/**
+ * Production default: repository root (parent of scripts/).
+ * Tests may override with OPENBOT_CHECK_REPO_ROOT (absolute or cwd-relative)
+ * so fixtures run without rewriting the live worktree.
+ */
+function resolveRepoRoot() {
+  const override = process.env.OPENBOT_CHECK_REPO_ROOT?.trim();
+  if (override) {
+    return path.resolve(override);
+  }
+  return path.resolve(scriptDir, "..");
+}
+const repoRoot = resolveRepoRoot();
 const uiRoot = path.join(repoRoot, "ui", "src", "ui");
 
 const controllerImportRules = [
   {
     file: "ui/src/ui/app.ts",
     allowed: [
+      "ui/src/ui/controllers/admin-activation-email-receipt.ts",
       "ui/src/ui/controllers/collaboration-governance-actions.ts",
       "ui/src/ui/controllers/collaboration-learning.ts",
+      "ui/src/ui/controllers/collaboration-observability.ts",
       "ui/src/ui/controllers/cron.ts",
       "ui/src/ui/controllers/daibai.ts",
       "ui/src/ui/controllers/devices.ts",
       "ui/src/ui/controllers/enterprise-data-source-governance.ts",
       "ui/src/ui/controllers/enterprise-operational-identity.ts",
+      "ui/src/ui/controllers/enterprise-organization-monthly-usage.ts",
       "ui/src/ui/controllers/enterprise-organization-snapshot.ts",
       "ui/src/ui/controllers/enterprise-seat-assets.ts",
       "ui/src/ui/controllers/exec-approval.ts",
       "ui/src/ui/controllers/exec-approvals.ts",
       "ui/src/ui/controllers/focus-switch-gate.ts",
       "ui/src/ui/controllers/knowledge-universe.ts",
+      "ui/src/ui/controllers/local-file-approval.ts",
       "ui/src/ui/controllers/platform-auth.ts",
       "ui/src/ui/controllers/platform-models-management.ts",
       "ui/src/ui/controllers/skills.ts",

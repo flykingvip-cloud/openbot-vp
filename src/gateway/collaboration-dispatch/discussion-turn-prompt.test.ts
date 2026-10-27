@@ -455,7 +455,7 @@ describe("collaboration discussion turn prompt", () => {
     const prompt = buildCollaborationDiscussionTurnPrompt({
       scope,
       bot: createBot("bot", "高级秘书"),
-      decision: decision as ParticipationDecision,
+      decision: decision as unknown as ParticipationDecision,
       participationTier: "mention",
       contributionRole: "lead",
       sharedDocCard: "[共享文档]\n路径：deliverables/report.md\n标题：Report",

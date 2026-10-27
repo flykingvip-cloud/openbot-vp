@@ -1,0 +1,131 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 check /private/tmp/openbot-memory-batch1-rework
+> pnpm check:host-env-policy:swift && pnpm format:check && pnpm build:collaboration:packages && pnpm build:evolution:packages && pnpm tsgo && pnpm lint && pnpm lint:tmp:no-random-messaging && pnpm lint:tmp:channel-agnostic-boundaries && pnpm lint:tmp:no-raw-channel-fetch && pnpm lint:agent:ingress-owner && pnpm lint:plugins:no-register-http-handler && pnpm lint:plugins:no-monolithic-plugin-sdk-entry-imports && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope && pnpm lint:ui:capability-boundaries && pnpm lint:ui:employee-capability-terminology && pnpm lint:core:composition-root-loc && pnpm lint:gateway:method-packs && pnpm lint:gateway:isolation-fail-closed && pnpm lint:core:architecture-manifest && pnpm lint:aor:boundaries && pnpm lint:convergence:registry && pnpm lint:collab:runtime-capabilities && pnpm lint:collab:runtime-authority && pnpm lint:collab:policy-consumption && pnpm test:collab:runtime-lifecycle
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check:host-env-policy:swift /private/tmp/openbot-memory-batch1-rework
+> node scripts/generate-host-env-security-policy-swift.mjs --check
+
+OK apps/macos/Sources/OpenBot/HostEnvSecurityPolicy.generated.swift
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /private/tmp/openbot-memory-batch1-rework
+> oxfmt --check
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 11409ms on 16871 files using 14 threads.
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:collaboration:packages /private/tmp/openbot-memory-batch1-rework
+> pnpm --dir packages/collaboration-core build && pnpm --dir packages/collaboration-runtime build && pnpm --dir packages/collaboration-openbot-adapter build
+
+
+> @openbot/collaboration-core@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-core
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-runtime@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-runtime
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-openbot-adapter@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-openbot-adapter
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:evolution:packages /private/tmp/openbot-memory-batch1-rework
+> pnpm --dir packages/evolution-core build
+
+
+> @openbot/evolution-core@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/evolution-core
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint /private/tmp/openbot-memory-batch1-rework
+> oxlint --type-aware
+
+Found 0 warnings and 0 errors.
+Finished in 10.1s on 12242 files with 136 rules using 14 threads.
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:tmp:no-random-messaging /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-no-random-messaging-tmp.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:tmp:channel-agnostic-boundaries /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-channel-agnostic-boundaries.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:tmp:no-raw-channel-fetch /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-no-raw-channel-fetch.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:agent:ingress-owner /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-ingress-agent-owner-context.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:plugins:no-register-http-handler /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-no-register-http-handler.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:plugins:no-monolithic-plugin-sdk-entry-imports /private/tmp/openbot-memory-batch1-rework
+> node --import tsx scripts/check-no-monolithic-plugin-sdk-entry-imports.ts
+
+OK: bundled plugin source files use scoped plugin-sdk subpaths (844 checked).
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:webhook:no-low-level-body-read /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-webhook-auth-body-order.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:auth:no-pairing-store-group /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-no-pairing-store-group-auth.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:auth:pairing-account-scope /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-pairing-account-scope.mjs
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:ui:capability-boundaries /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-openbot-ui-boundaries.mjs
+
+OpenBot UI boundary check passed.
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:ui:employee-capability-terminology /private/tmp/openbot-memory-batch1-rework
+> node --import tsx scripts/employee-capability-terminology-lint.ts
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:core:composition-root-loc /private/tmp/openbot-memory-batch1-rework
+> node --import tsx scripts/check-core-composition-root-loc.ts
+
+Core composition-root LOC guard passed (12 files within budget).
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:gateway:method-packs /private/tmp/openbot-memory-batch1-rework
+> node --import tsx src/gateway/server-methods/check-gateway-method-packs.ts
+
+check-gateway-method-packs ok (22 packs, 148 methods)
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:gateway:isolation-fail-closed /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-isolation-fail-closed.mjs
+
+isolation fail-closed guard: ok
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:core:architecture-manifest /private/tmp/openbot-memory-batch1-rework
+> node --import tsx scripts/check-architecture-manifest.ts
+
+Architecture manifest passed (12 rules, 13259 files scanned).
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:aor:boundaries /private/tmp/openbot-memory-batch1-rework
+> node --import tsx scripts/check-aor-boundaries.ts
+
+AOR boundary guard: OK (no forbidden imports in packages/aor-*).
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:convergence:registry /private/tmp/openbot-memory-batch1-rework
+> node --import tsx scripts/check-convergence-registry.ts
+
+convergence registry ok: 19 responsibilities
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint:collab:runtime-capabilities /private/tmp/openbot-memory-batch1-rework
+> node scripts/check-collab-runtime-capabilities.mjs
+
+Collaboration runtime capability red line violated (Floor Runtime v2.1 §2.2 (a)):
+- src/gateway/collaboration-dispatch/group-task-heartbeat-scheduler.ts:198 [no-set-interval] setInterval (R3 periodic timer)
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

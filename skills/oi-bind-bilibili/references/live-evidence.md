@@ -15,12 +15,12 @@ skill: oi-bind-bilibili
 
 ## E2E 尝试（2026-10-19）
 
-| 序 | 步骤 | 环境 | 结果 |
-|----|------|------|------|
-| 1 | 确认公开入口 `https://openhome.bilibili.com/` | Mac worktree | ok（public_docs） |
-| 2 | 云电脑登录 → 取 Token → bind | Cloud PC | **阻断**：无云电脑会话 |
-| 3 | `credentials.bind` | gateway | **未执行**（无真实凭证） |
-| 4 | 个人授权页 bilibili=active | 产品 UI | **未达** |
+| 序  | 步骤                                          | 环境         | 结果                     |
+| --- | --------------------------------------------- | ------------ | ------------------------ |
+| 1   | 确认公开入口 `https://openhome.bilibili.com/` | Mac worktree | ok（public_docs）        |
+| 2   | 云电脑登录 → 取 Token → bind                  | Cloud PC     | **阻断**：无云电脑会话   |
+| 3   | `credentials.bind`                            | gateway      | **未执行**（无真实凭证） |
+| 4   | 个人授权页 bilibili=active                    | 产品 UI      | **未达**                 |
 
 ## 失败点 / 阻断
 

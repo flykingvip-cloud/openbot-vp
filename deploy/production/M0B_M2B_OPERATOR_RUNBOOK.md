@@ -33,15 +33,15 @@ the closed seq 45 digest `ee132a30…`. Current LIVE is seq 51 / digest
 Do **not** treat the OP-2 reconstruction table below as LIVE. Current LIVE is seq **51**.
 This leftover still does not authorize a cutover.
 
-| Field            | In-repo claim (ledger `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`; host identities from last verified cutover)                |
-| ---------------- | -------------------------------------------------------------------------------------------------- |
-| LIVE row         | seq **51** / `59be50660d8ebacf867211a206c92b4300bec418`                                            |
-| Image            | `rc-amd64-provenance-59be50660d`                                                                   |
-| Digest           | `sha256:a64adc1f04f116d7dd0e7e434f1d1a00a99601ed8de8ae8523becd2b1a470595`                          |
-| Tag              | `provenance/sha-59be50660d8e`                                                                      |
-| Host / container | `8.217.93.71` / `openbot-gateway-rc`                                                               |
-| Evidence         | `liveVerified=true`; pulled from GHCR; no host build; liveFrom `2026-08-29T13:15:53Z`; no `liveTo` |
-| Next cutover     | Explicit PRODUCTION_GO only. A later `origin/main` image is **not** LIVE until recorded.           |
+| Field            | In-repo claim (ledger `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`; host identities from last verified cutover) |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| LIVE row         | seq **51** / `59be50660d8ebacf867211a206c92b4300bec418`                                                                                                                      |
+| Image            | `rc-amd64-provenance-59be50660d`                                                                                                                                             |
+| Digest           | `sha256:a64adc1f04f116d7dd0e7e434f1d1a00a99601ed8de8ae8523becd2b1a470595`                                                                                                    |
+| Tag              | `provenance/sha-59be50660d8e`                                                                                                                                                |
+| Host / container | `8.217.93.71` / `openbot-gateway-rc`                                                                                                                                         |
+| Evidence         | `liveVerified=true`; pulled from GHCR; no host build; liveFrom `2026-08-29T13:15:53Z`; no `liveTo`                                                                           |
+| Next cutover     | Explicit PRODUCTION_GO only. A later `origin/main` image is **not** LIVE until recorded.                                                                                     |
 
 ## Historical ledger claim after OP-2 reconstruction (seq 47; superseded by seq 48–51)
 

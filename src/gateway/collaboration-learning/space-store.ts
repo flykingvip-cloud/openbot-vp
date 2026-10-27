@@ -2,6 +2,7 @@ import { loadConfig } from "../../config/config.js";
 import { isSharedTenantAddressingEnabled } from "../../config/data-space.js";
 import { readOrganizationPresence } from "../../organization/presence.js";
 import { readOrganizationTaskAssignments } from "../../organization/task-assignment.js";
+import { applyRosterAuthChangeSharedCas } from "../collaboration-dispatch/task-control-cas.js";
 import {
   attachSeatManagedAsset,
   type EnterpriseSeatAssetsStore,
@@ -29,6 +30,7 @@ import {
   cloneMembersForReset,
   createWorkspaceCollaborationStores,
   ensureCreatorHumanMember,
+  readGroupOperatingState,
   ensureWorkspaceGroupBootstrapArtifacts,
   ensureWorkspaceSpaceProfile,
   listUserScopedCollaborationExtras,
@@ -59,6 +61,33 @@ import type {
   GatewayCollaborationSpacesListResult,
 } from "./snapshot-types.js";
 import { assertBuiltinStewardGroupMembershipAllowed } from "./steward-group-policy.js";
+
+/** W1: after durable roster/profile write, force OS auth through shared CAS writer. */
+async function persistRosterAuthViaSharedCas(params: {
+  groupId: string;
+  profile:
+    | {
+        ownerUserId?: string | null;
+        coordinatorBotId?: string | null;
+      }
+    | null
+    | undefined;
+  members: Parameters<typeof applyRosterAuthChangeSharedCas>[0]["members"];
+  invalidateTaskIds?: readonly string[];
+}) {
+  const { fileStore } = createWorkspaceCollaborationStores();
+  const live = await readGroupOperatingState({ fileStore, groupId: params.groupId });
+  if (!live) {
+    // e.g. after reset wipe — sync/commitSynced creates OS with auth projection.
+    return null;
+  }
+  return applyRosterAuthChangeSharedCas({
+    groupId: params.groupId,
+    profile: params.profile,
+    members: params.members,
+    invalidateTaskIds: params.invalidateTaskIds,
+  });
+}
 
 /**
  * Maps `agentId` (lowercased) → owning employee's platform user id.
@@ -440,6 +469,11 @@ export async function updateGatewayCollaborationSpaceMembers(
     requestedSystemInstructions: params.systemInstructions,
     requestedConfidentialityTier: params.confidentialityTier,
   });
+  await persistRosterAuthViaSharedCas({
+    groupId: params.groupId,
+    profile,
+    members: nextMembersWithOwner,
+  });
   const groupCapabilities = await metadataStorage.readGroupCapabilities(params.groupId);
   const operatingState = await syncGroupOperatingState({
     fileStore,
@@ -550,6 +584,11 @@ export async function resetGatewayCollaborationSpace(params: GatewayCollaboratio
     learningStorage,
     requestedSystemInstructions: existingGroupCapabilities?.systemInstructions,
     requestedConfidentialityTier: existingGroupCapabilities?.confidentialityTier,
+  });
+  await persistRosterAuthViaSharedCas({
+    groupId: params.groupId,
+    profile: rebuiltProfile,
+    members: resetMembers,
   });
   const rebuiltGroupCapabilities = await metadataStorage.readGroupCapabilities(params.groupId);
   const rebuiltOperatingState = await syncGroupOperatingState({
@@ -687,6 +726,11 @@ export async function dissolveGatewayCollaborationSpace(
     requestedConfidentialityTier: existingGroupCapabilities?.confidentialityTier,
   });
   const rebuiltProfile = await groupStorage.readProfile(params.groupId);
+  await persistRosterAuthViaSharedCas({
+    groupId: params.groupId,
+    profile: rebuiltProfile,
+    members: nextMembers,
+  });
   const groupCapabilities = await metadataStorage.readGroupCapabilities(params.groupId);
   const operatingState = await syncGroupOperatingState({
     fileStore,
@@ -792,6 +836,11 @@ export async function leaveGatewayCollaborationSpace(
     learningStorage,
     requestedSystemInstructions: existingGroupCapabilities?.systemInstructions,
     requestedConfidentialityTier: existingGroupCapabilities?.confidentialityTier,
+  });
+  await persistRosterAuthViaSharedCas({
+    groupId: params.groupId,
+    profile,
+    members: nextMembers,
   });
   const groupCapabilities = await metadataStorage.readGroupCapabilities(params.groupId);
   const operatingState = await syncGroupOperatingState({
@@ -916,6 +965,11 @@ export async function transferGatewayCollaborationSpaceOwnership(
       newCurrentManagerLabel: normalizeValue(params.newOwnerLabel) ?? nextOwnerUserId,
     });
   }
+  await persistRosterAuthViaSharedCas({
+    groupId: params.groupId,
+    profile: await groupStorage.readProfile(params.groupId),
+    members: await groupStorage.readMembers(params.groupId),
+  });
   const groupCapabilities = await metadataStorage.readGroupCapabilities(params.groupId);
   const operatingState = await syncGroupOperatingState({
     fileStore,

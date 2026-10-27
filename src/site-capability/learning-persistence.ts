@@ -110,10 +110,7 @@ export function loadLearningSnapshot(rootDir: string): LearningPersistenceSnapsh
 }
 
 /** Atomic JSON write under rootDir. */
-export function saveLearningSnapshot(
-  rootDir: string,
-  snapshot: LearningPersistenceSnapshot,
-): void {
+export function saveLearningSnapshot(rootDir: string, snapshot: LearningPersistenceSnapshot): void {
   fs.mkdirSync(rootDir, { recursive: true });
   const file = snapshotPath(rootDir);
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;

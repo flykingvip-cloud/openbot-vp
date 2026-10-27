@@ -5,6 +5,7 @@ import { resolveCoreToolCapability } from "../tool-catalog.js";
 import {
   COLLABORATION_BOARD_TOOL,
   createCollaborationBoardTool,
+  type CollaborationBoardToolDeps,
   shouldExposeCollaborationBoardTool,
 } from "./collaboration-board-tool.js";
 
@@ -88,7 +89,7 @@ describe("collaboration_board tool", () => {
       agentGroupId: GROUP,
       deps: {
         isEnabled: () => false,
-        markInProgress,
+        markInProgress: markInProgress as unknown as CollaborationBoardToolDeps["markInProgress"],
         resolveActor: async () => "bot-2",
       },
     });
@@ -111,12 +112,12 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        markInProgress: async () => {
+        markInProgress: (async () => {
           throw new ClaimContractEntryError(
             "not_claimant",
             "markBoardItemInProgress: actor is not the current claimant",
           );
-        },
+        }) as unknown as CollaborationBoardToolDeps["markInProgress"],
       },
     });
     const result = detailsOf(
@@ -138,7 +139,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        submitForReview,
+        submitForReview:
+          submitForReview as unknown as CollaborationBoardToolDeps["submitForReview"],
       },
     });
     const result = detailsOf(
@@ -171,7 +173,7 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        markInProgress,
+        markInProgress: markInProgress as unknown as CollaborationBoardToolDeps["markInProgress"],
       },
     });
     const result = detailsOf(
@@ -210,7 +212,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        submitForReview,
+        submitForReview:
+          submitForReview as unknown as CollaborationBoardToolDeps["submitForReview"],
       },
     });
     const result = detailsOf(
@@ -268,7 +271,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        proposeTodolist,
+        proposeTodolist:
+          proposeTodolist as unknown as CollaborationBoardToolDeps["proposeTodolist"],
       },
     });
     const result = detailsOf(
@@ -304,7 +308,7 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        listItems,
+        listItems: listItems as unknown as CollaborationBoardToolDeps["listItems"],
       },
     });
     const result = detailsOf(
@@ -338,7 +342,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
-        acceptSubmission,
+        acceptSubmission:
+          acceptSubmission as unknown as CollaborationBoardToolDeps["acceptSubmission"],
       },
     });
     const result = detailsOf(
@@ -375,7 +380,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
-        acceptSubmission,
+        acceptSubmission:
+          acceptSubmission as unknown as CollaborationBoardToolDeps["acceptSubmission"],
       },
     });
     const result = detailsOf(
@@ -401,7 +407,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
-        acceptSubmission,
+        acceptSubmission:
+          acceptSubmission as unknown as CollaborationBoardToolDeps["acceptSubmission"],
       },
     });
     const result = detailsOf(
@@ -434,7 +441,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
-        returnSubmission,
+        returnSubmission:
+          returnSubmission as unknown as CollaborationBoardToolDeps["returnSubmission"],
       },
     });
     const result = detailsOf(
@@ -465,7 +473,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
-        returnSubmission,
+        returnSubmission:
+          returnSubmission as unknown as CollaborationBoardToolDeps["returnSubmission"],
       },
     });
     const result = detailsOf(
@@ -489,7 +498,8 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
-        returnSubmission,
+        returnSubmission:
+          returnSubmission as unknown as CollaborationBoardToolDeps["returnSubmission"],
       },
     });
     const result = detailsOf(
@@ -512,7 +522,7 @@ describe("collaboration_board tool", () => {
       deps: {
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
-        markInProgress: vi.fn(),
+        markInProgress: vi.fn() as unknown as CollaborationBoardToolDeps["markInProgress"],
       },
     });
     const result = detailsOf(

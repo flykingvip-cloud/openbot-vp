@@ -1,0 +1,384 @@
+{
+  "schema": "memory-e2e-baseline/v3",
+  "phase": "post-rebase",
+  "createdAtAsiaShanghai": "2026-10-26 13:25:13",
+  "codeVersion": "2441ccbeb88d09ed36c1f1eb60af4df49edd0dc1",
+  "datasetVersion": "v1",
+  "datasetPath": "docs/design/evidence/memory-batch1-dataset-v1.json",
+  "fileFingerprints": {
+    "src/memory/health-probe.ts": "b9b9d3350ef20546",
+    "src/gateway/server-methods/doctor-memory-health.ts": "ef0a3924fe6fe193",
+    "scripts/memory-platform-audit.mjs": "1c1794e0dd4221d4",
+    "src/memory/memory-batch1-o8-baseline-v3.test.ts": "157ca4e184a6bd8c",
+    "src/memory/memory-batch1-o4-o5-diagnose.test.ts": "cd28efed707a4996",
+    "docs/design/evidence/memory-batch1-dataset-v1.json": "dad7d70748cb9c61"
+  },
+  "supersedes": {
+    "v2": "docs/design/evidence/memory-e2e-baseline-v2-post-rework-2026-10-26.json",
+    "v2Matrix": "docs/design/evidence/memory-e2e-baseline-v2-coverage-matrix-2026-10-26.md",
+    "reason": "v2 counted MODEL-v2-untimed as pass:true and mislabeled forgetMemoryEntry as gateway-handler-chain"
+  },
+  "v1Retained": {
+    "pre": "docs/design/evidence/memory-e2e-baseline-pre-2026-10-26.json",
+    "post": "docs/design/evidence/memory-e2e-baseline-post-2026-10-26.json",
+    "coverageLimits": "docs/design/evidence/memory-e2e-baseline-v1-coverage-limits-2026-10-26.md",
+    "o5EvidenceInvalid": true,
+    "prePostScaffoldOnly": "13/22→19/22 scaffold-internal; not system effectiveness"
+  },
+  "v2RetainedSuperseded": true,
+  "layers": {
+    "isolation": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "sdk-unit": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "notRun": 0
+    },
+    "manager-integration": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "cross-process-retrieval": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "helper-integration": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "gateway-handler-chain": {
+      "total": 3,
+      "passed": 0,
+      "failed": 0,
+      "notRun": 3
+    },
+    "health-audit-observability": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "notRun": 0
+    },
+    "model-effect": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "notRun": 1
+    }
+  },
+  "summary": {
+    "total": 12,
+    "passed": 8,
+    "failed": 0,
+    "notRun": 4,
+    "executedSamples": 7,
+    "executedCaseIds": [
+      "ISO-v3-1",
+      "S2-v3-real-deprecate",
+      "S3-v3-wrong-owner",
+      "S1-v3-manager-search",
+      "S5-v3-manager-cross-process-search",
+      "S4-v3-forget-same-source",
+      "H1-v3-backend-scope-health",
+      "A1-v3-empty-md-class"
+    ],
+    "notRunCaseIds": [
+      "GW-v3-auth-not-run",
+      "GW-v3-managed-reject-not-run",
+      "GW-v3-handler-chain-not-run",
+      "MODEL-v3-untimed"
+    ],
+    "sampleIdsExecutedAll": ["P01", "P02", "P03", "P04", "P05", "P21"],
+    "scaffoldInternalOnly": true,
+    "notSystemEffectiveness": true
+  },
+  "uncoveredSamples": {
+    "gatewayAuth": ["GW-v3-auth-not-run"],
+    "managedReject": ["GW-v3-managed-reject-not-run"],
+    "gatewayHandlerChain": ["GW-v3-handler-chain-not-run"],
+    "modelEffect": ["MODEL-v3-untimed"],
+    "datasetPositiveNotExecuted": [
+      "P06",
+      "P07",
+      "P08",
+      "P09",
+      "P10",
+      "P11",
+      "P12",
+      "P13",
+      "P14",
+      "P15",
+      "P16",
+      "P17",
+      "P18",
+      "P19",
+      "P20",
+      "P22"
+    ],
+    "datasetNegativeNotExecuted": [
+      "N01",
+      "N02",
+      "N03",
+      "N04",
+      "N05",
+      "N06",
+      "N07",
+      "N08",
+      "N09",
+      "N10",
+      "N11"
+    ]
+  },
+  "acceptanceRules": {
+    "unapprovedNewFailuresFailAcceptance": true,
+    "diagnosticSuccessIsNotProductPass": true,
+    "doNotCallFullE2E": true,
+    "notRunMustNotIncrementPassed": true,
+    "helperMustNotClaimGatewayHandlerChain": true
+  },
+  "cases": [
+    {
+      "id": "ISO-v3-1",
+      "scenario": "isolation-path-assert",
+      "layer": "isolation",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "resolvedPaths": {
+          "stateDir": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/state",
+          "dataRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/data",
+          "tenantsRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/tenants",
+          "workspace": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/workspace-main",
+          "configPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/state/openbot.json",
+          "canonicalStorePath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/data/.meta/cogniweave/canonical.sqlite",
+          "parentOfCanonicalIsSymlink": false,
+          "canonicalExists": false
+        }
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "S2-v3-real-deprecate",
+      "scenario": "S2",
+      "layer": "sdk-unit",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [
+        "conflict-marker-write-path",
+        "fact-update-replace-with-new-version-via-product-API"
+      ],
+      "detail": {
+        "deprecatedId": "v3-p-0",
+        "hitCount": 4,
+        "deprecatedStillVisible": false
+      },
+      "sampleIdsExecuted": ["P01", "P02", "P03", "P04", "P05"],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "S3-v3-wrong-owner",
+      "scenario": "S3",
+      "layer": "sdk-unit",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "hitCount": 0
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "S1-v3-manager-search",
+      "scenario": "S1",
+      "layer": "manager-integration",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [
+        "real-tool-call-chain",
+        "reply-handler-new-session-injection",
+        "prompt-construction-with-recalled-memory"
+      ],
+      "detail": {
+        "hitCount": 1,
+        "paths": ["MEMORY.md"]
+      },
+      "sampleIdsExecuted": ["P01"],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "S5-v3-manager-cross-process-search",
+      "scenario": "S5",
+      "layer": "cross-process-retrieval",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "seedHits": 1,
+        "childStatus": 0,
+        "childHitCount": 1,
+        "childStdout": "{\"hitCount\":1,\"paths\":[\"MEMORY.md\"]}",
+        "childStderr": "(node:22437) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+        "note": "Rebuilds CogniWeaveMemoryManager in child and calls search — not metadata-only"
+      },
+      "sampleIdsExecuted": ["P21"],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "S4-v3-forget-same-source",
+      "scenario": "S4",
+      "layer": "helper-integration",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [
+        "live-gateway-RPC-transport",
+        "gateway-handler-chain",
+        "gateway-auth",
+        "managed-mode-rejectWhenManaged-runtime-call"
+      ],
+      "detail": {
+        "deletedPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v3-Qr73yX/data/agents/main/memory/agent/o8-v3-forget.md",
+        "beforePaths": ["MEMORY.md"],
+        "afterPaths": ["MEMORY.md"],
+        "sameSourceResidual": false,
+        "diagnosticSuccessNotProductPass": true,
+        "calledHelper": "forgetMemoryEntry",
+        "note": "Direct forgetMemoryEntry helper/data-layer call. NOT gateway-handler-chain coverage. Gateway auth, managed reject, and handler chain remain not-run."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "GW-v3-auth-not-run",
+      "scenario": "gateway-auth",
+      "layer": "gateway-handler-chain",
+      "repeat": 1,
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": ["gateway-auth", "session-token-validation"],
+      "detail": {
+        "note": "Gateway authentication path not exercised this batch."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": false
+    },
+    {
+      "id": "GW-v3-managed-reject-not-run",
+      "scenario": "managed-reject",
+      "layer": "gateway-handler-chain",
+      "repeat": 1,
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": ["rejectWhenManaged-runtime-call"],
+      "detail": {
+        "note": "Managed-mode forget rejection not runtime-tested this batch."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": false
+    },
+    {
+      "id": "GW-v3-handler-chain-not-run",
+      "scenario": "gateway-handler-chain",
+      "layer": "gateway-handler-chain",
+      "repeat": 1,
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": ["data.memory.forget-gateway-method", "live-RPC-transport"],
+      "detail": {
+        "note": "No gateway handler invocation. S4-v3 uses forgetMemoryEntry helper only."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": false
+    },
+    {
+      "id": "H1-v3-backend-scope-health",
+      "scenario": "H1",
+      "layer": "health-audit-observability",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "configuredBackend": "cogniweave",
+        "backend": "cogniweave",
+        "searchableDocumentCount": null,
+        "backendHealth": "unknown",
+        "storage": "ready"
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "A1-v3-empty-md-class",
+      "scenario": "A1",
+      "layer": "health-audit-observability",
+      "repeat": 1,
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "emptyClass": "diagnostic-insufficient",
+        "recoveryAction": "diagnostic-insufficient",
+        "auditStatus": 0
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": true
+    },
+    {
+      "id": "MODEL-v3-untimed",
+      "scenario": "model-effect",
+      "layer": "model-effect",
+      "repeat": 1,
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": ["request-send", "correct-adoption", "paid-model-call"],
+      "detail": {
+        "note": "No real model invoked this batch; status=not-run so it does not increase passed."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed",
+      "pass": false
+    }
+  ]
+}

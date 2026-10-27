@@ -543,7 +543,7 @@ export async function runAgentTurnWithFallback(params: {
           capabilityOutcomeForTurn = consumedCapability.capabilityOutcome;
         }
         if (executionRouting.planFailure.kind === "no_executable_candidates") {
-          recordGrowthTaskOutcome(false);
+          void recordGrowthTaskOutcome(false);
           return {
             kind: "final",
             payload: {

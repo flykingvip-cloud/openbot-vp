@@ -8,6 +8,7 @@ import { ORCH_READONLY_INVOKE_ENV, isReadonlyInvokeEnabled } from "./feature.js"
 import { observeOrchestrationConsider } from "./gateway-hook.js";
 import { ORCH_READONLY_PATH_PILOT_ENV, clearReadonlyPathBindingsForTests } from "./path-binding.js";
 import { invokeReadonlySurface } from "./readonly-invoke.js";
+import type { ReadonlyInvokeDeps } from "./readonly-invoke.js";
 import { ORCH_REASON } from "./reason-codes.js";
 import {
   ORCHESTRATION_LIVE_INVOKE,
@@ -40,19 +41,27 @@ const adapters = vi.hoisted(() => {
 });
 
 vi.mock("../agents/tools/memory-tool.js", () => ({
-  createMemorySearchTool: adapters.createMemorySearchTool,
+  createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+    ReadonlyInvokeDeps["createMemorySearchTool"]
+  >,
 }));
 
 vi.mock("../agents/tools/web-fetch.js", () => ({
-  createWebFetchTool: adapters.createWebFetchTool,
+  createWebFetchTool: adapters.createWebFetchTool as unknown as NonNullable<
+    ReadonlyInvokeDeps["createWebFetchTool"]
+  >,
 }));
 
 vi.mock("../agents/tools/web-search.js", () => ({
-  createWebSearchTool: adapters.createWebSearchTool,
+  createWebSearchTool: adapters.createWebSearchTool as unknown as NonNullable<
+    ReadonlyInvokeDeps["createWebSearchTool"]
+  >,
 }));
 
 vi.mock("../cron/isolated-agent/skills-snapshot.js", () => ({
-  resolveCronSkillsSnapshot: adapters.resolveCronSkillsSnapshot,
+  resolveCronSkillsSnapshot: adapters.resolveCronSkillsSnapshot as unknown as NonNullable<
+    ReadonlyInvokeDeps["resolveCronSkillsSnapshot"]
+  >,
 }));
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -427,7 +436,9 @@ describe("WP-05 readonly single-path pilot", () => {
       actionId: "act-legacy-1",
       env: {},
       deps: {
-        createMemorySearchTool: adapters.createMemorySearchTool,
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
       },
     });
     expect(result.invokedTool).toBe(true);
@@ -443,14 +454,22 @@ describe("WP-05 readonly single-path pilot", () => {
       query: "hello",
       actionId: "act-dual-1",
       env: {},
-      deps: { createMemorySearchTool: adapters.createMemorySearchTool },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
+      },
     });
     const second = await invokeReadonlySurface({
       surface: "memory",
       query: "hello-again",
       actionId: "act-dual-1",
       env: {},
-      deps: { createMemorySearchTool: adapters.createMemorySearchTool },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
+      },
     });
     expect(second.invokedTool).toBe(false);
     expect(second.reason).toBe("dual_exec_refused");
@@ -463,7 +482,11 @@ describe("WP-05 readonly single-path pilot", () => {
       query: "hello",
       actionId: "act-fabric-no-check",
       env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
-      deps: { createMemorySearchTool: adapters.createMemorySearchTool },
+      deps: {
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
+      },
     });
     expect(result.invokedTool).toBe(false);
     expect(result.reason).toBe("fabric_path_requires_policy_check");
@@ -477,7 +500,9 @@ describe("WP-05 readonly single-path pilot", () => {
       actionId: "act-fabric-deny",
       env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
       deps: {
-        createMemorySearchTool: adapters.createMemorySearchTool,
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
         policyCheck: async () => ({ decision: "DENY", reason: "shadow_deny" }),
       },
     });
@@ -491,7 +516,9 @@ describe("WP-05 readonly single-path pilot", () => {
       actionId: "act-fabric-allow",
       env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
       deps: {
-        createMemorySearchTool: adapters.createMemorySearchTool,
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
         policyCheck: async () => ({ decision: "ALLOW" }),
       },
     });
@@ -507,7 +534,9 @@ describe("WP-05 readonly single-path pilot", () => {
       actionId: "act-fabric-modify",
       env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
       deps: {
-        createMemorySearchTool: adapters.createMemorySearchTool,
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
         policyCheck: async () => ({ decision: "MODIFY", reason: "shadow_modify" }),
       },
     });
@@ -521,7 +550,9 @@ describe("WP-05 readonly single-path pilot", () => {
       actionId: "act-fabric-modify-default",
       env: { [ORCH_READONLY_PATH_PILOT_ENV]: "fabric" },
       deps: {
-        createMemorySearchTool: adapters.createMemorySearchTool,
+        createMemorySearchTool: adapters.createMemorySearchTool as unknown as NonNullable<
+          ReadonlyInvokeDeps["createMemorySearchTool"]
+        >,
         policyCheck: async () => ({ decision: "MODIFY" }),
       },
     });

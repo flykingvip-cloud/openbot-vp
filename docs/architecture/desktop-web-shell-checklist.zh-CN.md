@@ -7,12 +7,12 @@
 
 ## 边界
 
-| 做                                      | 不做                                                  |
-| --------------------------------------- | ----------------------------------------------------- |
-| 桌面窗口/嵌入加载 **Web employee**      | 移植 `EmployeeRootTabs` / `PostOnboardingTabs` 到桌面 |
-| Mac 伴侣继续 Gateway / TCC / node       | 伴侣内做对话/任务/知识/我的底栏                       |
-| 与 Web 同一 Gateway RPC                 | 桌面私有员工 API                                      |
-| Windows **Web shell 宿主**（Stage 55）  | Windows 原生四 Tab；冒充完整伴侣已交付                |
+| 做                                     | 不做                                                  |
+| -------------------------------------- | ----------------------------------------------------- |
+| 桌面窗口/嵌入加载 **Web employee**     | 移植 `EmployeeRootTabs` / `PostOnboardingTabs` 到桌面 |
+| Mac 伴侣继续 Gateway / TCC / node      | 伴侣内做对话/任务/知识/我的底栏                       |
+| 与 Web 同一 Gateway RPC                | 桌面私有员工 API                                      |
+| Windows **Web shell 宿主**（Stage 55） | Windows 原生四 Tab；冒充完整伴侣已交付                |
 
 ## 建议切片顺序
 

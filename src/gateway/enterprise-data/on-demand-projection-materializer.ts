@@ -1,8 +1,8 @@
+import { getProcessControlledSarProvider } from "./controlled-sar-provider.js";
 import { listEnterpriseKnowledgeProjectionBindings } from "./enterprise-knowledge-projection-binding-store.js";
 import { listKnowledgeFeedItems } from "./knowledge-feed-item-store.js";
 import { isImplementedMaterializationMode } from "./knowledge-publication.js";
 import { resolveVisibilityForFeedItem } from "./knowledge-visibility-policy-store.js";
-import { getProcessControlledSarProvider } from "./controlled-sar-provider.js";
 import { runProjectionMaterialization } from "./projection-materializer.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import type { EnterpriseDataStore, KnowledgeAgentType } from "./types.js";

@@ -12,20 +12,20 @@
 
 ## 2. 生命周期与唯一判定（冻结）
 
-| lifecycle | taskJudgement（查询） |
-|-----------|----------------------|
-| 非 `closed` | **必须** `incomplete` |
-| `closed` | 仅 `success` \| `failure` \| `cancelled` |
+| lifecycle   | taskJudgement（查询）                    |
+| ----------- | ---------------------------------------- |
+| 非 `closed` | **必须** `incomplete`                    |
+| `closed`    | 仅 `success` \| `failure` \| `cancelled` |
 
-| 场景 | lifecycle | judgement |
-|------|-----------|-----------|
-| 验收 pending，交付 blocked/pending | `awaiting_acceptance` | incomplete |
-| 验收 failed，允许修复 | `recovering` | incomplete |
-| 验收 failed，停止修复 | `closed` | **failure** |
-| 验收通过，等待交付 | `awaiting_delivery` | incomplete |
-| 验收满足且交付 delivered/not_required | `closed` | **success** |
-| 用户取消 | `closed` | **cancelled** |
-| prepare/preflight 拒绝 | `closed` | **failure**（归因 prepare） |
+| 场景                                  | lifecycle             | judgement                   |
+| ------------------------------------- | --------------------- | --------------------------- |
+| 验收 pending，交付 blocked/pending    | `awaiting_acceptance` | incomplete                  |
+| 验收 failed，允许修复                 | `recovering`          | incomplete                  |
+| 验收 failed，停止修复                 | `closed`              | **failure**                 |
+| 验收通过，等待交付                    | `awaiting_delivery`   | incomplete                  |
+| 验收满足且交付 delivered/not_required | `closed`              | **success**                 |
+| 用户取消                              | `closed`              | **cancelled**               |
+| prepare/preflight 拒绝                | `closed`              | **failure**（归因 prepare） |
 
 硬规则：
 

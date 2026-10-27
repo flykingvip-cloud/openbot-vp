@@ -14,54 +14,54 @@ Repo：`upbeyond/openbot`
 
 真相源：`user-operational-identity-providers.ts`、`workbench-operational-identity-forms.ts`（`renderGithubPersonalForm`）、`user-operational-identity-oauth.ts`。
 
-| UI / 语义 | 写入 | 必填 |
-|-----------|------|------|
-| 显示名称 | `displayName`（oauth.start 可带；缺省用 GitHub login） | 建议填 |
-| GitHub 用户名 | `credentialHandleId` 表单位；**真 OAuth 可留空**（回调用 `api.github.com/user` 的 login） | 否 |
-| 提交 | 「授权绑定」/「重新认证」 | — |
+| UI / 语义     | 写入                                                                                      | 必填   |
+| ------------- | ----------------------------------------------------------------------------------------- | ------ |
+| 显示名称      | `displayName`（oauth.start 可带；缺省用 GitHub login）                                    | 建议填 |
+| GitHub 用户名 | `credentialHandleId` 表单位；**真 OAuth 可留空**（回调用 `api.github.com/user` 的 login） | 否     |
+| 提交          | 「授权绑定」/「重新认证」                                                                 | —      |
 
 运营动作（绑后 catalog，非整表勾选）：`create_issue`、`create_pull_request`、`comment`。  
 绑后数字人授权：另走 `oi-grant-owned-bots` → `grants.upsert`（本 skill 不混写）。
 
 ## 回写路径（唯一）
 
-1. `user-operational-identity.oauth.start`  
-   - 入参：`provider=github-personal`，可选 `displayName` / `identityId`（重新认证）/ `returnPath` / `callbackOrigin`  
+1. `user-operational-identity.oauth.start`
+   - 入参：`provider=github-personal`，可选 `displayName` / `identityId`（重新认证）/ `returnPath` / `callbackOrigin`
    - 出参：`authorizeUrl`（已配置 `GITHUB_CLIENT_ID`/`SECRET` + callback 时）、`session`、`simulateAllowed`（无真 GitHub 配置时）
-2. 用户在 GitHub 同意页授权 → 回调 `user-operational-identity` OAuth callback（既有路径）→ `oauth` 会话 complete  
-3. 验收：身份 `active`；secret store 有 token；个人设置 → 授权 → GitHub（个人）显示已配置  
+2. 用户在 GitHub 同意页授权 → 回调 `user-operational-identity` OAuth callback（既有路径）→ `oauth` 会话 complete
+3. 验收：身份 `active`；secret store 有 token；个人设置 → 授权 → GitHub（个人）显示已配置
 4. 可选轮询：`user-operational-identity.oauth.status`；取消：`oauth.cancel`
 
 **禁止**：直接改 `openbot-user-operational-identity.json` / `*-secrets.json`；禁止用 `credentials.bind` 假装 GitHub OAuth（manual 会被拒）；禁止把 access_token / refresh / cookie 打进聊天或投影。
 
 ## 深链
 
-- UI：个人设置 → `authorization` → `add:github-personal`（或左栏「GitHub（个人）」）  
+- UI：个人设置 → `authorization` → `add:github-personal`（或左栏「GitHub（个人）」）
 - Skill：`oi-bind-github-personal`；编排：`oi-orchestrate-personal-identity` catalog-map 已指向本 skill
 
 ## OAuth 路径摘要
 
-| 步骤 | 真实 URL / 行为 |
-|------|-----------------|
-| 授权 | `https://github.com/login/oauth/authorize?client_id=…&redirect_uri=…&state=…&scope=read:user,user:email,repo` |
-| 换票 | `https://github.com/login/oauth/access_token`（服务端，skill 不持 client_secret） |
-| 账号标签 | `GET https://api.github.com/user` → `login` |
-| 配置 | env：`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`（及既有 redirect 解析）；未配置时 `simulateAllowed` 仅限开发/测试，生产须真 OAuth |
+| 步骤     | 真实 URL / 行为                                                                                                                   |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 授权     | `https://github.com/login/oauth/authorize?client_id=…&redirect_uri=…&state=…&scope=read:user,user:email,repo`                     |
+| 换票     | `https://github.com/login/oauth/access_token`（服务端，skill 不持 client_secret）                                                 |
+| 账号标签 | `GET https://api.github.com/user` → `login`                                                                                       |
+| 配置     | env：`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`（及既有 redirect 解析）；未配置时 `simulateAllowed` 仅限开发/测试，生产须真 OAuth |
 
 云电脑角色：打开 `authorizeUrl`、必要时协助登录/2FA；**不是**权威源，也不代持 client_secret。
 
 ## 交付物
 
-1. 本文档  
-2. `skills/oi-bind-github-personal/`（SKILL + references）  
-3. 更新 `oi-orchestrate-personal-identity` catalog-map：`github-personal` → 本 skill  
-4. guidance / docs / platform-ops 最小接线  
+1. 本文档
+2. `skills/oi-bind-github-personal/`（SKILL + references）
+3. 更新 `oi-orchestrate-personal-identity` catalog-map：`github-personal` → 本 skill
+4. guidance / docs / platform-ops 最小接线
 5. 契约测：S2 skill 存在；`registrationReady` + `authMode=oauth`；回写与禁区声明
 
 ## 非目标
 
-- 社交站（S3）、飞书、微信个人号云电脑主路径  
-- 改 OAuth 服务端 / adapter（除非明显断线且最小修复）  
+- 社交站（S3）、飞书、微信个人号云电脑主路径
+- 改 OAuth 服务端 / adapter（除非明显断线且最小修复）
 - 真机 E2E 必须（本阶段 skill + 文档 + 契约测）
 
 ## 验收闸门（独立验收 Bot「私有数字身份智能化验收」）

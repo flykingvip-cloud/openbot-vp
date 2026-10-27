@@ -21,6 +21,6 @@ describe("estimateContextChars after compile", () => {
 
     expect(() => estimateContextChars(messages, createMessageCharEstimateCache())).not.toThrow();
     expect(estimateContextChars(messages, createMessageCharEstimateCache())).toBeGreaterThan(0);
-    expect(getToolResultText(messages[1] as AgentMessage)).toBe("kept");
+    expect(getToolResultText(messages[1])).toBe("kept");
   });
 });

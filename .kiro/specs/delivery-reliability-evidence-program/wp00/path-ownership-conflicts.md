@@ -6,29 +6,29 @@ Agent：`grokbot-verifiable-delivery`
 
 ## A. 本任务可直接改（无运行热点冲突）
 
-| 路径 | 说明 |
-| --- | --- |
-| `.kiro/specs/delivery-reliability-evidence-program/**` | 计划、WP-00/01/02/12 文档与 E0 证据 |
+| 路径                                                        | 说明                                   |
+| ----------------------------------------------------------- | -------------------------------------- |
+| `.kiro/specs/delivery-reliability-evidence-program/**`      | 计划、WP-00/01/02/12 文档与 E0 证据    |
 | `.kiro/specs/delivery-reliability-evidence-program/wp12/**` | 许可审计产出（只读结论，不改 LICENSE） |
 
 ## B. 共享提交热点（声明≠可提交）
 
-| 路径 | lander / 信号 | 规则 |
-| --- | --- | --- |
+| 路径                  | lander / 信号                                     | 规则                                           |
+| --------------------- | ------------------------------------------------- | ---------------------------------------------- |
 | `.loom/registry.yaml` | lander=`kiro-loom`（loom-workspace-orchestrator） | 可 `loom register`；**提交由指定 lander 落地** |
 
 ## C. 运行路径 — 未批准整片接管
 
-| 路径 | 冲突信号 | 本阶段处置 |
-| --- | --- | --- |
-| `src/agents/pi-embedded-runner/run/attempt.ts` | 10+ active claimants | **禁止整片接管**；非第一刀 |
-| `src/gateway/collaboration-dispatch/**` | 大量 collab 任务 | **禁止整片接管**；仅精确文件切片 |
-| `src/agents/execution-preflight/**` | constitutional + batch8 + cursor-grok | WP-01/08 先设计，后接管 |
-| `src/fabric/**` | kiro-fabric | WP-04 先审计；代码需协调 |
-| `packages/evolution-core/**` | evolution 专项 | WP-09+ 协调 |
-| `src/gateway/server.impl.ts` | 多任务宣称 | WP-02 恢复接线候选；需精确接管 |
-| `src/gateway/collaboration-dispatch/handoff-contract.ts` | 主要为宽泛 `src/**` 宣称 | WP-02 候选；见 wp02 接管表 |
-| `src/gateway/collaboration-learning/handoff-contract-entry.ts` | tenant-context + `src/**` | 仅当接线证明需要时纳入 |
+| 路径                                                           | 冲突信号                              | 本阶段处置                       |
+| -------------------------------------------------------------- | ------------------------------------- | -------------------------------- |
+| `src/agents/pi-embedded-runner/run/attempt.ts`                 | 10+ active claimants                  | **禁止整片接管**；非第一刀       |
+| `src/gateway/collaboration-dispatch/**`                        | 大量 collab 任务                      | **禁止整片接管**；仅精确文件切片 |
+| `src/agents/execution-preflight/**`                            | constitutional + batch8 + cursor-grok | WP-01/08 先设计，后接管          |
+| `src/fabric/**`                                                | kiro-fabric                           | WP-04 先审计；代码需协调         |
+| `packages/evolution-core/**`                                   | evolution 专项                        | WP-09+ 协调                      |
+| `src/gateway/server.impl.ts`                                   | 多任务宣称                            | WP-02 恢复接线候选；需精确接管   |
+| `src/gateway/collaboration-dispatch/handoff-contract.ts`       | 主要为宽泛 `src/**` 宣称              | WP-02 候选；见 wp02 接管表       |
+| `src/gateway/collaboration-learning/handoff-contract-entry.ts` | tenant-context + `src/**`             | 仅当接线证明需要时纳入           |
 
 ## D. 历史全局冲突
 

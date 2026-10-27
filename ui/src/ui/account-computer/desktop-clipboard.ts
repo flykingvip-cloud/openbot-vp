@@ -24,12 +24,7 @@ export const DEFAULT_CLIPBOARD_TEXT_MAX_BYTES = 256 * 1024;
 /** Primary (and currently only) allowed MIME. */
 export const ALLOWED_CLIPBOARD_MIME = "text/plain" as const;
 
-export type ClipboardPermissionState =
-  | "unknown"
-  | "prompt"
-  | "granted"
-  | "denied"
-  | "unsupported";
+export type ClipboardPermissionState = "unknown" | "prompt" | "granted" | "denied" | "unsupported";
 
 export type ClipboardSyncDirection = "host_to_remote" | "remote_to_host";
 

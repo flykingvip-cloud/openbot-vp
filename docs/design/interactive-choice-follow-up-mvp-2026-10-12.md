@@ -6,13 +6,13 @@ Reusable interactive choice on OpenBot control-ui without inventing DIL/GenUI.
 
 ## Mapping
 
-| Capability | OpenBot mechanism |
-| --- | --- |
-| Single-select | `chat-delivery` choice buttons (`role="option"`) |
-| Selection state | Ephemeral panel map in `chat-delivery-view.ts` |
-| Submit | 「确认并继续」 → `onSubmitChoice` → `handleSendChat(text)` |
-| Skill guidance | `skills/interactive-choice-follow-up/SKILL.md` |
-| Text fallback | Same `你选` / `A ·` markdown |
+| Capability      | OpenBot mechanism                                          |
+| --------------- | ---------------------------------------------------------- |
+| Single-select   | `chat-delivery` choice buttons (`role="option"`)           |
+| Selection state | Ephemeral panel map in `chat-delivery-view.ts`             |
+| Submit          | 「确认并继续」 → `onSubmitChoice` → `handleSendChat(text)` |
+| Skill guidance  | `skills/interactive-choice-follow-up/SKILL.md`             |
+| Text fallback   | Same `你选` / `A ·` markdown                               |
 
 ## Files
 

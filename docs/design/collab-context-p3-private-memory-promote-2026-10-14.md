@@ -14,13 +14,13 @@
 
 ## Hard invariants
 
-| Invariant | Enforcement |
-|-----------|-------------|
-| GROUP_PUBLIC remains SoT for group transcript | No new transcript writers; promote only touches learning storage |
-| No per-bot full group-history copy | Unchanged; `dropDivergentGroupTranscriptMirrors` remains |
-| Private state never dirty-writes transcript | `assertNoPrivateMemoryDirtyWriteToGroupPublic` on write/append paths |
-| Entry only via promote + audit | `promotePrivateMemoryCapsuleToGroup` |
-| Flags default OFF; no Floor live | `privateMemoryPromote` unset/false |
+| Invariant                                     | Enforcement                                                          |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| GROUP_PUBLIC remains SoT for group transcript | No new transcript writers; promote only touches learning storage     |
+| No per-bot full group-history copy            | Unchanged; `dropDivergentGroupTranscriptMirrors` remains             |
+| Private state never dirty-writes transcript   | `assertNoPrivateMemoryDirtyWriteToGroupPublic` on write/append paths |
+| Entry only via promote + audit                | `promotePrivateMemoryCapsuleToGroup`                                 |
+| Flags default OFF; no Floor live              | `privateMemoryPromote` unset/false                                   |
 
 ## Architecture
 
@@ -44,10 +44,10 @@ GROUP_PUBLIC transcript ←── assertNoPrivateMemoryDirtyWriteToGroupPublic
 
 ## Flag
 
-| Value | Behavior |
-|-------|----------|
+| Value                   | Behavior                                                                    |
+| ----------------------- | --------------------------------------------------------------------------- |
 | unset / false (default) | `promotePrivateMemoryCapsuleToGroup` returns `flag_off`; no learning writes |
-| true | Promote path may write group capsules / projections / assets + audit |
+| true                    | Promote path may write group capsules / projections / assets + audit        |
 
 Dirty-write / DM-mirror refusal on transcript paths is **always on** (independent of the flag).
 

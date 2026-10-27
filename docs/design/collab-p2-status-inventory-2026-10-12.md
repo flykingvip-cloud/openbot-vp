@@ -20,34 +20,34 @@ Prior inventories: [`collab-p0-status-inventory-2026-10-12.md`](./collab-p0-stat
 
 ## 1. Task-book → existing symbols
 
-| Capability | Status | Existing symbol / file |
-| --- | --- | --- |
-| Shadow stage flag A/B | **EXISTS** (default OFF) | `readCollabFloorShadowConfig` / `isCollabFloorShadowStageA\|B` in `shadow-stage-flag.ts`; config `collaboration.floor.shadowStage` in `types.collaboration.ts` / `zod-schema.ts` |
-| Shadow-A L0 / L1 / Admission plan | **EXISTS** | `computeFloorShadowA` / `attachFloorShadowA` in `floor-shadow-plan.ts`; `routeL0` (`router-l0.ts`); `routeL1` (`router-l1.ts`); `admit` (`admission.ts`) |
-| Attach onto decide without speaker rewrite | **EXISTS** | `decideParticipants` → `attachFloorShadow` in `decision-engine.ts`; `assertFloorShadowDidNotReplaceSpeakers` in `floor-live-cutover.ts` |
-| Legacy vs Floor compare | **PARTIAL → fixed in this PR** | `compareLegacyFloorAdmission` in `floor-shadow-plan.ts`; EDR `floorCompare` in `episode-decision-record.ts`. Writers previously set `legacy.admitted` from lead-only `primaryQueue`. Now use `legacyAdmittedSpeakersFromDecision` → `executionBots` (full production speakers). `primaryQueue` stays a separate field. |
-| Same policy snapshot | **EXISTS** | Shadow uses the caller's `RuntimeAuthority.policy` (`policyHash` / `policySnapshotId`) |
-| Persist Stage-A compare to ledger | **EXISTS** (dual-flag OFF) | `recordFloorShadowStageAAfterRound` — requires `shadowStage=A` **and** `collaboration.ledger.decisionRecords` |
-| Shadow-B bid collect (signal only) | **EXISTS** (default no model calls) | `startFloorBidShadow` / `collectFloorBids` in `floor-bid.ts`; budget `floor-bid-budget.ts`; model `floor-bid-model.ts`; `drivesProductionDecision: false` + `assertBidDoesNotDriveProduction` |
-| Shadow-B calibration sink | **EXISTS** | `<ns>/shadow/floor-bid-calibration.jsonl` + `floor-bid-tokens.json` (stage=B; independent of decisionRecords) |
-| Persist Stage-B bids / calibration to EDR | **EXISTS** (dual-flag OFF) | `recordFloorShadowStageBAfterRound` — requires `shadowStage=B` **and** `decisionRecords` |
-| Round wiring (no dispatch side effects) | **EXISTS** | `round-runtime.ts` `executeCollaborationRound`: Stage-B bid parallel; Stage-A/B record in `finishShadow`; throws swallowed |
-| Protocol=`shadow` jsonl metrics | **EXISTS** (sibling, default OFF) | `isCollabFloorShadowEnabled` / `observeFloorShadowAfterRound` in `floor-shadow.ts` — **independent** of `shadowStage` |
-| Floor live cutover refuse | **EXISTS** (OFF) | `FLOOR_LIVE_CUTOVER_DEFAULT=false`; G1 receipt in `floor-live-cutover.ts`; `legacy-production-executor.ts` |
-| Tests | **EXISTS** (+ this PR) | `floor-shadow-stage-a.test.ts`, `floor-shadow.test.ts`, `floor-bid.test.ts`, `floor-bid-model.test.ts`, `floor-live-cutover.g1.test.ts` |
-| Second Shadow orchestrator / Bid→admission | **MUST NOT BUILD** | Admission does not consume model bids; bids never rewrite production decisions |
-| Observability dashboards / 200-ep gate | **MISSING** (ops, not code) | Exit criteria belong in observation / acceptance, not a new runtime module |
+| Capability                                 | Status                              | Existing symbol / file                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Shadow stage flag A/B                      | **EXISTS** (default OFF)            | `readCollabFloorShadowConfig` / `isCollabFloorShadowStageA\|B` in `shadow-stage-flag.ts`; config `collaboration.floor.shadowStage` in `types.collaboration.ts` / `zod-schema.ts`                                                                                                                                       |
+| Shadow-A L0 / L1 / Admission plan          | **EXISTS**                          | `computeFloorShadowA` / `attachFloorShadowA` in `floor-shadow-plan.ts`; `routeL0` (`router-l0.ts`); `routeL1` (`router-l1.ts`); `admit` (`admission.ts`)                                                                                                                                                               |
+| Attach onto decide without speaker rewrite | **EXISTS**                          | `decideParticipants` → `attachFloorShadow` in `decision-engine.ts`; `assertFloorShadowDidNotReplaceSpeakers` in `floor-live-cutover.ts`                                                                                                                                                                                |
+| Legacy vs Floor compare                    | **PARTIAL → fixed in this PR**      | `compareLegacyFloorAdmission` in `floor-shadow-plan.ts`; EDR `floorCompare` in `episode-decision-record.ts`. Writers previously set `legacy.admitted` from lead-only `primaryQueue`. Now use `legacyAdmittedSpeakersFromDecision` → `executionBots` (full production speakers). `primaryQueue` stays a separate field. |
+| Same policy snapshot                       | **EXISTS**                          | Shadow uses the caller's `RuntimeAuthority.policy` (`policyHash` / `policySnapshotId`)                                                                                                                                                                                                                                 |
+| Persist Stage-A compare to ledger          | **EXISTS** (dual-flag OFF)          | `recordFloorShadowStageAAfterRound` — requires `shadowStage=A` **and** `collaboration.ledger.decisionRecords`                                                                                                                                                                                                          |
+| Shadow-B bid collect (signal only)         | **EXISTS** (default no model calls) | `startFloorBidShadow` / `collectFloorBids` in `floor-bid.ts`; budget `floor-bid-budget.ts`; model `floor-bid-model.ts`; `drivesProductionDecision: false` + `assertBidDoesNotDriveProduction`                                                                                                                          |
+| Shadow-B calibration sink                  | **EXISTS**                          | `<ns>/shadow/floor-bid-calibration.jsonl` + `floor-bid-tokens.json` (stage=B; independent of decisionRecords)                                                                                                                                                                                                          |
+| Persist Stage-B bids / calibration to EDR  | **EXISTS** (dual-flag OFF)          | `recordFloorShadowStageBAfterRound` — requires `shadowStage=B` **and** `decisionRecords`                                                                                                                                                                                                                               |
+| Round wiring (no dispatch side effects)    | **EXISTS**                          | `round-runtime.ts` `executeCollaborationRound`: Stage-B bid parallel; Stage-A/B record in `finishShadow`; throws swallowed                                                                                                                                                                                             |
+| Protocol=`shadow` jsonl metrics            | **EXISTS** (sibling, default OFF)   | `isCollabFloorShadowEnabled` / `observeFloorShadowAfterRound` in `floor-shadow.ts` — **independent** of `shadowStage`                                                                                                                                                                                                  |
+| Floor live cutover refuse                  | **EXISTS** (OFF)                    | `FLOOR_LIVE_CUTOVER_DEFAULT=false`; G1 receipt in `floor-live-cutover.ts`; `legacy-production-executor.ts`                                                                                                                                                                                                             |
+| Tests                                      | **EXISTS** (+ this PR)              | `floor-shadow-stage-a.test.ts`, `floor-shadow.test.ts`, `floor-bid.test.ts`, `floor-bid-model.test.ts`, `floor-live-cutover.g1.test.ts`                                                                                                                                                                                |
+| Second Shadow orchestrator / Bid→admission | **MUST NOT BUILD**                  | Admission does not consume model bids; bids never rewrite production decisions                                                                                                                                                                                                                                         |
+| Observability dashboards / 200-ep gate     | **MISSING** (ops, not code)         | Exit criteria belong in observation / acceptance, not a new runtime module                                                                                                                                                                                                                                             |
 
 ## 2. Defaults that must stay OFF
 
-| Flag / constant | Default | Note |
-| --- | --- | --- |
-| `collaboration.floor.shadowStage` | unset | Shadow-A/B optional; leave unset |
-| `collaboration.floor.bidSampleRate` | unset → 0 | Even with stage=B, no model calls |
-| `collaboration.floor.bidDailyTokenCap` | unset → 0 | Even with stage=B, no model calls |
-| `collaboration.floor.protocol` | unset/legacy | `shadow` writes jsonl metrics; `floor` accepted and ignored (not live) |
-| `collaboration.ledger.decisionRecords` | unset/false | No EDR `floorCompare` until explicitly on |
-| `FLOOR_LIVE_CUTOVER_DEFAULT` | `false` | Unsigned cutover; shadowStage alone cannot promote Floor speakers |
+| Flag / constant                        | Default      | Note                                                                   |
+| -------------------------------------- | ------------ | ---------------------------------------------------------------------- |
+| `collaboration.floor.shadowStage`      | unset        | Shadow-A/B optional; leave unset                                       |
+| `collaboration.floor.bidSampleRate`    | unset → 0    | Even with stage=B, no model calls                                      |
+| `collaboration.floor.bidDailyTokenCap` | unset → 0    | Even with stage=B, no model calls                                      |
+| `collaboration.floor.protocol`         | unset/legacy | `shadow` writes jsonl metrics; `floor` accepted and ignored (not live) |
+| `collaboration.ledger.decisionRecords` | unset/false  | No EDR `floorCompare` until explicitly on                              |
+| `FLOOR_LIVE_CUTOVER_DEFAULT`           | `false`      | Unsigned cutover; shadowStage alone cannot promote Floor speakers      |
 
 ## 3. Thin hardening in this PR (path B only)
 

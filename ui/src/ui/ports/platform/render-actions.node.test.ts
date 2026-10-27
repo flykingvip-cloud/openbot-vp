@@ -151,5 +151,30 @@ describe("platform render actions", () => {
       const { value } = lastProviderWrite();
       expect(value.apiKey).toBe("sk-add-key");
     });
+
+    it("does not write callType into provider model entries", () => {
+      const { actions } = setup();
+      actions.models.onAddModel({
+        providerId: "p3",
+        baseUrl: "https://api.music.com/v1",
+        modelId: "suno-v3",
+        name: "Suno",
+        api: "openai-completions",
+        inputModes: ["text"],
+        reasoning: false,
+        apiKey: "",
+        callType: "music_generation",
+      });
+      const { value } = lastProviderWrite();
+      const models = value.models as Array<Record<string, unknown>>;
+      const row = models.find((entry) => entry.id === "suno-v3");
+      expect(row).toBeTruthy();
+      expect(row).not.toHaveProperty("callType");
+      expect(row).toMatchObject({
+        id: "suno-v3",
+        name: "Suno",
+        api: "openai-completions",
+      });
+    });
   });
 });

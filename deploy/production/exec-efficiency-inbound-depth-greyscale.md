@@ -15,17 +15,17 @@ compose default in this PR stream — only via host `.env` after shadow evidence
 
 ## Flag ladder (all default off in code)
 
-| Env | Effect when `1` / `true` | Safe default |
-| --- | --- | --- |
-| `OPENBOT_CHAT_INBOUND_DEPTH_SHADOW` | Classify depth; emit `chat.depth_decided` (`mode=shadow`). **Does not** skip knowledge or strip tools by itself. | OK for LIVE after P0 (may already be on) |
-| `OPENBOT_CHAT_INBOUND_DEPTH_ROUTER` | Apply chat-lane cuts when depth=`chat` for sessions that only classify under ROUTER (steward employee already gets classify-only chat-lane without this flag). | **Off** until shadow window is clean |
-| `OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY` | Retrieve-depth source intersection / live-source gate. | Off until router is stable |
-| `OPENBOT_CHAT_INBOUND_TOOL_POLICY` | Retrieve-depth read-only tool allowlist. | Off until router is stable |
-| `OPENBOT_CHAT_INBOUND_DEPTH_AGENT_ALLOWLIST` | Comma-separated agentIds (besides default `main`) in scope. Empty = main steward only. | Empty until explicitly expanded |
-| `OPENBOT_CHAT_INBOUND_PERSIST_EARLY` | Persist plain-text user messages before ACK. | Independent; enable only if transcript contract approved |
-| `OPENBOT_EXECUTION_ROUTER_OBSERVATION` | Terminal `chat.execution_observation` with stage latencies. | Optional for dashboards |
-| `OPENBOT_CHAT_INBOUND_DEPTH_HARVEST` | Durable local JSONL of `chat.depth_decided` under `$OPENBOT_STATE_DIR/inbound-depth-harvest/`. | **Auto-on with SHADOW/ROUTER**; set `0` to disable; set `1` to force |
-| `OPENBOT_CHAT_INBOUND_DEPTH_HARVEST_RETENTION_DAYS` | Day-file retention for harvest JSONL (default **14**, max 90). | Optional |
+| Env                                                 | Effect when `1` / `true`                                                                                                                                       | Safe default                                                         |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `OPENBOT_CHAT_INBOUND_DEPTH_SHADOW`                 | Classify depth; emit `chat.depth_decided` (`mode=shadow`). **Does not** skip knowledge or strip tools by itself.                                               | OK for LIVE after P0 (may already be on)                             |
+| `OPENBOT_CHAT_INBOUND_DEPTH_ROUTER`                 | Apply chat-lane cuts when depth=`chat` for sessions that only classify under ROUTER (steward employee already gets classify-only chat-lane without this flag). | **Off** until shadow window is clean                                 |
+| `OPENBOT_CHAT_INBOUND_KNOWLEDGE_POLICY`             | Retrieve-depth source intersection / live-source gate.                                                                                                         | Off until router is stable                                           |
+| `OPENBOT_CHAT_INBOUND_TOOL_POLICY`                  | Retrieve-depth read-only tool allowlist.                                                                                                                       | Off until router is stable                                           |
+| `OPENBOT_CHAT_INBOUND_DEPTH_AGENT_ALLOWLIST`        | Comma-separated agentIds (besides default `main`) in scope. Empty = main steward only.                                                                         | Empty until explicitly expanded                                      |
+| `OPENBOT_CHAT_INBOUND_PERSIST_EARLY`                | Persist plain-text user messages before ACK.                                                                                                                   | Independent; enable only if transcript contract approved             |
+| `OPENBOT_EXECUTION_ROUTER_OBSERVATION`              | Terminal `chat.execution_observation` with stage latencies.                                                                                                    | Optional for dashboards                                              |
+| `OPENBOT_CHAT_INBOUND_DEPTH_HARVEST`                | Durable local JSONL of `chat.depth_decided` under `$OPENBOT_STATE_DIR/inbound-depth-harvest/`.                                                                 | **Auto-on with SHADOW/ROUTER**; set `0` to disable; set `1` to force |
+| `OPENBOT_CHAT_INBOUND_DEPTH_HARVEST_RETENTION_DAYS` | Day-file retention for harvest JSONL (default **14**, max 90).                                                                                                 | Optional                                                             |
 
 Independent of these flags (already on main via P0 + classify-only chat-lane): employee-steward
 turns always classify depth. When depth=`chat`, the same chat-lane cuts apply even with
@@ -111,10 +111,10 @@ undo those merges.
 
 ## Do / Don't
 
-| Do | Don't |
-| --- | --- |
-| Toggle via host env + recreate | Bake ROUTER=`1` into Dockerfile / compose `environment` defaults |
-| Keep shadow on during router canary | Jump to KNOWLEDGE_POLICY + TOOL_POLICY in the same change without evidence |
+| Do                                              | Don't                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Toggle via host env + recreate                  | Bake ROUTER=`1` into Dockerfile / compose `environment` defaults                     |
+| Keep shadow on during router canary             | Jump to KNOWLEDGE_POLICY + TOOL_POLICY in the same change without evidence           |
 | Watch `knowledgeMs` / `modelTtftMs` / depth mix | Push LIVE config JSON (`bootstrapMaxChars` etc.) from agent automation without Owner |
 
 ---
@@ -150,13 +150,13 @@ Each inbound turn sync-calls several `observe*` helpers from
 `dispatch-from-config` (CTR shadow / Activation, orchestration consider,
 web_read shadow, reply-completion). They are **standby or opt-in**:
 
-| Surface | Default | Live delivery? |
-| --- | --- | --- |
-| CTR shadow / Activation `analyzeTurn`/`detectTurn` | Off until `init*Hook` + flag | No — observation / gated activation only |
-| Orchestration consider / web_read shadow | Env flags default off | No — `ORCHESTRATION_LIVE_INVOKE` stays frozen false |
-| SkillExecutionBinding | Always available as projection | No — merges lifecycle skills into the **same** embedded runner |
-| `OPENBOT_CANARY_VALIDATORS` (json-canvas / hook-delivery) | Empty / unset | No — contracts inert until the env **names** the validator |
-| soft-observe-dh (`OPENBOT_EVOLUTION_SOFT_OBSERVE_DH`) | Default on | **Canary-scoped only** — never production cutover |
+| Surface                                                   | Default                        | Live delivery?                                                 |
+| --------------------------------------------------------- | ------------------------------ | -------------------------------------------------------------- |
+| CTR shadow / Activation `analyzeTurn`/`detectTurn`        | Off until `init*Hook` + flag   | No — observation / gated activation only                       |
+| Orchestration consider / web_read shadow                  | Env flags default off          | No — `ORCHESTRATION_LIVE_INVOKE` stays frozen false            |
+| SkillExecutionBinding                                     | Always available as projection | No — merges lifecycle skills into the **same** embedded runner |
+| `OPENBOT_CANARY_VALIDATORS` (json-canvas / hook-delivery) | Empty / unset                  | No — contracts inert until the env **names** the validator     |
+| soft-observe-dh (`OPENBOT_EVOLUTION_SOFT_OBSERVE_DH`)     | Default on                     | **Canary-scoped only** — never production cutover              |
 
 **Do not** bake `OPENBOT_CANARY_VALIDATORS`, Activation live, ORCH live, or soft-observe
 active cutover into image / compose `environment` defaults. Host `.env` canary only.
@@ -189,4 +189,3 @@ Independent of LIVE depth flags, MainPath P1 thins the skills prompt defaults in
 
 Prefer turn `preferSkillNames` / agent bindings so truncation keeps the promoted set.
 Do **not** treat this as enabling `OPENBOT_CHAT_INBOUND_DEPTH_ROUTER`.
-

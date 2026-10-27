@@ -6,6 +6,9 @@ import {
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { selectPlatformModelsActions } from "./actions.ts";
 import { buildPlatformModelsVM } from "./adapter.ts";
+import { previewRoutingDecisionViaService } from "./admission/routing-decision-service.ts";
+import { ensureCapabilityVerificationLifecycle } from "./admission/verification-service.ts";
+import type { RoutingDecisionPreview } from "./routing-decision-preview.ts";
 import {
   renderModelsAorBanditPanel,
   renderModelsAorLiveCodingEvidence,
@@ -90,6 +93,10 @@ function renderModelsTabBar(activeTab: ModelsTabId) {
 
 let modelsSnapshotAutoLoadTriggered = false;
 let modelsSnapshotAutoLoadTimer: number | null = null;
+let lastRoutingPreview: RoutingDecisionPreview | null = null;
+export function getLastRoutingPreviewForTest() {
+  return lastRoutingPreview;
+}
 
 function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
   if (modelsSnapshotAutoLoadTriggered) {
@@ -120,6 +127,9 @@ function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
 }
 
 export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
+  // Page lifecycle: recover orphaned verification tasks from a prior refresh.
+  // Live in-page tasks are preserved; opening a detail drawer does not re-enter here alone.
+  ensureCapabilityVerificationLifecycle();
   maybeAutoTriggerModelsSnapshot(props);
   let vm: ReturnType<typeof buildPlatformModelsVM>;
   try {
@@ -199,6 +209,7 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 props.readModel.modelsManagementLoading === true ||
                 (!props.readModel.modelsManagementSnapshot &&
                   !props.readModel.modelsManagementError),
+              // 推荐池 = allowlist（入池／可被推荐），与租户可选、自动路由分开。
               onToggleRecommendationPool: (modelId, nextValue) => {
                 if (nextValue) {
                   actions.onUpsertAllowlistEntry(modelId, null);
@@ -207,14 +218,8 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 }
                 void actions.onSaveConfig?.();
               },
-              onToggleTenantSelectable: (modelId, nextValue) => {
-                if (nextValue) {
-                  actions.onUpsertAllowlistEntry(modelId, null);
-                } else {
-                  actions.onRemoveAllowlistEntry(modelId);
-                }
-                void actions.onSaveConfig?.();
-              },
+              // 租户可选／自动路由：后端准入 RPC 未接入前不挂开关，避免 localStorage
+              // 草稿被展示成平台已生效状态。按钮保持禁用并提示“尚未接入”。
             })}
           `
         : activeTab === "taskPlans"
@@ -238,6 +243,21 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                   onNavigateTab,
                   context: activeModelsContext,
                   compat: vm.compat?.legacyModelsVM ?? null,
+                  routingPreview: lastRoutingPreview,
+                  onSimulateRouting: (input) => {
+                    lastRoutingPreview = previewRoutingDecisionViaService({
+                      request: {
+                        taskProfileId: input.taskProfileId,
+                        planId: input.planId,
+                        taskText: input.taskText ?? input.sampleInput,
+                        outputType: input.outputType,
+                        budget: input.budget,
+                        requiredCapabilities: input.requiredCapabilities,
+                      },
+                      candidates: vm.assets.models,
+                    });
+                    requestOpenBotAppRerender();
+                  },
                   onSetDefaultPrimary: actions.onSetDefaultPrimary,
                   onSetDefaultFallbacks: actions.onSetDefaultFallbacks,
                   onSetDefaultImagePrimary: actions.onSetDefaultImagePrimary,

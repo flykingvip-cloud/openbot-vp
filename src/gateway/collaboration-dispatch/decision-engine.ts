@@ -141,7 +141,7 @@ function preferSkillOrMainBot(bots: CollaborationBotTarget[]): CollaborationBotT
     bots.find((bot) => {
       const name = (bot.name ?? "").toLowerCase();
       const id = normalizeAgentIdentifier(bot.agentId);
-      return id.includes("skill") || name.includes("skill") || name.includes("技能");
+      return (id ?? "").includes("skill") || name.includes("skill") || name.includes("技能");
     });
   if (skill) {
     return skill;

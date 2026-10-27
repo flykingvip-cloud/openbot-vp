@@ -15,33 +15,33 @@
 
 下列字段参与幂等、恢复、查询、统计和验收，必须是稳定的一等字段（或经 compat-read 映射到一等字段）。**不得**把它们藏在 payload 里当第二权威：
 
-| 字段 | 含义 |
-| --- | --- |
-| `logicalActionId` | 业务动作身份（≠ attempt） |
-| `taskId` | 任务身份 |
-| `stepId` | 步骤身份（常与 `ExecutionStep.id` 对齐） |
-| `attemptId` | 一次执行尝试 |
-| `tenantId` / `operatorId` | 租户 / 操作者 |
-| `executionPath` | 执行路径（如 legacy / fabric） |
-| `idempotencyKey` | 动作幂等键（通常 hash(tenant, taskId, logicalActionId)） |
-| `status` | 步骤状态（含 `unknown_outcome`，见下） |
-| `outcome` | 结果摘要（非 adapter 原始响应） |
-| `policyVersion` | 策略版本 |
-| `executorVersion` | 执行器版本 |
-| `startedAt` / `completedAt` | 起止时间（ms epoch 对齐既有 `*AtMs` 命名时可映射） |
-| `retryCount` | 重试次数（同 logicalAction 下 attempt 计数语义） |
-| `evidenceRefs` | 证据引用列表 |
-| `externalReceiptRefs` | 外部回执引用列表 |
-| `errorCode` / `unknownReason` | 失败码 / 未知结果原因 |
+| 字段                          | 含义                                                     |
+| ----------------------------- | -------------------------------------------------------- |
+| `logicalActionId`             | 业务动作身份（≠ attempt）                                |
+| `taskId`                      | 任务身份                                                 |
+| `stepId`                      | 步骤身份（常与 `ExecutionStep.id` 对齐）                 |
+| `attemptId`                   | 一次执行尝试                                             |
+| `tenantId` / `operatorId`     | 租户 / 操作者                                            |
+| `executionPath`               | 执行路径（如 legacy / fabric）                           |
+| `idempotencyKey`              | 动作幂等键（通常 hash(tenant, taskId, logicalActionId)） |
+| `status`                      | 步骤状态（含 `unknown_outcome`，见下）                   |
+| `outcome`                     | 结果摘要（非 adapter 原始响应）                          |
+| `policyVersion`               | 策略版本                                                 |
+| `executorVersion`             | 执行器版本                                               |
+| `startedAt` / `completedAt`   | 起止时间（ms epoch 对齐既有 `*AtMs` 命名时可映射）       |
+| `retryCount`                  | 重试次数（同 logicalAction 下 attempt 计数语义）         |
+| `evidenceRefs`                | 证据引用列表                                             |
+| `externalReceiptRefs`         | 外部回执引用列表                                         |
+| `errorCode` / `unknownReason` | 失败码 / 未知结果原因                                    |
 
 ### payload（non-authority extensions only）
 
-| 允许 | 禁止 |
-| --- | --- |
-| adapter-specific request/response | 逻辑动作身份 / 幂等键 / 权威 status |
-| provider metadata | 把 attemptId 只放 payload 当唯一来源 |
-| redacted diagnostics | 敏感原文（只保留脱敏引用） |
-| non-canonical extension fields | 与 Step 字段双写双权威 |
+| 允许                              | 禁止                                 |
+| --------------------------------- | ------------------------------------ |
+| adapter-specific request/response | 逻辑动作身份 / 幂等键 / 权威 status  |
+| provider metadata                 | 把 attemptId 只放 payload 当唯一来源 |
+| redacted diagnostics              | 敏感原文（只保留脱敏引用）           |
+| non-canonical extension fields    | 与 Step 字段双写双权威               |
 
 原始 payload **必须**带内容哈希或版本引用；敏感内容只保留脱敏引用。
 

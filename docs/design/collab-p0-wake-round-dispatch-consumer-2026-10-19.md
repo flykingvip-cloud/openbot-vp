@@ -12,23 +12,23 @@ ledger rows with `outcome: "recorded"` but never opened an execution round.
 
 ## Inventory-first
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| Human structured `@` → decideParticipants + wake `dispatched` | EXISTS | Unchanged |
-| self_advance / nudge / escalate wake writers | EXISTS | Were ledger-only |
-| Mode B `executeCollaborationRound` | EXISTS | Reused by dispatcher |
-| Wake → 真回合 consumer | **THIS PR** | Opt-in via execute allowlist + bound dispatcher |
+| Surface                                                       | Status      | Note                                            |
+| ------------------------------------------------------------- | ----------- | ----------------------------------------------- |
+| Human structured `@` → decideParticipants + wake `dispatched` | EXISTS      | Unchanged                                       |
+| self_advance / nudge / escalate wake writers                  | EXISTS      | Were ledger-only                                |
+| Mode B `executeCollaborationRound`                            | EXISTS      | Reused by dispatcher                            |
+| Wake → 真回合 consumer                                        | **THIS PR** | Opt-in via execute allowlist + bound dispatcher |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| `wake-round-dispatch.ts` | Gate + `consumeWakeForRoundDispatch`; `dispatched` only on successful Mode B dispatch |
-| `mode-b-wake-round-dispatcher.ts` | Builds Mode B single-owner decision; calls `executeCollaborationRound` |
-| `trySelfAdvance` delivery_exec execute | Uses consumer (unbound → `recorded`) |
-| Heartbeat emit nudge/escalate | Uses consumer (selfAdvance dry_run → `recorded`) |
-| continue-after-round nudge | Same consumer |
-| Tests | allowlist外 recorded; execute+mock dispatched; dry_run fallback; Mode B mock runBot |
+| Surface                                | Behavior                                                                              |
+| -------------------------------------- | ------------------------------------------------------------------------------------- |
+| `wake-round-dispatch.ts`               | Gate + `consumeWakeForRoundDispatch`; `dispatched` only on successful Mode B dispatch |
+| `mode-b-wake-round-dispatcher.ts`      | Builds Mode B single-owner decision; calls `executeCollaborationRound`                |
+| `trySelfAdvance` delivery_exec execute | Uses consumer (unbound → `recorded`)                                                  |
+| Heartbeat emit nudge/escalate          | Uses consumer (selfAdvance dry_run → `recorded`)                                      |
+| continue-after-round nudge             | Same consumer                                                                         |
+| Tests                                  | allowlist外 recorded; execute+mock dispatched; dry_run fallback; Mode B mock runBot   |
 
 ## Gate (all required)
 

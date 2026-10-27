@@ -11,9 +11,7 @@ export function isWeixinArticleHost(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
     return (
-      host === "mp.weixin.qq.com" ||
-      host.endsWith(".mp.weixin.qq.com") ||
-      host === "weixin.qq.com"
+      host === "mp.weixin.qq.com" || host.endsWith(".mp.weixin.qq.com") || host === "weixin.qq.com"
     );
   } catch {
     return /mp\.weixin\.qq\.com/i.test(url);
@@ -53,16 +51,14 @@ function decodeBasicEntities(value: string): string {
     .replace(/&#39;/gi, "'")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
-      String.fromCharCode(Number.parseInt(hex, 16)),
-    )
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCharCode(Number.parseInt(hex, 16)))
     .replace(/&#(\d+);/gi, (_, dec: string) => String.fromCharCode(Number.parseInt(dec, 10)));
 }
 
 function extractTitleFromWeixinHtml(html: string): string | undefined {
-  const og = html.match(
-    /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
-  ) || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
+  const og =
+    html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i);
   if (og?.[1]) {
     return decodeBasicEntities(og[1]).trim() || undefined;
   }
@@ -112,9 +108,7 @@ export function extractWeixinJsContent(
 
   // Some pages put escaped HTML inside a script / data attribute.
   if (!bodyHtml) {
-    const dataContent = html.match(
-      /id=["']js_content["'][^>]*data-content=["']([^"']+)["']/i,
-    );
+    const dataContent = html.match(/id=["']js_content["'][^>]*data-content=["']([^"']+)["']/i);
     if (dataContent?.[1]) {
       bodyHtml = decodeBasicEntities(dataContent[1]);
     }
@@ -126,10 +120,7 @@ export function extractWeixinJsContent(
 
   const title = extractTitleFromWeixinHtml(html);
   const rendered = htmlToMarkdown(bodyHtml);
-  const text =
-    extractMode === "text"
-      ? markdownToText(rendered.text)
-      : rendered.text;
+  const text = extractMode === "text" ? markdownToText(rendered.text) : rendered.text;
   const cleaned = text.replace(/\u200b/g, "").trim();
   if (isNearEmptyWeixinExtract(cleaned)) {
     return null;

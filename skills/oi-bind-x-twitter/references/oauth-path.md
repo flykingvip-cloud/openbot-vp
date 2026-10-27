@@ -19,13 +19,13 @@ live_evidence: references/live-evidence.md
    默认 scope：`tweet.read tweet.write users.read offline.access`  
    （可由 `OPENBOT_USER_OPERATIONAL_IDENTITY_X_TWITTER_SCOPE` 覆盖；由 `oauth.start` 返回的 `authorizeUrl` 已拼好，skill 不要手改。）
 
-2. **用户侧**  
-   - 若未登录 X：登录（可能 2FA）  
+2. **用户侧**
+   - 若未登录 X：登录（可能 2FA）
    - 同意应用权限 → 重定向到 OpenBot callback（`redirect_uri` + `code` + `state`）
 
-3. **服务端（非 skill）**  
-   - POST `https://api.twitter.com/2/oauth2/token`（PKCE `code_verifier`）  
-   - GET `https://api.twitter.com/2/users/me` → `username` 作 `@handle`  
+3. **服务端（非 skill）**
+   - POST `https://api.twitter.com/2/oauth2/token`（PKCE `code_verifier`）
+   - GET `https://api.twitter.com/2/users/me` → `username` 作 `@handle`
    - 写入 secret store（`kind=oauth_token`，`metadata.scope`）+ 注册/轮换 identity
 
 ## 云电脑步骤
@@ -38,14 +38,14 @@ live_evidence: references/live-evidence.md
 
 ## 开发者门户（非产品主路径）
 
-| 名称 | URL | 来源级别 |
-|------|-----|----------|
+| 名称                 | URL                        | 来源级别    |
+| -------------------- | -------------------------- | ----------- |
 | X Developer Platform | `https://developer.x.com/` | public_docs |
 
 菜单点击序、App 创建控件均为 **UNKNOWN**。运维配好 Client ID/Secret 后，用户只走应用内「授权绑定」。
 
 ## 注意
 
-- client_secret **只在服务端**；云电脑会话不是权威源。  
-- scope 以平台拼装 / 回调 `scope` 为准；发布动作执行与 grant 会门禁 `tweet.write`。  
+- client_secret **只在服务端**；云电脑会话不是权威源。
+- scope 以平台拼装 / 回调 `scope` 为准；发布动作执行与 grant 会门禁 `tweet.write`。
 - 本路径是继 `github-personal` 后的第二个 oauth 类个人身份模板，可供其他社媒后续照搬。

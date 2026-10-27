@@ -11,7 +11,7 @@ import type { OpenBotConfig } from "../config/config.js";
 import { loadSessionStore } from "../config/sessions/store.js";
 
 const { runReplyAgentMock } = vi.hoisted(() => ({
-  runReplyAgentMock: vi.fn(async () => ({ text: "agent-ran" })),
+  runReplyAgentMock: vi.fn(async (..._args: unknown[]) => ({ text: "agent-ran" })),
 }));
 
 vi.mock("./reply/agent-runner.js", () => ({

@@ -1,0 +1,10 @@
+
+ RUN  v4.0.18 /private/tmp/openbot-memory-batch1-rework
+
+ ✓ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts (15 tests | 6 skipped) 838ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed | 6 skipped (15)
+   Start at  15:07:42
+   Duration  4.74s (transform 2.70s, setup 172ms, import 3.65s, tests 838ms, environment 0ms)
+

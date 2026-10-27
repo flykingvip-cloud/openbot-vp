@@ -1,11 +1,11 @@
 # Collab — `challengeWindowGroupAllowlist` (gray scoped)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **flags default OFF** |
+| Field   | Value                                                             |
+| ------- | ----------------------------------------------------------------- |
+| Date    | 2026-10-15 Asia/Shanghai                                          |
+| Status  | Code ready; **flags default OFF**                                 |
 | Depends | P0 gray-group-allowlist (`tenantId/groupId`); S1 challenge-window |
-| Code | `challenge-window.ts`, config schema, `challenge-window.test.ts` |
+| Code    | `challenge-window.ts`, config schema, `challenge-window.test.ts`  |
 
 ## Why
 
@@ -15,13 +15,13 @@ Mirror Claim / Wake: add `challengeWindowGroupAllowlist` with the same P0 scoped
 
 ## Behavior
 
-| Config | Effect |
-| --- | --- |
-| `challengeWindow` unset/false + empty allowlist | OFF (platform default) |
-| `challengeWindow=true` | ON for all groups (legacy global; tip should avoid) |
-| allowlist `001/grp-…` + managed caller tenant `001` | ON for that group only |
-| bare `grp-…` + managed caller tenant set | **refuse** (P0) |
-| `001/grp-…` + caller tenant `002` | **refuse** (cross-tenant) |
+| Config                                              | Effect                                              |
+| --------------------------------------------------- | --------------------------------------------------- |
+| `challengeWindow` unset/false + empty allowlist     | OFF (platform default)                              |
+| `challengeWindow=true`                              | ON for all groups (legacy global; tip should avoid) |
+| allowlist `001/grp-…` + managed caller tenant `001` | ON for that group only                              |
+| bare `grp-…` + managed caller tenant set            | **refuse** (P0)                                     |
+| `001/grp-…` + caller tenant `002`                   | **refuse** (cross-tenant)                           |
 
 Writes (`open` / `critique` / `resolve` / `skip` / publish gate) use
 `isCollabTaskChallengeWindowEnabled(cfg, groupId, tenantId)`.

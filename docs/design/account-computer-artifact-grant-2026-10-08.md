@@ -10,11 +10,11 @@
 
 ## 0. 一句话结论
 
-| 层 | 共享？ | 含义 |
-| --- | --- | --- |
-| Account Computer 桌面 / Chromium profile / noVNC | **按用户共享** | 同用户多 agent 共用一台「显示器 + 浏览器」 |
-| Agent workspace / exec 写根 / 私有 artifacts | **按 agent 隔离** | 共享桌面 ≠ 共享整盘 ACL |
-| 跨 agent 审稿 | **仅 Artifact Grant** | 路径级、TTL、只读、可撤销、可审计的通行证 |
+| 层                                               | 共享？                | 含义                                       |
+| ------------------------------------------------ | --------------------- | ------------------------------------------ |
+| Account Computer 桌面 / Chromium profile / noVNC | **按用户共享**        | 同用户多 agent 共用一台「显示器 + 浏览器」 |
+| Agent workspace / exec 写根 / 私有 artifacts     | **按 agent 隔离**     | 共享桌面 ≠ 共享整盘 ACL                    |
+| 跨 agent 审稿                                    | **仅 Artifact Grant** | 路径级、TTL、只读、可撤销、可审计的通行证  |
 
 **不要**把 Ownership、剪贴板、或 Account Computer profile 当成文件 ACL。
 
@@ -82,11 +82,11 @@
 
 ### 2.3 与 Ownership / 桌面的关系
 
-| 能力 | 管什么 | 不管什么 |
-| --- | --- | --- |
-| #423 Account Computer | 谁用哪台共享浏览器 | 文件 ACL |
-| #439 Ownership | keyboard/mouse/clipboard-flag/navigation lease | 产出读写 |
-| Artifact Grant（本片） | 跨 agent 单对象读授权 | 键鼠、profile、整盘 |
+| 能力                   | 管什么                                         | 不管什么            |
+| ---------------------- | ---------------------------------------------- | ------------------- |
+| #423 Account Computer  | 谁用哪台共享浏览器                             | 文件 ACL            |
+| #439 Ownership         | keyboard/mouse/clipboard-flag/navigation lease | 产出读写            |
+| Artifact Grant（本片） | 跨 agent 单对象读授权                          | 键鼠、profile、整盘 |
 
 ---
 
@@ -99,8 +99,8 @@ type ArtifactGrant = {
   userId: string;
   publisherAgentId: string;
   granteeAgentId: string;
-  scopes: Array<"read">;      // MVP：仅 read
-  expiresAt: number;          // epoch ms
+  scopes: Array<"read">; // MVP：仅 read
+  expiresAt: number; // epoch ms
   singleUse: boolean;
   revokedAt?: number;
   redeemedCount: number;
@@ -121,13 +121,13 @@ type ArtifactGrant = {
 
 ### 4.1 Gateway methods（pack `artifact-grant`）
 
-| Method | Scope | 作用 |
-| --- | --- | --- |
-| `artifact.publish` | write | A 发布 blob → artifactId |
-| `artifact.grant.create` | write | A 为 B 建 grant（TTL、singleUse） |
-| `artifact.grant.redeem` | read | B 兑换并读取内容 |
-| `artifact.grant.revoke` | write | A 撤销 |
-| `artifact.grant.get` | read | 查 grant 元数据（不含内容；错主体仅知存在性策略见实现） |
+| Method                  | Scope | 作用                                                    |
+| ----------------------- | ----- | ------------------------------------------------------- |
+| `artifact.publish`      | write | A 发布 blob → artifactId                                |
+| `artifact.grant.create` | write | A 为 B 建 grant（TTL、singleUse）                       |
+| `artifact.grant.redeem` | read  | B 兑换并读取内容                                        |
+| `artifact.grant.revoke` | write | A 撤销                                                  |
+| `artifact.grant.get`    | read  | 查 grant 元数据（不含内容；错主体仅知存在性策略见实现） |
 
 MVP 实现见 `src/artifact-grant/` + `src/gateway/server-methods/artifact-grant*.ts`。
 

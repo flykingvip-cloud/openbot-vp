@@ -126,6 +126,13 @@ export type GroupBoardClaimItem = Readonly<{
   claimantId?: string;
   claimedAt?: number;
   appliedAt?: number;
+  /**
+   * T48: task.handoffs length at the moment this item became applied.
+   * Recovery treats only subsequent history (slice from this index) as
+   * "this claim was handed off away" — not arbitrary older from===claimant hits.
+   * Local ordering for this board apply; not a full responsibility revision ledger.
+   */
+  applyBaseHistoryLen?: number;
   /** C1: work started (after claim/apply). */
   inProgressAt?: number;
   /** C1: idempotent交卷 id; required on submitted_for_review. */
@@ -900,10 +907,13 @@ export async function applyClaim(
       if (!claimantId) {
         return fail("claimant_missing", "claimed item has no claimantId");
       }
+      const governed = task as { handoffs?: readonly unknown[] | null };
+      const applyBaseHistoryLen = Array.isArray(governed.handoffs) ? governed.handoffs.length : 0;
       const next: GroupBoardClaimItem = {
         ...current,
         status: "applied",
         appliedAt: nowOf(options),
+        applyBaseHistoryLen,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };

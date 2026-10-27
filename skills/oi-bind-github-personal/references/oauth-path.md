@@ -7,13 +7,13 @@
    Query：`client_id`、`redirect_uri`、`state`、`scope=read:user,user:email,repo`  
    （由 `oauth.start` 返回的 `authorizeUrl` 已拼好，skill 不要手改 scope。）
 
-2. **用户侧**  
-   - 若未登录 GitHub：登录（可能 TOTP/WebAuthn）  
+2. **用户侧**
+   - 若未登录 GitHub：登录（可能 TOTP/WebAuthn）
    - 同意应用权限 → 重定向到 OpenBot callback（`redirect_uri` + `code` + `state`）
 
-3. **服务端（非 skill）**  
-   - POST `https://github.com/login/oauth/access_token`  
-   - GET `https://api.github.com/user` → `login` 作 accountLabel  
+3. **服务端（非 skill）**
+   - POST `https://github.com/login/oauth/access_token`
+   - GET `https://api.github.com/user` → `login` 作 accountLabel
    - 写入 secret store + 注册/轮换 identity
 
 ## 云电脑步骤
@@ -26,6 +26,6 @@
 
 ## 注意
 
-- client_secret **只在服务端**；云电脑会话不是权威源。  
-- scope 以平台拼装为准；本 skill 不扩大授权范围。  
+- client_secret **只在服务端**；云电脑会话不是权威源。
+- scope 以平台拼装为准；本 skill 不扩大授权范围。
 - 本路径是 oauth 类模板；S3 社媒勿照搬除非 authMode 也是 oauth。

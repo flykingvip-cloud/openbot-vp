@@ -1,12 +1,12 @@
 # Collab S4 — Heartbeat scheduler with observe-first defaults (FINAL v3)
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **schedulerEnabled default false**, **mode default observe** |
-| Spec | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S4 + expert dual acceptance |
-| Depends | **P0 #731**, **S1 #734**, **S2 #735**, **S3 #737** (tip `43ef44f1a6…`) |
-| Code | `group-task-heartbeat.ts` (observe/emit), `group-task-heartbeat-scheduler.ts`, `group-task-heartbeat-scheduler-boot.ts`, `collab-s4-heartbeat-scheduler.test.ts` |
+| Field   | Value                                                                                                                                                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Date    | 2026-10-15 Asia/Shanghai                                                                                                                                         |
+| Status  | Code ready; **schedulerEnabled default false**, **mode default observe**                                                                                         |
+| Spec    | `openbot-collab-self-run-FINAL-v3-2026-10-15.md` §S4 + expert dual acceptance                                                                                    |
+| Depends | **P0 #731**, **S1 #734**, **S2 #735**, **S3 #737** (tip `43ef44f1a6…`)                                                                                           |
+| Code    | `group-task-heartbeat.ts` (observe/emit), `group-task-heartbeat-scheduler.ts`, `group-task-heartbeat-scheduler-boot.ts`, `collab-s4-heartbeat-scheduler.test.ts` |
 
 ## Scope
 
@@ -18,15 +18,15 @@
 
 ## Config (defaults stay safe)
 
-| Key | Default | Tip gray |
-| --- | --- | --- |
-| `groupTaskHeartbeat.schedulerEnabled` | **false** | true to arm timer |
-| `groupTaskHeartbeat.mode` | **observe** | keep observe until emit authorized |
-| `groupTaskHeartbeat.emitGroupAllowlist` | `[]` | scoped `001/grp-…` + wake allowlist |
-| `groupTaskHeartbeat.scanIntervalMs` | 1_800_000 (30min) | configurable |
-| `groupTaskHeartbeat.escalateAfterConsecutiveNoResponse` | 2 | configurable |
-| `wakeContract` / allowlist | false / `[]` | required for emit path |
-| `claimContract` / challenge / self_advance / LIVE / Floor | unchanged OFF | **not** opened here |
+| Key                                                       | Default           | Tip gray                            |
+| --------------------------------------------------------- | ----------------- | ----------------------------------- |
+| `groupTaskHeartbeat.schedulerEnabled`                     | **false**         | true to arm timer                   |
+| `groupTaskHeartbeat.mode`                                 | **observe**       | keep observe until emit authorized  |
+| `groupTaskHeartbeat.emitGroupAllowlist`                   | `[]`              | scoped `001/grp-…` + wake allowlist |
+| `groupTaskHeartbeat.scanIntervalMs`                       | 1_800_000 (30min) | configurable                        |
+| `groupTaskHeartbeat.escalateAfterConsecutiveNoResponse`   | 2                 | configurable                        |
+| `wakeContract` / allowlist                                | false / `[]`      | required for emit path              |
+| `claimContract` / challenge / self_advance / LIVE / Floor | unchanged OFF     | **not** opened here                 |
 
 **Does not** open production gray writes. LIVE / Floor untouched. No second orchestrator.
 

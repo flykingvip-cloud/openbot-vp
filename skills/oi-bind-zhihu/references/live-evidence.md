@@ -19,32 +19,32 @@ skill: oi-bind-zhihu
 
 ## E2E 条目 A — OI bind 尝试（2026-10-19）
 
-| 序 | 步骤 | 环境 | 结果 |
-|----|------|------|------|
-| 1 | 确认公开入口 `https://www.zhihu.com/` 与 path-map | Mac worktree | ok（public_docs） |
-| 2 | 云电脑取 Access Token / Cookie → `credentials.bind` | Cloud PC | **阻断**：无云电脑会话 / 无真实凭证 |
-| 3 | 个人授权页 zhihu=active | 产品 UI | **未达** |
+| 序  | 步骤                                                | 环境         | 结果                                |
+| --- | --------------------------------------------------- | ------------ | ----------------------------------- |
+| 1   | 确认公开入口 `https://www.zhihu.com/` 与 path-map   | Mac worktree | ok（public_docs）                   |
+| 2   | 云电脑取 Access Token / Cookie → `credentials.bind` | Cloud PC     | **阻断**：无云电脑会话 / 无真实凭证 |
+| 3   | 个人授权页 zhihu=active                             | 产品 UI      | **未达**                            |
 
 ## E2E 条目 B — 相关 Account Computer（2026-10-18，#827，非 OI bind）
 
-| 序 | 步骤 | 环境 | 结果 |
-|----|------|------|------|
-| 1 | 打开 `zhihu.com/signin` 检测 App QR / SMS / 微信 OAuth popup | Worker Docker / host Chrome | measured（登录**页**可达） |
-| 2 | 完成扫码/SMS 并取得会话 Cookie 后 OI bind | — | **未宣称**；#827 明确不宣称 completed session |
-| 3 | OI `credentials.bind` | — | **未覆盖** |
+| 序  | 步骤                                                         | 环境                        | 结果                                          |
+| --- | ------------------------------------------------------------ | --------------------------- | --------------------------------------------- |
+| 1   | 打开 `zhihu.com/signin` 检测 App QR / SMS / 微信 OAuth popup | Worker Docker / host Chrome | measured（登录**页**可达）                    |
+| 2   | 完成扫码/SMS 并取得会话 Cookie 后 OI bind                    | —                           | **未宣称**；#827 明确不宣称 completed session |
+| 3   | OI `credentials.bind`                                        | —                           | **未覆盖**                                    |
 
 见 `docs/design/account-computer-zhihu-login-e2e-acceptance-brief-2026-10-18.md`。
 
 ## 失败点 / 阻断
 
-- OI 路径：无 Cloud PC bind；无合规 Token。  
+- OI 路径：无 Cloud PC bind；无合规 Token。
 - #827 只证明登录页 detect / handoff wiring，measured ≠ OI verified_live。
 
 ## 翻旗前置（尚未满足）
 
-1. 真机/云电脑完成知乎登录（可借助 AC handoff，但须真人扫码/SMS）  
-2. 取得可用于 social_account 的 Access Token / Cookie（不进聊天）  
-3. `credentials.bind` 成功且 zhihu=active  
+1. 真机/云电脑完成知乎登录（可借助 AC handoff，但须真人扫码/SMS）
+2. 取得可用于 social_account 的 Access Token / Cookie（不进聊天）
+3. `credentials.bind` 成功且 zhihu=active
 4. 回写成功步骤后再允许翻旗
 
 ## 禁止

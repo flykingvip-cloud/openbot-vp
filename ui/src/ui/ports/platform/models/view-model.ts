@@ -1,4 +1,6 @@
 import type { ModelsVM as LegacyModelsVM } from "../view-models/types.ts";
+import type { CapabilityEvidenceItem } from "./capability-evidence.ts";
+import type { AutoRoutingAdmission } from "./model-admission-store.ts";
 import type { PlatformAorReadModel, PlatformModelsMode } from "./snapshot-types.ts";
 
 export type LegacyPlatformModelsVM = LegacyModelsVM;
@@ -35,9 +37,25 @@ export type ModelAsset = {
   source: "configured" | "referenced" | "discovered";
   inputModalities: Array<"text" | "image" | "audio" | "video" | "multimodal">;
   outputModalities: Array<"text" | "image" | "audio" | "video">;
-  capabilities: Array<"reasoning" | "vision" | "code" | "tools" | "stream" | "long_context">;
+  /** Canonical capability tags (coding/tool_use). Legacy code/tools are normalized at ingest. */
+  capabilities: Array<"reasoning" | "vision" | "coding" | "tool_use" | "stream" | "long_context">;
+  /**
+   * Capability evidence with source + verification status.
+   * Inferred tags land as status=suggested; never treat as verified.
+   */
+  capabilityEvidence?: CapabilityEvidenceItem[];
+  /** Actual executor path badge (e.g. 图片生成 · Stepfun). */
+  executorPathBadge?: string;
+  executorPathDetail?: string;
+  /** Fingerprint of endpoint/protocol/model used for connection admission. */
+  connectionFingerprint?: string;
+  baseUrl?: string | null;
+  api?: string | null;
   contextWindow?: number;
+  /** True when context/maxTokens came from an explicit source (not a hidden default). */
+  contextWindowSource?: "catalog" | "admin" | "unknown";
   maxOutputTokens?: number;
+  maxOutputTokensSource?: "catalog" | "admin" | "unknown";
   costTier: "low" | "medium" | "high" | "unknown";
   inputPrice?: number;
   outputPrice?: number;
@@ -71,6 +89,16 @@ export type ModelAsset = {
   taskTags: string[];
   inRecommendationPool: boolean;
   tenantSelectable: boolean;
+  /**
+   * False until backend tenant/auto-routing admission RPCs land.
+   * When false, UI must show "尚未接入" and must not treat local draft flags
+   * as platform-effective admission.
+   */
+  admissionControlsAvailable?: boolean;
+  /** Independent of allowlist / recommendation pool. Backend fact only when available. */
+  autoRouting?: AutoRoutingAdmission;
+  autoRoutingReason?: string;
+  autoRoutingTaskCategories?: string[];
   usage7d?: {
     calls: number;
     cost: number;

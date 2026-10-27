@@ -284,7 +284,10 @@ export const enterpriseSecurityControlHandlers: GatewayRequestHandlers = {
     }
     const current = deps();
     try {
-      const result = await current.withAuth(async (auth) => {
+      const result = await current.withAuth<
+        | { missingUser: true }
+        | { missingUser: false; enrolled: Awaited<ReturnType<typeof enrollEnterpriseMfa>> }
+      >(async (auth) => {
         const user = resolveSignedInUser(auth.store, client);
         if (!user) {
           return { persist: false, value: { missingUser: true as const } };
@@ -293,7 +296,7 @@ export const enterpriseSecurityControlHandlers: GatewayRequestHandlers = {
           tenantId,
           userId: user.id,
           email: user.email,
-          action: params.action,
+          action: params.action as "start" | "confirm",
           ...(params.action === "confirm" ? { code: stringValue(params.code) ?? "" } : {}),
           idempotencyKey,
           now: current.now(),

@@ -135,7 +135,7 @@ export async function enrollEnterpriseMfa(params: {
       return { ok: true, enabled: true };
     },
   });
-  return outcome.value;
+  return outcome.value as MfaEnrollResult;
 }
 
 export function isEnterpriseLoginSession(

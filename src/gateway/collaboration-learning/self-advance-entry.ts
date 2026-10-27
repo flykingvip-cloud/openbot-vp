@@ -68,11 +68,10 @@ async function buildSelfAdvanceAuthority(params: {
 }
 
 /**
- * T09-B3: this entry only adapts RPC → {@link trySelfAdvance}. It does not
- * implement a parallel plan-gate / reauth / write path. Independent PASS remains
- * 人工控制 (CF-008). Full-entrypoint stop + wake-revoke races stay 待测.
+ * T09-B3 / T36 L3: this entry only adapts RPC → {@link trySelfAdvance}.
+ * Stop preflight is assertPersistedTaskNotStopped (U1) — no parallel marker gate.
+ * Independent PASS remains 人工控制 (CF-008).
  */
-export const SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE = true as const;
 
 /** Production self_advance tick — non-zero Governance Gate caller. */
 export async function runCollaborationSelfAdvance(params: {

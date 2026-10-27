@@ -234,7 +234,9 @@ describe("C0 member progress export", () => {
     expect(item.constraints).toEqual(["gray-group-only"]);
     expect(item.dueAtMs).toBe(1_792_906_125_582);
     // Regression: tip export stripped goal → boardItemGoal empty → exec_bag_incomplete
-    expect(boardItemGoal(item)).toBe("完成 CEO 行业口径拍板后的 v2 修订");
+    expect(boardItemGoal(item as Parameters<typeof boardItemGoal>[0])).toBe(
+      "完成 CEO 行业口径拍板后的 v2 修订",
+    );
 
     const todolist = {
       todolistId: "tl-1",

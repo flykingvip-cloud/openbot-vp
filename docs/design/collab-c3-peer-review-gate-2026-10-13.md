@@ -17,23 +17,23 @@ Depends on **C2** (merged via #668 @ `83f240b7f56`).
 
 ## Inventory-first (AS-IS)
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| Claim progress C1 | EXISTS | submitted_for_review → accepted | returned |
-| `acceptBoardItemSubmission` | EXISTS | No peer-review check before C3 |
-| Collaboration quality ledger `event: review` | EXISTS | Used by RCIS aggregate |
-| Named peer-review ledger + accept gate | **was MISSING** | This PR |
+| Surface                                      | Status          | Note                            |
+| -------------------------------------------- | --------------- | ------------------------------- | -------- |
+| Claim progress C1                            | EXISTS          | submitted_for_review → accepted | returned |
+| `acceptBoardItemSubmission`                  | EXISTS          | No peer-review check before C3  |
+| Collaboration quality ledger `event: review` | EXISTS          | Used by RCIS aggregate          |
+| Named peer-review ledger + accept gate       | **was MISSING** | This PR                         |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| Flag `collaboration.task.requirePeerReview` | Default OFF; accept gate only when ON |
-| `peer-review-gate.ts` | record / list / count / assert gate |
-| Hook | `acceptBoardItemSubmission` calls gate when flag ON |
-| RPC | `collaboration.task.recordPeerReview` (not `ui.*`) |
-| RCIS observe | best-effort quality ledger `review` on record; `drivesAdmission: false` |
-| Design doc | This file |
+| Surface                                     | Behavior                                                                |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| Flag `collaboration.task.requirePeerReview` | Default OFF; accept gate only when ON                                   |
+| `peer-review-gate.ts`                       | record / list / count / assert gate                                     |
+| Hook                                        | `acceptBoardItemSubmission` calls gate when flag ON                     |
+| RPC                                         | `collaboration.task.recordPeerReview` (not `ui.*`)                      |
+| RCIS observe                                | best-effort quality ledger `review` on record; `drivesAdmission: false` |
+| Design doc                                  | This file                                                               |
 
 ## Explicit non-goals
 

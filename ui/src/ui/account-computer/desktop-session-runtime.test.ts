@@ -1,12 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  assertNoLocationReload,
-  createDesktopSessionRuntime,
-} from "./desktop-session-runtime.ts";
-import {
   createDesktopSessionPreviewBind,
   resetPreviewBindsForTests,
 } from "./desktop-session-preview-bind.ts";
+import { assertNoLocationReload, createDesktopSessionRuntime } from "./desktop-session-runtime.ts";
 
 afterEach(() => {
   resetPreviewBindsForTests();
@@ -102,7 +99,6 @@ describe("desktop-session-runtime recovery", () => {
   });
 });
 
-
 describe("frame_tick promotion after missed first_frame", () => {
   it("promotes STREAM_ATTACHED → INTERACTIVE when frame_tick arrives first", () => {
     const bind = createDesktopSessionPreviewBind({
@@ -112,18 +108,19 @@ describe("frame_tick promotion after missed first_frame", () => {
     bind.onStreamUrl("/sandbox/novnc?token=test");
     expect(bind.runtime.snapshot.phase).toBe("STREAM_ATTACHED");
 
-    let handler: ((ev: MessageEvent) => void) | null = null;
+    let captured: ((ev: MessageEvent) => void) | undefined;
     const dispose = bind.attachMessageListener({
-      addEventListener(type: string, listener: EventListener) {
-        if (type === "message") {
-          handler = listener as (ev: MessageEvent) => void;
+      addEventListener(type: string, listener: unknown) {
+        if (type === "message" && typeof listener === "function") {
+          const fn = listener as unknown as (ev: MessageEvent) => void;
+          captured = fn;
         }
       },
       removeEventListener() {},
     } as unknown as Window);
 
-    expect(handler).toBeTruthy();
-    handler?.({
+    expect(captured).toBeTypeOf("function");
+    captured!({
       data: { source: "openbot-novnc-observer", type: "frame_tick", ts: Date.now() },
     } as MessageEvent);
     expect(bind.runtime.snapshot.phase).toBe("INTERACTIVE");

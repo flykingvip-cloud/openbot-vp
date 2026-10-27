@@ -10,29 +10,29 @@
 
 ## 1. Task-book → existing symbols
 
-| Task-book name | Status | Existing symbol / file |
-| --- | --- | --- |
-| Tenant namespace isolation for round-store / ledger | **EXISTS** (flag OFF) | `resolveCollaborationRuntimeFactPaths`, `resolveRuntimeNamespace`, `RuntimeNamespaceTenantRequiredError` in `src/gateway/collaboration-dispatch/runtime-namespace.ts`; wired by `round-store.ts` / `collaboration-ledger/writer.ts` + `reader.ts` |
-| Fail-closed when tenant context missing (managed) | **EXISTS** (when flag ON) | `RuntimeNamespaceTenantRequiredError`; G7 suite `runtime-namespace.g7.test.ts` |
-| organizationId / trusted runtime identity | **EXISTS** as `tenantId` + trust | `resolveCollaborationTenantResolution` / `CollaborationTenantTrustLevel` in `src/gateway/collaboration-learning/trusted-tenant.ts` (membership → actor_fallback → none). Request-declared org alone is not ACL SoT. |
-| `resolveRoundEffectivePolicy` | **EXISTS** under group name | `resolveGroupEffectivePolicy` / `compileAndFreezeGroupPolicyInput` in `resolve-effective-policy.ts` (clone → `deepFreeze` → `hashEffectiveCollaborationPolicy`) |
-| PolicySnapshot per Episode | **EXISTS** (persist flag OFF) | `RoundPolicySnapshot` / `createRoundPolicySnapshot*` in `round-policy-snapshot.ts`; in-memory always via `buildGroupRuntimeAuthority` |
-| RuntimeAuthority sole consumption entry | **EXISTS** | `createRuntimeAuthority`, `buildGroupRuntimeAuthority`, `projectRuntimeFacts` in `runtime-authority.ts`; composition root `chat.ts` |
-| `authorize(action, trustedContext, snapshot)` | **NOT added** (by design) | Closest existing gate: `evaluateGovernanceGate` in `governance-gate.ts`. Path B forbids a parallel authorize API. |
-| CI / lint against policy-compiler bypass | **EXISTS** | `pnpm lint:collab:runtime-authority` → `scripts/check-collab-runtime-authority.mjs`; `pnpm lint:collab:policy-consumption` → `scripts/check-collab-policy-consumption.mjs` (in `pnpm check`) |
-| Cross-tenant same groupId / list overreach / history | **EXISTS** (+ named cases in this PR) | `runtime-namespace.test.ts`, `runtime-namespace.g7.test.ts` |
-| Handoff contract | **EXISTS** (flag OFF; P1+) | `handoff-contract.ts` — out of P0 cutover |
-| Floor live cutover | **OFF** | `floor-live-cutover.ts`; default protocol ≠ `floor` |
+| Task-book name                                       | Status                                | Existing symbol / file                                                                                                                                                                                                                            |
+| ---------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant namespace isolation for round-store / ledger  | **EXISTS** (flag OFF)                 | `resolveCollaborationRuntimeFactPaths`, `resolveRuntimeNamespace`, `RuntimeNamespaceTenantRequiredError` in `src/gateway/collaboration-dispatch/runtime-namespace.ts`; wired by `round-store.ts` / `collaboration-ledger/writer.ts` + `reader.ts` |
+| Fail-closed when tenant context missing (managed)    | **EXISTS** (when flag ON)             | `RuntimeNamespaceTenantRequiredError`; G7 suite `runtime-namespace.g7.test.ts`                                                                                                                                                                    |
+| organizationId / trusted runtime identity            | **EXISTS** as `tenantId` + trust      | `resolveCollaborationTenantResolution` / `CollaborationTenantTrustLevel` in `src/gateway/collaboration-learning/trusted-tenant.ts` (membership → actor_fallback → none). Request-declared org alone is not ACL SoT.                               |
+| `resolveRoundEffectivePolicy`                        | **EXISTS** under group name           | `resolveGroupEffectivePolicy` / `compileAndFreezeGroupPolicyInput` in `resolve-effective-policy.ts` (clone → `deepFreeze` → `hashEffectiveCollaborationPolicy`)                                                                                   |
+| PolicySnapshot per Episode                           | **EXISTS** (persist flag OFF)         | `RoundPolicySnapshot` / `createRoundPolicySnapshot*` in `round-policy-snapshot.ts`; in-memory always via `buildGroupRuntimeAuthority`                                                                                                             |
+| RuntimeAuthority sole consumption entry              | **EXISTS**                            | `createRuntimeAuthority`, `buildGroupRuntimeAuthority`, `projectRuntimeFacts` in `runtime-authority.ts`; composition root `chat.ts`                                                                                                               |
+| `authorize(action, trustedContext, snapshot)`        | **NOT added** (by design)             | Closest existing gate: `evaluateGovernanceGate` in `governance-gate.ts`. Path B forbids a parallel authorize API.                                                                                                                                 |
+| CI / lint against policy-compiler bypass             | **EXISTS**                            | `pnpm lint:collab:runtime-authority` → `scripts/check-collab-runtime-authority.mjs`; `pnpm lint:collab:policy-consumption` → `scripts/check-collab-policy-consumption.mjs` (in `pnpm check`)                                                      |
+| Cross-tenant same groupId / list overreach / history | **EXISTS** (+ named cases in this PR) | `runtime-namespace.test.ts`, `runtime-namespace.g7.test.ts`                                                                                                                                                                                       |
+| Handoff contract                                     | **EXISTS** (flag OFF; P1+)            | `handoff-contract.ts` — out of P0 cutover                                                                                                                                                                                                         |
+| Floor live cutover                                   | **OFF**                               | `floor-live-cutover.ts`; default protocol ≠ `floor`                                                                                                                                                                                               |
 
 ## 2. Defaults that must stay OFF
 
-| Flag / constant | Default | Note |
-| --- | --- | --- |
-| `RUNTIME_NAMESPACE_CUTOVER_DEFAULT` | `false` | `runtime-namespace.ts` — do not flip in code or committed config |
-| `collaboration.runtimeNamespace` | unset/false | N2 cutover runbook still blocks production enablement |
-| `collaboration.policySnapshot` | unset/false | In-memory snapshot still built; persistence gated |
-| `collaboration.floor.protocol` | unset/legacy | Floor is not the live orchestrator |
-| `collaboration.task.handoffContract` | unset/false | P1+ |
+| Flag / constant                      | Default      | Note                                                             |
+| ------------------------------------ | ------------ | ---------------------------------------------------------------- |
+| `RUNTIME_NAMESPACE_CUTOVER_DEFAULT`  | `false`      | `runtime-namespace.ts` — do not flip in code or committed config |
+| `collaboration.runtimeNamespace`     | unset/false  | N2 cutover runbook still blocks production enablement            |
+| `collaboration.policySnapshot`       | unset/false  | In-memory snapshot still built; persistence gated                |
+| `collaboration.floor.protocol`       | unset/legacy | Floor is not the live orchestrator                               |
+| `collaboration.task.handoffContract` | unset/false  | P1+                                                              |
 
 Cutover ops remain in
 [`collab-floor-p0-0a-runtime-namespace-cutover-2026-10-05.md`](./collab-floor-p0-0a-runtime-namespace-cutover-2026-10-05.md).

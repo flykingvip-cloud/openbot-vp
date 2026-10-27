@@ -12,11 +12,11 @@
 
 ## 权威边界（冻结）
 
-| 位置 | 角色 |
-| --- | --- |
-| **ExecutionStep**（canonical fields） | 一等权威：logicalActionId / attemptId / idempotencyKey / status / outcome / evidenceRefs / … |
-| **payload** | 非权威：adapter req/res、provider metadata、redacted diagnostics、extensions；须带 content hash / version ref |
-| **orch-lease-fields** | lease/fence provisional（holder、fencingToken、heartbeat…）；未来挂 Step 或经 compat 映射 |
+| 位置                                  | 角色                                                                                                          |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| **ExecutionStep**（canonical fields） | 一等权威：logicalActionId / attemptId / idempotencyKey / status / outcome / evidenceRefs / …                  |
+| **payload**                           | 非权威：adapter req/res、provider metadata、redacted diagnostics、extensions；须带 content hash / version ref |
+| **orch-lease-fields**                 | lease/fence provisional（holder、fencingToken、heartbeat…）；未来挂 Step 或经 compat 映射                     |
 
 **Compat read** 允许在旧合同只收 payload 时从 payload 读取并映射到 canonical view；**新写入优先填充 ExecutionStep canonical fields**。禁止两处同时成为权威。
 
@@ -38,16 +38,16 @@
 
 ## Lease/fence provisional（orch-lease-fields）
 
-| provisional 字段 | 校验要点 |
-| --- | --- |
-| `leaseHolder` | string trim 非空 **或** null |
-| `fencingToken` | 非负整数 |
-| `heartbeatAtMs` / `deadlineAtMs` | 非负有限数 **或** null；heartbeat 不得晚于 deadline |
-| `cancelRequested` | boolean |
-| `attempt` | 非负整数（lease 侧；canonical 优先 `attemptId` 字符串身份） |
-| `budgetRemaining` | 有限数 |
-| `resultRef` | 非空 string **或** null |
-| `logicalActionId` | 非空 string（与 canonical 对齐原料） |
+| provisional 字段                 | 校验要点                                                    |
+| -------------------------------- | ----------------------------------------------------------- |
+| `leaseHolder`                    | string trim 非空 **或** null                                |
+| `fencingToken`                   | 非负整数                                                    |
+| `heartbeatAtMs` / `deadlineAtMs` | 非负有限数 **或** null；heartbeat 不得晚于 deadline         |
+| `cancelRequested`                | boolean                                                     |
+| `attempt`                        | 非负整数（lease 侧；canonical 优先 `attemptId` 字符串身份） |
+| `budgetRemaining`                | 有限数                                                      |
+| `resultRef`                      | 非空 string **或** null                                     |
+| `logicalActionId`                | 非空 string（与 canonical 对齐原料）                        |
 
 ## 明确非目标
 

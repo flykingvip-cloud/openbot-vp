@@ -111,7 +111,11 @@ export {
   type RepairProposal,
   type SarFailureClass,
 } from "./failure-class.js";
-export { SiteLearningLoop, type ExplorationInput, type SiteLearningLoopOptions } from "./learning-loop.js";
+export {
+  SiteLearningLoop,
+  type ExplorationInput,
+  type SiteLearningLoopOptions,
+} from "./learning-loop.js";
 export {
   LEARNING_PERSISTENCE_SCHEMA,
   createLearningAssetStore,

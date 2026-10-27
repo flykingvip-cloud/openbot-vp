@@ -24,9 +24,13 @@ vi.mock("../agent-tenant.js", () => ({ resolveAgentTenant }));
 vi.mock("../../agents/agent-scope.js", () => ({
   resolveAgentConfig,
   resolveDefaultAgentId: () => "main",
+  resolveAgentWorkspaceDir: (_cfg: OpenBotConfig, agentId: string) => `/ws/${agentId}`,
 }));
 vi.mock("../../agents/memory-search.js", () => ({ resolveMemorySearchConfig }));
-vi.mock("../../config/paths.js", () => ({ resolveStateDir: () => "/state" }));
+vi.mock("../../config/paths.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../config/paths.js")>();
+  return { ...actual, resolveStateDir: () => "/state" };
+});
 
 import { filterAgentsForMemoryHealth, runMemoryHealthRpc } from "./doctor-memory-health.js";
 
@@ -273,5 +277,73 @@ describe("filterAgentsForMemoryHealth", () => {
       allowed: false,
       reason: "No agents authorized for caller tenant",
     });
+  });
+});
+
+describe("doctor.memory.health backend-aware probe input (O1)", () => {
+  beforeEach(() => {
+    loadConfig.mockClear();
+    resolveMemorySearchConfig.mockReset();
+    resolveMemorySearchConfig.mockReturnValue({
+      store: { path: "/state/memory/{agentId}.sqlite" },
+    } as never);
+  });
+
+  it("reports cogniweave configured backend instead of hardcoding builtin", async () => {
+    const { buildMemoryProbeAgentInput } = await import("./doctor-memory-health.js");
+    loadConfig.mockReturnValue({
+      data: { root: "/tmp/openbot-data-o1", mode: "local", schemaVersion: 1 },
+      memory: { backend: "cogniweave", cogniweave: { mode: "embedded", writeSync: "sync" } },
+      agents: { defaults: { workspace: "/tmp/ws-o1" }, list: [{ id: "main", default: true }] },
+    } as never);
+    const input = buildMemoryProbeAgentInput(loadConfig(), "main");
+    expect(input.backend).toBe("cogniweave");
+    expect(input.configuredBackend).toBe("cogniweave");
+    expect(input.indexPath).toContain(".meta/cogniweave/canonical.sqlite");
+    expect(input.indexPath).not.toContain("/state/memory/main.sqlite");
+  });
+
+  it("keeps builtin index path when backend is builtin", async () => {
+    const { buildMemoryProbeAgentInput } = await import("./doctor-memory-health.js");
+    loadConfig.mockReturnValue({
+      memory: { backend: "builtin" },
+      agents: { defaults: { workspace: "/tmp/ws-o1" }, list: [{ id: "main", default: true }] },
+    } as never);
+    const input = buildMemoryProbeAgentInput(loadConfig(), "main");
+    expect(input.backend).toBe("builtin");
+    expect(input.configuredBackend).toBe("builtin");
+  });
+
+  it("uses qmd collections without builtin sqlite tables", async () => {
+    const { buildMemoryProbeAgentInput } = await import("./doctor-memory-health.js");
+    loadConfig.mockReturnValue({
+      memory: {
+        backend: "qmd",
+        qmd: { paths: [{ path: "/tmp/ws-o1/memory", name: "mem" }] },
+      },
+      agents: {
+        defaults: { workspace: "/tmp/ws-o1" },
+        list: [{ id: "main", default: true, workspace: "/tmp/ws-o1" }],
+      },
+    } as never);
+    const input = buildMemoryProbeAgentInput(loadConfig(), "main");
+    expect(input.backend).toBe("qmd");
+    expect(input.configuredBackend).toBe("qmd");
+    expect(input.qmdCollectionPaths?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("passes cogniweave REST mode without requiring local sqlite health", async () => {
+    const { buildMemoryProbeAgentInput } = await import("./doctor-memory-health.js");
+    loadConfig.mockReturnValue({
+      data: { root: "/tmp/openbot-data-o1-rest", mode: "local", schemaVersion: 1 },
+      memory: { backend: "cogniweave", cogniweave: { mode: "rest", writeSync: "sync" } },
+      agents: { defaults: { workspace: "/tmp/ws-o1" }, list: [{ id: "main", default: true }] },
+    } as never);
+    const input = buildMemoryProbeAgentInput(loadConfig(), "main");
+    expect(input.backend).toBe("cogniweave");
+    expect(input.configuredBackend).toBe("cogniweave");
+    expect(input.cogniweaveMode).toBe("rest");
+    expect(input.scopeCountTrusted).toBe(false);
+    expect(input.scopedDocumentCount).toBeNull();
   });
 });
