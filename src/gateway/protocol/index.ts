@@ -104,6 +104,8 @@ import {
   type CollaborationTaskUnblockBoardItemParams,
   type CollaborationTaskCancelBoardItemParams,
   type CollaborationTaskStopParams,
+  type CollaborationTaskWakeOpReleaseForRetryParams,
+  type CollaborationTaskWakeOpConfirmCompletedParams,
   type CollaborationTaskRecordPeerReviewParams,
   type CollaborationTaskListPeerReviewsParams,
   type CollaborationTaskOpenChallengeWindowParams,
@@ -139,6 +141,8 @@ import {
   CollaborationTaskUnblockBoardItemParamsSchema,
   CollaborationTaskCancelBoardItemParamsSchema,
   CollaborationTaskStopParamsSchema,
+  CollaborationTaskWakeOpReleaseForRetryParamsSchema,
+  CollaborationTaskWakeOpConfirmCompletedParamsSchema,
   CollaborationTaskRecordPeerReviewParamsSchema,
   CollaborationTaskListPeerReviewsParamsSchema,
   CollaborationTaskOpenChallengeWindowParamsSchema,
@@ -652,6 +656,14 @@ export const validateCollaborationTaskCancelBoardItemParams =
 export const validateCollaborationTaskStopParams = ajv.compile<CollaborationTaskStopParams>(
   CollaborationTaskStopParamsSchema,
 );
+export const validateCollaborationTaskWakeOpReleaseForRetryParams =
+  ajv.compile<CollaborationTaskWakeOpReleaseForRetryParams>(
+    CollaborationTaskWakeOpReleaseForRetryParamsSchema,
+  );
+export const validateCollaborationTaskWakeOpConfirmCompletedParams =
+  ajv.compile<CollaborationTaskWakeOpConfirmCompletedParams>(
+    CollaborationTaskWakeOpConfirmCompletedParamsSchema,
+  );
 export const validateCollaborationTaskRecordPeerReviewParams =
   ajv.compile<CollaborationTaskRecordPeerReviewParams>(
     CollaborationTaskRecordPeerReviewParamsSchema,

@@ -47,6 +47,9 @@ import {
   transitionCollaborationReview,
   transitionCollaborationTask,
   requestCollaborationTaskStop,
+  releaseWakeOpForRetryViaGatewaySession,
+  confirmWakeOpCompletedViaGatewaySession,
+  WakeOpGatewayRecoveryEntryError,
   updateCollaborationDecisionDraft,
 } from "../collaboration-learning.js";
 import {
@@ -93,6 +96,8 @@ import {
   validateCollaborationTaskUnblockBoardItemParams,
   validateCollaborationTaskCancelBoardItemParams,
   validateCollaborationTaskStopParams,
+  validateCollaborationTaskWakeOpReleaseForRetryParams,
+  validateCollaborationTaskWakeOpConfirmCompletedParams,
   validateCollaborationTaskListWakeEventsParams,
   validateCollaborationTaskWhoWokeWhomParams,
   validateCollaborationTaskRunGroupTaskHeartbeatParams,
@@ -1174,6 +1179,87 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       );
     }
   },
+  "collaboration.task.wakeOp.releaseForRetry": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskWakeOpReleaseForRetryParams,
+        "collaboration.task.wakeOp.releaseForRetry",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const result = await releaseWakeOpForRetryViaGatewaySession({
+        client,
+        groupId: params.groupId,
+        taskId: params.taskId,
+        opKey: params.opKey,
+        verificationId: params.verificationId,
+        detail: typeof params.detail === "string" ? params.detail : undefined,
+        tenant,
+      });
+      if (!result.ok) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, result, undefined);
+    } catch (error) {
+      const reasonCode = error instanceof WakeOpGatewayRecoveryEntryError ? error.code : undefined;
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+          reasonCode ? { reasonCode } : undefined,
+        ),
+      );
+    }
+  },
+  "collaboration.task.wakeOp.confirmCompleted": async ({ params, respond, client }) => {
+    if (
+      !assertValidParams(
+        params,
+        validateCollaborationTaskWakeOpConfirmCompletedParams,
+        "collaboration.task.wakeOp.confirmCompleted",
+        respond,
+      )
+    ) {
+      return;
+    }
+    try {
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const result = await confirmWakeOpCompletedViaGatewaySession({
+        client,
+        groupId: params.groupId,
+        taskId: params.taskId,
+        opKey: params.opKey,
+        roundId: params.roundId,
+        detail: typeof params.detail === "string" ? params.detail : undefined,
+        tenant,
+      });
+      if (!result.ok) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, result, undefined);
+    } catch (error) {
+      const reasonCode = error instanceof WakeOpGatewayRecoveryEntryError ? error.code : undefined;
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          resolveCollaborationTransitionError(error) ?? String(error),
+          reasonCode ? { reasonCode } : undefined,
+        ),
+      );
+    }
+  },
+
   "collaboration.task.recordPeerReview": async ({ params, respond, client }) => {
     if (
       !assertValidParams(

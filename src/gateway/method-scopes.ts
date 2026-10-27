@@ -883,6 +883,8 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "collaboration.task.unblockBoardItem",
     "collaboration.task.cancelBoardItem",
     "collaboration.task.stop",
+    "collaboration.task.wakeOp.releaseForRetry",
+    "collaboration.task.wakeOp.confirmCompleted",
     "collaboration.task.recordPeerReview",
     "collaboration.task.listPeerReviews",
     "collaboration.task.openChallengeWindow",

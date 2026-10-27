@@ -38,6 +38,8 @@ const BASE_METHODS = [
   "collaboration.task.unblockBoardItem",
   "collaboration.task.cancelBoardItem",
   "collaboration.task.stop",
+  "collaboration.task.wakeOp.releaseForRetry",
+  "collaboration.task.wakeOp.confirmCompleted",
   "collaboration.task.recordPeerReview",
   "collaboration.task.listPeerReviews",
   "collaboration.task.openChallengeWindow",
