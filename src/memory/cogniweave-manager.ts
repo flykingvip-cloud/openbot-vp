@@ -50,6 +50,10 @@ import {
   type MemoryCenterReadonlyListResult,
   type MemoryCenterStatusView,
 } from "./memory-center-o4-readonly.js";
+import {
+  orchestrateFactSoftForget,
+  type FactForgetResult,
+} from "./memory-fact-forget.js";
 import * as memoryWorkspaceHandle from "./memory-workspace-handle.js";
 import { buildSessionEntry, listSessionFilesForAgent } from "./session-files.js";
 import type {
@@ -888,6 +892,72 @@ export class CogniWeaveMemoryManager implements MemorySearchManager {
       const message = err instanceof Error ? err.message : String(err);
       log.warn(`cogniweave memory artifact lifecycle failed op=${input.operationId}: ${message}`);
       return { ok: false, applied: [], skipped: false, error: message };
+    }
+  }
+
+
+  /**
+   * Fact-level soft forget (MVP). factRef = atomId within defaultScope.
+   * Soft-forgets each live linked source; never purges; never text-scans corpus.
+   */
+  async forgetFact(input: {
+    atomId: string;
+    operationId: string;
+    reasonCode?: string;
+  }): Promise<FactForgetResult> {
+    const atomId = input.atomId.trim();
+    const operationId = input.operationId.trim();
+    if (!atomId || !operationId) {
+      return {
+        ok: false,
+        factRef: { atomId },
+        sources: [],
+        error: "atomId and operationId are required",
+      };
+    }
+    if (this.handleWritesBlocked()) {
+      return {
+        ok: false,
+        factRef: { atomId },
+        sources: [],
+        error: this.denyHandleWrite("prune"),
+      };
+    }
+    const reasonCode = input.reasonCode ?? "FACT_LEVEL_FORGET";
+    try {
+      const scopeState = await this.syncScope(this.defaultScope, { reason: "lifecycle" });
+      const engine = scopeState.runtime.engine;
+      return await orchestrateFactSoftForget({
+        atomId,
+        operationId,
+        atomExists: async () => {
+          const history = await engine.getVersionHistory(atomId);
+          return history.length > 0;
+        },
+        enumerate: async () => {
+          if (typeof engine.listLiveSourcesForAtom !== "function") {
+            return [];
+          }
+          return engine.listLiveSourcesForAtom(atomId);
+        },
+        softForgetSource: async (source, opId) => {
+          return this.applyTranscriptSourceLifecycle({
+            mode: "forget",
+            sourceIdentityId: source.sourceIdentityId,
+            operationId: opId,
+            reasonCode,
+          });
+        },
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      log.warn(`cogniweave forgetFact failed atom=${atomId} op=${operationId}: ${message}`);
+      return {
+        ok: false,
+        factRef: { atomId },
+        sources: [],
+        error: message,
+      };
     }
   }
 

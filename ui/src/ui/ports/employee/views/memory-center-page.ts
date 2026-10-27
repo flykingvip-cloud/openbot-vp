@@ -393,6 +393,19 @@ export function renderMemoryCenterPanel(
                   </div>
                 </div>
               </div>
+              <div
+                class="employee-workbench__settings-password-actions employee-workbench__settings-password-actions--inline"
+              >
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  title="soft-forget 该记忆要点关联的全部来源；默认不永久清除（purge）；不会改动「删除此记忆文件」入口"
+                  ?disabled=${state.busy || !state.selectedAtomId}
+                  @click=${() => void settings.onMemoryCenterForgetFact?.()}
+                >
+                  ${state.busy ? "处理中…" : "忘记此事实（全部来源）"}
+                </button>
+              </div>
             `
           : nothing
       }

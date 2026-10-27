@@ -216,6 +216,7 @@ const BASE_METHODS = [
   "conversations.sourceIdentity.migrate",
   "data.memory.list",
   "data.memory.forget",
+  "data.memory.forgetFact",
   "data.retention.summary",
   "enterprise-memory.governance.overview",
   "enterprise-memory.governance.retention.get",

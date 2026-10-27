@@ -15,6 +15,7 @@ import type {
   ScopeInput,
   SourceLifecycleInput,
   SourceLifecycleReceipt,
+  SourceLifecycleMode,
   SourceType,
   TaskFrame,
   TracePackageResult,
@@ -230,6 +231,19 @@ export interface CogniWeaveEngine {
   restoreSource(input: SourceLifecycleInput): Promise<SourceLifecycleReceipt>;
   forgetSource(input: SourceLifecycleInput): Promise<SourceLifecycleReceipt>;
   purgeSource(input: SourceLifecycleInput): Promise<SourceLifecycleReceipt>;
+
+  /**
+   * Fact-level forget enumeration: live source bindings linked to an atom
+   * via atom and/or evidence source_object_links (no text-scan deletes).
+   */
+  listLiveSourcesForAtom(atomId: string): Promise<
+    Array<{
+      sourceBindingId: string;
+      sourceIdentityId: string;
+      sourceLocator: string;
+      status: SourceLifecycleMode;
+    }>
+  >;
 }
 
 export type MemoryEngine = CogniWeaveEngine;

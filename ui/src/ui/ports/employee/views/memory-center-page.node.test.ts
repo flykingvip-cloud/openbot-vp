@@ -87,6 +87,7 @@ describe("renderMemoryCenterPanel", () => {
     );
     expect(container.textContent).toContain("Prefer async retries under latency");
     expect(container.textContent).toContain("记忆要点");
+    expect(container.textContent).toContain("忘记此事实（全部来源）");
     expect(container.textContent).not.toContain("删除此记忆文件");
     expect(container.textContent).not.toMatch(/provenance|evidenceRef|embedding|journal|sqlite/i);
   });
@@ -153,11 +154,13 @@ describe("O5 file-delete copy contract", () => {
     expect(container.textContent).toContain("已删除所选记忆文件");
     expect(container.textContent).not.toContain("忘记这条记忆");
     expect(container.textContent).not.toContain("已忘记这条记忆");
-    // Atom detail is selected too, but delete remains a file action only (one button).
+    // File-delete copy/entry unchanged; fact-level uses a separate button/label.
     const deleteButtons = Array.from(container.querySelectorAll("button")).filter((button) =>
       (button.textContent ?? "").includes("删除此记忆文件"),
     );
     expect(deleteButtons).toHaveLength(1);
+    expect(deleteButtons[0]?.getAttribute("title") ?? "").toContain("不会清除会话或其他来源");
+    expect(container.textContent).toContain("忘记此事实（全部来源）");
   });
 });
 
@@ -298,5 +301,46 @@ describe("O4 candidate status view (C1–C6 UI)", () => {
     );
     expect(container.textContent).toContain("暂无待确认的候选记忆");
     expect(container.textContent).not.toContain("可切换到「候选（待确认）」查看待确认项");
+  });
+});
+
+describe("fact-level forget entry (MVP)", () => {
+  it("exposes soft-forget-all-sources action on atom detail only", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel(
+        {
+          robotEntries: [{ id: "main", name: "大白管家", source: "owned" }],
+          groupEntries: [],
+          onMemoryCenterForgetFact: () => undefined,
+          onMemoryCenterAtomIdChange: () => undefined,
+        } as never,
+        {
+          mode: "local",
+          agentId: "main",
+          selectedAtomId: "atom_1",
+          atoms: [
+            {
+              id: "atom_1",
+              summary: "fact row",
+              atomType: "strategy",
+              scope: { kind: "agent", visibility: "private", agentId: "main" },
+              botId: "main",
+              syncEligible: false,
+              shared: false,
+              status: "active",
+              updatedAtMs: 1_700_000_000_000,
+            },
+          ],
+        },
+      ),
+      container,
+    );
+    const factBtn = Array.from(container.querySelectorAll("button")).find((button) =>
+      (button.textContent ?? "").includes("忘记此事实（全部来源）"),
+    );
+    expect(factBtn).toBeTruthy();
+    expect(factBtn?.getAttribute("title") ?? "").toMatch(/soft-forget|purge/i);
+    expect(container.textContent).not.toContain("删除此记忆文件");
   });
 });
