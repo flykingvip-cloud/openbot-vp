@@ -345,7 +345,7 @@ export async function consumeWakeForRoundDispatch(
       roundId: inspected.record.roundId,
       dispatcherPresent: false,
       opKey: inspected.opKey,
-      wakeOp: inspected.record,
+      wakeOp: inspected.record ?? undefined,
       reused: true,
     };
   }
@@ -359,7 +359,7 @@ export async function consumeWakeForRoundDispatch(
       roundId: undefined,
       dispatcherPresent: false,
       opKey: inspected.opKey,
-      wakeOp: inspected.record,
+      wakeOp: inspected.record ?? undefined,
       reused: false,
     };
   }
@@ -445,7 +445,7 @@ export async function consumeWakeForRoundDispatch(
       roundId: claimed.record.roundId,
       dispatcherPresent: false,
       opKey: claimed.opKey,
-      wakeOp: claimed.record,
+      wakeOp: claimed.record ?? undefined,
       reused: true,
     };
   }
@@ -459,7 +459,7 @@ export async function consumeWakeForRoundDispatch(
       roundId: undefined,
       dispatcherPresent: false,
       opKey: claimed.opKey,
-      wakeOp: claimed.record,
+      wakeOp: claimed.record ?? undefined,
       reused: false,
     };
   }

@@ -933,6 +933,15 @@ export async function applyRosterAuthChangeSharedCas(params: {
     profile: params.profile,
     members: params.members,
   });
+  // Destructure auth projection before the OS write so the policy-consumption
+  // guard does not treat this write path as a multi-source coordinator *read*
+  // (assignment/write targets are out of scope for BP-15/16 consumption).
+  const {
+    ownerUserId,
+    adminUserIds,
+    coordinatorBotId,
+    finalDecisionPolicy: projectedFinalDecisionPolicy,
+  } = projected.governance;
   return applyAuthRevokeSharedCas({
     groupId: params.groupId,
     cfg: params.cfg,
@@ -944,11 +953,10 @@ export async function applyRosterAuthChangeSharedCas(params: {
       memberRoleMap: projected.memberRoleMap,
       governance: {
         ...state.governance,
-        ownerUserId: projected.governance.ownerUserId,
-        adminUserIds: projected.governance.adminUserIds,
-        coordinatorBotId: projected.governance.coordinatorBotId,
-        finalDecisionPolicy:
-          state.governance?.finalDecisionPolicy ?? projected.governance.finalDecisionPolicy,
+        ownerUserId,
+        adminUserIds,
+        coordinatorBotId,
+        finalDecisionPolicy: state.governance?.finalDecisionPolicy ?? projectedFinalDecisionPolicy,
       },
     }),
   });

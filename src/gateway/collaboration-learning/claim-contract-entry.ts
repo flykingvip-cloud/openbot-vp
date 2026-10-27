@@ -88,6 +88,7 @@ import {
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
 import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   asGovernedTask,
   nextGovernedTaskFields,
@@ -557,6 +558,17 @@ export type ApplyCollaborationBoardClaimParams = {
  * If board is already applied (retry / prior partial), task side is repaired
  * idempotently without re-mutating the board row.
  */
+
+function requireAppliedBoardItem(item: GroupBoardClaimItem | null): GroupBoardClaimItem {
+  if (!item) {
+    throw new ClaimContractEntryError(
+      "apply_incomplete",
+      "board claim apply finished without an item result",
+    );
+  }
+  return item;
+}
+
 export async function applyCollaborationBoardClaim(
   params: ApplyCollaborationBoardClaimParams,
 ): Promise<{ task: GovernedTask; item: GroupBoardClaimItem }> {
@@ -707,12 +719,9 @@ export async function applyCollaborationBoardClaim(
       };
     },
   });
-  if (!resultItem) {
-    throw new ClaimContractEntryError(
-      "apply_incomplete",
-      "board claim apply finished without an item result",
-    );
-  }
+  // resultItem is assigned inside buildPatch (callback); use a typed guard so TS
+  // does not treat the outer binding as still-null / never after the throw.
+  const appliedItem = requireAppliedBoardItem(resultItem);
   await syncGroupOperatingState({
     fileStore: stores.fileStore,
     groupStorage: stores.groupStorage,
@@ -722,7 +731,7 @@ export async function applyCollaborationBoardClaim(
     objectStorage: stores.objectStorage,
     groupId: params.groupId,
   });
-  const claimantId = resultItem.claimantId?.trim() || params.actor?.trim() || "collab-claimant";
+  const claimantId = appliedItem.claimantId?.trim() || params.actor?.trim() || "collab-claimant";
   const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;
   const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
   // Restore same claim tip; record apply as run-end without inventing acceptance/delivery.
@@ -736,7 +745,7 @@ export async function applyCollaborationBoardClaim(
     runId: `collab-apply:${params.groupId}:${params.itemId}:${claimantId}`,
     success: true,
   });
-  return { task: updated, item: resultItem };
+  return { task: updated, item: appliedItem };
 }
 
 /**
