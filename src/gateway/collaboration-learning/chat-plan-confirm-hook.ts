@@ -5,7 +5,8 @@
  * collapsing consumed/stale. Awaits the same confirmCollaborationTodolist path
  * as the UI card. Failures surface as 尚未确认 — never invent confirm.
  *
- * Auto-dispatch after confirm is NOT wired on this track (基础接口).
+ * After successful confirm, triggers existing wake nudge + wake→round consumer
+ * (autoAdvanceWired=true when that path is attempted).
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import {
@@ -14,6 +15,7 @@ import {
   tryConfirmPlanFromChat,
   type TryConfirmPlanFromChatResult,
 } from "./chat-plan-confirm.js";
+import { triggerPostPlanConfirmAdvance } from "./post-plan-confirm-advance.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export type ChatPlanConfirmHookInput = {
@@ -44,16 +46,13 @@ export type ChatPlanConfirmHookResult =
       userMessage: string;
       /** When true, chat.send must not start confirm-dependent execution. */
       blockDependentExecution: boolean;
-      /** Honest: auto advance after confirm is not connected on this PR. */
-      autoAdvanceWired: false;
+      /** True when confirm success attempted existing wake/schedule advance. */
+      autoAdvanceWired: boolean;
     };
 
 function formatUserMessage(result: TryConfirmPlanFromChatResult): string {
   if (result.status === "confirmed" && result.confirmed) {
-    return (
-      `计划已确认（todolist=${result.todolistId} v${result.version}）。` +
-      `自动推进尚未接通（基础接口）；确认事件已写入，但不会在本轮自动启动依赖执行。`
-    );
+    return `计划已确认（todolist=${result.todolistId} v${result.version}）。已按现有 wake/调度机制请求推进。`;
   }
   if (result.status === "ambiguous") {
     return `尚未确认：确认表述不唯一（${result.reason}）。请单独发送「确认计划」，或点选计划卡片。`;
@@ -198,11 +197,43 @@ export async function maybeConfirmPlanFromChatSend(
     stores: params.stores,
     cfg: params.cfg,
   });
+
+  let autoAdvanceWired = false;
+  let userMessage = formatUserMessage(result);
+  if (result.confirmed && result.status === "confirmed") {
+    try {
+      const advance = await triggerPostPlanConfirmAdvance({
+        groupId: params.groupId,
+        taskId,
+        boardItemId: boardItemId || undefined,
+        todolistId: todolistId || undefined,
+        confirmerId: params.actor,
+        tenant: params.tenant,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        cfg: params.cfg,
+      });
+      autoAdvanceWired = advance.autoAdvanceWired;
+      userMessage =
+        formatUserMessage(result) +
+        (advance.dispatched
+          ? ` 已派发执行（${advance.reason}）。`
+          : advance.wakeRecorded
+            ? ` 已写入推进 wake（${advance.reason}）。`
+            : ` 推进请求未完成（${advance.reason}）。`);
+    } catch (error) {
+      autoAdvanceWired = true;
+      const detail = error instanceof Error ? error.message : String(error);
+      userMessage = formatUserMessage(result) + ` 自动推进异常（${detail}）。`;
+    }
+  }
+
   return {
     handled: true,
     result,
-    userMessage: formatUserMessage(result),
+    userMessage,
     blockDependentExecution: !result.confirmed,
-    autoAdvanceWired: false,
+    autoAdvanceWired,
   };
 }

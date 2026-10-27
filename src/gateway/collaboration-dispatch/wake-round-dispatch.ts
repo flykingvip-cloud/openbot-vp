@@ -17,6 +17,11 @@
  */
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
+import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
+import {
+  checkMemberDispatchReadiness,
+  ensureRegisteredMemberMainSession,
+} from "../collaboration-learning/member-dispatch-readiness.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -26,6 +31,7 @@ import {
   TRUSTED_GROUP_LOCATOR_REQUIRED,
 } from "../collaboration-learning/team-resource-auth.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import { listAgentsForGateway } from "../session-utils.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import {
@@ -1373,6 +1379,90 @@ export async function consumeWakeForRoundDispatch(
 
     if (gate.allowed && dispatcherPresent && dispatcher) {
       try {
+        // Force dispatch-readiness before external round dispatch (product wiring).
+        // Registration: OS active bots (trusted wake stores) and/or gateway agent list.
+        // Missing main session: ensure then re-check (write path; not the read-only RPC).
+        const memberIds = [...request.toAgentIds];
+        if (memberIds.length > 0) {
+          const agents = listAgentsForGateway(params.cfg).agents;
+          let osMembers: Array<{
+            memberId?: string;
+            memberKind?: string;
+            status?: string;
+          }> = [];
+          try {
+            const os = await readGroupOperatingState({
+              fileStore: wakeStores.fileStore,
+              groupId: request.groupId,
+              groupRootDir: wakeStores.groupRootDir,
+              cfg: params.cfg,
+            });
+            osMembers = Array.isArray(os?.memberRoleMap) ? os.memberRoleMap : [];
+          } catch {
+            osMembers = [];
+          }
+          const readiness = await checkMemberDispatchReadiness({
+            members: memberIds.map((memberId) => ({ memberId })),
+            cfg: params.cfg,
+            autoEnsureSession: true,
+            ensureSession: async (agentId, sessionKey) => {
+              await ensureRegisteredMemberMainSession({
+                agentId,
+                sessionKey,
+                cfg: params.cfg,
+                nowMs: params.nowMs,
+              });
+            },
+            resolveMember: (memberId) => {
+              const id = memberId.trim();
+              const agent = agents.find((row) => row.id === id);
+              const osRow = osMembers.find((row) => row.memberId === id);
+              const activeBot =
+                osRow?.memberKind === "bot" &&
+                (osRow.status === "active" || osRow.status == null || osRow.status === "");
+              if (!agent && !activeBot) {
+                return {
+                  memberId: id,
+                  agentId: null,
+                  displayName: null,
+                  registration: "not_registered" as const,
+                  sessionKey: null,
+                };
+              }
+              const agentId = agent?.id ?? id;
+              return {
+                memberId: id,
+                agentId,
+                displayName: null,
+                registration: "registered" as const,
+                sessionKey: defaultConversationSessionKey(agentId),
+              };
+            },
+          });
+          if (!readiness.allDispatchable) {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: `dispatch_readiness_not_ready:${readiness.gaps.map((g) => g.code).join(",")}`,
+            });
+            noteNudgeNoExternal("dispatch_readiness_not_ready");
+            await flushNudgeNoExternalReceipt();
+            return {
+              outcome: "recorded",
+              dispatched: false,
+              gate,
+              reason: "dispatch_readiness_not_ready",
+              wakeEvent: undefined,
+              roundId: undefined,
+              dispatcherPresent,
+              opKey: claimed.opKey,
+              wakeOp: failed ?? wakeOp,
+              reused: false,
+            };
+          }
+        }
         externalDispatchInvoked = true;
         const result = await dispatcher(request);
         if (result.ok && compact(result.roundId)) {

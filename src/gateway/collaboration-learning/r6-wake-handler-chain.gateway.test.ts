@@ -8,7 +8,7 @@
  * - REAL chatHandlers["chat.send"] for plan-confirm early-return path
  *   (agent dispatch mocked so confirm failure cannot start execution).
  *
- * Not claimed: full browser UI E2E, autoAdvanceWired, readiness/agent tools.
+ * Not claimed: full browser UI E2E / F4 autonomous loop (wiring landed separately).
  */
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -1077,12 +1077,13 @@ describe("R6 chatHandlers chat.send plan confirm (visible result, no execution)"
     ];
     expect(ok, JSON.stringify({ payload, err })).toBe(true);
     expect(asText(payload.message)).toMatch(/确认|计划|尚未/);
-    expect(payload.autoAdvanceWired).toBe(false);
     expect(payload.planConfirm).toBeTruthy();
     const plan = payload.planConfirm as { confirmed?: boolean; status?: string };
     expect(
       plan.confirmed === true || plan.status === "confirmed" || plan.status === "idempotent",
     ).toBe(true);
+    // Product wiring: confirmed path attempts post-confirm advance (nudge+wake).
+    expect(payload.autoAdvanceWired).toBe(true);
     expect(dispatchInboundMock).not.toHaveBeenCalled();
     // Respond message is the UI-visible channel; transcriptPersist reports write honesty.
     expect(payload.transcriptPersist).toBeTruthy();

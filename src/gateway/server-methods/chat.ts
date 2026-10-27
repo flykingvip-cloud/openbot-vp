@@ -269,6 +269,7 @@ import {
   resolveBlockedAgentIdsForCurrentTask,
   type GatewayCollaborationSpaceSnapshot,
 } from "../collaboration-learning.js";
+import { maybeSubmitTeamDeliverableFromChatFinal } from "../collaboration-learning/chat-deliverable-team-submit.js";
 import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
 import {
   isGroupPublicTranscriptSessionFile,
@@ -3756,6 +3757,13 @@ async function runGroupBotDiscussionTurn(params: {
         );
       }
       try {
+        const osTaskId =
+          (
+            params.scope.operatingState as
+              | { activeContext?: { currentTaskId?: string | null } }
+              | null
+              | undefined
+          )?.activeContext?.currentTaskId?.trim() || null;
         prepared = prepareChatDeliverablePublish({
           text: replyText,
           publishIntent: "group-bot-final",
@@ -3765,9 +3773,31 @@ async function runGroupBotDiscussionTurn(params: {
           agentId: params.bot.agentId,
           userId: deliverableOwnerId,
           clientRunId: runId,
-          taskId: null,
+          taskId: osTaskId,
         });
         replyText = prepared.text;
+        if (
+          osTaskId &&
+          params.scope.groupId &&
+          replyText.includes("DELIVERABLE") &&
+          prepared.structured
+        ) {
+          void maybeSubmitTeamDeliverableFromChatFinal({
+            text: replyText,
+            groupId: params.scope.groupId,
+            taskId: osTaskId,
+            agentId: params.bot.agentId,
+            client: params.client,
+            tenant: params.scope.tenantId
+              ? { tenantId: params.scope.tenantId, trust: "membership" }
+              : null,
+            cfg,
+          }).catch((submitErr) => {
+            params.context.logGateway.warn(
+              `collaboration team deliverable submit failed (${params.bot.agentId}): ${formatForLog(submitErr)}`,
+            );
+          });
+        }
       } catch (err) {
         params.context.logGateway.warn(
           `collaboration deliverable settle failed (${params.bot.agentId}): ${formatForLog(err)}`,
