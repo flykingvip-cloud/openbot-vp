@@ -49,42 +49,57 @@ export type GroupCollaborationPaths = {
 export function resolveGroupCollaborationPaths(
   groupId: string,
   cfg?: ReturnType<typeof loadConfig>,
+  options?: {
+    /**
+     * Trusted groups root (tenant collaboration/groups). When set, paths resolve
+     * under this root instead of createWorkspaceCollaborationStores (host dual-root).
+     */
+    groupRootDir?: string;
+    /** Absolute group directory — when set, used directly as groupDir. */
+    groupLocator?: string;
+  },
 ): GroupCollaborationPaths {
   const normalizedGroupId = normalizeValue(groupId);
   if (!normalizedGroupId) {
     throw new Error("groupId is required");
   }
-  const stores = createWorkspaceCollaborationStores(cfg);
-  const groupDir = resolveGroupWorkspacePath(stores.groupRootDir, normalizedGroupId);
+  const trustedRoot = options?.groupRootDir?.trim() ? path.resolve(options.groupRootDir) : null;
+  const trustedLocator = options?.groupLocator?.trim() ? path.resolve(options.groupLocator) : null;
+  const stores = trustedRoot ? null : createWorkspaceCollaborationStores(cfg);
+  const groupRootDir = trustedRoot ?? stores!.groupRootDir;
+  const groupDir = trustedLocator ?? resolveGroupWorkspacePath(groupRootDir, normalizedGroupId);
+  const stateDir = stores?.stateDir ?? path.dirname(path.dirname(groupRootDir));
+  const workspaceDir = stores?.workspaceDir ?? groupDir;
+  const collaborationWorkspaceRoot = stores?.collaborationWorkspaceRoot ?? groupRootDir;
   return {
     groupId: normalizedGroupId,
-    stateDir: stores.stateDir,
-    workspaceDir: stores.workspaceDir,
-    collaborationWorkspaceRoot: stores.collaborationWorkspaceRoot,
-    groupRootDir: stores.groupRootDir,
+    stateDir,
+    workspaceDir,
+    collaborationWorkspaceRoot,
+    groupRootDir,
     managedSpaceDir: groupDir,
     groupDir,
     workspacePath: groupDir,
     memoryDir: path.join(groupDir, "memory"),
     participationsFile: resolveGroupStoreFilePath({
-      groupRootDir: stores.groupRootDir,
+      groupRootDir,
       groupId: normalizedGroupId,
       filename: "participations.json",
     }),
     operatingStateFile: resolveGroupStoreFilePath({
-      groupRootDir: stores.groupRootDir,
+      groupRootDir,
       groupId: normalizedGroupId,
       filename: OPERATING_STATE_FILENAME,
     }),
     governanceDir: path.join(groupDir, "governance"),
     groupCharterFile: resolveGroupStoreFilePath({
-      groupRootDir: stores.groupRootDir,
+      groupRootDir,
       groupId: normalizedGroupId,
       filename: GROUP_CHARTER_FILENAME,
     }),
     ledgerDir: path.join(groupDir, "ledger"),
     collaborationLedgerFile: resolveGroupStoreFilePath({
-      groupRootDir: stores.groupRootDir,
+      groupRootDir,
       groupId: normalizedGroupId,
       filename: COLLABORATION_LEDGER_FILENAME,
     }),
@@ -115,9 +130,10 @@ export function resolveLegacyGroupRuntimeFactPaths(
 export function resolveGroupPublicTranscriptPath(
   groupId: string,
   cfg?: ReturnType<typeof loadConfig>,
+  options?: { groupRootDir?: string; groupLocator?: string },
 ): string {
   return rewriteOpenclawPathToOpenbotIfPresent(
-    resolveGroupCollaborationPaths(groupId, cfg).publicTranscriptFile,
+    resolveGroupCollaborationPaths(groupId, cfg, options).publicTranscriptFile,
   );
 }
 
