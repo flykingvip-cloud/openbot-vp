@@ -252,7 +252,7 @@ export function buildWorkbenchMemoryCenterActionHandlers(
       const agentId = (state.workbenchMemoryCenterAgentId ?? "").trim();
       const memoryKey = (state.workbenchMemoryCenterKey ?? "").trim();
       if (!agentId || !memoryKey) {
-        state.workbenchMemoryCenterMessage = "请先选择要忘记的记忆。";
+        state.workbenchMemoryCenterMessage = "请先选择要删除的记忆文件。";
         requestRender();
         return;
       }
@@ -266,7 +266,7 @@ export function buildWorkbenchMemoryCenterActionHandlers(
       requestRender();
       try {
         await state.client.request("data.memory.forget", { agentId, memoryKey });
-        state.workbenchMemoryCenterMessage = "已忘记这条记忆。";
+        state.workbenchMemoryCenterMessage = "已删除所选记忆文件";
         state.workbenchMemoryCenterKey = "";
         await loadWorkbenchMemoryCenterEntries(state, agentId, requestRender);
       } catch (error) {

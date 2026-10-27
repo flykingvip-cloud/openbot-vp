@@ -19,34 +19,34 @@ Base inventory HEAD at authoring: `b9e2a34423` (P0 merge). Constitution matrix:
 
 ## 1. Task-book → existing symbols
 
-| Capability | Status | Existing symbol / file |
-| --- | --- | --- |
-| EffectivePolicy sole compose root | **EXISTS** (LIVE) | `compileGroupEffectivePolicy` in `resolve-effective-policy.ts`; `policy-compiler.ts` / `policy-compiler-sections.ts`; per-round `buildGroupRuntimeAuthority` in `runtime-authority.ts` |
-| Legacy compatibility projection (read-only) | **EXISTS** (LIVE) | `toLegacyPolicyView` in `legacy-policy-view.ts`; `resolveDispatchLanePolicyV1` + five `policy-lane-*.ts` (default mode **legacy**) |
-| Round-inline PolicyDecisionRecord | **EXISTS** (LIVE) | `buildPolicyDecisionRecord` in `policy-decision-record.ts`; written on `PersistedRound` by `round-runtime.ts` (not ledger PDR v2) |
-| Ledger EDR + PDR v2 | **EXISTS** (FLAG-OFF) | `writeBeatDecisionRecords` in `episode-decision-record.ts`; `appendCollaborationEpisodeDecisionRecord` / `appendCollaborationPolicyDecisionRecord` in `collaboration-ledger/writer.ts`; gated by `collaboration.ledger.decisionRecords` |
-| Execution ledger | **EXISTS** (LIVE) | `appendCollaborationExecutionRecord` (`kind: "execution"`); `chat.ts` |
-| HandoffContract state machine | **EXISTS** (FLAG-OFF) | `proposeHandoff` → `acceptHandoff` → `approveHandoff` → `applyApprovedHandoff` in `handoff-contract.ts`; `handoff-invariant.test.ts` |
-| Flag-on refusal of `owner_transfer` shortcut | **EXISTS** | `applyTaskHandoff` → `HandoffContractRequiredError` in `task-runtime.ts` |
-| Learning RPC seam never bypasses contract when flag ON | **PARTIAL → fixed in this PR** | `handoffCollaborationTask` in `collaboration-learning/state-machine.ts` previously reached `applyTaskHandoff` (which throws when flag ON). Now checks the flag first and **never** calls the shortcut when enabled. |
-| Production callers of contract APIs | **MISSING** (by design until gates) | No non-test callers of `proposeHandoff*` yet; closed loop is the contract API surface, not `collaboration.task.handoff` RPC |
-| Flag-off shortcut | **RETIRED (T09-B1 2026-10-25)** | `applyTaskHandoff` / `handoffCollaborationTask` refuse on flag-off and flag-on; sole writer `applyApprovedHandoff` when flag explicitly on |
-| Episode Store (P1-B① adjacent) | **EXISTS** (FLAG-OFF) | `episode-store.ts` / `isCollabEpisodeStoreEnabled` |
-| Group task board / claim | **PARTIAL / MISSING** (map only) | `operatingState.activeContext.currentTaskId`; 1:1 `SessionTaskBoard`; UI `SupervisorTaskBoard`. No collab-group claim board product — **do not invent here** |
-| Floor live / namespace cutover | **OFF** | `FLOOR_LIVE_CUTOVER_DEFAULT=false`; `RUNTIME_NAMESPACE_CUTOVER_DEFAULT=false` |
+| Capability                                             | Status                              | Existing symbol / file                                                                                                                                                                                                                  |
+| ------------------------------------------------------ | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| EffectivePolicy sole compose root                      | **EXISTS** (LIVE)                   | `compileGroupEffectivePolicy` in `resolve-effective-policy.ts`; `policy-compiler.ts` / `policy-compiler-sections.ts`; per-round `buildGroupRuntimeAuthority` in `runtime-authority.ts`                                                  |
+| Legacy compatibility projection (read-only)            | **EXISTS** (LIVE)                   | `toLegacyPolicyView` in `legacy-policy-view.ts`; `resolveDispatchLanePolicyV1` + five `policy-lane-*.ts` (default mode **legacy**)                                                                                                      |
+| Round-inline PolicyDecisionRecord                      | **EXISTS** (LIVE)                   | `buildPolicyDecisionRecord` in `policy-decision-record.ts`; written on `PersistedRound` by `round-runtime.ts` (not ledger PDR v2)                                                                                                       |
+| Ledger EDR + PDR v2                                    | **EXISTS** (FLAG-OFF)               | `writeBeatDecisionRecords` in `episode-decision-record.ts`; `appendCollaborationEpisodeDecisionRecord` / `appendCollaborationPolicyDecisionRecord` in `collaboration-ledger/writer.ts`; gated by `collaboration.ledger.decisionRecords` |
+| Execution ledger                                       | **EXISTS** (LIVE)                   | `appendCollaborationExecutionRecord` (`kind: "execution"`); `chat.ts`                                                                                                                                                                   |
+| HandoffContract state machine                          | **EXISTS** (FLAG-OFF)               | `proposeHandoff` → `acceptHandoff` → `approveHandoff` → `applyApprovedHandoff` in `handoff-contract.ts`; `handoff-invariant.test.ts`                                                                                                    |
+| Flag-on refusal of `owner_transfer` shortcut           | **EXISTS**                          | `applyTaskHandoff` → `HandoffContractRequiredError` in `task-runtime.ts`                                                                                                                                                                |
+| Learning RPC seam never bypasses contract when flag ON | **PARTIAL → fixed in this PR**      | `handoffCollaborationTask` in `collaboration-learning/state-machine.ts` previously reached `applyTaskHandoff` (which throws when flag ON). Now checks the flag first and **never** calls the shortcut when enabled.                     |
+| Production callers of contract APIs                    | **MISSING** (by design until gates) | No non-test callers of `proposeHandoff*` yet; closed loop is the contract API surface, not `collaboration.task.handoff` RPC                                                                                                             |
+| Flag-off shortcut                                      | **RETIRED (T09-B1 2026-10-25)**     | `applyTaskHandoff` / `handoffCollaborationTask` refuse on flag-off and flag-on; sole writer `applyApprovedHandoff` when flag explicitly on                                                                                              |
+| Episode Store (P1-B① adjacent)                         | **EXISTS** (FLAG-OFF)               | `episode-store.ts` / `isCollabEpisodeStoreEnabled`                                                                                                                                                                                      |
+| Group task board / claim                               | **PARTIAL / MISSING** (map only)    | `operatingState.activeContext.currentTaskId`; 1:1 `SessionTaskBoard`; UI `SupervisorTaskBoard`. No collab-group claim board product — **do not invent here**                                                                            |
+| Floor live / namespace cutover                         | **OFF**                             | `FLOOR_LIVE_CUTOVER_DEFAULT=false`; `RUNTIME_NAMESPACE_CUTOVER_DEFAULT=false`                                                                                                                                                           |
 
 ## 2. Defaults that must stay OFF
 
-| Flag / constant | Default | Note |
-| --- | --- | --- |
-| `collaboration.ledger.decisionRecords` | unset/false | EDR/PDR v2 writers no-op |
-| `collaboration.task.handoffContract` | unset/false | Contract path + state-machine refuse shortcut only when explicitly true |
-| `collaboration.episodeStore` | unset/false | P1-B① gate |
-| `collaboration.floor.protocol` | unset/legacy | Floor is not the live orchestrator |
-| `collaboration.floor.shadowStage` | unset | Shadow-A/B optional; not this PR |
-| `collaboration.runtimeNamespace` | unset/false | N2 still blocks production enablement |
-| `FLOOR_LIVE_CUTOVER_DEFAULT` | `false` | Unsigned cutover |
-| `RUNTIME_NAMESPACE_CUTOVER_DEFAULT` | `false` | Do not flip |
+| Flag / constant                        | Default      | Note                                                                    |
+| -------------------------------------- | ------------ | ----------------------------------------------------------------------- |
+| `collaboration.ledger.decisionRecords` | unset/false  | EDR/PDR v2 writers no-op                                                |
+| `collaboration.task.handoffContract`   | unset/false  | Contract path + state-machine refuse shortcut only when explicitly true |
+| `collaboration.episodeStore`           | unset/false  | P1-B① gate                                                              |
+| `collaboration.floor.protocol`         | unset/legacy | Floor is not the live orchestrator                                      |
+| `collaboration.floor.shadowStage`      | unset        | Shadow-A/B optional; not this PR                                        |
+| `collaboration.runtimeNamespace`       | unset/false  | N2 still blocks production enablement                                   |
+| `FLOOR_LIVE_CUTOVER_DEFAULT`           | `false`      | Unsigned cutover                                                        |
+| `RUNTIME_NAMESPACE_CUTOVER_DEFAULT`    | `false`      | Do not flip                                                             |
 
 ## 3. Thin hardening in this PR (path B only)
 

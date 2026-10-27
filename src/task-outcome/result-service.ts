@@ -382,19 +382,6 @@ function isSameEffect(current: TaskOutcomeRecord, transition: SubmitTransition):
   return false;
 }
 
-function semanticallyEqualForIdempotency(a: TaskOutcomeRecord, b: TaskOutcomeRecord): boolean {
-  return (
-    a.lifecycle === b.lifecycle &&
-    a.taskJudgement === b.taskJudgement &&
-    a.acceptance.status === b.acceptance.status &&
-    a.delivery.status === b.delivery.status &&
-    a.decisiveRunId === b.decisiveRunId &&
-    a.reasonCode === b.reasonCode &&
-    a.capabilityModality?.executionStatus === b.capabilityModality?.executionStatus &&
-    a.capabilityModality?.targetModalityCompleted === b.capabilityModality?.targetModalityCompleted
-  );
-}
-
 export function newFencingToken(): string {
   return `ft_${randomUUID()}`;
 }

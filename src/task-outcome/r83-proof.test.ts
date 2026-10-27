@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
@@ -56,7 +57,7 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
     expect(store2.loadTaskVersion("t-crash", 1)?.outcomeVersion).toBe(1);
   });
 
-  it("two OS processes racing same expectedVersion: exactly one wins", () => {
+  it("two OS processes racing same expectedVersion: exactly one wins", async () => {
     const store = new DurableTaskOutcomeStore(root);
     const service = new TaskOutcomeResultService({ store });
     const opened = service.submit("t-race", {
@@ -95,38 +96,90 @@ describe("R83 proof: persist / concurrency / idempotency / security", () => {
     expect(att.ok).toBe(true);
 
     const barrier = path.join(root, "barrier");
-    const workerPath = path.resolve("src/task-outcome/r83-race-worker.mts");
+    // Prefer direct node+tsx (same pattern as growth-bridge race): avoids pnpm exec
+    // startup / lock contention under vitest forks, and keeps stderr visible on failure.
+    const workerPath = fileURLToPath(new URL("./r83-race-worker.mts", import.meta.url));
 
-    const children = [1, 2].map((id) =>
-      spawn("pnpm", ["exec", "tsx", workerPath, root, "2", fencing, barrier, String(id)], {
-        cwd: process.cwd(),
-        env: process.env,
-        stdio: "ignore",
-      }),
-    );
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    const spawnOne = (id: number) =>
+      spawn(
+        process.execPath,
+        ["--import", "tsx", workerPath, root, "2", fencing, barrier, String(id)],
+        {
+          cwd: process.cwd(),
+          env: process.env,
+          stdio: ["ignore", "pipe", "pipe"],
+        },
+      );
+
+    const children = [1, 2].map((id) => spawnOne(id));
+    await new Promise((r) => setTimeout(r, 100));
     fs.writeFileSync(barrier, "go");
-    const deadline = Date.now() + 20000;
-    while (Date.now() < deadline) {
-      if (
-        fs.existsSync(path.join(root, "result-1.json")) &&
-        fs.existsSync(path.join(root, "result-2.json"))
-      ) {
-        break;
-      }
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50);
+
+    const waitChild = (child: ReturnType<typeof spawn>, id: number) =>
+      new Promise<{
+        id: number;
+        code: number | null;
+        signal: NodeJS.Signals | null;
+        err: string;
+        out: string;
+      }>((resolve) => {
+        let err = "";
+        let out = "";
+        let done = false;
+        const finish = (code: number | null, signal: NodeJS.Signals | null) => {
+          if (done) {
+            return;
+          }
+          done = true;
+          resolve({ id, code, signal, err, out });
+        };
+        child.stderr?.on("data", (d) => {
+          err += String(d);
+        });
+        child.stdout?.on("data", (d) => {
+          out += String(d);
+        });
+        child.on("error", (e) => {
+          err += `spawn_error: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}\n`;
+          finish(null, null);
+        });
+        child.on("exit", (code, signal) => finish(code, signal));
+        setTimeout(() => {
+          if (done) {
+            return;
+          }
+          err += "wait_timeout: killed after 20000ms\n";
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            // ignore
+          }
+        }, 20000);
+      });
+
+    const settled = await Promise.all(children.map((c, i) => waitChild(c, i + 1)));
+    const r1Path = path.join(root, "result-1.json");
+    const r2Path = path.join(root, "result-2.json");
+    const missing = [r1Path, r2Path].filter((p) => !fs.existsSync(p));
+    if (missing.length > 0) {
+      const diag = settled
+        .map(
+          (s) =>
+            `worker-${s.id}: code=${s.code} signal=${s.signal}\nstderr:\n${s.err || "(empty)"}\nstdout:\n${s.out || "(empty)"}`,
+        )
+        .join("\n---\n");
+      throw new Error(
+        `r83 race workers did not write result files: missing=${missing.join(", ")}\n${diag}`,
+      );
     }
-    for (const c of children) {
-      try {
-        c.kill();
-      } catch {
-        // ignore
-      }
+    for (const s of settled) {
+      expect(s.code, `worker-${s.id} stderr:\n${s.err}`).toBe(0);
     }
-    const r1 = JSON.parse(fs.readFileSync(path.join(root, "result-1.json"), "utf8")) as {
+
+    const r1 = JSON.parse(fs.readFileSync(r1Path, "utf8")) as {
       ok: boolean;
     };
-    const r2 = JSON.parse(fs.readFileSync(path.join(root, "result-2.json"), "utf8")) as {
+    const r2 = JSON.parse(fs.readFileSync(r2Path, "utf8")) as {
       ok: boolean;
     };
     expect([r1.ok, r2.ok].filter(Boolean).length).toBe(1);

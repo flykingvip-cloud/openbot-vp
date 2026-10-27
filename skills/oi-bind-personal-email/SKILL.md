@@ -24,9 +24,9 @@ Guidance 资产（带路文案）：
 
 ## 何时 Path B / Path C
 
-| 情况 | 路径 |
-|------|------|
-| 用户已有授权码，会填表 | Path B（表单） |
+| 情况                                                  | 路径                                 |
+| ----------------------------------------------------- | ------------------------------------ |
+| 用户已有授权码，会填表                                | Path B（表单）                       |
 | 「不知道怎么拿授权码 / 网页登录 / 126·163·QQ 授权码」 | Path C（browser 协驾）再回到表单提交 |
 
 绑定完成后的收发运营可交给 `personal-mail-assistant`；**本 skill 只负责绑定**。
@@ -35,14 +35,14 @@ Guidance 资产（带路文案）：
 
 与 `renderPersonalEmailForm` 一致：
 
-| UI 标签 | 字段 | 说明 |
-|---------|------|------|
-| 显示名称 | displayName | |
-| 发件邮箱 | credentialHandleId | 如 `name@126.com` |
-| 平台代发 | usePlatformSmtp | 仅当 snapshot.platformSmtpConfigured；**126/163/yeah 不要勾选** |
-| SMTP 主机/端口/用户名 | smtp* | 有域名 preset 时可自动填；无 preset 手填 |
-| IMAP 主机/端口/用户名 | imap* | 同上；非平台代发时需要 |
-| SMTP 授权码 | appSecret（表单复用该槽） | **应用专用密码 / 客户端授权码**，不是登录密码 |
+| UI 标签               | 字段                      | 说明                                                            |
+| --------------------- | ------------------------- | --------------------------------------------------------------- |
+| 显示名称              | displayName               |                                                                 |
+| 发件邮箱              | credentialHandleId        | 如 `name@126.com`                                               |
+| 平台代发              | usePlatformSmtp           | 仅当 snapshot.platformSmtpConfigured；**126/163/yeah 不要勾选** |
+| SMTP 主机/端口/用户名 | smtp\*                    | 有域名 preset 时可自动填；无 preset 手填                        |
+| IMAP 主机/端口/用户名 | imap\*                    | 同上；非平台代发时需要                                          |
+| SMTP 授权码           | appSecret（表单复用该槽） | **应用专用密码 / 客户端授权码**，不是登录密码                   |
 
 Preset 主机见 `personal-email-providers` / `personal-email-presets`（163/126/yeah/qq 等）。
 

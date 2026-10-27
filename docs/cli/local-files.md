@@ -79,13 +79,13 @@ There is deliberately no "allow always". Each grant covers one read, because the
 
 Every subcommand accepts:
 
-| Option                | Meaning                                                           |
-| --------------------- | ----------------------------------------------------------------- |
-| `--url <url>`         | Gateway WebSocket URL. Defaults to `gateway.remote.url` when set. |
-| `--token <token>`     | Gateway token, when the gateway requires one.                     |
-| `--password <password>` | Gateway password, when the gateway uses password auth.          |
-| `--timeout <ms>`      | Timeout in milliseconds. Defaults to `10000`.                     |
-| `--json`              | Output JSON instead of a table.                                   |
+| Option                  | Meaning                                                           |
+| ----------------------- | ----------------------------------------------------------------- |
+| `--url <url>`           | Gateway WebSocket URL. Defaults to `gateway.remote.url` when set. |
+| `--token <token>`       | Gateway token, when the gateway requires one.                     |
+| `--password <password>` | Gateway password, when the gateway uses password auth.            |
+| `--timeout <ms>`        | Timeout in milliseconds. Defaults to `10000`.                     |
+| `--json`                | Output JSON instead of a table.                                   |
 
 These options inherit Gateway auth: `local-files` RPCs go through `callGatewayFromCli` (CLI client name/mode). Device binding keys are taken from the live authenticated node connection gateway-side, never from the CLI argv.
 

@@ -21,7 +21,7 @@ function asset(overrides: Partial<ModelAsset> = {}): ModelAsset {
     source: "configured",
     inputModalities: ["text"],
     outputModalities: ["text"],
-    capabilities: ["tools"],
+    capabilities: ["tool_use"],
     costTier: "medium",
     health: "degraded",
     healthBasis: "live_probe_failed",
@@ -76,7 +76,6 @@ function paint(actions: PlatformModelsActions, model?: ModelAsset) {
       compat: null,
       onNavigateTab: () => {},
       onToggleRecommendationPool: () => {},
-      onToggleTenantSelectable: () => {},
     }),
     host,
   );
@@ -98,7 +97,6 @@ function openDetail(host: HTMLElement, view: ModelAssetsVM, actions: PlatformMod
       compat: null,
       onNavigateTab: () => {},
       onToggleRecommendationPool: () => {},
-      onToggleTenantSelectable: () => {},
     }),
     host,
   );
@@ -161,7 +159,6 @@ describe("model detail drawer layout", () => {
         compat: null,
         onNavigateTab,
         onToggleRecommendationPool: () => {},
-        onToggleTenantSelectable: () => {},
       }),
       host,
     );

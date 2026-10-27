@@ -113,11 +113,11 @@ OpenBot 多端已经形成 **「契约共享 + 视觉 SoT + 并行原生壳」**
 
 ### 3.4 Native shells（原生壳）
 
-| 平台        | 推荐姿态                                                   | 备注                                            |
-| ----------- | ---------------------------------------------------------- | ----------------------------------------------- |
-| **Android** | Compose 继续作为手机参考实现                               | stage38 tip 为四 Tab 最完整基线                 |
-| **iOS**     | SwiftUI 四 Tab + Kit Chat；按切片补 Tasks / Knowledge / Me | stage39 shell 已换主路径，避免再嵌 WebView 主壳 |
-| **Mac**     | **已拍板：Web shell** + 菜单栏伴侣（Gateway/TCC/node）     | 伴侣 ≠ 员工四 Tab；见 ADR                       |
+| 平台        | 推荐姿态                                                                 | 备注                                                  |
+| ----------- | ------------------------------------------------------------------------ | ----------------------------------------------------- |
+| **Android** | Compose 继续作为手机参考实现                                             | stage38 tip 为四 Tab 最完整基线                       |
+| **iOS**     | SwiftUI 四 Tab + Kit Chat；按切片补 Tasks / Knowledge / Me               | stage39 shell 已换主路径，避免再嵌 WebView 主壳       |
+| **Mac**     | **已拍板：Web shell** + 菜单栏伴侣（Gateway/TCC/node）                   | 伴侣 ≠ 员工四 Tab；见 ADR                             |
 | **Windows** | **已拍板：不做原生四 Tab**；Web shell 宿主 ✅ Stage 55（`apps/windows`） | WSL2 CLI + Gateway；员工窗 = WebView2；伴侣仍 planned |
 
 **桌面 UI 路径决策（Stage 52 已拍板，Daniel / 2026-10-07）：**

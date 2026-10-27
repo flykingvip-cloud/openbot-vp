@@ -10,8 +10,8 @@ import { styleHealthChannelLine } from "../../terminal/health-style.js";
 import { formatDocsLink } from "../../terminal/links.js";
 import { colorize, isRich, theme } from "../../terminal/theme.js";
 import { formatTokenCount, formatUsd } from "../../utils/usage-format.js";
-import { runCommandWithRuntime } from "../cli-utils.js";
 import { reportCliError } from "../cli-errors.js";
+import { runCommandWithRuntime } from "../cli-utils.js";
 import { inheritOptionFromParent } from "../command-options.js";
 import { addGatewayServiceCommands } from "../daemon-cli.js";
 import { formatHelpExamples } from "../help-format.js";
@@ -31,11 +31,7 @@ function runGatewayCommand(action: () => Promise<void>, label?: string) {
   return runCommandWithRuntime(defaultRuntime, action, (err) => {
     const message = err instanceof Error ? err.message : String(err);
     // Gateway-bound path: always report as gateway reject (exit 1), never usage (exit 2).
-    reportCliError(
-      defaultRuntime,
-      "gateway_reject",
-      label ? `${label}: ${message}` : message,
-    );
+    reportCliError(defaultRuntime, "gateway_reject", label ? `${label}: ${message}` : message);
   });
 }
 

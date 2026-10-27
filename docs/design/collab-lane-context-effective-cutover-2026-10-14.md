@@ -14,10 +14,10 @@ consumers already go through `policy-lane-context.ts`; unset config now serves
 
 ## What changed
 
-| Before (P2) | After (this cutover) |
-|-------------|----------------------|
-| unset → `legacy` | unset → `effective` |
-| Operator must set `effective` after clean shadow window | Default is effective; rollback is explicit |
+| Before (P2)                                                      | After (this cutover)                                 |
+| ---------------------------------------------------------------- | ---------------------------------------------------- |
+| unset → `legacy`                                                 | unset → `effective`                                  |
+| Operator must set `effective` after clean shadow window          | Default is effective; rollback is explicit           |
 | `describeContextLaneSingleTrackCutover().defaultMode = "legacy"` | `defaultMode = "effective"`, `killSwitch = "legacy"` |
 
 Only the **context** lane default changes. Presentation / participation / dispatch /

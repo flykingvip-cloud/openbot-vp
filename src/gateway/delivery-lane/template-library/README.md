@@ -1,9 +1,9 @@
 # DeliveryLane template library (Tip F / P2)
 
-| Id | Label | Notes |
-| -- | ----- | ----- |
+| Id                          | Label        | Notes         |
+| --------------------------- | ------------ | ------------- |
 | `cloud-computer-experience` | 云电脑体验轨 | 体验 tip 交付 |
-| `collab-dual-gate` | 协作双门禁 | 双钥合入守卫 |
+| `collab-dual-gate`          | 协作双门禁   | 双钥合入守卫  |
 
 ## Hosted CI 计费挡 → 本机 must-green
 

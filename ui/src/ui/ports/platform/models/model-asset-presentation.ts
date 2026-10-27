@@ -127,6 +127,10 @@ export function lifecycleStageLabel(stage: ModelAssetLifecycleStage): string {
 }
 
 export function tenantSelectableLabel(asset: ModelAsset): string {
+  if (asset.admissionControlsAvailable === false || asset.admissionControlsAvailable == null) {
+    // Backend tenant-admission RPC not wired — never imply platform "允许".
+    return "尚未接入";
+  }
   if (asset.source !== "configured") {
     return "需先入池";
   }
@@ -139,10 +143,13 @@ export function tenantSelectableLabel(asset: ModelAsset): string {
   if (asset.health === "degraded") {
     return "降级可用";
   }
-  return "允许";
+  return asset.tenantSelectable ? "允许" : "不允许";
 }
 
 export function tenantSelectableTone(asset: ModelAsset): "ok" | "warn" | "" {
+  if (asset.admissionControlsAvailable === false || asset.admissionControlsAvailable == null) {
+    return "warn";
+  }
   if (asset.tenantSelectable) {
     return "ok";
   }
@@ -150,4 +157,21 @@ export function tenantSelectableTone(asset: ModelAsset): "ok" | "warn" | "" {
     return "warn";
   }
   return "";
+}
+
+export function autoRoutingAdmissionLabel(asset: ModelAsset): string {
+  if (asset.admissionControlsAvailable === false || asset.admissionControlsAvailable == null) {
+    return "尚未接入";
+  }
+  switch (asset.autoRouting ?? "disabled") {
+    case "eligible":
+      return "可参与";
+    case "restricted":
+      return "受限";
+    case "paused":
+      return "暂停";
+    case "disabled":
+    default:
+      return "未启用";
+  }
 }

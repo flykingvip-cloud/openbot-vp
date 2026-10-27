@@ -23,4 +23,3 @@ triggers: pptx,ppt,演示文稿,幻灯片,路演,转成ppt,做成ppt,生成ppt,p
 ## 沙箱说明
 
 沙箱缺 `python-pptx` / pip **是预期**，不是无法做 PPT 的理由。立刻改走 `cyber-ppt` + PptxGenJS。不要安装或调用本目录旧 `scripts/pptx_engine.py` 作为终版。
-

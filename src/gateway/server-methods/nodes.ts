@@ -651,7 +651,9 @@ export const nodeHandlers: GatewayRequestHandlers = {
       const nodeIds = new Set<string>([...pairedById.keys(), ...connectedById.keys()]);
       if (queryScope.kind !== "platform") {
         for (const nodeId of nodeIds) {
-          if (pairedById.has(nodeId)) continue;
+          if (pairedById.has(nodeId)) {
+            continue;
+          }
           // Keep currently connected hosts visible even when their pairing row was
           // scope-filtered (common for agent/CLI under platformAuth). Safety boundary:
           // only nodes already present in nodeRegistry (live connection on this gateway);

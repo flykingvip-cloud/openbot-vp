@@ -21,6 +21,16 @@ export type MemoryUserStatus = {
   reasonCode: string;
   reason: string;
   backend: string;
+  /** Configured backend from resolveMemoryBackendConfig (may differ from observed). */
+  configuredBackend?: string;
+  /** Backend confirmed by read-only store evidence; unknown when not verified. */
+  observedBackend?: string;
+  /** Whether the probe function itself completed. */
+  probeExecution?: "ok" | "error";
+  /** Backend storage/scope/readiness judgment — not the same as probeExecution. */
+  backendHealth?: "healthy" | "degraded" | "unhealthy" | "unknown";
+  /** Retrieval capability; stays unknown without an actual retrieval evidence probe. */
+  retrievalStatus?: "ready" | "empty" | "error" | "unknown";
   fields?: MemoryStatusFieldProvenance;
 };
 

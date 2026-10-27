@@ -111,7 +111,7 @@ describe("E2 data asset linkage", () => {
     const store = normalizeEnterpriseDataStore(null);
     const source = siteSource(store);
     source.status = "connected";
-    delete (source as { status: string }).status;
+    Reflect.deleteProperty(source as object, "status");
     (source as { status: string }).status = "mystery";
     const [item] = buildDataAssetLinkage({
       store,

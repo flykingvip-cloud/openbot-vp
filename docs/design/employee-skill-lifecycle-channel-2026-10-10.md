@@ -24,10 +24,10 @@
 
 ### 1.1 两条栈
 
-| 栈 | 发现物 | 持久化 | 进入 agent 的方式 |
-| --- | --- | --- | --- |
-| 文件系统技能 | `SKILL.md` 目录 | 工作区 / `~/.openbot/skills` / 包内 `skills/` | `loadWorkspaceSkillEntries` → `resolveSkillsPromptForRun` |
-| 员工技能资产 | `EmployeeSkillProfile` + `SkillRuntimeDefinition` | `CONFIG_DIR/skill-assets/store.json` | 机器人关系变更 → `syncSkillExecutionBinding` → 物化 `SKILL.md` → 同上一次加载 |
+| 栈           | 发现物                                            | 持久化                                        | 进入 agent 的方式                                                             |
+| ------------ | ------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
+| 文件系统技能 | `SKILL.md` 目录                                   | 工作区 / `~/.openbot/skills` / 包内 `skills/` | `loadWorkspaceSkillEntries` → `resolveSkillsPromptForRun`                     |
+| 员工技能资产 | `EmployeeSkillProfile` + `SkillRuntimeDefinition` | `CONFIG_DIR/skill-assets/store.json`          | 机器人关系变更 → `syncSkillExecutionBinding` → 物化 `SKILL.md` → 同上一次加载 |
 
 员工资产在物化之前 **不是** Pi loader 的技能目录。`draft` 可以挂上源机器人关系，但执行投影会跳过 `draft` / `rejected` / `retired`（`EXECUTABLE_LIFECYCLES`）。
 
@@ -69,24 +69,24 @@ flowchart TB
 
 ### 1.2 阶段与模块边界
 
-| 阶段 | 模块 | 入口 | 边界 |
-| --- | --- | --- | --- |
-| 文件系统发现 | `src/agents/skills/workspace.ts` | `loadWorkspaceSkillEntries` | 同名覆盖顺序见 §1.3。畸形 frontmatter 被吞掉（`catch { // ignore malformed skills }`） |
-| 资格过滤 | `src/agents/skills/config.ts`、`skills-status.ts` | `shouldIncludeSkill`、`buildWorkspaceSkillStatus` | 缺二进制 / env / `enabled: false` / bundled allowlist 时技能不进 prompt |
-| 依赖安装 | `src/agents/skills-install.ts` | `installSkill` | 执行 `SKILL.md` metadata 里的 brew/node/go/uv/download。**不是** registry 拉包 |
-| Gateway 依赖 RPC | `src/gateway/server-methods/skills.ts` | `skills.status` / `skills.install` / `skills.update` | 同上，安装器语义 |
-| CLI 检视 | `src/cli/skills-cli.ts` | `registerSkillsCli` | 仅 `list` / `info` / `check` |
-| 资产抽取/保存 | `src/gateway/skill-lifecycle-store.ts` | `extractSkillPreview`、`saveSkillAsset` | 初始 lifecycle 由 visibility 决定 |
-| 资产 RPC | `src/gateway/server-methods/skill-lifecycle.ts` | `skillLifecycleHandlers` | `personal-skills.*`、`robot-skills.*`、审核别名 |
-| 安装门控 | 同上 + `skill-capability-contract.ts` | `assertRobotSkillInstallAllowed`、`assessSkillAvailability` | 停用/本机原生/缺密钥会拒绝；draft/reviewing 仍 `installAllowed: true`，文案提示还不能给更多机器人用 |
-| 机器人安装/开关/升级/卸载 | store | `installSkillToRobotAsset`、`toggleRobotSkillAsset`、`upgradeRobotSkillAsset`、`removeRobotSkillAsset`、`deletePersonalSkillAsset` | 变更发 `SkillRelationMutationEvent` |
-| 执行投影 | `src/gateway/skill-execution-binding/` | `syncSkillExecutionBinding`、`materializeSkillExecutionBinding`、`isExecutableSkillProjectionEligible` | 写出 Pi 兼容 `SKILL.md` |
-| Turn 加载 | `src/agents/pi-embedded-runner/skills-runtime.ts` | `resolveEmbeddedRunSkillEntries` | 工作区条目与 live binding 合并，再套 skill policy |
-| Turn 策略 | `src/auto-reply/reply/runtime-skill-policy.ts` | `resolveRuntimeSkillPolicy` | 与 `composeSkillPolicy` 做交集 |
-| 调用归因 | `src/gateway/skill-invocation/` | `resolveSelectedSkillForToolCall`、`createLifecycleSkillToolAttributionHandler` | 工具流 start/result。歧义时不计数。handler 异常被吞 |
-| 员工安装向导 | `src/gateway/server-methods/employee-install.ts` | `employeeInstallHandlers`、`executeInstallConfirmation` | 文件头仍写 stub。请求落在 `~/.config/openbot/stores/employee-install.json`，与 `CONFIG_DIR` 分裂 |
-| 创建机器人时自动装包 | `src/gateway/capability-packs/install-pack-to-robot.ts` | `autoInstallCapabilitiesOnAgentCreate` | 从 registry 物化资产并安装。运行时同步失败被吞 |
-| 企业/平台 | `enterprise-capability.*`、`platform-capability.*` | `submitSkillToEnterpriseReview` 等 | 见 §3 |
+| 阶段                      | 模块                                                    | 入口                                                                                                                               | 边界                                                                                                |
+| ------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 文件系统发现              | `src/agents/skills/workspace.ts`                        | `loadWorkspaceSkillEntries`                                                                                                        | 同名覆盖顺序见 §1.3。畸形 frontmatter 被吞掉（`catch { // ignore malformed skills }`）              |
+| 资格过滤                  | `src/agents/skills/config.ts`、`skills-status.ts`       | `shouldIncludeSkill`、`buildWorkspaceSkillStatus`                                                                                  | 缺二进制 / env / `enabled: false` / bundled allowlist 时技能不进 prompt                             |
+| 依赖安装                  | `src/agents/skills-install.ts`                          | `installSkill`                                                                                                                     | 执行 `SKILL.md` metadata 里的 brew/node/go/uv/download。**不是** registry 拉包                      |
+| Gateway 依赖 RPC          | `src/gateway/server-methods/skills.ts`                  | `skills.status` / `skills.install` / `skills.update`                                                                               | 同上，安装器语义                                                                                    |
+| CLI 检视                  | `src/cli/skills-cli.ts`                                 | `registerSkillsCli`                                                                                                                | 仅 `list` / `info` / `check`                                                                        |
+| 资产抽取/保存             | `src/gateway/skill-lifecycle-store.ts`                  | `extractSkillPreview`、`saveSkillAsset`                                                                                            | 初始 lifecycle 由 visibility 决定                                                                   |
+| 资产 RPC                  | `src/gateway/server-methods/skill-lifecycle.ts`         | `skillLifecycleHandlers`                                                                                                           | `personal-skills.*`、`robot-skills.*`、审核别名                                                     |
+| 安装门控                  | 同上 + `skill-capability-contract.ts`                   | `assertRobotSkillInstallAllowed`、`assessSkillAvailability`                                                                        | 停用/本机原生/缺密钥会拒绝；draft/reviewing 仍 `installAllowed: true`，文案提示还不能给更多机器人用 |
+| 机器人安装/开关/升级/卸载 | store                                                   | `installSkillToRobotAsset`、`toggleRobotSkillAsset`、`upgradeRobotSkillAsset`、`removeRobotSkillAsset`、`deletePersonalSkillAsset` | 变更发 `SkillRelationMutationEvent`                                                                 |
+| 执行投影                  | `src/gateway/skill-execution-binding/`                  | `syncSkillExecutionBinding`、`materializeSkillExecutionBinding`、`isExecutableSkillProjectionEligible`                             | 写出 Pi 兼容 `SKILL.md`                                                                             |
+| Turn 加载                 | `src/agents/pi-embedded-runner/skills-runtime.ts`       | `resolveEmbeddedRunSkillEntries`                                                                                                   | 工作区条目与 live binding 合并，再套 skill policy                                                   |
+| Turn 策略                 | `src/auto-reply/reply/runtime-skill-policy.ts`          | `resolveRuntimeSkillPolicy`                                                                                                        | 与 `composeSkillPolicy` 做交集                                                                      |
+| 调用归因                  | `src/gateway/skill-invocation/`                         | `resolveSelectedSkillForToolCall`、`createLifecycleSkillToolAttributionHandler`                                                    | 工具流 start/result。歧义时不计数。handler 异常被吞                                                 |
+| 员工安装向导              | `src/gateway/server-methods/employee-install.ts`        | `employeeInstallHandlers`、`executeInstallConfirmation`                                                                            | 文件头仍写 stub。请求落在 `~/.config/openbot/stores/employee-install.json`，与 `CONFIG_DIR` 分裂    |
+| 创建机器人时自动装包      | `src/gateway/capability-packs/install-pack-to-robot.ts` | `autoInstallCapabilitiesOnAgentCreate`                                                                                             | 从 registry 物化资产并安装。运行时同步失败被吞                                                      |
+| 企业/平台                 | `enterprise-capability.*`、`platform-capability.*`      | `submitSkillToEnterpriseReview` 等                                                                                                 | 见 §3                                                                                               |
 
 ### 1.3 文件系统发现顺序
 
@@ -94,15 +94,15 @@ flowchart TB
 
 `extra < bundled < managed < ~/.agents/skills < <workspace>/.agents/skills < workspace`
 
-| `sourceInfo.source` | 位置 |
-| --- | --- |
-| `openclaw-extra` | `skills.load.extraDirs`，以及插件 `resolvePluginSkillDirs` |
-| `openclaw-bundled` | `resolveBundledSkillsDir()` |
-| `openclaw-managed` | `CONFIG_DIR/skills`（默认 `~/.openbot/skills`） |
-| `agents-skills-personal` | `~/.agents/skills` |
-| `agents-skills-project` | `<workspace>/.agents/skills` |
-| `openclaw-workspace` | `<workspace>/skills` |
-| `openbot-lifecycle-binding` | 员工资产投影目录 `skill-execution-bindings/<agentId>/` |
+| `sourceInfo.source`         | 位置                                                       |
+| --------------------------- | ---------------------------------------------------------- |
+| `openclaw-extra`            | `skills.load.extraDirs`，以及插件 `resolvePluginSkillDirs` |
+| `openclaw-bundled`          | `resolveBundledSkillsDir()`                                |
+| `openclaw-managed`          | `CONFIG_DIR/skills`（默认 `~/.openbot/skills`）            |
+| `agents-skills-personal`    | `~/.agents/skills`                                         |
+| `agents-skills-project`     | `<workspace>/.agents/skills`                               |
+| `openclaw-workspace`        | `<workspace>/skills`                                       |
+| `openbot-lifecycle-binding` | 员工资产投影目录 `skill-execution-bindings/<agentId>/`     |
 
 ClawHub **没有**进入这个 loader。外部 `clawhub` CLI 若把目录写进 workspace `skills/`，下一次会话才会被当成 workspace 技能。gateway TypeScript 中 **未找到** ClawHub HTTP/API 客户端。
 
@@ -155,18 +155,18 @@ flowchart TD
 
 ### 2.1 各层在做什么
 
-| 层 | 函数 | 触发 | 检索外部源？ | 创建技能？ | 回退 |
-| --- | --- | --- | --- | --- | --- |
-| 系统提示词 | `buildUserVisibleReplySection`（`src/agents/system-prompt.ts`） | 模型认为能力不够、拒绝时 | 否。同文件 `buildDocsSection` 写明不要把用户导向第三方 registry | 否。只要求打一次机器标记 | 标记被限流则 `recordHonestCapabilityGap` 的解析返回 null |
-| 成长门控 | `shouldBlockGrowthTaskSend`、`resolveNextGrowthAction`、`extractTaskSkillRequirements` | **仅首条** mission，且用户未点 proceed | 否。候选来自模板 + `listSkillRecommendations`（已发布/共享的企业技能） | 否。提示词禁止发明目录外 key | LLM 抽取失败走 `fallbackTaskGapsFromTemplate`；`analyzeAndStoreGrowthTask` 异常时 chat 仍记下 `firstMissionSentAtMs`，避免永久卡住 |
-| 能力匹配 API | `employee-capability.can` → `matchCapabilityIntent` | 查询，不是 turn 内自动补齐 | 已装 + 企业推荐 | 否 | 未找到实现：不会因此去 ClawHub |
-| 执行预检 | `resolvePrimary` | 每轮可跑 | 否 | 否 | `no_skill_contract` 保持普通工具面 |
-| 缺口摄入 | `recordHonestCapabilityGap` → `recordCapabilityGapEvent` | 标记、空回复、运行错误。注释：用户取消不记 | 否 | 本函数只记事件 | store 抛错被 try/catch 吃掉，**不让回复失败** |
-| 缺口消费 | `processDiscoveredProposal` / `actSkill` / `actTool` | scheduler tick，离开回复路径 | 否 | skill 类：占位 draft。tool 类：governance proposal | 未达阈值不动；`act` 失败只打 evolution log |
-| 诊断 | `buildSkillInstallationPreviewFact`，意图仅 `install_existing_skill` | 显式安装意图 | 只提议安装 **已有 skillId** | 禁止从缺口发明 spec。文件头写 Path A 候选在 A0 之后恒空；live auto-submit **未接线** | skill-spec surface 的 recheck 为 `unsupported_surface` |
-| 数字员工创建 | `resolveSkillNeed` | 起草员工 | registry 的 `catalog.skillKeys` | 不在目录则 `unresolved`。注释 Never invent a skillKey | 安装走 `installRegistrySkillOntoRobot` |
-| 学习策展 | `curateLearningSkillDrafts` | 学习资产被注入 prompt 并记账之后 | 否 | draft，`auto` 发布没有 | 无候选返回空；失败 `logVerbose`，不挡回复 |
-| Bundled 技能正文 | `skills/skill-authoring/SKILL.md`、`skills/openbot-skills` | 仅当该技能已被加载，且模型选择遵守 | `skill-authoring` 写明 `skills.install` 不会拉 registry；有 CLI 时才 `clawhub publish` | 教模型写 `SKILL.md`，不是 gateway 自动写 | 系统提示词与这条技能对「第三方 registry」的态度相反，见缺口 P0 |
+| 层               | 函数                                                                                   | 触发                                       | 检索外部源？                                                                           | 创建技能？                                                                           | 回退                                                                                                                               |
+| ---------------- | -------------------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 系统提示词       | `buildUserVisibleReplySection`（`src/agents/system-prompt.ts`）                        | 模型认为能力不够、拒绝时                   | 否。同文件 `buildDocsSection` 写明不要把用户导向第三方 registry                        | 否。只要求打一次机器标记                                                             | 标记被限流则 `recordHonestCapabilityGap` 的解析返回 null                                                                           |
+| 成长门控         | `shouldBlockGrowthTaskSend`、`resolveNextGrowthAction`、`extractTaskSkillRequirements` | **仅首条** mission，且用户未点 proceed     | 否。候选来自模板 + `listSkillRecommendations`（已发布/共享的企业技能）                 | 否。提示词禁止发明目录外 key                                                         | LLM 抽取失败走 `fallbackTaskGapsFromTemplate`；`analyzeAndStoreGrowthTask` 异常时 chat 仍记下 `firstMissionSentAtMs`，避免永久卡住 |
+| 能力匹配 API     | `employee-capability.can` → `matchCapabilityIntent`                                    | 查询，不是 turn 内自动补齐                 | 已装 + 企业推荐                                                                        | 否                                                                                   | 未找到实现：不会因此去 ClawHub                                                                                                     |
+| 执行预检         | `resolvePrimary`                                                                       | 每轮可跑                                   | 否                                                                                     | 否                                                                                   | `no_skill_contract` 保持普通工具面                                                                                                 |
+| 缺口摄入         | `recordHonestCapabilityGap` → `recordCapabilityGapEvent`                               | 标记、空回复、运行错误。注释：用户取消不记 | 否                                                                                     | 本函数只记事件                                                                       | store 抛错被 try/catch 吃掉，**不让回复失败**                                                                                      |
+| 缺口消费         | `processDiscoveredProposal` / `actSkill` / `actTool`                                   | scheduler tick，离开回复路径               | 否                                                                                     | skill 类：占位 draft。tool 类：governance proposal                                   | 未达阈值不动；`act` 失败只打 evolution log                                                                                         |
+| 诊断             | `buildSkillInstallationPreviewFact`，意图仅 `install_existing_skill`                   | 显式安装意图                               | 只提议安装 **已有 skillId**                                                            | 禁止从缺口发明 spec。文件头写 Path A 候选在 A0 之后恒空；live auto-submit **未接线** | skill-spec surface 的 recheck 为 `unsupported_surface`                                                                             |
+| 数字员工创建     | `resolveSkillNeed`                                                                     | 起草员工                                   | registry 的 `catalog.skillKeys`                                                        | 不在目录则 `unresolved`。注释 Never invent a skillKey                                | 安装走 `installRegistrySkillOntoRobot`                                                                                             |
+| 学习策展         | `curateLearningSkillDrafts`                                                            | 学习资产被注入 prompt 并记账之后           | 否                                                                                     | draft，`auto` 发布没有                                                               | 无候选返回空；失败 `logVerbose`，不挡回复                                                                                          |
+| Bundled 技能正文 | `skills/skill-authoring/SKILL.md`、`skills/openbot-skills`                             | 仅当该技能已被加载，且模型选择遵守         | `skill-authoring` 写明 `skills.install` 不会拉 registry；有 CLI 时才 `clawhub publish` | 教模型写 `SKILL.md`，不是 gateway 自动写                                             | 系统提示词与这条技能对「第三方 registry」的态度相反，见缺口 P0                                                                     |
 
 `surfaceForCategory`（`capability-gap-ingest.ts`）把 **skill → `capability.skill-spec`**，**tool → `capability.skill-installation`**。消费端却是 skill 写 draft、tool 交治理提案。surface 名字和动作容易读反，诊断 recheck 又不支持 `capability.skill-spec`。
 
@@ -174,13 +174,13 @@ flowchart TD
 
 ### 2.2 检索外表源：实际有哪些源
 
-| 源 | 运行时是否自动搜 | 证据 |
-| --- | --- | --- |
+| 源                                                               | 运行时是否自动搜                                                                                         | 证据                                              |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | 企业 registry（`capability-governance-store` 的 `listRegistry`） | 创建机器人装包、数字员工解析、`robot-skills.install`、员工安装向导列出来源时会读。不是「任务中缺了再搜」 | `install-pack-to-robot.ts`、`employee-install.ts` |
-| 已发布/小组共享技能 | `listSkillRecommendations` 过滤 published / sharedGroups | `skill-lifecycle-store.ts` |
-| ClawHub / clawhub.ai | **未找到** gateway 自动 search/install。公开文档与 bundled `openbot-skills` 描述 CLI | `docs/tools/skills-cli.md` |
-| 本地外部包 | `employee-install.scan-external` 后，`external-local` 确认安装才允许。未扫描会 RPC 报错 | `employee-install.ts` |
-| `skills.install` | 只跑已发现技能的依赖安装器 | `skills-install.ts` |
+| 已发布/小组共享技能                                              | `listSkillRecommendations` 过滤 published / sharedGroups                                                 | `skill-lifecycle-store.ts`                        |
+| ClawHub / clawhub.ai                                             | **未找到** gateway 自动 search/install。公开文档与 bundled `openbot-skills` 描述 CLI                     | `docs/tools/skills-cli.md`                        |
+| 本地外部包                                                       | `employee-install.scan-external` 后，`external-local` 确认安装才允许。未扫描会 RPC 报错                  | `employee-install.ts`                             |
+| `skills.install`                                                 | 只跑已发现技能的依赖安装器                                                                               | `skills-install.ts`                               |
 
 `ui/src/ui/views/public-skills-mcp-document.ts` 写明：团队/企业技能经平台能力中心发布、审核、安装、授权，而不是外部 marketplace。
 
@@ -220,17 +220,17 @@ stateDiagram-v2
   private --> published: sharePersonalSkillToGroup
 ```
 
-| 转移 | 谁触发 | 备注 |
-| --- | --- | --- |
-| 创建时的默认态 | `resolveInitialLifecycle` | private→draft，group→published，enterprise→reviewing |
-| draft→private | 用户 RPC `personal-skills.finalize-draft` | 再对已启用关系重放安装事件 |
-| 编辑 | `editPersonalSkillAsset` | patch 版本 +1，历史进 `versions[]` |
-| 分享到组 | `sharePersonalSkillToGroup` | 先 `assertContentReadyForIncubation` |
-| 提交企业 | `submitPersonalSkillToEnterprise` | draft 会先变 private 再 reviewing。直接 `submitSkillForReview` 拒绝 draft |
-| 企业通过后发布 | `publishSkillReview` | `skill-review.publish` 在没有 registry 条目时拒绝 |
-| 弃用/退役 | `deprecateSkillReview` / `retireSkillReview` | gateway RPC |
-| 进化回滚 lifecycle | `restoreSkillLifecycleState` | 只回 lifecycle，不改内容 |
-| 版本回滚 | `rollbackSkillVersion` | 生成新的 head 版本，并同步机器人 `installedVersion` |
+| 转移               | 谁触发                                       | 备注                                                                      |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------------------------- |
+| 创建时的默认态     | `resolveInitialLifecycle`                    | private→draft，group→published，enterprise→reviewing                      |
+| draft→private      | 用户 RPC `personal-skills.finalize-draft`    | 再对已启用关系重放安装事件                                                |
+| 编辑               | `editPersonalSkillAsset`                     | patch 版本 +1，历史进 `versions[]`                                        |
+| 分享到组           | `sharePersonalSkillToGroup`                  | 先 `assertContentReadyForIncubation`                                      |
+| 提交企业           | `submitPersonalSkillToEnterprise`            | draft 会先变 private 再 reviewing。直接 `submitSkillForReview` 拒绝 draft |
+| 企业通过后发布     | `publishSkillReview`                         | `skill-review.publish` 在没有 registry 条目时拒绝                         |
+| 弃用/退役          | `deprecateSkillReview` / `retireSkillReview` | gateway RPC                                                               |
+| 进化回滚 lifecycle | `restoreSkillLifecycleState`                 | 只回 lifecycle，不改内容                                                  |
+| 版本回滚           | `rollbackSkillVersion`                       | 生成新的 head 版本，并同步机器人 `installedVersion`                       |
 
 `approved` 在枚举里。企业主路径是 reviewing →（registry 批准）→ published。`SkillReviewRecord.decision` 使用 `"approved" | "rejected"`。**未找到**企业审核拒绝时把 `skill.lifecycle` 写成 `rejected` 的 store 函数；拒绝主要落在 governance proposal。
 
@@ -275,13 +275,13 @@ Registry `lifecycleState`：`draft | review | approved | active | deprecated | r
 
 ### 3.4 其它孵化入口
 
-| 机制 | 状态 | 是否自动 | 接入 live turn？ |
-| --- | --- | --- | --- |
-| 学习资产策展 | 直接 `lifecycle: "draft"` | 复用或出现次数 ≥ 3 | 是。`learning-recall-context.ts` 在复用记账后调用 |
-| 模式检测 | `candidate → rejected/approved → publish-draft-skill` | 批准与发布都是用户 RPC | 否 |
-| quick-save 后档案增强 | 仍是 draft，异步 `triggerAssetCuration` | LLM 补档案，不发布 | 保存 RPC 之后，不是每轮聊天 |
-| 资产孵化会话 | 事件 `copy/download/share/submit`；采纳 `share_to_group` 等 | `asset-incubation.review.schedule` 按复发阈值聚类给 UI | RPC / 分享提交时记账 |
-| Skill auto-evolution | `src/gateway/evolution-governance/skill-auto-evolution.ts` | 默认关。`OPENBOT_SKILL_AUTO_EVOLUTION=on` 且 governance mode 为 auto 才允许变更。注释：永不自动 approve，只推进带 `autoInstallIntent` 的 job | scheduler，约 15 分钟，不是每轮 |
+| 机制                  | 状态                                                        | 是否自动                                                                                                                                     | 接入 live turn？                                  |
+| --------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| 学习资产策展          | 直接 `lifecycle: "draft"`                                   | 复用或出现次数 ≥ 3                                                                                                                           | 是。`learning-recall-context.ts` 在复用记账后调用 |
+| 模式检测              | `candidate → rejected/approved → publish-draft-skill`       | 批准与发布都是用户 RPC                                                                                                                       | 否                                                |
+| quick-save 后档案增强 | 仍是 draft，异步 `triggerAssetCuration`                     | LLM 补档案，不发布                                                                                                                           | 保存 RPC 之后，不是每轮聊天                       |
+| 资产孵化会话          | 事件 `copy/download/share/submit`；采纳 `share_to_group` 等 | `asset-incubation.review.schedule` 按复发阈值聚类给 UI                                                                                       | RPC / 分享提交时记账                              |
+| Skill auto-evolution  | `src/gateway/evolution-governance/skill-auto-evolution.ts`  | 默认关。`OPENBOT_SKILL_AUTO_EVOLUTION=on` 且 governance mode 为 auto 才允许变更。注释：永不自动 approve，只推进带 `autoInstallIntent` 的 job | scheduler，约 15 分钟，不是每轮                   |
 
 员工 UI「我的积累」分段（`ui/src/ui/controllers/my-accumulation.ts`）是 `all | drafts | reviewing | contributed | optimize`，由 `lifecycle === "draft"` 与 `shareVisibility` 映射，和企业 VM 的 `submitted|reviewing|approved|published|...` 不是同一套枚举。
 
@@ -299,67 +299,67 @@ Registry `lifecycleState`：`draft | review | approved | active | deprecated | r
 
 ## 4. 关键代码索引
 
-| 符号 | 路径 |
-| --- | --- |
-| `SkillLifecycleState`、`saveSkillAsset`、`resolveInitialLifecycle`、`finalizeDraftSkill`、`installSkillToRobotAsset` | `src/gateway/skill-lifecycle-store.ts` |
-| `normalizeAssetType`（未知类型 → `capability`） | 同上 |
-| `skillLifecycleHandlers`、`assertRobotSkillInstallAllowed` | `src/gateway/server-methods/skill-lifecycle.ts` |
-| `assessSkillAvailability` | `src/gateway/skill-capability-contract.ts` |
-| `EXECUTABLE_LIFECYCLES`、`NON_EXECUTABLE_LIFECYCLES` | `src/gateway/skill-execution-binding/types.ts` |
-| `isExecutableSkillProjectionEligible`、`renderSkillMarkdown` | `src/gateway/skill-execution-binding/materialize.ts` |
-| `syncSkillExecutionBinding` | `src/gateway/skill-execution-binding/sync.ts` |
-| `loadWorkspaceSkillEntries` | `src/agents/skills/workspace.ts` |
-| `resolveEmbeddedRunSkillEntries` | `src/agents/pi-embedded-runner/skills-runtime.ts` |
-| `installSkill` | `src/agents/skills-install.ts` |
-| `registerSkillsCli` | `src/cli/skills-cli.ts` |
-| `resolveRuntimeSkillPolicy` | `src/auto-reply/reply/runtime-skill-policy.ts` |
-| `resolveSelectedSkillForToolCall` | `src/gateway/skill-invocation/record.ts` |
-| `createLifecycleSkillToolAttributionHandler` | `src/gateway/skill-invocation/lifecycle-tool-attribution.ts` |
-| `shouldBlockGrowthTaskSend` | `src/gateway/agent-growth/growth-task-gate.ts` |
-| `resolveNextGrowthAction` | `src/gateway/agent-growth/next-action.ts` |
-| `buildUserVisibleReplySection`（capability_gap 标记） | `src/agents/system-prompt.ts` |
-| `recordHonestCapabilityGap` | `src/auto-reply/reply/honest-empty-reply.ts` |
-| `surfaceForCategory`、`recordCapabilityGapEvent` | `src/gateway/evolution-control/capability-gap-ingest.ts` |
-| `actSkill`、`actTool`、`processDiscoveredProposal` | `src/gateway/evolution-control/capability-gap-consumer.ts` |
-| `SKILL_INSTALLATION_INTENTS = install_existing_skill` | `src/diagnosis/skill-installation-candidate.ts` |
-| `resolvePrimary`（`no_skill_contract`） | `src/agents/execution-preflight/resolve.ts` |
-| `curateLearningSkillDrafts` | `src/auto-reply/reply/learning-skill-curation.ts` |
-| `DEFAULT_REUSE_THRESHOLD` | `src/gateway/agent-growth/skill-draft-curation.ts` |
-| `isSkillAutoEvolutionEnabled` | `src/gateway/evolution-governance/skill-auto-evolution.ts` |
-| `employeeInstallHandlers`、`executeInstallConfirmation` | `src/gateway/server-methods/employee-install.ts` |
-| `computeScore`、`isCandidateEligible`、`incubationHandlers` | `src/gateway/server-methods/incubation.ts` |
-| `saveEffectTracking` | `src/gateway/incubation-store.ts`（生产调用未找到） |
-| 技能写作规范 | `skills/skill-authoring/SKILL.md` |
-| 孵化运营说明 | `skills/openbot-platform-ops/references/skill-asset-incubation.md` |
+| 符号                                                                                                                 | 路径                                                               |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `SkillLifecycleState`、`saveSkillAsset`、`resolveInitialLifecycle`、`finalizeDraftSkill`、`installSkillToRobotAsset` | `src/gateway/skill-lifecycle-store.ts`                             |
+| `normalizeAssetType`（未知类型 → `capability`）                                                                      | 同上                                                               |
+| `skillLifecycleHandlers`、`assertRobotSkillInstallAllowed`                                                           | `src/gateway/server-methods/skill-lifecycle.ts`                    |
+| `assessSkillAvailability`                                                                                            | `src/gateway/skill-capability-contract.ts`                         |
+| `EXECUTABLE_LIFECYCLES`、`NON_EXECUTABLE_LIFECYCLES`                                                                 | `src/gateway/skill-execution-binding/types.ts`                     |
+| `isExecutableSkillProjectionEligible`、`renderSkillMarkdown`                                                         | `src/gateway/skill-execution-binding/materialize.ts`               |
+| `syncSkillExecutionBinding`                                                                                          | `src/gateway/skill-execution-binding/sync.ts`                      |
+| `loadWorkspaceSkillEntries`                                                                                          | `src/agents/skills/workspace.ts`                                   |
+| `resolveEmbeddedRunSkillEntries`                                                                                     | `src/agents/pi-embedded-runner/skills-runtime.ts`                  |
+| `installSkill`                                                                                                       | `src/agents/skills-install.ts`                                     |
+| `registerSkillsCli`                                                                                                  | `src/cli/skills-cli.ts`                                            |
+| `resolveRuntimeSkillPolicy`                                                                                          | `src/auto-reply/reply/runtime-skill-policy.ts`                     |
+| `resolveSelectedSkillForToolCall`                                                                                    | `src/gateway/skill-invocation/record.ts`                           |
+| `createLifecycleSkillToolAttributionHandler`                                                                         | `src/gateway/skill-invocation/lifecycle-tool-attribution.ts`       |
+| `shouldBlockGrowthTaskSend`                                                                                          | `src/gateway/agent-growth/growth-task-gate.ts`                     |
+| `resolveNextGrowthAction`                                                                                            | `src/gateway/agent-growth/next-action.ts`                          |
+| `buildUserVisibleReplySection`（capability_gap 标记）                                                                | `src/agents/system-prompt.ts`                                      |
+| `recordHonestCapabilityGap`                                                                                          | `src/auto-reply/reply/honest-empty-reply.ts`                       |
+| `surfaceForCategory`、`recordCapabilityGapEvent`                                                                     | `src/gateway/evolution-control/capability-gap-ingest.ts`           |
+| `actSkill`、`actTool`、`processDiscoveredProposal`                                                                   | `src/gateway/evolution-control/capability-gap-consumer.ts`         |
+| `SKILL_INSTALLATION_INTENTS = install_existing_skill`                                                                | `src/diagnosis/skill-installation-candidate.ts`                    |
+| `resolvePrimary`（`no_skill_contract`）                                                                              | `src/agents/execution-preflight/resolve.ts`                        |
+| `curateLearningSkillDrafts`                                                                                          | `src/auto-reply/reply/learning-skill-curation.ts`                  |
+| `DEFAULT_REUSE_THRESHOLD`                                                                                            | `src/gateway/agent-growth/skill-draft-curation.ts`                 |
+| `isSkillAutoEvolutionEnabled`                                                                                        | `src/gateway/evolution-governance/skill-auto-evolution.ts`         |
+| `employeeInstallHandlers`、`executeInstallConfirmation`                                                              | `src/gateway/server-methods/employee-install.ts`                   |
+| `computeScore`、`isCandidateEligible`、`incubationHandlers`                                                          | `src/gateway/server-methods/incubation.ts`                         |
+| `saveEffectTracking`                                                                                                 | `src/gateway/incubation-store.ts`（生产调用未找到）                |
+| 技能写作规范                                                                                                         | `skills/skill-authoring/SKILL.md`                                  |
+| 孵化运营说明                                                                                                         | `skills/openbot-platform-ops/references/skill-asset-incubation.md` |
 
 ## 5. 员工端与平台端的分界
 
 两边都在 **同一个 gateway 进程**里，用不同 RPC 和 store，不是两个部署单元。割裂来自数据面和产品叙事，不是网络边界。
 
-| 面 | RPC / store | 员工能直接完成的事 |
-| --- | --- | --- |
-| Host 技能 | `skills.status/install/update`，CLI `openbot skills` | 看本机 `SKILL.md`、装依赖。不能从这里发布企业技能 |
-| 个人资产 | `skill-lifecycle.extract/save`，`employee-capability.quick-save`，`personal-skills.*` | 存 draft、编辑、分享到组、提交企业、装到自己的机器人 |
-| 机器人关系 | `robot-skills.install/toggle/upgrade/remove` | 启用后才投影进该机器人的 turn |
-| 安装向导 | `employee-install.*` | 列 registry、扫本地包、确认安装。持久化路径与 skill-assets 不同，文件头仍称 stub |
-| 企业 | `enterprise-capability.review/list/submit-to-platform/...` | 员工提交后等待审核。审核通过才进 registry |
-| 平台 | `platform-capability.publish-enterprise-capability` 等 | 员工 RPC 到不了发布。`incubation.decide` 也不代发 |
-| 外部 ClawHub | 非 core gateway | 仅当本机有 `clawhub` CLI，且模型/用户去跑它 |
+| 面           | RPC / store                                                                           | 员工能直接完成的事                                                               |
+| ------------ | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Host 技能    | `skills.status/install/update`，CLI `openbot skills`                                  | 看本机 `SKILL.md`、装依赖。不能从这里发布企业技能                                |
+| 个人资产     | `skill-lifecycle.extract/save`，`employee-capability.quick-save`，`personal-skills.*` | 存 draft、编辑、分享到组、提交企业、装到自己的机器人                             |
+| 机器人关系   | `robot-skills.install/toggle/upgrade/remove`                                          | 启用后才投影进该机器人的 turn                                                    |
+| 安装向导     | `employee-install.*`                                                                  | 列 registry、扫本地包、确认安装。持久化路径与 skill-assets 不同，文件头仍称 stub |
+| 企业         | `enterprise-capability.review/list/submit-to-platform/...`                            | 员工提交后等待审核。审核通过才进 registry                                        |
+| 平台         | `platform-capability.publish-enterprise-capability` 等                                | 员工 RPC 到不了发布。`incubation.decide` 也不代发                                |
+| 外部 ClawHub | 非 core gateway                                                                       | 仅当本机有 `clawhub` CLI，且模型/用户去跑它                                      |
 
 因此：员工端可以沉淀和自用；「进化到企业/平台可用」依赖人工审核链。SaaS 叙事（能力中心）和主机叙事（ClawHub + `openbot skills install`）在文档里被写成同一条技能通道。
 
 ## 6. 文档与代码不一致
 
-| 主题 | 文档 | 代码 |
-| --- | --- | --- |
-| `openbot skills install/update` | `docs/tools/skills.md` 写安装与 `--all` 更新，并链到 `/tools/skills-cli` | `registerSkillsCli` 无这两个子命令。`docs/cli/skills.md` 只列 list/info/check |
-| `/tools/skills-cli` 页面 | 标题与正文是 ClawHub（`clawhub search/install/update/publish`） | 不是 `openbot skills` 的实现说明 |
-| 配置路径 | `docs/tools/skills.md`、`docs/tools/skills-config.md` 写 `~/.gmood2008/openbot.json` | `CONFIG_DIR` 为 `~/.openbot`（或遗留 `~/.openclaw`） |
-| 加载来源 | 公开文档写三处：bundled、managed、workspace | loader 还有 extra、plugin、两级 `.agents/skills` |
-| 系统提示词 | `buildDocsSection`：技能由本地 `skills/` 与 `openbot skills` CLI 管理，不要导向第三方 registry | 公开技能页把 ClawHub 当作注册表；`skill-authoring` 又允许 `clawhub publish` |
-| governance 目录注释 | 设计文档写 `~/.openbot/governance/` | `capability-governance-store.ts` 文件头注释仍写 `~/.openclaw/governance/`，运行时跟 `CONFIG_DIR` |
-| reviewing 是否进运行时 | `saveSkillAsset` 注释：跳过 draft/reviewing | `EXECUTABLE_LIFECYCLES` 包含 reviewing |
-| 员工安装 | 设计任务拆解把 `employee-install.*` 当安装治理 | 实现文件自称为 Phase 1 stub，且 store 不在 `CONFIG_DIR` |
+| 主题                            | 文档                                                                                           | 代码                                                                                             |
+| ------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `openbot skills install/update` | `docs/tools/skills.md` 写安装与 `--all` 更新，并链到 `/tools/skills-cli`                       | `registerSkillsCli` 无这两个子命令。`docs/cli/skills.md` 只列 list/info/check                    |
+| `/tools/skills-cli` 页面        | 标题与正文是 ClawHub（`clawhub search/install/update/publish`）                                | 不是 `openbot skills` 的实现说明                                                                 |
+| 配置路径                        | `docs/tools/skills.md`、`docs/tools/skills-config.md` 写 `~/.gmood2008/openbot.json`           | `CONFIG_DIR` 为 `~/.openbot`（或遗留 `~/.openclaw`）                                             |
+| 加载来源                        | 公开文档写三处：bundled、managed、workspace                                                    | loader 还有 extra、plugin、两级 `.agents/skills`                                                 |
+| 系统提示词                      | `buildDocsSection`：技能由本地 `skills/` 与 `openbot skills` CLI 管理，不要导向第三方 registry | 公开技能页把 ClawHub 当作注册表；`skill-authoring` 又允许 `clawhub publish`                      |
+| governance 目录注释             | 设计文档写 `~/.openbot/governance/`                                                            | `capability-governance-store.ts` 文件头注释仍写 `~/.openclaw/governance/`，运行时跟 `CONFIG_DIR` |
+| reviewing 是否进运行时          | `saveSkillAsset` 注释：跳过 draft/reviewing                                                    | `EXECUTABLE_LIFECYCLES` 包含 reviewing                                                           |
+| 员工安装                        | 设计任务拆解把 `employee-install.*` 当安装治理                                                 | 实现文件自称为 Phase 1 stub，且 store 不在 `CONFIG_DIR`                                          |
 
 `docs/zh-CN/**` 由英文生成。上述漂移会被翻译副本放大。本调查不改那棵树。
 

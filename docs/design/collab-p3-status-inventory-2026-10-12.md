@@ -22,36 +22,36 @@ Prior inventories: [`collab-p0-status-inventory-2026-10-12.md`](./collab-p0-stat
 
 ## 1. Task-book → existing symbols
 
-| Capability | Status | Existing symbol / file |
-| --- | --- | --- |
-| Single-Beat Episode wrap around legacy round | **EXISTS** (`episodeStore` default OFF) | `runSingleBeatEpisodeAroundRound` / `beginSingleBeatEpisodeRuntime` / `finishSingleBeatEpisodeRuntime` in `episode-single-beat-runtime.ts`; composition root `chat.ts` wraps `executeCollaborationRound` |
-| LegacyBeatExecutor retained | **EXISTS** (different name) | `LEGACY_PRIMARY_SUPPLEMENT_EXECUTOR` / `resolveProductionCollaborationExecutor` in `legacy-production-executor.ts`; always the production speaker path while G1 refuses Floor |
-| Episode state machine | **EXISTS** | `episode-state.ts`; `episode-state-machine.ts` (`BEAT_ACTIVE`, `FACILITATOR_OBSERVE`, `stop_loop`) |
-| Episode Store | **EXISTS** (default OFF) | `episode-store.ts`; `isCollabEpisodeStoreEnabled` ← `collaboration.episodeStore` |
-| Facilitator control plane | **EXISTS** (gated with episodeStore) | `facilitator-control.ts`: `gateFacilitatorControl`, `recordFacilitatorObservation`, `singleBeatControlRequests`; outcomes `authorized` / `denied` / `route_to_task_governance` |
-| Refuse multi-beat | **EXISTS** | `assertSingleBeatEvent` rejects `next_beat`; `assertAtMostOneBeat` |
-| Floor live cutover refuse | **EXISTS** (OFF) | `FLOOR_LIVE_CUTOVER_DEFAULT=false` in `floor-live-cutover.ts`; `FLOOR_DRIVES_PRODUCTION_DECISION=false` in `legacy-production-executor.ts` |
-| Peer Floor L0 / L1 / Admission | **EXISTS as SHADOW** | `router-l0.ts` / `router-l1.ts` / `admission.ts` via `floor-shadow-plan.ts`; does **not** rewrite production speakers |
-| Floor Bid | **EXISTS as SHADOW-B** | `floor-bid.ts`; `drivesProductionDecision: false` |
-| Need resolver (EDR Facilitator path) | **EXISTS** | `need-resolver.ts`; used when Facilitator writes EDR |
-| chat wiring assert | **EXISTS** | `episode-single-beat-runtime.g2.test.ts` asserts `chat.ts` contains wrap + `productionExecutor: resolveProductionCollaborationExecutor(...)` |
-| Facilitator G3 / Legacy G8 / Cutover G1 tests | **EXISTS** | `facilitator-control.g3.test.ts`; `legacy-production-executor.g8.test.ts`; `floor-live-cutover.g1.test.ts` |
-| Digital-team pilot fixtures | **PARTIAL** | `__fixtures__/digital-team-real-rounds.ts`; `collab-dialogue-regressions.test.ts` (selection/visible-reply; not a full P3 exit suite) |
-| Facilitator `CHALLENGE` / `REQUEST_EVIDENCE` named actions | **MISSING** (intentional) | Only `stop_loop` / `route_to_task_governance` / deny others |
-| Floor live production speaker rewrite | **MISSING** (intentional) | `promoteFloorAdmittedToProductionSpeakers` always refuses |
-| Observability / pilot exit gates | **MISSING** (ops, not code) | Useful-reply rate, mention coverage, etc. belong in acceptance, not a new runtime |
-| Second Episode / Floor orchestrator | **MUST NOT BUILD** | Keep G8 legacy executor; single-beat only wraps it |
+| Capability                                                 | Status                                  | Existing symbol / file                                                                                                                                                                                   |
+| ---------------------------------------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single-Beat Episode wrap around legacy round               | **EXISTS** (`episodeStore` default OFF) | `runSingleBeatEpisodeAroundRound` / `beginSingleBeatEpisodeRuntime` / `finishSingleBeatEpisodeRuntime` in `episode-single-beat-runtime.ts`; composition root `chat.ts` wraps `executeCollaborationRound` |
+| LegacyBeatExecutor retained                                | **EXISTS** (different name)             | `LEGACY_PRIMARY_SUPPLEMENT_EXECUTOR` / `resolveProductionCollaborationExecutor` in `legacy-production-executor.ts`; always the production speaker path while G1 refuses Floor                            |
+| Episode state machine                                      | **EXISTS**                              | `episode-state.ts`; `episode-state-machine.ts` (`BEAT_ACTIVE`, `FACILITATOR_OBSERVE`, `stop_loop`)                                                                                                       |
+| Episode Store                                              | **EXISTS** (default OFF)                | `episode-store.ts`; `isCollabEpisodeStoreEnabled` ← `collaboration.episodeStore`                                                                                                                         |
+| Facilitator control plane                                  | **EXISTS** (gated with episodeStore)    | `facilitator-control.ts`: `gateFacilitatorControl`, `recordFacilitatorObservation`, `singleBeatControlRequests`; outcomes `authorized` / `denied` / `route_to_task_governance`                           |
+| Refuse multi-beat                                          | **EXISTS**                              | `assertSingleBeatEvent` rejects `next_beat`; `assertAtMostOneBeat`                                                                                                                                       |
+| Floor live cutover refuse                                  | **EXISTS** (OFF)                        | `FLOOR_LIVE_CUTOVER_DEFAULT=false` in `floor-live-cutover.ts`; `FLOOR_DRIVES_PRODUCTION_DECISION=false` in `legacy-production-executor.ts`                                                               |
+| Peer Floor L0 / L1 / Admission                             | **EXISTS as SHADOW**                    | `router-l0.ts` / `router-l1.ts` / `admission.ts` via `floor-shadow-plan.ts`; does **not** rewrite production speakers                                                                                    |
+| Floor Bid                                                  | **EXISTS as SHADOW-B**                  | `floor-bid.ts`; `drivesProductionDecision: false`                                                                                                                                                        |
+| Need resolver (EDR Facilitator path)                       | **EXISTS**                              | `need-resolver.ts`; used when Facilitator writes EDR                                                                                                                                                     |
+| chat wiring assert                                         | **EXISTS**                              | `episode-single-beat-runtime.g2.test.ts` asserts `chat.ts` contains wrap + `productionExecutor: resolveProductionCollaborationExecutor(...)`                                                             |
+| Facilitator G3 / Legacy G8 / Cutover G1 tests              | **EXISTS**                              | `facilitator-control.g3.test.ts`; `legacy-production-executor.g8.test.ts`; `floor-live-cutover.g1.test.ts`                                                                                               |
+| Digital-team pilot fixtures                                | **PARTIAL**                             | `__fixtures__/digital-team-real-rounds.ts`; `collab-dialogue-regressions.test.ts` (selection/visible-reply; not a full P3 exit suite)                                                                    |
+| Facilitator `CHALLENGE` / `REQUEST_EVIDENCE` named actions | **MISSING** (intentional)               | Only `stop_loop` / `route_to_task_governance` / deny others                                                                                                                                              |
+| Floor live production speaker rewrite                      | **MISSING** (intentional)               | `promoteFloorAdmittedToProductionSpeakers` always refuses                                                                                                                                                |
+| Observability / pilot exit gates                           | **MISSING** (ops, not code)             | Useful-reply rate, mention coverage, etc. belong in acceptance, not a new runtime                                                                                                                        |
+| Second Episode / Floor orchestrator                        | **MUST NOT BUILD**                      | Keep G8 legacy executor; single-beat only wraps it                                                                                                                                                       |
 
 ## 2. Defaults that must stay OFF
 
-| Flag / constant | Default | Note |
-| --- | --- | --- |
-| `FLOOR_LIVE_CUTOVER_DEFAULT` | `false` | Unsigned cutover; keep OFF through P3 |
-| `FLOOR_DRIVES_PRODUCTION_DECISION` | `false` | Bids never select production speakers |
-| `collaboration.episodeStore` | unset/false | Flag-off: wrap is no-op (calls `executeRound` only) |
-| `collaboration.floor.protocol` | unset/legacy | `floor` accepted and ignored (not live) |
-| `collaboration.floor.shadowStage` | unset | Shadow A/B optional; leave unset |
-| `collaboration.ledger.decisionRecords` | unset/false | No EDR facilitator copy until dual-flag on |
+| Flag / constant                        | Default      | Note                                                |
+| -------------------------------------- | ------------ | --------------------------------------------------- |
+| `FLOOR_LIVE_CUTOVER_DEFAULT`           | `false`      | Unsigned cutover; keep OFF through P3               |
+| `FLOOR_DRIVES_PRODUCTION_DECISION`     | `false`      | Bids never select production speakers               |
+| `collaboration.episodeStore`           | unset/false  | Flag-off: wrap is no-op (calls `executeRound` only) |
+| `collaboration.floor.protocol`         | unset/legacy | `floor` accepted and ignored (not live)             |
+| `collaboration.floor.shadowStage`      | unset        | Shadow A/B optional; leave unset                    |
+| `collaboration.ledger.decisionRecords` | unset/false  | No EDR facilitator copy until dual-flag on          |
 
 Episode records created under the flag still stamp `protocol: "legacy"` in
 `beginSingleBeatEpisodeRuntime` — consistent with Floor not being live.

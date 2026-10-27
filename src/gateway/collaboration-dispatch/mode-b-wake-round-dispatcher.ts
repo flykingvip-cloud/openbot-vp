@@ -84,12 +84,12 @@ export function buildModeBWakeParticipationDecision(params: {
           message: summary,
         },
       ],
-      mentionMode: "explicit",
+      mentionMode: "single_primary",
     },
     lowSignalLimited: false,
     mentionUnmatched: false,
     primaryMode: "single",
-    mentionMode: "explicit",
+    mentionMode: "single_primary",
     primaryQueue: [lead.agentId],
   };
 }

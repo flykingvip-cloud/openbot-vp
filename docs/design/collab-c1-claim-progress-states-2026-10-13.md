@@ -24,15 +24,15 @@ published → claimed → applied → in_progress → submitted_for_review → a
 
 ## RPCs
 
-| Method | Flag | Behavior |
-| --- | --- | --- |
-| `collaboration.task.listBoardItems` | read always | `{ items }` |
-| `collaboration.task.getMemberProgress` | read always | `{ progress }` member table |
-| `collaboration.task.markInProgress` | write needs flag | claimant only |
-| `collaboration.task.submitForReview` | write needs flag | requires UUID submissionId |
-| `collaboration.task.acceptSubmission` | write needs flag | coordinator/owner actor |
-| `collaboration.task.returnSubmission` | write needs flag | reason required |
-| `collaboration.task.blockBoardItem` | write needs flag | optional reason |
+| Method                                 | Flag             | Behavior                    |
+| -------------------------------------- | ---------------- | --------------------------- |
+| `collaboration.task.listBoardItems`    | read always      | `{ items }`                 |
+| `collaboration.task.getMemberProgress` | read always      | `{ progress }` member table |
+| `collaboration.task.markInProgress`    | write needs flag | claimant only               |
+| `collaboration.task.submitForReview`   | write needs flag | requires UUID submissionId  |
+| `collaboration.task.acceptSubmission`  | write needs flag | coordinator/owner actor     |
+| `collaboration.task.returnSubmission`  | write needs flag | reason required             |
+| `collaboration.task.blockBoardItem`    | write needs flag | optional reason             |
 
 ## Non-goals
 

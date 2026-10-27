@@ -1,0 +1,311 @@
+{
+  "schema": "memory-e2e-baseline/v1",
+  "currentLayeredBaseline": "docs/design/evidence/memory-e2e-baseline-v3-post-rework-2026-10-26.json",
+  "currentLayeredBaselineNote": "v1 retained; authoritative layered status model is v3 (v2 superseded).",
+  "phase": "pre",
+  "capturedAtAsiaShanghai": "2026-10-26 11:23:57",
+  "gitHead": "a3e263cc67da94bb031f35e11167dabd67557f71",
+  "datasetVersion": "v1",
+  "datasetPath": "docs/design/evidence/memory-batch1-dataset-v1.json",
+  "scoringRules": {
+    "recallHit": "queryAtoms or manager.search returns target atom/path among hits",
+    "promptConstruction": "untimed_this_batch_no_real_model",
+    "requestSend": "untimed_this_batch_no_real_model",
+    "correctAdoption": "untimed_this_batch_no_real_model",
+    "unauthorizedHit": "queryAtoms hits length must be 0",
+    "deleteAfterRecall": "after forget entry complete-state, same query hit count for target is 0"
+  },
+  "codeIdentity": {
+    "doctorMemoryHealth": "src/gateway/server-methods/doctor-memory-health.ts",
+    "healthProbe": "src/memory/health-probe.ts",
+    "auditScript": "scripts/memory-platform-audit.mjs",
+    "aclTest": "src/memory/query-atoms-acl.test.ts"
+  },
+  "summary": {
+    "total": 22,
+    "passed": 13,
+    "failed": 9
+  },
+  "cases": [
+    {
+      "id": "ISO-1",
+      "scenario": "isolation-path-assert",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "resolvedPaths": [
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/state",
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/data",
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/tenants",
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/workspace-main",
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/state/agents/main/sessions",
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/state/collaboration-shared/groups",
+          "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph/state/openbot.json"
+        ],
+        "isolationRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-batch1-MCayph"
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S1-legal-1",
+      "scenario": "S1",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "hitCount": 8,
+        "hasDeprecated": false
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-unbound-1",
+      "scenario": "S3",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-wrong-owner-1",
+      "scenario": "S3",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-cross-tenant-1",
+      "scenario": "S3",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S2-deprecated-filtered-1",
+      "scenario": "S2",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "deprecatedPresent": false
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S1-legal-2",
+      "scenario": "S1",
+      "repeat": 2,
+      "pass": false,
+      "detail": {
+        "hitCount": 8,
+        "hasDeprecated": false
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-unbound-2",
+      "scenario": "S3",
+      "repeat": 2,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-wrong-owner-2",
+      "scenario": "S3",
+      "repeat": 2,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-cross-tenant-2",
+      "scenario": "S3",
+      "repeat": 2,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S2-deprecated-filtered-2",
+      "scenario": "S2",
+      "repeat": 2,
+      "pass": false,
+      "detail": {
+        "deprecatedPresent": false
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S1-legal-3",
+      "scenario": "S1",
+      "repeat": 3,
+      "pass": false,
+      "detail": {
+        "hitCount": 8,
+        "hasDeprecated": false
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-unbound-3",
+      "scenario": "S3",
+      "repeat": 3,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-wrong-owner-3",
+      "scenario": "S3",
+      "repeat": 3,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-cross-tenant-3",
+      "scenario": "S3",
+      "repeat": 3,
+      "pass": true,
+      "detail": {
+        "hitCount": 0
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S2-deprecated-filtered-3",
+      "scenario": "S2",
+      "repeat": 3,
+      "pass": false,
+      "detail": {
+        "deprecatedPresent": false
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S5-cross-process",
+      "scenario": "S5",
+      "repeat": 1,
+      "pass": true,
+      "detail": {
+        "sameProcessHits": 8,
+        "childStatus": 0,
+        "childStdout": "{\"hitCount\":8}",
+        "childStderr": "(node:77910) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+        "childHitCount": 8
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "H1-backend-misreport",
+      "scenario": "H1",
+      "repeat": 1,
+      "pass": false,
+      "detail": {
+        "configuredBackend": "cogniweave",
+        "probeBackend": "builtin",
+        "reportedBackend": "builtin",
+        "search": "unknown",
+        "misreport": true
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "A1-empty-md-class",
+      "scenario": "A1",
+      "repeat": 1,
+      "pass": false,
+      "detail": {
+        "auditStatus": 0,
+        "emptyClass": "empty-workspace",
+        "recoveryAction": "empty-workspace",
+        "stderr": ""
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S4-forget-1",
+      "scenario": "S4",
+      "repeat": 1,
+      "pass": false,
+      "detail": {
+        "entryMode": "entry-success-but-residual-recall",
+        "deletedPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-forget-1-c3qT5A/data/agents/main/memory/agent/upsilon-forget-1.md",
+        "beforeHits": ["MEMORY.md"],
+        "afterImmediateHits": ["MEMORY.md"],
+        "afterSearchSyncHits": ["MEMORY.md"],
+        "note": "data.memory.forget path only deletes Data Space file; manager lifecycle not chained"
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S4-forget-2",
+      "scenario": "S4",
+      "repeat": 2,
+      "pass": false,
+      "detail": {
+        "entryMode": "entry-success-but-residual-recall",
+        "deletedPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-forget-2-zvZOny/data/agents/main/memory/agent/upsilon-forget-2.md",
+        "beforeHits": ["MEMORY.md"],
+        "afterImmediateHits": ["MEMORY.md"],
+        "afterSearchSyncHits": ["MEMORY.md"],
+        "note": "data.memory.forget path only deletes Data Space file; manager lifecycle not chained"
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S4-forget-3",
+      "scenario": "S4",
+      "repeat": 3,
+      "pass": false,
+      "detail": {
+        "entryMode": "entry-success-but-residual-recall",
+        "deletedPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-mem-forget-3-Ma4xMF/data/agents/main/memory/agent/upsilon-forget-3.md",
+        "beforeHits": ["MEMORY.md"],
+        "afterImmediateHits": ["MEMORY.md"],
+        "afterSearchSyncHits": ["MEMORY.md"],
+        "note": "data.memory.forget path only deletes Data Space file; manager lifecycle not chained"
+      },
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    }
+  ]
+}

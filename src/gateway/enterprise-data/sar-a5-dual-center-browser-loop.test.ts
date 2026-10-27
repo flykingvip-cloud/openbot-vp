@@ -319,6 +319,7 @@ function buildControllableRuntime(opts?: { injectStructureFault?: boolean }): {
     { op: "capture_result", fields: ["query", "items"] },
   ];
   const record: SiteCapabilityRecord = {
+    lifecycle: "approved",
     manifest: {
       schemaVersion: "1",
       id: capabilityId,

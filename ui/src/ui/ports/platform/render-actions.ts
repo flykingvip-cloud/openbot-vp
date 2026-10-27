@@ -52,6 +52,7 @@ import type {
 } from "./capabilities/enterprise-submissions-types.ts";
 import { refreshCapabilityGovernanceSnapshot } from "./capability-governance-gateway.ts";
 import { getOrCreateCapabilityGovernanceViewState } from "./capability-governance-state.ts";
+import { buildPlatformModelDefinitionEntry } from "./models/platform-model-definition.ts";
 
 // Module-level discovery dispatcher with npm + GitHub adapters pre-registered.
 const discoveryDispatcher = new DiscoveryDispatcher([npmAdapter, githubTopicAdapter]);
@@ -96,11 +97,17 @@ export type PlatformModelAddInput = {
   modelId: string;
   name: string;
   api: string;
-  contextWindow: number;
-  maxTokens: number;
+  /** Omit or null when unknown — do not invent 128k/8k defaults. */
+  contextWindow?: number | null;
+  maxTokens?: number | null;
   inputModes: Array<"text" | "image">;
   reasoning: boolean;
   apiKey: string;
+  /**
+   * Executor call type for the platform capability archive / UI labels only.
+   * Must NOT be written into models.providers.*.models[] (ModelDefinitionSchema.strict()).
+   */
+  callType?: "text_chat" | "image_generation" | "music_generation";
 };
 
 export type PlatformModelProviderUpdateInput = {
@@ -183,10 +190,6 @@ function modelEntryId(entry: unknown): string | null {
 function normalizeModelApi(value: string) {
   const trimmed = value.trim();
   return trimmed || "openai-responses";
-}
-
-function normalizePositiveInteger(value: number, fallback: number) {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
 }
 
 function defaultsModelValue(config: ConfigRuntimeView, key: "model" | "imageModel") {
@@ -629,21 +632,16 @@ export function createPlatformPortActions({
         }
         const existingProvider = currentProviderConfig(configRuntime, providerId) ?? {};
         const existingModels = currentProviderModels(configRuntime, providerId);
-        const nextModel = {
-          id: modelId,
-          name: input.name.trim() || modelId,
+        // callType stays out of the model entry — platform capability archive only.
+        const nextModel = buildPlatformModelDefinitionEntry({
+          modelId,
+          name: input.name,
           api: normalizeModelApi(input.api),
           reasoning: input.reasoning,
-          input: input.inputModes.length > 0 ? input.inputModes : ["text"],
-          cost: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-          },
-          contextWindow: normalizePositiveInteger(input.contextWindow, 128000),
-          maxTokens: normalizePositiveInteger(input.maxTokens, 8192),
-        };
+          inputModes: input.inputModes,
+          contextWindow: input.contextWindow,
+          maxTokens: input.maxTokens,
+        });
         const nextProvider = {
           ...existingProvider,
           baseUrl:
@@ -693,8 +691,9 @@ export function createPlatformPortActions({
             cacheRead: 0,
             cacheWrite: 0,
           },
-          contextWindow: normalizePositiveInteger(input.contextWindow ?? 128000, 128000),
-          maxTokens: 8192,
+          ...(input.contextWindow != null && Number(input.contextWindow) > 0
+            ? { contextWindow: Math.floor(Number(input.contextWindow)) }
+            : {}),
         };
         const nextProvider = {
           ...existingProvider,
@@ -772,21 +771,15 @@ export function createPlatformPortActions({
         }
         const existingProvider = currentProviderConfig(configRuntime, providerId) ?? {};
         const existingModels = currentProviderModels(configRuntime, providerId);
-        const nextModel = {
-          id: modelId,
-          name: input.name.trim() || modelId,
+        const nextModel = buildPlatformModelDefinitionEntry({
+          modelId,
+          name: input.name,
           api: normalizeModelApi(input.api),
           reasoning: input.reasoning,
-          input: input.inputModes.length > 0 ? input.inputModes : ["text"],
-          cost: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-          },
-          contextWindow: normalizePositiveInteger(input.contextWindow, 128000),
-          maxTokens: normalizePositiveInteger(input.maxTokens, 8192),
-        };
+          inputModes: input.inputModes,
+          contextWindow: input.contextWindow,
+          maxTokens: input.maxTokens,
+        });
         const nextProvider = {
           ...existingProvider,
           baseUrl:

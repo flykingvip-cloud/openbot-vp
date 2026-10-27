@@ -17,16 +17,16 @@ Repo：`upbeyond/openbot`
 
 字段真相源：`src/gateway/user-operational-identity-providers.ts`、`ui/.../workbench-operational-identity-forms.ts`。
 
-| provider | skill id | 回写字段（表单同构） | 落库 API | S1 |
-|----------|----------|----------------------|----------|----|
-| `wechat-official` | `oi-bind-wechat-official`（委派 `wechat-official-credential`） | 显示名称、AppID、AppSecret；出口 IP 提示（不进配置项，写入微信侧白名单） | `user-operational-identity.credentials.bind`（`wechat_oa`） | 是 |
-| `personal-email` | `oi-bind-personal-email`（包装 Path B/C guidance） | 显示名称、发件邮箱、可选平台代发、SMTP/IMAP*、SMTP 授权码 | `credentials.bind`（`smtp`） | 是 |
-| `github-personal` | `oi-bind-github-personal`（S2） | 显示名称、可选 GitHub 用户名 | `oauth.start` / `oauth.complete` | 否 |
-| `weibo` / `zhihu` / `douyin` / `xiaohongshu` / `kuaishou` / `bilibili` / `x-twitter` | `oi-bind-<provider>`（S3） | 显示名称、账号标识、访问凭证 | `credentials.bind`（`social_account`） | 否 |
-| `wechat-personal` | 文档指向 `wechat-personal-worker-setup` | 本机通道 + 扫码；非云电脑主路径 | `wechat-personal.*` | 仅文档 |
-| `feishu-personal` | — | — | — | 不做（`registrationReady=false`） |
-| * | `oi-grant-owned-bots` | `identityId` + 自有数字人 `agentId` + `agentScope=owned` + `grantMode` | `grants.upsert`（逐个 agent） | 是 |
-| * | `oi-orchestrate-personal-identity` | 编排上述 skill | 不直接写库 | 是 |
+| provider                                                                             | skill id                                                       | 回写字段（表单同构）                                                     | 落库 API                                                    | S1                                |
+| ------------------------------------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------- |
+| `wechat-official`                                                                    | `oi-bind-wechat-official`（委派 `wechat-official-credential`） | 显示名称、AppID、AppSecret；出口 IP 提示（不进配置项，写入微信侧白名单） | `user-operational-identity.credentials.bind`（`wechat_oa`） | 是                                |
+| `personal-email`                                                                     | `oi-bind-personal-email`（包装 Path B/C guidance）             | 显示名称、发件邮箱、可选平台代发、SMTP/IMAP\*、SMTP 授权码               | `credentials.bind`（`smtp`）                                | 是                                |
+| `github-personal`                                                                    | `oi-bind-github-personal`（S2）                                | 显示名称、可选 GitHub 用户名                                             | `oauth.start` / `oauth.complete`                            | 否                                |
+| `weibo` / `zhihu` / `douyin` / `xiaohongshu` / `kuaishou` / `bilibili` / `x-twitter` | `oi-bind-<provider>`（S3）                                     | 显示名称、账号标识、访问凭证                                             | `credentials.bind`（`social_account`）                      | 否                                |
+| `wechat-personal`                                                                    | 文档指向 `wechat-personal-worker-setup`                        | 本机通道 + 扫码；非云电脑主路径                                          | `wechat-personal.*`                                         | 仅文档                            |
+| `feishu-personal`                                                                    | —                                                              | —                                                                        | —                                                           | 不做（`registrationReady=false`） |
+| \*                                                                                   | `oi-grant-owned-bots`                                          | `identityId` + 自有数字人 `agentId` + `agentScope=owned` + `grantMode`   | `grants.upsert`（逐个 agent）                               | 是                                |
+| \*                                                                                   | `oi-orchestrate-personal-identity`                             | 编排上述 skill                                                           | 不直接写库                                                  | 是                                |
 
 ### 存储（只读约定，不改路径）
 
@@ -45,14 +45,14 @@ Repo：`upbeyond/openbot`
 
 ### registrationReady 目录（与代码一致）
 
-| provider | label | authMode | registrationReady |
-|----------|-------|----------|-------------------|
-| github-personal | GitHub（个人） | oauth | true |
-| personal-email | 个人邮箱 | manual / smtp | true |
-| wechat-official | 微信公众号 | manual / wechat_oa | true |
-| weibo … x-twitter | 各社媒 | manual / social_account | true |
-| wechat-personal | 微信个人号 | qr_channel | true（本机） |
-| feishu-personal | 飞书个人账号 | oauth | **false** |
+| provider          | label          | authMode                | registrationReady |
+| ----------------- | -------------- | ----------------------- | ----------------- |
+| github-personal   | GitHub（个人） | oauth                   | true              |
+| personal-email    | 个人邮箱       | manual / smtp           | true              |
+| wechat-official   | 微信公众号     | manual / wechat_oa      | true              |
+| weibo … x-twitter | 各社媒         | manual / social_account | true              |
+| wechat-personal   | 微信个人号     | qr_channel              | true（本机）      |
+| feishu-personal   | 飞书个人账号   | oauth                   | **false**         |
 
 ## S1 — 交付物
 

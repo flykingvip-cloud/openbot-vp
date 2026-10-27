@@ -309,23 +309,23 @@
 
 ### 定案表
 
-| 决策               | 状态       | 定案 / 默认                                                                                     | 生效波次 |
-| ------------------ | ---------- | ----------------------------------------------------------------------------------------------- | -------- |
-| **D-LOGIN**        | 【已定案】 | 独立登录面；Wave 1 不引入 employee MFA；SSO = trusted-proxy 既有入口（通用 OIDC 延后，净新增）  | Wave 1   |
-| **D-MACOS-FORM**   | 【已定案】 | 复用主窗口内嵌 employee 壳，保留菜单栏 companion                                                | Wave 1   |
-| **D-COMPANION-IA** | 【已定案】 | `Me > Device`                                                                                   | Wave 1   |
-| **D-PUSH-SCOPE**   | 【已定案】 | A：Wave 1 深链 + 本地/系统通知；employee 服务端推送（APNs 重绑 + Android FCM，净新增）移 Wave 2 | W1 / W2  |
-| **D-PUSH-W2-TRIGGER** | 【已定案】 | MVP 触发 = **仅 @mention**（挂既有 human-mention inbox；远程投递另实现） | Wave 2 |
-| **D-PUSH-W2-PLATFORM** | 【已定案】 | **iOS APNs 首刀** → Android FCM → Mac 远程后置；**Windows WNS 不在 MVP** | Wave 2 |
-| **D-PUSH-W2-MULTI** | 【已定案】 | 同 `accountId` **多 device registration 并存** | Wave 2 |
-| **D-PUSH-W2-CREDS** | 【已定案】 | 员工 **独立** APNs 配置/topic（不写 node 表）；env 占位见 `contracts/push-model.md`；bundle/topic 值 TBD | Wave 2 |
-| **D-PUSH-W2-CLICK** | 【已定案】 | 复用 Wave 1 `EmployeeNotificationRouter`；强制 `deepLink`；短 title/body；alert；per-accountId token；logout/switch 注销 | Wave 2 |
-| **D-PUSH-W2-RPC** | 【提案待确认】 | 方法名族在 `contracts/push-model.md` 提案；**gateway owner 确认前禁止落码** | Wave 2 |
-| **D-MINCLIENT**    | 【暂定】   | 软门禁（先告警后拒绝）                                                                          | W2 前    |
-| **D-UPLOAD**       | 【暂定】   | 一期图片                                                                                        | W2 前    |
-| **D-PC-STACK**     | 【暂定】   | Tauri                                                                                           | W3 前    |
-| **D-PC-ADMIN**     | 【暂定】   | 是（仅 PC）+ 先 Epic E1                                                                         | W4 前    |
-| **D-RENAME**       | 【暂定】   | 延后（仅保用户可见品牌统一）                                                                    | GA 前    |
+| 决策                   | 状态           | 定案 / 默认                                                                                                              | 生效波次 |
+| ---------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------ | -------- |
+| **D-LOGIN**            | 【已定案】     | 独立登录面；Wave 1 不引入 employee MFA；SSO = trusted-proxy 既有入口（通用 OIDC 延后，净新增）                           | Wave 1   |
+| **D-MACOS-FORM**       | 【已定案】     | 复用主窗口内嵌 employee 壳，保留菜单栏 companion                                                                         | Wave 1   |
+| **D-COMPANION-IA**     | 【已定案】     | `Me > Device`                                                                                                            | Wave 1   |
+| **D-PUSH-SCOPE**       | 【已定案】     | A：Wave 1 深链 + 本地/系统通知；employee 服务端推送（APNs 重绑 + Android FCM，净新增）移 Wave 2                          | W1 / W2  |
+| **D-PUSH-W2-TRIGGER**  | 【已定案】     | MVP 触发 = **仅 @mention**（挂既有 human-mention inbox；远程投递另实现）                                                 | Wave 2   |
+| **D-PUSH-W2-PLATFORM** | 【已定案】     | **iOS APNs 首刀** → Android FCM → Mac 远程后置；**Windows WNS 不在 MVP**                                                 | Wave 2   |
+| **D-PUSH-W2-MULTI**    | 【已定案】     | 同 `accountId` **多 device registration 并存**                                                                           | Wave 2   |
+| **D-PUSH-W2-CREDS**    | 【已定案】     | 员工 **独立** APNs 配置/topic（不写 node 表）；env 占位见 `contracts/push-model.md`；bundle/topic 值 TBD                 | Wave 2   |
+| **D-PUSH-W2-CLICK**    | 【已定案】     | 复用 Wave 1 `EmployeeNotificationRouter`；强制 `deepLink`；短 title/body；alert；per-accountId token；logout/switch 注销 | Wave 2   |
+| **D-PUSH-W2-RPC**      | 【提案待确认】 | 方法名族在 `contracts/push-model.md` 提案；**gateway owner 确认前禁止落码**                                              | Wave 2   |
+| **D-MINCLIENT**        | 【暂定】       | 软门禁（先告警后拒绝）                                                                                                   | W2 前    |
+| **D-UPLOAD**           | 【暂定】       | 一期图片                                                                                                                 | W2 前    |
+| **D-PC-STACK**         | 【暂定】       | Tauri                                                                                                                    | W3 前    |
+| **D-PC-ADMIN**         | 【暂定】       | 是（仅 PC）+ 先 Epic E1                                                                                                  | W4 前    |
+| **D-RENAME**           | 【暂定】       | 延后（仅保用户可见品牌统一）                                                                                             | GA 前    |
 
 ### 问题/Owner/Deadline 明细（追溯）
 

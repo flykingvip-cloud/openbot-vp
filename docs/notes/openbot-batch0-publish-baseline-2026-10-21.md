@@ -1,13 +1,13 @@
 # 批次 0：交付发布基线（openbot-vp）
 
-| 项 | 值 |
-| --- | --- |
-| 日期 | 2026-10-21 |
-| 仓库 | `flykingvip-cloud/openbot-vp`（含网关实现；不是仅 README 的 `flykingvip-cloud/openbot`） |
-| 对照 commit | `645648c49b24ee913fb2909b6ab68762fe714735` |
+| 项               | 值                                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 日期             | 2026-10-21                                                                                                                                                                    |
+| 仓库             | `flykingvip-cloud/openbot-vp`（含网关实现；不是仅 README 的 `flykingvip-cloud/openbot`）                                                                                      |
+| 对照 commit      | `645648c49b24ee913fb2909b6ab68762fe714735`                                                                                                                                    |
 | 与 `origin/main` | 2026-10-21 `git fetch origin main` 后，`origin/main` 与该 SHA **相同**。`git merge-base --is-ancestor 645648c49… origin/main` 为真。盘点基于该工作树 / 默认分支上的网关代码。 |
-| 性质 | 只读盘点 + 实施合同。**无运行时行为变更、不开旗、不放宽权限。** |
-| 行号 | 均相对上述 SHA。 |
+| 性质             | 只读盘点 + 实施合同。**无运行时行为变更、不开旗、不放宽权限。**                                                                                                               |
+| 行号             | 均相对上述 SHA。                                                                                                                                                              |
 
 `readable` 在本文只表示**服务端文件可读**（settle 在无群根时的技术结果）。预览是否打开（路由 / 权限 / 渲染）单列，不等于用户已看到。
 
@@ -15,12 +15,12 @@
 
 ## 1. 路径确认
 
-| 合同路径 | 本树 | 盘点锚点 |
-| --- | --- | --- |
-| `src/gateway/server-methods/chat.ts` | 存在 | `broadcastChatFinal`、`chat.send`、`chat.inject`、`chat.restore` |
-| `src/gateway/workspace-resolver/settle-declared-deliverable.ts` | 存在 | `settleDeclaredDeliverableText`、`settleCollaborationDeclaredDeliverable` |
-| `src/gateway/collaboration-learning/` | 存在 | `claim-contract-entry.ts`（propose / confirm）、`self-advance-entry.ts`、`owner-decision-emit.ts` |
-| `src/gateway/collaboration-dispatch/` | 存在 | `group-task-heartbeat.ts`、`self-advance.ts`、`executor-private-todolist.ts`、`claim-contract.ts` |
+| 合同路径                                                        | 本树 | 盘点锚点                                                                                          |
+| --------------------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------- |
+| `src/gateway/server-methods/chat.ts`                            | 存在 | `broadcastChatFinal`、`chat.send`、`chat.inject`、`chat.restore`                                  |
+| `src/gateway/workspace-resolver/settle-declared-deliverable.ts` | 存在 | `settleDeclaredDeliverableText`、`settleCollaborationDeclaredDeliverable`                         |
+| `src/gateway/collaboration-learning/`                           | 存在 | `claim-contract-entry.ts`（propose / confirm）、`self-advance-entry.ts`、`owner-decision-emit.ts` |
+| `src/gateway/collaboration-dispatch/`                           | 存在 | `group-task-heartbeat.ts`、`self-advance.ts`、`executor-private-todolist.ts`、`claim-contract.ts` |
 
 群心跳引导：`src/gateway/group-task-heartbeat-scheduler-boot.ts` 把 tick 接到 `runCollaborationGroupTaskHeartbeat`。调度器默认休眠：`collaboration.task.groupTaskHeartbeat.schedulerEnabled === true` 才启用（`resolveGroupTaskHeartbeatSchedulerEnabled`）。
 
@@ -38,12 +38,12 @@
 2. 删除 `agentRunSeq` 上的 run。
 3. 若能抽出助手正文，调用 `maybeAutoCaptureAgentDeliverable`。捕获异常被吞掉，注释写明不得打断 final。
 
-| # | 调用点 | 场景 | settle | 载荷 |
-| --- | --- | --- | --- | --- |
-| G1 | `runGroupBotDiscussionTurn` 约 3744 | 群内单个机器人**可见回复**。runId = `` `${clientRunId}:${agentId}` ``，sessionKey = 群 `rawSessionKey` | **之前**调用 `settleCollaborationDeclaredDeliverable`（约 3697） | 已写入群 transcript 的助手消息；登记失败时仍是结算后的正文（见 §3） |
-| G2 | `chat.send` 群回合收尾 约 5197 | 回合结束再发一条 final。runId = 父级 `clientRunId` | 否 | 有中止文案或点名确认文案时带上该消息；正常可见回复时 `message` 为 `undefined`（只关流，不再发第二份成果正文） |
-| D1 | `chat.send` 约 5586 | 点名路由 `skipHostAgent`，宿主代理不再跑 | 否 | **无 message** 的空 final，dedupe 记 `ok: true` |
-| D2 | `chat.send` 约 5793 | **1:1**，且 `onAgentRunStart` 没触发（`agentRunStarted === false`）的回退 | **否** | 有合并正文时先 `appendAssistantTranscriptMessage`，失败则仍用内存消息广播 |
+| #   | 调用点                              | 场景                                                                                                   | settle                                                           | 载荷                                                                                                          |
+| --- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| G1  | `runGroupBotDiscussionTurn` 约 3744 | 群内单个机器人**可见回复**。runId = `` `${clientRunId}:${agentId}` ``，sessionKey = 群 `rawSessionKey` | **之前**调用 `settleCollaborationDeclaredDeliverable`（约 3697） | 已写入群 transcript 的助手消息；登记失败时仍是结算后的正文（见 §3）                                           |
+| G2  | `chat.send` 群回合收尾 约 5197      | 回合结束再发一条 final。runId = 父级 `clientRunId`                                                     | 否                                                               | 有中止文案或点名确认文案时带上该消息；正常可见回复时 `message` 为 `undefined`（只关流，不再发第二份成果正文） |
+| D1  | `chat.send` 约 5586                 | 点名路由 `skipHostAgent`，宿主代理不再跑                                                               | 否                                                               | **无 message** 的空 final，dedupe 记 `ok: true`                                                               |
+| D2  | `chat.send` 约 5793                 | **1:1**，且 `onAgentRunStart` 没触发（`agentRunStarted === false`）的回退                              | **否**                                                           | 有合并正文时先 `appendAssistantTranscriptMessage`，失败则仍用内存消息广播                                     |
 
 G1 在广播前还会把执行账记为 `status: "completed"`（约 3751），**不看** settle 的 `confirmed` / `retryable` / `unwritten` / `conflict`。
 
@@ -51,11 +51,11 @@ G2 在失败且没有可见回复时，**先** `broadcastChatError`（约 5180�
 
 ### 2.2 `chat.ts` 内旁路（自建 `state: "final"`，不进 `broadcastChatFinal`，因此也不进自动捕获）
 
-| # | 方法 | 约行 | 行为 |
-| --- | --- | --- | --- |
-| B1 | `chat.guide.append` | 6026–6034 | transcript 写入成功后 `broadcastChat` + `nodeSendToSession`。runId = `` `guide-${messageId}` ``，seq 固定 0。无 settle、无捕获。 |
-| B2 | `chat.inject` | 6211–6221 | 同上。runId = `` `inject-${messageId}` ``。同行投递 / cron / peer 收据都走这里。 |
-| B3 | `chat.restore` **无 `checkpointId`** | 6733–6743 | 把 `formatSessionContinuityCheckpointRestoreText` 追加进 transcript 后，按 inject 同形广播 final。 |
+| #   | 方法                                 | 约行      | 行为                                                                                                                             |
+| --- | ------------------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| B1  | `chat.guide.append`                  | 6026–6034 | transcript 写入成功后 `broadcastChat` + `nodeSendToSession`。runId = `` `guide-${messageId}` ``，seq 固定 0。无 settle、无捕获。 |
+| B2  | `chat.inject`                        | 6211–6221 | 同上。runId = `` `inject-${messageId}` ``。同行投递 / cron / peer 收据都走这里。                                                 |
+| B3  | `chat.restore` **无 `checkpointId`** | 6733–6743 | 把 `formatSessionContinuityCheckpointRestoreText` 追加进 transcript 后，按 inject 同形广播 final。                               |
 
 `chat.restore` **带 `checkpointId`**（约 6687–6699）成功时只 `respond`，**不**追加恢复文本，**不**广播 final。见 §6。
 
@@ -63,10 +63,10 @@ G2 在失败且没有可见回复时，**先** `broadcastChatError`（约 5180�
 
 `chat.send` 在 `agentRunStarted === true` 时（约 5799–5802）**不再**调用 `broadcastChatFinal`。注释写明回复管线已经持久化并广播。实际出口是 `src/gateway/server-chat.ts` 的 `emitChatFinal`：
 
-| # | 条件 | 约行 | 行为 |
-| --- | --- | --- | --- |
-| A1 | `jobState === "done"` | 715–748 | 普通 1:1 助手 final。协作 space 子会话键直接 return（`space_child_parent_canonical`），避免和 G1 再画一个气泡。 |
-| A2 | `jobState === "error"` 且不支持的图片被软化 | 697–712 | 仍发 `state: "final"`，正文是固定对话句，不是错误态。 |
+| #   | 条件                                        | 约行    | 行为                                                                                                            |
+| --- | ------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
+| A1  | `jobState === "done"`                       | 715–748 | 普通 1:1 助手 final。协作 space 子会话键直接 return（`space_child_parent_canonical`），避免和 G1 再画一个气泡。 |
+| A2  | `jobState === "error"` 且不支持的图片被软化 | 697–712 | 仍发 `state: "final"`，正文是固定对话句，不是错误态。                                                           |
 
 这两条都是直接 `broadcastChat` + `nodeSendToSession`。**不**调用 `settleCollaborationDeclaredDeliverable`，**不**调用 `maybeAutoCaptureAgentDeliverable`。
 
@@ -104,14 +104,14 @@ G1 顺序：
 
 `settleDeclaredDeliverableText`（约 286）：
 
-| 状态 | 写入 | 展示用正文 |
-| --- | --- | --- |
-| `none` | 无 `file=` 则原样返回 | 原文 |
-| `unwritten` | 不确认。可能已尝试写字节但失败则标 `write_failed` | 信封 `unwritten="1"` `settle="declared"` |
-| `conflict` | **不覆盖**群正式根上已有的不同字节 | `settle="conflict"`，群文件保持旧字节 |
+| 状态        | 写入                                                                                                                                                    | 展示用正文                                                            |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `none`      | 无 `file=` 则原样返回                                                                                                                                   | 原文                                                                  |
+| `unwritten` | 不确认。可能已尝试写字节但失败则标 `write_failed`                                                                                                       | 信封 `unwritten="1"` `settle="declared"`                              |
+| `conflict`  | **不覆盖**群正式根上已有的不同字节                                                                                                                      | `settle="conflict"`，群文件保持旧字节                                 |
 | `retryable` | 群磁盘字节已对齐，**清单写入失败**（`manifest_write_failed`）；或群作用域但群根不可用（`missing_tenant` / `locator_failed` / `group_root_unavailable`） | `settle="retryable"`。群根缺失时**禁止**降级成只写个人区的 `readable` |
-| `confirmed` | 代理工作区与群正式根字节一致，并 `upsertGroupSettleManifestDraft` | `settle="confirmed"`，`file=` 改成最终相对路径 |
-| `readable` | **仅无群根**的代理工作区。可把信封正文或已有字节镜像进代理路径 | 正文不打 `settle` |
+| `confirmed` | 代理工作区与群正式根字节一致，并 `upsertGroupSettleManifestDraft`                                                                                       | `settle="confirmed"`，`file=` 改成最终相对路径                        |
+| `readable`  | **仅无群根**的代理工作区。可把信封正文或已有字节镜像进代理路径                                                                                          | 正文不打 `settle`                                                     |
 
 群保留前缀 `runtime/`、`governance/`、`profile/`、`sessions/`、`.git/` 不能当成果目标。文本类扩展名可在工具没写文件时用信封正文落盘；二进制缺字节则 `binary_requires_tool_write`，不发明字节。
 
@@ -141,15 +141,15 @@ G1 顺序：
 
 一条发布记录建议至少这些字段。技术交付态与业务验收态分开：`confirmed` / `readable` 不是任务 `accepted`。
 
-| 字段组 | 建议 | 现状缺口 |
-| --- | --- | --- |
-| 作用域 | `tenantId`、`sessionKey`、可选 `groupId`、可选 `taskId` | 1:1 **允许 `taskId` 为空**。G1 有 groupId；A1 只有 sessionKey + runId |
-| 交付身份与版本 | `logicalId`、`relativePath`、`versionChecksum`（sha256） | settle 返回值有 checksum，**没有**写进聊天事件或幂等存储 |
-| 来源回合 | `clientRunId`、机器人 final 的 `` `${clientRunId}:${agentId}` ``、`messageId` | 各入口 runId 规则不同（guide-/inject-/父 run/子 run） |
-| 技术检查 | `none \| readable \| confirmed \| unwritten \| retryable \| conflict` + `reason` | 只活在 settle 返回值；G1 广播前丢掉 status |
-| 登记 | `manifestOk`、捕获 `deliverableId` | 清单失败仍广播；捕获结果不回写事件 |
-| 发布 | `broadcastChat` 与 `nodeSendToSession` 是否已尝试 | 没有投递回执。失败与成功都可能已写出 transcript |
-| 失败原因 | settle `reason`、捕获异常、transcript `error` | settle 抛错只进网关 warn，正文仍是原回复 |
+| 字段组         | 建议                                                                             | 现状缺口                                                              |
+| -------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 作用域         | `tenantId`、`sessionKey`、可选 `groupId`、可选 `taskId`                          | 1:1 **允许 `taskId` 为空**。G1 有 groupId；A1 只有 sessionKey + runId |
+| 交付身份与版本 | `logicalId`、`relativePath`、`versionChecksum`（sha256）                         | settle 返回值有 checksum，**没有**写进聊天事件或幂等存储              |
+| 来源回合       | `clientRunId`、机器人 final 的 `` `${clientRunId}:${agentId}` ``、`messageId`    | 各入口 runId 规则不同（guide-/inject-/父 run/子 run）                 |
+| 技术检查       | `none \| readable \| confirmed \| unwritten \| retryable \| conflict` + `reason` | 只活在 settle 返回值；G1 广播前丢掉 status                            |
+| 登记           | `manifestOk`、捕获 `deliverableId`                                               | 清单失败仍广播；捕获结果不回写事件                                    |
+| 发布           | `broadcastChat` 与 `nodeSendToSession` 是否已尝试                                | 没有投递回执。失败与成功都可能已写出 transcript                       |
+| 失败原因       | settle `reason`、捕获异常、transcript `error`                                    | settle 抛错只进网关 warn，正文仍是原回复                              |
 
 幂等键（合同，尚未实现）：
 
@@ -170,15 +170,15 @@ G1 顺序：
 
 演员来源：协作 RPC 用 `resolveDeliveryAclActor`（会话主体）。self_advance **不**调用 submit / accept。
 
-| 动作 | 执行者（认领人 / 计划所有者） | 协调者 | 授权人（看板 `publishedBy`，且成员表为 active） | self_advance | 代码现状 |
-| --- | --- | --- | --- | --- | --- |
-| 生成计划候选 `proposeTodolist` | **仅所有者**。`proposedBy !== ownerMemberId` → `actor_not_owner` | 不能代提 | 不能代提 | 不调用 | `executor-private-todolist.ts` `proposeTodolist`。默认新 `todolistId`（UUID） |
-| 技术 settle / 登记 | 群回合里当前机器人，无第二道角色校验 | 不单独调用 | 不单独调用 | 不调用 | 仅 G1。写盘 + 群清单。失败仍广播 |
-| `submitForReview` | **仅认领人** `requireClaimantActor` → 否则 `actor_not_claimant` | 除非自己就是认领人，否则不能交卷 | 同左 | **不** submit / accept / finalize（文件头写明） | 须 UUID `submissionId` + 非空 `artifactVersion` + 非空正文。同 id 同版本幂等；不同版本 `submission_version_clash`。旗标 `claimContract` 关则 `flag_off` |
-| accept / finalize | 函数体**没有**「必须是协调者/授权人」检查。任何能解析出的 `actorId` 都会进入 `acceptBoardItemSubmission` | 注释写协调者/所有者；**实现未再校验该角色** | 同左 | **不得**（代码路径不调用） | 必须 `expectedSubmissionId` 等于当前 pending，否则 `expected_submission_id_required` 或拒绝陈旧/错误 id。须写 reason，并勾齐看板验收标准。`requirePeerReview` 开时还要 ≥1 条非作者评审；旗标关则这道闸不生效。晚到的 accept（状态已不是 `submitted_for_review`）拒绝 |
-| return / 驳回 | 同样**没有**协调者角色校验，只要有 `actorId` | 同 accept | 同 accept | 不调用 | 绑 `expectedSubmissionId`。成功后清掉 pending `submissionId` / `artifactVersion`，避免旧 id 再被 accept。并 best-effort 唤醒认领人 |
-| 确认 Todolist | 所有者默认**不能**自确认，除非该 id 同时在授权确认人或协调者名单里 | 可以，且必须在 operating state 里是 **active** 成员 | `publishedBy` 且 active 才进入 `authorizedConfirmerIds` | 不调用 | 见下方「待复现」 |
-| wake / heartbeat 推进 | — | 心跳 escalate 目标含协调者 / 群主配置 | — | 默认 **dry_run**。`execute` 还要 `mode=execute` 且群在 `executeGroupAllowlist`。L2 `botMaySelfAdvanceWithoutHuman` 平台默认 false。五条资格全过才允许推进，且 `decisionMode` 必须仍是 `human_required` | 心跳调度默认关。写模式默认 `observe`；`emit` 还要 Wake Contract 开，并且配置为 emit 或群在 `emitGroupAllowlist`。未认领桥接只在非 dry-run 且 self_advance 写模式为 execute 时尝试 |
+| 动作                           | 执行者（认领人 / 计划所有者）                                                                            | 协调者                                              | 授权人（看板 `publishedBy`，且成员表为 active）         | self_advance                                                                                                                                                                                           | 代码现状                                                                                                                                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 生成计划候选 `proposeTodolist` | **仅所有者**。`proposedBy !== ownerMemberId` → `actor_not_owner`                                         | 不能代提                                            | 不能代提                                                | 不调用                                                                                                                                                                                                 | `executor-private-todolist.ts` `proposeTodolist`。默认新 `todolistId`（UUID）                                                                                                                                                                                        |
+| 技术 settle / 登记             | 群回合里当前机器人，无第二道角色校验                                                                     | 不单独调用                                          | 不单独调用                                              | 不调用                                                                                                                                                                                                 | 仅 G1。写盘 + 群清单。失败仍广播                                                                                                                                                                                                                                     |
+| `submitForReview`              | **仅认领人** `requireClaimantActor` → 否则 `actor_not_claimant`                                          | 除非自己就是认领人，否则不能交卷                    | 同左                                                    | **不** submit / accept / finalize（文件头写明）                                                                                                                                                        | 须 UUID `submissionId` + 非空 `artifactVersion` + 非空正文。同 id 同版本幂等；不同版本 `submission_version_clash`。旗标 `claimContract` 关则 `flag_off`                                                                                                              |
+| accept / finalize              | 函数体**没有**「必须是协调者/授权人」检查。任何能解析出的 `actorId` 都会进入 `acceptBoardItemSubmission` | 注释写协调者/所有者；**实现未再校验该角色**         | 同左                                                    | **不得**（代码路径不调用）                                                                                                                                                                             | 必须 `expectedSubmissionId` 等于当前 pending，否则 `expected_submission_id_required` 或拒绝陈旧/错误 id。须写 reason，并勾齐看板验收标准。`requirePeerReview` 开时还要 ≥1 条非作者评审；旗标关则这道闸不生效。晚到的 accept（状态已不是 `submitted_for_review`）拒绝 |
+| return / 驳回                  | 同样**没有**协调者角色校验，只要有 `actorId`                                                             | 同 accept                                           | 同 accept                                               | 不调用                                                                                                                                                                                                 | 绑 `expectedSubmissionId`。成功后清掉 pending `submissionId` / `artifactVersion`，避免旧 id 再被 accept。并 best-effort 唤醒认领人                                                                                                                                   |
+| 确认 Todolist                  | 所有者默认**不能**自确认，除非该 id 同时在授权确认人或协调者名单里                                       | 可以，且必须在 operating state 里是 **active** 成员 | `publishedBy` 且 active 才进入 `authorizedConfirmerIds` | 不调用                                                                                                                                                                                                 | 见下方「待复现」                                                                                                                                                                                                                                                     |
+| wake / heartbeat 推进          | —                                                                                                        | 心跳 escalate 目标含协调者 / 群主配置               | —                                                       | 默认 **dry_run**。`execute` 还要 `mode=execute` 且群在 `executeGroupAllowlist`。L2 `botMaySelfAdvanceWithoutHuman` 平台默认 false。五条资格全过才允许推进，且 `decisionMode` 必须仍是 `human_required` | 心跳调度默认关。写模式默认 `observe`；`emit` 还要 Wake Contract 开，并且配置为 emit 或群在 `emitGroupAllowlist`。未认领桥接只在非 dry-run 且 self_advance 写模式为 execute 时尝试                                                                                    |
 
 确认 Todolist 的加载：`confirmTodolist` 用 `taskId + todolistId` 调 `loadExecutorTodolist` → `latestById`（同一 id 的日志最后一行）。RPC schema `CollaborationTaskConfirmTodolistParamsSchema` 只有 `groupId`、`taskId`、`todolistId`，**没有预期计划版本**。卡片上的 `version` 不回传。
 
@@ -266,10 +266,10 @@ G1 顺序：
 
 `src/gateway/collaboration-learning/owner-decision-emit.ts`
 
-| `reason` | 约行 | 含义 |
-| --- | --- | --- |
-| `build_failed` | 351–352 | 卡片建不出来，`ok: false` |
-| `transcript_header` | 371–376 | 群公共 transcript 头写失败 |
+| `reason`            | 约行    | 含义                                                       |
+| ------------------- | ------- | ---------------------------------------------------------- |
+| `build_failed`      | 351–352 | 卡片建不出来，`ok: false`                                  |
+| `transcript_header` | 371–376 | 群公共 transcript 头写失败                                 |
 | `transcript_append` | 394–399 | `appendPersistedAgentMessageToTranscript` 返回 `ok: false` |
 
 `no_active_confirmer` / `idempotent_exists` 是 `ok: true, skipped: true`，不算 emit 失败。跳过时提案同样返回成功，聊天里没有新卡片。

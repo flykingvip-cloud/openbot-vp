@@ -1,11 +1,11 @@
 # Collab — align submit/accept RPC schema with S3 versioning
 
-| Field | Value |
-| --- | --- |
-| Date | 2026-10-15 Asia/Shanghai |
-| Status | Code ready; **flags unchanged (default OFF)** |
-| Depends | #737 S3 submit-review-versioning (entry + claim-contract) |
-| Code | `src/gateway/protocol/schema/collaboration.ts`, schema unit test |
+| Field   | Value                                                            |
+| ------- | ---------------------------------------------------------------- |
+| Date    | 2026-10-15 Asia/Shanghai                                         |
+| Status  | Code ready; **flags unchanged (default OFF)**                    |
+| Depends | #737 S3 submit-review-versioning (entry + claim-contract)        |
+| Code    | `src/gateway/protocol/schema/collaboration.ts`, schema unit test |
 
 ## Why
 
@@ -19,11 +19,11 @@ Entry (`claim-contract-entry.ts`) and claim-contract already require S3 fields; 
 
 ## Behavior
 
-| Method | Required S3 fields after align |
-| --- | --- |
-| `submitForReview` | `submissionId`, `artifactVersion` (+ optional `submissionSummary`) |
+| Method             | Required S3 fields after align                                                                             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| `submitForReview`  | `submissionId`, `artifactVersion` (+ optional `submissionSummary`)                                         |
 | `acceptSubmission` | `expectedSubmissionId`, `reason`, `checkedAcceptanceCriteria` (+ optional `proxyForActorId`, `proxyBasis`) |
-| `returnSubmission` | `reason`, `expectedSubmissionId` |
+| `returnSubmission` | `reason`, `expectedSubmissionId`                                                                           |
 
 `additionalProperties: false` retained. Business rules (version match, criteria coverage, proxy basis) stay in claim-contract / entry — schema only admits the fields.
 

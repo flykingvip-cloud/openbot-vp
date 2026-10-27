@@ -14,6 +14,7 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   acceptCollaborationTaskHandoffContract,
   applyCollaborationTaskHandoffContract,
@@ -140,7 +141,7 @@ describe("P4a handoff contract production entry", () => {
     ).rejects.toThrow(/proposeHandoff → acceptHandoff → approveHandoff → applyApprovedHandoff/);
 
     const { objectStorage } = createWorkspaceCollaborationStores();
-    const persisted = await objectStorage.readObject<Task>(groupId, "task", seed.taskId);
+    const persisted = await objectStorage.readObject<GovernedTask>(groupId, "task", seed.taskId);
     expect(persisted?.ownerMemberId).toBe("bot-a");
     expect(persisted?.responsibility?.owner ?? "bot-a").toBe("bot-a");
   });
@@ -198,7 +199,7 @@ describe("P4a handoff contract production entry", () => {
     expect(applied.responsibility?.executors).toEqual(["bot-a"]);
 
     const { objectStorage } = createWorkspaceCollaborationStores();
-    const persisted = await objectStorage.readObject<Task>(groupId, "task", seed.taskId);
+    const persisted = await objectStorage.readObject<GovernedTask>(groupId, "task", seed.taskId);
     expect(persisted?.ownerMemberId).toBe("bot-b");
     expect(persisted?.responsibility?.owner).toBe("bot-b");
   });

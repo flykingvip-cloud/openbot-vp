@@ -91,7 +91,20 @@ export async function confirmPendingTurnDelivery(params: {
   }
 
   // R85e: persistRoot alone cannot locate a record — need runId / deliveryId / taskId.
+  // askOutcome P1: observe missing locators; never guess session pending or clear.
   if (!runId && !deliveryId && !taskId) {
+    logVerbose(
+      [
+        "event=confirm_skipped_no_locator_ids",
+        "source=confirmPendingTurnDelivery",
+        `hasRunId=0`,
+        `hasDeliveryId=0`,
+        `hasTaskId=0`,
+        `hasSessionKey=${sessionKey ? 1 : 0}`,
+        `persistScopeResolvable=${persistRoot ? 1 : 0}`,
+        `status=${params.status}`,
+      ].join(" "),
+    );
     return;
   }
 

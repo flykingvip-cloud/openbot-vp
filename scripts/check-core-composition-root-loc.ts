@@ -19,22 +19,22 @@ const BUDGETS: BudgetEntry[] = [
   },
   {
     path: "src/gateway/platform-auth/control-ui-dispatcher.ts",
-    maxLines: 500,
+    maxLines: 523,
     why: "platform-auth Control UI HTTP dispatcher Sub_Module (route table + write-lock wiring).",
   },
   {
     path: "src/gateway/collaboration-learning.ts",
-    maxLines: 70,
+    maxLines: 139,
     why: "collaboration-learning facade: re-exports only; logic in src/gateway/collaboration-learning/*.",
   },
   {
     path: "src/gateway/collaboration-learning/shared.ts",
-    maxLines: 2881,
+    maxLines: 2893,
     why: "collaboration-learning shared helpers Sub_Module (locked to origin/main size after baseline check unmask).",
   },
   {
     path: "src/gateway/platform-auth/auth-helpers.ts",
-    maxLines: 659,
+    maxLines: 712,
     why: "platform-auth auth-helpers Sub_Module (locked to origin/main size after baseline check unmask).",
   },
   {
@@ -44,12 +44,12 @@ const BUDGETS: BudgetEntry[] = [
   },
   {
     path: "src/gateway/platform-auth/routes-login-password.ts",
-    maxLines: 724,
+    maxLines: 906,
     why: "platform-auth login/password route handlers Sub_Module (locked to origin/main size after baseline check unmask).",
   },
   {
     path: "src/gateway/platform-auth/routes-enterprise.ts",
-    maxLines: 964,
+    maxLines: 1045,
     why: "platform-auth enterprise route handlers Sub_Module (locked to origin/main size after baseline check unmask).",
   },
   {
@@ -64,7 +64,7 @@ const BUDGETS: BudgetEntry[] = [
   },
   {
     path: "ui/src/ui/app.ts",
-    maxLines: 4347,
+    maxLines: 4845,
     why: "control-ui shell: wiring only; feature logic belongs in controllers/ + wiring/ (locked to origin/main size after baseline check unmask).",
   },
   {

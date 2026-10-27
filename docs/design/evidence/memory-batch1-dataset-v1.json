@@ -1,0 +1,188 @@
+{
+  "schema": "memory-batch1-dataset/v1",
+  "version": "v1",
+  "createdAtAsiaShanghai": "2026-10-26T11:21:00+08:00",
+  "seed": 20261026,
+  "scoringRules": {
+    "recallHit": "queryAtoms or manager.search returns target atom/path among hits",
+    "promptConstruction": "untimed_this_batch_no_real_model",
+    "requestSend": "untimed_this_batch_no_real_model",
+    "correctAdoption": "untimed_this_batch_no_real_model",
+    "unauthorizedHit": "queryAtoms hits length must be 0",
+    "deleteAfterRecall": "after forget entry complete-state, same query hit count for target is 0"
+  },
+  "scenarioCoverage": [
+    { "id": "S1", "name": "save-then-new-session-recall", "repeats": 3 },
+    { "id": "S2", "name": "update-deprecate-conflict", "repeats": 3 },
+    { "id": "S3", "name": "scope-isolation-acl", "repeats": 3 },
+    { "id": "S4", "name": "forget-entry-before-after", "repeats": 3 },
+    { "id": "S5", "name": "cross-process-persistence", "repeats": 3 },
+    { "id": "H1", "name": "health-probe-known-misreport", "repeats": 3 },
+    { "id": "A1", "name": "audit-empty-md-misclassify", "repeats": 3 }
+  ],
+  "positiveFacts": [
+    {
+      "id": "P01",
+      "statement": "Batch1FactAlpha preference is morning tea with lemon.",
+      "tags": ["preference", "S1"]
+    },
+    {
+      "id": "P02",
+      "statement": "Batch1FactBeta office is on Floor 12 Room 1208.",
+      "tags": ["fact", "S1"]
+    },
+    {
+      "id": "P03",
+      "statement": "Batch1FactGamma shipping address uses postal code 200120.",
+      "tags": ["fact", "S1"]
+    },
+    {
+      "id": "P04",
+      "statement": "Batch1FactDelta calendar timezone is Asia/Shanghai.",
+      "tags": ["preference", "S1"]
+    },
+    {
+      "id": "P05",
+      "statement": "Batch1FactEpsilon project codename is Orchid Bridge.",
+      "tags": ["project", "S1"]
+    },
+    {
+      "id": "P06",
+      "statement": "Batch1FactZeta weekly standup is every Tuesday 10:00.",
+      "tags": ["schedule", "S1"]
+    },
+    {
+      "id": "P07",
+      "statement": "Batch1FactEta VPN profile name is corp-edge-primary.",
+      "tags": ["infra", "S1"]
+    },
+    {
+      "id": "P08",
+      "statement": "Batch1FactTheta printer queue is PRINT-EAST-03.",
+      "tags": ["infra", "S1"]
+    },
+    {
+      "id": "P09",
+      "statement": "Batch1FactIota preferred language for memos is zh-CN.",
+      "tags": ["preference", "S1"]
+    },
+    {
+      "id": "P10",
+      "statement": "Batch1FactKappa expense policy limit for meals is 200 CNY.",
+      "tags": ["policy", "S1"]
+    },
+    {
+      "id": "P11",
+      "statement": "Batch1FactLambda backup vault label is vault-orchid-01.",
+      "tags": ["infra", "S5"]
+    },
+    {
+      "id": "P12",
+      "statement": "Batch1FactMu release train cadence is biweekly.",
+      "tags": ["process", "S5"]
+    },
+    {
+      "id": "P13",
+      "statement": "Batch1FactNu oncall rotation starts with Alice then Bob.",
+      "tags": ["process", "S5"]
+    },
+    {
+      "id": "P14",
+      "statement": "Batch1FactXi feature flag memory_batch1_probe is default off.",
+      "tags": ["config", "S5"]
+    },
+    {
+      "id": "P15",
+      "statement": "Batch1FactOmicron docs root is docs/design/evidence.",
+      "tags": ["docs", "S1"]
+    },
+    {
+      "id": "P16",
+      "statement": "Batch1FactPi staging tenant id is tenant-batch1-a.",
+      "tags": ["tenant", "S3"]
+    },
+    {
+      "id": "P17",
+      "statement": "Batch1FactRho agent main owns private scope ws-batch1-a.",
+      "tags": ["acl", "S3"]
+    },
+    {
+      "id": "P18",
+      "statement": "Batch1FactSigma conflict pair marker uses statement version 1.",
+      "tags": ["conflict", "S2"]
+    },
+    {
+      "id": "P19",
+      "statement": "Batch1FactTau updated value after revise is TAU-REVISED-42.",
+      "tags": ["update", "S2"]
+    },
+    {
+      "id": "P20",
+      "statement": "Batch1FactUpsilon forget target phrase is UpsilonForgetUniqueToken.",
+      "tags": ["forget", "S4"]
+    },
+    {
+      "id": "P21",
+      "statement": "Batch1FactPhi secondary recall phrase is PhiPersistAcrossRestart.",
+      "tags": ["persist", "S5"]
+    },
+    {
+      "id": "P22",
+      "statement": "Batch1FactChi empty-md agent still has synthetic atoms for audit.",
+      "tags": ["audit", "A1"]
+    }
+  ],
+  "negativeFacts": [
+    {
+      "id": "N01",
+      "statement": "Batch1NegIrrelevant weather on Mars is mild.",
+      "tags": ["irrelevant", "S1"]
+    },
+    {
+      "id": "N02",
+      "statement": "Batch1NegWrongOwner secret belongs to agent-other.",
+      "tags": ["acl", "S3"]
+    },
+    {
+      "id": "N03",
+      "statement": "Batch1NegCrossTenant data for tenant-batch1-b only.",
+      "tags": ["acl", "S3"]
+    },
+    {
+      "id": "N04",
+      "statement": "Batch1NegDeprecated should not surface after deprecate.",
+      "tags": ["deprecated", "S2"]
+    },
+    {
+      "id": "N05",
+      "statement": "Batch1NegDeleted UpsilonForgetUniqueToken after forget.",
+      "tags": ["forget", "S4"]
+    },
+    {
+      "id": "N06",
+      "statement": "Batch1NegUnbound caller must see empty hits.",
+      "tags": ["acl", "S3"]
+    },
+    {
+      "id": "N07",
+      "statement": "Batch1NegConflictLoser statement version 0 is superseded.",
+      "tags": ["conflict", "S2"]
+    },
+    {
+      "id": "N08",
+      "statement": "Batch1NegOtherScope private note for agent-beta.",
+      "tags": ["acl", "S3"]
+    },
+    {
+      "id": "N09",
+      "statement": "Batch1NegNoise random UUID 8f3c2a1b-noise.",
+      "tags": ["noise", "S1"]
+    },
+    {
+      "id": "N10",
+      "statement": "Batch1NegHealthBuiltinLie is not a storage health signal.",
+      "tags": ["health", "H1"]
+    },
+    { "id": "N11", "statement": "Batch1NegAuditEmptyMdIsNotAlwaysP0.", "tags": ["audit", "A1"] }
+  ]
+}

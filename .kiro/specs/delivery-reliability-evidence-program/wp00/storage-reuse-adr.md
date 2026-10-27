@@ -11,15 +11,15 @@
 
 ## 已观察的可复用存储面（E0）
 
-| 面 | 位置 | 已见能力 | 缺口 |
-| --- | --- | --- | --- |
-| 交接事实 | `handoffsDir` 下 `*.txn` + task log（`handoff-contract.ts`） | 事务文件、roll-forward、锁 `withRoundLock` | `recoverPendingHandoffTxns` 未挂启动路径 |
-| 外发队列 | `src/infra/outbound/delivery-queue.ts` | `recoverPendingDeliveries` 已在 `server.impl` 启动调用 | 与 handoff 恢复分离；不可混用语义 |
-| Fabric 审计 | `createFabricAuditStore` 注入 Gateway | 进程内容量审计 | 非跨进程权威账本 |
-| completion-hold | `execution-preflight/completion-hold.ts` | 收据/hold | 注释指向 in-memory；不可当跨重启权威 |
-| 编排 | `src/task-orchestration/*` ledger/bridge | 观测与只读 invoke | live invoke 冻结；未见生产租约/fencing 实体 |
-| 进化/效果 | evolution-control / governance stores | 实验绑定、效果核验接口 | 内存 store 工厂 ≠ 生产持久化证明 |
-| 正式交付目录 | formal-deliverable-root / knowledge deliverables | 产物落盘与 settle | 与任务结果信封需 WP-01 对齐 |
+| 面              | 位置                                                         | 已见能力                                               | 缺口                                        |
+| --------------- | ------------------------------------------------------------ | ------------------------------------------------------ | ------------------------------------------- |
+| 交接事实        | `handoffsDir` 下 `*.txn` + task log（`handoff-contract.ts`） | 事务文件、roll-forward、锁 `withRoundLock`             | `recoverPendingHandoffTxns` 未挂启动路径    |
+| 外发队列        | `src/infra/outbound/delivery-queue.ts`                       | `recoverPendingDeliveries` 已在 `server.impl` 启动调用 | 与 handoff 恢复分离；不可混用语义           |
+| Fabric 审计     | `createFabricAuditStore` 注入 Gateway                        | 进程内容量审计                                         | 非跨进程权威账本                            |
+| completion-hold | `execution-preflight/completion-hold.ts`                     | 收据/hold                                              | 注释指向 in-memory；不可当跨重启权威        |
+| 编排            | `src/task-orchestration/*` ledger/bridge                     | 观测与只读 invoke                                      | live invoke 冻结；未见生产租约/fencing 实体 |
+| 进化/效果       | evolution-control / governance stores                        | 实验绑定、效果核验接口                                 | 内存 store 工厂 ≠ 生产持久化证明            |
+| 正式交付目录    | formal-deliverable-root / knowledge deliverables             | 产物落盘与 settle                                      | 与任务结果信封需 WP-01 对齐                 |
 
 ## 决定
 

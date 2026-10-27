@@ -275,7 +275,7 @@ describe("S5 limited self_advance contracts", () => {
       triggerSource: "test:l2_off",
     });
     expect(r1.ok && !r1.advanced).toBe(true);
-    if (r1.ok) {
+    if (r1.ok && !r1.advanced) {
       expect(r1.reason).toBe("l2_bot_may_self_advance");
       expect(r1.executed).toBe(false);
       expect(r1.writeMode).toBe("dry_run");
@@ -290,7 +290,7 @@ describe("S5 limited self_advance contracts", () => {
       triggerSource: "test:no_task",
     });
     expect(r2.ok && !r2.advanced).toBe(true);
-    if (r2.ok) {
+    if (r2.ok && !r2.advanced) {
       expect(r2.reason).toBe("active_unaccepted_board");
     }
 
@@ -302,7 +302,7 @@ describe("S5 limited self_advance contracts", () => {
       triggerSource: "test:onboarding",
     });
     expect(r3.ok && !r3.advanced).toBe(true);
-    if (r3.ok) {
+    if (r3.ok && !r3.advanced) {
       expect(r3.reason).toBe("mission_not_onboarding");
     }
   });

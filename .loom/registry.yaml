@@ -9619,6 +9619,11 @@ tasks:
       - src/gateway/protocol/index.ts
       - src/gateway/collaboration-dispatch/task-runtime.ts
       - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/task-control-cas.ts
+      - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     state: active
     sessions:
       - id: t30u-u1-boundary-20261026
@@ -9667,19 +9672,51 @@ tasks:
       - u3-wake-idempotent-resume
       - wl2-wake-idempotent-resume
     paths:
+      - src/gateway/collaboration-dispatch/wake-op-ledger.ts
       - src/gateway/collaboration-dispatch/wake-contract.ts
       - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
       - src/gateway/collaboration-learning/wake-contract-entry.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
-    state: ready
+    state: active
     sessions:
       - id: t29u-u3-1792978430
         taskId: u3-wake-idempotent-resume:协作小组
         ide: cursor
         agent: 协作小组
-        status: active
+        status: done
         lastSignalAt: 2026-10-26T01:33:51.109Z
+        metadata: {}
+      - id: t31u-u3-wake-20261026
+        taskId: u3-wake-idempotent-resume:协作小组
+        ide: cursor
+        agent: 协作小组/u3-wake
+        status: active
+        lastSignalAt: 2026-10-26T03:00:20.069Z
+        metadata:
+          org: 协作小组
+          executor: 协作小组/u3-wake
+          t31u: true
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: memory-system-review-2026-10-26:grok-bot
+    owner: grok-bot
+    intent:
+      - Revise memory review report and optimization plan per audit agent
+        feedback; docs only; no implementation
+    paths:
+      - docs/design/memory-system-review-report-2026-10-26.md
+      - docs/design/memory-system-optimization-plan-2026-10-26.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: rev-audit-2026-10-26-a
+        taskId: memory-system-review-2026-10-26:grok-bot
+        ide: cursor
+        agent: grok-bot
+        status: active
+        lastSignalAt: 2026-10-26T02:55:24.440Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-26
@@ -9745,7 +9782,7 @@ tasks:
       - src/commands/agent/model-governance.test.ts
       - src/commands/agent/model-governance.fallback.test.ts
       - .loom/registry.yaml
-    state: active
+    state: landed
     sessions: []
     ownerHistory: []
     since: 2026-10-26
@@ -9827,49 +9864,12 @@ landingStreams:
     landingPolicy: serial
     paths:
       - .loom/registry.yaml
-      - packages/aor-core/src/parser.ts
-      - packages/aor-core/src/parser.test.ts
-      - packages/aor-core/src/selector.ts
-      - packages/aor-core/src/selector.test.ts
-      - packages/aor-core/src/task-types.ts
-      - packages/aor-core/src/types.ts
-      - src/agents/subagent-spawn.ts
-      - src/auto-reply/reply/agent-runner-execution.ts
-      - src/auto-reply/reply/followup-runner.ts
-      - src/cron/isolated-agent/run.ts
-      - src/gateway/model-entitlement/employee-model-gate.ts
-      - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
-      - src/gateway/model-entitlement/task-capability-plan.ts
-      - src/gateway/model-entitlement/task-capability-plan.test.ts
-      - src/gateway/model-entitlement/run-context-estimate.ts
-      - src/gateway/model-entitlement/run-context-estimate.test.ts
-      - src/gateway/model-entitlement/child-task-aor-reorder.ts
-      - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
-      - src/gateway/model-entitlement/capability-entry-consume.ts
-      - src/gateway/model-entitlement/capability-entry-consume.test.ts
-      - src/task-outcome/types.ts
-      - src/gateway/governance/spawn-snapshot-handoff.ts
-      - src/gateway/governance/decision.ts
-      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
-      - src/gateway/model-entitlement/child-spawn-capability-routing.test.ts
-      - src/task-outcome/capability-modality.ts
-      - src/task-outcome/capability-modality.test.ts
-      - src/task-outcome/runtime-from-runner.ts
-      - src/task-outcome/runtime-from-runner.test.ts
-      - src/task-outcome/transitions.ts
-      - src/task-outcome/result-service.ts
-      - src/task-outcome/entrypoints/chat.ts
-      - src/commands/agent/model-governance.test.ts
-      - src/commands/agent/model-governance.fallback.test.ts
-    canLandWith:
-      - askOutcome-p0-task-outcome-contract
-      - askOutcome-p0-r83-remediation
-      - p0a-p0-task-capability-plan
+    canLandWith: []
     metadata:
       task: p1-task-driven-aor-scoring
       owner: grok-bot
       reviewAfter: "2026-11-30"
-      convergeNote: after-merge trim hot paths; sharedPaths landers remain authoritative
+      convergeNote: post-#86 landed; hot paths trimmed; sharedPaths landers remain authoritative
       purpose: P1 current-task-driven AOR scoring, CJK/parent quality, full context
         constraints, executor_unwired outcome claims
 
@@ -9920,8 +9920,7 @@ landingStreams:
       - docs/design/task-outcome/contract.md
       - docs/design/task-outcome/call-chain-and-replacements.md
       - src/task-outcome/**
-    canLandWith:
-      - p1-task-driven-aor-scoring
+    canLandWith: []
     metadata:
       task: askOutcome-p0-r83-remediation
       owner: executor-acceptance
@@ -9952,8 +9951,7 @@ landingStreams:
       - src/task-outcome/entrypoints/collab.ts
       - src/task-outcome/runtime-from-runner.ts
       - src/task-outcome/runtime-from-runner.test.ts
-    canLandWith:
-      - p1-task-driven-aor-scoring
+    canLandWith: []
     metadata:
       task: askOutcome-p0-task-outcome-contract
       owner: executor-acceptance
@@ -9975,8 +9973,7 @@ landingStreams:
       - src/gateway/user-operational-identity-execution.p0a.test.ts
       - src/gateway/user-operational-identity-social-execution.ts
       - src/gateway/user-operational-identity-social-execution.p0a.test.ts
-    canLandWith:
-      - p1-task-driven-aor-scoring
+    canLandWith: []
     metadata:
       task: p0a-p0-task-capability-plan
       owner: grok-bot
@@ -9991,6 +9988,7 @@ landingStreams:
       - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/full-entrypoint-race-migration.evidence.test.ts
       - src/gateway/collaboration-learning/handoff-contract-entry.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/self-advance-entry.ts
@@ -10007,6 +10005,11 @@ landingStreams:
       - src/gateway/protocol/index.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/task-control-cas.ts
+      - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     canLandWith:
       - COLLAB_RESIDUAL_B_TOOL_LOOP
       - batch2-reliable-confirm-cards
@@ -19303,6 +19306,7 @@ landingStreams:
       - src/telegram/sticker-cache.ts
       - scripts/check-isolation-fail-closed.mjs
       - scripts/memory-platform-audit.mjs
+      - scripts/memory-platform-audit.d.mts
       - scripts/memory-platform-recovery.mjs
       - scripts/governance/shadow-decisions-report.ts
       - scripts/__tests__/governance/shadow-decisions-report.test.ts

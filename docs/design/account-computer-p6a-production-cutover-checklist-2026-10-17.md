@@ -6,12 +6,12 @@
 
 ## Status snapshot
 
-| Layer | State |
-|---|---|
-| Secure Form + handoff / await_return (P5a/P5b code on tip) | Present on tip; product login path coded |
-| Dual-flag Docker Account Worker (prototype) | Opt-in only; memory driver remains default |
-| Signed third-party login golden-path e2e | Deferred (P6 golden-path); fixture HTML only |
-| Production default-on cutover | See **P6b** brief (`account-computer-p6b-production-default-on-2026-10-17.md`) |
+| Layer                                                      | State                                                                          |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Secure Form + handoff / await_return (P5a/P5b code on tip) | Present on tip; product login path coded                                       |
+| Dual-flag Docker Account Worker (prototype)                | Opt-in only; memory driver remains default                                     |
+| Signed third-party login golden-path e2e                   | Deferred (P6 golden-path); fixture HTML only                                   |
+| Production default-on cutover                              | See **P6b** brief (`account-computer-p6b-production-default-on-2026-10-17.md`) |
 
 Do **not** claim historical P0–P4 GitHub PRs `#366`–`#372` were merged on GitHub; capability landed later on `main` via subsequent work. Record the **tip SHA** you verified, not a PR number story.
 
@@ -19,9 +19,9 @@ Hand-back Tab label (locked): **「交给AI」** (`computerHandBack`).
 
 ## Dual flags (must both be on for Docker path)
 
-| Env | Role |
-|---|---|
-| `OPENBOT_ACCOUNT_WORKER=1` | Enable Account Worker path |
+| Env                               | Role                                           |
+| --------------------------------- | ---------------------------------------------- |
+| `OPENBOT_ACCOUNT_WORKER=1`        | Enable Account Worker path                     |
 | `OPENBOT_ACCOUNT_WORKER_DOCKER=1` | Second opt-in: real Docker driver (not memory) |
 
 - Either flag alone is **not** production Docker cutover.
@@ -48,10 +48,10 @@ OPENBOT_ACCOUNT_WORKER_DOCKER_E2E=1 pnpm exec vitest run \
 
 ## Image tags (defaults)
 
-| Role | Default tag |
-|---|---|
-| Exec / sandbox | `openbot-sandbox:bookworm-slim` |
-| Browser | `openbot-sandbox-browser:bookworm-slim` |
+| Role           | Default tag                             |
+| -------------- | --------------------------------------- |
+| Exec / sandbox | `openbot-sandbox:bookworm-slim`         |
+| Browser        | `openbot-sandbox-browser:bookworm-slim` |
 
 Overrides: `OPENBOT_ACCOUNT_WORKER_EXEC_IMAGE`, `OPENBOT_ACCOUNT_WORKER_BROWSER_IMAGE` (and legacy image env where documented). See `src/agents/sandbox/ACCOUNT_WORKER_SANDBOX_IMAGES.md`.
 

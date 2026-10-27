@@ -12,10 +12,10 @@ Chat-inline Form remains the primary Generative UI path.
 
 ## Canonical shapes
 
-| Fence / surface | Schema | Notes |
-| --- | --- | --- |
-| ` ```ogui-form` ` | `OguiFormSchema` | `schema_version: "ogui/v1"`; fields = `single_select` only |
-| thin choice | `OguiChoiceSchema` | `type: "choice"`; chat-inline; **not** forced into Canvas |
+| Fence / surface     | Schema             | Notes                                                                               |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------------- |
+| ` ```ogui-form` `   | `OguiFormSchema`   | `schema_version: "ogui/v1"`; fields = `single_select` only                          |
+| thin choice         | `OguiChoiceSchema` | `type: "choice"`; chat-inline; **not** forced into Canvas                           |
 | ` ```ogui-answer` ` | `OguiAnswerSchema` | `answers` is `Record<fieldId, value>`; `submission_id` = chat.send `idempotencyKey` |
 
 Source: `src/gateway/protocol/schema/ogui.ts`  
@@ -24,11 +24,11 @@ UI fence parsing (aliases like `form_id`, `version: 1`) stays in
 
 ## Wizard mapping (adapter only)
 
-| OGUI | WizardStep.type | Direction |
-| --- | --- | --- |
-| `single_select` | `select` | bidirectional when option values are string-coercible |
-| (deferred) `multi_select` | `multiselect` | **not** implemented in P1′ |
-| — | `text` / `confirm` / `note` / `progress` / `action` | **no** OGUI invent |
+| OGUI                      | WizardStep.type                                     | Direction                                             |
+| ------------------------- | --------------------------------------------------- | ----------------------------------------------------- |
+| `single_select`           | `select`                                            | bidirectional when option values are string-coercible |
+| (deferred) `multi_select` | `multiselect`                                       | **not** implemented in P1′                            |
+| —                         | `text` / `confirm` / `note` / `progress` / `action` | **no** OGUI invent                                    |
 
 Adapter: `src/gateway/protocol/ogui-wizard-adapter.ts`  
 **Does not** share Wizard session state, `wizard.*` RPC, or renderers.

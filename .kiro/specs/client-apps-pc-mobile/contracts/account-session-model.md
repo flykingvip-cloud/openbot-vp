@@ -36,7 +36,7 @@
 | `urlSessionId`   | 该账号的客户端 HTTP 会话/ cookie jar 标识。                                                                             |
 | `webDataStoreId` | 该账号的 Employee Shell WebView 数据存储标识（UUID）。                                                                  |
 | `credentialRef`  | 安全存储中该账号凭据/会话的键句柄。                                                                                     |
-| `pushTokenRef`   | （Wave 2）该账号推送 token 句柄。语义与生命周期见 `contracts/push-model.md`。                                              |
+| `pushTokenRef`   | （Wave 2）该账号推送 token 句柄。语义与生命周期见 `contracts/push-model.md`。                                           |
 
 全局单值：`activeAccountId`、`appLockPolicy`。
 

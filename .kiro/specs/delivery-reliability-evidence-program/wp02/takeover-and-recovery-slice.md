@@ -13,13 +13,13 @@
 
 ## 精确接管表（提议）
 
-| 文件 | 当前 owner 信号 | 工作区 WIP？ | 接管依据 | 提议唯一 lander |
-| --- | --- | --- | --- | --- |
-| `src/gateway/server.impl.ts` | 多任务宣称（conversation-task-activate、development-supervisor、conversation-lifecycle、data-governance-v2-p0、diskgrant、宽泛 `src/**` 等） | 否（对照 git status 干净） | 唯一已知启动恢复挂点旁；需插入 handoff recover 调用 | grokbot-verifiable-delivery（**待 verify-then-take 确认**） |
-| `src/gateway/collaboration-dispatch/handoff-contract.ts` | 主要为 `pi-sdk-family-migration-v3:cursor` 的 `src/**` 宽泛宣称；无更细 active 精确行 | 否 | 一般**不必改**（函数已存在）；仅当导出/签名不够用时再纳 | 默认不接管；保持现状 |
-| `src/gateway/collaboration-dispatch/task-runtime.ts` | 同上宽泛宣称 | 否 | 只读依赖 `isCollabTaskHandoffContractEnabled`；**不改** | 不接管 |
-| `src/gateway/collaboration-learning/handoff-contract-entry.ts` | tenant-context-propagation + `src/**` | 否 | 入口 API 不负责启动恢复；**不改** | 不接管 |
-| 新测试文件（建议）`src/gateway/collaboration-dispatch/handoff-recovery.gateway-hook.test.ts` 或扩展既有 invariant 测 | 无 | n/a | 崩溃/重复恢复证据 | 随 server.impl 切片 lander |
+| 文件                                                                                                                 | 当前 owner 信号                                                                                                                              | 工作区 WIP？               | 接管依据                                                | 提议唯一 lander                                             |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
+| `src/gateway/server.impl.ts`                                                                                         | 多任务宣称（conversation-task-activate、development-supervisor、conversation-lifecycle、data-governance-v2-p0、diskgrant、宽泛 `src/**` 等） | 否（对照 git status 干净） | 唯一已知启动恢复挂点旁；需插入 handoff recover 调用     | grokbot-verifiable-delivery（**待 verify-then-take 确认**） |
+| `src/gateway/collaboration-dispatch/handoff-contract.ts`                                                             | 主要为 `pi-sdk-family-migration-v3:cursor` 的 `src/**` 宽泛宣称；无更细 active 精确行                                                        | 否                         | 一般**不必改**（函数已存在）；仅当导出/签名不够用时再纳 | 默认不接管；保持现状                                        |
+| `src/gateway/collaboration-dispatch/task-runtime.ts`                                                                 | 同上宽泛宣称                                                                                                                                 | 否                         | 只读依赖 `isCollabTaskHandoffContractEnabled`；**不改** | 不接管                                                      |
+| `src/gateway/collaboration-learning/handoff-contract-entry.ts`                                                       | tenant-context-propagation + `src/**`                                                                                                        | 否                         | 入口 API 不负责启动恢复；**不改**                       | 不接管                                                      |
+| 新测试文件（建议）`src/gateway/collaboration-dispatch/handoff-recovery.gateway-hook.test.ts` 或扩展既有 invariant 测 | 无                                                                                                                                           | n/a                        | 崩溃/重复恢复证据                                       | 随 server.impl 切片 lander                                  |
 
 **不在本切片：** `attempt.ts`、整个 `collaboration-dispatch/**`、权限/flag 默认值、OGUI 投影逻辑。
 

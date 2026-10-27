@@ -23,12 +23,12 @@ metadata:
 
 必填参数（与 server-methods 一致）：
 
-| 参数 | 值 |
-|------|-----|
-| identityId | 已绑定身份 id |
-| agentId | 数字人 id |
+| 参数       | 值                                       |
+| ---------- | ---------------------------------------- |
+| identityId | 已绑定身份 id                            |
+| agentId    | 数字人 id                                |
 | agentScope | 自有场景用 `owned`（须与服务器认定一致） |
-| grantMode | `auto` 或 `explicit`（用户确认后） |
+| grantMode  | `auto` 或 `explicit`（用户确认后）       |
 
 可选：`sessionKey`。多个数字人 → **逐个** upsert（API 单次一个 agentId）。
 

@@ -28,7 +28,6 @@ Don't ask permission. Just do it.
 
 MainPath authority lives in the system prompt (`Tool Call Style`). Workspace skill `execution-discipline` is standby detail (`skills/execution-discipline/SKILL.md`). UI click-along stays in `user-guidance-protocol` and must not become confirm loops for already-delegated work.
 
-
 ## Memory
 
 You wake up fresh each session. These files are your continuity:

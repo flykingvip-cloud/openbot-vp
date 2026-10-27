@@ -1,4 +1,5 @@
 import { EnterpriseDataStoreError } from "../enterprise-data/connector-action-store.js";
+import { getProcessControlledSarProvider } from "../enterprise-data/controlled-sar-provider.js";
 import {
   assertNoMaterializerRunOverrides,
   requireResolvedEnterpriseAdminTenantId,
@@ -15,7 +16,6 @@ import {
   resolveVisibilityForFeedItem,
   upsertKnowledgeVisibilityPolicy,
 } from "../enterprise-data/knowledge-visibility-policy-store.js";
-import { getProcessControlledSarProvider } from "../enterprise-data/controlled-sar-provider.js";
 import { runProjectionMaterialization } from "../enterprise-data/projection-materializer.js";
 import { upsertEnterpriseKnowledgeProjectionSpec } from "../enterprise-data/projection-spec-store.js";
 import type {

@@ -13,24 +13,24 @@
 
 ## 1. 选型（冻结）
 
-| 项 | 决定 |
-| --- | --- |
-| Pilot ID | `orch.readonly.multistep.memory-web-acceptance` |
-| 步骤序列 | **1 memory → 2 web_read → 3 acceptance** |
-| 执行面 | 仅既有只读路径；acceptance **无工具**（名级核对） |
-| Planner / LIVE | 冻结；不经 `considerDispatch` live 路径 |
-| Ledger | **禁止**从本 pilot / readonly invoke 写 Progress Ledger |
-| Fabric | 不夺取 execute 所有权；默认 path=`legacy`；fabric 仅 decide-only（WP-05） |
+| 项             | 决定                                                                      |
+| -------------- | ------------------------------------------------------------------------- |
+| Pilot ID       | `orch.readonly.multistep.memory-web-acceptance`                           |
+| 步骤序列       | **1 memory → 2 web_read → 3 acceptance**                                  |
+| 执行面         | 仅既有只读路径；acceptance **无工具**（名级核对）                         |
+| Planner / LIVE | 冻结；不经 `considerDispatch` live 路径                                   |
+| Ledger         | **禁止**从本 pilot / readonly invoke 写 Progress Ledger                   |
+| Fabric         | 不夺取 execute 所有权；默认 path=`legacy`；fabric 仅 decide-only（WP-05） |
 
 备选（未选）：ledger event extension — 仅当本 pilot 证明命名不够用且人审同意时再开。
 
 ## 2. 精确步骤序列与既有 API
 
-| Ordinal | stepKind | 既有 API | 输入 | 输出（pilot 形状） |
-| --- | --- | --- | --- | --- |
-| 1 | `memory` | `considerReadonlyInvoke({ intent: "recall_memory", query, … })` → `routeStep` → `invokeReadonlySurface({ surface: "memory" })` → `memory_search` | `query`（回忆检索串） | `untrustedText`；`wroteLedger: false`；可选 `pathBinding` |
-| 2 | `web_read` | `considerReadonlyInvoke({ intent: "read_web", query, … })` → `invokeReadonlySurface({ surface: "web_read" })` → `web_fetch` 或 `web_search` | `query`（URL 或搜索串） | 同上 |
-| 3 | `acceptance` | **无** `considerReadonlyInvoke`；纯函数 `evaluateReadonlyMultistepAcceptance` | 前两步 `resultRef` + 非空 `untrustedText` 标志 | `{ ok, reason, checkedResultRefs }`；`wroteLedger: false` |
+| Ordinal | stepKind     | 既有 API                                                                                                                                         | 输入                                           | 输出（pilot 形状）                                        |
+| ------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- | --------------------------------------------------------- |
+| 1       | `memory`     | `considerReadonlyInvoke({ intent: "recall_memory", query, … })` → `routeStep` → `invokeReadonlySurface({ surface: "memory" })` → `memory_search` | `query`（回忆检索串）                          | `untrustedText`；`wroteLedger: false`；可选 `pathBinding` |
+| 2       | `web_read`   | `considerReadonlyInvoke({ intent: "read_web", query, … })` → `invokeReadonlySurface({ surface: "web_read" })` → `web_fetch` 或 `web_search`      | `query`（URL 或搜索串）                        | 同上                                                      |
+| 3       | `acceptance` | **无** `considerReadonlyInvoke`；纯函数 `evaluateReadonlyMultistepAcceptance`                                                                    | 前两步 `resultRef` + 非空 `untrustedText` 标志 | `{ ok, reason, checkedResultRefs }`；`wroteLedger: false` |
 
 约束：
 
@@ -42,15 +42,15 @@
 
 命名空间与 ADR「幂等键 / resultRef / lease」对齐；**生产租约仍未发放**——本 pilot 只验证键是否够用。
 
-| ADR 概念 | 本 pilot 命名规则 | 例（`taskId=t1`） |
-| --- | --- | --- |
-| `logicalActionId` | `orch.ro.ms.{taskId}.{stepKind}` | `orch.ro.ms.t1.memory` |
-| `jobStepId`（合成 job+step） | `{taskId}::{stepKind}::{ordinal}` | `t1::memory::1` |
-| lease key | **= `jobStepId`**（与 `OrchLeaseRecord.jobStepId` 同键） | `t1::memory::1` |
-| `attempt` | 默认 `1`；同 `jobStepId` 重试时单调 +1（pilot 默认不重试） | `1` |
-| `resultRef` | `orch-ro-result:{jobStepId}:a{attempt}`（指向只读产物占位；**不是** WP-01 信封落库，也不是 ledger 证据） | `orch-ro-result:t1::memory::1:a1` |
-| path-binding `actionId` | **= `logicalActionId`**（单路径绑定键） | `orch.ro.ms.t1.memory` |
-| acceptance | 无 lease / 无 tool；核对前两步均有非空 `resultRef` 且 `wroteLedger===false` | stepKind=`acceptance` |
+| ADR 概念                     | 本 pilot 命名规则                                                                                        | 例（`taskId=t1`）                 |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `logicalActionId`            | `orch.ro.ms.{taskId}.{stepKind}`                                                                         | `orch.ro.ms.t1.memory`            |
+| `jobStepId`（合成 job+step） | `{taskId}::{stepKind}::{ordinal}`                                                                        | `t1::memory::1`                   |
+| lease key                    | **= `jobStepId`**（与 `OrchLeaseRecord.jobStepId` 同键）                                                 | `t1::memory::1`                   |
+| `attempt`                    | 默认 `1`；同 `jobStepId` 重试时单调 +1（pilot 默认不重试）                                               | `1`                               |
+| `resultRef`                  | `orch-ro-result:{jobStepId}:a{attempt}`（指向只读产物占位；**不是** WP-01 信封落库，也不是 ledger 证据） | `orch-ro-result:t1::memory::1:a1` |
+| path-binding `actionId`      | **= `logicalActionId`**（单路径绑定键）                                                                  | `orch.ro.ms.t1.memory`            |
+| acceptance                   | 无 lease / 无 tool；核对前两步均有非空 `resultRef` 且 `wroteLedger===false`                              | stepKind=`acceptance`             |
 
 可选演练（helper 内、**内存** `createOrchLeaseStore()`）：对 memory/web_read 步 `tryAcquireLease` → `submitResult({ resultRef })` → `release`。证明 lease 键与 `resultRef` 可挂在既有形状上；**不**宣称生产 holder 授予，**不**写文件除非测试注入 `rootDir`（默认内存）。
 
@@ -65,15 +65,15 @@
 
 本轮已落地的最小证明（`readonly-multistep-pilot.test.ts`）：
 
-| # | 断言 | 含义 |
-| --- | --- | --- |
-| S1 | `ORCHESTRATION_LIVE_INVOKE === false` | LIVE 未翻 |
-| S2 | 三步 plan 顺序固定 memory→web_read→acceptance | 选型冻结 |
-| S3 | 每步 `logicalActionId` / `jobStepId` / lease key / `resultRef` 符合 §3 | 命名够用 |
-| S4 | memory + web_read 经 injectable readonly invoke（mock，无网络）返回 `wroteLedger: false` | 真实只读路径形状 |
-| S5 | acceptance 在两步均有 `resultRef` 时 `ok`；缺一步则失败 | 名级验收 |
-| S6 | 可选内存 lease-store：acquire→submitResult→release 成功且 `resultRef` 回读一致 | 键可挂既有形状 |
-| S7 | 同 `logicalActionId` 二次 bind → `dual_exec_refused`（复用 path-binding） | WP-05 约束 |
+| #   | 断言                                                                                     | 含义             |
+| --- | ---------------------------------------------------------------------------------------- | ---------------- |
+| S1  | `ORCHESTRATION_LIVE_INVOKE === false`                                                    | LIVE 未翻        |
+| S2  | 三步 plan 顺序固定 memory→web_read→acceptance                                            | 选型冻结         |
+| S3  | 每步 `logicalActionId` / `jobStepId` / lease key / `resultRef` 符合 §3                   | 命名够用         |
+| S4  | memory + web_read 经 injectable readonly invoke（mock，无网络）返回 `wroteLedger: false` | 真实只读路径形状 |
+| S5  | acceptance 在两步均有 `resultRef` 时 `ok`；缺一步则失败                                  | 名级验收         |
+| S6  | 可选内存 lease-store：acquire→submitResult→release 成功且 `resultRef` 回读一致           | 键可挂既有形状   |
+| S7  | 同 `logicalActionId` 二次 bind → `dual_exec_refused`（复用 path-binding）                | WP-05 约束       |
 
 **明确不算成功 / 不宣称：**
 

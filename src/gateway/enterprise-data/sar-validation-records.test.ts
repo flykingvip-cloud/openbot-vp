@@ -6,7 +6,6 @@
 import fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ValidationRecord } from "../../site-capability/validation-record.js";
-import type { GatewayRequestHandler } from "../server-methods/types.js";
 import { projectCapabilityCenterInstall } from "./capability-center-install.js";
 import { registerCallerAccountBinding } from "./data-asset-linkage.js";
 import { upsertDataSource } from "./data-source-store.js";
@@ -259,13 +258,11 @@ describe("A2 sar validation records → install projection", () => {
     expect(source).toContain("listSarValidationRecordsForInstall");
     expect(source).not.toMatch(/validationRecords:\s*\[\s*\]/);
 
-    const { resetSkillHealthWindowsCacheForTests, saveSkillAsset } = await import(
-      "../skill-lifecycle-store.js"
-    );
+    const { resetSkillHealthWindowsCacheForTests, saveSkillAsset } =
+      await import("../skill-lifecycle-store.js");
     const { writeSarExecutionPin } = await import("../skill-execution-binding/sar-pin.js");
-    const { createEnterpriseDataAssetHandlers } = await import(
-      "../server-methods/enterprise-data-assets.js"
-    );
+    const { createEnterpriseDataAssetHandlers } =
+      await import("../server-methods/enterprise-data-assets.js");
 
     resetSkillHealthWindowsCacheForTests();
     const saved = saveSkillAsset({
@@ -318,7 +315,7 @@ describe("A2 sar validation records → install projection", () => {
     }
 
     const handlers = createEnterpriseDataAssetHandlers(withStore);
-    const handler = handlers["enterprise-data.assets.capability-install"] as GatewayRequestHandler;
+    const handler = handlers["enterprise-data.assets.capability-install"];
 
     let respondOk = false;
     let payload: Record<string, unknown> | undefined;
@@ -351,13 +348,11 @@ describe("A2 sar validation records → install projection", () => {
   });
 
   it("RPC path rejects cross-tenant durable records", async () => {
-    const { resetSkillHealthWindowsCacheForTests, saveSkillAsset } = await import(
-      "../skill-lifecycle-store.js"
-    );
+    const { resetSkillHealthWindowsCacheForTests, saveSkillAsset } =
+      await import("../skill-lifecycle-store.js");
     const { writeSarExecutionPin } = await import("../skill-execution-binding/sar-pin.js");
-    const { createEnterpriseDataAssetHandlers } = await import(
-      "../server-methods/enterprise-data-assets.js"
-    );
+    const { createEnterpriseDataAssetHandlers } =
+      await import("../server-methods/enterprise-data-assets.js");
 
     resetSkillHealthWindowsCacheForTests();
     const saved = saveSkillAsset({
@@ -407,7 +402,7 @@ describe("A2 sar validation records → install projection", () => {
     }
 
     const handlers = createEnterpriseDataAssetHandlers(withStore);
-    const handler = handlers["enterprise-data.assets.capability-install"] as GatewayRequestHandler;
+    const handler = handlers["enterprise-data.assets.capability-install"];
     let payload: Record<string, unknown> | undefined;
     await handler({
       req: { type: "req", id: "2", method: "enterprise-data.assets.capability-install" },

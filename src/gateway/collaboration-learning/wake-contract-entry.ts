@@ -1,13 +1,8 @@
 /**
- * C2 follow-up — production read-only entry for Wake Contract ledger.
- *
+ * C2 follow-up / T36 L3 — production read-only entry for Wake Contract ledger.
  * listWakeEvents / whoWokeWhom do not require wakeContract flag (observe AS-IS).
  * Writers stay on chat.send hook + claim/handoff paths; list/whoWokeWhom do not write.
- * Heartbeat may emit wakes only via wake-contract writers (flag/allowlist), not a fork.
- *
- * T09-B3: full-entrypoint stop + wake-revoke concurrency remain 待测 (see T10 close table).
  */
-export const WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE = true as const;
 
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";

@@ -1,37 +1,58 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <title>Account Computer fixture — WeChat QR wait</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 28rem; margin: 3rem auto; padding: 0 1rem; text-align: center; }
-    .qr-box {
-      width: 180px; height: 180px; margin: 1.5rem auto; border: 2px dashed #07c160;
-      display: flex; align-items: center; justify-content: center; color: #07c160; font-size: 0.85rem;
-    }
-    #status { margin-top: 1rem; color: #333; min-height: 1.5rem; }
-    button { margin-top: 1rem; padding: 0.5rem 1rem; }
-  </style>
-</head>
-<body data-fixture="wechat-qr" data-login-surface="qr">
-  <!--
+  <head>
+    <meta charset="utf-8" />
+    <title>Account Computer fixture — WeChat QR wait</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 28rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+        text-align: center;
+      }
+      .qr-box {
+        width: 180px;
+        height: 180px;
+        margin: 1.5rem auto;
+        border: 2px dashed #07c160;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #07c160;
+        font-size: 0.85rem;
+      }
+      #status {
+        margin-top: 1rem;
+        color: #333;
+        min-height: 1.5rem;
+      }
+      button {
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+      }
+    </style>
+  </head>
+  <body data-fixture="wechat-qr" data-login-surface="qr">
+    <!--
     Static fixture for WeChat-style QR wait surface.
     No real WeChat. Do not point production traffic here.
   -->
-  <h1>微信扫码登录（夹具）</h1>
-  <p id="instruction">请使用微信扫描下方二维码</p>
-  <div id="qr-panel" class="qr-box" role="img" aria-label="fixture-wechat-qr-placeholder">
-    fixture-qr
-  </div>
-  <p id="status" role="status" aria-live="polite">等待扫码…</p>
-  <!-- Test-only control: simulates phone confirm without real WeChat -->
-  <button type="button" id="simulate-scan-ok">模拟扫码成功</button>
-  <script>
-    document.getElementById("simulate-scan-ok").addEventListener("click", function () {
-      document.getElementById("status").textContent = "fixture-ok: wechat-qr confirmed (no real WeChat)";
-      document.body.setAttribute("data-signed-in", "true");
-    });
-  </script>
-</body>
+    <h1>微信扫码登录（夹具）</h1>
+    <p id="instruction">请使用微信扫描下方二维码</p>
+    <div id="qr-panel" class="qr-box" role="img" aria-label="fixture-wechat-qr-placeholder">
+      fixture-qr
+    </div>
+    <p id="status" role="status" aria-live="polite">等待扫码…</p>
+    <!-- Test-only control: simulates phone confirm without real WeChat -->
+    <button type="button" id="simulate-scan-ok">模拟扫码成功</button>
+    <script>
+      document.getElementById("simulate-scan-ok").addEventListener("click", function () {
+        document.getElementById("status").textContent =
+          "fixture-ok: wechat-qr confirmed (no real WeChat)";
+        document.body.setAttribute("data-signed-in", "true");
+      });
+    </script>
+  </body>
 </html>

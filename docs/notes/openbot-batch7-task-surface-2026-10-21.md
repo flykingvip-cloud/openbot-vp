@@ -22,17 +22,17 @@
 
 ## 接入
 
-| 位置 | 作用 |
-| --- | --- |
-| `src/agents/task-surface/surface.ts` | 对账、序号、回执、幽灵过滤 |
-| `src/agents/task-surface/apply.ts` | 写会话挂起板和 ledger；写失败走旁路回执 |
-| `src/auto-reply/reply/get-reply-run.ts` | 整句就是清表或问挂起列表时直接回执，不交给模型再问一遍 |
-| `src/conversation-task/session-task-board.ts` | 这两类句子不触发任务切换 |
-| `src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts` | 模型仍追问序号时，改成同一张回执 |
-| `src/agents/context-compiler/candidates.ts` | 非主线注入在有用户句时按相关性省略，并带来源 |
-| `src/auto-reply/reply/restore-task-isolation.ts` | 恢复待核对行带来源；已取消行不再注入 |
-| `src/infra/heartbeat-parked-notice.ts` | 心跳挂起通知标 `source=heartbeat` |
-| `src/agents/turn-completion/contract.ts` | 导出 `formatSidePathBypassReceipt`，清表写失败复用批次 6 原文 |
+| 位置                                                         | 作用                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------- |
+| `src/agents/task-surface/surface.ts`                         | 对账、序号、回执、幽灵过滤                                    |
+| `src/agents/task-surface/apply.ts`                           | 写会话挂起板和 ledger；写失败走旁路回执                       |
+| `src/auto-reply/reply/get-reply-run.ts`                      | 整句就是清表或问挂起列表时直接回执，不交给模型再问一遍        |
+| `src/conversation-task/session-task-board.ts`                | 这两类句子不触发任务切换                                      |
+| `src/agents/pi-embedded-runner/run/rewrite-visible-reply.ts` | 模型仍追问序号时，改成同一张回执                              |
+| `src/agents/context-compiler/candidates.ts`                  | 非主线注入在有用户句时按相关性省略，并带来源                  |
+| `src/auto-reply/reply/restore-task-isolation.ts`             | 恢复待核对行带来源；已取消行不再注入                          |
+| `src/infra/heartbeat-parked-notice.ts`                       | 心跳挂起通知标 `source=heartbeat`                             |
+| `src/agents/turn-completion/contract.ts`                     | 导出 `formatSidePathBypassReceipt`，清表写失败复用批次 6 原文 |
 
 ## 怎么跑测试
 

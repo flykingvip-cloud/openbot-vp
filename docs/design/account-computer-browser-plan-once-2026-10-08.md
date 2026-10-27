@@ -1,4 +1,4 @@
-# Account Computer — Browser plan-once + legal DOM action space + NEEDS_*
+# Account Computer — Browser plan-once + legal DOM action space + NEEDS\_\*
 
 Landing: `BROWSER_PLAN_ONCE_LEGAL_DOM_M1`  
 Date: 2026-10-08 (rev 2026-10-09: replan/terminal table + Shape B budgets)  
@@ -63,10 +63,10 @@ Hypothesis for plug-in points (verify in impl tip against current tree): browser
 
 Both shapes use the **same** counters on the action-layer run:
 
-| Field | Default | Meaning |
-|---|---|---|
-| `max_actions` | `20` | Cap on grounded execute calls (click/type/press/scroll count; `wait` may count or not — impl must pick one and stick; recommend **counting** wait toward the budget) |
-| `max_replans` | `2` | Cap on **frontier** replans after the initial plan. Exhausted → `BLOCKED` (or `FAIL` if the planner previously declared the task impossible). **No unbounded frontier replan** (M3 plan-once). |
+| Field         | Default | Meaning                                                                                                                                                                                        |
+| ------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_actions` | `20`    | Cap on grounded execute calls (click/type/press/scroll count; `wait` may count or not — impl must pick one and stick; recommend **counting** wait toward the budget)                           |
+| `max_replans` | `2`     | Cap on **frontier** replans after the initial plan. Exhausted → `BLOCKED` (or `FAIL` if the planner previously declared the task impossible). **No unbounded frontier replan** (M3 plan-once). |
 
 Optional later (not M1): one **cheap** (non-frontier) disambiguation call per grounding miss — does **not** consume `max_replans`.
 
@@ -100,13 +100,13 @@ Planner calls `act` once with:
 
 Action vocabulary (M1):
 
-| `action` | Needs snapshot `id`? | Notes |
-|---|---|---|
-| `click` | **Yes** | Ground `target`/`role`/`near` → id |
-| `type` | **Yes** | Field id; `text` from planner or `inputs` only |
-| `press` | **No** (global key) | Keyboard chord only (`key` + modifiers). Prefer this name; do **not** use `press-on-element` |
-| `scroll` | **No** | Optional `target` as scroll container label; if provided and matchable, ground it; else scroll active/viewport |
-| `wait` | **No** | Settle-only; use sparingly |
+| `action` | Needs snapshot `id`? | Notes                                                                                                          |
+| -------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `click`  | **Yes**              | Ground `target`/`role`/`near` → id                                                                             |
+| `type`   | **Yes**              | Field id; `text` from planner or `inputs` only                                                                 |
+| `press`  | **No** (global key)  | Keyboard chord only (`key` + modifiers). Prefer this name; do **not** use `press-on-element`                   |
+| `scroll` | **No**               | Optional `target` as scroll container label; if provided and matchable, ground it; else scroll active/viewport |
+| `wait`   | **No**               | Settle-only; use sparingly                                                                                     |
 
 `text` for `type` must come from planner (or from `inputs` keys); action layer refuses empty / invented secrets.
 
@@ -116,15 +116,15 @@ Action vocabulary (M1):
 
 After each settle, `observe()` returns a snapshot:
 
-| Field | Notes |
-|---|---|
-| `id` | Snapshot-local stable id for this observe only (or backend nodeId if durable) |
-| `role` | button, link, textbox, … |
-| `name` / `label` | Accessible name |
-| `value` | Current value (redact if `secret_inputs`) |
-| `enabled` / `visible` | Disabled targets are not choosable |
-| `bounds?` | Optional; **not** required for legal click if id is present |
-| `meta.options?` | For `<select>` |
+| Field                 | Notes                                                                         |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `id`                  | Snapshot-local stable id for this observe only (or backend nodeId if durable) |
+| `role`                | button, link, textbox, …                                                      |
+| `name` / `label`      | Accessible name                                                               |
+| `value`               | Current value (redact if `secret_inputs`)                                     |
+| `enabled` / `visible` | Disabled targets are not choosable                                            |
+| `bounds?`             | Optional; **not** required for legal click if id is present                   |
+| `meta.options?`       | For `<select>`                                                                |
 
 **Rules:**
 
@@ -148,33 +148,33 @@ After each settle, `observe()` returns a snapshot:
 
 Implementers **must** use this table; there is no discretionary “BLOCKED or replan”.
 
-| Situation | Outcome |
-|---|---|
-| Missing literal the field needs (OTP, password, address, unpaid form value) — including anything that would require inventing `secret_inputs` | **`NEEDS_INPUT`**. Never replan to invent secrets. |
-| Grounding miss (label not in snapshot) **or** label ambiguity after role/`near` | **`NEEDS_AGENT`**. Optional (not M1-required): one cheap non-frontier disambiguation among legal candidates; if still ambiguous → `NEEDS_AGENT`. Does **not** burn `max_replans`. |
-| Step verify fail, remaining planned steps exist **or** replan budget remains (`replans_used < max_replans`) | **Replan** once (frontier): increment `replans_used`, discard rest of current step list, new `act`/`Subtask` from current screen. |
-| Step verify fail **and** `replans_used >= max_replans` | **`BLOCKED`** (or **`FAIL`** if planner already said impossible). |
-| Anti-loop: identical action + same control-state as a prior admitted action | **`BLOCKED`** (do not send input). |
-| Anti-loop: same action identity ≥ 3 times without goal progress | **`BLOCKED`**. |
-| Two consecutive unverified effects **and** `replans_used < max_replans` | **Replan** (counts as one frontier replan). |
-| Two consecutive unverified effects **and** replan budget exhausted | **`BLOCKED`**. |
-| No legal actions in snapshot for a required `click`/`type` | **`BLOCKED`**. |
-| `max_actions` exhausted before verification criteria hold | **`BLOCKED`**. |
-| Verification criteria hold | **`DONE`**. |
-| Constraint / policy violation (e.g. would click 立即支付) | **`FAIL`** or **`NEEDS_INPUT`** (扫码) — never execute the forbidden control. |
-| User 接管 / cancel | Cancel run; not a planner terminal — Ownership wins. |
+| Situation                                                                                                                                     | Outcome                                                                                                                                                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Missing literal the field needs (OTP, password, address, unpaid form value) — including anything that would require inventing `secret_inputs` | **`NEEDS_INPUT`**. Never replan to invent secrets.                                                                                                                                |
+| Grounding miss (label not in snapshot) **or** label ambiguity after role/`near`                                                               | **`NEEDS_AGENT`**. Optional (not M1-required): one cheap non-frontier disambiguation among legal candidates; if still ambiguous → `NEEDS_AGENT`. Does **not** burn `max_replans`. |
+| Step verify fail, remaining planned steps exist **or** replan budget remains (`replans_used < max_replans`)                                   | **Replan** once (frontier): increment `replans_used`, discard rest of current step list, new `act`/`Subtask` from current screen.                                                 |
+| Step verify fail **and** `replans_used >= max_replans`                                                                                        | **`BLOCKED`** (or **`FAIL`** if planner already said impossible).                                                                                                                 |
+| Anti-loop: identical action + same control-state as a prior admitted action                                                                   | **`BLOCKED`** (do not send input).                                                                                                                                                |
+| Anti-loop: same action identity ≥ 3 times without goal progress                                                                               | **`BLOCKED`**.                                                                                                                                                                    |
+| Two consecutive unverified effects **and** `replans_used < max_replans`                                                                       | **Replan** (counts as one frontier replan).                                                                                                                                       |
+| Two consecutive unverified effects **and** replan budget exhausted                                                                            | **`BLOCKED`**.                                                                                                                                                                    |
+| No legal actions in snapshot for a required `click`/`type`                                                                                    | **`BLOCKED`**.                                                                                                                                                                    |
+| `max_actions` exhausted before verification criteria hold                                                                                     | **`BLOCKED`**.                                                                                                                                                                    |
+| Verification criteria hold                                                                                                                    | **`DONE`**.                                                                                                                                                                       |
+| Constraint / policy violation (e.g. would click 立即支付)                                                                                     | **`FAIL`** or **`NEEDS_INPUT`** (扫码) — never execute the forbidden control.                                                                                                     |
+| User 接管 / cancel                                                                                                                            | Cancel run; not a planner terminal — Ownership wins.                                                                                                                              |
 
 **Replan** means exactly one additional frontier planner turn that emits a new step list / subtask. It is **not** per-click reasoning. Exceeding `max_replans` is always terminal (`BLOCKED`/`FAIL`), never silent continue.
 
 ## Terminal states (align M2)
 
-| Status | Meaning | UI / chat |
-|---|---|---|
-| `DONE` | Verification criteria hold | Normal completion; `chat.final` allowed |
-| `FAIL` | Cannot complete in this browser context / policy stop | Explain; no fake success |
-| `NEEDS_INPUT` | Missing literal (OTP, address, 密码, …) | Pause; request user / form; no final |
-| `NEEDS_AGENT` | Ambiguity / grounding miss needing human or higher reason | Pause; offer 接管; no final |
-| `BLOCKED` | Anti-loop, budget exhausted, or no legal actions | Pause; 接管; no final |
+| Status        | Meaning                                                   | UI / chat                               |
+| ------------- | --------------------------------------------------------- | --------------------------------------- |
+| `DONE`        | Verification criteria hold                                | Normal completion; `chat.final` allowed |
+| `FAIL`        | Cannot complete in this browser context / policy stop     | Explain; no fake success                |
+| `NEEDS_INPUT` | Missing literal (OTP, address, 密码, …)                   | Pause; request user / form; no final    |
+| `NEEDS_AGENT` | Ambiguity / grounding miss needing human or higher reason | Pause; offer 接管; no final             |
+| `BLOCKED`     | Anti-loop, budget exhausted, or no legal actions          | Pause; 接管; no final                   |
 
 **Hard mapping:** any `NEEDS_*` / `BLOCKED` / non-success **`FAIL`** **forbids** premature `chat.final` and plan-speak-as-done (extends M2).
 

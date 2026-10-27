@@ -22,7 +22,11 @@ import type { OpenBotConfig } from "../../config/types.js";
 import type { CollaborationFactRecord, HandoffFactType } from "../collaboration-ledger/types.js";
 import { appendCollaborationFactRecord } from "../collaboration-ledger/writer.js";
 import { eventKeyOf } from "./collaboration-event-key.js";
-import type { EffectiveCollaborationPolicy, TaskResponsibility } from "./effective-policy.js";
+import type {
+  EffectiveCollaborationPolicy,
+  TaskHandoff,
+  TaskResponsibility,
+} from "./effective-policy.js";
 import { evaluateGovernanceGate, type GovernanceActor } from "./governance-gate.js";
 import {
   enrichHandoffAssumptionsWithOguiBrief,
@@ -78,10 +82,16 @@ export type HandoffContract = Readonly<{
   approvedAt?: number;
   appliedAt?: number;
   expiresAt?: number;
+  /**
+   * T47: responsibility-chain precondition — handoffs[] length observed at propose.
+   * Apply refuses when live history length diverges (A→B→A then replay old contract).
+   */
+  baseHistoryLen?: number;
 }>;
 
 export type HandoffTask = Task & {
   responsibility?: TaskResponsibility;
+  handoffs?: TaskHandoff[];
 };
 
 export type HandoffResult<T> =
@@ -103,6 +113,8 @@ export type ProposeHandoffInput = {
   requiresApproval?: HandoffApproval;
   expiresAt?: number;
   handoffId?: string;
+  /** T47: snapshot of task.handoffs length at propose (duty-chain version). */
+  baseHistoryLen?: number;
   /**
    * Optional chat text carrying an `ogui-answer` fence (Form P0 submit).
    * When `collaboration.task.oguiHandoffProjection` is ON, a legal fence is
@@ -509,6 +521,178 @@ function nextResponsibility(
   return { ...current, executors };
 }
 
+/** T45: expose responsibility projection for live-lock apply. */
+export function responsibilityFromHandoffTask(task: HandoffTask): TaskResponsibility {
+  return responsibilityOf(task);
+}
+
+/** T45: apply approved contract to a live responsibility snapshot. */
+export function applyHandoffContractToResponsibility(
+  current: TaskResponsibility,
+  contract: HandoffContract,
+): TaskResponsibility {
+  return nextResponsibility(current, contract);
+}
+
+export type HandoffLiveApplyDecision =
+  | { kind: "apply"; responsibility: TaskResponsibility }
+  | { kind: "idempotent"; responsibility: TaskResponsibility }
+  | {
+      kind: "already_at_target";
+      responsibility: TaskResponsibility;
+      detail: string;
+    }
+  | { kind: "conflict"; detail: string; responsibility: TaskResponsibility };
+
+/**
+ * T45/T47/T48: classify whether an approved handoff may still change live responsibility.
+ *
+ * Idempotent ONLY when the same handoffId is already in task history (contract identity).
+ * Live responsibility happening to equal `toId` is `already_at_target` — never "already applied".
+ * `baseHistoryLen` binds duty-chain version so A→B→A then replay of an old contract conflicts.
+ * Ledger/status `applied` without history may still repair projection — but ONLY after the same
+ * owner/reviewer/approver/executor `from` checks as a fresh apply. Applied proves the contract
+ * reached apply once; it does not prove live responsibility is still safe to re-project.
+ */
+export function classifyHandoffApplyAgainstLive(params: {
+  contract: HandoffContract;
+  live: HandoffTask;
+  historyHandoffIds?: ReadonlySet<string> | readonly (string | undefined | null)[];
+  /** Live task.handoffs length (duty-chain version). */
+  liveHistoryLen?: number;
+}): HandoffLiveApplyDecision {
+  const liveResp = responsibilityOf(params.live);
+  const handoffId = compact(params.contract.handoffId);
+  const ids = params.historyHandoffIds;
+  const idSet =
+    ids instanceof Set
+      ? ids
+      : new Set([...(ids ?? [])].map((v) => compact(v)).filter((v): v is string => Boolean(v)));
+  if (handoffId && idSet.has(handoffId)) {
+    return { kind: "idempotent", responsibility: liveResp };
+  }
+
+  const liveHistoryLen =
+    typeof params.liveHistoryLen === "number"
+      ? params.liveHistoryLen
+      : Array.isArray(params.live.handoffs)
+        ? params.live.handoffs.length
+        : idSet.size;
+  const baseHistoryLen = params.contract.baseHistoryLen;
+  if (typeof baseHistoryLen === "number" && liveHistoryLen !== baseHistoryLen) {
+    return {
+      kind: "conflict",
+      detail: `expected handoff history length ${baseHistoryLen}, live ${liveHistoryLen}`,
+      responsibility: liveResp,
+    };
+  }
+
+  // T48: do NOT short-circuit on status===applied. Missing history may repair only when
+  // live still satisfies the same from-preconditions as a fresh apply; otherwise conflict.
+
+  const fromId = compact(params.contract.from.agentId);
+  const toId = compact(params.contract.to.agentId);
+  const role = params.contract.to.responsibilityRole;
+  const isOwnerMove = params.contract.kind === "owner_transfer" || role === "owner";
+
+  if (isOwnerMove) {
+    if (compact(liveResp.owner) === toId) {
+      return {
+        kind: "already_at_target",
+        detail: `live owner already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
+        responsibility: liveResp,
+      };
+    }
+    if (compact(liveResp.owner) !== fromId) {
+      return {
+        kind: "conflict",
+        detail: `expected owner ${fromId}, live owner ${liveResp.owner}`,
+        responsibility: liveResp,
+      };
+    }
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
+  if (role === "reviewer") {
+    if (compact(liveResp.reviewer) === toId) {
+      return {
+        kind: "already_at_target",
+        detail: `live reviewer already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
+        responsibility: liveResp,
+      };
+    }
+    if (liveResp.reviewer && compact(liveResp.reviewer) !== fromId) {
+      return {
+        kind: "conflict",
+        detail: `expected reviewer ${fromId}, live reviewer ${liveResp.reviewer}`,
+        responsibility: liveResp,
+      };
+    }
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
+  if (role === "approver") {
+    if (compact(liveResp.approver) === toId) {
+      return {
+        kind: "already_at_target",
+        detail: `live approver already ${toId}; handoff ${handoffId || "(missing)"} not in history`,
+        responsibility: liveResp,
+      };
+    }
+    if (liveResp.approver && compact(liveResp.approver) !== fromId) {
+      return {
+        kind: "conflict",
+        detail: `expected approver ${fromId}, live approver ${liveResp.approver}`,
+        responsibility: liveResp,
+      };
+    }
+    return {
+      kind: "apply",
+      responsibility: nextResponsibility(liveResp, params.contract),
+    };
+  }
+
+  // continue / evidence / executor role
+  const executors = new Set(liveResp.executors.map((id) => compact(id)).filter(Boolean));
+  if (executors.has(toId) && !executors.has(fromId)) {
+    return {
+      kind: "already_at_target",
+      detail: `live executors already include ${toId} without ${fromId}; handoff ${handoffId || "(missing)"} not in history`,
+      responsibility: liveResp,
+    };
+  }
+  if (!executors.has(fromId)) {
+    return {
+      kind: "conflict",
+      detail: `expected executor ${fromId} still assigned; live executors=[${[...executors].join(",")}]`,
+      responsibility: liveResp,
+    };
+  }
+  return {
+    kind: "apply",
+    responsibility: nextResponsibility(liveResp, params.contract),
+  };
+}
+
+/** Append handoff history by handoffId (no whole-array replace from outside the lock). */
+export function appendHandoffHistoryById(
+  existing: readonly TaskHandoff[] | null | undefined,
+  entry: TaskHandoff,
+): TaskHandoff[] {
+  const prior = [...(existing ?? [])];
+  const id = compact(entry.handoffId);
+  if (id && prior.some((h) => compact(h.handoffId) === id)) {
+    return prior;
+  }
+  return [...prior, entry];
+}
+
 function withResponsibility(
   task: HandoffTask,
   responsibility: TaskResponsibility,
@@ -750,6 +934,7 @@ export async function proposeHandoff(
     proposedBy: compact(input.proposedBy) || fromId,
     proposedAt: at,
     ...(typeof input.expiresAt === "number" ? { expiresAt: input.expiresAt } : {}),
+    ...(typeof input.baseHistoryLen === "number" ? { baseHistoryLen: input.baseHistoryLen } : {}),
   };
   const handoffsDir = authority.namespace.handoffsDir;
   const stem = safeStem(taskId)!;

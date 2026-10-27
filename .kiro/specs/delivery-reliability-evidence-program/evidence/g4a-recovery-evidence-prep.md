@@ -17,15 +17,15 @@
 
 ## 准则 → 现有产物映射
 
-| G4-A 准则 | 现有路径 / 测试 | 覆盖度 | 缺口 |
-| --- | --- | --- | --- |
-| kill before/after schedule | `ORCH_KILL_FIXTURE_IDS` + `lease-kill-fixtures.ts` / `.test.ts` | 文件背 lease-store 夹具 | 未挂生产 Progress Ledger 持久面 |
-| kill before/after exec | 同上 | 夹具 | 无真实工具执行杀进程证据 |
-| kill before/after result persist | `lease-kill-fixtures` after-result-persist + projections idempotent write | 夹具 rootDir JSON | projections ≠ ledger fold |
-| 旧 worker / stale fence 不得推进 | `lease-store.ts` `stale_fencing_token` | 单测 | 生产 writer 尚未消费 fence 字段 |
-| 无永久悬挂步骤 | cancelRequested / expiry reacquire 行为 | 夹具 | 无生产悬挂扫描/告警证据 |
-| 跨重启权威 | ADR：权威应在 ledger/task 增量 | **设计** | `orch-lease-fields.ts` 仅类型；fold 未迁移 |
-| LIVE 调度恢复 | — | **FAIL 预期** | `ORCHESTRATION_LIVE_INVOKE === false`；不得靠打开 LIVE「证明」恢复 |
+| G4-A 准则                        | 现有路径 / 测试                                                           | 覆盖度                  | 缺口                                                               |
+| -------------------------------- | ------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------ |
+| kill before/after schedule       | `ORCH_KILL_FIXTURE_IDS` + `lease-kill-fixtures.ts` / `.test.ts`           | 文件背 lease-store 夹具 | 未挂生产 Progress Ledger 持久面                                    |
+| kill before/after exec           | 同上                                                                      | 夹具                    | 无真实工具执行杀进程证据                                           |
+| kill before/after result persist | `lease-kill-fixtures` after-result-persist + projections idempotent write | 夹具 rootDir JSON       | projections ≠ ledger fold                                          |
+| 旧 worker / stale fence 不得推进 | `lease-store.ts` `stale_fencing_token`                                    | 单测                    | 生产 writer 尚未消费 fence 字段                                    |
+| 无永久悬挂步骤                   | cancelRequested / expiry reacquire 行为                                   | 夹具                    | 无生产悬挂扫描/告警证据                                            |
+| 跨重启权威                       | ADR：权威应在 ledger/task 增量                                            | **设计**                | `orch-lease-fields.ts` 仅类型；fold 未迁移                         |
+| LIVE 调度恢复                    | —                                                                         | **FAIL 预期**           | `ORCHESTRATION_LIVE_INVOKE === false`；不得靠打开 LIVE「证明」恢复 |
 
 ## 已落地相关文件
 

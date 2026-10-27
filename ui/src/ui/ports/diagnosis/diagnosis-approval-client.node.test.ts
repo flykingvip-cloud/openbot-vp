@@ -138,7 +138,9 @@ describe("platform diagnosis approval client", () => {
         subject: { kind: "authorization", grantId: "grant-1" },
       }),
     );
-    const body = request.mock.calls[0]?.[1] as { idempotencyKey?: string };
+    const body = (
+      request.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>
+    )[0]?.[1] as { idempotencyKey?: string };
     expect(body.idempotencyKey?.length).toBeGreaterThan(0);
   });
 });

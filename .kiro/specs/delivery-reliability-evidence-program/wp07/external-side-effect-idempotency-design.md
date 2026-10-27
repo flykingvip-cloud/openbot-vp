@@ -15,17 +15,17 @@
 
 ## 代码地基（只读盘点；引用路径）
 
-| 模式 | 路径 | 与 WP-07 关系 |
-| --- | --- | --- |
-| Outbound delivery queue（文件 outbox + 恢复） | `src/infra/outbound/delivery-queue.ts`（`enqueueDelivery` / `recoverPendingDeliveries`；`*.delivered` 标记；MAX_RETRIES/backoff） | **首选复用面**做消息类副作用意图落盘；本切片不改其所有权 |
-| Outbound send / channel adapters | `src/infra/outbound/outbound-send-service.ts`；`src/infra/outbound/channel-adapters.ts`；`src/infra/outbound/deliver.ts` | 真实发送路径；接线须经 adapter owner 审，本切片仅矩阵模板 |
-| Toolkit gated executor + receipt digest | `packages/toolkit/src/gated-executor.ts`（`digest` / `idempotencyKey`）；`packages/toolkit/src/receipt.ts` | 参数摘要与回执形状可借鉴 |
-| Diagnosis Da Bai delivery queue | `src/diagnosis/daibai-delivery.ts`（`createDiagnosisDaibaiDeliveryQueue`；receipt statuses；TTL/retries） | **域专用**队列；可作幂等/回执语义参考，**禁止**泛化为 orch 通用队列（ADR 非目标） |
-| Diagnosis approval idempotency ledger | `src/diagnosis/approval-decide.ts`（`lookup` / `idempotency_conflict`） | 同键冲突语义参考 |
-| Orch readonly path bind（dual-exec 拒绝） | `src/task-orchestration/path-binding.ts` | 单路径绑定；写路径仍等本 WP |
-| Orch lease/fence（形状） | `src/task-orchestration/lease-store.ts` | 过期 worker 不得推进；外部无 fencing 时仍依赖动作幂等 |
-| Provisional ledger fields | `src/progress-ledger/orch-lease-fields.ts`（`logicalActionId` / `resultRef`） | 未来事件镜像；非生产权威 |
-| **本切片 helper** | `src/task-orchestration/action-idempotency.ts` | `key=hash(tenant,taskId,logicalActionId)` + 同键异参拒绝；**未**挂 send |
+| 模式                                          | 路径                                                                                                                              | 与 WP-07 关系                                                                     |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Outbound delivery queue（文件 outbox + 恢复） | `src/infra/outbound/delivery-queue.ts`（`enqueueDelivery` / `recoverPendingDeliveries`；`*.delivered` 标记；MAX_RETRIES/backoff） | **首选复用面**做消息类副作用意图落盘；本切片不改其所有权                          |
+| Outbound send / channel adapters              | `src/infra/outbound/outbound-send-service.ts`；`src/infra/outbound/channel-adapters.ts`；`src/infra/outbound/deliver.ts`          | 真实发送路径；接线须经 adapter owner 审，本切片仅矩阵模板                         |
+| Toolkit gated executor + receipt digest       | `packages/toolkit/src/gated-executor.ts`（`digest` / `idempotencyKey`）；`packages/toolkit/src/receipt.ts`                        | 参数摘要与回执形状可借鉴                                                          |
+| Diagnosis Da Bai delivery queue               | `src/diagnosis/daibai-delivery.ts`（`createDiagnosisDaibaiDeliveryQueue`；receipt statuses；TTL/retries）                         | **域专用**队列；可作幂等/回执语义参考，**禁止**泛化为 orch 通用队列（ADR 非目标） |
+| Diagnosis approval idempotency ledger         | `src/diagnosis/approval-decide.ts`（`lookup` / `idempotency_conflict`）                                                           | 同键冲突语义参考                                                                  |
+| Orch readonly path bind（dual-exec 拒绝）     | `src/task-orchestration/path-binding.ts`                                                                                          | 单路径绑定；写路径仍等本 WP                                                       |
+| Orch lease/fence（形状）                      | `src/task-orchestration/lease-store.ts`                                                                                           | 过期 worker 不得推进；外部无 fencing 时仍依赖动作幂等                             |
+| Provisional ledger fields                     | `src/progress-ledger/orch-lease-fields.ts`（`logicalActionId` / `resultRef`）                                                     | 未来事件镜像；非生产权威                                                          |
+| **本切片 helper**                             | `src/task-orchestration/action-idempotency.ts`                                                                                    | `key=hash(tenant,taskId,logicalActionId)` + 同键异参拒绝；**未**挂 send           |
 
 ## 设计决定（本切片冻结）
 
@@ -38,12 +38,12 @@
 
 ## 故障夹具清单（设计级；未实现）
 
-| 夹具 ID（provisional） | 场景 | 期望 |
-| --- | --- | --- |
-| `wp07.lost_ack_after_send` | 发送一次，结果丢失 | unknown_outcome；回查后单次业务效果 |
-| `wp07.charged_then_timeout` | 已扣费/提交，响应丢失 | 回查远端；禁止第二扣费 |
-| `wp07.lease_expired_remote_completes` | worker 租约过期后远端才完成 | 旧 fence 拒绝推进；业务键去重 |
-| `wp07.same_key_param_mismatch` | 同键不同参数 | 拒绝；保留原意图 |
+| 夹具 ID（provisional）                | 场景                        | 期望                                |
+| ------------------------------------- | --------------------------- | ----------------------------------- |
+| `wp07.lost_ack_after_send`            | 发送一次，结果丢失          | unknown_outcome；回查后单次业务效果 |
+| `wp07.charged_then_timeout`           | 已扣费/提交，响应丢失       | 回查远端；禁止第二扣费              |
+| `wp07.lease_expired_remote_completes` | worker 租约过期后远端才完成 | 旧 fence 拒绝推进；业务键去重       |
+| `wp07.same_key_param_mismatch`        | 同键不同参数                | 拒绝；保留原意图                    |
 
 ## 明确非目标
 

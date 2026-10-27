@@ -9,31 +9,31 @@
 
 ## 1. 冻结事实
 
-| 项 | 代码 | 含义 |
-| --- | --- | --- |
-| `ORCHESTRATION_LIVE_INVOKE` | `src/task-orchestration/types.ts` L22：`false` | 不可在本设计轮翻转为 true |
-| Live dispatch | `considerDispatch`（`dispatch.ts`）：若 LIVE 为 true 反而 fail-closed；常态 `invokedTool: false` | 生产不经此路径 invoke |
-| Readonly invoke | `invokeReadonlySurface` / `isReadonlyInvokeEnabled`（默认 ON，`feature.ts`） | 可调 memory/web/skill；**不写** Progress Ledger |
-| `OrchestratorJob` | `types.ts` L94–102 | **内存形状**；注释写明 P4.5 never materializes on live path；status∈shadow|queued|dormant |
-| Feature flags | `ORCHESTRATION_ENV` 默认 off（shadow/dispatch/node/browser） | 与 LIVE 常量正交 |
+| 项                          | 代码                                                                                             | 含义                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------ | ------- |
+| `ORCHESTRATION_LIVE_INVOKE` | `src/task-orchestration/types.ts` L22：`false`                                                   | 不可在本设计轮翻转为 true                                                  |
+| Live dispatch               | `considerDispatch`（`dispatch.ts`）：若 LIVE 为 true 反而 fail-closed；常态 `invokedTool: false` | 生产不经此路径 invoke                                                      |
+| Readonly invoke             | `invokeReadonlySurface` / `isReadonlyInvokeEnabled`（默认 ON，`feature.ts`）                     | 可调 memory/web/skill；**不写** Progress Ledger                            |
+| `OrchestratorJob`           | `types.ts` L94–102                                                                               | **内存形状**；注释写明 P4.5 never materializes on live path；status∈shadow | queued | dormant |
+| Feature flags               | `ORCHESTRATION_ENV` 默认 off（shadow/dispatch/node/browser）                                     | 与 LIVE 常量正交                                                           |
 
 ## 2. 逻辑模型需求 vs 现有实体映射
 
 WP 要求至少：job / step / action / attempt、依赖、checkpoint、lease holder、fencing token、heartbeat、deadline、cancel、budget、result refs。
 
-| 逻辑概念 | 现有实体 / 面 | 缺口 |
-| --- | --- | --- |
-| job | `OrchestratorJob`（内存，未持久化） | 无跨进程存储 |
-| step | Progress Ledger `ExecutionStep`（`src/progress-ledger/types.ts`）；orch `stepId` 字段 | Ledger 写桥在 live 路径刻意关闭（`ledger-bridge.ts` 校验/意图，非生产 writer 宣称） |
-| action | WP-01 结果信封逻辑动作（草案）；工具名+参数摘要 | 需与 action 幂等键对齐（WP-07） |
-| attempt | **编排面未见一等 attempt 实体**；conversation-task 有 `attemptReopen`（控制面重开，非 step attempt） | 需在既有 step/事件上增量 attempt 序号，禁止新 DB |
-| 依赖 / checkpoint | Ledger events / fold；complex-task-loop 内存步骤 | 跨重启 checkpoint **UNKNOWN/弱** |
-| lease holder | **编排面无**；可类比 `withRoundLock`（handoff `round-store-io`）、delivery-queue 文件认领、memory Stage D fencing（`item7-stage-d-*`，**另一子系统**） | 不可把 memory fencing 直接当 orch 租约；可 **借鉴 CAS 语义** 增量到选中存储 |
-| fencing token | 同上；memory handle `fencingToken` | orch 无 |
-| heartbeat / deadline | ConversationTask 类型含 `deadlineAtMs` 等（`conversation-task/types.ts`）；orch job 无 heartbeat | 需映射到 task/job 持久字段 |
-| cancel | conversation-task cancel 路径存在（多文件）；orch dispatch 无取消传播实现宣称 | 设计：沿父子 task 传取消，重启不丢 |
-| budget | Fabric `costLimit`；context budgets；orch 无统一 remaining budget 实体 | 增量字段挂 job/task；重启不重置 |
-| result refs | readonly `untrustedText`；deliverable / handoff 事实；WP-01 信封 | 统一引用，不平行完成账本 |
+| 逻辑概念             | 现有实体 / 面                                                                                                                                          | 缺口                                                                                |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| job                  | `OrchestratorJob`（内存，未持久化）                                                                                                                    | 无跨进程存储                                                                        |
+| step                 | Progress Ledger `ExecutionStep`（`src/progress-ledger/types.ts`）；orch `stepId` 字段                                                                  | Ledger 写桥在 live 路径刻意关闭（`ledger-bridge.ts` 校验/意图，非生产 writer 宣称） |
+| action               | WP-01 结果信封逻辑动作（草案）；工具名+参数摘要                                                                                                        | 需与 action 幂等键对齐（WP-07）                                                     |
+| attempt              | **编排面未见一等 attempt 实体**；conversation-task 有 `attemptReopen`（控制面重开，非 step attempt）                                                   | 需在既有 step/事件上增量 attempt 序号，禁止新 DB                                    |
+| 依赖 / checkpoint    | Ledger events / fold；complex-task-loop 内存步骤                                                                                                       | 跨重启 checkpoint **UNKNOWN/弱**                                                    |
+| lease holder         | **编排面无**；可类比 `withRoundLock`（handoff `round-store-io`）、delivery-queue 文件认领、memory Stage D fencing（`item7-stage-d-*`，**另一子系统**） | 不可把 memory fencing 直接当 orch 租约；可 **借鉴 CAS 语义** 增量到选中存储         |
+| fencing token        | 同上；memory handle `fencingToken`                                                                                                                     | orch 无                                                                             |
+| heartbeat / deadline | ConversationTask 类型含 `deadlineAtMs` 等（`conversation-task/types.ts`）；orch job 无 heartbeat                                                       | 需映射到 task/job 持久字段                                                          |
+| cancel               | conversation-task cancel 路径存在（多文件）；orch dispatch 无取消传播实现宣称                                                                          | 设计：沿父子 task 传取消，重启不丢                                                  |
+| budget               | Fabric `costLimit`；context budgets；orch 无统一 remaining budget 实体                                                                                 | 增量字段挂 job/task；重启不重置                                                     |
+| result refs          | readonly `untrustedText`；deliverable / handoff 事实；WP-01 信封                                                                                       | 统一引用，不平行完成账本                                                            |
 
 ## 3. 存储复用决定（设计）
 
@@ -62,14 +62,14 @@ Readonly invoke 行为保持：可执行 memory/web/skill 适配；`invokedTool`
 
 对齐 G4-A 场景名与期望；**slice #2** 已落文件背演练夹具（`lease-kill-fixtures`），仍**不是**生产 ledger 证据包 / **不宣称 G4-A**：
 
-| 夹具 ID | 杀点 | 期望（设计） |
-| --- | --- | --- |
-| `orch.kill.before-schedule` | job 已持久、尚未选 worker | 重启后可被新 holder 租约调度；无双 holder |
-| `orch.kill.after-schedule` | lease 已授，exec 未开始 | 租约超时后 fencing 递增；旧 holder 提交被拒 |
-| `orch.kill.before-exec` | 即将调用 readonly/tool 前 | 恢复后同一 action 幂等键不双执行（写操作还必须 WP-07） |
-| `orch.kill.after-exec` | 工具已返回，结果未持久 | 结果进 `unknown_outcome` 或重查；只读可重拉；写操作禁盲重试 |
-| `orch.kill.before-result-persist` | 持久化中崩溃 | 重启收敛到单一终态；无永久悬挂 step |
-| `orch.kill.after-result-persist` | 已落库未投影 | 投影/只读恢复收敛；重复 recover 无二次业务效果 |
+| 夹具 ID                           | 杀点                      | 期望（设计）                                                |
+| --------------------------------- | ------------------------- | ----------------------------------------------------------- |
+| `orch.kill.before-schedule`       | job 已持久、尚未选 worker | 重启后可被新 holder 租约调度；无双 holder                   |
+| `orch.kill.after-schedule`        | lease 已授，exec 未开始   | 租约超时后 fencing 递增；旧 holder 提交被拒                 |
+| `orch.kill.before-exec`           | 即将调用 readonly/tool 前 | 恢复后同一 action 幂等键不双执行（写操作还必须 WP-07）      |
+| `orch.kill.after-exec`            | 工具已返回，结果未持久    | 结果进 `unknown_outcome` 或重查；只读可重拉；写操作禁盲重试 |
+| `orch.kill.before-result-persist` | 持久化中崩溃              | 重启收敛到单一终态；无永久悬挂 step                         |
+| `orch.kill.after-result-persist`  | 已落库未投影              | 投影/只读恢复收敛；重复 recover 无二次业务效果              |
 
 夹具存储：slice #2 对 **lease-store 可注入 `rootDir` 文件 JSON** 做真实 temp-dir 演练（新 store 实例 = 重启）；禁止只测 in-memory `OrchestratorJob`。生产权威仍须未来挂 ledger/task 增量——本 harness **不是** 生产 Progress Ledger 证据包。
 

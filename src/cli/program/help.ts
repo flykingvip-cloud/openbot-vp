@@ -4,12 +4,8 @@ import { formatDocsLink } from "../../terminal/links.js";
 import { isRich, theme } from "../../terminal/theme.js";
 import { escapeRegExp } from "../../utils.js";
 import { hasFlag, hasRootVersionAlias } from "../argv.js";
-import {
-  CLI_EXIT_USAGE,
-  formatCliErrorMessage,
-  isCommanderUsageError,
-} from "../cli-errors.js";
 import { formatCliBannerLine, hasEmittedCliBanner } from "../banner.js";
+import { CLI_EXIT_USAGE, formatCliErrorMessage, isCommanderUsageError } from "../cli-errors.js";
 import { replaceCliName, resolveCliName } from "../cli-name.js";
 import { CLI_LOG_LEVEL_VALUES, parseCliLogLevelOption } from "../log-level-option.js";
 import { getCoreCliCommandsWithSubcommands } from "./command-registry.js";

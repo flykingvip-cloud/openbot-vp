@@ -25,13 +25,13 @@
 
 LIVE `cf7ceb40a7` → main `76fea1fb0669`,12 提交 / 13 文件 / +1281-38:
 
-| 类别           | 内容                                                    | 默认生效行为   |
-| -------------- | ------------------------------------------------------- | -------------- |
-| 治理/规格 docs | `.kiro/specs/**`(p2-5 三件、item7 handoff、tasks)       | 无             |
+| 类别           | 内容                                                                                                                                             | 默认生效行为   |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- |
+| 治理/规格 docs | `.kiro/specs/**`(p2-5 三件、item7 handoff、tasks)                                                                                                | 无             |
 | 交付记账       | `RELEASE_RECORD.md`、`https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl`、CSC cutover 记录 | 无(记录性)     |
-| Loom           | `.loom/registry.yaml`                                   | 无             |
-| 证据           | `docs/design/evidence/**`(json / test.mjs)              | 无             |
-| **代码**       | `src/memory/item7-stage-d-readiness.ts`(+test)          | **无默认生效** |
+| Loom           | `.loom/registry.yaml`                                                                                                                            | 无             |
+| 证据           | `docs/design/evidence/**`(json / test.mjs)                                                                                                       | 无             |
+| **代码**       | `src/memory/item7-stage-d-readiness.ts`(+test)                                                                                                   | **无默认生效** |
 
 **唯一 `src` 改动 `item7-stage-d-readiness.ts` — 已逐条核实安全:**
 

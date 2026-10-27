@@ -186,3 +186,152 @@ describe("health-probe read-only fixtures", () => {
     expect(report).not.toHaveProperty("authorizedAgentIds");
   });
 });
+
+describe("health-probe backend branching (O1)", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  function mkRoot(prefix: string): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+    dirs.push(dir);
+    return dir;
+  }
+
+  it("does not claim search ready from storage readability alone", () => {
+    const root = mkRoot("hp-o1-search-");
+    const workspace = path.join(root, "workspace");
+    fs.mkdirSync(workspace, { recursive: true });
+    const indexPath = path.join(root, "memory", "agent.sqlite");
+    createWalBackedSqlite(indexPath);
+    const result = probeAgentReadOnly({
+      agentId: "agent",
+      workspaceRoot: workspace,
+      indexPath,
+      backend: "builtin",
+      configuredBackend: "builtin",
+    });
+    expect(result.agent.searchableDocumentCount).toBe(1);
+    expect(result.agent.documentState).toBe("populated");
+    expect(result.agent.search).toBe("unknown");
+    expect(result.agent.retrievalStatus).toBe("unknown");
+    expect(result.agent.probeExecution).toBe("ok");
+  });
+
+  it("reads cogniweave_atoms instead of builtin files for cogniweave backend", async () => {
+    const root = mkRoot("hp-o1-cw-");
+    const workspace = path.join(root, "workspace");
+    fs.mkdirSync(workspace, { recursive: true });
+    const indexPath = path.join(root, "canonical.sqlite");
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(indexPath);
+    db.exec("CREATE TABLE cogniweave_atoms (id TEXT PRIMARY KEY)");
+    db.prepare("INSERT INTO cogniweave_atoms (id) VALUES (?)").run("a1");
+    db.prepare("INSERT INTO cogniweave_atoms (id) VALUES (?)").run("a2");
+    // Also create a misleading files table that must be ignored for cogniweave.
+    db.exec("CREATE TABLE files (path TEXT)");
+    db.prepare("INSERT INTO files (path) VALUES (?)").run("noise.md");
+    db.close();
+    const result = probeAgentReadOnly({
+      agentId: "main",
+      workspaceRoot: workspace,
+      indexPath,
+      backend: "cogniweave",
+      configuredBackend: "cogniweave",
+    });
+    expect(result.agent.configuredBackend).toBe("cogniweave");
+    expect(result.agent.observedBackend).toBe("cogniweave");
+    // Full-DB atom count must NOT become per-agent searchableDocumentCount.
+    expect(result.agent.searchableDocumentCount).toBeNull();
+    expect(result.agent.storage).toBe("ready");
+    expect(result.agent.search).toBe("unknown");
+    // Storage readable alone must not force backendHealth=healthy.
+    expect(result.agent.backendHealth).toBe("unknown");
+  });
+
+  it("accepts trusted scopedDocumentCount without using full-library totals", async () => {
+    const root = mkRoot("hp-o1-scoped-");
+    const workspace = path.join(root, "workspace");
+    fs.mkdirSync(workspace, { recursive: true });
+    const indexPath = path.join(root, "canonical.sqlite");
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(indexPath);
+    db.exec("CREATE TABLE cogniweave_atoms (id TEXT PRIMARY KEY)");
+    db.prepare("INSERT INTO cogniweave_atoms (id) VALUES (?)").run("a1");
+    db.prepare("INSERT INTO cogniweave_atoms (id) VALUES (?)").run("a2");
+    db.prepare("INSERT INTO cogniweave_atoms (id) VALUES (?)").run("a3");
+    db.close();
+    const result = probeAgentReadOnly({
+      agentId: "main",
+      workspaceRoot: workspace,
+      indexPath,
+      backend: "cogniweave",
+      configuredBackend: "cogniweave",
+      scopeCountTrusted: true,
+      scopedDocumentCount: 1,
+    });
+    expect(result.agent.searchableDocumentCount).toBe(1);
+    expect(result.agent.storage).toBe("ready");
+    expect(result.agent.backendHealth).toBe("unknown");
+  });
+
+  it("does not mark CogniWeave REST unhealthy when local canonical.sqlite is missing", () => {
+    const root = mkRoot("hp-o1-rest-");
+    const workspace = path.join(root, "workspace");
+    fs.mkdirSync(workspace, { recursive: true });
+    const indexPath = path.join(root, "missing", "canonical.sqlite");
+    const result = probeAgentReadOnly({
+      agentId: "main",
+      workspaceRoot: workspace,
+      indexPath,
+      backend: "cogniweave",
+      configuredBackend: "cogniweave",
+      cogniweaveMode: "rest",
+    });
+    expect(fs.existsSync(indexPath)).toBe(false);
+    expect(result.agent.storage).toBe("unknown");
+    expect(result.agent.backendHealth).toBe("unknown");
+    expect(result.agent.searchableDocumentCount).toBeNull();
+    expect(result.agent.probeExecution).toBe("ok");
+  });
+
+  it("treats QMD collection path existence as storage-only, not backend health", () => {
+    const root = mkRoot("hp-o1-qmd-");
+    const workspace = path.join(root, "workspace");
+    const collection = path.join(workspace, "memory");
+    fs.mkdirSync(collection, { recursive: true });
+    const result = probeAgentReadOnly({
+      agentId: "main",
+      workspaceRoot: workspace,
+      indexPath: path.join(workspace, ".openbot-qmd-probe-sentinel"),
+      backend: "qmd",
+      configuredBackend: "qmd",
+      qmdCollectionPaths: [collection],
+    });
+    expect(result.agent.storage).toBe("ready");
+    expect(result.agent.backendHealth).toBe("unknown");
+    expect(result.agent.searchableDocumentCount).toBeNull();
+    expect(result.agent.retrievalStatus).toBe("unknown");
+  });
+
+  it("does not create missing cogniweave store during probe", () => {
+    const root = mkRoot("hp-o1-missing-");
+    const workspace = path.join(root, "workspace");
+    fs.mkdirSync(workspace, { recursive: true });
+    const indexPath = path.join(root, "missing", "canonical.sqlite");
+    const before = fs.existsSync(path.dirname(indexPath));
+    const result = probeAgentReadOnly({
+      agentId: "main",
+      workspaceRoot: workspace,
+      indexPath,
+      backend: "cogniweave",
+      configuredBackend: "cogniweave",
+    });
+    expect(before).toBe(false);
+    expect(fs.existsSync(path.dirname(indexPath))).toBe(false);
+    expect(result.agent.storage).toBe("missing");
+    expect(result.agent.probeExecution).toBe("ok");
+  });
+});

@@ -123,7 +123,7 @@ function authority(
   return createRuntimeAuthority({
     snapshot,
     episodeId: "ep_s2",
-    tenant: { tenantId: "001", trust: "explicit" },
+    tenant: { tenantId: "001", trust: "membership" },
     groupId: "grp_s2",
     profile: "personal_local",
     cfg,
@@ -132,9 +132,12 @@ function authority(
 
 const seedTask = {
   taskId: "task_s2",
+  groupId: "grp_s2",
   title: "S2 plan gate",
-  status: "open",
-} as Task;
+  status: "ready",
+  createdAtMs: 1,
+  updatedAtMs: 1,
+} satisfies Task;
 
 function boardStub(
   partial: Partial<GroupBoardClaimItem> & { itemId: string },

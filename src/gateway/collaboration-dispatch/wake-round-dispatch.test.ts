@@ -431,3 +431,109 @@ describe("P0-2 wake→round dispatch consumer", () => {
     }
   });
 });
+
+describe("Mode B wake single-lead mentionMode (consumption path)", () => {
+  const lead: CollaborationBotTarget = {
+    agentId: "bot:analyst",
+    name: "分析助手",
+    sessionKey: "agent:bot:analyst:main",
+    updatedAt: 1,
+  };
+  const other: CollaborationBotTarget = {
+    agentId: "bot:peer",
+    name: "同伴",
+    sessionKey: "agent:bot:peer:main",
+    updatedAt: 2,
+  };
+
+  it("buildModeBWakeParticipationDecision uses single_primary on top-level and roundPlan", async () => {
+    const { buildModeBWakeParticipationDecision } =
+      await import("./mode-b-wake-round-dispatcher.js");
+    const decision = buildModeBWakeParticipationDecision({
+      roundId: "wake_test_1",
+      sessionKey: "space:grp_mode_b_wake",
+      leadBot: lead,
+      reason: "test",
+      source: "self_advance",
+    });
+    expect(decision.responseMode).toBe("single_owner");
+    expect(decision.primaryMode).toBe("single");
+    expect(decision.mentionMode).toBe("single_primary");
+    expect(decision.roundPlan.mentionMode).toBe("single_primary");
+    expect(decision.primaryQueue).toEqual([lead.agentId]);
+    expect(decision.executionBots).toHaveLength(1);
+  });
+
+  it("executeCollaborationRound keeps single owner / single primaryQueue (no multi-mention fan-out)", async () => {
+    const fs = await import("node:fs/promises");
+    const os = await import("node:os");
+    const path = await import("node:path");
+    const { executeCollaborationRoundForTest } =
+      await import("./__fixtures__/runtime-authority-test-utils.js");
+    const { buildModeBWakeParticipationDecision } =
+      await import("./mode-b-wake-round-dispatcher.js");
+    const { DEFAULT_COLLABORATION_POLICY } = await import("./policy.js");
+    const roundsDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-mode-b-wake-"));
+    const decision = buildModeBWakeParticipationDecision({
+      roundId: "wake_consume_1",
+      sessionKey: "space:grp_mode_b_wake",
+      leadBot: lead,
+      reason: "consume-path",
+      source: "self_advance",
+    });
+    const calls: string[] = [];
+    const round = await executeCollaborationRoundForTest({
+      decision,
+      policy: {
+        ...DEFAULT_COLLABORATION_POLICY,
+        supplement: { ...DEFAULT_COLLABORATION_POLICY.supplement, enabled: false },
+        coordinator: { ...DEFAULT_COLLABORATION_POLICY.coordinator, enabled: false },
+      },
+      scope: {
+        groupId: "grp_mode_b_wake",
+        rawSessionKey: "space:grp_mode_b_wake",
+        title: "Mode B Wake",
+        bots: [lead, other],
+      },
+      message: "【Mode B 自推进】请继续推进",
+      sessionKey: "space:grp_mode_b_wake",
+      roundsDir,
+      isAborted: () => false,
+      runBot: async ({ dispatchId, bot }) => {
+        calls.push(`${dispatchId}|${bot.agentId}`);
+        return { text: "继续推进认领项，结论已给出。" };
+      },
+    });
+    expect(round.mentionMode).toBe("single_primary");
+    expect(round.primaryMode).toBe("single");
+    expect(round.primaryQueue).toEqual([lead.agentId]);
+    expect(round.collaborationMode).toBe("single_owner");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain(lead.agentId);
+    expect(calls.some((c) => c.includes(other.agentId))).toBe(false);
+    expect(round.state).toBe("ROUND_COMPLETE");
+  });
+
+  it("default board-kickoff expand does not rewrite Mode B single-lead into explicit_multi", async () => {
+    const { buildModeBWakeParticipationDecision } =
+      await import("./mode-b-wake-round-dispatcher.js");
+    const { applyBoardKickoffMultiParticipant } = await import("./claim-contract.js");
+    const decision = buildModeBWakeParticipationDecision({
+      roundId: "wake_kickoff_1",
+      sessionKey: "space:grp_mode_b_wake",
+      leadBot: lead,
+      reason: "kickoff-guard",
+      source: "self_advance",
+    });
+    const next = applyBoardKickoffMultiParticipant({
+      decision,
+      groupId: "grp_mode_b_wake",
+      groupBots: [lead, other],
+      intendedClaimantIds: [lead.agentId, other.agentId],
+    });
+    expect(next.mentionMode).toBe("single_primary");
+    expect(next.primaryMode).toBe("single");
+    expect(next.primaryQueue).toEqual([lead.agentId]);
+    expect(next).toBe(decision);
+  });
+});

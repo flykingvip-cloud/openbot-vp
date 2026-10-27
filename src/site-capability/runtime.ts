@@ -12,11 +12,11 @@
 import { randomUUID } from "node:crypto";
 import { DEFAULT_BROWSER_EVALUATE_ENABLED } from "../browser/constants.js";
 import type { SkillLifecycleHint } from "../gateway/skill-capability-contract.js";
+import { createAccountBrowserPort } from "./account-browser-port.js";
 import { SAR_DENIAL_CODE, sarDeny, type SarDenial } from "./codes.js";
 import type { SiteCapabilityManifest } from "./contract.js";
 import { ensureAccountBrowserCoordinator } from "./coordinator.js";
 import { SarExecutionAuthority } from "./execution-authority.js";
-import { createAccountBrowserPort } from "./account-browser-port.js";
 import { findSarScriptKey, type TrustedPagePort } from "./operations.js";
 import {
   type SiteCompleteness,

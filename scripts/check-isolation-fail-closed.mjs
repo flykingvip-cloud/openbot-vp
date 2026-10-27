@@ -25,7 +25,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(__dirname, "..");
+/**
+ * Production default: repository root (parent of scripts/).
+ * Tests may override with OPENBOT_CHECK_REPO_ROOT so fixtures do not
+ * create/delete probes under the live worktree.
+ */
+function resolveRepoRoot() {
+  const override = process.env.OPENBOT_CHECK_REPO_ROOT?.trim();
+  if (override) {
+    return path.resolve(override);
+  }
+  return path.resolve(__dirname, "..");
+}
+const repoRoot = resolveRepoRoot();
 const SCRIPT_PATH = "scripts/check-isolation-fail-closed.mjs";
 const wantDaibaiFrame = process.argv.includes("--daibai-frame");
 const wantJson = process.argv.includes("--json");
@@ -175,6 +187,8 @@ const bareSeatAllowlist = new Set([
   // Main-origin paths auto-merged during tenant-merge-main; migrate to tenant loader in follow-up.
   "src/gateway/enterprise-operational-identity-oauth/social-oauth.ts",
   "src/gateway/meeting-tencent-meeting-bridge.ts",
+  // Cross-tenant seat→tenant index: must read process-global store then per-tenant stores.
+  "src/gateway/seat-tenant-index.ts",
 ]);
 
 const failOpenRosterRe =

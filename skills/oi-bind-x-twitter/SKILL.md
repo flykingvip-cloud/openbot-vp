@@ -39,11 +39,11 @@ S6 live 证据：[references/live-evidence.md](references/live-evidence.md)
 
 与 `renderOauthPersonalForm`（`x-twitter`）一致：
 
-| UI 标签 | 写入 | 必填 |
-|---------|------|------|
-| 显示名称 | displayName（`oauth.start`） | 建议 |
-| X 用户名 | 表单 credentialHandleId 位；真 OAuth **可留空** | 否 |
-| 提交 | 「授权绑定」/「重新认证」 | — |
+| UI 标签  | 写入                                            | 必填 |
+| -------- | ----------------------------------------------- | ---- |
+| 显示名称 | displayName（`oauth.start`）                    | 建议 |
+| X 用户名 | 表单 credentialHandleId 位；真 OAuth **可留空** | 否   |
+| 提交     | 「授权绑定」/「重新认证」                       | —    |
 
 运营动作（catalog，绑后按 scope 门禁）：
 

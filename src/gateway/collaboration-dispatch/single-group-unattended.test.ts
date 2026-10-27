@@ -485,6 +485,9 @@ describe("batch 5 single-group unattended", () => {
       throw new Error(result.message);
     }
     expect(result.advanced).toBe(false);
+    if (result.advanced) {
+      return;
+    }
     expect(result.reason).toBe("mission_fence_human_gate");
     expect(spy.calls).toHaveLength(0);
     const state = await readUnattendedLaneState(auth);
@@ -922,6 +925,10 @@ describe("batch 5 single-group unattended", () => {
     if (!first.ok) {
       throw new Error(first.message);
     }
+    expect(first.advanced).toBe(false);
+    if (first.advanced) {
+      return;
+    }
     expect(first.reason).toBe("mission_fence_human_gate");
     expect(spy.calls).toHaveLength(0);
     const second = await trySelfAdvance(auth, {
@@ -934,6 +941,10 @@ describe("batch 5 single-group unattended", () => {
     expect(second.ok).toBe(true);
     if (!second.ok) {
       throw new Error(second.message);
+    }
+    expect(second.advanced).toBe(false);
+    if (second.advanced) {
+      return;
     }
     expect(second.reason).toBe("duplicate_external_side_effect");
     expect(spy.calls).toHaveLength(0);

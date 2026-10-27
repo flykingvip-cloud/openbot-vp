@@ -1,36 +1,85 @@
-# 调用链与旧成功写入替换清单（askOutcome P0）
+# 调用链与旧成功写入替换清单（askOutcome）
 
-## 新调用链
+> W0（基线与证据收敛）修订：对齐 main tip 合入身份（#85 / #89 / #94），去掉过时「runner success → not_required 关闭」表述；**不**把局部适配器声明当成全系统入口闭环。
+
+## 已核实合入（gh，勿口述）
+
+| PR | state | mergeCommit | head tip | 主题 |
+|----|-------|-------------|----------|------|
+| [#85](https://github.com/flykingvip-cloud/openbot-vp/pull/85) | MERGED | `d00bdcca0f3ab5d43af9ed01c65d6a9f47c0a13b` | `ac21ae17…` | R83 persist/CAS/consumer |
+| [#89](https://github.com/flykingvip-cloud/openbot-vp/pull/89) | MERGED | `c3a40259e1e6a878e4608133733349eb39a1646d` | `f67c05ad…` | gateway boot hydrate awaiting-delivery |
+| [#94](https://github.com/flykingvip-cloud/openbot-vp/pull/94) | MERGED | `d3cd349a378c2ccfb736807988e0d97c285272ff` | `9006274a…` | attempt 诚实归因 + confirm-no-id |
+
+当前 `origin/main` tip ≡ #94 merge `d3cd349a…`（W0 取证时）。
+
+## 新调用链（模块内）
 
 ```
-entrypoint adapter (chat|gateway_agent|cron|cli|collab)
+entrypoint adapter 实例方法
   → TaskOutcomeResultService.submit
   → DurableTaskOutcomeStore (task + outbox)
   → OutcomeConsumerRuntime.drain (consumerId+eventId)
   → contribution projection + evaluation eligibility
+  →（仅 closed + eligible）growth-bridge → appendEvolutionTaskOutcome
 ```
 
-## 旧路径（本批替换策略）
+生产热路径（**已接线、有调用证据**）：
 
-| 旧写入 | 文件 | 本批处理 |
-|--------|------|----------|
-| `appendEvolutionTaskOutcome` 直接记 completed/failed | `src/gateway/agent-growth/evolution-task-outcomes.ts` | 保留存储格式；新增 `growth-bridge.ts` 仅在统一结果 + 评价资格允许时写入 |
-| agent-runner 演化 outcome 写失败可观测 | `agent-runner-evolution-outcome.test.ts` | 保留；runner 现经 `recordRunnerTurnOutcome` |
-| `recordRunOutcome` 直接记 turn 成功 | `agent-runner-execution.ts` | **已切换**：`recordGrowthTaskOutcome` → `recordRunnerTurnOutcome`（TaskOutcome + growth-bridge） |
-| operational-metrics-store 内 append | `operational-metrics-store.ts` | 热路径不再经此 append 任务成功；工具计数仍用 `recordToolOutcomes` |
+1. **chat / gateway 对话 turn**：`agent-runner-execution` → `ensureChatTurnTaskOutcome`（`ChatTaskOutcomeAdapter.createOrRestore`，持久 `entrypoint: "chat"`）→ 收尾 `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome` → 按调用方传入的 acceptance/delivery 门闩推进；**不**在 runner 内发明 `not_required`。
+2. **#89 hydrate**：gateway boot → `hydrateAllAgentsAwaitingDeliveries` / `recoverTaskOutcomeConsumersAtGatewayBoot`（`consumer-boot.ts` + `pending-delivery.ts`）。
+3. **#94 attempt**：`attempt.ts` 末 pattern `success=null`（未证实失败时）；技能仍调 `recordLifecycleSkillsLoadedOnRun`，run 级 `outcome=null` 时跳过 prompt-named-use **成功**写入、不转 failure；工具级按 `toolMetas`。`confirmPendingTurnDelivery` 三 id 皆缺 → fail-soft + `confirm_skipped_no_locator_ids`。
 
-生产热路径：`agent-runner-execution.recordGrowthTaskOutcome` → `recordRunnerTurnOutcome` → `ChatTaskOutcomeAdapter` / `TaskOutcomeResultService` → 仅在 closed+eligible 时 `publishEvolutionFromTaskOutcome`。run 成功保持 `awaiting_acceptance`（incomplete），不发明任务成功。
+## 入口适配器现状（W0 核验；W1 待修）
 
-热文件 `agent-runner-execution.ts` 的 loom `sharedPaths` lander 仍归 `openbot-evolution-loop-fix:cursor-grok`；本任务只拥有 `src/task-outcome/**`（含 `runtime-from-runner`）。
+| 类 | 声明的 `entrypoint` 字段 | `openTask` / create 实际写入 | 生产接线 |
+|----|-------------------------|------------------------------|----------|
+| `ChatTaskOutcomeAdapter` | （无字段；create 写 `"chat"`） | **`entrypoint: "chat"` 硬编码**于 `createOrRestore` | **已接线**：`chat-entry.ts` / `runtime-from-runner.ts` / `agent-runner-execution.ts` |
+| `CronTaskOutcomeAdapter` | `"cron"` | `openTask` → 父类 `createOrRestore` → **仍写 `"chat"`** | 仅导出 + 单元测 `openTask` 复用 taskId；cron 生产另调 `recordRunnerTurnOutcome` **且未传 taskId**（会 throw / void 吞掉），**不能**称 cron 入口闭环 |
+| `CliTaskOutcomeAdapter` | `"cli"` | 同上 → **仍写 `"chat"`** | **无**生产调用点（仅 `index` 导出） |
+| `CollabTaskOutcomeAdapter` | `"collab"` | 同上 → **仍写 `"chat"`** | **无**生产调用点 |
+| `GatewayAgentTaskOutcomeAdapter` | `"gateway_agent"` | 同上 → **仍写 `"chat"`** | **无**生产调用点（对话走 chat-entry） |
 
-## R83 remediation (post #83)
+结论（优先核验点）：**子类声明的 entrypoint 不会进入持久记录**；持久来源是 `ChatTaskOutcomeAdapter.createOrRestore` 的字面量 `"chat"`。子类字段仅存在于 TS 实例上，submit create 未读取。W1 须改 create 传真实入口，并补各入口生产接线与断言持久字段的测试。
 
-- Persist: `commitBundle` publishes one commit then materializes tip + immutable `versions/` snapshot + outbox; reopen replays unapplied commits.
-- Concurrency: per-task exclusive lock in `withTaskLock` around version check + commit (proven by two OS processes).
-- Consume: `OutcomeConsumerRuntime` durable projection; evolution publish only via drain handlers (no runner bypass).
-- Failure attribution: `fail_closed` with structured `reasonCode` (not boolean→acceptance_failed).
-- commandId digest idempotency; correction allowlist; restore scope/subject checks.
+## 关闭语义（R85b 起；取代过时句）
 
-- Entry: `ensureChatTurnTaskOutcome` at `agent-runner-execution` turn start; `recordRunnerTurnOutcome` requires taskId (no `run:` invent).
+**过时（已删除）**：`runner success closes with not_required acceptance/delivery`。
 
-- R85: recover tip monotonic; handler-independent ack; contribution count flags + always rebuild; commandLog in commit bundle; requiredScope mandatory; correction binds callerSubjectRef; runner success closes with not_required acceptance/delivery.
+**现行**：
+
+- `recordRunnerTurnOutcome`：**禁止**自行发明 `not_required`；仅当调用方显式传入 `acceptance` / `delivery` 才 `setAcceptance` / `setDelivery`（见 `runtime-from-runner.ts` R85b 注释）。
+- 成功 run 默认停留在可验收/可交付中间态（`awaiting_acceptance` / incomplete），由 `resolveChatTurnCloseGates` / 契约分类决定是否 waiver：
+  - 仅 **显式** `chat_turn` + 无 required validators → acceptance `not_required`；
+  - 缺分类 / `unknown` / 执行意图 → acceptance **pending**（不自动免验）；
+  - delivery 默认 `awaiting`→pending，须真实 send/confirm（#89 hydrate 保活 pending）。
+- 任务级 evolution 样本：仅 tip `closed` 且 `computeEvaluationEligibility` 允许时由 consumer / `publishEvolutionFromTaskOutcome` 写入。
+
+## 旧路径分类（详见 W0 报告；不按函数名批量删除）
+
+| 写入 | 文件 | 分类 | 说明 |
+|------|------|------|------|
+| `appendEvolutionTaskOutcome`（growth-bridge） | `growth-bridge.ts` | **已替换路径上的合法写入** | 仅统一结果 + 资格允许时；含 revoke |
+| `appendEvolutionTaskOutcome`（operational-metrics `recordTaskOutcome` / `recordRunOutcome`） | `operational-metrics-store.ts` | **待替换 / 旁路** | 仍可直接记 succeeded；`evolution-control` RPC 仍调 `recordRunOutcome` |
+| `recordToolOutcomes` | `operational-metrics-store.ts` | **合法独立观测** | 工具计数；非任务成功 |
+| `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome` | `agent-runner-execution.ts` | **已替换** | 热路径已切统一 TaskOutcome |
+| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun` | `attempt.ts` | **观测；#94 已阻误成功** | 非任务 tip；正样本回填属 W2 |
+| agent-runner 演化写失败可观测 | `agent-runner-evolution-outcome.test.ts` | **合法独立观测** | 保留 |
+
+## loom / 热文件（W0 登记）
+
+| 路径 | landerTask | owner | reviewAfter | 备注 |
+|------|------------|-------|-------------|------|
+| `src/task-outcome/**`、`docs/design/task-outcome/**` | `askOutcome-p0-task-outcome-contract` | `executor-acceptance` | 2026-11-30 | W0–W5 收尾唯一模块 owner |
+| `src/auto-reply/reply/agent-runner-execution.ts` | `openbot-evolution-loop-fix:cursor-grok` | `cursor-grok` | 2026-11-30 | 热文件；过期 reviewAfter ≠ 自动失效；改接线须临时协调后恢复 |
+| `src/agents/pi-embedded-runner/run/attempt.ts` | constitutional-runtime…（sharedPath） | 见 registry | （见 registry） | #94 已改；后续 attempt 仍须协调 |
+
+**原则**：过期 `reviewAfter` 不等于原归属自动失效；临时 lander 须在交付前恢复，不得双 owner。
+
+## R83 / R85 / P1 要点（保留）
+
+- Persist：`commitBundle` + tip/`versions/` + outbox；CAS：`withTaskLock`。
+- Consume：durable projection；evolution 仅经 drain / growth-bridge（runner 不旁路写成功样本）。
+- Failure：`fail_closed` + `reasonCode`。
+- Entry：`ensureChatTurnTaskOutcome`；`recordRunnerTurnOutcome` 强制 taskId（拒 `run:` 发明）。
+- R85：recover tip；handler-independent ack；contribution flags；commandLog；requiredScope；correction 绑 callerSubjectRef；**关闭门闩由契约/调用方解析，非 runner 成功即 not_required**。
+- P1（#94）：见上文 attempt / confirm-no-id；本批不做验收后正样本回填。
