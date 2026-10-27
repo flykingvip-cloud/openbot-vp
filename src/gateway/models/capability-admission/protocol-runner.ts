@@ -1,8 +1,10 @@
 /**
  * Formal protocol check runner for gateway admission.
  * Does not call paid Midjourney / Suno / other generation APIs.
- * text_chat may pass when connectionOk; specialized capabilities stay
- * checker_unavailable until a real specialized runner is injected.
+ * text_chat may pass only from server-trusted connection resolution or
+ * already-bound formal evidence; client-supplied connectionOk is ignored.
+ * Specialized capabilities stay checker_unavailable until a real specialized
+ * runner is injected.
  */
 
 import { capabilityLabel } from "./capability-ids.js";
@@ -18,39 +20,67 @@ export type CapabilityCheckRunner = {
   check(ctx: ProtocolCheckContext): Promise<ProtocolCheckOutcome[]> | ProtocolCheckOutcome[];
 };
 
+/**
+ * Resolve whether text_chat may be marked formally passed.
+ * Never trusts ctx.connectionOk from RPC clients.
+ */
+async function resolveTrustedConnectionOk(
+  ctx: ProtocolCheckContext,
+  resolveConnectionOk?: (modelRef: string, fingerprint?: string) => boolean | Promise<boolean>,
+): Promise<boolean> {
+  if (resolveConnectionOk) {
+    return Boolean(await resolveConnectionOk(ctx.modelRef, ctx.configFingerprint));
+  }
+  return false;
+}
+
 export function createDefaultProtocolRunner(
   resolveConnectionOk?: (modelRef: string, fingerprint?: string) => boolean | Promise<boolean>,
+  storePath?: string,
 ): CapabilityCheckRunner {
   return {
     async check(ctx: ProtocolCheckContext): Promise<ProtocolCheckOutcome[]> {
-      const connectionOk =
-        ctx.connectionOk ??
-        (resolveConnectionOk
-          ? Boolean(await resolveConnectionOk(ctx.modelRef, ctx.configFingerprint))
-          : false);
-      const admission = await getModelAdmission(ctx.modelRef);
+      // Client-forged connectionOk must not mint formal passed.
+      const connectionOk = await resolveTrustedConnectionOk(ctx, resolveConnectionOk);
+      const admission = await getModelAdmission(ctx.modelRef, storePath);
       return ctx.capabilityIds.map((id) => {
         if (id === "text_chat") {
+          const existing = admission.capabilityEvidence.find(
+            (item) => item.id === "text_chat" && item.status === "passed",
+          );
+          const fingerprintBound =
+            Boolean(ctx.configFingerprint) &&
+            Boolean(admission.connectionFingerprint) &&
+            ctx.configFingerprint === admission.connectionFingerprint;
           if (connectionOk) {
-            const existing = admission.capabilityEvidence.find(
-              (item) => item.id === "text_chat" && item.status === "passed",
-            );
             return {
               capabilityId: id,
               status: "passed" as const,
               testVersion: existing?.testVersion ?? "gateway-protocol-v1",
               sourceNote: existing
-                ? "复用已通过的连接协议探测（指纹绑定）"
-                : "连接协议探测通过（指纹绑定）",
+                ? "复用已通过的连接协议探测（服务端可信）"
+                : "连接协议探测通过（服务端可信）",
               verifiedAt: existing?.verifiedAt ?? admission.connectionVerifiedAt ?? Date.now(),
               expiresAt: existing?.expiresAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000,
               reuseExistingEvidence: Boolean(existing),
             };
           }
+          // Reuse prior formal evidence only when fingerprint still matches.
+          if (existing && fingerprintBound) {
+            return {
+              capabilityId: id,
+              status: "passed" as const,
+              testVersion: existing.testVersion ?? "gateway-protocol-v1",
+              sourceNote: "复用已绑定指纹的正式证据（非客户端声明）",
+              verifiedAt: existing.verifiedAt ?? admission.connectionVerifiedAt,
+              expiresAt: existing.expiresAt ?? Date.now() + 7 * 24 * 60 * 60 * 1000,
+              reuseExistingEvidence: true,
+            };
+          }
           return {
             capabilityId: id,
             status: "failed" as const,
-            failureReason: "连接未验证或指纹不匹配，不能证明文本对话可用",
+            failureReason: "连接未经验证（拒绝客户端 connectionOk 声明），不能证明文本对话可用",
             testVersion: "gateway-protocol-v1",
           };
         }

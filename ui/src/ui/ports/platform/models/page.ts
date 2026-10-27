@@ -250,6 +250,7 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
               },
               // 租户可选／自动路由：仅在 gateway models.admission.* 已绑定时由抽屉启用；
               // localStorage 草稿不会被展示成平台已生效状态。
+              // 准入 applied／platformEffective 只写存档并供干跑预览；不驱动线上会话选型。
             })}
           `
         : activeTab === "taskPlans"

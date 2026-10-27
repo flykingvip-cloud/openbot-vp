@@ -67,6 +67,10 @@ export type SetRoutingEligibilityRequest = {
 
 export type SetRoutingEligibilityResponse =
   | {
+      /**
+       * Written to gateway admission store (`platformEffective`).
+       * Feeds admin UX + dry-run preview only — not live agent/chat selection yet.
+       */
       status: "applied";
       modelRef: string;
       autoRouting: AutoRoutingAdmission;

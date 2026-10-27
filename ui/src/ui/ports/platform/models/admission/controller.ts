@@ -1,6 +1,8 @@
 /**
  * Capability admission controller: discover / start / query / cancel / routing eligibility.
- * When gateway RPC is bound, setRoutingEligibility returns applied (platform-effective).
+ * When gateway RPC is bound, setRoutingEligibility returns applied (admission store
+ * platform-effective). That is management persistence + dry-run preview input — not
+ * live agent/chat model selection.
  * Offline / unbound path stays draft/not_wired via local_protocol adapter.
  */
 
@@ -110,8 +112,9 @@ export async function retryCapabilityVerification(
 }
 
 /**
- * Routing eligibility — returns applied when gateway RPC is bound;
+ * Routing eligibility — returns applied (store write) when gateway RPC is bound;
  * otherwise local_protocol reports not_wired draft.
+ * Applied does not mean live session routing already consumes eligibility.
  */
 export async function setModelRoutingEligibility(input: {
   modelRef: string;

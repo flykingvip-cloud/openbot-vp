@@ -4,6 +4,9 @@
  * Formal platform admission (tenant selectable, auto-routing eligibility) must come
  * from backend facts (`platformEffective: true` after models.admission.* RPC sync).
  * Local tenant/autoRouting drafts stay non-effective until synced from gateway.
+ * `platformEffective` / status `applied` means the admission *store* record is real —
+ * it feeds admin UX + dry-run preview only; live agent/chat model selection does not
+ * read this eligibility yet.
  *
  * Formal capabilityEvidence is for real verification results only.
  * demoCapabilityEvidence is isolated UI-demo output and never feeds verified sets.
@@ -47,8 +50,9 @@ export type ModelAdmissionRecord = {
   demoCapabilityEvidence?: CapabilityEvidenceItem[];
   updatedAt: number;
   /**
-   * True when values were synced from gateway admission RPC (platform-effective).
+   * True when values were synced from gateway admission RPC (platform store effective).
    * Local drafts stay false / undefined and must not be shown as live policy.
+   * Does NOT mean live chat/agent routing already consumes this eligibility.
    */
   platformEffective?: boolean;
 };
@@ -496,7 +500,7 @@ export function autoRoutingLabel(value: AutoRoutingAdmission): string {
     case "disabled":
       return "未启用";
     case "eligible":
-      return "可参与";
+      return "可参与（预览）";
     case "restricted":
       return "受限";
     case "paused":

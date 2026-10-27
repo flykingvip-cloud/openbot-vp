@@ -64,13 +64,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
+      // Client connectionOk is intentionally ignored: formal passed requires
+      // server-trusted resolveConnectionOk / bound evidence, never RPC claims.
       const result = await service.createVerificationTask({
         modelRef: params.modelRef,
         capabilityIds: params.capabilityIds,
         mode: params.mode,
         configFingerprint: params.configFingerprint,
         estimatedCalls: params.estimatedCalls,
-        connectionOk: params.connectionOk,
       });
       respond(true, result, undefined);
     } catch (err) {

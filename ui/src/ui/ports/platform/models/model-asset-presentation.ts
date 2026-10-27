@@ -165,7 +165,7 @@ export function autoRoutingAdmissionLabel(asset: ModelAsset): string {
   }
   switch (asset.autoRouting ?? "disabled") {
     case "eligible":
-      return "可参与";
+      return "可参与（预览）";
     case "restricted":
       return "受限";
     case "paused":
