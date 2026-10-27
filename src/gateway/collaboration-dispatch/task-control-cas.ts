@@ -39,7 +39,11 @@ import {
   withGroupAuthLock,
   writeGroupOperatingState,
 } from "../collaboration-learning/shared.js";
-import type { TrustedGroupStores } from "../collaboration-learning/team-resource-auth.js";
+import {
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+  type TrustedGroupStores,
+} from "../collaboration-learning/team-resource-auth.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 
 /** T51/T52: OS auth version lives on the durable operating-state object (field authEpoch). */
 export type OperatingStateWithAuthEpoch = GatewayCollaborationGroupOperatingState & {
@@ -68,6 +72,61 @@ function readClaimAuthEpoch(claim: { authEpoch?: number } | null | undefined): n
   return typeof claim?.authEpoch === "number" && Number.isFinite(claim.authEpoch)
     ? Number(claim.authEpoch)
     : 0;
+}
+
+/**
+ * Complete trusted SoT for task-control CAS (commit/take/clear/release).
+ * Prefer passing this bundle so optional fields cannot be half-migrated.
+ */
+export type TaskControlTrustedStores = {
+  groupRootDir: string;
+  objectStorage: TrustedGroupStores["objectStorage"];
+  fileStore: TrustedGroupStores["fileStore"];
+};
+
+/**
+ * Resolve task-control stores.
+ * - Complete `trusted` / complete individual fields → use them.
+ * - managed_enterprise + incomplete → hard refuse (never patch host ~/.openbot/collaboration).
+ * - personal_local + omit all → workspace compat only (no mixed partial fill).
+ */
+export function resolveTaskControlTrustedStores(params: {
+  cfg?: OpenBotConfig;
+  trusted?: TaskControlTrustedStores | null;
+  groupRootDir?: string;
+  objectStorage?: TrustedGroupStores["objectStorage"];
+  fileStore?: TrustedGroupStores["fileStore"];
+}): TaskControlTrustedStores {
+  const cfg = params.cfg ?? loadConfig();
+  if (params.trusted?.groupRootDir && params.trusted.objectStorage && params.trusted.fileStore) {
+    return {
+      groupRootDir: path.resolve(params.trusted.groupRootDir),
+      objectStorage: params.trusted.objectStorage,
+      fileStore: params.trusted.fileStore,
+    };
+  }
+  const root = params.groupRootDir?.trim() ?? "";
+  if (root && params.objectStorage && params.fileStore) {
+    return {
+      groupRootDir: path.resolve(root),
+      objectStorage: params.objectStorage,
+      fileStore: params.fileStore,
+    };
+  }
+  const anyPartial = Boolean(root || params.objectStorage || params.fileStore || params.trusted);
+  const profile = resolveSecurityProfile(cfg).profile;
+  if (profile === "managed_enterprise" || anyPartial) {
+    throw new Error(
+      `${TRUSTED_GROUP_LOCATOR_REQUIRED}: task-control CAS requires complete trusted stores ` +
+        `(groupRootDir+objectStorage+fileStore); host ~/.openbot/collaboration fallback removed for managed/partial`,
+    );
+  }
+  const legacy = createWorkspaceCollaborationStores(cfg);
+  return {
+    groupRootDir: legacy.groupRootDir,
+    objectStorage: legacy.objectStorage,
+    fileStore: legacy.fileStore,
+  };
 }
 
 /**
@@ -556,20 +615,36 @@ export async function casClearTaskDispatchClaimForOp(params: {
   claimId: string;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Prefer complete trusted bundle (same SoT/lock as commit/take). */
+  trusted?: TaskControlTrustedStores | null;
+  groupRootDir?: string;
+  objectStorage?: TrustedGroupStores["objectStorage"];
+  fileStore?: TrustedGroupStores["fileStore"];
 }): Promise<{ cleared: boolean; reason?: string; task: GovernedTask | null }> {
   const cfg = params.cfg ?? loadConfig();
   const nowMs = params.nowMs ?? Date.now();
   const opKey = compact(params.opKey);
   const claimId = compact(params.claimId);
+  const stores = resolveTaskControlTrustedStores({
+    cfg,
+    trusted: params.trusted,
+    groupRootDir: params.groupRootDir,
+    objectStorage: params.objectStorage,
+    fileStore: params.fileStore,
+  });
   return withTaskControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
+    groupRootDir: stores.groupRootDir,
     fn: async () => {
       let current: Task | null;
       try {
-        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-        current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+        current = await stores.objectStorage.readObject<Task>(
+          params.groupId,
+          "task",
+          params.taskId,
+        );
       } catch {
         return { cleared: false, reason: "task_unreadable", task: null };
       }
@@ -592,21 +667,12 @@ export async function casClearTaskDispatchClaimForOp(params: {
         dispatchClaim: undefined,
         updatedAtMs: nowMs,
       };
-      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+      await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
       return { cleared: true, task: updated };
     },
   });
 }
 
-/**
- * T43 recovery: release a **committed** (not taken) claim when the caller can
- * prove it was never consumed — typically via associated wake-op/attempt state
- * (failed / unknown / mirror never completed) plus matching claimId.
- *
- * Refuses taken leases (must not auto-rerun on timeout alone — use receipt or
- * keep unknown). Does not bump controlEpoch.
- */
 export async function casReleaseUnconsumedCommittedClaim(params: {
   groupId: string;
   taskId: string;
@@ -614,6 +680,11 @@ export async function casReleaseUnconsumedCommittedClaim(params: {
   claimId: string;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Prefer complete trusted bundle (same SoT/lock as commit/take). */
+  trusted?: TaskControlTrustedStores | null;
+  groupRootDir?: string;
+  objectStorage?: TrustedGroupStores["objectStorage"];
+  fileStore?: TrustedGroupStores["fileStore"];
 }): Promise<{
   released: boolean;
   reason?:
@@ -633,15 +704,26 @@ export async function casReleaseUnconsumedCommittedClaim(params: {
   if (!claimId) {
     return { released: false, reason: "claim_id_required", task: null };
   }
+  const stores = resolveTaskControlTrustedStores({
+    cfg,
+    trusted: params.trusted,
+    groupRootDir: params.groupRootDir,
+    objectStorage: params.objectStorage,
+    fileStore: params.fileStore,
+  });
   return withTaskControlLock({
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
+    groupRootDir: stores.groupRootDir,
     fn: async () => {
       let current: Task | null;
       try {
-        const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-        current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
+        current = await stores.objectStorage.readObject<Task>(
+          params.groupId,
+          "task",
+          params.taskId,
+        );
       } catch {
         return { released: false, reason: "task_unreadable", task: null };
       }
@@ -667,21 +749,12 @@ export async function casReleaseUnconsumedCommittedClaim(params: {
         dispatchClaim: undefined,
         updatedAtMs: nowMs,
       };
-      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-      await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+      await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
       return { released: true, task: updated };
     },
   });
 }
 
-/**
- * Stop path helper: under the shared task control lock, accept stop, bump
- * controlEpoch, and clear any dispatchClaim so outstanding eligibility loses CAS.
- *
- * T42: accepts **only** the stop patch (stopControl + operator + time). The lock
- * re-reads the live task and patches control fields onto that latest record —
- * never merge a whole stale task snapshot from outside the lock.
- */
 export async function applyTaskStopUnderControlLock(params: {
   groupId: string;
   taskId: string;

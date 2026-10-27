@@ -980,6 +980,7 @@ export async function consumeWakeForRoundDispatch(
           claimId: taskDispatchClaimId,
           cfg: params.cfg,
           nowMs: params.nowMs,
+          trusted: wakeStores,
         });
       }
       noteNudgeNoExternal("eligibility_commit_failed");
@@ -1025,6 +1026,7 @@ export async function consumeWakeForRoundDispatch(
           claimId: taskDispatchClaimId,
           cfg: params.cfg,
           nowMs: params.nowMs,
+          trusted: wakeStores,
         });
       }
       noteNudgeNoExternal("eligibility_commit_failed");
@@ -1079,6 +1081,7 @@ export async function consumeWakeForRoundDispatch(
           claimId: taskDispatchClaimId,
           cfg: params.cfg,
           nowMs: params.nowMs,
+          trusted: wakeStores,
         });
       }
       if (
@@ -1593,6 +1596,7 @@ export async function consumeWakeForRoundDispatch(
               claimId: taskDispatchClaimId,
               cfg: params.cfg,
               nowMs: params.nowMs,
+              trusted: wakeStores,
             });
           } catch (err) {
             clearError = err;

@@ -19,7 +19,11 @@ import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
 } from "../collaboration-learning/shared.js";
-import type { TrustedGroupStores } from "../collaboration-learning/team-resource-auth.js";
+import {
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+  type TrustedGroupStores,
+} from "../collaboration-learning/team-resource-auth.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import { asGovernedTask } from "./task-runtime.js";
 
 /** Trusted SoT stores for auth recheck — must match wake authority locator. */
@@ -90,11 +94,32 @@ export async function recheckCurrentDispatchAuthorization(params: {
   let fileStore = params.fileStore;
   let objectStorage = params.objectStorage;
   if (!fileStore || !objectStorage) {
-    // Compat only when caller did not pass trusted stores (legacy personal paths).
-    // Wake round dispatch MUST pass wakeStores — never rely on this for managed.
+    const profile = resolveSecurityProfile(params.cfg).profile;
+    // managed: never patch missing half with host ~/.openbot/collaboration (mixed SoT).
+    if (profile === "managed_enterprise") {
+      return {
+        ok: false,
+        reason: "auth_source_unreadable",
+        revokedActorIds: [],
+        detail:
+          `${TRUSTED_GROUP_LOCATOR_REQUIRED}: recheckCurrentDispatchAuthorization requires ` +
+          "complete trusted fileStore+objectStorage in managed_enterprise",
+      };
+    }
+    // personal_local compat only when BOTH omitted — refuse partial mix always.
+    if (fileStore || objectStorage) {
+      return {
+        ok: false,
+        reason: "auth_source_unreadable",
+        revokedActorIds: [],
+        detail:
+          `${TRUSTED_GROUP_LOCATOR_REQUIRED}: partial trusted stores refused for auth recheck ` +
+          "(pass both fileStore and objectStorage, or omit both for personal_local compat)",
+      };
+    }
     const legacy = createWorkspaceCollaborationStores(params.cfg);
-    fileStore = fileStore ?? legacy.fileStore;
-    objectStorage = objectStorage ?? legacy.objectStorage;
+    fileStore = legacy.fileStore;
+    objectStorage = legacy.objectStorage;
   }
   let operatingState: Parameters<typeof isMappedDeliveryIdentity>[0] = null;
   try {

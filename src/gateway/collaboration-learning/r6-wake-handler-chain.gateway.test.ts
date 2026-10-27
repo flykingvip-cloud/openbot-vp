@@ -636,12 +636,48 @@ describe("R6 wake auth recheck uses authority-aligned stores (dual-root conflict
         reason: "r6-conflict-reverse",
       },
     });
-    // Must not fail for auth_revoked (legacy poison). Other gate reasons OK.
+    // Strong positive: must actually dispatch once (not "any non-auth failure").
     expect(consume.reason).not.toBe("auth_revoked");
-    if (consume.reason === "auth_revoked") {
-      throw new Error("wake mis-read legacy root and false-revoked");
-    }
-    void dispatchedCalls;
+    expect(consume.dispatched).toBe(true);
+    expect(dispatchedCalls).toBe(1);
+    expect(consume.roundId).toBe("round-auth-ok");
+
+    const afterFirst = (await seeded.stores.objectStorage.readObject(
+      groupId,
+      "task",
+      taskId,
+    )) as Task & { dispatchClaim?: unknown };
+    expect(afterFirst?.dispatchClaim).toBeFalsy();
+
+    // Second distinct op must also succeed (claim cleared on tenant root, not stuck claim_held).
+    let dispatchedCalls2 = 0;
+    const consume2 = await consumeWakeForRoundDispatch({
+      authority,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        dispatchedCalls2 += 1;
+        return { ok: true, roundId: "round-auth-ok-op-b" };
+      },
+      request: {
+        groupId,
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: [bot],
+        source: "nudge",
+        taskId,
+        itemId: "item-2",
+        reason: "r6-conflict-reverse-op-b",
+      },
+    });
+    expect(consume2.reason).not.toBe("auth_revoked");
+    expect(consume2.reason).not.toBe("eligibility_cas_rejected");
+    expect(consume2.dispatched).toBe(true);
+    expect(dispatchedCalls2).toBe(1);
+    expect(consume2.roundId).toBe("round-auth-ok-op-b");
+
+    // Legacy root must not receive the tenant task claim lifecycle writes.
+    const legacyTask = await legacy.objectStorage.readObject(groupId, "task", taskId);
+    expect(legacyTask).toBeNull();
   });
 });
 
