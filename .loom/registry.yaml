@@ -9833,7 +9833,6 @@ tasks:
       reviewAfter: "2026-11-30"
       note: config-gated IMAGE_EXECUTOR_WIRED / AUDIO_MUSIC_WIRED; no merge/deploy in this PR
 
-
   - id: askOutcome-p0-r83-remediation
     owner: executor-acceptance
     intent:
@@ -9911,7 +9910,6 @@ landingStreams:
       owner: grok-bot
       reviewAfter: "2026-11-30"
       purpose: Midjourney/Stepfun image_gen and Suno music_gen executor wiring (config-gated)
-
 
   - id: askOutcome-p0-r83-remediation
     landingPolicy: serial
