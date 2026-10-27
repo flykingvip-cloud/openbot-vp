@@ -257,6 +257,98 @@ export async function finalizeVerificationTaskIfInFlight(
   });
 }
 
+const FINGERPRINT_STALE_ERROR = "配置指纹已变更，结果仅保留在历史中，未更新正式证据";
+const GENERATION_STALE_ERROR = "已被更新的验证任务取代，结果仅保留在历史中，未更新正式证据";
+
+export type CompleteVerificationOutcomeParams = {
+  taskId: string;
+  modelRef: string;
+  /** Build the terminal task fields (status/results/timestamps/fingerprint/generation). */
+  buildTerminal: (current: CapabilityVerificationTask) => CapabilityVerificationTask;
+  executionGeneration: number;
+  /** Current config fingerprint observed just before completion (may be undefined). */
+  currentFingerprint?: string;
+  /** Formal evidence candidates; merged only when fingerprint+generation are still current. */
+  mergeableEvidence: CapabilityEvidenceItem[];
+  configFingerprint?: string;
+};
+
+/**
+ * Atomically publish a terminal verification outcome while still in-flight.
+ * Clients that observe a terminal task status are guaranteed to also see either:
+ * - formal evidence already merged into the admission record, or
+ * - a history-only rejection reason on the task (`error`).
+ * Cancel / interrupt / prior terminal still wins and skips both writes.
+ */
+export async function completeVerificationOutcomeIfInFlight(
+  params: CompleteVerificationOutcomeParams,
+  storePath?: string,
+): Promise<CapabilityVerificationTask | null> {
+  return await withLock(async () => {
+    const store = await loadStore(storePath);
+    const current = store.tasks[params.taskId];
+    if (!current || (current.status !== "queued" && current.status !== "running")) {
+      return null;
+    }
+
+    const modelKey = params.modelRef.trim();
+    const currentGen = store.executionGenerationByModel[modelKey] ?? 0;
+    const generationStale = params.executionGeneration < currentGen;
+
+    const terminalBase = params.buildTerminal(current);
+    const taskFp = params.configFingerprint ?? terminalBase.configFingerprint;
+    const fingerprintStale = Boolean(
+      taskFp && params.currentFingerprint && taskFp !== params.currentFingerprint,
+    );
+    const stale = fingerprintStale || generationStale;
+
+    const next: CapabilityVerificationTask = stale
+      ? {
+          ...terminalBase,
+          error:
+            terminalBase.error ??
+            (fingerprintStale ? FINGERPRINT_STALE_ERROR : GENERATION_STALE_ERROR),
+        }
+      : terminalBase;
+
+    store.tasks[params.taskId] = next;
+
+    if (!stale && params.mergeableEvidence.length > 0) {
+      const prev = store.admissions[modelKey] ?? defaultRecord(modelKey);
+      const byId = new Map(prev.capabilityEvidence.map((item) => [item.id, item]));
+      for (const item of params.mergeableEvidence) {
+        if (item.status === "checker_unavailable" || item.status === "untested") {
+          if (!byId.has(item.id)) {
+            byId.set(item.id, item);
+          }
+          continue;
+        }
+        const existing = byId.get(item.id);
+        if (item.status === "pending" && existing?.status === "passed") {
+          continue;
+        }
+        byId.set(item.id, item);
+      }
+      store.admissions[modelKey] = {
+        ...prev,
+        modelRef: modelKey,
+        capabilityEvidence: Array.from(byId.values()),
+        ...(params.configFingerprint
+          ? {
+              connectionFingerprint: params.configFingerprint,
+              connectionVerifiedAt: Date.now(),
+            }
+          : {}),
+        platformEffective: true,
+        updatedAt: Date.now(),
+      };
+    }
+
+    await saveStore(store, storePath);
+    return next;
+  });
+}
+
 export async function interruptInFlightVerificationTasks(
   reason: string,
   storePath?: string,

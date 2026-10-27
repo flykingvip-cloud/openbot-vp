@@ -4,8 +4,9 @@
  *
  * Lifecycle (aligned with UI local_protocol protections):
  * - create returns taskId promptly; runner work continues in background
- * - before merging formal evidence: re-check cancel / interrupt, config
- *   fingerprint, and execution generation
+ * - before publishing terminal status: re-check cancel / interrupt, config
+ *   fingerprint, and execution generation; terminal status, stale reason, and
+ *   formal evidence merge share one store write
  * - wall-clock timeout covers the entire runner execution
  * - late success after cancel or a superseded generation must not pollute
  *   current formal evidence
@@ -22,13 +23,12 @@ import {
   type CapabilityCheckRunner,
 } from "./protocol-runner.js";
 import {
+  completeVerificationOutcomeIfInFlight,
   finalizeVerificationTaskIfInFlight,
-  getCurrentExecutionGeneration,
   getModelAdmission,
   getVerificationTask,
   interruptInFlightVerificationTasks,
   listVerificationTasks,
-  mergeFormalCapabilityEvidence,
   nextExecutionGeneration,
   saveVerificationTask,
   setAutoRoutingAdmission,
@@ -174,55 +174,34 @@ export function createGatewayVerificationService(options: GatewayVerificationSer
   ) {
     const results = outcomes.map((o) => outcomeToEvidence(o, mode));
     const status = summarizeTaskStatus(results);
-
-    // Atomic vs cancel/interrupt: only transition while still in-flight.
-    const done = await finalizeVerificationTaskIfInFlight(
-      taskId,
-      (latest) => ({
-        ...latest,
-        status,
-        results,
-        updatedAt: Date.now(),
-        configFingerprint: requestFingerprint ?? latest.configFingerprint,
-        executionGeneration,
-      }),
-      storePath,
-    );
-    if (!done) {
-      // Cancel / interrupt / prior terminal already won — do not pollute evidence.
-      return;
-    }
-
-    const currentFp = await resolveFingerprintNow(modelRef);
-    const taskFp = requestFingerprint ?? done.configFingerprint;
-    const fingerprintStale = Boolean(taskFp && currentFp && taskFp !== currentFp);
-    const currentGen = await getCurrentExecutionGeneration(modelRef, storePath);
-    const generationStale = executionGeneration < currentGen;
-
-    if (fingerprintStale || generationStale) {
-      const stale: CapabilityVerificationTask = {
-        ...done,
-        error:
-          done.error ??
-          (fingerprintStale
-            ? "配置指纹已变更，结果仅保留在历史中，未更新正式证据"
-            : "已被更新的验证任务取代，结果仅保留在历史中，未更新正式证据"),
-      };
-      await saveVerificationTask(stale, storePath);
-      return;
-    }
-
+    // Observe fingerprint before the atomic publish so stale detection is ready
+    // to ship in the same store write as the terminal status.
+    const currentFingerprint = await resolveFingerprintNow(modelRef);
     const mergeable = results.filter(
       (item) => item.status === "passed" || item.status === "failed",
     );
-    if (mergeable.length > 0) {
-      await mergeFormalCapabilityEvidence(
+
+    // Single locked publish: terminal task (+ stale error) and optional formal
+    // evidence merge. Cancel/interrupt/prior terminal still wins and skips both.
+    await completeVerificationOutcomeIfInFlight(
+      {
+        taskId,
         modelRef,
-        mergeable,
-        { configFingerprint: requestFingerprint },
-        storePath,
-      );
-    }
+        executionGeneration,
+        currentFingerprint,
+        configFingerprint: requestFingerprint,
+        mergeableEvidence: mergeable,
+        buildTerminal: (latest) => ({
+          ...latest,
+          status,
+          results,
+          updatedAt: Date.now(),
+          configFingerprint: requestFingerprint ?? latest.configFingerprint,
+          executionGeneration,
+        }),
+      },
+      storePath,
+    );
   }
 
   async function finishWithError(
