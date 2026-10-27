@@ -146,14 +146,6 @@ export type ExperienceExposureState = {
    * Tip success + exposure alone = 「成功任务中的曝光」, not validity.
    */
   adoptedAssetIds?: string[];
-  /**
-   * Last successful outcome_verified contribution (event idempotency + correction revoke).
-   */
-  verifiedContribution?: {
-    eventId: string;
-    outcomeVersion: number;
-    assetIds: string[];
-  };
 };
 
 export type TaskOutcomeRecord = {

@@ -80,7 +80,7 @@ entrypoint adapter 实例方法
 - cron 冷启动：仍靠 tip store / gateway hydrate（跨进程无第二套身份）。
 - **子 agent lane**：`commands/agent` 对 `AGENT_LANE_SUBAGENT` **故意跳过** TaskOutcome（文档诚实登记，不算完成）。
 
-**登记**：W1–W5 + wrap-up #117 已合入。Residual：非 chat 入口复用同一 `recordRunnerTurnOutcome` tip.budget（iterations；`costUsd` 仅调用方显式传入）；`attachAdoptedLearningAssetsToTask` 显式 adopted（禁止注入猜测）；evolution `recordRunOutcome` **仍不退役**（缺：evolution-control RPC / canary 无 tip 生命周期证明）。pending 仍进程内。**本 residual PR 未 merge / 未部署**。
+**登记**：W1–W5 + wrap-up #117 已合入。Residual：非 chat 入口复用同一 `recordRunnerTurnOutcome` tip.budget（iterations；`costUsd` 仅调用方显式传入）；`attachAdoptedLearningAssetsToTask` 显式 adopted（禁止注入猜测）；evolution `recordRunOutcome` **仍不退役**（缺：evolution-control RPC / canary 无 tip 生命周期证明）。pending 仍进程内；experience-verified 贡献在 contributions/ 不回写 tip；计数按 contributionKey reconcile。**本 residual PR 未 merge / 未部署**。
 
 **既有超时/重试/回退/用量（W3 inventory，不另起）**：`CloseReasonCode.timeout` + eligibility；supervisor `retry.nextStop`（iterations/cost/duration）；agents `model-fallback`；gateway billing / enterprise-model budget-gate。任务总预算 tip 只做投影与关闭归因，不替代上述机制。
 
@@ -142,7 +142,7 @@ entrypoint adapter 实例方法
 | W0   | 基线与证据      | `1f698e37` #95               | 是              | n/a（文档）                                                | 文档分类                                          | 「已完成」仅限有调用证据入口                                             |
 | W1   | 跨入口身份/收尾 | `b6c60550` #98 + residual    | 是              | chat/cron/cli/gateway_agent/collab claim                   | 已接线入口测 + residual inventory                 | 子 agent **故意跳过**；collab 非 claim RPC 复用 tip；cron 冷启动 hydrate |
 | W2   | 技能/模式消费   | `f3a19e08` #99               | 是              | tip 消费链                                                 | handlers 测                                       | evolution 旁路仍 inventory                                               |
-| W3   | 验收与总预算    | `f53e027b` + #117 + residual | 是（投影/门闩） | **共用** `recordRunnerTurnOutcome`（含非 chat entrypoint） | residual：cron/cli/collab/gateway_agent 累计/超限 | mid-run 预检；ParentChild；无 USD 证据不计 cost；supervisor 旁路         |
+| W3   | 验收与总预算    | `f53e027b` + #117 + residual | 是（投影/门闩） | **共用** `recordRunnerTurnOutcome`（含非 chat entrypoint） | residual：cron/cli/collab/gateway_agent 累计/超限 | chat `assessRunnerTurnBudgetGate` 执行前；`chargeRunnerTurnBudgetSpend` 真实用量；其它入口仍收尾累计；ParentChild；supervisor 旁路         |
 | W4   | 经验有效性      | `b8ff8ea4` + #117 + residual | 是（四段字段）  | tip exposure + **显式 adopted API**                        | residual：attach→adopted；无 adopted 不策展       | 生产采用方须显式传 id；pending 仍进程内；无自动推断                      |
 | W5   | 结构/矩阵       | `23314d48` #112 + residual   | 是              | loop-log 观测                                              | **有界 ring 行为已验证**                          | 旁路不退役（RPC/canary 无 tip）；**不**宣布原计划完成                    |
 

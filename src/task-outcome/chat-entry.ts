@@ -7,6 +7,7 @@ import {
   type PendingLearningInjectionScope,
 } from "../auto-reply/reply/learning-experience-pending.js";
 import type { OpenBotConfig } from "../config/config.js";
+import { buildTaskBudgetState, ensureTaskBudgetStarted } from "./budget.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { TASK_OUTCOME_STORE_DIRNAME } from "./runtime-from-runner.js";
@@ -109,6 +110,38 @@ export function ensureChatTurnTaskOutcome(
 
   const fencingToken = opened.fencingToken || newFencingToken();
   let record = opened.record;
+
+  // W3 reverify: tip budget starts at entry (task wall-clock), not first closeout spend.
+  if (!record.budget) {
+    const budget = ensureTaskBudgetStarted(buildTaskBudgetState({}), Date.now());
+    const ensured = service.submit(
+      taskId,
+      {
+        type: "set_budget",
+        budget,
+        expectedVersion: record.outcomeVersion,
+        fencingToken,
+      },
+      { requiredScope: scope, commandId: `budget-entry:${taskId}` },
+    );
+    if (ensured.ok) {
+      record = ensured.record;
+    }
+  } else if (record.budget.startedAtMs == null) {
+    const started = service.submit(
+      taskId,
+      {
+        type: "set_budget",
+        budget: ensureTaskBudgetStarted(record.budget, Date.now()),
+        expectedVersion: record.outcomeVersion,
+        fencingToken,
+      },
+      { requiredScope: scope, commandId: `budget-entry-start:${taskId}` },
+    );
+    if (started.ok) {
+      record = started.record;
+    }
+  }
 
   // W4 wrap-up: attach exposure from task context or run/task-keyed pending only.
   // Never peek by agentId (concurrent turns would clobber / cross-verify).

@@ -1,10 +1,9 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { PendingLearningInjectionScope } from "../auto-reply/reply/learning-experience-pending.js";
-import {
-  adjustLearningExperienceStage,
-  recordLearningExperienceStage,
-} from "../auto-reply/reply/learning-recall.js";
 /**
- * W4 wrap-up: tip closed + eligible success may verify **adopted** exposure only.
+ * W4 wrap-up + reverify P1:
+ * tip closed + eligible success may verify **adopted** exposure only.
  *
  * 口径（Option A）：
  * - tip success + exposure alone = 「成功任务中的曝光」(reason exposure_on_success_not_verified)
@@ -13,13 +12,19 @@ import {
  *   outcome_verified 并策展。禁止共现=有效；禁止按 agentId 猜测 pending。
  *
  * 落盘：可等待、失败传播；消费确认必须在落盘成功之后（drain await）。
- * 幂等：同一 eventId 不重复加数；correction 撤销旧贡献。
+ * 幂等：稳定 contributionKey 驱动计数（key 注册表为源，asset 计数 reconcile）；
+ * 任务级贡献元数据写入 contributions/experience-verified，**不**回写 TaskOutcome tip。
  */
 import { curateLearningSkillDraftsSafely } from "../auto-reply/reply/learning-skill-curation.js";
 import type { ConsumerHandler } from "./consumers.js";
 import { computeEvaluationEligibility } from "./eligibility.js";
+import {
+  applyOutcomeVerifiedContributionKey,
+  revokeOutcomeVerifiedContributionKey,
+} from "./experience-verified-counts.js";
 import type { DurableTaskOutcomeStore } from "./store.js";
-import type { ExperienceExposureState, OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
+import { scopeIdOf } from "./transitions.js";
+import type { OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
 
 export const EXPERIENCE_VERIFIED_CONSUMER_ID = "experience-verified";
 
@@ -27,6 +32,18 @@ export type ExperienceVerificationPlan = {
   shouldVerify: boolean;
   reason: string;
   scopes: PendingLearningInjectionScope[];
+};
+
+/** Durable consumer contribution — lives outside TaskOutcome tip. */
+export type ExperienceVerifiedContribution = {
+  contributionKey: string;
+  eventId: string;
+  outcomeVersion: number;
+  taskId: string;
+  status: "applied" | "revoked";
+  scopes: PendingLearningInjectionScope[];
+  assetIds: string[];
+  updatedAt: string;
 };
 
 function normalizeScopes(
@@ -96,98 +113,110 @@ export function resolveExperienceVerificationPlan(
   return { shouldVerify: true, reason: "tip_success_eligible_adopted", scopes };
 }
 
-function groupAssetIdsByScope(
-  scopes: PendingLearningInjectionScope[],
-  assetIds: string[],
-): PendingLearningInjectionScope[] {
-  const wanted = new Set(assetIds);
-  return scopes
-    .map((scope) => ({
-      ...scope,
-      assetIds: scope.assetIds.filter((id) => wanted.has(id)),
-    }))
-    .filter((scope) => scope.assetIds.length > 0);
+export function buildExperienceVerifiedContributionKey(params: {
+  taskId: string;
+  eventId: string;
+}): string {
+  return `experience-verified:${params.taskId.trim()}:${params.eventId.trim()}`;
 }
 
-async function revokeVerifiedContribution(
-  record: TaskOutcomeRecord,
-  assetIds: string[],
-): Promise<void> {
-  if (assetIds.length === 0) {
-    return;
+function experienceContributionDir(store: DurableTaskOutcomeStore): string {
+  return path.join(
+    store.rootDir,
+    "contributions",
+    encodeURIComponent(EXPERIENCE_VERIFIED_CONSUMER_ID),
+  );
+}
+
+function experienceContributionPath(
+  store: DurableTaskOutcomeStore,
+  scopeId: string,
+  taskId: string,
+): string {
+  return path.join(
+    experienceContributionDir(store),
+    `${encodeURIComponent(scopeId)}__${encodeURIComponent(taskId)}.json`,
+  );
+}
+
+export function loadExperienceVerifiedContribution(
+  store: DurableTaskOutcomeStore,
+  scopeId: string,
+  taskId: string,
+): ExperienceVerifiedContribution | undefined {
+  const filePath = experienceContributionPath(store, scopeId, taskId);
+  if (!fs.existsSync(filePath)) {
+    return undefined;
   }
-  const tipScopes = normalizeScopes(record.experienceExposure?.scopes);
-  const grouped =
-    tipScopes.length > 0
-      ? groupAssetIdsByScope(tipScopes, assetIds)
-      : [{ scopeId: "", botId: "", assetIds }];
-  for (const scope of grouped) {
-    if (!scope.scopeId || scope.assetIds.length === 0) {
-      continue;
-    }
-    await adjustLearningExperienceStage({
-      scopeId: scope.scopeId,
-      assetIds: scope.assetIds,
-      stage: "outcome_verified",
-      delta: -1,
-    });
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8")) as ExperienceVerifiedContribution;
+  } catch {
+    return undefined;
+  }
+}
+
+export function saveExperienceVerifiedContribution(
+  store: DurableTaskOutcomeStore,
+  scopeId: string,
+  value: ExperienceVerifiedContribution,
+): void {
+  const filePath = experienceContributionPath(store, scopeId, value.taskId);
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tmp = `${filePath}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  fs.renameSync(tmp, filePath);
+}
+
+export function clearExperienceVerifiedContribution(
+  store: DurableTaskOutcomeStore,
+  scopeId: string,
+  taskId: string,
+): void {
+  const filePath = experienceContributionPath(store, scopeId, taskId);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
   }
 }
 
 /**
- * Awaitable apply: durable stage write then curation. Propagates failures.
+ * Awaitable apply: durable keyed stage write then curation. Propagates failures.
+ * Prefer createExperienceVerifiedHandler for production (contribution store + keys).
  */
-export async function applyExperienceVerification(plan: ExperienceVerificationPlan): Promise<{
+export async function applyExperienceVerification(
+  plan: ExperienceVerificationPlan,
+  opts?: { contributionKey?: string },
+): Promise<{
   verifiedAssetIds: string[];
   reason: string;
 }> {
   if (!plan.shouldVerify) {
     return { verifiedAssetIds: [], reason: plan.reason };
   }
+  const contributionKey =
+    opts?.contributionKey?.trim() ||
+    `experience-verified:ad-hoc:${plan.reason}:${plan.scopes
+      .flatMap((s) => s.assetIds)
+      .toSorted()
+      .join(",")}`;
   const verifiedAssetIds: string[] = [];
   for (const scope of plan.scopes) {
-    await recordLearningExperienceStage({
+    const applied = await applyOutcomeVerifiedContributionKey({
+      contributionKey: `${contributionKey}:${scope.scopeId}`,
       scopeId: scope.scopeId,
       assetIds: scope.assetIds,
-      stage: "outcome_verified",
     });
-    // Curation after durable verified accounting (still fail-soft for draft write).
     curateLearningSkillDraftsSafely({
       scopeId: scope.scopeId,
       botId: scope.botId,
     });
-    verifiedAssetIds.push(...scope.assetIds);
+    verifiedAssetIds.push(...applied.verifiedAssetIds);
   }
   return { verifiedAssetIds: [...new Set(verifiedAssetIds)], reason: plan.reason };
 }
 
-function persistVerifiedContribution(
-  store: DurableTaskOutcomeStore,
-  record: TaskOutcomeRecord,
-  next: ExperienceExposureState["verifiedContribution"] | undefined,
-): TaskOutcomeRecord {
-  if (!record.experienceExposure) {
-    return record;
-  }
-  const experienceExposure: ExperienceExposureState = {
-    ...record.experienceExposure,
-    ...(next ? { verifiedContribution: next } : {}),
-  };
-  if (!next) {
-    delete experienceExposure.verifiedContribution;
-  }
-  const patched: TaskOutcomeRecord = {
-    ...record,
-    experienceExposure,
-    updatedAt: new Date().toISOString(),
-  };
-  store.saveTask(patched);
-  return patched;
-}
-
 /**
  * experience-verified consumer: adopted ∩ tip exposure → outcome_verified + curation.
- * Awaitable onEvent so drain marks consumed only after durable write succeeds.
+ * Contribution metadata stays in contributions/experience-verified — never store.saveTask.
  */
 export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore): ConsumerHandler {
   return {
@@ -197,17 +226,39 @@ export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore):
         return;
       }
       const plan = resolveExperienceVerificationPlan(record);
-      const prev = record.experienceExposure?.verifiedContribution;
+      const sid = scopeIdOf(record.scope);
+      const prev = loadExperienceVerifiedContribution(store, sid, record.taskId);
+      const contributionKey = buildExperienceVerifiedContributionKey({
+        taskId: record.taskId,
+        eventId: event.eventId,
+      });
 
-      // Idempotent: same event already contributed.
-      if (prev && prev.eventId === event.eventId) {
+      // Same event already fully recorded in contribution store — reconcile counts, no tip write.
+      if (prev && prev.eventId === event.eventId && prev.status === "applied") {
+        for (const scope of prev.scopes) {
+          await applyOutcomeVerifiedContributionKey({
+            contributionKey: `${prev.contributionKey}:${scope.scopeId}`,
+            scopeId: scope.scopeId,
+            assetIds: scope.assetIds,
+          });
+        }
         return;
       }
 
       // Correction / non-verify: revoke prior contribution for this tip.
-      if (prev && !plan.shouldVerify) {
-        await revokeVerifiedContribution(record, prev.assetIds);
-        persistVerifiedContribution(store, record, undefined);
+      if (prev && prev.status === "applied" && !plan.shouldVerify) {
+        for (const scope of prev.scopes) {
+          await revokeOutcomeVerifiedContributionKey({
+            contributionKey: `${prev.contributionKey}:${scope.scopeId}`,
+            scopeId: scope.scopeId,
+            assetIds: scope.assetIds,
+          });
+        }
+        saveExperienceVerifiedContribution(store, sid, {
+          ...prev,
+          status: "revoked",
+          updatedAt: new Date().toISOString(),
+        });
         return;
       }
 
@@ -216,18 +267,45 @@ export function createExperienceVerifiedHandler(store: DurableTaskOutcomeStore):
       }
 
       // Newer version replacing older verified contribution on same tip.
-      if (prev && prev.eventId !== event.eventId) {
-        await revokeVerifiedContribution(record, prev.assetIds);
+      if (prev && prev.status === "applied" && prev.eventId !== event.eventId) {
+        for (const scope of prev.scopes) {
+          await revokeOutcomeVerifiedContributionKey({
+            contributionKey: `${prev.contributionKey}:${scope.scopeId}`,
+            scopeId: scope.scopeId,
+            assetIds: scope.assetIds,
+          });
+        }
       }
 
-      const applied = await applyExperienceVerification(plan);
-      if (applied.verifiedAssetIds.length === 0) {
+      const verifiedAssetIds: string[] = [];
+      for (const scope of plan.scopes) {
+        const applied = await applyOutcomeVerifiedContributionKey({
+          contributionKey: `${contributionKey}:${scope.scopeId}`,
+          scopeId: scope.scopeId,
+          assetIds: scope.assetIds,
+        });
+        curateLearningSkillDraftsSafely({
+          scopeId: scope.scopeId,
+          botId: scope.botId,
+        });
+        verifiedAssetIds.push(...applied.verifiedAssetIds);
+      }
+      const uniqueAssets = [...new Set(verifiedAssetIds)];
+      if (uniqueAssets.length === 0) {
         return;
       }
-      persistVerifiedContribution(store, record, {
+
+      // Persist contribution metadata AFTER keyed count reconcile (key is source of truth).
+      // Crash before this write: replay re-reconciles via key (no double count) then rewrites file.
+      saveExperienceVerifiedContribution(store, sid, {
+        contributionKey,
         eventId: event.eventId,
         outcomeVersion: event.outcomeVersion,
-        assetIds: applied.verifiedAssetIds,
+        taskId: record.taskId,
+        status: "applied",
+        scopes: plan.scopes,
+        assetIds: uniqueAssets,
+        updatedAt: new Date().toISOString(),
       });
     },
   };
