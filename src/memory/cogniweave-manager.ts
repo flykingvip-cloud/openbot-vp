@@ -1124,7 +1124,7 @@ export class CogniWeaveMemoryManager implements MemorySearchManager {
   /**
    * O4 isolated readonly Memory Center list (active|tentative exact).
    * Does not syncScope, ensureMemorySubjectBinding, mkdir, or migrate.
-   * Does not replace listMemoryCenterAtoms / data.memory.list this round.
+   * Prefer this from data.memory.list when statusView is requested; legacy listMemoryCenterAtoms remains for sync-bound callers.
    */
   async listMemoryCenterAtomsReadonly(opts?: {
     statusView?: MemoryCenterStatusView;
