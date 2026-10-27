@@ -9,6 +9,7 @@
  * groupsRoot/groupLocator from authorizeTeamGroupResourceAccess.
  * Immutable versions use O_EXCL (wx); concurrent submit is lock-scoped.
  * Idempotent replay verifies on-disk bytes; missing file is not "success".
+ * Dual-root: never falls back to createWorkspaceCollaborationStores / ~/.openbot/collaboration.
  */
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -52,6 +53,11 @@ export type TeamDeliverableSubmitInput = {
   client?: GatewayClient | null;
   /** When false, skip ACL (unit tests that seed membership separately). Default true. */
   enforceAcl?: boolean;
+  /**
+   * Explicit trusted locator when enforceAcl=false.
+   * Required under managed_enterprise without auth — never silent home collaboration.
+   */
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
   identityAliases?: readonly string[];
   cfg?: OpenBotConfig;
   nowMs?: number;
@@ -298,7 +304,22 @@ export async function submitTeamDeliverable(
     auth = authResult;
   }
 
-  const stores = resolveTeamDeliverableStores({ auth, groupId, cfg });
+  const storesResult = resolveTeamDeliverableStores({
+    auth,
+    trusted: params.trusted,
+    groupId,
+    cfg,
+    tenantId: auth?.tenantId ?? params.tenant?.tenantId ?? null,
+  });
+  if (!storesResult.ok) {
+    return {
+      ok: false,
+      reason: storesResult.reason,
+      detail: storesResult.detail,
+      writtenToGroupDir: false,
+    };
+  }
+  const stores = storesResult;
   const groupDir = stores.groupDir;
 
   const taskCheck = await assertTaskBelongsToGroup({
@@ -572,6 +593,7 @@ export async function readTeamDeliverable(params: {
   tenant?: CollaborationTenantResolution | null;
   client?: GatewayClient | null;
   enforceAcl?: boolean;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
   identityAliases?: readonly string[];
   cfg?: OpenBotConfig;
 }): Promise<
@@ -621,7 +643,22 @@ export async function readTeamDeliverable(params: {
     }
     auth = authResult;
   }
-  const stores = resolveTeamDeliverableStores({ auth, groupId, cfg });
+  const storesResult = resolveTeamDeliverableStores({
+    auth,
+    trusted: params.trusted,
+    groupId,
+    cfg,
+    tenantId: auth?.tenantId ?? params.tenant?.tenantId ?? null,
+  });
+  if (!storesResult.ok) {
+    return {
+      ok: false,
+      reason: storesResult.reason,
+      detail: storesResult.detail,
+      writtenToGroupDir: false,
+    };
+  }
+  const stores = storesResult;
   const row = await stores.objectStorage.readObject<TeamDeliverableRecord>(
     groupId,
     "deliverable",

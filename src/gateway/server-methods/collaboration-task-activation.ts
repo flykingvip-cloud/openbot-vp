@@ -1,3 +1,4 @@
+import path from "node:path";
 import { loadConfig } from "../../config/config.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
 import { listAgentAssets } from "../agent-registry/registry.js";
@@ -14,15 +15,16 @@ import {
   ensureRegisteredMemberMainSession,
   type TrustedMemberResolution,
 } from "../collaboration-learning/member-dispatch-readiness.js";
-import {
-  createWorkspaceCollaborationStores,
-  readGroupOperatingState,
-} from "../collaboration-learning/shared.js";
+import { readGroupOperatingState } from "../collaboration-learning/shared.js";
 import {
   readTeamDeliverable,
   submitTeamDeliverable,
 } from "../collaboration-learning/team-deliverable-submit.js";
-import { authorizeTeamGroupResourceAccess } from "../collaboration-learning/team-resource-auth.js";
+import {
+  authorizeTeamGroupResourceAccess,
+  createTrustedGroupStores,
+  resolveTeamDeliverableStores,
+} from "../collaboration-learning/team-resource-auth.js";
 import {
   resolveCollaborationTenantResolution,
   resolveMembershipTenantIdForAcl,
@@ -30,6 +32,7 @@ import {
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
+import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
 function readString(value: unknown): string | undefined {
@@ -65,11 +68,39 @@ async function resolveTrustedMembersForGroup(params: {
     profile,
     cfg,
   });
-  const osStores = createWorkspaceCollaborationStores(cfg);
-  const os = await readGroupOperatingState({
-    fileStore: osStores.fileStore,
-    groupId: params.groupId,
-  }).catch(() => null);
+  // Team OS read: trusted locator only (never host ~/.openbot/collaboration fallthrough).
+  let osFileStore = null as ReturnType<typeof createTrustedGroupStores>["fileStore"] | null;
+  try {
+    if (profile === "managed_enterprise" && tenantId) {
+      const groupLocator = resolveTrustedGroupLocator({
+        groupId: params.groupId,
+        tenantId,
+        profile,
+        cfg,
+      });
+      osFileStore = createTrustedGroupStores({
+        groupsRoot: path.dirname(groupLocator),
+        groupLocator,
+      }).fileStore;
+    } else if (profile === "personal_local") {
+      const resolved = resolveTeamDeliverableStores({
+        groupId: params.groupId,
+        cfg,
+        tenantId: null,
+      });
+      if (resolved.ok) {
+        osFileStore = resolved.fileStore;
+      }
+    }
+  } catch {
+    osFileStore = null;
+  }
+  const os = osFileStore
+    ? await readGroupOperatingState({
+        fileStore: osFileStore,
+        groupId: params.groupId,
+      }).catch(() => null)
+    : null;
   const roleMap = new Map(
     (os?.memberRoleMap ?? [])
       .map((row) => {
@@ -229,6 +260,7 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         humanConfirmed: readBoolean(params?.humanConfirmed) === true,
         requireHumanConfirm: readBoolean(params?.requireHumanConfirm),
         tenant,
+        auth,
       });
       respond(true, result, undefined);
     } catch (error) {

@@ -6,22 +6,35 @@
  * Write action requires active non-observer membership (not read ACL renamed).
  * Auth result carries groupLocator + groupsRoot so callers use ONE trusted root.
  * Does not remount formal-root twins or invent a parallel deliverable authority.
+ * Dual-root cleanup: team stores NEVER fall back to createWorkspaceCollaborationStores
+ * (host ~/.openbot/collaboration). Managed writes use tenants/<tid>/collaboration only.
  */
 import path from "node:path";
 import type { CollaborationMember, Task } from "@openbot/collaboration-core";
-import { OpenBotObjectStorage } from "@openbot/collaboration-openbot-adapter";
+import {
+  OpenBotGroupStorage,
+  OpenBotLearningStorage,
+  OpenBotMemoryStorage,
+  OpenBotMetadataStorage,
+  OpenBotObjectStorage,
+} from "@openbot/collaboration-openbot-adapter";
 import { loadConfig } from "../../config/config.js";
+import { resolveStateDir } from "../../config/paths.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import type { GatewayClient } from "../server-methods/types.js";
 import { assertGroupMemberAccess, loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
-import { createGroupFileStore, createWorkspaceCollaborationStores } from "./shared.js";
+import { createGroupFileStore, createWorkspaceGroupStoreFunctions } from "./shared.js";
 import {
   isAclSafeTenantTrust,
   type CollaborationTenantResolution,
   resolveMembershipTenantIdForAcl,
 } from "./trusted-tenant.js";
+
+/** Team APIs must never silently fall back to host ~/.openbot/collaboration as SoT. */
+export const LEGACY_COLLABORATION_ROOT_REJECTED = "legacy_collaboration_root_rejected";
+export const TRUSTED_GROUP_LOCATOR_REQUIRED = "trusted_group_locator_required";
 
 export type TeamResourceAuthOk = {
   ok: true;
@@ -49,7 +62,21 @@ export type TrustedGroupStores = {
   groupLocator: string;
   fileStore: ReturnType<typeof createGroupFileStore>;
   objectStorage: OpenBotObjectStorage;
+  groupStorage: OpenBotGroupStorage;
+  learningStorage: OpenBotLearningStorage;
+  memoryStorage: OpenBotMemoryStorage;
+  metadataStorage: OpenBotMetadataStorage;
+  /** Always false for team SoT — personal_local locator is explicit profile, not silent legacy. */
+  usedLegacyWorkspaceFallback: false;
 };
+
+export type ResolveTeamStoresOk = TrustedGroupStores & { groupDir: string; ok: true };
+export type ResolveTeamStoresDenied = {
+  ok: false;
+  reason: string;
+  detail?: string;
+};
+export type ResolveTeamStoresResult = ResolveTeamStoresOk | ResolveTeamStoresDenied;
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -76,7 +103,21 @@ function memberMatchesActor(
 }
 
 /**
- * Build object/file stores rooted at the trusted groupsRoot from auth.
+ * True when absolutePath sits under the host STATE_DIR collaboration tree
+ * (typically ~/.openbot/collaboration) — the stripped dual-root / personal_local legacy SoT.
+ */
+export function isHostLegacyCollaborationPath(
+  absolutePath: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const resolved = path.resolve(absolutePath);
+  const legacyRoot = path.resolve(path.join(resolveStateDir(env), "collaboration"));
+  const rel = path.relative(legacyRoot, resolved);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+/**
+ * Build object/file/OS stores rooted at the trusted groupsRoot from auth.
  * Callers must NOT fall back to createWorkspaceCollaborationStores(cfg) after auth.
  */
 export function createTrustedGroupStores(params: {
@@ -85,37 +126,88 @@ export function createTrustedGroupStores(params: {
 }): TrustedGroupStores {
   const groupsRoot = path.resolve(params.groupsRoot);
   const fileStore = createGroupFileStore(groupsRoot);
+  const stateDir = resolveStateDir();
+  const groupStoreFunctions = createWorkspaceGroupStoreFunctions(fileStore, stateDir, groupsRoot);
   return {
     groupsRoot,
     groupLocator: path.resolve(params.groupLocator),
     fileStore,
     objectStorage: new OpenBotObjectStorage(undefined, fileStore),
+    groupStorage: new OpenBotGroupStorage(undefined, groupStoreFunctions),
+    learningStorage: new OpenBotLearningStorage(undefined, fileStore),
+    memoryStorage: new OpenBotMemoryStorage(undefined, fileStore),
+    metadataStorage: new OpenBotMetadataStorage(undefined, fileStore),
+    usedLegacyWorkspaceFallback: false,
   };
 }
 
-/** Resolve stores for a group using auth result, or legacy workspace root when ACL skipped. */
+/**
+ * Resolve team stores from auth / explicit trusted locator / profile-aware trusted locator.
+ * NEVER calls createWorkspaceCollaborationStores (silent ~/.openbot/collaboration fallthrough).
+ * Managed without tenant/auth → rejected. Managed path under host legacy root → rejected.
+ */
 export function resolveTeamDeliverableStores(params: {
   auth?: TeamResourceAuthOk | null;
+  /** Explicit trusted locator when ACL is skipped in unit tests — still not legacy fallthrough. */
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
   groupId: string;
   cfg?: OpenBotConfig;
-}): TrustedGroupStores & { groupDir: string } {
-  if (params.auth) {
-    const stores = createTrustedGroupStores({
-      groupsRoot: params.auth.groupsRoot,
-      groupLocator: params.auth.groupLocator,
-    });
-    return { ...stores, groupDir: stores.groupLocator };
-  }
+  /** Optional tenant for personal_local→managed-aware locator when auth omitted. */
+  tenantId?: string | null;
+}): ResolveTeamStoresResult {
   const cfg = params.cfg ?? loadConfig();
-  const legacy = createWorkspaceCollaborationStores(cfg);
-  const groupDir = path.join(legacy.groupRootDir, encodeURIComponent(compact(params.groupId)));
-  return {
-    groupsRoot: legacy.groupRootDir,
-    groupLocator: groupDir,
-    groupDir,
-    fileStore: legacy.fileStore,
-    objectStorage: legacy.objectStorage,
-  };
+  const profile = resolveSecurityProfile(cfg).profile;
+  const groupId = compact(params.groupId);
+
+  let groupsRoot: string;
+  let groupLocator: string;
+
+  if (params.auth) {
+    groupsRoot = params.auth.groupsRoot;
+    groupLocator = params.auth.groupLocator;
+  } else if (params.trusted?.groupsRoot && params.trusted.groupLocator) {
+    groupsRoot = params.trusted.groupsRoot;
+    groupLocator = params.trusted.groupLocator;
+  } else {
+    if (!groupId) {
+      return { ok: false, reason: TRUSTED_GROUP_LOCATOR_REQUIRED, detail: "groupId required" };
+    }
+    if (profile === "managed_enterprise" && !compact(params.tenantId ?? undefined)) {
+      return {
+        ok: false,
+        reason: TRUSTED_GROUP_LOCATOR_REQUIRED,
+        detail:
+          "managed_enterprise team stores require authorizeTeamGroupResourceAccess or explicit tenant-scoped locator; host ~/.openbot/collaboration fallback removed",
+      };
+    }
+    try {
+      groupLocator = resolveTrustedGroupLocator({
+        groupId,
+        tenantId: params.tenantId ?? null,
+        profile,
+        cfg,
+      });
+      groupsRoot = path.dirname(groupLocator);
+    } catch (error) {
+      return {
+        ok: false,
+        reason: TRUSTED_GROUP_LOCATOR_REQUIRED,
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  if (profile === "managed_enterprise" && isHostLegacyCollaborationPath(groupsRoot)) {
+    return {
+      ok: false,
+      reason: LEGACY_COLLABORATION_ROOT_REJECTED,
+      detail:
+        "managed team SoT must be $OPENBOT_TENANTS_ROOT/<tenantId>/collaboration; host ~/.openbot/collaboration is not team authority",
+    };
+  }
+
+  const stores = createTrustedGroupStores({ groupsRoot, groupLocator });
+  return { ...stores, groupDir: stores.groupLocator, ok: true };
 }
 
 function isWriteCapableRole(
@@ -239,12 +331,12 @@ export async function authorizeTeamGroupResourceAccess(params: {
   };
 }
 
-/** Verify task exists under the SAME trusted stores as auth (no cross-tenant fallback). */
+/** Verify task exists under the SAME trusted stores as auth (no cross-tenant / legacy fallback). */
 export async function assertTaskBelongsToGroup(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
-  /** Prefer stores from authorizeTeamGroupResourceAccess. */
+  /** Required — callers must pass stores from resolveTeamDeliverableStores / auth. */
   stores?: Pick<TrustedGroupStores, "objectStorage"> | null;
 }): Promise<{ ok: true; task: Task } | { ok: false; reason: string; detail?: string }> {
   const groupId = compact(params.groupId);
@@ -252,10 +344,14 @@ export async function assertTaskBelongsToGroup(params: {
   if (!groupId || !taskId) {
     return { ok: false, reason: "missing_group_or_task" };
   }
-  const objectStorage =
-    params.stores?.objectStorage ??
-    createWorkspaceCollaborationStores(params.cfg ?? loadConfig()).objectStorage;
-  const task = await objectStorage.readObject<Task>(groupId, "task", taskId);
+  if (!params.stores?.objectStorage) {
+    return {
+      ok: false,
+      reason: TRUSTED_GROUP_LOCATOR_REQUIRED,
+      detail: "assertTaskBelongsToGroup refuses createWorkspaceCollaborationStores fallback",
+    };
+  }
+  const task = await params.stores.objectStorage.readObject<Task>(groupId, "task", taskId);
   if (!task) {
     return { ok: false, reason: "task_not_found", detail: taskId };
   }

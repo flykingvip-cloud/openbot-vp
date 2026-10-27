@@ -9999,6 +9999,7 @@ tasks:
       - src/gateway/collaboration-learning/team-resource-auth.ts
       - src/gateway/collaboration-learning/dispatch-readiness-precheck.ts
       - src/gateway/server-methods/chat.ts
+      - docs/notes/team-real-dual-root-cleanup-2026-10-27.md
     state: active
     sessions:
       - id: team-real-f1f3-20261027191957
@@ -10006,14 +10007,14 @@ tasks:
         ide: cursor
         agent: 协作对话验收测试
         status: active
-        lastSignalAt: 2026-10-27T11:57:19.529Z
+        lastSignalAt: 2026-10-27T12:27:39.861Z
         metadata: {}
       - id: team-real-f1f3-review-ae-20261027195718
         taskId: team-real-collab-loop:f1f3
         ide: cursor
         agent: 协作对话验收测试
         status: active
-        lastSignalAt: 2026-10-27T11:57:19.529Z
+        lastSignalAt: 2026-10-27T12:27:39.861Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-27
@@ -10023,6 +10024,7 @@ landingStreams:
     landingPolicy: parallel
     paths:
       - docs/notes/team-real-collab-activation-confirm-deliverable-2026-10-27.md
+      - docs/notes/team-real-dual-root-cleanup-2026-10-27.md
       - src/gateway/collaboration-learning/activate-collaboration-task.ts
       - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
       - src/gateway/collaboration-learning/chat-plan-confirm.ts
@@ -10046,7 +10048,6 @@ landingStreams:
       task: team-real-collab-loop:f1f3
       owner: 协作对话验收测试
       purpose: TEAM-REAL F1-F3 activation/confirm/deliverable/readiness review A-E
-
   - id: p1-task-driven-aor-scoring
     landingPolicy: serial
     paths:

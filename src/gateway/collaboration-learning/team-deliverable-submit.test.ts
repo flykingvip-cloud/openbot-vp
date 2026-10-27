@@ -11,7 +11,6 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import { persistAuthoritativeGroupMembers } from "../workspace/group-acl.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
-import { createWorkspaceCollaborationStores } from "./shared.js";
 import {
   assertNoSymlinkEscape,
   readTeamDeliverable,
@@ -74,21 +73,16 @@ async function seedTask(
   opts?: { tenantId?: string | null; profile?: "personal_local" | "managed_enterprise" },
 ) {
   const profile = opts?.profile ?? "personal_local";
-  let stores;
-  if (profile === "managed_enterprise" && opts?.tenantId) {
-    const groupLocator = resolveTrustedGroupLocator({
-      groupId,
-      tenantId: opts.tenantId,
-      profile,
-      cfg,
-    });
-    stores = createTrustedGroupStores({
-      groupsRoot: path.dirname(groupLocator),
-      groupLocator,
-    });
-  } else {
-    stores = createWorkspaceCollaborationStores(cfg);
-  }
+  const groupLocator = resolveTrustedGroupLocator({
+    groupId,
+    tenantId: opts?.tenantId ?? null,
+    profile,
+    cfg,
+  });
+  const stores = createTrustedGroupStores({
+    groupsRoot: path.dirname(groupLocator),
+    groupLocator,
+  });
   const now = Date.now();
   const task: Task = {
     taskId,
@@ -532,6 +526,7 @@ describe("submitTeamDeliverable two-tenant same local ids", () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-team-deliv-2t-"));
     tempDirs.push(root);
     process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+    process.env.OPENBOT_TENANTS_ROOT = path.join(root, "tenants");
     process.env.OPENBOT_SECURITY_PROFILE = "managed_enterprise";
     const cfg = {
       agents: { defaults: { workspace: path.join(root, "agent-ws") } },
@@ -621,5 +616,173 @@ describe("submitTeamDeliverable two-tenant same local ids", () => {
     expect(crossRead.ok).toBe(false);
 
     delete process.env.OPENBOT_SECURITY_PROFILE;
+  });
+});
+
+describe("dual-root cleanup — team SoT uniqueness", () => {
+  it("managed without tenant/auth refuses host collaboration fallthrough", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-team-deliv-legacy-"));
+    tempDirs.push(root);
+    const stateDir = path.join(root, "state");
+    const tenantsRoot = path.join(root, "tenants");
+    process.env.OPENBOT_STATE_DIR = stateDir;
+    process.env.OPENBOT_TENANTS_ROOT = tenantsRoot;
+    process.env.OPENBOT_SECURITY_PROFILE = "managed_enterprise";
+    const cfg = {
+      agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+      gateway: { security: { profile: "managed_enterprise" } },
+      collaboration: {
+        defaults: { workspace: path.join(root, "collaboration") },
+        runtimeNamespace: true,
+      },
+    } as OpenBotConfig;
+    const configPath = path.join(root, "openbot.json");
+    await fs.writeFile(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+    process.env.OPENBOT_CONFIG_PATH = configPath;
+    process.env.OPENCLAW_CONFIG_PATH = configPath;
+    setRuntimeConfigSnapshot(cfg, cfg);
+    clearConfigCache();
+
+    // Plant a decoy file under host legacy collaboration root.
+    const legacyGroup = path.join(
+      stateDir,
+      "collaboration",
+      "groups",
+      encodeURIComponent("grp_dual"),
+      "deliverables",
+    );
+    await fs.mkdir(legacyGroup, { recursive: true });
+    await fs.writeFile(path.join(legacyGroup, "decoy.md"), "# decoy legacy\n", "utf8");
+
+    const denied = await submitTeamDeliverable({
+      groupId: "grp_dual",
+      taskId: "task-dual",
+      actor: "user-x",
+      title: "提纲",
+      content: "# should not land in legacy\n",
+      cfg,
+      enforceAcl: false,
+      // no trusted / no tenant → must refuse
+    });
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) {
+      expect(
+        denied.reason === "trusted_group_locator_required" ||
+          denied.reason === "legacy_collaboration_root_rejected",
+      ).toBe(true);
+      expect(denied.writtenToGroupDir).toBe(false);
+    }
+    // Decoy untouched and no new team write under legacy
+    const legacyListing = await fs.readdir(legacyGroup);
+    expect(legacyListing).toEqual(["decoy.md"]);
+
+    delete process.env.OPENBOT_SECURITY_PROFILE;
+    delete process.env.OPENBOT_TENANTS_ROOT;
+  });
+
+  it("when legacy+managed coexist, write goes only to managed tenants root", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-team-deliv-both-"));
+    tempDirs.push(root);
+    const stateDir = path.join(root, "state");
+    const tenantsRoot = path.join(root, "tenants");
+    process.env.OPENBOT_STATE_DIR = stateDir;
+    process.env.OPENBOT_TENANTS_ROOT = tenantsRoot;
+    process.env.OPENBOT_SECURITY_PROFILE = "managed_enterprise";
+    const cfg = {
+      agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+      gateway: { security: { profile: "managed_enterprise" } },
+      collaboration: {
+        defaults: { workspace: path.join(root, "collaboration") },
+        runtimeNamespace: true,
+      },
+    } as OpenBotConfig;
+    const configPath = path.join(root, "openbot.json");
+    await fs.writeFile(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+    process.env.OPENBOT_CONFIG_PATH = configPath;
+    process.env.OPENCLAW_CONFIG_PATH = configPath;
+    setRuntimeConfigSnapshot(cfg, cfg);
+    clearConfigCache();
+
+    const groupId = "grp_both";
+    const taskId = "task-both";
+    const tenantId = "tenant-managed";
+
+    const legacyDeliverables = path.join(
+      stateDir,
+      "collaboration",
+      "groups",
+      encodeURIComponent(groupId),
+      "deliverables",
+    );
+    await fs.mkdir(legacyDeliverables, { recursive: true });
+    await fs.writeFile(
+      path.join(legacyDeliverables, "legacy-only.md"),
+      "# only in legacy — must not be team SoT\n",
+      "utf8",
+    );
+
+    await persistAuthoritativeGroupMembers({
+      groupId,
+      tenantId,
+      profile: "managed_enterprise",
+      cfg,
+      members: [
+        {
+          memberId: "m1",
+          memberKind: "human",
+          userId: "user-m",
+          governanceRole: "owner",
+          status: "active",
+          updatedAtMs: Date.now(),
+        },
+      ],
+    });
+    await seedTask(cfg, groupId, taskId, { tenantId, profile: "managed_enterprise" });
+
+    const write = await submitTeamDeliverable({
+      groupId,
+      taskId,
+      actor: "user-m",
+      title: "正式成果",
+      content: "# managed only\n",
+      cfg,
+      enforceAcl: true,
+      tenant: { tenantId, trust: "membership" },
+    });
+    expect(write.ok).toBe(true);
+    if (!write.ok) {
+      return;
+    }
+    expect(
+      write.locator.includes(path.join("tenants", tenantId)) || write.locator.includes(tenantId),
+    ).toBe(true);
+    expect(
+      write.locator.includes(`${stateDir}/collaboration`) ||
+        write.locator.includes("/state/collaboration/"),
+    ).toBe(false);
+    const managedBody = await fs.readFile(write.locator, "utf8");
+    expect(managedBody).toBe("# managed only\n");
+
+    // Legacy decoy still only decoy — team write did not land there
+    const legacyFiles = await fs.readdir(legacyDeliverables);
+    expect(legacyFiles).toEqual(["legacy-only.md"]);
+
+    // Reading with same managed auth succeeds; legacy-only content is not team deliverable
+    const readOk = await readTeamDeliverable({
+      groupId,
+      deliverableId: write.deliverableId,
+      actor: "user-m",
+      cfg,
+      enforceAcl: true,
+      tenant: { tenantId, trust: "membership" },
+    });
+    expect(readOk.ok).toBe(true);
+    if (readOk.ok) {
+      expect(readOk.content).toBe("# managed only\n");
+      expect(readOk.content.includes("only in legacy")).toBe(false);
+    }
+
+    delete process.env.OPENBOT_SECURITY_PROFILE;
+    delete process.env.OPENBOT_TENANTS_ROOT;
   });
 });

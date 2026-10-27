@@ -50,3 +50,11 @@
 - **缩小范围 / 剩余接线**：未改 claimBoardItem / claim-contract-entry / formal-root settle；agent 成果工具未强制走 submitTeamDeliverable。
 - 不合入 main / 不切 18789 / 不做 F4（待真实聊天+agent 链接通后再复审）。
 
+## 双根清理（本轮）
+
+- **唯一团队 SoT**：`$OPENBOT_TENANTS_ROOT/<tenantId>/collaboration`（经 `authorizeTeamGroupResourceAccess` → `groupLocator`）。
+- **删除/硬拒**：`resolveTeamDeliverableStores` / 激活路径 **不再**调用 `createWorkspaceCollaborationStores` 作为团队回退；managed 无 tenant/auth → `trusted_group_locator_required`；managed 却落到 host `STATE_DIR/collaboration` → `legacy_collaboration_root_rejected`。
+- **personal_local**：仍可经 `resolveTrustedGroupLocator` 显式定位（非静默双写、非团队 managed SoT）。
+- **不做** A/B 双向同步、不挂整租户树、不改 claim/formal-root 热文件。
+- 详见 `docs/notes/team-real-dual-root-cleanup-2026-10-27.md`。
+

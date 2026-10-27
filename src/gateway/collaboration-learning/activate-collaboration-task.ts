@@ -21,11 +21,12 @@ import {
   listCollaborationBoardItems,
   materializeCollaborationIntentToBoard,
 } from "./claim-contract-entry.js";
+import { readGroupOperatingState, syncGroupOperatingState } from "./shared.js";
 import {
-  createWorkspaceCollaborationStores,
-  readGroupOperatingState,
-  syncGroupOperatingState,
-} from "./shared.js";
+  resolveTeamDeliverableStores,
+  type TeamResourceAuthOk,
+  type TrustedGroupStores,
+} from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export type ActivateCollaborationTaskInput = {
@@ -46,6 +47,10 @@ export type ActivateCollaborationTaskInput = {
   requireHumanConfirm?: boolean;
   skipChallengeWindow?: boolean;
   tenant?: CollaborationTenantResolution | null;
+  /** Trusted auth from gateway — preferred store root (managed tenants/<tid>/…). */
+  auth?: TeamResourceAuthOk | null;
+  /** Explicit trusted locator for tests; never silent ~/.openbot/collaboration. */
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
   cfg?: OpenBotConfig;
   nowMs?: number;
 };
@@ -108,6 +113,29 @@ function compact(value: string | null | undefined): string {
 }
 
 /** Stable activation key = normalized full contract fingerprint (not free-text join). */
+
+function resolveActivationStores(params: {
+  groupId: string;
+  cfg: OpenBotConfig;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  tenant?: CollaborationTenantResolution | null;
+}):
+  | { ok: true; stores: TrustedGroupStores & { groupDir: string } }
+  | { ok: false; reason: string; detail?: string } {
+  const resolved = resolveTeamDeliverableStores({
+    auth: params.auth,
+    trusted: params.trusted,
+    groupId: params.groupId,
+    cfg: params.cfg,
+    tenantId: params.auth?.tenantId ?? params.tenant?.tenantId ?? null,
+  });
+  if (!resolved.ok) {
+    return { ok: false, reason: resolved.reason, detail: resolved.detail };
+  }
+  return { ok: true, stores: resolved };
+}
+
 export function buildActivationKey(params: {
   groupId: string;
   taskId: string;
@@ -189,9 +217,10 @@ async function mutateCollaborationTaskObject(params: {
   readyRequested: boolean;
   cfg: OpenBotConfig;
   nowMs?: number;
+  stores: TrustedGroupStores;
 }): Promise<EnsureTaskResult> {
   const now = params.nowMs ?? Date.now();
-  const stores = createWorkspaceCollaborationStores(params.cfg);
+  const stores = params.stores;
   const existing = await stores.objectStorage.readObject<Task>(
     params.groupId,
     "task",
@@ -259,6 +288,7 @@ async function ensureCollaborationTaskObject(params: {
       readyRequested: params.readyRequested,
       cfg,
       nowMs: params.nowMs,
+      stores: params.stores,
     });
   try {
     if (params.alreadyLocked) {
@@ -290,6 +320,7 @@ async function findExistingPublishedItem(params: {
   title: string;
   cfg?: OpenBotConfig;
   tenant?: CollaborationTenantResolution | null;
+  stores: TrustedGroupStores;
 }): Promise<FindExistingResult> {
   const cfg = params.cfg ?? loadConfig();
   let items: GroupBoardClaimItem[];
@@ -324,7 +355,7 @@ async function findExistingPublishedItem(params: {
   }
   // Consult task tag fingerprint — same title with different contract is a conflict.
   try {
-    const stores = createWorkspaceCollaborationStores(cfg);
+    const stores = params.stores;
     const task = await stores.objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
     const priorKey = taskActivationKey(task);
     if (priorKey && priorKey !== params.activationKey) {
@@ -434,12 +465,33 @@ export async function activateCollaborationTask(
   const cfg = params.cfg ?? loadConfig();
   const humanConfirmed = params.humanConfirmed === true;
 
+  const storesResolved = resolveActivationStores({
+    groupId,
+    cfg,
+    auth: params.auth,
+    trusted: params.trusted,
+    tenant: params.tenant,
+  });
+  if (!storesResolved.ok) {
+    return {
+      status: "blocked",
+      taskId,
+      activationKey,
+      reason: storesResolved.reason,
+      detail: storesResolved.detail,
+      taskEnsured: false,
+      boardPublished: false,
+      dispatched: false,
+    };
+  }
+  const teamStores = storesResolved.stores;
+
   const syncActivated = async (
     item: GroupBoardClaimItem,
     taskCreated: boolean,
     idempotentReplay: boolean,
   ) => {
-    const stores = createWorkspaceCollaborationStores(cfg);
+    const stores = teamStores;
     try {
       await syncGroupOperatingState({
         fileStore: stores.fileStore,
@@ -584,6 +636,7 @@ export async function activateCollaborationTask(
       activationKey,
       readyRequested: false,
       cfg,
+      stores: teamStores,
       nowMs: params.nowMs,
     });
     if (!ensured.ok) {
@@ -654,6 +707,7 @@ export async function activateCollaborationTask(
           activationKey,
           title,
           cfg,
+          stores: teamStores,
           tenant: params.tenant,
         });
         if (!existingLookup.ok) {
@@ -681,6 +735,7 @@ export async function activateCollaborationTask(
           activationKey,
           readyRequested: false,
           cfg,
+          stores: teamStores,
           nowMs: params.nowMs,
           alreadyLocked: true,
         });
@@ -754,6 +809,7 @@ export async function activateCollaborationTask(
           activationKey,
           readyRequested: true,
           cfg,
+          stores: teamStores,
           nowMs: params.nowMs,
           alreadyLocked: true,
         });
