@@ -11,6 +11,7 @@ import { GROWTH_EVOLUTION_CONSUMER_ID, OutcomeConsumerRuntime } from "./consumer
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { createExperienceVerifiedHandler } from "./experience-verified-handler.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
+import { mergeAdoptedIntoExperienceExposure } from "./learning-adoption.js";
 import {
   resolveTrustedRunModalityCompletionEvidence,
   type ModalityCompletionEvidence,
@@ -100,6 +101,11 @@ export type RunnerTurnOutcomeInput = {
   costUsd?: number;
   /** Optional tighten-only tip budget limits (applied on first ensure). */
   budgetLimits?: Partial<import("./budget.js").TaskBudgetLimits>;
+  /**
+   * Residual: explicit adoption evidence (subset of tip exposure).
+   * Merged onto tip before close/verify — never inferred from injected alone.
+   */
+  adoptedAssetIds?: readonly string[];
 };
 
 export type GrowthOutcomeCommitOpts = {
@@ -111,6 +117,8 @@ export type GrowthOutcomeCommitOpts = {
   acceptanceEvidence?: import("./types.js").AcceptanceEvidence[];
   allowRetry?: boolean;
   processPlaceholder?: boolean;
+  /** Explicit learning adoption evidence — forwarded to tip; never guessed from inject. */
+  adoptedAssetIds?: readonly string[];
 };
 
 function resolveStoreRoot(cfg: OpenBotConfig, agentId: string): string {
@@ -292,6 +300,29 @@ export async function recordRunnerTurnOutcome(
     );
     if (replaced.ok) {
       tipRecord = replaced.record;
+    }
+  }
+
+  // Residual: merge explicit adoptedAssetIds onto tip exposure (no invent / no inject copy).
+  if (input.adoptedAssetIds && input.adoptedAssetIds.length > 0) {
+    const merged = mergeAdoptedIntoExperienceExposure(
+      tipRecord.experienceExposure,
+      input.adoptedAssetIds,
+    );
+    if (merged) {
+      const adoptedSubmit = service.submit(
+        taskId,
+        {
+          type: "set_experience_exposure",
+          experienceExposure: merged,
+          expectedVersion: tipRecord.outcomeVersion,
+          fencingToken,
+        },
+        { requiredScope: scope, commandId: `adopt-merge:${taskId}:${input.runId}` },
+      );
+      if (adoptedSubmit.ok) {
+        tipRecord = adoptedSubmit.record;
+      }
     }
   }
 

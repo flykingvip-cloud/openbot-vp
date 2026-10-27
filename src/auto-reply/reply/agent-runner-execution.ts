@@ -325,6 +325,9 @@ export async function runAgentTurnWithFallback(params: {
       ...(opts?.acceptanceEvidence ? { acceptanceEvidence: opts.acceptanceEvidence } : {}),
       ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
       ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
+      ...(opts?.adoptedAssetIds && opts.adoptedAssetIds.length > 0
+        ? { adoptedAssetIds: opts.adoptedAssetIds }
+        : {}),
     })
       .then(async () => {
         await syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId);
