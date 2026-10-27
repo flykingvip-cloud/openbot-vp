@@ -265,7 +265,11 @@ describe("O4 candidate status view (C1–C6 UI)", () => {
       container,
     );
     expect(container.textContent).toContain("confirmed preference");
-    expect(container.textContent).not.toContain("待确认");
+    // Filter tab label includes「待确认」, but confirmed rows must not carry the badge.
+    expect(container.querySelector(".employee-workbench__memory-badge")).toBeNull();
+    const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
+    const confirmed = tabs.find((tab) => (tab.textContent ?? "").trim() === "已确认");
+    expect(confirmed?.getAttribute("aria-selected")).toBe("true");
   });
 
   it("C5: managed mode still hides local memory center actions", () => {
