@@ -34,6 +34,7 @@ import {
 } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   asGovernedTask,
   isCollabTaskHandoffContractEnabled,

@@ -227,9 +227,11 @@ async function seed(params: { cfg: OpenBotConfig; taskId: string; itemId: string
     assignedMemberIds: [tenant.bot0],
     responsibility: {
       owner: tenant.coordinator,
+
       executors: [tenant.bot0],
-      reviewers: [],
-      approvers: [tenant.approver],
+
+      approver: tenant.approver,
+      decisionAuthority: tenant.approver,
     },
     controlEpoch: 0,
     createdAtMs: 1,
@@ -1582,9 +1584,11 @@ describe("T42 M3 stop patch + single claim write", () => {
       status: "in_progress" as const,
       responsibility: {
         owner: tenant.coordinator,
+
         executors: [tenant.bot0],
-        reviewers: [],
-        approvers: [tenant.approver],
+
+        approver: tenant.approver,
+        decisionAuthority: tenant.approver,
       },
       ownerMemberId: tenant.coordinator,
       assignedMemberIds: [tenant.bot0],
@@ -1597,9 +1601,11 @@ describe("T42 M3 stop patch + single claim write", () => {
       status: "blocked" as const,
       responsibility: {
         owner: tenant.admin,
+
         executors: [tenant.approver],
-        reviewers: [tenant.bot0],
-        approvers: [tenant.owner],
+        reviewer: tenant.bot0,
+        approver: tenant.owner,
+        decisionAuthority: tenant.owner,
       },
       ownerMemberId: tenant.admin,
       assignedMemberIds: [tenant.approver],
@@ -2532,9 +2538,11 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
           responsibility: {
             ...(liveGoverned.responsibility ?? {
               owner: tenant.coordinator,
+
               executors: [tenant.bot0],
-              reviewers: [],
-              approvers: [tenant.approver],
+
+              approver: tenant.approver,
+              decisionAuthority: tenant.approver,
             }),
             owner: tenant.admin,
           },
@@ -3307,9 +3315,11 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
           responsibility: {
             ...(g.responsibility ?? {
               owner: tenant.coordinator,
+
               executors: [tenant.bot0],
-              reviewers: [],
-              approvers: [tenant.approver],
+
+              approver: tenant.approver,
+              decisionAuthority: tenant.approver,
             }),
             owner: tenant.admin,
           },
@@ -3370,9 +3380,11 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
           responsibility: {
             ...(g.responsibility ?? {
               owner: tenant.coordinator,
+
               executors: [tenant.bot0],
-              reviewers: [],
-              approvers: [tenant.approver],
+
+              approver: tenant.approver,
+              decisionAuthority: tenant.approver,
             }),
             executors: [tenant.admin],
           },
@@ -3436,9 +3448,11 @@ describe("T45 M3 business atomicity (handoff / board-claim / complete-gate)", ()
           responsibility: {
             ...(g.responsibility ?? {
               owner: tenant.coordinator,
+
               executors: [tenant.admin],
-              reviewers: [],
-              approvers: [tenant.approver],
+
+              approver: tenant.approver,
+              decisionAuthority: tenant.approver,
             }),
             owner: tenant.admin,
           },
@@ -3783,9 +3797,11 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
       assignedMemberIds: [tenant.coordinator],
       responsibility: {
         owner: tenant.coordinator,
+
         executors: [tenant.coordinator],
-        reviewers: [],
-        approvers: [tenant.approver],
+
+        approver: tenant.approver,
+        decisionAuthority: tenant.approver,
       },
       controlEpoch: 0,
       createdAtMs: 1,
@@ -3942,9 +3958,11 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
       assignedMemberIds: [tenant.bot0],
       responsibility: {
         owner: tenant.coordinator,
+
         executors: [tenant.bot0],
-        reviewers: [],
-        approvers: [tenant.approver],
+
+        approver: tenant.approver,
+        decisionAuthority: tenant.approver,
       },
       controlEpoch: 0,
       createdAtMs: 1,
@@ -4127,9 +4145,11 @@ describe("T51 M3-REVOKE shared authEpoch CAS", () => {
       assignedMemberIds: [tenant.bot0],
       responsibility: {
         owner: tenant.coordinator,
+
         executors: [tenant.bot0],
-        reviewers: [],
-        approvers: [tenant.approver],
+
+        approver: tenant.approver,
+        decisionAuthority: tenant.approver,
       },
       controlEpoch: 0,
       createdAtMs: 1,
@@ -4736,6 +4756,9 @@ describe("T54 M3 AUTH sync production entry (syncGroupOperatingState)", () => {
       cfg,
     });
     expect(recheck.ok).toBe(false);
+    if (recheck.ok) {
+      throw new Error("expected auth recheck failure");
+    }
     expect(recheck.reason).toBe("auth_revoked");
   });
 
@@ -5032,6 +5055,9 @@ describe("W1 AUTH production entry close (roster CAS + stale sync)", () => {
       cfg,
     });
     expect(recheck.ok).toBe(false);
+    if (recheck.ok) {
+      throw new Error("expected auth recheck failure");
+    }
     expect(recheck.reason).toBe("auth_revoked");
   });
 

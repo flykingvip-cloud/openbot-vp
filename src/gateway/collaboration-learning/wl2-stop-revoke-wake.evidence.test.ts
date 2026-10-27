@@ -26,6 +26,7 @@ import {
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { readOperatingStateAuthEpoch } from "../collaboration-dispatch/task-control-cas.js";
 import { recheckCurrentDispatchAuthorization } from "../collaboration-dispatch/task-dispatch-auth-recheck.js";
+import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   claimWakeOpRunning,
   confirmWakeOpCompleted,
@@ -284,7 +285,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     ).rejects.toThrow();
 
     const persisted = await objectStorage.readObject<Task>(groupId, "task", taskId);
-    expect(persisted?.responsibility?.owner).toBe(tenant.bots[1].id);
+    expect(asGovernedTask(persisted!).responsibility?.owner).toBe(tenant.bots[1].id);
   });
 
   test("L3 residual cleanup: self-advance/wake entries remain behavioral (markers deleted)", () => {
@@ -957,7 +958,11 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
     });
     revoked.memberRoleMap = []; // strip all mapped members (coordinator still mapped via governance)
     // Also clear coordinator so bot-exec / bot-coord duty targets fail recheck.
-    revoked.governance = { ownerUserId: tenant.employees[0].id, coordinatorBotId: "" };
+    revoked.governance = {
+      ownerUserId: tenant.employees[0].id,
+      adminUserIds: [],
+      coordinatorBotId: "",
+    };
     await writeAuthOsForTest({ fileStore, groupId, cfg, state: revoked });
 
     const auth = await recheckCurrentDispatchAuthorization({
@@ -1019,7 +1024,7 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
 
     // Task responsibility unchanged (no apply after revoke path).
     const task = await objectStorage.readObject<Task>(groupId, "task", taskId);
-    expect(task?.responsibility?.owner).toBe(tenant.bots[0].id);
+    expect(asGovernedTask(task!).responsibility?.owner).toBe(tenant.bots[0].id);
   });
 
   test("WL2-REVOKE-HB-01: heartbeat path revoke race same T-E5判定点 as wake", async () => {
@@ -1448,7 +1453,6 @@ describe("WL2 CAP-03/04 evidence bindings", () => {
       groupId,
       taskId,
       actor: tenant.employees[0].id,
-      actorType: "human",
       reason: "resume-stop-gate",
       cfg,
     });

@@ -277,7 +277,7 @@ describe("batch3 Chinese / mixed task classification", () => {
     ).toBe("general_text");
   });
 
-  it("explicit text output does not fall back to music_generation profile", () => {
+  it("explicit text output does not fall back to music_generation profile", async () => {
     expect(
       detectTaskCategoryForPreview({
         taskText: "请帮我处理一下",
@@ -287,7 +287,7 @@ describe("batch3 Chinese / mixed task classification", () => {
     ).toBe("general_text");
   });
 
-  it("explicit text still allows coding / reasoning profile fallback", () => {
+  it("explicit text still allows coding / reasoning profile fallback", async () => {
     expect(
       detectTaskCategoryForPreview({
         taskText: "请帮我处理一下",
@@ -304,7 +304,7 @@ describe("batch3 Chinese / mixed task classification", () => {
     ).toBe("high_quality_reasoning");
   });
 
-  it("preview uses Chinese coding example for required capabilities", () => {
+  it("preview uses Chinese coding example for required capabilities", async () => {
     __resetModelAdmissionStoreForTest();
     const preview = previewRoutingDecision({
       request: { taskText: "重构这段代码并补充测试", outputType: "text" },
@@ -335,7 +335,7 @@ describe("batch3 specialized score pipeline through protocol adapter", () => {
     expect(normalizeQualityScore("0.9")).toBeUndefined();
   });
 
-  it("runner specialized score persists, rereads, and displays version/time/score", () => {
+  it("runner specialized score persists, rereads, and displays version/time/score", async () => {
     const verifiedAt = 1_700_000_000_000;
     const service = createLocalProtocolVerificationService({
       runner: createInjectedProtocolRunner({
@@ -351,7 +351,7 @@ describe("batch3 specialized score pipeline through protocol adapter", () => {
       settleDelayMs: 0,
     });
 
-    const { task, authority } = service.createVerificationTask({
+    const { task, authority } = await service.createVerificationTask({
       modelRef: "private/score-pipe",
       capabilityIds: ["coding"],
       mode: "specialized_eval",
@@ -383,7 +383,7 @@ describe("batch3 specialized score pipeline through protocol adapter", () => {
     expect(rows[0]?.isDemo).toBe(false);
   });
 
-  it("drops out-of-range qualityScore instead of persisting it", () => {
+  it("drops out-of-range qualityScore instead of persisting it", async () => {
     const service = createLocalProtocolVerificationService({
       runner: createInjectedProtocolRunner({
         coding: {
@@ -395,7 +395,7 @@ describe("batch3 specialized score pipeline through protocol adapter", () => {
       }),
       settleDelayMs: 0,
     });
-    const { task } = service.createVerificationTask({
+    const { task } = await service.createVerificationTask({
       modelRef: "private/bad-score",
       capabilityIds: ["coding"],
       mode: "specialized_eval",

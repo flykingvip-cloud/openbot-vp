@@ -213,6 +213,9 @@ describe("batch2 formal capability verification", () => {
       autoRouting: "eligible",
     });
     expect(routeA.status).toBe("not_wired");
+    if (routeA.status !== "not_wired") {
+      throw new Error("expected not_wired routing response");
+    }
     expect(routeA.message).toMatch(/尚未接入|草稿/);
   });
 
@@ -464,12 +467,12 @@ describe("batch2 formal capability verification", () => {
       },
     });
 
-    const older = stamped.createVerificationTask({
+    const older = await stamped.createVerificationTask({
       modelRef: "private/gen",
       capabilityIds: ["text_chat"],
       configFingerprint: "fp-stable",
     });
-    const newer = stamped.createVerificationTask({
+    const newer = await stamped.createVerificationTask({
       modelRef: "private/gen",
       capabilityIds: ["text_chat"],
       configFingerprint: "fp-stable",
@@ -520,7 +523,7 @@ describe("batch2 formal capability verification", () => {
     );
   });
 
-  it("demo simulate never enters formal verified set", () => {
+  it("demo simulate never enters formal verified set", async () => {
     const task = createCapabilityVerificationTask({
       modelRef: "private/demo-only",
       capabilityIds: ["text_chat", "tool_use"],
@@ -532,7 +535,7 @@ describe("batch2 formal capability verification", () => {
     expect(verifiedCapabilityIds(admission.demoCapabilityEvidence ?? [])).toContain("text_chat");
   });
 
-  it("injected runner can pass tool_use formally without paid APIs", () => {
+  it("injected runner can pass tool_use formally without paid APIs", async () => {
     const service = createLocalProtocolVerificationService({
       runner: createInjectedProtocolRunner({
         tool_use: {
@@ -543,7 +546,7 @@ describe("batch2 formal capability verification", () => {
         },
       }),
     });
-    const { task, authority } = service.createVerificationTask({
+    const { task, authority } = await service.createVerificationTask({
       modelRef: "private/tools",
       capabilityIds: ["tool_use"],
     });

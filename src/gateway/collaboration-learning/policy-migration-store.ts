@@ -32,7 +32,9 @@ export function createWorkspacePolicyMigrationTxnIo(params: {
   const { groupId } = params;
   return {
     readState: async () => await readGroupOperatingState({ fileStore, groupId }),
-    writeState: async (state) => await writeGroupOperatingState({ fileStore, groupId, state }),
+    writeState: async (state) => {
+      await writeGroupOperatingState({ fileStore, groupId, state });
+    },
     readTxn: async () =>
       await fileStore.readGroupFile<PolicyMigrationTxn>({
         groupId,
