@@ -6,11 +6,11 @@
 
 ## 交付
 
-| 产物 | 路径 |
-| --- | --- |
-| Harness | `src/memory/memory-effect-acceptance-matrix.test.ts` |
+| 产物     | 路径                                                                 |
+| -------- | -------------------------------------------------------------------- |
+| Harness  | `src/memory/memory-effect-acceptance-matrix.test.ts`                 |
 | 覆盖矩阵 | `docs/design/evidence/memory-effect-acceptance-matrix-2026-10-27.md` |
-| 隔离复用 | `src/memory/memory-batch1-isolation.ts` |
+| 隔离复用 | `src/memory/memory-batch1-isolation.ts`                              |
 
 ## 非目标
 
