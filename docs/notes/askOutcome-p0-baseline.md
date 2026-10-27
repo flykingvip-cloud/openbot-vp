@@ -21,4 +21,5 @@
 
 See `docs/design/task-outcome/call-chain-and-replacements.md` for the converged matrix.
 
-| residual four items | open (this PR) | W1 inventory；非 chat budget；adopted API；evolution inventory-only |
+| residual four items | merged #120 | W1 inventory；非 chat budget iterations；adopted API；evolution inventory-only |
+| paths / bypass cleanup | open (this PR) | cron/followup/cli/gateway `costUsd`；evolution tip-bridged dedupe；adopted/subagent/RPC 仍 inventory |

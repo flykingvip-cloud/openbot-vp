@@ -123,6 +123,7 @@ import {
   ensureGatewayAgentTurnTaskOutcome,
 } from "../task-outcome/entrypoint-ensure.js";
 import {
+  estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   type RunnerTurnFailureReason,
 } from "../task-outcome/runtime-from-runner.js";
@@ -900,6 +901,8 @@ async function agentCommandInternal(
   let agentOutcomeTaskId: string | undefined;
   let agentOutcomeScope: TrustedScope | undefined;
   let agentOutcomeCloseoutDone = false;
+  /** Real usage-derived USD for tip budget closeout (cli/gateway_agent have no mid-run charge). */
+  let tipBudgetCostUsd: number | undefined;
   let agentOutcomeSuccess: boolean | undefined;
   let agentOutcomeFailureReason: RunnerTurnFailureReason | undefined;
   let agentOutcomeFailureDetail: string | undefined;
@@ -960,6 +963,7 @@ async function agentCommandInternal(
         scope: agentOutcomeScope,
         entrypoint: agentOutcomeEntrypoint,
         latencyMs: Math.max(0, Date.now() - agentOutcomeStartedAt),
+        ...(tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
         ...(success
           ? {}
           : {
@@ -1508,6 +1512,12 @@ async function agentCommandInternal(
       result = fallbackResult.result;
       fallbackProvider = fallbackResult.provider;
       fallbackModel = fallbackResult.model;
+      tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
+        usage: result.meta?.agentMeta?.usage,
+        provider: fallbackProvider,
+        model: result.meta?.agentMeta?.model ?? fallbackModel,
+        config: cfg,
+      });
       // Enterprise credit usage. Subagent runs record against the slot they acquired.
       await recordAgentCommandCreditUsage({
         gate: commercialGate,

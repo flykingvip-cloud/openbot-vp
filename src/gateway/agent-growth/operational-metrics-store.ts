@@ -12,6 +12,7 @@ import path from "node:path";
 import { resolveAgentDir } from "../../agents/agent-scope.js";
 import type { OpenBotConfig } from "../../config/config.js";
 import { createAsyncLock, readJsonFile, writeJsonAtomic } from "../../infra/json-files.js";
+import { hasTipBridgedEvolutionForRun } from "../../task-outcome/growth-bridge.js";
 import { appendEvolutionTaskOutcome } from "./evolution-task-outcomes.js";
 import type { OperationalScoreSignals } from "./operational-score.js";
 
@@ -169,11 +170,17 @@ export async function recordTaskOutcome(
       }
     }
   });
-  appendEvolutionTaskOutcome(
-    cfg,
-    evolutionRecordFromObservation(agentId, outcome),
-    outcome.evolutionPersistDir ? { persistDir: outcome.evolutionPersistDir } : undefined,
-  );
+  // Paths cleanup: tip→growth-bridge already published this run → skip redundant bypass append.
+  const tipBridged =
+    Boolean(outcome.runId?.trim()) &&
+    hasTipBridgedEvolutionForRun(cfg, agentId, outcome.runId!.trim());
+  if (!tipBridged) {
+    appendEvolutionTaskOutcome(
+      cfg,
+      evolutionRecordFromObservation(agentId, outcome),
+      outcome.evolutionPersistDir ? { persistDir: outcome.evolutionPersistDir } : undefined,
+    );
+  }
 }
 
 /** 记录一次工具调用结果。 */
@@ -226,14 +233,21 @@ export async function recordRunOutcome(
     m.toolsTotal += toolsTotal;
     m.toolsSucceeded += toolsSucceeded;
   });
-  appendEvolutionTaskOutcome(
-    cfg,
-    evolutionRecordFromObservation(agentId, {
-      ...outcome,
-      toolsObserved: toolsTotal,
-    }),
-    outcome.evolutionPersistDir ? { persistDir: outcome.evolutionPersistDir } : undefined,
-  );
+  // Paths cleanup: tip→growth-bridge already published this run → skip redundant bypass append.
+  // Metrics counters above still update (operational ledger ≠ evolution sample).
+  const tipBridged =
+    Boolean(outcome.runId?.trim()) &&
+    hasTipBridgedEvolutionForRun(cfg, agentId, outcome.runId!.trim());
+  if (!tipBridged) {
+    appendEvolutionTaskOutcome(
+      cfg,
+      evolutionRecordFromObservation(agentId, {
+        ...outcome,
+        toolsObserved: toolsTotal,
+      }),
+      outcome.evolutionPersistDir ? { persistDir: outcome.evolutionPersistDir } : undefined,
+    );
+  }
 }
 
 /**

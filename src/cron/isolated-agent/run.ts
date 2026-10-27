@@ -88,7 +88,10 @@ import {
 } from "../../security/external-content.js";
 import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
 import { ensureCronTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
-import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
+import {
+  estimateTipBudgetCostUsdFromUsage,
+  recordRunnerTurnOutcome,
+} from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
 import { isWorkbenchOnlyLegacyCronDelivery } from "../delivery-surfaces.js";
@@ -796,6 +799,8 @@ export async function runCronIsolatedAgentTurn(params: {
     | import("../../task-outcome/runtime-from-runner.js").RunnerTurnOutcomeInput["capabilityOutcome"]
     | undefined;
   let cronOutcomeCloseoutDone = false;
+  /** Real usage-derived USD for tip budget closeout (set when agentMeta.usage exists). */
+  let tipBudgetCostUsd: number | undefined;
   if (!cronOutcomeOpened.ok) {
     logWarn(
       `[cron:${params.job.id}] task-outcome entry failed: ${cronOutcomeOpened.code} ${cronOutcomeOpened.message}`,
@@ -889,6 +894,7 @@ export async function runCronIsolatedAgentTurn(params: {
           scope: cronOutcomeScope,
           entrypoint: "cron",
           latencyMs: Math.max(0, runEndedAt - runStartedAt),
+          ...(tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
           ...(failureReason
             ? {
                 failureReason,
@@ -1326,6 +1332,12 @@ export async function runCronIsolatedAgentTurn(params: {
         setCliSessionId(cronSession.sessionEntry, providerUsed, cliSessionId);
       }
     }
+    tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
+      usage,
+      provider: providerUsed,
+      model: modelUsed,
+      config: cfgWithAgentDefaults,
+    });
     if (hasNonzeroUsage(usage)) {
       const input = usage.input ?? 0;
       const output = usage.output ?? 0;

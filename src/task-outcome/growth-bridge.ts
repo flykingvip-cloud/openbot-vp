@@ -97,6 +97,25 @@ function taskKey(taskId: string, outcomeVersion: number): string {
 }
 
 /**
+ * True when tip→growth-bridge already published a sample for this runId
+ * (row carries taskOutcomeKey). Used to skip redundant bypass appends.
+ */
+export function hasTipBridgedEvolutionForRun(
+  cfg: OpenBotConfig,
+  agentId: string,
+  runId: string,
+): boolean {
+  const rid = runId.trim();
+  if (!rid) {
+    return false;
+  }
+  const filePath = resolveEvolutionTaskOutcomesPath(cfg, agentId);
+  return readRawEvolutionLines(filePath).some(
+    (row) => !row.revoked && row.runId === rid && Boolean(row.taskOutcomeKey?.trim()),
+  );
+}
+
+/**
  * Effective real samples: per taskId keep the highest non-revoked outcomeVersion.
  * Older failure rows superseded by a later success are excluded.
  */

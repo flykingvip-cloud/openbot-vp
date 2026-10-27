@@ -75,6 +75,7 @@ import type { ModalityExecutionArtifact } from "../../task-outcome/modality-arti
 import {
   assessRunnerTurnBudgetGate,
   chargeRunnerTurnBudgetSpend,
+  estimateTipBudgetCostUsdFromUsage,
   recordRunnerTurnOutcome,
   TaskBudgetExceededError,
   type GrowthOutcomeCommitOpts,
@@ -85,7 +86,6 @@ import {
   resolveMessageChannel,
 } from "../../utils/message-channel.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
-import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { TemplateContext } from "../templating.js";
 import type { VerboseLevel } from "../thinking.js";
@@ -245,23 +245,12 @@ export async function runAgentTurnWithFallback(params: {
       return;
     }
     tipBudgetModelCallSeq += 1;
-    let costUsd: number | undefined;
-    try {
-      const usage = normalizeUsage(opts.usage as never);
-      if (usage) {
-        const costConfig = resolveModelCostConfig({
-          provider: opts.provider,
-          model: opts.model,
-          config: params.followupRun.run.config,
-        });
-        const estimated = estimateUsageCost({ usage, cost: costConfig });
-        if (typeof estimated === "number" && Number.isFinite(estimated) && estimated > 0) {
-          costUsd = estimated;
-        }
-      }
-    } catch {
-      // cost estimate is best-effort; iterations still charged
-    }
+    const costUsd = estimateTipBudgetCostUsdFromUsage({
+      usage: opts.usage,
+      provider: opts.provider,
+      model: opts.model,
+      config: params.followupRun.run.config,
+    });
     chargeRunnerTurnBudgetSpend(params.followupRun.run.config, growthAgentIdForEntry, {
       taskId: chatOutcomeTaskId,
       scope: chatOutcomeScope,
