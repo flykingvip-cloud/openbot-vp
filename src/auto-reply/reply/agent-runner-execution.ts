@@ -71,6 +71,7 @@ import { emitAgentEvent, registerAgentRunContext } from "../../infra/agent-event
 import { defaultRuntime } from "../../runtime.js";
 import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.js";
 import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
+import type { ModalityExecutionArtifact } from "../../task-outcome/modality-artifact-evidence.js";
 import {
   recordRunnerTurnOutcome,
   type GrowthOutcomeCommitOpts,
@@ -212,6 +213,7 @@ export async function runAgentTurnWithFallback(params: {
   // 工具成功率仍在 turn 内内存累加、收尾一次落盘。
   let growthToolTotal = 0;
   let growthToolSucceeded = 0;
+  const modalityArtifacts: ModalityExecutionArtifact[] = [];
   const growthStartedAt = Date.now();
   let modelGate: EmployeeModelGateResult | undefined;
   let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
@@ -276,8 +278,10 @@ export async function runAgentTurnWithFallback(params: {
     }
     const toolsTotal = growthToolTotal;
     const toolsSucceeded = growthToolSucceeded;
+    const artifactsForTurn = [...modalityArtifacts];
     growthToolTotal = 0;
     growthToolSucceeded = 0;
+    modalityArtifacts.length = 0;
     const tenantId = modelGate?.tenantId?.trim();
     // askOutcome R83: requires entry taskId; never invent run:${runId} at finish.
     if (!chatOutcomeTaskId || !chatOutcomeScope) {
@@ -312,6 +316,7 @@ export async function runAgentTurnWithFallback(params: {
       latencyMs: Math.max(0, Date.now() - growthStartedAt),
       ...(tenantId ? { tenantId } : {}),
       ...(capabilityOutcomeForTurn ? { capabilityOutcome: capabilityOutcomeForTurn } : {}),
+      ...(artifactsForTurn.length > 0 ? { modalityArtifacts: artifactsForTurn } : {}),
       ...(failureReason ? { failureReason } : {}),
       ...(opts?.failureDetail ? { failureDetail: opts.failureDetail } : {}),
       ...(opts?.acceptance ? { acceptance: opts.acceptance } : {}),
@@ -902,6 +907,15 @@ export async function runAgentTurnWithFallback(params: {
                       // Agent Growth OS：工具成功率信号源（此前 recordToolOutcome 无任何调用方）。
                       if (phase === "result") {
                         recordGrowthToolResult(evt.data.isError === true);
+                        if (evt.data.isError !== true && name) {
+                          const relativePath =
+                            typeof evt.data.relativePath === "string"
+                              ? evt.data.relativePath.trim()
+                              : "";
+                          if (relativePath && (name === "image_gen" || name === "music_gen")) {
+                            modalityArtifacts.push({ toolName: name, relativePath });
+                          }
+                        }
                       }
                     }
                     // Track auto-compaction completion

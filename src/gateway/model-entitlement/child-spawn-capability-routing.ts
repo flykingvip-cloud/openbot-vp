@@ -16,6 +16,7 @@ import {
   reorderAuthorizedModelsForChildTask,
   type ChildTaskAorReorderResult,
 } from "./child-task-aor-reorder.js";
+import { resolveModalityExecutorWiring } from "./executor-wiring.js";
 import {
   buildRunContextEstimateParts,
   type RunContextEstimateBuild,
@@ -199,6 +200,7 @@ export function planChildSpawnCapabilityRouting(
     catalog: input.catalog ?? [],
     modelContextWindows: input.modelContextWindows,
     contextParts: contextEstimate.contextParts,
+    executorWiring: resolveModalityExecutorWiring(input.cfg),
   });
   const consumed = consumeCapabilityRoutingResult({
     planFailure: childReorder.planFailure,

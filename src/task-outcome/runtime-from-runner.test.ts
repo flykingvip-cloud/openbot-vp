@@ -351,3 +351,124 @@ describe("formal acceptance enforces capability modality (via service)", () => {
     expect(refused.message).toContain("target_modality_not_accepted");
   });
 });
+
+describe("recordRunnerTurnOutcome — artifact-backed modality completion", () => {
+  let agentDir = "";
+  let cfg: OpenBotConfig;
+
+  beforeEach(() => {
+    agentDir = fs.mkdtempSync(path.join(os.tmpdir(), "runner-artifact-"));
+    cfg = { agents: { list: [{ id: "bot", agentDir }] } } as unknown as OpenBotConfig;
+  });
+
+  afterEach(() => {
+    fs.rmSync(agentDir, { recursive: true, force: true });
+  });
+
+  const wiredImageClaim = {
+    planFailureKind: "none",
+    allowedModality: "image_generation",
+    forbiddenSuccessModalities: [] as string[],
+    textReturnedAllowed: true,
+    targetModalityCompleted: false,
+    status: "ok",
+    incompleteModalities: [] as string[],
+    detail: "routing_executable_not_completed",
+  };
+
+  const wiredMusicClaim = {
+    ...wiredImageClaim,
+    allowedModality: "audio_music_generation",
+  };
+
+  it("failure response does not mark image modality completed", async () => {
+    const out = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: false,
+      runId: "run-img-fail",
+      taskId: "chat:bot:sess:run-img-fail",
+      failureReason: "run_failed",
+      capabilityOutcome: wiredImageClaim,
+      modalityArtifacts: [
+        { toolName: "image_gen", relativePath: ".openbot/generated-images/a.png" },
+      ],
+    });
+    expect(out.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(out.record.capabilityModality?.executionStatus).toBe("routing_ok");
+  });
+
+  it("success without artifact leaves image/music incomplete; acceptance refused", async () => {
+    const imageOut = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-img-no-art",
+      taskId: "chat:bot:sess:run-img-no-art",
+      capabilityOutcome: wiredImageClaim,
+    });
+    expect(imageOut.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(imageOut.record.capabilityModality?.targetModality).toBe("image_generation");
+    expect(imageOut.record.reasonDetail ?? "").not.toContain("target_modality_completed_via=");
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const refused = chat.setAcceptance(
+      imageOut.record.taskId,
+      imageOut.record.outcomeVersion,
+      imageOut.record.fencingToken!,
+      { status: "passed" },
+      { allowRetry: false, scope: imageOut.record.scope },
+    );
+    expect(refused.ok).toBe(false);
+
+    const musicOut = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-music-no-art",
+      taskId: "chat:bot:sess:run-music-no-art",
+      capabilityOutcome: wiredMusicClaim,
+    });
+    expect(musicOut.record.capabilityModality?.targetModalityCompleted).toBe(false);
+    expect(musicOut.record.capabilityModality?.targetModality).toBe("audio_music_generation");
+  });
+
+  it("success with real image/music artifact marks completed and acceptance can pass", async () => {
+    const imageOut = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-img-art",
+      taskId: "chat:bot:sess:run-img-art",
+      capabilityOutcome: wiredImageClaim,
+      modalityArtifacts: [
+        { toolName: "image_gen", relativePath: ".openbot/generated-images/hero.png" },
+      ],
+    });
+    expect(imageOut.record.capabilityModality?.targetModalityCompleted).toBe(true);
+    expect(imageOut.record.capabilityModality?.executionStatus).toBe("completed");
+    expect(imageOut.record.reasonDetail).toContain(
+      "target_modality_completed_via=execution_artifact:.openbot/generated-images/hero.png",
+    );
+
+    const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
+    const service = new TaskOutcomeResultService({ store });
+    const chat = new ChatTaskOutcomeAdapter(service);
+    const passed = chat.setAcceptance(
+      imageOut.record.taskId,
+      imageOut.record.outcomeVersion,
+      imageOut.record.fencingToken!,
+      { status: "passed" },
+      { allowRetry: false, scope: imageOut.record.scope },
+    );
+    expect(passed.ok).toBe(true);
+
+    const musicOut = await recordRunnerTurnOutcome(cfg, "bot", {
+      success: true,
+      runId: "run-music-art",
+      taskId: "chat:bot:sess:run-music-art",
+      capabilityOutcome: wiredMusicClaim,
+      modalityArtifacts: [
+        { toolName: "music_gen", relativePath: ".openbot/generated-audio/theme.mp3" },
+      ],
+    });
+    expect(musicOut.record.capabilityModality?.targetModalityCompleted).toBe(true);
+    expect(musicOut.record.reasonDetail).toContain(
+      "target_modality_completed_via=execution_artifact:.openbot/generated-audio/theme.mp3",
+    );
+  });
+});
