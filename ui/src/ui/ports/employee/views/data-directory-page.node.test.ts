@@ -76,7 +76,7 @@ describe("renderDataDirectoryPanel", () => {
       (button.textContent ?? "").includes("删除此记忆文件"),
     );
     expect(forgetBtn?.getAttribute("title")).toBe(
-      "仅删除所选文件，不会清除其他来源中的相同内容，也不保证立即停止相关召回",
+      "仅删除工作区已索引记忆语料中的所选文件（MEMORY.md / memory/**），不会清除会话或其他来源中的相同内容，也不保证立即停止相关召回",
     );
     expect(container.textContent).toContain("撤销授权");
     expect(container.textContent).toContain("shared/knowledge/a");

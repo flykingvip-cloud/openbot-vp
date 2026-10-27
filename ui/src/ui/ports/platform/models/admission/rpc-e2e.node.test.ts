@@ -14,6 +14,7 @@ import {
   interruptOrphanedInFlightVerificationTasks,
 } from "../model-admission-store.ts";
 import { detectTaskCategoryForPreview } from "../routing-decision-preview.ts";
+import type { ModelAsset } from "../view-model.ts";
 import { previewRoutingDecisionViaService } from "./routing-decision-service.ts";
 import {
   createRpcCapabilityVerificationService,
@@ -52,6 +53,24 @@ type FakeAdmission = {
   connectionFingerprint?: string;
   connectionVerifiedAt?: number;
 };
+
+function stubCandidate(modelId: string): ModelAsset {
+  return {
+    modelId,
+    providerId: "private",
+    displayName: modelId,
+    source: "configured",
+    inputModalities: ["text"],
+    outputModalities: ["text"],
+    capabilities: ["coding"],
+    costTier: "low",
+    health: "healthy",
+    contextWindow: 128000,
+    taskTags: [],
+    inRecommendationPool: false,
+    tenantSelectable: true,
+  };
+}
 
 function createFakeGateway(opts?: {
   hold?: Map<string, { release: () => void; promise: Promise<void> }>;
@@ -499,10 +518,7 @@ describe("rpc + registry e2e regression", () => {
         taskText: "帮我重构这个模块的类型定义",
         outputType: "text",
       },
-      candidates: [
-        { modelId: "private/coder", health: "healthy", costTier: "low", contextWindow: 128000 },
-        { modelId: "private/other", health: "healthy", costTier: "low", contextWindow: 128000 },
-      ],
+      candidates: [stubCandidate("private/coder"), stubCandidate("private/other")],
     });
     expect(zh.backendStatus).toBe("wired");
     expect(zh.uiDemo).toBe(false);
@@ -523,9 +539,7 @@ describe("rpc + registry e2e regression", () => {
         taskText: "画一张海报",
         outputType: "text",
       },
-      candidates: [
-        { modelId: "private/coder", health: "healthy", costTier: "low", contextWindow: 128000 },
-      ],
+      candidates: [stubCandidate("private/coder")],
     });
     expect(textConstrained.taskCategory).not.toBe("image_generation");
     expect(textConstrained.outputType).toBe("text");

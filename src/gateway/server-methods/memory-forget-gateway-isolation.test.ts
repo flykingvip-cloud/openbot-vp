@@ -113,13 +113,15 @@ describe("data.memory.forget real gateway handler isolation", () => {
     expect(String(respond.mock.calls[0]?.[2]?.message ?? "")).toMatch(/permission/i);
   });
 
-  it("allows local operator (null client) to delete a synthetic Data Space file", async () => {
-    await fs.mkdir(path.join(tmpRoot, "agents", "main", "memory", "agent"), { recursive: true });
-    const memoryKey = "o5-gateway-allow.md";
-    const filePath = path.join(tmpRoot, "agents", "main", "memory", "agent", memoryKey);
+  it("allows local operator (null client) to delete a workspace-indexed memory file (DS path1)", async () => {
+    const workspace = path.join(tmpRoot, "workspace-main");
+    await fs.mkdir(path.join(workspace, "memory"), { recursive: true });
+    const memoryKey = "memory/o5-gateway-allow.md";
+    const filePath = path.join(workspace, "memory", "o5-gateway-allow.md");
     await fs.writeFile(filePath, "O5GatewayAllowUniqueToken source-A\n", "utf8");
     vi.mocked(loadConfig).mockReturnValue({
       data: { root: tmpRoot, mode: "local", schemaVersion: 1 },
+      agents: { defaults: { workspace } },
     } as OpenBotConfig);
 
     const { promise, respond } = makeCall(

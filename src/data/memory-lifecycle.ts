@@ -1,7 +1,9 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { resolveDataRoot } from "../config/data-space.js";
+import { isIndexedWorkspaceMemoryKey } from "./memory-list.js";
 
 export type AgentMemoryDisposalMode = "delete_all" | "keep_artifacts_conversations" | "soft_unbind";
 
@@ -9,45 +11,39 @@ export function resolveAgentDataSpaceDir(dataRoot: string, agentId: string): str
   return path.join(dataRoot, "agents", agentId);
 }
 
-function resolveMemoryCandidatePaths(
-  dataRoot: string,
-  agentId: string,
-  memoryKey: string,
-): string[] {
-  const trimmed = memoryKey.trim().replace(/^\/+/, "");
-  if (!trimmed) {
-    return [];
-  }
-  const agentRoot = resolveAgentDataSpaceDir(dataRoot, agentId);
-  return [
-    path.join(agentRoot, "memory", "agent", trimmed),
-    path.join(agentRoot, "memory", "workspace", trimmed),
-    path.join(dataRoot, "memory", "personal", trimmed),
-    path.join(agentRoot, trimmed),
-  ];
-}
-
-/** Delete a single memory artifact under the Data Space (best-effort). */
+/**
+ * Delete a single memory artifact from the indexed workspace corpus (DS path1).
+ * Only MEMORY.md / memory.md / memory/*.md (recursive) under the agent workspace.
+ */
 export async function forgetMemoryEntry(params: {
   cfg?: OpenBotConfig;
   agentId: string;
   memoryKey: string;
 }): Promise<{ deletedPath: string | null }> {
-  const dataRoot = resolveDataRoot(params.cfg);
-  for (const candidate of resolveMemoryCandidatePaths(dataRoot, params.agentId, params.memoryKey)) {
-    try {
-      const stat = await fs.stat(candidate);
-      if (stat.isFile()) {
-        await fs.unlink(candidate);
-        return { deletedPath: candidate };
-      }
-      if (stat.isDirectory()) {
-        await fs.rm(candidate, { recursive: true, force: true });
-        return { deletedPath: candidate };
-      }
-    } catch {
-      // try next candidate
+  const agentId = params.agentId.trim();
+  const key = params.memoryKey.trim().replace(/^\/+/, "").replace(/\\/g, "/");
+  if (!agentId || !isIndexedWorkspaceMemoryKey(key)) {
+    return { deletedPath: null };
+  }
+  const cfg = params.cfg ?? ({} as OpenBotConfig);
+  const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+  const workspaceRoot = await fs.realpath(workspaceDir).catch(() => path.resolve(workspaceDir));
+  const candidate = path.resolve(workspaceRoot, key);
+  const rel = path.relative(workspaceRoot, candidate).split(path.sep).join("/");
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return { deletedPath: null };
+  }
+  if (!isIndexedWorkspaceMemoryKey(rel)) {
+    return { deletedPath: null };
+  }
+  try {
+    const stat = await fs.stat(candidate);
+    if (stat.isFile()) {
+      await fs.unlink(candidate);
+      return { deletedPath: candidate };
     }
+  } catch {
+    return { deletedPath: null };
   }
   return { deletedPath: null };
 }
