@@ -196,6 +196,15 @@ export async function nextExecutionGeneration(
   });
 }
 
+export async function getCurrentExecutionGeneration(
+  modelRef: string,
+  storePath?: string,
+): Promise<number> {
+  const key = modelRef.trim();
+  const store = await loadStore(storePath);
+  return store.executionGenerationByModel[key] ?? 0;
+}
+
 export async function getVerificationTask(
   taskId: string,
   storePath?: string,
@@ -223,6 +232,28 @@ export async function saveVerificationTask(
     store.tasks[task.taskId] = task;
     await saveStore(store, storePath);
     return task;
+  });
+}
+
+/**
+ * Atomically finalize a task only while it is still queued/running.
+ * Returns null when cancel/interrupt/prior terminal already won the race.
+ */
+export async function finalizeVerificationTaskIfInFlight(
+  taskId: string,
+  build: (current: CapabilityVerificationTask) => CapabilityVerificationTask,
+  storePath?: string,
+): Promise<CapabilityVerificationTask | null> {
+  return await withLock(async () => {
+    const store = await loadStore(storePath);
+    const current = store.tasks[taskId];
+    if (!current || (current.status !== "queued" && current.status !== "running")) {
+      return null;
+    }
+    const next = build(current);
+    store.tasks[taskId] = next;
+    await saveStore(store, storePath);
+    return next;
   });
 }
 

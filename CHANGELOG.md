@@ -4,6 +4,8 @@ Docs: https://docs.openbot.love
 
 ## Unreleased
 
+- Platform/models: gateway `models.admission` verification ignores client `connectionOk` for formal text_chat passed; async tasks return `taskId` promptly and re-check cancel / config fingerprint / execution generation plus wall-clock timeout before merging formal evidence (late success cannot pollute current admission).
+
 - Platform/models: capability admission UX — separate connection vs verified capability vs auto-routing, fingerprint-bound verification tasks with cancel/refresh interrupt, capability matrix/history, and a dry-run smart-routing trial preview labeled as UI demo (not backend decision). (#91) Thanks @gmood2008.
 
 - Evolution/digital-employee: soft/observe self-running closed loop (Apply→Verify→Promote) for `agent.working-dna` and `capability.skill-installation`. Governance tick advances eligible tenant-scoped proposals past Experiment with soft canary only; does not enable LIVE_INVOKE, Fabric default-on, or Phase-D-enforce. Timeline treats superseded rollback-drill receipts as non-final so `verified_effective` / `learned_this_week` can surface after Promote. Env `OPENBOT_EVOLUTION_SOFT_OBSERVE_DH=on|off` (default on). Claim: runtime-enabled.

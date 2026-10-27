@@ -93,6 +93,11 @@ export type ProtocolCheckContext = {
   modelRef: string;
   mode: VerificationMode;
   configFingerprint?: string;
+  /**
+   * @deprecated Ignored by the default gateway runner for formal evidence.
+   * Kept optional so injected test runners may still read it if they choose;
+   * RPC clients cannot mint formal passed via this field.
+   */
   connectionOk?: boolean;
   capabilityIds: CanonicalCapabilityId[];
 };
