@@ -42,6 +42,7 @@ export {
 export {
   publishEvolutionFromTaskOutcome,
   readEffectiveEvolutionTaskOutcomes,
+  hasTipBridgedEvolutionForRun,
 } from "./growth-bridge.js";
 export {
   recoverTaskOutcomeConsumersAtGatewayBoot,
@@ -122,6 +123,7 @@ export {
 export {
   assessRunnerTurnBudgetGate,
   chargeRunnerTurnBudgetSpend,
+  estimateTipBudgetCostUsdFromUsage,
   TaskBudgetExceededError,
   type RunnerBudgetGateResult,
 } from "./runtime-from-runner.js";

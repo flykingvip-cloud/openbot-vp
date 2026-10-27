@@ -1,7 +1,9 @@
 import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
+import { normalizeUsage } from "../agents/usage.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { recordToolOutcomes } from "../gateway/agent-growth/operational-metrics-store.js";
+import { estimateUsageCost, resolveModelCostConfig } from "../utils/usage-format.js";
 import { applySpendAndAssess, assessTaskBudgetExhaustion, buildTaskBudgetState } from "./budget.js";
 import {
   assessTargetModalityAcceptance,
@@ -224,6 +226,37 @@ function openRunnerBudgetContext(
     }
   }
   return { store, service, chat, record, fencingToken };
+}
+
+/**
+ * Best-effort USD estimate from real agent usage + model cost config.
+ * Returns undefined when usage/cost evidence is missing — never invents spend.
+ * Reused by chat mid-run charge and non-chat closeout paths.
+ */
+export function estimateTipBudgetCostUsdFromUsage(params: {
+  usage?: unknown;
+  provider?: string;
+  model?: string;
+  config?: OpenBotConfig;
+}): number | undefined {
+  try {
+    const usage = normalizeUsage(params.usage as never);
+    if (!usage) {
+      return undefined;
+    }
+    const costConfig = resolveModelCostConfig({
+      provider: params.provider,
+      model: params.model,
+      config: params.config,
+    });
+    const estimated = estimateUsageCost({ usage, cost: costConfig });
+    if (typeof estimated === "number" && Number.isFinite(estimated) && estimated > 0) {
+      return estimated;
+    }
+  } catch {
+    // cost estimate is best-effort; callers still charge iterations
+  }
+  return undefined;
 }
 
 /**
