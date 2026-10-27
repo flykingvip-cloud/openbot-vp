@@ -3,7 +3,12 @@ import type { GatewayRequestHandlerOptions } from "./types.js";
 
 const releaseViaGatewayMock = vi.fn();
 const confirmViaGatewayMock = vi.fn();
-const resolveTenantMock = vi.fn(async () => ({ tenantId: "001", trust: "membership" as const }));
+const resolveTenantMock = vi.fn(
+  async (_client: import("./types.js").GatewayClient | null | undefined) => ({
+    tenantId: "001",
+    trust: "membership" as const,
+  }),
+);
 
 vi.mock("../collaboration-learning.js", async () => {
   const actual = await vi.importActual<typeof import("../collaboration-learning.js")>(
@@ -22,7 +27,9 @@ vi.mock("../collaboration-learning/trusted-tenant.js", async () => {
   >("../collaboration-learning/trusted-tenant.js");
   return {
     ...actual,
-    resolveCollaborationTenantResolution: (...args: unknown[]) => resolveTenantMock(...args),
+    resolveCollaborationTenantResolution: (
+      ...args: Parameters<typeof actual.resolveCollaborationTenantResolution>
+    ) => resolveTenantMock(...args),
   };
 });
 
