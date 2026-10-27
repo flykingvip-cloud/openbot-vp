@@ -76,3 +76,23 @@ export {
   resolveAttemptBackfillJudgement,
   type AttemptBackfillResult,
 } from "./attempt-backfill.js";
+
+export {
+  DEFAULT_TASK_BUDGET_LIMITS,
+  accumulateTaskBudgetSpend,
+  applySpendAndAssess,
+  assessTaskBudgetExhaustion,
+  buildTaskBudgetState,
+  ensureTaskBudgetStarted,
+  resolveEffectiveTaskBudget,
+  type TaskBudgetExhaustion,
+  type TaskBudgetLimits,
+  type TaskBudgetState,
+} from "./budget.js";
+export {
+  CHAT_TURN_CONTRACT_ID,
+  assessAcceptanceByTaskType,
+  buildTaskContractIdentity,
+  isInventedNotRequiredSuccess,
+  type AssessAcceptanceByTaskTypeInput,
+} from "./task-type-acceptance.js";

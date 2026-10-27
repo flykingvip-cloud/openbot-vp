@@ -72,6 +72,14 @@ export function computeEvaluationEligibility(record: TaskOutcomeRecord): Evaluat
         learningValue: "low",
         attribution: "other",
       };
+    case "budget_exceeded":
+      return {
+        countsSkillSuccessRate: false,
+        countsGrowthNegative: false,
+        countsModelStability: false,
+        learningValue: "low",
+        attribution: "budget",
+      };
     case "accepted_and_delivered":
       return {
         countsSkillSuccessRate: true,
