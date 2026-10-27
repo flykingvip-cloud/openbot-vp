@@ -115,12 +115,31 @@ export interface AgentLearningAsset {
   assetType?: AgentLearningAssetType;
   abstractedContent?: Record<string, unknown>;
   /**
-   * 复用次数：该资产被真正注入到系统提示词的次数（不是被创建/被查看的次数）。
-   * 这是"复用阈值策展"（用够 N 次 → 沉淀为正式技能）唯一可信的计数口径。
+   * @deprecated W4: legacy exposure alias. Prefer `injectedCount`.
+   * Historically incremented on prompt injection; must NOT alone drive skill curation.
+   * Kept in sync when recording `injected` for backward-compatible readers.
    */
   reuseCount?: number;
   lastReusedAt?: number;
-  /** 已由复用阈值策展成技能草稿时记录 skillId，避免重复生成。 */
+  /** W4: times the asset was returned from storage for a recall read. */
+  retrievedCount?: number;
+  lastRetrievedAt?: number;
+  /** W4: times the asset was actually injected into the system prompt (exposure). */
+  injectedCount?: number;
+  lastInjectedAt?: number;
+  /**
+   * W4: times the asset was observed as adopted (model followed it).
+   * Requires an explicit adoption signal — prompt injection alone is not adoption.
+   */
+  adoptedCount?: number;
+  lastAdoptedAt?: number;
+  /**
+   * W4: times a TaskOutcome closed success+eligible after this asset was injected.
+   * This — not injection/exposure — is the curation threshold metric.
+   */
+  outcomeVerifiedCount?: number;
+  lastOutcomeVerifiedAt?: number;
+  /** 已由 outcome_verified 阈值策展成技能草稿时记录 skillId，避免重复生成。 */
   curatedSkillId?: string;
   curatedAt?: number;
   applicabilityScope?: AgentLearningAssetScope;

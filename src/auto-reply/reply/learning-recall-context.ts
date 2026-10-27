@@ -1,8 +1,10 @@
 /**
  * 学习经验的系统提示词注入点。
  *
- * 这是"经验回流"闭环的最后一公里：把已审批并晋升的学习资产渲染成提示词片段，
- * 并把本次真正注入的资产记为一次复用（喂给复用阈值策展）。
+ * 这是"经验回流"闭环的最后一公里：把已审批并晋升的学习资产渲染成提示词片段。
+ *
+ * W4：注入只证明 **曝光 (injected)**，不能宣称已采用或 outcome_verified。
+ * 策展改由 tip closed+eligible 后的 outcome_verified 路径触发，不在此 fire-and-forget。
  *
  * 作用域：协作群（groupId）+ 单聊个人作用域（`agent:<agentId>`），两者都注入，
  * 因为单聊里的失败经验同样需要回来。
@@ -10,14 +12,17 @@
 
 import { logVerbose } from "../../globals.js";
 import {
+  rememberPendingLearningInjection,
+  type PendingLearningInjectionScope,
+} from "./learning-experience-pending.js";
+import {
   type LearningRecall,
   type LearningRecallEntry,
   LEARNING_RECALL_LIMIT,
   readLearningRecall,
-  recordLearningReuseSafely,
+  recordLearningExperienceStageSafely,
   resolvePersonalLearningScopeId,
 } from "./learning-recall.js";
-import { curateLearningSkillDraftsSafely } from "./learning-skill-curation.js";
 
 const ASSET_TYPE_LABEL: Record<LearningRecallEntry["assetType"], string> = {
   lesson: "经验教训",
@@ -29,8 +34,11 @@ const ASSET_TYPE_LABEL: Record<LearningRecallEntry["assetType"], string> = {
 
 function formatEntry(entry: LearningRecallEntry): string {
   const label = entry.isAntiPattern ? "负面模式" : ASSET_TYPE_LABEL[entry.assetType];
-  const reuse = entry.reuseCount > 0 ? `，已复用 ${entry.reuseCount} 次` : "";
-  return `- [${label}｜置信度 ${entry.confidence}${reuse}] ${entry.lesson}`;
+  const exposure = entry.injectedCount > 0 ? entry.injectedCount : entry.reuseCount;
+  const exposureNote = exposure > 0 ? `，已曝光 ${exposure} 次` : "";
+  const verifiedNote =
+    entry.outcomeVerifiedCount > 0 ? `，已验证有效 ${entry.outcomeVerifiedCount} 次` : "";
+  return `- [${label}｜置信度 ${entry.confidence}${exposureNote}${verifiedNote}] ${entry.lesson}`;
 }
 
 /** 渲染提示词片段（纯函数，便于单测）。 */
@@ -41,6 +49,7 @@ export function renderLearningRecallPrompt(recall: LearningRecall): string | und
   return [
     "## 已沉淀的经验（来自过往任务的复盘，已通过审批）",
     "在动手前先对照下面的经验；标为「负面模式」的做法不要重复。",
+    "（提示：出现在本段只表示曝光，不表示本回合已采用或已验证有效。）",
     ...recall.lessons.map(formatEntry),
   ].join("\n");
 }
@@ -64,23 +73,48 @@ function mergeRecall(entries: LearningRecall[], limit: number): LearningRecall {
   return { capabilities, lessons };
 }
 
+export type LearningRecallPromptBuildResult = {
+  prompt: string | undefined;
+  retrievedAssetIds: string[];
+  injectedAssetIds: string[];
+  pendingScopes: PendingLearningInjectionScope[];
+};
+
 /**
  * 组装学习经验提示词。
  *
- * 副作用（有意为之）：对本次真正注入的资产累加复用次数，fire-and-forget。
+ * 副作用（有意为之，W4 收紧）：
+ * - 对读出的资产记 `retrieved`
+ * - 对真正进提示词的资产记 `injected`（曝光）
+ * - **不**在注入时触发技能策展；策展等 outcome_verified
+ * - 若提供 `exposureKey`（通常为 agentId），把本次注入记入 pending，供 tip 收尾验证
  */
 export async function buildLearningRecallSystemPrompt(params: {
   agentId?: string | null;
   groupId?: string | null;
   botId?: string | null;
   limit?: number;
+  /** W4: key for pending injection ledger (prefer agentId). */
+  exposureKey?: string | null;
 }): Promise<string | undefined> {
+  const built = await buildLearningRecallSystemPromptWithMeta(params);
+  return built.prompt;
+}
+
+/** Same as buildLearningRecallSystemPrompt but returns stage meta (tests / tip attach). */
+export async function buildLearningRecallSystemPromptWithMeta(params: {
+  agentId?: string | null;
+  groupId?: string | null;
+  botId?: string | null;
+  limit?: number;
+  exposureKey?: string | null;
+}): Promise<LearningRecallPromptBuildResult> {
   const agentId = params.agentId?.trim();
   const groupId = params.groupId?.trim();
   // 群内以 participation 的 botId 为主体；单聊回落到 agentId。
   const botId = params.botId?.trim() || agentId;
   if (!botId) {
-    return undefined;
+    return { prompt: undefined, retrievedAssetIds: [], injectedAssetIds: [], pendingScopes: [] };
   }
   const limit = params.limit ?? LEARNING_RECALL_LIMIT;
 
@@ -92,7 +126,7 @@ export async function buildLearningRecallSystemPrompt(params: {
     scopes.push({ scopeId: resolvePersonalLearningScopeId(agentId), botId: agentId });
   }
   if (scopes.length === 0) {
-    return undefined;
+    return { prompt: undefined, retrievedAssetIds: [], injectedAssetIds: [], pendingScopes: [] };
   }
 
   const results = await Promise.all(
@@ -114,33 +148,51 @@ export async function buildLearningRecallSystemPrompt(params: {
     limit,
   );
   const prompt = renderLearningRecallPrompt(merged);
-  if (!prompt) {
-    return undefined;
-  }
+  const injectedSet = new Set(merged.lessons.map((lesson) => lesson.assetId));
+  const retrievedAssetIds: string[] = [];
+  const injectedAssetIds: string[] = [];
+  const pendingScopes: PendingLearningInjectionScope[] = [];
 
-  // 只对真正进了提示词的资产计复用（按作用域分别落账），随后检查复用阈值策展。
-  const injected = new Set(merged.lessons.map((lesson) => lesson.assetId));
   for (const entry of results) {
     if (!entry.recall) {
       continue;
     }
-    const assetIds = entry.recall.lessons
-      .map((lesson) => lesson.assetId)
-      .filter((assetId) => injected.has(assetId));
-    if (assetIds.length === 0) {
-      continue;
+    const retrievedIds = entry.recall.lessons.map((lesson) => lesson.assetId);
+    const injectedIds = retrievedIds.filter((assetId) => injectedSet.has(assetId));
+    retrievedAssetIds.push(...retrievedIds);
+    injectedAssetIds.push(...injectedIds);
+
+    if (retrievedIds.length > 0) {
+      recordLearningExperienceStageSafely({
+        scopeId: entry.scope.scopeId,
+        assetIds: retrievedIds,
+        stage: "retrieved",
+      });
     }
-    // 先记账再查阈值：这一次复用要算进去，否则永远差一次才毕业。
-    recordLearningReuseSafely({
-      scopeId: entry.scope.scopeId,
-      assetIds,
-      onRecorded: () => {
-        curateLearningSkillDraftsSafely({
-          scopeId: entry.scope.scopeId,
-          botId: entry.scope.botId,
-        });
-      },
-    });
+    if (injectedIds.length > 0) {
+      // Exposure only — do NOT trigger curation here (W4).
+      recordLearningExperienceStageSafely({
+        scopeId: entry.scope.scopeId,
+        assetIds: injectedIds,
+        stage: "injected",
+      });
+      pendingScopes.push({
+        scopeId: entry.scope.scopeId,
+        botId: entry.scope.botId,
+        assetIds: injectedIds,
+      });
+    }
   }
-  return prompt;
+
+  const exposureKey = params.exposureKey?.trim() || agentId || botId;
+  if (exposureKey && pendingScopes.length > 0) {
+    rememberPendingLearningInjection({ key: exposureKey, scopes: pendingScopes });
+  }
+
+  return {
+    prompt,
+    retrievedAssetIds: [...new Set(retrievedAssetIds)],
+    injectedAssetIds: [...new Set(injectedAssetIds)],
+    pendingScopes,
+  };
 }
