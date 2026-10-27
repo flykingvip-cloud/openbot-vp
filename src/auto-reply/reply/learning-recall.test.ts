@@ -41,6 +41,7 @@ const {
   extractLessonFromAsset,
   rankLearningAssets,
   readLearningRecall,
+  recordLearningExperienceStage,
   recordLearningReuse,
   resolvePersonalLearningScopeId,
 } = await import("./learning-recall.js");
@@ -96,6 +97,8 @@ describe("buildLearningRecall", () => {
     ]);
     expect(recall.lessons).toHaveLength(1);
     expect(recall.lessons[0]?.lesson).toBe("先跑迁移");
+    expect(recall.lessons[0]?.injectedCount).toBe(0);
+    expect(recall.lessons[0]?.outcomeVerifiedCount).toBe(0);
     expect(recall.capabilities).toEqual(["deploy"]);
   });
 
@@ -171,8 +174,12 @@ describe("recordLearningReuse", () => {
     await recordLearningReuse({ scopeId: "grp-1", assetIds: ["used"], atMs: 1234 });
 
     const stored = assetsByScope.get("grp-1") ?? [];
-    expect(stored.find((asset) => asset.assetId === "used")?.reuseCount).toBe(3);
-    expect(stored.find((asset) => asset.assetId === "used")?.lastReusedAt).toBe(1234);
+    const used = stored.find((asset) => asset.assetId === "used");
+    expect(used?.reuseCount).toBe(3);
+    expect(used?.injectedCount).toBe(3);
+    expect(used?.lastReusedAt).toBe(1234);
+    expect(used?.lastInjectedAt).toBe(1234);
+    expect(used?.outcomeVerifiedCount ?? 0).toBe(0);
     expect(stored.find((asset) => asset.assetId === "unused")?.reuseCount).toBe(7);
   });
 
@@ -199,5 +206,54 @@ describe("recordLearningReuse", () => {
     ]);
 
     expect(assetsByScope.get("grp-1")?.[0]?.reuseCount).toBe(3);
+  });
+});
+
+describe("recordLearningExperienceStage", () => {
+  it("separates retrieved / injected / adopted / outcome_verified counters", async () => {
+    assetsByScope.set("grp-1", [makeAsset({ assetId: "a1" })]);
+    await recordLearningExperienceStage({
+      scopeId: "grp-1",
+      assetIds: ["a1"],
+      stage: "retrieved",
+      atMs: 100,
+    });
+    await recordLearningExperienceStage({
+      scopeId: "grp-1",
+      assetIds: ["a1"],
+      stage: "injected",
+      atMs: 200,
+    });
+    await recordLearningExperienceStage({
+      scopeId: "grp-1",
+      assetIds: ["a1"],
+      stage: "adopted",
+      atMs: 300,
+    });
+    await recordLearningExperienceStage({
+      scopeId: "grp-1",
+      assetIds: ["a1"],
+      stage: "outcome_verified",
+      atMs: 400,
+    });
+    const asset = assetsByScope.get("grp-1")?.[0];
+    expect(asset?.retrievedCount).toBe(1);
+    expect(asset?.injectedCount).toBe(1);
+    expect(asset?.reuseCount).toBe(1); // legacy alias of injected
+    expect(asset?.adoptedCount).toBe(1);
+    expect(asset?.outcomeVerifiedCount).toBe(1);
+    expect(asset?.lastOutcomeVerifiedAt).toBe(400);
+  });
+
+  it("does not treat injected as outcome_verified", async () => {
+    assetsByScope.set("grp-1", [makeAsset({ assetId: "hot" })]);
+    await recordLearningExperienceStage({
+      scopeId: "grp-1",
+      assetIds: ["hot"],
+      stage: "injected",
+    });
+    const asset = assetsByScope.get("grp-1")?.[0];
+    expect(asset?.injectedCount).toBe(1);
+    expect(asset?.outcomeVerifiedCount ?? 0).toBe(0);
   });
 });

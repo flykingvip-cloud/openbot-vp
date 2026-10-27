@@ -15,6 +15,7 @@ function makeAsset(overrides: Partial<AgentLearningAsset> = {}): AgentLearningAs
     assetType: "lesson",
     status: "active",
     reuseCount: 0,
+    outcomeVerifiedCount: 0,
     abstractedContent: { lesson: "部署前先跑迁移脚本" },
     ...overrides,
   };
@@ -41,20 +42,28 @@ describe("resolveClusterKey", () => {
 
 describe("deriveSkillDraftCandidates", () => {
   it("does not graduate experience below both thresholds", () => {
-    const candidates = deriveSkillDraftCandidates([makeAsset({ reuseCount: 2 })], {
+    const candidates = deriveSkillDraftCandidates([makeAsset({ outcomeVerifiedCount: 2 })], {
       reuseThreshold: 3,
       occurrenceThreshold: 3,
     });
     expect(candidates).toEqual([]);
   });
 
-  it("graduates on accumulated reuse", () => {
-    const candidates = deriveSkillDraftCandidates([makeAsset({ reuseCount: 3 })], {
+  it("does not graduate on prompt injection / legacy reuseCount alone (W4)", () => {
+    const candidates = deriveSkillDraftCandidates(
+      [makeAsset({ reuseCount: 10, injectedCount: 10, outcomeVerifiedCount: 0 })],
+      { reuseThreshold: 3, occurrenceThreshold: 99 },
+    );
+    expect(candidates).toEqual([]);
+  });
+
+  it("graduates on accumulated outcome_verified", () => {
+    const candidates = deriveSkillDraftCandidates([makeAsset({ outcomeVerifiedCount: 3 })], {
       reuseThreshold: 3,
       occurrenceThreshold: 3,
     });
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]?.trigger).toBe("reuse_threshold");
+    expect(candidates[0]?.trigger).toBe("outcome_verified_threshold");
     expect(candidates[0]?.totalReuse).toBe(3);
   });
 
@@ -62,7 +71,7 @@ describe("deriveSkillDraftCandidates", () => {
     const assets = ["a1", "a2", "a3"].map((assetId) =>
       makeAsset({
         assetId,
-        reuseCount: 0,
+        outcomeVerifiedCount: 0,
         abstractedContent: { lesson: "别直接改生产库", source: { reason: "prod_write" } },
       }),
     );
@@ -77,8 +86,8 @@ describe("deriveSkillDraftCandidates", () => {
 
   it("keeps clusters separate per bot", () => {
     const assets = [
-      makeAsset({ assetId: "a1", botId: "bot-1", reuseCount: 5 }),
-      makeAsset({ assetId: "a2", botId: "bot-2", reuseCount: 5 }),
+      makeAsset({ assetId: "a1", botId: "bot-1", outcomeVerifiedCount: 5 }),
+      makeAsset({ assetId: "a2", botId: "bot-2", outcomeVerifiedCount: 5 }),
     ];
     const candidates = deriveSkillDraftCandidates(assets, { reuseThreshold: 3 });
     expect(candidates).toHaveLength(2);
@@ -87,7 +96,7 @@ describe("deriveSkillDraftCandidates", () => {
 
   it("is idempotent: already-curated assets are excluded", () => {
     const candidates = deriveSkillDraftCandidates(
-      [makeAsset({ reuseCount: 10, curatedSkillId: "skill-1" })],
+      [makeAsset({ outcomeVerifiedCount: 10, curatedSkillId: "skill-1" })],
       { reuseThreshold: 3 },
     );
     expect(candidates).toEqual([]);
@@ -95,16 +104,16 @@ describe("deriveSkillDraftCandidates", () => {
 
   it("ignores non-active assets", () => {
     const candidates = deriveSkillDraftCandidates(
-      [makeAsset({ reuseCount: 10, status: "revoked" })],
+      [makeAsset({ outcomeVerifiedCount: 10, status: "revoked" })],
       { reuseThreshold: 3 },
     );
     expect(candidates).toEqual([]);
   });
 
-  it("sums reuse across a cluster", () => {
+  it("sums outcome_verified across a cluster", () => {
     const assets = [
-      makeAsset({ assetId: "a1", reuseCount: 1 }),
-      makeAsset({ assetId: "a2", reuseCount: 1 }),
+      makeAsset({ assetId: "a1", outcomeVerifiedCount: 1 }),
+      makeAsset({ assetId: "a2", outcomeVerifiedCount: 1 }),
     ];
     const candidates = deriveSkillDraftCandidates(assets, {
       reuseThreshold: 2,
@@ -118,14 +127,14 @@ describe("deriveSkillDraftCandidates", () => {
 
 describe("buildSkillDraftProfile", () => {
   it("produces a private draft profile that explains why it graduated", () => {
-    const [candidate] = deriveSkillDraftCandidates([makeAsset({ reuseCount: 4 })], {
+    const [candidate] = deriveSkillDraftCandidates([makeAsset({ outcomeVerifiedCount: 4 })], {
       reuseThreshold: 3,
     });
     expect(candidate).toBeDefined();
     const profile = buildSkillDraftProfile(candidate);
     expect(profile.visibility).toBe("private");
     expect(profile.name).toContain("经验沉淀");
-    expect(profile.summary).toContain("累计复用 4 次");
+    expect(profile.summary).toContain("累计验证有效 4 次");
     expect(profile.summary).toContain("待人工审核");
   });
 });

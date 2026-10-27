@@ -8,6 +8,7 @@ import {
 } from "./capability-modality.js";
 import { GROWTH_EVOLUTION_CONSUMER_ID, OutcomeConsumerRuntime } from "./consumers.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
+import { createExperienceVerifiedHandler } from "./experience-verified-handler.js";
 import { publishEvolutionFromTaskOutcome } from "./growth-bridge.js";
 import {
   resolveTrustedRunModalityCompletionEvidence,
@@ -166,6 +167,8 @@ function drainGrowthEvolution(
       // W2: skill/mode consume tip+eligibility (not run terminal alone); skill also backfills attempt.
       createSkillQualityHandler(store, { agentId }),
       createModeQualityHandler(store, { agentId }),
+      // W4: injected exposure → outcome_verified only on closed+eligible success; then curation.
+      createExperienceVerifiedHandler(store, { agentId }),
     ],
   });
   const drained = runtime.drain((taskId) => store.loadTask(taskId));

@@ -1,5 +1,9 @@
 import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
+import {
+  peekPendingLearningInjection,
+  takePendingLearningInjection,
+} from "../auto-reply/reply/learning-experience-pending.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
@@ -93,12 +97,42 @@ export function ensureChatTurnTaskOutcome(
       message: opened.message,
     };
   }
+
+  const fencingToken = opened.fencingToken || newFencingToken();
+  let record = opened.record;
+
+  // W4: attach prompt-injection exposure from pending ledger onto tip (durable).
+  // Injection happens earlier in get-reply-run; ensure is the first tip touch afterward.
+  if (!record.experienceExposure) {
+    const pending = peekPendingLearningInjection(identity.agentId);
+    if (pending && pending.scopes.length > 0) {
+      const attached = service.submit(
+        taskId,
+        {
+          type: "set_experience_exposure",
+          experienceExposure: {
+            scopes: pending.scopes,
+            attachedAt: new Date().toISOString(),
+          },
+          expectedVersion: record.outcomeVersion,
+          fencingToken,
+        },
+        { requiredScope: scope, commandId: `experience-exposure:${taskId}` },
+      );
+      if (attached.ok) {
+        record = attached.record;
+        takePendingLearningInjection(identity.agentId);
+      }
+      // Fail-soft: tip without exposure still works; verification may fall back to pending.
+    }
+  }
+
   return {
     ok: true,
     taskId,
     scope,
-    fencingToken: opened.fencingToken || newFencingToken(),
-    record: opened.record,
+    fencingToken,
+    record,
   };
 }
 

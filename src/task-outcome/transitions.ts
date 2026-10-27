@@ -232,6 +232,16 @@ export function applyTransition(
       };
       break;
     }
+    case "set_experience_exposure": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        experienceExposure: transition.experienceExposure,
+      };
+      break;
+    }
     case "accumulate_budget_spend": {
       if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
         return { record: current, illegal: "stale_fencing" };
