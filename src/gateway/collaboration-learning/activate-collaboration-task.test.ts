@@ -234,4 +234,69 @@ describe("activateCollaborationTask", () => {
     });
     expect(a).not.toBe(b);
   });
+  it("buildActivationKey changes when dueAtMs changes", () => {
+    const a = buildActivationKey({
+      groupId: "g",
+      taskId: "t",
+      title: "标题",
+      goal: "目标",
+      acceptanceCriteria: ["a"],
+      message: "m",
+      dueAtMs: 1_700_000_000_000,
+    });
+    const b = buildActivationKey({
+      groupId: "g",
+      taskId: "t",
+      title: "标题",
+      goal: "目标",
+      acceptanceCriteria: ["a"],
+      message: "m",
+      dueAtMs: 1_700_000_000_001,
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it("buildActivationKey changes when suggestedClaimantIds change", () => {
+    const a = buildActivationKey({
+      groupId: "g",
+      taskId: "t",
+      title: "标题",
+      goal: "目标",
+      acceptanceCriteria: ["a"],
+      message: "m",
+      suggestedClaimantIds: ["bot-1"],
+    });
+    const b = buildActivationKey({
+      groupId: "g",
+      taskId: "t",
+      title: "标题",
+      goal: "目标",
+      acceptanceCriteria: ["a"],
+      message: "m",
+      suggestedClaimantIds: ["bot-2"],
+    });
+    expect(a).not.toBe(b);
+  });
+
+  it("buildActivationKey is stable for same contract regardless of claimant order", () => {
+    const a = buildActivationKey({
+      groupId: "g",
+      taskId: "t",
+      title: "标题",
+      goal: "目标",
+      acceptanceCriteria: ["b", "a"],
+      message: "m",
+      suggestedClaimantIds: ["bot-2", "bot-1"],
+    });
+    const b = buildActivationKey({
+      groupId: "g",
+      taskId: "t",
+      title: "标题",
+      goal: "目标",
+      acceptanceCriteria: ["a", "b"],
+      message: "m",
+      suggestedClaimantIds: ["bot-1", "bot-2"],
+    });
+    expect(a).toBe(b);
+  });
 });

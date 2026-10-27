@@ -94,6 +94,16 @@ function compact(value: string | null | undefined): string {
  * Does not invent registration — caller must already mark the member registered.
  * Must not be invoked from operator.read handlers.
  */
+/** Strict agent↔sessionKey binding using the canonical conversation key helper. */
+export function assertAgentBoundSessionKey(agentId: string, sessionKey: string): void {
+  const id = compact(agentId);
+  const key = compact(sessionKey);
+  const expected = defaultConversationSessionKey(id);
+  if (!id || !key || key !== expected) {
+    throw new Error(`sessionKey not bound to agentId=${id}: expected ${expected}`);
+  }
+}
+
 export async function ensureRegisteredMemberMainSession(params: {
   agentId: string;
   sessionKey?: string;
@@ -106,12 +116,12 @@ export async function ensureRegisteredMemberMainSession(params: {
   if (!agentId) {
     throw new Error("agentId is required");
   }
-  const sessionKey = compact(params.sessionKey) || defaultConversationSessionKey(agentId);
+  const expected = defaultConversationSessionKey(agentId);
+  const sessionKey = compact(params.sessionKey) || expected;
   if (params.expectAgentBoundSession !== false) {
-    const expected = defaultConversationSessionKey(agentId);
-    // Allow exact default main key or keys that embed the agent id.
-    if (sessionKey !== expected && !sessionKey.includes(agentId)) {
-      throw new Error(`sessionKey not bound to agentId=${agentId}`);
+    // Strict binding via the canonical session-key helper — no substring includes().
+    if (sessionKey !== expected) {
+      throw new Error(`sessionKey not bound to agentId=${agentId}: expected ${expected}`);
     }
   }
   const cfg = params.cfg ?? loadConfig();

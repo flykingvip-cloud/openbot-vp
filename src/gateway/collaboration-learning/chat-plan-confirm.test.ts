@@ -45,7 +45,7 @@ describe("parseChatPlanConfirmIntent", () => {
 });
 
 describe("tryConfirmPlanFromChat", () => {
-  it("refuses to confirm without expectedVersion or card binding", async () => {
+  it("refuses to confirm without expectedVersion", async () => {
     const result = await tryConfirmPlanFromChat({
       groupId: "grp",
       taskId: "task-1",
@@ -55,7 +55,7 @@ describe("tryConfirmPlanFromChat", () => {
     expect(result.confirmed).toBe(false);
     expect(result.status).toBe("blocked");
     if (result.status === "blocked") {
-      expect(result.reason).toBe("expected_version_or_card_binding_required");
+      expect(result.reason).toBe("expected_version_required");
     }
   });
 
@@ -83,7 +83,7 @@ describe("tryConfirmPlanFromChat", () => {
     expect(result.status).toBe("blocked");
   });
 
-  it("allows card binding (todolistId+boardItemId) without expectedVersion", async () => {
+  it("blocks card binding alone without expectedVersion (todolist may have been revised)", async () => {
     const result = await tryConfirmPlanFromChat({
       groupId: "grp",
       taskId: "task-1",
@@ -92,7 +92,25 @@ describe("tryConfirmPlanFromChat", () => {
       todolistId: "tl-1",
       boardItemId: "board-1",
     });
+    expect(result.confirmed).toBe(false);
+    expect(result.status).toBe("blocked");
+    if (result.status === "blocked") {
+      expect(result.reason).toBe("expected_version_required");
+    }
+  });
+
+  it("confirms when card binding AND expectedVersion match", async () => {
+    const result = await tryConfirmPlanFromChat({
+      groupId: "grp",
+      taskId: "task-1",
+      actor: "human:owner",
+      message: "确认计划",
+      todolistId: "tl-1",
+      boardItemId: "board-1",
+      expectedVersion: 3,
+    });
     expect(result.status).toBe("confirmed");
+    expect(result.confirmed).toBe(true);
   });
 });
 

@@ -107,7 +107,7 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-/** Stable activation key = full contract fingerprint for idempotent retries. */
+/** Stable activation key = normalized full contract fingerprint (not free-text join). */
 export function buildActivationKey(params: {
   groupId: string;
   taskId: string;
@@ -116,17 +116,31 @@ export function buildActivationKey(params: {
   acceptanceCriteria?: readonly string[];
   constraints?: readonly string[];
   message?: string;
+  suggestedClaimantIds?: readonly string[];
+  suggestedRole?: string;
+  dueAtMs?: number;
 }): string {
-  const material = [
-    compact(params.groupId),
-    compact(params.taskId),
-    compact(params.title),
-    compact(params.goal),
-    compact(params.message),
-    ...(params.acceptanceCriteria ?? []).map((line) => compact(line)).filter(Boolean),
-    ...(params.constraints ?? []).map((line) => compact(line)).filter(Boolean),
-  ].join("\n");
-  return `act-${createHash("sha256").update(material).digest("hex").slice(0, 24)}`;
+  const normList = (values: readonly string[] | undefined) =>
+    [...(values ?? [])]
+      .map((line) => compact(line))
+      .filter(Boolean)
+      .sort();
+  const payload = {
+    groupId: compact(params.groupId),
+    taskId: compact(params.taskId),
+    title: compact(params.title),
+    goal: compact(params.goal) || null,
+    message: compact(params.message) || null,
+    acceptanceCriteria: normList(params.acceptanceCriteria),
+    constraints: normList(params.constraints),
+    suggestedClaimantIds: normList(params.suggestedClaimantIds),
+    suggestedRole: compact(params.suggestedRole) || null,
+    dueAtMs:
+      typeof params.dueAtMs === "number" && Number.isFinite(params.dueAtMs)
+        ? Math.floor(params.dueAtMs)
+        : null,
+  };
+  return `act-${createHash("sha256").update(JSON.stringify(payload)).digest("hex").slice(0, 24)}`;
 }
 
 function isSafeTaskId(taskId: string): boolean {
@@ -165,7 +179,7 @@ function taskActivationKey(task: Task | null | undefined): string {
   return tag ? tag.slice(ACTIVATION_TAG_PREFIX.length) : "";
 }
 
-async function ensureCollaborationTaskObject(params: {
+async function mutateCollaborationTaskObject(params: {
   groupId: string;
   taskId: string;
   title: string;
@@ -173,61 +187,88 @@ async function ensureCollaborationTaskObject(params: {
   activationKey?: string;
   /** When true, new or draft tasks become ready; terminal still refused. */
   readyRequested: boolean;
-  cfg?: OpenBotConfig;
+  cfg: OpenBotConfig;
   nowMs?: number;
 }): Promise<EnsureTaskResult> {
-  const cfg = params.cfg ?? loadConfig();
   const now = params.nowMs ?? Date.now();
+  const stores = createWorkspaceCollaborationStores(params.cfg);
+  const existing = await stores.objectStorage.readObject<Task>(
+    params.groupId,
+    "task",
+    params.taskId,
+  );
+  if (existing) {
+    if (TERMINAL_TASK_STATUSES.has(existing.status)) {
+      return {
+        ok: false,
+        reason: "terminal_task_not_reopened",
+        detail: `task status=${existing.status}`,
+      };
+    }
+    const nextStatus =
+      params.readyRequested && existing.status === "draft" ? "ready" : existing.status;
+    const tags = mergeActivationTag(existing.tags, params.activationKey);
+    const touched: Task = {
+      ...existing,
+      title: compact(params.title) || existing.title,
+      status: nextStatus,
+      tags,
+      updatedBy: compact(params.actor) || existing.updatedBy,
+      updatedAtMs: now,
+    };
+    await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, touched);
+    return { ok: true, task: touched, created: false };
+  }
+  const created: Task = {
+    taskId: params.taskId,
+    groupId: params.groupId,
+    title: compact(params.title) || params.taskId,
+    status: params.readyRequested ? "ready" : "draft",
+    ownerMemberId: compact(params.actor) || undefined,
+    assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
+    tags: mergeActivationTag(undefined, params.activationKey),
+    createdBy: compact(params.actor) || undefined,
+    updatedBy: compact(params.actor) || undefined,
+    createdAtMs: now,
+    updatedAtMs: now,
+  };
+  await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, created);
+  return { ok: true, task: created, created: true };
+}
+
+async function ensureCollaborationTaskObject(params: {
+  groupId: string;
+  taskId: string;
+  title: string;
+  actor: string;
+  activationKey?: string;
+  readyRequested: boolean;
+  cfg?: OpenBotConfig;
+  nowMs?: number;
+  /** When true, caller already holds withTaskControlLock. */
+  alreadyLocked?: boolean;
+}): Promise<EnsureTaskResult> {
+  const cfg = params.cfg ?? loadConfig();
+  const run = () =>
+    mutateCollaborationTaskObject({
+      groupId: params.groupId,
+      taskId: params.taskId,
+      title: params.title,
+      actor: params.actor,
+      activationKey: params.activationKey,
+      readyRequested: params.readyRequested,
+      cfg,
+      nowMs: params.nowMs,
+    });
   try {
+    if (params.alreadyLocked) {
+      return await run();
+    }
     return await withTaskControlLock({
       groupId: params.groupId,
       taskId: params.taskId,
       cfg,
-      fn: async () => {
-        const stores = createWorkspaceCollaborationStores(cfg);
-        const existing = await stores.objectStorage.readObject<Task>(
-          params.groupId,
-          "task",
-          params.taskId,
-        );
-        if (existing) {
-          if (TERMINAL_TASK_STATUSES.has(existing.status)) {
-            return {
-              ok: false as const,
-              reason: "terminal_task_not_reopened",
-              detail: `task status=${existing.status}`,
-            };
-          }
-          const nextStatus =
-            params.readyRequested && existing.status === "draft" ? "ready" : existing.status;
-          const tags = mergeActivationTag(existing.tags, params.activationKey);
-          const touched: Task = {
-            ...existing,
-            title: compact(params.title) || existing.title,
-            status: nextStatus,
-            tags,
-            updatedBy: compact(params.actor) || existing.updatedBy,
-            updatedAtMs: now,
-          };
-          await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, touched);
-          return { ok: true as const, task: touched, created: false };
-        }
-        const created: Task = {
-          taskId: params.taskId,
-          groupId: params.groupId,
-          title: compact(params.title) || params.taskId,
-          status: params.readyRequested ? "ready" : "draft",
-          ownerMemberId: compact(params.actor) || undefined,
-          assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
-          tags: mergeActivationTag(undefined, params.activationKey),
-          createdBy: compact(params.actor) || undefined,
-          updatedBy: compact(params.actor) || undefined,
-          createdAtMs: now,
-          updatedAtMs: now,
-        };
-        await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, created);
-        return { ok: true as const, task: created, created: true };
-      },
+      fn: run,
     });
   } catch (error) {
     return {
@@ -348,6 +389,9 @@ export async function activateCollaborationTask(
     acceptanceCriteria: params.acceptanceCriteria,
     constraints: params.constraints,
     message,
+    suggestedClaimantIds: params.suggestedClaimantIds,
+    suggestedRole: params.suggestedRole,
+    dueAtMs: params.dueAtMs,
   });
 
   if (!groupId || !taskId || !actor || !title || !message) {
@@ -390,28 +434,11 @@ export async function activateCollaborationTask(
   const cfg = params.cfg ?? loadConfig();
   const humanConfirmed = params.humanConfirmed === true;
 
-  // Idempotency / conflict check BEFORE mutating task (except we still need lock later).
-  const existingLookup = await findExistingPublishedItem({
-    groupId,
-    taskId,
-    activationKey,
-    title,
-    cfg,
-    tenant: params.tenant,
-  });
-  if (!existingLookup.ok) {
-    return {
-      status: "blocked",
-      taskId,
-      activationKey,
-      reason: existingLookup.reason,
-      detail: existingLookup.detail,
-      taskEnsured: false,
-      boardPublished: false,
-      dispatched: false,
-    };
-  }
-  if (existingLookup.item && humanConfirmed) {
+  const syncActivated = async (
+    item: GroupBoardClaimItem,
+    taskCreated: boolean,
+    idempotentReplay: boolean,
+  ) => {
     const stores = createWorkspaceCollaborationStores(cfg);
     try {
       await syncGroupOperatingState({
@@ -425,67 +452,39 @@ export async function activateCollaborationTask(
       });
     } catch (error) {
       return {
-        status: "partial_success",
+        status: "partial_success" as const,
         taskId,
         activationKey,
-        boardItemId: existingLookup.item.itemId,
-        item: existingLookup.item,
-        taskCreated: false,
+        boardItemId: item.itemId,
+        item,
+        taskCreated,
         reason: "operating_state_sync_failed",
         detail: error instanceof Error ? error.message : String(error),
-        taskEnsured: true,
-        boardPublished: true,
-        operatingStateSynced: false,
-        dispatched: false,
+        taskEnsured: true as const,
+        boardPublished: true as const,
+        operatingStateSynced: false as const,
+        dispatched: false as const,
       };
     }
     const os = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
     return {
-      status: "activated",
+      status: "activated" as const,
       taskId,
       activationKey,
-      boardItemId: existingLookup.item.itemId,
-      item: existingLookup.item,
-      taskCreated: false,
-      idempotentReplay: true,
+      boardItemId: item.itemId,
+      item,
+      taskCreated,
+      idempotentReplay,
       currentTaskId: os?.activeContext?.currentTaskId ?? null,
-      taskEnsured: true,
-      boardPublished: true,
-      operatingStateSynced: true,
-      dispatched: false,
+      taskEnsured: true as const,
+      boardPublished: true as const,
+      operatingStateSynced: true as const,
+      dispatched: false as const,
     };
-  }
+  };
 
-  // Draft path: ensure draft task only after basic validation; never claim published.
-  // Publish path: ensure ready under control lock before materialize.
-  let taskCreated = false;
-  const ensured = await ensureCollaborationTaskObject({
-    groupId,
-    taskId,
-    title,
-    actor,
-    activationKey,
-    readyRequested: humanConfirmed,
-    cfg,
-    nowMs: params.nowMs,
-  });
-  if (!ensured.ok) {
-    return {
-      status: "blocked",
-      taskId,
-      activationKey,
-      reason: ensured.reason,
-      detail: ensured.detail,
-      taskEnsured: false,
-      boardPublished: false,
-      dispatched: false,
-    };
-  }
-  taskCreated = ensured.created;
-
-  let materialized: MaterializeIntentResult;
-  try {
-    materialized = await materializeCollaborationIntentToBoard({
+  const runMaterialize = async () =>
+    materializeCollaborationIntentToBoard({
       groupId,
       taskId,
       message,
@@ -504,135 +503,290 @@ export async function activateCollaborationTask(
       tenant: params.tenant,
       cfg,
     });
-  } catch (error) {
-    if (error instanceof ClaimContractEntryError) {
-      return {
-        status: "blocked",
-        taskId,
-        activationKey,
-        reason: error.code || "materialize_failed",
-        detail: error.message,
-        taskEnsured: true,
-        boardPublished: false,
-        dispatched: false,
-      };
-    }
-    return {
-      status: "blocked",
-      taskId,
-      activationKey,
-      reason: "materialize_failed",
-      detail: error instanceof Error ? error.message : String(error),
-      taskEnsured: true,
-      boardPublished: false,
-      dispatched: false,
-    };
-  }
 
-  if (materialized.status === "needs_confirm") {
-    return {
-      status: "needs_confirm",
-      taskId,
-      activationKey,
-      reason: humanConfirmed
-        ? "contract_incomplete_after_confirm"
-        : "awaiting_human_confirm_or_contract_fields",
-      qualityIssues: materialized.qualityIssues,
-      draftTitle: materialized.draft.title,
-      taskEnsured: true,
-      boardPublished: false,
-      dispatched: false,
-    };
-  }
-  if (materialized.status === "needs_challenge") {
-    return {
-      status: "blocked",
-      taskId,
-      activationKey,
-      reason: "needs_challenge",
-      detail: materialized.reason,
-      taskEnsured: true,
-      boardPublished: false,
-      dispatched: false,
-    };
-  }
-  if (materialized.status === "flag_off") {
-    return {
-      status: "blocked",
-      taskId,
-      activationKey,
-      reason: "claim_contract_flag_off",
-      detail: materialized.reason,
-      taskEnsured: true,
-      boardPublished: false,
-      dispatched: false,
-    };
-  }
-  if (materialized.status === "skipped") {
-    if (!humanConfirmed) {
+  const mapMaterializeFailure = (
+    materialized: MaterializeIntentResult,
+    taskEnsured: boolean,
+  ): ActivateCollaborationTaskResult | null => {
+    if (materialized.status === "needs_confirm") {
       return {
         status: "needs_confirm",
         taskId,
         activationKey,
-        reason: "awaiting_human_confirm_or_contract_fields",
-        draftTitle: title,
+        reason: humanConfirmed
+          ? "contract_incomplete_after_confirm"
+          : "awaiting_human_confirm_or_contract_fields",
+        qualityIssues: materialized.qualityIssues,
+        draftTitle: materialized.draft.title,
+        taskEnsured,
+        boardPublished: false,
+        dispatched: false,
+      };
+    }
+    if (materialized.status === "needs_challenge") {
+      return {
+        status: "blocked",
+        taskId,
+        activationKey,
+        reason: "needs_challenge",
+        detail: materialized.reason,
+        taskEnsured,
+        boardPublished: false,
+        dispatched: false,
+      };
+    }
+    if (materialized.status === "flag_off") {
+      return {
+        status: "blocked",
+        taskId,
+        activationKey,
+        reason: "claim_contract_flag_off",
+        detail: materialized.reason,
+        taskEnsured,
+        boardPublished: false,
+        dispatched: false,
+      };
+    }
+    if (materialized.status === "skipped") {
+      if (!humanConfirmed) {
+        return {
+          status: "needs_confirm",
+          taskId,
+          activationKey,
+          reason: "awaiting_human_confirm_or_contract_fields",
+          draftTitle: title,
+          taskEnsured,
+          boardPublished: false,
+          dispatched: false,
+        };
+      }
+      return {
+        status: "blocked",
+        taskId,
+        activationKey,
+        reason: "not_a_board_candidate_or_publish_skipped",
+        detail: materialized.reason,
+        taskEnsured,
+        boardPublished: false,
+        dispatched: false,
+      };
+    }
+    return null;
+  };
+
+  // Draft / unconfirmed: ensure draft only (never ready before quality+publish).
+  if (!humanConfirmed) {
+    const ensured = await ensureCollaborationTaskObject({
+      groupId,
+      taskId,
+      title,
+      actor,
+      activationKey,
+      readyRequested: false,
+      cfg,
+      nowMs: params.nowMs,
+    });
+    if (!ensured.ok) {
+      return {
+        status: "blocked",
+        taskId,
+        activationKey,
+        reason: ensured.reason,
+        detail: ensured.detail,
+        taskEnsured: false,
+        boardPublished: false,
+        dispatched: false,
+      };
+    }
+    let materialized: MaterializeIntentResult;
+    try {
+      materialized = await runMaterialize();
+    } catch (error) {
+      if (error instanceof ClaimContractEntryError) {
+        return {
+          status: "blocked",
+          taskId,
+          activationKey,
+          reason: error.code || "materialize_failed",
+          detail: error.message,
+          taskEnsured: true,
+          boardPublished: false,
+          dispatched: false,
+        };
+      }
+      return {
+        status: "blocked",
+        taskId,
+        activationKey,
+        reason: "materialize_failed",
+        detail: error instanceof Error ? error.message : String(error),
         taskEnsured: true,
         boardPublished: false,
         dispatched: false,
       };
     }
+    const mapped = mapMaterializeFailure(materialized, true);
+    if (mapped) {
+      return mapped;
+    }
+    // Unexpected publish without humanConfirmed — treat as blocked.
     return {
       status: "blocked",
       taskId,
       activationKey,
-      reason: "not_a_board_candidate_or_publish_skipped",
-      detail: materialized.reason,
+      reason: "publish_without_human_confirm",
       taskEnsured: true,
       boardPublished: false,
       dispatched: false,
     };
   }
 
-  const stores = createWorkspaceCollaborationStores(cfg);
+  // Confirmed publish: lookup + ensure(draft) + materialize + promote ready under ONE lock.
   try {
-    await syncGroupOperatingState({
-      fileStore: stores.fileStore,
-      groupStorage: stores.groupStorage,
-      metadataStorage: stores.metadataStorage,
-      memoryStorage: stores.memoryStorage,
-      learningStorage: stores.learningStorage,
-      objectStorage: stores.objectStorage,
+    return await withTaskControlLock({
       groupId,
+      taskId,
+      cfg,
+      fn: async (): Promise<ActivateCollaborationTaskResult> => {
+        const existingLookup = await findExistingPublishedItem({
+          groupId,
+          taskId,
+          activationKey,
+          title,
+          cfg,
+          tenant: params.tenant,
+        });
+        if (!existingLookup.ok) {
+          return {
+            status: "blocked",
+            taskId,
+            activationKey,
+            reason: existingLookup.reason,
+            detail: existingLookup.detail,
+            taskEnsured: false,
+            boardPublished: false,
+            dispatched: false,
+          };
+        }
+        if (existingLookup.item) {
+          return await syncActivated(existingLookup.item, false, true);
+        }
+
+        // Quality not yet proven — keep draft until materialize publishes.
+        const ensured = await ensureCollaborationTaskObject({
+          groupId,
+          taskId,
+          title,
+          actor,
+          activationKey,
+          readyRequested: false,
+          cfg,
+          nowMs: params.nowMs,
+          alreadyLocked: true,
+        });
+        if (!ensured.ok) {
+          return {
+            status: "blocked",
+            taskId,
+            activationKey,
+            reason: ensured.reason,
+            detail: ensured.detail,
+            taskEnsured: false,
+            boardPublished: false,
+            dispatched: false,
+          };
+        }
+        const taskCreated = ensured.created;
+
+        let materialized: MaterializeIntentResult;
+        try {
+          materialized = await runMaterialize();
+        } catch (error) {
+          if (error instanceof ClaimContractEntryError) {
+            return {
+              status: "blocked",
+              taskId,
+              activationKey,
+              reason: error.code || "materialize_failed",
+              detail: error.message,
+              taskEnsured: true,
+              boardPublished: false,
+              dispatched: false,
+            };
+          }
+          return {
+            status: "blocked",
+            taskId,
+            activationKey,
+            reason: "materialize_failed",
+            detail: error instanceof Error ? error.message : String(error),
+            taskEnsured: true,
+            boardPublished: false,
+            dispatched: false,
+          };
+        }
+
+        const mapped = mapMaterializeFailure(materialized, true);
+        if (mapped) {
+          // Contract incomplete / blocked — task remains draft.
+          return mapped;
+        }
+        if (materialized.status !== "published") {
+          return {
+            status: "blocked",
+            taskId,
+            activationKey,
+            reason: "materialize_unexpected_status",
+            detail: String((materialized as { status?: string }).status),
+            taskEnsured: true,
+            boardPublished: false,
+            dispatched: false,
+          };
+        }
+        const publishedItem = materialized.item;
+
+        // Promote draft → ready only AFTER successful board publish.
+        const promoted = await ensureCollaborationTaskObject({
+          groupId,
+          taskId,
+          title,
+          actor,
+          activationKey,
+          readyRequested: true,
+          cfg,
+          nowMs: params.nowMs,
+          alreadyLocked: true,
+        });
+        if (!promoted.ok) {
+          return {
+            status: "partial_success",
+            taskId,
+            activationKey,
+            boardItemId: publishedItem.itemId,
+            item: publishedItem,
+            taskCreated,
+            reason: "task_ready_promote_failed",
+            detail: promoted.detail ?? promoted.reason,
+            taskEnsured: true,
+            boardPublished: true,
+            operatingStateSynced: false,
+            dispatched: false,
+          };
+        }
+
+        return await syncActivated(publishedItem, taskCreated, false);
+      },
     });
   } catch (error) {
     return {
-      status: "partial_success",
+      status: "blocked",
       taskId,
       activationKey,
-      boardItemId: materialized.item.itemId,
-      item: materialized.item,
-      taskCreated,
-      reason: "operating_state_sync_failed",
+      reason: "activation_lock_failed",
       detail: error instanceof Error ? error.message : String(error),
-      taskEnsured: true,
-      boardPublished: true,
-      operatingStateSynced: false,
+      taskEnsured: false,
+      boardPublished: false,
       dispatched: false,
     };
   }
-  const os = await readGroupOperatingState({ fileStore: stores.fileStore, groupId });
-  return {
-    status: "activated",
-    taskId,
-    activationKey,
-    boardItemId: materialized.item.itemId,
-    item: materialized.item,
-    taskCreated,
-    idempotentReplay: false,
-    currentTaskId: os?.activeContext?.currentTaskId ?? null,
-    taskEnsured: true,
-    boardPublished: true,
-    operatingStateSynced: true,
-    dispatched: false,
-  };
 }

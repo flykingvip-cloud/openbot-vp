@@ -41,3 +41,12 @@
 | 真实小闭环 F4 | 未执行 |
 | 复杂任务 F5 | 未执行 |
 | 生产启用 | 未授权 |
+
+## R2 三包收敛（相对 tip b35dc8b9）
+
+- 包1：`authorizeTeamGroupResourceAccess` 的 groupLocator/groupsRoot 贯穿 submit/read/task 查找；write≠read（observer/非 active 拒写）；readiness 仅活跃 bot + agent registry，严格 sessionKey；`precheckDispatchReadiness` = **基础接口待接入**（未强制进 claim/派工链）。
+- 包2：激活查重+发布同一 `withTaskControlLock`；JSON 规范化完整指纹含 Due/suggestedClaimants；质量不足保持 draft；chat.send await 确认并 surface，从 owner-decision delivery 绑定 version，确认轮不进入依赖执行。
+- 包3：`writeFileExclusiveImmutable`（wx）；withRoundLock；幂等校验磁盘文件，缺失 → `idempotent_replay_file_missing`。
+- **缩小范围 / 剩余接线**：未改 claimBoardItem / claim-contract-entry / formal-root settle；agent 成果工具未强制走 submitTeamDeliverable。
+- 不合入 main / 不切 18789 / 不做 F4（待真实聊天+agent 链接通后再复审）。
+

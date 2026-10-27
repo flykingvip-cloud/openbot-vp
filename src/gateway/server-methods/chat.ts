@@ -4725,14 +4725,15 @@ export const chatHandlers: GatewayRequestHandlers = {
         relatedId: clientRunId,
         ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
       }).catch(() => undefined);
-      // TEAM-REAL D: NL plan confirm shares confirmCollaborationTodolist with UI cards.
-      // Ambiguous / unbound confirms must not flip runtime state.
-      void (async () => {
+      // TEAM-REAL R2 包2: NL plan confirm — await formal result, surface to user,
+      // and do not start confirm-dependent execution when 尚未确认.
+      {
+        const confirmActor =
+          (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
+        const tenant = await resolveCollaborationTenantResolution(client);
+        let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
         try {
-          const confirmActor =
-            (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
-          const tenant = await resolveCollaborationTenantResolution(client);
-          await maybeConfirmPlanFromChatSend({
+          confirmHook = await maybeConfirmPlanFromChatSend({
             groupId: scope.groupId,
             message: mentionMessage,
             actor: confirmActor,
@@ -4740,10 +4741,38 @@ export const chatHandlers: GatewayRequestHandlers = {
             tenant,
             cfg: policySnapshotCfg,
           });
-        } catch {
-          // best-effort — chat send must not fail closed on confirm hook errors
+        } catch (confirmError) {
+          respond(
+            true,
+            {
+              runId: clientRunId,
+              status: "stopped" as const,
+              message: `尚未确认：确认入口异常（${
+                confirmError instanceof Error ? confirmError.message : String(confirmError)
+              }）。`,
+            },
+            undefined,
+            { runId: clientRunId },
+          );
+          return;
         }
-      })();
+        if (confirmHook.handled) {
+          respond(
+            true,
+            {
+              runId: clientRunId,
+              status: "stopped" as const,
+              message: confirmHook.userMessage,
+              planConfirm: confirmHook.result,
+            },
+            undefined,
+            { runId: clientRunId },
+          );
+          // Confirmed or not: do not continue into agent dispatch for a confirm turn.
+          // Dependent execution must wait for a subsequent explicit work message.
+          return;
+        }
+      }
       let v1RollCallExtraLines: string[] | undefined;
       if (v1RollCallHooks.active) {
         const lines: string[] = [];

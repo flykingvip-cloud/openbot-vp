@@ -12,6 +12,10 @@ import {
   confirmCollaborationTodolist,
   listCollaborationTodolists,
 } from "./claim-contract-entry.js";
+import {
+  readOwnerDecisionDeliveries,
+  type OwnerDecisionCardDelivery,
+} from "./owner-decision-delivery.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export type ChatPlanConfirmIntent =
@@ -98,6 +102,77 @@ export type TryConfirmPlanFromChatResult =
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
+}
+
+export type PendingPlanConfirmBinding = {
+  taskId: string;
+  boardItemId: string;
+  todolistId: string;
+  version: number;
+  decisionId?: string;
+  source: "owner_decision_delivery";
+};
+
+/**
+ * Resolve the plan version the user was actually shown from the durable
+ * owner-decision delivery log. Never invents "current unique proposed" version.
+ */
+export async function resolvePendingPlanConfirmBinding(params: {
+  groupId: string;
+  taskId?: string;
+  cfg?: OpenBotConfig;
+}): Promise<PendingPlanConfirmBinding | null> {
+  const groupId = compact(params.groupId);
+  if (!groupId) {
+    return null;
+  }
+  const taskId = compact(params.taskId);
+  let rows: OwnerDecisionCardDelivery[] = [];
+  try {
+    rows = await readOwnerDecisionDeliveries({
+      groupId,
+      taskId: taskId || undefined,
+      cfg: params.cfg,
+    });
+  } catch {
+    return null;
+  }
+  for (let index = rows.length - 1; index >= 0; index -= 1) {
+    const row = rows[index];
+    if (!row) {
+      continue;
+    }
+    if (row.userFacing === "consumed" || row.userFacing === "stale_version") {
+      continue;
+    }
+    if (
+      row.stage === "confirmation_consumed" ||
+      row.stage === "skipped" ||
+      row.stage === "delivery_failed"
+    ) {
+      continue;
+    }
+    const todolistId = compact(row.todolistId);
+    const boardItemId = compact(row.boardItemId);
+    const boundTaskId = compact(row.taskId);
+    const version =
+      typeof row.version === "number" && Number.isFinite(row.version) ? Math.floor(row.version) : 0;
+    if (!todolistId || !boardItemId || !boundTaskId || version <= 0) {
+      continue;
+    }
+    if (taskId && boundTaskId !== taskId) {
+      continue;
+    }
+    return {
+      taskId: boundTaskId,
+      boardItemId,
+      todolistId,
+      version,
+      decisionId: compact(row.card?.decisionId) || undefined,
+      source: "owner_decision_delivery",
+    };
+  }
+  return null;
 }
 
 /**
@@ -194,21 +269,20 @@ export async function tryConfirmPlanFromChat(
   }
 
   const target = scoped[0];
-  // Never invent the version the user "must have seen". Require explicit
-  // expectedVersion, or a card binding (todolistId + boardItemId) that uniquely
-  // identifies the plan the user replied to.
-  const hasCardBinding = Boolean(todolistFilter && boardItemFilter);
-  if (typeof params.expectedVersion !== "number" && !hasCardBinding) {
+  // Never invent the version the user "must have seen".
+  // todolistId+boardItemId alone is insufficient — the same todolist may revise.
+  // expectedVersion must come from the caller or a trusted delivery/card binding
+  // that already carries the version the user was shown.
+  if (typeof params.expectedVersion !== "number" || !Number.isFinite(params.expectedVersion)) {
     return {
       status: "blocked",
       confirmed: false,
-      reason: "expected_version_or_card_binding_required",
+      reason: "expected_version_required",
       detail:
-        "refusing to confirm without expectedVersion or todolistId+boardItemId; current unique proposed plan is not proof the user saw it",
+        "refusing to confirm without expectedVersion from the card/delivery the user replied to; current unique proposed plan is not proof the user saw it",
     };
   }
-  const expectedVersion =
-    typeof params.expectedVersion === "number" ? params.expectedVersion : target.version;
+  const expectedVersion = Math.floor(params.expectedVersion);
 
   try {
     const confirmed = await confirmCollaborationTodolist({

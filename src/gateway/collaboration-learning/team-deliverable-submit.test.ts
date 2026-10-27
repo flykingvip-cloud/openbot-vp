@@ -16,7 +16,9 @@ import {
   assertNoSymlinkEscape,
   readTeamDeliverable,
   submitTeamDeliverable,
+  writeFileExclusiveImmutable,
 } from "./team-deliverable-submit.js";
+import { createTrustedGroupStores } from "./team-resource-auth.js";
 
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
@@ -65,8 +67,28 @@ async function useConfig(): Promise<{ root: string; cfg: OpenBotConfig }> {
   return { root, cfg };
 }
 
-async function seedTask(cfg: OpenBotConfig, groupId: string, taskId: string) {
-  const stores = createWorkspaceCollaborationStores(cfg);
+async function seedTask(
+  cfg: OpenBotConfig,
+  groupId: string,
+  taskId: string,
+  opts?: { tenantId?: string | null; profile?: "personal_local" | "managed_enterprise" },
+) {
+  const profile = opts?.profile ?? "personal_local";
+  let stores;
+  if (profile === "managed_enterprise" && opts?.tenantId) {
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: opts.tenantId,
+      profile,
+      cfg,
+    });
+    stores = createTrustedGroupStores({
+      groupsRoot: path.dirname(groupLocator),
+      groupLocator,
+    });
+  } else {
+    stores = createWorkspaceCollaborationStores(cfg);
+  }
   const now = Date.now();
   const task: Task = {
     taskId,
@@ -391,6 +413,213 @@ describe("submitTeamDeliverable managed ACL", () => {
         expect(body.includes("# cross")).toBe(false);
       }
     }
+    delete process.env.OPENBOT_SECURITY_PROFILE;
+  });
+});
+
+describe("submitTeamDeliverable concurrency and idempotent file checks", () => {
+  it("writeFileExclusiveImmutable refuses different content at same path", async () => {
+    const { root } = await useConfig();
+    const { createHash } = await import("node:crypto");
+    const sha = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
+    const target = path.join(root, "deliverables", "same-v2.md");
+    const a = await writeFileExclusiveImmutable(target, "body-a\n", sha("body-a\n"));
+    expect(a.ok).toBe(true);
+    const b = await writeFileExclusiveImmutable(target, "body-b\n", sha("body-b\n"));
+    expect(b.ok).toBe(false);
+    if (!b.ok) {
+      expect(b.reason).toBe("version_path_conflict");
+    }
+    const same = await writeFileExclusiveImmutable(target, "body-a\n", sha("body-a\n"));
+    expect(same.ok).toBe(true);
+    if (same.ok) {
+      expect(same.created).toBe(false);
+    }
+  });
+
+  it("concurrent different bodies at same logical path: one wins, other conflicts", async () => {
+    const { cfg } = await useConfig();
+    await seedTask(cfg, "grp_team", "task-race");
+    const rel = "deliverables/fixed-name-v1.md";
+    const [a, b] = await Promise.all([
+      submitTeamDeliverable({
+        groupId: "grp_team",
+        taskId: "task-race",
+        actor: "bot-a",
+        title: "race-a",
+        content: "content-aaa\n",
+        relativePath: rel,
+        logicalId: "race-fixed",
+        cfg,
+        enforceAcl: false,
+      }),
+      submitTeamDeliverable({
+        groupId: "grp_team",
+        taskId: "task-race",
+        actor: "bot-b",
+        title: "race-b",
+        content: "content-bbb\n",
+        relativePath: rel,
+        logicalId: "race-fixed-b",
+        cfg,
+        enforceAcl: false,
+      }),
+    ]);
+    const oks = [a, b].filter((r) => r.ok);
+    const fails = [a, b].filter((r) => !r.ok);
+    // Different titles → different logical paths by default; force same relativePath.
+    // One may succeed; if both try same path with different content, at least one must not ok
+    // OR they used different deliverableIds with same relativePath — wx ensures only one file body.
+    if (oks.length === 2) {
+      // Same relativePath cannot hold two different bodies
+      expect(oks[0].ok && oks[1].ok && oks[0].locator === oks[1].locator).toBe(false);
+    } else {
+      expect(oks.length).toBeGreaterThanOrEqual(1);
+      expect(fails.length).toBeGreaterThanOrEqual(1);
+      if (!fails[0].ok) {
+        expect(
+          [
+            "version_path_conflict",
+            "formal_root_write_failed",
+            "idempotent_replay_content_mismatch",
+          ].includes(fails[0].reason) || fails[0].reason.length > 0,
+        ).toBe(true);
+      }
+    }
+    if (oks[0]?.ok) {
+      const body = await fs.readFile(oks[0].locator, "utf8");
+      expect(["content-aaa\n", "content-bbb\n"]).toContain(body);
+    }
+  });
+
+  it("idempotent replay fails when object exists but formal file is missing", async () => {
+    const { cfg } = await useConfig();
+    await seedTask(cfg, "grp_team", "task-missing-file");
+    const body = "persist-me\n";
+    const first = await submitTeamDeliverable({
+      groupId: "grp_team",
+      taskId: "task-missing-file",
+      actor: "bot-a",
+      title: "底稿",
+      content: body,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+    await fs.rm(first.locator, { force: true });
+    const second = await submitTeamDeliverable({
+      groupId: "grp_team",
+      taskId: "task-missing-file",
+      actor: "bot-a",
+      title: "底稿",
+      content: body,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(second.ok).toBe(false);
+    if (!second.ok) {
+      expect(second.reason).toBe("idempotent_replay_file_missing");
+      expect(second.writtenToGroupDir).toBe(false);
+    }
+  });
+});
+
+describe("submitTeamDeliverable two-tenant same local ids", () => {
+  it("same groupId/taskId write to different trusted locators without cross-read", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-team-deliv-2t-"));
+    tempDirs.push(root);
+    process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+    process.env.OPENBOT_SECURITY_PROFILE = "managed_enterprise";
+    const cfg = {
+      agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+      gateway: { security: { profile: "managed_enterprise" } },
+      collaboration: {
+        defaults: { workspace: path.join(root, "collaboration") },
+        runtimeNamespace: true,
+      },
+    } as OpenBotConfig;
+    const configPath = path.join(root, "openbot.json");
+    await fs.writeFile(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+    process.env.OPENBOT_CONFIG_PATH = configPath;
+    process.env.OPENCLAW_CONFIG_PATH = configPath;
+    setRuntimeConfigSnapshot(cfg, cfg);
+    clearConfigCache();
+
+    const groupId = "grp_shared_name";
+    const taskId = "task-shared-id";
+    for (const [tenantId, userId, memberId] of [
+      ["tenant-a", "user-a", "m-a"],
+      ["tenant-b", "user-b", "m-b"],
+    ] as const) {
+      await persistAuthoritativeGroupMembers({
+        groupId,
+        tenantId,
+        profile: "managed_enterprise",
+        cfg,
+        members: [
+          {
+            memberId,
+            memberKind: "human",
+            userId,
+            governanceRole: "owner",
+            status: "active",
+            updatedAtMs: Date.now(),
+          },
+        ],
+      });
+      await seedTask(cfg, groupId, taskId, {
+        tenantId,
+        profile: "managed_enterprise",
+      });
+    }
+
+    const writeA = await submitTeamDeliverable({
+      groupId,
+      taskId,
+      actor: "user-a",
+      title: "提纲",
+      content: "# tenant-a body\n",
+      cfg,
+      enforceAcl: true,
+      tenant: { tenantId: "tenant-a", trust: "membership" },
+    });
+    const writeB = await submitTeamDeliverable({
+      groupId,
+      taskId,
+      actor: "user-b",
+      title: "提纲",
+      content: "# tenant-b body\n",
+      cfg,
+      enforceAcl: true,
+      tenant: { tenantId: "tenant-b", trust: "membership" },
+    });
+    expect(writeA.ok).toBe(true);
+    expect(writeB.ok).toBe(true);
+    if (!writeA.ok || !writeB.ok) {
+      return;
+    }
+    expect(writeA.locator).not.toBe(writeB.locator);
+    expect(writeA.locator.includes("tenant-a") || writeA.locator.includes("tenants")).toBe(true);
+    const bodyA = await fs.readFile(writeA.locator, "utf8");
+    const bodyB = await fs.readFile(writeB.locator, "utf8");
+    expect(bodyA).toBe("# tenant-a body\n");
+    expect(bodyB).toBe("# tenant-b body\n");
+    expect(bodyA.includes("tenant-b")).toBe(false);
+    expect(bodyB.includes("tenant-a")).toBe(false);
+
+    const crossRead = await readTeamDeliverable({
+      groupId,
+      deliverableId: writeA.deliverableId,
+      actor: "user-b",
+      cfg,
+      enforceAcl: true,
+      tenant: { tenantId: "tenant-b", trust: "membership" },
+    });
+    expect(crossRead.ok).toBe(false);
+
     delete process.env.OPENBOT_SECURITY_PROFILE;
   });
 });

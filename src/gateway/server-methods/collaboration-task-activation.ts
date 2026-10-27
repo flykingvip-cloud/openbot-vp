@@ -1,5 +1,7 @@
 import { loadConfig } from "../../config/config.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
+import { listAgentAssets } from "../agent-registry/registry.js";
+import { loadAgentRegistryStore } from "../agent-registry/store.js";
 /**
  * TEAM-REAL F1–F3 gateway handlers — activation, NL confirm, team deliverable, readiness.
  * Pack-owned; review A: resource ACL + membership tenant; read readiness never writes.
@@ -77,6 +79,28 @@ async function resolveTrustedMembersForGroup(params: {
       .filter((row): row is readonly [string, (typeof os.memberRoleMap)[number]] => Boolean(row)),
   );
 
+  // Enterprise agent registry (managed). Personal_local may have no registry —
+  // then bot members with an agentId field still count as registered bots.
+  const registryAgentIds = new Set<string>();
+  if (profile === "managed_enterprise" && tenantId) {
+    try {
+      const store = await loadAgentRegistryStore();
+      for (const asset of listAgentAssets(store, tenantId)) {
+        if (asset.status !== "active") {
+          continue;
+        }
+        if (asset.legacyAgentId?.trim()) {
+          registryAgentIds.add(asset.legacyAgentId.trim());
+        }
+        if (asset.agentSlug?.trim()) {
+          registryAgentIds.add(asset.agentSlug.trim());
+        }
+      }
+    } catch {
+      // Registry unavailable → no bot will be treated as registered under managed.
+    }
+  }
+
   return async (memberId: string): Promise<TrustedMemberResolution | null> => {
     const id = memberId.trim();
     if (!id) {
@@ -89,25 +113,52 @@ async function resolveTrustedMembersForGroup(params: {
       return candidates.includes(id);
     });
     const fromRole = roleMap.get(id);
+
+    const notRegistered = (): TrustedMemberResolution => ({
+      memberId: id,
+      agentId: null,
+      displayName: fromMembers?.name?.trim() || null,
+      registration: "not_registered",
+      sessionKey: null,
+    });
+
     if (!fromMembers && !fromRole) {
-      return {
-        memberId: id,
-        agentId: null,
-        displayName: null,
-        registration: "not_registered",
-        sessionKey: null,
-      };
+      return notRegistered();
     }
-    const agentId =
-      fromMembers?.agentId?.trim() ||
-      fromMembers?.userId?.trim() ||
-      fromMembers?.memberId?.trim() ||
-      id;
-    const displayName = fromMembers?.name?.trim() || null;
+
+    const status = fromMembers?.status ?? fromRole?.status;
+    if (status === "removed" || status === "revoked" || status === "paused") {
+      return notRegistered();
+    }
+
+    const memberKind = fromMembers?.memberKind ?? fromRole?.memberKind;
+    // Only active/invited BOTS are session-ensure candidates. Never treat a human
+    // userId as an agentId for main-session creation.
+    if (memberKind !== "bot") {
+      return notRegistered();
+    }
+
+    const agentId = fromMembers?.agentId?.trim() || fromRole?.memberId?.trim() || "";
+    if (!agentId) {
+      return notRegistered();
+    }
+
+    if (profile === "managed_enterprise") {
+      if (!registryAgentIds.has(agentId)) {
+        return {
+          memberId: id,
+          agentId,
+          displayName: fromMembers?.name?.trim() || null,
+          registration: "not_registered",
+          sessionKey: null,
+        };
+      }
+    }
+
     return {
       memberId: id,
       agentId,
-      displayName,
+      displayName: fromMembers?.name?.trim() || null,
       registration: "registered",
       sessionKey: defaultConversationSessionKey(agentId),
     };
