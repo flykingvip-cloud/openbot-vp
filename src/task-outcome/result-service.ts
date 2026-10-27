@@ -74,6 +74,12 @@ function attemptFingerprint(record: TaskOutcomeRecord): string {
         budgetIterations: record.budget?.iterationCount ?? null,
         budgetMaxCost: record.budget?.maxCostUsd ?? null,
         budgetMaxIterations: record.budget?.maxIterations ?? null,
+        // W4: experience exposure attach must not be treated as a no-op fingerprint.
+        experienceExposureScopes: (record.experienceExposure?.scopes ?? []).map((scope) => ({
+          scopeId: scope.scopeId,
+          botId: scope.botId,
+          assetIds: [...scope.assetIds].toSorted(),
+        })),
       }),
     )
     .digest("hex");

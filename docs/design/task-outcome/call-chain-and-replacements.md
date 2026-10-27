@@ -3,20 +3,22 @@
 > W0（基线与证据收敛）修订：对齐 main tip 合入身份（#85 / #89 / #94），去掉过时「runner success → not_required 关闭」表述。
 > W1（跨入口任务身份与唯一结果）**已合入** [#98](https://github.com/flykingvip-cloud/openbot-vp/pull/98) squash → main `b6c60550`：稳定身份 / 统一收尾 / 真实入口接线。
 > W2（消费者与技能/模式统一消费链）**已合入** [#99](https://github.com/flykingvip-cloud/openbot-vp/pull/99) squash → main `f3a19e08`：A–C tip+eligibility 消费 / attempt 回填 / cancelled 不计负样本；D 旁路仅 inventory。
-> **W3（任务类型验收与总预算）收紧中**：A tip `taskContract` + 复用 `chat-entry` 门闩（禁止发明 `not_required`）；B tip `budget` 投影复用 supervisor D-BUDGET（非新账本）。**未 merge / 未部署 / 未开 W4**。
+> W3（任务类型验收与总预算）**已合入** [#102](https://github.com/flykingvip-cloud/openbot-vp/pull/102) squash → main `f53e027b`：taskContract + budget 投影。
+> **W4（经验有效性与受控进化）进行中**：learning-recall retrieved/injected/adopted/outcome_verified 分离；曝光≠verified；策展改看 outcome_verified。**未 merge / 未部署 / 未开 W5**。
 
 ## 已核实合入（gh，勿口述）
 
-| PR                                                            | state  | mergeCommit                                | head tip    | 主题                                   |
-| ------------------------------------------------------------- | ------ | ------------------------------------------ | ----------- | -------------------------------------- |
-| [#85](https://github.com/flykingvip-cloud/openbot-vp/pull/85) | MERGED | `d00bdcca0f3ab5d43af9ed01c65d6a9f47c0a13b` | `ac21ae17…` | R83 persist/CAS/consumer               |
-| [#89](https://github.com/flykingvip-cloud/openbot-vp/pull/89) | MERGED | `c3a40259e1e6a878e4608133733349eb39a1646d` | `f67c05ad…` | gateway boot hydrate awaiting-delivery |
-| [#94](https://github.com/flykingvip-cloud/openbot-vp/pull/94) | MERGED | `d3cd349a378c2ccfb736807988e0d97c285272ff` | `9006274a…` | attempt 诚实归因 + confirm-no-id       |
-| [#95](https://github.com/flykingvip-cloud/openbot-vp/pull/95) | MERGED | `1f698e378a3d1185b864b8bdcfe78e6d2b78c892` | `bf0f467a…` | W0 调用链基线与入口声明澄清            |
-| [#98](https://github.com/flykingvip-cloud/openbot-vp/pull/98) | MERGED | `b6c60550fddf0e9aabae6c1a99f06622687ba103` | （squash）  | W1 稳定身份 / 统一收尾 / 真实入口接线  |
-| [#99](https://github.com/flykingvip-cloud/openbot-vp/pull/99) | MERGED | `f3a19e08fea8ad830504230ed3700625ee6cdbcf` | （squash）  | W2 消费者 / 技能·模式统一消费          |
+| PR                                                              | state  | mergeCommit                                | head tip    | 主题                                   |
+| --------------------------------------------------------------- | ------ | ------------------------------------------ | ----------- | -------------------------------------- |
+| [#85](https://github.com/flykingvip-cloud/openbot-vp/pull/85)   | MERGED | `d00bdcca0f3ab5d43af9ed01c65d6a9f47c0a13b` | `ac21ae17…` | R83 persist/CAS/consumer               |
+| [#89](https://github.com/flykingvip-cloud/openbot-vp/pull/89)   | MERGED | `c3a40259e1e6a878e4608133733349eb39a1646d` | `f67c05ad…` | gateway boot hydrate awaiting-delivery |
+| [#94](https://github.com/flykingvip-cloud/openbot-vp/pull/94)   | MERGED | `d3cd349a378c2ccfb736807988e0d97c285272ff` | `9006274a…` | attempt 诚实归因 + confirm-no-id       |
+| [#95](https://github.com/flykingvip-cloud/openbot-vp/pull/95)   | MERGED | `1f698e378a3d1185b864b8bdcfe78e6d2b78c892` | `bf0f467a…` | W0 调用链基线与入口声明澄清            |
+| [#98](https://github.com/flykingvip-cloud/openbot-vp/pull/98)   | MERGED | `b6c60550fddf0e9aabae6c1a99f06622687ba103` | （squash）  | W1 稳定身份 / 统一收尾 / 真实入口接线  |
+| [#99](https://github.com/flykingvip-cloud/openbot-vp/pull/99)   | MERGED | `f3a19e08fea8ad830504230ed3700625ee6cdbcf` | （squash）  | W2 消费者 / 技能·模式统一消费          |
+| [#102](https://github.com/flykingvip-cloud/openbot-vp/pull/102) | MERGED | `f53e027bdafa1ccf229144a1c5619b35f67b9299` | （squash）  | W3 任务类型验收与任务级总预算          |
 
-W3 基于 `origin/main` tip ≡ #99 merge `f3a19e08…`。
+W4 基于 `origin/main` tip ≡ #102 merge `f53e027b…`。
 
 ## 新调用链（模块内）
 
@@ -30,6 +32,7 @@ entrypoint adapter 实例方法
   →（W2）skill-quality / mode-quality handlers（tip+eligibility；cancelled 只进 cancelledCount）
   →（W2）attempt 正样本回填 confirmPatternOutcomeByRunId / skill task_outcome_confirmed
   →（W3）tip taskContract（门闩复用 chat-entry）；tip budget 投影（复用 supervisor D-BUDGET；exhaust → budget_exceeded）
+  →（W4）learning-recall：retrieved/injected 记账；tip experienceExposure；closed+eligible → outcome_verified → 既有策展
 ```
 
 生产热路径（**已接线、有调用证据**）：
@@ -67,7 +70,7 @@ entrypoint adapter 实例方法
 
 **诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander 已恢复为模块路径 only（交付树无异 owner 热路径声明）。
 
-**登记**：W1 已合入 `b6c60550`；W2 已合入 `f3a19e08`；W3 收紧（验收复用 chat-entry；预算投影复用 D-BUDGET；已删平行 task-type-acceptance）。诚实缺口仍含 gateway/server-methods/agent、collab 其它 board RPC、cron 冷启动 hydrate、子 agent lane 跳过；W3 未把 supervisor 热路径自动扣 tip（提供 `projectTipBudgetFromSupervisor`，生产接线属后续）。**未 merge W3 / 未部署 / 未开 W4**。D 旁路 inventory 仍在，本轮不退役。
+**登记**：W1 `b6c60550`；W2 `f3a19e08`；W3 `f53e027b`。W4：修正「提示词曝光=有效复用」；`reuseCount` 降为 injected 别名；策展阈值改 `outcomeVerifiedCount`；普通偏好/事实不走实验晋升（本轮不新增记忆系统）。诚实缺口：adopted 需显式信号（本轮 API 已留、无自动推断）；pending ledger 进程内（tip `experienceExposure` 为耐久路径）；并发同 agent 可能覆盖 pending；evolution 旁路仍在（不本轮强拆）。**未 merge W4 / 未部署 / 未开 W5**。
 
 **既有超时/重试/回退/用量（W3 inventory，不另起）**：`CloseReasonCode.timeout` + eligibility；supervisor `retry.nextStop`（iterations/cost/duration）；agents `model-fallback`；gateway billing / enterprise-model budget-gate。任务总预算 tip 只做投影与关闭归因，不替代上述机制。
 
@@ -86,14 +89,15 @@ entrypoint adapter 实例方法
 
 ## 旧路径分类（详见 W0 报告；不按函数名批量删除）
 
-| 写入                                                                                         | 文件                                     | 分类                       | 说明                                                                  |
-| -------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- | --------------------------------------------------------------------- |
-| `appendEvolutionTaskOutcome`（growth-bridge）                                                | `growth-bridge.ts`                       | **已替换路径上的合法写入** | 仅统一结果 + 资格允许时；含 revoke                                    |
-| `appendEvolutionTaskOutcome`（operational-metrics `recordTaskOutcome` / `recordRunOutcome`） | `operational-metrics-store.ts`           | **待替换 / 旁路**          | 仍可直接记 succeeded；`evolution-control` RPC 仍调 `recordRunOutcome` |
-| `recordToolOutcomes`                                                                         | `operational-metrics-store.ts`           | **合法独立观测**           | 工具计数；非任务成功                                                  |
-| `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome`                                        | `agent-runner-execution.ts`              | **已替换**                 | 热路径已切统一 TaskOutcome                                            |
-| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun`                            | `attempt.ts`                             | **观测；#94 已阻误成功**   | 非任务 tip；W2 经 consumer `attempt-backfill` 在 closed+eligible 回填 |
-| agent-runner 演化写失败可观测                                                                | `agent-runner-evolution-outcome.test.ts` | **合法独立观测**           | 保留                                                                  |
+| 写入                                                                                         | 文件                                     | 分类                       | 说明                                                                   |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------------------- | ---------------------------------------------------------------------- |
+| `appendEvolutionTaskOutcome`（growth-bridge）                                                | `growth-bridge.ts`                       | **已替换路径上的合法写入** | 仅统一结果 + 资格允许时；含 revoke                                     |
+| `appendEvolutionTaskOutcome`（operational-metrics `recordTaskOutcome` / `recordRunOutcome`） | `operational-metrics-store.ts`           | **待替换 / 旁路**          | 仍可直接记 succeeded；`evolution-control` RPC 仍调 `recordRunOutcome`  |
+| `recordToolOutcomes`                                                                         | `operational-metrics-store.ts`           | **合法独立观测**           | 工具计数；非任务成功                                                   |
+| `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome`                                        | `agent-runner-execution.ts`              | **已替换**                 | 热路径已切统一 TaskOutcome                                             |
+| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun`                            | `attempt.ts`                             | **观测；#94 已阻误成功**   | 非任务 tip；W2 经 consumer `attempt-backfill` 在 closed+eligible 回填  |
+| agent-runner 演化写失败可观测                                                                | `agent-runner-evolution-outcome.test.ts` | **合法独立观测**           | 保留                                                                   |
+| `learning-recall` 注入累加 reuse                                                             | `learning-recall-context.ts`             | **W4 已替换语义**          | 注入=injected 曝光；策展改 outcome_verified；reuseCount 为 legacy 别名 |
 
 ## loom / 热文件（W0 登记）
 
@@ -115,3 +119,4 @@ entrypoint adapter 实例方法
 - P1（#94）：见上文 attempt / confirm-no-id。
 - W2：`quality-handlers`（skill/mode）+ `attempt-backfill`；cancelled 投影可证；evolution 旁路仅 inventory。
 - W3：复用 `chat-entry` 验收门闩 + tip `taskContract` 拒发明；`budget.ts` 投影 supervisor D-BUDGET（`budget_exceeded` eligibility）。
+- W4：learning-recall 四段指标；注入≠策展；`experience-verified` consumer 在 tip success+eligible 后记 outcome_verified 并触发既有 skill-draft 策展。

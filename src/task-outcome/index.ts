@@ -92,3 +92,10 @@ export {
 } from "./budget.js";
 // W3 acceptance: reuse chat-entry (CHAT_TURN_CONTRACT_V1 / resolveTurnTaskContract /
 // resolveChatTurnCloseGates) — do not re-export a parallel task-type-acceptance module.
+
+export {
+  EXPERIENCE_VERIFIED_CONSUMER_ID,
+  applyExperienceVerification,
+  createExperienceVerifiedHandler,
+  resolveExperienceVerificationPlan,
+} from "./experience-verified-handler.js";

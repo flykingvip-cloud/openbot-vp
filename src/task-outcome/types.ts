@@ -129,6 +129,19 @@ export type CloseReasonCode =
   | "budget_exceeded"
   | "other";
 
+/** W4: tip-durable record of learning assets injected during the turn (exposure). */
+export type ExperienceExposureScope = {
+  scopeId: string;
+  botId: string;
+  assetIds: string[];
+};
+
+export type ExperienceExposureState = {
+  /** Assets injected into the system prompt for this task (not yet verified). */
+  scopes: ExperienceExposureScope[];
+  attachedAt: string;
+};
+
 export type TaskOutcomeRecord = {
   schemaVersion: typeof TASK_OUTCOME_SCHEMA_VERSION;
   taskContractVersion: string;
@@ -147,6 +160,11 @@ export type TaskOutcomeRecord = {
    * Exhaust → fail_closed(budget_exceeded); eligibility attribution=budget.
    */
   budget?: TaskBudgetState;
+  /**
+   * W4: learning assets injected (exposed) on this turn.
+   * outcome_verified is recorded by experience-verified consumer on closed+eligible success.
+   */
+  experienceExposure?: ExperienceExposureState;
   entrypoint: Entrypoint;
   lifecycle: Lifecycle;
   decisiveRunStatus: DecisiveRunStatus;
@@ -304,6 +322,13 @@ export type SubmitTransition =
       expectedVersion: number;
       fencingToken: string;
       nowMs?: number;
+    }
+  | {
+      /** W4: attach injected learning-asset exposure for later outcome_verified. */
+      type: "set_experience_exposure";
+      experienceExposure: ExperienceExposureState;
+      expectedVersion: number;
+      fencingToken: string;
     }
   | {
       /**
