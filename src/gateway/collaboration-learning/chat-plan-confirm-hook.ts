@@ -52,7 +52,7 @@ export type ChatPlanConfirmHookResult =
 
 function formatUserMessage(result: TryConfirmPlanFromChatResult): string {
   if (result.status === "confirmed" && result.confirmed) {
-    return `计划已确认（todolist=${result.todolistId} v${result.version}）。已按现有 wake/调度机制请求推进。`;
+    return `计划已确认（todolist=${result.todolistId} v${result.version}）。将按现有自推进资格与 wake 门控请求推进。`;
   }
   if (result.status === "ambiguous") {
     return `尚未确认：确认表述不唯一（${result.reason}）。请单独发送「确认计划」，或点选计划卡片。`;
@@ -202,11 +202,17 @@ export async function maybeConfirmPlanFromChatSend(
   let userMessage = formatUserMessage(result);
   if (result.confirmed && result.status === "confirmed") {
     try {
+      const confirmedStep =
+        result.todolist.steps.find((s) => s.status === "active" || s.status === "pending") ??
+        result.todolist.steps[0];
       const advance = await triggerPostPlanConfirmAdvance({
         groupId: params.groupId,
-        taskId,
-        boardItemId: boardItemId || undefined,
-        todolistId: todolistId || undefined,
+        // Strict: use confirm result binding, not ambient group currentTaskId.
+        taskId: result.taskId,
+        boardItemId: result.boardItemId,
+        todolistId: result.todolistId,
+        confirmedVersion: result.version,
+        stepId: confirmedStep?.stepId ?? null,
         confirmerId: params.actor,
         tenant: params.tenant,
         auth: params.auth,

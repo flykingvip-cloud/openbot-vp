@@ -269,7 +269,10 @@ import {
   resolveBlockedAgentIdsForCurrentTask,
   type GatewayCollaborationSpaceSnapshot,
 } from "../collaboration-learning.js";
-import { maybeSubmitTeamDeliverableFromChatFinal } from "../collaboration-learning/chat-deliverable-team-submit.js";
+import {
+  formatTeamDeliverableUserMessage,
+  maybeSubmitTeamDeliverableFromChatFinal,
+} from "../collaboration-learning/chat-deliverable-team-submit.js";
 import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
 import {
   isGroupPublicTranscriptSessionFile,
@@ -281,6 +284,7 @@ import {
   dropDivergentGroupTranscriptMirrors,
 } from "../collaboration-learning/group-public-transcript.js";
 import { assertNoPrivateMemoryDirtyWriteToGroupPublic } from "../collaboration-learning/private-memory-promote.js";
+import { resolveActorDeliverableTaskBinding } from "../collaboration-learning/resolve-actor-deliverable-task.js";
 import { resolveCollaborationSpaceSessionId } from "../collaboration-learning/session-id.js";
 import {
   resolveSessionParticipationGroupId,
@@ -291,7 +295,10 @@ import {
   authorizeTeamGroupResourceAccess,
   createTrustedGroupStores,
 } from "../collaboration-learning/team-resource-auth.js";
-import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
+import {
+  labelCollaborationIoTenant,
+  resolveCollaborationTenantResolution,
+} from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import type { CollaborationExecutionRecord } from "../collaboration-ledger/types.js";
 import {
@@ -3757,7 +3764,8 @@ async function runGroupBotDiscussionTurn(params: {
         );
       }
       try {
-        const osTaskId =
+        // OS currentTaskId is unreliable as sole binding; keep for settle metadata only.
+        const groupCurrentTaskId =
           (
             params.scope.operatingState as
               | { activeContext?: { currentTaskId?: string | null } }
@@ -3773,30 +3781,94 @@ async function runGroupBotDiscussionTurn(params: {
           agentId: params.bot.agentId,
           userId: deliverableOwnerId,
           clientRunId: runId,
-          taskId: osTaskId,
+          // Chat settle/ledger only — not the team SoT task authority.
+          taskId: null,
         });
         replyText = prepared.text;
-        if (
-          osTaskId &&
-          params.scope.groupId &&
-          replyText.includes("DELIVERABLE") &&
-          prepared.structured
-        ) {
-          void maybeSubmitTeamDeliverableFromChatFinal({
-            text: replyText,
-            groupId: params.scope.groupId,
-            taskId: osTaskId,
-            agentId: params.bot.agentId,
-            client: params.client,
-            tenant: params.scope.tenantId
-              ? { tenantId: params.scope.tenantId, trust: "membership" }
-              : null,
-            cfg,
-          }).catch((submitErr) => {
+        if (params.scope.groupId && replyText.includes("DELIVERABLE") && prepared.structured) {
+          // Unique formal team delivery: await submitTeamDeliverable and surface result.
+          // Do not invent trust:membership from a bare tenantId string.
+          const tenantResolution = await resolveCollaborationTenantResolution(params.client);
+          const tenant =
+            tenantResolution.trust === "membership"
+              ? tenantResolution
+              : labelCollaborationIoTenant(
+                  tenantResolution.tenantId ?? params.scope.tenantId ?? null,
+                );
+          let deliverAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null =
+            null;
+          let deliverStores: ReturnType<typeof createTrustedGroupStores> | null = null;
+          try {
+            deliverAuth = await authorizeTeamGroupResourceAccess({
+              groupId: params.scope.groupId,
+              actor: params.bot.agentId,
+              client: params.client,
+              tenant,
+              action: "write",
+              cfg,
+            });
+            if (deliverAuth.ok) {
+              deliverStores = createTrustedGroupStores({
+                groupsRoot: deliverAuth.groupsRoot,
+                groupLocator: deliverAuth.groupLocator,
+              });
+            }
+          } catch (authErr) {
             params.context.logGateway.warn(
-              `collaboration team deliverable submit failed (${params.bot.agentId}): ${formatForLog(submitErr)}`,
+              `collaboration team deliverable auth failed (${params.bot.agentId}): ${formatForLog(authErr)}`,
             );
-          });
+          }
+          const binding =
+            deliverAuth && deliverAuth.ok
+              ? await resolveActorDeliverableTaskBinding({
+                  groupId: params.scope.groupId,
+                  actorId: params.bot.agentId,
+                  groupCurrentTaskId,
+                  auth: deliverAuth,
+                  stores: deliverStores,
+                  trusted: {
+                    groupsRoot: deliverAuth.groupsRoot,
+                    groupLocator: deliverAuth.groupLocator,
+                  },
+                  tenant,
+                  cfg,
+                })
+              : ({ ok: false, reason: "deliverable_auth_required" } as const);
+          if (!binding.ok) {
+            const miss = `团队成果未完成（task_binding_required:${binding.reason}；未使用群 currentTaskId=${groupCurrentTaskId ?? "none"}）。`;
+            replyText = `${replyText.trim()}
+
+${miss}`;
+            params.context.logGateway.warn(
+              `collaboration team deliverable skipped (${params.bot.agentId}): ${binding.reason}`,
+            );
+          } else {
+            const submitOutcome = await maybeSubmitTeamDeliverableFromChatFinal({
+              text: replyText,
+              groupId: params.scope.groupId,
+              taskId: binding.taskId,
+              agentId: params.bot.agentId,
+              client: params.client,
+              tenant,
+              trusted:
+                deliverAuth && deliverAuth.ok
+                  ? {
+                      groupsRoot: deliverAuth.groupsRoot,
+                      groupLocator: deliverAuth.groupLocator,
+                    }
+                  : null,
+              cfg,
+            });
+            const teamMsg = formatTeamDeliverableUserMessage(submitOutcome);
+            replyText = `${replyText.trim()}
+
+${teamMsg}`;
+            if (!submitOutcome.ok) {
+              params.context.logGateway.warn(
+                `collaboration team deliverable submit not ok (${params.bot.agentId}): ${submitOutcome.reason}`,
+              );
+            }
+          }
         }
       } catch (err) {
         params.context.logGateway.warn(

@@ -251,7 +251,7 @@ async function resolveClaimStores(params: {
   };
 }
 
-async function buildClaimAuthority(params: {
+export async function buildClaimAuthority(params: {
   groupId: string;
   taskId: string;
   cfg: OpenBotConfig;
