@@ -30,6 +30,11 @@ import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
 } from "../collaboration-learning/shared.js";
+import {
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+  resolveStoresFromGroupLocator,
+} from "../collaboration-learning/team-resource-auth.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import { withRoundLock, writeJsonDurable } from "./round-store-io.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import { assertCollaborationRuntimeWritable } from "./runtime-namespace.js";
@@ -511,10 +516,46 @@ export type ConfirmWakeOpResult =
 
 /** M3: fingerprint of target actors' auth rows for eligibility binding. */
 
+function resolveRecoveryStores(params: {
+  authority?: RuntimeAuthority;
+  cfg?: OpenBotConfig;
+  fileStore?: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  objectStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
+}): {
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  objectStorage: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
+} {
+  if (params.fileStore && params.objectStorage) {
+    return { fileStore: params.fileStore, objectStorage: params.objectStorage };
+  }
+  const locator =
+    typeof params.authority?.namespace?.groupLocator === "string"
+      ? params.authority.namespace.groupLocator.trim()
+      : "";
+  if (locator) {
+    const resolved = resolveStoresFromGroupLocator({ groupLocator: locator, cfg: params.cfg });
+    if (resolved.ok) {
+      return { fileStore: resolved.fileStore, objectStorage: resolved.objectStorage };
+    }
+  }
+  const profile = resolveSecurityProfile(params.cfg).profile;
+  if (profile === "managed_enterprise") {
+    throw new Error(
+      `${TRUSTED_GROUP_LOCATOR_REQUIRED}: wake recovery refused without authority.namespace.groupLocator`,
+    );
+  }
+  const legacy = createWorkspaceCollaborationStores(params.cfg);
+  return { fileStore: legacy.fileStore, objectStorage: legacy.objectStorage };
+}
+
 async function loadRecoveryAuthContext(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
+  /** Trusted SoT aligned with wake authority — prefer over host dual-root. */
+  fileStore?: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  objectStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
+  groupRootDir?: string;
 }): Promise<{
   operatingState: WakeOpRecoveryAuthState;
   taskApproverIds: string[];
@@ -524,7 +565,11 @@ async function loadRecoveryAuthContext(params: {
   if (!groupId || !taskId) {
     return null;
   }
-  const { fileStore, objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+  const { fileStore, objectStorage } = resolveRecoveryStores({
+    cfg: params.cfg,
+    fileStore: params.fileStore,
+    objectStorage: params.objectStorage,
+  });
   const operatingState = await readGroupOperatingState({ fileStore, groupId });
   const task = await objectStorage.readObject<Task>(groupId, "task", taskId);
   const raw = (task as { responsibility?: { approvers?: unknown } } | null)?.responsibility
@@ -656,10 +701,16 @@ export async function releaseWakeOpForRetry(params: {
   }
   const releasedBy = trusted.subject.actorId;
   // Execute-time recheck against durable OS (not caller-supplied / stale mint snapshot).
+  const recoveryStores = resolveRecoveryStores({
+    authority: params.authority,
+    cfg: params.cfg,
+  });
   const authCtx = await loadRecoveryAuthContext({
     groupId: trusted.subject.groupId,
     taskId: trusted.subject.taskId,
     cfg: params.cfg,
+    fileStore: recoveryStores.fileStore,
+    objectStorage: recoveryStores.objectStorage,
   });
   if (!authCtx) {
     return { ok: false, reason: "missing_task_scope" };
@@ -785,10 +836,16 @@ export async function confirmWakeOpCompleted(params: {
   const confirmedBy = trusted.subject.actorId;
   // Execute-time: reload task approvers + OS — forged approver lists on a minted
   // subject cannot unlock (M1).
+  const recoveryStores = resolveRecoveryStores({
+    authority: params.authority,
+    cfg: params.cfg,
+  });
   const authCtx = await loadRecoveryAuthContext({
     groupId: trusted.subject.groupId,
     taskId: trusted.subject.taskId,
     cfg: params.cfg,
+    fileStore: recoveryStores.fileStore,
+    objectStorage: recoveryStores.objectStorage,
   });
   if (!authCtx) {
     return { ok: false, reason: "missing_task_scope" };

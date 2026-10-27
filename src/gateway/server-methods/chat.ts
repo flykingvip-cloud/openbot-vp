@@ -4794,15 +4794,26 @@ export const chatHandlers: GatewayRequestHandlers = {
           const errMsg = `尚未确认：确认入口异常（${
             confirmError instanceof Error ? confirmError.message : String(confirmError)
           }）。`;
+          let transcriptPersist: { ok: boolean; error?: string } = {
+            ok: false,
+            error: "session_context_missing",
+          };
           if (groupSession.entry.sessionId && groupSession.storePath) {
-            await appendAssistantTranscriptMessage({
-              message: errMsg,
-              sessionId: groupSession.entry.sessionId,
-              storePath: groupSession.storePath,
-              sessionFile: groupSession.entry.sessionFile,
-              createIfMissing: true,
-              idempotencyKey: `${clientRunId}:plan-confirm-error`,
-            }).catch(() => undefined);
+            try {
+              transcriptPersist = await appendAssistantTranscriptMessage({
+                message: errMsg,
+                sessionId: groupSession.entry.sessionId,
+                storePath: groupSession.storePath,
+                sessionFile: groupSession.entry.sessionFile,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:plan-confirm-error`,
+              });
+            } catch (persistErr) {
+              transcriptPersist = {
+                ok: false,
+                error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+              };
+            }
           }
           respond(
             true,
@@ -4810,6 +4821,8 @@ export const chatHandlers: GatewayRequestHandlers = {
               runId: clientRunId,
               status: "stopped" as const,
               message: errMsg,
+              transcriptPersist,
+              transcriptVisible: transcriptPersist.ok,
             },
             undefined,
             { runId: clientRunId },
@@ -4817,25 +4830,41 @@ export const chatHandlers: GatewayRequestHandlers = {
           return;
         }
         if (confirmHook.handled) {
+          let transcriptPersist: { ok: boolean; error?: string } = {
+            ok: false,
+            error: "session_context_missing",
+          };
           if (groupSession.entry.sessionId && groupSession.storePath) {
-            await appendAssistantTranscriptMessage({
-              message: confirmHook.userMessage,
-              sessionId: groupSession.entry.sessionId,
-              storePath: groupSession.storePath,
-              sessionFile: groupSession.entry.sessionFile,
-              createIfMissing: true,
-              idempotencyKey: `${clientRunId}:plan-confirm`,
-            }).catch(() => undefined);
+            try {
+              transcriptPersist = await appendAssistantTranscriptMessage({
+                message: confirmHook.userMessage,
+                sessionId: groupSession.entry.sessionId,
+                storePath: groupSession.storePath,
+                sessionFile: groupSession.entry.sessionFile,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:plan-confirm`,
+              });
+            } catch (persistErr) {
+              transcriptPersist = {
+                ok: false,
+                error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+              };
+            }
           }
+          const visibleMessage = transcriptPersist.ok
+            ? confirmHook.userMessage
+            : `${confirmHook.userMessage}（展示写入失败：${transcriptPersist.error ?? "unknown"}）`;
           respond(
             true,
             {
               runId: clientRunId,
               status: "stopped" as const,
-              // Transcript + response: chat.history can paint the same userMessage.
-              message: confirmHook.userMessage,
+              // Transcript + response: chat.history can paint the same userMessage when persist ok.
+              message: visibleMessage,
               planConfirm: confirmHook.result,
               autoAdvanceWired: confirmHook.autoAdvanceWired,
+              transcriptPersist,
+              transcriptVisible: transcriptPersist.ok,
               ...(confirmStores
                 ? {
                     trustedGroupLocator: confirmStores.groupLocator,

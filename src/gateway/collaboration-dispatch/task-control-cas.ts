@@ -39,6 +39,7 @@ import {
   withGroupAuthLock,
   writeGroupOperatingState,
 } from "../collaboration-learning/shared.js";
+import type { TrustedGroupStores } from "../collaboration-learning/team-resource-auth.js";
 
 /** T51/T52: OS auth version lives on the durable operating-state object (field authEpoch). */
 export type OperatingStateWithAuthEpoch = GatewayCollaborationGroupOperatingState & {
@@ -122,10 +123,7 @@ export type CasCommitTaskDispatchEligibilityParams = {
     writeObject: (groupId: string, kind: string, id: string, value: unknown) => Promise<void>;
   };
   /** Trusted OS fileStore; when omitted, workspace stores (compat). */
-  fileStore?: {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any;
-  };
+  fileStore?: TrustedGroupStores["fileStore"];
   /** Observed controlEpoch that must still match under the lock (expected-version). */
   expectedControlEpoch: number;
   /**
@@ -242,7 +240,7 @@ export async function casCommitTaskDispatchEligibility(
           try {
             const fileStore = params.fileStore ?? createWorkspaceCollaborationStores(cfg).fileStore;
             const os = await readGroupOperatingState({
-              fileStore: fileStore as never,
+              fileStore,
               groupId: params.groupId,
             });
             liveAuthEpoch = readOperatingStateAuthEpoch(os);
@@ -345,7 +343,7 @@ export type CasTakeTaskDispatchEligibilityParams = {
     readObject: <T>(groupId: string, kind: string, id: string) => Promise<T | null>;
     writeObject: (groupId: string, kind: string, id: string, value: unknown) => Promise<void>;
   };
-  fileStore?: Record<string, unknown>;
+  fileStore?: TrustedGroupStores["fileStore"];
   cfg?: OpenBotConfig;
   nowMs?: number;
   targetActorIds?: readonly string[];

@@ -461,6 +461,8 @@ export async function consumeWakeForRoundDispatch(
       taskId: request.taskId,
       targetActorIds: request.toAgentIds,
       cfg: params.cfg,
+      fileStore: wakeStores.fileStore,
+      objectStorage: wakeStores.objectStorage,
       _testForceOperatingStateReadError: params._testForcePreClaimAuthOsReadError,
     });
     if (!auth.ok) {
@@ -653,6 +655,8 @@ export async function consumeWakeForRoundDispatch(
       taskId: request.taskId,
       targetActorIds: request.toAgentIds,
       cfg: params.cfg,
+      fileStore: wakeStores.fileStore,
+      objectStorage: wakeStores.objectStorage,
     });
     if (!auth.ok) {
       const failed = await markWakeOpFailed({
@@ -807,6 +811,8 @@ export async function consumeWakeForRoundDispatch(
         taskId: request.taskId,
         targetActorIds: request.toAgentIds,
         cfg: params.cfg,
+        fileStore: wakeStores.fileStore,
+        objectStorage: wakeStores.objectStorage,
       });
       if (!authBeforeCommit.ok) {
         const failed = await markWakeOpFailed({
@@ -1275,6 +1281,8 @@ export async function consumeWakeForRoundDispatch(
         taskId: request.taskId,
         targetActorIds: request.toAgentIds,
         cfg: params.cfg,
+        fileStore: wakeStores.fileStore,
+        objectStorage: wakeStores.objectStorage,
       });
       const eligibilityStillValid =
         !stopAfterEligibility &&

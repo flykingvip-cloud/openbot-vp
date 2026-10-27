@@ -19,7 +19,14 @@ import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
 } from "../collaboration-learning/shared.js";
+import type { TrustedGroupStores } from "../collaboration-learning/team-resource-auth.js";
 import { asGovernedTask } from "./task-runtime.js";
+
+/** Trusted SoT stores for auth recheck — must match wake authority locator. */
+export type DispatchAuthRecheckStores = {
+  fileStore: TrustedGroupStores["fileStore"];
+  objectStorage: TrustedGroupStores["objectStorage"];
+};
 
 export type DispatchAuthRecheckFailure = {
   ok: false;
@@ -64,6 +71,12 @@ export async function recheckCurrentDispatchAuthorization(params: {
   targetActorIds?: readonly string[] | null;
   cfg?: OpenBotConfig;
   /**
+   * Trusted fileStore/objectStorage aligned with wake authority.namespace.groupLocator.
+   * Required for managed team SoT — must NOT re-derive host ~/.openbot/collaboration.
+   */
+  fileStore?: DispatchAuthRecheckStores["fileStore"];
+  objectStorage?: DispatchAuthRecheckStores["objectStorage"];
+  /**
    * Test-only: force operating-state membership read to throw.
    * Production callers omit this. Must not be treated as ok:true.
    */
@@ -74,7 +87,15 @@ export async function recheckCurrentDispatchAuthorization(params: {
     return { ok: true };
   }
 
-  const { fileStore, objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+  let fileStore = params.fileStore;
+  let objectStorage = params.objectStorage;
+  if (!fileStore || !objectStorage) {
+    // Compat only when caller did not pass trusted stores (legacy personal paths).
+    // Wake round dispatch MUST pass wakeStores — never rely on this for managed.
+    const legacy = createWorkspaceCollaborationStores(params.cfg);
+    fileStore = fileStore ?? legacy.fileStore;
+    objectStorage = objectStorage ?? legacy.objectStorage;
+  }
   let operatingState: Parameters<typeof isMappedDeliveryIdentity>[0] = null;
   try {
     if (params._testForceOperatingStateReadError) {
