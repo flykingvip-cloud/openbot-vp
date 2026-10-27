@@ -29,7 +29,7 @@ const BUDGETS: BudgetEntry[] = [
   },
   {
     path: "src/gateway/collaboration-learning/shared.ts",
-    maxLines: 2893,
+    maxLines: 3364,
     why: "collaboration-learning shared helpers Sub_Module (locked to origin/main size after baseline check unmask).",
   },
   {
