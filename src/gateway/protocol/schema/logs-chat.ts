@@ -131,6 +131,15 @@ export const ChatSendParamsSchema = Type.Object(
         { additionalProperties: false },
       ),
     ),
+    /**
+     * TEAM-REAL: bind NL plan confirm to the card/version the user actually saw.
+     * Schema-backed (not type-assertion-only). Prefer over group currentTaskId.
+     */
+    planConfirmTaskId: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+    planConfirmBoardItemId: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+    planConfirmTodolistId: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+    planConfirmDecisionId: Type.Optional(Type.String({ minLength: 1, maxLength: 256 })),
+    planConfirmExpectedVersion: Type.Optional(Type.Integer({ minimum: 0 })),
     idempotencyKey: NonEmptyString,
     contextScope: Type.Optional(
       Type.Object(

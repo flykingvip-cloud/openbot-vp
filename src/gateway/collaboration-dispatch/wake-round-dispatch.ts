@@ -21,6 +21,11 @@ import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
 } from "../collaboration-learning/shared.js";
+import {
+  resolveStoresFromGroupLocator,
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+} from "../collaboration-learning/team-resource-auth.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import {
@@ -54,6 +59,46 @@ import {
   writeNudgeNoExternalCallEffectReceipt,
   type WakeOpRecord,
 } from "./wake-op-ledger.js";
+
+/** Resolve task/OS stores from authority.namespace.groupLocator (tenant SoT). */
+function resolveWakeTrustedStores(params: { authority: RuntimeAuthority; cfg?: OpenBotConfig }): {
+  groupRootDir: string;
+  objectStorage: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  mode: "trusted" | "compat_workspace";
+} {
+  const locator =
+    typeof params.authority?.namespace?.groupLocator === "string"
+      ? params.authority.namespace.groupLocator.trim()
+      : "";
+  if (locator) {
+    const resolved = resolveStoresFromGroupLocator({
+      groupLocator: locator,
+      cfg: params.cfg,
+    });
+    if (resolved.ok) {
+      return {
+        groupRootDir: resolved.groupsRoot,
+        objectStorage: resolved.objectStorage,
+        fileStore: resolved.fileStore,
+        mode: "trusted",
+      };
+    }
+  }
+  const profile = resolveSecurityProfile(params.cfg).profile;
+  if (profile === "managed_enterprise") {
+    throw new Error(
+      `${TRUSTED_GROUP_LOCATOR_REQUIRED}: wake dispatch refused without authority.namespace.groupLocator`,
+    );
+  }
+  const legacy = createWorkspaceCollaborationStores(params.cfg);
+  return {
+    groupRootDir: legacy.groupRootDir,
+    objectStorage: legacy.objectStorage,
+    fileStore: legacy.fileStore,
+    mode: "compat_workspace",
+  };
+}
 
 export const WAKE_ROUND_DISPATCH_SOURCES = ["self_advance", "nudge", "escalate"] as const;
 
@@ -306,6 +351,10 @@ export type ConsumeWakeRoundDispatchResult = Readonly<{
 export async function consumeWakeForRoundDispatch(
   params: ConsumeWakeRoundDispatchParams,
 ): Promise<ConsumeWakeRoundDispatchResult> {
+  const wakeStores = resolveWakeTrustedStores({
+    authority: params.authority,
+    cfg: params.cfg,
+  });
   const request: WakeRoundDispatchRequest = {
     ...params.request,
     groupId: compact(params.request.groupId) || params.authority.groupId,
@@ -372,7 +421,7 @@ export async function consumeWakeForRoundDispatch(
         const forced = params._testForcePreClaimTaskReadError;
         throw typeof forced === "function" ? forced() : forced;
       }
-      const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+      const { objectStorage } = wakeStores;
       const current = await objectStorage.readObject<Task>(request.groupId, "task", stoppedTaskId);
       if (current && isTaskStopAccepted(asGovernedTask(current))) {
         return {
@@ -528,7 +577,7 @@ export async function consumeWakeForRoundDispatch(
     let taskControlUnreadableAfterClaim = false;
     if (stoppedTaskId) {
       try {
-        const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+        const { objectStorage } = wakeStores;
         const current = await objectStorage.readObject<Task>(
           request.groupId,
           "task",
@@ -631,7 +680,7 @@ export async function consumeWakeForRoundDispatch(
 
     let authSourceUnreadableBeforeEligibility = false;
     try {
-      const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+      const { fileStore } = wakeStores;
       const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
       eligibilityAuthEpoch = readOperatingStateAuthEpoch(os);
       eligibilityAuthFingerprint = wakeOpAuthFingerprint(os, request.toAgentIds);
@@ -676,7 +725,7 @@ export async function consumeWakeForRoundDispatch(
       let taskMissingBeforeCommit = false;
       if (stoppedTaskId) {
         try {
-          const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+          const { objectStorage } = wakeStores;
           const current = await objectStorage.readObject<Task>(
             request.groupId,
             "task",
@@ -783,7 +832,7 @@ export async function consumeWakeForRoundDispatch(
         };
       }
       try {
-        const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+        const { fileStore } = wakeStores;
         const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
         eligibilityAuthEpoch = readOperatingStateAuthEpoch(os);
         eligibilityAuthFingerprint = wakeOpAuthFingerprint(os, request.toAgentIds);
@@ -832,6 +881,9 @@ export async function consumeWakeForRoundDispatch(
         executionAttemptId: claimed.record?.executionAttemptId,
         cfg: params.cfg,
         nowMs: params.nowMs,
+        groupRootDir: wakeStores.groupRootDir,
+        objectStorage: wakeStores.objectStorage,
+        fileStore: wakeStores.fileStore,
       });
       if (!cas.ok) {
         const detail = `task_eligibility_cas_failed:${cas.reason}:${cas.detail}`;
@@ -1003,6 +1055,9 @@ export async function consumeWakeForRoundDispatch(
       claimId: taskDispatchClaimId,
       targetActorIds: request.toAgentIds,
       cfg: params.cfg,
+      groupRootDir: wakeStores.groupRootDir,
+      objectStorage: wakeStores.objectStorage,
+      fileStore: wakeStores.fileStore,
       nowMs: params.nowMs,
     });
     if (!take.ok) {
@@ -1117,7 +1172,7 @@ export async function consumeWakeForRoundDispatch(
             const forced = params._testForcePostEligibilityTaskReadError;
             throw typeof forced === "function" ? forced() : forced;
           }
-          const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+          const { objectStorage } = wakeStores;
           const current = await objectStorage.readObject<Task>(
             request.groupId,
             "task",
@@ -1149,7 +1204,7 @@ export async function consumeWakeForRoundDispatch(
           const forced = params._testForcePostEligibilityAuthSourceReadError;
           throw typeof forced === "function" ? forced() : forced;
         }
-        const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+        const { fileStore } = wakeStores;
         const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
         authEpochLive = readOperatingStateAuthEpoch(os);
         authFp = wakeOpAuthFingerprint(os, request.toAgentIds);
@@ -1326,7 +1381,7 @@ export async function consumeWakeForRoundDispatch(
           let receiptAuthUnreadable = false;
           if (stoppedTaskId) {
             try {
-              const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+              const { objectStorage } = wakeStores;
               const current = await objectStorage.readObject<Task>(
                 request.groupId,
                 "task",
@@ -1351,7 +1406,7 @@ export async function consumeWakeForRoundDispatch(
             }
           }
           try {
-            const { fileStore } = createWorkspaceCollaborationStores(params.cfg);
+            const { fileStore } = wakeStores;
             const os = await readGroupOperatingState({ fileStore, groupId: request.groupId });
             receiptAuthEpoch = readOperatingStateAuthEpoch(os);
             receiptAuthFp = wakeOpAuthFingerprint(os, request.toAgentIds);

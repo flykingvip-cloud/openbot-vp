@@ -286,6 +286,10 @@ import {
   resolveSessionParticipationOverlay,
 } from "../collaboration-learning/session-participation-overlay.js";
 import { resolveCollaborationGroupOwnerEntitlementScope } from "../collaboration-learning/steward-group-policy.js";
+import {
+  authorizeTeamGroupResourceAccess,
+  createTrustedGroupStores,
+} from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import type { CollaborationExecutionRecord } from "../collaboration-ledger/types.js";
@@ -4725,31 +4729,41 @@ export const chatHandlers: GatewayRequestHandlers = {
         relatedId: clientRunId,
         ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
       }).catch(() => undefined);
-      // TEAM-REAL R3: NL plan confirm — actor-bound delivery, await formal result,
-      // surface via chat.send message (UI-visible). Auto-advance NOT wired.
+      // TEAM-REAL R5: NL plan confirm — schema-backed binding fields, handler-resolved
+      // trusted locator, await formal result, persist assistant line into transcript
+      // so chat.history / UI see success or 尚未确认. Auto-advance NOT wired.
       {
         const confirmActor =
           (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
-        const tenant = await resolveCollaborationTenantResolution(client);
-        const replyBinding =
-          p && typeof p === "object"
-            ? (p as {
-                planConfirmTaskId?: unknown;
-                planConfirmBoardItemId?: unknown;
-                planConfirmTodolistId?: unknown;
-                planConfirmDecisionId?: unknown;
-                planConfirmExpectedVersion?: unknown;
-              })
-            : null;
+        const tenant = collabTenant;
         const readBound = (value: unknown): string | undefined =>
           typeof value === "string" && value.trim() ? value.trim() : undefined;
         const readBoundNum = (value: unknown): number | undefined =>
           typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : undefined;
-        const explicitTaskId = readBound(replyBinding?.planConfirmTaskId);
-        const explicitBoard = readBound(replyBinding?.planConfirmBoardItemId);
-        const explicitTodolist = readBound(replyBinding?.planConfirmTodolistId);
-        const explicitDecision = readBound(replyBinding?.planConfirmDecisionId);
-        const explicitVersion = readBoundNum(replyBinding?.planConfirmExpectedVersion);
+        // Schema fields on ChatSendParamsSchema (not type-assertion-only).
+        const explicitTaskId = readBound(p.planConfirmTaskId);
+        const explicitBoard = readBound(p.planConfirmBoardItemId);
+        const explicitTodolist = readBound(p.planConfirmTodolistId);
+        const explicitDecision = readBound(p.planConfirmDecisionId);
+        const explicitVersion = readBoundNum(p.planConfirmExpectedVersion);
+        let confirmAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null = null;
+        let confirmStores: ReturnType<typeof createTrustedGroupStores> | null = null;
+        if (confirmActor) {
+          confirmAuth = await authorizeTeamGroupResourceAccess({
+            groupId: scope.groupId,
+            actor: confirmActor,
+            client,
+            tenant,
+            action: "write",
+            cfg: policySnapshotCfg,
+          });
+          if (confirmAuth.ok) {
+            confirmStores = createTrustedGroupStores({
+              groupsRoot: confirmAuth.groupsRoot,
+              groupLocator: confirmAuth.groupLocator,
+            });
+          }
+        }
         let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
         try {
           confirmHook = await maybeConfirmPlanFromChatSend({
@@ -4765,16 +4779,37 @@ export const chatHandlers: GatewayRequestHandlers = {
             taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
             tenant,
             cfg: policySnapshotCfg,
+            ...(confirmAuth && confirmAuth.ok
+              ? {
+                  auth: confirmAuth,
+                  stores: confirmStores,
+                  trusted: {
+                    groupsRoot: confirmAuth.groupsRoot,
+                    groupLocator: confirmAuth.groupLocator,
+                  },
+                }
+              : {}),
           });
         } catch (confirmError) {
+          const errMsg = `尚未确认：确认入口异常（${
+            confirmError instanceof Error ? confirmError.message : String(confirmError)
+          }）。`;
+          if (groupSession.entry.sessionId && groupSession.storePath) {
+            await appendAssistantTranscriptMessage({
+              message: errMsg,
+              sessionId: groupSession.entry.sessionId,
+              storePath: groupSession.storePath,
+              sessionFile: groupSession.entry.sessionFile,
+              createIfMissing: true,
+              idempotencyKey: `${clientRunId}:plan-confirm-error`,
+            }).catch(() => undefined);
+          }
           respond(
             true,
             {
               runId: clientRunId,
               status: "stopped" as const,
-              message: `尚未确认：确认入口异常（${
-                confirmError instanceof Error ? confirmError.message : String(confirmError)
-              }）。`,
+              message: errMsg,
             },
             undefined,
             { runId: clientRunId },
@@ -4782,15 +4817,31 @@ export const chatHandlers: GatewayRequestHandlers = {
           return;
         }
         if (confirmHook.handled) {
+          if (groupSession.entry.sessionId && groupSession.storePath) {
+            await appendAssistantTranscriptMessage({
+              message: confirmHook.userMessage,
+              sessionId: groupSession.entry.sessionId,
+              storePath: groupSession.storePath,
+              sessionFile: groupSession.entry.sessionFile,
+              createIfMissing: true,
+              idempotencyKey: `${clientRunId}:plan-confirm`,
+            }).catch(() => undefined);
+          }
           respond(
             true,
             {
               runId: clientRunId,
               status: "stopped" as const,
-              // UI-visible chat result chain (not RPC-only field).
+              // Transcript + response: chat.history can paint the same userMessage.
               message: confirmHook.userMessage,
               planConfirm: confirmHook.result,
               autoAdvanceWired: confirmHook.autoAdvanceWired,
+              ...(confirmStores
+                ? {
+                    trustedGroupLocator: confirmStores.groupLocator,
+                    trustedGroupsRoot: confirmStores.groupsRoot,
+                  }
+                : {}),
             },
             undefined,
             { runId: clientRunId },

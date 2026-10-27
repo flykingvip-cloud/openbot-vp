@@ -232,7 +232,16 @@ async function resolveClaimStores(params: {
       mode: "trusted",
     };
   }
-  // Compat branch: legacy / personal_local callers without explicit trusted.
+  // Managed must never silently fall into host dual-root. Handlers must pass
+  // auth/trusted/stores from resolveHandlerTrustedTeamContext.
+  const profile = resolveSecurityProfile(params.cfg).profile;
+  if (profile === "managed_enterprise") {
+    throw new ClaimContractEntryError(
+      TRUSTED_GROUP_LOCATOR_REQUIRED,
+      "managed_enterprise claim/board/plan requires trusted group locator from handler auth; compat createWorkspaceCollaborationStores is refused",
+    );
+  }
+  // Compat branch: personal_local / legacy callers only.
   const stores = createWorkspaceCollaborationStores(params.cfg);
   return {
     stores,

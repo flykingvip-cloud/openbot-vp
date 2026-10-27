@@ -224,6 +224,69 @@ function isWriteCapableRole(
 }
 
 /**
+ * Composition-root helper: authorize actor then return auth + trusted stores.
+ * Handlers call this once and pass `auth` into existing service APIs — do not
+ * invent a parallel optional-param surface or re-resolve host dual-root.
+ */
+export async function resolveHandlerTrustedTeamContext(params: {
+  groupId: string;
+  actor: string;
+  client?: GatewayClient | null;
+  tenant?: CollaborationTenantResolution | null;
+  action: "read" | "write";
+  cfg?: OpenBotConfig;
+  identityAliases?: readonly string[];
+}): Promise<
+  | {
+      ok: true;
+      auth: TeamResourceAuthOk;
+      stores: TrustedGroupStores;
+      trusted: { groupsRoot: string; groupLocator: string };
+    }
+  | { ok: false; reason: string; detail?: string }
+> {
+  const auth = await authorizeTeamGroupResourceAccess(params);
+  if (!auth.ok) {
+    return { ok: false, reason: auth.reason, detail: auth.detail };
+  }
+  const stores = createTrustedGroupStores({
+    groupsRoot: auth.groupsRoot,
+    groupLocator: auth.groupLocator,
+  });
+  return {
+    ok: true,
+    auth,
+    stores,
+    trusted: { groupsRoot: auth.groupsRoot, groupLocator: auth.groupLocator },
+  };
+}
+
+/**
+ * Prefer authority.namespace.groupLocator (already tenant-scoped). Never fall
+ * through to createWorkspaceCollaborationStores for managed team SoT.
+ */
+export function resolveStoresFromGroupLocator(params: {
+  groupLocator?: string | null;
+  cfg?: OpenBotConfig;
+  /** When true (default for managed callers), missing locator is a hard error. */
+  requireTrusted?: boolean;
+}): ResolveTeamStoresResult {
+  const locator = compact(params.groupLocator ?? undefined);
+  if (!locator) {
+    return {
+      ok: false,
+      reason: TRUSTED_GROUP_LOCATOR_REQUIRED,
+      detail: "groupLocator required to resolve team stores",
+    };
+  }
+  return resolveTeamDeliverableStores({
+    trusted: { groupsRoot: path.dirname(locator), groupLocator: locator },
+    groupId: path.basename(locator),
+    cfg: params.cfg,
+  });
+}
+
+/**
  * Authorize actor for group resource action. Managed requires membership tenant.
  * Never trusts client-supplied tenantId.
  * Write ≠ read: observers and non-active members are denied write.

@@ -20,8 +20,15 @@ import {
   type TaskStopExternalEffect,
   type TaskStopInFlightAbort,
 } from "../collaboration-dispatch/task-stop-control.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import { isMappedDeliveryIdentity } from "./delivery-actor-binding.js";
 import { createWorkspaceCollaborationStores, readGroupOperatingState } from "./shared.js";
+import {
+  resolveTeamDeliverableStores,
+  type TeamResourceAuthOk,
+  type TrustedGroupStores,
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+} from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export { assertTaskNotStopped, isTaskStopAccepted, readTaskStopControl, TaskStoppedError };
@@ -116,6 +123,10 @@ export type RequestCollaborationTaskStopParams = {
   inFlightAbort?: TaskStopInFlightAbort;
   externalEffect?: TaskStopExternalEffect;
   tenant?: CollaborationTenantResolution | null;
+  /** Handler-resolved trusted auth — required for managed_enterprise. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   cfg?: OpenBotConfig;
   nowMs?: number;
 };
@@ -138,7 +149,42 @@ export async function requestCollaborationTaskStop(
     throw new TaskStopEntryError("actor_required", "actor is required to request task stop");
   }
   const cfg = params.cfg ?? loadConfig();
-  const { objectStorage, fileStore } = createWorkspaceCollaborationStores(cfg);
+  const profile = resolveSecurityProfile(cfg).profile;
+  let objectStorage: TrustedGroupStores["objectStorage"];
+  let fileStore: TrustedGroupStores["fileStore"];
+  let groupRootDir: string | undefined;
+  if (params.stores?.objectStorage && params.stores.fileStore) {
+    objectStorage = params.stores.objectStorage;
+    fileStore = params.stores.fileStore;
+    groupRootDir = params.stores.groupsRoot;
+  } else if (params.auth || params.trusted) {
+    const resolved = resolveTeamDeliverableStores({
+      auth: params.auth,
+      trusted: params.trusted,
+      groupId: params.groupId,
+      cfg,
+      tenantId: params.auth?.tenantId ?? params.tenant?.tenantId ?? null,
+    });
+    if (!resolved.ok) {
+      throw new TaskStopEntryError(
+        resolved.reason || TRUSTED_GROUP_LOCATOR_REQUIRED,
+        resolved.detail || "trusted group locator required for task stop",
+      );
+    }
+    objectStorage = resolved.objectStorage;
+    fileStore = resolved.fileStore;
+    groupRootDir = resolved.groupsRoot;
+  } else if (profile === "managed_enterprise") {
+    throw new TaskStopEntryError(
+      TRUSTED_GROUP_LOCATOR_REQUIRED,
+      "managed_enterprise task stop requires trusted group locator from handler auth",
+    );
+  } else {
+    const legacy = createWorkspaceCollaborationStores(cfg);
+    objectStorage = legacy.objectStorage;
+    fileStore = legacy.fileStore;
+    groupRootDir = legacy.groupRootDir;
+  }
   const operatingState = await readGroupOperatingState({
     fileStore,
     groupId: params.groupId,
@@ -175,6 +221,8 @@ export async function requestCollaborationTaskStop(
     updatedBy: actorId,
     updatedAtMs: params.nowMs ?? Date.now(),
     cfg,
+    groupRootDir,
+    objectStorage,
   });
   const persistedStop = readTaskStopControl(updated);
   if (!persistedStop) {

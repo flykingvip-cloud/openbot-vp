@@ -310,6 +310,10 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         );
         return;
       }
+      const stores = createTrustedGroupStores({
+        groupsRoot: auth.groupsRoot,
+        groupLocator: auth.groupLocator,
+      });
       const result = await tryConfirmPlanFromChat({
         groupId,
         message,
@@ -319,6 +323,9 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         todolistId: readString(params?.todolistId),
         expectedVersion: readNumber(params?.expectedVersion),
         tenant,
+        auth,
+        stores,
+        trusted: { groupsRoot: auth.groupsRoot, groupLocator: auth.groupLocator },
       });
       respond(true, result, undefined);
     } catch (error) {

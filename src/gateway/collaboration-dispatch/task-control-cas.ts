@@ -115,6 +115,17 @@ export type CasCommitTaskDispatchEligibilityParams = {
   groupId: string;
   taskId: string;
   opKey: string;
+  /** Trusted groups root for CAS lock + task read (tenant SoT). */
+  groupRootDir?: string;
+  objectStorage?: {
+    readObject: <T>(groupId: string, kind: string, id: string) => Promise<T | null>;
+    writeObject: (groupId: string, kind: string, id: string, value: unknown) => Promise<void>;
+  };
+  /** Trusted OS fileStore; when omitted, workspace stores (compat). */
+  fileStore?: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
+  };
   /** Observed controlEpoch that must still match under the lock (expected-version). */
   expectedControlEpoch: number;
   /**
@@ -181,15 +192,18 @@ export async function casCommitTaskDispatchEligibility(
   return withGroupAuthLock({
     groupId: params.groupId,
     cfg,
+    groupRootDir: params.groupRootDir,
     fn: async () =>
       withTaskControlLock({
         groupId: params.groupId,
         taskId: params.taskId,
         cfg,
+        groupRootDir: params.groupRootDir,
         fn: async () => {
           let current: Task | null;
           try {
-            const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+            const objectStorage =
+              params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
             current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
           } catch (error) {
             return {
@@ -226,9 +240,9 @@ export async function casCommitTaskDispatchEligibility(
           let liveFp = wantFp;
           let liveAuthEpoch = expectedAuth;
           try {
-            const { fileStore } = createWorkspaceCollaborationStores(cfg);
+            const fileStore = params.fileStore ?? createWorkspaceCollaborationStores(cfg).fileStore;
             const os = await readGroupOperatingState({
-              fileStore,
+              fileStore: fileStore as never,
               groupId: params.groupId,
             });
             liveAuthEpoch = readOperatingStateAuthEpoch(os);
@@ -310,8 +324,9 @@ export async function casCommitTaskDispatchEligibility(
             dispatchClaim: claim,
             updatedAtMs: nowMs,
           };
-          const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-          await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+          const objectStorageWrite =
+            params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
+          await objectStorageWrite.writeObject(params.groupId, "task", params.taskId, updated);
           return { ok: true, task: updated, claim };
         },
       }),
@@ -324,6 +339,13 @@ export type CasTakeTaskDispatchEligibilityParams = {
   opKey: string;
   /** Must match the claimId returned by commit (generation bind). */
   claimId: string;
+  /** Trusted groups root for take lock + task read (tenant SoT). */
+  groupRootDir?: string;
+  objectStorage?: {
+    readObject: <T>(groupId: string, kind: string, id: string) => Promise<T | null>;
+    writeObject: (groupId: string, kind: string, id: string, value: unknown) => Promise<void>;
+  };
+  fileStore?: Record<string, unknown>;
   cfg?: OpenBotConfig;
   nowMs?: number;
   targetActorIds?: readonly string[];
@@ -374,15 +396,18 @@ export async function casTakeTaskDispatchEligibility(
   return withGroupAuthLock({
     groupId: params.groupId,
     cfg,
+    groupRootDir: params.groupRootDir,
     fn: async () =>
       withTaskControlLock({
         groupId: params.groupId,
         taskId: params.taskId,
         cfg,
+        groupRootDir: params.groupRootDir,
         fn: async () => {
           let current: Task | null;
           try {
-            const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+            const objectStorage =
+              params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
             current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
           } catch (error) {
             return {
@@ -454,7 +479,7 @@ export async function casTakeTaskDispatchEligibility(
           let liveFp = compact(claim.authFingerprint);
           let liveAuthEpoch = readClaimAuthEpoch(claim);
           try {
-            const { fileStore } = createWorkspaceCollaborationStores(cfg);
+            const fileStore = params.fileStore ?? createWorkspaceCollaborationStores(cfg).fileStore;
             const os = await readGroupOperatingState({
               fileStore,
               groupId: params.groupId,
@@ -508,8 +533,9 @@ export async function casTakeTaskDispatchEligibility(
             dispatchClaim: taken,
             updatedAtMs: nowMs,
           };
-          const { objectStorage } = createWorkspaceCollaborationStores(cfg);
-          await objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+          const objectStorageWrite =
+            params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
+          await objectStorageWrite.writeObject(params.groupId, "task", params.taskId, updated);
           return { ok: true, task: updated, claim: taken };
         },
       }),
@@ -665,6 +691,13 @@ export async function applyTaskStopUnderControlLock(params: {
   updatedBy: string;
   updatedAtMs?: number;
   cfg?: OpenBotConfig;
+  /** Trusted groups root so stop lock matches activate/claim task writes. */
+  groupRootDir?: string;
+  /** Trusted object storage; when omitted, workspace stores (compat / personal_local). */
+  objectStorage?: {
+    readObject: <T>(groupId: string, kind: string, id: string) => Promise<T | null>;
+    writeObject: (groupId: string, kind: string, id: string, value: unknown) => Promise<void>;
+  };
 }): Promise<GovernedTask> {
   const cfg = params.cfg ?? loadConfig();
   const updatedAtMs = params.updatedAtMs ?? Date.now();
@@ -673,8 +706,10 @@ export async function applyTaskStopUnderControlLock(params: {
     groupId: params.groupId,
     taskId: params.taskId,
     cfg,
+    groupRootDir: params.groupRootDir,
     fn: async () => {
-      const { objectStorage } = createWorkspaceCollaborationStores(cfg);
+      const objectStorage =
+        params.objectStorage ?? createWorkspaceCollaborationStores(cfg).objectStorage;
       // Re-read under lock to serialize vs eligibility CAS / other writers.
       const current = await objectStorage.readObject<Task>(params.groupId, "task", params.taskId);
       if (!current) {

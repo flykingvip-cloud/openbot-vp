@@ -60,6 +60,7 @@ import {
 } from "../collaboration-learning/capsule-governance.js";
 import { promoteApprovedCapsuleIfEligible } from "../collaboration-learning/capsule-promotion.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import { COLLABORATION_LEDGER_KINDS } from "../collaboration-ledger/types.js";
@@ -148,6 +149,35 @@ function collaborationEntryErrorShape(error: unknown) {
     });
   }
   return errorShape(ErrorCodes.INVALID_REQUEST, message);
+}
+
+async function resolveTrustedWriteContext(
+  client: Parameters<typeof resolveDeliveryAclActor>[0],
+  groupId: string,
+) {
+  const tenant = await resolveCollaborationTenantResolution(client);
+  const actor = await resolveDeliveryAclActor(client, groupId);
+  if (!actor) {
+    return { ok: false as const, error: "actor_not_authenticated", tenant, actor: null };
+  }
+  const trusted = await resolveHandlerTrustedTeamContext({
+    groupId,
+    actor,
+    client,
+    tenant,
+    action: "write",
+  });
+  if (!trusted.ok) {
+    return { ok: false as const, error: trusted.reason, detail: trusted.detail, tenant, actor };
+  }
+  return {
+    ok: true as const,
+    tenant,
+    actor,
+    auth: trusted.auth,
+    stores: trusted.stores,
+    trusted: trusted.trusted,
+  };
 }
 
 export const collaborationLearningHandlers: GatewayRequestHandlers = {
@@ -355,11 +385,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const item = await publishCollaborationBoardItem({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { item }, undefined);
     } catch (error) {
@@ -385,11 +426,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const item = await claimCollaborationBoardItem({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { item }, undefined);
     } catch (error) {
@@ -415,11 +467,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const result = await applyCollaborationBoardClaim({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, result, undefined);
     } catch (error) {
@@ -445,8 +508,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
-      const items = await listCollaborationBoardItems({ ...params, tenant });
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const items = await listCollaborationBoardItems({
+        ...params,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
+      });
       respond(true, { items }, undefined);
     } catch (error) {
       respond(
@@ -645,11 +722,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const proposed = await proposeCollaborationTodolist({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(
         true,
@@ -679,14 +767,25 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const retried = await retryCollaborationOwnerDecisionDelivery({
         groupId: params.groupId,
         taskId: params.taskId,
         todolistId: params.todolistId,
         expectedVersion: params.expectedVersion,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { todolist: retried.todolist, cardDelivery: retried.cardDelivery }, undefined);
     } catch (error) {
@@ -712,12 +811,23 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const deliveries = await listCollaborationOwnerDecisionDeliveries({
         groupId: params.groupId,
         taskId: params.taskId,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { deliveries }, undefined);
     } catch (error) {
@@ -743,14 +853,25 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const todolist = await confirmCollaborationTodolist({
         groupId: params.groupId,
         taskId: params.taskId,
         todolistId: params.todolistId,
         expectedVersion: params.expectedVersion,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { todolist }, undefined);
     } catch (error) {
@@ -769,7 +890,15 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const todolist = await reviseCollaborationTodolist({
         groupId: params.groupId,
         taskId: params.taskId,
@@ -777,8 +906,11 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         reason: params.reason,
         steps: params.steps,
         expectedVersion: params.expectedVersion,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { todolist }, undefined);
     } catch (error) {
@@ -1123,11 +1255,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const item = await cancelCollaborationBoardItem({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { item }, undefined);
     } catch (error) {
@@ -1153,11 +1296,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const result = await requestCollaborationTaskStop({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(
         true,
