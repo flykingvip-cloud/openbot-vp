@@ -2,8 +2,8 @@
  * 经验有效性策展：反复被 **outcome_verified** 证明有效的经验 → 自动沉淀为**技能草稿**（待人工审核）。
  *
  * W4 口径修正（曝光 ≠ verified）：
- *  - **outcome_verified** = 注入后关联 TaskOutcome closed+eligible 成功（`learning-recall` 阶段记账）；
- *  - 提示词注入只算曝光（injected），**不能**单独触发策展；
+ *  - **outcome_verified** = tip closed+eligible **且**有采用证据（adopted∩exposure）；共现成功≠有效；
+ *  - 提示词注入只算曝光（injected）；成功任务中的曝光也不触发策展；
  *  - 同一条经验反复出现（多个资产同源）仍可走 occurrence 阈值；
  *  - 达阈值 → 生成 `draft` 状态技能，**不自动发布**，等人工审核（既有 skill lifecycle）。
  * 普通偏好/事实更新不走本策展，也不走实验晋升。

@@ -9,7 +9,8 @@ export type ContributionProjection = DurableProjection;
 
 export type ConsumerHandler = {
   consumerId: string;
-  onEvent: (event: OutcomeOutboxEvent, record: TaskOutcomeRecord) => void;
+  /** May be async; drain awaits and only markConsumed after resolve (failure ⇒ retry). */
+  onEvent: (event: OutcomeOutboxEvent, record: TaskOutcomeRecord) => void | Promise<void>;
 };
 
 export const GROWTH_EVOLUTION_CONSUMER_ID = "growth-evolution";
@@ -113,11 +114,11 @@ export class OutcomeConsumerRuntime {
     return this.getProjection();
   }
 
-  drain(loadRecord: (taskId: string) => TaskOutcomeRecord | undefined): {
+  async drain(loadRecord: (taskId: string) => TaskOutcomeRecord | undefined): Promise<{
     processed: number;
     skippedDup: number;
     deferred: number;
-  } {
+  }> {
     let processed = 0;
     let skippedDup = 0;
     let deferred = 0;
@@ -140,7 +141,7 @@ export class OutcomeConsumerRuntime {
           continue;
         }
         try {
-          h.onEvent(event, versioned);
+          await Promise.resolve(h.onEvent(event, versioned));
           this.store.markConsumed(h.consumerId, event.eventId, {
             outcomeVersion: event.outcomeVersion,
           });

@@ -43,7 +43,9 @@ describe("askOutcome W5 structure closeout", () => {
     expect(callChain).toMatch(/旁路|recordRunOutcome/);
     // Must not claim bypass fully retired without replacement proof
     expect(callChain).not.toMatch(/evolution 旁路.*已退役(?!条件)/);
-    expect(callChain).toMatch(/b8ff8ea4|#109/);
+    expect(callChain).toMatch(/b8ff8ea4|#109|23314d48|#112/);
+    expect(callChain).toMatch(/接口可用/);
+    expect(callChain).toMatch(/生产接通|行为已验证|未完成/);
   });
 
   it("contract marks W5 evolution-loop-log closeout (no longer pure non-goal)", () => {

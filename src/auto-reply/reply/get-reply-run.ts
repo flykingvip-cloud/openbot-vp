@@ -152,6 +152,7 @@ import {
   buildInboundMetaSystemPrompt,
 } from "./inbound-meta.js";
 import { buildKnowledgeUniversePromptContext } from "./knowledge-universe-context.js";
+import { learningExperienceRunKey } from "./learning-experience-pending.js";
 import { buildLearningRecallSystemPrompt } from "./learning-recall-context.js";
 import type { createModelSelectionState } from "./model-selection.js";
 import { buildOperationalIdentitySystemPrompt } from "./operational-identity-context.js";
@@ -1244,6 +1245,7 @@ export async function runPreparedReply(
     extraSystemPromptParts = [...extraSystemPromptParts, currentSpeakerPrompt];
   }
   if (!isHeartbeat && !applyChatLane) {
+    const learningExposureKey = learningExperienceRunKey(opts?.runId);
     const learningRecallPrompt = await buildLearningRecallSystemPrompt({
       agentId,
       groupId: collaborationGroupId,
@@ -1251,6 +1253,8 @@ export async function runPreparedReply(
         sessionCtx.CollaborationBotAgentId?.trim() ||
         sessionCtx.CollaborationPrivateRunBag?.agentId ||
         undefined,
+      // Task-bound only; omit key (no agentId fallback) when runId missing.
+      exposureKey: learningExposureKey,
     });
     if (learningRecallPrompt) {
       extraSystemPromptParts = [...extraSystemPromptParts, learningRecallPrompt];

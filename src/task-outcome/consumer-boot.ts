@@ -47,16 +47,16 @@ export function hydrateAllAgentsAwaitingDeliveries(cfg: OpenBotConfig): {
   return { agentsScanned: agents.length, hydrated };
 }
 
-export function drainAllAgentsPendingGrowth(
+export async function drainAllAgentsPendingGrowth(
   cfg: OpenBotConfig,
-): Omit<TaskOutcomeConsumerBootResult, "hydrated"> {
+): Promise<Omit<TaskOutcomeConsumerBootResult, "hydrated">> {
   let processed = 0;
   let deferred = 0;
   let written = 0;
   const agents = listAgentIds(cfg);
   for (const agentId of agents) {
     try {
-      const out = drainPendingGrowthEvolution(cfg, agentId);
+      const out = await drainPendingGrowthEvolution(cfg, agentId);
       processed += out.processed;
       deferred += out.deferred;
       if (out.written) {
@@ -74,19 +74,19 @@ export function drainAllAgentsPendingGrowth(
  * once, then keep a lightweight runtime timer so failed handler acks can retry
  * without a subsequent user message.
  */
-export function recoverTaskOutcomeConsumersAtGatewayBoot(params: {
+export async function recoverTaskOutcomeConsumersAtGatewayBoot(params: {
   cfg: OpenBotConfig;
   log?: TaskOutcomeConsumerBootLog;
   /** When true, also start the independent runtime drain interval. */
   startRuntimeDrain?: boolean;
   intervalMs?: number;
-}): TaskOutcomeConsumerBootResult {
+}): Promise<TaskOutcomeConsumerBootResult> {
   const hydrate = hydrateAllAgentsAwaitingDeliveries(params.cfg);
   params.log?.info?.(
     `task-outcome awaiting-delivery hydrate: agents=${hydrate.agentsScanned} hydrated=${hydrate.hydrated}`,
   );
 
-  const drain = drainAllAgentsPendingGrowth(params.cfg);
+  const drain = await drainAllAgentsPendingGrowth(params.cfg);
   params.log?.info?.(
     `task-outcome consumer boot: agents=${drain.agentsScanned} processed=${drain.processed} deferred=${drain.deferred} written=${drain.written}`,
   );
@@ -119,18 +119,19 @@ export function startTaskOutcomeRuntimeDrain(
     if (!active) {
       return;
     }
-    try {
-      const out = drainAllAgentsPendingGrowth(active);
-      if (out.processed > 0 || out.deferred > 0) {
-        opts?.log?.info?.(
-          `task-outcome runtime drain: processed=${out.processed} deferred=${out.deferred}`,
+    void drainAllAgentsPendingGrowth(active)
+      .then((out) => {
+        if (out.processed > 0 || out.deferred > 0) {
+          opts?.log?.info?.(
+            `task-outcome runtime drain: processed=${out.processed} deferred=${out.deferred}`,
+          );
+        }
+      })
+      .catch((err) => {
+        opts?.log?.warn?.(
+          `task-outcome runtime drain failed: ${err instanceof Error ? err.message : String(err)}`,
         );
-      }
-    } catch (err) {
-      opts?.log?.warn?.(
-        `task-outcome runtime drain failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+      });
   }, intervalMs);
   // Allow process to exit in tests without lingering handles when unref is available.
   if (typeof runtimeDrainTimer === "object" && runtimeDrainTimer && "unref" in runtimeDrainTimer) {

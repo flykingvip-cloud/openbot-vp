@@ -78,7 +78,7 @@ describe("W2 consumers A–C", () => {
     return { store, chat: new ChatTaskOutcomeAdapter(service) };
   }
 
-  it("A: skill/mode handlers consume tip+eligibility, not run alone", () => {
+  it("A: skill/mode handlers consume tip+eligibility, not run alone", async () => {
     const { store, chat } = openStore();
     const opened = chat.createOrRestore({
       taskId: "t-skill",
@@ -120,7 +120,7 @@ describe("W2 consumers A–C", () => {
         createModeQualityHandler(store),
       ],
     });
-    runtimeIncomplete.drain((id) => store.loadTask(id));
+    await runtimeIncomplete.drain((id) => store.loadTask(id));
     expect(store.loadProjection(SKILL_CONSUMER_ID).successCount).toBe(0);
     expect(store.loadProjection(MODE_CONSUMER_ID).successCount).toBe(0);
 
@@ -155,7 +155,7 @@ describe("W2 consumers A–C", () => {
         createModeQualityHandler(store),
       ],
     });
-    runtimeClosed.drain((id) => store.loadTask(id));
+    await runtimeClosed.drain((id) => store.loadTask(id));
     expect(store.loadProjection(SKILL_CONSUMER_ID).successCount).toBe(1);
     expect(store.loadProjection(SKILL_CONSUMER_ID).failureCount).toBe(0);
     expect(store.loadProjection(MODE_CONSUMER_ID).successCount).toBe(1);
@@ -237,7 +237,7 @@ describe("W2 consumers A–C", () => {
     expect(listPatternSamples().find((s) => s.runId === "run-backfill")?.success).toBe(true);
   });
 
-  it("C: cancelled → countedCancelled only; not skill/mode/growth failure", () => {
+  it("C: cancelled → countedCancelled only; not skill/mode/growth failure", async () => {
     const { store, chat } = openStore();
     const opened = chat.createOrRestore({
       taskId: "t-cancel",
@@ -262,7 +262,7 @@ describe("W2 consumers A–C", () => {
         createModeQualityHandler(store),
       ],
     });
-    runtime.drain((id) => store.loadTask(id));
+    await runtime.drain((id) => store.loadTask(id));
 
     const growth = runtime.getProjection();
     expect(growth.cancelledCount).toBe(1);
@@ -318,7 +318,7 @@ describe("W2 consumers A–C", () => {
     expect(readEvolutionTaskOutcomes(cfg, "bot").filter((r) => !r.succeeded)).toHaveLength(0);
   });
 
-  it("prepare_failed failure does not count skill success/failure rates", () => {
+  it("prepare_failed failure does not count skill success/failure rates", async () => {
     const { store, chat } = openStore();
     const opened = chat.createOrRestore({
       taskId: "t-prep",
@@ -342,13 +342,13 @@ describe("W2 consumers A–C", () => {
         createModeQualityHandler(store),
       ],
     });
-    runtime.drain((id) => store.loadTask(id));
+    await runtime.drain((id) => store.loadTask(id));
     expect(store.loadProjection(SKILL_CONSUMER_ID).failureCount).toBe(0);
     expect(store.loadProjection(SKILL_CONSUMER_ID).successCount).toBe(0);
     expect(store.loadProjection(MODE_CONSUMER_ID).failureCount).toBe(0);
   });
 
-  it("provider_fault counts mode stability failure, not skill rate", () => {
+  it("provider_fault counts mode stability failure, not skill rate", async () => {
     const { store, chat } = openStore();
     const opened = chat.createOrRestore({
       taskId: "t-prov",
@@ -372,7 +372,7 @@ describe("W2 consumers A–C", () => {
         createModeQualityHandler(store),
       ],
     });
-    runtime.drain((id) => store.loadTask(id));
+    await runtime.drain((id) => store.loadTask(id));
     expect(store.loadProjection(SKILL_CONSUMER_ID).failureCount).toBe(0);
     expect(store.loadProjection(MODE_CONSUMER_ID).failureCount).toBe(1);
     expect(store.loadProjection(MODE_CONSUMER_ID).cancelledCount).toBe(0);

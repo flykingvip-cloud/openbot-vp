@@ -86,7 +86,7 @@ describe("r85 recover / consumer / authz proofs", () => {
     expect(reopened.loadTaskVersion("t-regress", 1)?.outcomeVersion).toBe(1);
   });
 
-  it("handler side-effect after interrupt yields single business result", () => {
+  it("handler side-effect after interrupt yields single business result", async () => {
     const store = new DurableTaskOutcomeStore(root);
     const service = new TaskOutcomeResultService({ store, submittedBy: "t" });
     const chat = new ChatTaskOutcomeAdapter(service);
@@ -177,13 +177,13 @@ describe("r85 recover / consumer / authz proofs", () => {
         },
       ],
     });
-    const first = runtime.drain((id) => store.loadTask(id));
+    const first = await runtime.drain((id) => store.loadTask(id));
     expect(first.deferred).toBeGreaterThan(0);
     expect(calls).toBe(1);
     // outbox still pending for handler retry
     expect(store.listPendingOutbox().length).toBeGreaterThan(0);
 
-    const second = runtime.drain((id) => store.loadTask(id));
+    const second = await runtime.drain((id) => store.loadTask(id));
     expect(calls).toBe(2);
     expect(second.processed).toBeGreaterThan(0);
     // business file still one logical result line (last write), but handler ran twice —
@@ -192,7 +192,7 @@ describe("r85 recover / consumer / authz proofs", () => {
     expect(store.listPendingOutbox().length).toBe(0);
   });
 
-  it("nonzero projection crash rebuild keeps eligibility exclusions", () => {
+  it("nonzero projection crash rebuild keeps eligibility exclusions", async () => {
     const store = new DurableTaskOutcomeStore(root);
     const service = new TaskOutcomeResultService({ store, submittedBy: "t" });
     const chat = new ChatTaskOutcomeAdapter(service);
@@ -260,7 +260,7 @@ describe("r85 recover / consumer / authz proofs", () => {
     }
 
     const rt = new OutcomeConsumerRuntime(store);
-    rt.drain((id) => store.loadTask(id));
+    await rt.drain((id) => store.loadTask(id));
     const before = rt.getProjection();
     expect(before.successCount).toBe(1);
     // prepare_failed should not inflate failureCount if eligibility excludes it

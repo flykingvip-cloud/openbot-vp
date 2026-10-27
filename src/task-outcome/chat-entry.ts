@@ -1,8 +1,10 @@
 import path from "node:path";
 import { resolveAgentDir } from "../agents/agent-scope.js";
 import {
-  peekPendingLearningInjection,
+  learningExperienceRunKey,
+  learningExperienceTaskKey,
   takePendingLearningInjection,
+  type PendingLearningInjectionScope,
 } from "../auto-reply/reply/learning-experience-pending.js";
 import type { OpenBotConfig } from "../config/config.js";
 import { ChatTaskOutcomeAdapter } from "./entrypoints/chat.js";
@@ -20,6 +22,13 @@ export type ChatEntryIdentity = {
   tenantId?: string;
   authzScopeRef?: string;
   taskContractVersion?: string;
+  /**
+   * Optional: learning exposure scopes already known from this turn's context.
+   * Preferred over pending ledger. Never resolved via agentId guess.
+   */
+  experienceExposureScopes?: PendingLearningInjectionScope[];
+  /** Optional adoption evidence (subset of injected asset ids). */
+  adoptedAssetIds?: string[];
 };
 
 export function chatTurnTaskId(params: {
@@ -101,11 +110,36 @@ export function ensureChatTurnTaskOutcome(
   const fencingToken = opened.fencingToken || newFencingToken();
   let record = opened.record;
 
-  // W4: attach prompt-injection exposure from pending ledger onto tip (durable).
-  // Injection happens earlier in get-reply-run; ensure is the first tip touch afterward.
+  // W4 wrap-up: attach exposure from task context or run/task-keyed pending only.
+  // Never peek by agentId (concurrent turns would clobber / cross-verify).
   if (!record.experienceExposure) {
-    const pending = peekPendingLearningInjection(identity.agentId);
+    const fromIdentity = (identity.experienceExposureScopes ?? [])
+      .map((scopeRow) => ({
+        scopeId: scopeRow.scopeId.trim(),
+        botId: scopeRow.botId.trim(),
+        assetIds: [...new Set(scopeRow.assetIds.map((id) => id.trim()).filter(Boolean))],
+      }))
+      .filter((scopeRow) => scopeRow.scopeId && scopeRow.botId && scopeRow.assetIds.length > 0);
+    const runKey = learningExperienceRunKey(identity.runId);
+    const taskKey = learningExperienceTaskKey(taskId);
+    const pending =
+      fromIdentity.length > 0
+        ? { scopes: fromIdentity }
+        : ((runKey ? takePendingLearningInjection(runKey) : undefined) ??
+          (taskKey ? takePendingLearningInjection(taskKey) : undefined));
+    // Drop any leftover run/task pending after identity win so it cannot leak.
+    if (fromIdentity.length > 0) {
+      if (runKey) {
+        takePendingLearningInjection(runKey);
+      }
+      if (taskKey) {
+        takePendingLearningInjection(taskKey);
+      }
+    }
     if (pending && pending.scopes.length > 0) {
+      const adoptedAssetIds = [
+        ...new Set((identity.adoptedAssetIds ?? []).map((id) => id.trim()).filter(Boolean)),
+      ];
       const attached = service.submit(
         taskId,
         {
@@ -113,6 +147,7 @@ export function ensureChatTurnTaskOutcome(
           experienceExposure: {
             scopes: pending.scopes,
             attachedAt: new Date().toISOString(),
+            ...(adoptedAssetIds.length > 0 ? { adoptedAssetIds } : {}),
           },
           expectedVersion: record.outcomeVersion,
           fencingToken,
@@ -121,9 +156,8 @@ export function ensureChatTurnTaskOutcome(
       );
       if (attached.ok) {
         record = attached.record;
-        takePendingLearningInjection(identity.agentId);
       }
-      // Fail-soft: tip without exposure still works; verification may fall back to pending.
+      // Fail-soft: tip without exposure still works; verification skips without tip attachment.
     }
   }
 

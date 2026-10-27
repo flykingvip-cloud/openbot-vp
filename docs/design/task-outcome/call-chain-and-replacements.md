@@ -5,7 +5,8 @@
 > W2（消费者与技能/模式统一消费链）**已合入** [#99](https://github.com/flykingvip-cloud/openbot-vp/pull/99) squash → main `f3a19e08`。
 > W3（任务类型验收与总预算）**已合入** [#102](https://github.com/flykingvip-cloud/openbot-vp/pull/102) squash → main `f53e027b`。
 > W4（经验有效性与受控进化）**已合入** [#109](https://github.com/flykingvip-cloud/openbot-vp/pull/109) squash → main `b8ff8ea4`：曝光≠verified。
-> **W5（结构与运行收尾、总验收矩阵收敛）进行中**：`evolution-loop-log` 有界 `captured[]`；总矩阵收敛；旁路仅 inventory（未证明被替代前不退役）。**未 merge / 未部署**。
+> W5（结构与运行收尾）**日志有界**已合入 [#112](https://github.com/flykingvip-cloud/openbot-vp/pull/112) → main `23314d48`；**不**宣布 W0–W5 全部收尾。
+> **Wrap-up（本轮）**：修 W4 P1（任务级曝光 / 可等待落盘 / 共现≠有效）；W3 tip 预算最小生产接线（`recordRunnerTurnOutcome`）；矩阵改为四态。**未 merge / 未部署**。
 
 ## 已核实合入（gh，勿口述）
 
@@ -20,7 +21,7 @@
 | [#102](https://github.com/flykingvip-cloud/openbot-vp/pull/102) | MERGED | `f53e027bdafa1ccf229144a1c5619b35f67b9299` | （squash）  | W3 任务类型验收与任务级总预算          |
 | [#109](https://github.com/flykingvip-cloud/openbot-vp/pull/109) | MERGED | `b8ff8ea4b193f8d16b846b9a080fc0cf8acb525b` | （squash）  | W4 经验有效性（曝光≠verified）         |
 
-W5 基于 `origin/main` tip ≡ #109 merge `b8ff8ea4…`。
+W5 merge tip `23314d48`（#112）。Wrap-up 基于更新后的 `origin/main`（含 #114 memory 等）。
 
 ## 新调用链（模块内）
 
@@ -33,8 +34,8 @@ entrypoint adapter 实例方法
   →（仅 closed + eligible）growth-bridge → appendEvolutionTaskOutcome
   →（W2）skill-quality / mode-quality handlers（tip+eligibility；cancelled 只进 cancelledCount）
   →（W2）attempt 正样本回填 confirmPatternOutcomeByRunId / skill task_outcome_confirmed
-  →（W3）tip taskContract（门闩复用 chat-entry）；tip budget 投影（复用 supervisor D-BUDGET；exhaust → budget_exceeded）
-  →（W4）learning-recall：retrieved/injected 记账；tip experienceExposure；closed+eligible → outcome_verified → 既有策展
+  →（W3）tip taskContract；tip budget 投影 + **chat runner 路径** `recordRunnerTurnOutcome` 累计/超限 `budget_exceeded`（其余路径未覆盖）
+  →（W4 wrap-up）tip experienceExposure（run/task 键）；成功+曝光=「成功任务中的曝光」；**adopted∩exposure** 才 outcome_verified→策展
   →（W5）evolution-loop-log：进程内 captured 有界 ring（`EVOLUTION_LOOP_LOG_CAPTURE_MAX`）；console JSON 仍为生产观测
 ```
 
@@ -73,7 +74,7 @@ entrypoint adapter 实例方法
 
 **诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander 已恢复为模块路径 only（交付树无异 owner 热路径声明）。
 
-**登记**：W1 `b6c60550`；W2 `f3a19e08`；W3 `f53e027b`；W4 `b8ff8ea4`。W5：有界 `evolution-loop-log.captured`（`EVOLUTION_LOOP_LOG_CAPTURE_MAX=500`，丢弃最旧）；总验收矩阵收敛见下表；**不**另起主动记忆/容错。诚实缺口（不挡 W5）：evolution-control → `recordRunOutcome` 旁路仍在（canary/operational 仍用，**未**证明已被 tip 路径替代 → **不退役**）；W1 遗留入口；W3 supervisor 热路径未自动扣 tip；adopted 无自动推断；pending injection 进程内。**未 merge W5 / 未部署**。
+**登记**：W1–W5 合入 tip 见上表。Wrap-up 修 W4 P1 + W3 chat-runner 预算接线 + 四态矩阵。**不**另起主动记忆/容错/预算控制层。诚实缺口：evolution `recordRunOutcome` 旁路不退役；W1 遗留入口；W3 非 runner 路径未接 tip 预算；adopted 无自动推断；pending 仍进程内。**本 wrap-up PR 未 merge / 未部署**。
 
 **既有超时/重试/回退/用量（W3 inventory，不另起）**：`CloseReasonCode.timeout` + eligibility；supervisor `retry.nextStop`（iterations/cost/duration）；agents `model-fallback`；gateway billing / enterprise-model budget-gate。任务总预算 tip 只做投影与关闭归因，不替代上述机制。
 
@@ -123,24 +124,29 @@ entrypoint adapter 实例方法
 - P1（#94）：见上文 attempt / confirm-no-id。
 - W2：`quality-handlers`（skill/mode）+ `attempt-backfill`；cancelled 投影可证；evolution 旁路仅 inventory。
 - W3：复用 `chat-entry` 验收门闩 + tip `taskContract` 拒发明；`budget.ts` 投影 supervisor D-BUDGET（`budget_exceeded` eligibility）。
-- W4：learning-recall 四段指标；注入≠策展；`experience-verified` consumer 在 tip success+eligible 后记 outcome_verified 并触发既有 skill-draft 策展。
+- W4：learning-recall 四段指标；注入≠策展；wrap-up：run/task 键曝光；成功+曝光≠verified；adopted∩exposure 才 outcome_verified→策展。
 - W5：`evolution-loop-log` 有界 captured；总矩阵收敛；旁路 inventory-only（未证明替代则不退役）；清理过时「W4 进行中 / 无界 captured」表述。
 
-## 总验收矩阵收敛（W0→W5，实现侧自检）
+## 总验收矩阵（四态：接口可用 / 生产接通 / 行为已验证 / 未完成）
 
-| 阶段 | 主题                      | main tip（squash） | 结论口径                   | 残留（诚实）                                               |
-| ---- | ------------------------- | ------------------ | -------------------------- | ---------------------------------------------------------- |
-| W0   | 基线与证据/矩阵           | `1f698e37` #95     | 文档+分类完成              | 矩阵「已完成」仅限有调用证据的入口                         |
-| W1   | 跨入口身份与收尾          | `b6c60550` #98     | 有条件全入口接线           | server-methods/agent 未改；collab 其它 RPC；子 agent 跳过  |
-| W2   | 技能/模式消费 + cancelled | `f3a19e08` #99     | tip+eligibility 消费可证   | evolution 旁路仅 inventory                                 |
-| W3   | 任务类型验收与总预算      | `f53e027b` #102    | 契约拒发明 + budget 投影   | supervisor 热路径未自动扣 tip；ParentChild 未扩            |
-| W4   | 经验曝光≠verified         | `b8ff8ea4` #109    | 四段指标 + 策展改 verified | adopted 无自动推断；pending 进程内                         |
-| W5   | 结构收尾 / 矩阵收敛       | （本 PR）          | 有界 loop-log；矩阵表收敛  | **旁路不退役**（缺替代证明）；无界问题已收敛为有界测试缓冲 |
+**禁止**把下列各项统一标成「收尾完成」或「原计划已完成」。日志有界（W5）可标行为已验证；其余按实态。
 
-**复用 / 断点 / 减少（W5）**
+| 阶段 | 主题            | main tip                     | 接口可用        | 生产接通                                      | 行为已验证                               | 未完成（诚实）                                                |
+| ---- | --------------- | ---------------------------- | --------------- | --------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| W0   | 基线与证据      | `1f698e37` #95               | 是              | n/a（文档）                                   | 文档分类                                 | 「已完成」仅限有调用证据入口                                  |
+| W1   | 跨入口身份/收尾 | `b6c60550` #98               | 是              | 部分入口                                      | 已接线入口测                             | server-methods/agent；collab 其它 RPC；子 agent               |
+| W2   | 技能/模式消费   | `f3a19e08` #99               | 是              | tip 消费链                                    | handlers 测                              | evolution 旁路仍 inventory                                    |
+| W3   | 验收与总预算    | `f53e027b` #102 + wrap-up    | 是（投影/门闩） | **一条**：`recordRunnerTurnOutcome` 累计/超限 | wrap-up 测：同 task 重试累计、超限停止   | supervisor 其它热路径；ParentChild；非 chat runner            |
+| W4   | 经验有效性      | `b8ff8ea4` #109 + wrap-up P1 | 是（四段字段）  | tip exposure + consumer                       | wrap-up：并发不串、落盘后 ack、共现≠策展 | adopted **无**自动推断；pending 仍进程内；无采用则不 verified |
+| W5   | 结构/矩阵       | `23314d48` #112              | 是              | loop-log 观测                                 | **有界 ring 行为已验证**                 | 旁路不退役；**不**宣布 W0–W5 全部收尾                         |
 
-| 项            | 复用什么                                                                               | 修哪个断点                              | 减少什么                                     |
-| ------------- | -------------------------------------------------------------------------------------- | --------------------------------------- | -------------------------------------------- |
-| 无界 captured | 既有 `logEvolutionLoop` / test list+reset；风格对齐 capability-gap `DEDUP_MAX_ENTRIES` | 长跑进程 `captured[]` 无界增长          | 有界 ring + dropped 计数；不另起日志系统     |
-| 矩阵收敛      | W0 矩阵 + 本 call-chain 验收表                                                         | 文档仍写 W4 进行中 / 无界待收尾         | 更新合入 tip；残留旁路标「不退役」而非假完成 |
-| 旁路          | growth-bridge 合法 tip→evolution                                                       | operational `recordRunOutcome` 仍绕 tip | **不删除**（未证明被替代）；只登记退役条件   |
+**复用 / 断点 / 减少（wrap-up）**
+
+| 项      | 复用什么                                         | 修哪个断点                | 减少什么                                          |
+| ------- | ------------------------------------------------ | ------------------------- | ------------------------------------------------- |
+| W4 关联 | tip `experienceExposure`；`run:`/`task:` pending | agentId 并发串经验        | 禁止 agentId 猜测；无可靠关联则跳过验证           |
+| W4 落盘 | `recordLearningExperienceStage`（可等待）        | 先 ack 后写丢数           | drain await；失败不 markConsumed；correction 撤销 |
+| W4 口径 | 既有四段指标 + 策展阈值                          | 共现当有效                | Option A：无 adopted＝成功任务中的曝光；不策展    |
+| W3 预算 | `budget.ts` / supervisor D-BUDGET                | tip 有快照无执行限制      | 只接 chat `recordRunnerTurnOutcome`；不另造账本   |
+| W5 矩阵 | call-chain 表                                    | 假「全部收尾」            | 四态分列；日志有界单独通过                        |
+| 旁路    | growth-bridge                                    | `recordRunOutcome` 绕 tip | **不删除**（未证明替代）                          |

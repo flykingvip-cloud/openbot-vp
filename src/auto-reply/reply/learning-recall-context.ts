@@ -12,6 +12,7 @@
 
 import { logVerbose } from "../../globals.js";
 import {
+  isTaskBoundLearningExposureKey,
   rememberPendingLearningInjection,
   type PendingLearningInjectionScope,
 } from "./learning-experience-pending.js";
@@ -87,14 +88,15 @@ export type LearningRecallPromptBuildResult = {
  * - 对读出的资产记 `retrieved`
  * - 对真正进提示词的资产记 `injected`（曝光）
  * - **不**在注入时触发技能策展；策展等 outcome_verified
- * - 若提供 `exposureKey`（通常为 agentId），把本次注入记入 pending，供 tip 收尾验证
+ * - 若提供 **任务绑定** `exposureKey`（`run:<runId>` / `task:<taskId>`），记入 pending；
+ *   禁止 agentId 猜测。无可靠 key 则不记 pending（tip 无曝光则跳过验证）。
  */
 export async function buildLearningRecallSystemPrompt(params: {
   agentId?: string | null;
   groupId?: string | null;
   botId?: string | null;
   limit?: number;
-  /** W4: key for pending injection ledger (prefer agentId). */
+  /** Task-bound pending key only (`run:…` / `task:…`). Never agentId. */
   exposureKey?: string | null;
 }): Promise<string | undefined> {
   const built = await buildLearningRecallSystemPromptWithMeta(params);
@@ -184,8 +186,9 @@ export async function buildLearningRecallSystemPromptWithMeta(params: {
     }
   }
 
-  const exposureKey = params.exposureKey?.trim() || agentId || botId;
-  if (exposureKey && pendingScopes.length > 0) {
+  // Refuse agentId fallback — concurrent tasks for one agent must not share pending.
+  const exposureKey = params.exposureKey?.trim();
+  if (exposureKey && isTaskBoundLearningExposureKey(exposureKey) && pendingScopes.length > 0) {
     rememberPendingLearningInjection({ key: exposureKey, scopes: pendingScopes });
   }
 

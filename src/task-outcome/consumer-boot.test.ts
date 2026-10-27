@@ -54,7 +54,7 @@ describe("task-outcome consumer boot / runtime drain", () => {
     fs.rmSync(agentDir, { recursive: true, force: true });
   });
 
-  it("drains pending outbox without a subsequent user turn", () => {
+  it("drains pending outbox without a subsequent user turn", async () => {
     const store = new DurableTaskOutcomeStore(storeRoot);
     const service = new TaskOutcomeResultService({ store, submittedBy: "t" });
     const chat = new ChatTaskOutcomeAdapter(service);
@@ -111,7 +111,7 @@ describe("task-outcome consumer boot / runtime drain", () => {
     }
     expect(store.listPendingOutbox().length).toBeGreaterThan(0);
 
-    const boot = recoverTaskOutcomeConsumersAtGatewayBoot({
+    const boot = await recoverTaskOutcomeConsumersAtGatewayBoot({
       cfg,
       startRuntimeDrain: false,
     });
@@ -121,7 +121,7 @@ describe("task-outcome consumer boot / runtime drain", () => {
     expect(store.listPendingOutbox()).toHaveLength(0);
 
     // Second drain is a no-op without new events (proves independent of user messages).
-    const again = drainAllAgentsPendingGrowth(cfg);
+    const again = await drainAllAgentsPendingGrowth(cfg);
     expect(again.processed).toBe(0);
   });
 
@@ -164,7 +164,7 @@ describe("task-outcome consumer boot / runtime drain", () => {
     // Without persistRoot, lazy disk read cannot run — proves we need boot hydrate.
     expect(peekAwaitingDelivery({ deliveryId })).toBeUndefined();
 
-    const boot = recoverTaskOutcomeConsumersAtGatewayBoot({
+    const boot = await recoverTaskOutcomeConsumersAtGatewayBoot({
       cfg,
       startRuntimeDrain: false,
     });
