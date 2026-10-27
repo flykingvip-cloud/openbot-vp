@@ -137,14 +137,14 @@ entrypoint adapter 实例方法
 
 **禁止**把下列各项统一标成「收尾完成」或「原计划已完成」。日志有界（W5）可标行为已验证；其余按实态。
 
-| 阶段 | 主题            | main tip                     | 接口可用        | 生产接通                                                   | 行为已验证                                        | 未完成（诚实）                                                           |
-| ---- | --------------- | ---------------------------- | --------------- | ---------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------ |
-| W0   | 基线与证据      | `1f698e37` #95               | 是              | n/a（文档）                                                | 文档分类                                          | 「已完成」仅限有调用证据入口                                             |
-| W1   | 跨入口身份/收尾 | `b6c60550` #98 + residual    | 是              | chat/cron/cli/gateway_agent/collab claim                   | 已接线入口测 + residual inventory                 | 子 agent **故意跳过**；collab 非 claim RPC 复用 tip；cron 冷启动 hydrate |
-| W2   | 技能/模式消费   | `f3a19e08` #99               | 是              | tip 消费链                                                 | handlers 测                                       | evolution 旁路仍 inventory                                               |
-| W3   | 验收与总预算    | `f53e027b` + #117 + residual | 是（投影/门闩） | **共用** `recordRunnerTurnOutcome`（含非 chat entrypoint） | residual：cron/cli/collab/gateway_agent 累计/超限 | chat `assessRunnerTurnBudgetGate` 执行前；`chargeRunnerTurnBudgetSpend` 真实用量；其它入口仍收尾累计；ParentChild；supervisor 旁路         |
-| W4   | 经验有效性      | `b8ff8ea4` + #117 + residual | 是（四段字段）  | tip exposure + **显式 adopted API**                        | residual：attach→adopted；无 adopted 不策展       | 生产采用方须显式传 id；pending 仍进程内；无自动推断                      |
-| W5   | 结构/矩阵       | `23314d48` #112 + residual   | 是              | loop-log 观测                                              | **有界 ring 行为已验证**                          | 旁路不退役（RPC/canary 无 tip）；**不**宣布原计划完成                    |
+| 阶段 | 主题            | main tip                     | 接口可用        | 生产接通                                                   | 行为已验证                                        | 未完成（诚实）                                                                                                                     |
+| ---- | --------------- | ---------------------------- | --------------- | ---------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| W0   | 基线与证据      | `1f698e37` #95               | 是              | n/a（文档）                                                | 文档分类                                          | 「已完成」仅限有调用证据入口                                                                                                       |
+| W1   | 跨入口身份/收尾 | `b6c60550` #98 + residual    | 是              | chat/cron/cli/gateway_agent/collab claim                   | 已接线入口测 + residual inventory                 | 子 agent **故意跳过**；collab 非 claim RPC 复用 tip；cron 冷启动 hydrate                                                           |
+| W2   | 技能/模式消费   | `f3a19e08` #99               | 是              | tip 消费链                                                 | handlers 测                                       | evolution 旁路仍 inventory                                                                                                         |
+| W3   | 验收与总预算    | `f53e027b` + #117 + residual | 是（投影/门闩） | **共用** `recordRunnerTurnOutcome`（含非 chat entrypoint） | residual：cron/cli/collab/gateway_agent 累计/超限 | chat `assessRunnerTurnBudgetGate` 执行前；`chargeRunnerTurnBudgetSpend` 真实用量；其它入口仍收尾累计；ParentChild；supervisor 旁路 |
+| W4   | 经验有效性      | `b8ff8ea4` + #117 + residual | 是（四段字段）  | tip exposure + **显式 adopted API**                        | residual：attach→adopted；无 adopted 不策展       | 生产采用方须显式传 id；pending 仍进程内；无自动推断                                                                                |
+| W5   | 结构/矩阵       | `23314d48` #112 + residual   | 是              | loop-log 观测                                              | **有界 ring 行为已验证**                          | 旁路不退役（RPC/canary 无 tip）；**不**宣布原计划完成                                                                              |
 
 **复用 / 断点 / 减少（wrap-up）**
 
