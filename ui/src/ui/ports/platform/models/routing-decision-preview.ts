@@ -62,10 +62,19 @@ export type RoutingDecisionPreview = {
  * 2. Task text ONLY (CN + EN + mixed). Never mix taskProfileId into this corpus.
  *    When outputType === "text", do NOT promote image/music keywords from the text.
  * 3. Only if task text cannot be recognized, fall back to taskProfileId, else general_text.
+ *    Profile fallback is still constrained by outputType: explicit text may keep
+ *    coding / reasoning / general_text profiles, but image / music / audio profiles
+ *    fall back to general_text (do not rewrite a text task into a modality category).
  */
 function matchesAny(haystack: string, needles: string[]): boolean {
   return needles.some((n) => haystack.includes(n));
 }
+
+const MODALITY_TASK_CATEGORIES = new Set([
+  "image_generation",
+  "music_generation",
+  "audio_understanding",
+]);
 
 function classifyFromTextCorpus(corpus: string, allowModalityFromText: boolean): string | null {
   if (
@@ -101,6 +110,20 @@ function classifyFromTextCorpus(corpus: string, allowModalityFromText: boolean):
   return null;
 }
 
+/** Apply outputType constraints when falling back to a strategy profile. */
+function constrainProfileFallback(
+  profileId: string | undefined,
+  outputType: RoutingPreviewRequest["outputType"],
+): string {
+  const profile = profileId?.trim() || "general_text";
+  // Explicit text: keep text-compatible profiles (coding / reasoning / general_text…);
+  // refuse modality profiles that would rewrite the task category.
+  if (outputType === "text" && MODALITY_TASK_CATEGORIES.has(profile)) {
+    return "general_text";
+  }
+  return profile;
+}
+
 function detectTaskCategory(req: RoutingPreviewRequest): string {
   // Priority 1: explicit modality output type.
   if (req.outputType === "image") {
@@ -123,7 +146,8 @@ function detectTaskCategory(req: RoutingPreviewRequest): string {
   }
 
   // Priority 3: strategy profile only when task text cannot be recognized.
-  return req.taskProfileId?.trim() || "general_text";
+  // Still constrained by outputType (text vs modality profiles).
+  return constrainProfileFallback(req.taskProfileId, req.outputType);
 }
 
 /** Exported for unit tests of Chinese / mixed classification. */

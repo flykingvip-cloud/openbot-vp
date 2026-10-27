@@ -267,6 +267,43 @@ describe("batch3 Chinese / mixed task classification", () => {
     ).toBe("music_generation");
   });
 
+  it("explicit text output does not fall back to image_generation profile", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "请帮我处理一下",
+        outputType: "text",
+        taskProfileId: "image_generation",
+      }),
+    ).toBe("general_text");
+  });
+
+  it("explicit text output does not fall back to music_generation profile", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "请帮我处理一下",
+        outputType: "text",
+        taskProfileId: "music_generation",
+      }),
+    ).toBe("general_text");
+  });
+
+  it("explicit text still allows coding / reasoning profile fallback", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "请帮我处理一下",
+        outputType: "text",
+        taskProfileId: "coding",
+      }),
+    ).toBe("coding");
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "请帮我处理一下",
+        outputType: "text",
+        taskProfileId: "high_quality_reasoning",
+      }),
+    ).toBe("high_quality_reasoning");
+  });
+
   it("preview uses Chinese coding example for required capabilities", () => {
     __resetModelAdmissionStoreForTest();
     const preview = previewRoutingDecision({
