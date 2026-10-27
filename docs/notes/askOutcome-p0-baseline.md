@@ -20,3 +20,5 @@
 | W5 structure closeout  | merged #112           | `23314d48` 有界 loop-log；**四态矩阵**；不宣布整体收尾 |
 
 See `docs/design/task-outcome/call-chain-and-replacements.md` for the converged matrix.
+
+| residual four items | open (this PR) | W1 inventory；非 chat budget；adopted API；evolution inventory-only |

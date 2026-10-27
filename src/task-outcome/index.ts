@@ -94,8 +94,34 @@ export {
 // resolveChatTurnCloseGates) — do not re-export a parallel task-type-acceptance module.
 
 export {
+  applyOutcomeVerifiedContributionKey,
+  OUTCOME_VERIFIED_CONTRIBUTION_KEYS_FILENAME,
+  revokeOutcomeVerifiedContributionKey,
+  type OutcomeVerifiedContributionKeyEntry,
+  type OutcomeVerifiedContributionKeyStatus,
+} from "./experience-verified-counts.js";
+export {
   EXPERIENCE_VERIFIED_CONSUMER_ID,
   applyExperienceVerification,
+  buildExperienceVerifiedContributionKey,
+  clearExperienceVerifiedContribution,
   createExperienceVerifiedHandler,
+  loadExperienceVerifiedContribution,
   resolveExperienceVerificationPlan,
+  saveExperienceVerifiedContribution,
+  type ExperienceVerifiedContribution,
 } from "./experience-verified-handler.js";
+
+export {
+  attachAdoptedLearningAssetsToTask,
+  mergeAdoptedIntoExperienceExposure,
+  type AttachAdoptedLearningAssetsParams,
+  type AttachAdoptedLearningAssetsResult,
+} from "./learning-adoption.js";
+
+export {
+  assessRunnerTurnBudgetGate,
+  chargeRunnerTurnBudgetSpend,
+  TaskBudgetExceededError,
+  type RunnerBudgetGateResult,
+} from "./runtime-from-runner.js";

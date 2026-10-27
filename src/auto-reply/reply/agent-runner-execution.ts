@@ -73,7 +73,10 @@ import { registerRunReplyLanguage } from "../../shared/text/run-reply-language.j
 import { ensureChatTurnTaskOutcome } from "../../task-outcome/chat-entry.js";
 import type { ModalityExecutionArtifact } from "../../task-outcome/modality-artifact-evidence.js";
 import {
+  assessRunnerTurnBudgetGate,
+  chargeRunnerTurnBudgetSpend,
   recordRunnerTurnOutcome,
+  TaskBudgetExceededError,
   type GrowthOutcomeCommitOpts,
   type RunnerTurnFailureReason,
 } from "../../task-outcome/runtime-from-runner.js";
@@ -82,6 +85,7 @@ import {
   resolveMessageChannel,
 } from "../../utils/message-channel.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
+import { estimateUsageCost, resolveModelCostConfig } from "../../utils/usage-format.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { TemplateContext } from "../templating.js";
 import type { VerboseLevel } from "../thinking.js";
@@ -215,6 +219,59 @@ export async function runAgentTurnWithFallback(params: {
   let growthToolSucceeded = 0;
   const modalityArtifacts: ModalityExecutionArtifact[] = [];
   const growthStartedAt = Date.now();
+  /** Tip budget wall-clock start = task entry time (not first closeout spend). */
+  const tipBudgetStartedAtMs = growthStartedAt;
+  let tipBudgetChargedThisTurn = false;
+  let tipBudgetModelCallSeq = 0;
+  const assertTipBudgetAllowsModelCall = (): void => {
+    if (!chatOutcomeTaskId || !chatOutcomeScope || params.isHeartbeat || !growthAgentIdForEntry) {
+      return;
+    }
+    const gate = assessRunnerTurnBudgetGate(params.followupRun.run.config, growthAgentIdForEntry, {
+      taskId: chatOutcomeTaskId,
+      scope: chatOutcomeScope,
+      startedAtMs: tipBudgetStartedAtMs,
+    });
+    if (!gate.allowed) {
+      throw new TaskBudgetExceededError(chatOutcomeTaskId, gate.exhaustion);
+    }
+  };
+  const chargeTipBudgetAfterModelCall = (opts: {
+    provider: string;
+    model: string;
+    usage?: unknown;
+  }): void => {
+    if (!chatOutcomeTaskId || !chatOutcomeScope || params.isHeartbeat || !growthAgentIdForEntry) {
+      return;
+    }
+    tipBudgetModelCallSeq += 1;
+    let costUsd: number | undefined;
+    try {
+      const usage = normalizeUsage(opts.usage as never);
+      if (usage) {
+        const costConfig = resolveModelCostConfig({
+          provider: opts.provider,
+          model: opts.model,
+          config: params.followupRun.run.config,
+        });
+        const estimated = estimateUsageCost({ usage, cost: costConfig });
+        if (typeof estimated === "number" && Number.isFinite(estimated) && estimated > 0) {
+          costUsd = estimated;
+        }
+      }
+    } catch {
+      // cost estimate is best-effort; iterations still charged
+    }
+    chargeRunnerTurnBudgetSpend(params.followupRun.run.config, growthAgentIdForEntry, {
+      taskId: chatOutcomeTaskId,
+      scope: chatOutcomeScope,
+      runId,
+      callSeq: tipBudgetModelCallSeq,
+      iterations: 1,
+      ...(costUsd != null ? { costUsd } : {}),
+    });
+    tipBudgetChargedThisTurn = true;
+  };
   let modelGate: EmployeeModelGateResult | undefined;
   let capabilityOutcomeForTurn: CapabilityOutcomeForTurn | undefined;
   const recordGrowthToolResult = (isError: boolean): void => {
@@ -325,6 +382,10 @@ export async function runAgentTurnWithFallback(params: {
       ...(opts?.acceptanceEvidence ? { acceptanceEvidence: opts.acceptanceEvidence } : {}),
       ...(opts?.processPlaceholder ? { processPlaceholder: true } : {}),
       ...(opts?.allowRetry !== undefined ? { allowRetry: opts.allowRetry } : {}),
+      ...(opts?.adoptedAssetIds && opts.adoptedAssetIds.length > 0
+        ? { adoptedAssetIds: opts.adoptedAssetIds }
+        : {}),
+      ...(tipBudgetChargedThisTurn || opts?.skipBudgetCharge ? { skipBudgetCharge: true } : {}),
     })
       .then(async () => {
         await syncRobotGrowthFromOperationalMetrics(params.followupRun.run.config, growthAgentId);
@@ -608,6 +669,7 @@ export async function runAgentTurnWithFallback(params: {
             });
 
             if (isCliProvider(provider, params.followupRun.run.config)) {
+              assertTipBudgetAllowsModelCall();
               const startedAt = Date.now();
               notifyAgentRunStart();
               emitAgentEvent({
@@ -728,6 +790,21 @@ export async function runAgentTurnWithFallback(params: {
                     });
                   }
 
+                  try {
+                    chargeTipBudgetAfterModelCall({
+                      provider,
+                      model,
+                      usage: result.meta?.agentMeta?.usage,
+                    });
+                  } catch (chargeErr) {
+                    if (chargeErr instanceof TaskBudgetExceededError) {
+                      throw chargeErr;
+                    }
+                    logVerbose(
+                      `tip budget mid-run charge failed (cli): ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
+                    );
+                  }
+
                   return result;
                 } catch (err) {
                   emitAgentEvent({
@@ -800,6 +877,7 @@ export async function runAgentTurnWithFallback(params: {
                 firstTokenEmitted = true;
                 emitModelStage("first_token", { modelTtftMs: Date.now() - modelStartedAtMs });
               };
+              assertTipBudgetAllowsModelCall();
               emitModelStage("model_started");
               const conversationToolObserver = createConversationTurnToolObserver({
                 isHeartbeat: params.isHeartbeat,
@@ -1001,6 +1079,20 @@ export async function runAgentTurnWithFallback(params: {
                   ok: true,
                 });
                 emitModelStage("assistant_persisted", { source: "session_manager" });
+                try {
+                  chargeTipBudgetAfterModelCall({
+                    provider,
+                    model,
+                    usage: result.meta?.agentMeta?.usage,
+                  });
+                } catch (chargeErr) {
+                  if (chargeErr instanceof TaskBudgetExceededError) {
+                    throw chargeErr;
+                  }
+                  logVerbose(
+                    `tip budget mid-run charge failed: ${chargeErr instanceof Error ? chargeErr.message : String(chargeErr)}`,
+                  );
+                }
                 return result;
               } catch (err) {
                 emitModelStage("model_finished", {
@@ -1114,6 +1206,19 @@ export async function runAgentTurnWithFallback(params: {
 
         break;
       } catch (err) {
+        if (err instanceof TaskBudgetExceededError) {
+          void recordGrowthTaskOutcome(false, {
+            failureReason: "other",
+            failureDetail: err.message.slice(0, 200),
+            skipBudgetCharge: tipBudgetChargedThisTurn,
+          });
+          return {
+            kind: "final",
+            payload: {
+              text: "⚠️ 任务预算已耗尽，已停止继续调用模型。请缩小范围或开新任务后再试。",
+            },
+          };
+        }
         if (isModelEntitlementEmptyError(err)) {
           return {
             kind: "final",
@@ -1227,6 +1332,25 @@ export async function runAgentTurnWithFallback(params: {
         }
 
         if (isTransientHttp && !didRetryTransientHttpError && retryAllowedForMessage(message)) {
+          // Pre-retry budget gate: do not spend another model call when already exhausted.
+          try {
+            assertTipBudgetAllowsModelCall();
+          } catch (gateErr) {
+            if (gateErr instanceof TaskBudgetExceededError) {
+              void recordGrowthTaskOutcome(false, {
+                failureReason: "other",
+                failureDetail: gateErr.message.slice(0, 200),
+                skipBudgetCharge: tipBudgetChargedThisTurn,
+              });
+              return {
+                kind: "final",
+                payload: {
+                  text: "⚠️ 任务预算已耗尽，已停止继续调用模型。请缩小范围或开新任务后再试。",
+                },
+              };
+            }
+            throw gateErr;
+          }
           didRetryTransientHttpError = true;
           // Retry the full runWithModelFallback() cycle — transient errors
           // (502/521/etc.) typically affect the whole provider, so falling
