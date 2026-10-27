@@ -62,6 +62,7 @@ export type SetRoutingEligibilityRequest = {
   autoRouting: AutoRoutingAdmission;
   reason?: string;
   taskCategories?: string[];
+  tenantSelectable?: boolean;
 };
 
 export type SetRoutingEligibilityResponse =

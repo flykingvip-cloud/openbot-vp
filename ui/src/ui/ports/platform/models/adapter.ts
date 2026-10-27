@@ -608,10 +608,10 @@ function modelAssetFromSourceEntry(
   // Publish live config identity for verification finish-time stale checks.
   // Must not use admission.connectionFingerprint (last verified) as "current".
   publishCurrentConfigFingerprint(modelRef, connectionFingerprint);
-  // Backend admission RPCs are not wired yet — do NOT surface localStorage drafts
-  // as platform-effective "允许" / "可参与".
-  const admissionControlsAvailable = false;
-  const tenantSelectable = false;
+  // Only surface tenant/auto-routing when synced from gateway admission RPC.
+  // Local drafts (platformEffective !== true) must not look platform-effective.
+  const admissionControlsAvailable = admission.platformEffective === true;
+  const tenantSelectable = admissionControlsAvailable ? admission.tenantSelectable : false;
   const asset: ModelAsset = {
     modelId: modelRef,
     providerId: entry.providerId,
@@ -646,9 +646,11 @@ function modelAssetFromSourceEntry(
     inRecommendationPool,
     tenantSelectable,
     admissionControlsAvailable,
-    autoRouting: "disabled",
-    autoRoutingReason: "后端准入未接入",
-    autoRoutingTaskCategories: [],
+    autoRouting: admissionControlsAvailable ? admission.autoRouting : "disabled",
+    autoRoutingReason: admissionControlsAvailable ? admission.autoRoutingReason : "后端准入未接入",
+    autoRoutingTaskCategories: admissionControlsAvailable
+      ? admission.autoRoutingTaskCategories
+      : [],
   };
   asset.taskTags = inferTaskTags(asset);
   return asset;

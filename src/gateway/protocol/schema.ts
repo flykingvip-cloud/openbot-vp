@@ -12,6 +12,7 @@ export * from "./schema/frames.js";
 export * from "./schema/knowledge.js";
 export * from "./schema/logs-chat.js";
 export * from "./schema/models-management.js";
+export * from "./schema/models-admission.js";
 export * from "./schema/local-files.js";
 export * from "./schema/nodes.js";
 export * from "./schema/ownership.js";

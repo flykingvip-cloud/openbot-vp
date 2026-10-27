@@ -1,6 +1,7 @@
 /**
- * Task routing decision preview (frontend UI demo stub).
- * Interface demonstration only — NOT a backend routing decision.
+ * Task routing decision preview.
+ * Local path is UI demo dry-run. Gateway RPC path (via routing-decision-service)
+ * produces the same shape with uiDemo=false / backendStatus=wired.
  * Default does NOT call generation models.
  */
 
@@ -46,10 +47,12 @@ export type RoutingDecisionPreview = {
   fallback: string[];
   excluded: RoutingPreviewExclusion[];
   decisionReason: string;
-  /** Stub marker: UI must label as 界面演示，非后端决策. */
+  /** Always dry-run: must not call generation models. */
   dryRun: true;
-  /** Explicit demo flag — never claim backend decision. */
-  uiDemo: true;
+  /** True for local UI demo; false when produced via gateway admission RPC. */
+  uiDemo: boolean;
+  /** Optional backend wiring status when produced via service wrapper. */
+  backendStatus?: "not_wired" | "ui_demo" | "wired";
   /** Normalized required capabilities used for this preview. */
   requiredCapabilities: CanonicalCapabilityId[];
   budget?: "low" | "medium" | "high";

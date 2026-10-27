@@ -7,7 +7,11 @@ import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { selectPlatformModelsActions } from "./actions.ts";
 import { buildPlatformModelsVM } from "./adapter.ts";
 import { previewRoutingDecisionViaService } from "./admission/routing-decision-service.ts";
-import { ensureCapabilityVerificationLifecycle } from "./admission/verification-service.ts";
+import {
+  bindCapabilityAdmissionGateway,
+  ensureCapabilityVerificationLifecycle,
+  isCapabilityAdmissionRpcActive,
+} from "./admission/verification-service.ts";
 import type { RoutingDecisionPreview } from "./routing-decision-preview.ts";
 import {
   renderModelsAorBanditPanel,
@@ -126,10 +130,36 @@ function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
   }, 0);
 }
 
+let admissionGatewayBindKey: string | null = null;
+
+function ensureAdmissionGatewayBinding(props: PlatformSurfaceProps) {
+  const connected = Boolean(props.client && props.connected);
+  const key = connected ? "connected" : "offline";
+  if (admissionGatewayBindKey === key) {
+    return;
+  }
+  admissionGatewayBindKey = key;
+  if (connected && props.client) {
+    const client = props.client;
+    void bindCapabilityAdmissionGateway((method, params) =>
+      client.request(method, params ?? {}),
+    ).then((result) => {
+      if (result.synced > 0) {
+        requestOpenBotAppRerender();
+      }
+    });
+    return;
+  }
+  if (isCapabilityAdmissionRpcActive()) {
+    void bindCapabilityAdmissionGateway(null);
+  }
+}
+
 export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
   // Page lifecycle: recover orphaned verification tasks from a prior refresh.
   // Live in-page tasks are preserved; opening a detail drawer does not re-enter here alone.
   ensureCapabilityVerificationLifecycle();
+  ensureAdmissionGatewayBinding(props);
   maybeAutoTriggerModelsSnapshot(props);
   let vm: ReturnType<typeof buildPlatformModelsVM>;
   try {
@@ -218,8 +248,8 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 }
                 void actions.onSaveConfig?.();
               },
-              // 租户可选／自动路由：后端准入 RPC 未接入前不挂开关，避免 localStorage
-              // 草稿被展示成平台已生效状态。按钮保持禁用并提示“尚未接入”。
+              // 租户可选／自动路由：仅在 gateway models.admission.* 已绑定时由抽屉启用；
+              // localStorage 草稿不会被展示成平台已生效状态。
             })}
           `
         : activeTab === "taskPlans"
@@ -245,7 +275,7 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                   compat: vm.compat?.legacyModelsVM ?? null,
                   routingPreview: lastRoutingPreview,
                   onSimulateRouting: (input) => {
-                    lastRoutingPreview = previewRoutingDecisionViaService({
+                    void previewRoutingDecisionViaService({
                       request: {
                         taskProfileId: input.taskProfileId,
                         planId: input.planId,
@@ -255,8 +285,10 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                         requiredCapabilities: input.requiredCapabilities,
                       },
                       candidates: vm.assets.models,
+                    }).then((preview) => {
+                      lastRoutingPreview = preview;
+                      requestOpenBotAppRerender();
                     });
-                    requestOpenBotAppRerender();
                   },
                   onSetDefaultPrimary: actions.onSetDefaultPrimary,
                   onSetDefaultFallbacks: actions.onSetDefaultFallbacks,

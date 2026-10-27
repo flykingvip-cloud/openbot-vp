@@ -12,8 +12,10 @@ import {
 } from "../admission/capability-matrix.ts";
 import {
   cancelCapabilityVerification,
+  setModelRoutingEligibility,
   startCapabilityVerification,
 } from "../admission/controller.ts";
+import { isCapabilityAdmissionRpcActive } from "../admission/verification-service.ts";
 import { statusLabel as capabilityStatusLabel } from "../capability-evidence.ts";
 import { assetMatchesRequiredCapabilities, capabilityLabel } from "../capability-ids.ts";
 import { resolveExecutorPathLabel } from "../executor-path-labels.ts";
@@ -1645,30 +1647,74 @@ function renderDrawerActionSection(params: {
         >
           ${selectedModel.inRecommendationPool ? "移出推荐池" : "加入推荐池"}
         </button>
-        <button
-          class="btn btn--sm"
-          type="button"
-          ?disabled=${true}
-          title="租户可选准入尚未接入后端，当前不可操作"
-          data-testid="model-drawer-tenant-selectable"
-        >
-          允许租户选择（尚未接入）
-        </button>
-        <button
-          class="btn btn--sm"
-          type="button"
-          data-testid="model-drawer-auto-routing"
-          ?disabled=${true}
-          title="自动路由准入尚未接入后端，当前不可操作"
-        >
-          启用自动路由（尚未接入）
-        </button>
+        ${(() => {
+          const rpcActive = isCapabilityAdmissionRpcActive();
+          const controlsAvailable = selectedModel.admissionControlsAvailable === true || rpcActive;
+          return html`
+            <button
+              class="btn btn--sm"
+              type="button"
+              data-testid="model-drawer-tenant-selectable"
+              ?disabled=${!canManage || !controlsAvailable}
+              title=${controlsAvailable ? "写入平台租户可选（models.admission.setRoutingEligibility）" : "租户可选准入尚未接入后端，当前不可操作"}
+              @click=${() => {
+                if (!controlsAvailable) {
+                  return;
+                }
+                void setModelRoutingEligibility({
+                  modelRef: selectedModel.modelId,
+                  autoRouting: selectedModel.autoRouting ?? "disabled",
+                  tenantSelectable: !selectedModel.tenantSelectable,
+                  reason: "UI 抽屉切换租户可选",
+                }).then(() => requestPlatformSurfaceRerender());
+              }}
+            >
+              ${
+                controlsAvailable
+                  ? selectedModel.tenantSelectable
+                    ? "取消租户可选"
+                    : "允许租户选择"
+                  : "允许租户选择（尚未接入）"
+              }
+            </button>
+            <button
+              class="btn btn--sm"
+              type="button"
+              data-testid="model-drawer-auto-routing"
+              ?disabled=${!canManage || !controlsAvailable}
+              title=${controlsAvailable ? "写入平台自动路由资格（models.admission.setRoutingEligibility）" : "自动路由准入尚未接入后端，当前不可操作"}
+              @click=${() => {
+                if (!controlsAvailable) {
+                  return;
+                }
+                const next = selectedModel.autoRouting === "eligible" ? "disabled" : "eligible";
+                void setModelRoutingEligibility({
+                  modelRef: selectedModel.modelId,
+                  autoRouting: next,
+                  reason: next === "eligible" ? "UI 抽屉启用自动路由" : "UI 抽屉关闭自动路由",
+                }).then(() => requestPlatformSurfaceRerender());
+              }}
+            >
+              ${
+                controlsAvailable
+                  ? selectedModel.autoRouting === "eligible"
+                    ? "关闭自动路由"
+                    : "启用自动路由"
+                  : "启用自动路由（尚未接入）"
+              }
+            </button>
+          `;
+        })()}
         <button
           class="btn btn--sm"
           type="button"
           data-testid="model-drawer-verify-capabilities"
           ?disabled=${!canManage}
-          title="发起正式协议探测（local_protocol）；不调用付费 Midjourney/Suno API"
+          title=${
+            isCapabilityAdmissionRpcActive()
+              ? "发起正式协议探测（gateway models.admission）；不调用付费 Midjourney/Suno API"
+              : "发起正式协议探测（local_protocol）；不调用付费 Midjourney/Suno API"
+          }
           @click=${() => void runFormalCapabilityVerification(selectedModel)}
         >
           验证能力

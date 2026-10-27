@@ -2,8 +2,8 @@
  * Frontend admission / draft store.
  *
  * Formal platform admission (tenant selectable, auto-routing eligibility) must come
- * from backend facts. Until those RPCs land, local tenant/autoRouting values are
- * DRAFT ONLY and must not be rendered as platform-effective status.
+ * from backend facts (`platformEffective: true` after models.admission.* RPC sync).
+ * Local tenant/autoRouting drafts stay non-effective until synced from gateway.
  *
  * Formal capabilityEvidence is for real verification results only.
  * demoCapabilityEvidence is isolated UI-demo output and never feeds verified sets.
@@ -46,6 +46,11 @@ export type ModelAdmissionRecord = {
    */
   demoCapabilityEvidence?: CapabilityEvidenceItem[];
   updatedAt: number;
+  /**
+   * True when values were synced from gateway admission RPC (platform-effective).
+   * Local drafts stay false / undefined and must not be shown as live policy.
+   */
+  platformEffective?: boolean;
 };
 
 export type CapabilityVerificationTask = {
@@ -190,6 +195,7 @@ function defaultRecord(modelRef: string): ModelAdmissionRecord {
     autoRoutingTaskCategories: [],
     capabilityEvidence: [],
     updatedAt: Date.now(),
+    platformEffective: false,
   };
 }
 

@@ -107,6 +107,22 @@ export type ModelsManagementSnapshotParams = SchemaType<"ModelsManagementSnapsho
 export type ModelsManagementRoutingExplanationsParams =
   SchemaType<"ModelsManagementRoutingExplanationsParams">;
 export type ModelsManagementAorStatusParams = SchemaType<"ModelsManagementAorStatusParams">;
+export type ModelsAdmissionDiscoverParams = SchemaType<"ModelsAdmissionDiscoverParams">;
+export type ModelsAdmissionCreateVerificationParams =
+  SchemaType<"ModelsAdmissionCreateVerificationParams">;
+export type ModelsAdmissionGetVerificationParams =
+  SchemaType<"ModelsAdmissionGetVerificationParams">;
+export type ModelsAdmissionListVerificationParams =
+  SchemaType<"ModelsAdmissionListVerificationParams">;
+export type ModelsAdmissionCancelVerificationParams =
+  SchemaType<"ModelsAdmissionCancelVerificationParams">;
+export type ModelsAdmissionBatchVerificationParams =
+  SchemaType<"ModelsAdmissionBatchVerificationParams">;
+export type ModelsAdmissionSetRoutingEligibilityParams =
+  SchemaType<"ModelsAdmissionSetRoutingEligibilityParams">;
+export type ModelsAdmissionGetModelParams = SchemaType<"ModelsAdmissionGetModelParams">;
+export type ModelsAdmissionListModelsParams = SchemaType<"ModelsAdmissionListModelsParams">;
+export type ModelsAdmissionPreviewRoutingParams = SchemaType<"ModelsAdmissionPreviewRoutingParams">;
 export type SkillsStatusParams = SchemaType<"SkillsStatusParams">;
 export type ToolsCatalogParams = SchemaType<"ToolsCatalogParams">;
 export type ToolCatalogProfile = SchemaType<"ToolCatalogProfile">;

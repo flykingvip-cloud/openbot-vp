@@ -31,6 +31,7 @@ import {
   nextExecutionGeneration,
   saveVerificationTask,
   setAutoRoutingAdmission,
+  setTenantSelectable,
   type CapabilityVerificationTask,
 } from "../model-admission-store.ts";
 import { getCurrentConfigFingerprint } from "../model-connection-gate.ts";
@@ -590,6 +591,9 @@ export function createLocalProtocolVerificationService(
       reason: req.reason ?? "本地草稿，后端准入尚未接入",
       taskCategories: req.taskCategories,
     });
+    if (req.tenantSelectable !== undefined) {
+      setTenantSelectable(req.modelRef, req.tenantSelectable);
+    }
     return {
       status: "not_wired",
       modelRef: req.modelRef.trim(),

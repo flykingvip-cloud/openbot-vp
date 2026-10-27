@@ -91,6 +91,7 @@ import {
   enterpriseModelGrantHandlers,
   platformModelBindingHandlers,
 } from "./server-methods/model-entitlement-management.js";
+import { modelsAdmissionHandlers } from "./server-methods/models-admission.js";
 import { modelsManagementHandlers } from "./server-methods/models-management.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodePendingHandlers } from "./server-methods/nodes-pending.js";
@@ -275,6 +276,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...webHandlers,
   ...modelsHandlers,
   ...modelsManagementHandlers,
+  ...modelsAdmissionHandlers,
   ...platformModelBindingHandlers,
   ...platformPlanBundleHandlers,
   ...platformTenantHandlers,
