@@ -17,6 +17,7 @@ import { createRuntimeAuthority, type RuntimeAuthority } from "./runtime-authori
 import { trySelfAdvance } from "./self-advance.js";
 import type { CollaborationBotTarget } from "./types.js";
 import { listWakeEvents, whoWokeWhom } from "./wake-contract.js";
+import { readWakeOpDurableEffectReceipt } from "./wake-op-effect-verify.js";
 import {
   consumeWakeForRoundDispatch,
   evaluateWakeRoundDispatchGate,
@@ -257,6 +258,76 @@ describe("P0-2 wake→round dispatch consumer", () => {
     expect(
       timeline.some((row) => row.source === "self_advance" && row.outcome === "recorded"),
     ).toBe(true);
+  });
+
+  it("W3-prod: nudge + no_consumer writes durable none receipt; missing≠none after throw", async () => {
+    const { cfg } = await useConfig({
+      wakeContract: true,
+      selfAdvanceMode: "execute",
+      selfAdvanceExecuteAllowlist: ["grp_wd"],
+    });
+    const auth = authority(cfg);
+
+    const noneResult = await consumeWakeForRoundDispatch({
+      authority: auth,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: null,
+      nowMs: 1_700_000_000_100,
+      request: {
+        groupId: "grp_wd",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: ["bot:analyst"],
+        source: "nudge",
+        taskId: "task_nudge_none",
+        itemId: "nudge-none-1",
+        reason: "test:nudge_no_consumer",
+      },
+    });
+    expect(noneResult.dispatched).toBe(false);
+    expect(noneResult.reason).toBe("no_consumer");
+    expect(noneResult.opKey).toBeTruthy();
+    const attemptId = noneResult.wakeOp?.executionAttemptId;
+    expect(attemptId).toBeTruthy();
+    const receipt = await readWakeOpDurableEffectReceipt({
+      authority: auth,
+      opKey: noneResult.opKey!,
+      attemptId: attemptId!,
+    });
+    expect(receipt).not.toBeNull();
+    expect(receipt?.outcome).toBe("none");
+    expect(receipt?.operationType).toBe("nudge");
+    expect(receipt?.source).toBe("executor:nudge:no_external_call:no_consumer");
+
+    const throwResult = await consumeWakeForRoundDispatch({
+      authority: auth,
+      cfg,
+      writeMode: "execute",
+      roundDispatcher: async () => {
+        throw new Error("boom_after_invoke");
+      },
+      nowMs: 1_700_000_000_110,
+      request: {
+        groupId: "grp_wd",
+        fromAgentId: "system:group_task_heartbeat",
+        toAgentIds: ["bot:analyst"],
+        source: "nudge",
+        taskId: "task_nudge_throw",
+        itemId: "nudge-throw-1",
+        reason: "test:nudge_throw",
+      },
+    });
+    expect(throwResult.dispatched).toBe(false);
+    expect(throwResult.wakeOp?.status).toBe("unknown");
+    const throwAttempt = throwResult.wakeOp?.executionAttemptId;
+    expect(throwAttempt).toBeTruthy();
+    const missing = await readWakeOpDurableEffectReceipt({
+      authority: auth,
+      opKey: throwResult.opKey!,
+      attemptId: throwAttempt!,
+    });
+    // Absence of receipt must not be treated as none — verify path stays fail-closed.
+    expect(missing).toBeNull();
   });
 
   it("consume: mock dispatcher success → dispatched; whoWokeWhom answers", async () => {
