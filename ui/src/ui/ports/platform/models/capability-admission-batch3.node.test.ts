@@ -66,7 +66,7 @@ describe("batch3 routing trial preview", () => {
     __resetModelAdmissionStoreForTest();
   });
 
-  it("returns task category, executor, primary/fallback, and exclusion reasons", () => {
+  it("returns task category, executor, primary/fallback, and exclusion reasons", async () => {
     const candidates = [
       asset({ modelId: "private/a", autoRouting: "eligible", costTier: "high" }),
       asset({
@@ -98,7 +98,7 @@ describe("batch3 routing trial preview", () => {
       ],
     });
 
-    const preview = previewRoutingDecisionViaService({
+    const preview = await previewRoutingDecisionViaService({
       request: {
         taskText: "refactor this module",
         outputType: "text",

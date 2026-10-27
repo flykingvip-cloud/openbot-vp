@@ -1,6 +1,7 @@
 /**
  * Capability admission controller: discover / start / query / cancel / routing eligibility.
- * Keeps first-batch authenticity: routing eligibility stays draft/not_wired until backend RPC.
+ * When gateway RPC is bound, setRoutingEligibility returns applied (platform-effective).
+ * Offline / unbound path stays draft/not_wired via local_protocol adapter.
  */
 
 import { requestOpenBotAppRerender } from "../../../../request-app-rerender.ts";
@@ -109,14 +110,15 @@ export async function retryCapabilityVerification(
 }
 
 /**
- * Routing eligibility — always reports not_wired until backend admission RPC lands.
- * Draft may be stored locally; UI must not present it as platform-effective.
+ * Routing eligibility — returns applied when gateway RPC is bound;
+ * otherwise local_protocol reports not_wired draft.
  */
 export async function setModelRoutingEligibility(input: {
   modelRef: string;
   autoRouting: "disabled" | "eligible" | "restricted" | "paused";
   reason?: string;
   taskCategories?: string[];
+  tenantSelectable?: boolean;
 }): Promise<SetRoutingEligibilityResponse> {
   return await getCapabilityVerificationService().setRoutingEligibility(input);
 }

@@ -19,6 +19,11 @@ import {
   createLocalProtocolVerificationService,
   type LocalProtocolAdapterOptions,
 } from "./local-protocol-adapter.ts";
+import {
+  createRpcCapabilityVerificationService,
+  syncAdmissionsFromGateway,
+  type AdmissionGatewayRequest,
+} from "./rpc-adapter.ts";
 import type {
   CapabilityCheckRunner,
   CapabilityVerificationService,
@@ -32,12 +37,14 @@ function defaultResolveConnectionOk(modelRef: string, fingerprint?: string): boo
   });
 }
 
-export type VerificationServiceMode = "local_protocol" | "demo" | "unavailable";
+export type VerificationServiceMode = "local_protocol" | "demo" | "rpc" | "unavailable";
 
 export type VerificationServiceRegistryOptions = {
   mode?: VerificationServiceMode;
   local?: LocalProtocolAdapterOptions;
   demoSimulate?: DemoSimulateOptions;
+  /** Required when mode === "rpc". */
+  request?: AdmissionGatewayRequest;
 };
 
 let activeService: CapabilityVerificationService | null = null;
@@ -101,6 +108,12 @@ export function createCapabilityVerificationService(
   }
   if (mode === "unavailable") {
     return buildUnavailableService();
+  }
+  if (mode === "rpc") {
+    if (!options.request) {
+      throw new Error("rpc verification mode requires a gateway request function");
+    }
+    return createRpcCapabilityVerificationService(options.request);
   }
   const local = options.local ?? {};
   return createLocalProtocolVerificationService({
@@ -180,3 +193,37 @@ export {
   createDemoCapabilityVerificationService,
 };
 export type { CapabilityCheckRunner, CapabilityVerificationService, DemoSimulateOptions };
+
+let rpcRequest: AdmissionGatewayRequest | null = null;
+
+/** True when the active service is the gateway RPC adapter. */
+export function isCapabilityAdmissionRpcActive(): boolean {
+  return getCapabilityVerificationService().kind === "rpc";
+}
+
+/**
+ * Bind / unbind gateway client for models admission RPC.
+ * When connected, switches formal path to rpc and syncs admissions.
+ * When disconnected, falls back to local_protocol (honest offline draft).
+ */
+export async function bindCapabilityAdmissionGateway(
+  request: AdmissionGatewayRequest | null,
+): Promise<{ mode: VerificationServiceMode; synced: number }> {
+  rpcRequest = request;
+  if (!request) {
+    configureCapabilityVerificationService({ mode: "local_protocol" });
+    return { mode: "local_protocol", synced: 0 };
+  }
+  configureCapabilityVerificationService({ mode: "rpc", request });
+  let synced = 0;
+  try {
+    synced = await syncAdmissionsFromGateway(request);
+  } catch {
+    // Binding still succeeds; sync is best-effort on first paint.
+  }
+  return { mode: "rpc", synced };
+}
+
+export function getCapabilityAdmissionGatewayRequest(): AdmissionGatewayRequest | null {
+  return rpcRequest;
+}
