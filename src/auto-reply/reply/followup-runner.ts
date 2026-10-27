@@ -41,7 +41,10 @@ import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
 import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
-import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
+import {
+  estimateTipBudgetCostUsdFromUsage,
+  recordRunnerTurnOutcome,
+} from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
@@ -179,6 +182,8 @@ export function createFollowupRunner(params: {
       | undefined;
     let followupFailureDetail: string | undefined;
     let followupOutcomeCloseoutDone = false;
+    /** Real usage-derived USD for tip budget closeout (followup has no mid-run charge). */
+    let tipBudgetCostUsd: number | undefined;
     const submitFollowupOutcomeCloseout = async (overrides?: {
       success?: boolean;
       failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
@@ -213,6 +218,7 @@ export function createFollowupRunner(params: {
           taskId: followupOutcomeTaskId,
           scope: followupOutcomeScope,
           entrypoint: "chat",
+          ...(tipBudgetCostUsd != null ? { costUsd: tipBudgetCostUsd } : {}),
           ...(failureReason && !success
             ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
             : {}),
@@ -608,6 +614,12 @@ export function createFollowupRunner(params: {
       const usage = runResult.meta?.agentMeta?.usage;
       const promptTokens = runResult.meta?.agentMeta?.promptTokens;
       const modelUsed = runResult.meta?.agentMeta?.model ?? fallbackModel ?? defaultModel;
+      tipBudgetCostUsd = estimateTipBudgetCostUsdFromUsage({
+        usage,
+        provider: fallbackProvider,
+        model: modelUsed,
+        config: queued.run.config,
+      });
       const contextTokensUsed =
         agentCfgContextTokens ??
         lookupContextTokens(modelUsed) ??
