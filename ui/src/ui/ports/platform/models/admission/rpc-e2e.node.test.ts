@@ -54,21 +54,22 @@ type FakeAdmission = {
   connectionVerifiedAt?: number;
 };
 
-function stubCandidate(modelId: string): ModelAsset {
+/** Minimal ModelAsset fixture for routing preview candidates (aligns with batch3 / #115). */
+function asset(partial: Partial<ModelAsset> & Pick<ModelAsset, "modelId">): ModelAsset {
   return {
-    modelId,
     providerId: "private",
-    displayName: modelId,
+    displayName: partial.modelId,
     source: "configured",
     inputModalities: ["text"],
     outputModalities: ["text"],
-    capabilities: ["coding"],
-    costTier: "low",
+    capabilities: [],
+    costTier: "medium",
     health: "healthy",
-    contextWindow: 128000,
     taskTags: [],
-    inRecommendationPool: false,
-    tenantSelectable: true,
+    inRecommendationPool: true,
+    tenantSelectable: false,
+    autoRouting: "disabled",
+    ...partial,
   };
 }
 
@@ -518,7 +519,20 @@ describe("rpc + registry e2e regression", () => {
         taskText: "帮我重构这个模块的类型定义",
         outputType: "text",
       },
-      candidates: [stubCandidate("private/coder"), stubCandidate("private/other")],
+      candidates: [
+        asset({
+          modelId: "private/coder",
+          health: "healthy",
+          costTier: "low",
+          contextWindow: 128000,
+        }),
+        asset({
+          modelId: "private/other",
+          health: "healthy",
+          costTier: "low",
+          contextWindow: 128000,
+        }),
+      ],
     });
     expect(zh.backendStatus).toBe("wired");
     expect(zh.uiDemo).toBe(false);
@@ -539,7 +553,14 @@ describe("rpc + registry e2e regression", () => {
         taskText: "画一张海报",
         outputType: "text",
       },
-      candidates: [stubCandidate("private/coder")],
+      candidates: [
+        asset({
+          modelId: "private/coder",
+          health: "healthy",
+          costTier: "low",
+          contextWindow: 128000,
+        }),
+      ],
     });
     expect(textConstrained.taskCategory).not.toBe("image_generation");
     expect(textConstrained.outputType).toBe("text");
