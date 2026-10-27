@@ -51,6 +51,7 @@ import {
   readWakeOpRecord,
   wakeOpAuthFingerprint,
   wakeOpIdempotencyKey,
+  writeNudgeNoExternalCallEffectReceipt,
   type WakeOpRecord,
 } from "./wake-op-ledger.js";
 
@@ -466,6 +467,42 @@ export async function consumeWakeForRoundDispatch(
 
   let wakeOp: WakeOpRecord | undefined = claimed.record ?? undefined;
 
+  /** Set true immediately before invoking the Mode B round dispatcher. */
+  let externalDispatchInvoked = false;
+  /** Fact token for nudge none-receipt when dispatcher was never invoked. */
+  let noExternalNoneReason: string | undefined;
+  const noteNudgeNoExternal = (detail: string): void => {
+    if (!externalDispatchInvoked) {
+      noExternalNoneReason = detail;
+    }
+  };
+  const flushNudgeNoExternalReceipt = async (): Promise<void> => {
+    if (externalDispatchInvoked) {
+      return;
+    }
+    if (request.source !== "nudge") {
+      return;
+    }
+    const reason = noExternalNoneReason;
+    if (!reason) {
+      return;
+    }
+    const attemptId = wakeOp?.executionAttemptId ?? claimed.record?.executionAttemptId ?? undefined;
+    try {
+      await writeNudgeNoExternalCallEffectReceipt({
+        authority: params.authority,
+        cfg: params.cfg,
+        source: request.source,
+        opKey: claimed.opKey,
+        attemptId,
+        reason,
+        nowMs: params.nowMs,
+      });
+    } catch {
+      // best-effort: missing receipt stays fail-closed at verify time
+    }
+  };
+
   // M3 order-1 seam: after claim, before eligibility commit.
   if (params._testAfterClaimBarrier) {
     await params._testAfterClaimBarrier();
@@ -523,6 +560,8 @@ export async function consumeWakeForRoundDispatch(
         nowMs: params.nowMs,
         detail: "task_stopped_after_claim",
       });
+      noteNudgeNoExternal("task_stopped");
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -544,6 +583,8 @@ export async function consumeWakeForRoundDispatch(
         nowMs: params.nowMs,
         detail: "task_control_unreadable_before_eligibility",
       });
+      noteNudgeNoExternal("task_control_unreadable");
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -572,6 +613,8 @@ export async function consumeWakeForRoundDispatch(
         nowMs: params.nowMs,
         detail: `${auth.reason}_after_claim`,
       });
+      noteNudgeNoExternal(auth.reason);
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -604,6 +647,8 @@ export async function consumeWakeForRoundDispatch(
         nowMs: params.nowMs,
         detail: "auth_source_unreadable_before_eligibility",
       });
+      noteNudgeNoExternal("auth_source_unreadable");
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -665,6 +710,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail: "task_stopped_before_eligibility_commit",
         });
+        noteNudgeNoExternal("task_stopped");
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -689,6 +736,10 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail,
         });
+        noteNudgeNoExternal(
+          taskUnreadableBeforeCommit ? "task_control_unreadable" : "task_missing",
+        );
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -716,6 +767,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail: `${authBeforeCommit.reason}_before_eligibility_commit`,
         });
+        noteNudgeNoExternal(authBeforeCommit.reason);
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -742,6 +795,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail: "auth_source_unreadable_before_eligibility_commit",
         });
+        noteNudgeNoExternal("auth_source_unreadable");
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -793,6 +848,8 @@ export async function consumeWakeForRoundDispatch(
             nowMs: params.nowMs,
             detail,
           });
+          noteNudgeNoExternal(cas.reason);
+          await flushNudgeNoExternalReceipt();
           return {
             outcome: "recorded",
             dispatched: false,
@@ -813,6 +870,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail,
         });
+        noteNudgeNoExternal(detail);
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -865,6 +924,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
         });
       }
+      noteNudgeNoExternal("eligibility_commit_failed");
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -908,6 +969,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
         });
       }
+      noteNudgeNoExternal("eligibility_commit_failed");
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -969,6 +1032,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail,
         });
+        noteNudgeNoExternal("task_stopped_in_flight");
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -990,6 +1055,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail,
         });
+        noteNudgeNoExternal(take.reason);
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -1016,6 +1083,8 @@ export async function consumeWakeForRoundDispatch(
           : take.reason === "auth_fingerprint_mismatch" || take.reason === "auth_epoch_mismatch"
             ? "auth_revoked"
             : "eligibility_take_rejected";
+      noteNudgeNoExternal(reason);
+      await flushNudgeNoExternalReceipt();
       return {
         outcome: "recorded",
         dispatched: false,
@@ -1109,6 +1178,8 @@ export async function consumeWakeForRoundDispatch(
             nowMs: params.nowMs,
             detail,
           });
+          noteNudgeNoExternal(reason);
+          await flushNudgeNoExternalReceipt();
           return {
             outcome: "recorded",
             dispatched: false,
@@ -1129,6 +1200,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail,
         });
+        noteNudgeNoExternal(reason);
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -1173,6 +1246,8 @@ export async function consumeWakeForRoundDispatch(
             nowMs: params.nowMs,
             detail,
           });
+          noteNudgeNoExternal("task_stopped_in_flight");
+          await flushNudgeNoExternalReceipt();
           return {
             outcome: "recorded",
             dispatched: false,
@@ -1193,6 +1268,8 @@ export async function consumeWakeForRoundDispatch(
           nowMs: params.nowMs,
           detail,
         });
+        noteNudgeNoExternal(!auth.ok ? auth.reason : "eligibility_stale");
+        await flushNudgeNoExternalReceipt();
         return {
           outcome: "recorded",
           dispatched: false,
@@ -1230,6 +1307,7 @@ export async function consumeWakeForRoundDispatch(
 
     if (gate.allowed && dispatcherPresent && dispatcher) {
       try {
+        externalDispatchInvoked = true;
         const result = await dispatcher(request);
         if (result.ok && compact(result.roundId)) {
           // M3 order-3 seam: external sent, receipt not yet written.
@@ -1371,6 +1449,8 @@ export async function consumeWakeForRoundDispatch(
       if (failed) {
         wakeOp = failed;
       }
+      noteNudgeNoExternal(reason);
+      await flushNudgeNoExternalReceipt();
     } else {
       // Gate refused after claim — release to failed so work is not stuck running.
       const failed = await markWakeOpFailed({
@@ -1383,6 +1463,8 @@ export async function consumeWakeForRoundDispatch(
       if (failed) {
         wakeOp = failed;
       }
+      noteNudgeNoExternal(reason);
+      await flushNudgeNoExternalReceipt();
     }
 
     let wakeEvent: WakeEvent | undefined;
