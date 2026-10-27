@@ -97,7 +97,7 @@ export async function attachAdoptedLearningAssetsToTask(
     return {
       ok: false,
       code: attached.code,
-      message: "message" in attached ? String(attached.message) : attached.code,
+      message: String(attached.message),
     };
   }
 
