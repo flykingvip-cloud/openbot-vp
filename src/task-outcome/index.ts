@@ -64,3 +64,15 @@ export {
   ensureGatewayAgentTurnTaskOutcome,
   ensureFollowupTurnTaskOutcome,
 } from "./entrypoint-ensure.js";
+
+export {
+  createSkillQualityHandler,
+  createModeQualityHandler,
+  rebuildQualityProjectionFromContributions,
+  type QualityHandlerOptions,
+} from "./quality-handlers.js";
+export {
+  backfillAttemptSamplesFromTaskOutcome,
+  resolveAttemptBackfillJudgement,
+  type AttemptBackfillResult,
+} from "./attempt-backfill.js";

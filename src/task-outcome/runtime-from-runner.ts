@@ -14,6 +14,7 @@ import {
   type ModalityCompletionEvidence,
   type ModalityExecutionArtifact,
 } from "./modality-artifact-evidence.js";
+import { createModeQualityHandler, createSkillQualityHandler } from "./quality-handlers.js";
 import { newFencingToken, TaskOutcomeResultService } from "./result-service.js";
 import { DurableTaskOutcomeStore } from "./store.js";
 import { scopeIdOf } from "./transitions.js";
@@ -162,6 +163,9 @@ function drainGrowthEvolution(
           }
         },
       },
+      // W2: skill/mode consume tip+eligibility (not run terminal alone); skill also backfills attempt.
+      createSkillQualityHandler(store, { agentId }),
+      createModeQualityHandler(store, { agentId }),
     ],
   });
   const drained = runtime.drain((taskId) => store.loadTask(taskId));
