@@ -1656,7 +1656,7 @@ function renderDrawerActionSection(params: {
               type="button"
               data-testid="model-drawer-tenant-selectable"
               ?disabled=${!canManage || !controlsAvailable}
-              title=${controlsAvailable ? "写入平台租户可选（models.admission.setRoutingEligibility）" : "租户可选准入尚未接入后端，当前不可操作"}
+              title=${controlsAvailable ? "写入准入租户可选（存档；干跑预览可见；不驱动线上会话选型）" : "租户可选准入尚未接入后端，当前不可操作"}
               @click=${() => {
                 if (!controlsAvailable) {
                   return;
@@ -1682,7 +1682,7 @@ function renderDrawerActionSection(params: {
               type="button"
               data-testid="model-drawer-auto-routing"
               ?disabled=${!canManage || !controlsAvailable}
-              title=${controlsAvailable ? "写入平台自动路由资格（models.admission.setRoutingEligibility）" : "自动路由准入尚未接入后端，当前不可操作"}
+              title=${controlsAvailable ? "写入准入自动路由资格（存档；干跑预览可见；不驱动线上会话选型）" : "自动路由准入尚未接入后端，当前不可操作"}
               @click=${() => {
                 if (!controlsAvailable) {
                   return;
@@ -1691,18 +1691,30 @@ function renderDrawerActionSection(params: {
                 void setModelRoutingEligibility({
                   modelRef: selectedModel.modelId,
                   autoRouting: next,
-                  reason: next === "eligible" ? "UI 抽屉启用自动路由" : "UI 抽屉关闭自动路由",
+                  reason:
+                    next === "eligible"
+                      ? "UI 抽屉写入自动路由资格（预览）"
+                      : "UI 抽屉关闭自动路由资格",
                 }).then(() => requestPlatformSurfaceRerender());
               }}
             >
               ${
                 controlsAvailable
                   ? selectedModel.autoRouting === "eligible"
-                    ? "关闭自动路由"
-                    : "启用自动路由"
-                  : "启用自动路由（尚未接入）"
+                    ? "关闭自动路由资格"
+                    : "启用自动路由资格"
+                  : "启用自动路由资格（尚未接入）"
               }
             </button>
+            ${
+              controlsAvailable
+                ? html`
+                    <div class="muted card-follow--xs" data-testid="model-drawer-admission-scope-note">
+                      租户可选／自动路由资格写入 gateway 准入存档，并参与干跑试配预览；尚未被线上会话／Agent 选型消费。
+                    </div>
+                  `
+                : ""
+            }
           `;
         })()}
         <button

@@ -56,7 +56,7 @@ export type ModelAdmissionRecord = {
   autoRoutingReason?: string;
   capabilityEvidence: CapabilityEvidenceItem[];
   updatedAt: number;
-  /** True when this record was written by gateway admission RPC (platform-effective). */
+  /** Written by gateway admission RPC (store-effective). Not live routing consumption. */
   platformEffective: boolean;
 };
 

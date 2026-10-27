@@ -2,6 +2,7 @@
  * Task routing decision preview.
  * Local path is UI demo dry-run. Gateway RPC path (via routing-decision-service)
  * produces the same shape with uiDemo=false / backendStatus=wired.
+ * Neither path is live agent/chat model selection.
  * Default does NOT call generation models.
  */
 

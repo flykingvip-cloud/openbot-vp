@@ -340,7 +340,7 @@ function createFakeGateway(opts?: {
           primary,
           fallback: [],
           excluded,
-          decisionReason: "后端决策预览（干跑）",
+          decisionReason: "后端准入干跑预览（干跑）",
           dryRun: true,
           uiDemo: false,
           backendStatus: "wired",
@@ -508,7 +508,7 @@ describe("rpc + registry e2e regression", () => {
     expect(zh.uiDemo).toBe(false);
     expect(zh.dryRun).toBe(true);
     expect(zh.taskCategory).toBe("coding");
-    expect(zh.banner).toMatch(/后端决策预览/);
+    expect(zh.banner).toMatch(/后端准入干跑预览|后端决策预览/);
 
     // Explicit text output must not fall through to image_generation profile.
     expect(

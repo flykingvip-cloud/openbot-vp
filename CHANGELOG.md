@@ -4,6 +4,7 @@ Docs: https://docs.openbot.love
 
 ## Unreleased
 
+- Platform/models: clarify routing eligibility scope — `setRoutingEligibility` `applied` / `platformEffective` writes the gateway admission store and feeds dry-run `previewRoutingDecision` / admin UX only; live agent/chat model selection does **not** consume `autoRouting` / `tenantSelectable` yet. UI copy and banners narrowed accordingly. (#107)
 - Platform/models: RPC/registry e2e regression for `models.admission` — online/offline bind, refresh interrupt, cancel+retry, batch partial success, Chinese trial classification, and explicit text output constraints (in-process fake gateway; no paid gen APIs). (#107)
 - Platform/models: gateway `models.admission` verification ignores client `connectionOk` for formal text_chat passed; async tasks return `taskId` promptly and re-check cancel / config fingerprint / execution generation plus wall-clock timeout before merging formal evidence (late success cannot pollute current admission).
 

@@ -1,6 +1,7 @@
 /**
  * Gateway routing decision preview (dry-run).
  * Uses platform-effective admission records; does not call generation models.
+ * Not wired into live agent/chat model selection — admin preview / RPC only.
  */
 
 import { normalizeCapabilityIds, verifiedCapabilityIds } from "./capability-ids.js";
@@ -252,8 +253,8 @@ export async function previewRoutingDecision(params: {
     fallback,
     excluded,
     decisionReason: selected
-      ? `按任务类别 ${category} 选择已验证且允许自动路由的模型（后端决策预览，干跑）`
-      : `没有满足已验证能力要求的可路由模型（类别 ${category}；后端决策预览，干跑）`,
+      ? `按任务类别 ${category} 选择已验证且允许自动路由的模型（后端准入干跑预览；不驱动线上会话选型）`
+      : `没有满足已验证能力要求的可路由模型（类别 ${category}；后端准入干跑预览；不驱动线上会话选型）`,
     dryRun: true,
     uiDemo: false,
     backendStatus: "wired",
