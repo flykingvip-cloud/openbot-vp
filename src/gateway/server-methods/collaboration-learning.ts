@@ -151,10 +151,7 @@ function collaborationEntryErrorShape(error: unknown) {
   return errorShape(ErrorCodes.INVALID_REQUEST, message);
 }
 
-async function resolveTrustedWriteContext(
-  client: Parameters<typeof resolveDeliveryAclActor>[0],
-  groupId: string,
-) {
+async function resolveTrustedWriteContext(client: GatewayClient | null, groupId: string) {
   const tenant = await resolveCollaborationTenantResolution(client);
   const actor = await resolveDeliveryAclActor(client, groupId);
   if (!actor) {

@@ -7,26 +7,26 @@
 
 ## 策略
 
-| 根 | 角色 |
-| --- | --- |
-| `$OPENBOT_TENANTS_ROOT/<tid>/collaboration` | **唯一团队 SoT**（managed_enterprise） |
+| 根                                                      | 角色                                                          |
+| ------------------------------------------------------- | ------------------------------------------------------------- |
+| `$OPENBOT_TENANTS_ROOT/<tid>/collaboration`             | **唯一团队 SoT**（managed_enterprise）                        |
 | `~/.openbot/collaboration`（`STATE_DIR/collaboration`） | 遗留 / personal_local 非团队 SoT；**团队 API 不得静默落到此** |
 
 不做 A/B 双向同步；不另建平行成果权威；不挂整租户树进沙箱；不改 claim/formal-root。
 
 ## 代码变更（删除 / 硬拒）
 
-| 符号 | 文件 | 行为 |
-| --- | --- | --- |
-| `resolveTeamDeliverableStores` | `team-resource-auth.ts` | **删除**对 `createWorkspaceCollaborationStores` 的团队回退；改走 auth / explicit `trusted` / `resolveTrustedGroupLocator` |
-| `createTrustedGroupStores` | 同上 | 扩展为含 group/learning/memory/metadata stores，供激活 OS sync |
-| `isHostLegacyCollaborationPath` | 同上 | 检测 host legacy collaboration 路径 |
-| `LEGACY_COLLABORATION_ROOT_REJECTED` | 同上 | managed 却指向 host legacy → 硬拒 |
-| `TRUSTED_GROUP_LOCATOR_REQUIRED` | 同上 | managed 无 tenant/auth → 硬拒 |
-| `assertTaskBelongsToGroup` | 同上 | **删除**无 stores 时落到 `createWorkspaceCollaborationStores` |
-| `activateCollaborationTask` | `activate-collaboration-task.ts` | task/OS 读写改 `resolveTeamDeliverableStores`；接受 `auth`/`trusted` |
-| `resolveTrustedMembersForGroup` OS | `collaboration-task-activation.ts` | OS 读改 trusted locator；activate 传入 `auth` |
-| `submitTeamDeliverable` / `readTeamDeliverable` | `team-deliverable-submit.ts` | stores Result 失败直接返回；支持 `trusted` |
+| 符号                                            | 文件                               | 行为                                                                                                                      |
+| ----------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `resolveTeamDeliverableStores`                  | `team-resource-auth.ts`            | **删除**对 `createWorkspaceCollaborationStores` 的团队回退；改走 auth / explicit `trusted` / `resolveTrustedGroupLocator` |
+| `createTrustedGroupStores`                      | 同上                               | 扩展为含 group/learning/memory/metadata stores，供激活 OS sync                                                            |
+| `isHostLegacyCollaborationPath`                 | 同上                               | 检测 host legacy collaboration 路径                                                                                       |
+| `LEGACY_COLLABORATION_ROOT_REJECTED`            | 同上                               | managed 却指向 host legacy → 硬拒                                                                                         |
+| `TRUSTED_GROUP_LOCATOR_REQUIRED`                | 同上                               | managed 无 tenant/auth → 硬拒                                                                                             |
+| `assertTaskBelongsToGroup`                      | 同上                               | **删除**无 stores 时落到 `createWorkspaceCollaborationStores`                                                             |
+| `activateCollaborationTask`                     | `activate-collaboration-task.ts`   | task/OS 读写改 `resolveTeamDeliverableStores`；接受 `auth`/`trusted`                                                      |
+| `resolveTrustedMembersForGroup` OS              | `collaboration-task-activation.ts` | OS 读改 trusted locator；activate 传入 `auth`                                                                             |
+| `submitTeamDeliverable` / `readTeamDeliverable` | `team-deliverable-submit.ts`       | stores Result 失败直接返回；支持 `trusted`                                                                                |
 
 ## 测试
 

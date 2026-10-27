@@ -101,13 +101,14 @@ async function resolveTrustedMembersForGroup(params: {
         groupId: params.groupId,
       }).catch(() => null)
     : null;
+  type MemberRoleRow = NonNullable<NonNullable<typeof os>["memberRoleMap"]>[number];
   const roleMap = new Map(
     (os?.memberRoleMap ?? [])
       .map((row) => {
         const id = typeof row.memberId === "string" ? row.memberId.trim() : "";
         return id ? ([id, row] as const) : null;
       })
-      .filter((row): row is readonly [string, (typeof os.memberRoleMap)[number]] => Boolean(row)),
+      .filter((row): row is readonly [string, MemberRoleRow] => Boolean(row)),
   );
 
   // Enterprise agent registry (managed). Personal_local may have no registry —

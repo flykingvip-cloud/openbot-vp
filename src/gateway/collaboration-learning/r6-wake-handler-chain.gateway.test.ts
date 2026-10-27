@@ -112,7 +112,8 @@ vi.mock("../session-utils.js", async (importOriginal) => {
 });
 
 vi.mock("../../auto-reply/dispatch.js", () => ({
-  dispatchInboundMessage: (...args: unknown[]) => dispatchInboundMock(...args),
+  dispatchInboundMessage: (...args: unknown[]) =>
+    (dispatchInboundMock as (...a: unknown[]) => unknown)(...args),
 }));
 
 const learningSnapshotMock = vi.hoisted(() =>
@@ -256,14 +257,14 @@ function clientFor(owner: string) {
     platformUserId: owner,
     user: owner,
     connect: { platformUserId: owner },
-  } as never;
+  };
 }
 
 async function invoke(
   handlers: Record<string, Function>,
   method: string,
   params: Record<string, unknown>,
-  client: never,
+  client: ReturnType<typeof clientFor>,
 ) {
   let payload: unknown;
   let error: unknown;
@@ -860,7 +861,7 @@ describe("R6 continuous handlers · real ACL · stop→wake (no mid seedOs)", ()
     const denied = await authorizeTeamGroupResourceAccess({
       groupId: SHARED_GROUP,
       actor: stranger,
-      client: clientFor(stranger),
+      client: clientFor(stranger) as never,
       action: "write",
       cfg,
     });
@@ -869,7 +870,7 @@ describe("R6 continuous handlers · real ACL · stop→wake (no mid seedOs)", ()
     const before = await resolveHandlerTrustedTeamContext({
       groupId: SHARED_GROUP,
       actor: t.owner,
-      client: clientFor(t.owner),
+      client: clientFor(t.owner) as never,
       action: "write",
       cfg,
     });

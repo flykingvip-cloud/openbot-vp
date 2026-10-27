@@ -999,6 +999,9 @@ async function mutateProgress(
     taskId: string;
     tenant?: CollaborationTenantResolution | null;
     cfg?: OpenBotConfig;
+    auth?: TeamResourceAuthOk | null;
+    trusted?: { groupsRoot: string; groupLocator: string } | null;
+    stores?: TrustedGroupStores | null;
   },
   run: (
     authority: Awaited<ReturnType<typeof buildClaimAuthority>>["authority"],

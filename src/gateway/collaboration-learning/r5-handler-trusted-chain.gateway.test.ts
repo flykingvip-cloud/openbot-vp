@@ -522,6 +522,7 @@ describe("R5 gateway handlers · two-tenant same local ids", () => {
         taskId: SHARED_TASK,
         title: "should fail",
         remainingWork: "x",
+        acceptanceCriteria: ["x"],
         actor: "tenant-r5-a/emp-owner",
         tenant: { tenantId: "tenant-r5-a", trust: "membership" },
         // deliberately no auth/trusted/stores — composition root must supply them

@@ -4403,6 +4403,11 @@ export const chatHandlers: GatewayRequestHandlers = {
         lifetime?: string;
         sources?: Array<{ type?: string; id?: string; parentId?: string }>;
       };
+      planConfirmTaskId?: string;
+      planConfirmBoardItemId?: string;
+      planConfirmTodolistId?: string;
+      planConfirmDecisionId?: string;
+      planConfirmExpectedVersion?: number;
     };
     if ((p.systemInputProvenance || p.systemProvenanceReceipt) && !isAcpBridgeClient(client)) {
       respond(
