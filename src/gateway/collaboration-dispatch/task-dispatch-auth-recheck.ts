@@ -19,7 +19,18 @@ import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
 } from "../collaboration-learning/shared.js";
+import {
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+  type TrustedGroupStores,
+} from "../collaboration-learning/team-resource-auth.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 import { asGovernedTask } from "./task-runtime.js";
+
+/** Trusted SoT stores for auth recheck — must match wake authority locator. */
+export type DispatchAuthRecheckStores = {
+  fileStore: TrustedGroupStores["fileStore"];
+  objectStorage: TrustedGroupStores["objectStorage"];
+};
 
 export type DispatchAuthRecheckFailure = {
   ok: false;
@@ -64,6 +75,12 @@ export async function recheckCurrentDispatchAuthorization(params: {
   targetActorIds?: readonly string[] | null;
   cfg?: OpenBotConfig;
   /**
+   * Trusted fileStore/objectStorage aligned with wake authority.namespace.groupLocator.
+   * Required for managed team SoT — must NOT re-derive host ~/.openbot/collaboration.
+   */
+  fileStore?: DispatchAuthRecheckStores["fileStore"];
+  objectStorage?: DispatchAuthRecheckStores["objectStorage"];
+  /**
    * Test-only: force operating-state membership read to throw.
    * Production callers omit this. Must not be treated as ok:true.
    */
@@ -74,7 +91,36 @@ export async function recheckCurrentDispatchAuthorization(params: {
     return { ok: true };
   }
 
-  const { fileStore, objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+  let fileStore = params.fileStore;
+  let objectStorage = params.objectStorage;
+  if (!fileStore || !objectStorage) {
+    const profile = resolveSecurityProfile(params.cfg).profile;
+    // managed: never patch missing half with host ~/.openbot/collaboration (mixed SoT).
+    if (profile === "managed_enterprise") {
+      return {
+        ok: false,
+        reason: "auth_source_unreadable",
+        revokedActorIds: [],
+        detail:
+          `${TRUSTED_GROUP_LOCATOR_REQUIRED}: recheckCurrentDispatchAuthorization requires ` +
+          "complete trusted fileStore+objectStorage in managed_enterprise",
+      };
+    }
+    // personal_local compat only when BOTH omitted — refuse partial mix always.
+    if (fileStore || objectStorage) {
+      return {
+        ok: false,
+        reason: "auth_source_unreadable",
+        revokedActorIds: [],
+        detail:
+          `${TRUSTED_GROUP_LOCATOR_REQUIRED}: partial trusted stores refused for auth recheck ` +
+          "(pass both fileStore and objectStorage, or omit both for personal_local compat)",
+      };
+    }
+    const legacy = createWorkspaceCollaborationStores(params.cfg);
+    fileStore = legacy.fileStore;
+    objectStorage = legacy.objectStorage;
+  }
   let operatingState: Parameters<typeof isMappedDeliveryIdentity>[0] = null;
   try {
     if (params._testForceOperatingStateReadError) {

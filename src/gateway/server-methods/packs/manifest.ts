@@ -58,6 +58,29 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
     scopes: { "operator.read": ["chat.checkpoints.list"] },
   },
   {
+    id: "collaboration-task-activation",
+    methods: [
+      "collaboration.task.readTeamDeliverable",
+      "collaboration.task.checkDispatchReadiness",
+      "collaboration.task.activate",
+      "collaboration.task.confirmPlanFromChat",
+      "collaboration.task.submitTeamDeliverable",
+      "collaboration.task.ensureMemberSession",
+    ],
+    scopes: {
+      "operator.read": [
+        "collaboration.task.readTeamDeliverable",
+        "collaboration.task.checkDispatchReadiness",
+      ],
+      "operator.write": [
+        "collaboration.task.activate",
+        "collaboration.task.confirmPlanFromChat",
+        "collaboration.task.submitTeamDeliverable",
+        "collaboration.task.ensureMemberSession",
+      ],
+    },
+  },
+  {
     id: "steward-workspace-file",
     methods: [
       "workbench.steward-file.read",

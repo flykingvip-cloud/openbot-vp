@@ -30,6 +30,11 @@ import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { createWorkspaceCollaborationStores } from "../collaboration-learning/shared.js";
 import {
+  TRUSTED_GROUP_LOCATOR_REQUIRED,
+  resolveStoresFromGroupLocator,
+} from "../collaboration-learning/team-resource-auth.js";
+import { resolveSecurityProfile } from "../security-profile.js";
+import {
   boardClaimsDir,
   type BoardClaimStatus,
   type GroupBoardClaimItem,
@@ -783,17 +788,45 @@ function resolveEscalateTargets(options?: GroupTaskHeartbeatOptions): string[] {
  * Does **not** append transcript / fake completion.
  */
 
+function resolveHeartbeatStores(params: { authority?: RuntimeAuthority; cfg?: OpenBotConfig }): {
+  objectStorage: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+} {
+  const locator =
+    typeof params.authority?.namespace?.groupLocator === "string"
+      ? params.authority.namespace.groupLocator.trim()
+      : "";
+  if (locator) {
+    const resolved = resolveStoresFromGroupLocator({ groupLocator: locator, cfg: params.cfg });
+    if (resolved.ok) {
+      return { objectStorage: resolved.objectStorage, fileStore: resolved.fileStore };
+    }
+  }
+  const profile = resolveSecurityProfile(params.cfg).profile;
+  if (profile === "managed_enterprise") {
+    throw new Error(
+      `${TRUSTED_GROUP_LOCATOR_REQUIRED}: heartbeat refused without authority.namespace.groupLocator`,
+    );
+  }
+  const legacy = createWorkspaceCollaborationStores(params.cfg);
+  return { objectStorage: legacy.objectStorage, fileStore: legacy.fileStore };
+}
+
 async function isPersistedTaskStopped(params: {
   groupId: string;
   taskId: string;
   cfg?: OpenBotConfig;
+  authority?: RuntimeAuthority;
+  objectStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
 }): Promise<boolean> {
   const taskId = params.taskId.trim();
   if (!taskId) {
     return false;
   }
   try {
-    const { objectStorage } = createWorkspaceCollaborationStores(params.cfg);
+    const objectStorage =
+      params.objectStorage ??
+      resolveHeartbeatStores({ authority: params.authority, cfg: params.cfg }).objectStorage;
     const current = await objectStorage.readObject<Task>(params.groupId, "task", taskId);
     return Boolean(current && isTaskStopAccepted(asGovernedTask(current)));
   } catch {
@@ -807,12 +840,21 @@ async function isPersistedDispatchAuthRevoked(params: {
   taskId: string;
   targetActorIds: readonly string[];
   cfg?: OpenBotConfig;
+  authority?: RuntimeAuthority;
+  fileStore?: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  objectStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["objectStorage"];
 }): Promise<boolean> {
+  const stores =
+    params.fileStore && params.objectStorage
+      ? { fileStore: params.fileStore, objectStorage: params.objectStorage }
+      : resolveHeartbeatStores({ authority: params.authority, cfg: params.cfg });
   const auth = await recheckCurrentDispatchAuthorization({
     groupId: params.groupId,
     taskId: params.taskId,
     targetActorIds: params.targetActorIds,
     cfg: params.cfg,
+    fileStore: stores.fileStore,
+    objectStorage: stores.objectStorage,
   });
   return !auth.ok;
 }
@@ -908,7 +950,7 @@ export async function runGroupTaskHeartbeat(
 
     if (decision.action === "nudge") {
       if (!dryRun && !unattendedTarget) {
-        if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg })) {
+        if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg, authority })) {
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
@@ -925,6 +967,7 @@ export async function runGroupTaskHeartbeat(
             taskId: item.taskId,
             targetActorIds: decision.toAgentIds,
             cfg,
+            authority,
           })
         ) {
           nextItems[item.itemId] = {
@@ -971,7 +1014,7 @@ export async function runGroupTaskHeartbeat(
 
     if (decision.action === "escalate") {
       if (!dryRun && !unattendedTarget) {
-        if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg })) {
+        if (await isPersistedTaskStopped({ groupId, taskId: item.taskId, cfg, authority })) {
           nextItems[item.itemId] = {
             consecutiveNoResponse: prior?.consecutiveNoResponse ?? 0,
             lastNudgeAt: prior?.lastNudgeAt,
@@ -988,6 +1031,7 @@ export async function runGroupTaskHeartbeat(
             taskId: item.taskId,
             targetActorIds: decision.toAgentIds,
             cfg,
+            authority,
           })
         ) {
           nextItems[item.itemId] = {

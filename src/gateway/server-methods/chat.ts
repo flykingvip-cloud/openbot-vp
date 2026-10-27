@@ -269,10 +269,12 @@ import {
   resolveBlockedAgentIdsForCurrentTask,
   type GatewayCollaborationSpaceSnapshot,
 } from "../collaboration-learning.js";
+import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
 import {
   isGroupPublicTranscriptSessionFile,
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
+import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
   bindGroupPublicTranscript,
   dropDivergentGroupTranscriptMirrors,
@@ -284,6 +286,10 @@ import {
   resolveSessionParticipationOverlay,
 } from "../collaboration-learning/session-participation-overlay.js";
 import { resolveCollaborationGroupOwnerEntitlementScope } from "../collaboration-learning/steward-group-policy.js";
+import {
+  authorizeTeamGroupResourceAccess,
+  createTrustedGroupStores,
+} from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import type { CollaborationExecutionRecord } from "../collaboration-ledger/types.js";
@@ -4397,6 +4403,11 @@ export const chatHandlers: GatewayRequestHandlers = {
         lifetime?: string;
         sources?: Array<{ type?: string; id?: string; parentId?: string }>;
       };
+      planConfirmTaskId?: string;
+      planConfirmBoardItemId?: string;
+      planConfirmTodolistId?: string;
+      planConfirmDecisionId?: string;
+      planConfirmExpectedVersion?: number;
     };
     if ((p.systemInputProvenance || p.systemProvenanceReceipt) && !isAcpBridgeClient(client)) {
       respond(
@@ -4723,6 +4734,156 @@ export const chatHandlers: GatewayRequestHandlers = {
         relatedId: clientRunId,
         ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
       }).catch(() => undefined);
+      // TEAM-REAL R5: NL plan confirm — schema-backed binding fields, handler-resolved
+      // trusted locator, await formal result, persist assistant line into transcript
+      // so chat.history / UI see success or 尚未确认. Auto-advance NOT wired.
+      {
+        const confirmActor =
+          (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
+        const tenant = collabTenant;
+        const readBound = (value: unknown): string | undefined =>
+          typeof value === "string" && value.trim() ? value.trim() : undefined;
+        const readBoundNum = (value: unknown): number | undefined =>
+          typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : undefined;
+        // Schema fields on ChatSendParamsSchema (not type-assertion-only).
+        const explicitTaskId = readBound(p.planConfirmTaskId);
+        const explicitBoard = readBound(p.planConfirmBoardItemId);
+        const explicitTodolist = readBound(p.planConfirmTodolistId);
+        const explicitDecision = readBound(p.planConfirmDecisionId);
+        const explicitVersion = readBoundNum(p.planConfirmExpectedVersion);
+        let confirmAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null = null;
+        let confirmStores: ReturnType<typeof createTrustedGroupStores> | null = null;
+        if (confirmActor) {
+          confirmAuth = await authorizeTeamGroupResourceAccess({
+            groupId: scope.groupId,
+            actor: confirmActor,
+            client,
+            tenant,
+            action: "write",
+            cfg: policySnapshotCfg,
+          });
+          if (confirmAuth.ok) {
+            confirmStores = createTrustedGroupStores({
+              groupsRoot: confirmAuth.groupsRoot,
+              groupLocator: confirmAuth.groupLocator,
+            });
+          }
+        }
+        let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
+        try {
+          confirmHook = await maybeConfirmPlanFromChatSend({
+            groupId: scope.groupId,
+            message: mentionMessage,
+            actor: confirmActor,
+            // Prefer explicit card/reply binding; group currentTaskId alone is unreliable.
+            taskId: explicitTaskId || wakeTaskId,
+            boardItemId: explicitBoard,
+            todolistId: explicitTodolist,
+            decisionId: explicitDecision,
+            expectedVersion: explicitVersion,
+            taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
+            tenant,
+            cfg: policySnapshotCfg,
+            ...(confirmAuth && confirmAuth.ok
+              ? {
+                  auth: confirmAuth,
+                  stores: confirmStores,
+                  trusted: {
+                    groupsRoot: confirmAuth.groupsRoot,
+                    groupLocator: confirmAuth.groupLocator,
+                  },
+                }
+              : {}),
+          });
+        } catch (confirmError) {
+          const errMsg = `尚未确认：确认入口异常（${
+            confirmError instanceof Error ? confirmError.message : String(confirmError)
+          }）。`;
+          let transcriptPersist: { ok: boolean; error?: string } = {
+            ok: false,
+            error: "session_context_missing",
+          };
+          if (groupSession.entry.sessionId && groupSession.storePath) {
+            try {
+              transcriptPersist = await appendAssistantTranscriptMessage({
+                message: errMsg,
+                sessionId: groupSession.entry.sessionId,
+                storePath: groupSession.storePath,
+                sessionFile: groupSession.entry.sessionFile,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:plan-confirm-error`,
+              });
+            } catch (persistErr) {
+              transcriptPersist = {
+                ok: false,
+                error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+              };
+            }
+          }
+          respond(
+            true,
+            {
+              runId: clientRunId,
+              status: "stopped" as const,
+              message: errMsg,
+              transcriptPersist,
+              transcriptVisible: transcriptPersist.ok,
+            },
+            undefined,
+            { runId: clientRunId },
+          );
+          return;
+        }
+        if (confirmHook.handled) {
+          let transcriptPersist: { ok: boolean; error?: string } = {
+            ok: false,
+            error: "session_context_missing",
+          };
+          if (groupSession.entry.sessionId && groupSession.storePath) {
+            try {
+              transcriptPersist = await appendAssistantTranscriptMessage({
+                message: confirmHook.userMessage,
+                sessionId: groupSession.entry.sessionId,
+                storePath: groupSession.storePath,
+                sessionFile: groupSession.entry.sessionFile,
+                createIfMissing: true,
+                idempotencyKey: `${clientRunId}:plan-confirm`,
+              });
+            } catch (persistErr) {
+              transcriptPersist = {
+                ok: false,
+                error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+              };
+            }
+          }
+          const visibleMessage = transcriptPersist.ok
+            ? confirmHook.userMessage
+            : `${confirmHook.userMessage}（展示写入失败：${transcriptPersist.error ?? "unknown"}）`;
+          respond(
+            true,
+            {
+              runId: clientRunId,
+              status: "stopped" as const,
+              // Transcript + response: chat.history can paint the same userMessage when persist ok.
+              message: visibleMessage,
+              planConfirm: confirmHook.result,
+              autoAdvanceWired: confirmHook.autoAdvanceWired,
+              transcriptPersist,
+              transcriptVisible: transcriptPersist.ok,
+              ...(confirmStores
+                ? {
+                    trustedGroupLocator: confirmStores.groupLocator,
+                    trustedGroupsRoot: confirmStores.groupsRoot,
+                  }
+                : {}),
+            },
+            undefined,
+            { runId: clientRunId },
+          );
+          // Confirm turn never starts dependent execution here (auto-advance not wired).
+          return;
+        }
+      }
       let v1RollCallExtraLines: string[] | undefined;
       if (v1RollCallHooks.active) {
         const lines: string[] = [];

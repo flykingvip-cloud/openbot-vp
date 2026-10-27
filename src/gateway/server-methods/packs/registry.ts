@@ -5,6 +5,7 @@
 import { DIAGNOSIS_REPORT_API_DEPLOYED } from "../../../diagnosis/report-query-deploy.js";
 import { artifactGrantPack } from "../artifact-grant.pack.js";
 import { chatCheckpointsPack } from "../chat-checkpoints.pack.js";
+import { collaborationTaskActivationPack } from "../collaboration-task-activation.pack.js";
 import { daibaiPack } from "../daibai.pack.js";
 import { dataGovernancePack } from "../data-governance.pack.js";
 import { deliveryLanePack } from "../delivery-lane.pack.js";
@@ -34,6 +35,7 @@ export { GATEWAY_METHOD_PACK_MANIFEST, PACK_OWNED_METHOD_NAMES };
 export const GATEWAY_METHOD_PACKS: readonly GatewayMethodPack[] = [
   artifactGrantPack,
   chatCheckpointsPack,
+  collaborationTaskActivationPack,
   stewardWorkspaceFilePack,
   groupWorkspaceFilePack,
   groupSharedDocPack,

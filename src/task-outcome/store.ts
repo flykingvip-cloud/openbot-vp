@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { OutcomeOutboxEvent, TaskOutcomeRecord } from "./types.js";
@@ -407,7 +407,11 @@ export class DurableTaskOutcomeStore {
   }
 
   commandLogPath(commandId: string): string {
-    return path.join(this.rootDir, "command-log", `${encodeURIComponent(commandId)}.json`);
+    // Avoid ENAMETOOLONG on macOS when commandId embeds long space session keys.
+    const encoded = encodeURIComponent(commandId);
+    const base =
+      encoded.length > 160 ? `h-${createHash("sha256").update(commandId).digest("hex")}` : encoded;
+    return path.join(this.rootDir, "command-log", `${base}.json`);
   }
 
   loadCommand(

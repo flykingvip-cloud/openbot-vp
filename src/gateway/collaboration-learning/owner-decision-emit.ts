@@ -34,6 +34,7 @@ import {
   type OwnerDecisionCardDelivery,
 } from "./owner-decision-delivery.js";
 import { createWorkspaceCollaborationStores, readGroupOperatingState } from "./shared.js";
+import { createTrustedGroupStores } from "./team-resource-auth.js";
 
 export type OwnerDecisionEmitResult = (
   | { ok: true; card: OwnerDecisionCard; messageId?: string; skipped?: false }
@@ -309,6 +310,8 @@ async function finishDelivery(params: {
   cfg?: OpenBotConfig;
   nowMs: number;
   delivery: OwnerDecisionCardDelivery;
+  groupRootDir?: string;
+  groupLocator?: string;
 }): Promise<OwnerDecisionCardDelivery> {
   if (!compact(params.groupId)) {
     return params.delivery;
@@ -319,6 +322,8 @@ async function finishDelivery(params: {
       cfg: params.cfg,
       nowMs: params.nowMs,
       delivery: params.delivery,
+      groupRootDir: params.groupRootDir,
+      groupLocator: params.groupLocator,
     });
   } catch (err) {
     return normalizeOwnerDecisionDelivery({
@@ -340,12 +345,22 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
   authority?: RuntimeAuthority;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Trusted locator so delivery log matches board/plan SoT. */
+  groupRootDir?: string;
+  groupLocator?: string;
 }): Promise<OwnerDecisionEmitResult> {
   const cfg = params.cfg ?? loadConfig();
   const nowMs = params.nowMs ?? Date.now();
   const groupId = compact(params.groupId) || compact(params.todolist.groupId);
   const tracked = async (delivery: OwnerDecisionCardDelivery): Promise<OwnerDecisionCardDelivery> =>
-    finishDelivery({ groupId, cfg, nowMs, delivery });
+    finishDelivery({
+      groupId,
+      cfg,
+      nowMs,
+      delivery,
+      groupRootDir: params.groupRootDir,
+      groupLocator: params.groupLocator,
+    });
 
   if (!groupId) {
     return {
@@ -376,7 +391,13 @@ export async function emitOwnerDecisionCardForProposedTodolist(params: {
   let operatingState: OperatingStateAclSource = null;
   let memberRows: GroupMemberNameRow[] = [];
   try {
-    const stores = createWorkspaceCollaborationStores(cfg);
+    const stores =
+      params.groupRootDir && params.groupLocator
+        ? createTrustedGroupStores({
+            groupsRoot: params.groupRootDir,
+            groupLocator: params.groupLocator,
+          })
+        : createWorkspaceCollaborationStores(cfg);
     operatingState = (await readGroupOperatingState({
       fileStore: stores.fileStore,
       groupId,
