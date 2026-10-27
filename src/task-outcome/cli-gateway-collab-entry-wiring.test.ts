@@ -113,6 +113,10 @@ function mockAgentConfig(home: string, agentDir: string) {
 }
 
 describe("askOutcome W1 CLI / gateway_agent entry wiring via agentCommand*", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     recordRunnerTurnOutcomeMock.mockReset();
@@ -276,6 +280,8 @@ describe("askOutcome W1 collab claim/apply entry wiring", () => {
   });
 
   beforeEach(() => {
+    // CLI describe spies loadConfig; restore so seed/authority use the collab snapshot.
+    vi.restoreAllMocks();
     recordRunnerTurnOutcomeMock.mockReset();
     recordRunnerTurnOutcomeMock.mockResolvedValue({
       record: { taskId: "t", entrypoint: "collab" },
