@@ -57,7 +57,15 @@
 
 既有收敛（本轮仅 inventory，不另起）：`CloseReasonCode.timeout` 已有 eligibility；supervisor `retry` / agents `model-fallback` / gateway billing usage limits 继续各自生效。
 
-非目标：W4 learning-recall；W5 evolution-loop-log；supervisor 热路径全量自动扣 tip；evolution 旁路退役。
+### 5.2 W5 结构收尾（复用现有机制）
+
+| 问题          | 复用什么                                                           | 修哪个断点                              | 减少什么                                                            |
+| ------------- | ------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------- |
+| 无界 loop-log | `logEvolutionLoop` / test list+reset；对齐 capability-gap 有界 Map | 进程内 `captured[]` 无界                | `EVOLUTION_LOOP_LOG_CAPTURE_MAX` ring；dropped 计数；不另起耐久日志 |
+| 矩阵收敛      | W0 矩阵 + `call-chain-and-replacements.md`                         | 过时「无界待收尾 / W4 进行中」          | 总表 W0–W5 tip + 诚实残留                                           |
+| 旁路          | tip→growth-bridge 合法写入                                         | operational `recordRunOutcome` 仍绕 tip | **不退役**（canary 仍用；缺替代证明）                               |
+
+非目标：supervisor 热路径全量自动扣 tip；evolution 旁路强制删除；新增主动记忆/容错系统。
 
 ## 6. 入口适配
 
