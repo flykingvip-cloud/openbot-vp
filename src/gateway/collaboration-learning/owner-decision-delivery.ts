@@ -110,8 +110,12 @@ export function ownerDecisionDeliveryStatusCopy(
   return null;
 }
 
-export function resolveOwnerDecisionDeliveryLogPath(groupId: string, cfg?: OpenBotConfig): string {
-  const transcript = resolveGroupPublicTranscriptPath(groupId, cfg);
+export function resolveOwnerDecisionDeliveryLogPath(
+  groupId: string,
+  cfg?: OpenBotConfig,
+  options?: { groupRootDir?: string; groupLocator?: string },
+): string {
+  const transcript = resolveGroupPublicTranscriptPath(groupId, cfg, options);
   return path.join(path.dirname(transcript), "owner-decision-delivery.jsonl");
 }
 
@@ -284,6 +288,9 @@ export async function recordOwnerDecisionDelivery(params: {
   delivery: OwnerDecisionCardDelivery;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Trusted group locator — keep delivery log on same SoT as board/plan. */
+  groupRootDir?: string;
+  groupLocator?: string;
 }): Promise<OwnerDecisionCardDelivery> {
   const delivery = normalizeOwnerDecisionDelivery({
     ...params.delivery,
@@ -293,7 +300,10 @@ export async function recordOwnerDecisionDelivery(params: {
   if (raw.includes("confirmationToken")) {
     throw new Error("owner-decision delivery record must not contain confirmationToken");
   }
-  const dest = resolveOwnerDecisionDeliveryLogPath(params.groupId || delivery.groupId, params.cfg);
+  const dest = resolveOwnerDecisionDeliveryLogPath(params.groupId || delivery.groupId, params.cfg, {
+    groupRootDir: params.groupRootDir,
+    groupLocator: params.groupLocator,
+  });
   await appendJsonlDurable(dest, {
     kind: OWNER_DECISION_DELIVERY_KIND,
     at: params.nowMs ?? Date.now(),
@@ -307,8 +317,13 @@ export async function readOwnerDecisionDeliveries(params: {
   taskId?: string;
   todolistId?: string;
   cfg?: OpenBotConfig;
+  groupRootDir?: string;
+  groupLocator?: string;
 }): Promise<OwnerDecisionCardDelivery[]> {
-  const dest = resolveOwnerDecisionDeliveryLogPath(params.groupId, params.cfg);
+  const dest = resolveOwnerDecisionDeliveryLogPath(params.groupId, params.cfg, {
+    groupRootDir: params.groupRootDir,
+    groupLocator: params.groupLocator,
+  });
   let text = "";
   try {
     text = await fsp.readFile(dest, "utf8");
