@@ -158,13 +158,13 @@ dependencies {
     implementation(composeBom)
     androidTestImplementation(composeBom)
 
-    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     implementation("androidx.lifecycle:lifecycle-process:2.11.0")
-    implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     implementation("androidx.activity:activity-compose:1.13.0")
-    implementation("androidx.webkit:webkit:1.17.0")
-    implementation("androidx.browser:browser:1.9.0")
+    implementation("androidx.webkit:webkit:1.18.0")
+    implementation("androidx.browser:browser:1.10.0")
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -172,25 +172,25 @@ dependencies {
     // material-icons-extended pulled in full icon set (~20 MB DEX). Only ~18 icons used.
     // R8 will tree-shake unused icons when minify is enabled on release builds.
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.navigation:navigation-compose:2.10.1")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     // Material Components (XML theme + resources)
     implementation("com.google.android.material:material:1.14.0")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
 
     implementation("androidx.security:security-crypto:1.1.0")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
-    implementation("com.squareup.okhttp3:okhttp:5.5.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
     implementation("org.bouncycastle:bcprov-jdk18on:1.86")
-    implementation("org.commonmark:commonmark:0.30.0")
-    implementation("org.commonmark:commonmark-ext-autolink:0.30.0")
-    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0")
-    implementation("org.commonmark:commonmark-ext-gfm-tables:0.30.0")
-    implementation("org.commonmark:commonmark-ext-task-list-items:0.30.0")
+    implementation("org.commonmark:commonmark:0.31.0")
+    implementation("org.commonmark:commonmark-ext-autolink:0.31.0")
+    implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.31.0")
+    implementation("org.commonmark:commonmark-ext-gfm-tables:0.31.0")
+    implementation("org.commonmark:commonmark-ext-task-list-items:0.31.0")
 
     // CameraX (for node.invoke camera.* parity)
     implementation("androidx.camera:camera-core:1.5.2")
@@ -203,10 +203,10 @@ dependencies {
     implementation("dnsjava:dnsjava:3.6.5")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("io.kotest:kotest-runner-junit5-jvm:6.2.5")
-    testImplementation("io.kotest:kotest-assertions-core-jvm:6.2.5")
-    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.12.0")
+    testImplementation("io.kotest:kotest-runner-junit5-jvm:6.2.6")
+    testImplementation("io.kotest:kotest-assertions-core-jvm:6.2.6")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
     testImplementation("org.robolectric:robolectric:4.17")
     testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.3")
 }
