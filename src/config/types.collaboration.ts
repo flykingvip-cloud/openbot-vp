@@ -307,6 +307,24 @@ export type CollaborationTaskConfig = {
    */
   wakeContractGroupAllowlist?: string[];
   /**
+   * R3 wake-op gateway recovery (plan `collab.task.wakeOpGatewayRecovery`). Default off.
+   * When true, gateway methods `collaboration.task.wakeOp.releaseForRetry` /
+   * `collaboration.task.wakeOp.confirmCompleted` may mint a trusted gateway
+   * session from platform auth and run recovery release/confirm. Prefer
+   * wakeOpGatewayRecoveryGroupAllowlist for gray canary. Fail-closed until
+   * CF-008 + explicit gray GO. Does not enable TEST_ONLY mint or non-nudge
+   * auto-retry.
+   */
+  wakeOpGatewayRecovery?: boolean;
+  /**
+   * Gray-group allowlist for wake-op gateway recovery (default empty = off).
+   * FINAL v3 P0: managed_enterprise entries MUST be `tenantId/groupId`
+   * (or wildcard-tenant `/groupId` with tenant=`*`). Bare `groupId` never authorizes a non-empty tenantId
+   * caller. Bare entries remain personal_local only. Platform flag stays
+   * false by default; gray-enable = add the scoped entry; rollback = remove it.
+   */
+  wakeOpGatewayRecoveryGroupAllowlist?: string[];
+  /**
    * Mode B post-claim intended fan-out wake (plan `collab.task.postClaimFanoutWake`).
    * Default unset/false = off. When true (or group on allowlist), claimBoardItem
    * also wakes `intendedClaimantIds \ {claimantId}` via Wake Contract so

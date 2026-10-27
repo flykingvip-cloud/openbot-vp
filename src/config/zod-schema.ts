@@ -210,6 +210,8 @@ const CollaborationSchema = z
         claimContractGroupAllowlist: z.array(z.string()).optional(),
         wakeContract: z.boolean().optional(),
         wakeContractGroupAllowlist: z.array(z.string()).optional(),
+        wakeOpGatewayRecovery: z.boolean().optional(),
+        wakeOpGatewayRecoveryGroupAllowlist: z.array(z.string()).optional(),
         postClaimFanoutWake: z.boolean().optional(),
         postClaimFanoutWakeGroupAllowlist: z.array(z.string()).optional(),
         boardKickoffMultiParticipant: z.boolean().optional(),
