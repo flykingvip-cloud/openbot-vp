@@ -1,5 +1,5 @@
 {
-  "originHash" : "b3b449a88f438cacfcb808119afc68bf9590087e48e57bdd11ca4f9bedfe114f",
+  "originHash" : "4a16d3e216353c35e991702c8b56859d6368527293a4ab8813b702412bcf12bc",
   "pins" : [
     {
       "identity" : "axorcist",
@@ -42,7 +42,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/steipete/Peekaboo.git",
       "state" : {
-        "branch" : "main",
         "revision" : "8d5e638e6ac9e93fae7d8dcb2ac0a0f01f3d49ec"
       }
     },
@@ -96,8 +95,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-subprocess.git",
       "state" : {
-        "revision" : "ba5888ad7758cbcbe7abebac37860b1652af2d9c",
-        "version" : "0.3.0"
+        "revision" : "dbe21bd7dfd4ffef8c32588918542a8abfa1b54c",
+        "version" : "1.0.2"
       }
     },
     {
