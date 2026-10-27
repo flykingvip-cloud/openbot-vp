@@ -4,7 +4,6 @@
  * Requires a live gateway request function; does not invent local stub verified.
  */
 
-import type { CanonicalCapabilityId } from "../capability-ids.ts";
 import {
   saveVerificationTask,
   upsertModelAdmission,

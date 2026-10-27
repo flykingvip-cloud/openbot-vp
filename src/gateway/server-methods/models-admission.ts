@@ -12,7 +12,6 @@ import {
 import {
   ErrorCodes,
   errorShape,
-  formatValidationErrors,
   validateModelsAdmissionBatchVerificationParams,
   validateModelsAdmissionCancelVerificationParams,
   validateModelsAdmissionCreateVerificationParams,
@@ -25,32 +24,20 @@ import {
   validateModelsAdmissionSetRoutingEligibilityParams,
 } from "../protocol/index.js";
 import type { GatewayRequestHandlers } from "./types.js";
+import { assertValidParams } from "./validation.js";
 
 const service = createGatewayVerificationService();
 
-function invalid(
-  respond: (ok: false, _p: undefined, err: unknown) => void,
-  method: string,
-  errors: unknown,
-) {
-  respond(
-    false,
-    undefined,
-    errorShape(
-      ErrorCodes.INVALID_REQUEST,
-      `invalid ${method} params: ${formatValidationErrors(errors)}`,
-    ),
-  );
-}
-
 export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   "models.admission.discoverCapabilities": async ({ params, respond }) => {
-    if (!validateModelsAdmissionDiscoverParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionDiscoverParams,
         "models.admission.discoverCapabilities",
-        validateModelsAdmissionDiscoverParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -66,12 +53,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.createVerificationTask": async ({ params, respond }) => {
-    if (!validateModelsAdmissionCreateVerificationParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionCreateVerificationParams,
         "models.admission.createVerificationTask",
-        validateModelsAdmissionCreateVerificationParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -90,12 +79,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.getVerificationTask": async ({ params, respond }) => {
-    if (!validateModelsAdmissionGetVerificationParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionGetVerificationParams,
         "models.admission.getVerificationTask",
-        validateModelsAdmissionGetVerificationParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -107,12 +98,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.listVerificationTasks": async ({ params, respond }) => {
-    if (!validateModelsAdmissionListVerificationParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionListVerificationParams,
         "models.admission.listVerificationTasks",
-        validateModelsAdmissionListVerificationParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -124,12 +117,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.cancelVerificationTask": async ({ params, respond }) => {
-    if (!validateModelsAdmissionCancelVerificationParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionCancelVerificationParams,
         "models.admission.cancelVerificationTask",
-        validateModelsAdmissionCancelVerificationParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -141,12 +136,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.createBatchVerificationTasks": async ({ params, respond }) => {
-    if (!validateModelsAdmissionBatchVerificationParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionBatchVerificationParams,
         "models.admission.createBatchVerificationTasks",
-        validateModelsAdmissionBatchVerificationParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -158,12 +155,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.setRoutingEligibility": async ({ params, respond }) => {
-    if (!validateModelsAdmissionSetRoutingEligibilityParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionSetRoutingEligibilityParams,
         "models.admission.setRoutingEligibility",
-        validateModelsAdmissionSetRoutingEligibilityParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -181,12 +180,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.getModelAdmission": async ({ params, respond }) => {
-    if (!validateModelsAdmissionGetModelParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionGetModelParams,
         "models.admission.getModelAdmission",
-        validateModelsAdmissionGetModelParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -198,12 +199,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.listModelAdmissions": async ({ params, respond }) => {
-    if (!validateModelsAdmissionListModelsParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionListModelsParams,
         "models.admission.listModelAdmissions",
-        validateModelsAdmissionListModelsParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {
@@ -215,12 +218,14 @@ export const modelsAdmissionHandlers: GatewayRequestHandlers = {
   },
 
   "models.admission.previewRoutingDecision": async ({ params, respond }) => {
-    if (!validateModelsAdmissionPreviewRoutingParams(params)) {
-      invalid(
-        respond,
+    if (
+      !assertValidParams(
+        params,
+        validateModelsAdmissionPreviewRoutingParams,
         "models.admission.previewRoutingDecision",
-        validateModelsAdmissionPreviewRoutingParams.errors,
-      );
+        respond,
+      )
+    ) {
       return;
     }
     try {

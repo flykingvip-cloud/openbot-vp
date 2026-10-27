@@ -1,6 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { __resetModelAdmissionStoreForTest, getModelAdmission } from "../model-admission-store.ts";
-import { createRpcCapabilityVerificationService } from "./rpc-adapter.ts";
+import {
+  createRpcCapabilityVerificationService,
+  type AdmissionGatewayRequest,
+} from "./rpc-adapter.ts";
 import {
   __resetCapabilityVerificationServiceForTest,
   bindCapabilityAdmissionGateway,
@@ -14,7 +17,10 @@ describe("rpc capability verification adapter", () => {
   });
 
   it("mirrors formal task + admission from gateway and reports applied routing", async () => {
-    const request = vi.fn(async (method: string, params?: Record<string, unknown>) => {
+    const requestImpl = async (
+      method: string,
+      params?: Record<string, unknown>,
+    ): Promise<unknown> => {
       if (method === "models.admission.createVerificationTask") {
         return {
           authority: "formal",
@@ -80,7 +86,11 @@ describe("rpc capability verification adapter", () => {
         return { admissions: [] };
       }
       throw new Error(`unexpected method ${method}`);
-    });
+    };
+    const request: AdmissionGatewayRequest = <T>(
+      method: string,
+      params?: Record<string, unknown>,
+    ) => requestImpl(method, params) as Promise<T>;
 
     await bindCapabilityAdmissionGateway(request);
     expect(isCapabilityAdmissionRpcActive()).toBe(true);
