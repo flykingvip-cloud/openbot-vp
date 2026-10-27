@@ -2787,6 +2787,10 @@ tasks:
       - src/memory/memory-batch1-o8-baseline.test.ts
       - src/memory/memory-batch1-o8-baseline-v2.test.ts
       - src/memory/memory-batch1-o8-baseline-v3.test.ts
+      - src/memory/memory-effect-acceptance-matrix.test.ts
+      - docs/design/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-run-2026-10-27.json
       - ui/src/ui/ports/employee/views/data-directory-page.ts
       - ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
       - src/gateway/server-methods/data.ts
@@ -19474,6 +19478,7 @@ landingStreams:
       - LDRG
       - CHAT_HISTORY_P0_IMAGE_OMIT
       - u1-unified-task-stop
+      - DDOC
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
@@ -19628,6 +19633,10 @@ landingStreams:
       - src/memory/memory-batch1-o8-baseline.test.ts
       - src/memory/memory-batch1-o8-baseline-v2.test.ts
       - src/memory/memory-batch1-o8-baseline-v3.test.ts
+      - src/memory/memory-effect-acceptance-matrix.test.ts
+      - docs/design/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-run-2026-10-27.json
       - ui/src/ui/ports/employee/views/data-directory-page.ts
       - ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
       - src/gateway/server-methods/data.ts
@@ -19685,6 +19694,8 @@ landingStreams:
       - .loom/registry.yaml
     canLandWith:
       - CDUI
+      - MRR
+      - DDOC
     metadata:
       legacyTitle: Conversation Lifecycle (Catalog + Gateway + Employee UI)
       disposition: MERGE
@@ -21767,7 +21778,9 @@ landingStreams:
       - docs/design/**
       - test/seq96-seq97-adjudication.test.ts
       - test/constitutional-governance-state-convergence.test.ts
-    canLandWith: []
+    canLandWith:
+      - CL
+      - MRR
     metadata:
       legacyRuleId: merge-design-docs
       legacyTitle: Design Documents (Straggler)
