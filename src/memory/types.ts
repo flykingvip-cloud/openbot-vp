@@ -144,4 +144,12 @@ export interface MemorySearchManager {
       confidence?: number;
     }>
   >;
+  /**
+   * O4 isolated readonly foundation — optional; absent on non-CogniWeave backends.
+   * See `memory-center-o4-readonly.ts`. Wired via data.memory.list statusView.
+   */
+  listMemoryCenterAtomsReadonly?(opts?: {
+    statusView?: "active" | "tentative";
+    limit?: number;
+  }): Promise<import("./memory-center-o4-readonly.js").MemoryCenterReadonlyListResult>;
 }

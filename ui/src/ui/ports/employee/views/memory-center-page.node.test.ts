@@ -160,3 +160,143 @@ describe("O5 file-delete copy contract", () => {
     expect(deleteButtons).toHaveLength(1);
   });
 });
+
+describe("O4 candidate status view (C1–C6 UI)", () => {
+  const baseSettings = {
+    robotEntries: [{ id: "main", name: "大白管家", source: "owned" }],
+    groupEntries: [],
+    onMemoryCenterStatusViewChange: () => undefined,
+    onMemoryCenterAtomIdChange: () => undefined,
+  } as never;
+
+  it("C1: default active view with only tentative elsewhere shows candidate hint empty-state", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel(baseSettings, {
+        mode: "local",
+        agentId: "main",
+        statusView: "active",
+        atoms: [],
+        entries: [],
+        otherViewTotal: 2,
+      }),
+      container,
+    );
+    expect(container.textContent).toContain("已确认");
+    expect(container.textContent).toContain("候选（待确认）");
+    expect(container.textContent).toContain("可切换到「候选（待确认）」查看待确认项");
+    expect(container.textContent).not.toContain("待确认的候选记忆");
+  });
+
+  it("C2: tentative view shows rows with 待确认 badge and detail status", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel(baseSettings, {
+        mode: "local",
+        agentId: "main",
+        statusView: "tentative",
+        selectedAtomId: "atom_t",
+        atoms: [
+          {
+            id: "atom_t",
+            summary: "maybe prefer dark mode",
+            atomType: "preference",
+            scope: { kind: "agent", visibility: "private", agentId: "main" },
+            botId: "main",
+            syncEligible: false,
+            shared: false,
+            status: "tentative",
+            updatedAtMs: 1_700_000_000_000,
+          },
+        ],
+      }),
+      container,
+    );
+    expect(container.textContent).toContain("maybe prefer dark mode");
+    expect(container.textContent).toContain("待确认");
+    expect(container.textContent).toContain("候选 ·");
+    // Filter tab selected
+    const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
+    const candidate = tabs.find((tab) => (tab.textContent ?? "").includes("候选"));
+    expect(candidate?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("C3: unbound atomListError is explicit (not fake empty copy)", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel(baseSettings, {
+        mode: "local",
+        agentId: "main",
+        statusView: "tentative",
+        atoms: [],
+        entries: [],
+        atomListError: {
+          code: "MEMORY_SUBJECT_UNBOUND",
+          message: "unbound",
+        },
+      }),
+      container,
+    );
+    expect(container.textContent).toContain("尚未绑定记忆主体");
+    expect(container.textContent).not.toContain("暂无待确认的候选记忆");
+  });
+
+  it("C4: active view lists only confirmed atoms without tentative badge", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel(baseSettings, {
+        mode: "local",
+        agentId: "main",
+        statusView: "active",
+        atoms: [
+          {
+            id: "atom_a",
+            summary: "confirmed preference",
+            atomType: "preference",
+            scope: { kind: "agent", visibility: "private", agentId: "main" },
+            botId: "main",
+            syncEligible: false,
+            shared: false,
+            status: "active",
+            updatedAtMs: 1_700_000_000_000,
+          },
+        ],
+      }),
+      container,
+    );
+    expect(container.textContent).toContain("confirmed preference");
+    // Filter tab label includes「待确认」, but confirmed rows must not carry the badge.
+    expect(container.querySelector(".employee-workbench__memory-badge")).toBeNull();
+    const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
+    const confirmed = tabs.find((tab) => (tab.textContent ?? "").trim() === "已确认");
+    expect(confirmed?.getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("C5: managed mode still hides local memory center actions", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel({} as never, { mode: "managed", statusView: "tentative" }),
+      container,
+    );
+    expect(container.textContent).toContain("云端托管");
+    expect(container.textContent).not.toContain("候选（待确认）");
+    expect(container.textContent).not.toContain("删除此记忆文件");
+  });
+
+  it("C6: tentative empty-state copy does not imply confirmed memories", () => {
+    const container = document.createElement("div");
+    render(
+      renderMemoryCenterPanel(baseSettings, {
+        mode: "local",
+        agentId: "main",
+        statusView: "tentative",
+        atoms: [],
+        entries: [],
+        otherViewTotal: 3,
+      }),
+      container,
+    );
+    expect(container.textContent).toContain("暂无待确认的候选记忆");
+    expect(container.textContent).not.toContain("可切换到「候选（待确认）」查看待确认项");
+  });
+});

@@ -45,6 +45,11 @@ import {
   type CogniWeaveCloudSyncLoopHandle,
 } from "./cogniweave-cloud-sync-drain.js";
 import { mapAtomToMemoryCenterRow, type MemoryCenterAtomRow } from "./memory-center-atoms.js";
+import {
+  listMemoryCenterAtomsReadonly as listMemoryCenterAtomsReadonlyFoundation,
+  type MemoryCenterReadonlyListResult,
+  type MemoryCenterStatusView,
+} from "./memory-center-o4-readonly.js";
 import * as memoryWorkspaceHandle from "./memory-workspace-handle.js";
 import { buildSessionEntry, listSessionFilesForAgent } from "./session-files.js";
 import type {
@@ -1114,6 +1119,26 @@ export class CogniWeaveMemoryManager implements MemorySearchManager {
       },
     });
     return hits.map((hit) => mapAtomToMemoryCenterRow(hit.atom));
+  }
+
+  /**
+   * O4 isolated readonly Memory Center list (active|tentative exact).
+   * Does not syncScope, ensureMemorySubjectBinding, mkdir, or migrate.
+   * Prefer this from data.memory.list when statusView is requested; legacy listMemoryCenterAtoms remains for sync-bound callers.
+   */
+  async listMemoryCenterAtomsReadonly(opts?: {
+    statusView?: MemoryCenterStatusView;
+    limit?: number;
+  }): Promise<MemoryCenterReadonlyListResult> {
+    return listMemoryCenterAtomsReadonlyFoundation({
+      metadataStorePath: this.metadataStorePath,
+      scope: this.defaultScope,
+      agentId: this.agentId,
+      statusView: opts?.statusView,
+      limit: opts?.limit,
+      backend: "cogniweave",
+      cogniweaveMode: this.resolved.mode,
+    });
   }
 
   status(): MemoryProviderStatus {
