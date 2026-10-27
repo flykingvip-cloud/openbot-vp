@@ -3,6 +3,7 @@ import { renderIcon } from "../../../../icons.ts";
 import { formatCost } from "../../../../views/usage-metrics.ts";
 import "./model-assets-drawer.css";
 import "./model-assets-list.css";
+import type { PlatformModelAddInput } from "../../render-actions.ts";
 import { requestPlatformSurfaceRerender } from "../../shared/surface.ts";
 import type { PlatformModelsActions } from "../actions.ts";
 import {
@@ -33,6 +34,7 @@ import {
   isManagedPoolModel,
   markModelConnectionVerified,
 } from "../model-connection-gate.ts";
+import type { PlatformModelCallType } from "../platform-model-definition.ts";
 import { formatOperatorProbeMessage } from "../probe-operator-message.ts";
 import {
   SPECIALIZED_EVAL_BACKEND_STATUS,
@@ -86,7 +88,7 @@ function activePanelField(form: HTMLFormElement, name: string): string {
   return input ? input.value.trim() : "";
 }
 
-export function buildBootstrapModelInput(form: HTMLFormElement) {
+export function buildBootstrapModelInput(form: HTMLFormElement): PlatformModelAddInput | null {
   const data = new FormData(form);
   const providerId = formText(data, "providerId");
   const modelId = formText(data, "modelId");
@@ -101,13 +103,13 @@ export function buildBootstrapModelInput(form: HTMLFormElement) {
         .filter((item): item is "text" | "image" => item === "text" || item === "image")
     : [];
   const callTypeRaw = formText(data, "callType");
-  const callType =
+  const callType: PlatformModelCallType | undefined =
     callTypeRaw === "image_generation" ||
     callTypeRaw === "music_generation" ||
     callTypeRaw === "text_chat"
       ? callTypeRaw
       : undefined;
-  return {
+  const input: PlatformModelAddInput = {
     providerId,
     baseUrl: activePanelField(form, "baseUrl"),
     modelId,
@@ -120,6 +122,7 @@ export function buildBootstrapModelInput(form: HTMLFormElement) {
     apiKey: activePanelField(form, "apiKey"),
     ...(callType ? { callType } : {}),
   };
+  return input;
 }
 
 function parseModelRowRef(text: string): { providerId: string; modelId: string } | null {
