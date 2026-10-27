@@ -51,3 +51,16 @@ export {
   stopTaskOutcomeRuntimeDrainForTests,
 } from "./consumer-boot.js";
 export * from "./chat-entry.js";
+
+export {
+  cronTurnTaskId,
+  cliTurnTaskId,
+  collabTurnTaskId,
+  gatewayAgentTurnTaskId,
+  followupTurnTaskId,
+  ensureCronTurnTaskOutcome,
+  ensureCliTurnTaskOutcome,
+  ensureCollabTurnTaskOutcome,
+  ensureGatewayAgentTurnTaskOutcome,
+  ensureFollowupTurnTaskOutcome,
+} from "./entrypoint-ensure.js";

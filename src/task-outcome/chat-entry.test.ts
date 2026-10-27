@@ -35,8 +35,10 @@ describe("chat entry taskId", () => {
       chatTurnTaskId({ agentId: "bot", runId: "run-1", sessionKey: "sess-a" }),
     );
     expect(opened.record.lifecycle).toBe("awaiting_acceptance");
+    expect(opened.record.entrypoint).toBe("chat");
     const store = new DurableTaskOutcomeStore(path.join(agentDir, TASK_OUTCOME_STORE_DIRNAME));
     expect(store.loadTask(opened.taskId)?.taskId).toBe(opened.taskId);
+    expect(store.loadTask(opened.taskId)?.entrypoint).toBe("chat");
   });
 
   it("rejects restore with different subject", () => {

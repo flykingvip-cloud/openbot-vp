@@ -47,6 +47,8 @@ export type RunnerTurnOutcomeInput = {
   /** Required stable task id from entry; do not invent from runId when provided. */
   taskId?: string;
   scope?: TrustedScope;
+  /** When creating (not restore), persist this entrypoint; defaults to chat. */
+  entrypoint?: import("./types.js").Entrypoint;
   /** Structured failure — required when success=false. Defaults to run_failed. */
   failureReason?: RunnerTurnFailureReason;
   failureDetail?: string;
@@ -220,6 +222,7 @@ export async function recordRunnerTurnOutcome(
     scope,
     taskContractVersion: "1.0.0",
     commandId: `create:${taskId}`,
+    ...(input.entrypoint ? { entrypoint: input.entrypoint } : {}),
   });
   if (!opened.ok) {
     throw new Error(`task-outcome open failed: ${"code" in opened ? opened.code : "unknown"}`);

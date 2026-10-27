@@ -47,6 +47,7 @@ export function applyTransition(
       judgementPolicyVersion: JUDGEMENT_POLICY_VERSION,
       scope: transition.scope,
       taskId,
+      ...(transition.parentTaskId?.trim() ? { parentTaskId: transition.parentTaskId.trim() } : {}),
       entrypoint: transition.entrypoint,
       lifecycle,
       decisiveRunStatus: "none",

@@ -183,7 +183,13 @@ export type EvaluationEligibility = {
 };
 
 export type SubmitTransition =
-  | { type: "create"; entrypoint: Entrypoint; scope: TrustedScope; taskContractVersion: string }
+  | {
+      type: "create";
+      entrypoint: Entrypoint;
+      scope: TrustedScope;
+      taskContractVersion: string;
+      parentTaskId?: string;
+    }
   | {
       type: "record_attempt";
       attempt: AttemptResult;

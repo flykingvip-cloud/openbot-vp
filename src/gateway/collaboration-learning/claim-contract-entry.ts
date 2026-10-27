@@ -7,8 +7,14 @@
  * Floor live / multi-beat / RCIS / tip-prompt rules. Does not grant bots L3 task.assign.
  */
 import type { Task } from "@openbot/collaboration-core";
+import { resolveDefaultAgentId } from "../../agents/agent-scope.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { ensureCollabTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import {
+  recordRunnerTurnOutcome,
+  type RunnerTurnFailureReason,
+} from "../../task-outcome/runtime-from-runner.js";
 import {
   listChallengeWindows,
   openChallengeWindow,
@@ -389,6 +395,68 @@ export async function publishCollaborationBoardItem(
   );
 }
 
+/** askOutcome W1: stable collab tip identity for one board claim (group+item+claimant). */
+function collabClaimOutcomeIdentity(params: {
+  groupId: string;
+  boardItemId: string;
+  claimId: string;
+  subjectRef: string;
+  tenantId?: string;
+}) {
+  return {
+    groupId: params.groupId,
+    boardItemId: params.boardItemId,
+    claimId: params.claimId,
+    subjectRef: params.subjectRef,
+    ...(params.tenantId ? { tenantId: params.tenantId } : {}),
+  };
+}
+
+async function recordCollabClaimTurnOutcome(params: {
+  cfg: OpenBotConfig;
+  groupId: string;
+  boardItemId: string;
+  claimId: string;
+  subjectRef: string;
+  tenantId?: string;
+  runId: string;
+  success: boolean;
+  failureReason?: RunnerTurnFailureReason;
+  failureDetail?: string;
+}): Promise<void> {
+  const agentId = resolveDefaultAgentId(params.cfg);
+  const opened = ensureCollabTurnTaskOutcome(params.cfg, {
+    agentId,
+    ...collabClaimOutcomeIdentity({
+      groupId: params.groupId,
+      boardItemId: params.boardItemId,
+      claimId: params.claimId,
+      subjectRef: params.subjectRef,
+      tenantId: params.tenantId,
+    }),
+  });
+  if (!opened.ok) {
+    return;
+  }
+  try {
+    await recordRunnerTurnOutcome(params.cfg, agentId, {
+      success: params.success,
+      runId: params.runId,
+      taskId: opened.taskId,
+      scope: opened.scope,
+      entrypoint: "collab",
+      ...(params.success
+        ? {}
+        : {
+            failureReason: params.failureReason ?? ("run_failed" as const),
+            ...(params.failureDetail ? { failureDetail: params.failureDetail } : {}),
+          }),
+    });
+  } catch {
+    // Best-effort: board mutation already committed; tip write must not roll it back.
+  }
+}
+
 export type ClaimCollaborationBoardItemParams = {
   groupId: string;
   taskId: string;
@@ -419,18 +487,48 @@ export async function claimCollaborationBoardItem(
   if (!claimantId) {
     throw new ClaimContractEntryError("claimant_required", "claimantId / actor is required");
   }
-  return unwrap(
-    await claimBoardItem(
-      authority,
-      {
-        taskId: params.taskId,
-        itemId: params.itemId,
-        claimantId,
-      },
-      { cfg },
-    ),
-    "claimBoardItem",
-  );
+  const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
+  const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;
+  const tipRunId = `collab-claim:${params.groupId}:${params.itemId}:${claimantId}`;
+  try {
+    const item = unwrap(
+      await claimBoardItem(
+        authority,
+        {
+          taskId: params.taskId,
+          itemId: params.itemId,
+          claimantId,
+        },
+        { cfg },
+      ),
+      "claimBoardItem",
+    );
+    // Create/restore tip at real claim entry; leave awaiting_acceptance until accept path.
+    const agentId = resolveDefaultAgentId(cfg);
+    ensureCollabTurnTaskOutcome(cfg, {
+      agentId,
+      groupId: params.groupId,
+      boardItemId: params.itemId,
+      claimId: claimantId,
+      subjectRef,
+      ...(tenantId ? { tenantId } : {}),
+    });
+    return item;
+  } catch (err) {
+    await recordCollabClaimTurnOutcome({
+      cfg,
+      groupId: params.groupId,
+      boardItemId: params.itemId,
+      claimId: claimantId,
+      subjectRef,
+      tenantId,
+      runId: tipRunId,
+      success: false,
+      failureReason: err instanceof ClaimContractFlagOffError ? "authz_denied" : "run_failed",
+      failureDetail: String(err),
+    });
+    throw err;
+  }
 }
 
 export type ApplyCollaborationBoardClaimParams = {
@@ -623,6 +721,20 @@ export async function applyCollaborationBoardClaim(
     learningStorage: stores.learningStorage,
     objectStorage: stores.objectStorage,
     groupId: params.groupId,
+  });
+  const claimantId = resultItem.claimantId?.trim() || params.actor?.trim() || "collab-claimant";
+  const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;
+  const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
+  // Restore same claim tip; record apply as run-end without inventing acceptance/delivery.
+  await recordCollabClaimTurnOutcome({
+    cfg,
+    groupId: params.groupId,
+    boardItemId: params.itemId,
+    claimId: claimantId,
+    subjectRef,
+    tenantId,
+    runId: `collab-apply:${params.groupId}:${params.itemId}:${claimantId}`,
+    success: true,
   });
   return { task: updated, item: resultItem };
 }

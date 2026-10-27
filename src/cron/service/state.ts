@@ -83,6 +83,8 @@ export type CronServiceDeps = {
   runIsolatedAgentJob: (params: {
     job: CronJob;
     message: string;
+    /** askOutcome W1: scheduler-persisted fire identity for TaskOutcome. */
+    fireId?: string;
     abortSignal?: AbortSignal;
   }) => Promise<
     {
