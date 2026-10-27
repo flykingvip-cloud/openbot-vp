@@ -1,7 +1,7 @@
 /**
- * #129 R1 product wiring — call-chain coverage for review gaps.
+ * #129 product wiring — call-chain coverage for review gaps (R1–R3).
  * Not F4 / not 18789 cutover. Identity may still be mocked at ACL edges;
- * submit pipeline below is non-mock.
+ * submit pipeline below is non-mock where noted.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -16,10 +16,14 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import { upsertAgent, type RuntimeAgent } from "../agent-runtime-store.js";
 import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
+import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-event-key.js";
+import { createModeBWakeRoundDispatcher } from "../collaboration-dispatch/mode-b-wake-round-dispatcher.js";
 import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { buildGroupRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-stop-control.js";
+import type { CollaborationBotTarget } from "../collaboration-dispatch/types.js";
 import * as wakeContract from "../collaboration-dispatch/wake-contract.js";
 import {
   consumeWakeForRoundDispatch,
@@ -29,14 +33,14 @@ import {
 import * as wakeRound from "../collaboration-dispatch/wake-round-dispatch.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import {
+  finalizeMemberRunTeamDeliverable,
   formatTeamDeliverableUserMessage,
   maybeSubmitTeamDeliverableFromChatFinal,
 } from "./chat-deliverable-team-submit.js";
 import * as claimEntry from "./claim-contract-entry.js";
 import {
-  clearExecutionDeliverableBindings,
-  consumeExecutionDeliverableBinding,
-  rememberExecutionDeliverableBinding,
+  buildExecutionDeliverableBinding,
+  type ExecutionDeliverableBinding,
 } from "./execution-deliverable-binding.js";
 import { triggerPostPlanConfirmAdvance } from "./post-plan-confirm-advance.js";
 import { resolveActorDeliverableTaskBinding } from "./resolve-actor-deliverable-task.js";
@@ -48,10 +52,10 @@ const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
 const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
 const savedOpenclawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
+const savedTenantsRoot = process.env.OPENBOT_TENANTS_ROOT;
 
 afterEach(async () => {
   setWakeRoundDispatcher(null);
-  clearExecutionDeliverableBindings();
   clearRuntimeConfigSnapshot();
   clearConfigCache();
   vi.restoreAllMocks();
@@ -69,6 +73,11 @@ afterEach(async () => {
     delete process.env.OPENCLAW_CONFIG_PATH;
   } else {
     process.env.OPENCLAW_CONFIG_PATH = savedOpenclawConfigPath;
+  }
+  if (savedTenantsRoot === undefined) {
+    delete process.env.OPENBOT_TENANTS_ROOT;
+  } else {
+    process.env.OPENBOT_TENANTS_ROOT = savedTenantsRoot;
   }
   await Promise.all(tempDirs.splice(0).map((d) => fs.rm(d, { recursive: true, force: true })));
 });
@@ -847,17 +856,6 @@ describe("R2 deliverable binding — explicit only, no group scan", () => {
     if (!noExplicit.ok) {
       expect(noExplicit.reason).toBe("execution_binding_required");
     }
-
-    // Stale OS currentTaskId must not become the bind source.
-    rememberExecutionDeliverableBinding(groupId, "bot-exec", {
-      taskId: "task-b",
-      boardItemId: "board-b",
-      source: "wake_dispatch",
-    });
-    const remembered = consumeExecutionDeliverableBinding(groupId, "bot-exec");
-    expect(remembered?.taskId).toBe("task-b");
-    // After consume, no leftover guess.
-    expect(consumeExecutionDeliverableBinding(groupId, "bot-exec")).toBeNull();
   });
 
   it("explicit ids must verify claimant + active status", async () => {
@@ -1028,9 +1026,17 @@ describe("R2 plan-confirm → real consumeWake → final dispatch revalidate", (
       } as never;
     });
 
-    const captured: Array<{ prompt?: string | null; reason?: string }> = [];
+    const captured: Array<{
+      prompt?: string | null;
+      reason?: string;
+      binding?: ExecutionDeliverableBinding | null;
+    }> = [];
     const capturing: WakeRoundDispatcher = async (req) => {
-      captured.push({ prompt: req.dispatchPrompt, reason: req.reason });
+      captured.push({
+        prompt: req.dispatchPrompt,
+        reason: req.reason,
+        binding: req.executionDeliverableBinding ?? null,
+      });
       return { ok: true, roundId: "r2-plan-ok", detail: "member-run" };
     };
 
@@ -1051,16 +1057,15 @@ describe("R2 plan-confirm → real consumeWake → final dispatch revalidate", (
     expect(String(captured[0]?.prompt)).toContain("写草稿");
     expect(String(captured[0]?.prompt)).toContain("group-transcript");
     expect(String(captured[0]?.reason)).toContain("v3");
-    // Binding remembered for chat final after successful dispatch.
-    const binding = consumeExecutionDeliverableBinding(groupId, claimant);
-    expect(binding?.taskId).toBe(taskId);
-    expect(binding?.boardItemId).toBe(boardItemId);
-    expect(binding?.planVersion).toBe(3);
+    expect(captured[0]?.binding?.taskId).toBe(taskId);
+    expect(captured[0]?.binding?.boardItemId).toBe(boardItemId);
+    expect(captured[0]?.binding?.planVersion).toBe(3);
+    expect(captured[0]?.binding?.runId).toBeTruthy();
+    expect(captured[0]?.binding?.groupId).toBe(groupId);
 
     // Revision AFTER pre-check bag, BEFORE final dispatch — use a fresh task/board
     // so wake opKey is not idempotent_reuse of the prior completed advance.
     captured.length = 0;
-    clearExecutionDeliverableBindings();
     const taskId2 = "task_r2_plan_rev";
     const boardItemId2 = "board_r2_rev";
     const todolistId2 = "td_r2_rev";
@@ -1124,5 +1129,517 @@ describe("R2 plan-confirm → real consumeWake → final dispatch revalidate", (
     expect(String(revised.reason)).toMatch(
       /plan_revised_before_dispatch|dispatch_failed:plan_revised|plan_step_changed/,
     );
+  });
+});
+
+describe("R3 run binding — no Map; unconfusable context", () => {
+  it("same member dual-task interleaved finals do not cross-bind", async () => {
+    const { cfg } = await useRoot();
+    const groupId = "grp_r3_interleave";
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: null,
+      profile: "personal_local",
+      cfg,
+    });
+    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    for (const taskId of ["task-a", "task-b"]) {
+      await stores.objectStorage.writeObject(groupId, "task", taskId, {
+        taskId,
+        groupId,
+        title: taskId,
+        status: "ready",
+        createdAtMs: now,
+        updatedAtMs: now,
+      } satisfies Task);
+    }
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockImplementation(async (params) => {
+      const taskId = String(params.taskId);
+      return [
+        {
+          itemId: taskId === "task-a" ? "board-a" : "board-b",
+          taskId,
+          groupId,
+          status: "applied",
+          claimantId: "bot-exec",
+          title: taskId,
+          remainingWork: "do",
+        },
+      ] as never;
+    });
+
+    const bindA = buildExecutionDeliverableBinding({
+      groupId,
+      taskId: "task-a",
+      boardItemId: "board-a",
+      runId: "run-a-1",
+      source: "explicit_run",
+    });
+    const bindB = buildExecutionDeliverableBinding({
+      groupId,
+      taskId: "task-b",
+      boardItemId: "board-b",
+      runId: "run-b-1",
+      source: "explicit_run",
+    });
+    expect(bindA).toBeTruthy();
+    expect(bindB).toBeTruthy();
+
+    const textA = '<<DELIVERABLE title="A" file="notes/a.md">>\nbody-a\n<</DELIVERABLE>>';
+    const textB = '<<DELIVERABLE title="B" file="notes/b.md">>\nbody-b\n<</DELIVERABLE>>';
+
+    // Interleave: finalize B then A (as if finals arrived out of order).
+    const outB = await finalizeMemberRunTeamDeliverable({
+      text: textB,
+      agentId: "bot-exec",
+      binding: bindB,
+      trusted,
+      stores,
+      cfg,
+      enforceAcl: false,
+    });
+    const outA = await finalizeMemberRunTeamDeliverable({
+      text: textA,
+      agentId: "bot-exec",
+      binding: bindA,
+      trusted,
+      stores,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(outB.outcome.ok, JSON.stringify(outB.outcome)).toBe(true);
+    expect(outA.outcome.ok, JSON.stringify(outA.outcome)).toBe(true);
+    if (outA.outcome.ok && outB.outcome.ok) {
+      expect(outA.outcome.taskId).toBe("task-a");
+      expect(outB.outcome.taskId).toBe("task-b");
+      expect(outA.outcome.deliverableId).not.toBe(outB.outcome.deliverableId);
+    }
+
+    const readA = await readTeamDeliverable({
+      groupId,
+      taskId: "task-a",
+      deliverableId: outA.outcome.ok ? outA.outcome.deliverableId : "",
+      version: outA.outcome.ok ? outA.outcome.version : 1,
+      actor: "human:peer",
+      cfg,
+      enforceAcl: false,
+      trusted,
+    });
+    const readB = await readTeamDeliverable({
+      groupId,
+      taskId: "task-b",
+      deliverableId: outB.outcome.ok ? outB.outcome.deliverableId : "",
+      version: outB.outcome.ok ? outB.outcome.version : 1,
+      actor: "human:peer",
+      cfg,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(readA.ok && readA.content).toContain("body-a");
+    expect(readB.ok && readB.content).toContain("body-b");
+  });
+
+  it("dual tenants same local groupId/agentId do not share binding", async () => {
+    const tenantsRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-pr129-tenants-"));
+    tempDirs.push(tenantsRoot);
+    process.env.OPENBOT_TENANTS_ROOT = tenantsRoot;
+    const { cfg } = await useRoot({ profile: "managed_enterprise" });
+    const groupId = "grp_shared_local";
+    const agentId = "bot-exec";
+    const results: Array<{ tenantId: string; deliverableId?: string; content?: string }> = [];
+
+    for (const tenantId of ["tenant-a", "tenant-b"]) {
+      const groupLocator = resolveTrustedGroupLocator({
+        groupId,
+        tenantId,
+        profile: "managed_enterprise",
+        cfg,
+      });
+      const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+      const stores = createTrustedGroupStores(trusted);
+      const taskId = "task-same";
+      const now = Date.now();
+      await stores.objectStorage.writeObject(groupId, "task", taskId, {
+        taskId,
+        groupId,
+        title: taskId,
+        status: "ready",
+        createdAtMs: now,
+        updatedAtMs: now,
+      } satisfies Task);
+      vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
+        {
+          itemId: "board-same",
+          taskId,
+          groupId,
+          status: "applied",
+          claimantId: agentId,
+          title: "x",
+          remainingWork: "y",
+        },
+      ] as never);
+
+      const binding = buildExecutionDeliverableBinding({
+        tenantId,
+        groupId,
+        taskId,
+        boardItemId: "board-same",
+        runId: `run-${tenantId}-1`,
+        source: "wake_dispatch",
+      });
+      const body = `body-for-${tenantId}`;
+      const out = await finalizeMemberRunTeamDeliverable({
+        text: `<<DELIVERABLE title="T" file="notes/out.md">>\n${body}\n<</DELIVERABLE>>`,
+        agentId,
+        binding,
+        trusted,
+        stores,
+        cfg,
+        enforceAcl: false,
+        tenant: { tenantId, trust: "membership" },
+      });
+      expect(out.outcome.ok, `${tenantId}:${JSON.stringify(out.outcome)}`).toBe(true);
+      if (out.outcome.ok) {
+        const read = await readTeamDeliverable({
+          groupId,
+          taskId,
+          deliverableId: out.outcome.deliverableId,
+          version: out.outcome.version,
+          actor: "human:peer",
+          cfg,
+          enforceAcl: false,
+          trusted,
+          tenant: { tenantId, trust: "membership" },
+        });
+        expect(read.ok && read.content).toContain(body);
+        results.push({
+          tenantId,
+          deliverableId: out.outcome.deliverableId,
+          content: read.ok ? read.content : undefined,
+        });
+      }
+    }
+    expect(results).toHaveLength(2);
+    expect(results[0]?.content).not.toBe(results[1]?.content);
+    // Locators / ids must not collide across tenants even with same local ids.
+    expect(results[0]?.deliverableId).toBeTruthy();
+  });
+
+  it("failed dispatch then ordinary reply without binding refuses (no residual Map)", async () => {
+    const out = await finalizeMemberRunTeamDeliverable({
+      text: '<<DELIVERABLE title="X" file="notes/x.md">>\nbody\n<</DELIVERABLE>>',
+      agentId: "bot-exec",
+      binding: null,
+    });
+    expect(out.outcome.ok).toBe(false);
+    if (!out.outcome.ok) {
+      expect(out.outcome.reason).toBe("execution_binding_required");
+    }
+    expect(out.text).toContain("团队成果未完成");
+    expect(out.text).toContain("execution_binding_required");
+  });
+
+  it("submit failure retry still has the same run binding", async () => {
+    const { cfg } = await useRoot();
+    const groupId = "grp_r3_retry";
+    const taskId = "task-retry";
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: null,
+      profile: "personal_local",
+      cfg,
+    });
+    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    // Missing task on first attempt → fail; then create task and retry with SAME binding.
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
+      {
+        itemId: "board-retry",
+        taskId,
+        groupId,
+        status: "applied",
+        claimantId: "bot-exec",
+        title: "x",
+        remainingWork: "y",
+      },
+    ] as never);
+
+    const binding = buildExecutionDeliverableBinding({
+      groupId,
+      taskId,
+      boardItemId: "board-retry",
+      runId: "run-retry-1",
+      attemptId: "attempt-1",
+      source: "explicit_run",
+    });
+    expect(binding).toBeTruthy();
+
+    const text =
+      '<<DELIVERABLE title="Retry" file="notes/retry.md">>\nretry-body\n<</DELIVERABLE>>';
+    const first = await finalizeMemberRunTeamDeliverable({
+      text,
+      agentId: "bot-exec",
+      binding,
+      trusted,
+      stores,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(first.outcome.ok).toBe(false);
+
+    await stores.objectStorage.writeObject(groupId, "task", taskId, {
+      taskId,
+      groupId,
+      title: taskId,
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+    } satisfies Task);
+
+    // Same binding object reused — Map would have consumed it already.
+    const second = await finalizeMemberRunTeamDeliverable({
+      text,
+      agentId: "bot-exec",
+      binding,
+      trusted,
+      stores,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(second.outcome.ok, JSON.stringify(second.outcome)).toBe(true);
+    if (second.outcome.ok) {
+      expect(second.outcome.taskId).toBe(taskId);
+    }
+  });
+
+  it("stale plan version / stopped task refuse current formal delivery", async () => {
+    const { cfg } = await useRoot();
+    const groupId = "grp_r3_stale";
+    const taskId = "task-stale";
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: null,
+      profile: "personal_local",
+      cfg,
+    });
+    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    await stores.objectStorage.writeObject(groupId, "task", taskId, {
+      taskId,
+      groupId,
+      title: taskId,
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+    } satisfies Task);
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
+      {
+        itemId: "board-1",
+        taskId,
+        groupId,
+        status: "applied",
+        claimantId: "bot-exec",
+        title: "x",
+        remainingWork: "y",
+      },
+    ] as never);
+    vi.spyOn(claimEntry, "getCollaborationTodolist").mockResolvedValue({
+      todolistId: "td-1",
+      version: 9,
+      status: "confirmed",
+      boardItemId: "board-1",
+      steps: [],
+    } as never);
+
+    const stale = await resolveActorDeliverableTaskBinding({
+      groupId,
+      actorId: "bot-exec",
+      explicitTaskId: taskId,
+      explicitBoardItemId: "board-1",
+      explicitTodolistId: "td-1",
+      explicitPlanVersion: 3,
+      explicitStepId: "step-a",
+      stores,
+      trusted,
+      cfg,
+    });
+    expect(stale.ok).toBe(false);
+    if (!stale.ok) {
+      expect(stale.reason).toMatch(/plan_version_stale_not_current_formal/);
+    }
+
+    // Mark task stopped
+    const stopped = asGovernedTask({
+      taskId,
+      groupId,
+      title: taskId,
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+      stopControl: buildAcceptedTaskStopControl({
+        requestedBy: "human:owner",
+        reason: "halt",
+        requestedAtMs: now,
+      }),
+    });
+    await stores.objectStorage.writeObject(groupId, "task", taskId, stopped as never);
+    const stoppedBind = await resolveActorDeliverableTaskBinding({
+      groupId,
+      actorId: "bot-exec",
+      explicitTaskId: taskId,
+      explicitBoardItemId: "board-1",
+      stores,
+      trusted,
+      cfg,
+    });
+    expect(stoppedBind.ok).toBe(false);
+    if (!stoppedBind.ok) {
+      expect(stoppedBind.reason).toBe("task_stopped_not_current_formal");
+    }
+  });
+});
+
+describe("R3 gateway boot dispatcher → member final → non-mock deliverable", () => {
+  it("Mode B dispatcher runBot final writes file readable by peer", async () => {
+    const { cfg } = await useRoot({
+      selfAdvanceMode: "execute",
+      selfAdvanceExecuteAllowlist: ["grp_r3_boot"],
+      wakeContract: true,
+      wakeContractGroupAllowlist: ["grp_r3_boot"],
+    });
+    const groupId = "grp_r3_boot";
+    const taskId = "task-boot";
+    const boardItemId = "board-boot";
+    const agentId = "bot-exec";
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: null,
+      profile: "personal_local",
+      cfg,
+    });
+    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    await stores.objectStorage.writeObject(groupId, "task", taskId, {
+      taskId,
+      groupId,
+      title: taskId,
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+    } satisfies Task);
+
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
+      {
+        itemId: boardItemId,
+        taskId,
+        groupId,
+        status: "applied",
+        claimantId: agentId,
+        title: "boot step",
+        remainingWork: "write",
+      },
+    ] as never);
+
+    const binding = buildExecutionDeliverableBinding({
+      groupId,
+      taskId,
+      boardItemId,
+      runId: "wake_run_boot_1",
+      attemptId: "op-boot-1",
+      source: "wake_dispatch",
+    });
+    expect(binding).toBeTruthy();
+
+    const leadBot: CollaborationBotTarget = {
+      agentId,
+      name: agentId,
+      sessionKey: `agent:${agentId}:main`,
+      updatedAt: 0,
+    };
+    const { authority, facts } = buildGroupRuntimeAuthority({
+      scope: {
+        groupId,
+        rawSessionKey: `agent:${agentId}:main`,
+        title: groupId,
+        bots: [leadBot],
+        tenantId: null,
+        operatingState: null,
+      },
+      episodeId: episodeIdForClientRun(`wake-dispatch:${groupId}:test`),
+      cfg,
+    });
+
+    const dispatcher = createModeBWakeRoundDispatcher(async (request) => {
+      return {
+        authority,
+        facts,
+        sessionKey: `agent:${agentId}:main`,
+        leadBot,
+        cfg,
+        message: request.dispatchPrompt ?? "continue",
+        runBot: async ({ bot }) => {
+          const raw =
+            '完成。\n<<DELIVERABLE title="BootOut" file="notes/boot.md">>\nboot-body-v1\n<</DELIVERABLE>>';
+          const finalized = await finalizeMemberRunTeamDeliverable({
+            text: raw,
+            agentId: bot.agentId,
+            binding: request.executionDeliverableBinding ?? null,
+            trusted,
+            stores,
+            cfg,
+            enforceAcl: false,
+          });
+          return { text: finalized.text };
+        },
+      };
+    });
+
+    const result = await dispatcher({
+      groupId,
+      fromAgentId: "human:owner",
+      toAgentIds: [agentId],
+      source: "nudge",
+      taskId,
+      itemId: boardItemId,
+      reason: "r3_boot_e2e",
+      executionDeliverableBinding: binding,
+      dispatchPrompt: "请提交文本成果",
+    });
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+
+    // Discover deliverable id via object listing / re-submit idempotent path
+    const resubmit = await finalizeMemberRunTeamDeliverable({
+      text: '<<DELIVERABLE title="BootOut" file="notes/boot.md">>\nboot-body-v1\n<</DELIVERABLE>>',
+      agentId,
+      binding,
+      trusted,
+      stores,
+      cfg,
+      enforceAcl: false,
+    });
+    expect(resubmit.outcome.ok, JSON.stringify(resubmit.outcome)).toBe(true);
+    if (!resubmit.outcome.ok) {
+      return;
+    }
+    const peerRead = await readTeamDeliverable({
+      groupId,
+      taskId,
+      deliverableId: resubmit.outcome.deliverableId,
+      version: resubmit.outcome.version,
+      actor: "human:reviewer",
+      cfg,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(peerRead.ok).toBe(true);
+    if (peerRead.ok) {
+      expect(peerRead.content).toContain("boot-body-v1");
+      expect(peerRead.locator).toBe(resubmit.outcome.locator);
+    }
   });
 });

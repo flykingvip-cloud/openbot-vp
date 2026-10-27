@@ -3,12 +3,17 @@
  *
  * Never uses OS activeContext.currentTaskId alone (unreliable group current).
  * Never scans the whole group for "unique active claimant" (ambiguous / wrong bind).
+ * Never falls back to a process Map of "latest member binding".
+ *
  * Requires explicit task+board from the execution bag / wake run binding, then
- * verifies claimant + active board status before accepting.
+ * verifies claimant + active board + task not stopped + plan still confirmed at
+ * the bound version. Stale plan / stopped task → refuse as current formal delivery
+ * (old work may be isolated elsewhere; do not silently upgrade it).
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import { SELF_ADVANCE_ACTIVE_BOARD_STATUSES } from "../collaboration-dispatch/self-advance.js";
-import { listCollaborationBoardItems } from "./claim-contract-entry.js";
+import { getCollaborationTodolist, listCollaborationBoardItems } from "./claim-contract-entry.js";
+import { assertPersistedTaskNotStopped, TaskStoppedError } from "./task-stop-entry.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
@@ -25,6 +30,7 @@ export type ActorDeliverableTaskBinding =
       planVersion?: number | null;
       todolistId?: string | null;
       stepId?: string | null;
+      runId?: string | null;
     }
   | { ok: false; reason: string };
 
@@ -35,10 +41,12 @@ export async function resolveActorDeliverableTaskBinding(params: {
   explicitTaskId?: string | null;
   /** Explicit round / execution-bag board item id (required). */
   explicitBoardItemId?: string | null;
-  /** Optional plan binding for diagnostics / future gates. */
+  /** Optional plan binding — when present, must still be confirmed at this version. */
   explicitTodolistId?: string | null;
   explicitPlanVersion?: number | null;
   explicitStepId?: string | null;
+  /** Unconfusable run id (diagnostics / refuse messaging). */
+  explicitRunId?: string | null;
   /** Recorded only for diagnostics — never used as sole submission target. */
   groupCurrentTaskId?: string | null;
   auth?: TeamResourceAuthOk | null;
@@ -62,6 +70,22 @@ export async function resolveActorDeliverableTaskBinding(params: {
       ok: false,
       reason: "execution_binding_required",
     };
+  }
+
+  // Task stop / auth boundary: stopped tasks must not accept current formal delivery.
+  try {
+    await assertPersistedTaskNotStopped({
+      groupId,
+      taskId: explicitTaskId,
+      cfg: params.cfg,
+      objectStorage: params.stores?.objectStorage,
+    });
+  } catch (error) {
+    if (error instanceof TaskStoppedError) {
+      return { ok: false, reason: "task_stopped_not_current_formal" };
+    }
+    const detail = error instanceof Error ? error.message : String(error);
+    return { ok: false, reason: `task_stop_check_failed:${detail}`.slice(0, 200) };
   }
 
   const active = new Set<string>(SELF_ADVANCE_ACTIVE_BOARD_STATUSES);
@@ -102,16 +126,59 @@ export async function resolveActorDeliverableTaskBinding(params: {
     };
   }
 
+  const todolistId = compact(params.explicitTodolistId);
+  const planVersion =
+    typeof params.explicitPlanVersion === "number" && Number.isFinite(params.explicitPlanVersion)
+      ? params.explicitPlanVersion
+      : null;
+  const stepId = compact(params.explicitStepId) || null;
+
+  // When the run bound a plan version, it must still be the confirmed current plan.
+  // Revised / unconfirmed → refuse as current formal (do not auto-upgrade old work).
+  if (todolistId && planVersion !== null) {
+    try {
+      const todolist = await getCollaborationTodolist({
+        groupId,
+        taskId: explicitTaskId,
+        todolistId,
+        viewerId: actorId,
+        actor: actorId,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        tenant: params.tenant,
+        cfg: params.cfg,
+      });
+      const status = compact((todolist as { status?: string }).status);
+      const version = Number((todolist as { version?: number }).version);
+      if (status !== "confirmed") {
+        return {
+          ok: false,
+          reason: `plan_not_confirmed_isolate:${status || "unknown"}`,
+        };
+      }
+      if (!Number.isFinite(version) || version !== planVersion) {
+        return {
+          ok: false,
+          reason: `plan_version_stale_not_current_formal:bound=${planVersion}:current=${
+            Number.isFinite(version) ? version : "none"
+          }`,
+        };
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      return { ok: false, reason: `plan_check_failed:${detail}`.slice(0, 200) };
+    }
+  }
+
   return {
     ok: true,
     taskId: explicitTaskId,
     boardItemId: explicitBoardItemId,
     source: "explicit",
-    todolistId: compact(params.explicitTodolistId) || null,
-    planVersion:
-      typeof params.explicitPlanVersion === "number" && Number.isFinite(params.explicitPlanVersion)
-        ? params.explicitPlanVersion
-        : null,
-    stepId: compact(params.explicitStepId) || null,
+    todolistId: todolistId || null,
+    planVersion,
+    stepId,
+    runId: compact(params.explicitRunId) || null,
   };
 }

@@ -8,6 +8,8 @@
  *
  * Reuses executeCollaborationRound via Mode B dispatcher — no second orchestrator.
  * runBot uses getReplyFromConfig (same E1 path as heartbeat), not chat.send.
+ * R3: when the reply contains DELIVERABLE, formal team submit uses
+ * request.executionDeliverableBinding (no group+agent Map). Missing binding refuses.
  */
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
@@ -29,8 +31,17 @@ import {
   setWakeRoundDispatcher,
   type WakeRoundDispatchRequest,
 } from "./collaboration-dispatch/wake-round-dispatch.js";
+import { finalizeMemberRunTeamDeliverable } from "./collaboration-learning/chat-deliverable-team-submit.js";
 import { resolveCollaborationGroupTenantId } from "./collaboration-learning/shared.js";
 import { listGatewayCollaborationSpaces } from "./collaboration-learning/space-store.js";
+import {
+  authorizeTeamGroupResourceAccess,
+  createTrustedGroupStores,
+} from "./collaboration-learning/team-resource-auth.js";
+import {
+  labelCollaborationIoTenant,
+  type CollaborationTenantResolution,
+} from "./collaboration-learning/trusted-tenant.js";
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -63,7 +74,8 @@ function buildWakeMessage(params: { request: WakeRoundDispatchRequest; leadName:
     .join("\n");
 }
 
-async function resolveModeBWakeRoundContext(
+/** Exported for product-wiring E2E: boot context → member run → deliverable final. */
+export async function resolveModeBWakeRoundContext(
   request: WakeRoundDispatchRequest,
   cfg: OpenBotConfig,
 ): Promise<ModeBWakeRoundContext | null> {
@@ -170,7 +182,53 @@ async function resolveModeBWakeRoundContext(
           {},
           cfg,
         );
-        const text = replyTextFromResult(result);
+        let text = replyTextFromResult(result);
+        if (text && text.includes("DELIVERABLE")) {
+          // Real dispatcher → member final: use request binding only (no Map).
+          const binding = request.executionDeliverableBinding ?? null;
+          let tenant: CollaborationTenantResolution | null = null;
+          if (tenantId) {
+            tenant = labelCollaborationIoTenant(tenantId);
+          }
+          let deliverAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null =
+            null;
+          let deliverStores: ReturnType<typeof createTrustedGroupStores> | null = null;
+          try {
+            deliverAuth = await authorizeTeamGroupResourceAccess({
+              groupId,
+              actor: bot.agentId,
+              tenant,
+              action: "write",
+              cfg,
+            });
+            if (deliverAuth.ok) {
+              deliverStores = createTrustedGroupStores({
+                groupsRoot: deliverAuth.groupsRoot,
+                groupLocator: deliverAuth.groupLocator,
+              });
+              // Do not invent trust:"membership" from a bare auth.tenantId.
+            }
+          } catch {
+            deliverAuth = null;
+          }
+          const finalized = await finalizeMemberRunTeamDeliverable({
+            text,
+            agentId: bot.agentId,
+            binding,
+            tenant,
+            auth: deliverAuth && deliverAuth.ok ? deliverAuth : null,
+            trusted:
+              deliverAuth && deliverAuth.ok
+                ? {
+                    groupsRoot: deliverAuth.groupsRoot,
+                    groupLocator: deliverAuth.groupLocator,
+                  }
+                : null,
+            stores: deliverStores,
+            cfg,
+          });
+          text = finalized.text;
+        }
         return text ? { text } : undefined;
       } catch {
         // Mirror chat runStageBot: bot failure must not throw out of

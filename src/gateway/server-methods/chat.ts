@@ -269,26 +269,19 @@ import {
   resolveBlockedAgentIdsForCurrentTask,
   type GatewayCollaborationSpaceSnapshot,
 } from "../collaboration-learning.js";
-import {
-  formatTeamDeliverableUserMessage,
-  maybeSubmitTeamDeliverableFromChatFinal,
-} from "../collaboration-learning/chat-deliverable-team-submit.js";
+import { finalizeMemberRunTeamDeliverable } from "../collaboration-learning/chat-deliverable-team-submit.js";
 import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
 import {
   isGroupPublicTranscriptSessionFile,
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
-import {
-  consumeExecutionDeliverableBinding,
-  type ExecutionDeliverableBinding,
-} from "../collaboration-learning/execution-deliverable-binding.js";
+import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   bindGroupPublicTranscript,
   dropDivergentGroupTranscriptMirrors,
 } from "../collaboration-learning/group-public-transcript.js";
 import { assertNoPrivateMemoryDirtyWriteToGroupPublic } from "../collaboration-learning/private-memory-promote.js";
-import { resolveActorDeliverableTaskBinding } from "../collaboration-learning/resolve-actor-deliverable-task.js";
 import { resolveCollaborationSpaceSessionId } from "../collaboration-learning/session-id.js";
 import {
   resolveSessionParticipationGroupId,
@@ -3340,7 +3333,7 @@ async function runGroupBotDiscussionTurn(params: {
   v1RollCallExtraLines?: string[];
   /**
    * Formal deliverable must bind this execution bag / wake run.
-   * When omitted, chat final may still consume a remembered wake binding.
+   * Missing → refuse formal team submit (no Map / no latest-member fallback).
    */
   executionDeliverableBinding?: ExecutionDeliverableBinding | null;
 }): Promise<SameRoundReply | null> {
@@ -3795,7 +3788,7 @@ async function runGroupBotDiscussionTurn(params: {
         });
         replyText = prepared.text;
         if (params.scope.groupId && replyText.includes("DELIVERABLE") && prepared.structured) {
-          // Unique formal team delivery: await submitTeamDeliverable and surface result.
+          // Unique formal team delivery via run binding only (R3 — no Map fallback).
           // Do not invent trust:membership from a bare tenantId string.
           const tenantResolution = await resolveCollaborationTenantResolution(params.client);
           const tenant =
@@ -3827,66 +3820,29 @@ async function runGroupBotDiscussionTurn(params: {
               `collaboration team deliverable auth failed (${params.bot.agentId}): ${formatForLog(authErr)}`,
             );
           }
-          // R2: prefer explicit run binding, else consume wake-remembered binding.
-          // Never scan group claimants / never use OS currentTaskId alone.
-          const runBinding =
-            params.executionDeliverableBinding ??
-            consumeExecutionDeliverableBinding(params.scope.groupId, params.bot.agentId);
-          const binding =
-            deliverAuth && deliverAuth.ok
-              ? await resolveActorDeliverableTaskBinding({
-                  groupId: params.scope.groupId,
-                  actorId: params.bot.agentId,
-                  explicitTaskId: runBinding?.taskId ?? null,
-                  explicitBoardItemId: runBinding?.boardItemId ?? null,
-                  explicitTodolistId: runBinding?.todolistId ?? null,
-                  explicitPlanVersion: runBinding?.planVersion ?? null,
-                  explicitStepId: runBinding?.stepId ?? null,
-                  groupCurrentTaskId,
-                  auth: deliverAuth,
-                  stores: deliverStores,
-                  trusted: {
+          const finalized = await finalizeMemberRunTeamDeliverable({
+            text: replyText,
+            agentId: params.bot.agentId,
+            binding: params.executionDeliverableBinding ?? null,
+            client: params.client,
+            tenant,
+            auth: deliverAuth && deliverAuth.ok ? deliverAuth : null,
+            trusted:
+              deliverAuth && deliverAuth.ok
+                ? {
                     groupsRoot: deliverAuth.groupsRoot,
                     groupLocator: deliverAuth.groupLocator,
-                  },
-                  tenant,
-                  cfg,
-                })
-              : ({ ok: false, reason: "deliverable_auth_required" } as const);
-          if (!binding.ok) {
-            const miss = `团队成果未完成（task_binding_required:${binding.reason}；未使用群 currentTaskId=${groupCurrentTaskId ?? "none"}）。`;
-            replyText = `${replyText.trim()}
-
-${miss}`;
+                  }
+                : null,
+            stores: deliverStores,
+            cfg,
+            groupCurrentTaskId,
+          });
+          replyText = finalized.text;
+          if (!finalized.outcome.ok) {
             params.context.logGateway.warn(
-              `collaboration team deliverable skipped (${params.bot.agentId}): ${binding.reason}`,
+              `collaboration team deliverable not ok (${params.bot.agentId}): ${finalized.outcome.reason}; unused groupCurrentTaskId=${groupCurrentTaskId ?? "none"}`,
             );
-          } else {
-            const submitOutcome = await maybeSubmitTeamDeliverableFromChatFinal({
-              text: replyText,
-              groupId: params.scope.groupId,
-              taskId: binding.taskId,
-              agentId: params.bot.agentId,
-              client: params.client,
-              tenant,
-              trusted:
-                deliverAuth && deliverAuth.ok
-                  ? {
-                      groupsRoot: deliverAuth.groupsRoot,
-                      groupLocator: deliverAuth.groupLocator,
-                    }
-                  : null,
-              cfg,
-            });
-            const teamMsg = formatTeamDeliverableUserMessage(submitOutcome);
-            replyText = `${replyText.trim()}
-
-${teamMsg}`;
-            if (!submitOutcome.ok) {
-              params.context.logGateway.warn(
-                `collaboration team deliverable submit not ok (${params.bot.agentId}): ${submitOutcome.reason}`,
-              );
-            }
           }
         }
       } catch (err) {

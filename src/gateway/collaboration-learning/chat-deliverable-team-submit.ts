@@ -9,14 +9,21 @@ import path from "node:path";
  * Empty declared body does NOT fall back to the whole chat text.
  * This PR supports text deliverables only — binary declarations are refused
  * (no UTF-8 round-trip of PDF/images/archives).
+ *
+ * R3: finalizeMemberRunTeamDeliverable requires an unconfusable run binding from
+ * the real dispatcher (no process Map / no "latest member" fallback). Binding is
+ * not consumed so submit failure can retry with the same binding.
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import { extractDeliverableEnvelope } from "../../shared/preview-artifact/deliverable-envelope.js";
 import type { GatewayClient } from "../server-methods/types.js";
+import type { ExecutionDeliverableBinding } from "./execution-deliverable-binding.js";
+import { resolveActorDeliverableTaskBinding } from "./resolve-actor-deliverable-task.js";
 import {
   submitTeamDeliverable,
   type TeamDeliverableSubmitResult,
 } from "./team-deliverable-submit.js";
+import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 function compact(value: string | null | undefined): string {
@@ -130,4 +137,74 @@ export function formatTeamDeliverableUserMessage(
   }
   const detail = "detail" in outcome && outcome.detail ? `: ${outcome.detail}` : "";
   return `团队成果未完成（${outcome.reason}${detail}）。`;
+}
+
+/**
+ * R3: dispatcher → member run final. Binding stays with the caller for retries.
+ */
+export async function finalizeMemberRunTeamDeliverable(params: {
+  text: string;
+  agentId: string;
+  binding: ExecutionDeliverableBinding | null | undefined;
+  client?: GatewayClient | null;
+  tenant?: CollaborationTenantResolution | null;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
+  cfg?: OpenBotConfig;
+  groupCurrentTaskId?: string | null;
+  enforceAcl?: boolean;
+}): Promise<{ text: string; outcome: ChatTeamDeliverableSubmitOutcome }> {
+  if (!params.text.includes("DELIVERABLE")) {
+    return { text: params.text, outcome: { ok: false, reason: "no_deliverable_envelope" } };
+  }
+  const binding = params.binding;
+  if (!binding) {
+    const outcome = { ok: false as const, reason: "execution_binding_required" };
+    return {
+      text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+      outcome,
+    };
+  }
+  const resolved = await resolveActorDeliverableTaskBinding({
+    groupId: binding.groupId,
+    actorId: params.agentId,
+    explicitTaskId: binding.taskId,
+    explicitBoardItemId: binding.boardItemId,
+    explicitTodolistId: binding.todolistId,
+    explicitPlanVersion: binding.planVersion,
+    explicitStepId: binding.stepId,
+    explicitRunId: binding.runId,
+    groupCurrentTaskId: params.groupCurrentTaskId,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
+    tenant: params.tenant,
+    cfg: params.cfg,
+  });
+  if (!resolved.ok) {
+    const outcome = {
+      ok: false as const,
+      reason: `task_binding_required:${resolved.reason}`,
+    };
+    return {
+      text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+      outcome,
+    };
+  }
+  const outcome = await maybeSubmitTeamDeliverableFromChatFinal({
+    text: params.text,
+    groupId: binding.groupId,
+    taskId: resolved.taskId,
+    agentId: params.agentId,
+    client: params.client,
+    tenant: params.tenant,
+    trusted: params.trusted,
+    cfg: params.cfg,
+    enforceAcl: params.enforceAcl,
+  });
+  return {
+    text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+    outcome,
+  };
 }

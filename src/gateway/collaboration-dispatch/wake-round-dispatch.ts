@@ -19,6 +19,7 @@ import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
 import { listAgents } from "../agent-runtime-store.js";
+import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   checkMemberDispatchReadiness,
   ensureRegisteredMemberMainSession,
@@ -135,6 +136,11 @@ export type WakeRoundDispatchRequest = Readonly<{
   }>;
   /** Optional enriched prompt (board summary / context pointer / confirmed step). */
   dispatchPrompt?: string | null;
+  /**
+   * Unconfusable run binding for formal team deliverable submit.
+   * Passed into the member run; missing binding → refuse formal submit (no Map).
+   */
+  executionDeliverableBinding?: ExecutionDeliverableBinding | null;
 }>;
 
 export type WakeRoundDispatchResult =

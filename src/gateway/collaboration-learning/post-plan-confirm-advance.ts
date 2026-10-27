@@ -10,10 +10,11 @@
  * (cfg mode + executeGroupAllowlist). Binding failure refuses — never falls back
  * to another board work item.
  *
- * R2: final dispatch re-validates the same plan version, injects board summary /
- * context pointer / confirmed step into the member run prompt, and remembers the
- * execution deliverable binding for formal team submit.
+ * R3: final dispatch re-validates the same plan version, injects board summary /
+ * context pointer / confirmed step into the member run prompt, and passes an
+ * unconfusable executionDeliverableBinding on the wake request (no process Map).
  */
+import { randomUUID } from "node:crypto";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { formatExecutionTaskBagForPrompt } from "../collaboration-dispatch/executor-private-todolist.js";
@@ -30,7 +31,7 @@ import {
   buildCollaborationExecutionTaskBag,
   listCollaborationBoardItems,
 } from "./claim-contract-entry.js";
-import { rememberExecutionDeliverableBinding } from "./execution-deliverable-binding.js";
+import { buildExecutionDeliverableBinding } from "./execution-deliverable-binding.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
@@ -357,14 +358,22 @@ export async function triggerPostPlanConfirmAdvance(params: {
       };
     }
 
-    rememberExecutionDeliverableBinding(groupId, claimant, {
+    const runId = `wake_deliverable_${randomUUID()}`;
+    const executionDeliverableBinding = buildExecutionDeliverableBinding({
+      tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? req.tenantId ?? null,
+      groupId,
       taskId,
       boardItemId,
       todolistId,
       planVersion: confirmedVersion,
       stepId: compact(step.stepId) || bagStepId,
+      runId,
+      attemptId: compact(req.opKey) || null,
       source: "wake_dispatch",
     });
+    if (!executionDeliverableBinding) {
+      return { ok: false, reason: "execution_deliverable_binding_incomplete" };
+    }
 
     const dispatchPrompt = buildDispatchPrompt({
       source: req.source,
@@ -381,6 +390,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
       },
       dispatchPrompt,
       reason: advanceReason,
+      executionDeliverableBinding,
     };
 
     if (!baseDispatcher) {
