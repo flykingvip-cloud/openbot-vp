@@ -2679,7 +2679,6 @@ Docs: https://docs.openbot.love
 
 - Platform models capability admission gateway RPC (`models.admission.*`): formal verification tasks, routing eligibility apply, and dry-run decision preview. UI binds when gateway connected; offline falls back to local_protocol. Stub/demo evidence still cannot become formal verified. Does not call paid Midjourney/Suno APIs.
 
-
 - Commands: add `commands.allowFrom` config for separate command authorization, allowing operators to restrict slash commands to specific users while keeping chat open to others. (#12430) Thanks @thewilloftheshadow.
 - Docker: add ClawDock shell helpers for Docker workflows. (#12817) Thanks @Olshansk.
 - Gateway: periodic channel health monitor auto-restarts stuck, crashed, or silently-stopped channels. Configurable via `gateway.channelHealthCheckMinutes` (default: 5, set to 0 to disable). (#7053, #4302)

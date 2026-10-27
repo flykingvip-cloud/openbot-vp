@@ -24,8 +24,8 @@ const BUDGETS: BudgetEntry[] = [
   },
   {
     path: "src/gateway/collaboration-learning.ts",
-    maxLines: 139,
-    why: "collaboration-learning facade: re-exports only; logic in src/gateway/collaboration-learning/*.",
+    maxLines: 150,
+    why: "collaboration-learning facade: re-exports only; logic in src/gateway/collaboration-learning/* (locked to origin/main size after #103 wake-op re-exports unmasked check).",
   },
   {
     path: "src/gateway/collaboration-learning/shared.ts",
