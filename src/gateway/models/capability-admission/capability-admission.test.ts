@@ -21,6 +21,8 @@ async function waitTerminal(
   while (Date.now() - start < timeoutMs) {
     const task = await service.getVerificationTask(taskId);
     if (task && task.status !== "queued" && task.status !== "running") {
+      // First terminal observation is the contract surface: callers must not
+      // need an extra flush/sleep for evidence or history-only error.
       return task;
     }
     // Do not flush ALL background work: concurrent gated runners would deadlock.
@@ -197,6 +199,45 @@ describe("gateway capability admission", () => {
     ).toBe(false);
   });
 
+  it("publishes terminal status with evidence or stale reason in the same store write", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const service = createGatewayVerificationService({
+      storePath,
+      interruptOrphansOnCreate: false,
+      resolveConnectionOk: () => true,
+      runner: {
+        async check(ctx) {
+          await gate;
+          return ctx.capabilityIds.map(
+            (id): ProtocolCheckOutcome => ({
+              capabilityId: id,
+              status: "passed",
+              testVersion: "gateway-protocol-v1",
+              verifiedAt: Date.now(),
+            }),
+          );
+        },
+      },
+    });
+    const { task: created } = await service.createVerificationTask({
+      modelRef: "openai/atomic-publish",
+      capabilityIds: ["coding"],
+      configFingerprint: "fp-atomic",
+    });
+    release();
+    // First terminal read must already see formal evidence — no extra wait/flush.
+    const done = await waitTerminal(service, created.taskId);
+    expect(done.status).toBe("succeeded");
+    expect(done.error).toBeUndefined();
+    const admission = await getModelAdmission("openai/atomic-publish", storePath);
+    expect(
+      admission.capabilityEvidence.some((e) => e.id === "coding" && e.status === "passed"),
+    ).toBe(true);
+  });
+
   it("fingerprint change keeps late results in history only", async () => {
     let currentFp = "fp-v1";
     let release!: () => void;
@@ -228,6 +269,7 @@ describe("gateway capability admission", () => {
     });
     currentFp = "fp-v2";
     release();
+    // First terminal observation must already carry the history-only reason.
     const done = await waitTerminal(service, created.taskId);
     expect(done.results?.some((r) => r.id === "coding" && r.status === "passed")).toBe(true);
     expect(done.error).toMatch(/指纹/);
@@ -288,6 +330,7 @@ describe("gateway capability admission", () => {
     );
     // Late success from older generation must not replace newer failed evidence.
     gateByFp.get("gen-old")!.release();
+    // First terminal observation must already carry the superseded reason.
     const older = await waitTerminal(service, first.task.taskId);
     expect(older.error).toMatch(/取代|代次|generation|历史/i);
     const admission = await getModelAdmission("openai/gen", storePath);
