@@ -512,3 +512,256 @@ describe("activateCollaborationTask lock order vs auth", () => {
     }
   });
 });
+
+describe("R4 trusted chain: two-tenant activate→claim→apply→propose→confirm→deliverable", () => {
+  it("records per-step locators and never crosses tenant roots", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-r4-chain-"));
+    tempDirs.push(root);
+    const tenantsRoot = path.join(root, "tenants");
+    const hostCollab = path.join(root, "host-collaboration");
+    process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+    process.env.OPENBOT_TENANTS_ROOT = tenantsRoot;
+    process.env.OPENBOT_SECURITY_PROFILE = "managed_enterprise";
+    const cfg = {
+      agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+      gateway: { security: { profile: "managed_enterprise" } },
+      collaboration: {
+        defaults: { workspace: hostCollab },
+        runtimeNamespace: true,
+        task: { claimContract: true },
+      },
+    } as OpenBotConfig;
+    const configPath = path.join(root, "openbot.json");
+    await fs.writeFile(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+    process.env.OPENBOT_CONFIG_PATH = configPath;
+    process.env.OPENCLAW_CONFIG_PATH = configPath;
+    setRuntimeConfigSnapshot(cfg, cfg);
+    clearConfigCache();
+
+    const { createTrustedGroupStores } = await import("./team-resource-auth.js");
+    const { resolveTrustedGroupLocator } = await import("../workspace/group-locator.js");
+    const { taskControlLockDir } = await import("../collaboration-dispatch/task-control-cas.js");
+    const { writeGroupOperatingState } = await import("./shared.js");
+    const { makeOperatingState } =
+      await import("../collaboration-dispatch/__fixtures__/policy-source-matrix.js");
+    const {
+      claimCollaborationBoardItem,
+      applyCollaborationBoardClaim,
+      proposeCollaborationTodolist,
+      listCollaborationBoardItems,
+    } = await import("./claim-contract-entry.js");
+    const { maybeConfirmPlanFromChatSend } = await import("./chat-plan-confirm-hook.js");
+    const { resolveOwnerDecisionDeliveryLogPath } = await import("./owner-decision-delivery.js");
+    const { submitTeamDeliverable, readTeamDeliverable } =
+      await import("./team-deliverable-submit.js");
+
+    const groupId = "grp_r4_shared";
+    const taskId = "TASK_R4_SHARED";
+    const actor = "human:owner";
+    const claimant = "bot-analyst";
+    const tenants = ["tenant-r4-a", "tenant-r4-b"] as const;
+    const bodies = ["# A chain deliverable\n", "# B chain deliverable\n"] as const;
+
+    type StepLoc = { step: string; path: string };
+    const allLocs: Record<string, StepLoc[]> = {};
+
+    for (let i = 0; i < tenants.length; i += 1) {
+      const tenantId = tenants[i];
+      const groupLocator = resolveTrustedGroupLocator({
+        groupId,
+        tenantId,
+        profile: "managed_enterprise",
+        cfg,
+      });
+      const groupsRoot = path.dirname(groupLocator);
+      const trusted = { groupsRoot, groupLocator };
+      const stores = createTrustedGroupStores(trusted);
+      await fs.mkdir(groupLocator, { recursive: true });
+      const locs: StepLoc[] = [];
+      const record = (step: string, p: string) => {
+        expect(p.includes(tenantId), `${step} must sit under ${tenantId}: ${p}`).toBe(true);
+        expect(p.includes(hostCollab), `${step} must not use host collab: ${p}`).toBe(false);
+        locs.push({ step, path: p });
+      };
+
+      record("groupLocator", groupLocator);
+
+      const activated = await activateCollaborationTask({
+        groupId,
+        taskId,
+        title: "整链收敛验收报告",
+        message: "请为双租户隔离整链发布看板并分工认领，验收交付报告与计划确认闭环",
+        actor,
+        goal: "产出可验收的整链交付报告",
+        acceptanceCriteria: ["激活隔离", "认领应用", "计划确认", "成果提交"],
+        constraints: ["仅本租户 locator", "禁止串租户读写"],
+        suggestedClaimantIds: [claimant],
+        humanConfirmed: true,
+        requireHumanConfirm: true,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+        cfg,
+      });
+      if (activated.status !== "activated" && activated.status !== "partial_success") {
+        throw new Error(`activate failed: ${JSON.stringify(activated)}`);
+      }
+      expect(["activated", "partial_success"]).toContain(activated.status);
+      const boardItemId = activated.boardItemId;
+      record("taskObjectRoot", stores.groupsRoot);
+      const lockDir = taskControlLockDir({ groupId, cfg, groupRootDir: groupsRoot });
+      record("taskControlLockDir", lockDir);
+
+      const listed = await listCollaborationBoardItems({
+        groupId,
+        taskId,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+        cfg,
+      });
+      expect(listed.some((row) => row.itemId === boardItemId)).toBe(true);
+
+      const claimed = await claimCollaborationBoardItem({
+        groupId,
+        taskId,
+        itemId: boardItemId,
+        claimantId: claimant,
+        actor: claimant,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+        cfg,
+      });
+      expect(claimed.status).toBe("claimed");
+
+      const applied = await applyCollaborationBoardClaim({
+        groupId,
+        taskId,
+        itemId: boardItemId,
+        actor: claimant,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+        cfg,
+      });
+      expect(applied.item.status).toBe("applied");
+
+      // Seed OS after apply sync so confirmer ACL is not wiped by projection rewrite.
+      const { readGroupOperatingState } = await import("./shared.js");
+      const liveOs = await readGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupId,
+      });
+      const state = makeOperatingState({
+        groupId,
+        governance: {
+          ...liveOs?.governance,
+          coordinatorBotId: actor,
+          ownerUserId: actor,
+        },
+      });
+      state.memberRoleMap = [
+        {
+          memberId: actor,
+          memberKind: "human",
+          governanceRole: "owner",
+          collaborationRole: null,
+          status: "active",
+        },
+        {
+          memberId: claimant,
+          memberKind: "bot",
+          governanceRole: "member",
+          collaborationRole: null,
+          status: "active",
+        },
+      ];
+      (state as { authEpoch?: number }).authEpoch =
+        (typeof (liveOs as { authEpoch?: number } | null)?.authEpoch === "number"
+          ? (liveOs as { authEpoch: number }).authEpoch
+          : 0) + 1;
+      await writeGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupId,
+        state,
+        writeKind: "auth",
+        groupRootDir: groupsRoot,
+      });
+
+      const proposed = await proposeCollaborationTodolist({
+        groupId,
+        taskId,
+        boardItemId,
+        ownerMemberId: claimant,
+        steps: [{ title: "写成果" }, { title: "自检" }],
+        actor: claimant,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+        cfg,
+      });
+      expect(proposed.todolist.status).toBe("proposed");
+      const deliveryLog = resolveOwnerDecisionDeliveryLogPath(groupId, cfg, {
+        groupRootDir: groupsRoot,
+        groupLocator,
+      });
+      record("ownerDecisionDeliveryLog", deliveryLog);
+
+      // Chat confirm path (same entry as UI card) — user-visible message, no auto-advance.
+      const chatHook = await maybeConfirmPlanFromChatSend({
+        groupId,
+        message: "确认计划",
+        actor,
+        taskId,
+        boardItemId,
+        todolistId: proposed.todolist.todolistId,
+        expectedVersion: proposed.todolist.version,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+        cfg,
+      });
+      expect(chatHook.handled).toBe(true);
+      if (!chatHook.handled) {
+        return;
+      }
+      expect(chatHook.result.confirmed).toBe(true);
+      expect(chatHook.userMessage).toContain("计划已确认");
+      expect(chatHook.userMessage).toContain("自动推进尚未接通");
+      expect(chatHook.autoAdvanceWired).toBe(false);
+
+      const write = await submitTeamDeliverable({
+        groupId,
+        taskId,
+        actor,
+        title: "整链成果",
+        content: bodies[i],
+        enforceAcl: false,
+        trusted,
+        cfg,
+      });
+      expect(write.ok).toBe(true);
+      if (!write.ok) {
+        return;
+      }
+      record("deliverableLocator", write.locator);
+      const read = await readTeamDeliverable({
+        groupId,
+        deliverableId: write.deliverableId,
+        actor,
+        enforceAcl: false,
+        trusted,
+        cfg,
+      });
+      expect(read.ok).toBe(true);
+      if (read.ok) {
+        expect(read.content).toBe(bodies[i]);
+      }
+
+      allLocs[tenantId] = locs;
+    }
+
+    // Cross-tenant: no locator from A appears under B's tenant id path and vice versa.
+    for (const loc of allLocs["tenant-r4-a"]) {
+      expect(loc.path.includes("tenant-r4-b")).toBe(false);
+    }
+    for (const loc of allLocs["tenant-r4-b"]) {
+      expect(loc.path.includes("tenant-r4-a")).toBe(false);
+    }
+  });
+});

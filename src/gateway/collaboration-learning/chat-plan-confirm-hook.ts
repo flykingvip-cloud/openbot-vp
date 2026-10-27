@@ -28,6 +28,9 @@ export type ChatPlanConfirmHookInput = {
   expectedVersion?: number;
   /** When true, taskId came from unreliable group operating-state currentTaskId. */
   taskIdFromGroupCurrent?: boolean;
+  auth?: import("./team-resource-auth.js").TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: import("./team-resource-auth.js").TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 };
@@ -113,6 +116,9 @@ export async function maybeConfirmPlanFromChatSend(
       todolistId: todolistId || undefined,
       decisionId: params.decisionId?.trim() || undefined,
       cfg: params.cfg,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores: params.stores,
     });
     if (resolved.status === "ambiguous") {
       const result: TryConfirmPlanFromChatResult = {
@@ -187,6 +193,9 @@ export async function maybeConfirmPlanFromChatSend(
     todolistId: todolistId || undefined,
     expectedVersion,
     tenant: params.tenant,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
     cfg: params.cfg,
   });
   return {

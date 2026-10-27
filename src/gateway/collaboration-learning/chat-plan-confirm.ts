@@ -16,6 +16,7 @@ import {
   readOwnerDecisionDeliveries,
   type OwnerDecisionCardDelivery,
 } from "./owner-decision-delivery.js";
+import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export type ChatPlanConfirmIntent =
@@ -58,6 +59,10 @@ export type TryConfirmPlanFromChatInput = {
   boardItemId?: string;
   todolistId?: string;
   expectedVersion?: number;
+  /** Trusted tenant SoT for confirm + delivery log. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 };
@@ -249,6 +254,9 @@ export async function resolvePendingPlanConfirmBinding(params: {
   todolistId?: string;
   decisionId?: string;
   cfg?: OpenBotConfig;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
 }): Promise<ResolvePendingPlanConfirmBindingResult> {
   const groupId = compact(params.groupId);
   const actor = compact(params.actor);
@@ -262,11 +270,19 @@ export async function resolvePendingPlanConfirmBinding(params: {
 
   let rows: OwnerDecisionCardDelivery[] = [];
   try {
+    const locator = params.stores
+      ? { groupRootDir: params.stores.groupsRoot, groupLocator: params.stores.groupLocator }
+      : params.trusted
+        ? { groupRootDir: params.trusted.groupsRoot, groupLocator: params.trusted.groupLocator }
+        : params.auth
+          ? { groupRootDir: params.auth.groupsRoot, groupLocator: params.auth.groupLocator }
+          : {};
     rows = await readOwnerDecisionDeliveries({
       groupId,
       taskId: taskId || undefined,
       todolistId: todolistFilter || undefined,
       cfg: params.cfg,
+      ...locator,
     });
   } catch {
     return { status: "none", reason: "delivery_log_unreadable" };
@@ -350,6 +366,9 @@ export async function tryConfirmPlanFromChat(
       viewerId: actor,
       cfg,
       tenant: params.tenant,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores: params.stores,
     });
   } catch (error) {
     return {
@@ -412,6 +431,9 @@ export async function tryConfirmPlanFromChat(
       actor,
       expectedVersion,
       tenant: params.tenant,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores: params.stores,
       cfg,
     });
     return {

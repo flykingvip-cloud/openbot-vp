@@ -356,6 +356,7 @@ async function ensureCollaborationTaskObject(params: {
       groupId: params.groupId,
       taskId: params.taskId,
       cfg,
+      groupRootDir: params.stores.groupsRoot,
       fn: run,
     });
   } catch (error) {
@@ -778,6 +779,7 @@ export async function activateCollaborationTask(
       groupId,
       taskId,
       cfg,
+      groupRootDir: teamStores.groupsRoot,
       fn: async (): Promise<LockedPublish> => {
         const existingLookup = await findExistingPublishedItem({
           groupId,
