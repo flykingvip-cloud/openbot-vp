@@ -113,66 +113,185 @@ export type PendingPlanConfirmBinding = {
   source: "owner_decision_delivery";
 };
 
+export type ResolvePendingPlanConfirmBindingResult =
+  | { status: "bound"; binding: PendingPlanConfirmBinding }
+  | { status: "none"; reason: string }
+  | {
+      status: "ambiguous";
+      reason: string;
+      candidates: PendingPlanConfirmBinding[];
+    };
+
+export function deliveryCollapseKey(row: OwnerDecisionCardDelivery): string {
+  const decisionId = compact(row.card?.decisionId);
+  if (decisionId) {
+    return `decision:${decisionId}`;
+  }
+  return `todolist:${compact(row.todolistId)}:v${Math.floor(row.version || 0)}`;
+}
+
+export function isTerminalDelivery(row: OwnerDecisionCardDelivery): boolean {
+  if (row.userFacing === "consumed" || row.userFacing === "stale_version") {
+    return true;
+  }
+  if (
+    row.stage === "confirmation_consumed" ||
+    row.stage === "skipped" ||
+    row.stage === "delivery_failed"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function actorMayConfirmDelivery(row: OwnerDecisionCardDelivery, actor: string): boolean {
+  const id = compact(actor);
+  if (!id) {
+    return false;
+  }
+  const mentions = row.card?.mentionMemberIds ?? [];
+  if (mentions.length === 0) {
+    // No mention list on the card — refuse guessing; require explicit RPC binding.
+    return false;
+  }
+  return mentions.some((memberId) => compact(memberId) === id);
+}
+
+function toBinding(row: OwnerDecisionCardDelivery): PendingPlanConfirmBinding | null {
+  const todolistId = compact(row.todolistId);
+  const boardItemId = compact(row.boardItemId);
+  const boundTaskId = compact(row.taskId);
+  const version =
+    typeof row.version === "number" && Number.isFinite(row.version) ? Math.floor(row.version) : 0;
+  if (!todolistId || !boardItemId || !boundTaskId || version <= 0) {
+    return null;
+  }
+  return {
+    taskId: boundTaskId,
+    boardItemId,
+    todolistId,
+    version,
+    decisionId: compact(row.card?.decisionId) || undefined,
+    source: "owner_decision_delivery",
+  };
+}
+
+/** Pure candidate selection after chronological collapse (testable). */
+export function selectPendingPlanConfirmCandidates(params: {
+  rows: OwnerDecisionCardDelivery[];
+  actor: string;
+  taskId?: string;
+  boardItemId?: string;
+  todolistId?: string;
+  decisionId?: string;
+}): PendingPlanConfirmBinding[] {
+  const actor = compact(params.actor);
+  const taskId = compact(params.taskId);
+  const boardItemFilter = compact(params.boardItemId);
+  const todolistFilter = compact(params.todolistId);
+  const decisionFilter = compact(params.decisionId);
+
+  const invalidated = new Set<string>();
+  const latestByKey = new Map<string, OwnerDecisionCardDelivery>();
+  for (const row of params.rows) {
+    if (!row) {
+      continue;
+    }
+    const key = deliveryCollapseKey(row);
+    if (isTerminalDelivery(row)) {
+      invalidated.add(key);
+      latestByKey.delete(key);
+      continue;
+    }
+    if (invalidated.has(key)) {
+      continue;
+    }
+    latestByKey.set(key, row);
+  }
+
+  const candidates: PendingPlanConfirmBinding[] = [];
+  for (const row of latestByKey.values()) {
+    if (!actorMayConfirmDelivery(row, actor)) {
+      continue;
+    }
+    const binding = toBinding(row);
+    if (!binding) {
+      continue;
+    }
+    if (taskId && binding.taskId !== taskId) {
+      continue;
+    }
+    if (boardItemFilter && binding.boardItemId !== boardItemFilter) {
+      continue;
+    }
+    if (todolistFilter && binding.todolistId !== todolistFilter) {
+      continue;
+    }
+    if (decisionFilter && (binding.decisionId || "") !== decisionFilter) {
+      continue;
+    }
+    candidates.push(binding);
+  }
+  return candidates;
+}
+
 /**
- * Resolve the plan version the user was actually shown from the durable
- * owner-decision delivery log. Never invents "current unique proposed" version.
+ * Resolve the plan the *current actor* may confirm from durable delivery log.
+ * Collapses later consumed/stale events so they cannot fall back to an earlier
+ * delivery of the same decision/todolist+version. Never picks "group latest".
+ * Multiple distinct pending candidates → ambiguous (refuse to guess).
  */
 export async function resolvePendingPlanConfirmBinding(params: {
   groupId: string;
+  actor: string;
   taskId?: string;
+  boardItemId?: string;
+  todolistId?: string;
+  decisionId?: string;
   cfg?: OpenBotConfig;
-}): Promise<PendingPlanConfirmBinding | null> {
+}): Promise<ResolvePendingPlanConfirmBindingResult> {
   const groupId = compact(params.groupId);
-  if (!groupId) {
-    return null;
+  const actor = compact(params.actor);
+  if (!groupId || !actor) {
+    return { status: "none", reason: "missing_group_or_actor" };
   }
   const taskId = compact(params.taskId);
+  const boardItemFilter = compact(params.boardItemId);
+  const todolistFilter = compact(params.todolistId);
+  const decisionFilter = compact(params.decisionId);
+
   let rows: OwnerDecisionCardDelivery[] = [];
   try {
     rows = await readOwnerDecisionDeliveries({
       groupId,
       taskId: taskId || undefined,
+      todolistId: todolistFilter || undefined,
       cfg: params.cfg,
     });
   } catch {
-    return null;
+    return { status: "none", reason: "delivery_log_unreadable" };
   }
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    const row = rows[index];
-    if (!row) {
-      continue;
-    }
-    if (row.userFacing === "consumed" || row.userFacing === "stale_version") {
-      continue;
-    }
-    if (
-      row.stage === "confirmation_consumed" ||
-      row.stage === "skipped" ||
-      row.stage === "delivery_failed"
-    ) {
-      continue;
-    }
-    const todolistId = compact(row.todolistId);
-    const boardItemId = compact(row.boardItemId);
-    const boundTaskId = compact(row.taskId);
-    const version =
-      typeof row.version === "number" && Number.isFinite(row.version) ? Math.floor(row.version) : 0;
-    if (!todolistId || !boardItemId || !boundTaskId || version <= 0) {
-      continue;
-    }
-    if (taskId && boundTaskId !== taskId) {
-      continue;
-    }
+
+  const candidates = selectPendingPlanConfirmCandidates({
+    rows,
+    actor,
+    taskId: taskId || undefined,
+    boardItemId: boardItemFilter || undefined,
+    todolistId: todolistFilter || undefined,
+    decisionId: decisionFilter || undefined,
+  });
+
+  if (candidates.length === 0) {
+    return { status: "none", reason: "no_actor_accessible_pending_delivery" };
+  }
+  if (candidates.length > 1) {
     return {
-      taskId: boundTaskId,
-      boardItemId,
-      todolistId,
-      version,
-      decisionId: compact(row.card?.decisionId) || undefined,
-      source: "owner_decision_delivery",
+      status: "ambiguous",
+      reason: "multiple_pending_deliveries_refuse_guess",
+      candidates,
     };
   }
-  return null;
+  return { status: "bound", binding: candidates[0] };
 }
 
 /**

@@ -18,6 +18,7 @@ const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
 const savedOpenclawConfigPath = process.env.OPENCLAW_CONFIG_PATH;
 const savedSecurityProfile = process.env.OPENBOT_SECURITY_PROFILE;
 const savedLegacySecurityProfile = process.env.OPENCLAW_SECURITY_PROFILE;
+const savedTenantsRoot = process.env.OPENBOT_TENANTS_ROOT;
 
 afterEach(async () => {
   clearRuntimeConfigSnapshot();
@@ -46,6 +47,12 @@ afterEach(async () => {
     delete process.env.OPENCLAW_SECURITY_PROFILE;
   } else {
     process.env.OPENCLAW_SECURITY_PROFILE = savedLegacySecurityProfile;
+  }
+
+  if (savedTenantsRoot === undefined) {
+    delete process.env.OPENBOT_TENANTS_ROOT;
+  } else {
+    process.env.OPENBOT_TENANTS_ROOT = savedTenantsRoot;
   }
   await Promise.all(tempDirs.splice(0).map((dir) => fs.rm(dir, { recursive: true, force: true })));
 });
@@ -298,5 +305,210 @@ describe("activateCollaborationTask", () => {
       suggestedClaimantIds: ["bot-1", "bot-2"],
     });
     expect(a).toBe(b);
+  });
+});
+
+describe("activateCollaborationTask two-tenant same local ids full entry", () => {
+  it("activates then submit/read stay isolated per tenant locator", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-act-2ten-"));
+    tempDirs.push(root);
+    const tenantsRoot = path.join(root, "tenants");
+    process.env.OPENBOT_STATE_DIR = path.join(root, "state");
+    process.env.OPENBOT_TENANTS_ROOT = tenantsRoot;
+    process.env.OPENBOT_SECURITY_PROFILE = "managed_enterprise";
+    const cfg = {
+      agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+      gateway: { security: { profile: "managed_enterprise" } },
+      collaboration: {
+        defaults: { workspace: path.join(root, "host-collaboration") },
+        runtimeNamespace: true,
+        task: { claimContract: true },
+      },
+    } as OpenBotConfig;
+    const configPath = path.join(root, "openbot.json");
+    await fs.writeFile(configPath, `${JSON.stringify(cfg, null, 2)}\n`, "utf8");
+    process.env.OPENBOT_CONFIG_PATH = configPath;
+    process.env.OPENCLAW_CONFIG_PATH = configPath;
+    setRuntimeConfigSnapshot(cfg, cfg);
+    clearConfigCache();
+
+    const { createTrustedGroupStores } = await import("./team-resource-auth.js");
+    const { submitTeamDeliverable, readTeamDeliverable } =
+      await import("./team-deliverable-submit.js");
+    const { resolveTrustedGroupLocator } = await import("../workspace/group-locator.js");
+
+    const groupId = "grp_shared_local";
+    const taskId = "TASK_SHARED_LOCAL";
+    const shared = {
+      groupId,
+      taskId,
+      title: "两租户同局部ID",
+      message: "请为两租户隔离激活看板并验收交付",
+      actor: "human:owner",
+      goal: "隔离",
+      acceptanceCriteria: ["A租户成果", "B租户成果"],
+      constraints: ["仅写本租户 locator", "禁止串租户读写"],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      cfg,
+    };
+
+    const tenants = ["tenant-aaa", "tenant-bbb"] as const;
+    const bodies = ["# tenant A body\n", "# tenant B body\n"] as const;
+    for (let i = 0; i < tenants.length; i += 1) {
+      const tenantId = tenants[i];
+      const groupLocator = resolveTrustedGroupLocator({
+        groupId,
+        tenantId,
+        profile: "managed_enterprise",
+        cfg,
+      });
+      const groupsRoot = path.dirname(groupLocator);
+      const trusted = { groupsRoot, groupLocator };
+      const stores = createTrustedGroupStores(trusted);
+      await fs.mkdir(groupLocator, { recursive: true });
+
+      const activated = await activateCollaborationTask({
+        ...shared,
+        trusted,
+        tenant: { tenantId, trust: "membership" },
+      });
+      // Full entry: must create task via activate on this tenant locator (no pre-seed).
+      expect(["activated", "partial_success"]).toContain(activated.status);
+      const task = await stores.objectStorage.readObject<Task>(groupId, "task", taskId);
+      expect(task).toBeTruthy();
+      expect(task?.groupId).toBe(groupId);
+      expect(activated.taskEnsured).toBe(true);
+
+      const write = await submitTeamDeliverable({
+        groupId,
+        taskId,
+        actor: "human:owner",
+        title: shared.title,
+        content: bodies[i],
+        enforceAcl: false,
+        trusted,
+        cfg,
+      });
+      expect(write.ok).toBe(true);
+      if (!write.ok) {
+        return;
+      }
+      expect(write.locator.includes(tenantId)).toBe(true);
+      const read = await readTeamDeliverable({
+        groupId,
+        deliverableId: write.deliverableId,
+        actor: "human:owner",
+        enforceAcl: false,
+        trusted,
+        cfg,
+      });
+      expect(read.ok).toBe(true);
+      if (read.ok) {
+        expect(read.content).toBe(bodies[i]);
+      }
+    }
+
+    // Cross-tenant: A locator must not see B file bytes.
+    const locatorA = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: "tenant-aaa",
+      profile: "managed_enterprise",
+      cfg,
+    });
+    const storesA = createTrustedGroupStores({
+      groupsRoot: path.dirname(locatorA),
+      groupLocator: locatorA,
+    });
+    const listA = await storesA.objectStorage.listObjects(groupId, "deliverable");
+    for (const row of listA) {
+      const body =
+        typeof (row as { content?: string }).content === "string"
+          ? (row as { content: string }).content
+          : "";
+      expect(body).not.toContain("tenant B");
+    }
+  });
+});
+
+describe("activateCollaborationTask lock order vs auth", () => {
+  it("activate sync and concurrent auth-lock revoke do not deadlock", async () => {
+    const { cfg } = await useConfig(true);
+    const { withGroupAuthLock } = await import("./shared.js");
+    const { createTrustedGroupStores } = await import("./team-resource-auth.js");
+    const { resolveTrustedGroupLocator } = await import("../workspace/group-locator.js");
+
+    const groupId = "grp_lock_order";
+    const taskId = "TEAM-REAL-LOCK-1";
+    const groupLocator = resolveTrustedGroupLocator({
+      groupId,
+      tenantId: null,
+      profile: "personal_local",
+      cfg,
+    });
+    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
+    await fs.mkdir(groupLocator, { recursive: true });
+
+    const activatePromise = activateCollaborationTask({
+      groupId,
+      taskId,
+      title: "锁序并发",
+      message: "请发布看板并验证锁序，验收无死锁",
+      actor: "human:owner",
+      goal: "无死锁",
+      acceptanceCriteria: ["无死锁", "无重复看板"],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      trusted,
+      cfg,
+    });
+
+    const revokePromise = (async () => {
+      // Hold auth lock briefly overlapping activation sync window.
+      await withGroupAuthLock({
+        groupId,
+        groupRootDir: trusted.groupsRoot,
+        cfg,
+        fn: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return "revoked-sim";
+        },
+      });
+    })();
+
+    const settled = await Promise.race([
+      Promise.all([activatePromise, revokePromise]).then((value) => ({ ok: true as const, value })),
+      new Promise<{ ok: false }>((resolve) => setTimeout(() => resolve({ ok: false }), 15_000)),
+    ]);
+    expect(settled.ok).toBe(true);
+    if (!settled.ok) {
+      return;
+    }
+    const [activated] = settled.value;
+    expect(["activated", "partial_success", "needs_confirm", "blocked"]).toContain(
+      activated.status,
+    );
+    if (activated.status === "activated" || activated.status === "partial_success") {
+      const stores = createTrustedGroupStores(trusted);
+      // Re-activate same contract should be idempotent (no duplicate board).
+      const again = await activateCollaborationTask({
+        groupId,
+        taskId,
+        title: "锁序并发",
+        message: "请发布看板并验证锁序，验收无死锁",
+        actor: "human:owner",
+        goal: "无死锁",
+        acceptanceCriteria: ["无死锁", "无重复看板"],
+        humanConfirmed: true,
+        requireHumanConfirm: true,
+        trusted,
+        cfg,
+      });
+      if (again.status === "activated" && activated.status === "activated") {
+        expect(again.boardItemId).toBe(activated.boardItemId);
+        expect(again.idempotentReplay).toBe(true);
+      }
+      void stores;
+    }
   });
 });

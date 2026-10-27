@@ -4725,19 +4725,44 @@ export const chatHandlers: GatewayRequestHandlers = {
         relatedId: clientRunId,
         ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
       }).catch(() => undefined);
-      // TEAM-REAL R2 包2: NL plan confirm — await formal result, surface to user,
-      // and do not start confirm-dependent execution when 尚未确认.
+      // TEAM-REAL R3: NL plan confirm — actor-bound delivery, await formal result,
+      // surface via chat.send message (UI-visible). Auto-advance NOT wired.
       {
         const confirmActor =
           (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
         const tenant = await resolveCollaborationTenantResolution(client);
+        const replyBinding =
+          p && typeof p === "object"
+            ? (p as {
+                planConfirmTaskId?: unknown;
+                planConfirmBoardItemId?: unknown;
+                planConfirmTodolistId?: unknown;
+                planConfirmDecisionId?: unknown;
+                planConfirmExpectedVersion?: unknown;
+              })
+            : null;
+        const readBound = (value: unknown): string | undefined =>
+          typeof value === "string" && value.trim() ? value.trim() : undefined;
+        const readBoundNum = (value: unknown): number | undefined =>
+          typeof value === "number" && Number.isFinite(value) ? Math.floor(value) : undefined;
+        const explicitTaskId = readBound(replyBinding?.planConfirmTaskId);
+        const explicitBoard = readBound(replyBinding?.planConfirmBoardItemId);
+        const explicitTodolist = readBound(replyBinding?.planConfirmTodolistId);
+        const explicitDecision = readBound(replyBinding?.planConfirmDecisionId);
+        const explicitVersion = readBoundNum(replyBinding?.planConfirmExpectedVersion);
         let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
         try {
           confirmHook = await maybeConfirmPlanFromChatSend({
             groupId: scope.groupId,
             message: mentionMessage,
             actor: confirmActor,
-            taskId: wakeTaskId,
+            // Prefer explicit card/reply binding; group currentTaskId alone is unreliable.
+            taskId: explicitTaskId || wakeTaskId,
+            boardItemId: explicitBoard,
+            todolistId: explicitTodolist,
+            decisionId: explicitDecision,
+            expectedVersion: explicitVersion,
+            taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
             tenant,
             cfg: policySnapshotCfg,
           });
@@ -4762,14 +4787,15 @@ export const chatHandlers: GatewayRequestHandlers = {
             {
               runId: clientRunId,
               status: "stopped" as const,
+              // UI-visible chat result chain (not RPC-only field).
               message: confirmHook.userMessage,
               planConfirm: confirmHook.result,
+              autoAdvanceWired: confirmHook.autoAdvanceWired,
             },
             undefined,
             { runId: clientRunId },
           );
-          // Confirmed or not: do not continue into agent dispatch for a confirm turn.
-          // Dependent execution must wait for a subsequent explicit work message.
+          // Confirm turn never starts dependent execution here (auto-advance not wired).
           return;
         }
       }

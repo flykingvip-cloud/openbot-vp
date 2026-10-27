@@ -786,3 +786,182 @@ describe("dual-root cleanup — team SoT uniqueness", () => {
     delete process.env.OPENBOT_TENANTS_ROOT;
   });
 });
+
+describe("submitTeamDeliverable failure recovery", () => {
+  it("recovers draft+file when submitted object write failed then retried", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-deliv-rec-"));
+    tempDirs.push(root);
+    const groupDir = path.join(root, "groups", "grp_rec");
+    await fs.mkdir(path.join(groupDir, "deliverables"), { recursive: true });
+    const trusted = { groupsRoot: path.join(root, "groups"), groupLocator: groupDir };
+    const { createTrustedGroupStores } = await import("./team-resource-auth.js");
+    const stores = createTrustedGroupStores(trusted);
+    await stores.objectStorage.writeObject("grp_rec", "task", "t1", {
+      taskId: "t1",
+      groupId: "grp_rec",
+      title: "任务",
+      status: "ready",
+      createdAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+    });
+
+    const content = "# recovered body\n";
+    const first = await submitTeamDeliverable({
+      groupId: "grp_rec",
+      taskId: "t1",
+      actor: "human:owner",
+      title: "成果恢复",
+      content,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+
+    // Simulate lost response + retry (same content, no previousId).
+    const second = await submitTeamDeliverable({
+      groupId: "grp_rec",
+      taskId: "t1",
+      actor: "human:owner",
+      title: "成果恢复",
+      content,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(second.ok).toBe(true);
+    if (second.ok) {
+      expect(second.idempotentReplay).toBe(true);
+      expect(second.deliverableId).toBe(first.deliverableId);
+      expect(second.locator).toBe(first.locator);
+    }
+  });
+
+  it("retries with previousId after success+lost response", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-deliv-prev-"));
+    tempDirs.push(root);
+    const groupDir = path.join(root, "groups", "grp_prev");
+    await fs.mkdir(path.join(groupDir, "deliverables"), { recursive: true });
+    const trusted = { groupsRoot: path.join(root, "groups"), groupLocator: groupDir };
+    const { createTrustedGroupStores } = await import("./team-resource-auth.js");
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    await stores.objectStorage.writeObject("grp_prev", "task", "t1", {
+      taskId: "t1",
+      groupId: "grp_prev",
+      title: "任务",
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+    });
+    const previousId = "del-prev-base";
+    await stores.objectStorage.writeObject("grp_prev", "deliverable", previousId, {
+      deliverableId: previousId,
+      groupId: "grp_prev",
+      taskId: "t1",
+      title: "旧版",
+      status: "submitted",
+      version: 1,
+      content: "# v1\n",
+      contentSha256: "x",
+      createdAtMs: now,
+      updatedAtMs: now,
+      submittedAtMs: now,
+    });
+
+    const content = "# v2 revision\n";
+    const first = await submitTeamDeliverable({
+      groupId: "grp_prev",
+      taskId: "t1",
+      actor: "human:owner",
+      title: "新版",
+      content,
+      previousDeliverableId: previousId,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+
+    const retry = await submitTeamDeliverable({
+      groupId: "grp_prev",
+      taskId: "t1",
+      actor: "human:owner",
+      title: "新版",
+      content,
+      previousDeliverableId: previousId,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(retry.ok).toBe(true);
+    if (retry.ok) {
+      expect(retry.idempotentReplay).toBe(true);
+      expect(retry.deliverableId).toBe(first.deliverableId);
+      expect(retry.version).toBe(first.version);
+    }
+  });
+
+  it("recovers from draft left after file write when submitted transition is retried", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-deliv-draft-"));
+    tempDirs.push(root);
+    const groupDir = path.join(root, "groups", "grp_draft");
+    await fs.mkdir(path.join(groupDir, "deliverables"), { recursive: true });
+    const trusted = { groupsRoot: path.join(root, "groups"), groupLocator: groupDir };
+    const { createTrustedGroupStores } = await import("./team-resource-auth.js");
+    const { writeFileExclusiveImmutable } = await import("./team-deliverable-submit.js");
+    const stores = createTrustedGroupStores(trusted);
+    const now = Date.now();
+    await stores.objectStorage.writeObject("grp_draft", "task", "t1", {
+      taskId: "t1",
+      groupId: "grp_draft",
+      title: "任务",
+      status: "ready",
+      createdAtMs: now,
+      updatedAtMs: now,
+    });
+    const content = "# draft interrupt\n";
+    const { createHash } = await import("node:crypto");
+    const sha = createHash("sha256").update(content, "utf8").digest("hex");
+    const deliverableId = "del-draft-interrupt";
+    const relativePath = `deliverables/${deliverableId}-v1.md`;
+    const absolutePath = path.join(groupDir, relativePath);
+    await stores.objectStorage.writeObject("grp_draft", "deliverable", deliverableId, {
+      deliverableId,
+      groupId: "grp_draft",
+      taskId: "t1",
+      title: "中断成果",
+      status: "draft",
+      version: 1,
+      content,
+      contentSha256: sha,
+      relativePath,
+      formalLocator: absolutePath,
+      createdBy: "human:owner",
+      updatedBy: "human:owner",
+      createdAtMs: now,
+      updatedAtMs: now,
+    });
+    const written = await writeFileExclusiveImmutable(absolutePath, content, sha);
+    expect(written.ok).toBe(true);
+
+    const result = await submitTeamDeliverable({
+      groupId: "grp_draft",
+      taskId: "t1",
+      actor: "human:owner",
+      title: "中断成果",
+      content,
+      enforceAcl: false,
+      trusted,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.deliverableId).toBe(deliverableId);
+      expect(result.status).toBe("submitted");
+      const onDisk = await fs.readFile(absolutePath, "utf8");
+      expect(onDisk).toBe(content);
+    }
+  });
+});

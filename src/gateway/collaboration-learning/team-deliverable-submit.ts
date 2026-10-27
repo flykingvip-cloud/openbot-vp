@@ -185,7 +185,8 @@ export async function assertNoSymlinkEscape(params: {
 
 /**
  * Create-only write: never overwrites an existing version file.
- * Returns exists_same when bytes already match (safe idempotent).
+ * Writes to a sibling temp then link/rename into place so a crash mid-write
+ * does not leave a half-written *final* path. Returns exists_same when bytes match.
  */
 export async function writeFileExclusiveImmutable(
   absolutePath: string,
@@ -197,11 +198,45 @@ export async function writeFileExclusiveImmutable(
 > {
   const dir = path.dirname(absolutePath);
   await fs.mkdir(dir, { recursive: true });
+
+  // Fast path: final already present with matching bytes (idempotent / recovery).
   try {
-    await fs.writeFile(absolutePath, content, { encoding: "utf8", flag: "wx" });
-    return { ok: true, created: true };
+    const existing = await fs.readFile(absolutePath, "utf8");
+    if (sha256Hex(existing) === contentSha256) {
+      return { ok: true, created: false };
+    }
+    return { ok: false, reason: "version_path_conflict", detail: absolutePath };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      return {
+        ok: false,
+        reason: "formal_root_write_failed",
+        detail: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  const tempPath = `${absolutePath}.${randomUUID().slice(0, 8)}.partial`;
+  try {
+    await fs.writeFile(tempPath, content, { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "formal_root_write_failed",
+      detail: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  try {
+    // link is create-only on the destination; fails with EEXIST if raced.
+    await fs.link(tempPath, absolutePath);
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
+    try {
+      await fs.unlink(tempPath);
+    } catch {
+      // best-effort cleanup of partial
+    }
     if (code === "EEXIST") {
       try {
         const existing = await fs.readFile(absolutePath, "utf8");
@@ -217,12 +252,41 @@ export async function writeFileExclusiveImmutable(
         };
       }
     }
-    return {
-      ok: false,
-      reason: "formal_root_write_failed",
-      detail: error instanceof Error ? error.message : String(error),
-    };
+    // Fallback for filesystems without link: exclusive wx create of final.
+    try {
+      await fs.writeFile(absolutePath, content, { encoding: "utf8", flag: "wx" });
+      return { ok: true, created: true };
+    } catch (wxError) {
+      const wxCode = (wxError as NodeJS.ErrnoException).code;
+      if (wxCode === "EEXIST") {
+        try {
+          const existing = await fs.readFile(absolutePath, "utf8");
+          if (sha256Hex(existing) === contentSha256) {
+            return { ok: true, created: false };
+          }
+          return { ok: false, reason: "version_path_conflict", detail: absolutePath };
+        } catch (readError) {
+          return {
+            ok: false,
+            reason: "formal_root_write_failed",
+            detail: readError instanceof Error ? readError.message : String(readError),
+          };
+        }
+      }
+      return {
+        ok: false,
+        reason: "formal_root_write_failed",
+        detail: wxError instanceof Error ? wxError.message : String(wxError),
+      };
+    }
   }
+
+  try {
+    await fs.unlink(tempPath);
+  } catch {
+    // final is linked; leftover partial is harmless and unique-named
+  }
+  return { ok: true, created: true };
 }
 
 function receiptFromRecord(params: {
@@ -390,25 +454,32 @@ export async function submitTeamDeliverable(
       };
     }
 
+    const isTerminalStatus = (status: string) =>
+      status === "submitted" ||
+      status === "in_review" ||
+      status === "approved" ||
+      status === "published";
+
+    const hashOf = (row: TeamDeliverableRecord) =>
+      compact(row.contentSha256) || (typeof row.content === "string" ? sha256Hex(row.content) : "");
+
+    // Idempotent replay (also covers previousId retry after success + lost response).
     const replay = existingList.find((row) => {
       if (row.taskId !== taskId) {
         return false;
       }
-      if (compact(row.title) !== title) {
+      if (hashOf(row) !== contentSha256) {
         return false;
       }
-      const storedHash =
-        compact(row.contentSha256) ||
-        (typeof row.content === "string" ? sha256Hex(row.content) : "");
-      return (
-        storedHash === contentSha256 &&
-        (row.status === "submitted" ||
-          row.status === "in_review" ||
-          row.status === "approved" ||
-          row.status === "published")
-      );
+      if (!isTerminalStatus(row.status)) {
+        return false;
+      }
+      if (previousId) {
+        return compact(row.previousVersionId) === previousId;
+      }
+      return compact(row.title) === title;
     });
-    if (replay && !previousId) {
+    if (replay) {
       const storedRel =
         compact(replay.relativePath) ||
         sanitizeRelativePath(undefined, replay.deliverableId, replay.version) ||
@@ -441,6 +512,76 @@ export async function submitTeamDeliverable(
         relativePath: storedRel,
         contentFallback: content,
       });
+    }
+
+    // Recoverable draft left by a prior interrupted submit (file may already exist).
+    const recoverableDraft = existingList.find((row) => {
+      if (row.taskId !== taskId || row.status !== "draft") {
+        return false;
+      }
+      if (hashOf(row) !== contentSha256) {
+        return false;
+      }
+      if (previousId) {
+        return compact(row.previousVersionId) === previousId;
+      }
+      return compact(row.title) === title;
+    });
+    if (recoverableDraft) {
+      const storedRel =
+        compact(recoverableDraft.relativePath) ||
+        sanitizeRelativePath(undefined, recoverableDraft.deliverableId, recoverableDraft.version) ||
+        `deliverables/${recoverableDraft.deliverableId}.md`;
+      const locator = compact(recoverableDraft.formalLocator) || path.join(groupDir, storedRel);
+      const written = await writeFileExclusiveImmutable(locator, content, contentSha256);
+      if (!written.ok) {
+        return {
+          ok: false as const,
+          reason: written.reason,
+          detail: `${written.detail ?? locator}; draft=${recoverableDraft.deliverableId} recoverable`,
+          writtenToGroupDir: false as const,
+        };
+      }
+      try {
+        const machine = new DeliverableStateMachine();
+        const nextStatus = machine.transition(recoverableDraft.status, "submitted", actor);
+        const submitted: TeamDeliverableRecord = {
+          ...recoverableDraft,
+          status: nextStatus,
+          submittedAtMs: now,
+          updatedBy: actor,
+          updatedAtMs: now,
+          relativePath: storedRel,
+          contentSha256,
+          formalLocator: locator,
+        };
+        await stores.objectStorage.writeObject(
+          groupId,
+          "deliverable",
+          recoverableDraft.deliverableId,
+          submitted,
+        );
+        return {
+          ok: true as const,
+          taskId,
+          groupId,
+          deliverableId: submitted.deliverableId,
+          version: submitted.version,
+          locator,
+          relativePath: storedRel,
+          sizeBytes,
+          contentSha256,
+          status: submitted.status,
+          idempotentReplay: !written.created,
+        };
+      } catch (error) {
+        return {
+          ok: false as const,
+          reason: "deliverable_submit_transition_failed",
+          detail: `${error instanceof Error ? error.message : String(error)}; draft=${recoverableDraft.deliverableId} file_present recoverable`,
+          writtenToGroupDir: false as const,
+        };
+      }
     }
 
     const version = previous ? previous.version + 1 : 1;
@@ -520,7 +661,7 @@ export async function submitTeamDeliverable(
       return {
         ok: false as const,
         reason: written.reason,
-        detail: written.detail,
+        detail: `${written.detail ?? absolutePath}; draft=${deliverableId} recoverable`,
         writtenToGroupDir: false as const,
       };
     }
@@ -546,7 +687,7 @@ export async function submitTeamDeliverable(
       return {
         ok: false as const,
         reason: "deliverable_submit_transition_failed",
-        detail: error instanceof Error ? error.message : String(error),
+        detail: `${error instanceof Error ? error.message : String(error)}; draft=${deliverableId} file_present recoverable`,
         writtenToGroupDir: false as const,
       };
     }

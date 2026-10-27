@@ -1,9 +1,11 @@
 /**
- * NL plan confirm on group chat.send (R2 包2).
+ * NL plan confirm on group chat.send (R3).
  *
- * Binds expectedVersion from the durable owner-decision delivery the user was
- * shown. Awaits the same confirmCollaborationTodolist path as the UI card.
- * Failures surface as 尚未确认 — never invent confirm or swallow errors.
+ * Binds expectedVersion from an actor-accessible owner-decision delivery after
+ * collapsing consumed/stale. Awaits the same confirmCollaborationTodolist path
+ * as the UI card. Failures surface as 尚未确认 — never invent confirm.
+ *
+ * Auto-dispatch after confirm is NOT wired on this track (基础接口).
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import {
@@ -18,10 +20,14 @@ export type ChatPlanConfirmHookInput = {
   groupId: string;
   message: string;
   actor: string;
+  /** Only when bound to the user's explicit reply / card — never group currentTaskId alone. */
   taskId?: string | null;
   boardItemId?: string | null;
   todolistId?: string | null;
+  decisionId?: string | null;
   expectedVersion?: number;
+  /** When true, taskId came from unreliable group operating-state currentTaskId. */
+  taskIdFromGroupCurrent?: boolean;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
 };
@@ -31,21 +37,26 @@ export type ChatPlanConfirmHookResult =
   | {
       handled: true;
       result: TryConfirmPlanFromChatResult;
-      /** Short user-visible summary for chat.send to present. */
+      /** Short user-visible summary for chat.send to present in the chat transcript/UI. */
       userMessage: string;
       /** When true, chat.send must not start confirm-dependent execution. */
       blockDependentExecution: boolean;
+      /** Honest: auto advance after confirm is not connected on this PR. */
+      autoAdvanceWired: false;
     };
 
 function formatUserMessage(result: TryConfirmPlanFromChatResult): string {
   if (result.status === "confirmed" && result.confirmed) {
-    return `计划已确认（todolist=${result.todolistId} v${result.version}）。`;
+    return (
+      `计划已确认（todolist=${result.todolistId} v${result.version}）。` +
+      `自动推进尚未接通（基础接口）；确认事件已写入，但不会在本轮自动启动依赖执行。`
+    );
   }
   if (result.status === "ambiguous") {
     return `尚未确认：确认表述不唯一（${result.reason}）。请单独发送「确认计划」，或点选计划卡片。`;
   }
   if (result.status === "no_unique_plan") {
-    return `尚未确认：${result.reason}。请绑定任务与计划卡片后再确认。`;
+    return `尚未确认：${result.reason}。请绑定你可见的待确认卡片后再确认。`;
   }
   if (result.status === "blocked") {
     return `尚未确认：${result.reason}${result.detail ? `（${result.detail}）` : ""}。`;
@@ -71,10 +82,21 @@ export async function maybeConfirmPlanFromChatSend(
       result,
       userMessage: formatUserMessage(result),
       blockDependentExecution: true,
+      autoAdvanceWired: false,
     };
   }
 
-  let taskId = params.taskId?.trim() || "";
+  // Group-level currentTaskId is unreliable — ignore unless paired with card binding.
+  const explicitTaskId =
+    params.taskIdFromGroupCurrent &&
+    !params.boardItemId &&
+    !params.todolistId &&
+    !params.decisionId &&
+    params.expectedVersion == null
+      ? ""
+      : params.taskId?.trim() || "";
+
+  let taskId = explicitTaskId;
   let boardItemId = params.boardItemId?.trim() || "";
   let todolistId = params.todolistId?.trim() || "";
   let expectedVersion =
@@ -82,15 +104,38 @@ export async function maybeConfirmPlanFromChatSend(
       ? Math.floor(params.expectedVersion)
       : undefined;
 
-  // Bind the version the user was shown from owner-decision delivery — never
-  // invent from "current unique proposed".
   if (expectedVersion == null || !todolistId || !boardItemId || !taskId) {
-    const binding = await resolvePendingPlanConfirmBinding({
+    const resolved = await resolvePendingPlanConfirmBinding({
       groupId: params.groupId,
+      actor: params.actor,
       taskId: taskId || undefined,
+      boardItemId: boardItemId || undefined,
+      todolistId: todolistId || undefined,
+      decisionId: params.decisionId?.trim() || undefined,
       cfg: params.cfg,
     });
-    if (binding) {
+    if (resolved.status === "ambiguous") {
+      const result: TryConfirmPlanFromChatResult = {
+        status: "no_unique_plan",
+        confirmed: false,
+        reason: resolved.reason,
+        candidates: resolved.candidates.map((row) => ({
+          taskId: row.taskId,
+          todolistId: row.todolistId,
+          version: row.version,
+          boardItemId: row.boardItemId,
+        })),
+      };
+      return {
+        handled: true,
+        result,
+        userMessage: formatUserMessage(result),
+        blockDependentExecution: true,
+        autoAdvanceWired: false,
+      };
+    }
+    if (resolved.status === "bound") {
+      const binding = resolved.binding;
       taskId = taskId || binding.taskId;
       boardItemId = boardItemId || binding.boardItemId;
       todolistId = todolistId || binding.todolistId;
@@ -104,7 +149,7 @@ export async function maybeConfirmPlanFromChatSend(
     const result: TryConfirmPlanFromChatResult = {
       status: "no_unique_plan",
       confirmed: false,
-      reason: "taskId_required_to_bind_confirm",
+      reason: "no_actor_accessible_pending_delivery",
       candidates: [],
     };
     return {
@@ -112,6 +157,7 @@ export async function maybeConfirmPlanFromChatSend(
       result,
       userMessage: formatUserMessage(result),
       blockDependentExecution: true,
+      autoAdvanceWired: false,
     };
   }
 
@@ -121,13 +167,14 @@ export async function maybeConfirmPlanFromChatSend(
       confirmed: false,
       reason: "expected_version_required",
       detail:
-        "no owner-decision delivery binding with version; refusing to confirm an unseen plan revision",
+        "no actor-accessible pending delivery with version; refusing to confirm an unseen plan revision",
     };
     return {
       handled: true,
       result,
       userMessage: formatUserMessage(result),
       blockDependentExecution: true,
+      autoAdvanceWired: false,
     };
   }
 
@@ -147,5 +194,6 @@ export async function maybeConfirmPlanFromChatSend(
     result,
     userMessage: formatUserMessage(result),
     blockDependentExecution: !result.confirmed,
+    autoAdvanceWired: false,
   };
 }

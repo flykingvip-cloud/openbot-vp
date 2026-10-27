@@ -14,20 +14,33 @@ import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import type { GroupBoardClaimItem } from "../collaboration-dispatch/claim-contract.js";
 import { oralDispatchCreatesBoardFact } from "../collaboration-dispatch/claim-contract.js";
+import { listBoardClaimItems } from "../collaboration-dispatch/claim-contract.js";
+import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-event-key.js";
 import type { MaterializeIntentResult } from "../collaboration-dispatch/intent-board-materialize.js";
-import { withTaskControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import {
-  ClaimContractEntryError,
-  listCollaborationBoardItems,
-  materializeCollaborationIntentToBoard,
-} from "./claim-contract-entry.js";
+  materializeIntentToBoardItem,
+  type BoardIntentMaterializeInput,
+} from "../collaboration-dispatch/intent-board-materialize.js";
+import { resolveGroupPolicyInput } from "../collaboration-dispatch/resolve-effective-policy.js";
+import {
+  createRoundPolicySnapshot,
+  generatePolicySnapshotId,
+} from "../collaboration-dispatch/round-policy-snapshot.js";
+import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import { buildRuntimeNamespace } from "../collaboration-dispatch/runtime-namespace.js";
+import { withTaskControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import { resolveSecurityProfile } from "../security-profile.js";
+import { ClaimContractEntryError } from "./claim-contract-entry.js";
 import { readGroupOperatingState, syncGroupOperatingState } from "./shared.js";
 import {
   resolveTeamDeliverableStores,
   type TeamResourceAuthOk,
   type TrustedGroupStores,
 } from "./team-resource-auth.js";
-import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+import {
+  resolveAuthorityTenantForEntry,
+  type CollaborationTenantResolution,
+} from "./trusted-tenant.js";
 
 export type ActivateCollaborationTaskInput = {
   groupId: string;
@@ -134,6 +147,49 @@ function resolveActivationStores(params: {
     return { ok: false, reason: resolved.reason, detail: resolved.detail };
   }
   return { ok: true, stores: resolved };
+}
+
+async function buildTrustedBoardAuthority(params: {
+  groupId: string;
+  taskId: string;
+  cfg: OpenBotConfig;
+  stores: TrustedGroupStores;
+  tenant?: CollaborationTenantResolution | null;
+}) {
+  const operatingState = await readGroupOperatingState({
+    fileStore: params.stores.fileStore,
+    groupId: params.groupId,
+  });
+  const now = Date.now();
+  const snapshot = createRoundPolicySnapshot(resolveGroupPolicyInput({ operatingState }), {
+    now,
+    idGen: () => generatePolicySnapshotId(now),
+  });
+  const tenant = resolveAuthorityTenantForEntry({
+    preferred: params.tenant,
+    groupTenantId: params.tenant?.tenantId ?? null,
+  });
+  const profile = resolveSecurityProfile(params.cfg).profile;
+  // Force namespace onto the same trusted locator used for task/deliverable SoT.
+  const namespace = buildRuntimeNamespace({
+    profile,
+    tenantId: tenant.tenantId,
+    groupId: params.groupId,
+    groupLocator: params.stores.groupLocator,
+  });
+  const authority = createRuntimeAuthority({
+    snapshot,
+    episodeId: episodeIdForClientRun(`task-claim:${params.groupId}:${params.taskId}`),
+    tenant,
+    groupId: params.groupId,
+    profile,
+    cfg: params.cfg,
+  });
+  // Replace namespace root with trusted locator (createRuntimeAuthority may re-resolve).
+  return {
+    authority: { ...authority, namespace },
+    operatingState,
+  };
 }
 
 export function buildActivationKey(params: {
@@ -274,6 +330,8 @@ async function ensureCollaborationTaskObject(params: {
   readyRequested: boolean;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Trusted tenant-scoped stores — required (no host collaboration fallthrough). */
+  stores: TrustedGroupStores;
   /** When true, caller already holds withTaskControlLock. */
   alreadyLocked?: boolean;
 }): Promise<EnsureTaskResult> {
@@ -325,12 +383,14 @@ async function findExistingPublishedItem(params: {
   const cfg = params.cfg ?? loadConfig();
   let items: GroupBoardClaimItem[];
   try {
-    items = await listCollaborationBoardItems({
+    const { authority } = await buildTrustedBoardAuthority({
       groupId: params.groupId,
       taskId: params.taskId,
       cfg,
+      stores: params.stores,
       tenant: params.tenant,
     });
+    items = await listBoardClaimItems(authority, { taskId: params.taskId });
   } catch (error) {
     return {
       ok: false,
@@ -535,13 +595,20 @@ export async function activateCollaborationTask(
     };
   };
 
-  const runMaterialize = async () =>
-    materializeCollaborationIntentToBoard({
+  const runMaterialize = async () => {
+    const { authority } = await buildTrustedBoardAuthority({
       groupId,
       taskId,
+      cfg,
+      stores: teamStores,
+      tenant: params.tenant,
+    });
+    const publishedBy = actor;
+    const input: BoardIntentMaterializeInput = {
       message,
-      publishedBy: actor,
-      actor,
+      groupId,
+      taskId,
+      publishedBy,
       title,
       suggestedClaimantIds: params.suggestedClaimantIds
         ? [...params.suggestedClaimantIds]
@@ -552,9 +619,9 @@ export async function activateCollaborationTask(
       dueAtMs: params.dueAtMs,
       requireHumanConfirm: params.requireHumanConfirm ?? true,
       humanConfirmed,
-      tenant: params.tenant,
-      cfg,
-    });
+    };
+    return materializeIntentToBoardItem({ authority, input, cfg });
+  };
 
   const mapMaterializeFailure = (
     materialized: MaterializeIntentResult,
@@ -694,13 +761,24 @@ export async function activateCollaborationTask(
     };
   }
 
-  // Confirmed publish: lookup + ensure(draft) + materialize + promote ready under ONE lock.
+  // Confirmed publish: lookup + ensure(draft) + materialize + promote ready under ONE task lock.
+  // Projection sync (takes group auth lock) MUST run outside the task lock — preserve auth→task order.
+  type LockedPublish =
+    | ActivateCollaborationTaskResult
+    | {
+        status: "ready_to_sync";
+        item: GroupBoardClaimItem;
+        taskCreated: boolean;
+        idempotentReplay: boolean;
+      };
+
+  let locked: LockedPublish;
   try {
-    return await withTaskControlLock({
+    locked = await withTaskControlLock({
       groupId,
       taskId,
       cfg,
-      fn: async (): Promise<ActivateCollaborationTaskResult> => {
+      fn: async (): Promise<LockedPublish> => {
         const existingLookup = await findExistingPublishedItem({
           groupId,
           taskId,
@@ -723,7 +801,12 @@ export async function activateCollaborationTask(
           };
         }
         if (existingLookup.item) {
-          return await syncActivated(existingLookup.item, false, true);
+          return {
+            status: "ready_to_sync",
+            item: existingLookup.item,
+            taskCreated: false,
+            idempotentReplay: true,
+          };
         }
 
         // Quality not yet proven — keep draft until materialize publishes.
@@ -830,7 +913,12 @@ export async function activateCollaborationTask(
           };
         }
 
-        return await syncActivated(publishedItem, taskCreated, false);
+        return {
+          status: "ready_to_sync",
+          item: publishedItem,
+          taskCreated,
+          idempotentReplay: false,
+        };
       },
     });
   } catch (error) {
@@ -845,4 +933,9 @@ export async function activateCollaborationTask(
       dispatched: false,
     };
   }
+
+  if (locked.status === "ready_to_sync") {
+    return await syncActivated(locked.item, locked.taskCreated, locked.idempotentReplay);
+  }
+  return locked;
 }
