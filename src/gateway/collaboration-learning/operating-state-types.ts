@@ -83,6 +83,12 @@ export type GatewayCollaborationGroupOperatingState = {
   };
   updatedAtMs: number;
   /**
+   * T51/T52: monotonic authorization version on the durable operating-state object.
+   * Shared revoke/commit/take condition (see task-control-cas). Absent ⇒ 0.
+   * Business writes must not roll this back (writeGroupOperatingState auth merge).
+   */
+  authEpoch?: number;
+  /**
    * P1-A2 (Floor Runtime v2.1 §4.2): monotonic revision of the L2 policy literals.
    * Absent ⇒ 0. Bumped by policy migrations (PolicyMigrationEvent.policyRevision)
    * and used as the CAS token for migration txns.
