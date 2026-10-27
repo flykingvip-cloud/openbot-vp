@@ -168,6 +168,20 @@ export function createDefaultProtocolRunner(
   };
 }
 
+/**
+ * Keep only finite scores in the agreed [0, 1] range; drop invalid values.
+ * Exported for unit tests of the specialized-eval score pipeline.
+ */
+export function normalizeQualityScore(score: unknown): number | undefined {
+  if (typeof score !== "number" || !Number.isFinite(score)) {
+    return undefined;
+  }
+  if (score < 0 || score > 1) {
+    return undefined;
+  }
+  return score;
+}
+
 function outcomeToEvidence(
   outcome: ProtocolCheckOutcome,
   mode: VerificationMode,
@@ -192,6 +206,7 @@ function outcomeToEvidence(
       status = "untested";
       break;
   }
+  const qualityScore = normalizeQualityScore(outcome.qualityScore);
   return {
     id: outcome.capabilityId,
     label: capabilityLabel(outcome.capabilityId),
@@ -203,6 +218,7 @@ function outcomeToEvidence(
     sourceNote: outcome.sourceNote,
     failureReason: outcome.failureReason,
     expiresAt: outcome.expiresAt,
+    ...(qualityScore != null ? { qualityScore } : {}),
   };
 }
 
@@ -362,6 +378,7 @@ export function createLocalProtocolVerificationService(
             sourceNote: r.sourceNote,
             expiresAt: r.expiresAt,
             verifiedAt: r.verifiedAt,
+            ...(r.qualityScore != null ? { qualityScore: r.qualityScore } : {}),
           })),
           { fromPendingTimeout: true },
         );

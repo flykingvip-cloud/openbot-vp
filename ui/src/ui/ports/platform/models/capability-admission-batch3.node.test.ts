@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  createInjectedProtocolRunner,
+  createLocalProtocolVerificationService,
+  normalizeQualityScore,
+} from "./admission/local-protocol-adapter.ts";
 import { previewRoutingDecisionViaService } from "./admission/routing-decision-service.ts";
 import { verifiedCapabilityIds } from "./capability-evidence.ts";
 import {
@@ -13,7 +18,10 @@ import {
   setAutoRoutingAdmission,
   upsertModelAdmission,
 } from "./model-admission-store.ts";
-import { previewRoutingDecision } from "./routing-decision-preview.ts";
+import {
+  detectTaskCategoryForPreview,
+  previewRoutingDecision,
+} from "./routing-decision-preview.ts";
 import {
   SPECIALIZED_EVAL_DEMO_VERSION,
   buildSpecializedEvalDisplay,
@@ -181,5 +189,167 @@ describe("batch3 specialized eval display", () => {
       demo: admission.demoCapabilityEvidence,
     });
     expect(display.some((row) => row.isDemo && row.id === "coding")).toBe(true);
+  });
+});
+
+describe("batch3 Chinese / mixed task classification", () => {
+  it("classifies page Chinese coding example as coding", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "重构这段代码并补充测试",
+        outputType: "text",
+      }),
+    ).toBe("coding");
+  });
+
+  it("classifies Chinese poster / soundtrack and mixed EN+CN", () => {
+    expect(detectTaskCategoryForPreview({ taskText: "画一张活动海报" })).toBe("image_generation");
+    expect(detectTaskCategoryForPreview({ taskText: "为短片配乐" })).toBe("music_generation");
+    expect(detectTaskCategoryForPreview({ taskText: "refactor 这段代码 and add 单元测试" })).toBe(
+      "coding",
+    );
+    expect(detectTaskCategoryForPreview({ taskText: "generate a 海报 for launch" })).toBe(
+      "image_generation",
+    );
+    expect(detectTaskCategoryForPreview({ taskText: "suno 风格配乐 for trailer" })).toBe(
+      "music_generation",
+    );
+  });
+
+  it("gives outputType priority over conflicting task text", () => {
+    // Explicit image wins even when text talks about coding.
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "重构这段代码并补充测试",
+        outputType: "image",
+      }),
+    ).toBe("image_generation");
+    // Explicit music wins over coding text.
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "refactor this module",
+        outputType: "music",
+      }),
+    ).toBe("music_generation");
+    // Explicit text blocks promoting 海报/配乐 keywords from the description.
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "写一段说明文，提到活动海报和配乐需求即可",
+        outputType: "text",
+      }),
+    ).toBe("general_text");
+  });
+
+  it("falls back to strategy profile after text when no stronger signal", () => {
+    expect(
+      detectTaskCategoryForPreview({
+        taskText: "随便聊聊",
+        taskProfileId: "high_quality_reasoning",
+      }),
+    ).toBe("high_quality_reasoning");
+  });
+
+  it("preview uses Chinese coding example for required capabilities", () => {
+    __resetModelAdmissionStoreForTest();
+    const preview = previewRoutingDecision({
+      request: { taskText: "重构这段代码并补充测试", outputType: "text" },
+      candidates: [],
+    });
+    expect(preview.taskCategory).toBe("coding");
+    expect(preview.requiredCapabilities).toEqual(["coding"]);
+    expect(preview.uiDemo).toBe(true);
+  });
+});
+
+describe("batch3 specialized score pipeline through protocol adapter", () => {
+  beforeEach(() => {
+    __resetModelAdmissionStoreForTest();
+  });
+  afterEach(() => {
+    __resetModelAdmissionStoreForTest();
+  });
+
+  it("normalizeQualityScore keeps [0,1] finite only", () => {
+    expect(normalizeQualityScore(0)).toBe(0);
+    expect(normalizeQualityScore(1)).toBe(1);
+    expect(normalizeQualityScore(0.88)).toBe(0.88);
+    expect(normalizeQualityScore(Number.NaN)).toBeUndefined();
+    expect(normalizeQualityScore(Number.POSITIVE_INFINITY)).toBeUndefined();
+    expect(normalizeQualityScore(-0.1)).toBeUndefined();
+    expect(normalizeQualityScore(1.01)).toBeUndefined();
+    expect(normalizeQualityScore("0.9")).toBeUndefined();
+  });
+
+  it("runner specialized score persists, rereads, and displays version/time/score", () => {
+    const verifiedAt = 1_700_000_000_000;
+    const service = createLocalProtocolVerificationService({
+      runner: createInjectedProtocolRunner({
+        coding: {
+          capabilityId: "coding",
+          status: "passed",
+          testVersion: "eval-suite-v3",
+          verifiedAt,
+          qualityScore: 0.88,
+          sourceNote: "专项评测注入结果（测试）",
+        },
+      }),
+      settleDelayMs: 0,
+    });
+
+    const { task, authority } = service.createVerificationTask({
+      modelRef: "private/score-pipe",
+      capabilityIds: ["coding"],
+      mode: "specialized_eval",
+      configFingerprint: "fp-score-1",
+    });
+    expect(authority).toBe("formal");
+    expect(task.status).toBe("succeeded");
+    expect(task.results?.[0]?.qualityScore).toBe(0.88);
+    expect(task.results?.[0]?.testVersion).toBe("eval-suite-v3");
+    expect(task.results?.[0]?.source).toBe("specialized_eval");
+
+    const admission = getModelAdmission("private/score-pipe");
+    const persisted = admission.capabilityEvidence.find((e) => e.id === "coding");
+    expect(persisted?.qualityScore).toBe(0.88);
+    expect(persisted?.testVersion).toBe("eval-suite-v3");
+    expect(persisted?.verifiedAt).toBe(verifiedAt);
+    expect(persisted?.source).toBe("specialized_eval");
+
+    // Re-read path: build display from persisted formal evidence.
+    const rows = buildSpecializedEvalDisplay({
+      formal: getModelAdmission("private/score-pipe").capabilityEvidence,
+      demo: [],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.testVersion).toBe("eval-suite-v3");
+    expect(rows[0]?.qualityScore).toBe(0.88);
+    expect(rows[0]?.qualityScoreLabel).toBe("88%");
+    expect(rows[0]?.verifiedAtLabel).not.toBe("未记录时间");
+    expect(rows[0]?.isDemo).toBe(false);
+  });
+
+  it("drops out-of-range qualityScore instead of persisting it", () => {
+    const service = createLocalProtocolVerificationService({
+      runner: createInjectedProtocolRunner({
+        coding: {
+          capabilityId: "coding",
+          status: "passed",
+          testVersion: "eval-suite-v3",
+          qualityScore: 1.5,
+        },
+      }),
+      settleDelayMs: 0,
+    });
+    const { task } = service.createVerificationTask({
+      modelRef: "private/bad-score",
+      capabilityIds: ["coding"],
+      mode: "specialized_eval",
+    });
+    expect(task.status).toBe("succeeded");
+    const persisted = getModelAdmission("private/bad-score").capabilityEvidence.find(
+      (e) => e.id === "coding",
+    );
+    expect(persisted?.status).toBe("passed");
+    expect(persisted?.qualityScore).toBeUndefined();
   });
 });

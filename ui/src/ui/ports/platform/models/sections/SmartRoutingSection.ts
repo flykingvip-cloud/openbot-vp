@@ -1359,7 +1359,7 @@ function renderTrialMatchForm(
           <textarea
             rows="2"
             .value=${trialMatchState.taskText}
-            placeholder="例如：重构这段代码并补充测试"
+            placeholder="例如：重构这段代码并补充测试／画一张活动海报／为短片配乐"
             data-testid="routing-trial-task-text"
             @input=${(event: Event) => {
               trialMatchState = {

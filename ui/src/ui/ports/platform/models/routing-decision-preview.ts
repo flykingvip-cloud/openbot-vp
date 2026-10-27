@@ -56,22 +56,74 @@ export type RoutingDecisionPreview = {
   outputType?: "text" | "image" | "music" | "audio";
 };
 
+/**
+ * Priority (UI demo only):
+ * 1. Explicit modality outputType (image / music / audio) wins over task text.
+ * 2. Task text (and profile text) — CN + EN + mixed; when outputType === "text",
+ *    do NOT promote image/music keywords from the text (conflict → text wins).
+ * 3. Fall back to taskProfileId, else general_text.
+ */
+function matchesAny(haystack: string, needles: string[]): boolean {
+  return needles.some((n) => haystack.includes(n));
+}
+
 function detectTaskCategory(req: RoutingPreviewRequest): string {
-  const text =
-    `${req.taskText ?? ""} ${req.taskProfileId ?? ""} ${req.outputType ?? ""}`.toLowerCase();
-  if (req.outputType === "image" || text.includes("image") || text.includes("midjourney")) {
+  // Priority 1: explicit modality output type.
+  if (req.outputType === "image") {
     return "image_generation";
   }
-  if (req.outputType === "music" || text.includes("music") || text.includes("suno")) {
+  if (req.outputType === "music") {
     return "music_generation";
   }
-  if (text.includes("code") || text.includes("coding") || text.includes("refactor")) {
+  if (req.outputType === "audio") {
+    return "audio_understanding";
+  }
+
+  const raw = `${req.taskText ?? ""} ${req.taskProfileId ?? ""}`;
+  const lower = raw.toLowerCase();
+  // CJK keywords are case-invariant; keep both original and lower for EN tokens.
+  const corpus = `${raw} ${lower}`;
+
+  // Priority 2: task / profile text. outputType === "text" blocks modality promotion.
+  const allowModalityFromText = req.outputType !== "text";
+  if (
+    allowModalityFromText &&
+    matchesAny(corpus, ["image", "midjourney", "海报", "配图", "图片", "画一张", "生成图"])
+  ) {
+    return "image_generation";
+  }
+  if (
+    allowModalityFromText &&
+    matchesAny(corpus, ["music", "suno", "配乐", "作曲", "歌曲", "音乐", "写首歌"])
+  ) {
+    return "music_generation";
+  }
+  if (
+    matchesAny(corpus, [
+      "code",
+      "coding",
+      "refactor",
+      "unit test",
+      "重构",
+      "代码",
+      "单元测试",
+      "补充测试",
+      "写测试",
+    ])
+  ) {
     return "coding";
   }
-  if (text.includes("reason")) {
+  if (matchesAny(corpus, ["reason", "reasoning", "推理", "深度思考"])) {
     return "high_quality_reasoning";
   }
+
+  // Priority 3: strategy profile id as category fallback.
   return req.taskProfileId?.trim() || "general_text";
+}
+
+/** Exported for unit tests of Chinese / mixed classification. */
+export function detectTaskCategoryForPreview(req: RoutingPreviewRequest): string {
+  return detectTaskCategory(req);
 }
 
 function executorPathForCategory(category: string): string {
@@ -80,6 +132,9 @@ function executorPathForCategory(category: string): string {
   }
   if (category === "music_generation") {
     return "音乐生成 · Suno 兼容";
+  }
+  if (category === "audio_understanding") {
+    return "音频理解（尚未接入）";
   }
   return "文本对话";
 }

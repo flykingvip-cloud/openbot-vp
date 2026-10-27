@@ -114,6 +114,11 @@ export type ProtocolCheckOutcome = {
   verifiedAt?: number;
   /** When true, merge must keep existing formal evidence identity if still valid. */
   reuseExistingEvidence?: boolean;
+  /**
+   * Specialized eval quality score in [0, 1]. Non-finite / out-of-range values
+   * must be dropped by adapters and must not enter formal evidence.
+   */
+  qualityScore?: number;
 };
 
 export type ProtocolCheckContext = {
