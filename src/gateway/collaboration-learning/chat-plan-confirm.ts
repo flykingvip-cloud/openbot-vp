@@ -194,6 +194,19 @@ export async function tryConfirmPlanFromChat(
   }
 
   const target = scoped[0];
+  // Never invent the version the user "must have seen". Require explicit
+  // expectedVersion, or a card binding (todolistId + boardItemId) that uniquely
+  // identifies the plan the user replied to.
+  const hasCardBinding = Boolean(todolistFilter && boardItemFilter);
+  if (typeof params.expectedVersion !== "number" && !hasCardBinding) {
+    return {
+      status: "blocked",
+      confirmed: false,
+      reason: "expected_version_or_card_binding_required",
+      detail:
+        "refusing to confirm without expectedVersion or todolistId+boardItemId; current unique proposed plan is not proof the user saw it",
+    };
+  }
   const expectedVersion =
     typeof params.expectedVersion === "number" ? params.expectedVersion : target.version;
 

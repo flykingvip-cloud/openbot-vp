@@ -1,31 +1,43 @@
-# TEAM-REAL F1–F3：任务激活 / 计划确认 / 团队成果提交
+# TEAM-REAL F1–F3：任务激活 / 计划确认 / 团队成果提交（审查 A–E 响应）
 
 - 日期：2026-10-27（Asia/Shanghai）
 - 分支：`fix/team-real-collab-activation-confirm-deliverable`
-- 规避：不改 #34/#67/#68 formal-root twin remount；不改 claim-contract-entry / intent-board-materialize / conversation-send / formal-root settle|publish 热文件。
+- PR：https://github.com/flykingvip-cloud/openbot-vp/pull/128
+- 规避：不改 #34/#67/#68 formal-root twin remount；不新建平行成果权威；不做 A/B 双向同步；不扩大沙箱挂载。
 
-## 根因（F0）
-- 新请求未物化为独立 Task + 共享看板；口头派工≠ board 事实。
-- 聊天“确认”未绑定 taskId/boardItemId/todolistId/version 走同一 confirm 入口。
-- 成果散落个人 workspace；沙箱写文件≠团队交付成功。
-- `registered_no_session` / `not_registered` 未在派工前结构化检查；ENAMETOOLONG 仅 accept worktree 脏补丁。
+## 审查结论响应（NEEDS CHANGES → 本轮）
 
-## 修复
-- F1.1 `activateCollaborationTask`：合同不全 → needs_confirm/blocked；确认后 ensure Task + materialize board；幂等 activationKey。
-- F1.2 `tryConfirmPlanFromChat`：无歧义 NL → `confirmCollaborationTodolist`（含 actor）；UI/聊天同一状态。
-- F2 `submitTeamDeliverable`：宿主受权提交到小组 `deliverables/` locator；回执含任务关联/ID/版本/locator/大小/摘要；失败 `writtenToGroupDir:false`。
-- F3 `checkMemberDispatchReadiness` + `commandLogPath` 有界哈希。
-- Pack：`collaboration-task-activation` → packs registry/manifest。
+### A 授权与会话
+- `authorizeTeamGroupResourceAccess` 复用 `assertGroupMemberAccess` + membership tenant + `resolveTrustedGroupLocator`。
+- 提交前校验 task 存在/归属；读取前校验读权；拒绝时 `writtenToGroupDir:false` 且不返回正文。
+- `checkDispatchReadiness`（operator.read）只接受 memberId，注册/归属/会话从权威 roster 解析；**默认不写会话**。
+- 会话创建改走 write 方法 `collaboration.task.ensureMemberSession`，并校验 sessionKey↔agent 绑定；空 session ≠ 模型/工具就绪。
 
-## 退役
-- 不把 personal_local 根当作 managed SoT；不做 A/B 双向同步；不扩大沙箱挂载。
-- 口头“已派工/已确认/已落盘小组目录”不得替代本 pack 回执。
+### B 任务控制 + 激活幂等
+- task 写入改走 `withTaskControlLock`；**不重开** completed/cancelled。
+- 未确认仅 draft；确认后才 ready。
+- `activationKey` 含完整合同指纹，落入 task.tags；冲突拒绝；board list 失败显式错误。
+- 看板态使用 `submitted_for_review`；board 已发布但 OS sync 失败 → `partial_success`（`boardPublished:true`）。
+
+### C 成果 locator / 路径 / 版本
+- 复用 objectStorage deliverable + group `deliverables/` locator（非平行库）。
+- 持久化 `relativePath` / `contentSha256` / `formalLocator`；幂等回放返回**原回执**并校验内容。
+- 父目录 symlink 逃逸拒绝；不可变版本路径；先对象后原子文件写，避免覆盖后回滚删。
+
+### D 真实接线
+- `chat.send` → `maybeConfirmPlanFromChatSend`（与 UI 同一 `confirmCollaborationTodolist`）。
+- `precheckDispatchReadiness` 供派工前调用；readiness RPC 已挂 pack。
+- **缩小范围**：未改 `claim-contract-entry` / `claimBoardItem` 热实现体（避免回归）；正式派工前产品须调 readiness；agent DELIVERABLE settle/formal-root 热文件未改。
+
+### E 质量
+- NL confirm：无 `expectedVersion` 且无 card binding（todolistId+boardItemId）时拒绝，不默认当前唯一 proposed。
+- 相关 vitest 31 通过；未跑 F4/F5；未合入；未切 18789。
 
 ## 分栏结论
 | 栏 | 判定 |
 | --- | --- |
-| 代码修复 | 本 PR |
-| 隔离验证 | 本 PR vitest |
-| 真实小闭环 F4 | 未执行（待授权） |
-| 复杂任务 F5 | 未执行（待授权） |
-| 生产启用 | 未执行（待授权合入与 18789 切换） |
+| 代码修复 | 本 PR（审查 A–E 响应） |
+| 隔离验证 | vitest 本 pack 相关 |
+| 真实小闭环 F4 | 未执行 |
+| 复杂任务 F5 | 未执行 |
+| 生产启用 | 未授权 |

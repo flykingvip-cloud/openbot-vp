@@ -1,5 +1,5 @@
 /**
- * TEAM-REAL F1–F3 gateway method pack.
+ * TEAM-REAL F1–F3 gateway method pack (review A: ensure session is write-scoped).
  */
 import { collaborationTaskActivationHandlers } from "./collaboration-task-activation.js";
 import { defineGatewayMethodPack } from "./pack-types.js";
@@ -12,6 +12,7 @@ const WRITE_METHODS = [
   "collaboration.task.activate",
   "collaboration.task.confirmPlanFromChat",
   "collaboration.task.submitTeamDeliverable",
+  "collaboration.task.ensureMemberSession",
 ] as const;
 const METHODS = [...READ_METHODS, ...WRITE_METHODS] as const;
 

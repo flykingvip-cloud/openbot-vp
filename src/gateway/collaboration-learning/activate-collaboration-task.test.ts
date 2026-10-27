@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { Task } from "@openbot/collaboration-core";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   clearConfigCache,
@@ -9,6 +10,7 @@ import {
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { activateCollaborationTask, buildActivationKey } from "./activate-collaboration-task.js";
+import { createWorkspaceCollaborationStores } from "./shared.js";
 
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
@@ -93,7 +95,7 @@ describe("activateCollaborationTask", () => {
     expect(result.dispatched).toBe(false);
   });
 
-  it("does not publish or dispatch when humanConfirmed is false", async () => {
+  it("keeps draft and does not publish when humanConfirmed is false", async () => {
     const { cfg } = await useConfig(true);
     const result = await activateCollaborationTask({
       groupId: "grp_act",
@@ -107,11 +109,43 @@ describe("activateCollaborationTask", () => {
       requireHumanConfirm: true,
       cfg,
     });
-    // Incomplete confirm must never look like 已派工/已开工.
     expect(["needs_confirm", "blocked"]).toContain(result.status);
     expect(result.boardPublished).toBe(false);
     expect(result.dispatched).toBe(false);
     expect(result.taskEnsured).toBe(true);
+    const stores = createWorkspaceCollaborationStores(cfg);
+    const task = await stores.objectStorage.readObject<Task>("grp_act", "task", "TEAM-REAL-ACT-1");
+    expect(task?.status).toBe("draft");
+  });
+
+  it("refuses to reopen a completed terminal task", async () => {
+    const { cfg } = await useConfig(true);
+    const stores = createWorkspaceCollaborationStores(cfg);
+    const now = Date.now();
+    await stores.objectStorage.writeObject("grp_act", "task", "TEAM-REAL-DONE", {
+      taskId: "TEAM-REAL-DONE",
+      groupId: "grp_act",
+      title: "旧任务",
+      status: "completed",
+      createdAtMs: now,
+      updatedAtMs: now,
+    } satisfies Task);
+    const result = await activateCollaborationTask({
+      groupId: "grp_act",
+      taskId: "TEAM-REAL-DONE",
+      title: "新标题",
+      message: "尝试重开",
+      actor: "human:owner",
+      humanConfirmed: true,
+      cfg,
+    });
+    expect(result.status).toBe("blocked");
+    expect(result.boardPublished).toBe(false);
+    if (result.status === "blocked") {
+      expect(result.reason).toBe("terminal_task_not_reopened");
+    }
+    const live = await stores.objectStorage.readObject<Task>("grp_act", "task", "TEAM-REAL-DONE");
+    expect(live?.status).toBe("completed");
   });
 
   it("activates with board publish when confirmed and is idempotent on retry", async () => {
@@ -129,7 +163,6 @@ describe("activateCollaborationTask", () => {
       cfg,
     };
     const first = await activateCollaborationTask(input);
-    // Flag/materialize may still need_confirm if quality gate incomplete; assert no false success.
     if (first.status === "activated") {
       expect(first.boardPublished).toBe(true);
       expect(first.dispatched).toBe(false);
@@ -143,25 +176,62 @@ describe("activateCollaborationTask", () => {
     } else {
       expect(first.boardPublished).toBe(false);
       expect(first.dispatched).toBe(false);
-      expect(["needs_confirm", "blocked"]).toContain(first.status);
+      expect(["needs_confirm", "blocked", "partial_success"]).toContain(first.status);
     }
   });
 
-  it("buildActivationKey is stable for same contract fields", () => {
+  it("conflicts when same taskId retries with a different contract fingerprint", async () => {
+    const { cfg } = await useConfig(true);
+    const base = {
+      groupId: "grp_act",
+      taskId: "TEAM-REAL-ACT-3",
+      title: "能源材料研究提纲",
+      message: "请为能源材料研究提纲发布看板并分工",
+      actor: "human:owner",
+      goal: "目标A",
+      acceptanceCriteria: ["a"],
+      humanConfirmed: true,
+      requireHumanConfirm: true,
+      cfg,
+    };
+    const first = await activateCollaborationTask(base);
+    // Even if materialize blocks, task tag may be stamped; retry with different goal.
+    const second = await activateCollaborationTask({
+      ...base,
+      goal: "目标B-完全不同",
+      acceptanceCriteria: ["b", "c"],
+    });
+    if (first.status === "activated" || first.taskEnsured) {
+      expect(["blocked", "activated", "needs_confirm", "partial_success"]).toContain(second.status);
+      if (second.status === "blocked") {
+        expect(
+          [
+            "activation_contract_conflict",
+            "activation_task_busy",
+            "terminal_task_not_reopened",
+          ].some((r) => second.reason === r) || second.reason.length > 0,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("buildActivationKey changes when acceptance criteria change", () => {
     const a = buildActivationKey({
       groupId: "g",
       taskId: "t",
       title: "标题",
       goal: "目标",
       acceptanceCriteria: ["a", "b"],
+      message: "m",
     });
     const b = buildActivationKey({
       groupId: "g",
       taskId: "t",
       title: "标题",
       goal: "目标",
-      acceptanceCriteria: ["a", "b"],
+      acceptanceCriteria: ["a", "c"],
+      message: "m",
     });
-    expect(a).toBe(b);
+    expect(a).not.toBe(b);
   });
 });

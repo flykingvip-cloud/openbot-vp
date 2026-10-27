@@ -14,6 +14,7 @@ describe("collaboration-task-activation pack", () => {
         "collaboration.task.submitTeamDeliverable",
         "collaboration.task.readTeamDeliverable",
         "collaboration.task.checkDispatchReadiness",
+        "collaboration.task.ensureMemberSession",
       ]),
     );
   });

@@ -1,11 +1,12 @@
 /**
- * TEAM-REAL F2 — Host-authorized team deliverable submit.
+ * TEAM-REAL F2 — Host-authorized team deliverable submit (review A/C hardened).
  *
  * Sandbox drafts stay in the agent workspace until this entry copies/registers
  * them into the collaboration group formal locator. Writing a personal
  * workspace file alone is NOT team delivery success.
  *
- * Does not remount formal-root twins, expand sandbox mounts, or A/B-sync roots.
+ * Reuses objectStorage deliverable records + group locator (no parallel authority,
+ * no formal-root twin remount, no A/B sync, no expanded sandbox mounts).
  */
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -13,9 +14,22 @@ import path from "node:path";
 import type { Deliverable } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import type { GatewayClient } from "../server-methods/types.js";
 import { resolveGroupCollaborationPaths } from "./collaboration-paths.js";
 import { createWorkspaceCollaborationStores } from "./shared.js";
 import { transitionCollaborationDeliverable } from "./state-machine.js";
+import {
+  assertTaskBelongsToGroup,
+  authorizeTeamGroupResourceAccess,
+} from "./team-resource-auth.js";
+import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+
+/** Extended deliverable fields persisted alongside core Deliverable. */
+export type TeamDeliverableRecord = Deliverable & {
+  relativePath?: string;
+  contentSha256?: string;
+  formalLocator?: string;
+};
 
 export type TeamDeliverableSubmitInput = {
   groupId: string;
@@ -31,6 +45,12 @@ export type TeamDeliverableSubmitInput = {
   previousDeliverableId?: string;
   /** Relative path under the group workspace; must stay inside deliverables/. */
   relativePath?: string;
+  /** Trusted membership tenant from gateway (never client-supplied alone). */
+  tenant?: CollaborationTenantResolution | null;
+  client?: GatewayClient | null;
+  /** When false, skip ACL (unit tests that seed membership separately). Default true. */
+  enforceAcl?: boolean;
+  identityAliases?: readonly string[];
   cfg?: OpenBotConfig;
   nowMs?: number;
 };
@@ -73,8 +93,12 @@ function defaultLogicalId(taskId: string, title: string): string {
   return `td-${createHash("sha256").update(`${taskId}\n${title}`).digest("hex").slice(0, 16)}`;
 }
 
-function sanitizeRelativePath(raw: string | undefined, logicalId: string): string | null {
-  const fallback = `deliverables/${logicalId}.md`;
+function sanitizeRelativePath(
+  raw: string | undefined,
+  logicalId: string,
+  version: number,
+): string | null {
+  const fallback = `deliverables/${logicalId}-v${version}.md`;
   const candidate = compact(raw) || fallback;
   const normalized = candidate.replace(/\\/g, "/").replace(/^\/+/, "");
   if (!normalized || normalized.includes("\0")) {
@@ -96,6 +120,74 @@ function assertInsideGroupDir(groupDir: string, absolutePath: string): boolean {
   const root = path.resolve(groupDir);
   const target = path.resolve(absolutePath);
   return target === root || target.startsWith(`${root}${path.sep}`);
+}
+
+/**
+ * Reject when any ancestor between groupDir and target is a symlink that escapes,
+ * or the leaf itself is a symlink that escapes.
+ */
+export async function assertNoSymlinkEscape(params: {
+  groupDir: string;
+  absolutePath: string;
+}): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const root = path.resolve(params.groupDir);
+  const target = path.resolve(params.absolutePath);
+  if (!assertInsideGroupDir(root, target)) {
+    return { ok: false, reason: "path_escape_rejected" };
+  }
+  let cursor = target;
+  while (true) {
+    try {
+      const st = await fs.lstat(cursor);
+      if (st.isSymbolicLink()) {
+        let real: string;
+        try {
+          real = await fs.realpath(cursor);
+        } catch {
+          return { ok: false, reason: "symlink_escape_rejected" };
+        }
+        if (!assertInsideGroupDir(root, real)) {
+          return { ok: false, reason: "symlink_escape_rejected" };
+        }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        return { ok: false, reason: "path_stat_failed" };
+      }
+      // missing is fine for leaf; parents may also be missing until mkdir
+    }
+    const parent = path.dirname(cursor);
+    if (parent === cursor || path.resolve(parent) === root) {
+      // Also check the groupDir itself if it is a symlink.
+      try {
+        const rootSt = await fs.lstat(root);
+        if (rootSt.isSymbolicLink()) {
+          const realRoot = await fs.realpath(root);
+          if (path.resolve(realRoot) !== root && !assertInsideGroupDir(root, realRoot)) {
+            // groupDir itself symlink: realpath must still be the configured locator use-case;
+            // for safety require realpath stays equal after resolve of configured root's parent.
+            return { ok: false, reason: "symlink_escape_rejected" };
+          }
+        }
+      } catch {
+        // ignore
+      }
+      break;
+    }
+    cursor = parent;
+  }
+  return { ok: true };
+}
+
+async function writeFileAtomic(absolutePath: string, content: string): Promise<void> {
+  const dir = path.dirname(absolutePath);
+  await fs.mkdir(dir, { recursive: true });
+  const tmp = path.join(
+    dir,
+    `.${path.basename(absolutePath)}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`,
+  );
+  await fs.writeFile(tmp, content, "utf8");
+  await fs.rename(tmp, absolutePath);
 }
 
 /**
@@ -129,8 +221,149 @@ export async function submitTeamDeliverable(
   }
 
   const cfg = params.cfg ?? loadConfig();
+  const enforceAcl = params.enforceAcl !== false;
+  if (enforceAcl) {
+    const auth = await authorizeTeamGroupResourceAccess({
+      groupId,
+      actor,
+      client: params.client,
+      tenant: params.tenant,
+      cfg,
+      identityAliases: params.identityAliases,
+      action: "write",
+    });
+    if (!auth.ok) {
+      return {
+        ok: false,
+        reason: auth.reason,
+        detail: auth.detail,
+        writtenToGroupDir: false,
+      };
+    }
+  }
+
+  const taskCheck = await assertTaskBelongsToGroup({ groupId, taskId, cfg });
+  if (!taskCheck.ok) {
+    return {
+      ok: false,
+      reason: taskCheck.reason,
+      detail: taskCheck.detail,
+      writtenToGroupDir: false,
+    };
+  }
+
+  const contentSha256 = sha256Hex(content);
+  const sizeBytes = Buffer.byteLength(content, "utf8");
+  const stores = createWorkspaceCollaborationStores(cfg);
+  const now = params.nowMs ?? Date.now();
+
+  let previous: TeamDeliverableRecord | null = null;
+  const previousId = compact(params.previousDeliverableId);
+  if (previousId) {
+    previous =
+      (await stores.objectStorage.readObject<TeamDeliverableRecord>(
+        groupId,
+        "deliverable",
+        previousId,
+      )) ?? null;
+    if (!previous) {
+      return {
+        ok: false,
+        reason: "previous_deliverable_not_found",
+        detail: previousId,
+        writtenToGroupDir: false,
+      };
+    }
+    if (previous.taskId && previous.taskId !== taskId) {
+      return {
+        ok: false,
+        reason: "previous_task_mismatch",
+        detail: `previous taskId=${previous.taskId} current=${taskId}`,
+        writtenToGroupDir: false,
+      };
+    }
+  }
+
+  // Idempotent replay: same task + title + body already submitted — return stored receipt.
+  let existingList: TeamDeliverableRecord[];
+  try {
+    existingList = await stores.objectStorage.listObjects<TeamDeliverableRecord>(
+      groupId,
+      "deliverable",
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "deliverable_list_failed",
+      detail: error instanceof Error ? error.message : String(error),
+      writtenToGroupDir: false,
+    };
+  }
+  const replay = existingList.find((row) => {
+    if (row.taskId !== taskId) {
+      return false;
+    }
+    if (compact(row.title) !== title) {
+      return false;
+    }
+    const storedHash =
+      compact(row.contentSha256) || (typeof row.content === "string" ? sha256Hex(row.content) : "");
+    return (
+      storedHash === contentSha256 &&
+      (row.status === "submitted" ||
+        row.status === "in_review" ||
+        row.status === "approved" ||
+        row.status === "published")
+    );
+  });
+  if (replay && !previousId) {
+    const storedRel =
+      compact(replay.relativePath) ||
+      sanitizeRelativePath(undefined, replay.deliverableId, replay.version) ||
+      `deliverables/${replay.deliverableId}.md`;
+    const locator =
+      compact(replay.formalLocator) ||
+      path.join(resolveGroupCollaborationPaths(groupId, cfg).groupDir, storedRel);
+    // Verify on-disk bytes when locator exists; mismatch → refuse silent wrong receipt.
+    try {
+      const onDisk = await fs.readFile(locator, "utf8");
+      if (sha256Hex(onDisk) !== contentSha256) {
+        return {
+          ok: false,
+          reason: "idempotent_replay_content_mismatch",
+          detail: locator,
+          writtenToGroupDir: false,
+        };
+      }
+    } catch {
+      // Object record is authoritative for content; file may be missing in degraded mode.
+    }
+    return {
+      ok: true,
+      taskId,
+      groupId,
+      deliverableId: replay.deliverableId,
+      version: replay.version,
+      locator,
+      relativePath: storedRel,
+      sizeBytes: Buffer.byteLength(
+        typeof replay.content === "string" ? replay.content : content,
+        "utf8",
+      ),
+      contentSha256,
+      status: replay.status,
+      idempotentReplay: true,
+    };
+  }
+
   const logicalId = compact(params.logicalId) || defaultLogicalId(taskId, title);
-  const relativePath = sanitizeRelativePath(params.relativePath, logicalId);
+  const version = previous ? previous.version + 1 : 1;
+  // Immutable version path: never overwrite prior version files.
+  const relativePath = sanitizeRelativePath(
+    previous ? undefined : params.relativePath,
+    logicalId,
+    version,
+  );
   if (!relativePath) {
     return {
       ok: false,
@@ -162,64 +395,35 @@ export async function submitTeamDeliverable(
     };
   }
 
-  const contentSha256 = sha256Hex(content);
-  const sizeBytes = Buffer.byteLength(content, "utf8");
-  const stores = createWorkspaceCollaborationStores(cfg);
-  const now = params.nowMs ?? Date.now();
-
-  // Idempotent replay: same task + title + body already submitted.
-  const existingList = await stores.objectStorage.listObjects<Deliverable>(groupId, "deliverable");
-  const replay = existingList.find((row) => {
-    if (row.taskId !== taskId) {
-      return false;
-    }
-    if (compact(row.title) !== title) {
-      return false;
-    }
-    const body = typeof row.content === "string" ? row.content : "";
-    return (
-      sha256Hex(body) === contentSha256 &&
-      (row.status === "submitted" ||
-        row.status === "in_review" ||
-        row.status === "approved" ||
-        row.status === "published")
-    );
+  const symlinkCheck = await assertNoSymlinkEscape({
+    groupDir: paths.groupDir,
+    absolutePath,
   });
-  if (replay) {
+  if (!symlinkCheck.ok) {
     return {
-      ok: true,
-      taskId,
-      groupId,
-      deliverableId: replay.deliverableId,
-      version: replay.version,
-      locator: absolutePath,
-      relativePath,
-      sizeBytes,
-      contentSha256,
-      status: replay.status,
-      idempotentReplay: true,
+      ok: false,
+      reason: symlinkCheck.reason,
+      writtenToGroupDir: false,
     };
   }
 
-  let previous: Deliverable | null = null;
-  const previousId = compact(params.previousDeliverableId);
-  if (previousId) {
-    previous =
-      (await stores.objectStorage.readObject<Deliverable>(groupId, "deliverable", previousId)) ??
-      null;
-    if (!previous) {
+  // Refuse overwrite of an existing different version file (immutable versions).
+  try {
+    const existingBytes = await fs.readFile(absolutePath, "utf8");
+    if (sha256Hex(existingBytes) !== contentSha256) {
       return {
         ok: false,
-        reason: "previous_deliverable_not_found",
-        detail: previousId,
+        reason: "version_path_conflict",
+        detail: absolutePath,
         writtenToGroupDir: false,
       };
     }
-    if (previous.taskId && previous.taskId !== taskId) {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
       return {
         ok: false,
-        reason: "previous_task_mismatch",
-        detail: `previous taskId=${previous.taskId} current=${taskId}`,
+        reason: "formal_root_stat_failed",
+        detail: error instanceof Error ? error.message : String(error),
         writtenToGroupDir: false,
       };
     }
@@ -228,9 +432,8 @@ export async function submitTeamDeliverable(
   const deliverableId = previous
     ? `del-${createHash("sha256").update(`${previous.deliverableId}:${contentSha256}`).digest("hex").slice(0, 20)}`
     : `del-${logicalId}-${randomUUID().slice(0, 8)}`;
-  const version = previous ? previous.version + 1 : 1;
 
-  const draft: Deliverable = {
+  const draft: TeamDeliverableRecord = {
     deliverableId,
     groupId,
     taskId,
@@ -245,44 +448,29 @@ export async function submitTeamDeliverable(
     updatedBy: actor,
     createdAtMs: now,
     updatedAtMs: now,
+    relativePath,
+    contentSha256,
+    formalLocator: absolutePath,
   };
 
+  // Persist object first, then immutable file — avoids "overwrite then rollback delete".
   try {
-    await fs.mkdir(path.dirname(absolutePath), { recursive: true });
-    // Reject symlink escape: if path exists as symlink outside groupDir, refuse.
-    try {
-      const st = await fs.lstat(absolutePath);
-      if (st.isSymbolicLink()) {
-        const real = await fs.realpath(absolutePath).catch(() => null);
-        if (!real || !assertInsideGroupDir(paths.groupDir, real)) {
-          return {
-            ok: false,
-            reason: "symlink_escape_rejected",
-            writtenToGroupDir: false,
-          };
-        }
-      }
-    } catch {
-      // path does not exist yet — ok
-    }
-    await fs.writeFile(absolutePath, content, "utf8");
+    await stores.objectStorage.writeObject(groupId, "deliverable", deliverableId, draft);
   } catch (error) {
     return {
       ok: false,
-      reason: "formal_root_write_failed",
+      reason: "deliverable_object_persist_failed",
       detail: error instanceof Error ? error.message : String(error),
       writtenToGroupDir: false,
     };
   }
 
   try {
-    await stores.objectStorage.writeObject(groupId, "deliverable", deliverableId, draft);
+    await writeFileAtomic(absolutePath, content);
   } catch (error) {
-    // Best-effort rollback of the file so we never claim success with only a stray file.
-    await fs.rm(absolutePath, { force: true }).catch(() => undefined);
     return {
       ok: false,
-      reason: "deliverable_object_persist_failed",
+      reason: "formal_root_write_failed",
       detail: error instanceof Error ? error.message : String(error),
       writtenToGroupDir: false,
     };
@@ -305,7 +493,25 @@ export async function submitTeamDeliverable(
     };
   }
 
-  // Verify bytes on disk match receipt before claiming success.
+  // Keep locator metadata on the submitted record.
+  try {
+    const live =
+      (await stores.objectStorage.readObject<TeamDeliverableRecord>(
+        groupId,
+        "deliverable",
+        deliverableId,
+      )) ?? (submitted as TeamDeliverableRecord);
+    const stamped: TeamDeliverableRecord = {
+      ...live,
+      relativePath,
+      contentSha256,
+      formalLocator: absolutePath,
+    };
+    await stores.objectStorage.writeObject(groupId, "deliverable", deliverableId, stamped);
+  } catch {
+    // non-fatal: receipt still carries locator
+  }
+
   try {
     const onDisk = await fs.readFile(absolutePath, "utf8");
     if (sha256Hex(onDisk) !== contentSha256) {
@@ -344,6 +550,10 @@ export async function readTeamDeliverable(params: {
   groupId: string;
   deliverableId: string;
   actor: string;
+  tenant?: CollaborationTenantResolution | null;
+  client?: GatewayClient | null;
+  enforceAcl?: boolean;
+  identityAliases?: readonly string[];
   cfg?: OpenBotConfig;
 }): Promise<
   | {
@@ -371,8 +581,27 @@ export async function readTeamDeliverable(params: {
     };
   }
   const cfg = params.cfg ?? loadConfig();
+  if (params.enforceAcl !== false) {
+    const auth = await authorizeTeamGroupResourceAccess({
+      groupId,
+      actor,
+      client: params.client,
+      tenant: params.tenant,
+      cfg,
+      identityAliases: params.identityAliases,
+      action: "read",
+    });
+    if (!auth.ok) {
+      return {
+        ok: false,
+        reason: auth.reason,
+        detail: auth.detail,
+        writtenToGroupDir: false,
+      };
+    }
+  }
   const stores = createWorkspaceCollaborationStores(cfg);
-  const row = await stores.objectStorage.readObject<Deliverable>(
+  const row = await stores.objectStorage.readObject<TeamDeliverableRecord>(
     groupId,
     "deliverable",
     deliverableId,
@@ -383,8 +612,10 @@ export async function readTeamDeliverable(params: {
   const content = typeof row.content === "string" ? row.content : "";
   const paths = resolveGroupCollaborationPaths(groupId, cfg);
   const relativePath =
-    sanitizeRelativePath(undefined, row.deliverableId) ?? `deliverables/${row.deliverableId}.md`;
-  const locator = path.join(paths.groupDir, relativePath);
+    compact(row.relativePath) ||
+    sanitizeRelativePath(undefined, row.deliverableId, row.version) ||
+    `deliverables/${row.deliverableId}.md`;
+  const locator = compact(row.formalLocator) || path.join(paths.groupDir, relativePath);
   return {
     ok: true,
     deliverableId: row.deliverableId,
@@ -392,7 +623,7 @@ export async function readTeamDeliverable(params: {
     version: row.version,
     status: row.status,
     content,
-    contentSha256: sha256Hex(content),
+    contentSha256: compact(row.contentSha256) || sha256Hex(content),
     sizeBytes: Buffer.byteLength(content, "utf8"),
     locator,
     relativePath,

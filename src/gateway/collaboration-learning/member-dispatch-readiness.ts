@@ -1,11 +1,12 @@
 /**
- * TEAM-REAL F3 — Member dispatch readiness before派工.
+ * TEAM-REAL F3 — Member dispatch readiness before派工 (review A hardened).
  *
  * - not_registered → never dispatchable
- * - registered_no_session → may controlled-create a main session when ensureSession works
- * - ready → registered + session exists (or just ensured)
+ * - registered_no_session → report gap; session create is NOT done on read path
+ * - ready → registered + session exists
  *
- * Does not treat oral "已送达" as success when a member is unavailable.
+ * Registration / agentId / sessionKey are resolved from trusted runtime sources
+ * when resolveMember is provided. Request body must not invent registration.
  */
 import { randomUUID } from "node:crypto";
 import { loadConfig } from "../../config/config.js";
@@ -24,16 +25,27 @@ export type DispatchReadinessCode =
   | "ready"
   | "registered_no_session"
   | "not_registered"
-  | "session_ensure_failed";
+  | "session_ensure_failed"
+  | "unresolved_member";
 
 export type MemberDispatchCandidate = {
   memberId: string;
   agentId?: string;
   displayName?: string;
-  /** Caller-supplied registration fact (from enterprise roster / group members). */
-  registration: MemberRegistrationStatus;
-  /** When omitted for registered bots, sessionKey defaults to agent:id:main. */
+  /**
+   * @deprecated Prefer resolveMember from trusted runtime. When resolveMember is
+   * omitted, registration may be supplied for unit tests only.
+   */
+  registration?: MemberRegistrationStatus;
   sessionKey?: string;
+};
+
+export type TrustedMemberResolution = {
+  memberId: string;
+  agentId: string | null;
+  displayName: string | null;
+  registration: MemberRegistrationStatus;
+  sessionKey: string | null;
 };
 
 export type MemberDispatchReadiness = {
@@ -49,14 +61,20 @@ export type MemberDispatchReadiness = {
 
 export type CheckMemberDispatchReadinessInput = {
   members: readonly MemberDispatchCandidate[];
-  /** Returns whether the main session already exists. */
+  /**
+   * Trusted resolver — registration/agent/session come from runtime roster,
+   * not the request body. Required for production gateway handlers.
+   */
+  resolveMember?: (
+    memberId: string,
+  ) => TrustedMemberResolution | Promise<TrustedMemberResolution | null> | null;
   sessionExists?: (agentId: string, sessionKey: string) => boolean | Promise<boolean>;
   /**
-   * Controlled session create for registered_no_session.
-   * When omitted, registered_no_session stays non-dispatchable (gap recorded).
+   * Controlled session create. Must only be supplied on write-scoped entrypoints.
+   * Read-scoped checkDispatchReadiness must omit this.
    */
   ensureSession?: (agentId: string, sessionKey: string) => Promise<void>;
-  /** When true (default), call ensureSession for registered_no_session. */
+  /** Default false — read checks must not write. */
   autoEnsureSession?: boolean;
   cfg?: OpenBotConfig;
 };
@@ -71,17 +89,16 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-function resolveAgentId(member: MemberDispatchCandidate): string {
-  return compact(member.agentId) || compact(member.memberId);
-}
-
 /**
  * Default ensure: create a minimal main session entry in the agent session store.
  * Does not invent registration — caller must already mark the member registered.
+ * Must not be invoked from operator.read handlers.
  */
 export async function ensureRegisteredMemberMainSession(params: {
   agentId: string;
   sessionKey?: string;
+  /** Required binding check — sessionKey must belong to this agent. */
+  expectAgentBoundSession?: boolean;
   cfg?: OpenBotConfig;
   nowMs?: number;
 }): Promise<{ sessionKey: string; created: boolean }> {
@@ -90,6 +107,13 @@ export async function ensureRegisteredMemberMainSession(params: {
     throw new Error("agentId is required");
   }
   const sessionKey = compact(params.sessionKey) || defaultConversationSessionKey(agentId);
+  if (params.expectAgentBoundSession !== false) {
+    const expected = defaultConversationSessionKey(agentId);
+    // Allow exact default main key or keys that embed the agent id.
+    if (sessionKey !== expected && !sessionKey.includes(agentId)) {
+      throw new Error(`sessionKey not bound to agentId=${agentId}`);
+    }
+  }
   const cfg = params.cfg ?? loadConfig();
   const storePath = resolveStorePath(cfg.session?.store, { agentId });
   const now = params.nowMs ?? Date.now();
@@ -122,25 +146,61 @@ function defaultSessionExistsFactory(cfg: OpenBotConfig) {
 
 /**
  * Evaluate dispatch readiness for each candidate. not_registered never becomes ready.
+ * Empty session create is never treated as proof of model/tool readiness — only
+ * that a session record exists when ensureSession was explicitly provided.
  */
 export async function checkMemberDispatchReadiness(
   params: CheckMemberDispatchReadinessInput,
 ): Promise<CheckMemberDispatchReadinessResult> {
   const cfg = params.cfg ?? loadConfig();
   const sessionExists = params.sessionExists ?? defaultSessionExistsFactory(cfg);
-  const autoEnsure = params.autoEnsureSession !== false;
+  const autoEnsure = params.autoEnsureSession === true;
   const results: MemberDispatchReadiness[] = [];
 
   for (const member of params.members) {
-    const memberId = compact(member.memberId) || resolveAgentId(member);
-    const agentId = resolveAgentId(member);
-    const displayName = compact(member.displayName) || null;
-    const sessionKey =
-      compact(member.sessionKey) || (agentId ? defaultConversationSessionKey(agentId) : "");
+    const requestedId = compact(member.memberId);
+    if (!requestedId) {
+      continue;
+    }
 
-    if (member.registration === "not_registered" || !agentId) {
+    let registration: MemberRegistrationStatus = "not_registered";
+    let agentId = "";
+    let displayName: string | null = null;
+    let sessionKey = "";
+
+    if (params.resolveMember) {
+      const resolved = await params.resolveMember(requestedId);
+      if (!resolved) {
+        results.push({
+          memberId: requestedId,
+          agentId: null,
+          displayName: null,
+          code: "unresolved_member",
+          dispatchable: false,
+          sessionKey: null,
+          sessionEnsured: false,
+          detail: "member not found in trusted roster",
+        });
+        continue;
+      }
+      registration = resolved.registration;
+      agentId = compact(resolved.agentId ?? undefined) || compact(resolved.memberId);
+      displayName = compact(resolved.displayName ?? undefined) || null;
+      sessionKey =
+        compact(resolved.sessionKey ?? undefined) ||
+        (agentId ? defaultConversationSessionKey(agentId) : "");
+    } else {
+      // Test / internal path only — still refuse invented registration when omitted.
+      registration = member.registration === "registered" ? "registered" : "not_registered";
+      agentId = compact(member.agentId) || requestedId;
+      displayName = compact(member.displayName) || null;
+      sessionKey =
+        compact(member.sessionKey) || (agentId ? defaultConversationSessionKey(agentId) : "");
+    }
+
+    if (registration === "not_registered" || !agentId) {
       results.push({
-        memberId,
+        memberId: requestedId,
         agentId: agentId || null,
         displayName,
         code: "not_registered",
@@ -155,27 +215,28 @@ export async function checkMemberDispatchReadiness(
     const exists = await sessionExists(agentId, sessionKey);
     if (exists) {
       results.push({
-        memberId,
+        memberId: requestedId,
         agentId,
         displayName,
         code: "ready",
         dispatchable: true,
         sessionKey,
         sessionEnsured: false,
+        detail: "session record present — not a model/tool capability proof",
       });
       continue;
     }
 
     if (!autoEnsure || !params.ensureSession) {
       results.push({
-        memberId,
+        memberId: requestedId,
         agentId,
         displayName,
         code: "registered_no_session",
         dispatchable: false,
         sessionKey,
         sessionEnsured: false,
-        detail: "registered but main session missing; ensureSession not applied",
+        detail: "registered but main session missing; read check does not create sessions",
       });
       continue;
     }
@@ -185,7 +246,7 @@ export async function checkMemberDispatchReadiness(
       const after = await sessionExists(agentId, sessionKey);
       if (!after) {
         results.push({
-          memberId,
+          memberId: requestedId,
           agentId,
           displayName,
           code: "session_ensure_failed",
@@ -197,17 +258,18 @@ export async function checkMemberDispatchReadiness(
         continue;
       }
       results.push({
-        memberId,
+        memberId: requestedId,
         agentId,
         displayName,
         code: "ready",
         dispatchable: true,
         sessionKey,
         sessionEnsured: true,
+        detail: "session record ensured — not a model/tool capability proof",
       });
     } catch (error) {
       results.push({
-        memberId,
+        memberId: requestedId,
         agentId,
         displayName,
         code: "session_ensure_failed",

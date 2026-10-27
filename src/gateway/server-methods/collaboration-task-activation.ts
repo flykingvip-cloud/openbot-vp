@@ -1,6 +1,8 @@
+import { loadConfig } from "../../config/config.js";
+import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
 /**
  * TEAM-REAL F1–F3 gateway handlers — activation, NL confirm, team deliverable, readiness.
- * Pack-owned; does not edit collaboration-learning.ts hot board/confirm surface.
+ * Pack-owned; review A: resource ACL + membership tenant; read readiness never writes.
  */
 import { activateCollaborationTask } from "../collaboration-learning/activate-collaboration-task.js";
 import { tryConfirmPlanFromChat } from "../collaboration-learning/chat-plan-confirm.js";
@@ -8,15 +10,24 @@ import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-acto
 import {
   checkMemberDispatchReadiness,
   ensureRegisteredMemberMainSession,
-  type MemberDispatchCandidate,
-  type MemberRegistrationStatus,
+  type TrustedMemberResolution,
 } from "../collaboration-learning/member-dispatch-readiness.js";
+import {
+  createWorkspaceCollaborationStores,
+  readGroupOperatingState,
+} from "../collaboration-learning/shared.js";
 import {
   readTeamDeliverable,
   submitTeamDeliverable,
 } from "../collaboration-learning/team-deliverable-submit.js";
-import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
+import { authorizeTeamGroupResourceAccess } from "../collaboration-learning/team-resource-auth.js";
+import {
+  resolveCollaborationTenantResolution,
+  resolveMembershipTenantIdForAcl,
+} from "../collaboration-learning/trusted-tenant.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
+import { resolveSecurityProfile } from "../security-profile.js";
+import { loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
 function readString(value: unknown): string | undefined {
@@ -39,6 +50,70 @@ function readNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
+async function resolveTrustedMembersForGroup(params: {
+  groupId: string;
+  client: Parameters<typeof resolveDeliveryAclActor>[0];
+}): Promise<(memberId: string) => Promise<TrustedMemberResolution | null>> {
+  const cfg = loadConfig();
+  const profile = resolveSecurityProfile(cfg).profile;
+  const tenantId = await resolveMembershipTenantIdForAcl(params.client as never);
+  const members = await loadAuthoritativeGroupMembers({
+    groupId: params.groupId,
+    tenantId,
+    profile,
+    cfg,
+  });
+  const osStores = createWorkspaceCollaborationStores(cfg);
+  const os = await readGroupOperatingState({
+    fileStore: osStores.fileStore,
+    groupId: params.groupId,
+  }).catch(() => null);
+  const roleMap = new Map(
+    (os?.memberRoleMap ?? [])
+      .map((row) => {
+        const id = typeof row.memberId === "string" ? row.memberId.trim() : "";
+        return id ? ([id, row] as const) : null;
+      })
+      .filter((row): row is readonly [string, (typeof os.memberRoleMap)[number]] => Boolean(row)),
+  );
+
+  return async (memberId: string): Promise<TrustedMemberResolution | null> => {
+    const id = memberId.trim();
+    if (!id) {
+      return null;
+    }
+    const fromMembers = members.find((m) => {
+      const candidates = [m.userId, m.memberId, m.agentId]
+        .map((v) => (typeof v === "string" ? v.trim() : ""))
+        .filter(Boolean);
+      return candidates.includes(id);
+    });
+    const fromRole = roleMap.get(id);
+    if (!fromMembers && !fromRole) {
+      return {
+        memberId: id,
+        agentId: null,
+        displayName: null,
+        registration: "not_registered",
+        sessionKey: null,
+      };
+    }
+    const agentId =
+      fromMembers?.agentId?.trim() ||
+      fromMembers?.userId?.trim() ||
+      fromMembers?.memberId?.trim() ||
+      id;
+    const displayName = fromMembers?.name?.trim() || null;
+    return {
+      memberId: id,
+      agentId,
+      displayName,
+      registration: "registered",
+      sessionKey: defaultConversationSessionKey(agentId),
+    };
+  };
+}
+
 export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
   "collaboration.task.activate": async ({ params, respond, client }) => {
     const groupId = readString(params?.groupId);
@@ -56,6 +131,38 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
     try {
       const tenant = await resolveCollaborationTenantResolution(client);
       const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const auth = await authorizeTeamGroupResourceAccess({
+        groupId,
+        actor,
+        client,
+        tenant,
+        action: "write",
+      });
+      if (!auth.ok) {
+        respond(
+          true,
+          {
+            status: "blocked",
+            reason: auth.reason,
+            detail: auth.detail,
+            boardPublished: false,
+            dispatched: false,
+            taskEnsured: false,
+            taskId,
+            activationKey: "",
+          },
+          undefined,
+        );
+        return;
+      }
       const result = await activateCollaborationTask({
         groupId,
         taskId,
@@ -72,10 +179,6 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         requireHumanConfirm: readBoolean(params?.requireHumanConfirm),
         tenant,
       });
-      if (result.status !== "activated") {
-        respond(true, result, undefined);
-        return;
-      }
       respond(true, result, undefined);
     } catch (error) {
       respond(
@@ -101,6 +204,29 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
     try {
       const tenant = await resolveCollaborationTenantResolution(client);
       const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const auth = await authorizeTeamGroupResourceAccess({
+        groupId,
+        actor,
+        client,
+        tenant,
+        action: "write",
+      });
+      if (!auth.ok) {
+        respond(
+          true,
+          { status: "blocked", confirmed: false, reason: auth.reason, detail: auth.detail },
+          undefined,
+        );
+        return;
+      }
       const result = await tryConfirmPlanFromChat({
         groupId,
         message,
@@ -135,7 +261,16 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
+      const tenant = await resolveCollaborationTenantResolution(client);
       const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
       const result = await submitTeamDeliverable({
         groupId,
         taskId,
@@ -146,11 +281,11 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         contentType: readString(params?.contentType),
         previousDeliverableId: readString(params?.previousDeliverableId),
         relativePath: readString(params?.relativePath),
+        tenant,
+        client,
+        enforceAcl: true,
+        identityAliases: [client?.user ?? ""].map((v) => String(v).trim()).filter(Boolean),
       });
-      if (!result.ok) {
-        respond(true, result, undefined);
-        return;
-      }
       respond(true, result, undefined);
     } catch (error) {
       respond(
@@ -173,8 +308,25 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
+      const tenant = await resolveCollaborationTenantResolution(client);
       const actor = await resolveDeliveryAclActor(client, groupId);
-      const result = await readTeamDeliverable({ groupId, deliverableId, actor });
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const result = await readTeamDeliverable({
+        groupId,
+        deliverableId,
+        actor,
+        tenant,
+        client,
+        enforceAcl: true,
+        identityAliases: [client?.user ?? ""].map((v) => String(v).trim()).filter(Boolean),
+      });
       respond(true, result, undefined);
     } catch (error) {
       respond(
@@ -185,8 +337,14 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
     }
   },
 
+  /** Read-only readiness: never creates sessions; registration from trusted roster. */
   "collaboration.task.checkDispatchReadiness": async ({ params, respond, client }) => {
+    const groupId = readString(params?.groupId);
     const rawMembers = Array.isArray(params?.members) ? params.members : null;
+    if (!groupId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "groupId is required"));
+      return;
+    }
     if (!rawMembers || rawMembers.length === 0) {
       respond(
         false,
@@ -195,43 +353,127 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
       );
       return;
     }
-    const members: MemberDispatchCandidate[] = [];
+    const memberIds: string[] = [];
     for (const row of rawMembers) {
       if (!row || typeof row !== "object") {
         continue;
       }
       const memberId = readString((row as { memberId?: unknown }).memberId);
-      const registrationRaw = readString((row as { registration?: unknown }).registration);
-      const registration: MemberRegistrationStatus =
-        registrationRaw === "registered" ? "registered" : "not_registered";
-      if (!memberId) {
-        continue;
+      if (memberId) {
+        memberIds.push(memberId);
       }
-      members.push({
-        memberId,
-        agentId: readString((row as { agentId?: unknown }).agentId),
-        displayName: readString((row as { displayName?: unknown }).displayName),
-        registration,
-        sessionKey: readString((row as { sessionKey?: unknown }).sessionKey),
-      });
     }
-    if (members.length === 0) {
+    if (memberIds.length === 0) {
       respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "no valid members"));
       return;
     }
     try {
-      void client;
-      const autoEnsure = readBoolean(params?.autoEnsureSession) !== false;
+      const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const auth = await authorizeTeamGroupResourceAccess({
+        groupId,
+        actor,
+        client,
+        tenant,
+        action: "read",
+      });
+      if (!auth.ok) {
+        respond(
+          true,
+          {
+            members: [],
+            allDispatchable: false,
+            gaps: [{ memberId: "*", code: "not_registered", detail: auth.reason }],
+          },
+          undefined,
+        );
+        return;
+      }
+      const resolveMember = await resolveTrustedMembersForGroup({ groupId, client });
       const result = await checkMemberDispatchReadiness({
-        members,
-        autoEnsureSession: autoEnsure,
-        ensureSession: autoEnsure
-          ? async (agentId, sessionKey) => {
-              await ensureRegisteredMemberMainSession({ agentId, sessionKey });
-            }
-          : undefined,
+        members: memberIds.map((memberId) => ({ memberId })),
+        resolveMember,
+        // Read scope: never write sessions.
+        autoEnsureSession: false,
       });
       respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, error instanceof Error ? error.message : String(error)),
+      );
+    }
+  },
+
+  /**
+   * Write-scoped: controlled ensure of a registered member main session.
+   * Does not prove model/tool readiness — only creates a session store record.
+   */
+  "collaboration.task.ensureMemberSession": async ({ params, respond, client }) => {
+    const groupId = readString(params?.groupId);
+    const memberId = readString(params?.memberId);
+    if (!groupId || !memberId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "groupId, memberId are required"),
+      );
+      return;
+    }
+    try {
+      const actor = await resolveDeliveryAclActor(client, groupId);
+      if (!actor) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "actor_not_authenticated"),
+        );
+        return;
+      }
+      const tenant = await resolveCollaborationTenantResolution(client);
+      const auth = await authorizeTeamGroupResourceAccess({
+        groupId,
+        actor,
+        client,
+        tenant,
+        action: "write",
+      });
+      if (!auth.ok) {
+        respond(true, { ok: false, reason: auth.reason, detail: auth.detail }, undefined);
+        return;
+      }
+      const resolveMember = await resolveTrustedMembersForGroup({ groupId, client });
+      const resolved = await resolveMember(memberId);
+      if (!resolved || resolved.registration !== "registered" || !resolved.agentId) {
+        respond(true, { ok: false, reason: "not_registered", memberId }, undefined);
+        return;
+      }
+      const ensured = await ensureRegisteredMemberMainSession({
+        agentId: resolved.agentId,
+        sessionKey: resolved.sessionKey ?? undefined,
+        expectAgentBoundSession: true,
+      });
+      respond(
+        true,
+        {
+          ok: true,
+          memberId,
+          agentId: resolved.agentId,
+          sessionKey: ensured.sessionKey,
+          created: ensured.created,
+          capabilityProof: false,
+        },
+        undefined,
+      );
     } catch (error) {
       respond(
         false,

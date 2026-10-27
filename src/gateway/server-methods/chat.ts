@@ -269,10 +269,12 @@ import {
   resolveBlockedAgentIdsForCurrentTask,
   type GatewayCollaborationSpaceSnapshot,
 } from "../collaboration-learning.js";
+import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
 import {
   isGroupPublicTranscriptSessionFile,
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
+import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
   bindGroupPublicTranscript,
   dropDivergentGroupTranscriptMirrors,
@@ -4723,6 +4725,25 @@ export const chatHandlers: GatewayRequestHandlers = {
         relatedId: clientRunId,
         ...(wakeTaskId ? { taskId: wakeTaskId } : {}),
       }).catch(() => undefined);
+      // TEAM-REAL D: NL plan confirm shares confirmCollaborationTodolist with UI cards.
+      // Ambiguous / unbound confirms must not flip runtime state.
+      void (async () => {
+        try {
+          const confirmActor =
+            (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId;
+          const tenant = await resolveCollaborationTenantResolution(client);
+          await maybeConfirmPlanFromChatSend({
+            groupId: scope.groupId,
+            message: mentionMessage,
+            actor: confirmActor,
+            taskId: wakeTaskId,
+            tenant,
+            cfg: policySnapshotCfg,
+          });
+        } catch {
+          // best-effort — chat send must not fail closed on confirm hook errors
+        }
+      })();
       let v1RollCallExtraLines: string[] | undefined;
       if (v1RollCallHooks.active) {
         const lines: string[] = [];

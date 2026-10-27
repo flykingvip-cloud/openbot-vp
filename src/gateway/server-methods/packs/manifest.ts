@@ -65,6 +65,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
       "collaboration.task.activate",
       "collaboration.task.confirmPlanFromChat",
       "collaboration.task.submitTeamDeliverable",
+      "collaboration.task.ensureMemberSession",
     ],
     scopes: {
       "operator.read": [
@@ -75,6 +76,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
         "collaboration.task.activate",
         "collaboration.task.confirmPlanFromChat",
         "collaboration.task.submitTeamDeliverable",
+        "collaboration.task.ensureMemberSession",
       ],
     },
   },
