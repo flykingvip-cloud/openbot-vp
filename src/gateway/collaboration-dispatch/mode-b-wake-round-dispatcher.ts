@@ -121,6 +121,7 @@ export async function executeModeBWakeRound(params: {
   const roundId = `wake_${request.source}_${randomUUID()}`;
   const reason = compact(request.reason) || `wake:${request.source}`;
   const message =
+    compact(request.dispatchPrompt) ||
     compact(context.message) ||
     [
       `【Mode B 自推进】来源=${request.source}`,

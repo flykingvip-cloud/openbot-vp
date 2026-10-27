@@ -9,17 +9,28 @@
  * Does NOT hardcode writeMode=execute: gate uses resolveWakeRoundSelfAdvanceWriteMode
  * (cfg mode + executeGroupAllowlist). Binding failure refuses — never falls back
  * to another board work item.
+ *
+ * R2: final dispatch re-validates the same plan version, injects board summary /
+ * context pointer / confirmed step into the member run prompt, and remembers the
+ * execution deliverable binding for formal team submit.
  */
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { formatExecutionTaskBagForPrompt } from "../collaboration-dispatch/executor-private-todolist.js";
 import { SELF_ADVANCE_ACTIVE_BOARD_STATUSES } from "../collaboration-dispatch/self-advance.js";
 import { recordNudgeWake } from "../collaboration-dispatch/wake-contract.js";
-import { consumeWakeForRoundDispatch } from "../collaboration-dispatch/wake-round-dispatch.js";
+import {
+  consumeWakeForRoundDispatch,
+  getWakeRoundDispatcher,
+  type WakeRoundDispatcher,
+  type WakeRoundDispatchRequest,
+} from "../collaboration-dispatch/wake-round-dispatch.js";
 import {
   buildClaimAuthority,
   buildCollaborationExecutionTaskBag,
   listCollaborationBoardItems,
 } from "./claim-contract-entry.js";
+import { rememberExecutionDeliverableBinding } from "./execution-deliverable-binding.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
@@ -37,6 +48,38 @@ export type PostPlanConfirmAdvanceResult = {
   targetAgentIds: string[];
 };
 
+function buildDispatchPrompt(params: {
+  source: string;
+  claimantName: string;
+  reason: string;
+  bag: Awaited<ReturnType<typeof buildCollaborationExecutionTaskBag>>;
+}): string {
+  const header = [
+    `【Mode B 自推进】来源=${params.source}`,
+    `请继续推进你认领的看板项（责任人 ${params.claimantName}）。`,
+    params.reason,
+  ];
+  try {
+    if (params.bag?.boardSummary?.itemId && params.bag?.groupContextPointer?.groupId) {
+      return [...header, "", formatExecutionTaskBagForPrompt(params.bag)].join("\n");
+    }
+  } catch {
+    // fall through to minimal prompt
+  }
+  const step = params.bag?.todolistCurrentStep;
+  return [
+    ...header,
+    params.bag?.boardSummary?.itemId ? `board=${params.bag.boardSummary.itemId}` : null,
+    params.bag?.boardSummary?.goal ? `goal=${params.bag.boardSummary.goal}` : null,
+    step ? `step=${step.stepId}:v${step.version}:${step.title ?? ""}` : null,
+    params.bag?.groupContextPointer?.transcriptHint
+      ? `transcript=${params.bag.groupContextPointer.transcriptHint}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export async function triggerPostPlanConfirmAdvance(params: {
   groupId: string;
   taskId: string;
@@ -52,6 +95,8 @@ export async function triggerPostPlanConfirmAdvance(params: {
   stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
+  /** Tests may inject the final dispatcher (still goes through real consumeWake). */
+  roundDispatcher?: WakeRoundDispatcher | null;
 }): Promise<PostPlanConfirmAdvanceResult> {
   const cfg = params.cfg ?? loadConfig();
   const groupId = compact(params.groupId);
@@ -162,8 +207,9 @@ export async function triggerPostPlanConfirmAdvance(params: {
 
   // Reuse execution task bag: confirmed todolist/version/current step must still bind.
   let bagStepId = stepId;
+  let initialBag: Awaited<ReturnType<typeof buildCollaborationExecutionTaskBag>>;
   try {
-    const bag = await buildCollaborationExecutionTaskBag({
+    initialBag = await buildCollaborationExecutionTaskBag({
       groupId,
       taskId,
       boardItemId,
@@ -176,7 +222,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
       tenant: params.tenant,
       cfg,
     });
-    if (!bag.planGate.confirmed) {
+    if (!initialBag.planGate.confirmed) {
       return {
         autoAdvanceWired: true,
         wakeRecorded: false,
@@ -186,7 +232,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
         targetAgentIds: [],
       };
     }
-    const step = bag.todolistCurrentStep;
+    const step = initialBag.todolistCurrentStep;
     if (!step) {
       return {
         autoAdvanceWired: true,
@@ -269,9 +315,85 @@ export async function triggerPostPlanConfirmAdvance(params: {
     bagStepId ?? "nostep",
     claimant,
   ].join("|");
+
+  const baseDispatcher: WakeRoundDispatcher | null =
+    params.roundDispatcher !== undefined ? params.roundDispatcher : getWakeRoundDispatcher();
+
+  const finalDispatcher: WakeRoundDispatcher = async (req: WakeRoundDispatchRequest) => {
+    // Final dispatch entry: re-validate the SAME plan version after CAS take.
+    let bag: Awaited<ReturnType<typeof buildCollaborationExecutionTaskBag>>;
+    try {
+      bag = await buildCollaborationExecutionTaskBag({
+        groupId,
+        taskId,
+        boardItemId,
+        ownerMemberId: claimant,
+        viewerId: confirmerId,
+        actor: confirmerId,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: stores ?? params.stores,
+        tenant: params.tenant,
+        cfg,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      return { ok: false, reason: `plan_revalidate_bag_unavailable:${detail}`.slice(0, 240) };
+    }
+    if (!bag.planGate.confirmed || !bag.todolistCurrentStep) {
+      return { ok: false, reason: "plan_revised_or_unconfirmed_before_dispatch" };
+    }
+    const step = bag.todolistCurrentStep;
+    if (compact(step.todolistId) !== todolistId || step.version !== confirmedVersion) {
+      return {
+        ok: false,
+        reason: `plan_revised_before_dispatch:bag=${step.version}:confirmed=${confirmedVersion}`,
+      };
+    }
+    if (bagStepId && compact(step.stepId) && compact(step.stepId) !== bagStepId) {
+      return {
+        ok: false,
+        reason: `plan_step_changed_before_dispatch:bag=${step.stepId}:expected=${bagStepId}`,
+      };
+    }
+
+    rememberExecutionDeliverableBinding(groupId, claimant, {
+      taskId,
+      boardItemId,
+      todolistId,
+      planVersion: confirmedVersion,
+      stepId: compact(step.stepId) || bagStepId,
+      source: "wake_dispatch",
+    });
+
+    const dispatchPrompt = buildDispatchPrompt({
+      source: req.source,
+      claimantName: claimant,
+      reason: advanceReason,
+      bag,
+    });
+    const enriched: WakeRoundDispatchRequest = {
+      ...req,
+      planConfirmBinding: {
+        todolistId,
+        confirmedVersion,
+        stepId: bagStepId,
+      },
+      dispatchPrompt,
+      reason: advanceReason,
+    };
+
+    if (!baseDispatcher) {
+      // Keep parity with unbound registry: no fake dispatch success.
+      return { ok: false, reason: "mode_b_dispatcher_unbound" };
+    }
+    return baseDispatcher(enriched);
+  };
+
   const consume = await consumeWakeForRoundDispatch({
     authority,
     cfg,
+    roundDispatcher: finalDispatcher,
     request: {
       groupId,
       tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? null,
@@ -282,6 +404,17 @@ export async function triggerPostPlanConfirmAdvance(params: {
       itemId: boardItemId,
       reason: advanceReason,
       opKey: advanceOpKey,
+      planConfirmBinding: {
+        todolistId,
+        confirmedVersion,
+        stepId: bagStepId,
+      },
+      dispatchPrompt: buildDispatchPrompt({
+        source: "nudge",
+        claimantName: claimant,
+        reason: advanceReason,
+        bag: initialBag,
+      }),
     },
   });
 

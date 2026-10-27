@@ -47,6 +47,10 @@ function replyTextFromResult(
 }
 
 function buildWakeMessage(params: { request: WakeRoundDispatchRequest; leadName: string }): string {
+  const prompt = compact(params.request.dispatchPrompt);
+  if (prompt) {
+    return prompt;
+  }
   const reason = compact(params.request.reason) || `wake:${params.request.source}`;
   return [
     `【Mode B 自推进】来源=${params.request.source}`,

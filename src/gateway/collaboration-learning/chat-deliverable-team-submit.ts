@@ -1,3 +1,4 @@
+import path from "node:path";
 /**
  * Force group agent DELIVERABLE finals through submitTeamDeliverable (product wiring).
  *
@@ -6,10 +7,9 @@
  * this helper and surface ok/failure; never treat settle alone as team delivery success.
  *
  * Empty declared body does NOT fall back to the whole chat text.
- * Binary-looking file declarations require real file bytes (contentFromFile), not prose.
+ * This PR supports text deliverables only — binary declarations are refused
+ * (no UTF-8 round-trip of PDF/images/archives).
  */
-import fs from "node:fs/promises";
-import path from "node:path";
 import type { OpenBotConfig } from "../../config/types.js";
 import { extractDeliverableEnvelope } from "../../shared/preview-artifact/deliverable-envelope.js";
 import type { GatewayClient } from "../server-methods/types.js";
@@ -63,8 +63,8 @@ export async function maybeSubmitTeamDeliverableFromChatFinal(params: {
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   cfg?: OpenBotConfig;
   /**
-   * When declared file looks binary, read bytes from this absolute path instead of
-   * writing chat prose as the file body.
+   * @deprecated R2: this PR is text-only. Ignored; binary paths are always refused.
+   * Kept so call sites compile until authorized bytes submit lands in a later PR.
    */
   contentFromFile?: string | null;
   /** Tests / trusted composition roots may disable ACL when already authorized. */
@@ -87,29 +87,20 @@ export async function maybeSubmitTeamDeliverableFromChatFinal(params: {
     ? declared.file
     : `deliverables/${declared.file.replace(/^\/+/, "")}`;
 
-  let content = compact(declared.body);
-  if (!content) {
-    const fromFile = compact(params.contentFromFile);
-    if (fromFile) {
-      try {
-        content = await fs.readFile(fromFile, "utf8");
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        return { ok: false, reason: "deliverable_file_unreadable", detail };
-      }
-      content = compact(content);
-    }
-  }
-  if (!content) {
-    // Refuse: empty body must not fall back to whole chat text.
-    return { ok: false, reason: "deliverable_empty_body" };
-  }
-  if (looksBinaryPath(relativePath) && !compact(params.contentFromFile)) {
+  // R2: text-only — refuse all binary declarations (do not UTF-8-corrupt bytes).
+  if (looksBinaryPath(relativePath)) {
     return {
       ok: false,
-      reason: "deliverable_binary_requires_file_bytes",
+      reason: "deliverable_binary_not_supported_in_this_pr",
       detail: relativePath,
     };
+  }
+  void params.contentFromFile;
+
+  const content = compact(declared.body);
+  if (!content) {
+    // Refuse: empty body must not fall back to whole chat text or file UTF-8.
+    return { ok: false, reason: "deliverable_empty_body" };
   }
 
   return submitTeamDeliverable({

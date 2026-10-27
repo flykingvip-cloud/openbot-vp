@@ -124,6 +124,17 @@ export type WakeRoundDispatchRequest = Readonly<{
   relatedId?: string;
   /** Explicit U3 idempotency key; when omitted, derived from request fields. */
   opKey?: string;
+  /**
+   * Plan-confirm advance binding. When set, final dispatch re-validates the
+   * execution bag and prefers dispatchPrompt for the member run message.
+   */
+  planConfirmBinding?: Readonly<{
+    todolistId: string;
+    confirmedVersion: number;
+    stepId?: string | null;
+  }>;
+  /** Optional enriched prompt (board summary / context pointer / confirmed step). */
+  dispatchPrompt?: string | null;
 }>;
 
 export type WakeRoundDispatchResult =
@@ -1063,9 +1074,26 @@ export async function consumeWakeForRoundDispatch(
     await params._testAfterEligibilityBarrier();
   }
 
-  // Product wiring R1: readiness + session ensure BEFORE final stop/auth/CAS take.
+  // Product wiring R1/R2: readiness + session ensure BEFORE final stop/auth/CAS take.
   // Registration = tenant-authoritative agent registry ∩ active group bot member.
   // OS unreadable → refuse (no global listAgentsForGateway / agent||activeBot fallback).
+  // R2: readiness/session-ensure failure MUST release the unconsumed committed claim
+  // on the same trusted root (never release taken claims).
+  const releaseUnconsumedTaskClaimAfterReadinessFailure = async () => {
+    if (!(stoppedTaskId && taskDispatchClaimNeedsRelease && taskDispatchClaimId)) {
+      return;
+    }
+    taskDispatchClaimNeedsRelease = false;
+    await casReleaseUnconsumedCommittedClaim({
+      groupId: request.groupId,
+      taskId: stoppedTaskId,
+      opKey: claimed.opKey,
+      claimId: taskDispatchClaimId,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+      trusted: wakeStores,
+    });
+  };
   {
     const memberIds = [...request.toAgentIds];
     if (memberIds.length > 0) {
@@ -1075,103 +1103,132 @@ export async function consumeWakeForRoundDispatch(
       if (!tenantId) {
         // fall through to CAS take without tenant∩OS readiness
       } else {
-        let osMembers: Array<{
-          memberId?: string;
-          memberKind?: string;
-          status?: string;
-        }> = [];
-        let osReadable = true;
         try {
-          const os = await readGroupOperatingState({
-            fileStore: wakeStores.fileStore,
-            groupId: request.groupId,
-            groupRootDir: wakeStores.groupRootDir,
-            cfg: params.cfg,
-          });
-          osMembers = Array.isArray(os?.memberRoleMap) ? os.memberRoleMap : [];
-        } catch {
-          osReadable = false;
-        }
-        if (!osReadable) {
-          const failed = await markWakeOpFailed({
-            authority: params.authority,
-            opKey: claimed.opKey,
-            cfg: params.cfg,
-            nowMs: params.nowMs,
-            detail: "dispatch_readiness_os_unreadable",
-          });
-          noteNudgeNoExternal("dispatch_readiness_not_ready");
-          await flushNudgeNoExternalReceipt();
-          return {
-            outcome: "recorded",
-            dispatched: false,
-            gate: emptyGate(),
-            reason: "dispatch_readiness_not_ready",
-            wakeEvent: undefined,
-            roundId: undefined,
-            dispatcherPresent: false,
-            opKey: claimed.opKey,
-            wakeOp: failed ?? wakeOp,
-            reused: false,
-          };
-        }
-        const tenantAgents = listAgents({
-          lifecycle: null,
-          health: null,
-          tenantId,
-          searchQuery: "",
-        });
-        const tenantAgentIds = new Set(
-          tenantAgents.map((row) => compact(row.runtimeAgentId)).filter(Boolean),
-        );
-        const readiness = await checkMemberDispatchReadiness({
-          members: memberIds.map((memberId) => ({ memberId })),
-          cfg: params.cfg,
-          autoEnsureSession: true,
-          ensureSession: async (agentId, sessionKey) => {
-            await ensureRegisteredMemberMainSession({
-              agentId,
-              sessionKey,
+          let osMembers: Array<{
+            memberId?: string;
+            memberKind?: string;
+            status?: string;
+          }> = [];
+          let osReadable = true;
+          try {
+            const os = await readGroupOperatingState({
+              fileStore: wakeStores.fileStore,
+              groupId: request.groupId,
+              groupRootDir: wakeStores.groupRootDir,
+              cfg: params.cfg,
+            });
+            osMembers = Array.isArray(os?.memberRoleMap) ? os.memberRoleMap : [];
+          } catch {
+            osReadable = false;
+          }
+          if (!osReadable) {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
               cfg: params.cfg,
               nowMs: params.nowMs,
+              detail: "dispatch_readiness_os_unreadable",
             });
-          },
-          resolveMember: (memberId) => {
-            const id = memberId.trim();
-            const osRow = osMembers.find((row) => compact(row.memberId) === id);
-            const activeBot =
-              osRow?.memberKind === "bot" &&
-              (osRow.status === "active" || osRow.status == null || osRow.status === "");
-            const inTenantRegistry = tenantAgentIds.has(id);
-            // Intersection only — global agent presence alone is insufficient.
-            if (!activeBot || !inTenantRegistry) {
+            noteNudgeNoExternal("dispatch_readiness_not_ready");
+            await flushNudgeNoExternalReceipt();
+            await releaseUnconsumedTaskClaimAfterReadinessFailure();
+            return {
+              outcome: "recorded",
+              dispatched: false,
+              gate: emptyGate(),
+              reason: "dispatch_readiness_not_ready",
+              wakeEvent: undefined,
+              roundId: undefined,
+              dispatcherPresent: false,
+              opKey: claimed.opKey,
+              wakeOp: failed ?? wakeOp,
+              reused: false,
+            };
+          }
+          const tenantAgents = listAgents({
+            lifecycle: null,
+            health: null,
+            tenantId,
+            searchQuery: "",
+          });
+          const tenantAgentIds = new Set(
+            tenantAgents.map((row) => compact(row.runtimeAgentId)).filter(Boolean),
+          );
+          const readiness = await checkMemberDispatchReadiness({
+            members: memberIds.map((memberId) => ({ memberId })),
+            cfg: params.cfg,
+            autoEnsureSession: true,
+            ensureSession: async (agentId, sessionKey) => {
+              await ensureRegisteredMemberMainSession({
+                agentId,
+                sessionKey,
+                cfg: params.cfg,
+                nowMs: params.nowMs,
+              });
+            },
+            resolveMember: (memberId) => {
+              const id = memberId.trim();
+              const osRow = osMembers.find((row) => compact(row.memberId) === id);
+              const activeBot =
+                osRow?.memberKind === "bot" &&
+                (osRow.status === "active" || osRow.status == null || osRow.status === "");
+              const inTenantRegistry = tenantAgentIds.has(id);
+              // Intersection only — global agent presence alone is insufficient.
+              if (!activeBot || !inTenantRegistry) {
+                return {
+                  memberId: id,
+                  agentId: null,
+                  displayName: null,
+                  registration: "not_registered" as const,
+                  sessionKey: null,
+                };
+              }
               return {
                 memberId: id,
-                agentId: null,
+                agentId: id,
                 displayName: null,
-                registration: "not_registered" as const,
-                sessionKey: null,
+                registration: "registered" as const,
+                sessionKey: defaultConversationSessionKey(id),
               };
-            }
+            },
+          });
+          if (!readiness.allDispatchable) {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: `dispatch_readiness_not_ready:${readiness.gaps.map((g) => g.code).join(",")}`,
+            });
+            noteNudgeNoExternal("dispatch_readiness_not_ready");
+            await flushNudgeNoExternalReceipt();
+            await releaseUnconsumedTaskClaimAfterReadinessFailure();
             return {
-              memberId: id,
-              agentId: id,
-              displayName: null,
-              registration: "registered" as const,
-              sessionKey: defaultConversationSessionKey(id),
+              outcome: "recorded",
+              dispatched: false,
+              gate: emptyGate(),
+              reason: "dispatch_readiness_not_ready",
+              wakeEvent: undefined,
+              roundId: undefined,
+              dispatcherPresent: false,
+              opKey: claimed.opKey,
+              wakeOp: failed ?? wakeOp,
+              reused: false,
             };
-          },
-        });
-        if (!readiness.allDispatchable) {
+          }
+        } catch (readinessError) {
+          const detail =
+            readinessError instanceof Error ? readinessError.message : String(readinessError);
           const failed = await markWakeOpFailed({
             authority: params.authority,
             opKey: claimed.opKey,
             cfg: params.cfg,
             nowMs: params.nowMs,
-            detail: `dispatch_readiness_not_ready:${readiness.gaps.map((g) => g.code).join(",")}`,
+            detail: `dispatch_readiness_exception:${detail}`.slice(0, 400),
           });
           noteNudgeNoExternal("dispatch_readiness_not_ready");
           await flushNudgeNoExternalReceipt();
+          await releaseUnconsumedTaskClaimAfterReadinessFailure();
           return {
             outcome: "recorded",
             dispatched: false,

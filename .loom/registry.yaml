@@ -10050,8 +10050,16 @@ landingStreams:
       - src/gateway/server-methods/packs/registry.ts
       - src/gateway/server-methods/chat.ts
       - src/gateway/protocol/schema/logs-chat.ts
+      - src/gateway/collaboration-learning/chat-deliverable-team-submit.ts
+      - src/gateway/collaboration-learning/execution-deliverable-binding.ts
+      - src/gateway/collaboration-learning/post-plan-confirm-advance.ts
+      - src/gateway/collaboration-learning/product-wiring-autoadvance-readiness-deliverable.test.ts
+      - src/gateway/collaboration-learning/resolve-actor-deliverable-task.ts
+      - src/gateway/collaboration-dispatch/mode-b-wake-round-dispatcher.ts
+      - src/gateway/wake-round-dispatcher-boot.ts
       - .loom/registry.yaml
-    canLandWith: []
+    canLandWith:
+      - collab-p0-wake-dispatch:grok-bot
     metadata:
       task: team-real-collab-loop:f1f3
       owner: 协作对话验收测试
@@ -11023,6 +11031,7 @@ landingStreams:
       - src/gateway/wake-round-dispatcher-boot.test.ts
     canLandWith:
       - COLLAB_S4_HEARTBEAT_SCHEDULER
+      - team-real-collab-loop-f1f3
     metadata:
       legacyTitle: P0-2 wake to Mode B round dispatch consumer
       legacyDisposition: MERGE

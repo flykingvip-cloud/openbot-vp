@@ -280,6 +280,10 @@ import {
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
+  consumeExecutionDeliverableBinding,
+  type ExecutionDeliverableBinding,
+} from "../collaboration-learning/execution-deliverable-binding.js";
+import {
   bindGroupPublicTranscript,
   dropDivergentGroupTranscriptMirrors,
 } from "../collaboration-learning/group-public-transcript.js";
@@ -3334,6 +3338,11 @@ async function runGroupBotDiscussionTurn(params: {
   eventKey?: CollaborationEventKey;
   /** // v1-only — P0.2 roll-call roster / brief-hint lines. */
   v1RollCallExtraLines?: string[];
+  /**
+   * Formal deliverable must bind this execution bag / wake run.
+   * When omitted, chat final may still consume a remembered wake binding.
+   */
+  executionDeliverableBinding?: ExecutionDeliverableBinding | null;
 }): Promise<SameRoundReply | null> {
   return await groupBotQueue.enqueue(params.bot.sessionKey, async () => {
     const {
@@ -3818,11 +3827,21 @@ async function runGroupBotDiscussionTurn(params: {
               `collaboration team deliverable auth failed (${params.bot.agentId}): ${formatForLog(authErr)}`,
             );
           }
+          // R2: prefer explicit run binding, else consume wake-remembered binding.
+          // Never scan group claimants / never use OS currentTaskId alone.
+          const runBinding =
+            params.executionDeliverableBinding ??
+            consumeExecutionDeliverableBinding(params.scope.groupId, params.bot.agentId);
           const binding =
             deliverAuth && deliverAuth.ok
               ? await resolveActorDeliverableTaskBinding({
                   groupId: params.scope.groupId,
                   actorId: params.bot.agentId,
+                  explicitTaskId: runBinding?.taskId ?? null,
+                  explicitBoardItemId: runBinding?.boardItemId ?? null,
+                  explicitTodolistId: runBinding?.todolistId ?? null,
+                  explicitPlanVersion: runBinding?.planVersion ?? null,
+                  explicitStepId: runBinding?.stepId ?? null,
                   groupCurrentTaskId,
                   auth: deliverAuth,
                   stores: deliverStores,
