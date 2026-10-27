@@ -1,0 +1,384 @@
+{
+  "version": "memory-effect-acceptance-matrix-v1",
+  "generatedAt": "2026-10-27T05:29:34.831Z",
+  "timezoneNote": "box/user Asia/Shanghai; ISO timestamps are UTC",
+  "gitHeadHint": "unknown",
+  "extends": "memory-batch1-o8-baseline-v3",
+  "hardBans": [
+    "no-deploy",
+    "no-prod-memory-writes",
+    "no-claim-production-online-effect-verified",
+    "no-fact-level-forget-product",
+    "no-D4-forget-lifecycle-chaining"
+  ],
+  "cases": [
+    {
+      "id": "EFF-ISO-1",
+      "scenario": "isolation-path-assert",
+      "layer": "isolation",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "resolvedPaths": {
+          "stateDir": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/state",
+          "dataRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/data",
+          "tenantsRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/tenants",
+          "workspace": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/workspace-main",
+          "configPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/state/openbot.json",
+          "canonicalStorePath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/data/.meta/cogniweave/canonical.sqlite",
+          "parentOfCanonicalIsSymlink": false,
+          "canonicalExists": false
+        }
+      },
+      "covers": ["synthetic isolation roots; no real ~/.openbot or ~/OpenBot"],
+      "doesNotClaim": ["production paths", "online host state"],
+      "pass": true
+    },
+    {
+      "id": "EFF-RECALL-1",
+      "scenario": "recall-manager-search",
+      "layer": "manager-integration",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [
+        "real-tool-call-chain",
+        "reply-handler-injection",
+        "prompt-construction-with-recalled-memory",
+        "production-online-recall"
+      ],
+      "detail": {
+        "hitCount": 1,
+        "paths": ["MEMORY.md"]
+      },
+      "covers": ["CogniWeaveMemoryManager.search after workspace MEMORY.md ingest"],
+      "doesNotClaim": [
+        "production/online recall",
+        "model adoption",
+        "gateway tool chain",
+        "full E2E"
+      ],
+      "pass": true
+    },
+    {
+      "id": "EFF-LIST-1",
+      "scenario": "path1-list-workspace-corpus",
+      "layer": "data-layer",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": ["gateway memory.list RPC transport"],
+      "detail": {
+        "keys": ["memory/listed.md", "MEMORY.md"],
+        "hasDsLegacy": false
+      },
+      "covers": [
+        "listAgentMemoryEntries returns workspace MEMORY.md + memory/**/*.md",
+        "DS legacy memory/agent not listed (path1)"
+      ],
+      "doesNotClaim": ["gateway list RPC", "UI Memory Center full chain"],
+      "pass": true
+    },
+    {
+      "id": "EFF-ACL-1",
+      "scenario": "acl-bound-active-in-scope",
+      "layer": "sdk-unit",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "ids": ["acl-a1"]
+      },
+      "covers": ["queryAtoms ACL: bound legal subject sees active in-scope only"],
+      "doesNotClaim": ["gateway auth", "production ACL enforcement online"],
+      "pass": true
+    },
+    {
+      "id": "EFF-ACL-2",
+      "scenario": "acl-wrong-owner-deny",
+      "layer": "sdk-unit",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "hitCount": 0
+      },
+      "covers": ["queryAtoms ACL: wrong-owner fail-closed empty hits"],
+      "doesNotClaim": ["gateway auth chain", "live multi-tenant prod"],
+      "pass": true
+    },
+    {
+      "id": "EFF-O4-1",
+      "scenario": "o4-statusView-active-filter",
+      "layer": "o4-statusView",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": ["full Memory Center UI client chain", "real auth session"],
+      "detail": {
+        "ok": true,
+        "total": 2,
+        "ids": ["eff-active-2", "eff-active-1"]
+      },
+      "covers": ["listMemoryCenterAtomsReadonly statusView=active exact filter"],
+      "doesNotClaim": ["UI statusView end-to-end", "production Memory Center"],
+      "pass": true
+    },
+    {
+      "id": "EFF-O4-2",
+      "scenario": "o4-statusView-tentative-filter",
+      "layer": "o4-statusView",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": ["full Memory Center UI client chain"],
+      "detail": {
+        "ok": true,
+        "total": 2,
+        "ids": ["eff-tent-2", "eff-tent-1"]
+      },
+      "covers": ["listMemoryCenterAtomsReadonly statusView=tentative exact filter"],
+      "doesNotClaim": ["UI statusView end-to-end", "production Memory Center"],
+      "pass": true
+    },
+    {
+      "id": "EFF-O4-3",
+      "scenario": "o4-statusView-unbound-deny",
+      "layer": "o4-statusView",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "ok": false,
+        "code": "MEMORY_SUBJECT_UNBOUND"
+      },
+      "covers": ["O4 readonly refuses unbound subject (MEMORY_SUBJECT_UNBOUND)"],
+      "doesNotClaim": ["gateway auth", "live binding issuance"],
+      "pass": true
+    },
+    {
+      "id": "EFF-FORGET-PATH1-1",
+      "scenario": "path1-forget-file-scope",
+      "layer": "path1-forget-vs-multi-source",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [
+        "gateway data.memory.forget handler chain",
+        "fact-level forget across all sources",
+        "D4 cogniweave forget-lifecycle chaining"
+      ],
+      "detail": {
+        "deletedPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-effect-mx-I2ywDF/workspace-main/MEMORY.md",
+        "aGone": true,
+        "dsUntouched": true,
+        "beforeHits": 2,
+        "note": "path1 forgetMemoryEntry helper only; not gateway chain"
+      },
+      "covers": [
+        "forgetMemoryEntry deletes workspace-indexed MEMORY.md",
+        "DS legacy memory/agent untouched by path1 forget"
+      ],
+      "doesNotClaim": [
+        "gateway forget RPC",
+        "fact-level forget product",
+        "D4 lifecycle chaining",
+        "production online effect"
+      ],
+      "pass": true
+    },
+    {
+      "id": "EFF-MULTI-1",
+      "scenario": "multi-source-delete-A-leave-B-expected",
+      "layer": "path1-forget-vs-multi-source",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": ["fact-level forget all-sources product"],
+      "detail": {
+        "aGone": true,
+        "bRemains": true,
+        "bStillSearchable": true,
+        "afterHits": 1,
+        "assessmentRef": "docs/design/memory-fact-level-forget-assessment-2026-10-27.md §3 — 删 A 留 B 是预期，不得判遗忘故障"
+      },
+      "covers": [
+        "same phrase in MEMORY.md (A) + memory/*.md (B); forget A leaves B searchable",
+        "documents expected multi-source residual (not a defect)"
+      ],
+      "doesNotClaim": [
+        "fact-level all-source forget",
+        "production forget UX completion",
+        "model no-longer-adopts residual B"
+      ],
+      "pass": true
+    },
+    {
+      "id": "EFF-FORGET-PATH1-2",
+      "scenario": "path1-forget-rejects-non-corpus",
+      "layer": "helper-integration",
+      "status": "passed",
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "rejectDs": null,
+        "rejectTrav": null,
+        "dsStillExists": true
+      },
+      "covers": ["path1 forget rejects non-indexed keys and traversal"],
+      "doesNotClaim": ["gateway managed-mode reject runtime"],
+      "pass": true
+    },
+    {
+      "id": "EFF-GW-1-not-run",
+      "scenario": "gateway-handler-chain",
+      "layer": "gateway-handler-chain",
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": [
+        "data.memory.forget-gateway-method",
+        "memory.list-gateway-method",
+        "live-RPC-transport",
+        "gateway-auth"
+      ],
+      "detail": {
+        "note": "Explicit not-run; helper/data-layer cases above are not gateway."
+      },
+      "covers": [],
+      "doesNotClaim": ["any gateway coverage"],
+      "pass": false
+    },
+    {
+      "id": "EFF-MODEL-1-not-run",
+      "scenario": "model-effect-adoption",
+      "layer": "model-effect",
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": ["request-send", "correct-adoption", "timed-model-probe"],
+      "detail": {
+        "note": "Model effect untimed/not-run; never counts as passed."
+      },
+      "covers": [],
+      "doesNotClaim": ["model adoption", "reply uses recalled memory"],
+      "pass": false
+    },
+    {
+      "id": "EFF-PROD-1-not-run",
+      "scenario": "production-online-effect",
+      "layer": "production-online",
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": ["prod-host-write", "online-recall-verification", "deploy"],
+      "detail": {
+        "note": "HARD BAN: no prod writes, no deploy, no claim of production/online effect verified."
+      },
+      "covers": [],
+      "doesNotClaim": ["production/online effect verified", "deploy"],
+      "pass": false
+    },
+    {
+      "id": "EFF-FACT-1-not-run",
+      "scenario": "fact-level-forget-product",
+      "layer": "path1-forget-vs-multi-source",
+      "status": "not-run",
+      "executed": false,
+      "untestedSteps": [
+        "fact-level-all-source-forget",
+        "D4-forget-lifecycle-chaining",
+        "completion-UX"
+      ],
+      "detail": {
+        "note": "Assessment-only prior work (#111); product not authorized. Multi-source residual is expected."
+      },
+      "covers": [],
+      "doesNotClaim": ["fact-level forget product", "D4 chaining"],
+      "pass": false
+    }
+  ],
+  "byLayer": {
+    "isolation": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "manager-integration": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "data-layer": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "sdk-unit": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "notRun": 0
+    },
+    "o4-statusView": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0,
+      "notRun": 0
+    },
+    "path1-forget-vs-multi-source": {
+      "total": 3,
+      "passed": 2,
+      "failed": 0,
+      "notRun": 1
+    },
+    "helper-integration": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "notRun": 0
+    },
+    "gateway-handler-chain": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "notRun": 1
+    },
+    "model-effect": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "notRun": 1
+    },
+    "production-online": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "notRun": 1
+    }
+  },
+  "summary": {
+    "total": 15,
+    "passed": 11,
+    "failed": 0,
+    "notRun": 4,
+    "executedCaseIds": [
+      "EFF-ISO-1",
+      "EFF-RECALL-1",
+      "EFF-LIST-1",
+      "EFF-ACL-1",
+      "EFF-ACL-2",
+      "EFF-O4-1",
+      "EFF-O4-2",
+      "EFF-O4-3",
+      "EFF-FORGET-PATH1-1",
+      "EFF-MULTI-1",
+      "EFF-FORGET-PATH1-2"
+    ],
+    "notRunCaseIds": [
+      "EFF-GW-1-not-run",
+      "EFF-MODEL-1-not-run",
+      "EFF-PROD-1-not-run",
+      "EFF-FACT-1-not-run"
+    ],
+    "scaffoldInternalOnly": true,
+    "notSystemEffectiveness": true,
+    "productionOnlineEffectVerified": false,
+    "factLevelForgetProduct": false
+  }
+}
