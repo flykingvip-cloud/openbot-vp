@@ -1,7 +1,8 @@
 # 调用链与旧成功写入替换清单（askOutcome）
 
 > W0（基线与证据收敛）修订：对齐 main tip 合入身份（#85 / #89 / #94），去掉过时「runner success → not_required 关闭」表述。
-> W1（跨入口任务身份与唯一结果）整改中（#98）：稳定身份（cron `currentFireId` 持久化；followup 入队 `followupItemId` 子任务 + 可选 `parentTaskId`）；cron/followup 统一收尾；CLI / gateway_agent / collab claim 生产 ensure* 接线 + 经真实入口的测试。**登记**：入口持久来源修复通过；cron／followup 部分接线通过；W1 全入口与恢复身份仍按验收矩阵收敛中。**未 merge / 未部署 / 未开 W2**。
+> W1（跨入口任务身份与唯一结果）**已合入** [#98](https://github.com/flykingvip-cloud/openbot-vp/pull/98) squash → main `b6c60550`：稳定身份 / 统一收尾 / 真实入口接线。
+> **W2（消费者与技能/模式统一消费链）开工中**：A skill-quality / mode-quality 从 tip+eligibility 消费；B attempt 正样本仅在 closed+eligible 回填（不删 attempt 观测）；C cancelled 端到端不计能力失败/成长负样本；D evolution-control→recordRunOutcome 旁路 **仅 inventory，本轮不退役**。**未 merge / 未部署 / 未开 W3**。
 
 ## 已核实合入（gh，勿口述）
 
@@ -11,8 +12,9 @@
 | [#89](https://github.com/flykingvip-cloud/openbot-vp/pull/89) | MERGED | `c3a40259e1e6a878e4608133733349eb39a1646d` | `f67c05ad…` | gateway boot hydrate awaiting-delivery |
 | [#94](https://github.com/flykingvip-cloud/openbot-vp/pull/94) | MERGED | `d3cd349a378c2ccfb736807988e0d97c285272ff` | `9006274a…` | attempt 诚实归因 + confirm-no-id       |
 | [#95](https://github.com/flykingvip-cloud/openbot-vp/pull/95) | MERGED | `1f698e378a3d1185b864b8bdcfe78e6d2b78c892` | `bf0f467a…` | W0 调用链基线与入口声明澄清            |
+| [#98](https://github.com/flykingvip-cloud/openbot-vp/pull/98) | MERGED | `b6c60550fddf0e9aabae6c1a99f06622687ba103` | （squash）  | W1 稳定身份 / 统一收尾 / 真实入口接线  |
 
-W1 基于 `origin/main` tip ≡ #95 merge `1f698e37…`。
+W2 基于 `origin/main` tip ≡ #98 merge `b6c60550…`。
 
 ## 新调用链（模块内）
 
@@ -23,6 +25,8 @@ entrypoint adapter 实例方法
   → OutcomeConsumerRuntime.drain (consumerId+eventId)
   → contribution projection + evaluation eligibility
   →（仅 closed + eligible）growth-bridge → appendEvolutionTaskOutcome
+  →（W2）skill-quality / mode-quality handlers（tip+eligibility；cancelled 只进 cancelledCount）
+  →（W2）attempt 正样本回填 confirmPatternOutcomeByRunId / skill task_outcome_confirmed
 ```
 
 生产热路径（**已接线、有调用证据**）：
@@ -33,13 +37,13 @@ entrypoint adapter 实例方法
 
 ## 入口适配器现状（W1 已修 create；接线分层）
 
-| 类                               | 声明的 `entrypoint`            | `openTask` / create 实际写入                           | 生产接线                                                                                                                               |
-| -------------------------------- | ------------------------------ | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `ChatTaskOutcomeAdapter`         | `readonly entrypoint = "chat"` | **`this.entrypoint` / 可选 override**                  | **已接线**：`ensureChatTurnTaskOutcome` ← `agent-runner-execution.ts`；followup → `ensureFollowupTurnTaskOutcome`（chat 身份）         |
-| `CronTaskOutcomeAdapter`         | `"cron"`                       | 父类 `createOrRestore` 读 **`this.entrypoint` → cron** | **已接线**：timer 持久 `currentFireId` → `run.ts` ensureCron；`completeRun` 统一收尾 `recordRunnerTurnOutcome`                                                                 |
+| 类                               | 声明的 `entrypoint`            | `openTask` / create 实际写入                           | 生产接线                                                                                                                                                                                 |
+| -------------------------------- | ------------------------------ | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ChatTaskOutcomeAdapter`         | `readonly entrypoint = "chat"` | **`this.entrypoint` / 可选 override**                  | **已接线**：`ensureChatTurnTaskOutcome` ← `agent-runner-execution.ts`；followup → `ensureFollowupTurnTaskOutcome`（chat 身份）                                                           |
+| `CronTaskOutcomeAdapter`         | `"cron"`                       | 父类 `createOrRestore` 读 **`this.entrypoint` → cron** | **已接线**：timer 持久 `currentFireId` → `run.ts` ensureCron；`completeRun` 统一收尾 `recordRunnerTurnOutcome`                                                                           |
 | `CliTaskOutcomeAdapter`          | `"cli"`                        | 持久 **cli**                                           | **已接线**：`agentCommandInternal`（`commands/agent.ts`）prepare 后 `ensureCliTurnTaskOutcome`；authz_denied + 统一 finally；`cli-gateway-collab-entry-wiring.test.ts` 经 `agentCommand` |
-| `CollabTaskOutcomeAdapter`       | `"collab"`                     | 持久 **collab**                                        | **已接线**：`claim-contract-entry.ts` claim 创建 + apply 收尾；同测经 claim/apply |
-| `GatewayAgentTaskOutcomeAdapter` | `"gateway_agent"`              | 持久 **gateway_agent**                                 | **已接线**：同函数 `governanceEntry===E2` → `ensureGatewayAgentTurnTaskOutcome`；经 `agentCommandFromIngress`；对话热路径仍可走 chat-entry |
+| `CollabTaskOutcomeAdapter`       | `"collab"`                     | 持久 **collab**                                        | **已接线**：`claim-contract-entry.ts` claim 创建 + apply 收尾；同测经 claim/apply                                                                                                        |
+| `GatewayAgentTaskOutcomeAdapter` | `"gateway_agent"`              | 持久 **gateway_agent**                                 | **已接线**：同函数 `governanceEntry===E2` → `ensureGatewayAgentTurnTaskOutcome`；经 `agentCommandFromIngress`；对话热路径仍可走 chat-entry                                               |
 
 ### W1 整改要点（#98，相对 tip `c181be43`）
 
@@ -49,19 +53,18 @@ entrypoint adapter 实例方法
 
 ### 验收矩阵（实现侧自检；独立验收为准）
 
-| 入口 | 创建 | 重试身份 | 前置失败 | 运行结束 | 取消/重放 | 测经真实入口 |
-| ---- | ---- | -------- | -------- | -------- | --------- | ------------ |
-| cron | run.ts ensureCron | currentFireId 持久 | 有 | completeRun | 有 / fire 复用 | cron-fire-id + closeout |
-| followup | runner ensureFollowup | followupItemId | 有 | finally | 同 item 稳定 | identity + closeout |
-| cli | agent.ts ensureCli | tip runId | authz_denied | finally | finally | wiring.test agentCommand |
-| gateway_agent | agent.ts ensureGateway | tip runId | authz_denied | finally | finally | wiring.test FromIngress |
-| collab | claim-contract ensureCollab | group:item:claim | claim 面 | apply | claim 面 | wiring.test claim/apply |
-| chat | 既有 ensureChat | tip | 既有 | 既有 | 既有 | 既有 |
+| 入口          | 创建                        | 重试身份           | 前置失败     | 运行结束    | 取消/重放      | 测经真实入口             |
+| ------------- | --------------------------- | ------------------ | ------------ | ----------- | -------------- | ------------------------ |
+| cron          | run.ts ensureCron           | currentFireId 持久 | 有           | completeRun | 有 / fire 复用 | cron-fire-id + closeout  |
+| followup      | runner ensureFollowup       | followupItemId     | 有           | finally     | 同 item 稳定   | identity + closeout      |
+| cli           | agent.ts ensureCli          | tip runId          | authz_denied | finally     | finally        | wiring.test agentCommand |
+| gateway_agent | agent.ts ensureGateway      | tip runId          | authz_denied | finally     | finally        | wiring.test FromIngress  |
+| collab        | claim-contract ensureCollab | group:item:claim   | claim 面     | apply       | claim 面       | wiring.test claim/apply  |
+| chat          | 既有 ensureChat             | tip                | 既有         | 既有        | 既有           | 既有                     |
 
 **诚实缺口**：`gateway/server-methods/agent.ts` 未改（走 commands/agent）；collab 其它 board RPC 未全覆盖；跨进程 cron 冷启动仍靠 store/hydrate；子 agent lane 跳过。临时热文件 lander 已恢复为模块路径 only（交付树无异 owner 热路径声明）。
 
-**登记（验收未翻盘前）**：入口持久来源修复通过；cron／followup 部分接线通过；W1 全入口与恢复身份未完成。**未 merge / 未部署 / 未开 W2**。
-
+**登记**：W1 已合入 main `b6c60550`；W2 实现中（A–C）；诚实缺口仍含 gateway/server-methods/agent、collab 其它 board RPC、cron 冷启动 hydrate、子 agent lane 跳过。**未 merge W2 / 未部署 / 未开 W3**。D 旁路 inventory：`evolution-control`→`recordRunOutcome`→直写 `appendEvolutionTaskOutcome` 仍在（operational-metrics-store），本轮不退役。
 
 ## 关闭语义（R85b 起；取代过时句）
 
@@ -84,7 +87,7 @@ entrypoint adapter 实例方法
 | `appendEvolutionTaskOutcome`（operational-metrics `recordTaskOutcome` / `recordRunOutcome`） | `operational-metrics-store.ts`           | **待替换 / 旁路**          | 仍可直接记 succeeded；`evolution-control` RPC 仍调 `recordRunOutcome` |
 | `recordToolOutcomes`                                                                         | `operational-metrics-store.ts`           | **合法独立观测**           | 工具计数；非任务成功                                                  |
 | `recordGrowthTaskOutcome` → `recordRunnerTurnOutcome`                                        | `agent-runner-execution.ts`              | **已替换**                 | 热路径已切统一 TaskOutcome                                            |
-| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun`                            | `attempt.ts`                             | **观测；#94 已阻误成功**   | 非任务 tip；正样本回填属 W2                                           |
+| `ingestPatternSampleFromRun` / `recordLifecycleSkillsLoadedOnRun`                            | `attempt.ts`                             | **观测；#94 已阻误成功**   | 非任务 tip；W2 经 consumer `attempt-backfill` 在 closed+eligible 回填 |
 | agent-runner 演化写失败可观测                                                                | `agent-runner-evolution-outcome.test.ts` | **合法独立观测**           | 保留                                                                  |
 
 ## loom / 热文件（W0 登记）
@@ -104,4 +107,5 @@ entrypoint adapter 实例方法
 - Failure：`fail_closed` + `reasonCode`。
 - Entry：`ensureChatTurnTaskOutcome` / `ensureCronTurnTaskOutcome` / `ensureCli|Collab|GatewayAgent|FollowupTurnTaskOutcome`；`recordRunnerTurnOutcome` 强制 taskId（拒 `run:` 发明），可选 `entrypoint` 在 create 时写入。
 - R85：recover tip；handler-independent ack；contribution flags；commandLog；requiredScope；correction 绑 callerSubjectRef；**关闭门闩由契约/调用方解析，非 runner 成功即 not_required**。
-- P1（#94）：见上文 attempt / confirm-no-id；本批不做验收后正样本回填。
+- P1（#94）：见上文 attempt / confirm-no-id。
+- W2：`quality-handlers`（skill/mode）+ `attempt-backfill`；cancelled 投影可证；evolution 旁路仅 inventory。
