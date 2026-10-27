@@ -365,6 +365,9 @@ export const FIELD_LABELS: Record<string, string> = {
   "collaboration.task.claimContractGroupAllowlist": "Collaboration Claim Contract Group Allowlist",
   "collaboration.task.wakeContract": "Collaboration Task Wake Contract",
   "collaboration.task.wakeContractGroupAllowlist": "Collaboration Wake Contract Group Allowlist",
+  "collaboration.task.wakeOpGatewayRecovery": "Collaboration Wake-Op Gateway Recovery",
+  "collaboration.task.wakeOpGatewayRecoveryGroupAllowlist":
+    "Collaboration Wake-Op Gateway Recovery Group Allowlist",
   "collaboration.task.postClaimFanoutWake": "Collaboration Post-Claim Fanout Wake",
   "collaboration.task.postClaimFanoutWakeGroupAllowlist":
     "Collaboration Post-Claim Fanout Wake Group Allowlist",
