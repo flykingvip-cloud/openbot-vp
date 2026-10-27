@@ -15,7 +15,7 @@ let package = Package(
         .executable(name: "openbot-mac", targets: ["OpenBotMacCLI"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/orchetect/MenuBarExtraAccess", exact: "1.3.0"),
+        .package(url: "https://github.com/orchetect/MenuBarExtraAccess", exact: "1.3.1"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.2"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.8.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.1"),
