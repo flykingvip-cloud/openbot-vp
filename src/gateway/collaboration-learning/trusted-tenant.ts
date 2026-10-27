@@ -6,13 +6,21 @@ import { resolveTenantContext } from "../tenant-context.js";
  * Trust levels for "tenant id" surfaces (Mode A / Track D).
  *
  * - membership: gateway `resolveTenantContext` / platform-auth membership only (ACL-safe).
+ * - service_execution: durable background/service principal tenant, minted only at a
+ *   controlled composition root after re-verifying persistent tenant ownership /
+ *   executing bot / authorization basis. ACL-safe for managed team writes; NOT a
+ *   renamed actor_fallback and NOT a fake interactive employee session.
  * - actor_fallback: employee workbench actor hint — collaboration I/O only, NEVER ACL SoT.
  * - none: unresolved; fail closed for authorization paths.
  *
  * Diagnosis uses a separate protocol type `TrustedTenantContext` /
  * `DiagnosisTrustedTenantContext` in `src/diagnosis/types.ts` — do not conflate.
  */
-export type CollaborationTenantTrustLevel = "membership" | "actor_fallback" | "none";
+export type CollaborationTenantTrustLevel =
+  | "membership"
+  | "service_execution"
+  | "actor_fallback"
+  | "none";
 
 export type CollaborationTenantResolution = {
   tenantId: string | null;
@@ -78,13 +86,28 @@ export async function resolveTrustedCollaborationTenantId(
 
 /**
  * Label a non-membership tenant id for collaboration I/O / runtime namespace only.
- * Never returns trust `"membership"` — ACL SoT must call {@link resolveMembershipTenantIdForAcl}.
+ * Never returns trust `"membership"` or `"service_execution"` — ACL SoT must call
+ * {@link resolveMembershipTenantIdForAcl} or mint {@link labelServiceExecutionTenant}
+ * at a controlled composition root.
  */
 export function labelCollaborationIoTenant(
   tenantId: string | null | undefined,
 ): CollaborationTenantResolution {
   const id = tenantId?.trim() || null;
   return { tenantId: id, trust: id ? "actor_fallback" : "none" };
+}
+
+/**
+ * Label a verified background/service-execution tenant for managed ACL.
+ * Call only from gateway composition roots that already re-checked durable
+ * tenant+group ownership and the executing bot — never from client-supplied
+ * tenant params alone, and never as a rename of actor_fallback → membership.
+ */
+export function labelServiceExecutionTenant(
+  tenantId: string | null | undefined,
+): CollaborationTenantResolution {
+  const id = tenantId?.trim() || null;
+  return { tenantId: id, trust: id ? "service_execution" : "none" };
 }
 
 /**
@@ -104,6 +127,9 @@ export function resolveAuthorityTenantForEntry(params: {
     if (trust === "membership") {
       return { tenantId: preferredId, trust: "membership" };
     }
+    if (trust === "service_execution") {
+      return { tenantId: preferredId, trust: "service_execution" };
+    }
     if (trust === "none") {
       return { tenantId: preferredId, trust: "actor_fallback" };
     }
@@ -112,7 +138,11 @@ export function resolveAuthorityTenantForEntry(params: {
   return labelCollaborationIoTenant(params.groupTenantId);
 }
 
-/** Sole ACL-safe trust level. `actor_fallback` / `none` must not authorize managed ACL. */
+/**
+ * ACL-safe trust levels: interactive membership sessions and verified
+ * background service_execution. `actor_fallback` / `none` must not authorize
+ * managed ACL.
+ */
 export function isAclSafeTenantTrust(trust: CollaborationTenantTrustLevel): boolean {
-  return trust === "membership";
+  return trust === "membership" || trust === "service_execution";
 }

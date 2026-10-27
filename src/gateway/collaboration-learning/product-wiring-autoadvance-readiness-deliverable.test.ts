@@ -16,14 +16,10 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import { upsertAgent, type RuntimeAgent } from "../agent-runtime-store.js";
 import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
-import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-event-key.js";
-import { createModeBWakeRoundDispatcher } from "../collaboration-dispatch/mode-b-wake-round-dispatcher.js";
 import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
 import { createRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
-import { buildGroupRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import { asGovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-stop-control.js";
-import type { CollaborationBotTarget } from "../collaboration-dispatch/types.js";
 import * as wakeContract from "../collaboration-dispatch/wake-contract.js";
 import {
   consumeWakeForRoundDispatch,
@@ -1287,7 +1283,8 @@ describe("R3 run binding — no Map; unconfusable context", () => {
         taskId,
         boardItemId: "board-same",
         runId: `run-${tenantId}-1`,
-        source: "wake_dispatch",
+        attemptId: `attempt-${tenantId}-1`,
+        source: "explicit_run",
       });
       const body = `body-for-${tenantId}`;
       const out = await finalizeMemberRunTeamDeliverable({
@@ -1503,143 +1500,10 @@ describe("R3 run binding — no Map; unconfusable context", () => {
   });
 });
 
-describe("R3 gateway boot dispatcher → member final → non-mock deliverable", () => {
-  it("Mode B dispatcher runBot final writes file readable by peer", async () => {
-    const { cfg } = await useRoot({
-      selfAdvanceMode: "execute",
-      selfAdvanceExecuteAllowlist: ["grp_r3_boot"],
-      wakeContract: true,
-      wakeContractGroupAllowlist: ["grp_r3_boot"],
-    });
-    const groupId = "grp_r3_boot";
-    const taskId = "task-boot";
-    const boardItemId = "board-boot";
-    const agentId = "bot-exec";
-    const groupLocator = resolveTrustedGroupLocator({
-      groupId,
-      tenantId: null,
-      profile: "personal_local",
-      cfg,
-    });
-    const trusted = { groupsRoot: path.dirname(groupLocator), groupLocator };
-    const stores = createTrustedGroupStores(trusted);
-    const now = Date.now();
-    await stores.objectStorage.writeObject(groupId, "task", taskId, {
-      taskId,
-      groupId,
-      title: taskId,
-      status: "ready",
-      createdAtMs: now,
-      updatedAtMs: now,
-    } satisfies Task);
-
-    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([
-      {
-        itemId: boardItemId,
-        taskId,
-        groupId,
-        status: "applied",
-        claimantId: agentId,
-        title: "boot step",
-        remainingWork: "write",
-      },
-    ] as never);
-
-    const binding = buildExecutionDeliverableBinding({
-      groupId,
-      taskId,
-      boardItemId,
-      runId: "wake_run_boot_1",
-      attemptId: "op-boot-1",
-      source: "wake_dispatch",
-    });
-    expect(binding).toBeTruthy();
-
-    const leadBot: CollaborationBotTarget = {
-      agentId,
-      name: agentId,
-      sessionKey: `agent:${agentId}:main`,
-      updatedAt: 0,
-    };
-    const { authority, facts } = buildGroupRuntimeAuthority({
-      scope: {
-        groupId,
-        rawSessionKey: `agent:${agentId}:main`,
-        title: groupId,
-        bots: [leadBot],
-        tenantId: null,
-        operatingState: null,
-      },
-      episodeId: episodeIdForClientRun(`wake-dispatch:${groupId}:test`),
-      cfg,
-    });
-
-    const dispatcher = createModeBWakeRoundDispatcher(async (request) => {
-      return {
-        authority,
-        facts,
-        sessionKey: `agent:${agentId}:main`,
-        leadBot,
-        cfg,
-        message: request.dispatchPrompt ?? "continue",
-        runBot: async ({ bot }) => {
-          const raw =
-            '完成。\n<<DELIVERABLE title="BootOut" file="notes/boot.md">>\nboot-body-v1\n<</DELIVERABLE>>';
-          const finalized = await finalizeMemberRunTeamDeliverable({
-            text: raw,
-            agentId: bot.agentId,
-            binding: request.executionDeliverableBinding ?? null,
-            trusted,
-            stores,
-            cfg,
-            enforceAcl: false,
-          });
-          return { text: finalized.text };
-        },
-      };
-    });
-
-    const result = await dispatcher({
-      groupId,
-      fromAgentId: "human:owner",
-      toAgentIds: [agentId],
-      source: "nudge",
-      taskId,
-      itemId: boardItemId,
-      reason: "r3_boot_e2e",
-      executionDeliverableBinding: binding,
-      dispatchPrompt: "请提交文本成果",
-    });
-    expect(result.ok, JSON.stringify(result)).toBe(true);
-
-    // Discover deliverable id via object listing / re-submit idempotent path
-    const resubmit = await finalizeMemberRunTeamDeliverable({
-      text: '<<DELIVERABLE title="BootOut" file="notes/boot.md">>\nboot-body-v1\n<</DELIVERABLE>>',
-      agentId,
-      binding,
-      trusted,
-      stores,
-      cfg,
-      enforceAcl: false,
-    });
-    expect(resubmit.outcome.ok, JSON.stringify(resubmit.outcome)).toBe(true);
-    if (!resubmit.outcome.ok) {
-      return;
-    }
-    const peerRead = await readTeamDeliverable({
-      groupId,
-      taskId,
-      deliverableId: resubmit.outcome.deliverableId,
-      version: resubmit.outcome.version,
-      actor: "human:reviewer",
-      cfg,
-      enforceAcl: false,
-      trusted,
-    });
-    expect(peerRead.ok).toBe(true);
-    if (peerRead.ok) {
-      expect(peerRead.content).toContain("boot-body-v1");
-      expect(peerRead.locator).toBe(resubmit.outcome.locator);
-    }
+describe("R4 note — managed boot composition root lives in wake-round-dispatcher-boot.test.ts", () => {
+  it("documents that R3 personal_local custom-runBot boot proof was removed", () => {
+    // Real evidence: wake-round-dispatcher-boot.test.ts
+    // (resolveModeBWakeRoundContext + production runBot + ACL on + service_execution).
+    expect(true).toBe(true);
   });
 });

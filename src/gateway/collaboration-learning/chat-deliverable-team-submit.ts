@@ -17,7 +17,10 @@ import path from "node:path";
 import type { OpenBotConfig } from "../../config/types.js";
 import { extractDeliverableEnvelope } from "../../shared/preview-artifact/deliverable-envelope.js";
 import type { GatewayClient } from "../server-methods/types.js";
-import type { ExecutionDeliverableBinding } from "./execution-deliverable-binding.js";
+import {
+  normalizeExecutionDeliverableBinding,
+  type ExecutionDeliverableBinding,
+} from "./execution-deliverable-binding.js";
 import { resolveActorDeliverableTaskBinding } from "./resolve-actor-deliverable-task.js";
 import {
   submitTeamDeliverable,
@@ -140,7 +143,8 @@ export function formatTeamDeliverableUserMessage(
 }
 
 /**
- * R3: dispatcher → member run final. Binding stays with the caller for retries.
+ * R3/R4: dispatcher → member run final. Binding stays with the caller for retries.
+ * Re-normalizes the binding and checks tenant/authority scope before submit.
  */
 export async function finalizeMemberRunTeamDeliverable(params: {
   text: string;
@@ -158,14 +162,60 @@ export async function finalizeMemberRunTeamDeliverable(params: {
   if (!params.text.includes("DELIVERABLE")) {
     return { text: params.text, outcome: { ok: false, reason: "no_deliverable_envelope" } };
   }
-  const binding = params.binding;
+  const binding = normalizeExecutionDeliverableBinding(params.binding);
   if (!binding) {
-    const outcome = { ok: false as const, reason: "execution_binding_required" };
+    const outcome = {
+      ok: false as const,
+      reason: params.binding ? "execution_binding_incomplete" : "execution_binding_required",
+    };
     return {
       text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
       outcome,
     };
   }
+
+  const authTenant = compact(params.auth?.tenantId);
+  const labeledTenant = compact(params.tenant?.tenantId);
+  const bindingTenant = compact(binding.tenantId);
+  // When authority / labeled tenant is present, binding must agree (no cross-tenant final).
+  if (authTenant && bindingTenant && authTenant.toLowerCase() !== bindingTenant.toLowerCase()) {
+    const outcome = {
+      ok: false as const,
+      reason: "execution_binding_tenant_mismatch",
+      detail: `binding=${bindingTenant} auth=${authTenant}`,
+    };
+    return {
+      text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+      outcome,
+    };
+  }
+  if (
+    labeledTenant &&
+    bindingTenant &&
+    labeledTenant.toLowerCase() !== bindingTenant.toLowerCase()
+  ) {
+    const outcome = {
+      ok: false as const,
+      reason: "execution_binding_tenant_mismatch",
+      detail: `binding=${bindingTenant} tenant=${labeledTenant}`,
+    };
+    return {
+      text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+      outcome,
+    };
+  }
+  if ((authTenant || labeledTenant) && !bindingTenant) {
+    const outcome = {
+      ok: false as const,
+      reason: "execution_binding_tenant_required",
+      detail: "authorized tenant present but binding.tenantId missing",
+    };
+    return {
+      text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+      outcome,
+    };
+  }
+
   const resolved = await resolveActorDeliverableTaskBinding({
     groupId: binding.groupId,
     actorId: params.agentId,

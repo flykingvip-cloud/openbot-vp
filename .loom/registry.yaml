@@ -10057,6 +10057,9 @@ landingStreams:
       - src/gateway/collaboration-learning/resolve-actor-deliverable-task.ts
       - src/gateway/collaboration-dispatch/mode-b-wake-round-dispatcher.ts
       - src/gateway/wake-round-dispatcher-boot.ts
+      - src/gateway/wake-round-dispatcher-boot.test.ts
+      - src/gateway/collaboration-learning/trusted-tenant.ts
+      - src/gateway/collaboration-learning/trusted-tenant.test.ts
       - .loom/registry.yaml
     canLandWith:
       - collab-p0-wake-dispatch:grok-bot

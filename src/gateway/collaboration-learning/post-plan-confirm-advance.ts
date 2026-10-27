@@ -359,6 +359,8 @@ export async function triggerPostPlanConfirmAdvance(params: {
     }
 
     const runId = `wake_deliverable_${randomUUID()}`;
+    // attemptId is a distinct execution-attempt identity — never reuse opKey.
+    const attemptId = `wake_attempt_${randomUUID()}`;
     const executionDeliverableBinding = buildExecutionDeliverableBinding({
       tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? req.tenantId ?? null,
       groupId,
@@ -368,7 +370,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
       planVersion: confirmedVersion,
       stepId: compact(step.stepId) || bagStepId,
       runId,
-      attemptId: compact(req.opKey) || null,
+      attemptId,
       source: "wake_dispatch",
     });
     if (!executionDeliverableBinding) {

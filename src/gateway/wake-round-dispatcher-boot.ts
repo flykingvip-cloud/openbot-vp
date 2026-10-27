@@ -8,8 +8,10 @@
  *
  * Reuses executeCollaborationRound via Mode B dispatcher — no second orchestrator.
  * runBot uses getReplyFromConfig (same E1 path as heartbeat), not chat.send.
- * R3: when the reply contains DELIVERABLE, formal team submit uses
+ * R3/R4: when the reply contains DELIVERABLE, formal team submit uses
  * request.executionDeliverableBinding (no group+agent Map). Missing binding refuses.
+ * Managed background auth uses service_execution (not actor_fallback / fake membership).
+ * Space lookup is tenantId+groupId; lead bot has no bots[0] fallback.
  */
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
@@ -32,6 +34,7 @@ import {
   type WakeRoundDispatchRequest,
 } from "./collaboration-dispatch/wake-round-dispatch.js";
 import { finalizeMemberRunTeamDeliverable } from "./collaboration-learning/chat-deliverable-team-submit.js";
+import { normalizeExecutionDeliverableBinding } from "./collaboration-learning/execution-deliverable-binding.js";
 import { resolveCollaborationGroupTenantId } from "./collaboration-learning/shared.js";
 import { listGatewayCollaborationSpaces } from "./collaboration-learning/space-store.js";
 import {
@@ -39,9 +42,10 @@ import {
   createTrustedGroupStores,
 } from "./collaboration-learning/team-resource-auth.js";
 import {
-  labelCollaborationIoTenant,
+  labelServiceExecutionTenant,
   type CollaborationTenantResolution,
 } from "./collaboration-learning/trusted-tenant.js";
+import { resolveSecurityProfile } from "./security-profile.js";
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
@@ -84,6 +88,13 @@ export async function resolveModeBWakeRoundContext(
     return null;
   }
 
+  const profile = resolveSecurityProfile(cfg).profile;
+  const requestTenantId = compact(request.tenantId);
+  // Managed background wake must carry a durable tenant; never guess from groupId alone.
+  if (profile === "managed_enterprise" && !requestTenantId) {
+    return null;
+  }
+
   let spaces: Awaited<ReturnType<typeof listGatewayCollaborationSpaces>>;
   try {
     spaces = await listGatewayCollaborationSpaces();
@@ -91,17 +102,45 @@ export async function resolveModeBWakeRoundContext(
     return null;
   }
 
-  const space =
-    spaces.spaces.find(
-      (entry) =>
-        entry.groupId.trim().toLowerCase() === groupId.toLowerCase() ||
-        entry.id
-          .trim()
-          .toLowerCase()
-          .replace(/^space:/, "") === groupId.toLowerCase(),
-    ) ?? null;
-  if (!space) {
+  const groupKey = groupId.toLowerCase();
+  const tenantKey = requestTenantId.toLowerCase();
+  const matches = spaces.spaces.filter((entry) => {
+    const entryGroup = compact(entry.groupId).toLowerCase();
+    const entryId = compact(entry.id)
+      .toLowerCase()
+      .replace(/^space:/, "");
+    const groupMatch = entryGroup === groupKey || entryId === groupKey;
+    if (!groupMatch) {
+      return false;
+    }
+    const entryTenant = compact(entry.tenantId).toLowerCase();
+    if (tenantKey) {
+      // Trusted tenantId + groupId — never accept another tenant's same local groupId.
+      return entryTenant === tenantKey;
+    }
+    // personal_local without request tenant: only spaces that are not tenant-owned.
+    return !entryTenant;
+  });
+  if (matches.length !== 1) {
     return null;
+  }
+  const space = matches[0];
+
+  // Re-verify durable ownership when a tenant was requested (fail closed on mismatch).
+  if (requestTenantId) {
+    const owned = resolveCollaborationGroupTenantId(groupId, requestTenantId);
+    const spaceTenant = compact(space.tenantId);
+    if (owned && owned.toLowerCase() !== requestTenantId.toLowerCase()) {
+      return null;
+    }
+    if (spaceTenant && spaceTenant.toLowerCase() !== requestTenantId.toLowerCase()) {
+      return null;
+    }
+    // When ownership SoT has an active record for a different binding, owned is null
+    // for this pair — refuse rather than fall through to another group.
+    if (!owned && !spaceTenant) {
+      return null;
+    }
   }
 
   const sessionKey = toCollaborationSpaceSessionKey(groupId);
@@ -118,22 +157,37 @@ export async function resolveModeBWakeRoundContext(
       updatedAt: 0,
     }));
 
-  const leadBot =
-    resolveWakeLeadBot({
-      toAgentIds: request.toAgentIds,
-      bots,
-    }) ??
-    bots[0] ??
-    null;
+  // No bots[0] fallback — request target must resolve inside THIS tenant's members.
+  const leadBot = resolveWakeLeadBot({
+    toAgentIds: request.toAgentIds,
+    bots,
+  });
   if (!leadBot) {
     return null;
   }
 
-  const tenantId =
-    compact(request.tenantId) ||
-    compact(space.tenantId) ||
-    resolveCollaborationGroupTenantId(groupId) ||
-    null;
+  const tenantId = requestTenantId || compact(space.tenantId) || null;
+
+  // Background service identity (not interactive membership, not actor_fallback).
+  const serviceTenant: CollaborationTenantResolution = tenantId
+    ? labelServiceExecutionTenant(tenantId)
+    : { tenantId: null, trust: "none" };
+
+  const bindingAtResolve = normalizeExecutionDeliverableBinding(
+    request.executionDeliverableBinding ?? null,
+  );
+  if (request.executionDeliverableBinding && !bindingAtResolve) {
+    // Incomplete production wake binding — refuse context rather than dispatch.
+    return null;
+  }
+  if (bindingAtResolve?.tenantId && tenantId) {
+    if (compact(bindingAtResolve.tenantId).toLowerCase() !== tenantId.toLowerCase()) {
+      return null;
+    }
+  }
+  if (bindingAtResolve && compact(bindingAtResolve.groupId).toLowerCase() !== groupKey) {
+    return null;
+  }
 
   const scope: CollaborationDispatchScope = {
     groupId,
@@ -154,6 +208,7 @@ export async function resolveModeBWakeRoundContext(
     scope,
     episodeId: episodeIdForClientRun(`wake-dispatch:${groupId}:${request.source}`),
     cfg,
+    tenantTrust: serviceTenant.trust,
   });
 
   const message = buildWakeMessage({ request, leadName: leadBot.name });
@@ -184,20 +239,18 @@ export async function resolveModeBWakeRoundContext(
         );
         let text = replyTextFromResult(result);
         if (text && text.includes("DELIVERABLE")) {
-          // Real dispatcher → member final: use request binding only (no Map).
-          const binding = request.executionDeliverableBinding ?? null;
-          let tenant: CollaborationTenantResolution | null = null;
-          if (tenantId) {
-            tenant = labelCollaborationIoTenant(tenantId);
-          }
+          const binding = normalizeExecutionDeliverableBinding(
+            request.executionDeliverableBinding ?? null,
+          );
           let deliverAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null =
             null;
           let deliverStores: ReturnType<typeof createTrustedGroupStores> | null = null;
           try {
+            // Re-verify at composition root with service_execution tenant (ACL on).
             deliverAuth = await authorizeTeamGroupResourceAccess({
               groupId,
               actor: bot.agentId,
-              tenant,
+              tenant: serviceTenant,
               action: "write",
               cfg,
             });
@@ -206,7 +259,6 @@ export async function resolveModeBWakeRoundContext(
                 groupsRoot: deliverAuth.groupsRoot,
                 groupLocator: deliverAuth.groupLocator,
               });
-              // Do not invent trust:"membership" from a bare auth.tenantId.
             }
           } catch {
             deliverAuth = null;
@@ -215,7 +267,7 @@ export async function resolveModeBWakeRoundContext(
             text,
             agentId: bot.agentId,
             binding,
-            tenant,
+            tenant: serviceTenant,
             auth: deliverAuth && deliverAuth.ok ? deliverAuth : null,
             trusted:
               deliverAuth && deliverAuth.ok
@@ -226,6 +278,8 @@ export async function resolveModeBWakeRoundContext(
                 : null,
             stores: deliverStores,
             cfg,
+            // Production boot keeps resource ACL enforced.
+            enforceAcl: true,
           });
           text = finalized.text;
         }
