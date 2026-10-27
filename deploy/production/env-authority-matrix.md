@@ -57,17 +57,17 @@
 
 ## 3. 密钥与商业（按需）
 
-| Primary                                                              | 类别           | 备注                              |
-| -------------------------------------------------------------------- | -------------- | --------------------------------- |
-| `OPENBOT_SMTP_HOST` / `PORT` / `USER` / `PASS` / `FROM` / `STARTTLS` | 邮件           | 平台邮件 / operational identity   |
-| `OPENBOT_SECRET_MASTER_KEY`                                          | 加密           | 密钥派生；勿入库                  |
-| `OPENBOT_ENTERPRISE_DATA_VAULT_KEY`                                  | 企业数据保险库 | 或 `*_KEY_REF`                    |
-| `OPENBOT_ENTERPRISE_DATA_VAULT_KEY_REF`                              | 引用           | 外部密钥引用                      |
-| `OPENBOT_COMMERCE_STRIPE_*` / `OPENBOT_COMMERCE_ALIPAY_*`            | 支付           | 仅启用商务时                      |
-| `OPENBOT_USER_OPERATIONAL_IDENTITY_GITHUB_*`                         | OAuth          | GitHub 运营身份                   |
-| `OPENBOT_USER_OPERATIONAL_IDENTITY_X_TWITTER_*`                       | OAuth          | X（Twitter）个人运营身份；见 `x-twitter-oauth.env.example` |
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` …          | 模型           | **无 OPENBOT 前缀**；沿用厂商惯例 |
-| `TELEGRAM_BOT_TOKEN` / `DISCORD_BOT_TOKEN` / …                       | 通道           | 无 OPENBOT 前缀                   |
+| Primary                                                              | 类别           | 备注                                                       |
+| -------------------------------------------------------------------- | -------------- | ---------------------------------------------------------- |
+| `OPENBOT_SMTP_HOST` / `PORT` / `USER` / `PASS` / `FROM` / `STARTTLS` | 邮件           | 平台邮件 / operational identity                            |
+| `OPENBOT_SECRET_MASTER_KEY`                                          | 加密           | 密钥派生；勿入库                                           |
+| `OPENBOT_ENTERPRISE_DATA_VAULT_KEY`                                  | 企业数据保险库 | 或 `*_KEY_REF`                                             |
+| `OPENBOT_ENTERPRISE_DATA_VAULT_KEY_REF`                              | 引用           | 外部密钥引用                                               |
+| `OPENBOT_COMMERCE_STRIPE_*` / `OPENBOT_COMMERCE_ALIPAY_*`            | 支付           | 仅启用商务时                                               |
+| `OPENBOT_USER_OPERATIONAL_IDENTITY_GITHUB_*`                         | OAuth          | GitHub 运营身份                                            |
+| `OPENBOT_USER_OPERATIONAL_IDENTITY_X_TWITTER_*`                      | OAuth          | X（Twitter）个人运营身份；见 `x-twitter-oauth.env.example` |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` …          | 模型           | **无 OPENBOT 前缀**；沿用厂商惯例                          |
+| `TELEGRAM_BOT_TOKEN` / `DISCORD_BOT_TOKEN` / …                       | 通道           | 无 OPENBOT 前缀                                            |
 
 通道与模型密钥：**Primary = 厂商/生态惯用名**（非 OPENBOT\_），不在此表强制改名。
 

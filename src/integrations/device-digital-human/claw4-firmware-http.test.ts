@@ -94,6 +94,9 @@ async function exchangeGrant(service: DeviceDhService): Promise<{
     undefined,
     "trace-exchange",
   );
+  if (!("authorizationCredential" in exchanged) || !("authorizationRef" in exchanged)) {
+    throw new Error(`authorization exchange incomplete: ${JSON.stringify(exchanged)}`);
+  }
   const credential = String(exchanged.authorizationCredential);
   return {
     authorizationRef: String(exchanged.authorizationRef),

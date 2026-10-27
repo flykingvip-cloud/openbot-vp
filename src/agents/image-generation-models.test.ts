@@ -14,6 +14,9 @@ describe("isImageGenerationModelId", () => {
     expect(isImageGenerationModelId("阶跃星辰/step-image-edit-2")).toBe(true);
     expect(isImageGenerationModelId("openai/gpt-image-1")).toBe(true);
     expect(isImageGenerationModelId("dall-e-3")).toBe(true);
+    expect(isImageGenerationModelId("midjourney")).toBe(true);
+    expect(isImageGenerationModelId("vendor/mj-v6")).toBe(true);
+    expect(isImageGenerationModelId("mj-v7")).toBe(true);
   });
 
   it("rejects chat and vision models that were previously sent to Stepfun", () => {

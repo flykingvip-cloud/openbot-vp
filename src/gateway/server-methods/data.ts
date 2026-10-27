@@ -193,8 +193,25 @@ export const dataHandlers: GatewayRequestHandlers = {
     ) {
       return;
     }
+    const statusView =
+      params.statusView === "tentative" ? ("tentative" as const) : ("active" as const);
     const result = await listAgentMemoryEntries({ cfg: loadConfig(), agentId });
     let atoms: MemoryCenterAtomRow[] = [];
+    let atomList:
+      | {
+          ok: true;
+          statusView: "active" | "tentative";
+          total: number;
+          truncated: boolean;
+          otherViewTotal?: number;
+        }
+      | {
+          ok: false;
+          statusView: "active" | "tentative";
+          code: string;
+          message: string;
+        }
+      | undefined;
     const actor = await resolveEmployeeWorkbenchActor(client).catch(() => null);
     const governance = actor?.tenantId
       ? buildMemorySearchGovernanceFromCallEntry({
@@ -208,29 +225,102 @@ export const dataHandlers: GatewayRequestHandlers = {
       agentId,
       governance,
     });
-    if (manager && "listMemoryCenterAtoms" in manager) {
-      const listAtoms = (
-        manager as {
-          listMemoryCenterAtoms?: (opts?: { limit?: number }) => Promise<MemoryCenterAtomRow[]>;
+    type ReadonlyLister = {
+      listMemoryCenterAtomsReadonly?: (opts?: {
+        statusView?: "active" | "tentative";
+        limit?: number;
+      }) => Promise<
+        | {
+            ok: true;
+            statusView: "active" | "tentative";
+            atoms: MemoryCenterAtomRow[];
+            total: number;
+            truncated: boolean;
+          }
+        | { ok: false; code: string; message: string }
+      >;
+      listMemoryCenterAtoms?: (opts?: { limit?: number }) => Promise<MemoryCenterAtomRow[]>;
+    };
+    const typedManager = manager as ReadonlyLister | null | undefined;
+    const listReadonly = typedManager?.listMemoryCenterAtomsReadonly;
+    if (typeof listReadonly === "function") {
+      try {
+        const listed = await listReadonly({ statusView, limit: 200 });
+        if (listed.ok) {
+          atoms = listed.atoms;
+          let otherViewTotal: number | undefined;
+          // Empty-state branch hint (C1): when current view is empty, probe sibling total readonly.
+          if (listed.total === 0) {
+            const siblingView = statusView === "active" ? "tentative" : "active";
+            const sibling = await listReadonly({
+              statusView: siblingView,
+              limit: 0,
+            });
+            if (sibling.ok) {
+              otherViewTotal = sibling.total;
+            }
+          }
+          atomList = {
+            ok: true,
+            statusView: listed.statusView,
+            total: listed.total,
+            truncated: listed.truncated,
+            ...(typeof otherViewTotal === "number" ? { otherViewTotal } : {}),
+          };
+        } else {
+          // Explicit unbound / store errors — do not fake success empty for Memory Center.
+          atoms = [];
+          atomList = {
+            ok: false,
+            statusView,
+            code: listed.code,
+            message: listed.message,
+          };
         }
-      ).listMemoryCenterAtoms;
-      if (typeof listAtoms === "function") {
+      } catch (err) {
+        atoms = [];
+        atomList = {
+          ok: false,
+          statusView,
+          code: "MEMORY_CENTER_ACCESS_DENIED",
+          message: String(err),
+        };
+      }
+    } else if (typedManager && typeof typedManager.listMemoryCenterAtoms === "function") {
+      // Legacy fallback: active-only path (pre-O4 managers).
+      if (statusView === "active") {
         try {
-          atoms = await listAtoms.call(manager, { limit: 200 });
+          atoms = await typedManager.listMemoryCenterAtoms({ limit: 200 });
+          atomList = {
+            ok: true,
+            statusView: "active",
+            total: atoms.length,
+            truncated: false,
+          };
         } catch {
           atoms = [];
         }
+      } else {
+        atomList = {
+          ok: false,
+          statusView,
+          code: "MEMORY_BACKEND_UNSUPPORTED",
+          message: "candidate statusView requires O4 readonly Memory Center foundation",
+        };
       }
     }
+    const entries = result.entries.map((entry) => ({
+      key: entry.key,
+      label: memoryCenterEntryLabel(entry.key),
+      bytes: entry.bytes,
+      updatedAtMs: entry.updatedAtMs,
+    }));
     respond(true, {
-      entries: result.entries.map((entry) => ({
-        key: entry.key,
-        label: memoryCenterEntryLabel(entry.key),
-        bytes: entry.bytes,
-        updatedAtMs: entry.updatedAtMs,
-      })),
+      entries,
       atoms,
-      viewMode: atoms.length > 0 ? "mixed" : ("files" as const),
+      statusView,
+      ...(atomList ? { atomList } : {}),
+      viewMode: atoms.length > 0 ? (entries.length > 0 ? "mixed" : "atoms") : ("files" as const),
     });
   },
 
@@ -268,6 +358,94 @@ export const dataHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, result);
+  },
+
+  "data.memory.forgetFact": async ({ params, respond, client }) => {
+    if (rejectWhenManaged("data.memory.forgetFact", respond)) {
+      return;
+    }
+    const agentId = typeof params.agentId === "string" ? params.agentId.trim() : "";
+    const atomId = typeof params.atomId === "string" ? params.atomId.trim() : "";
+    const operationIdRaw = typeof params.operationId === "string" ? params.operationId.trim() : "";
+    const operationId = operationIdRaw || `fact-forget:${atomId}:${Date.now().toString(36)}`;
+    if (!agentId || !atomId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "agentId and atomId are required"),
+      );
+      return;
+    }
+    if (
+      !(await assertMemoryCenterAgentAccess({
+        client,
+        agentId,
+        respond,
+        method: "data.memory.forgetFact",
+      }))
+    ) {
+      return;
+    }
+    const actor = await Promise.resolve(resolveEmployeeWorkbenchActor(client)).catch(() => null);
+    const governance = actor?.tenantId
+      ? buildMemorySearchGovernanceFromCallEntry({
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          seatId: actor.currentSeatId,
+        })
+      : undefined;
+    const { manager } = await getMemorySearchManager({
+      cfg: loadConfig(),
+      agentId,
+      governance,
+    });
+    type FactForgetManager = {
+      forgetFact?: (input: {
+        atomId: string;
+        operationId: string;
+        reasonCode?: string;
+      }) => Promise<{
+        ok: boolean;
+        factRef: { atomId: string };
+        sources: Array<Record<string, unknown>>;
+        atomMissing?: boolean;
+        error?: string;
+      }>;
+    };
+    const typed = manager as FactForgetManager | null | undefined;
+    if (!typed || typeof typed.forgetFact !== "function") {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.UNAVAILABLE, "fact-level forget requires cogniweave memory backend"),
+      );
+      return;
+    }
+    try {
+      const result = await typed.forgetFact({
+        atomId,
+        operationId,
+        reasonCode:
+          typeof params.reasonCode === "string" && params.reasonCode.trim()
+            ? params.reasonCode.trim()
+            : "FACT_LEVEL_FORGET",
+      });
+      if (result.atomMissing) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "atom not found"));
+        return;
+      }
+      if (!result.ok) {
+        respond(
+          false,
+          result,
+          errorShape(ErrorCodes.UNAVAILABLE, result.error ?? "forgetFact failed"),
+        );
+        return;
+      }
+      respond(true, result);
+    } catch (err) {
+      respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(err)));
+    }
   },
 
   "data.retention.summary": async ({ params, respond }) => {

@@ -253,6 +253,30 @@ type PromptBuildHookRunner = {
   ) => Promise<PluginHookBeforeAgentStartResult | undefined>;
 };
 
+/**
+ * askOutcome P1: map embedded-run terminal signals to honest skill/pattern attribution.
+ * Unknown (no abort/timeout/prompt error) → skip run-level success; do not invent failure.
+ */
+export function resolveAttemptEndOfRunAttribution(params: {
+  aborted: boolean;
+  timedOut: boolean;
+  promptError: unknown;
+  lastAssistantErrorMessage?: string | null;
+}): {
+  runFailed: boolean;
+  skillOutcome: "failure" | null;
+  patternSuccess: boolean | null;
+} {
+  const runFailed = Boolean(
+    params.aborted || params.timedOut || params.promptError || params.lastAssistantErrorMessage,
+  );
+  return {
+    runFailed,
+    skillOutcome: runFailed ? "failure" : null,
+    patternSuccess: runFailed ? false : null,
+  };
+}
+
 export function isOllamaCompatProvider(model: {
   provider?: string;
   baseUrl?: string;
@@ -3001,9 +3025,17 @@ export async function runEmbeddedAttempt(
 
       // End-of-run fallback: unique-owner / explicit skill only (mid-run uses toolCallId).
       // Per-tool success comes from toolMetas (not lastToolError).
+      // askOutcome P1: run-level success is unproven here — do not invent it.
+      // Known run failure → failure; otherwise outcome/success stay unknown (null).
+      // Still call skill recording so tool attribution is not skipped.
+      const { skillOutcome, patternSuccess } = resolveAttemptEndOfRunAttribution({
+        aborted,
+        timedOut,
+        promptError,
+        lastAssistantErrorMessage: lastAssistant?.errorMessage,
+      });
       if (params.agentId?.trim() && lifecycleSkillNamesLoaded.length > 0) {
-        const outcome =
-          aborted || timedOut || promptError || lastAssistant?.errorMessage ? "failure" : "success";
+        const outcome = skillOutcome;
         const usage = getUsageTotals?.() as { totalDurationMs?: number } | undefined;
         const latencyMs =
           typeof usage?.totalDurationMs === "number" ? usage.totalDurationMs : undefined;
@@ -3035,7 +3067,8 @@ export async function runEmbeddedAttempt(
             runId: params.runId ?? null,
             sessionKey: params.sessionKey ?? null,
             toolsUsed: toolNames,
-            success: !(aborted || timedOut || promptError || lastAssistant?.errorMessage),
+            // null = unknown clue; false = known failure. Never default true.
+            success: patternSuccess,
           });
         } catch {
           // best-effort; never break the run

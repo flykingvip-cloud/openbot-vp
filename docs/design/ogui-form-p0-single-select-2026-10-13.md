@@ -52,14 +52,14 @@ expand `ChatSendParamsSchema`). Same `submission_id` retries must not double-run
 
 ## Surfaces
 
-| Surface | Path |
-| --- | --- |
-| Parse / build | `ui/src/ui/chat/ogui-form.ts` |
-| Renderer | `ui/src/ui/chat/ogui-form-view.ts` |
-| Wiring | `ui/src/ui/chat/grouped-render.ts` (plain markdown path; ``` gate skips delivery) |
-| Skill | `skills/ogui-form/SKILL.md` |
-| C4 presence | `oguiFormUiPresentOnMain() === true` |
-| Projection | unchanged; flag default OFF |
+| Surface       | Path                                                                              |
+| ------------- | --------------------------------------------------------------------------------- |
+| Parse / build | `ui/src/ui/chat/ogui-form.ts`                                                     |
+| Renderer      | `ui/src/ui/chat/ogui-form-view.ts`                                                |
+| Wiring        | `ui/src/ui/chat/grouped-render.ts` (plain markdown path; ``` gate skips delivery) |
+| Skill         | `skills/ogui-form/SKILL.md`                                                       |
+| C4 presence   | `oguiFormUiPresentOnMain() === true`                                              |
+| Projection    | unchanged; flag default OFF                                                       |
 
 ## Behavior
 

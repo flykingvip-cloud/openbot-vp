@@ -70,11 +70,11 @@ Ancestry：`origin/main` 是 candidate 祖先；LIVE 是 candidate 祖先；LIVE
 
 ## 2. Provenance remint plan（不发布）
 
-| 对象                          | 决定                              | 原因                                                                                             |
-| ----------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 58       | **keep / 不改写**                 | 开放行已等于 LIVE。改写会掩盖运行版本。                                                          |
-| `RELEASE_RECORD.md`           | **defer_to_delivery_owner**       | Latest cutover 仍写 seq 54 / `37cc40e51f`。特征分支改写会使审批包看起来已对齐，而 trunk 仍落后。 |
-| `provenance/sha-6d9ea1f2d5da` | **do_not_mint / published=false** | seq 58 注明 cutover 拉取 GHCR `main` 且 `no provenance-sha-*`。事后补 tag 等于伪造发布史。       |
+| 对象                                                                                                             | 决定                              | 原因                                                                                             |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `https://github.com/flykingvip-cloud/harness-Benchmark-Engine/blob/main/deploy/production/releases.jsonl` seq 58 | **keep / 不改写**                 | 开放行已等于 LIVE。改写会掩盖运行版本。                                                          |
+| `RELEASE_RECORD.md`                                                                                              | **defer_to_delivery_owner**       | Latest cutover 仍写 seq 54 / `37cc40e51f`。特征分支改写会使审批包看起来已对齐，而 trunk 仍落后。 |
+| `provenance/sha-6d9ea1f2d5da`                                                                                    | **do_not_mint / published=false** | seq 58 注明 cutover 拉取 GHCR `main` 且 `no provenance-sha-*`。事后补 tag 等于伪造发布史。       |
 
 proposedTag=`provenance/sha-6d9ea1f2d5da`。存在的 tag 仍是 `provenance/sha-37cc40e51f46`。remint plan ≠ 发布 tag。
 

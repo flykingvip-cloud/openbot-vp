@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { CONFIG_DIR } from "../../utils.js";
+import { structureHashFromIo } from "./structure-hash.js";
 import type { IngestPatternSampleInput, PatternCandidate, PatternSample } from "./types.js";
 
 const STORE_DIR = path.join(CONFIG_DIR, "pattern-detection");
@@ -513,3 +514,58 @@ export function resetPatternDetectionStoreForTests(): void {
 }
 
 export { emptyStore as emptyPatternStoreForTests };
+
+/**
+ * W2: confirm unknown (success=null) pattern samples once TaskOutcome tip is closed + eligible.
+ * Never invents success at attempt time; only patches null → judged. Already-judged samples stay.
+ * Also rewrites outputStructureHash so confirmed samples leave the unknown cluster.
+ */
+export function confirmPatternOutcomeByRunId(
+  runId: string,
+  success: boolean,
+  opts?: { taskId?: string | null },
+): PatternSample[] {
+  const id = runId.trim();
+  if (!id) {
+    return [];
+  }
+  const store = readStore();
+  const nextHash = structureHashFromIo(success ? "ok" : "error", "output");
+  const patched: PatternSample[] = [];
+  store.samples = store.samples.map((sample) => {
+    if (sample.runId !== id) {
+      return sample;
+    }
+    if (sample.success !== null) {
+      return sample;
+    }
+    const next: PatternSample = {
+      ...sample,
+      success,
+      outputStructureHash: nextHash,
+      ...(opts?.taskId?.trim() && !sample.taskId ? { taskId: opts.taskId.trim() } : {}),
+    };
+    patched.push(next);
+    return next;
+  });
+  if (patched.length === 0) {
+    return [];
+  }
+  writeSamples(store.samples);
+  let candidates = store.candidates;
+  for (const sample of patched) {
+    const candidate = recomputeCandidateForSample({
+      sample,
+      allSamples: store.samples,
+      existingCandidates: candidates,
+    });
+    if (candidate) {
+      candidates = [
+        ...candidates.filter((entry) => entry.candidateId !== candidate.candidateId),
+        candidate,
+      ];
+    }
+  }
+  writeCandidates(candidates);
+  return patched;
+}

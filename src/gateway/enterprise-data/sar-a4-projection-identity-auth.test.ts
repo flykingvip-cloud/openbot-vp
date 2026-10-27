@@ -13,11 +13,9 @@ import { upsertDataCapability } from "./data-capability-store.js";
 import { upsertDataSource } from "./data-source-store.js";
 import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
 import { upsertEnterpriseKnowledgeProjectionBinding } from "./enterprise-knowledge-projection-binding-store.js";
-import {
-  resolveProjectionExecutionIdentity,
-} from "./knowledge-publication.js";
-import { upsertKnowledgeVisibilityPolicy } from "./knowledge-visibility-policy-store.js";
 import { listKnowledgeFeedItems } from "./knowledge-feed-item-store.js";
+import { resolveProjectionExecutionIdentity } from "./knowledge-publication.js";
+import { upsertKnowledgeVisibilityPolicy } from "./knowledge-visibility-policy-store.js";
 import { runProjectionMaterialization } from "./projection-materializer.js";
 import { upsertEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import { registerRuntimeHandler } from "./runtime-registry.js";
@@ -226,9 +224,7 @@ describe("A4 projection identity + continuous authorization", () => {
       (item) => item.sourceId === "src-a",
     );
     expect(bridge?.userId).toBe(ownerA);
-    expect(
-      findSeatActionGrant(store, tenantId, MATERIALIZER_SEAT_ID, actionRef),
-    ).toBeNull();
+    expect(findSeatActionGrant(store, tenantId, MATERIALIZER_SEAT_ID, actionRef)).toBeNull();
 
     expect(() =>
       resolveProjectionExecutionIdentity({
@@ -437,9 +433,7 @@ describe("A4 projection identity + continuous authorization", () => {
     });
 
     // Creating the projection did not invent a materializer delegation.
-    expect(
-      findSeatActionGrant(store, tenantId, MATERIALIZER_SEAT_ID, actionRef),
-    ).toBeNull();
+    expect(findSeatActionGrant(store, tenantId, MATERIALIZER_SEAT_ID, actionRef)).toBeNull();
     // Admin is not the AccountBinding owner.
     expect(store.accountBindings?.["bind-private"]?.userId).toBe(ownerA);
     expect(store.accountBindings?.["bind-private"]?.userId).not.toBe(adminId);
@@ -571,9 +565,9 @@ describe("A4 projection identity + continuous authorization", () => {
         agentType: "employee-agent",
       },
     });
-    expect(
-      withVisibility.accessible.some((item) => item.projectionId === spec.projectionId),
-    ).toBe(true);
+    expect(withVisibility.accessible.some((item) => item.projectionId === spec.projectionId)).toBe(
+      true,
+    );
 
     // Downstream seat still has no seat-action grant for the website action.
     expect(findSeatActionGrant(store, tenantId, "seat-downstream", actionRef)).toBeNull();

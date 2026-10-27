@@ -17,22 +17,22 @@ C0 answers: **can we export who is claimed / in_progress / submitted / returned 
 
 ## Inventory-first (AS-IS)
 
-| Surface | Status | Note |
-| --- | --- | --- |
-| `board-claims/*.jsonl` | EXISTS (P4b) | Authority for claim facts under `<ns>/board-claims` |
-| `listBoardClaimItems` (library) | EXISTS | No production RPC list/progress yet (C1) |
-| `operatingState.activeContext.currentTaskId` | EXISTS | No per-member progress map |
-| Chat `@` inside assistant text | EXISTS | Does **not** wake peers (C2) |
-| RCIS / Shadow | EXISTS | Must stay observe-only / not rewrite speaker |
+| Surface                                      | Status       | Note                                                |
+| -------------------------------------------- | ------------ | --------------------------------------------------- |
+| `board-claims/*.jsonl`                       | EXISTS (P4b) | Authority for claim facts under `<ns>/board-claims` |
+| `listBoardClaimItems` (library)              | EXISTS       | No production RPC list/progress yet (C1)            |
+| `operatingState.activeContext.currentTaskId` | EXISTS       | No per-member progress map                          |
+| Chat `@` inside assistant text               | EXISTS       | Does **not** wake peers (C2)                        |
+| RCIS / Shadow                                | EXISTS       | Must stay observe-only / not rewrite speaker        |
 
 ## What this PR adds
 
-| Surface | Behavior |
-| --- | --- |
-| `member-progress-export.ts` | Pure read of board-claims (+ optional operating-state) → member progress table |
-| `scripts/collab-member-progress-export.mjs` | CLI for tip soak; prints JSON + text table |
-| Freeze tests | oral≠board fact; RCIS `drivesAdmission===false`; Shadow fuse/cap invariants still importable; export answers member×status |
-| Design doc | This file |
+| Surface                                     | Behavior                                                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `member-progress-export.ts`                 | Pure read of board-claims (+ optional operating-state) → member progress table                                             |
+| `scripts/collab-member-progress-export.mjs` | CLI for tip soak; prints JSON + text table                                                                                 |
+| Freeze tests                                | oral≠board fact; RCIS `drivesAdmission===false`; Shadow fuse/cap invariants still importable; export answers member×status |
+| Design doc                                  | This file                                                                                                                  |
 
 ## Explicit non-goals
 

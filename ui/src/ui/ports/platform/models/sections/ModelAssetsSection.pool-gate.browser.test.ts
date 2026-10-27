@@ -17,7 +17,7 @@ function asset(overrides: Partial<ModelAsset>): ModelAsset {
     source: "configured",
     inputModalities: ["text"],
     outputModalities: ["text"],
-    capabilities: ["code"],
+    capabilities: ["coding"],
     costTier: "unknown",
     health: "healthy",
     healthBasis: "config_inferred",

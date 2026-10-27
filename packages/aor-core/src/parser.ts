@@ -25,11 +25,34 @@ export type LlmClassifier = (
   candidates: TaskTypeId[],
 ) => Promise<TaskTypeId | undefined>;
 
+function hasCjk(text: string): boolean {
+  return /[\u3400-\u9fff]/.test(text);
+}
+
+/**
+ * Tokenize for keyword scoring. ASCII tokens split on non-alnum; CJK runs are
+ * kept as whole tokens so Chinese keywords (e.g. 重构) are not discarded.
+ */
 function tokenize(goal: string): string[] {
-  return goal
-    .toLowerCase()
-    .split(/[^a-z0-9.+#]+/)
-    .filter((token) => token.length > 0);
+  const lower = goal.toLowerCase();
+  const ascii = lower.split(/[^a-z0-9.+#]+/).filter((token) => token.length > 0);
+  const cjk = lower.match(/[\u3400-\u9fff]+/g) ?? [];
+  return [...ascii, ...cjk];
+}
+
+function keywordHits(goalLower: string, tokens: Set<string>, keyword: string): boolean {
+  const key = keyword.toLowerCase();
+  if (!key) {
+    return false;
+  }
+  if (tokens.has(key)) {
+    return true;
+  }
+  // CJK keywords: substring match (tokenizer may merge adjacent chars).
+  if (hasCjk(key) && goalLower.includes(key)) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -50,10 +73,11 @@ export class RuleBasedTaskParser implements TaskParser {
 
     let best: { id: TaskTypeId; hits: number } | undefined;
     let totalHits = 0;
+    const goalLower = goal.toLowerCase();
     for (const def of defs) {
       let hits = 0;
       for (const keyword of def.keywords) {
-        if (tokens.has(keyword.toLowerCase())) {
+        if (keywordHits(goalLower, tokens, keyword)) {
           hits += 1;
         }
       }

@@ -1088,3 +1088,41 @@ export const CollaborationTaskStopParamsSchema = Type.Object(
   },
   { additionalProperties: false },
 );
+
+export type CollaborationTaskWakeOpReleaseForRetryParams = {
+  groupId: string;
+  taskId: string;
+  opKey: string;
+  verificationId: string;
+  detail?: string;
+};
+
+export const CollaborationTaskWakeOpReleaseForRetryParamsSchema = Type.Object(
+  {
+    groupId: NonEmptyString,
+    taskId: NonEmptyString,
+    opKey: NonEmptyString,
+    verificationId: NonEmptyString,
+    detail: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);
+
+export type CollaborationTaskWakeOpConfirmCompletedParams = {
+  groupId: string;
+  taskId: string;
+  opKey: string;
+  roundId: string;
+  detail?: string;
+};
+
+export const CollaborationTaskWakeOpConfirmCompletedParamsSchema = Type.Object(
+  {
+    groupId: NonEmptyString,
+    taskId: NonEmptyString,
+    opKey: NonEmptyString,
+    roundId: NonEmptyString,
+    detail: Type.Optional(Type.String()),
+  },
+  { additionalProperties: false },
+);

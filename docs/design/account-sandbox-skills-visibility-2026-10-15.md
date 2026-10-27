@@ -27,13 +27,13 @@ skills such as cyber-ppt (PptxGenJS) could not run even after a successful read.
 
 ## Implementation
 
-| Layer | Change |
-| --- | --- |
-| Mount plan | `resolveSharedAccountMountDirs` (+ managed∪bundled materialize) shared by `applyAccountSandboxConfig` and `RuntimeController.buildSpec` |
-| Prompt | `resolveSkillsPromptForRun({ accountSandboxLocations: true })` remaps `<location>` to `/account/skills/…` when container workdir is `/account/workspace` |
-| Image (P1) | `Dockerfile.sandbox` installs `nodejs` and `npm` |
-| Prompt / steward | System prompt Skills section + steward behavior rules encode the chain and incubation continuity |
-| Skill ops | `skills/openbot-platform-ops/references/skill-asset-incubation.md` Account sandbox section |
+| Layer            | Change                                                                                                                                                   |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount plan       | `resolveSharedAccountMountDirs` (+ managed∪bundled materialize) shared by `applyAccountSandboxConfig` and `RuntimeController.buildSpec`                  |
+| Prompt           | `resolveSkillsPromptForRun({ accountSandboxLocations: true })` remaps `<location>` to `/account/skills/…` when container workdir is `/account/workspace` |
+| Image (P1)       | `Dockerfile.sandbox` installs `nodejs` and `npm`                                                                                                         |
+| Prompt / steward | System prompt Skills section + steward behavior rules encode the chain and incubation continuity                                                         |
+| Skill ops        | `skills/openbot-platform-ops/references/skill-asset-incubation.md` Account sandbox section                                                               |
 
 ## DIGEST / ops note
 

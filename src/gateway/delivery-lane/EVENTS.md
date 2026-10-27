@@ -2,13 +2,13 @@
 
 ## Board advance
 
-| Event | Suggested stage |
-| ----- | --------------- |
-| `tip.opened` | drafting |
-| `tip.pushed` | implementing |
-| `pr.opened` / `pr.review_requested` | reviewing |
-| `pr.approved` / `pr.checks_green` | accepting |
-| `pr.merged` | merged |
+| Event                               | Suggested stage |
+| ----------------------------------- | --------------- |
+| `tip.opened`                        | drafting        |
+| `tip.pushed`                        | implementing    |
+| `pr.opened` / `pr.review_requested` | reviewing       |
+| `pr.approved` / `pr.checks_green`   | accepting       |
+| `pr.merged`                         | merged          |
 
 API: `lane.event.apply` (flag ON). Stages never regress via events. **Does not** call MergePort.
 

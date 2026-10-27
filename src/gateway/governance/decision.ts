@@ -113,7 +113,14 @@ export type RunGovernanceSnapshot = {
   actorId?: string;
   governanceMode: GovernanceMode;
   decisions: GovernanceDecision[];
-  effectiveModelSet?: { allowlist: string[]; preferredModelOrder?: string[] };
+  effectiveModelSet?: {
+    allowlist: string[];
+    preferredModelOrder?: string[];
+    /** Inherited by child spawn; never hardcode aor_enhanced at spawn. */
+    platformModelsMode?: "native" | "aor_enhanced";
+    /** Inherited selector strategy for child AOR re-rank when mode is aor_enhanced. */
+    selectorStrategy?: "cheapest" | "best_quality" | "balanced" | "bandit";
+  };
   commercialAuthorizationId?: string;
   /**
    * Set only when the parent's commercial gate was acquired and exposed

@@ -10,17 +10,17 @@
 
 在嵌入式 runner 一次 attempt 内，与「最终 prompt / messages」相关的预算面按时间顺序大致为：
 
-| 序 | 组件 | 符号 / 位置 | 作用 | 是否裁剪最终 messages |
-| --- | --- | --- | --- | --- |
-| A | 会话历史截断/配对修复 | `attempt.ts`：`limitHistoryTurns` → `sanitizeToolUseResultPairing`（约 L2060–2080 一带） | 历史窗口与 tool_use/result 配对修复 | 是（transcript 级） |
-| B | Legacy context engine assemble | `LegacyContextEngine.assemble`（`src/context-engine/legacy.ts` L79–104）→ 条件调用 `assembleMessagesWithBudget`（`src/conversations/context-assemble.ts` L135+） | 当 `OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `contextPlannerEnabled` 为真且传入 `tokenBudget` 时，按 `planContextBudget` 分配 history/summary；超预算 **overflow，不静默丢 current input**（`context-budget.ts` L102–152） | 条件是 |
-| C | Context-compiler transform | `installContextCompilerTransform`（`src/agents/context-compiler/install.ts` L33+）挂到 `agent.transformContext`；attempt 在 compiler 开启时安装（`attempt.ts` ~L1731） | `compileModelContext`（`compile.ts` L181+）按 lane budget 消化/剥离/丢弃 recent units，并注入 operating capsule | 是（Pi 循环 transformContext 时） |
-| D | Model-boundary fail-closed | `wrapContextCompilerModelBoundary`（`install.ts` L94+；`attempt.ts` ~L2028） | 若 provider 请求仍带入预编译长 transcript，切片回编译后规模 | 是（streamFn 边界） |
-| E | Outbound estimate guard | `wrapOutboundMessageEstimateGuard`（`install.ts` L137+；attempt 标 outermost） | 规范化 assistant 字符串等内容，避免 pi-ai 估 token 崩溃 | 规范化，非主预算策略 |
-| F | Tool-result context guard | `installToolResultContextGuard`（`tool-result-context-guard.ts`；`attempt.ts` ~L1767） | 就地压缩/截断过大 tool result，使上下文回到预算 | 是（tool result 文本） |
-| G | Active context system prompt（并行面） | `buildActiveContextSystemPrompt`（`context-budget-assembler.ts` L80+）经 `resolveContextBudget`（`resolve-context-budget.ts` L66+） | 按 segment priority 组装 **system prompt 侧** active context；与 message-list 预算分离 | 否（system 段） |
-| H | Gateway context-scope evidence | `resolveContextBudget` / `applyContextBudgetToEvidence`（`src/gateway/context-scope/budget.ts`） | 检索证据文件/token 硬帽 | 否（证据检索） |
-| I | Collab runtime assembly | `assembleCollaborationRuntimeContextParts`（`runtime-context-assembly.ts`；`get-reply-run.ts` ~L1110） | 协作任务 mission/context 注入 | 间接（system/parts） |
+| 序  | 组件                                   | 符号 / 位置                                                                                                                                                            | 作用                                                                                                                                                                                                                      | 是否裁剪最终 messages             |
+| --- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| A   | 会话历史截断/配对修复                  | `attempt.ts`：`limitHistoryTurns` → `sanitizeToolUseResultPairing`（约 L2060–2080 一带）                                                                               | 历史窗口与 tool_use/result 配对修复                                                                                                                                                                                       | 是（transcript 级）               |
+| B   | Legacy context engine assemble         | `LegacyContextEngine.assemble`（`src/context-engine/legacy.ts` L79–104）→ 条件调用 `assembleMessagesWithBudget`（`src/conversations/context-assemble.ts` L135+）       | 当 `OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `contextPlannerEnabled` 为真且传入 `tokenBudget` 时，按 `planContextBudget` 分配 history/summary；超预算 **overflow，不静默丢 current input**（`context-budget.ts` L102–152） | 条件是                            |
+| C   | Context-compiler transform             | `installContextCompilerTransform`（`src/agents/context-compiler/install.ts` L33+）挂到 `agent.transformContext`；attempt 在 compiler 开启时安装（`attempt.ts` ~L1731） | `compileModelContext`（`compile.ts` L181+）按 lane budget 消化/剥离/丢弃 recent units，并注入 operating capsule                                                                                                           | 是（Pi 循环 transformContext 时） |
+| D   | Model-boundary fail-closed             | `wrapContextCompilerModelBoundary`（`install.ts` L94+；`attempt.ts` ~L2028）                                                                                           | 若 provider 请求仍带入预编译长 transcript，切片回编译后规模                                                                                                                                                               | 是（streamFn 边界）               |
+| E   | Outbound estimate guard                | `wrapOutboundMessageEstimateGuard`（`install.ts` L137+；attempt 标 outermost）                                                                                         | 规范化 assistant 字符串等内容，避免 pi-ai 估 token 崩溃                                                                                                                                                                   | 规范化，非主预算策略              |
+| F   | Tool-result context guard              | `installToolResultContextGuard`（`tool-result-context-guard.ts`；`attempt.ts` ~L1767）                                                                                 | 就地压缩/截断过大 tool result，使上下文回到预算                                                                                                                                                                           | 是（tool result 文本）            |
+| G   | Active context system prompt（并行面） | `buildActiveContextSystemPrompt`（`context-budget-assembler.ts` L80+）经 `resolveContextBudget`（`resolve-context-budget.ts` L66+）                                    | 按 segment priority 组装 **system prompt 侧** active context；与 message-list 预算分离                                                                                                                                    | 否（system 段）                   |
+| H   | Gateway context-scope evidence         | `resolveContextBudget` / `applyContextBudgetToEvidence`（`src/gateway/context-scope/budget.ts`）                                                                       | 检索证据文件/token 硬帽                                                                                                                                                                                                   | 否（证据检索）                    |
+| I   | Collab runtime assembly                | `assembleCollaborationRuntimeContextParts`（`runtime-context-assembly.ts`；`get-reply-run.ts` ~L1110）                                                                 | 协作任务 mission/context 注入                                                                                                                                                                                             | 间接（system/parts）              |
 
 **标志默认值（代码）：**
 
@@ -42,11 +42,11 @@
 
 ### CONDITIONAL 双阶段显式交接（推荐过渡形态）
 
-| 阶段 | 所有者 | 允许做 | 禁止做 | 交接产物 |
-| --- | --- | --- | --- | --- |
-| Phase-A 准入 | `LegacyContextEngine.assemble` → `assembleMessagesWithBudget` / `planContextBudget` | 丢最旧 history；保留 summary（预算内）；报告 overflow | 不得丢 mandatory policy / 当前 user turn；不得拆散 tool_use/result 对（依赖上游 repair） | `AssembleWithBudgetResult` + `ContextBudgetTrace` |
-| Phase-B 终裁 | `compileModelContext`（+ model-boundary wrap） | 按 lane 消化 digests、剥离、丢 recent units；注入 capsule（task/memory/evidence） | 不得静默丢「当前轮用户请求」；丢弃须进 `contextDropReasons` 遥测 | `CompileContextResult.messages` + telemetry |
-| 旁路保护 | `installToolResultContextGuard` | 仅压缩 tool result 文本 | 不得删除配对的 tool_use；不得冒充 Phase-B | 就地 mutation + truncation notice |
+| 阶段         | 所有者                                                                              | 允许做                                                                            | 禁止做                                                                                   | 交接产物                                          |
+| ------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Phase-A 准入 | `LegacyContextEngine.assemble` → `assembleMessagesWithBudget` / `planContextBudget` | 丢最旧 history；保留 summary（预算内）；报告 overflow                             | 不得丢 mandatory policy / 当前 user turn；不得拆散 tool_use/result 对（依赖上游 repair） | `AssembleWithBudgetResult` + `ContextBudgetTrace` |
+| Phase-B 终裁 | `compileModelContext`（+ model-boundary wrap）                                      | 按 lane 消化 digests、剥离、丢 recent units；注入 capsule（task/memory/evidence） | 不得静默丢「当前轮用户请求」；丢弃须进 `contextDropReasons` 遥测                         | `CompileContextResult.messages` + telemetry       |
+| 旁路保护     | `installToolResultContextGuard`                                                     | 仅压缩 tool result 文本                                                           | 不得删除配对的 tool_use；不得冒充 Phase-B                                                | 就地 mutation + truncation notice                 |
 
 **单一责任语句（拟写入后续 ADR）：** 任何「最终发往模型的 messages 是否超窗」的争议，以 Phase-B telemetry（`pre/postCompileEstimatedTokens`、`contextDropReasons`、`providerBoundaryMatch`）为准；Phase-A 只解释历史准入，不解释最终 prompt。
 
@@ -54,24 +54,24 @@ System-prompt 侧 `resolveContextBudget`（agents defaults）与 gateway evidenc
 
 ## 3. 永不可静默丢弃清单
 
-| 类别 | 依据 | 行为要求 |
-| --- | --- | --- |
-| 安全 / 系统政策 | `planContextBudget` 将 `mandatory_policy` 计入强制切片；超窗 → overflow（`context-budget.ts` L245–248） | overflow / 阻断 / 重规划；禁止当普通 history 丢掉 |
-| 当前任务与验收 | compiler capsule 的 `task` 候选（`compile.ts` `buildOperatingContextCapsule` / `resolveCandidates`）；WP-01 结果信封对齐后须可追溯 | 预算不够则显式失败或重规划，不得只留闲聊 history |
-| 最近用户纠正 | compiler `noteUserRequest` + `currentTurnPreserved`；assemble「Never drop the latest user turn」（`context-assemble.ts` 文件头） | 丢弃当前用户请求必须 error/refuse emit |
-| 工具 call/result 原子对 | `attempt.ts` 在 limit 后 `sanitizeToolUseResultPairing`；transcriptPolicy | 禁止只留 result 或只留 use；压缩 tool result 时保留配对骨架 |
+| 类别                    | 依据                                                                                                                               | 行为要求                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 安全 / 系统政策         | `planContextBudget` 将 `mandatory_policy` 计入强制切片；超窗 → overflow（`context-budget.ts` L245–248）                            | overflow / 阻断 / 重规划；禁止当普通 history 丢掉           |
+| 当前任务与验收          | compiler capsule 的 `task` 候选（`compile.ts` `buildOperatingContextCapsule` / `resolveCandidates`）；WP-01 结果信封对齐后须可追溯 | 预算不够则显式失败或重规划，不得只留闲聊 history            |
+| 最近用户纠正            | compiler `noteUserRequest` + `currentTurnPreserved`；assemble「Never drop the latest user turn」（`context-assemble.ts` 文件头）   | 丢弃当前用户请求必须 error/refuse emit                      |
+| 工具 call/result 原子对 | `attempt.ts` 在 limit 后 `sanitizeToolUseResultPairing`；transcriptPolicy                                                          | 禁止只留 result 或只留 use；压缩 tool result 时保留配对骨架 |
 
 ## 4. 精确接管路径表（仅提议；本轮 docs-only 通常无需 runtime takeover）
 
-| 路径 | 当前触达 | 本轮是否改代码 | 若后续实施谁 land | 备注 |
-| --- | --- | --- | --- | --- |
-| `.kiro/specs/delivery-reliability-evidence-program/wp03/**` | 本审计 | 写文档 | grokbot-verifiable-delivery | 无需 loom runtime 路径 |
-| `src/agents/context-compiler/**` | 终裁实现 | **不改** | 待协调（常有宽泛 `src/**` 宣称） | G2-C 实施前 verify-then-take |
-| `src/conversations/context-budget.ts` / `context-assemble.ts` | Phase-A | **不改** | 同上 | |
-| `src/context-engine/legacy.ts` | assemble 开关 | **不改** | 同上 | |
-| `src/agents/pi-embedded-runner/run/attempt.ts` | 安装顺序 | **不改** | 多任务热点；禁止整片接管 | 仅在交接 ADR 批准后最小接线 |
-| `src/auto-reply/reply/context-budget-assembler.ts` | system 段 | **不改** | | 非最终 message owner |
-| `src/gateway/context-scope/**` | 证据帽 | **不改** | | 非最终 message owner |
+| 路径                                                          | 当前触达      | 本轮是否改代码 | 若后续实施谁 land                | 备注                         |
+| ------------------------------------------------------------- | ------------- | -------------- | -------------------------------- | ---------------------------- |
+| `.kiro/specs/delivery-reliability-evidence-program/wp03/**`   | 本审计        | 写文档         | grokbot-verifiable-delivery      | 无需 loom runtime 路径       |
+| `src/agents/context-compiler/**`                              | 终裁实现      | **不改**       | 待协调（常有宽泛 `src/**` 宣称） | G2-C 实施前 verify-then-take |
+| `src/conversations/context-budget.ts` / `context-assemble.ts` | Phase-A       | **不改**       | 同上                             |                              |
+| `src/context-engine/legacy.ts`                                | assemble 开关 | **不改**       | 同上                             |                              |
+| `src/agents/pi-embedded-runner/run/attempt.ts`                | 安装顺序      | **不改**       | 多任务热点；禁止整片接管         | 仅在交接 ADR 批准后最小接线  |
+| `src/auto-reply/reply/context-budget-assembler.ts`            | system 段     | **不改**       |                                  | 非最终 message owner         |
+| `src/gateway/context-scope/**`                                | 证据帽        | **不改**       |                                  | 非最终 message owner         |
 
 ## 5. 固定回放集大纲（仅命名；无假指标）
 

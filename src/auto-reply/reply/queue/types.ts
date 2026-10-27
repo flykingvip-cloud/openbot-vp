@@ -28,6 +28,17 @@ export type FollowupRun = {
   summaryLine?: string;
   enqueuedAt: number;
   /**
+   * askOutcome W1: stable queue-item identity allocated at enqueue.
+   * TaskOutcome taskId is derived from this; replaying the same queue item
+   * must not mint an unrelated task. Distinct from agent runId (correlation).
+   */
+  followupItemId?: string;
+  /**
+   * askOutcome W1: optional parent TaskOutcome taskId when this followup is
+   * an independent child of a prior user/chat/collab task.
+   */
+  parentTaskId?: string;
+  /**
    * Originating channel for reply routing.
    * When set, replies should be routed back to this provider
    * instead of using the session's lastChannel.

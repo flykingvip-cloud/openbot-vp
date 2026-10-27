@@ -49,9 +49,9 @@ describe("OPENBOT_SURFACE port selection", () => {
   });
 
   it("refuses a cut port list on the full surface", () => {
-    expect(() =>
-      assertP1BundlesFullPorts("full", ["employee", "enterprise", "diagnosis"]),
-    ).toThrow(/platform/);
+    expect(() => assertP1BundlesFullPorts("full", ["employee", "enterprise", "diagnosis"])).toThrow(
+      /platform/,
+    );
   });
 
   it("documents full as the only shipping surface", () => {

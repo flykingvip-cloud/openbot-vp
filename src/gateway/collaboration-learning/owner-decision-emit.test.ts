@@ -149,7 +149,7 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
     expect(again.ok).toBe(true);
     if (again.ok) {
       expect(again.skipped).toBe(true);
-      expect(again.reason).toBe("idempotent_exists");
+      expect(again).toMatchObject({ ok: false, reason: "idempotent_exists" });
     }
     const replayed = await fs.readFile(transcriptPath, "utf8");
     const idempotencyKey = result.delivery.idempotencyKey ?? "";
@@ -189,7 +189,7 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.skipped).toBe(true);
-      expect(result.reason).toBe("no_active_confirmer");
+      expect(result).toMatchObject({ ok: false, reason: "no_active_confirmer" });
     }
     expect(result.delivery).toMatchObject({
       ok: true,

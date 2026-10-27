@@ -30,12 +30,12 @@ metadata:
 
 与 `renderWechatOfficialForm` 一致：
 
-| UI 标签 | 写入 | 必填 |
-|---------|------|------|
-| 显示名称 | displayName | 是（用后台昵称，勿只留「微信公众号」） |
-| AppID | appId（`wx` 开头） | 是 |
-| AppSecret | appSecret → secret store | 是 |
-| 出口 IP | **不进** OI 配置项；抄工作台 egress IP 写入微信 IP 白名单 | 微信侧 |
+| UI 标签   | 写入                                                      | 必填                                   |
+| --------- | --------------------------------------------------------- | -------------------------------------- |
+| 显示名称  | displayName                                               | 是（用后台昵称，勿只留「微信公众号」） |
+| AppID     | appId（`wx` 开头）                                        | 是                                     |
+| AppSecret | appSecret → secret store                                  | 是                                     |
+| 出口 IP   | **不进** OI 配置项；抄工作台 egress IP 写入微信 IP 白名单 | 微信侧                                 |
 
 **不要**创建或向用户要 Token。`access_token` 是换票结果，不是配置项。
 

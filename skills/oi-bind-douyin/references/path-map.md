@@ -14,20 +14,20 @@ S6（2026-10-19 Asia/Shanghai）取证记录见 [live-evidence.md](live-evidence
 
 ## 公开入口
 
-| 名称 | URL | 来源级别 |
-|------|-----|----------|
+| 名称                         | URL                                  | 来源级别    |
+| ---------------------------- | ------------------------------------ | ----------- |
 | 抖音开放平台（公开文档入口） | `https://developer.open-douyin.com/` | public_docs |
-| 抖音开放平台（历史入口） | `https://open.douyin.com/` | public_docs |
+| 抖音开放平台（历史入口）     | `https://open.douyin.com/`           | public_docs |
 
 ## 人机步骤（未验证）
 
-| 步骤 | 状态 |
-|------|------|
-| 登录开发者/创作者后台 | UNKNOWN |
-| 创建应用 / 开通权限 | UNKNOWN |
-| 取得 Access Token / Cookie / 密钥 | UNKNOWN |
-| 复制账号标识（抖音号） | UNKNOWN |
-| 回到 OpenBot「添加并认证」提交 | 产品内路径已知；取证面仍 unstable |
+| 步骤                              | 状态                              |
+| --------------------------------- | --------------------------------- |
+| 登录开发者/创作者后台             | UNKNOWN                           |
+| 创建应用 / 开通权限               | UNKNOWN                           |
+| 取得 Access Token / Cookie / 密钥 | UNKNOWN                           |
+| 复制账号标识（抖音号）            | UNKNOWN                           |
+| 回到 OpenBot「添加并认证」提交    | 产品内路径已知；取证面仍 unstable |
 
 ## 大白策略
 

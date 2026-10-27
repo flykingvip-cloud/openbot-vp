@@ -37,6 +37,8 @@ export interface ModelProfile {
   taskTypeScores: Record<TaskTypeId, number>;
   /** Defaults to true; set false to exclude (auth/availability). */
   available?: boolean;
+  /** Optional context window (tokens); used by callers for executable-set filters. */
+  contextWindow?: number;
 }
 
 /** Constraints attached to a task by the developer. */

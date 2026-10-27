@@ -5,6 +5,7 @@ import {
   OGUI_DECISION_MUTATOR_NAME,
   classifyOguiAnswerDecisionFields,
   evaluateOguiAnswerLifecycle,
+  type OguiAnswerDecisionFields,
   isOguiDecisionLifecycleEnabled,
   isOguiDecisionLifecycleEnabledFor,
   planOguiDecisionMutation,
@@ -214,7 +215,7 @@ describe("ogui-answer lifecycle fields", () => {
     expect(classifyOguiAnswerDecisionFields({})).toEqual({ kind: "legacy" });
     expect(
       evaluateOguiAnswerLifecycle({
-        answer: { submission_id: "sub-1" },
+        answer: { submission_id: "sub-1" } as unknown as OguiAnswerDecisionFields,
         lifecycleEnabled: false,
       }),
     ).toEqual({ path: "legacy", ok: true });
@@ -307,7 +308,7 @@ describe("ogui-answer lifecycle fields", () => {
   it("rejects identity fields carried on the answer", () => {
     expect(
       evaluateOguiAnswerLifecycle({
-        answer: { userId: "spoofed" },
+        answer: { userId: "spoofed" } as unknown as OguiAnswerDecisionFields,
         lifecycleEnabled: false,
       }),
     ).toMatchObject({ ok: false, reason: "untrusted_identity", fallbackToPlainChat: false });

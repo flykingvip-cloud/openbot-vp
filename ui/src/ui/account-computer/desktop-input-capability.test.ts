@@ -71,9 +71,7 @@ describe("DESKTOP_INPUT_CAPABILITY_M1", () => {
 
   it("blocks keyboard/pointer/clipboard before INTERACTIVE (streamUrl / first frame)", () => {
     for (const phase of ["STREAM_ATTACHED", "FIRST_FRAME", "CONNECTING", "OPENING"] as const) {
-      const cap = resolveDesktopInputCapability(
-        gate({ phase, clipboardPermission: "granted" }),
-      );
+      const cap = resolveDesktopInputCapability(gate({ phase, clipboardPermission: "granted" }));
       expect(cap.keyboard, phase).toBe(false);
       expect(cap.pointer, phase).toBe(false);
       expect(cap.fullscreen, phase).toBe(true);
@@ -116,10 +114,9 @@ describe("DESKTOP_INPUT_CAPABILITY_M1", () => {
     ] as const) {
       expect(shouldForwardPointer(gate({ phase })), phase).toBe(false);
       expect(shouldForwardKeyboard(gate({ phase })), phase).toBe(false);
-      expect(
-        shouldForwardClipboard(gate({ phase, clipboardPermission: "granted" })),
-        phase,
-      ).toBe(false);
+      expect(shouldForwardClipboard(gate({ phase, clipboardPermission: "granted" })), phase).toBe(
+        false,
+      );
     }
   });
 

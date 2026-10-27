@@ -6,13 +6,13 @@
 
 ## What this ships
 
-| Item | Behavior |
-| --- | --- |
-| `collaboration.task.claimContractGroupAllowlist` | Gray enable: listed `groupId` or `tenantId/groupId` may write board facts while global flag stays false |
-| Board template fields | Optional `goal` / `constraints` / `dueAtMs` / `suggestedRole` on publish (+ RPC schema) |
-| Intent materialize | `buildBoardPublishDraftFromIntent` / `materializeIntentToBoardItem` / entry `materializeCollaborationIntentToBoard` — default **needs human confirm** before publish |
-| Progress read | Existing `listBoardItems` / `getMemberProgress` unchanged (readable even when writes off) |
-| `oralDispatchCreatesBoardFact()` | Still always `false` |
+| Item                                             | Behavior                                                                                                                                                             |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `collaboration.task.claimContractGroupAllowlist` | Gray enable: listed `groupId` or `tenantId/groupId` may write board facts while global flag stays false                                                              |
+| Board template fields                            | Optional `goal` / `constraints` / `dueAtMs` / `suggestedRole` on publish (+ RPC schema)                                                                              |
+| Intent materialize                               | `buildBoardPublishDraftFromIntent` / `materializeIntentToBoardItem` / entry `materializeCollaborationIntentToBoard` — default **needs human confirm** before publish |
+| Progress read                                    | Existing `listBoardItems` / `getMemberProgress` unchanged (readable even when writes off)                                                                            |
+| `oralDispatchCreatesBoardFact()`                 | Still always `false`                                                                                                                                                 |
 
 Sample gray group: `grp-daniel-hhd-gmail-com-upbeyond`（数字人战队）.
 

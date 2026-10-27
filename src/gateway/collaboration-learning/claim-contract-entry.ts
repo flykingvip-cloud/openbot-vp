@@ -7,8 +7,14 @@
  * Floor live / multi-beat / RCIS / tip-prompt rules. Does not grant bots L3 task.assign.
  */
 import type { Task } from "@openbot/collaboration-core";
+import { resolveDefaultAgentId } from "../../agents/agent-scope.js";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { ensureCollabTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import {
+  recordRunnerTurnOutcome,
+  type RunnerTurnFailureReason,
+} from "../../task-outcome/runtime-from-runner.js";
 import {
   listChallengeWindows,
   openChallengeWindow,
@@ -81,11 +87,17 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
+import { applyBusinessTaskPatchUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   asGovernedTask,
   nextGovernedTaskFields,
-  type GovernedTask,
+  seedTaskResponsibility,
 } from "../collaboration-dispatch/task-runtime.js";
+import {
+  assertTaskNotStopped,
+  isTaskStopAccepted,
+} from "../collaboration-dispatch/task-stop-control.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
   confirmationConsumedDelivery,
@@ -384,6 +396,68 @@ export async function publishCollaborationBoardItem(
   );
 }
 
+/** askOutcome W1: stable collab tip identity for one board claim (group+item+claimant). */
+function collabClaimOutcomeIdentity(params: {
+  groupId: string;
+  boardItemId: string;
+  claimId: string;
+  subjectRef: string;
+  tenantId?: string;
+}) {
+  return {
+    groupId: params.groupId,
+    boardItemId: params.boardItemId,
+    claimId: params.claimId,
+    subjectRef: params.subjectRef,
+    ...(params.tenantId ? { tenantId: params.tenantId } : {}),
+  };
+}
+
+async function recordCollabClaimTurnOutcome(params: {
+  cfg: OpenBotConfig;
+  groupId: string;
+  boardItemId: string;
+  claimId: string;
+  subjectRef: string;
+  tenantId?: string;
+  runId: string;
+  success: boolean;
+  failureReason?: RunnerTurnFailureReason;
+  failureDetail?: string;
+}): Promise<void> {
+  const agentId = resolveDefaultAgentId(params.cfg);
+  const opened = ensureCollabTurnTaskOutcome(params.cfg, {
+    agentId,
+    ...collabClaimOutcomeIdentity({
+      groupId: params.groupId,
+      boardItemId: params.boardItemId,
+      claimId: params.claimId,
+      subjectRef: params.subjectRef,
+      tenantId: params.tenantId,
+    }),
+  });
+  if (!opened.ok) {
+    return;
+  }
+  try {
+    await recordRunnerTurnOutcome(params.cfg, agentId, {
+      success: params.success,
+      runId: params.runId,
+      taskId: opened.taskId,
+      scope: opened.scope,
+      entrypoint: "collab",
+      ...(params.success
+        ? {}
+        : {
+            failureReason: params.failureReason ?? ("run_failed" as const),
+            ...(params.failureDetail ? { failureDetail: params.failureDetail } : {}),
+          }),
+    });
+  } catch {
+    // Best-effort: board mutation already committed; tip write must not roll it back.
+  }
+}
+
 export type ClaimCollaborationBoardItemParams = {
   groupId: string;
   taskId: string;
@@ -414,18 +488,48 @@ export async function claimCollaborationBoardItem(
   if (!claimantId) {
     throw new ClaimContractEntryError("claimant_required", "claimantId / actor is required");
   }
-  return unwrap(
-    await claimBoardItem(
-      authority,
-      {
-        taskId: params.taskId,
-        itemId: params.itemId,
-        claimantId,
-      },
-      { cfg },
-    ),
-    "claimBoardItem",
-  );
+  const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
+  const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;
+  const tipRunId = `collab-claim:${params.groupId}:${params.itemId}:${claimantId}`;
+  try {
+    const item = unwrap(
+      await claimBoardItem(
+        authority,
+        {
+          taskId: params.taskId,
+          itemId: params.itemId,
+          claimantId,
+        },
+        { cfg },
+      ),
+      "claimBoardItem",
+    );
+    // Create/restore tip at real claim entry; leave awaiting_acceptance until accept path.
+    const agentId = resolveDefaultAgentId(cfg);
+    ensureCollabTurnTaskOutcome(cfg, {
+      agentId,
+      groupId: params.groupId,
+      boardItemId: params.itemId,
+      claimId: claimantId,
+      subjectRef,
+      ...(tenantId ? { tenantId } : {}),
+    });
+    return item;
+  } catch (err) {
+    await recordCollabClaimTurnOutcome({
+      cfg,
+      groupId: params.groupId,
+      boardItemId: params.itemId,
+      claimId: claimantId,
+      subjectRef,
+      tenantId,
+      runId: tipRunId,
+      success: false,
+      failureReason: err instanceof ClaimContractFlagOffError ? "authz_denied" : "run_failed",
+      failureDetail: String(err),
+    });
+    throw err;
+  }
 }
 
 export type ApplyCollaborationBoardClaimParams = {
@@ -435,23 +539,44 @@ export type ApplyCollaborationBoardClaimParams = {
   actor?: string;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
+  /** Test-only: after outside read, before control-lock write. */
+  _testAfterTaskReadBarrier?: () => Promise<void>;
+  /**
+   * Test-only: after board applyClaim succeeds (status=applied) and before the
+   * task patch is returned — simulates board durable / task write failure.
+   */
+  _testAfterBoardAppliedBeforeTaskPatch?: () => Promise<void>;
 };
 
 /**
  * Applies a claimed board item: adds claimant to assignedMemberIds, seeds
  * responsibility via task-runtime, persists Task, syncs operatingState
  * (currentTaskId from active task selection).
+ *
+ * T45: board applyClaim runs **under** the task control lock after the live
+ * stop check, so stop cannot land between board-applied and task patch.
+ * If board is already applied (retry / prior partial), task side is repaired
+ * idempotently without re-mutating the board row.
  */
+
+function requireAppliedBoardItem(item: GroupBoardClaimItem | null): GroupBoardClaimItem {
+  if (!item) {
+    throw new ClaimContractEntryError(
+      "apply_incomplete",
+      "board claim apply finished without an item result",
+    );
+  }
+  return item;
+}
+
 export async function applyCollaborationBoardClaim(
   params: ApplyCollaborationBoardClaimParams,
-): Promise<{ task: Task; item: GroupBoardClaimItem }> {
+): Promise<{ task: GovernedTask; item: GroupBoardClaimItem }> {
   const cfg = params.cfg ?? loadConfig();
   requireFlag(cfg, params.groupId, tenantIdForClaimFlag(params.groupId, params.tenant));
-  await assertPersistedTaskNotStopped({
-    groupId: params.groupId,
-    taskId: params.taskId,
-    cfg,
-  });
+  // T45: stop / partial_success classification runs under the control lock below.
+  // An early assertPersistedTaskNotStopped would collapse "board already applied +
+  // task stopped" into generic TaskStoppedError and hide the recoverable signal.
   const { authority, stores, operatingState } = await buildClaimAuthority({
     groupId: params.groupId,
     taskId: params.taskId,
@@ -466,32 +591,137 @@ export async function applyCollaborationBoardClaim(
   if (!current) {
     throw new ClaimContractEntryError("task_not_found", `task not found: ${params.taskId}`);
   }
-  const governed = asGovernedTask(current);
-  const applied = unwrap(
-    await applyClaim(
-      authority,
-      { taskId: params.taskId, itemId: params.itemId },
-      governed,
-      authority.policy.effective,
-      { cfg, memberRoleMap: operatingState?.memberRoleMap ?? null },
-    ),
-    "applyClaim",
-  );
-  const governanceFields = nextGovernedTaskFields({
-    task: governed,
-    liveStatus: current.status,
-    responsibility: applied.responsibility,
-    handoffs: governed.handoffs ?? [],
+  if (params._testAfterTaskReadBarrier) {
+    await params._testAfterTaskReadBarrier();
+  }
+  let resultItem: GroupBoardClaimItem | null = null;
+  const updated = await applyBusinessTaskPatchUnderControlLock({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    // Custom stop handling so board-already-applied + stopped is identifiable.
+    refuseIfStopped: false,
+    buildPatch: async (live) => {
+      const now = Date.now();
+      const liveGoverned = asGovernedTask(live);
+      const existing = await loadBoardClaimItem(authority, {
+        taskId: params.taskId,
+        itemId: params.itemId,
+      });
+      if (isTaskStopAccepted(liveGoverned)) {
+        if (existing?.status === "applied") {
+          throw new ClaimContractEntryError(
+            "partial_success_board_applied_task_stopped",
+            `board item ${params.itemId} is applied but task ${params.taskId} is stopped; responsibility not repaired`,
+          );
+        }
+        assertTaskNotStopped(liveGoverned);
+      }
+
+      let assignedMemberIds: string[];
+      let responsibility: NonNullable<typeof liveGoverned.responsibility>;
+      let item: GroupBoardClaimItem;
+
+      if (existing?.status === "applied") {
+        // Idempotent recovery: board durable. Repair task projection only when the
+        // claim is still the legitimate assignee — never re-grant after a later
+        // handoff removed the claimant, and never re-seed over a newer responsibility.
+        const claimantId = (existing.claimantId ?? "").trim();
+        if (!claimantId) {
+          throw new ClaimContractEntryError(
+            "claimant_missing",
+            "applied board item has no claimantId",
+          );
+        }
+        const assigned = (liveGoverned.assignedMemberIds ?? [])
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const executors = (liveGoverned.responsibility?.executors ?? []).map((s) => s.trim());
+        const alreadyProjected = assigned.includes(claimantId) || executors.includes(claimantId);
+        // T48: only history after THIS board apply's baseline can supersede the claim.
+        // Arbitrary older h.from===claimantId must not block a legitimate new applied repair.
+        const handoffs = liveGoverned.handoffs ?? [];
+        const baseLen = existing.applyBaseHistoryLen;
+        const subsequent =
+          typeof baseLen === "number" && baseLen >= 0 ? handoffs.slice(baseLen) : handoffs;
+        const handedOffAway = subsequent.some((h) => (h.from ?? "").trim() === claimantId);
+        if (!alreadyProjected && handedOffAway) {
+          throw new ClaimContractEntryError(
+            "stale_applied_claim_superseded",
+            `board item ${params.itemId} is applied for ${claimantId}, but a later handoff moved responsibility away; refusing to re-grant`,
+          );
+        }
+        if (alreadyProjected) {
+          // Task already reflects claimant — keep live responsibility (do not re-seed).
+          assignedMemberIds = assigned;
+          responsibility =
+            liveGoverned.responsibility ??
+            seedTaskResponsibility({
+              task: liveGoverned,
+              effective: authority.policy.effective,
+              actor: claimantId,
+              nominatedOwnerId: (liveGoverned.ownerMemberId ?? "").trim() || undefined,
+              memberRoleMap: operatingState?.memberRoleMap ?? undefined,
+            });
+          item = existing;
+        } else {
+          // Partial success repair: board applied, task never projected claimant.
+          const merged = Array.from(new Set([...assigned, claimantId]));
+          const baseResp =
+            liveGoverned.responsibility ??
+            seedTaskResponsibility({
+              task: { ...liveGoverned, assignedMemberIds: merged },
+              effective: authority.policy.effective,
+              actor: claimantId,
+              nominatedOwnerId: (liveGoverned.ownerMemberId ?? "").trim() || undefined,
+              memberRoleMap: operatingState?.memberRoleMap ?? undefined,
+            });
+          responsibility = {
+            ...baseResp,
+            executors: Array.from(
+              new Set([...(baseResp.executors ?? []).map((s) => s.trim()), claimantId]),
+            ).filter(Boolean),
+          };
+          assignedMemberIds = merged;
+          item = existing;
+        }
+      } else {
+        const applied = unwrap(
+          await applyClaim(
+            authority,
+            { taskId: params.taskId, itemId: params.itemId },
+            liveGoverned,
+            authority.policy.effective,
+            { cfg, memberRoleMap: operatingState?.memberRoleMap ?? null },
+          ),
+          "applyClaim",
+        );
+        if (params._testAfterBoardAppliedBeforeTaskPatch) {
+          await params._testAfterBoardAppliedBeforeTaskPatch();
+        }
+        assignedMemberIds = applied.assignedMemberIds;
+        responsibility = applied.responsibility;
+        item = applied.item;
+      }
+      resultItem = item;
+
+      const governanceFields = nextGovernedTaskFields({
+        task: liveGoverned,
+        liveStatus: live.status,
+        responsibility,
+        handoffs: liveGoverned.handoffs ?? [],
+      });
+      return {
+        ...governanceFields,
+        assignedMemberIds,
+        updatedBy: params.actor ?? item.claimantId ?? live.updatedBy,
+        updatedAtMs: now,
+      };
+    },
   });
-  const now = Date.now();
-  const updated: GovernedTask = {
-    ...current,
-    ...governanceFields,
-    assignedMemberIds: applied.assignedMemberIds,
-    updatedBy: params.actor ?? applied.item.claimantId ?? current.updatedBy,
-    updatedAtMs: now,
-  };
-  await stores.objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
+  // resultItem is assigned inside buildPatch (callback); use a typed guard so TS
+  // does not treat the outer binding as still-null / never after the throw.
+  const appliedItem = requireAppliedBoardItem(resultItem);
   await syncGroupOperatingState({
     fileStore: stores.fileStore,
     groupStorage: stores.groupStorage,
@@ -501,7 +731,21 @@ export async function applyCollaborationBoardClaim(
     objectStorage: stores.objectStorage,
     groupId: params.groupId,
   });
-  return { task: updated, item: applied.item };
+  const claimantId = appliedItem.claimantId?.trim() || params.actor?.trim() || "collab-claimant";
+  const subjectRef = claimantId.includes(":") ? claimantId : `subject:${claimantId}`;
+  const tenantId = tenantIdForClaimFlag(params.groupId, params.tenant) ?? undefined;
+  // Restore same claim tip; record apply as run-end without inventing acceptance/delivery.
+  await recordCollabClaimTurnOutcome({
+    cfg,
+    groupId: params.groupId,
+    boardItemId: params.itemId,
+    claimId: claimantId,
+    subjectRef,
+    tenantId,
+    runId: `collab-apply:${params.groupId}:${params.itemId}:${claimantId}`,
+    success: true,
+  });
+  return { task: updated, item: appliedItem };
 }
 
 /**

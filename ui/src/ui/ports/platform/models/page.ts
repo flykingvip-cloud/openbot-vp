@@ -6,6 +6,13 @@ import {
 import type { PlatformSurfaceProps } from "../shared/surface.ts";
 import { selectPlatformModelsActions } from "./actions.ts";
 import { buildPlatformModelsVM } from "./adapter.ts";
+import { previewRoutingDecisionViaService } from "./admission/routing-decision-service.ts";
+import {
+  bindCapabilityAdmissionGateway,
+  ensureCapabilityVerificationLifecycle,
+  isCapabilityAdmissionRpcActive,
+} from "./admission/verification-service.ts";
+import type { RoutingDecisionPreview } from "./routing-decision-preview.ts";
 import {
   renderModelsAorBanditPanel,
   renderModelsAorLiveCodingEvidence,
@@ -90,6 +97,10 @@ function renderModelsTabBar(activeTab: ModelsTabId) {
 
 let modelsSnapshotAutoLoadTriggered = false;
 let modelsSnapshotAutoLoadTimer: number | null = null;
+let lastRoutingPreview: RoutingDecisionPreview | null = null;
+export function getLastRoutingPreviewForTest() {
+  return lastRoutingPreview;
+}
 
 function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
   if (modelsSnapshotAutoLoadTriggered) {
@@ -119,7 +130,36 @@ function maybeAutoTriggerModelsSnapshot(props: PlatformSurfaceProps): void {
   }, 0);
 }
 
+let admissionGatewayBindKey: string | null = null;
+
+function ensureAdmissionGatewayBinding(props: PlatformSurfaceProps) {
+  const connected = Boolean(props.client && props.connected);
+  const key = connected ? "connected" : "offline";
+  if (admissionGatewayBindKey === key) {
+    return;
+  }
+  admissionGatewayBindKey = key;
+  if (connected && props.client) {
+    const client = props.client;
+    void bindCapabilityAdmissionGateway((method, params) =>
+      client.request(method, params ?? {}),
+    ).then((result) => {
+      if (result.synced > 0) {
+        requestOpenBotAppRerender();
+      }
+    });
+    return;
+  }
+  if (isCapabilityAdmissionRpcActive()) {
+    void bindCapabilityAdmissionGateway(null);
+  }
+}
+
 export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
+  // Page lifecycle: recover orphaned verification tasks from a prior refresh.
+  // Live in-page tasks are preserved; opening a detail drawer does not re-enter here alone.
+  ensureCapabilityVerificationLifecycle();
+  ensureAdmissionGatewayBinding(props);
   maybeAutoTriggerModelsSnapshot(props);
   let vm: ReturnType<typeof buildPlatformModelsVM>;
   try {
@@ -199,6 +239,7 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 props.readModel.modelsManagementLoading === true ||
                 (!props.readModel.modelsManagementSnapshot &&
                   !props.readModel.modelsManagementError),
+              // 推荐池 = allowlist（入池／可被推荐），与租户可选、自动路由分开。
               onToggleRecommendationPool: (modelId, nextValue) => {
                 if (nextValue) {
                   actions.onUpsertAllowlistEntry(modelId, null);
@@ -207,14 +248,9 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                 }
                 void actions.onSaveConfig?.();
               },
-              onToggleTenantSelectable: (modelId, nextValue) => {
-                if (nextValue) {
-                  actions.onUpsertAllowlistEntry(modelId, null);
-                } else {
-                  actions.onRemoveAllowlistEntry(modelId);
-                }
-                void actions.onSaveConfig?.();
-              },
+              // 租户可选／自动路由：仅在 gateway models.admission.* 已绑定时由抽屉启用；
+              // localStorage 草稿不会被展示成平台已生效状态。
+              // 准入 applied／platformEffective 只写存档并供干跑预览；不驱动线上会话选型。
             })}
           `
         : activeTab === "taskPlans"
@@ -238,6 +274,23 @@ export function renderPlatformModelsSurface(props: PlatformSurfaceProps) {
                   onNavigateTab,
                   context: activeModelsContext,
                   compat: vm.compat?.legacyModelsVM ?? null,
+                  routingPreview: lastRoutingPreview,
+                  onSimulateRouting: (input) => {
+                    void previewRoutingDecisionViaService({
+                      request: {
+                        taskProfileId: input.taskProfileId,
+                        planId: input.planId,
+                        taskText: input.taskText ?? input.sampleInput,
+                        outputType: input.outputType,
+                        budget: input.budget,
+                        requiredCapabilities: input.requiredCapabilities,
+                      },
+                      candidates: vm.assets.models,
+                    }).then((preview) => {
+                      lastRoutingPreview = preview;
+                      requestOpenBotAppRerender();
+                    });
+                  },
                   onSetDefaultPrimary: actions.onSetDefaultPrimary,
                   onSetDefaultFallbacks: actions.onSetDefaultFallbacks,
                   onSetDefaultImagePrimary: actions.onSetDefaultImagePrimary,

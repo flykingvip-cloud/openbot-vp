@@ -4,11 +4,11 @@
  */
 
 import fs from "node:fs";
-import { qualifyTurn } from "./qualification.js";
 import {
   applyContextCutWithOptionalArticlePreserve,
   type PreserveArticleOptions,
 } from "./preserve-article-across-cut.js";
+import { qualifyTurn } from "./qualification.js";
 import { isSureDistinctWork } from "./session-task-board.js";
 
 export type { PreserveArticleOptions } from "./preserve-article-across-cut.js";

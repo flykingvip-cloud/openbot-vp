@@ -9,24 +9,24 @@ Depends on collab spine through **C2** (#668) and **OGUI Form P0** (#672 @ `2088
 
 ## Inventory (2026-10-13, `main` + this PR)
 
-| Surface | Status | Evidence |
-| --- | --- | --- |
-| `ogui-form` / `ogui-answer` fence + Form UI | **Present** | #672; `oguiFormUiPresentOnMain()===true` |
-| Interactive Choice Follow-up (#665) | EXISTS | NL「确认并继续」→ `chat.send`; **not** OGUI v1 |
-| `ChatSendParamsSchema` | CLOSED | `additionalProperties: false` — C4 must not expand |
-| HandoffContract | EXISTS (flag-off) | propose → accept → approve → apply |
-| OGUI→handoff projection seam (#670) | EXISTS | parse + project helpers |
-| chat.send → projection store + propose enrich | **This PR** | `ogui-handoff-projection-chat-hook` + `proposeHandoff` assumptions |
+| Surface                                       | Status            | Evidence                                                           |
+| --------------------------------------------- | ----------------- | ------------------------------------------------------------------ |
+| `ogui-form` / `ogui-answer` fence + Form UI   | **Present**       | #672; `oguiFormUiPresentOnMain()===true`                           |
+| Interactive Choice Follow-up (#665)           | EXISTS            | NL「确认并继续」→ `chat.send`; **not** OGUI v1                     |
+| `ChatSendParamsSchema`                        | CLOSED            | `additionalProperties: false` — C4 must not expand                 |
+| HandoffContract                               | EXISTS (flag-off) | propose → accept → approve → apply                                 |
+| OGUI→handoff projection seam (#670)           | EXISTS            | parse + project helpers                                            |
+| chat.send → projection store + propose enrich | **This PR**       | `ogui-handoff-projection-chat-hook` + `proposeHandoff` assumptions |
 
 ## What this PR adds (gap-only)
 
-| Surface | Behavior |
-| --- | --- |
-| Flag `collaboration.task.oguiHandoffProjection` | Default OFF; projection fail-closed |
-| `recordChatSendOguiProjectionBestEffort` | Group chat.send: legal `ogui-answer` → `<ns>/ogui-projections` brief |
-| `proposeHandoff` enrich | Flag-on: append latest / sourceChatText brief into `assumptions` |
-| Tests | flag-off no write; illegal degrade; flag-on store + propose assumptions |
-| Design doc | This file — Form P0 dependency satisfied; tip flag still required |
+| Surface                                         | Behavior                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| Flag `collaboration.task.oguiHandoffProjection` | Default OFF; projection fail-closed                                     |
+| `recordChatSendOguiProjectionBestEffort`        | Group chat.send: legal `ogui-answer` → `<ns>/ogui-projections` brief    |
+| `proposeHandoff` enrich                         | Flag-on: append latest / sourceChatText brief into `assumptions`        |
+| Tests                                           | flag-off no write; illegal degrade; flag-on store + propose assumptions |
+| Design doc                                      | This file — Form P0 dependency satisfied; tip flag still required       |
 
 ## Explicit non-goals (this PR)
 

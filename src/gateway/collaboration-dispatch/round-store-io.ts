@@ -4,7 +4,9 @@ import fsp from "node:fs/promises";
 import path from "node:path";
 import type { PersistedRound, RoundRuntimeEvent } from "./round-state.js";
 
-const LOCK_STALE_MS = 30_000;
+/** Stale lock age before withRoundLock unlinks and retries (ms). */
+export const ROUND_LOCK_STALE_MS = 30_000;
+const LOCK_STALE_MS = ROUND_LOCK_STALE_MS;
 const LOCK_RETRY_MS = 20;
 const LOCK_MAX_ATTEMPTS = 250;
 

@@ -2,6 +2,7 @@ import { resolveFailoverReasonFromError } from "../../agents/failover-error.js";
 import type { CronConfig, CronRetryOn } from "../../config/types.cron.js";
 import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
 import { DEFAULT_AGENT_ID } from "../../routing/session-key.js";
+import { resolveOrAllocateCronFireId } from "../../task-outcome/cron-fire-id.js";
 import { isCronCompletionScheduleHold } from "../completion-contract.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
 import { sweepCronRunSessions } from "../session-reaper.js";
@@ -474,6 +475,16 @@ export function applyJobResult(
     }
   }
 
+  // askOutcome W1: keep currentFireId across same-fire error retries; clear otherwise.
+  const retainedBecauseErrorRetry =
+    result.status === "error" &&
+    !completionHold &&
+    job.enabled &&
+    typeof job.state.nextRunAtMs === "number";
+  if (!retainedBecauseErrorRetry) {
+    job.state.currentFireId = undefined;
+  }
+
   return shouldDelete;
 }
 
@@ -616,6 +627,7 @@ export async function onTimer(state: CronServiceState) {
       for (const job of due) {
         job.state.runningAtMs = now;
         job.state.lastError = undefined;
+        resolveOrAllocateCronFireId(job.state, { jobId: job.id, startedAtMs: now });
       }
       await persist(state);
 
@@ -632,6 +644,7 @@ export async function onTimer(state: CronServiceState) {
       const { id, job } = params;
       const startedAt = state.deps.nowMs();
       job.state.runningAtMs = startedAt;
+      resolveOrAllocateCronFireId(job.state, { jobId: job.id, startedAtMs: startedAt });
       emit(state, { jobId: job.id, action: "started", runAtMs: startedAt });
       const jobTimeoutMs = resolveCronJobTimeoutMs(job);
 
@@ -904,6 +917,7 @@ async function planStartupCatchup(
     for (const job of startupCandidates) {
       job.state.runningAtMs = now;
       job.state.lastError = undefined;
+      resolveOrAllocateCronFireId(job.state, { jobId: job.id, startedAtMs: now });
     }
     await persist(state);
 
@@ -1129,9 +1143,16 @@ export async function executeJobCore(
     return resolveAbortError();
   }
 
+  const fireId =
+    job.state.currentFireId?.trim() ||
+    resolveOrAllocateCronFireId(job.state, {
+      jobId: job.id,
+      startedAtMs: state.deps.nowMs(),
+    });
   const res = await state.deps.runIsolatedAgentJob({
     job,
     message: job.payload.message,
+    fireId,
     abortSignal,
   });
 
@@ -1169,6 +1190,7 @@ export async function executeJob(
   const startedAt = state.deps.nowMs();
   job.state.runningAtMs = startedAt;
   job.state.lastError = undefined;
+  resolveOrAllocateCronFireId(job.state, { jobId: job.id, startedAtMs: startedAt });
   emit(state, { jobId: job.id, action: "started", runAtMs: startedAt });
 
   let coreResult: {

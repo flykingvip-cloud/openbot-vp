@@ -138,9 +138,14 @@ describe("promotePrivateMemoryCapsuleToGroup", () => {
   });
 
   it("promotes into group learning asset with confidentiality + audit (not transcript)", async () => {
-    const appendCapsule = vi.fn(async () => undefined);
+    const appendCapsule = vi.fn(
+      async (
+        _groupId: string,
+        _capsule: { groupId: string; metadata?: { confidentialityTier?: string } },
+      ) => undefined,
+    );
     const appendProjection = vi.fn(async () => undefined);
-    const appendLearningAsset = vi.fn(async () => undefined);
+    const appendLearningAsset = vi.fn(async (_groupId: string, _asset?: unknown) => undefined);
     const audits: Array<Record<string, unknown>> = [];
     const recordAudit = vi.fn(async (entry: Record<string, unknown>) => {
       audits.push(entry);
@@ -187,11 +192,16 @@ describe("promotePrivateMemoryCapsuleToGroup", () => {
     expect(result.confidentialityTier).toBe("restricted");
     expect(result.assetId).toBeTruthy();
     expect(appendCapsule).toHaveBeenCalledTimes(1);
-    expect(appendCapsule.mock.calls[0][0]).toBe("group-1");
-    expect(appendCapsule.mock.calls[0][1].groupId).toBe("group-1");
-    expect(appendCapsule.mock.calls[0][1].metadata?.confidentialityTier).toBe("restricted");
+    const capsuleCalls = appendCapsule.mock.calls as unknown as Array<
+      [string, { groupId: string; metadata?: { confidentialityTier?: string } }]
+    >;
+    expect(capsuleCalls[0]?.[0]).toBe("group-1");
+    expect(capsuleCalls[0]?.[1]?.groupId).toBe("group-1");
+    expect(capsuleCalls[0]?.[1]?.metadata?.confidentialityTier).toBe("restricted");
     expect(appendLearningAsset).toHaveBeenCalledTimes(1);
-    expect(appendLearningAsset.mock.calls[0][0]).toBe("group-1");
+    expect(
+      (appendLearningAsset.mock.calls as unknown as ReadonlyArray<ReadonlyArray<unknown>>)[0][0],
+    ).toBe("group-1");
     expect(audits).toHaveLength(1);
     expect(audits[0]).toMatchObject({
       groupId: "group-1",
@@ -206,9 +216,14 @@ describe("promotePrivateMemoryCapsuleToGroup", () => {
   });
 
   it("records audit when group promotion policy blocks", async () => {
-    const appendCapsule = vi.fn(async () => undefined);
+    const appendCapsule = vi.fn(
+      async (
+        _groupId: string,
+        _capsule: { groupId: string; metadata?: { confidentialityTier?: string } },
+      ) => undefined,
+    );
     const appendProjection = vi.fn(async () => undefined);
-    const appendLearningAsset = vi.fn(async () => undefined);
+    const appendLearningAsset = vi.fn(async (_groupId: string, _asset?: unknown) => undefined);
     const audits: Array<Record<string, unknown>> = [];
 
     // Use internal sensitivity so projection eligibility passes; policy still blocks.

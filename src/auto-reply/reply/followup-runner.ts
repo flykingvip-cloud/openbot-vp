@@ -29,11 +29,19 @@ import {
   rememberRunModelSet,
   snapshotCreditReportingFromGate,
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
+import {
+  consumeCapabilityRoutingResult,
+  formatCapabilityExecutionSurfaceLog,
+} from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
+import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { defaultRuntime } from "../../runtime.js";
+import { ensureFollowupTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
@@ -155,7 +163,100 @@ export function createFollowupRunner(params: {
   };
 
   return async (queued: FollowupRun) => {
+    // Agent run correlation id (may differ across retries of the same queue item).
     const runId = crypto.randomUUID();
+    // askOutcome W1: TaskOutcome identity is the enqueue-stable followupItemId.
+    const followupItemId =
+      queued.followupItemId?.trim() || (queued.followupItemId = crypto.randomUUID());
+    let followupOutcomeTaskId: string | undefined;
+    let followupOutcomeScope: import("../../task-outcome/types.js").TrustedScope | undefined;
+    let followupCapabilityOutcome:
+      | import("../../task-outcome/runtime-from-runner.js").RunnerTurnOutcomeInput["capabilityOutcome"]
+      | undefined;
+    let followupRunSucceeded: boolean | undefined;
+    let followupFailureReason:
+      | import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason
+      | undefined;
+    let followupFailureDetail: string | undefined;
+    let followupOutcomeCloseoutDone = false;
+    const submitFollowupOutcomeCloseout = async (overrides?: {
+      success?: boolean;
+      failureReason?: import("../../task-outcome/runtime-from-runner.js").RunnerTurnFailureReason;
+      failureDetail?: string;
+      force?: boolean;
+    }) => {
+      if (followupOutcomeCloseoutDone) {
+        return;
+      }
+      if (!followupOutcomeTaskId || !followupOutcomeScope || !queued.run.agentId) {
+        return;
+      }
+      // Skip non-run early exits (ogui pause/ack, empty queue path, etc.) unless forced.
+      const shouldClose =
+        overrides?.force === true ||
+        overrides?.success !== undefined ||
+        followupRunSucceeded !== undefined ||
+        followupFailureReason !== undefined ||
+        followupCapabilityOutcome !== undefined;
+      if (!shouldClose) {
+        return;
+      }
+      followupOutcomeCloseoutDone = true;
+      const success = overrides?.success ?? followupRunSucceeded ?? false;
+      const failureReason = overrides?.failureReason ?? followupFailureReason;
+      const failureDetail = overrides?.failureDetail ?? followupFailureDetail;
+      // tip runId stays agent correlation; taskId is stable followupItemId child.
+      try {
+        await recordRunnerTurnOutcome(queued.run.config, queued.run.agentId, {
+          success,
+          runId,
+          taskId: followupOutcomeTaskId,
+          scope: followupOutcomeScope,
+          entrypoint: "chat",
+          ...(failureReason && !success
+            ? { failureReason, ...(failureDetail ? { failureDetail } : {}) }
+            : {}),
+          ...(followupCapabilityOutcome ? { capabilityOutcome: followupCapabilityOutcome } : {}),
+        });
+      } catch (err) {
+        logVerbose(`followup unified recordRunnerTurnOutcome failed: ${String(err)}`);
+      }
+    };
+    if (queued.run.agentId) {
+      const subjectRaw = (
+        queued.run.gatewayClientPlatformUserId ??
+        queued.run.gatewayClientUser ??
+        queued.run.sessionKey ??
+        sessionKey ??
+        "followup"
+      )
+        .toString()
+        .trim();
+      const subjectRef =
+        subjectRaw.startsWith("platform-user:") || subjectRaw.includes(":")
+          ? subjectRaw
+          : `subject:${subjectRaw}`;
+      const tenantId =
+        queued.run.executionIdentity?.enterpriseId?.trim() ||
+        queued.run.executionIdentity?.collaborationOwnerEntitlement?.tenantId?.trim() ||
+        undefined;
+      const parentTaskId =
+        queued.parentTaskId?.trim() || queued.run.collaborationTaskId?.trim() || undefined;
+      const opened = ensureFollowupTurnTaskOutcome(queued.run.config, {
+        agentId: queued.run.agentId,
+        runId: followupItemId,
+        sessionKey: queued.run.sessionKey ?? sessionKey,
+        subjectRef,
+        ...(tenantId ? { tenantId } : {}),
+        ...(parentTaskId ? { parentTaskId } : {}),
+      });
+      if (opened.ok) {
+        followupOutcomeTaskId = opened.taskId;
+        followupOutcomeScope = opened.scope;
+      } else {
+        logVerbose(`followup task-outcome entry failed: ${opened.code} ${opened.message}`);
+      }
+    }
     let followupSlotHeld = false;
     let oguiResume:
       | { storePath: string; sessionKey: string; decisionId: string; resumeRef: string }
@@ -209,6 +310,8 @@ export function createFollowupRunner(params: {
       let runResult: Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
       let fallbackProvider = queued.run.provider;
       let fallbackModel = queued.run.model;
+      let modelGate: EmployeeModelGateResult | undefined;
+      let consumedCapability: ReturnType<typeof consumeCapabilityRoutingResult> | undefined;
       const activeSessionEntry =
         (sessionKey ? sessionStore?.[sessionKey] : undefined) ?? sessionEntry;
       let bootstrapPromptWarningSignaturesSeen = resolveBootstrapWarningSignaturesSeen(
@@ -217,14 +320,19 @@ export function createFollowupRunner(params: {
       try {
         // P5（model-entitlement-chain §6.5）：协作小组 / followup 多 bot 回合按 bot 归属席位
         // 接入 Commercial Runtime 统一闸口（P0）。
+        const runContextEstimate = buildRunContextEstimateParts({
+          taskText: queued.prompt,
+          sessionEntry: activeSessionEntry,
+          extraSystemPrompt: queued.run.extraSystemPrompt,
+        });
         const modelGateInput = {
           cfg: queued.run.config,
           agentId: queued.run.agentId,
           gatewayClientUser: queued.run.gatewayClientUser,
           gatewayClientSessionDomain: queued.run.gatewayClientSessionDomain,
           taskText: queued.prompt,
+          contextParts: runContextEstimate.contextParts,
         };
-        let modelGate: EmployeeModelGateResult = {};
         let followupAuthorizationId: string | undefined;
         const runSlot = await tryAcquireEnterpriseAgentRun({
           runId,
@@ -244,14 +352,36 @@ export function createFollowupRunner(params: {
           followupAuthorizationId = runSlot.authorizationDecisionId;
         }
         const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-          allowlist: modelGate.allowlist,
-          preferredModelOrder: modelGate.preferredModelOrder,
-          capabilityPlan: modelGate.capabilityPlan,
+          allowlist: modelGate?.allowlist,
+          preferredModelOrder: modelGate?.preferredModelOrder,
+          capabilityPlan: modelGate?.capabilityPlan,
         });
+        // Structured surface: do not void outcomeClaim. Text may return; image/music stay incomplete.
+        consumedCapability = consumeCapabilityRoutingResult({
+          planFailure: executionRouting.planFailure,
+          outcomeClaim: executionRouting.outcomeClaim,
+          executionSurface: executionRouting.executionSurface,
+          capabilityPlan: executionRouting.capabilityPlan,
+        });
+        logVerbose(
+          `followup ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
+        );
+        if (executionRouting.planFailure.kind === "no_executable_candidates") {
+          if (consumedCapability.capabilityOutcome) {
+            followupCapabilityOutcome = consumedCapability.capabilityOutcome;
+          }
+          await submitFollowupOutcomeCloseout({
+            success: false,
+            failureReason: "prepare_failed",
+            failureDetail: executionRouting.planFailure.message,
+          });
+          logVerbose(`followup capability plan: ${executionRouting.planFailure.message}`);
+          return;
+        }
         const embeddedModelGovernance = resolveEmbeddedModelGovernance({
           gateStatus: followupSlotHeld ? "acquired" : "skipped",
           allowlist: executionRouting.allowlist,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           commercialAuthorizationId: followupAuthorizationId,
         });
         const parentSnapshot = buildRunModelSetSnapshot({
@@ -259,8 +389,13 @@ export function createFollowupRunner(params: {
           allowlist: executionRouting.allowlist,
           governanceMode: embeddedModelGovernance.governanceMode,
           commercialAuthorizationId: followupAuthorizationId,
-          tenantId: modelGate.tenantId,
+          tenantId: modelGate?.tenantId,
           preferredModelOrder: executionRouting.preferredModelOrder,
+          platformModelsMode:
+            modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(queued.run.config),
+          ...(modelGate?.effectiveRouting?.selectorStrategy
+            ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
+            : {}),
           // P4-1: parent billing context for child runs (acquired gate only).
           creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
         });
@@ -299,8 +434,8 @@ export function createFollowupRunner(params: {
               const candidateRuntimeId = `${provider}/${model}`;
               if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
                 const tenantId =
-                  modelGate.tenantId?.trim() ||
-                  modelGate.creditReporting?.enterpriseId?.trim() ||
+                  modelGate?.tenantId?.trim() ||
+                  modelGate?.creditReporting?.enterpriseId?.trim() ||
                   "";
                 if (!tenantId) {
                   throw new Error(
@@ -436,12 +571,12 @@ export function createFollowupRunner(params: {
 
         // Mirror chat path: durable Credits/providerCost outbox for enterprise runs.
         // Outer provider/model stay as selected (may be ent/...), so BYOK ledger skips platform debit.
-        if (modelGate.creditReporting && hasNonzeroUsage(runResult.meta?.agentMeta?.usage)) {
+        if (modelGate?.creditReporting && hasNonzeroUsage(runResult.meta?.agentMeta?.usage)) {
           try {
             const tokenUsage = normalizeUsage(runResult.meta?.agentMeta?.usage);
             const usagePayload = buildCommercialRunCreditUsageInput({
-              enterpriseId: modelGate.creditReporting.enterpriseId,
-              policyId: modelGate.creditReporting.policyId,
+              enterpriseId: modelGate?.creditReporting.enterpriseId,
+              policyId: modelGate?.creditReporting.policyId,
               runId,
               provider: fallbackProvider,
               model: fallbackModel,
@@ -464,6 +599,9 @@ export function createFollowupRunner(params: {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         defaultRuntime.error?.(`Followup agent failed before reply: ${message}`);
+        followupRunSucceeded = false;
+        followupFailureReason = "run_failed";
+        followupFailureDetail = message;
         return;
       }
 
@@ -491,6 +629,11 @@ export function createFollowupRunner(params: {
         });
       }
 
+      if (consumedCapability?.capabilityOutcome) {
+        followupCapabilityOutcome = consumedCapability.capabilityOutcome;
+      }
+      // Ordinary run finished the embedded turn; unified closeout in finally records tip.
+      followupRunSucceeded = true;
       const payloadArray = runResult.payloads ?? [];
       if (payloadArray.length === 0) {
         return;
@@ -570,7 +713,16 @@ export function createFollowupRunner(params: {
       }
 
       await sendFollowupPayloads(finalPayloads, queued);
+    } catch (err) {
+      followupRunSucceeded = false;
+      followupFailureReason = "run_failed";
+      followupFailureDetail = err instanceof Error ? err.message : String(err);
+      // Do not rethrow: followup drain must continue; typing cleanup runs in finally.
+      defaultRuntime.error?.(`Followup turn failed: ${followupFailureDetail}`);
     } finally {
+      // askOutcome W1: unified closeout for ordinary success / preflight fail / exception.
+      // Missing evidence → leave acceptance/delivery pending (no invent not_required).
+      await submitFollowupOutcomeCloseout();
       if (oguiResume && !oguiResumeSettled) {
         await releaseOguiDecisionResume({
           storePath: oguiResume.storePath,

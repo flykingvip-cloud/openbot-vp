@@ -38,6 +38,7 @@ import {
   selfAdvanceDoesNotAutoCompleteTask,
   selfAdvanceRequiresPerTickReauth,
 } from "../collaboration-dispatch/self-advance.js";
+import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
 import {
   bindDeliveryActor,
   isMappedDeliveryIdentity,
@@ -52,7 +53,7 @@ import {
   proposeCollaborationTaskHandoffContract,
   resolveHandoffGovernanceActor,
 } from "./handoff-contract-entry.js";
-import { SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE } from "./self-advance-entry.js";
+import { runCollaborationSelfAdvance } from "./self-advance-entry.js";
 import { createWorkspaceCollaborationStores, writeGroupOperatingState } from "./shared.js";
 import {
   resolveCollaborationTenantResolution,
@@ -60,7 +61,7 @@ import {
   isAclSafeTenantTrust,
   resolveAuthorityTenantForEntry,
 } from "./trusted-tenant.js";
-import { WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE } from "./wake-contract-entry.js";
+import { listCollaborationWakeEvents } from "./wake-contract-entry.js";
 
 const tempDirs: string[] = [];
 const savedEnv = {
@@ -163,7 +164,7 @@ async function useIsolationRoot(opts?: {
       },
     },
   } as OpenBotConfig;
-  setRuntimeConfigSnapshot(cfg, path.join(root, "openbot.json"));
+  setRuntimeConfigSnapshot(cfg);
   return { root, cfg, tenantsRoot };
 }
 
@@ -359,7 +360,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
     });
     expect(proposed.status).toBe("proposed");
 
-    const mid = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const mid = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(mid?.ownerMemberId).toBe(alpha.bots[0].id);
     expect(mid?.responsibility?.owner).toBe(alpha.bots[0].id);
 
@@ -371,7 +372,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
       actorType: "bot",
       cfg,
     });
-    const afterAccept = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const afterAccept = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(afterAccept?.responsibility?.owner).toBe(alpha.bots[0].id);
 
     await approveCollaborationTaskHandoffContract({
@@ -382,7 +383,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
       actorType: "human",
       cfg,
     });
-    const afterApprove = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const afterApprove = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(afterApprove?.responsibility?.owner).toBe(alpha.bots[0].id);
 
     const applied = await applyCollaborationTaskHandoffContract({
@@ -577,7 +578,7 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
       }),
     ).rejects.toThrow();
 
-    const persisted = await objectStorage.readObject<Task>(groupId, "task", taskId);
+    const persisted = await objectStorage.readObject<GovernedTask>(groupId, "task", taskId);
     expect(persisted?.responsibility?.owner).toBe(alpha.bots[1].id);
   });
 
@@ -600,11 +601,12 @@ describe("PLT role-binding MT fixtures (r2.1)", () => {
     });
     expect(cfg.collaboration?.task?.selfAdvance?.mode ?? "dry_run").toBe("dry_run");
     expect(cfg.collaboration?.task?.selfAdvance?.executeGroupAllowlist ?? []).toEqual([]);
-    expect(SELF_ADVANCE_ENTRY_DELEGATES_UNIFIED_GATE).toBe(true);
     expect(selfAdvanceRequiresPerTickReauth()).toBe(true);
     expect(selfAdvanceDeliveryRequiresConfirmedPlan()).toBe(true);
     expect(selfAdvanceDoesNotAutoCompleteTask()).toBe(true);
-    expect(WAKE_CONTRACT_ENTRY_READ_PATHS_DO_NOT_WRITE).toBe(true);
+    // L3: behavior anchors (markers retired) — entry still exports production adapters.
+    expect(typeof runCollaborationSelfAdvance).toBe("function");
+    expect(typeof listCollaborationWakeEvents).toBe("function");
   });
 
   test("T09-B2: displayName claim alone does not authenticate write actor", () => {

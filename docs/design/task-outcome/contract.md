@@ -12,20 +12,20 @@
 
 ## 2. 生命周期与唯一判定（冻结）
 
-| lifecycle | taskJudgement（查询） |
-|-----------|----------------------|
-| 非 `closed` | **必须** `incomplete` |
-| `closed` | 仅 `success` \| `failure` \| `cancelled` |
+| lifecycle   | taskJudgement（查询）                    |
+| ----------- | ---------------------------------------- |
+| 非 `closed` | **必须** `incomplete`                    |
+| `closed`    | 仅 `success` \| `failure` \| `cancelled` |
 
-| 场景 | lifecycle | judgement |
-|------|-----------|-----------|
-| 验收 pending，交付 blocked/pending | `awaiting_acceptance` | incomplete |
-| 验收 failed，允许修复 | `recovering` | incomplete |
-| 验收 failed，停止修复 | `closed` | **failure** |
-| 验收通过，等待交付 | `awaiting_delivery` | incomplete |
-| 验收满足且交付 delivered/not_required | `closed` | **success** |
-| 用户取消 | `closed` | **cancelled** |
-| prepare/preflight 拒绝 | `closed` | **failure**（归因 prepare） |
+| 场景                                  | lifecycle             | judgement                   |
+| ------------------------------------- | --------------------- | --------------------------- |
+| 验收 pending，交付 blocked/pending    | `awaiting_acceptance` | incomplete                  |
+| 验收 failed，允许修复                 | `recovering`          | incomplete                  |
+| 验收 failed，停止修复                 | `closed`              | **failure**                 |
+| 验收通过，等待交付                    | `awaiting_delivery`   | incomplete                  |
+| 验收满足且交付 delivered/not_required | `closed`              | **success**                 |
+| 用户取消                              | `closed`              | **cancelled**               |
+| prepare/preflight 拒绝                | `closed`              | **failure**（归因 prepare） |
 
 硬规则：
 
@@ -47,6 +47,25 @@
 ## 5. 父子任务
 
 `ParentChildContract`：`requiredChildTaskIds` / `optionalChildTaskIds` / `aggregation`，防止父子重复计同一指标（P0 保留字段与类型；聚合计算接口边界，P1 扩消费）。
+
+## 5.1 W3 任务类型验收与总预算（复用现有机制）
+
+| 问题 | 复用什么                                                                                                                    | 修哪个断点                                                                                                           | 减少什么                                                     |
+| ---- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 验收 | `chat-entry`：`resolveTurnTaskContract` / `resolveChatTurnCloseGates` / `CHAT_TURN_CONTRACT_V1`（生产 `agent-runner` 已用） | tip 持久化 `taskContract` + `set_acceptance(not_required)` 在非 chat_turn/有 validators 时 → `invented_not_required` | 删除平行 `task-type-acceptance` 模块；普通聊天不要求产物验证 |
+| 预算 | supervisor D-BUDGET：`DEFAULT_SUPERVISOR_BUDGET` / `resolveEffectiveBudget`；耗尽臂对齐 `retry.nextStop`                    | tip 投影 spend + `fail_closed(budget_exceeded)`；eligibility attribution=`budget`（不计技能/成长负样本）             | 不新增账本/预占/调度；不复制默认天花板与 tighten 逻辑        |
+
+既有收敛（本轮仅 inventory，不另起）：`CloseReasonCode.timeout` 已有 eligibility；supervisor `retry` / agents `model-fallback` / gateway billing usage limits 继续各自生效。
+
+### 5.2 W5 结构收尾（复用现有机制）
+
+| 问题          | 复用什么                                                           | 修哪个断点                              | 减少什么                                                            |
+| ------------- | ------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------- |
+| 无界 loop-log | `logEvolutionLoop` / test list+reset；对齐 capability-gap 有界 Map | 进程内 `captured[]` 无界                | `EVOLUTION_LOOP_LOG_CAPTURE_MAX` ring；dropped 计数；不另起耐久日志 |
+| 矩阵收敛      | W0 矩阵 + `call-chain-and-replacements.md`                         | 过时「无界待收尾 / W4 进行中」          | 总表 W0–W5 tip + 诚实残留                                           |
+| 旁路          | tip→growth-bridge 合法写入                                         | operational `recordRunOutcome` 仍绕 tip | **不退役**（canary 仍用；缺替代证明）                               |
+
+非目标：supervisor 热路径全量自动扣 tip；evolution 旁路强制删除；新增主动记忆/容错系统。
 
 ## 6. 入口适配
 

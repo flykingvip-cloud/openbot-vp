@@ -8,12 +8,12 @@
 
 ## What flipped
 
-| Env | Before (P6a) | After (P6b) |
-|---|---|---|
-| `OPENBOT_ACCOUNT_WORKER` unset / empty | OFF | **ON** |
-| `OPENBOT_ACCOUNT_WORKER_DOCKER` unset / empty | OFF | **ON** |
-| Explicit `0` / `false` / `no` / `off` | OFF | OFF (rollback) |
-| Explicit `1` / `true` / `yes` / `on` | ON | ON |
+| Env                                           | Before (P6a) | After (P6b)    |
+| --------------------------------------------- | ------------ | -------------- |
+| `OPENBOT_ACCOUNT_WORKER` unset / empty        | OFF          | **ON**         |
+| `OPENBOT_ACCOUNT_WORKER_DOCKER` unset / empty | OFF          | **ON**         |
+| Explicit `0` / `false` / `no` / `off`         | OFF          | OFF (rollback) |
+| Explicit `1` / `true` / `yes` / `on`          | ON           | ON             |
 
 Shared parser: `src/agents/sandbox/account-worker-flags.ts` → `isAccountWorkerEnvFlagOn`.
 
@@ -27,12 +27,12 @@ Product worker enablement (`isAccountWorkerPrototypeEnabled`) still requires:
 
 So:
 
-| Context | Worker path |
-|---|---|
-| `personal_local` / local data mode | **OFF** (even if flags unset or set to 1) |
-| Managed + multitenant, flags unset | **ON** (P6b) |
-| Managed + multitenant, either flag `0` | **OFF** (ops rollback) |
-| Unset enterprise (no managed/multitenant) | Prototype **OFF** |
+| Context                                   | Worker path                               |
+| ----------------------------------------- | ----------------------------------------- |
+| `personal_local` / local data mode        | **OFF** (even if flags unset or set to 1) |
+| Managed + multitenant, flags unset        | **ON** (P6b)                              |
+| Managed + multitenant, either flag `0`    | **OFF** (ops rollback)                    |
+| Unset enterprise (no managed/multitenant) | Prototype **OFF**                         |
 
 Docker execution boundary (`dockerAccountWorkerExecutionBoundary`) uses the same default-ON dual-flag rule (startup gate for managed multitenant).
 

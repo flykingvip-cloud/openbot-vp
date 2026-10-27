@@ -16,7 +16,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/orchetect/MenuBarExtraAccess", exact: "1.3.0"),
-        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.1.0"),
+        .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.2"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.8.0"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.8.1"),
         .package(url: "https://github.com/steipete/Peekaboo.git", revision: "8d5e638e6ac9e93fae7d8dcb2ac0a0f01f3d49ec"),

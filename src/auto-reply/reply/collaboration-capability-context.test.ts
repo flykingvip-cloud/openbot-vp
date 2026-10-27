@@ -148,7 +148,7 @@ describe("buildCollaborationCapabilitySystemPrompt", () => {
 
   it("returns undefined for non-collab sessions without groupId (no capability/overlay prompt)", async () => {
     const prompt = await buildCollaborationCapabilitySystemPrompt({
-      sessionEntry: {},
+      sessionEntry: { sessionId: "sess-non-collab", updatedAt: 0 },
       workspaceDir: "/tmp/unused",
     });
     expect(prompt).toBeUndefined();

@@ -8,10 +8,10 @@ metadata: { "openclaw": { "emoji": "☑️" } }
 
 ## Two layers
 
-| Layer | Responsibility |
-| --- | --- |
-| **Skill** (this file) | When to show choices, which questions/options, how to interpret the submitted answer |
-| **Renderer** (control-ui `chat-delivery`) | Clickable options, selection state, 「确认并继续」 → `chat.send` / `handleSendChat` |
+| Layer                                     | Responsibility                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| **Skill** (this file)                     | When to show choices, which questions/options, how to interpret the submitted answer |
+| **Renderer** (control-ui `chat-delivery`) | Clickable options, selection state, 「确认并继续」 → `chat.send` / `handleSendChat`  |
 
 Do **not** invent DIL.useState / GenUI.issueNewTurn APIs. OpenBot already maps 「你选 / A.」 into `chat-delivery` and sends via the normal chat capability.
 

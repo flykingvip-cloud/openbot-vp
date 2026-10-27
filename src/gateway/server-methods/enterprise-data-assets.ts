@@ -1,6 +1,5 @@
 import { resolveBillingScope } from "../billing/scope.js";
 import { projectCapabilityCenterInstall } from "../enterprise-data/capability-center-install.js";
-import { listSarValidationRecordsForInstall } from "../enterprise-data/sar-validation-records.js";
 import { EnterpriseDataStoreError } from "../enterprise-data/connector-action-store.js";
 import {
   buildDataAssetLinkage,
@@ -10,6 +9,7 @@ import {
   summarizeDataAssetLinkage,
 } from "../enterprise-data/data-asset-linkage.js";
 import { requireResolvedEnterpriseAdminTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
+import { listSarValidationRecordsForInstall } from "../enterprise-data/sar-validation-records.js";
 import type { EnterpriseDataStore } from "../enterprise-data/types.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
 import { readSarExecutionPin } from "../skill-execution-binding/sar-pin.js";

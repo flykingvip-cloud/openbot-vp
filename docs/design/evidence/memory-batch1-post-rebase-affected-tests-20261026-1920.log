@@ -1,0 +1,37 @@
+=== memory-batch1 post-rebase affected tests ===
+date: 2026-10-26 19:19:23 CST
+HEAD: 55a8ba7e04f88d162a1fda33772fc62d60b190a9
+origin/main: 29f4edd0a2c16a7682f6ac5da9bc0766e503447f
+
+
+ RUN  v4.0.18 /private/tmp/openbot-memory-batch1-rework
+
+ ✓ test/scripts/check-isolation-fail-closed.test.ts (2 tests) 62ms
+ ✓ test/scripts/check-openbot-ui-boundaries.test.ts (2 tests) 68ms
+ ✓ src/memory/memory-platform-audit.o2.test.ts (10 tests) 67ms
+ ✓ src/memory/health-probe.test.ts (13 tests) 31ms
+ ✓ src/memory/query-atoms-acl.test.ts (4 tests) 11ms
+stderr | ui/src/ui/ports/employee/views/memory-center-page.node.test.ts
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+
+stderr | ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+
+ ✓ ui/src/ui/ports/employee/views/memory-center-page.node.test.ts (5 tests) 37ms
+ ✓ ui/src/ui/ports/employee/views/data-directory-page.node.test.ts (5 tests) 27ms
+ ✓ src/gateway/server-methods/doctor-memory-health.test.ts (10 tests) 9ms
+ ✓ src/memory/memory-batch1-o4-o5-diagnose.test.ts (3 tests) 54ms
+ ✓ src/gateway/server-methods/memory-forget-gateway-isolation.test.ts (5 tests) 12ms
+ ✓ src/gateway/server-methods/collaboration-learning.test.ts (10 tests) 3608ms
+     ✓ loads persisted collaboration learning objects for the active bot scope  3568ms
+ ✓ src/gateway/collaboration-dispatch/decision-engine.test.ts (49 tests) 86ms
+ ✓ src/gateway/collaboration-dispatch/wake-round-dispatch.test.ts (12 tests) 356ms
+ ✓ src/gateway/collaboration-dispatch/collab-s4-heartbeat-scheduler.test.ts (15 tests) 915ms
+     ✓ updateConfig during slow tick does not create duplicate timer chains  300ms
+
+ Test Files  14 passed (14)
+      Tests  145 passed (145)
+   Start at  19:19:24
+   Duration  4.49s (transform 17.27s, setup 3.09s, import 21.79s, tests 5.34s, environment 698ms)
+
+EXIT=0

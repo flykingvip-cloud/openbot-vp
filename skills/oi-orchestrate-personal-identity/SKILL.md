@@ -37,22 +37,21 @@ metadata:
   → resolve / 刷新「已配置」导航
 ```
 
-| 目录项 | 动作 |
-|--------|---------|
-| 微信公众号 | 加载 `oi-bind-wechat-official`（`verified_live`；云电脑证据） |
-| 个人邮箱 | 加载 `oi-bind-personal-email`（`verified_live`） |
-| 自有数字人授权 | 加载 `oi-grant-owned-bots` |
-| GitHub（个人） | 加载 `oi-bind-github-personal`（OAuth 样板；`verified_live`） |
-| 小红书 | 加载 `oi-bind-xiaohongshu`（`path_unstable`；S6 live-evidence 2026-10-19，未 verified_live） |
-| 抖音 | 加载 `oi-bind-douyin`（`path_unstable`；S6 live-evidence，未 verified_live） |
-| 微博 | 加载 `oi-bind-weibo`（`path_unstable`；S5 GeeTest/111001；S6 复核仍未 verified_live） |
-| 哔哩哔哩 | 加载 `oi-bind-bilibili`（`path_unstable`；S6 live-evidence，未 verified_live） |
-| 知乎 | 加载 `oi-bind-zhihu`（`path_unstable`；S6；#827 登录 detect ≠ OI bind） |
-| 快手 | 加载 `oi-bind-kuaishou`（`path_unstable`；S6 live-evidence，未 verified_live） |
-| X | 加载 `oi-bind-x-twitter`（OAuth2+PKCE；S6 live-evidence 仍 `verified_live: false`） |
-| 微信个人号 | 加载 `oi-bind-wechat-personal`（**非云电脑主路径**；委派 `wechat-personal-worker-setup`） |
-| 飞书个人账号 | `registrationReady=false`，不做 |
-
+| 目录项         | 动作                                                                                         |
+| -------------- | -------------------------------------------------------------------------------------------- |
+| 微信公众号     | 加载 `oi-bind-wechat-official`（`verified_live`；云电脑证据）                                |
+| 个人邮箱       | 加载 `oi-bind-personal-email`（`verified_live`）                                             |
+| 自有数字人授权 | 加载 `oi-grant-owned-bots`                                                                   |
+| GitHub（个人） | 加载 `oi-bind-github-personal`（OAuth 样板；`verified_live`）                                |
+| 小红书         | 加载 `oi-bind-xiaohongshu`（`path_unstable`；S6 live-evidence 2026-10-19，未 verified_live） |
+| 抖音           | 加载 `oi-bind-douyin`（`path_unstable`；S6 live-evidence，未 verified_live）                 |
+| 微博           | 加载 `oi-bind-weibo`（`path_unstable`；S5 GeeTest/111001；S6 复核仍未 verified_live）        |
+| 哔哩哔哩       | 加载 `oi-bind-bilibili`（`path_unstable`；S6 live-evidence，未 verified_live）               |
+| 知乎           | 加载 `oi-bind-zhihu`（`path_unstable`；S6；#827 登录 detect ≠ OI bind）                      |
+| 快手           | 加载 `oi-bind-kuaishou`（`path_unstable`；S6 live-evidence，未 verified_live）               |
+| X              | 加载 `oi-bind-x-twitter`（OAuth2+PKCE；S6 live-evidence 仍 `verified_live: false`）          |
+| 微信个人号     | 加载 `oi-bind-wechat-personal`（**非云电脑主路径**；委派 `wechat-personal-worker-setup`）    |
+| 飞书个人账号   | `registrationReady=false`，不做                                                              |
 
 ## 默认推荐（S5–S6）
 

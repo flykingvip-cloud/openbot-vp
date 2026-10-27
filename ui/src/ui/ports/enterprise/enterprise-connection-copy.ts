@@ -117,7 +117,7 @@ export function resolveEnterpriseConnectionView(input: {
     };
   }
 
-  if (loadingPhase || (input.connected !== true && !input.lastError && !terminal)) {
+  if (loadingPhase || (!input.lastError && !terminal)) {
     return {
       phase: "loading",
       label: "连接中",

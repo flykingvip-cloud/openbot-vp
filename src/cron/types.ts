@@ -126,6 +126,13 @@ type CronAgentTurnPayloadPatch = {
 export type CronJobState = {
   nextRunAtMs?: number;
   runningAtMs?: number;
+  /**
+   * askOutcome W1: durable identity for the current schedule fire.
+   * Allocated by the scheduler when a fire starts; reused on same-fire
+   * retry / restart recovery; cleared when the fire completes (next schedule
+   * allocates a new id).
+   */
+  currentFireId?: string;
   lastRunAtMs?: number;
   /** Preferred execution outcome field. */
   lastRunStatus?: CronRunStatus;

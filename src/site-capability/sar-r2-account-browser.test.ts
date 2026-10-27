@@ -14,12 +14,12 @@ import {
   readAccountComputerPreview,
   resetAccountComputerSlotsForTests,
 } from "../agents/sandbox/account-computer-stream.js";
+import { BROWSER_BRIDGES } from "../agents/sandbox/browser-bridges.js";
 import {
   notifyHandoffReturned,
   resetSecureFormHandoffWaitForTests,
   waitForHandoffReturn,
 } from "../agents/sandbox/secure-form-handoff-wait.js";
-import { BROWSER_BRIDGES } from "../agents/sandbox/browser-bridges.js";
 import { runWithAccountBrowserSerial } from "../agents/tools/browser-tool.account-serial.js";
 import type { LookupFn } from "../infra/net/ssrf.js";
 import {
@@ -29,7 +29,7 @@ import {
   uninstallAccountBrowserBridge,
 } from "./account-browser-port.js";
 import { resetAccountBrowserCoordinatorForTests } from "./coordinator.js";
-import { AccountBrowserSerialDenied, resetActiveAccountBrowserDeskForTests } from "./desk.js";
+import { resetActiveAccountBrowserDeskForTests } from "./desk.js";
 import {
   SarExecutionAuthority,
   memoryEpochStore,

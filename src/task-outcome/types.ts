@@ -4,6 +4,9 @@
  * Durable terminals: success | failure | cancelled only.
  */
 
+import type { TaskBudgetState } from "./budget.js";
+import type { CapabilityModalitySnapshot } from "./capability-modality.js";
+
 export const TASK_OUTCOME_SCHEMA_VERSION = "1.0.0" as const;
 export const JUDGEMENT_POLICY_VERSION = "1.0.0" as const;
 
@@ -77,6 +80,25 @@ export type AcceptanceEvidence = {
   executionVersion: string;
 };
 
+export type TaskContractKind =
+  | "chat_turn"
+  | "code"
+  | "document"
+  | "external_action"
+  | "execution"
+  | "unknown";
+
+/**
+ * W3: tip-durable task-type contract (same fields as chat-entry ResolvedTurnTaskContract).
+ * Acceptance gates reuse resolveTurnTaskContract / resolveChatTurnCloseGates — do not fork.
+ */
+export type TaskContractIdentity = {
+  id: string;
+  version: string;
+  kind: TaskContractKind;
+  requiredValidators: readonly string[];
+};
+
 export type ChildAggregationPolicy =
   | { strategy: "all_required" }
   | { strategy: "quorum"; requiredCount: number }
@@ -101,7 +123,38 @@ export type CloseReasonCode =
   | "prepare_failed"
   | "preflight_rejected"
   | "correction"
+  | "run_failed"
+  | "user_filtered"
+  | "timeout"
+  | "budget_exceeded"
   | "other";
+
+/** W4: tip-durable record of learning assets injected during the turn (exposure). */
+export type ExperienceExposureScope = {
+  scopeId: string;
+  botId: string;
+  assetIds: string[];
+};
+
+export type ExperienceExposureState = {
+  /** Assets injected into the system prompt for this task (exposure only). */
+  scopes: ExperienceExposureScope[];
+  attachedAt: string;
+  /**
+   * Wrap-up Option A: assets with **explicit adoption evidence** this turn.
+   * Only these may become outcome_verified / trigger validity curation.
+   * Tip success + exposure alone = 「成功任务中的曝光」, not validity.
+   */
+  adoptedAssetIds?: string[];
+  /**
+   * Last successful outcome_verified contribution (event idempotency + correction revoke).
+   */
+  verifiedContribution?: {
+    eventId: string;
+    outcomeVersion: number;
+    assetIds: string[];
+  };
+};
 
 export type TaskOutcomeRecord = {
   schemaVersion: typeof TASK_OUTCOME_SCHEMA_VERSION;
@@ -111,6 +164,21 @@ export type TaskOutcomeRecord = {
   taskId: string;
   parentTaskId?: string;
   parentChild?: ParentChildContract;
+  /**
+   * W3: durable contract identity on tip; set_acceptance(not_required) refused when
+   * kind≠chat_turn or validators present (gates still resolved via chat-entry).
+   */
+  taskContract?: TaskContractIdentity;
+  /**
+   * W3: tip projection of supervisor D-BUDGET (not a new ledger/prealloc/scheduler).
+   * Exhaust → fail_closed(budget_exceeded); eligibility attribution=budget.
+   */
+  budget?: TaskBudgetState;
+  /**
+   * W4: learning assets injected (exposed) on this turn.
+   * outcome_verified is recorded by experience-verified consumer on closed+eligible success.
+   */
+  experienceExposure?: ExperienceExposureState;
   entrypoint: Entrypoint;
   lifecycle: Lifecycle;
   decisiveRunStatus: DecisiveRunStatus;
@@ -124,6 +192,13 @@ export type TaskOutcomeRecord = {
   runs: RunResult[];
   reasonCode?: CloseReasonCode;
   reasonDetail?: string;
+  /**
+   * Structured capability modality (P1). Acceptance must consume this; do not
+   * upgrade executor_unwired / incomplete into target-modality success from
+   * reasonDetail strings alone.
+   * Reuses CapabilityModalitySnapshot so persist / assess / transitions stay aligned.
+   */
+  capabilityModality?: CapabilityModalitySnapshot;
   outcomeVersion: number;
   previousOutcomeVersion?: number;
   revisionKind?: "new_execution" | "correction";
@@ -167,11 +242,22 @@ export type EvaluationEligibility = {
     | "provider"
     | "delivery"
     | "prepare"
+    | "budget"
     | "other";
 };
 
 export type SubmitTransition =
-  | { type: "create"; entrypoint: Entrypoint; scope: TrustedScope; taskContractVersion: string }
+  | {
+      type: "create";
+      entrypoint: Entrypoint;
+      scope: TrustedScope;
+      taskContractVersion: string;
+      parentTaskId?: string;
+      /** W3 optional tip contract identity. */
+      taskContract?: TaskContractIdentity;
+      /** W3 optional initial budget snapshot. */
+      budget?: TaskBudgetState;
+    }
   | {
       type: "record_attempt";
       attempt: AttemptResult;
@@ -212,6 +298,13 @@ export type SubmitTransition =
       reasonDetail?: string;
     }
   | {
+      type: "fail_closed";
+      reasonCode: CloseReasonCode;
+      reasonDetail?: string;
+      expectedVersion: number;
+      fencingToken?: string;
+    }
+  | {
       type: "correction";
       expectedVersion: number;
       previousOutcomeVersion: number;
@@ -220,21 +313,71 @@ export type SubmitTransition =
       acceptance: AcceptanceGate;
       delivery: DeliveryGate;
       decisiveRunStatus?: DecisiveRunStatus;
+    }
+  | {
+      /** W3: attach / replace tip task-type contract (acceptance identity). */
+      type: "set_task_contract";
+      taskContract: TaskContractIdentity;
+      expectedVersion: number;
+      fencingToken: string;
+    }
+  | {
+      /** W3: set or replace tip budget snapshot (limits + spend). */
+      type: "set_budget";
+      budget: TaskBudgetState;
+      expectedVersion: number;
+      fencingToken: string;
+    }
+  | {
+      /** W3: accumulate spend; tip updated; caller may then fail_closed on exhaustion. */
+      type: "accumulate_budget_spend";
+      costUsd?: number;
+      iterations?: number;
+      expectedVersion: number;
+      fencingToken: string;
+      nowMs?: number;
+    }
+  | {
+      /** W4: attach injected learning-asset exposure for later outcome_verified. */
+      type: "set_experience_exposure";
+      experienceExposure: ExperienceExposureState;
+      expectedVersion: number;
+      fencingToken: string;
+    }
+  | {
+      /**
+       * Controlled path: mark target modality completed from real execution evidence.
+       * Refuses executor_unwired / no_executable_candidates / unsupported.
+       * Does not set acceptance — callers must still submit set_acceptance.
+       */
+      type: "mark_target_modality_completed";
+      expectedVersion: number;
+      fencingToken: string;
+      evidence: {
+        kind: "execution_artifact" | "run_completed" | "acceptance_artifact";
+        digestOrRef: string;
+        detail?: string;
+      };
     };
+
+export type SubmitFailure = {
+  ok: false;
+  code:
+    | "version_conflict"
+    | "stale_fencing"
+    | "illegal_transition"
+    | "terminal_protected"
+    | "scope_mismatch"
+    | "unauthorized_correction"
+    | "evidence_stale"
+    | "command_conflict"
+    | "not_found";
+  message: string;
+  current?: TaskOutcomeRecord;
+};
 
 export type SubmitResult =
   | { ok: true; record: TaskOutcomeRecord; createdEvents: OutcomeOutboxEvent[] }
-  | {
-      ok: false;
-      code:
-        | "version_conflict"
-        | "stale_fencing"
-        | "illegal_transition"
-        | "terminal_protected"
-        | "scope_mismatch"
-        | "unauthorized_correction"
-        | "evidence_stale"
-        | "not_found";
-      message: string;
-      current?: TaskOutcomeRecord;
-    };
+  | SubmitFailure;
+
+export type { TaskBudgetState, TaskBudgetLimits } from "./budget.js";

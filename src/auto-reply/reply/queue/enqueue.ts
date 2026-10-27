@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { createDedupeCache } from "../../../infra/dedupe.js";
 import { applyQueueDropPolicy, shouldSkipQueueItem } from "../../../utils/queue-helpers.js";
 import { kickFollowupDrainIfIdle } from "./drain.js";
@@ -80,6 +81,15 @@ export function enqueueFollowupRun(
   });
   if (!shouldEnqueue) {
     return false;
+  }
+
+  // askOutcome W1: allocate stable queue-item identity once at enqueue.
+  if (!run.followupItemId?.trim()) {
+    run.followupItemId = crypto.randomUUID();
+  }
+  // Independent child: inherit parent when caller did not set one.
+  if (!run.parentTaskId?.trim() && run.run.collaborationTaskId?.trim()) {
+    run.parentTaskId = run.run.collaborationTaskId.trim();
   }
 
   queue.items.push(run);

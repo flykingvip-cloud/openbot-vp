@@ -122,7 +122,7 @@ function captureRespond() {
 }
 
 async function withStore(
-  run: (env: { cron: CronService; storePath: string }) => Promise<void>,
+  run: (env: { cron: InstanceType<typeof CronService>; storePath: string }) => Promise<void>,
 ): Promise<void> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-scheduled-task-"));
   const storePath = path.join(root, "cron", "jobs.json");

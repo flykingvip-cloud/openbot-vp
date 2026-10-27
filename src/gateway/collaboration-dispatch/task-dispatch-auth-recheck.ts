@@ -11,7 +11,10 @@
  */
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
-import { isMappedDeliveryIdentity } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  hasDeliveryMembershipSurface,
+  isMappedDeliveryIdentity,
+} from "../collaboration-learning/delivery-actor-binding.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -20,7 +23,7 @@ import { asGovernedTask } from "./task-runtime.js";
 
 export type DispatchAuthRecheckFailure = {
   ok: false;
-  reason: "auth_revoked";
+  reason: "auth_revoked" | "auth_source_unreadable";
   revokedActorIds: string[];
   detail: string;
 };
@@ -51,19 +54,6 @@ function uniqueMappedCandidates(ids: readonly string[]): string[] {
   return out;
 }
 
-function hasMembershipSurface(state: Parameters<typeof isMappedDeliveryIdentity>[0]): boolean {
-  if (!state) {
-    return false;
-  }
-  if (compact(state.governance?.coordinatorBotId)) {
-    return true;
-  }
-  if (compact(state.governance?.ownerUserId)) {
-    return true;
-  }
-  return (state.memberRoleMap?.length ?? 0) > 0;
-}
-
 /**
  * Re-read operating-state membership and (optional) task duty binding.
  * Enforce only when duty binding and/or a membership surface exists.
@@ -73,6 +63,11 @@ export async function recheckCurrentDispatchAuthorization(params: {
   taskId?: string | null;
   targetActorIds?: readonly string[] | null;
   cfg?: OpenBotConfig;
+  /**
+   * Test-only: force operating-state membership read to throw.
+   * Production callers omit this. Must not be treated as ok:true.
+   */
+  _testForceOperatingStateReadError?: Error | (() => Error);
 }): Promise<DispatchAuthRecheckResult> {
   const groupId = compact(params.groupId);
   if (!groupId) {
@@ -82,10 +77,21 @@ export async function recheckCurrentDispatchAuthorization(params: {
   const { fileStore, objectStorage } = createWorkspaceCollaborationStores(params.cfg);
   let operatingState: Parameters<typeof isMappedDeliveryIdentity>[0] = null;
   try {
+    if (params._testForceOperatingStateReadError) {
+      const forced = params._testForceOperatingStateReadError;
+      throw typeof forced === "function" ? forced() : forced;
+    }
     operatingState = await readGroupOperatingState({ fileStore, groupId });
-  } catch {
-    // Unreadable membership cannot prove a revoke for non-ACL paths.
-    return { ok: true };
+  } catch (err) {
+    // Unreadable membership cannot prove revoke OR continued authorization.
+    // Fail closed: refuse / unknown — never ok:true (T39/T40 residual).
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      reason: "auth_source_unreadable",
+      revokedActorIds: [],
+      detail: `operating_state_unreadable:${message}`,
+    };
   }
 
   const targetCandidates = uniqueMappedCandidates(params.targetActorIds ?? []);
@@ -109,7 +115,7 @@ export async function recheckCurrentDispatchAuthorization(params: {
     }
   }
 
-  const membershipSurface = hasMembershipSurface(operatingState);
+  const membershipSurface = hasDeliveryMembershipSurface(operatingState);
   if (dutyCandidates.length === 0 && !membershipSurface) {
     return { ok: true };
   }

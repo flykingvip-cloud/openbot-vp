@@ -119,6 +119,24 @@ export interface MemorySearchManager {
     error?: string;
   }>;
   /**
+   * Fact-level soft forget: enumerate live sources for atomId, soft-forget each
+   * (no purge). Returns per-source completion status. Does not change file-delete path.
+   */
+  forgetFact?(input: { atomId: string; operationId: string; reasonCode?: string }): Promise<{
+    ok: boolean;
+    factRef: { atomId: string };
+    sources: Array<{
+      sourceBindingId: string;
+      sourceIdentityId: string;
+      sourceLocator: string;
+      previousStatus?: string;
+      status: "forgotten" | "already_forgotten" | "skipped" | "failed";
+      error?: string;
+    }>;
+    atomMissing?: boolean;
+    error?: string;
+  }>;
+  /**
    * Optional CogniWeave Memory Center atom listing (ACL + lifecycle gated).
    * Absent on non-CogniWeave backends.
    */
@@ -144,4 +162,12 @@ export interface MemorySearchManager {
       confidence?: number;
     }>
   >;
+  /**
+   * O4 isolated readonly foundation — optional; absent on non-CogniWeave backends.
+   * See `memory-center-o4-readonly.ts`. Wired via data.memory.list statusView.
+   */
+  listMemoryCenterAtomsReadonly?(opts?: {
+    statusView?: "active" | "tentative";
+    limit?: number;
+  }): Promise<import("./memory-center-o4-readonly.js").MemoryCenterReadonlyListResult>;
 }

@@ -7,20 +7,20 @@
 
 ## Inventory (reuse, do not reinvent)
 
-| Surface | Path | Role vs OGUI |
-| --- | --- | --- |
-| Chat-inline Form P0 | `ui/.../ogui-form.ts` | **Primary** Generative UI |
-| Canvas skill | `skills/canvas/SKILL.md` | HTML visuals / `canvas.present` / deliverable |
-| A2UI host | `src/canvas-host/a2ui.ts` | v0.8 only; `sendUserAction` bridge |
-| Mac Canvas docs | `docs/platforms/mac/canvas.md` | WKWebView panel + A2UI v0.8 |
+| Surface             | Path                           | Role vs OGUI                                  |
+| ------------------- | ------------------------------ | --------------------------------------------- |
+| Chat-inline Form P0 | `ui/.../ogui-form.ts`          | **Primary** Generative UI                     |
+| Canvas skill        | `skills/canvas/SKILL.md`       | HTML visuals / `canvas.present` / deliverable |
+| A2UI host           | `src/canvas-host/a2ui.ts`      | v0.8 only; `sendUserAction` bridge            |
+| Mac Canvas docs     | `docs/platforms/mac/canvas.md` | WKWebView panel + A2UI v0.8                   |
 
 ## Routing policy
 
-| Component | Surface |
-| --- | --- |
-| `ogui-form` / `ogui-choice` | **chat-inline** always |
-| Charts / architecture HTML | Canvas / materials |
-| A2UI component tree | Canvas host (v0.8) — not chat form renderer |
+| Component                   | Surface                                     |
+| --------------------------- | ------------------------------------------- |
+| `ogui-form` / `ogui-choice` | **chat-inline** always                      |
+| Charts / architecture HTML  | Canvas / materials                          |
+| A2UI component tree         | Canvas host (v0.8) — not chat form renderer |
 
 ## Adapter
 

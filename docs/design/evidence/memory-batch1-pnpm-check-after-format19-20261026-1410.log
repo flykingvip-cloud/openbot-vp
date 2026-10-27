@@ -1,0 +1,268 @@
+
+> @upbeyond/openbot@2026.7.12-rc.2 check /private/tmp/openbot-memory-batch1-rework
+> pnpm check:host-env-policy:swift && pnpm format:check && pnpm build:collaboration:packages && pnpm build:evolution:packages && pnpm tsgo && pnpm lint && pnpm lint:tmp:no-random-messaging && pnpm lint:tmp:channel-agnostic-boundaries && pnpm lint:tmp:no-raw-channel-fetch && pnpm lint:agent:ingress-owner && pnpm lint:plugins:no-register-http-handler && pnpm lint:plugins:no-monolithic-plugin-sdk-entry-imports && pnpm lint:webhook:no-low-level-body-read && pnpm lint:auth:no-pairing-store-group && pnpm lint:auth:pairing-account-scope && pnpm lint:ui:capability-boundaries && pnpm lint:ui:employee-capability-terminology && pnpm lint:core:composition-root-loc && pnpm lint:gateway:method-packs && pnpm lint:gateway:isolation-fail-closed && pnpm lint:core:architecture-manifest && pnpm lint:aor:boundaries && pnpm lint:convergence:registry && pnpm lint:collab:runtime-capabilities && pnpm lint:collab:runtime-authority && pnpm lint:collab:policy-consumption && pnpm test:collab:runtime-lifecycle
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 check:host-env-policy:swift /private/tmp/openbot-memory-batch1-rework
+> node scripts/generate-host-env-security-policy-swift.mjs --check
+
+OK apps/macos/Sources/OpenBot/HostEnvSecurityPolicy.generated.swift
+
+> @upbeyond/openbot@2026.7.12-rc.2 format:check /private/tmp/openbot-memory-batch1-rework
+> oxfmt --check
+
+Checking formatting...
+
+All matched files use the correct format.
+Finished in 9103ms on 16871 files using 14 threads.
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:collaboration:packages /private/tmp/openbot-memory-batch1-rework
+> pnpm --dir packages/collaboration-core build && pnpm --dir packages/collaboration-runtime build && pnpm --dir packages/collaboration-openbot-adapter build
+
+
+> @openbot/collaboration-core@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-core
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-runtime@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-runtime
+> tsc -p tsconfig.build.json
+
+
+> @openbot/collaboration-openbot-adapter@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/collaboration-openbot-adapter
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 build:evolution:packages /private/tmp/openbot-memory-batch1-rework
+> pnpm --dir packages/evolution-core build
+
+
+> @openbot/evolution-core@0.1.0 build /private/tmp/openbot-memory-batch1-rework/packages/evolution-core
+> tsc -p tsconfig.build.json
+
+
+> @upbeyond/openbot@2026.7.12-rc.2 lint /private/tmp/openbot-memory-batch1-rework
+> oxlint --type-aware
+
+
+  x eslint(no-unused-vars): Type 'GatewayRequestHandler' is imported but never used.
+    ,-[src/gateway/server-methods/enterprise-diagnosis-approval.test.ts:12:30]
+ 11 | } from "./enterprise-diagnosis-approval.js";
+ 12 | import type { GatewayClient, GatewayRequestHandler } from "./types.js";
+    :                              ^^^^^^^^^^|^^^^^^^^^^
+    :                                        `-- 'GatewayRequestHandler' is imported here
+ 13 | 
+    `----
+  help: Consider removing this import.
+
+  x eslint(curly): Expected { after 'if' condition.
+     ,-[src/gateway/server-methods/nodes.ts:654:39]
+ 653 |         for (const nodeId of nodeIds) {
+ 654 |           if (pairedById.has(nodeId)) continue;
+     :                                       ^^^^^^^^^
+ 655 |           // Keep currently connected hosts visible even when their pairing row was
+     `----
+  help: Replace `continue;` with `{continue;}`.
+
+  x eslint(no-unused-vars): Type 'SharedDocReviewComment' is imported but never used.
+    ,-[src/gateway/server-methods/group-shared-doc.ts:12:8]
+ 11 |   writeSharedDocBody,
+ 12 |   type SharedDocReviewComment,
+    :        ^^^^^^^^^^^|^^^^^^^^^^
+    :                   `-- 'SharedDocReviewComment' is imported here
+ 13 | } from "../collaboration-learning/shared-group-doc.js";
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unsafe-optional-chaining): Unsafe usage of optional chaining
+     ,-[src/gateway/enterprise-data/sar-a3-bridge-halt-admin.test.ts:294:13]
+ 293 |     expect(listed.ok).toBe(true);
+ 294 |     expect((listed.payload?.bridges as unknown[]).length).toBe(1);
+     :             ^^^^^^^^^^^^^^^^^^^^^^^
+ 295 | 
+     `----
+  help: If this short-circuits with 'undefined' the evaluation will throw TypeError
+
+  x eslint(no-unsafe-optional-chaining): Unsafe usage of optional chaining
+     ,-[src/gateway/enterprise-data/sar-a3-bridge-halt-admin.test.ts:425:21]
+ 424 | 
+ 425 |     const haltId = (halted.payload?.halt as { haltId: string }).haltId;
+     :                     ^^^^^^^^^^^^^^^^^^^^
+ 426 |     const resumed = await callHandler("enterprise-data.sar.halts.clear", { haltId }, store);
+     `----
+  help: If this short-circuits with 'undefined' the evaluation will throw TypeError
+
+  x eslint(no-unsafe-optional-chaining): Unsafe usage of optional chaining
+     ,-[src/gateway/enterprise-data/sar-a3-bridge-halt-admin.test.ts:430:13]
+ 429 |     expect(resumed.payload?.inFlightSideEffectsWithdrawn).toBe(false);
+ 430 |     expect((resumed.payload?.audit as { action: string }).action).toBe("halt_clear");
+     :             ^^^^^^^^^^^^^^^^^^^^^^
+ 431 | 
+     `----
+  help: If this short-circuits with 'undefined' the evaluation will throw TypeError
+
+  x eslint-plugin-unicorn(no-array-sort): Use `Array#toSorted()` instead of `Array#sort()`.
+     ,-[src/gateway/enterprise-data/sar-a3-bridge-halt-admin.test.ts:446:49]
+ 445 |     const events = auditList.payload?.events as Array<{ action: string }>;
+ 446 |     const actions = events.map((e) => e.action).sort();
+     :                                                 ^^^^
+ 447 |     expect(actions).toEqual(["bridge_upsert", "halt_clear", "halt_set"].sort());
+     `----
+  help: `Array#sort()` mutates the original array. Use `Array#toSorted()` to return a new sorted array without modifying the original.
+
+  x eslint-plugin-unicorn(no-array-sort): Use `Array#toSorted()` instead of `Array#sort()`.
+     ,-[src/gateway/enterprise-data/sar-a3-bridge-halt-admin.test.ts:447:73]
+ 446 |     const actions = events.map((e) => e.action).sort();
+ 447 |     expect(actions).toEqual(["bridge_upsert", "halt_clear", "halt_set"].sort());
+     :                                                                         ^^^^
+ 448 |   });
+     `----
+  help: `Array#sort()` mutates the original array. Use `Array#toSorted()` to return a new sorted array without modifying the original.
+
+  x eslint(no-unused-vars): Type 'GovernedTask' is imported but never used.
+    ,-[src/gateway/collaboration-learning/claim-contract-entry.test.ts:17:15]
+ 16 | import type { OpenBotConfig } from "../../config/types.js";
+ 17 | import type { GovernedTask } from "../collaboration-dispatch/task-runtime.js";
+    :               ^^^^^^|^^^^^
+    :                     `-- 'GovernedTask' is imported here
+ 18 | import {
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Identifier 'AccountBrowserSerialDenied' is imported but never used.
+    ,-[src/site-capability/sar-r2-account-browser.test.ts:32:10]
+ 31 | import { resetAccountBrowserCoordinatorForTests } from "./coordinator.js";
+ 32 | import { AccountBrowserSerialDenied, resetActiveAccountBrowserDeskForTests } from "./desk.js";
+    :          ^^^^^^^^^^^^^|^^^^^^^^^^^^
+    :                       `-- 'AccountBrowserSerialDenied' is imported here
+ 33 | import {
+    `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'TaskOutcomeResultService' is imported but never used.
+   ,-[src/task-outcome/entrypoints/gateway-agent.ts:1:15]
+ 1 | import type { TaskOutcomeResultService } from "../result-service.js";
+   :               ^^^^^^^^^^^^|^^^^^^^^^^^
+   :                           `-- 'TaskOutcomeResultService' is imported here
+ 2 | import type { TrustedScope } from "../types.js";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'TaskOutcomeResultService' is imported but never used.
+   ,-[src/task-outcome/entrypoints/cron.ts:1:15]
+ 1 | import type { TaskOutcomeResultService } from "../result-service.js";
+   :               ^^^^^^^^^^^^|^^^^^^^^^^^
+   :                           `-- 'TaskOutcomeResultService' is imported here
+ 2 | import type { TrustedScope } from "../types.js";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'TaskOutcomeResultService' is imported but never used.
+   ,-[src/task-outcome/entrypoints/cli.ts:1:15]
+ 1 | import type { TaskOutcomeResultService } from "../result-service.js";
+   :               ^^^^^^^^^^^^|^^^^^^^^^^^
+   :                           `-- 'TaskOutcomeResultService' is imported here
+ 2 | import type { TrustedScope } from "../types.js";
+   `----
+  help: Consider removing this import.
+
+  x eslint(no-unused-vars): Type 'TaskOutcomeResultService' is imported but never used.
+   ,-[src/task-outcome/entrypoints/collab.ts:1:15]
+ 1 | import type { TaskOutcomeResultService } from "../result-service.js";
+   :               ^^^^^^^^^^^^|^^^^^^^^^^^
+   :                           `-- 'TaskOutcomeResultService' is imported here
+ 2 | import type { TrustedScope } from "../types.js";
+   `----
+  help: Consider removing this import.
+
+  x typescript-eslint(no-base-to-string): 'err' will use Object's default stringification format ('[object Object]') when stringified.
+    ,-[src/cli/cli-errors.ts:42:70]
+ 41 |   }
+ 42 |   const message = typeof e.message === "string" ? e.message : String(err);
+    :                                                                      ^^^
+ 43 |   return isGatewayRejectMessage(message);
+    `----
+  help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+
+  x typescript-eslint(no-base-to-string): 'err ?? ""' will use Object's default stringification format ('[object Object]') when stringified.
+    ,-[src/cli/cli-errors.ts:77:81]
+ 76 |   const message =
+ 77 |     err instanceof Error ? err.message : typeof err === "string" ? err : String(err ?? "");
+    :                                                                                 ^^^^^^^^^
+ 78 |   if (/^usage:/i.test(message) || /^error:\s/i.test(message)) {
+    `----
+  help: Consider picking a property (e.g. `user.name`), using a formatter (or `JSON.stringify`), or implementing a custom `toString()`/`toLocaleString()` on the type.
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+     ,-[ui/src/ui/ports/platform/device-platform/page.browser.test.ts:241:74]
+ 240 |     expect(
+ 241 |       (container.querySelector("[data-testid='device-platform-secret']") as HTMLInputElement | null)
+     :        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^^|^^^^^^^^^^^^^
+     :                                        |                                              `-- Casting it to 'HTMLInputElement | null' is unnecessary
+     :                                        `-- This expression already has the type 'HTMLInputElement | null'
+ 242 |         ?.value ?? "",
+     `----
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+    ,-[src/auto-reply/dispatch.ogui-legacy.test.ts:19:32]
+ 18 |   runReplyAgent: (...args: unknown[]) =>
+ 19 |     runReplyAgentMock(...(args as Parameters<typeof runReplyAgentMock>)),
+    :                           ^^|^ ^^^^^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^^^^^^
+    :                             |                     `-- Casting it to 'unknown[]' is unnecessary
+    :                             `-- This expression already has the type 'unknown[]'
+ 20 | }));
+    `----
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+    ,-[src/agents/pi-embedded-runner/tool-result-char-estimator.test.ts:24:42]
+ 23 |     expect(estimateContextChars(messages, createMessageCharEstimateCache())).toBeGreaterThan(0);
+ 24 |     expect(getToolResultText(messages[1] as AgentMessage)).toBe("kept");
+    :                              ^^^^^|^^^^^ ^^^^^^^|^^^^^^^^
+    :                                   |             `-- Casting it to 'AgentMessage' is unnecessary
+    :                                   `-- This expression already has the type 'AgentMessage'
+ 25 |   });
+    `----
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+    ,-[src/auto-reply/reply/get-reply-run.ogui-wait.test.ts:82:32]
+ 81 |   runReplyAgent: (...args: unknown[]) =>
+ 82 |     runReplyAgentMock(...(args as Parameters<typeof runReplyAgentMock>)),
+    :                           ^^|^ ^^^^^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^^^^^^
+    :                             |                     `-- Casting it to 'unknown[]' is unnecessary
+    :                             `-- This expression already has the type 'unknown[]'
+ 83 | }));
+    `----
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+     ,-[src/gateway/enterprise-data/sar-a3-bridge-halt-admin.test.ts:225:36]
+ 224 |   const handlers = createEnterpriseDataSarAdminHandlers(withStore);
+ 225 |   const handler = handlers[method] as GatewayRequestHandler;
+     :                   ^^^^^^^^|^^^^^^^ ^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                           |                    `-- Casting it to 'GatewayRequestHandler' is unnecessary
+     :                           `-- This expression already has the type 'GatewayRequestHandler'
+ 226 |   let ok = false;
+     `----
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+     ,-[src/gateway/enterprise-data/sar-validation-records.test.ts:319:75]
+ 318 |     const handlers = createEnterpriseDataAssetHandlers(withStore);
+ 319 |     const handler = handlers["enterprise-data.assets.capability-install"] as GatewayRequestHandler;
+     :                     ^^^^^^^^^^^^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                                               |                                       `-- Casting it to 'GatewayRequestHandler' is unnecessary
+     :                                               `-- This expression already has the type 'GatewayRequestHandler'
+ 320 | 
+     `----
+
+  x typescript-eslint(no-unnecessary-type-assertion): This assertion is unnecessary since it does not change the type of the expression.
+     ,-[src/gateway/enterprise-data/sar-validation-records.test.ts:406:75]
+ 405 |     const handlers = createEnterpriseDataAssetHandlers(withStore);
+ 406 |     const handler = handlers["enterprise-data.assets.capability-install"] as GatewayRequestHandler;
+     :                     ^^^^^^^^^^^^^^^^^^^^^^^^^^|^^^^^^^^^^^^^^^^^^^^^^^^^^ ^^^^^^^^^^^^|^^^^^^^^^^^^
+     :                                               |                                       `-- Casting it to 'GatewayRequestHandler' is unnecessary
+     :                                               `-- This expression already has the type 'GatewayRequestHandler'
+ 407 |     let payload: Record<string, unknown> | undefined;
+     `----
+
+Found 0 warnings and 23 errors.
+Finished in 9.7s on 12242 files with 136 rules using 14 threads.
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

@@ -41,50 +41,50 @@ product_code: false
 
 ## 1. 状态
 
-| 项 | 本次现场 |
-| --- | --- |
-| 闸门 C | **进行中。** §4 只勾了有完整现场 PASS 的项。未勾完，不宣称闸门 C 通过 |
-| 孵化 | **不宣称孵化全通。** 孵化 Phase B 仍排在技能通道验收之后 |
-| 本次进程 | `156b03113c6cb45f2be56da57dccae65f4f8a5e3`。不是请求的 `277f6c53…`。不是 HK LIVE。不是 #553 之后 |
-| #553 | **进程不包含。** `robot-skills.install` 顶层键只有 `["skill"]`，没有分层的 relation / projection / runtimeBinding |
-| #552 | 仍是代码路径笔记。本文件的格子来自这次 live，不沿用那份「未实测（只读源码）」 |
+| 项       | 本次现场                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------- |
+| 闸门 C   | **进行中。** §4 只勾了有完整现场 PASS 的项。未勾完，不宣称闸门 C 通过                                             |
+| 孵化     | **不宣称孵化全通。** 孵化 Phase B 仍排在技能通道验收之后                                                          |
+| 本次进程 | `156b03113c6cb45f2be56da57dccae65f4f8a5e3`。不是请求的 `277f6c53…`。不是 HK LIVE。不是 #553 之后                  |
+| #553     | **进程不包含。** `robot-skills.install` 顶层键只有 `["skill"]`，没有分层的 relation / projection / runtimeBinding |
+| #552     | 仍是代码路径笔记。本文件的格子来自这次 live，不沿用那份「未实测（只读源码）」                                     |
 
 ## 2. 环境
 
-| 项 | 现场值 |
-| --- | --- |
-| 请求的 pin | `277f6c5304b00142a180effcf2c0062fa9b0d5e3`。**未在跑** |
-| gateway commit（实际在跑） | `156b03113c6cb45f2be56da57dccae65f4f8a5e3`（#547 Control UI fullscreen preview） |
-| 工作目录 | `/Users/daniel/AI VP/openbot-main-156b03113` |
-| 进程 | pid `75562`。2026-10-10 14:27:42 CST 由 `start-main-156b03113-gw.sh` 启动。这是进程启动时刻，不是每条 RPC 的时刻 |
-| health | live，端口 `:18789`。健康 live 不是 §5.2 的「真实执行上下文可见」 |
-| #553 是否在该进程 | **否。** `robot-skills.install` 的键只有 `["skill"]` |
-| 时间戳（Asia/Shanghai） | 2026-10-10 |
-| 来源 | 性能评测 live |
-| 本次机器人与技能 | `agentId=main`。选中已有技能 `consult-win-advisor`，`lifecycle=approved`，`assetType=mcp`，`ver=1.0.2` |
+| 项                         | 现场值                                                                                                           |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| 请求的 pin                 | `277f6c5304b00142a180effcf2c0062fa9b0d5e3`。**未在跑**                                                           |
+| gateway commit（实际在跑） | `156b03113c6cb45f2be56da57dccae65f4f8a5e3`（#547 Control UI fullscreen preview）                                 |
+| 工作目录                   | `/Users/daniel/AI VP/openbot-main-156b03113`                                                                     |
+| 进程                       | pid `75562`。2026-10-10 14:27:42 CST 由 `start-main-156b03113-gw.sh` 启动。这是进程启动时刻，不是每条 RPC 的时刻 |
+| health                     | live，端口 `:18789`。健康 live 不是 §5.2 的「真实执行上下文可见」                                                |
+| #553 是否在该进程          | **否。** `robot-skills.install` 的键只有 `["skill"]`                                                             |
+| 时间戳（Asia/Shanghai）    | 2026-10-10                                                                                                       |
+| 来源                       | 性能评测 live                                                                                                    |
+| 本次机器人与技能           | `agentId=main`。选中已有技能 `consult-win-advisor`，`lifecycle=approved`，`assetType=mcp`，`ver=1.0.2`           |
 
 身份对照：
 
-| 身份 | commit | 与本次的关系 |
-| --- | --- | --- |
-| 请求的 Mac pin | `277f6c5304b00142a180effcf2c0062fa9b0d5e3` | 未在跑。本次笔记不把行为写成这个 pin |
-| 实际 Mac 进程 | `156b03113c6cb45f2be56da57dccae65f4f8a5e3` | 本次五步只钉这一进程 |
-| HK LIVE | `65564d30b25a41f49866f96e0efed9caacd80a9b` | 不是本次。RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f` |
-| #553 | `17e11f1549531f2fc50c1d3b4417e8beff64f858` | 已在后来的 `main`。不是本次进程 |
+| 身份           | commit                                     | 与本次的关系                                                                                   |
+| -------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| 请求的 Mac pin | `277f6c5304b00142a180effcf2c0062fa9b0d5e3` | 未在跑。本次笔记不把行为写成这个 pin                                                           |
+| 实际 Mac 进程  | `156b03113c6cb45f2be56da57dccae65f4f8a5e3` | 本次五步只钉这一进程                                                                           |
+| HK LIVE        | `65564d30b25a41f49866f96e0efed9caacd80a9b` | 不是本次。RepoDigest `sha256:52cb4039a395717a1381f94f4c276306f085ec15c9b2bd63ff6f539baa993e6f` |
+| #553           | `17e11f1549531f2fc50c1d3b4417e8beff64f858` | 已在后来的 `main`。不是本次进程                                                                |
 
 ## 3. §4.2 三层记录表
 
 表结构与 #549 §4.2 一致。可用性只写在结论栏。关系、投影、绑定分开记。事后看到的 `SKILL.md` 不是下一次 `resolveEmbeddedRunSkillEntries`，也不是可用性 `ready`。
 
-| 步 | 安装关系 | 执行投影 | 运行时绑定 | 结论栏（仅笔记） | 失败原因原文 |
-| --- | --- | --- | --- | --- | --- |
-| 创建或选择 | 选中已有技能 `consult-win-advisor`（`lifecycle=approved`，`assetType=mcp`，`ver=1.0.2`，`agentId=main`）。新建 draft 的保存/定稿没有落成 | 本次报告未给出本步新投影 | 本次报告未给出本步绑定 | 选择已有 `approved` 资产。draft 保存/定稿失败，没有把 draft 装成可执行 | `authenticated user required to save personal assets`。WS 带 `user` 连接：`invalid connect params: unexpected property 'user'` |
-| 保存 | 再读位置是 skill-assets，不是 `employee-install.json` | 本次报告未给出本步投影 | 本次报告未给出本步绑定 | 再读 PASS：`~/.openbot/skill-assets/store.json`。`personal-skills.detail` 需要认证，这次再读不是走 detail RPC | 保存/定稿失败文案见上一行。运行 SHA 上该句由 `SkillAssetStoreError` 抛出（`src/gateway/personal-skill-asset-scope.ts`）。现场报告没有另打印类名 |
-| 授权/安装（主切片） | PASS。关系 `rel_main_consult-win-advisor`，enabled | 事后文件系统核对 PASS：`skill-execution-bindings/main/ob-asset-consult-win-advisor/` 下有 `SKILL.md`。这不是 loader，也不是可用性 `ready` | RPC 中缺席。无 #553，响应没有 `runtimeBinding` | 顶层键只有 `["skill"]`。关系与事后投影分开记。`{ skill }` 不证明绑定 `synced`，也不证明下一轮 loader | 响应里没有绑定 reason。旁注：`health.broken`，`mcporter` 不在 PATH |
-| 授权/安装（对照 employee-install） | 请求 `status=installed`。这是安装请求，不是 `robotRelations`。探针请求随后从 `employee-install.json` 删除 | 响应没有投影 `ready` | 响应没有 `reason`，没有 `executable` | `nextStep=done`。**installed ≠ ready。** 不把这次确认写成可用性 `ready` | 响应里没有 `syncInstallToRuntime` 的 reason，也没有 `console.warn` 记录 |
-| 运行（下一次 loader） | 本次报告未给出本步关系变化 | **PARTIAL。** 绑定切片经文件系统可见，名字与来源符合预期。完整函数没有跑成 | 完整 loader 未返回绑定过滤结果 | **PARTIAL，不是 PASS。** 不得据此勾「真实执行上下文可见」 | `resolveEmbeddedRunSkillEntries` 导入失败：`ERR_PACKAGE_PATH_NOT_EXPORTED`（`@earendil-works/pi-coding-agent`） |
-| 撤销 | PASS。关系已清除，列表为空 | 目录已消失 | 本次报告未给出绑定复核。`{ ok: true }` 不是绑定证据 | 关系清除、目录消失、列表为空，响应 `{ ok: true }`。这三条都不是下一次 `resolveEmbeddedRunSkillEntries` | 无失败文案。`{ ok: true }` 不单独当作下一轮 loader 证据 |
-| 撤销后的下一次 loader | 本次没有成功的 loader 调用 | 不把「目录已消失」升级成 loader 结果 | 本次没有成功的 loader 调用 | **未形成 PASS。** transcript 没有撤销之后另一次成功的 `resolveEmbeddedRunSkillEntries` | 安装后的导入失败仍是 `ERR_PACKAGE_PATH_NOT_EXPORTED`。没有另一次成功调用 |
+| 步                                 | 安装关系                                                                                                                                 | 执行投影                                                                                                                                  | 运行时绑定                                          | 结论栏（仅笔记）                                                                                              | 失败原因原文                                                                                                                                    |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 创建或选择                         | 选中已有技能 `consult-win-advisor`（`lifecycle=approved`，`assetType=mcp`，`ver=1.0.2`，`agentId=main`）。新建 draft 的保存/定稿没有落成 | 本次报告未给出本步新投影                                                                                                                  | 本次报告未给出本步绑定                              | 选择已有 `approved` 资产。draft 保存/定稿失败，没有把 draft 装成可执行                                        | `authenticated user required to save personal assets`。WS 带 `user` 连接：`invalid connect params: unexpected property 'user'`                  |
+| 保存                               | 再读位置是 skill-assets，不是 `employee-install.json`                                                                                    | 本次报告未给出本步投影                                                                                                                    | 本次报告未给出本步绑定                              | 再读 PASS：`~/.openbot/skill-assets/store.json`。`personal-skills.detail` 需要认证，这次再读不是走 detail RPC | 保存/定稿失败文案见上一行。运行 SHA 上该句由 `SkillAssetStoreError` 抛出（`src/gateway/personal-skill-asset-scope.ts`）。现场报告没有另打印类名 |
+| 授权/安装（主切片）                | PASS。关系 `rel_main_consult-win-advisor`，enabled                                                                                       | 事后文件系统核对 PASS：`skill-execution-bindings/main/ob-asset-consult-win-advisor/` 下有 `SKILL.md`。这不是 loader，也不是可用性 `ready` | RPC 中缺席。无 #553，响应没有 `runtimeBinding`      | 顶层键只有 `["skill"]`。关系与事后投影分开记。`{ skill }` 不证明绑定 `synced`，也不证明下一轮 loader          | 响应里没有绑定 reason。旁注：`health.broken`，`mcporter` 不在 PATH                                                                              |
+| 授权/安装（对照 employee-install） | 请求 `status=installed`。这是安装请求，不是 `robotRelations`。探针请求随后从 `employee-install.json` 删除                                | 响应没有投影 `ready`                                                                                                                      | 响应没有 `reason`，没有 `executable`                | `nextStep=done`。**installed ≠ ready。** 不把这次确认写成可用性 `ready`                                       | 响应里没有 `syncInstallToRuntime` 的 reason，也没有 `console.warn` 记录                                                                         |
+| 运行（下一次 loader）              | 本次报告未给出本步关系变化                                                                                                               | **PARTIAL。** 绑定切片经文件系统可见，名字与来源符合预期。完整函数没有跑成                                                                | 完整 loader 未返回绑定过滤结果                      | **PARTIAL，不是 PASS。** 不得据此勾「真实执行上下文可见」                                                     | `resolveEmbeddedRunSkillEntries` 导入失败：`ERR_PACKAGE_PATH_NOT_EXPORTED`（`@earendil-works/pi-coding-agent`）                                 |
+| 撤销                               | PASS。关系已清除，列表为空                                                                                                               | 目录已消失                                                                                                                                | 本次报告未给出绑定复核。`{ ok: true }` 不是绑定证据 | 关系清除、目录消失、列表为空，响应 `{ ok: true }`。这三条都不是下一次 `resolveEmbeddedRunSkillEntries`        | 无失败文案。`{ ok: true }` 不单独当作下一轮 loader 证据                                                                                         |
+| 撤销后的下一次 loader              | 本次没有成功的 loader 调用                                                                                                               | 不把「目录已消失」升级成 loader 结果                                                                                                      | 本次没有成功的 loader 调用                          | **未形成 PASS。** transcript 没有撤销之后另一次成功的 `resolveEmbeddedRunSkillEntries`                        | 安装后的导入失败仍是 `ERR_PACKAGE_PATH_NOT_EXPORTED`。没有另一次成功调用                                                                        |
 
 幂等补行：本次现场没有对同一机器人、同一技能再执行第二次 `robot-skills.install`。不记幂等通过。并发未测。
 

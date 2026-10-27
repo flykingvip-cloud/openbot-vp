@@ -16,6 +16,7 @@ const personalScope: TrustedScope = {
   subjectRef: "user:daniel",
   authzScopeRef: "scope:local",
 };
+const scope = personalScope;
 
 describe("TaskOutcome result service + durable consume", () => {
   let root = "";
@@ -25,7 +26,10 @@ describe("TaskOutcome result service + durable consume", () => {
   beforeEach(() => {
     root = fs.mkdtempSync(path.join(os.tmpdir(), "task-outcome-"));
     store = new DurableTaskOutcomeStore(root);
-    service = new TaskOutcomeResultService({ store });
+    service = new TaskOutcomeResultService({
+      store,
+      correctionAllowlist: ["reviewer-1", "ops", "auditor"],
+    });
   });
 
   afterEach(() => {
@@ -33,7 +37,7 @@ describe("TaskOutcome result service + durable consume", () => {
     fs.rmSync(root, { recursive: true, force: true });
   });
 
-  it("scenario A: tool success, acceptance pending, delivery blocked — incomplete, no success score", () => {
+  it("scenario A: tool success, acceptance pending, delivery blocked — incomplete, no success score", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-a",
@@ -64,19 +68,20 @@ describe("TaskOutcome result service + durable consume", () => {
         fencingToken: ft,
         status: "succeeded",
       },
+      { scope },
     );
     expect(r1.ok).toBe(true);
     if (!r1.ok) {
       return;
     }
     v = r1.record.outcomeVersion;
-    const r2 = chat.setAcceptance("t-a", v, ft, { status: "pending" }, { allowRetry: true });
+    const r2 = chat.setAcceptance("t-a", v, ft, { status: "pending" }, { allowRetry: true, scope });
     expect(r2.ok).toBe(true);
     if (!r2.ok) {
       return;
     }
     v = r2.record.outcomeVersion;
-    const r3 = chat.setDelivery("t-a", v, ft, { status: "blocked" });
+    const r3 = chat.setDelivery("t-a", v, ft, { status: "blocked" }, undefined, { scope });
     expect(r3.ok).toBe(true);
     if (!r3.ok) {
       return;
@@ -85,7 +90,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(r3.record.taskJudgement).toBe("incomplete");
 
     const consumer = new OutcomeConsumerRuntime(store);
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().successCount).toBe(0);
   });
 
@@ -112,6 +117,7 @@ describe("TaskOutcome result service + durable consume", () => {
         observedAt: new Date().toISOString(),
       },
       { runId: "r1", attemptIds: ["a1"], fencingToken: ft, status: "succeeded" },
+      { scope },
     );
     if (!attempt.ok) {
       throw new Error("attempt");
@@ -134,6 +140,7 @@ describe("TaskOutcome result service + durable consume", () => {
             executionVersion: "exec-1",
           },
         ],
+        scope,
       },
     );
     expect(closed.ok).toBe(true);
@@ -147,7 +154,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(el.attribution).toBe("capability");
   });
 
-  it("scenario C: fail then repair success counts once; history retained", () => {
+  it("scenario C: fail then repair success counts once; history retained", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-c",
@@ -170,12 +177,13 @@ describe("TaskOutcome result service + durable consume", () => {
         observedAt: new Date().toISOString(),
       },
       { runId: "r1", attemptIds: ["a1"], fencingToken: ft, status: "failed" },
+      { scope },
     );
     if (!res.ok) {
       throw new Error("a1");
     }
     v = res.record.outcomeVersion;
-    res = chat.setAcceptance("t-c", v, ft, { status: "failed" }, { allowRetry: true });
+    res = chat.setAcceptance("t-c", v, ft, { status: "failed" }, { allowRetry: true, scope });
     if (!res.ok) {
       throw new Error("acc fail");
     }
@@ -194,17 +202,18 @@ describe("TaskOutcome result service + durable consume", () => {
         observedAt: new Date().toISOString(),
       },
       { runId: "r2", attemptIds: ["a2"], fencingToken: ft, status: "succeeded" },
+      { scope },
     );
     if (!res.ok) {
       throw new Error("a2");
     }
     v = res.record.outcomeVersion;
-    res = chat.setAcceptance("t-c", v, ft, { status: "passed" }, { allowRetry: false });
+    res = chat.setAcceptance("t-c", v, ft, { status: "passed" }, { allowRetry: false, scope });
     if (!res.ok) {
       throw new Error("acc pass");
     }
     v = res.record.outcomeVersion;
-    res = chat.setDelivery("t-c", v, ft, { status: "delivered" }, "del-1");
+    res = chat.setDelivery("t-c", v, ft, { status: "delivered" }, "del-1", { scope });
     if (!res.ok) {
       throw new Error("del");
     }
@@ -212,7 +221,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(res.record.attempts.map((a) => a.attemptId)).toEqual(["a1", "a2"]);
 
     const consumer = new OutcomeConsumerRuntime(store);
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().successCount).toBe(1);
   });
 
@@ -226,7 +235,7 @@ describe("TaskOutcome result service + durable consume", () => {
     if (!opened.ok) {
       throw new Error("open");
     }
-    const res = chat.rejectBeforePreflight("t-d", "policy deny");
+    const res = chat.rejectBeforePreflight("t-d", "policy deny", scope);
     expect(res.ok).toBe(true);
     if (!res.ok) {
       return;
@@ -250,15 +259,15 @@ describe("TaskOutcome result service + durable consume", () => {
     }
     const ft = opened.fencingToken;
     const v = opened.record.outcomeVersion;
-    const a = chat.cancel("t-cas", v, ft);
-    const b = chat.setDelivery("t-cas", v, ft, { status: "delivered" }, "race-del");
+    const a = chat.cancel("t-cas", v, ft, { scope });
+    const b = chat.setDelivery("t-cas", v, ft, { status: "delivered" }, "race-del", { scope });
     expect(a.ok).toBe(true);
     expect(b.ok).toBe(false);
     if (!b.ok) {
       expect(b.code).toBe("version_conflict");
     }
     // identical cancel retry returns same terminal (idempotent), not a second close
-    const retry = chat.cancel("t-cas", v, ft);
+    const retry = chat.cancel("t-cas", v, ft, { scope });
     expect(retry.ok).toBe(true);
     if (retry.ok) {
       expect(retry.record.outcomeVersion).toBe(a.ok ? a.record.outcomeVersion : -1);
@@ -277,13 +286,13 @@ describe("TaskOutcome result service + durable consume", () => {
     }
     const ft = opened.fencingToken;
     let v = opened.record.outcomeVersion;
-    const cancelled = chat.cancel("t-race", v, ft);
+    const cancelled = chat.cancel("t-race", v, ft, { scope });
     expect(cancelled.ok).toBe(true);
     if (!cancelled.ok) {
       return;
     }
     v = cancelled.record.outcomeVersion;
-    const late = chat.setDelivery("t-race", v, ft, { status: "delivered" }, "late");
+    const late = chat.setDelivery("t-race", v, ft, { status: "delivered" }, "late", { scope });
     expect(late.ok).toBe(false);
     if (!late.ok) {
       expect(late.code).toBe("terminal_protected");
@@ -291,7 +300,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(service.get("t-race")?.taskJudgement).toBe("cancelled");
   });
 
-  it("crash between consume update and ack: replay does not double-count", () => {
+  it("crash between consume update and ack: replay does not double-count", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-crash",
@@ -303,12 +312,18 @@ describe("TaskOutcome result service + durable consume", () => {
     }
     const ft = opened.fencingToken;
     let v = opened.record.outcomeVersion;
-    let res = chat.setAcceptance("t-crash", v, ft, { status: "passed" }, { allowRetry: false });
+    let res = chat.setAcceptance(
+      "t-crash",
+      v,
+      ft,
+      { status: "passed" },
+      { allowRetry: false, scope },
+    );
     if (!res.ok) {
       throw new Error("acc");
     }
     v = res.record.outcomeVersion;
-    res = chat.setDelivery("t-crash", v, ft, { status: "delivered" }, "d1");
+    res = chat.setDelivery("t-crash", v, ft, { status: "delivered" }, "d1", { scope });
     if (!res.ok) {
       throw new Error("del");
     }
@@ -332,7 +347,7 @@ describe("TaskOutcome result service + durable consume", () => {
     // We mark contribution already at v; second apply with same version should not double.
     const again = store2.loadContribution(personalScope.personalDomainId, "t-crash");
     expect(again?.judgement).toBe("success");
-    consumer2.drain((id) => service2.get(id));
+    await consumer2.drain((id) => service2.get(id));
     // successCount from consumer2 starts 0; drain applies once
     expect(consumer2.getProjection().successCount).toBeLessThanOrEqual(1);
   });
@@ -355,7 +370,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(got?.taskJudgement).toBe("incomplete");
   });
 
-  it("correction v1 failure -> v2 success revokes old contribution", () => {
+  it("correction v1 failure -> v2 success revokes old contribution", async () => {
     const chat = new ChatTaskOutcomeAdapter(service);
     const opened = chat.createOrRestore({
       taskId: "t-fix",
@@ -367,29 +382,39 @@ describe("TaskOutcome result service + durable consume", () => {
     }
     const ft = opened.fencingToken;
     let v = opened.record.outcomeVersion;
-    let res = chat.setAcceptance("t-fix", v, ft, { status: "failed" }, { allowRetry: false });
+    let res = chat.setAcceptance(
+      "t-fix",
+      v,
+      ft,
+      { status: "failed" },
+      { allowRetry: false, scope },
+    );
     if (!res.ok) {
       throw new Error("fail");
     }
     const consumer = new OutcomeConsumerRuntime(store);
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().failureCount).toBe(1);
 
-    const corr = service.submit("t-fix", {
-      type: "correction",
-      expectedVersion: res.record.outcomeVersion,
-      previousOutcomeVersion: res.record.outcomeVersion,
-      authorizedBy: "auditor",
-      revisionReason: "mis-validated artifact",
-      acceptance: { status: "passed" },
-      delivery: { status: "delivered" },
-      decisiveRunStatus: "succeeded",
-    });
+    const corr = service.submit(
+      "t-fix",
+      {
+        type: "correction",
+        expectedVersion: res.record.outcomeVersion,
+        previousOutcomeVersion: res.record.outcomeVersion,
+        authorizedBy: "ops",
+        revisionReason: "mis-validated artifact",
+        acceptance: { status: "passed" },
+        delivery: { status: "delivered" },
+        decisiveRunStatus: "succeeded",
+      },
+      { requiredScope: scope, callerSubjectRef: "ops" },
+    );
     expect(corr.ok).toBe(true);
     if (!corr.ok) {
       return;
     }
-    consumer.drain((id) => service.get(id));
+    await consumer.drain((id) => service.get(id));
     expect(consumer.getProjection().failureCount).toBe(0);
     expect(consumer.getProjection().successCount).toBe(1);
   });
@@ -423,13 +448,16 @@ describe("TaskOutcome result service + durable consume", () => {
             executionVersion: "e1",
           },
         ],
+        scope,
       },
     );
     if (!res.ok) {
       throw new Error("acc");
     }
     v = res.record.outcomeVersion;
-    const inv = service.invalidateAcceptanceIfArtifactChanged("t-art", "sha256:new", v, ft);
+    const inv = service.invalidateAcceptanceIfArtifactChanged("t-art", "sha256:new", v, ft, {
+      requiredScope: scope,
+    });
     expect(inv.ok).toBe(true);
     if (!inv.ok) {
       return;
@@ -455,6 +483,8 @@ describe("TaskOutcome result service + durable consume", () => {
     if (a.ok && b.ok) {
       expect(a.record.taskId).toBe(b.record.taskId);
       expect(a.record.outcomeVersion).toBe(b.record.outcomeVersion);
+      expect(a.record.entrypoint).toBe("cron");
+      expect(b.record.entrypoint).toBe("cron");
     }
     const other = cron.openTask({
       taskId: "cron:job1:fire-10",
@@ -464,6 +494,7 @@ describe("TaskOutcome result service + durable consume", () => {
     expect(other.ok).toBe(true);
     if (other.ok) {
       expect(other.record.taskId).toBe("cron:job1:fire-10");
+      expect(other.record.entrypoint).toBe("cron");
     }
   });
 

@@ -1,3 +1,5 @@
+import { accumulateTaskBudgetSpend } from "./budget.js";
+import { assessTargetModalityAcceptance } from "./capability-modality.js";
 import { deriveLifecycle, projectTaskJudgement } from "./judge.js";
 import type {
   AcceptanceEvidence,
@@ -46,6 +48,9 @@ export function applyTransition(
       judgementPolicyVersion: JUDGEMENT_POLICY_VERSION,
       scope: transition.scope,
       taskId,
+      ...(transition.parentTaskId?.trim() ? { parentTaskId: transition.parentTaskId.trim() } : {}),
+      ...(transition.taskContract ? { taskContract: transition.taskContract } : {}),
+      ...(transition.budget ? { budget: transition.budget } : {}),
       entrypoint: transition.entrypoint,
       lifecycle,
       decisiveRunStatus: "none",
@@ -119,11 +124,139 @@ export function applyTransition(
       if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
         return { record: current, illegal: "stale_fencing" };
       }
+      // W3: refuse invented not_required when tip carries a non-chat_turn contract.
+      if (transition.acceptance.status === "not_required" && current.taskContract) {
+        const kind = current.taskContract.kind;
+        const hasValidators = (current.taskContract.requiredValidators ?? []).some((v) =>
+          Boolean(v?.trim()),
+        );
+        if (kind !== "chat_turn" || hasValidators) {
+          return {
+            record: current,
+            illegal: `invented_not_required:kind=${kind}`,
+          };
+        }
+      }
+      // Formal acceptance: refuse target success when structured modality is incomplete
+      // / executor_unwired. Missing modality stays legacy-compatible (allow).
+      if (
+        transition.acceptance.status === "passed" ||
+        transition.acceptance.status === "not_required"
+      ) {
+        const modality = current.capabilityModality;
+        if (modality) {
+          const assessed = assessTargetModalityAcceptance(modality);
+          if (!assessed.targetModalitySucceeded) {
+            return {
+              record: current,
+              illegal: `target_modality_not_accepted:${assessed.reason}`,
+            };
+          }
+        }
+      }
       stopRecovery = !transition.allowRetry && transition.acceptance.status === "failed";
       next = {
         ...next,
         acceptance: transition.acceptance,
         acceptanceEvidence: transition.evidence ?? current.acceptanceEvidence,
+      };
+      break;
+    }
+    case "mark_target_modality_completed": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      const modality = current.capabilityModality;
+      if (!modality) {
+        return { record: current, illegal: "missing_capability_modality" };
+      }
+      const digest = transition.evidence?.digestOrRef?.trim() ?? "";
+      if (!digest) {
+        return { record: current, illegal: "missing_execution_evidence" };
+      }
+      if (
+        modality.executionStatus === "executor_unwired" ||
+        modality.planFailureKind === "executor_unwired"
+      ) {
+        return { record: current, illegal: "cannot_complete_executor_unwired" };
+      }
+      if (
+        modality.executionStatus === "no_executable_candidates" ||
+        modality.planFailureKind === "no_executable_candidates"
+      ) {
+        return { record: current, illegal: "cannot_complete_no_executable_candidates" };
+      }
+      if (
+        modality.executionStatus === "unsupported" ||
+        modality.planFailureKind === "unsupported"
+      ) {
+        return { record: current, illegal: "cannot_complete_unsupported" };
+      }
+      const { incompleteReason: _dropIncomplete, ...modalityRest } = modality;
+      next = {
+        ...next,
+        capabilityModality: {
+          ...modalityRest,
+          executionStatus: "completed",
+          targetModalityCompleted: true,
+        },
+        reasonDetail: [
+          current.reasonDetail,
+          `target_modality_completed_via=${transition.evidence.kind}:${digest}`,
+          transition.evidence.detail,
+        ]
+          .filter(Boolean)
+          .join(" | "),
+      };
+      break;
+    }
+    case "set_task_contract": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        taskContract: transition.taskContract,
+        // Keep legacy version string aligned when identity is set.
+        taskContractVersion: transition.taskContract.version || current.taskContractVersion,
+      };
+      break;
+    }
+    case "set_budget": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        budget: transition.budget,
+      };
+      break;
+    }
+    case "set_experience_exposure": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        experienceExposure: transition.experienceExposure,
+      };
+      break;
+    }
+    case "accumulate_budget_spend": {
+      if (current.fencingToken && transition.fencingToken !== current.fencingToken) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      if (!current.budget) {
+        return { record: current, illegal: "missing_budget" };
+      }
+      const nowMs = transition.nowMs ?? Date.parse(nowIso);
+      next = {
+        ...next,
+        budget: accumulateTaskBudgetSpend(
+          current.budget,
+          { costUsd: transition.costUsd, iterations: transition.iterations },
+          Number.isFinite(nowMs) ? nowMs : Date.now(),
+        ),
       };
       break;
     }
@@ -199,6 +332,31 @@ export function applyTransition(
       }
       break;
     }
+
+    case "fail_closed": {
+      if (
+        current.fencingToken &&
+        transition.fencingToken &&
+        transition.fencingToken !== current.fencingToken
+      ) {
+        return { record: current, illegal: "stale_fencing" };
+      }
+      next = {
+        ...next,
+        reasonCode: transition.reasonCode,
+        reasonDetail: transition.reasonDetail,
+        lifecycle: "closed",
+        taskJudgement: transition.reasonCode === "user_cancelled" ? "cancelled" : "failure",
+      };
+      // force closed below
+      stopRecovery = true;
+      prepareFailed =
+        transition.reasonCode === "prepare_failed" ||
+        transition.reasonCode === "preflight_rejected";
+      cancelRequested = transition.reasonCode === "user_cancelled";
+      break;
+    }
+
     default:
       return { record: current, illegal: "illegal_transition" };
   }
@@ -207,6 +365,10 @@ export function applyTransition(
     next.lifecycle = "closed";
     next.taskJudgement = "failure";
     next.reasonCode = "delivery_unconfirmed_close";
+  } else if (transition.type === "fail_closed") {
+    next.lifecycle = "closed";
+    next.taskJudgement = transition.reasonCode === "user_cancelled" ? "cancelled" : "failure";
+    next.reasonCode = transition.reasonCode;
   } else {
     const lifecycle = deriveLifecycle({
       cancelRequested,

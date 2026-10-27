@@ -1,21 +1,21 @@
 /**
- * 复用阈值策展：反复被证明有效的经验 → 自动沉淀为**技能草稿**（待人工审核）。
+ * 经验有效性策展：反复被 **outcome_verified** 证明有效的经验 → 自动沉淀为**技能草稿**（待人工审核）。
  *
- * 这是"越用越强"叙事此前唯一完全缺失的一环。原实现里晋升门禁看的是群参与率，
- * 与复用次数无关；capsule/asset 数据模型里也没有任何计数字段。
- *
- * 现在的口径：
- *  - **复用** = 学习资产真的被注入进系统提示词（`learning-recall.ts` 记账），
- *    不是被创建、也不是被查看；
- *  - 同一条经验反复出现（多个资产同源）也算重复验证；
- *  - 达阈值 → 生成 `draft` 状态技能，**不自动发布**，等人工审核。
+ * W4 口径修正（曝光 ≠ verified）：
+ *  - **outcome_verified** = tip closed+eligible **且**有采用证据（adopted∩exposure）；共现成功≠有效；
+ *  - 提示词注入只算曝光（injected）；成功任务中的曝光也不触发策展；
+ *  - 同一条经验反复出现（多个资产同源）仍可走 occurrence 阈值；
+ *  - 达阈值 → 生成 `draft` 状态技能，**不自动发布**，等人工审核（既有 skill lifecycle）。
+ * 普通偏好/事实更新不走本策展，也不走实验晋升。
  */
 
 import type { AgentLearningAsset } from "@openbot/collaboration-core";
 import { stringValue } from "../records.js";
 
-/** 累计复用次数阈值（跨簇求和）。 */
+/** 累计 outcome_verified 次数阈值（跨簇求和）。 */
 export const DEFAULT_REUSE_THRESHOLD = 3;
+/** @deprecated W4 alias — same as DEFAULT_REUSE_THRESHOLD (verified, not exposure). */
+export const DEFAULT_OUTCOME_VERIFIED_THRESHOLD = DEFAULT_REUSE_THRESHOLD;
 /** 同一条经验重复出现的资产数阈值。 */
 export const DEFAULT_OCCURRENCE_THRESHOLD = 3;
 
@@ -26,7 +26,8 @@ export type SkillDraftCandidate = {
   botId: string;
   assetType: NonNullable<AgentLearningAsset["assetType"]>;
   /** 触发条件命中的原因，进入草稿说明便于审核者判断。 */
-  trigger: "reuse_threshold" | "occurrence_threshold";
+  trigger: "outcome_verified_threshold" | "occurrence_threshold";
+  /** Sum of outcomeVerifiedCount across the cluster (not injection/exposure). */
   totalReuse: number;
   occurrences: number;
   title: string;
@@ -81,8 +82,9 @@ function isCuratable(asset: AgentLearningAsset): boolean {
 /**
  * 纯函数：从学习资产推导出应当沉淀为技能草稿的候选簇。
  *
- * 只要满足**累计复用**或**重复出现**任一阈值即毕业；两个阈值都不满足则不产出，
- * 避免把偶发经验包装成"能力"。
+ * 只要满足**累计 outcome_verified**或**重复出现**任一阈值即毕业；两个阈值都不满足则不产出，
+ * 避免把偶发经验或仅提示词曝光包装成"能力"。
+ * `reuseThreshold` 参数名保留兼容，语义已改为 verified 阈值。
  */
 export function deriveSkillDraftCandidates(
   assets: AgentLearningAsset[],
@@ -115,11 +117,15 @@ export function deriveSkillDraftCandidates(
 
   const candidates: SkillDraftCandidate[] = [];
   for (const [clusterKey, bucket] of clusters) {
-    const totalReuse = bucket.reduce((sum, asset) => sum + (asset.reuseCount ?? 0), 0);
+    // W4: curation metric is outcome_verified, not prompt injection / legacy reuseCount.
+    const totalReuse = bucket.reduce(
+      (sum, asset) => sum + Math.max(0, Math.floor(asset.outcomeVerifiedCount ?? 0)),
+      0,
+    );
     const occurrences = bucket.length;
-    const meetsReuse = totalReuse >= reuseThreshold;
+    const meetsVerified = totalReuse >= reuseThreshold;
     const meetsOccurrence = occurrences >= occurrenceThreshold;
-    if (!meetsReuse && !meetsOccurrence) {
+    if (!meetsVerified && !meetsOccurrence) {
       continue;
     }
     const newest = bucket.toSorted(
@@ -139,7 +145,7 @@ export function deriveSkillDraftCandidates(
       assetIds: bucket.map((asset) => asset.assetId),
       botId: newest.botId,
       assetType: newest.assetType ?? "lesson",
-      trigger: meetsReuse ? "reuse_threshold" : "occurrence_threshold",
+      trigger: meetsVerified ? "outcome_verified_threshold" : "occurrence_threshold",
       totalReuse,
       occurrences,
       title: readText(content.title) ?? lesson.slice(0, 60),
@@ -167,8 +173,8 @@ export function buildSkillDraftProfile(candidate: SkillDraftCandidate): {
   outputDescription: string;
 } {
   const reasonLabel =
-    candidate.trigger === "reuse_threshold"
-      ? `累计复用 ${candidate.totalReuse} 次`
+    candidate.trigger === "outcome_verified_threshold"
+      ? `累计验证有效 ${candidate.totalReuse} 次`
       : `重复出现 ${candidate.occurrences} 次`;
   return {
     name: `经验沉淀：${candidate.title}`.slice(0, 120),

@@ -1,0 +1,19 @@
+
+ RUN  v4.0.18 /private/tmp/openbot-memory-batch1-rework
+
+stderr | ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+
+stderr | ui/src/ui/ports/employee/views/memory-center-page.node.test.ts
+Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+
+ ✓ ui/src/ui/ports/employee/views/memory-center-page.node.test.ts (5 tests) 40ms
+ ✓ ui/src/ui/ports/employee/views/data-directory-page.node.test.ts (5 tests) 28ms
+ ✓ src/memory/memory-batch1-o4-o5-diagnose.test.ts (3 tests) 56ms
+ ✓ src/gateway/server-methods/memory-forget-gateway-isolation.test.ts (5 tests) 8ms
+
+ Test Files  4 passed (4)
+      Tests  18 passed (18)
+   Start at  15:37:46
+   Duration  4.45s (transform 5.45s, setup 851ms, import 8.10s, tests 131ms, environment 722ms)
+

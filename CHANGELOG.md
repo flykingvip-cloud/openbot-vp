@@ -4,6 +4,12 @@ Docs: https://docs.openbot.love
 
 ## Unreleased
 
+- Platform/models: clarify routing eligibility scope — `setRoutingEligibility` `applied` / `platformEffective` writes the gateway admission store and feeds dry-run `previewRoutingDecision` / admin UX only; live agent/chat model selection does **not** consume `autoRouting` / `tenantSelectable` yet. UI copy and banners narrowed accordingly. (#107) Thanks @flykingvip-cloud.
+- Platform/models: RPC/registry e2e regression for `models.admission` — online/offline bind, refresh interrupt, cancel+retry, batch partial success, Chinese trial classification, and explicit text output constraints (in-process fake gateway; no paid gen APIs). (#107) Thanks @flykingvip-cloud.
+- Platform/models: gateway `models.admission` verification ignores client `connectionOk` for formal text_chat passed; async tasks return `taskId` promptly and re-check cancel / config fingerprint / execution generation plus wall-clock timeout before merging formal evidence (late success cannot pollute current admission). (#107) Thanks @flykingvip-cloud.
+
+- Platform/models: capability admission UX — separate connection vs verified capability vs auto-routing, fingerprint-bound verification tasks with cancel/refresh interrupt, capability matrix/history, and a dry-run smart-routing trial preview labeled as UI demo (not backend decision). (#91) Thanks @gmood2008.
+
 - Evolution/digital-employee: soft/observe self-running closed loop (Apply→Verify→Promote) for `agent.working-dna` and `capability.skill-installation`. Governance tick advances eligible tenant-scoped proposals past Experiment with soft canary only; does not enable LIVE_INVOKE, Fabric default-on, or Phase-D-enforce. Timeline treats superseded rollback-drill receipts as non-final so `verified_effective` / `learned_this_week` can surface after Promote. Env `OPENBOT_EVOLUTION_SOFT_OBSERVE_DH=on|off` (default on). Claim: runtime-enabled.
 
 - Agents/skills: add agent tool `skill_asset_save` so steward can submit a workspace `skills/<name>/SKILL.md` into **我的资产** when the user asks to 纳入资产 / 收录为资产 (solver path; not `/account/skills` remount and not inventing gateway RPCs). Wire coding/messaging profiles + sandbox allow; document in `openbot-platform-ops` skill-asset-incubation.
@@ -2674,6 +2680,8 @@ Docs: https://docs.openbot.love
 ## 2026.2.9
 
 ### Added
+
+- Platform models capability admission gateway RPC (`models.admission.*`): formal verification tasks, routing eligibility apply, and dry-run decision preview. UI binds when gateway connected; offline falls back to local_protocol. Stub/demo evidence still cannot become formal verified. Does not call paid Midjourney/Suno APIs.
 
 - Commands: add `commands.allowFrom` config for separate command authorization, allowing operators to restrict slash commands to specific users while keeping chat open to others. (#12430) Thanks @thewilloftheshadow.
 - Docker: add ClawDock shell helpers for Docker workflows. (#12817) Thanks @Olshansk.

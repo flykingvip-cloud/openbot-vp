@@ -77,28 +77,27 @@
 
 细则以 `browser-scan-proxy` 的 `references/routing.md` 为准。工具仍是 OpenBot `browser`，禁止再起一个叫 `browser` 的技能名。跨服务器 / 本机节点的整条任务先走 `independent-work`。
 
-| 用户说                                       | 技能                             | 是否自动触发                          |
-| -------------------------------------------- | -------------------------------- | ------------------------------------- |
-| 扫码登录 / 你打开网页我来扫 / 重新启动浏览器 | **`browser-scan-proxy`**         | 是                                    |
-| 已经扫码完毕 / 授权过期 / 二次扫码           | **`browser-scan-proxy`**         | 是                                    |
-| 配公众号 AppID / AppSecret / IP 白名单       | **`wechat-official-credential`** | 是；扫码循环仍用 `browser-scan-proxy` |
-| 个人设置里配私有数字身份 / 绑定账户          | **`oi-orchestrate-personal-identity`** | 是；再委派 oi-bind-* |
-| 找不到按钮、带我点                           | `user-guidance-protocol`         | 否：用户自己点                        |
-| 读公开网页 / 调研                            | `web-research` / `defuddle`      | 否：无登录公开页                      |
-
+| 用户说                                       | 技能                                   | 是否自动触发                          |
+| -------------------------------------------- | -------------------------------------- | ------------------------------------- |
+| 扫码登录 / 你打开网页我来扫 / 重新启动浏览器 | **`browser-scan-proxy`**               | 是                                    |
+| 已经扫码完毕 / 授权过期 / 二次扫码           | **`browser-scan-proxy`**               | 是                                    |
+| 配公众号 AppID / AppSecret / IP 白名单       | **`wechat-official-credential`**       | 是；扫码循环仍用 `browser-scan-proxy` |
+| 个人设置里配私有数字身份 / 绑定账户          | **`oi-orchestrate-personal-identity`** | 是；再委派 oi-bind-\*                 |
+| 找不到按钮、带我点                           | `user-guidance-protocol`               | 否：用户自己点                        |
+| 读公开网页 / 调研                            | `web-research` / `defuddle`            | 否：无登录公开页                      |
 
 ## 个人私有数字身份（授权目录）
 
-| 用户说 | 技能 | 说明 |
-| ------ | ---- | ---- |
-| 配数字身份 / 绑定账户 / 完善我的授权 | **`oi-orchestrate-personal-identity`** | 大白编排入口；不直接写库 |
-| 个人公众号 AppID / AppSecret | **`oi-bind-wechat-official`** | 委派 `wechat-official-credential`；个人店 |
-| 绑定个人邮箱 / 126·163 授权码 | **`oi-bind-personal-email`** | Path B 表单 + Path C browser |
-| 绑定 GitHub 个人 OAuth | **`oi-bind-github-personal`** | oauth.start；云电脑打开授权页 |
+| 用户说                                       | 技能                                     | 说明                                                                                                   |
+| -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| 配数字身份 / 绑定账户 / 完善我的授权         | **`oi-orchestrate-personal-identity`**   | 大白编排入口；不直接写库                                                                               |
+| 个人公众号 AppID / AppSecret                 | **`oi-bind-wechat-official`**            | 委派 `wechat-official-credential`；个人店                                                              |
+| 绑定个人邮箱 / 126·163 授权码                | **`oi-bind-personal-email`**             | Path B 表单 + Path C browser                                                                           |
+| 绑定 GitHub 个人 OAuth                       | **`oi-bind-github-personal`**            | oauth.start；云电脑打开授权页                                                                          |
 | 绑定社媒（小红书/抖音/微博/B站/知乎/快手/X） | **`oi-bind-xiaohongshu`** 等 `oi-bind-*` | credentials.bind (social_account)；仍 `path_unstable`（S5：微博已测 GeeTest/111001，未 verified_live） |
-| 个人数字身份默认推荐（S5） | **`oi-orchestrate-personal-identity`** | 默认只推 `verified_live`；公众号云电脑证据见 `oi-bind-wechat-official` |
-| 授权给自有数字人 | **`oi-grant-owned-bots`** | `grants.upsert` |
-| 个人微信扫码通道 / 绑定个人号 | **`oi-bind-wechat-personal`** | **非云电脑**主路径；委派 `wechat-personal-worker-setup` |
+| 个人数字身份默认推荐（S5）                   | **`oi-orchestrate-personal-identity`**   | 默认只推 `verified_live`；公众号云电脑证据见 `oi-bind-wechat-official`                                 |
+| 授权给自有数字人                             | **`oi-grant-owned-bots`**                | `grants.upsert`                                                                                        |
+| 个人微信扫码通道 / 绑定个人号                | **`oi-bind-wechat-personal`**            | **非云电脑**主路径；委派 `wechat-personal-worker-setup`                                                |
 
 ## 知识与写作类（若环境已装）
 

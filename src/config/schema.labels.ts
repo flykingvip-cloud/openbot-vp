@@ -365,6 +365,9 @@ export const FIELD_LABELS: Record<string, string> = {
   "collaboration.task.claimContractGroupAllowlist": "Collaboration Claim Contract Group Allowlist",
   "collaboration.task.wakeContract": "Collaboration Task Wake Contract",
   "collaboration.task.wakeContractGroupAllowlist": "Collaboration Wake Contract Group Allowlist",
+  "collaboration.task.wakeOpGatewayRecovery": "Collaboration Wake-Op Gateway Recovery",
+  "collaboration.task.wakeOpGatewayRecoveryGroupAllowlist":
+    "Collaboration Wake-Op Gateway Recovery Group Allowlist",
   "collaboration.task.postClaimFanoutWake": "Collaboration Post-Claim Fanout Wake",
   "collaboration.task.postClaimFanoutWakeGroupAllowlist":
     "Collaboration Post-Claim Fanout Wake Group Allowlist",
@@ -548,6 +551,8 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.imageModel.fallbacks": "Image Model Fallbacks",
   "agents.defaults.imageGenerationModel.primary": "Image Generation Model",
   "agents.defaults.imageGenerationModel.fallbacks": "Image Generation Model Fallbacks",
+  "agents.defaults.musicGenerationModel.primary": "Music Generation Model",
+  "agents.defaults.musicGenerationModel.fallbacks": "Music Generation Model Fallbacks",
   "agents.defaults.pdfModel.primary": "PDF Model",
   "agents.defaults.pdfModel.fallbacks": "PDF Model Fallbacks",
   "agents.defaults.pdfMaxBytesMb": "PDF Max Size (MB)",

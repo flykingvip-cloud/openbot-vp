@@ -305,11 +305,11 @@ node display name (hostname such as `Studio-Mac.local`) when the node reported o
 The three buttons reuse the existing exec-approval decisions. They do not open a
 second runtime and they do not switch the node to `security=full`.
 
-| Card | Decision | What it does |
-| --- | --- | --- |
+| Card         | Decision       | What it does                                                                |
+| ------------ | -------------- | --------------------------------------------------------------------------- |
 | Always Allow | `allow-always` | Run this approved command and remember its executable on the node allowlist |
-| Allow Once | `allow-once` | Run only the stored `systemRunPlan` |
-| Never | `deny` | Reject this request |
+| Allow Once   | `allow-once`   | Run only the stored `systemRunPlan`                                         |
+| Never        | `deny`         | Reject this request                                                         |
 
 `allow-always` binds cwd and argv. A later run with a different command or cwd
 does not reuse that approval. To stop prompting entirely, set the node exec

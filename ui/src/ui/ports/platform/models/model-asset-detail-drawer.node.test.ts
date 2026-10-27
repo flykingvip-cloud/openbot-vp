@@ -12,7 +12,7 @@ function sampleAsset(): ModelAsset {
     source: "discovered",
     inputModalities: ["text"],
     outputModalities: ["text"],
-    capabilities: ["tools"],
+    capabilities: ["tool_use"],
     costTier: "medium",
     health: "healthy",
     healthBasis: "config_inferred",

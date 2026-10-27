@@ -122,7 +122,7 @@ data volume fills (availability incident, not governance). The same applies to t
 | `env.production.example`           | Primary env vars for compose/k8s/fly                                                    |
 | `docker-compose.prod.yml`          | Production-oriented compose (auth required, no unconfigured)                            |
 | `smoke-checklist.md`               | Staging / prod smoke list                                                               |
-| `RELEASE_RECORD.md`                | Human release notes in this repo (not the machine ledger)                              |
+| `RELEASE_RECORD.md`                | Human release notes in this repo (not the machine ledger)                               |
 | `LEDGER.md`                        | Documents Path B machine SoT (`releases.jsonl` in this repo)                            |
 | `releases.jsonl`                   | Append-only Path B machine cutover ledger (SoT)                                         |
 | `M0B_M2B_OPERATOR_RUNBOOK.md`      | M0b/M2b verify-live + seq 46 rollback record (commands only; no secrets; no swap)       |
@@ -195,14 +195,14 @@ tenant addressing.
 Inventory Stage 5 closed the previous **部署未接线** gap with an opt-in compose
 service. This is **not** Production Auto Failover approval.
 
-| Item | Value |
-| --- | --- |
-| Service | `openbot-ha-controller` in `docker-compose.prod.yml` |
-| Profile | `ha` (default `up -d` does **not** start it) |
-| Image | `deploy/ha/controller/Dockerfile` → `OPENBOT_HA_CONTROLLER_IMAGE` |
-| Command | `python -m controller heartbeat-loop` |
-| Mode | `HA_CONTROLLER_MODE=manual` (default); `auto` refused |
-| Env | commented block in `env.production.example` |
+| Item    | Value                                                             |
+| ------- | ----------------------------------------------------------------- |
+| Service | `openbot-ha-controller` in `docker-compose.prod.yml`              |
+| Profile | `ha` (default `up -d` does **not** start it)                      |
+| Image   | `deploy/ha/controller/Dockerfile` → `OPENBOT_HA_CONTROLLER_IMAGE` |
+| Command | `python -m controller heartbeat-loop`                             |
+| Mode    | `HA_CONTROLLER_MODE=manual` (default); `auto` refused             |
+| Env     | commented block in `env.production.example`                       |
 
 ```bash
 docker compose -f deploy/production/docker-compose.prod.yml \
@@ -211,4 +211,3 @@ docker compose -f deploy/production/docker-compose.prod.yml \
 
 Red line: Production Auto Failover stays **NOT APPROVED / OFF**. See
 `deploy/ha/controller/README.md`.
-

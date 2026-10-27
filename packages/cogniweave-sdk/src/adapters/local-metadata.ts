@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -42,7 +42,24 @@ interface LocalMetadataRow {
 
 export interface LocalMetadataStoreConfig extends BackendAdapterConfig {
   path: string;
+  /**
+   * Default `readwrite` bootstraps schema (mkdir + DDL).
+   * `readonly` opens an existing DB with SQLite readOnly — no mkdir, no DDL/migrate.
+   */
+  openMode?: "readwrite" | "readonly";
 }
+
+/** Current local metadata schema_version written by bootstrapSchemaSync. */
+export const LOCAL_METADATA_SCHEMA_VERSION = "5";
+
+export type LocalMetadataReadonlyOpenFailureCode =
+  | "MEMORY_STORE_MISSING"
+  | "MEMORY_STORE_NOT_INITIALIZED"
+  | "MEMORY_STORE_SCHEMA_UNSUPPORTED";
+
+export type LocalMetadataReadonlyOpenResult =
+  | { ok: true; store: LocalMetadataStore }
+  | { ok: false; code: LocalMetadataReadonlyOpenFailureCode; message: string };
 
 export interface LocalMetadataBootstrapResult {
   path: string;
@@ -313,8 +330,25 @@ export class LocalMetadataStore implements MetadataStore {
 
   constructor(config: LocalMetadataStoreConfig) {
     this.path = config.path;
-    mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
+    const openMode = config.openMode ?? "readwrite";
     const { DatabaseSync } = requireNodeSqlite();
+    if (openMode === "readonly") {
+      if (!existsSync(this.path)) {
+        throw new Error(`LocalMetadataStore readonly open failed: missing file ${this.path}`);
+      }
+      this.db = new DatabaseSync(this.path, { readOnly: true, allowExtension: false });
+      this.db.exec("pragma busy_timeout = 5000;");
+      // Do not set journal_mode / foreign_keys DDL side-effects; do not bootstrap/migrate.
+      this.assertReadonlySchemaReady();
+      this.descriptor = {
+        kind: "metadata",
+        backend: config.backend,
+        environment: config.environment,
+        capabilities: ["canonical-read", "restart-safe"],
+      };
+      return;
+    }
+    mkdirSync(dirname(this.path), { recursive: true, mode: 0o700 });
     this.db = new DatabaseSync(this.path);
     this.db.exec("pragma foreign_keys = on;");
     this.db.exec("pragma journal_mode = wal;");
@@ -529,6 +563,39 @@ export class LocalMetadataStore implements MetadataStore {
       atoms = atoms.filter((atom) => types.has(atom.atomType));
     }
     return atoms;
+  }
+
+  /**
+   * Same scope/status predicates as queryAtoms, without limit/offset.
+   * Used by O4 readonly list for total consistent with status push-down.
+   */
+  async countAtoms(
+    filter: Omit<MetadataQueryFilter, "limit" | "offset" | "atomTypes">,
+  ): Promise<number> {
+    const clauses = ["workspace_id = ?", "project_id = ?", "agent_id = ?", "visibility = ?"];
+    const params: Array<string | number> = [
+      filter.scope.workspaceId,
+      filter.scope.projectId,
+      filter.scope.agentId,
+      filter.scope.visibility,
+    ];
+    if (filter.statuses && filter.statuses.length > 0) {
+      clauses.push(`status in (${filter.statuses.map(() => "?").join(", ")})`);
+      params.push(...filter.statuses);
+    } else {
+      const exclude = filter.excludeStatuses ?? DEFAULT_QUERY_EXCLUDE_STATUSES;
+      if (exclude.length > 0) {
+        clauses.push(`status not in (${exclude.map(() => "?").join(", ")})`);
+        params.push(...exclude);
+      }
+    }
+    const row = this.db
+      .prepare(
+        `select count(*) as n from ${this.table(this.tables.atoms)}
+         where ${clauses.join(" and ")}`,
+      )
+      .get(...params) as { n?: number } | undefined;
+    return typeof row?.n === "number" ? row.n : 0;
   }
 
   async bindDedupKey(dedupKey: string, atomId: string): Promise<void> {
@@ -1228,6 +1295,36 @@ export class LocalMetadataStore implements MetadataStore {
     this.db.close();
   }
 
+  private assertReadonlySchemaReady(): void {
+    const required = [this.tables.meta, this.tables.atoms, this.tables.memorySubjectBindings];
+    for (const table of required) {
+      const row = this.db
+        .prepare(`select name from sqlite_master where type = 'table' and name = ? limit 1`)
+        .get(table) as { name?: string } | undefined;
+      if (!row?.name) {
+        throw new Error(
+          `LocalMetadataStore readonly open failed: missing table ${table} (not initialized)`,
+        );
+      }
+    }
+    const versionRow = this.db
+      .prepare(
+        `select value from ${this.table(this.tables.meta)} where key = 'schema_version' limit 1`,
+      )
+      .get() as { value?: string } | undefined;
+    const version = versionRow?.value?.trim() ?? "";
+    if (!version) {
+      throw new Error(
+        "LocalMetadataStore readonly open failed: schema_version missing (not initialized)",
+      );
+    }
+    if (version !== LOCAL_METADATA_SCHEMA_VERSION) {
+      throw new Error(
+        `LocalMetadataStore readonly open failed: schema_version=${version} unsupported (want ${LOCAL_METADATA_SCHEMA_VERSION}; no migrate)`,
+      );
+    }
+  }
+
   private bootstrapSchemaSync(): number {
     const statements = buildLocalMetadataSchema();
     for (const statement of statements) {
@@ -1301,5 +1398,34 @@ export class LocalMetadataStore implements MetadataStore {
         encodePayload(payload),
         Date.now(),
       );
+  }
+}
+
+/**
+ * Open an existing local metadata SQLite in read-only mode.
+ * Never mkdir, never bootstrapSchema, never migrate older schema_version.
+ */
+export function openLocalMetadataStoreReadonly(
+  config: LocalMetadataStoreConfig,
+): LocalMetadataReadonlyOpenResult {
+  if (!existsSync(config.path)) {
+    return {
+      ok: false,
+      code: "MEMORY_STORE_MISSING",
+      message: `metadata store missing: ${config.path}`,
+    };
+  }
+  try {
+    const store = new LocalMetadataStore({ ...config, openMode: "readonly" });
+    return { ok: true, store };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/missing table|not initialized|schema_version missing/i.test(message)) {
+      return { ok: false, code: "MEMORY_STORE_NOT_INITIALIZED", message };
+    }
+    if (/schema_version=.*unsupported|no migrate/i.test(message)) {
+      return { ok: false, code: "MEMORY_STORE_SCHEMA_UNSUPPORTED", message };
+    }
+    return { ok: false, code: "MEMORY_STORE_NOT_INITIALIZED", message };
   }
 }

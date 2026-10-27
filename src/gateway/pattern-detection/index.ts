@@ -6,6 +6,7 @@ export type {
 } from "./types.js";
 export {
   applyToolsUsedByRunId,
+  confirmPatternOutcomeByRunId,
   approvePatternCandidate,
   captureDefaultApprovalPolicySnapshot,
   clearPatternAutoInstallIntent,

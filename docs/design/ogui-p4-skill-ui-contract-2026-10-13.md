@@ -11,9 +11,9 @@ new fields stay prompt-only (unchanged).
 
 ## Frontmatter
 
-| Key | Type | Meaning |
-| --- | --- | --- |
-| `supported-ui-components` | comma list | Whitelist: `ogui-form`, `ogui-choice` |
+| Key                        | Type           | Meaning                                                      |
+| -------------------------- | -------------- | ------------------------------------------------------------ |
+| `supported-ui-components`  | comma list     | Whitelist: `ogui-form`, `ogui-choice`                        |
 | `requires-ui-confirmation` | `true`/`false` | Prefer OGUI / Steward / Exec Approvals over invented buttons |
 
 Unknown component ids are **dropped** (soft), not a hard crash — keeps older

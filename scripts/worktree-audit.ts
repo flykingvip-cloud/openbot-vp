@@ -2376,6 +2376,8 @@ const allowedLinkedPrimaryGroups = [
   new Set(["EDGSC", "D"]),
   // Shared gateway scope registry carries both knowledge-universe (EDGSC) and entitlement (ME) deltas.
   new Set(["EDGSC", "ME"]),
+  // Memory Center manage/forget path1 spans list (ACL) + lifecycle (CL).
+  new Set(["CL", "ACL"]),
 ];
 
 function isAllowedLinkedPrimaryGroupMix(primaryRules: AuditRule[]) {

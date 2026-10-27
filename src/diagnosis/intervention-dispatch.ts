@@ -55,12 +55,7 @@ export async function dispatchInterventionCase(
       case: row,
     };
   }
-  if (row.status !== "queued" && row.status !== "failed" && row.status !== "blocked") {
-    // blocked retry must first return to queued via expand; allow queued only primarily
-    if (row.status !== "queued") {
-      return { ok: false, reason: "not_queued", case: row };
-    }
-  }
+  // failed/blocked retry must return to queued via expand first; only queued dispatches.
   if (row.status !== "queued") {
     return { ok: false, reason: "not_queued", case: row };
   }

@@ -42,7 +42,7 @@ describe("before-tool-call OGUI WAIT recheck (Ev6)", () => {
         started = true;
         return { content: [], details: undefined };
       },
-    } as AnyAgentTool;
+    } as unknown as AnyAgentTool;
     const assembled = filterToolsByPolicy([bash], { allow: ["bash", "read"] });
     expect(assembled.map((tool) => tool.name)).toContain("bash");
     const wrapped = wrapToolWithBeforeToolCallHook(assembled[0], {
@@ -50,7 +50,7 @@ describe("before-tool-call OGUI WAIT recheck (Ev6)", () => {
     });
     replaceOguiSessionWaits("agent:main:decision", ["ogd_after_assembly"]);
     await expect(
-      wrapped.execute("call-1", { command: "echo independent" }, undefined, undefined, undefined),
+      wrapped.execute("call-1", { command: "echo independent" }, undefined, undefined),
     ).rejects.toThrow(/WAIT is active/);
     expect(started).toBe(false);
   });
@@ -72,13 +72,7 @@ describe("before-tool-call OGUI WAIT recheck (Ev6)", () => {
       expect(exec).toBeDefined();
       replaceOguiSessionWaits(sessionKey, ["ogd_assembled"]);
       await expect(
-        exec?.execute(
-          "call-ev6",
-          { command: `echo ran > ${marker}` },
-          undefined,
-          undefined,
-          undefined,
-        ),
+        exec?.execute("call-ev6", { command: `echo ran > ${marker}` }, undefined, undefined),
       ).rejects.toThrow(/WAIT is active/);
       expect(fs.existsSync(marker)).toBe(false);
     } finally {

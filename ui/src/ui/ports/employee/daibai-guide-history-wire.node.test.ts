@@ -85,9 +85,13 @@ describe("daibai guide history wire", () => {
     });
     await flushDaibaiGuideHistoryNow();
 
-    const calls = request.mock.calls.map((call) => call[0]);
+    const calls = (request.mock.calls as unknown as Array<[string, unknown]>).map(
+      (call) => call[0],
+    );
     expect(calls).toContain("chat.guide.append");
-    const payloads = request.mock.calls.map((call) => call[1]) as Array<Record<string, unknown>>;
+    const payloads = (request.mock.calls as unknown as Array<[string, unknown]>).map(
+      (call) => call[1] as Record<string, unknown>,
+    );
     const team = payloads.find((payload) => payload.slot === "team");
     expect(team?.sessionKey).toBe("agent:main:main");
     const encoded = JSON.stringify(team);

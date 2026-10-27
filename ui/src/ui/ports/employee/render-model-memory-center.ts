@@ -6,6 +6,17 @@ import type {
   MemoryCenterPanelState,
 } from "./views/memory-center-page.ts";
 
+/** O4 runtime fields kept off shared shell-slices to avoid multi-stream landings. */
+type MemoryCenterO4RuntimeState = AppPortState & {
+  workbenchMemoryCenterStatusView?: "active" | "tentative";
+  workbenchMemoryCenterOtherViewTotal?: number;
+  workbenchMemoryCenterAtomListError?: { code: string; message: string } | null;
+};
+
+function asO4State(state: AppPortState): MemoryCenterO4RuntimeState {
+  return state as MemoryCenterO4RuntimeState;
+}
+
 type MemoryListResponse = {
   entries?: Array<{
     key?: string;
@@ -34,6 +45,21 @@ type MemoryListResponse = {
     confidence?: number;
   }>;
   viewMode?: "files" | "atoms" | "mixed";
+  statusView?: "active" | "tentative";
+  atomList?:
+    | {
+        ok: true;
+        statusView: "active" | "tentative";
+        total: number;
+        truncated: boolean;
+        otherViewTotal?: number;
+      }
+    | {
+        ok: false;
+        statusView: "active" | "tentative";
+        code: string;
+        message: string;
+      };
 };
 
 function friendlyMemoryCenterError(error: unknown): string {
@@ -44,7 +70,23 @@ function friendlyMemoryCenterError(error: unknown): string {
   if (/LOCAL_ONLY|managed/i.test(raw)) {
     return "当前为云端托管模式，本地记忆中心不可用。";
   }
+  if (/MEMORY_SUBJECT_UNBOUND/i.test(raw)) {
+    return "当前机器人尚未绑定记忆主体，无法列出记忆要点。";
+  }
+  if (/MEMORY_SUBJECT_OWNER_MISMATCH|MEMORY_SUBJECT_TENANT_MISMATCH/i.test(raw)) {
+    return "无权查看该机器人的记忆要点。";
+  }
   return raw;
+}
+
+function friendlyAtomListError(code: string, message: string): { code: string; message: string } {
+  if (code === "MEMORY_SUBJECT_UNBOUND") {
+    return { code, message: "当前机器人尚未绑定记忆主体，无法列出记忆要点。" };
+  }
+  if (code === "MEMORY_SUBJECT_OWNER_MISMATCH" || code === "MEMORY_SUBJECT_TENANT_MISMATCH") {
+    return { code, message: "无权查看该机器人的记忆要点。" };
+  }
+  return { code, message };
 }
 
 function parseAtomRow(
@@ -91,6 +133,7 @@ function parseAtomRow(
 }
 
 export function buildWorkbenchMemoryCenterPanelState(state: AppPortState): MemoryCenterPanelState {
+  const o4 = asO4State(state);
   const dataSpace = resolveWorkbenchDataSpaceSettings({
     config: state.configSnapshot?.config,
     bootstrapMode: state.bootstrapDataSpace?.mode ?? null,
@@ -110,6 +153,9 @@ export function buildWorkbenchMemoryCenterPanelState(state: AppPortState): Memor
     atoms: state.workbenchMemoryCenterAtoms,
     viewMode: state.workbenchMemoryCenterViewMode,
     entriesLoading: state.workbenchMemoryCenterEntriesLoading,
+    statusView: o4.workbenchMemoryCenterStatusView ?? "active",
+    otherViewTotal: o4.workbenchMemoryCenterOtherViewTotal,
+    atomListError: o4.workbenchMemoryCenterAtomListError ?? null,
   };
 }
 
@@ -165,12 +211,15 @@ export async function loadWorkbenchMemoryCenterEntries(
     requestRender();
     return;
   }
+  const o4 = asO4State(state);
   state.workbenchMemoryCenterEntriesLoading = true;
   state.workbenchMemoryCenterError = null;
   requestRender();
   try {
+    const statusView = o4.workbenchMemoryCenterStatusView === "tentative" ? "tentative" : "active";
     const result = await state.client.request<MemoryListResponse>("data.memory.list", {
       agentId: trimmed,
+      statusView,
     });
     const entries: MemoryCenterEntryRow[] = (result.entries ?? [])
       .map((row) => {
@@ -191,6 +240,21 @@ export async function loadWorkbenchMemoryCenterEntries(
       .filter((row): row is MemoryCenterAtomRow => row !== null);
     state.workbenchMemoryCenterEntries = entries;
     state.workbenchMemoryCenterAtoms = atoms;
+    o4.workbenchMemoryCenterStatusView =
+      result.statusView === "tentative" || result.atomList?.statusView === "tentative"
+        ? "tentative"
+        : statusView;
+    if (result.atomList && !result.atomList.ok) {
+      o4.workbenchMemoryCenterAtomListError = friendlyAtomListError(
+        result.atomList.code,
+        result.atomList.message,
+      );
+      o4.workbenchMemoryCenterOtherViewTotal = undefined;
+    } else {
+      o4.workbenchMemoryCenterAtomListError = null;
+      o4.workbenchMemoryCenterOtherViewTotal =
+        result.atomList && result.atomList.ok ? result.atomList.otherViewTotal : undefined;
+    }
     state.workbenchMemoryCenterViewMode =
       result.viewMode === "atoms" || result.viewMode === "mixed" || result.viewMode === "files"
         ? result.viewMode
@@ -215,6 +279,8 @@ export async function loadWorkbenchMemoryCenterEntries(
     state.workbenchMemoryCenterEntries = [];
     state.workbenchMemoryCenterAtoms = [];
     state.workbenchMemoryCenterViewMode = "files";
+    o4.workbenchMemoryCenterAtomListError = null;
+    o4.workbenchMemoryCenterOtherViewTotal = undefined;
     state.workbenchMemoryCenterError = friendlyMemoryCenterError(error);
   } finally {
     state.workbenchMemoryCenterEntriesLoading = false;
@@ -248,11 +314,23 @@ export function buildWorkbenchMemoryCenterActionHandlers(
       state.workbenchMemoryCenterMessage = null;
       requestRender();
     },
+    onMemoryCenterStatusViewChange: (value: "active" | "tentative") => {
+      const o4 = asO4State(state);
+      o4.workbenchMemoryCenterStatusView = value;
+      state.workbenchMemoryCenterAtomId = "";
+      state.workbenchMemoryCenterMessage = null;
+      o4.workbenchMemoryCenterAtomListError = null;
+      requestRender();
+      const agentId = (state.workbenchMemoryCenterAgentId ?? "").trim();
+      if (agentId) {
+        void loadWorkbenchMemoryCenterEntries(state, agentId, requestRender);
+      }
+    },
     onMemoryCenterForget: async () => {
       const agentId = (state.workbenchMemoryCenterAgentId ?? "").trim();
       const memoryKey = (state.workbenchMemoryCenterKey ?? "").trim();
       if (!agentId || !memoryKey) {
-        state.workbenchMemoryCenterMessage = "请先选择要忘记的记忆。";
+        state.workbenchMemoryCenterMessage = "请先选择要删除的记忆文件。";
         requestRender();
         return;
       }
@@ -266,8 +344,59 @@ export function buildWorkbenchMemoryCenterActionHandlers(
       requestRender();
       try {
         await state.client.request("data.memory.forget", { agentId, memoryKey });
-        state.workbenchMemoryCenterMessage = "已忘记这条记忆。";
+        state.workbenchMemoryCenterMessage = "已删除所选记忆文件";
         state.workbenchMemoryCenterKey = "";
+        await loadWorkbenchMemoryCenterEntries(state, agentId, requestRender);
+      } catch (error) {
+        state.workbenchMemoryCenterMessage = friendlyMemoryCenterError(error);
+      } finally {
+        state.workbenchMemoryCenterBusy = false;
+        requestRender();
+      }
+    },
+    onMemoryCenterForgetFact: async () => {
+      const agentId = (state.workbenchMemoryCenterAgentId ?? "").trim();
+      const atomId = (state.workbenchMemoryCenterAtomId ?? "").trim();
+      if (!agentId || !atomId) {
+        state.workbenchMemoryCenterMessage = "请先选择要忘记的记忆要点。";
+        requestRender();
+        return;
+      }
+      if (!state.client || !state.connected) {
+        state.workbenchMemoryCenterMessage = "当前未连接到网关。";
+        requestRender();
+        return;
+      }
+      const confirmed = window.confirm(
+        "将 soft-forget 该记忆要点关联的全部来源（默认不永久清除/purge）。同一来源上的其他要点也会失去该来源。不会删除记忆文件入口。是否继续？",
+      );
+      if (!confirmed) {
+        return;
+      }
+      state.workbenchMemoryCenterBusy = true;
+      state.workbenchMemoryCenterMessage = null;
+      requestRender();
+      try {
+        const result: {
+          ok?: boolean;
+          sources?: Array<{ status?: string; sourceLocator?: string; error?: string }>;
+          error?: string;
+        } = await state.client.request("data.memory.forgetFact", {
+          agentId,
+          atomId,
+        });
+        const sources = Array.isArray(result?.sources) ? result.sources : [];
+        const forgotten = sources.filter((s) => s.status === "forgotten").length;
+        const failed = sources.filter((s) => s.status === "failed").length;
+        if (failed > 0 || result?.ok === false) {
+          state.workbenchMemoryCenterMessage =
+            result?.error?.trim() ||
+            `事实遗忘部分失败：成功 ${forgotten}，失败 ${failed}（共 ${sources.length} 个来源）`;
+        } else if (sources.length === 0) {
+          state.workbenchMemoryCenterMessage = "该记忆要点没有可忘记的关联来源。";
+        } else {
+          state.workbenchMemoryCenterMessage = `已 soft-forget 该事实的全部来源（${forgotten}）`;
+        }
         await loadWorkbenchMemoryCenterEntries(state, agentId, requestRender);
       } catch (error) {
         state.workbenchMemoryCenterMessage = friendlyMemoryCenterError(error);

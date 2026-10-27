@@ -1,0 +1,250 @@
+{
+  "schema": "memory-e2e-baseline/v2",
+  "supersededBy": "docs/design/evidence/memory-e2e-baseline-v3-post-rework-2026-10-26.json",
+  "supersededNote": "v3 replaces v2 status accounting (not-run) and layer labels (helper ≠ gateway-handler-chain). Historical v2 body retained.",
+  "phase": "post-rework",
+  "createdAtAsiaShanghai": "2026-10-26 12:39:30",
+  "codeVersion": "cdf2a39d73fe57273d2d0dfb6979db03d441e7e6",
+  "datasetVersion": "v1",
+  "datasetPath": "docs/design/evidence/memory-batch1-dataset-v1.json",
+  "fileFingerprints": {
+    "src/memory/health-probe.ts": "b9b9d3350ef20546",
+    "src/gateway/server-methods/doctor-memory-health.ts": "ef0a3924fe6fe193",
+    "scripts/memory-platform-audit.mjs": "655f9da05110aa6d",
+    "src/memory/memory-batch1-o8-baseline-v2.test.ts": "77b4414dffc63336",
+    "src/memory/memory-batch1-o4-o5-diagnose.test.ts": "cd28efed707a4996",
+    "docs/design/evidence/memory-batch1-dataset-v1.json": "dad7d70748cb9c61"
+  },
+  "v1Retained": {
+    "pre": "docs/design/evidence/memory-e2e-baseline-pre-2026-10-26.json",
+    "post": "docs/design/evidence/memory-e2e-baseline-post-2026-10-26.json",
+    "coverageLimits": "docs/design/evidence/memory-e2e-baseline-v1-coverage-limits-2026-10-26.md",
+    "o5EvidenceInvalid": true,
+    "prePostScaffoldOnly": "13/22→19/22 scaffold-internal; not system effectiveness"
+  },
+  "layers": {
+    "isolation": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "sdk-unit": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "manager-integration": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "cross-process-retrieval": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "gateway-handler-chain": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "health-audit-observability": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "model-effect": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "summary": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "executedSamples": 7,
+    "scaffoldInternalOnly": true,
+    "notSystemEffectiveness": true
+  },
+  "acceptanceRules": {
+    "unapprovedNewFailuresFailAcceptance": true,
+    "diagnosticSuccessIsNotProductPass": true,
+    "doNotCallFullE2E": true
+  },
+  "cases": [
+    {
+      "id": "ISO-v2-1",
+      "scenario": "isolation-path-assert",
+      "layer": "isolation",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "resolvedPaths": {
+          "stateDir": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/state",
+          "dataRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/data",
+          "tenantsRoot": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/tenants",
+          "workspace": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/workspace-main",
+          "configPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/state/openbot.json",
+          "canonicalStorePath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/data/.meta/cogniweave/canonical.sqlite",
+          "parentOfCanonicalIsSymlink": false,
+          "canonicalExists": false
+        }
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S2-v2-real-deprecate",
+      "scenario": "S2",
+      "layer": "sdk-unit",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [
+        "conflict-marker-write-path",
+        "fact-update-replace-with-new-version-via-product-API"
+      ],
+      "detail": {
+        "deprecatedId": "v2-p-0",
+        "hitCount": 4,
+        "deprecatedStillVisible": false
+      },
+      "sampleIdsExecuted": ["P01", "P02", "P03", "P04", "P05"],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S3-v2-wrong-owner",
+      "scenario": "S3",
+      "layer": "sdk-unit",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "hitCount": 0
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S1-v2-manager-search",
+      "scenario": "S1",
+      "layer": "manager-integration",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [
+        "real-tool-call-chain",
+        "reply-handler-new-session-injection",
+        "prompt-construction-with-recalled-memory"
+      ],
+      "detail": {
+        "hitCount": 1,
+        "paths": ["MEMORY.md"]
+      },
+      "sampleIdsExecuted": ["P01"],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S5-v2-manager-cross-process-search",
+      "scenario": "S5",
+      "layer": "cross-process-retrieval",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "seedHits": 1,
+        "childStatus": 0,
+        "childHitCount": 1,
+        "childStdout": "{\"hitCount\":1,\"paths\":[\"MEMORY.md\"]}",
+        "childStderr": "(node:6502) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n(Use `node --trace-warnings ...` to show where the warning was created)\n",
+        "note": "Rebuilds CogniWeaveMemoryManager in child and calls search — not metadata-only"
+      },
+      "sampleIdsExecuted": ["P21"],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "S4-v2-forget-same-source",
+      "scenario": "S4",
+      "layer": "gateway-handler-chain",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [
+        "live-gateway-RPC-transport",
+        "managed-mode-rejectWhenManaged-runtime-call"
+      ],
+      "detail": {
+        "deletedPath": "/private/var/folders/lt/0xc3gnd12hzcfc5xcfgtzvdc0000gn/T/openbot-o8-v2-2Qx8Sb/data/agents/main/memory/agent/o8-v2-forget.md",
+        "beforePaths": ["MEMORY.md"],
+        "afterPaths": ["MEMORY.md"],
+        "sameSourceResidual": false,
+        "diagnosticSuccessNotProductPass": true,
+        "note": "Uses forgetMemoryEntry (gateway allow-path function). Managed reject covered by source assertion in O5 re-diagnose."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "H1-v2-backend-scope-health",
+      "scenario": "H1",
+      "layer": "health-audit-observability",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "configuredBackend": "cogniweave",
+        "backend": "cogniweave",
+        "searchableDocumentCount": null,
+        "backendHealth": "unknown",
+        "storage": "ready"
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "A1-v2-empty-md-class",
+      "scenario": "A1",
+      "layer": "health-audit-observability",
+      "repeat": 1,
+      "pass": true,
+      "executed": true,
+      "untestedSteps": [],
+      "detail": {
+        "emptyClass": "diagnostic-insufficient",
+        "recoveryAction": "diagnostic-insufficient",
+        "auditStatus": 0
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    },
+    {
+      "id": "MODEL-v2-untimed",
+      "scenario": "model-effect",
+      "layer": "model-effect",
+      "repeat": 1,
+      "pass": true,
+      "executed": false,
+      "untestedSteps": ["request-send", "correct-adoption", "paid-model-call"],
+      "detail": {
+        "note": "No real model invoked this batch; layer recorded as untimed/untested."
+      },
+      "sampleIdsExecuted": [],
+      "requestSend": "untimed",
+      "correctAdoption": "untimed"
+    }
+  ]
+}

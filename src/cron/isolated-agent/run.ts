@@ -67,9 +67,15 @@ import {
 } from "../../gateway/governance/spawn-snapshot-handoff.js";
 import { isHookDispatchSessionKey } from "../../gateway/hook-surface-session.js";
 import { resolveKnowledgeGatewayClientForAgentRun } from "../../gateway/knowledge/agent-run-gateway-client.js";
+import {
+  consumeCapabilityRoutingResult,
+  formatCapabilityExecutionSurfaceLog,
+} from "../../gateway/model-entitlement/capability-entry-consume.js";
 import type { EmployeeModelGateResult } from "../../gateway/model-entitlement/employee-model-gate.js";
 import { resolveAgentRunEntitlementScope } from "../../gateway/model-entitlement/resolve-agent-run-scope.js";
+import { buildRunContextEstimateParts } from "../../gateway/model-entitlement/run-context-estimate.js";
 import { resolveExecutionRoutingFromCapabilityPlan } from "../../gateway/model-entitlement/task-capability-plan.js";
+import { resolvePlatformModelsMode } from "../../gateway/models/platform-models-config.js";
 import { resolveCronWriteRoot } from "../../gateway/workspace-resolver/write-roots.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { logWarn } from "../../logger.js";
@@ -81,6 +87,8 @@ import {
   isExternalHookSession,
 } from "../../security/external-content.js";
 import { isReadonlyInvokeEnabled } from "../../task-orchestration/feature.js";
+import { ensureCronTurnTaskOutcome } from "../../task-outcome/entrypoint-ensure.js";
+import { recordRunnerTurnOutcome } from "../../task-outcome/runtime-from-runner.js";
 import { classifyCronCompletion } from "../completion-contract.js";
 import { isCronDeliveryOnlyFailure, isCronDeliveryToolError } from "../delivery-only-failure.js";
 import { isWorkbenchOnlyLegacyCronDelivery } from "../delivery-surfaces.js";
@@ -250,6 +258,8 @@ export async function runCronIsolatedAgentTurn(params: {
   deps: CliDeps;
   job: CronJob;
   message: string;
+  /** askOutcome W1: scheduler-persisted fire identity (same-fire retry/restart reuse). */
+  fireId?: string;
   abortSignal?: AbortSignal;
   signal?: AbortSignal;
   sessionKey: string;
@@ -760,6 +770,37 @@ export async function runCronIsolatedAgentTurn(params: {
   let commercialFallbackAttempts: unknown;
   // 每次执行唯一的记账幂等键（隔离/非隔离 cron 都按执行计费，不被会话 id 复用去重）。
   const creditTaskId = `cron-credit:${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+  // askOutcome W1: scheduler owns fire identity; run only falls back when unset (tests/manual).
+  const cronFireId =
+    (typeof params.fireId === "string" && params.fireId.trim()) ||
+    (typeof params.job.state?.currentFireId === "string" &&
+      params.job.state.currentFireId.trim()) ||
+    `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+  const cronOwnerRaw = params.job.ownership?.ownerId?.trim() || `cron:${params.job.id}`;
+  const cronSubjectRef =
+    cronOwnerRaw.startsWith("platform-user:") || cronOwnerRaw.includes(":")
+      ? cronOwnerRaw
+      : `subject:${cronOwnerRaw}`;
+  const cronOutcomeOpened = ensureCronTurnTaskOutcome(cfgWithAgentDefaults, {
+    agentId,
+    jobId: params.job.id,
+    fireId: cronFireId,
+    subjectRef: cronSubjectRef,
+    ...(params.job.ownership?.tenantId?.trim()
+      ? { tenantId: params.job.ownership.tenantId.trim() }
+      : {}),
+  });
+  const cronOutcomeTaskId = cronOutcomeOpened.ok ? cronOutcomeOpened.taskId : undefined;
+  const cronOutcomeScope = cronOutcomeOpened.ok ? cronOutcomeOpened.scope : undefined;
+  let cronCapabilityOutcome:
+    | import("../../task-outcome/runtime-from-runner.js").RunnerTurnOutcomeInput["capabilityOutcome"]
+    | undefined;
+  let cronOutcomeCloseoutDone = false;
+  if (!cronOutcomeOpened.ok) {
+    logWarn(
+      `[cron:${params.job.id}] task-outcome entry failed: ${cronOutcomeOpened.code} ${cronOutcomeOpened.message}`,
+    );
+  }
   const completeRun = async (result: RunCronAgentTurnResult): Promise<RunCronAgentTurnResult> => {
     runEndedAt = Date.now();
     const classified = classifyCronCompletion({
@@ -826,6 +867,53 @@ export async function runCronIsolatedAgentTurn(params: {
         logWarn(`[cron:${params.job.id}] progress ledger finish failed: ${String(err)}`);
       }
     }
+    // askOutcome W1: unified closeout — ordinary success/error/cancel, not only capability branches.
+    // tip runId is per-execution (sessionId:startedAt); taskId stays fire-stable across retries.
+    if (!cronOutcomeCloseoutDone && cronOutcomeTaskId && cronOutcomeScope) {
+      cronOutcomeCloseoutDone = true;
+      const aborted = isAborted();
+      const ok = settled.status === "ok" && !aborted;
+      const failureReason = aborted
+        ? ("user_cancelled" as const)
+        : settled.status === "error"
+          ? ("run_failed" as const)
+          : settled.status === "skipped"
+            ? ("other" as const)
+            : undefined;
+      const tipRunId = `${cronSession.sessionEntry.sessionId}:${runStartedAt}`;
+      try {
+        await recordRunnerTurnOutcome(cfgWithAgentDefaults, agentId, {
+          success: ok,
+          runId: tipRunId,
+          taskId: cronOutcomeTaskId,
+          scope: cronOutcomeScope,
+          entrypoint: "cron",
+          latencyMs: Math.max(0, runEndedAt - runStartedAt),
+          ...(failureReason
+            ? {
+                failureReason,
+                failureDetail: settled.error ?? (aborted ? abortReason() : undefined),
+              }
+            : {}),
+          // Real delivery evidence only; never invent not_required.
+          ...(result.delivered === true
+            ? {
+                delivery: { status: "delivered" as const },
+                deliveryId: `cron:${params.job.id}:${cronFireId}`,
+              }
+            : result.delivered === false
+              ? { delivery: { status: "failed" as const } }
+              : {}),
+          ...(cronCapabilityOutcome ? { capabilityOutcome: cronCapabilityOutcome } : {}),
+        });
+      } catch (err) {
+        logWarn(`[cron:${params.job.id}] unified recordRunnerTurnOutcome failed: ${String(err)}`);
+      }
+    } else if (!cronOutcomeCloseoutDone && (!cronOutcomeTaskId || !cronOutcomeScope)) {
+      logWarn(
+        `[cron:${params.job.id}] skip unified recordRunnerTurnOutcome: missing cron task entry`,
+      );
+    }
     return settled;
   };
   try {
@@ -851,12 +939,21 @@ export async function runCronIsolatedAgentTurn(params: {
     const runPrompt = async (promptText: string) => {
       const cronRunId = cronSession.sessionEntry.sessionId;
       let cronSlotHeld = false;
-      let modelGate: EmployeeModelGateResult = {};
+      let modelGate: EmployeeModelGateResult | undefined;
       let cronAuthorizationId: string | undefined;
+      const runContextEstimate = buildRunContextEstimateParts({
+        taskText: promptText,
+        sessionEntry: cronSession.sessionEntry,
+      });
       const runSlot = await tryAcquireEnterpriseAgentRun({
         runId: cronRunId,
         agentId,
-        modelGateInput: { cfg: cfgWithAgentDefaults, agentId, taskText: promptText },
+        modelGateInput: {
+          cfg: cfgWithAgentDefaults,
+          agentId,
+          taskText: promptText,
+          contextParts: runContextEstimate.contextParts,
+        },
       });
       if (!runSlot.skipped && !runSlot.acquired) {
         throw new Error(runSlot.message);
@@ -867,18 +964,37 @@ export async function runCronIsolatedAgentTurn(params: {
         if (runSlot.modelGate) {
           modelGate = runSlot.modelGate;
           commercialCreditReporting =
-            runSlot.modelGate.creditReporting ?? commercialCreditReporting;
+            runSlot.modelGate?.creditReporting ?? commercialCreditReporting;
         }
       }
       const executionRouting = resolveExecutionRoutingFromCapabilityPlan({
-        allowlist: modelGate.allowlist,
-        preferredModelOrder: modelGate.preferredModelOrder,
-        capabilityPlan: modelGate.capabilityPlan,
+        allowlist: modelGate?.allowlist,
+        preferredModelOrder: modelGate?.preferredModelOrder,
+        capabilityPlan: modelGate?.capabilityPlan,
       });
+      const consumedCapability = consumeCapabilityRoutingResult({
+        planFailure: executionRouting.planFailure,
+        outcomeClaim: executionRouting.outcomeClaim,
+        executionSurface: executionRouting.executionSurface,
+        capabilityPlan: executionRouting.capabilityPlan,
+      });
+      // Structured surface kept for TaskOutcome; do not void outcomeClaim.
+      if (consumedCapability.executionSurface.status !== "ok") {
+        logWarn(
+          `[cron:${params.job.id}] ${formatCapabilityExecutionSurfaceLog(consumedCapability.executionSurface)}`,
+        );
+      }
+      // Defer TaskOutcome write to completeRun unified closeout (attach claim there).
+      if (consumedCapability.capabilityOutcome) {
+        cronCapabilityOutcome = consumedCapability.capabilityOutcome;
+      }
+      if (executionRouting.planFailure.kind === "no_executable_candidates") {
+        throw new Error(executionRouting.planFailure.message);
+      }
       const embeddedModelGovernance = resolveEmbeddedModelGovernance({
         gateStatus: cronSlotHeld ? "acquired" : "skipped",
         allowlist: executionRouting.allowlist,
-        tenantId: modelGate.tenantId,
+        tenantId: modelGate?.tenantId,
         commercialAuthorizationId: cronAuthorizationId,
       });
       const parentSnapshot = buildRunModelSetSnapshot({
@@ -886,8 +1002,13 @@ export async function runCronIsolatedAgentTurn(params: {
         allowlist: executionRouting.allowlist,
         governanceMode: embeddedModelGovernance.governanceMode,
         commercialAuthorizationId: cronAuthorizationId,
-        tenantId: modelGate.tenantId,
+        tenantId: modelGate?.tenantId,
         preferredModelOrder: executionRouting.preferredModelOrder,
+        platformModelsMode:
+          modelGate?.effectiveRouting?.mode ?? resolvePlatformModelsMode(cfgWithAgentDefaults),
+        ...(modelGate?.effectiveRouting?.selectorStrategy
+          ? { selectorStrategy: modelGate?.effectiveRouting.selectorStrategy }
+          : {}),
         // P4-1: parent billing context for child runs (acquired gate only).
         creditReporting: runSlot.acquired ? snapshotCreditReportingFromGate(runSlot) : undefined,
       });
@@ -1003,7 +1124,9 @@ export async function runCronIsolatedAgentTurn(params: {
             const candidateRuntimeId = `${providerOverride}/${modelOverride}`;
             if (isEnterpriseRuntimeModelId(candidateRuntimeId)) {
               const tenantId =
-                modelGate.tenantId?.trim() || modelGate.creditReporting?.enterpriseId?.trim() || "";
+                modelGate?.tenantId?.trim() ||
+                modelGate?.creditReporting?.enterpriseId?.trim() ||
+                "";
               if (!tenantId) {
                 throw new Error(
                   "Enterprise BYOK model selected but managed tenantId could not be resolved",

@@ -29,6 +29,8 @@ export type MemoryCenterAtomRow = {
   confidence?: number;
 };
 
+export type MemoryCenterStatusView = "active" | "tentative";
+
 export type MemoryCenterPanelState = {
   loading?: boolean;
   error?: string | null;
@@ -42,6 +44,12 @@ export type MemoryCenterPanelState = {
   atoms?: MemoryCenterAtomRow[];
   viewMode?: "files" | "atoms" | "mixed";
   entriesLoading?: boolean;
+  /** O4: 已确认=active / 候选=tentative. Default active. */
+  statusView?: MemoryCenterStatusView;
+  /** Sibling view total for empty-state branching (C1). */
+  otherViewTotal?: number;
+  /** Explicit atom-list failure (UNBOUND etc.) — not a fake empty list. */
+  atomListError?: { code: string; message: string } | null;
 };
 
 function formatBytes(bytes: number): string {
@@ -89,8 +97,12 @@ function scopeLabel(atom: MemoryCenterAtomRow): string {
  * Hides journals, embeddings, vector backends, and other implementation details.
  * When `embedded`, omit the page chrome title (parent panel supplies 隐私与记忆).
  */
+type MemoryCenterSettings = SettingsContract & {
+  onMemoryCenterStatusViewChange?: (value: MemoryCenterStatusView) => void;
+};
+
 export function renderMemoryCenterPanel(
-  settings: SettingsContract,
+  settings: MemoryCenterSettings,
   state: MemoryCenterPanelState,
   options?: { embedded?: boolean },
 ): TemplateResult {
@@ -107,9 +119,13 @@ export function renderMemoryCenterPanel(
   }));
   const selected = (state.entries ?? []).find((entry) => entry.key === state.selectedKey);
   const selectedAtom = (state.atoms ?? []).find((atom) => atom.id === state.selectedAtomId);
+  const statusView: MemoryCenterStatusView =
+    state.statusView === "tentative" ? "tentative" : "active";
   const hasAtoms = (state.atoms?.length ?? 0) > 0;
-  const hasFiles = (state.entries?.length ?? 0) > 0;
-  const empty = !hasAtoms && !hasFiles;
+  const hasFiles = (state.entries ?? []).length > 0;
+  const atomListError = state.atomListError ?? null;
+  const otherViewTotal = state.otherViewTotal ?? 0;
+  const empty = !hasAtoms && !hasFiles && !atomListError;
 
   if (state.mode === "managed") {
     return html`
@@ -196,11 +212,69 @@ export function renderMemoryCenterPanel(
             ? html`
                 <div class="employee-workbench__settings-status-copy">正在加载记忆…</div>
               `
-            : empty
-              ? html`
-                  <div class="employee-workbench__settings-status-copy">暂无可管理的记忆。</div>
-                `
-              : html`
+            : html`
+                  <div
+                    class="employee-workbench__memory-status-filter"
+                    role="tablist"
+                    aria-label="记忆要点状态"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      class="employee-workbench__settings-row ${statusView === "active" ? "is-active" : ""}"
+                      aria-selected=${statusView === "active" ? "true" : "false"}
+                      @click=${() => settings.onMemoryCenterStatusViewChange?.("active")}
+                    >
+                      已确认
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      class="employee-workbench__settings-row ${statusView === "tentative" ? "is-active" : ""}"
+                      aria-selected=${statusView === "tentative" ? "true" : "false"}
+                      @click=${() => settings.onMemoryCenterStatusViewChange?.("tentative")}
+                    >
+                      候选（待确认）
+                    </button>
+                  </div>
+                  ${
+                    atomListError
+                      ? html`
+                          <div class="callout callout--danger employee-workbench__settings-callout">
+                            ${
+                              atomListError.code === "MEMORY_SUBJECT_UNBOUND"
+                                ? "当前机器人尚未绑定记忆主体，无法列出记忆要点。"
+                                : atomListError.code === "MEMORY_SUBJECT_OWNER_MISMATCH" ||
+                                    atomListError.code === "MEMORY_SUBJECT_TENANT_MISMATCH"
+                                  ? "无权查看该机器人的记忆要点。"
+                                  : atomListError.message
+                            }
+                          </div>
+                        `
+                      : nothing
+                  }
+                  ${
+                    !atomListError && !hasAtoms && statusView === "active"
+                      ? html`
+                          <div class="employee-workbench__settings-status-copy">
+                            ${
+                              otherViewTotal > 0
+                                ? "暂无已确认的记忆要点。可切换到「候选（待确认）」查看待确认项。"
+                                : empty
+                                  ? "暂无可管理的记忆。"
+                                  : "暂无已确认的记忆要点。"
+                            }
+                          </div>
+                        `
+                      : nothing
+                  }
+                  ${
+                    !atomListError && !hasAtoms && statusView === "tentative"
+                      ? html`
+                          <div class="employee-workbench__settings-status-copy">暂无待确认的候选记忆。</div>
+                        `
+                      : nothing
+                  }
                   ${
                     hasAtoms
                       ? html`
@@ -210,6 +284,7 @@ export function renderMemoryCenterPanel(
                           >
                             ${(state.atoms ?? []).map((atom) => {
                               const active = atom.id === state.selectedAtomId;
+                              const tentative = atom.status === "tentative";
                               return html`
                                 <button
                                   type="button"
@@ -218,6 +293,13 @@ export function renderMemoryCenterPanel(
                                 >
                                   <div class="employee-workbench__settings-label">
                                     ${atom.summary}
+                                    ${
+                                      tentative
+                                        ? html`
+                                            <span class="employee-workbench__memory-badge">待确认</span>
+                                          `
+                                        : nothing
+                                    }
                                   </div>
                                   <div class="employee-workbench__settings-value">
                                     ${scopeLabel(atom)} · ${formatUpdatedAt(atom.updatedAtMs)}
@@ -293,11 +375,36 @@ export function renderMemoryCenterPanel(
                   <div class="employee-workbench__settings-value">${selectedAtom.atomType}</div>
                 </div>
                 <div class="employee-workbench__settings-row">
+                  <div class="employee-workbench__settings-label">状态</div>
+                  <div class="employee-workbench__settings-value">
+                    ${
+                      selectedAtom.status === "tentative"
+                        ? html`
+                            候选 · <span class="employee-workbench__memory-badge">待确认</span>
+                          `
+                        : "已确认"
+                    }
+                  </div>
+                </div>
+                <div class="employee-workbench__settings-row">
                   <div class="employee-workbench__settings-label">更新时间</div>
                   <div class="employee-workbench__settings-value">
                     ${formatUpdatedAt(selectedAtom.updatedAtMs)}
                   </div>
                 </div>
+              </div>
+              <div
+                class="employee-workbench__settings-password-actions employee-workbench__settings-password-actions--inline"
+              >
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  title="soft-forget 该记忆要点关联的全部来源；默认不永久清除（purge）；不会改动「删除此记忆文件」入口"
+                  ?disabled=${state.busy || !state.selectedAtomId}
+                  @click=${() => void settings.onMemoryCenterForgetFact?.()}
+                >
+                  ${state.busy ? "处理中…" : "忘记此事实（全部来源）"}
+                </button>
               </div>
             `
           : nothing
@@ -332,11 +439,11 @@ export function renderMemoryCenterPanel(
                 <button
                   type="button"
                   class="btn btn--danger"
-                  title="从本机移除后，机器人将不再使用该记忆"
+                  title="仅删除工作区已索引记忆语料中的所选文件（MEMORY.md / memory/**），不会清除会话或其他来源中的相同内容，也不保证立即停止相关召回"
                   ?disabled=${state.busy || !state.selectedKey}
                   @click=${() => void settings.onMemoryCenterForget?.()}
                 >
-                  ${state.busy ? "处理中…" : "忘记这条记忆"}
+                  ${state.busy ? "处理中…" : "删除此记忆文件"}
                 </button>
               </div>
             `

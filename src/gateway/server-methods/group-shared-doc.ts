@@ -9,7 +9,6 @@ import {
   openOrCreateSharedDoc,
   upsertSharedDocSection,
   writeSharedDocBody,
-  type SharedDocReviewComment,
 } from "../collaboration-learning/shared-group-doc.js";
 import { resolveKnowledgeSourceContext } from "../knowledge/context.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";

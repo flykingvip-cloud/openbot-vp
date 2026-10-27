@@ -7,6 +7,7 @@ import type { SiteRunResult } from "../../site-capability/result.js";
 import { loadEnterpriseKnowledgeFeed } from "../knowledge/feed/enterprise-feed-adapter.js";
 import { invokeDataCapabilityWithContext } from "./capability-agent-invoke-runtime.js";
 import { EnterpriseDataStoreError, upsertConnectorAction } from "./connector-action-store.js";
+import { registerCallerAccountBinding } from "./data-asset-linkage.js";
 import { upsertDataCapability } from "./data-capability-store.js";
 import { invokeEnterpriseDataAction } from "./data-gateway.js";
 import { upsertDataSource } from "./data-source-store.js";
@@ -14,7 +15,6 @@ import {
   createTrustedExecutionContextForTest,
   MATERIALIZER_SEAT_ID,
 } from "./enterprise-data-seat-context.js";
-import { registerCallerAccountBinding } from "./data-asset-linkage.js";
 import { upsertEnterpriseKnowledgeProjectionBinding } from "./enterprise-knowledge-projection-binding-store.js";
 import { listKnowledgeFeedItems } from "./knowledge-feed-item-store.js";
 import {

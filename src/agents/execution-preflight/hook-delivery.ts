@@ -1,4 +1,9 @@
-import type { DeliveryEvidence, DeliveryValidatorReceipt, ExecutionPreflight } from "./types.js";
+import type {
+  DeliveryEvidence,
+  DeliveryValidatorReceipt,
+  ExecutionPreflight,
+  IntentClass,
+} from "./types.js";
 
 /** Trusted delivery evidence copied from one attempt. No file body and no secrets. */
 export type HookDeliveryResult = {
@@ -14,6 +19,14 @@ export type HookDeliveryResult = {
     | "not_required";
   allowedToDeliver: boolean;
   validatorReceipts?: DeliveryValidatorReceipt[];
+  /**
+   * Preflight intent classification. Used by TaskOutcome close gates — never infer
+   * "execution" merely from this object being present.
+   * Optional for legacy fixtures; production always sets it via toHookDeliveryResult.
+   */
+  intentClass?: IntentClass;
+  /** Bound skill id when preflight selected a primary skill (may have empty validators). */
+  primarySkill?: string;
 };
 
 function validatorsRequired(preflight: ExecutionPreflight): boolean {
@@ -37,6 +50,12 @@ export function toHookDeliveryResult(params: {
     ...(receipt.artifactSha256 ? { artifactSha256: receipt.artifactSha256 } : {}),
     validationResult: receipt.validationResult,
   }));
+  const intentFields = {
+    intentClass: params.preflight.intentClass,
+    ...(params.preflight.primarySkill?.trim()
+      ? { primarySkill: params.preflight.primarySkill.trim() }
+      : {}),
+  };
   if (!required) {
     return {
       taskId: params.preflight.taskId,
@@ -44,6 +63,7 @@ export function toHookDeliveryResult(params: {
       validatorsRequired: false,
       decisionCode: "not_required",
       allowedToDeliver: true,
+      ...intentFields,
       ...(receipts && receipts.length > 0 ? { validatorReceipts: receipts } : {}),
     };
   }
@@ -66,6 +86,7 @@ export function toHookDeliveryResult(params: {
     validatorsRequired: true,
     decisionCode,
     allowedToDeliver: decisionCode === "delivery_receipt_verified",
+    ...intentFields,
     ...(receipts && receipts.length > 0 ? { validatorReceipts: receipts } : {}),
   };
 }

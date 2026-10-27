@@ -1,8 +1,9 @@
 /**
- * 复用阈值策展的落地：学习资产 → `draft` 技能 → 等人工审核。
+ * outcome_verified 阈值策展的落地：学习资产 → `draft` 技能 → 等人工审核。
  *
- * 触发时机：一次复用记账之后（"刚刚又用了一次"是最自然的毕业检查点）。
+ * W4 触发时机：TaskOutcome closed+eligible 后记 outcome_verified（不是提示词注入）。
  * 幂等：策展后把 `curatedSkillId` 写回参与的资产，同一簇不会重复生成技能。
+ * 普通偏好/事实更新不走此路径；技能发布仍走既有 lifecycle（draft→review→approved）。
  */
 
 import type { AgentLearningAsset } from "@openbot/collaboration-core";
@@ -34,7 +35,7 @@ export type CurateLearningSkillDraftsParams = {
 };
 
 /**
- * 扫描某作用域下的学习资产，把达到复用阈值的经验沉淀为技能草稿。
+ * 扫描某作用域下的学习资产，把达到 outcome_verified 阈值的经验沉淀为技能草稿。
  *
  * 返回本次新生成的草稿；无候选时返回空数组且不写盘。
  */

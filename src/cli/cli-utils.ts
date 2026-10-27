@@ -1,10 +1,6 @@
 import type { Command } from "commander";
 import { formatErrorMessage } from "../infra/errors.js";
-import {
-  classifyCliError,
-  formatCliErrorMessage,
-  exitCodeForCliErrorKind,
-} from "./cli-errors.js";
+import { classifyCliError, formatCliErrorMessage, exitCodeForCliErrorKind } from "./cli-errors.js";
 
 export { formatErrorMessage };
 

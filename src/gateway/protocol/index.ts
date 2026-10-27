@@ -104,6 +104,8 @@ import {
   type CollaborationTaskUnblockBoardItemParams,
   type CollaborationTaskCancelBoardItemParams,
   type CollaborationTaskStopParams,
+  type CollaborationTaskWakeOpReleaseForRetryParams,
+  type CollaborationTaskWakeOpConfirmCompletedParams,
   type CollaborationTaskRecordPeerReviewParams,
   type CollaborationTaskListPeerReviewsParams,
   type CollaborationTaskOpenChallengeWindowParams,
@@ -139,6 +141,8 @@ import {
   CollaborationTaskUnblockBoardItemParamsSchema,
   CollaborationTaskCancelBoardItemParamsSchema,
   CollaborationTaskStopParamsSchema,
+  CollaborationTaskWakeOpReleaseForRetryParamsSchema,
+  CollaborationTaskWakeOpConfirmCompletedParamsSchema,
   CollaborationTaskRecordPeerReviewParamsSchema,
   CollaborationTaskListPeerReviewsParamsSchema,
   CollaborationTaskOpenChallengeWindowParamsSchema,
@@ -276,6 +280,26 @@ import {
   ModelsManagementRoutingExplanationsParamsSchema,
   type ModelsManagementSnapshotParams,
   ModelsManagementSnapshotParamsSchema,
+  type ModelsAdmissionDiscoverParams,
+  ModelsAdmissionDiscoverParamsSchema,
+  type ModelsAdmissionCreateVerificationParams,
+  ModelsAdmissionCreateVerificationParamsSchema,
+  type ModelsAdmissionGetVerificationParams,
+  ModelsAdmissionGetVerificationParamsSchema,
+  type ModelsAdmissionListVerificationParams,
+  ModelsAdmissionListVerificationParamsSchema,
+  type ModelsAdmissionCancelVerificationParams,
+  ModelsAdmissionCancelVerificationParamsSchema,
+  type ModelsAdmissionBatchVerificationParams,
+  ModelsAdmissionBatchVerificationParamsSchema,
+  type ModelsAdmissionSetRoutingEligibilityParams,
+  ModelsAdmissionSetRoutingEligibilityParamsSchema,
+  type ModelsAdmissionGetModelParams,
+  ModelsAdmissionGetModelParamsSchema,
+  type ModelsAdmissionListModelsParams,
+  ModelsAdmissionListModelsParamsSchema,
+  type ModelsAdmissionPreviewRoutingParams,
+  ModelsAdmissionPreviewRoutingParamsSchema,
   type ModelsProbeParams,
   ModelsProbeParamsSchema,
   type NodeDescribeParams,
@@ -652,6 +676,14 @@ export const validateCollaborationTaskCancelBoardItemParams =
 export const validateCollaborationTaskStopParams = ajv.compile<CollaborationTaskStopParams>(
   CollaborationTaskStopParamsSchema,
 );
+export const validateCollaborationTaskWakeOpReleaseForRetryParams =
+  ajv.compile<CollaborationTaskWakeOpReleaseForRetryParams>(
+    CollaborationTaskWakeOpReleaseForRetryParamsSchema,
+  );
+export const validateCollaborationTaskWakeOpConfirmCompletedParams =
+  ajv.compile<CollaborationTaskWakeOpConfirmCompletedParams>(
+    CollaborationTaskWakeOpConfirmCompletedParamsSchema,
+  );
 export const validateCollaborationTaskRecordPeerReviewParams =
   ajv.compile<CollaborationTaskRecordPeerReviewParams>(
     CollaborationTaskRecordPeerReviewParamsSchema,
@@ -751,6 +783,35 @@ export const validateModelsManagementRoutingExplanationsParams =
 export const validateModelsManagementAorStatusParams = ajv.compile<ModelsManagementAorStatusParams>(
   ModelsManagementAorStatusParamsSchema,
 );
+export const validateModelsAdmissionDiscoverParams = ajv.compile<ModelsAdmissionDiscoverParams>(
+  ModelsAdmissionDiscoverParamsSchema,
+);
+export const validateModelsAdmissionCreateVerificationParams =
+  ajv.compile<ModelsAdmissionCreateVerificationParams>(
+    ModelsAdmissionCreateVerificationParamsSchema,
+  );
+export const validateModelsAdmissionGetVerificationParams =
+  ajv.compile<ModelsAdmissionGetVerificationParams>(ModelsAdmissionGetVerificationParamsSchema);
+export const validateModelsAdmissionListVerificationParams =
+  ajv.compile<ModelsAdmissionListVerificationParams>(ModelsAdmissionListVerificationParamsSchema);
+export const validateModelsAdmissionCancelVerificationParams =
+  ajv.compile<ModelsAdmissionCancelVerificationParams>(
+    ModelsAdmissionCancelVerificationParamsSchema,
+  );
+export const validateModelsAdmissionBatchVerificationParams =
+  ajv.compile<ModelsAdmissionBatchVerificationParams>(ModelsAdmissionBatchVerificationParamsSchema);
+export const validateModelsAdmissionSetRoutingEligibilityParams =
+  ajv.compile<ModelsAdmissionSetRoutingEligibilityParams>(
+    ModelsAdmissionSetRoutingEligibilityParamsSchema,
+  );
+export const validateModelsAdmissionGetModelParams = ajv.compile<ModelsAdmissionGetModelParams>(
+  ModelsAdmissionGetModelParamsSchema,
+);
+export const validateModelsAdmissionListModelsParams = ajv.compile<ModelsAdmissionListModelsParams>(
+  ModelsAdmissionListModelsParamsSchema,
+);
+export const validateModelsAdmissionPreviewRoutingParams =
+  ajv.compile<ModelsAdmissionPreviewRoutingParams>(ModelsAdmissionPreviewRoutingParamsSchema);
 export const validateModelsProbeParams = ajv.compile<ModelsProbeParams>(ModelsProbeParamsSchema);
 export const validateSkillsStatusParams = ajv.compile<SkillsStatusParams>(SkillsStatusParamsSchema);
 export const validateToolsCatalogParams = ajv.compile<ToolsCatalogParams>(ToolsCatalogParamsSchema);
@@ -979,6 +1040,16 @@ export {
   ModelsManagementSnapshotParamsSchema,
   ModelsManagementRoutingExplanationsParamsSchema,
   ModelsManagementAorStatusParamsSchema,
+  ModelsAdmissionDiscoverParamsSchema,
+  ModelsAdmissionCreateVerificationParamsSchema,
+  ModelsAdmissionGetVerificationParamsSchema,
+  ModelsAdmissionListVerificationParamsSchema,
+  ModelsAdmissionCancelVerificationParamsSchema,
+  ModelsAdmissionBatchVerificationParamsSchema,
+  ModelsAdmissionSetRoutingEligibilityParamsSchema,
+  ModelsAdmissionGetModelParamsSchema,
+  ModelsAdmissionListModelsParamsSchema,
+  ModelsAdmissionPreviewRoutingParamsSchema,
   SkillsStatusParamsSchema,
   ToolsCatalogParamsSchema,
   SkillsInstallParamsSchema,

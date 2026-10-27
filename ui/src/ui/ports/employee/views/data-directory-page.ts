@@ -208,7 +208,7 @@ export function renderDataDirectoryPanel(
           管理记忆条目与 Agent 数据授权记录。
         </div>
         <label class="employee-workbench__settings-field">
-          <span class="employee-workbench__settings-field-label">忘记记忆（Agent ID）</span>
+          <span class="employee-workbench__settings-field-label">删除记忆文件（Agent ID）</span>
           <input
             class="employee-workbench__settings-input mono"
             .value=${state.forgetMemoryAgentId ?? ""}
@@ -233,10 +233,11 @@ export function renderDataDirectoryPanel(
           <button
             type="button"
             class="btn"
+            title="仅删除工作区已索引记忆语料中的所选文件（MEMORY.md / memory/**），不会清除会话或其他来源中的相同内容，也不保证立即停止相关召回"
             ?disabled=${state.forgetMemoryBusy}
             @click=${() => void settings.onForgetMemoryEntry?.()}
           >
-            ${state.forgetMemoryBusy ? "处理中…" : "忘记此条记忆"}
+            ${state.forgetMemoryBusy ? "处理中…" : "删除此记忆文件"}
           </button>
         </div>
         ${

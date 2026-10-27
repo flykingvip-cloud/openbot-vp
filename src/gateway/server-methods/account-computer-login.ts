@@ -38,7 +38,7 @@ import {
 } from "../../agents/sandbox/secure-form-store.js";
 import type { SecureFormFieldTarget } from "../../agents/sandbox/secure-form-types.js";
 import { ErrorCodes, errorShape } from "../protocol/index.js";
-import type { GatewayClient, GatewayRequestHandlers } from "./types.js";
+import type { GatewayClient, GatewayRequestHandlers, RespondFn } from "./types.js";
 
 const CLIENT_IDENTITY_KEYS = [
   "profile",
@@ -69,10 +69,7 @@ function resolveViewerAccount(
   return { tenantId, userId };
 }
 
-function rejectIdentity(
-  params: Record<string, unknown>,
-  respond: (ok: boolean, payload?: unknown, error?: unknown) => void,
-) {
+function rejectIdentity(params: Record<string, unknown>, respond: RespondFn) {
   for (const key of CLIENT_IDENTITY_KEYS) {
     if (params[key] != null && params[key] !== "") {
       respond(
@@ -89,10 +86,7 @@ function rejectIdentity(
   return false;
 }
 
-function requireAccount(
-  client: GatewayClient | null,
-  respond: (ok: boolean, payload?: unknown, error?: unknown) => void,
-) {
+function requireAccount(client: GatewayClient | null, respond: RespondFn) {
   const account = resolveViewerAccount(client);
   if (!account) {
     respond(

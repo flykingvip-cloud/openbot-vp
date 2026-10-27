@@ -2766,6 +2766,8 @@ tasks:
       - src/memory/cogniweave-cloud-sync-drain.test.ts
       - src/memory/memory-center-atoms.ts
       - src/memory/memory-center-atoms.test.ts
+      - src/memory/memory-center-o4-readonly.ts
+      - src/memory/memory-center-o4-readonly.test.ts
       - src/memory/recall-deny-search-wrapper.ts
       - src/memory/search-manager.ts
       - src/data/memory-lifecycle.ts
@@ -2778,6 +2780,19 @@ tasks:
       - src/config/zod-schema.ts
       - src/gateway/server-methods/memory-center-access.ts
       - src/gateway/server-methods/memory-center-access.test.ts
+      - src/gateway/server-methods/memory-list-o4-status-view.test.ts
+      - src/gateway/server-methods/memory-list.ts
+      - src/gateway/server-methods/memory-list.test.ts
+      - src/gateway/server-methods/memory-forget-gateway-isolation.test.ts
+      - src/memory/memory-batch1-o8-baseline.test.ts
+      - src/memory/memory-batch1-o8-baseline-v2.test.ts
+      - src/memory/memory-batch1-o8-baseline-v3.test.ts
+      - src/memory/memory-effect-acceptance-matrix.test.ts
+      - docs/design/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-run-2026-10-27.json
+      - ui/src/ui/ports/employee/views/data-directory-page.ts
+      - ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
       - src/gateway/server-methods/data.ts
       - src/gateway/server-methods/agents.ts
       - ui/src/ui/ports/employee/views/memory-center-page.ts
@@ -9619,6 +9634,11 @@ tasks:
       - src/gateway/protocol/index.ts
       - src/gateway/collaboration-dispatch/task-runtime.ts
       - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/task-control-cas.ts
+      - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     state: active
     sessions:
       - id: t30u-u1-boundary-20261026
@@ -9667,19 +9687,51 @@ tasks:
       - u3-wake-idempotent-resume
       - wl2-wake-idempotent-resume
     paths:
+      - src/gateway/collaboration-dispatch/wake-op-ledger.ts
       - src/gateway/collaboration-dispatch/wake-contract.ts
       - src/gateway/collaboration-dispatch/wake-round-dispatch.ts
       - src/gateway/collaboration-learning/wake-contract-entry.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
-    state: ready
+    state: active
     sessions:
       - id: t29u-u3-1792978430
         taskId: u3-wake-idempotent-resume:协作小组
         ide: cursor
         agent: 协作小组
-        status: active
+        status: done
         lastSignalAt: 2026-10-26T01:33:51.109Z
+        metadata: {}
+      - id: t31u-u3-wake-20261026
+        taskId: u3-wake-idempotent-resume:协作小组
+        ide: cursor
+        agent: 协作小组/u3-wake
+        status: active
+        lastSignalAt: 2026-10-26T03:00:20.069Z
+        metadata:
+          org: 协作小组
+          executor: 协作小组/u3-wake
+          t31u: true
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: memory-system-review-2026-10-26:grok-bot
+    owner: grok-bot
+    intent:
+      - Revise memory review report and optimization plan per audit agent
+        feedback; docs only; no implementation
+    paths:
+      - docs/design/memory-system-review-report-2026-10-26.md
+      - docs/design/memory-system-optimization-plan-2026-10-26.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: rev-audit-2026-10-26-a
+        taskId: memory-system-review-2026-10-26:grok-bot
+        ide: cursor
+        agent: grok-bot
+        status: active
+        lastSignalAt: 2026-10-26T02:55:24.440Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-26
@@ -9705,7 +9757,291 @@ tasks:
     ownerHistory: []
     since: 2026-10-26
     metadata: {}
+  - id: p1-task-driven-aor-scoring
+    owner: grok-bot
+    intent:
+      - P1 task-driven AOR scoring
+    paths:
+      - packages/aor-core/src/parser.ts
+      - packages/aor-core/src/parser.test.ts
+      - packages/aor-core/src/selector.ts
+      - packages/aor-core/src/selector.test.ts
+      - packages/aor-core/src/task-types.ts
+      - packages/aor-core/src/types.ts
+      - src/agents/subagent-spawn.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+      - src/auto-reply/reply/followup-runner.ts
+      - src/cron/isolated-agent/run.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/employee-model-gate.aor.test.ts
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/run-context-estimate.ts
+      - src/gateway/model-entitlement/run-context-estimate.test.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/task-outcome/types.ts
+      - src/gateway/governance/spawn-snapshot-handoff.ts
+      - src/gateway/governance/decision.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.test.ts
+      - src/task-outcome/capability-modality.ts
+      - src/task-outcome/capability-modality.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/task-outcome/transitions.ts
+      - src/task-outcome/result-service.ts
+      - src/task-outcome/entrypoints/chat.ts
+      - src/commands/agent/model-governance.test.ts
+      - src/commands/agent/model-governance.fallback.test.ts
+      - .loom/registry.yaml
+    state: landed
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-26
+    metadata:
+      reviewAfter: 2026-11-30
+      convergeNote: after-merge trim hot-path declarations once landed
+  - id: mj-suno-executor-wiring
+    owner: grok-bot
+    intent:
+      - Wire Midjourney/image_generation and Suno/audio_music_generation from
+        permanent executor_unwired to config-gated Stepfun image_gen and Suno
+        music_gen tool paths
+      - Keep TTS/audio_understanding unwired; config-gated IMAGE_EXECUTOR_WIRED
+        / AUDIO_MUSIC_WIRED only
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/executor-wiring.ts
+      - src/gateway/model-entitlement/executor-wiring.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/agents/image-generation-models.ts
+      - src/agents/image-generation-models.test.ts
+      - src/agents/music-generation-models.ts
+      - src/agents/music-generation-models.test.ts
+      - src/agents/tools/suno-music-tool.ts
+      - src/agents/tools/suno-music-tool.helpers.ts
+      - src/agents/tools/suno-music-tool.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/pi-embedded-subscribe.tools.ts
+      - src/config/types.agent-defaults.ts
+      - src/config/zod-schema.agent-defaults.ts
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/task-outcome/modality-artifact-evidence.ts
+      - src/task-outcome/modality-artifact-evidence.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.executor-wiring.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-26
+    metadata:
+      reviewAfter: "2026-11-30"
+      note: config-gated IMAGE_EXECUTOR_WIRED / AUDIO_MUSIC_WIRED; no merge/deploy in this PR
+
+  - id: askOutcome-p0-r83-remediation
+    owner: executor-acceptance
+    intent:
+      - R83 P0 persist CAS consumer chat-wire remediation
+      - R85b no-evidence-no-success growth-bridge failure-attribution
+      - R85c contract-gated acceptance send-confirm delivery effective DNA reads
+      - R85d deliver-AND durable-pending execution-no-chat-waive DNA observation
+        fields
+      - R85e real-deliver-callback unknown-keeps-pending id-threading
+        AND-no-early-success
+      - R85f classify-from-preflight-intent not-hookDelivery-presence
+        production-entry-proof
+    paths:
+      - src/task-outcome/**
+      - docs/design/task-outcome/**
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: askoutcome-p0-r83-20261026
+        taskId: askOutcome-p0-r83-remediation
+        ide: cursor-local
+        agent: executor-acceptance
+        status: active
+        lastSignalAt: 2026-10-26T05:14:00.000Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-26
+    metadata: {}
+  - id: platform-model-capability-admission
+    owner: grok-bot
+    intent:
+      - "Retrospective Loom ownership claim for #91 platform-models capability
+        admission / verification stub / routing preview (already merged; no code
+        change)"
+    paths:
+      - ui/src/ui/ports/platform/models/adapter.node.test.ts
+      - ui/src/ui/ports/platform/models/adapter.ts
+      - ui/src/ui/ports/platform/models/admission/capability-matrix.ts
+      - ui/src/ui/ports/platform/models/admission/controller.ts
+      - ui/src/ui/ports/platform/models/admission/demo-adapter.ts
+      - ui/src/ui/ports/platform/models/admission/local-protocol-adapter.ts
+      - ui/src/ui/ports/platform/models/admission/routing-decision-service.ts
+      - ui/src/ui/ports/platform/models/admission/verification-contract.ts
+      - ui/src/ui/ports/platform/models/admission/verification-service.ts
+      - ui/src/ui/ports/platform/models/capability-admission-batch3.node.test.ts
+      - ui/src/ui/ports/platform/models/capability-admission.node.test.ts
+      - ui/src/ui/ports/platform/models/capability-evidence.ts
+      - ui/src/ui/ports/platform/models/capability-ids.ts
+      - ui/src/ui/ports/platform/models/capability-verification-batch2.node.test.ts
+      - ui/src/ui/ports/platform/models/capability-verification.ts
+      - ui/src/ui/ports/platform/models/executor-path-labels.ts
+      - ui/src/ui/ports/platform/models/model-admission-store.ts
+      - ui/src/ui/ports/platform/models/model-asset-actions.ts
+      - ui/src/ui/ports/platform/models/model-asset-detail-drawer.node.test.ts
+      - ui/src/ui/ports/platform/models/model-asset-presentation.node.test.ts
+      - ui/src/ui/ports/platform/models/model-asset-presentation.ts
+      - ui/src/ui/ports/platform/models/model-connection-gate.node.test.ts
+      - ui/src/ui/ports/platform/models/model-connection-gate.ts
+      - ui/src/ui/ports/platform/models/page.ts
+      - ui/src/ui/ports/platform/models/platform-model-definition.ts
+      - ui/src/ui/ports/platform/models/routing-decision-preview.ts
+      - ui/src/ui/ports/platform/models/sections/ModelAssetsSection.detail.browser.test.ts
+      - ui/src/ui/ports/platform/models/sections/ModelAssetsSection.pool-gate.browser.test.ts
+      - ui/src/ui/ports/platform/models/sections/ModelAssetsSection.ts
+      - ui/src/ui/ports/platform/models/sections/ModelPoolSection.ts
+      - ui/src/ui/ports/platform/models/sections/SmartRoutingSection.ts
+      - ui/src/ui/ports/platform/models/sections/model-assets-list.css
+      - ui/src/ui/ports/platform/models/specialized-eval.ts
+      - ui/src/ui/ports/platform/models/view-model.ts
+      - ui/src/ui/ports/platform/render-actions.node.test.ts
+      - ui/src/ui/ports/platform/render-actions.ts
+      - .loom/registry.yaml
+    state: landed
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-27
+    metadata:
+      purpose: "#91 retrospective ownership claim (capability admission / verification stub / routing preview)"
+      pr: "91"
+      note: code already on main; registry-only claim; CHANGELOG.md left to existing owners; #100 should drop overlapping UI paths on rebase
+  - id: platform-models-real-verification-rpc
+    owner: grok-bot
+    intent: []
+    paths:
+      - .loom/registry.yaml
+      - CHANGELOG.md
+      - src/gateway/method-scopes.ts
+      - src/gateway/models/capability-admission/capability-admission.test.ts
+      - src/gateway/models/capability-admission/capability-ids.ts
+      - src/gateway/models/capability-admission/index.ts
+      - src/gateway/models/capability-admission/protocol-runner.ts
+      - src/gateway/models/capability-admission/routing-decision.ts
+      - src/gateway/models/capability-admission/store.ts
+      - src/gateway/models/capability-admission/types.ts
+      - src/gateway/models/capability-admission/verification-service.ts
+      - src/gateway/protocol/index.ts
+      - src/gateway/protocol/schema.ts
+      - src/gateway/protocol/schema/models-admission.ts
+      - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/gateway/protocol/schema/types.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/server-methods.ts
+      - src/gateway/server-methods/models-admission.ts
+      - ui/src/ui/ports/platform/models/admission/rpc-adapter.node.test.ts
+      - ui/src/ui/ports/platform/models/admission/rpc-adapter.ts
+    state: landed
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-27
+    metadata:
+      purpose: "#91 leftover real gateway models.admission verification/decision RPC (landed via #107)"
+      pr: "107"
+      convergeNote: after-merge trim hot-path declarations once landed
+      reviewAfter: "2026-11-30"
 landingStreams:
+  - id: p1-task-driven-aor-scoring
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+    canLandWith: []
+    metadata:
+      task: p1-task-driven-aor-scoring
+      owner: grok-bot
+      reviewAfter: 2026-11-30
+      convergeNote: post-#86 landed; hot paths trimmed; sharedPaths landers remain
+        authoritative
+      purpose: P1 current-task-driven AOR scoring, CJK/parent quality, full context
+        constraints, executor_unwired outcome claims
+  - id: mj-suno-executor-wiring
+    landingPolicy: parallel
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/model-entitlement/task-capability-plan.ts
+      - src/gateway/model-entitlement/task-capability-plan.test.ts
+      - src/gateway/model-entitlement/executor-wiring.ts
+      - src/gateway/model-entitlement/executor-wiring.test.ts
+      - src/gateway/model-entitlement/capability-entry-consume.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/model-entitlement/child-task-aor-reorder.ts
+      - src/gateway/model-entitlement/child-spawn-capability-routing.ts
+      - src/agents/image-generation-models.ts
+      - src/agents/image-generation-models.test.ts
+      - src/agents/music-generation-models.ts
+      - src/agents/music-generation-models.test.ts
+      - src/agents/tools/suno-music-tool.ts
+      - src/agents/tools/suno-music-tool.helpers.ts
+      - src/agents/tools/suno-music-tool.test.ts
+      - src/agents/openclaw-tools.ts
+      - src/agents/pi-embedded-subscribe.tools.ts
+      - src/config/types.agent-defaults.ts
+      - src/config/zod-schema.agent-defaults.ts
+      - src/config/schema.help.ts
+      - src/config/schema.labels.ts
+      - src/task-outcome/modality-artifact-evidence.ts
+      - src/task-outcome/modality-artifact-evidence.test.ts
+      - src/task-outcome/runtime-from-runner.ts
+      - src/task-outcome/runtime-from-runner.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.executor-wiring.test.ts
+      - src/agents/pi-embedded-subscribe.handlers.tools.ts
+      - src/auto-reply/reply/agent-runner-execution.ts
+    canLandWith: []
+    metadata:
+      task: mj-suno-executor-wiring
+      owner: grok-bot
+      reviewAfter: "2026-11-30"
+      purpose: Midjourney/Stepfun image_gen and Suno music_gen executor wiring (config-gated)
+
+  - id: platform-models-real-verification-rpc
+    landingPolicy: parallel
+    paths:
+      - .loom/registry.yaml
+    canLandWith: []
+    metadata:
+      task: platform-models-real-verification-rpc
+      owner: grok-bot
+      reviewAfter: "2026-11-30"
+      convergeNote: post-#107 landed; hot paths trimmed; sharedPaths landers remain
+        authoritative
+      purpose: "#91 leftover real gateway models.admission verification/decision RPC"
+
+  - id: askOutcome-p0-r83-remediation
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - docs/design/task-outcome/contract.md
+      - docs/design/task-outcome/call-chain-and-replacements.md
+      - src/task-outcome/**
+    canLandWith: []
+    metadata:
+      task: askOutcome-p0-r83-remediation
+      owner: executor-acceptance
+      purpose: R83/R85 TaskOutcome module land; hot-file temp landers restored pre-merge
   - id: askOutcome-p0-task-outcome-contract
     landingPolicy: serial
     paths:
@@ -9769,6 +10105,7 @@ landingStreams:
       - src/gateway/collaboration-dispatch/task-dispatch-auth-recheck.ts
       - src/gateway/collaboration-learning/task-stop-entry.ts
       - src/gateway/collaboration-learning/wl2-stop-revoke-wake.evidence.test.ts
+      - src/gateway/collaboration-learning/full-entrypoint-race-migration.evidence.test.ts
       - src/gateway/collaboration-learning/handoff-contract-entry.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/self-advance-entry.ts
@@ -9785,7 +10122,13 @@ landingStreams:
       - src/gateway/protocol/index.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/protocol/schema/protocol-schemas.ts
+      - src/gateway/collaboration-dispatch/handoff-contract.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/task-control-cas.ts
+      - src/gateway/collaboration-learning/wake-op-m1-m3.evidence.test.ts
     canLandWith:
+      - ACL
       - COLLAB_RESIDUAL_B_TOOL_LOOP
       - batch2-reliable-confirm-cards
       - collab-p1-artifact-accept-loop:grok-bot
@@ -19081,6 +19424,7 @@ landingStreams:
       - src/telegram/sticker-cache.ts
       - scripts/check-isolation-fail-closed.mjs
       - scripts/memory-platform-audit.mjs
+      - scripts/memory-platform-audit.d.mts
       - scripts/memory-platform-recovery.mjs
       - scripts/governance/shadow-decisions-report.ts
       - scripts/__tests__/governance/shadow-decisions-report.test.ts
@@ -19135,6 +19479,7 @@ landingStreams:
       - LDRG
       - CHAT_HISTORY_P0_IMAGE_OMIT
       - u1-unified-task-stop
+      - DDOC
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
@@ -19151,6 +19496,14 @@ landingStreams:
       - src/memory/memory-center-atoms*
       - ui/src/ui/ports/employee/render-model-memory-center.ts
       - ui/src/ui/ports/employee/views/memory-center-page.ts
+      - src/memory/memory-fact-forget.ts
+      - src/memory/memory-fact-forget.test.ts
+      - src/memory/types.ts
+      - src/gateway/server-methods/memory-forget-fact-gateway-isolation.test.ts
+      - ui/src/ui/ports/employee/views/memory-center-page.node.test.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-contracts.ts
+      - docs/design/memory-fact-level-forget-mvp-2026-10-27.md
+      - docs/design/memory-fact-level-forget-assessment-2026-10-27.md
       - ui/src/ui/ports/enterprise/views/enterprise-retention-policy-surface.ts
       - ui/src/ui/ports/employee/views/employee-data-retention-summary-card.ts
       - docs/design/openbot-agent-context-lifecycle*
@@ -19167,7 +19520,9 @@ landingStreams:
       - src/memory/query-atoms-acl.test.ts
       - docs/design/openbot-system-sandbox-security*
       - .loom/registry.yaml
-    canLandWith: []
+    canLandWith:
+      - MRR
+      - u1-unified-task-stop
     metadata:
       legacyTitle: Agent Context Lifecycle And Security P1
       task: agent-context-lifecycle
@@ -19270,6 +19625,8 @@ landingStreams:
       - src/memory/cogniweave-cloud-sync-drain.test.ts
       - src/memory/memory-center-atoms.ts
       - src/memory/memory-center-atoms.test.ts
+      - src/memory/memory-center-o4-readonly.ts
+      - src/memory/memory-center-o4-readonly.test.ts
       - src/config/types.memory.ts
       - src/config/zod-schema.ts
       - src/data/memory-lifecycle.ts
@@ -19280,6 +19637,19 @@ landingStreams:
       - src/gateway/server-methods/conversations.ts
       - src/gateway/server-methods/memory-center-access.ts
       - src/gateway/server-methods/memory-center-access.test.ts
+      - src/gateway/server-methods/memory-list-o4-status-view.test.ts
+      - src/gateway/server-methods/memory-list.ts
+      - src/gateway/server-methods/memory-list.test.ts
+      - src/gateway/server-methods/memory-forget-gateway-isolation.test.ts
+      - src/memory/memory-batch1-o8-baseline.test.ts
+      - src/memory/memory-batch1-o8-baseline-v2.test.ts
+      - src/memory/memory-batch1-o8-baseline-v3.test.ts
+      - src/memory/memory-effect-acceptance-matrix.test.ts
+      - docs/design/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-2026-10-27.md
+      - docs/design/evidence/memory-effect-acceptance-matrix-run-2026-10-27.json
+      - ui/src/ui/ports/employee/views/data-directory-page.ts
+      - ui/src/ui/ports/employee/views/data-directory-page.node.test.ts
       - src/gateway/server-methods/data.ts
       - src/gateway/server-methods/agents.ts
       - src/gateway/server-methods.ts
@@ -19335,6 +19705,8 @@ landingStreams:
       - .loom/registry.yaml
     canLandWith:
       - CDUI
+      - MRR
+      - DDOC
     metadata:
       legacyTitle: Conversation Lifecycle (Catalog + Gateway + Employee UI)
       disposition: MERGE
@@ -21417,7 +21789,9 @@ landingStreams:
       - docs/design/**
       - test/seq96-seq97-adjudication.test.ts
       - test/constitutional-governance-state-convergence.test.ts
-    canLandWith: []
+    canLandWith:
+      - CL
+      - MRR
     metadata:
       legacyRuleId: merge-design-docs
       legacyTitle: Design Documents (Straggler)
@@ -21628,7 +22002,8 @@ landingStreams:
 sharedPaths:
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
-    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with pi-sdk-family-migration-v3.
+    reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with
+      pi-sdk-family-migration-v3.
     reviewAfter: 2026-11-30
   - glob: src/gateway/collaboration-dispatch/claim-contract.ts
     landerTask: collab-p1-artifact-accept-loop:grok-bot
@@ -22560,7 +22935,8 @@ sharedPaths:
     reviewAfter: 2026-10-11
   - glob: src/auto-reply/reply/agent-runner-execution.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok
-    reason: Hot-file lander restored to evolution-loop-fix after askOutcome P0 wired recordGrowthTaskOutcome → recordRunnerTurnOutcome (call site owned here; TaskOutcome module stays askOutcome-p0).
+    reason: Hot-file lander restored to evolution-loop-fix after askOutcome R83/R85
+      wiring (call site owned here; TaskOutcome module stays askOutcome-p0).
     reviewAfter: 2026-11-30
   - glob: src/auto-reply/reply/agent-runner-evolution-outcome.test.ts
     landerTask: openbot-evolution-loop-fix:cursor-grok

@@ -5,9 +5,12 @@
  * `abstractedContent.capabilities` / `metadata.skills`（能力名字符串），而写入侧从不
  * 产出这两个键，于是每一条经验都"写得进、读不出"——教训永远不会回到行为里。
  *
- * 本模块补上真正的读回：
- *  - 渲染 `lesson` 正文（不是能力名）进提示词；
- *  - 记录**复用次数**（被注入提示词才算复用），为复用阈值策展提供唯一可信口径。
+ * 本模块补上真正的读回，并（W4）分离经验有效性四段指标：
+ *  - retrieved：从存储读出
+ *  - injected：真正进入系统提示词（曝光；≠ 有效复用）
+ *  - adopted：有明确采用信号（注入 alone 不算）
+ *  - outcome_verified：closed+eligible **且**有采用证据的资产才计（共现≠有效）
+ * 策展阈值只认 outcome_verified，不认提示词曝光，也不认「成功任务中的曝光」。
  */
 
 import type { AgentLearningAsset } from "@openbot/collaboration-core";
@@ -19,6 +22,9 @@ import { logVerbose } from "../../globals.js";
 import { withFileLock } from "../../infra/file-lock.js";
 import { createAsyncLock } from "../../infra/json-files.js";
 
+/** W4: experience validity stages (exposure ≠ verified). */
+export type LearningExperienceStage = "retrieved" | "injected" | "adopted" | "outcome_verified";
+
 /** 单条可复述的经验。 */
 export type LearningRecallEntry = {
   assetId: string;
@@ -26,7 +32,15 @@ export type LearningRecallEntry = {
   /** 人类可读的一句话教训（已由晋升侧构造）。 */
   lesson: string;
   confidence: NonNullable<AgentLearningAsset["confidence"]>;
+  /**
+   * @deprecated W4: legacy exposure alias (= injectedCount ?? reuseCount).
+   * Prompt copy should say 曝光, not 复用.
+   */
   reuseCount: number;
+  /** W4: prompt-injection exposure count. */
+  injectedCount: number;
+  /** W4: TaskOutcome-verified effective reuse count. */
+  outcomeVerifiedCount: number;
   isAntiPattern: boolean;
 };
 
@@ -36,6 +50,26 @@ export type LearningRecall = {
 };
 
 export const EMPTY_LEARNING_RECALL: LearningRecall = { capabilities: [], lessons: [] };
+
+/** Exposure count: prefer injectedCount, fall back to legacy reuseCount. */
+export function resolveInjectedCount(asset: AgentLearningAsset): number {
+  if (typeof asset.injectedCount === "number" && Number.isFinite(asset.injectedCount)) {
+    return Math.max(0, Math.floor(asset.injectedCount));
+  }
+  return Math.max(0, Math.floor(asset.reuseCount ?? 0));
+}
+
+export function resolveOutcomeVerifiedCount(asset: AgentLearningAsset): number {
+  return Math.max(0, Math.floor(asset.outcomeVerifiedCount ?? 0));
+}
+
+export function resolveRetrievedCount(asset: AgentLearningAsset): number {
+  return Math.max(0, Math.floor(asset.retrievedCount ?? 0));
+}
+
+export function resolveAdoptedCount(asset: AgentLearningAsset): number {
+  return Math.max(0, Math.floor(asset.adoptedCount ?? 0));
+}
 
 /** 单次注入的教训条数上限（控制提示词膨胀）。 */
 export const LEARNING_RECALL_LIMIT = 5;
@@ -147,7 +181,7 @@ function isActive(asset: AgentLearningAsset): boolean {
 
 const CONFIDENCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-/** 排序：高置信 → 高复用 → 新在前。纯函数，便于单测。 */
+/** 排序：高置信 → 高曝光(injected) → 新在前。纯函数，便于单测。 */
 export function rankLearningAssets(assets: AgentLearningAsset[]): AgentLearningAsset[] {
   return [...assets].toSorted((left, right) => {
     const confidence =
@@ -156,9 +190,9 @@ export function rankLearningAssets(assets: AgentLearningAsset[]): AgentLearningA
     if (confidence !== 0) {
       return confidence;
     }
-    const reuse = (right.reuseCount ?? 0) - (left.reuseCount ?? 0);
-    if (reuse !== 0) {
-      return reuse;
+    const exposure = resolveInjectedCount(right) - resolveInjectedCount(left);
+    if (exposure !== 0) {
+      return exposure;
     }
     return (right.updatedAt ?? 0) - (left.updatedAt ?? 0);
   });
@@ -179,12 +213,15 @@ export function buildLearningRecall(
       continue;
     }
     seenLessons.add(lesson);
+    const injectedCount = resolveInjectedCount(asset);
     lessons.push({
       assetId: asset.assetId,
       assetType: asset.assetType ?? "lesson",
       lesson,
       confidence: asset.confidence ?? "low",
-      reuseCount: asset.reuseCount ?? 0,
+      reuseCount: injectedCount,
+      injectedCount,
+      outcomeVerifiedCount: resolveOutcomeVerifiedCount(asset),
       isAntiPattern: asset.abstractedContent?.capsuleType === "anti_pattern",
     });
     if (lessons.length >= limit) {
@@ -210,14 +247,60 @@ export async function readLearningRecall(params: {
   return buildLearningRecall(assets, params.limit ?? LEARNING_RECALL_LIMIT);
 }
 
+function bumpStageFields(
+  asset: AgentLearningAsset,
+  stage: LearningExperienceStage,
+  now: number,
+): AgentLearningAsset {
+  switch (stage) {
+    case "retrieved":
+      return {
+        ...asset,
+        retrievedCount: resolveRetrievedCount(asset) + 1,
+        lastRetrievedAt: now,
+        updatedAt: now,
+      };
+    case "injected": {
+      const injectedCount = resolveInjectedCount(asset) + 1;
+      return {
+        ...asset,
+        injectedCount,
+        lastInjectedAt: now,
+        // Legacy alias stays in sync so old readers still see exposure.
+        reuseCount: injectedCount,
+        lastReusedAt: now,
+        updatedAt: now,
+      };
+    }
+    case "adopted":
+      return {
+        ...asset,
+        adoptedCount: resolveAdoptedCount(asset) + 1,
+        lastAdoptedAt: now,
+        updatedAt: now,
+      };
+    case "outcome_verified":
+      return {
+        ...asset,
+        outcomeVerifiedCount: resolveOutcomeVerifiedCount(asset) + 1,
+        lastOutcomeVerifiedAt: now,
+        updatedAt: now,
+      };
+    default: {
+      const _exhaustive: never = stage;
+      return _exhaustive;
+    }
+  }
+}
+
 /**
- * 记录复用：把注入过的资产 `reuseCount += 1`。
- *
- * 复用 = **真的进了提示词**，而不是被创建或被查看。这是阈值策展的计数口径。
+ * W4: record one experience-validity stage for the given assets.
+ * Injection/exposure must not be treated as outcome_verified.
  */
-export async function recordLearningReuse(params: {
+export async function recordLearningExperienceStage(params: {
   scopeId: string;
   assetIds: string[];
+  stage: LearningExperienceStage;
   atMs?: number;
 }): Promise<void> {
   const targets = new Set(params.assetIds.map((id) => id.trim()).filter(Boolean));
@@ -237,12 +320,7 @@ export async function recordLearningReuse(params: {
         return asset;
       }
       changed = true;
-      return {
-        ...asset,
-        reuseCount: (asset.reuseCount ?? 0) + 1,
-        lastReusedAt: now,
-        updatedAt: now,
-      } satisfies AgentLearningAsset;
+      return bumpStageFields(asset, params.stage, now);
     });
     if (!changed) {
       return;
@@ -252,21 +330,143 @@ export async function recordLearningReuse(params: {
 }
 
 /**
- * 永不 reject 的复用计数（提示词组装路径上不能因此失败）。
+ * @deprecated W4: alias for stage=`injected` (exposure). Does not mean outcome_verified.
+ * Prefer `recordLearningExperienceStage({ stage: "injected" })`.
+ */
+export async function recordLearningReuse(params: {
+  scopeId: string;
+  assetIds: string[];
+  atMs?: number;
+}): Promise<void> {
+  await recordLearningExperienceStage({
+    scopeId: params.scopeId,
+    assetIds: params.assetIds,
+    stage: "injected",
+    atMs: params.atMs,
+  });
+}
+
+/**
+ * Adjust a stage counter by delta (e.g. -1 to revoke a prior outcome_verified
+ * after task.corrected). Propagates failures — for business paths only.
+ */
+export async function adjustLearningExperienceStage(params: {
+  scopeId: string;
+  assetIds: string[];
+  stage: LearningExperienceStage;
+  delta: number;
+  atMs?: number;
+}): Promise<void> {
+  const delta = Math.trunc(params.delta);
+  if (delta === 0) {
+    return;
+  }
+  const targets = new Set(params.assetIds.map((id) => id.trim()).filter(Boolean));
+  if (targets.size === 0) {
+    return;
+  }
+  await withLearningAssetLock(params.scopeId, async () => {
+    const { learningStorage } = createWorkspaceCollaborationStores();
+    const assets = await learningStorage.readLearningAssets(params.scopeId);
+    if (assets.length === 0) {
+      return;
+    }
+    const now = params.atMs ?? Date.now();
+    let changed = false;
+    const next = assets.map((asset) => {
+      if (!targets.has(asset.assetId)) {
+        return asset;
+      }
+      changed = true;
+      if (delta > 0) {
+        let bumped = asset;
+        for (let i = 0; i < delta; i += 1) {
+          bumped = bumpStageFields(bumped, params.stage, now);
+        }
+        return bumped;
+      }
+      // decrement
+      const steps = -delta;
+      if (params.stage === "outcome_verified") {
+        const cur = resolveOutcomeVerifiedCount(asset);
+        return {
+          ...asset,
+          outcomeVerifiedCount: Math.max(0, cur - steps),
+          updatedAt: now,
+        };
+      }
+      if (params.stage === "adopted") {
+        const cur = resolveAdoptedCount(asset);
+        return {
+          ...asset,
+          adoptedCount: Math.max(0, cur - steps),
+          updatedAt: now,
+        };
+      }
+      if (params.stage === "injected") {
+        const cur = resolveInjectedCount(asset);
+        const injectedCount = Math.max(0, cur - steps);
+        return {
+          ...asset,
+          injectedCount,
+          reuseCount: injectedCount,
+          updatedAt: now,
+        };
+      }
+      if (params.stage === "retrieved") {
+        const cur = resolveRetrievedCount(asset);
+        return {
+          ...asset,
+          retrievedCount: Math.max(0, cur - steps),
+          updatedAt: now,
+        };
+      }
+      return asset;
+    });
+    if (!changed) {
+      return;
+    }
+    await learningStorage.writeLearningAssets(params.scopeId, next);
+  });
+}
+
+/**
+ * 永不 reject 的阶段计数（提示词组装路径上不能因此失败）。
  *
- * `onRecorded` 在计数**落盘之后**触发，供复用阈值策展使用——必须在写盘后才查阈值，
- * 否则本次复用没算进去，会永远差一次才毕业。
+ * W4: `onRecorded` is optional bookkeeping only — **do not** use it to trigger
+ * skill curation on injection. Curation must wait for `outcome_verified`.
+ */
+export function recordLearningExperienceStageSafely(params: {
+  scopeId: string;
+  assetIds: string[];
+  stage: LearningExperienceStage;
+  onRecorded?: () => void;
+}): void {
+  void recordLearningExperienceStage({
+    scopeId: params.scopeId,
+    assetIds: params.assetIds,
+    stage: params.stage,
+  })
+    .then(() => {
+      params.onRecorded?.();
+    })
+    .catch((err) => {
+      logVerbose(`learning experience stage accounting failed (${params.stage}): ${String(err)}`);
+    });
+}
+
+/**
+ * @deprecated W4: alias for injected stage. Curation must not be hooked here.
  */
 export function recordLearningReuseSafely(params: {
   scopeId: string;
   assetIds: string[];
   onRecorded?: () => void;
 }): void {
-  void recordLearningReuse({ scopeId: params.scopeId, assetIds: params.assetIds })
-    .then(() => {
-      params.onRecorded?.();
-    })
-    .catch((err) => {
-      logVerbose(`learning reuse accounting failed: ${String(err)}`);
-    });
+  recordLearningExperienceStageSafely({
+    scopeId: params.scopeId,
+    assetIds: params.assetIds,
+    stage: "injected",
+    onRecorded: params.onRecorded,
+  });
 }

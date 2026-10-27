@@ -44,9 +44,9 @@ describe("cli-errors (usage vs gateway reject)", () => {
   });
 
   it("classifies local --flag must be validation as usage", () => {
-    expect(
-      classifyCliError(new Error("--timeout must be a positive integer (milliseconds)")),
-    ).toBe("usage");
+    expect(classifyCliError(new Error("--timeout must be a positive integer (milliseconds)"))).toBe(
+      "usage",
+    );
   });
 
   it("reportCliError writes distinguishable stderr and exit codes", () => {

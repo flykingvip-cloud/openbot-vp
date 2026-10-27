@@ -690,7 +690,7 @@ describe("repaired ledger warning profile", () => {
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(false);
   });
 
-  it("production releases.jsonl Path B SoT reaches seq144 tip 9a8e91d19e89", () => {
+  it("production releases.jsonl Path B SoT reaches seq145 tip 065840dfba12", () => {
     const text = readFileSync("deploy/production/releases.jsonl", "utf8");
     const { rows, errors } = parseLedger(text);
     expect(errors).toEqual([]);
@@ -702,10 +702,10 @@ describe("repaired ledger warning profile", () => {
     // Path B SoT structure (history rewrite means many gatewaySha values are no longer
     // in this GitHub repo, so ancestry regression ERRORs are expected delivery debt).
     expect(rows.length).toBeGreaterThanOrEqual(142);
-    expect(Math.max(...rows.map((r) => r.seq))).toBe(144);
-    // Historical debt: seq 127 never received liveTo. Tip seq 144 is the Path B LIVE open row.
+    expect(Math.max(...rows.map((r) => r.seq))).toBe(145);
+    // Historical debt: seq 127 never received liveTo. Tip seq 145 is the Path B LIVE open row.
     // Dual-open remains an audit error until seq 127 is closed with an authentic stop time.
-    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([127, 144]);
+    expect(rows.filter((r) => r.liveTo === undefined).map((r) => r.seq)).toEqual([127, 145]);
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
     expect(audit.findings.some((f) => f.seq === 1 && f.code === "missing-tag")).toBe(true);
     expect(audit.findings.some((f) => f.code === "overlay-debt")).toBe(true);
@@ -801,14 +801,23 @@ describe("repaired ledger warning profile", () => {
       "sha256:9125dc6bae39836c4e591e3d024fb71b48cb09269d907bfd1650eb5cd7b30ac3",
     );
     // seq 143 closed at seq 144 liveFrom when Path B SoT was restored with the OHBE/PR19 seed.
+    // seq 144 closed at seq 145 liveFrom (HK Path B tip 065840dfba12 #79).
     expect(rows.find((r) => r.seq === 143)?.liveTo).toBe("2026-10-20T09:21:32Z");
     expect(rows.find((r) => r.seq === 144)?.liveFrom).toBe("2026-10-20T09:21:32Z");
-    expect(rows.find((r) => r.seq === 144)?.liveTo).toBeUndefined();
+    expect(rows.find((r) => r.seq === 144)?.liveTo).toBe("2026-10-25T10:45:47.391Z");
     expect(rows.find((r) => r.seq === 144)?.gatewaySha).toBe(
       "9a8e91d19e893fc5d963103538cdbd35f315ac30",
     );
     expect(rows.find((r) => r.seq === 144)?.artifactDigest).toBe(
       "sha256:8fd6d63213f53ce22d59f4ce6c9c7d11a52c4db708c74eb3aa7348f4a2dfd193",
+    );
+    expect(rows.find((r) => r.seq === 145)?.liveFrom).toBe("2026-10-25T10:45:47.391Z");
+    expect(rows.find((r) => r.seq === 145)?.liveTo).toBeUndefined();
+    expect(rows.find((r) => r.seq === 145)?.gatewaySha).toBe(
+      "065840dfba129475c9c9030c80af07970dcdd084",
+    );
+    expect(rows.find((r) => r.seq === 145)?.artifactDigest).toBe(
+      "sha256:ef333624c09bb2e5e43158871e768f74a046a472fcda63bdf68eb79a1a637918",
     );
     expect(audit.findings.some((f) => f.code === "open-interval")).toBe(true);
     expect(rows.filter((r) => r.seq >= 99 && r.seq <= 103).map((r) => r.executor)).toEqual(

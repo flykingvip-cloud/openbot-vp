@@ -560,4 +560,158 @@ describe("S4 scheduler reliability", () => {
     expect(scheduler.isRunning()).toBe(false);
     scheduler.stop();
   });
+
+  test("slow timer tick then resumes single chain", async () => {
+    const { cfg } = await useConfig({
+      schedulerEnabled: true,
+      wakeAllowlist: [SAMPLE_GRAY],
+    });
+    let invocations = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const scheduler = startGroupTaskHeartbeatScheduler({
+      cfg,
+      pollIntervalMs: 40,
+      listTargets: () => [{ groupId: SAMPLE_GRAY, tenantId: null }],
+      runGroup: async () => {
+        invocations += 1;
+        if (invocations === 1) {
+          await gate;
+        }
+        return {
+          ok: true,
+          skipped: true,
+          reason: "slow_tick",
+          groupId: SAMPLE_GRAY,
+        };
+      },
+    });
+    for (let i = 0; i < 50 && invocations < 1; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(invocations).toBe(1);
+    release();
+    await new Promise((r) => setTimeout(r, 20));
+    const baseline = invocations;
+    await new Promise((r) => setTimeout(r, 180));
+    const delta = invocations - baseline;
+    expect(delta).toBeGreaterThanOrEqual(2);
+    expect(delta).toBeLessThanOrEqual(7);
+    scheduler.stop();
+  });
+
+  test("timer-driven tick exception still re-arms once", async () => {
+    const { cfg } = await useConfig({
+      schedulerEnabled: true,
+      wakeAllowlist: [SAMPLE_GRAY],
+    });
+    let invocations = 0;
+    const scheduler = startGroupTaskHeartbeatScheduler({
+      cfg,
+      pollIntervalMs: 40,
+      listTargets: () => [{ groupId: SAMPLE_GRAY, tenantId: null }],
+      runGroup: async () => {
+        invocations += 1;
+        if (invocations === 1) {
+          throw new Error("timer_tick_boom");
+        }
+        return {
+          ok: true,
+          skipped: true,
+          reason: "after_boom",
+          groupId: SAMPLE_GRAY,
+        };
+      },
+    });
+    for (let i = 0; i < 80 && invocations < 2; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(invocations).toBeGreaterThanOrEqual(2);
+    expect(scheduler.getStatus().consecutiveFailures).toBe(0);
+    scheduler.stop();
+  });
+
+  test("stop during in-flight tick prevents finally re-arm", async () => {
+    const { cfg } = await useConfig({
+      schedulerEnabled: true,
+      wakeAllowlist: [SAMPLE_GRAY],
+    });
+    let invocations = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const scheduler = startGroupTaskHeartbeatScheduler({
+      cfg,
+      pollIntervalMs: 40,
+      listTargets: () => [{ groupId: SAMPLE_GRAY, tenantId: null }],
+      runGroup: async () => {
+        invocations += 1;
+        await gate;
+        return {
+          ok: true,
+          skipped: true,
+          reason: "held",
+          groupId: SAMPLE_GRAY,
+        };
+      },
+    });
+    for (let i = 0; i < 50 && invocations < 1; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(invocations).toBe(1);
+    scheduler.stop();
+    release();
+    await new Promise((r) => setTimeout(r, 120));
+    expect(invocations).toBe(1);
+    expect(scheduler.isRunning()).toBe(false);
+  });
+
+  test("updateConfig during slow tick does not create duplicate timer chains", async () => {
+    const { cfg } = await useConfig({
+      schedulerEnabled: true,
+      wakeAllowlist: [SAMPLE_GRAY],
+    });
+    let invocations = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const scheduler = startGroupTaskHeartbeatScheduler({
+      cfg,
+      pollIntervalMs: 40,
+      listTargets: () => [{ groupId: SAMPLE_GRAY, tenantId: null }],
+      runGroup: async () => {
+        invocations += 1;
+        if (invocations === 1) {
+          await gate;
+        }
+        return {
+          ok: true,
+          skipped: true,
+          reason: "held_for_updateConfig",
+          groupId: SAMPLE_GRAY,
+        };
+      },
+    });
+    for (let i = 0; i < 50 && invocations < 1; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(invocations).toBe(1);
+
+    // Concurrent config update while first tick is still running.
+    scheduler.updateConfig(cfg);
+    release();
+    await new Promise((r) => setTimeout(r, 30));
+
+    const baseline = invocations;
+    await new Promise((r) => setTimeout(r, 220));
+    const delta = invocations - baseline;
+    // Single chain @40ms over ~220ms ⇒ ~5 fires. Duplicate chains ≫ 8.
+    expect(delta).toBeGreaterThanOrEqual(3);
+    expect(delta).toBeLessThanOrEqual(8);
+    scheduler.stop();
+  });
 });

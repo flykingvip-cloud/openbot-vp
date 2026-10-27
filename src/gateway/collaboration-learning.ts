@@ -136,3 +136,14 @@ export {
   isTaskStopAccepted,
   readTaskStopControl,
 } from "./collaboration-learning/task-stop-entry.js";
+
+export {
+  isWakeOpGatewayRecoveryEnabled,
+  resolveWakeOpGatewayRecoveryGroupAllowlist,
+  mintTrustedGatewaySessionFromClient,
+  resolvePlatformAuthFieldsFromGatewayClient,
+  releaseWakeOpForRetryViaGatewaySession,
+  confirmWakeOpCompletedViaGatewaySession,
+  WakeOpGatewayRecoveryFlagOffError,
+  WakeOpGatewayRecoveryEntryError,
+} from "./collaboration-learning/wake-op-gateway-recovery-entry.js";

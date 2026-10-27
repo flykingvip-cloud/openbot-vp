@@ -22,19 +22,20 @@ function atom(
 }
 
 describe("queryAtoms ACL v1", () => {
-  it("returns only active atoms within requested scope", async () => {
-    const scopeA: Scope = {
-      workspaceId: "ws1",
-      projectId: "agent:main",
-      agentId: "main",
-      visibility: "private",
-    };
-    const scopeB: Scope = {
-      workspaceId: "ws1",
-      projectId: "agent:other",
-      agentId: "other",
-      visibility: "private",
-    };
+  const scopeA: Scope = {
+    workspaceId: "ws1",
+    projectId: "agent:main",
+    agentId: "main",
+    visibility: "private",
+  };
+  const scopeB: Scope = {
+    workspaceId: "ws1",
+    projectId: "agent:other",
+    agentId: "other",
+    visibility: "private",
+  };
+
+  async function seedRuntime() {
     const runtime = createCogniWeaveRuntime({
       environment: "local",
       metadataBackend: "memory",
@@ -48,12 +49,61 @@ describe("queryAtoms ACL v1", () => {
       atom("a2", scopeB, "active"),
       atom("a3", scopeA, "deprecated"),
     ]);
+    return runtime;
+  }
 
+  it("returns only active atoms within requested scope for a bound legal subject", async () => {
+    const runtime = await seedRuntime();
+    await runtime.engine.ensureMemorySubjectBinding({
+      scope: scopeA,
+      caller: { tenantId: "__local__", ownerType: "agent", ownerId: "main" },
+      scopeType: "agent",
+    });
     const hits = await runtime.engine.queryAtoms({
       scope: scopeA,
       caller: { tenantId: "__local__", ownerType: "agent", ownerId: "main" },
       filter: { limit: 10 },
     });
     expect(hits.map((hit) => hit.atom.id)).toEqual(["a1"]);
+  });
+
+  it("rejects unbound callers with empty hits (fail-closed)", async () => {
+    const runtime = await seedRuntime();
+    const hits = await runtime.engine.queryAtoms({
+      scope: scopeA,
+      caller: { tenantId: "__local__", ownerType: "agent", ownerId: "main" },
+      filter: { limit: 10 },
+    });
+    expect(hits).toEqual([]);
+  });
+
+  it("rejects wrong-owner callers with empty hits", async () => {
+    const runtime = await seedRuntime();
+    await runtime.engine.ensureMemorySubjectBinding({
+      scope: scopeA,
+      caller: { tenantId: "__local__", ownerType: "agent", ownerId: "main" },
+      scopeType: "agent",
+    });
+    const hits = await runtime.engine.queryAtoms({
+      scope: scopeA,
+      caller: { tenantId: "__local__", ownerType: "agent", ownerId: "intruder" },
+      filter: { limit: 10 },
+    });
+    expect(hits).toEqual([]);
+  });
+
+  it("rejects cross-tenant callers with empty hits", async () => {
+    const runtime = await seedRuntime();
+    await runtime.engine.ensureMemorySubjectBinding({
+      scope: scopeA,
+      caller: { tenantId: "__local__", ownerType: "agent", ownerId: "main" },
+      scopeType: "agent",
+    });
+    const hits = await runtime.engine.queryAtoms({
+      scope: scopeA,
+      caller: { tenantId: "other-tenant", ownerType: "agent", ownerId: "main" },
+      filter: { limit: 10 },
+    });
+    expect(hits).toEqual([]);
   });
 });

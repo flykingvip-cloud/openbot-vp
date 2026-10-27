@@ -41,4 +41,11 @@ describe("RuleBasedTaskParser", () => {
       "ops.deploy",
     );
   });
+
+  it("P1: Chinese 重构 hits coding.refactor", async () => {
+    const parser = new RuleBasedTaskParser(registry, "summarization");
+    const parsed = await parser.parse("帮我重构这段支付回调");
+    expect(parsed.type).toBe("coding.refactor");
+    expect(parsed.confidence).toBeGreaterThan(0);
+  });
 });

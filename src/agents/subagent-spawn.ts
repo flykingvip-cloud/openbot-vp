@@ -17,10 +17,9 @@ import {
   snapshotForChildModelHandoff,
   stageSpawnGovernanceSnapshot,
 } from "../gateway/governance/spawn-snapshot-handoff.js";
-import {
-  buildTaskCapabilityPlan,
-  resolveExecutionRoutingFromCapabilityPlan,
-} from "../gateway/model-entitlement/task-capability-plan.js";
+import { resourceCatalogToAorProfiles } from "../gateway/model-entitlement/aor-catalog-adapter.js";
+import { planChildSpawnCapabilityRouting } from "../gateway/model-entitlement/child-spawn-capability-routing.js";
+import { listResourceModelCatalog } from "../gateway/resource-catalog/models-catalog-store.js";
 import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import {
   isValidAgentId,
@@ -123,6 +122,26 @@ export type SpawnSubagentResult = {
     totalBytes: number;
     files: Array<{ name: string; bytes: number; sha256: string }>;
     relDir: string;
+  };
+  /**
+   * Structured capability surface for the child task plan. Distinguishes
+   * explanatory text-returned from image/music generation completed.
+   * Never omit by voiding outcomeClaim at the spawn site.
+   */
+  capabilityExecutionSurface?: {
+    textReturnedAllowed: boolean;
+    targetModalityCompleted: boolean;
+    status: string;
+    allowedModality: string;
+    incompleteModalities: readonly string[];
+    planFailureKind: string;
+    detail?: string;
+  };
+  /** Child-task AOR reorder summary (authorized set unchanged). */
+  childCapabilityPlan?: {
+    categoryId: string;
+    preferredModelOrder: readonly string[];
+    allowlist: readonly string[];
   };
 };
 
@@ -622,26 +641,71 @@ export async function spawnSubagentDirect(
   let childGovernanceSnapshot = snapshotForChildModelHandoff(parentModelSet);
   // P0: rebuild per-task capability plan from the child task within the parent
   // authorized/executable allowlist — classification must not expand rights.
+  let childCapabilitySurface: SpawnSubagentResult["capabilityExecutionSurface"] = undefined;
+  let childCapabilityPlanSummary: SpawnSubagentResult["childCapabilityPlan"] = undefined;
   if (childGovernanceSnapshot?.effectiveModelSet?.allowlist) {
     const parentAllowlist = childGovernanceSnapshot.effectiveModelSet.allowlist;
-    const childPlan = buildTaskCapabilityPlan({
+    // Re-rank inside parent allowlist by child task category — do not inherit parent AOR order.
+    // Mode + selectorStrategy come from parent snapshot or trusted config (never hardcode).
+    const catalogEntries = await listResourceModelCatalog();
+    const { profiles } = resourceCatalogToAorProfiles(catalogEntries);
+    const modelContextWindows: Record<string, number> = {};
+    for (const entry of catalogEntries) {
+      if (typeof entry.contextWindow === "number" && entry.contextWindow > 0) {
+        modelContextWindows[entry.modelId] = entry.contextWindow;
+      }
+    }
+    const childPlan = planChildSpawnCapabilityRouting({
+      cfg,
       taskText: task,
+      extraSystemPrompt: childSystemPrompt,
+      parentSnapshot: childGovernanceSnapshot,
       authorizedModelIds: parentAllowlist,
-      preferredModelOrderFromAuth:
+      parentPreferredModelOrder:
         childGovernanceSnapshot.effectiveModelSet.preferredModelOrder ?? parentAllowlist,
+      catalog: profiles,
+      modelContextWindows,
+      attachments: attachmentsReceipt
+        ? { files: attachmentsReceipt.files.map((f) => ({ name: f.name, bytes: f.bytes })) }
+        : null,
     });
-    const childRouting = resolveExecutionRoutingFromCapabilityPlan({
-      allowlist: parentAllowlist,
-      preferredModelOrder: childGovernanceSnapshot.effectiveModelSet.preferredModelOrder,
-      capabilityPlan: childPlan,
-    });
+    childCapabilitySurface = {
+      textReturnedAllowed: childPlan.consumedSurface.textReturnedAllowed,
+      targetModalityCompleted: childPlan.consumedSurface.targetModalityCompleted,
+      status: childPlan.consumedSurface.status,
+      allowedModality: childPlan.consumedSurface.allowedModality,
+      incompleteModalities: childPlan.consumedSurface.incompleteModalities,
+      planFailureKind: childPlan.consumedSurface.planFailureKind,
+      ...(childPlan.consumedSurface.detail ? { detail: childPlan.consumedSurface.detail } : {}),
+    };
+    childCapabilityPlanSummary = {
+      categoryId: childPlan.categoryId,
+      preferredModelOrder: childPlan.preferredModelOrder,
+      allowlist: childPlan.allowlist,
+    };
+    if (childPlan.planFailure.kind === "no_executable_candidates") {
+      discardStagedSpawnExecutionIdentity(childIdem);
+      discardStagedSpawnGovernanceSnapshot(childIdem);
+      await cleanupProvisionalSession(childSessionKey, {
+        emitLifecycleHooks: threadBindingReady,
+        deleteTranscript: true,
+      });
+      return {
+        status: "error" as const,
+        error: childPlan.planFailure.message,
+        capabilityExecutionSurface: childCapabilitySurface,
+        childCapabilityPlan: childCapabilityPlanSummary,
+      };
+    }
     childGovernanceSnapshot = {
       ...childGovernanceSnapshot,
       effectiveModelSet: {
-        allowlist: childRouting.allowlist ?? [...parentAllowlist],
-        ...(childRouting.preferredModelOrder
-          ? { preferredModelOrder: childRouting.preferredModelOrder }
+        allowlist: [...childPlan.allowlist],
+        ...(childPlan.preferredModelOrder.length > 0
+          ? { preferredModelOrder: [...childPlan.preferredModelOrder] }
           : {}),
+        platformModelsMode: childPlan.inherited.mode,
+        selectorStrategy: childPlan.inherited.selectorStrategy,
       },
     };
   }
@@ -831,5 +895,7 @@ export async function spawnSubagentDirect(
     note,
     modelApplied: resolvedModel ? modelApplied : undefined,
     attachments: attachmentsReceipt,
+    ...(childCapabilitySurface ? { capabilityExecutionSurface: childCapabilitySurface } : {}),
+    ...(childCapabilityPlanSummary ? { childCapabilityPlan: childCapabilityPlanSummary } : {}),
   };
 }

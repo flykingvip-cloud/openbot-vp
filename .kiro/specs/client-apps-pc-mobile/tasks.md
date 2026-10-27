@@ -51,7 +51,7 @@
 - **【已定案】D-MACOS-FORM**：主窗口内嵌 employee 壳，保留菜单栏 companion。
 - **【已定案】D-COMPANION-IA**：`Me > Device`。
 - **【已定案】D-PUSH-SCOPE = A**：Wave 1 先做**深链 + 本地/系统通知**；employee 服务端推送（APNs 重绑 + Android FCM）落 Wave 2。
-- **【已定案】D-PUSH-W2-*（2026-10-08）**：MVP 触发=@mention；平台=iOS APNs 首刀→FCM→Mac 后置、Windows WNS 不在 MVP；多设备并存；员工独立 APNs 配置/topic；点击复用 Wave 1 Router + 强制 deepLink + alert + logout 注销。契约：`contracts/push-model.md`。**D-PUSH-W2-RPC 已确认落地**（`employee.push.*`）。任务 2.1：**部分完成**（plumbing 已合 PR，真机 e2e 待凭据+本机 smoke）；2.2 未开工。
+- **【已定案】D-PUSH-W2-\*（2026-10-08）**：MVP 触发=@mention；平台=iOS APNs 首刀→FCM→Mac 后置、Windows WNS 不在 MVP；多设备并存；员工独立 APNs 配置/topic；点击复用 Wave 1 Router + 强制 deepLink + alert + logout 注销。契约：`contracts/push-model.md`。**D-PUSH-W2-RPC 已确认落地**（`employee.push.*`）。任务 2.1：**部分完成**（plumbing 已合 PR，真机 e2e 待凭据+本机 smoke）；2.2 未开工。
 - **【暂定】D-MINCLIENT**：软门禁（先告警后拒绝），Wave 2 对外前确认。
 - **【暂定】D-UPLOAD**：一期图片。**【暂定】D-PC-STACK**：Tauri。**【暂定】D-PC-ADMIN**：是（仅 PC，先交付 Epic E1）。**【暂定】D-RENAME**：延后（仅保用户可见品牌统一）。
 
@@ -206,9 +206,9 @@
 
 - [ ] 2. Wave 2 — 深化 employee 体验（P2，设计伙伴 beta）
   - [x] 2.0-contract employee push 产品契约 · [spec/release]
-    - 落地 `contracts/push-model.md`；同步 requirements/tasks 拍板表（D-PUSH-W2-*）。**不含** Gateway/客户端运行时实现。
+    - 落地 `contracts/push-model.md`；同步 requirements/tasks 拍板表（D-PUSH-W2-\*）。**不含** Gateway/客户端运行时实现。
     - _Requirements: R-Native.1, 10.5_
-  - [ ] 2.1 employee-scoped 服务端推送（APNs 重绑）· [gateway]（+ ios/macos 消费） · **部分：plumbing 已实现（register/store/test/mention enqueue/iOS 客户端），真机 e2e 待 OPENBOT_EMPLOYEE_APNS_* + 本机 smoke；合入前勿勾满**
+  - [ ] 2.1 employee-scoped 服务端推送（APNs 重绑）· [gateway]（+ ios/macos 消费） · **部分：plumbing 已实现（register/store/test/mention enqueue/iOS 客户端），真机 e2e 待 OPENBOT*EMPLOYEE_APNS*\* + 本机 smoke；合入前勿勾满**
     - 新增按 **employee 身份/会话** 的推送注册与投递（区别既有 node-scoped `push.apns.register`/`server-node-events.ts`）；登出/切账号注销 token；仅元数据。
     - **前置契约：** `contracts/push-model.md`（2026-10-08 已拍板；v0.2 实现首刀）。MVP 触发=@mention；平台首刀=iOS APNs；多设备并存；独立员工 APNs env/topic；点击复用 Wave 1 Router。RPC=`employee.push.register|unregister|test`。本勾选框仅在**真机验收通过并合入 main**后勾选。
     - _Requirements: R-Native.1, 10.5_
