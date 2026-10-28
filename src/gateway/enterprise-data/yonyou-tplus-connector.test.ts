@@ -14,6 +14,9 @@ import {
 } from "./connector-oauth.js";
 import { ensureConnectorPackage } from "./connector-packages.js";
 import { upsertDataSource } from "./data-source-store.js";
+import { MATERIALIZER_SEAT_ID } from "./enterprise-data-seat-context.js";
+import { findScopePolicy, upsertScopePolicy } from "./scope-policy-store.js";
+import { findSeatActionGrant, listSeatActionGrants } from "./seat-action-grant-store.js";
 import { probeDataSourceConnection } from "./source-connection-probe.js";
 import { normalizeEnterpriseDataStore } from "./store.js";
 import {
@@ -354,6 +357,121 @@ describe("yonyou tplus connector registration", () => {
       nowIso,
     });
     expect(again).toEqual({ installed: true, actionCount: 7 });
+  });
+
+  it("grants the projection materializer seat on install and again when actions already exist", () => {
+    const store = normalizeEnterpriseDataStore({});
+    const installed = ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso,
+    });
+    expect(installed).toEqual({ installed: true, actionCount: 7 });
+    expect(findScopePolicy(store, tenantId, "scope-team-default")?.scopeType).toBe("TEAM");
+    expect(findScopePolicy(store, tenantId, "scope-self-default")?.scopeType).toBe("SELF");
+
+    const actionKeys = [
+      "erp.account.read_version",
+      "erp.warehouse.query",
+      "erp.inventory.query_page",
+      "erp.partner.query_page",
+      "erp.sale_order.query_list",
+      "erp.sale_delivery.query_list",
+      "erp.doc.query",
+    ];
+    const grants = listSeatActionGrants({
+      store,
+      tenantId,
+      seatId: MATERIALIZER_SEAT_ID,
+    });
+    expect(grants.map((grant) => grant.actionKey).toSorted()).toEqual(actionKeys.toSorted());
+    expect(grants.every((grant) => grant.connectorId === "erp-yonyou-tplus")).toBe(true);
+    expect(grants.every((grant) => grant.version === "v1")).toBe(true);
+    expect(grants.every((grant) => grant.scopePolicyId === "scope-team-default")).toBe(true);
+    expect(grants.every((grant) => grant.approvalPolicyId == null)).toBe(true);
+    const grantIds = grants.map((grant) => grant.grantId).toSorted();
+
+    const repeated = ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso: "2026-10-22T01:00:00.000Z",
+    });
+    expect(repeated).toEqual({ installed: false, actionCount: 7 });
+    const repeatedGrants = listSeatActionGrants({
+      store,
+      tenantId,
+      seatId: MATERIALIZER_SEAT_ID,
+    });
+    expect(repeatedGrants.map((grant) => grant.grantId).toSorted()).toEqual(grantIds);
+
+    for (const grant of Object.values(store.seatActionGrants)) {
+      if (grant.seatId === MATERIALIZER_SEAT_ID) {
+        delete store.seatActionGrants[grant.grantId];
+      }
+    }
+    const repaired = ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso: "2026-10-22T02:00:00.000Z",
+    });
+    expect(repaired).toEqual({ installed: false, actionCount: 7 });
+    expect(listSeatActionGrants({ store, tenantId, seatId: MATERIALIZER_SEAT_ID })).toHaveLength(
+      actionKeys.length,
+    );
+  });
+
+  it("does not rewrite an existing materializer grant or an existing default scope policy", () => {
+    const store = normalizeEnterpriseDataStore({});
+    upsertScopePolicy({
+      store,
+      tenantId,
+      nowIso,
+      policy: {
+        scopePolicyId: "scope-team-default",
+        displayName: "租户自定义团队范围",
+        scopeType: "TEAM",
+        filterClauses: [
+          { field: "customer.owner_team", operator: "eq", valueRef: "current_user.team" },
+        ],
+        filterDescription: "保留管理员已写的范围说明",
+      },
+    });
+    ensureConnectorPackage({ store, tenantId, connectorId: "erp-yonyou-tplus", nowIso });
+    const inventory = findSeatActionGrant(store, tenantId, MATERIALIZER_SEAT_ID, {
+      connectorId: "erp-yonyou-tplus",
+      actionKey: "erp.inventory.query_page",
+      version: "v1",
+    });
+    expect(inventory).toBeTruthy();
+    if (!inventory) {
+      return;
+    }
+    inventory.scopePolicyId = "scope-all-readonly";
+    inventory.approvalPolicyId = "policy-none-default";
+
+    ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "erp-yonyou-tplus",
+      nowIso: "2026-10-22T03:00:00.000Z",
+    });
+    const kept = findSeatActionGrant(store, tenantId, MATERIALIZER_SEAT_ID, {
+      connectorId: "erp-yonyou-tplus",
+      actionKey: "erp.inventory.query_page",
+      version: "v1",
+    });
+    expect(kept?.grantId).toBe(inventory.grantId);
+    expect(kept?.scopePolicyId).toBe("scope-all-readonly");
+    expect(kept?.approvalPolicyId).toBe("policy-none-default");
+    expect(findScopePolicy(store, tenantId, "scope-team-default")).toMatchObject({
+      displayName: "租户自定义团队范围",
+      filterDescription: "保留管理员已写的范围说明",
+      updatedAt: nowIso,
+    });
+    expect(listSeatActionGrants({ store, tenantId, seatId: MATERIALIZER_SEAT_ID })).toHaveLength(7);
   });
 
   it("refreshes an expired openToken during probe and writes the new tokens", async () => {
