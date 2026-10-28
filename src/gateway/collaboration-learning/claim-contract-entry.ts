@@ -100,6 +100,7 @@ import {
   isTaskStopAccepted,
 } from "../collaboration-dispatch/task-stop-control.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import { collaborationDispatchIdsMatch } from "./member-dispatch-readiness.js";
 import {
   confirmationConsumedDelivery,
   normalizeOwnerDecisionDelivery,
@@ -328,8 +329,17 @@ export async function buildClaimAuthority(params: {
  * from this record plus the board `publishedBy` fact — never from RPC params.
  */
 type OperatingStateAclSource = {
-  governance?: { coordinatorBotId?: string | null };
-  memberRoleMap?: ReadonlyArray<{ memberId?: string | null; status?: string | null }>;
+  governance?: {
+    coordinatorBotId?: string | null;
+    ownerUserId?: string | null;
+    adminUserIds?: readonly string[] | null;
+  };
+  memberRoleMap?: ReadonlyArray<{
+    memberId?: string | null;
+    memberKind?: string | null;
+    status?: string | null;
+    governanceRole?: string | null;
+  }>;
 } | null;
 
 type TrustedTodolistAcl = {
@@ -344,24 +354,108 @@ type TrustedTodolistAcl = {
  * active row. When the id is in the map, RPC delivery handlers also require
  * `resolveDeliveryAclActor` to match a handshake-stamped session subject.
  */
+function aclMemberIdsMatch(left: string, right: string): boolean {
+  const a = left.trim();
+  const b = right.trim();
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  if (collaborationDispatchIdsMatch(a, b)) {
+    return true;
+  }
+  if (a.startsWith("human:") && a.slice("human:".length) === b) {
+    return true;
+  }
+  if (b.startsWith("human:") && b.slice("human:".length) === a) {
+    return true;
+  }
+  return false;
+}
+
 function memberExplicitlyActive(state: OperatingStateAclSource, memberId: string): boolean {
   const id = memberId.trim();
   if (!id) {
     return false;
   }
-  const member = state?.memberRoleMap?.find((row) => (row.memberId ?? "").trim() === id);
+  const member = state?.memberRoleMap?.find((row) => aclMemberIdsMatch(row.memberId ?? "", id));
   if (!member) {
     return false;
   }
   return (member.status ?? "active") === "active";
 }
 
-function trustedCoordinatorBotId(state: OperatingStateAclSource): string | null {
-  const id = state?.governance?.coordinatorBotId?.trim() ?? "";
+function canonicalActiveMemberId(state: OperatingStateAclSource, memberId: string): string | null {
+  const id = memberId.trim();
   if (!id || !memberExplicitlyActive(state, id)) {
     return null;
   }
-  return id;
+  const row = state?.memberRoleMap?.find((entry) => aclMemberIdsMatch(entry.memberId ?? "", id));
+  return (row?.memberId ?? id).trim() || id;
+}
+
+function trustedCoordinatorBotId(state: OperatingStateAclSource): string | null {
+  const id = state?.governance?.coordinatorBotId?.trim() ?? "";
+  return canonicalActiveMemberId(state, id);
+}
+
+function pushUniqueLead(leads: string[], id: string | null | undefined): void {
+  const value = id?.trim() ?? "";
+  if (!value) {
+    return;
+  }
+  if (leads.some((existing) => aclMemberIdsMatch(existing, value))) {
+    return;
+  }
+  leads.push(value);
+}
+
+/**
+ * Board publishedBy remains the primary lead. Active human owners/admins are
+ * also authorized confirmers so bot-activated F4 boards still have a human gate
+ * (confirm still required; submit/self_advance untouched).
+ */
+function humanGovernanceConfirmerIds(state: OperatingStateAclSource): string[] {
+  const out: string[] = [];
+  const ownerUserId = state?.governance?.ownerUserId?.trim() ?? "";
+  if (ownerUserId) {
+    pushUniqueLead(
+      out,
+      canonicalActiveMemberId(
+        state,
+        ownerUserId.startsWith("human:") ? ownerUserId : `human:${ownerUserId}`,
+      ),
+    );
+    pushUniqueLead(out, canonicalActiveMemberId(state, ownerUserId));
+  }
+  for (const adminId of state?.governance?.adminUserIds ?? []) {
+    const admin = adminId?.trim() ?? "";
+    if (!admin) {
+      continue;
+    }
+    pushUniqueLead(
+      out,
+      canonicalActiveMemberId(state, admin.startsWith("human:") ? admin : `human:${admin}`),
+    );
+    pushUniqueLead(out, canonicalActiveMemberId(state, admin));
+  }
+  for (const row of state?.memberRoleMap ?? []) {
+    const role = (row.governanceRole ?? "").trim();
+    if (role !== "owner" && role !== "admin") {
+      continue;
+    }
+    const mid = (row.memberId ?? "").trim();
+    const kind = (row.memberKind ?? "").trim();
+    if (!mid) {
+      continue;
+    }
+    if (kind === "human" || mid.startsWith("human:")) {
+      pushUniqueLead(out, canonicalActiveMemberId(state, mid));
+    }
+  }
+  return out;
 }
 
 async function resolveTrustedTodolistAcl(params: {
@@ -379,9 +473,10 @@ async function resolveTrustedTodolistAcl(params: {
       itemId: boardItemId,
     });
     const publishedBy = board?.publishedBy?.trim() ?? "";
-    if (publishedBy && memberExplicitlyActive(params.operatingState, publishedBy)) {
-      leads.push(publishedBy);
-    }
+    pushUniqueLead(leads, canonicalActiveMemberId(params.operatingState, publishedBy));
+  }
+  for (const humanLead of humanGovernanceConfirmerIds(params.operatingState)) {
+    pushUniqueLead(leads, humanLead);
   }
   return { authorizedConfirmerIds: leads, coordinatorBotId };
 }

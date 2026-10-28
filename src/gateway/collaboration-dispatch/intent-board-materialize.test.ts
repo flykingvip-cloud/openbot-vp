@@ -16,6 +16,8 @@ import {
   assessBoardContractQuality,
   buildBoardPublishDraftFromIntent,
   detectBoardMaterializeCandidate,
+  extractExplicitAcceptanceFromMessage,
+  extractExplicitConstraintsFromMessage,
   materializeIntentToBoardItem,
 } from "./intent-board-materialize.js";
 import { createRoundPolicySnapshot } from "./round-policy-snapshot.js";
@@ -129,6 +131,63 @@ describe("P1/S1 intent board materialize (FINAL v3 §C)", () => {
     ).toBe(true);
     expect(detectBoardMaterializeCandidate("你好")).toBe(false);
     expect(detectBoardMaterializeCandidate("哈哈")).toBe(false);
+  });
+
+  test("F4-style charter/deliverables path is a board candidate", () => {
+    expect(
+      detectBoardMaterializeCandidate(
+        "写 1 段「F4 连通性说明」到团队成果目录 deliverables/F4-20261028-loc/charter.md。",
+      ),
+    ).toBe(true);
+    expect(
+      detectBoardMaterializeCandidate(
+        "F4-20261028-loc 连通性说明\n写 charter.md 到 deliverables/F4-20261028-loc/",
+      ),
+    ).toBe(true);
+    const extracted = extractExplicitAcceptanceFromMessage(
+      "验收：charter.md 落在团队成果目录且 writtenToGroupDir=true，可 sha 核对。\n禁止长研报/PDF。",
+    );
+    expect(extracted.length).toBeGreaterThan(0);
+    expect(extracted.some((a) => /writtenToGroupDir|sha/i.test(a))).toBe(true);
+    const constraints = extractExplicitConstraintsFromMessage(
+      "Constraints：禁止长研报/15源/PDF\n禁止外发",
+    );
+    expect(constraints.length).toBeGreaterThan(0);
+  });
+
+  test("humanConfirmed promotes fuzzy due and publishes when Acceptance extracted", async () => {
+    const gray = "grp-daniel-hhd-gmail-com-upbeyond";
+    const { cfg } = await useAllowlist([gray]);
+    const auth = authority(cfg, gray);
+    const message = [
+      "F4-20261028-loc 连通性说明",
+      "写 1 段连通性说明到 deliverables/F4-20261028-loc/charter.md。",
+      "验收：charter.md 在团队成果目录且 writtenToGroupDir=true，可 sha 核对。",
+      "Constraints：禁止长研报/15源/PDF/多轮审查，不扩权不外发。",
+      "Due 今日。",
+    ].join("\n");
+    const result = await materializeIntentToBoardItem({
+      authority: auth,
+      input: {
+        message,
+        groupId: gray,
+        taskId: "F4-20261028-loc",
+        publishedBy: "bot:bot",
+        title: "F4-20261028-loc 连通性说明",
+        suggestedClaimantIds: ["bot"],
+        humanConfirmed: true,
+        requireHumanConfirm: true,
+        skipChallengeWindow: true,
+        nowMs: Date.parse("2026-10-28T13:00:00+08:00"),
+      },
+      cfg,
+    });
+    expect(result.status).toBe("published");
+    if (result.status === "published") {
+      expect(result.draft.acceptanceCriteria.length).toBeGreaterThan(0);
+      expect(result.draft.dueAtMs).toBeTypeOf("number");
+      expect(result.item.taskId).toBe("F4-20261028-loc");
+    }
   });
 
   test("draft without explicit Acceptance keeps empty contract + hints; fuzzy due pending", () => {

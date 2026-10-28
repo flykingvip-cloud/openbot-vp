@@ -605,12 +605,27 @@ export async function activateCollaborationTask(
       tenant: params.tenant,
     });
     const publishedBy = actor;
+    // humanConfirmed activate: board publish is pre-authorized; challenge window is
+    // orthogonal and would otherwise block gray groups on allowlist. Todolist card
+    // remains the execution human gate. Explicit skipChallengeWindow=false wins.
+    const skipChallengeWindow =
+      params.skipChallengeWindow === false
+        ? false
+        : params.skipChallengeWindow === true || humanConfirmed;
+    // Include title so short activate messages (e.g. F4 连通性说明 + charter path)
+    // still pass board-candidate detection.
+    const intentMessage =
+      title && !message.includes(title)
+        ? `${title}
+${message}`
+        : message;
     const input: BoardIntentMaterializeInput = {
-      message,
+      message: intentMessage,
       groupId,
       taskId,
       publishedBy,
       title,
+      goal: params.goal,
       suggestedClaimantIds: params.suggestedClaimantIds
         ? [...params.suggestedClaimantIds]
         : undefined,
@@ -620,6 +635,7 @@ export async function activateCollaborationTask(
       dueAtMs: params.dueAtMs,
       requireHumanConfirm: params.requireHumanConfirm ?? true,
       humanConfirmed,
+      skipChallengeWindow,
     };
     return materializeIntentToBoardItem({ authority, input, cfg });
   };

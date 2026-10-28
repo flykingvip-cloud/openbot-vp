@@ -28,6 +28,7 @@ import {
   materializeGroupCollaborationWorkspace,
   resolveGroupPublicTranscriptPath,
 } from "./collaboration-paths.js";
+import { collaborationDispatchIdsMatch } from "./member-dispatch-readiness.js";
 import {
   normalizeOwnerDecisionDelivery,
   recordOwnerDecisionDelivery,
@@ -43,12 +44,19 @@ export type OwnerDecisionEmitResult = (
 ) & { delivery: OwnerDecisionCardDelivery };
 
 type OperatingStateAclSource = {
-  governance?: { coordinatorBotId?: string | null };
+  governance?: {
+    coordinatorBotId?: string | null;
+    ownerUserId?: string | null;
+    adminUserIds?: readonly string[] | null;
+  };
   memberRoleMap?: ReadonlyArray<{
     memberId?: string | null;
+    memberKind?: string | null;
     status?: string | null;
     displayName?: string | null;
     name?: string | null;
+    label?: string | null;
+    governanceRole?: string | null;
   }>;
 } | null;
 
@@ -59,10 +67,34 @@ type GroupMemberNameRow = {
   name?: string | null;
   displayName?: string | null;
   status?: string | null;
+  memberKind?: string | null;
+  governanceRole?: string | null;
 };
 
 function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
+}
+
+function memberIdsMatch(left: string, right: string): boolean {
+  const a = compact(left);
+  const b = compact(right);
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  if (collaborationDispatchIdsMatch(a, b)) {
+    return true;
+  }
+  // human:<uuid> ↔ bare uuid
+  if (a.startsWith("human:") && a.slice("human:".length) === b) {
+    return true;
+  }
+  if (b.startsWith("human:") && b.slice("human:".length) === a) {
+    return true;
+  }
+  return false;
 }
 
 function memberExplicitlyActive(state: OperatingStateAclSource, memberId: string): boolean {
@@ -70,11 +102,58 @@ function memberExplicitlyActive(state: OperatingStateAclSource, memberId: string
   if (!id) {
     return false;
   }
-  const member = state?.memberRoleMap?.find((row) => (row.memberId ?? "").trim() === id);
+  const member = state?.memberRoleMap?.find((row) => memberIdsMatch(row.memberId ?? "", id));
   if (!member) {
     return false;
   }
   return (member.status ?? "active") === "active";
+}
+
+/** When OS is missing on managed SoT, project a minimal active map from members.json. */
+function operatingStateFromMemberRows(
+  rows: readonly GroupMemberNameRow[],
+  existing: OperatingStateAclSource,
+): OperatingStateAclSource {
+  if (!rows.length) {
+    return existing;
+  }
+  const memberRoleMap = rows
+    .map((row) => {
+      const memberId = compact(row.memberId);
+      if (!memberId) {
+        return null;
+      }
+      const status = compact(row.status) || "active";
+      if (status === "removed" || status === "revoked") {
+        return null;
+      }
+      return {
+        memberId,
+        memberKind: compact(row.memberKind) || undefined,
+        status,
+        displayName: compact(row.displayName) || compact(row.name) || undefined,
+        name: compact(row.name) || undefined,
+        governanceRole: compact(row.governanceRole) || undefined,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+  if (memberRoleMap.length === 0) {
+    return existing;
+  }
+  const ownerFromMembers =
+    memberRoleMap.find(
+      (row) =>
+        (row.governanceRole ?? "") === "owner" &&
+        ((row.memberKind ?? "").startsWith("human") || (row.memberId ?? "").startsWith("human:")),
+    )?.memberId ?? null;
+  return {
+    governance: {
+      coordinatorBotId: existing?.governance?.coordinatorBotId ?? null,
+      ownerUserId: existing?.governance?.ownerUserId ?? ownerFromMembers,
+      adminUserIds: existing?.governance?.adminUserIds ?? [],
+    },
+    memberRoleMap,
+  };
 }
 
 function agentNameFromConfig(cfg: OpenBotConfig | undefined, agentId: string): string {
@@ -117,27 +196,78 @@ function resolveMentionTargets(params: {
   const ids: string[] = [];
   const names: string[] = [];
   const memberRows = params.memberRows ?? [];
+  const state =
+    (params.operatingState?.memberRoleMap?.length ?? 0) > 0
+      ? params.operatingState
+      : operatingStateFromMemberRows(memberRows, params.operatingState);
+  const canonicalMemberId = (memberId: string): string => {
+    const match = state?.memberRoleMap?.find((row) => memberIdsMatch(row.memberId ?? "", memberId));
+    return compact(match?.memberId) || memberId;
+  };
   const push = (memberId: string | null | undefined) => {
-    const id = compact(memberId);
-    if (!id || !memberExplicitlyActive(params.operatingState, id)) {
+    const raw = compact(memberId);
+    if (!raw || !memberExplicitlyActive(state, raw)) {
       return;
     }
-    if (ids.includes(id)) {
+    const id = canonicalMemberId(raw);
+    if (ids.some((existing) => memberIdsMatch(existing, id))) {
       return;
     }
     ids.push(id);
-    const row = params.operatingState?.memberRoleMap?.find(
-      (entry) => (entry.memberId ?? "").trim() === id,
-    );
+    const row = state?.memberRoleMap?.find((entry) => memberIdsMatch(entry.memberId ?? "", id));
     const preferred =
       compact(row?.displayName) ||
+      compact(row?.label) ||
       compact(row?.name) ||
       nameFromMemberRows(memberRows, id) ||
       agentNameFromConfig(params.cfg, id);
     names.push(resolveOwnerDecisionMentionLabel(id, preferred));
   };
   push(params.publishedBy);
-  push(params.operatingState?.governance?.coordinatorBotId);
+  push(state?.governance?.coordinatorBotId);
+  // Human gate: surface governance owners/admins so a bot-published board still
+  // presents a card a human can confirm (does not auto-confirm or widen submit).
+  const ownerUserId = compact(state?.governance?.ownerUserId);
+  if (ownerUserId) {
+    push(ownerUserId.startsWith("human:") ? ownerUserId : `human:${ownerUserId}`);
+    push(ownerUserId);
+  }
+  for (const adminId of state?.governance?.adminUserIds ?? []) {
+    const admin = compact(adminId);
+    if (!admin) {
+      continue;
+    }
+    push(admin.startsWith("human:") ? admin : `human:${admin}`);
+    push(admin);
+  }
+  for (const row of state?.memberRoleMap ?? []) {
+    const role = compact(row.governanceRole);
+    if (role !== "owner" && role !== "admin") {
+      continue;
+    }
+    const mid = compact(row.memberId);
+    const kind = compact(row.memberKind);
+    if (!mid) {
+      continue;
+    }
+    if (kind === "human" || mid.startsWith("human:")) {
+      push(mid);
+    }
+  }
+  for (const row of memberRows) {
+    const role = compact(row.governanceRole);
+    if (role !== "owner" && role !== "admin") {
+      continue;
+    }
+    const mid = compact(row.memberId);
+    const kind = compact(row.memberKind);
+    if (!mid) {
+      continue;
+    }
+    if (kind === "human" || mid.startsWith("human:")) {
+      push(mid);
+    }
+  }
   return { mentionMemberIds: ids, mentionDisplayNames: names };
 }
 
