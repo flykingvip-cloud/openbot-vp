@@ -876,7 +876,22 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         trusted: ctx.trusted,
       });
       // Same post-plan wake/autoAdvance path as chat-plan-confirm-hook (UI RPC was missing it).
-      let autoAdvanceWired = false;
+      // Surface wakeRecorded/reason so silent early-return cannot hide (F4 R5).
+      let autoAdvance: {
+        autoAdvanceWired: boolean;
+        wakeRecorded: boolean;
+        wakeConsumed: boolean;
+        dispatched: boolean;
+        reason: string;
+        targetAgentIds: string[];
+      } = {
+        autoAdvanceWired: false,
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "advance_not_attempted",
+        targetAgentIds: [],
+      };
       try {
         const confirmedStep =
           todolist.steps.find((s) => s.status === "active" || s.status === "pending") ??
@@ -894,12 +909,35 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
           trusted: ctx.trusted,
           stores: ctx.stores,
         });
-        autoAdvanceWired = advance.autoAdvanceWired;
-      } catch {
+        autoAdvance = {
+          autoAdvanceWired: advance.autoAdvanceWired,
+          wakeRecorded: advance.wakeRecorded,
+          wakeConsumed: advance.wakeConsumed,
+          dispatched: advance.dispatched,
+          reason: advance.reason,
+          targetAgentIds: advance.targetAgentIds,
+        };
+      } catch (error) {
         // Confirm already committed; match chat hook — mark attempted, never roll back.
-        autoAdvanceWired = true;
+        const detail = error instanceof Error ? error.message : String(error);
+        autoAdvance = {
+          autoAdvanceWired: true,
+          wakeRecorded: false,
+          wakeConsumed: false,
+          dispatched: false,
+          reason: `advance_threw:${detail}`.slice(0, 240),
+          targetAgentIds: [],
+        };
       }
-      respond(true, { todolist, autoAdvanceWired }, undefined);
+      respond(
+        true,
+        {
+          todolist,
+          autoAdvanceWired: autoAdvance.autoAdvanceWired,
+          autoAdvance,
+        },
+        undefined,
+      );
     } catch (error) {
       respond(false, undefined, collaborationEntryErrorShape(error));
     }

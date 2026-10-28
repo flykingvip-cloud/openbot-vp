@@ -13,10 +13,19 @@
  * R3: final dispatch re-validates the same plan version, injects board summary /
  * context pointer / confirmed step into the member run prompt, and passes an
  * unconfusable executionDeliverableBinding on the wake request (no process Map).
+ *
+ * F4 R5: validate via loadExecutorTodolist(todolistId) + buildExecutionTaskBag —
+ * never ownerMemberId-filtered bag ACL (board claimant `bot` ≠ todolist owner
+ * `bot:bot`; confirmer email ≠ human:<uuid>). Log every finish reason.
  */
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import { formatExecutionTaskBagForPrompt } from "../collaboration-dispatch/executor-private-todolist.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
+import {
+  buildExecutionTaskBag,
+  formatExecutionTaskBagForPrompt,
+  loadExecutorTodolist,
+} from "../collaboration-dispatch/executor-private-todolist.js";
 import { SELF_ADVANCE_ACTIVE_BOARD_STATUSES } from "../collaboration-dispatch/self-advance.js";
 import { recordNudgeWake } from "../collaboration-dispatch/wake-contract.js";
 import {
@@ -25,11 +34,7 @@ import {
   type WakeRoundDispatcher,
   type WakeRoundDispatchRequest,
 } from "../collaboration-dispatch/wake-round-dispatch.js";
-import {
-  buildClaimAuthority,
-  buildCollaborationExecutionTaskBag,
-  listCollaborationBoardItems,
-} from "./claim-contract-entry.js";
+import { buildClaimAuthority, listCollaborationBoardItems } from "./claim-contract-entry.js";
 import {
   buildExecutionDeliverableBinding,
   runIdFromWakeOpAttempt,
@@ -41,17 +46,18 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
-/** Workspace compat stores are not TrustedGroupStores. Call sites only accept the latter. */
-function isTrustedGroupStores(
-  stores: TrustedGroupStores | { groupRootDir?: string } | null | undefined,
-): stores is TrustedGroupStores {
-  return (
-    !!stores &&
-    typeof stores === "object" &&
-    "groupsRoot" in stores &&
-    "groupLocator" in stores &&
-    "usedLegacyWorkspaceFallback" in stores
-  );
+const log = createSubsystemLogger("gateway/post-plan-confirm-advance");
+
+function finishAdvance(result: PostPlanConfirmAdvanceResult): PostPlanConfirmAdvanceResult {
+  const level = result.wakeRecorded ? "info" : "warn";
+  log[level]("triggerPostPlanConfirmAdvance", {
+    reason: result.reason,
+    wakeRecorded: result.wakeRecorded,
+    wakeConsumed: result.wakeConsumed,
+    dispatched: result.dispatched,
+    targetAgentIds: result.targetAgentIds,
+  });
+  return result;
 }
 
 export type PostPlanConfirmAdvanceResult = {
@@ -68,7 +74,7 @@ function buildDispatchPrompt(params: {
   source: string;
   claimantName: string;
   reason: string;
-  bag: Awaited<ReturnType<typeof buildCollaborationExecutionTaskBag>>;
+  bag: ReturnType<typeof buildExecutionTaskBag>;
 }): string {
   const header = [
     `【Mode B 自推进】来源=${params.source}`,
@@ -124,27 +130,27 @@ export async function triggerPostPlanConfirmAdvance(params: {
   const stepId = compact(params.stepId) || null;
 
   if (!groupId || !taskId || !confirmerId) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: "missing_group_task_or_confirmer",
       targetAgentIds: [],
-    };
+    });
   }
   if (!boardItemId || !todolistId || !Number.isFinite(confirmedVersion)) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: "confirm_binding_incomplete",
       targetAgentIds: [],
-    };
+    });
   }
 
-  const { authority, stores } = await buildClaimAuthority({
+  const { authority } = await buildClaimAuthority({
     groupId,
     taskId,
     cfg,
@@ -153,7 +159,6 @@ export async function triggerPostPlanConfirmAdvance(params: {
     trusted: params.trusted,
     stores: params.stores,
   });
-  const trustedStores = isTrustedGroupStores(stores) ? stores : (params.stores ?? null);
 
   const boardItems = await listCollaborationBoardItems({
     groupId,
@@ -161,136 +166,138 @@ export async function triggerPostPlanConfirmAdvance(params: {
     cfg,
     auth: params.auth,
     trusted: params.trusted,
-    stores: trustedStores,
+    stores: params.stores,
     tenant: params.tenant,
   });
 
   // Strict bind: confirmed boardItemId must exist; never fall back to other items.
   const item = boardItems.find((row) => row.itemId === boardItemId);
   if (!item) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: "confirm_board_item_missing",
       targetAgentIds: [],
-    };
+    });
   }
   if (compact(item.taskId) && compact(item.taskId) !== taskId) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: "confirm_board_task_mismatch",
       targetAgentIds: [],
-    };
+    });
   }
   const activeStatuses = new Set<string>(SELF_ADVANCE_ACTIVE_BOARD_STATUSES);
   if (!activeStatuses.has(compact(item.status))) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: `confirm_board_not_active:${compact(item.status) || "unknown"}`,
       targetAgentIds: [],
-    };
+    });
   }
 
   // Current effective responsibility only (claimant), not intendedClaimant fan-out.
   const claimant = compact(item.claimantId);
   if (!claimant) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: "confirm_board_no_claimant",
       targetAgentIds: [],
-    };
+    });
   }
   if (claimant === confirmerId) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: "confirm_claimant_is_confirmer",
       targetAgentIds: [],
-    };
+    });
   }
 
-  // Reuse execution task bag: confirmed todolist/version/current step must still bind.
+  // Load the JUST-CONFIRMED todolist by id. Do NOT re-derive via ownerMemberId
+  // filter: live boards often store claimantId=`bot` while propose writes
+  // ownerMemberId=`bot:bot`, and confirmer email≠human:<uuid> fails bag ACL —
+  // both produced silent wakeRecorded=false after UI confirmTodolist (F4 R5).
   let bagStepId = stepId;
-  let initialBag: Awaited<ReturnType<typeof buildCollaborationExecutionTaskBag>>;
+  let initialBag: ReturnType<typeof buildExecutionTaskBag>;
   try {
-    initialBag = await buildCollaborationExecutionTaskBag({
-      groupId,
-      taskId,
-      boardItemId,
-      ownerMemberId: claimant,
-      viewerId: confirmerId,
-      actor: confirmerId,
-      auth: params.auth,
-      trusted: params.trusted,
-      stores: trustedStores,
-      tenant: params.tenant,
-      cfg,
-    });
-    if (!initialBag.planGate.confirmed) {
-      return {
+    const loaded = await loadExecutorTodolist(authority, { taskId, todolistId });
+    if (!loaded) {
+      return finishAdvance({
+        autoAdvanceWired: true,
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "execution_bag_todolist_missing",
+        targetAgentIds: [],
+      });
+    }
+    if (compact(loaded.boardItemId) !== boardItemId) {
+      return finishAdvance({
+        autoAdvanceWired: true,
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "execution_bag_board_mismatch",
+        targetAgentIds: [],
+      });
+    }
+    if (loaded.status !== "confirmed") {
+      return finishAdvance({
         autoAdvanceWired: true,
         wakeRecorded: false,
         wakeConsumed: false,
         dispatched: false,
         reason: "execution_bag_plan_not_confirmed",
         targetAgentIds: [],
-      };
+      });
     }
+    if (loaded.version !== confirmedVersion) {
+      return finishAdvance({
+        autoAdvanceWired: true,
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: `execution_bag_version_mismatch:bag=${loaded.version}:confirmed=${confirmedVersion}`,
+        targetAgentIds: [],
+      });
+    }
+    initialBag = buildExecutionTaskBag({ boardItem: item, todolist: loaded });
     const step = initialBag.todolistCurrentStep;
     if (!step) {
-      return {
+      return finishAdvance({
         autoAdvanceWired: true,
         wakeRecorded: false,
         wakeConsumed: false,
         dispatched: false,
         reason: "execution_bag_missing_current_step",
         targetAgentIds: [],
-      };
-    }
-    if (compact(step.todolistId) !== todolistId) {
-      return {
-        autoAdvanceWired: true,
-        wakeRecorded: false,
-        wakeConsumed: false,
-        dispatched: false,
-        reason: "execution_bag_todolist_mismatch",
-        targetAgentIds: [],
-      };
-    }
-    if (step.version !== confirmedVersion) {
-      return {
-        autoAdvanceWired: true,
-        wakeRecorded: false,
-        wakeConsumed: false,
-        dispatched: false,
-        reason: `execution_bag_version_mismatch:bag=${step.version}:confirmed=${confirmedVersion}`,
-        targetAgentIds: [],
-      };
+      });
     }
     bagStepId = compact(step.stepId) || bagStepId;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: `execution_bag_unavailable:${detail}`,
       targetAgentIds: [],
-    };
+    });
   }
 
   const targetAgentIds = [claimant];
@@ -309,14 +316,14 @@ export async function triggerPostPlanConfirmAdvance(params: {
     { cfg },
   );
   if (!nudge.ok) {
-    return {
+    return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
       reason: `nudge_failed:${nudge.reason ?? "unknown"}`,
       targetAgentIds,
-    };
+    });
   }
 
   // Do NOT pass writeMode:"execute" — let consumer resolve from cfg + allowlist.
@@ -338,21 +345,19 @@ export async function triggerPostPlanConfirmAdvance(params: {
 
   const finalDispatcher: WakeRoundDispatcher = async (req: WakeRoundDispatchRequest) => {
     // Final dispatch entry: re-validate the SAME plan version after CAS take.
-    let bag: Awaited<ReturnType<typeof buildCollaborationExecutionTaskBag>>;
+    let bag: ReturnType<typeof buildExecutionTaskBag>;
     try {
-      bag = await buildCollaborationExecutionTaskBag({
-        groupId,
-        taskId,
-        boardItemId,
-        ownerMemberId: claimant,
-        viewerId: confirmerId,
-        actor: confirmerId,
-        auth: params.auth,
-        trusted: params.trusted,
-        stores: trustedStores,
-        tenant: params.tenant,
-        cfg,
-      });
+      const live = await loadExecutorTodolist(authority, { taskId, todolistId });
+      if (!live || live.status !== "confirmed") {
+        return { ok: false, reason: "plan_revised_or_unconfirmed_before_dispatch" };
+      }
+      if (compact(live.boardItemId) !== boardItemId || live.version !== confirmedVersion) {
+        return {
+          ok: false,
+          reason: `plan_revised_before_dispatch:bag=${live?.version ?? "missing"}:confirmed=${confirmedVersion}`,
+        };
+      }
+      bag = buildExecutionTaskBag({ boardItem: item, todolist: live });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       return { ok: false, reason: `plan_revalidate_bag_unavailable:${detail}`.slice(0, 240) };
@@ -457,12 +462,12 @@ export async function triggerPostPlanConfirmAdvance(params: {
     },
   });
 
-  return {
+  return finishAdvance({
     autoAdvanceWired: true,
     wakeRecorded: true,
     wakeConsumed: true,
     dispatched: Boolean(consume.dispatched),
     reason: consume.reason ?? (consume.dispatched ? "dispatched" : "wake_recorded"),
     targetAgentIds,
-  };
+  });
 }

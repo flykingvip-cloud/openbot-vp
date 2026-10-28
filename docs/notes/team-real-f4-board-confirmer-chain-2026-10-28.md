@@ -24,3 +24,10 @@
 - 未改 WIP `/Users/daniel/AI VP/openbot` tracked 文件。
 - 未重启/切换 `openbot-gateway-rebuild-24db4a357d`。
 - 未跑现场 F4；未宣称 PASS。
+
+## F4 R5 follow-up（UI confirm → wake silent）
+
+- 现象：tip `a1c1bcc` 已在 `collaboration.task.confirmTodolist` 接线 `triggerPostPlanConfirmAdvance`，UI 确认成功（SoT confirmedBy / confirmation_consumed），但 wake-events 无 `plan_confirmed_auto_advance`，日志无 advance 痕迹。
+- 根因：`triggerPostPlanConfirmAdvance` 经 `buildCollaborationExecutionTaskBag` 用 **board claimantId**（实网 `bot`）做 owner 过滤加载 todolist，而 propose 写入的 ownerMemberId 为 `bot:bot`；严格相等失败 → `execution_bag_plan_not_confirmed`。即使修复 owner 别名，confirmer email 对 bag ACL 的 `human:<uuid>` 仍可能 `forbidden`。空 catch + RPC 只回 `autoAdvanceWired` 把 early-return 藏成「确认 OK」。
+- 修复：按 **todolistId** `loadExecutorTodolist` + `buildExecutionTaskBag`（确认后路径，不走 owner 过滤/bag viewer ACL）；`finishAdvance` 打日志；RPC 回传 `autoAdvance.{wakeRecorded,reason,...}`。
+- 不放宽 submit/self_advance/accept/finalize；NO_PROMOTE；不宣称 F4 PASS。

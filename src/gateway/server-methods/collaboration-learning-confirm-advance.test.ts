@@ -157,6 +157,12 @@ describe("collaboration.task.confirmTodolist post-plan advance wiring", () => {
       expect.objectContaining({
         todolist: expect.objectContaining({ status: "confirmed", todolistId: "tl-1" }),
         autoAdvanceWired: true,
+        autoAdvance: expect.objectContaining({
+          autoAdvanceWired: true,
+          wakeRecorded: true,
+          reason: "test_advance",
+          targetAgentIds: ["bot-exec"],
+        }),
       }),
       undefined,
     );
@@ -190,6 +196,52 @@ describe("collaboration.task.confirmTodolist post-plan advance wiring", () => {
       expect.objectContaining({
         todolist: expect.objectContaining({ status: "confirmed" }),
         autoAdvanceWired: true,
+        autoAdvance: expect.objectContaining({
+          autoAdvanceWired: true,
+          wakeRecorded: false,
+          reason: expect.stringContaining("advance_threw:dispatcher_down"),
+        }),
+      }),
+      undefined,
+    );
+  });
+
+  it("surfaces wakeRecorded=false reason when advance declines (no silent OK)", async () => {
+    advanceMock.mockResolvedValueOnce({
+      autoAdvanceWired: true,
+      wakeRecorded: false,
+      wakeConsumed: false,
+      dispatched: false,
+      reason: "execution_bag_plan_not_confirmed",
+      targetAgentIds: [],
+    });
+    const { collaborationLearningHandlers } = await import("./collaboration-learning.js");
+    const respond = vi.fn();
+    await collaborationLearningHandlers["collaboration.task.confirmTodolist"]({
+      req: {} as never,
+      params: {
+        groupId: "grp-1",
+        taskId: "task-1",
+        todolistId: "tl-1",
+        expectedVersion: 2,
+      },
+      respond: respond as never,
+      context: {} as never,
+      client: {
+        connect: { user: "human:owner" },
+        platformUserId: "human:owner",
+      } as never,
+      isWebchatConnect: () => false,
+    });
+
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        autoAdvanceWired: true,
+        autoAdvance: expect.objectContaining({
+          wakeRecorded: false,
+          reason: "execution_bag_plan_not_confirmed",
+        }),
       }),
       undefined,
     );
