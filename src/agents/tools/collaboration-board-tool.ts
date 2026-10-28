@@ -11,19 +11,28 @@
  *
  * Catalog sideEffectLevel is reversible so delivery-tool-side-effect can
  * fingerprint submit/mark under a confirmed delivery exec turn.
+ *
+ * F4: resolveCompositionTrustedTeamContext from the session composition root
+ * (stamped enterprise id + gateway client identity) and pass auth/trusted/stores
+ * into every claim/board/plan entry. Managed without locator hard-refuses —
+ * never createWorkspaceCollaborationStores.
  */
 import { Type } from "@sinclair/typebox";
 import type { OpenBotConfig } from "../../config/config.js";
 import { loadConfig } from "../../config/config.js";
 import { extractCollaborationGroupId } from "../../conversations/shared-task-runtime.js";
 import { isCollabTaskClaimContractEnabled } from "../../gateway/collaboration-dispatch/claim-contract.js";
+import { activateCollaborationTask } from "../../gateway/collaboration-learning/activate-collaboration-task.js";
 import {
   acceptCollaborationBoardItemSubmission,
+  applyCollaborationBoardClaim,
   ClaimContractEntryError,
   ClaimContractFlagOffError,
+  claimCollaborationBoardItem,
   getCollaborationBoardMemberProgress,
   getCollaborationTodolist,
   listCollaborationBoardItems,
+  listCollaborationTodolists,
   markCollaborationBoardItemInProgress,
   proposeCollaborationTodolist,
   returnCollaborationBoardItemSubmission,
@@ -37,14 +46,29 @@ import {
   assertPersistedTaskNotStopped,
   TaskStoppedError,
 } from "../../gateway/collaboration-learning/task-stop-entry.js";
-import { labelCollaborationIoTenant } from "../../gateway/collaboration-learning/trusted-tenant.js";
+import {
+  resolveCompositionTrustedTeamContext,
+  type TeamResourceAuthOk,
+  type TrustedGroupStores,
+} from "../../gateway/collaboration-learning/team-resource-auth.js";
+import type { CollaborationTenantResolution } from "../../gateway/collaboration-learning/trusted-tenant.js";
+import type { GatewayClient } from "../../gateway/server-methods/types.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { stringEnum } from "../schema/typebox.js";
-import { asToolParams, jsonResult, readStringParam, type AnyAgentTool } from "./common.js";
+import {
+  asToolParams,
+  jsonResult,
+  readStringParam,
+  ToolInputError,
+  type AnyAgentTool,
+} from "./common.js";
 
 export const COLLABORATION_BOARD_TOOL = "collaboration_board";
 
 const WRITE_ACTIONS = [
+  "activate_task",
+  "claim_item",
+  "apply_claim",
   "propose_todolist",
   "mark_in_progress",
   "submit_for_review",
@@ -52,7 +76,7 @@ const WRITE_ACTIONS = [
   "return_submission",
 ] as const;
 
-const READ_ACTIONS = ["list_items", "get_member_progress", "get_todolist"] as const;
+const READ_ACTIONS = ["list_items", "get_member_progress", "get_todolist", "list_todolists"] as const;
 
 const ALL_ACTIONS = [...READ_ACTIONS, ...WRITE_ACTIONS] as const;
 
@@ -132,6 +156,36 @@ const CollaborationBoardSchema = Type.Object({
       description: "Proxy basis / 身份依据 when proxyForActorId is set.",
     }),
   ),
+  title: Type.Optional(Type.String({ description: "activate_task board title." })),
+  message: Type.Optional(
+    Type.String({ description: "activate_task intent message (not oral dispatch)." }),
+  ),
+  goal: Type.Optional(Type.String({ description: "activate_task goal." })),
+  acceptanceCriteria: Type.Optional(
+    Type.Array(Type.String(), { description: "activate_task acceptance clauses." }),
+  ),
+  constraints: Type.Optional(
+    Type.Array(Type.String(), { description: "activate_task constraints." }),
+  ),
+  suggestedClaimantIds: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        "activate_task intended claimants. Use gateway agent ids (bare id, not bot: prefix).",
+    }),
+  ),
+  humanConfirmed: Type.Optional(
+    Type.Boolean({
+      description:
+        "activate_task: true publishes the board item. The human gate is the later todolist card, not this flag.",
+    }),
+  ),
+  dueAtMs: Type.Optional(Type.Number({ description: "activate_task due time in epoch ms." })),
+  claimantId: Type.Optional(
+    Type.String({
+      description:
+        "claim_item claimant. Defaults to the session agent id (gateway agents.list id).",
+    }),
+  ),
 });
 
 export type CollaborationBoardToolDeps = {
@@ -152,6 +206,11 @@ export type CollaborationBoardToolDeps = {
   submitForReview?: typeof submitCollaborationBoardItemForReview;
   acceptSubmission?: typeof acceptCollaborationBoardItemSubmission;
   returnSubmission?: typeof returnCollaborationBoardItemSubmission;
+  activateTask?: typeof activateCollaborationTask;
+  claimItem?: typeof claimCollaborationBoardItem;
+  applyClaim?: typeof applyCollaborationBoardClaim;
+  listTodolists?: typeof listCollaborationTodolists;
+  resolveTrustedTeam?: typeof resolveCompositionTrustedTeamContext;
 };
 
 function isWriteAction(action: BoardAction): boolean {
@@ -254,6 +313,9 @@ function mapEntryError(error: unknown) {
   if (error instanceof TaskStoppedError) {
     return failResult(error.code, error.message);
   }
+  if (error instanceof ToolInputError) {
+    return failResult("invalid_input", error.message);
+  }
   if (error instanceof Error) {
     const unbound = error.message.includes("actor_not_authenticated");
     if (unbound) {
@@ -290,11 +352,80 @@ function resolveGroupId(params: {
   return { ok: true, groupId };
 }
 
+function bareCollaborationAgentId(value: string): string {
+  const id = value.trim();
+  if (id.startsWith("bot:")) {
+    return id.slice(4);
+  }
+  if (id.startsWith("agent:")) {
+    return id.slice("agent:".length);
+  }
+  return id;
+}
+
+function readStringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const out = value
+    .map((row) => (typeof row === "string" ? bareCollaborationAgentId(row) : ""))
+    .filter(Boolean);
+  return out.length > 0 ? out : undefined;
+}
+
+type BoundTeamFields = {
+  auth?: TeamResourceAuthOk;
+  trusted?: { groupsRoot: string; groupLocator: string };
+  stores?: TrustedGroupStores;
+  tenant: CollaborationTenantResolution;
+};
+
+function sessionGatewayClient(options: {
+  gatewayClientUser?: string;
+  gatewayClientPlatformUserId?: string;
+  gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
+  gatewayClientSessionEnterpriseId?: string;
+  gatewayClientSessionMembershipId?: string;
+}): GatewayClient | null {
+  const user = options.gatewayClientUser?.trim();
+  const platformUserId = options.gatewayClientPlatformUserId?.trim();
+  if (!user && !platformUserId) {
+    return null;
+  }
+  return {
+    connect: {} as GatewayClient["connect"],
+    ...(user ? { user } : {}),
+    ...(platformUserId ? { platformUserId } : {}),
+    ...(options.gatewayClientSessionDomain
+      ? { sessionDomain: options.gatewayClientSessionDomain }
+      : {}),
+    ...(options.gatewayClientSessionEnterpriseId
+      ? {
+          sessionEnterpriseId: options.gatewayClientSessionEnterpriseId,
+          sessionTenantId: options.gatewayClientSessionEnterpriseId,
+        }
+      : {}),
+    ...(options.gatewayClientSessionMembershipId
+      ? { sessionMembershipId: options.gatewayClientSessionMembershipId }
+      : {}),
+  };
+}
+
 export function createCollaborationBoardTool(options?: {
   agentSessionKey?: string;
   requesterAgentIdOverride?: string;
   agentGroupId?: string | null;
   tenantId?: string | null;
+  /**
+   * Gateway-frozen enterprise id (execution identity). Never read from tool args.
+   * Distinct from allowlist tenant normalization, which drops UUIDs.
+   */
+  stampedEnterpriseId?: string | null;
+  gatewayClientUser?: string;
+  gatewayClientPlatformUserId?: string;
+  gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
+  gatewayClientSessionEnterpriseId?: string;
+  gatewayClientSessionMembershipId?: string;
   config?: OpenBotConfig;
   deps?: CollaborationBoardToolDeps;
 }): AnyAgentTool {
@@ -309,22 +440,22 @@ export function createCollaborationBoardTool(options?: {
   const submitForReview = deps.submitForReview ?? submitCollaborationBoardItemForReview;
   const acceptSubmission = deps.acceptSubmission ?? acceptCollaborationBoardItemSubmission;
   const returnSubmission = deps.returnSubmission ?? returnCollaborationBoardItemSubmission;
+  const activateTask = deps.activateTask ?? activateCollaborationTask;
+  const claimItem = deps.claimItem ?? claimCollaborationBoardItem;
+  const applyClaim = deps.applyClaim ?? applyCollaborationBoardClaim;
+  const listTodolists = deps.listTodolists ?? listCollaborationTodolists;
+  const resolveTrustedTeam = deps.resolveTrustedTeam ?? resolveCompositionTrustedTeamContext;
+  const stampedEnterpriseId = compact(options?.stampedEnterpriseId);
 
   return {
     name: COLLABORATION_BOARD_TOOL,
     label: "Collaboration board",
     description:
-      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist (read); propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission (write). Requires claimContract / claimContractGroupAllowlist for this group. Claimant writes (propose/mark/submit) enforce claimant + plan gate + S3 inside the entry. submit_for_review needs submissionId (UUID) + artifactVersion + non-empty submissionSummary. accept_submission / return_submission are 主答验收 paths: expectedSubmissionId + reason required; accept also needs checkedAcceptanceCriteria. Does not invent a second orchestrator.",
+      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists (read); activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Human-gate card is propose_todolist. Claimant writes enforce claimant + plan gate + S3 inside the entry.",
     parameters: CollaborationBoardSchema,
     execute: async (_toolCallId, args) => {
       const params = asToolParams(args);
-      const actionRaw = readStringParam(params, "action", { required: true });
-      const action = actionRaw as BoardAction;
-      if (!(ALL_ACTIONS as readonly string[]).includes(action)) {
-        return failResult("invalid_action", `action must be one of: ${ALL_ACTIONS.join(", ")}`);
-      }
-
-      const cfg = options?.config ?? loadConfig();
+      const action = readStringParam(params, "action", { required: true }) as BoardAction;
       const groupResolved = resolveGroupId({
         paramGroupId: readStringParam(params, "groupId"),
         agentGroupId: options?.agentGroupId,
@@ -334,21 +465,23 @@ export function createCollaborationBoardTool(options?: {
         return failResult(groupResolved.reason, groupResolved.message);
       }
       const { groupId } = groupResolved;
-      const tenantIdRaw = options?.tenantId?.trim() || null;
+
+      const cfg = options?.config ?? loadConfig();
+      const tenantIdRaw = options?.tenantId;
       const tenantId = resolveClaimTenantIdForAllowlist(tenantIdRaw);
 
-      // Defense in depth: even if the tool was injected, refuse when flag/allowlist miss.
       if (!isEnabled(cfg, groupId, tenantId)) {
         return failResult(
           "flag_off",
-          "collaboration.task.claimContract is off for this group; enable the flag or claimContractGroupAllowlist",
+          "collaboration.task.claimContract is off for this group (and group is not on claimContractGroupAllowlist)",
           { groupId },
         );
       }
 
       const agentId =
-        options?.requesterAgentIdOverride?.trim() ||
+        compact(options?.requesterAgentIdOverride) ||
         resolveSessionAgentId({ sessionKey: options?.agentSessionKey, config: cfg });
+
       if (!agentId) {
         return failResult("actor_required", "could not resolve acting agent id");
       }
@@ -371,26 +504,175 @@ export function createCollaborationBoardTool(options?: {
           ? actorRaw
           : `bot:${actorRaw}`;
 
-      // Write path: never let a non-session agent spoof another owner via params.
-      if (isWriteAction(action) && actorId !== agentId) {
-        // Prefer session agent when ACL rebound to a different subject that is not us —
-        // for in-process bots the synthetic client should keep agentId; if it drifted,
-        // still require claimant checks against the resolved actor below.
+      const client = sessionGatewayClient({
+        gatewayClientUser: options?.gatewayClientUser ?? actorId,
+        gatewayClientPlatformUserId: options?.gatewayClientPlatformUserId ?? actorId,
+        gatewayClientSessionDomain: options?.gatewayClientSessionDomain,
+        gatewayClientSessionEnterpriseId:
+          options?.gatewayClientSessionEnterpriseId ?? (stampedEnterpriseId || undefined),
+        gatewayClientSessionMembershipId: options?.gatewayClientSessionMembershipId,
+      });
+
+      const aliases = [
+        options?.gatewayClientUser,
+        options?.gatewayClientPlatformUserId,
+        options?.gatewayClientSessionMembershipId,
+        actorId,
+        agentId,
+      ]
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter(Boolean);
+
+      let team: Awaited<ReturnType<typeof resolveTrustedTeam>> | null = null;
+      try {
+        team = await resolveTrustedTeam({
+          groupId,
+          action: isWriteAction(action) ? "write" : "read",
+          actor: actorId,
+          identityAliases: aliases,
+          client,
+          cfg,
+          stampedEnterpriseId: stampedEnterpriseId || tenantIdRaw || null,
+        });
+      } catch (err) {
+        return mapEntryError(err);
       }
+      if (!team || !team.ok) {
+        return failResult(
+          team?.reason ?? "trusted_group_locator_required",
+          team?.detail ??
+            "managed claim/board/plan requires trusted group locator from session composition root",
+          { groupId, action },
+        );
+      }
+
+      const bound: BoundTeamFields = {
+        auth: team.auth,
+        trusted: team.trusted,
+        stores: team.stores,
+        tenant: team.tenant,
+      };
 
       const taskId = readStringParam(params, "taskId");
       const itemId =
         readStringParam(params, "itemId") || readStringParam(params, "boardItemId") || undefined;
 
-      if (isWriteAction(action) && taskId) {
-        try {
-          await assertPersistedTaskNotStopped({ groupId, taskId, cfg });
-        } catch (error) {
-          return mapEntryError(error);
-        }
-      }
-
       try {
+        if (taskId) {
+          await assertPersistedTaskNotStopped({
+            groupId,
+            taskId,
+            cfg,
+            objectStorage: team.stores.objectStorage,
+          });
+        }
+
+        if (action === "activate_task") {
+          if (!taskId) {
+            return failResult("invalid_input", "activate_task requires taskId");
+          }
+          const title = readStringParam(params, "title", { required: true });
+          const message = readStringParam(params, "message", { required: true });
+          const suggested =
+            readStringList(params.suggestedClaimantIds) ?? [bareCollaborationAgentId(agentId)];
+          const activated = await activateTask({
+            groupId,
+            taskId,
+            title,
+            message,
+            actor: actorId,
+            goal: readStringParam(params, "goal"),
+            acceptanceCriteria: readStringList(params.acceptanceCriteria),
+            constraints: readStringList(params.constraints),
+            suggestedClaimantIds: suggested,
+            dueAtMs: typeof params.dueAtMs === "number" ? params.dueAtMs : undefined,
+            humanConfirmed: params.humanConfirmed === true,
+            ...bound,
+            cfg,
+          });
+          const published =
+            activated.status === "activated" || activated.status === "partial_success";
+          return jsonResult({
+            ok: published,
+            action,
+            groupId,
+            taskId,
+            locatorBound: true,
+            activation: activated,
+          });
+        }
+
+        if (action === "claim_item") {
+          if (!taskId || !itemId) {
+            return failResult("invalid_input", "claim_item requires taskId and itemId");
+          }
+          const claimantId = bareCollaborationAgentId(
+            readStringParam(params, "claimantId") || agentId,
+          );
+          const item = await claimItem({
+            groupId,
+            taskId,
+            itemId,
+            claimantId,
+            actor: actorId,
+            ...bound,
+            cfg,
+          });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            item,
+            locatorBound: true,
+          });
+        }
+
+        if (action === "apply_claim") {
+          if (!taskId || !itemId) {
+            return failResult("invalid_input", "apply_claim requires taskId and itemId");
+          }
+          const applied = await applyClaim({
+            groupId,
+            taskId,
+            itemId,
+            actor: actorId,
+            ...bound,
+            cfg,
+          });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            item: applied.item,
+            locatorBound: true,
+          });
+        }
+
+        if (action === "list_todolists") {
+          if (!taskId) {
+            return failResult("invalid_input", "list_todolists requires taskId");
+          }
+          const todolists = await listTodolists({
+            groupId,
+            taskId,
+            boardItemId: itemId,
+            actor: actorId,
+            viewerId: actorId,
+            ...bound,
+            cfg,
+          });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            todolists,
+            locatorBound: true,
+          });
+        }
+
         if (action === "list_items") {
           if (!taskId) {
             return failResult("invalid_input", "list_items requires taskId");
@@ -398,10 +680,10 @@ export function createCollaborationBoardTool(options?: {
           const items = await listItems({
             groupId,
             taskId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, items });
+          return jsonResult({ ok: true, action, groupId, taskId, items, locatorBound: true });
         }
 
         if (action === "get_member_progress") {
@@ -411,53 +693,50 @@ export function createCollaborationBoardTool(options?: {
           const progress = await getMemberProgress({
             groupId,
             taskId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, progress });
+          return jsonResult({ ok: true, action, groupId, taskId, progress, locatorBound: true });
         }
 
         if (action === "get_todolist") {
+          const todolistId = readStringParam(params, "todolistId", { required: true });
           if (!taskId) {
             return failResult("invalid_input", "get_todolist requires taskId");
           }
-          const todolistId = readStringParam(params, "todolistId", { required: true });
           const todolist = await getTodolist({
             groupId,
             taskId,
             todolistId,
             actor: actorId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            viewerId: actorId,
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, todolist });
+          return jsonResult({ ok: true, action, groupId, taskId, todolist, locatorBound: true });
         }
 
         if (action === "propose_todolist") {
           if (!taskId) {
             return failResult("invalid_input", "propose_todolist requires taskId");
           }
-          const boardItemId = itemId;
+          const boardItemId =
+            readStringParam(params, "boardItemId") ||
+            readStringParam(params, "itemId") ||
+            undefined;
           if (!boardItemId) {
             return failResult("invalid_input", "propose_todolist requires boardItemId or itemId");
           }
           const stepsRaw = params.steps;
-          if (!Array.isArray(stepsRaw) || stepsRaw.length === 0) {
-            return failResult("invalid_input", "propose_todolist requires non-empty steps");
+          if (!Array.isArray(stepsRaw) || stepsRaw.length < 1) {
+            return failResult("invalid_input", "propose_todolist requires steps (min 1)");
           }
-          const steps = stepsRaw.map((step, index) => {
-            const row = step && typeof step === "object" ? (step as Record<string, unknown>) : {};
-            const title = typeof row.title === "string" ? row.title.trim() : "";
-            if (!title) {
-              throw new ClaimContractEntryError(
-                "invalid_input",
-                `steps[${index}].title is required`,
-              );
-            }
+          const steps = stepsRaw.map((row) => {
+            const rec = row as Record<string, unknown>;
             return {
-              title,
-              detail: typeof row.detail === "string" ? row.detail : undefined,
-              stepId: typeof row.stepId === "string" ? row.stepId.trim() || undefined : undefined,
+              title: String(rec.title ?? ""),
+              ...(typeof rec.detail === "string" ? { detail: rec.detail } : {}),
+              ...(typeof rec.stepId === "string" ? { stepId: rec.stepId } : {}),
             };
           });
           const proposed = await proposeTodolist({
@@ -467,7 +746,7 @@ export function createCollaborationBoardTool(options?: {
             steps,
             actor: actorId,
             ownerMemberId: actorId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            ...bound,
             cfg,
           });
           return jsonResult({
@@ -477,6 +756,7 @@ export function createCollaborationBoardTool(options?: {
             taskId,
             todolist: proposed.todolist,
             cardDelivery: proposed.cardDelivery,
+            locatorBound: true,
           });
         }
 
@@ -489,10 +769,10 @@ export function createCollaborationBoardTool(options?: {
             taskId,
             itemId,
             actor: actorId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item });
+          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
         }
 
         if (action === "submit_for_review") {
@@ -501,12 +781,13 @@ export function createCollaborationBoardTool(options?: {
           }
           const submissionId = readStringParam(params, "submissionId", { required: true });
           const artifactVersion = readStringParam(params, "artifactVersion", { required: true });
-          const submissionSummary = readStringParam(params, "submissionSummary");
-          if (!submissionSummary?.trim()) {
-            return failResult(
-              "empty_submission",
-              "submissionSummary is required and must be non-empty; empty/duplicate does not count as success",
-            );
+          // Empty / whitespace-only is empty_submission (product code), not a generic required miss.
+          const submissionSummaryRaw = readStringParam(params, "submissionSummary", {
+            allowEmpty: true,
+          });
+          const submissionSummary = submissionSummaryRaw?.trim() ?? "";
+          if (!submissionSummary) {
+            return failResult("empty_submission", "submissionSummary must be non-empty");
           }
           const item = await submitForReview({
             groupId,
@@ -516,10 +797,10 @@ export function createCollaborationBoardTool(options?: {
             artifactVersion,
             submissionSummary,
             actor: actorId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item });
+          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
         }
 
         if (action === "accept_submission") {
@@ -529,43 +810,24 @@ export function createCollaborationBoardTool(options?: {
           const expectedSubmissionId = readStringParam(params, "expectedSubmissionId", {
             required: true,
           });
-          const reason = readStringParam(params, "reason");
-          if (!reason?.trim()) {
-            return failResult("invalid_input", "accept_submission requires a non-empty reason");
-          }
-          const criteriaRaw = params.checkedAcceptanceCriteria;
-          if (!Array.isArray(criteriaRaw) || criteriaRaw.length === 0) {
-            return failResult(
-              "invalid_input",
-              "accept_submission requires non-empty checkedAcceptanceCriteria",
-            );
-          }
-          const checkedAcceptanceCriteria = criteriaRaw.map((row, index) => {
-            const value = typeof row === "string" ? row.trim() : "";
-            if (!value) {
-              throw new ClaimContractEntryError(
-                "invalid_input",
-                `checkedAcceptanceCriteria[${index}] must be a non-empty string`,
-              );
-            }
-            return value;
-          });
-          const proxyForActorId = readStringParam(params, "proxyForActorId") || undefined;
-          const proxyBasis = readStringParam(params, "proxyBasis") || undefined;
+          const reason = readStringParam(params, "reason", { required: true });
+          const checked = readStringList(params.checkedAcceptanceCriteria) ?? [];
+          const proxyForActorId = readStringParam(params, "proxyForActorId");
+          const proxyBasis = readStringParam(params, "proxyBasis");
           const item = await acceptSubmission({
             groupId,
             taskId,
             itemId,
             expectedSubmissionId,
             reason,
-            checkedAcceptanceCriteria,
+            checkedAcceptanceCriteria: checked,
             proxyForActorId,
             proxyBasis,
             actor: actorId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            tenant: bound.tenant,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item });
+          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
         }
 
         if (action === "return_submission") {
@@ -575,10 +837,7 @@ export function createCollaborationBoardTool(options?: {
           const expectedSubmissionId = readStringParam(params, "expectedSubmissionId", {
             required: true,
           });
-          const reason = readStringParam(params, "reason");
-          if (!reason?.trim()) {
-            return failResult("invalid_input", "return_submission requires a non-empty reason");
-          }
+          const reason = readStringParam(params, "reason", { required: true });
           const item = await returnSubmission({
             groupId,
             taskId,
@@ -586,14 +845,13 @@ export function createCollaborationBoardTool(options?: {
             expectedSubmissionId,
             reason,
             actor: actorId,
-            tenant: labelCollaborationIoTenant(tenantId),
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item });
+          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
         }
 
-        // Exhaustiveness: BoardAction union is handled above.
-        return failResult("invalid_action", "unhandled action");
+        return failResult("invalid_action", `unknown action: ${action}`);
       } catch (error) {
         return mapEntryError(error);
       }

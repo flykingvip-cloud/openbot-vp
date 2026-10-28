@@ -22,6 +22,8 @@ import { listAgents } from "../agent-runtime-store.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   checkMemberDispatchReadiness,
+  collaborationDispatchAgentNeedle,
+  collaborationDispatchIdsMatch,
   ensureRegisteredMemberMainSession,
 } from "../collaboration-learning/member-dispatch-readiness.js";
 import {
@@ -1185,13 +1187,19 @@ export async function consumeWakeForRoundDispatch(
             },
             resolveMember: (memberId) => {
               const id = memberId.trim();
-              const osRow = osMembers.find((row) => compact(row.memberId) === id);
+              const needle = collaborationDispatchAgentNeedle(id);
+              const osRow = osMembers.find((row) =>
+                collaborationDispatchIdsMatch(row.memberId, needle),
+              );
               const activeBot =
                 osRow?.memberKind === "bot" &&
                 (osRow.status === "active" || osRow.status == null || osRow.status === "");
-              const inTenantRegistry = tenantAgentIds.has(id);
-              // Intersection only — global agent presence alone is insufficient.
-              if (!activeBot || !inTenantRegistry) {
+              const registryId =
+                [...tenantAgentIds].find((agentId) =>
+                  collaborationDispatchIdsMatch(agentId, needle),
+                ) ?? "";
+              // OS active bot ∩ gateway agents. Prefix form must not split the intersection.
+              if (!activeBot || !registryId) {
                 return {
                   memberId: id,
                   agentId: null,
@@ -1202,10 +1210,10 @@ export async function consumeWakeForRoundDispatch(
               }
               return {
                 memberId: id,
-                agentId: id,
+                agentId: registryId,
                 displayName: null,
                 registration: "registered" as const,
-                sessionKey: defaultConversationSessionKey(id),
+                sessionKey: defaultConversationSessionKey(registryId),
               };
             },
           });

@@ -427,6 +427,16 @@ export function createOpenClawTools(
             requesterAgentIdOverride: options?.requesterAgentIdOverride,
             agentGroupId: options?.agentGroupId,
             tenantId: options?.tenantId ?? options?.gatewayClientSessionEnterpriseId,
+            stampedEnterpriseId:
+              executionIdentity.enterpriseId ??
+              options?.gatewayClientSessionEnterpriseId ??
+              options?.tenantId ??
+              null,
+            gatewayClientUser: identityFields.gatewayClientUser,
+            gatewayClientPlatformUserId: identityFields.gatewayClientPlatformUserId,
+            gatewayClientSessionDomain: identityFields.gatewayClientSessionDomain,
+            gatewayClientSessionEnterpriseId: identityFields.gatewayClientSessionEnterpriseId,
+            gatewayClientSessionMembershipId: identityFields.gatewayClientSessionMembershipId,
             config: options?.config,
           }),
         ]

@@ -1,6 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { precheckDispatchReadiness } from "./dispatch-readiness-precheck.js";
-import { checkMemberDispatchReadiness } from "./member-dispatch-readiness.js";
+import {
+  checkMemberDispatchReadiness,
+  collaborationDispatchIdsMatch,
+} from "./member-dispatch-readiness.js";
+
+describe("collaborationDispatchIdsMatch", () => {
+  it("treats bare gateway agent ids and bot: prefixes as the same bot", () => {
+    expect(collaborationDispatchIdsMatch("bot", "bot:bot")).toBe(true);
+    expect(collaborationDispatchIdsMatch("agent:bot-2", "bot-2")).toBe(true);
+    expect(collaborationDispatchIdsMatch("bot", "bot-2")).toBe(false);
+  });
+});
 
 describe("checkMemberDispatchReadiness", () => {
   it("never dispatches not_registered members", async () => {
