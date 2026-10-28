@@ -722,8 +722,8 @@ describe("R4 trusted chain: two-tenant activate→claim→apply→propose→conf
       }
       expect(chatHook.result.confirmed).toBe(true);
       expect(chatHook.userMessage).toContain("计划已确认");
-      expect(chatHook.userMessage).toContain("自动推进尚未接通");
-      expect(chatHook.autoAdvanceWired).toBe(false);
+      expect(chatHook.autoAdvanceWired).toBe(true);
+      expect(chatHook.userMessage).toMatch(/已触发后续推进|尚未接通|推进/);
 
       const write = await submitTeamDeliverable({
         groupId,

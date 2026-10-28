@@ -269,12 +269,14 @@ import {
   resolveBlockedAgentIdsForCurrentTask,
   type GatewayCollaborationSpaceSnapshot,
 } from "../collaboration-learning.js";
+import { finalizeMemberRunTeamDeliverable } from "../collaboration-learning/chat-deliverable-team-submit.js";
 import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
 import {
   isGroupPublicTranscriptSessionFile,
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   bindGroupPublicTranscript,
   dropDivergentGroupTranscriptMirrors,
@@ -290,7 +292,10 @@ import {
   authorizeTeamGroupResourceAccess,
   createTrustedGroupStores,
 } from "../collaboration-learning/team-resource-auth.js";
-import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
+import {
+  labelCollaborationIoTenant,
+  resolveCollaborationTenantResolution,
+} from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import type { CollaborationExecutionRecord } from "../collaboration-ledger/types.js";
 import {
@@ -3326,6 +3331,11 @@ async function runGroupBotDiscussionTurn(params: {
   eventKey?: CollaborationEventKey;
   /** // v1-only — P0.2 roll-call roster / brief-hint lines. */
   v1RollCallExtraLines?: string[];
+  /**
+   * Formal deliverable must bind this execution bag / wake run.
+   * Missing → refuse formal team submit (no Map / no latest-member fallback).
+   */
+  executionDeliverableBinding?: ExecutionDeliverableBinding | null;
 }): Promise<SameRoundReply | null> {
   return await groupBotQueue.enqueue(params.bot.sessionKey, async () => {
     const {
@@ -3756,6 +3766,14 @@ async function runGroupBotDiscussionTurn(params: {
         );
       }
       try {
+        // OS currentTaskId is unreliable as sole binding; keep for settle metadata only.
+        const groupCurrentTaskId =
+          (
+            params.scope.operatingState as
+              | { activeContext?: { currentTaskId?: string | null } }
+              | null
+              | undefined
+          )?.activeContext?.currentTaskId?.trim() || null;
         prepared = prepareChatDeliverablePublish({
           text: replyText,
           publishIntent: "group-bot-final",
@@ -3765,9 +3783,68 @@ async function runGroupBotDiscussionTurn(params: {
           agentId: params.bot.agentId,
           userId: deliverableOwnerId,
           clientRunId: runId,
+          // Chat settle/ledger only — not the team SoT task authority.
           taskId: null,
         });
         replyText = prepared.text;
+        if (params.scope.groupId && replyText.includes("DELIVERABLE") && prepared.structured) {
+          // Unique formal team delivery via run binding only (R3 — no Map fallback).
+          // Do not invent trust:membership from a bare tenantId string.
+          const tenantResolution = await resolveCollaborationTenantResolution(params.client);
+          const tenant =
+            tenantResolution.trust === "membership"
+              ? tenantResolution
+              : labelCollaborationIoTenant(
+                  tenantResolution.tenantId ?? params.scope.tenantId ?? null,
+                );
+          let deliverAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null =
+            null;
+          let deliverStores: ReturnType<typeof createTrustedGroupStores> | null = null;
+          try {
+            deliverAuth = await authorizeTeamGroupResourceAccess({
+              groupId: params.scope.groupId,
+              actor: params.bot.agentId,
+              client: params.client,
+              tenant,
+              action: "write",
+              cfg,
+            });
+            if (deliverAuth.ok) {
+              deliverStores = createTrustedGroupStores({
+                groupsRoot: deliverAuth.groupsRoot,
+                groupLocator: deliverAuth.groupLocator,
+              });
+            }
+          } catch (authErr) {
+            params.context.logGateway.warn(
+              `collaboration team deliverable auth failed (${params.bot.agentId}): ${formatForLog(authErr)}`,
+            );
+          }
+          const finalized = await finalizeMemberRunTeamDeliverable({
+            text: replyText,
+            agentId: params.bot.agentId,
+            binding: params.executionDeliverableBinding ?? null,
+            client: params.client,
+            tenant,
+            auth: deliverAuth && deliverAuth.ok ? deliverAuth : null,
+            trusted:
+              deliverAuth && deliverAuth.ok
+                ? {
+                    groupsRoot: deliverAuth.groupsRoot,
+                    groupLocator: deliverAuth.groupLocator,
+                  }
+                : null,
+            stores: deliverStores,
+            cfg,
+            groupCurrentTaskId,
+          });
+          replyText = finalized.text;
+          if (!finalized.outcome.ok) {
+            params.context.logGateway.warn(
+              `collaboration team deliverable not ok (${params.bot.agentId}): ${finalized.outcome.reason}; unused groupCurrentTaskId=${groupCurrentTaskId ?? "none"}`,
+            );
+          }
+        }
       } catch (err) {
         params.context.logGateway.warn(
           `collaboration deliverable settle failed (${params.bot.agentId}): ${formatForLog(err)}`,

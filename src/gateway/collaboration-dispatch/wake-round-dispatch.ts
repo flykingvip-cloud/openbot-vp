@@ -17,6 +17,13 @@
  */
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
+import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
+import { listAgents } from "../agent-runtime-store.js";
+import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
+import {
+  checkMemberDispatchReadiness,
+  ensureRegisteredMemberMainSession,
+} from "../collaboration-learning/member-dispatch-readiness.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -118,6 +125,32 @@ export type WakeRoundDispatchRequest = Readonly<{
   relatedId?: string;
   /** Explicit U3 idempotency key; when omitted, derived from request fields. */
   opKey?: string;
+  /**
+   * Durable wake-op key after claim (composition roots inject before Mode B).
+   * Prefer this over inventing a new identity for deliverable binding.
+   */
+  wakeOpKey?: string | null;
+  /**
+   * Durable WakeOpRecord.executionAttemptId after claim. Binding.attemptId must
+   * equal this — never a freshly minted UUID that merely looks unique.
+   */
+  wakeExecutionAttemptId?: string | null;
+  /**
+   * Plan-confirm advance binding. When set, final dispatch re-validates the
+   * execution bag and prefers dispatchPrompt for the member run message.
+   */
+  planConfirmBinding?: Readonly<{
+    todolistId: string;
+    confirmedVersion: number;
+    stepId?: string | null;
+  }>;
+  /** Optional enriched prompt (board summary / context pointer / confirmed step). */
+  dispatchPrompt?: string | null;
+  /**
+   * Unconfusable run binding for formal team deliverable submit.
+   * Passed into the member run; missing binding → refuse formal submit (no Map).
+   */
+  executionDeliverableBinding?: ExecutionDeliverableBinding | null;
 }>;
 
 export type WakeRoundDispatchResult =
@@ -291,6 +324,11 @@ export type ConsumeWakeRoundDispatchParams = {
    * T41: CAS take runs after this barrier — stop/revoke here must refuse take.
    */
   _testAfterEligibilityBarrier?: () => Promise<void>;
+  /**
+   * Test-only barrier after dispatch readiness / session ensure, before CAS take.
+   * Stop/revoke here must refuse take (dispatcher calls = 0).
+   */
+  _testAfterReadinessBarrier?: () => Promise<void>;
   /**
    * Test-only barrier after external dispatcher returns ok, before receipt write (M3 order 3).
    */
@@ -1052,6 +1090,183 @@ export async function consumeWakeForRoundDispatch(
     await params._testAfterEligibilityBarrier();
   }
 
+  // Product wiring R1/R2: readiness + session ensure BEFORE final stop/auth/CAS take.
+  // Registration = tenant-authoritative agent registry ∩ active group bot member.
+  // OS unreadable → refuse (no global listAgentsForGateway / agent||activeBot fallback).
+  // R2: readiness/session-ensure failure MUST release the unconsumed committed claim
+  // on the same trusted root (never release taken claims).
+  const releaseUnconsumedTaskClaimAfterReadinessFailure = async () => {
+    if (!(stoppedTaskId && taskDispatchClaimNeedsRelease && taskDispatchClaimId)) {
+      return;
+    }
+    taskDispatchClaimNeedsRelease = false;
+    await casReleaseUnconsumedCommittedClaim({
+      groupId: request.groupId,
+      taskId: stoppedTaskId,
+      opKey: claimed.opKey,
+      claimId: taskDispatchClaimId,
+      cfg: params.cfg,
+      nowMs: params.nowMs,
+      trusted: wakeStores,
+    });
+  };
+  {
+    const memberIds = [...request.toAgentIds];
+    if (memberIds.length > 0) {
+      // Managed / tenant-scoped wake only: personal_local without tenantId skips
+      // this product-wiring gate (no inventing membership from empty tenant).
+      const tenantId = compact(request.tenantId) || compact(params.authority.tenantId) || "";
+      if (!tenantId) {
+        // fall through to CAS take without tenant∩OS readiness
+      } else {
+        try {
+          let osMembers: Array<{
+            memberId?: string;
+            memberKind?: string;
+            status?: string;
+          }> = [];
+          let osReadable = true;
+          try {
+            const os = await readGroupOperatingState({
+              fileStore: wakeStores.fileStore,
+              groupId: request.groupId,
+              // Pin the read to the trusted groups root. readGroupOperatingState
+              // takes baseDir, not groupRootDir.
+              baseDir: wakeStores.groupRootDir,
+            });
+            osMembers = Array.isArray(os?.memberRoleMap) ? os.memberRoleMap : [];
+          } catch {
+            osReadable = false;
+          }
+          if (!osReadable) {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: "dispatch_readiness_os_unreadable",
+            });
+            noteNudgeNoExternal("dispatch_readiness_not_ready");
+            await flushNudgeNoExternalReceipt();
+            await releaseUnconsumedTaskClaimAfterReadinessFailure();
+            return {
+              outcome: "recorded",
+              dispatched: false,
+              gate: emptyGate(),
+              reason: "dispatch_readiness_not_ready",
+              wakeEvent: undefined,
+              roundId: undefined,
+              dispatcherPresent: false,
+              opKey: claimed.opKey,
+              wakeOp: failed ?? wakeOp,
+              reused: false,
+            };
+          }
+          const tenantAgents = listAgents({
+            lifecycle: null,
+            health: null,
+            tenantId,
+            searchQuery: "",
+          });
+          const tenantAgentIds = new Set(
+            tenantAgents.map((row) => compact(row.runtimeAgentId)).filter(Boolean),
+          );
+          const readiness = await checkMemberDispatchReadiness({
+            members: memberIds.map((memberId) => ({ memberId })),
+            cfg: params.cfg,
+            autoEnsureSession: true,
+            ensureSession: async (agentId, sessionKey) => {
+              await ensureRegisteredMemberMainSession({
+                agentId,
+                sessionKey,
+                cfg: params.cfg,
+                nowMs: params.nowMs,
+              });
+            },
+            resolveMember: (memberId) => {
+              const id = memberId.trim();
+              const osRow = osMembers.find((row) => compact(row.memberId) === id);
+              const activeBot =
+                osRow?.memberKind === "bot" &&
+                (osRow.status === "active" || osRow.status == null || osRow.status === "");
+              const inTenantRegistry = tenantAgentIds.has(id);
+              // Intersection only — global agent presence alone is insufficient.
+              if (!activeBot || !inTenantRegistry) {
+                return {
+                  memberId: id,
+                  agentId: null,
+                  displayName: null,
+                  registration: "not_registered" as const,
+                  sessionKey: null,
+                };
+              }
+              return {
+                memberId: id,
+                agentId: id,
+                displayName: null,
+                registration: "registered" as const,
+                sessionKey: defaultConversationSessionKey(id),
+              };
+            },
+          });
+          if (!readiness.allDispatchable) {
+            const failed = await markWakeOpFailed({
+              authority: params.authority,
+              opKey: claimed.opKey,
+              cfg: params.cfg,
+              nowMs: params.nowMs,
+              detail: `dispatch_readiness_not_ready:${readiness.gaps.map((g) => g.code).join(",")}`,
+            });
+            noteNudgeNoExternal("dispatch_readiness_not_ready");
+            await flushNudgeNoExternalReceipt();
+            await releaseUnconsumedTaskClaimAfterReadinessFailure();
+            return {
+              outcome: "recorded",
+              dispatched: false,
+              gate: emptyGate(),
+              reason: "dispatch_readiness_not_ready",
+              wakeEvent: undefined,
+              roundId: undefined,
+              dispatcherPresent: false,
+              opKey: claimed.opKey,
+              wakeOp: failed ?? wakeOp,
+              reused: false,
+            };
+          }
+        } catch (readinessError) {
+          const detail =
+            readinessError instanceof Error ? readinessError.message : String(readinessError);
+          const failed = await markWakeOpFailed({
+            authority: params.authority,
+            opKey: claimed.opKey,
+            cfg: params.cfg,
+            nowMs: params.nowMs,
+            detail: `dispatch_readiness_exception:${detail}`.slice(0, 400),
+          });
+          noteNudgeNoExternal("dispatch_readiness_not_ready");
+          await flushNudgeNoExternalReceipt();
+          await releaseUnconsumedTaskClaimAfterReadinessFailure();
+          return {
+            outcome: "recorded",
+            dispatched: false,
+            gate: emptyGate(),
+            reason: "dispatch_readiness_not_ready",
+            wakeEvent: undefined,
+            roundId: undefined,
+            dispatcherPresent: false,
+            opKey: claimed.opKey,
+            wakeOp: failed ?? wakeOp,
+            reused: false,
+          };
+        }
+      } // end tenantId present
+    }
+  }
+
+  if (params._testAfterReadinessBarrier) {
+    await params._testAfterReadinessBarrier();
+  }
+
   // T41/T51: CAS-take task dispatchClaim (unoverwritable version condition) before any
   // external dispatcher call. Stop that advanced controlEpoch refuses take; revoke
   // that bumped OS authEpoch refuses take under the same lock (fingerprint secondary).
@@ -1373,8 +1588,19 @@ export async function consumeWakeForRoundDispatch(
 
     if (gate.allowed && dispatcherPresent && dispatcher) {
       try {
+        // Readiness already enforced before final CAS take (product wiring R1).
         externalDispatchInvoked = true;
-        const result = await dispatcher(request);
+        // Inject durable op/attempt identities so Mode B / deliverable binding
+        // bind to the claimed wake-op attempt — not a freshly minted UUID.
+        const durableAttempt =
+          compact(wakeOp?.executionAttemptId) || compact(claimed.record?.executionAttemptId) || "";
+        const dispatchRequest: WakeRoundDispatchRequest = {
+          ...request,
+          wakeOpKey: claimed.opKey,
+          wakeExecutionAttemptId: durableAttempt || request.wakeExecutionAttemptId || null,
+          opKey: request.opKey ?? claimed.opKey,
+        };
+        const result = await dispatcher(dispatchRequest);
         if (result.ok && compact(result.roundId)) {
           // M3 order-3 seam: external sent, receipt not yet written.
           if (params._testAfterExternalBeforeReceiptBarrier) {

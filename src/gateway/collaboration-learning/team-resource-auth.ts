@@ -287,8 +287,8 @@ export function resolveStoresFromGroupLocator(params: {
 }
 
 /**
- * Authorize actor for group resource action. Managed requires membership tenant.
- * Never trusts client-supplied tenantId.
+ * Authorize actor for group resource action. Managed requires an ACL-safe tenant
+ * (membership or service_execution). Never trusts client-supplied tenantId alone.
  * Write ≠ read: observers and non-active members are denied write.
  */
 export async function authorizeTeamGroupResourceAccess(params: {

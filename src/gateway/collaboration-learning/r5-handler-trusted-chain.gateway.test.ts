@@ -6,7 +6,7 @@
  * Each step records groupLocator/groupsRoot; tenants must never cross.
  * Managed missing trusted must hard-refuse compat dual-root.
  *
- * Scope honesty: autoAdvanceWired remains false; readiness/agent tools unwired.
+ * Scope honesty: R5 era noted autoAdvance unwired; product-wiring PR flips confirm→advance.
  */
 import fs from "node:fs/promises";
 import os from "node:os";

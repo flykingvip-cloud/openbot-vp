@@ -14,6 +14,7 @@ vi.mock("../employee-workbench-scope.js", () => ({
 const {
   isAclSafeTenantTrust,
   labelCollaborationIoTenant,
+  labelServiceExecutionTenant,
   resolveAuthorityTenantForEntry,
   resolveCollaborationTenantResolution,
   resolveMembershipTenantIdForAcl,
@@ -100,5 +101,27 @@ describe("trusted-tenant multi-surface fail-closed", () => {
         groupTenantId: "group-owned",
       }),
     ).toEqual({ tenantId: "hint", trust: "actor_fallback" });
+  });
+
+  it("labelServiceExecutionTenant is ACL-safe and distinct from membership/actor_fallback", () => {
+    expect(labelServiceExecutionTenant("t1")).toEqual({
+      tenantId: "t1",
+      trust: "service_execution",
+    });
+    expect(labelServiceExecutionTenant(null)).toEqual({ tenantId: null, trust: "none" });
+    expect(isAclSafeTenantTrust("service_execution")).toBe(true);
+    expect(isAclSafeTenantTrust("membership")).toBe(true);
+    expect(isAclSafeTenantTrust("actor_fallback")).toBe(false);
+    expect(labelServiceExecutionTenant("t1").trust).not.toBe("membership");
+    expect(labelServiceExecutionTenant("t1").trust).not.toBe("actor_fallback");
+  });
+
+  it("resolveAuthorityTenantForEntry preserves service_execution", () => {
+    expect(
+      resolveAuthorityTenantForEntry({
+        preferred: { tenantId: "svc-t", trust: "service_execution" },
+        groupTenantId: "group-owned",
+      }),
+    ).toEqual({ tenantId: "svc-t", trust: "service_execution" });
   });
 });
