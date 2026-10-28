@@ -104,7 +104,11 @@ import {
   renderCapabilityEditorModal,
   type CapabilityEditorState,
 } from "./enterprise-data-capability/product-editor-modal.ts";
-import { validateProductWizardStep } from "./enterprise-data-capability/product-wizard.ts";
+import {
+  productWizardSourceActionMismatch,
+  productWizardValidationContext,
+  validateProductWizardStep,
+} from "./enterprise-data-capability/product-wizard.ts";
 import {
   renderProductsCatalog,
   renderProductsPage,
@@ -4517,21 +4521,33 @@ export function renderEnterpriseDataGovernanceCenterSurface(
       projectionTemplateKey: editor.projectionTemplateKey,
       openScopeReady: state.seatGrantSeatIds.size + state.seatGrantDepartmentPaths.size > 0,
     };
+    const seatCount = props.readModel.seatSummaries?.length ?? state.orgTargets?.seats?.length ?? 0;
+    const wizardContext = productWizardValidationContext({
+      sources: state.sources,
+      actions: state.actionsCatalog,
+      seatCount,
+    });
     if (isCreate) {
-      const seatCount =
-        props.readModel.seatSummaries?.length ?? state.orgTargets?.seats?.length ?? 0;
       for (const step of [1, 2, 3, 4] as const) {
-        const validation = validateProductWizardStep(step, draft, {
-          sourceCount: state.sources.length,
-          actionCount: state.actionsCatalog.length,
-          seatCount,
-        });
+        const validation = validateProductWizardStep(step, draft, wizardContext);
         if (!validation.ok) {
           editor.wizardStep = step;
           editor.error = validation.message;
           refreshEnterpriseSurface();
           return;
         }
+      }
+    } else {
+      const mismatch = productWizardSourceActionMismatch({
+        sourceIds: draft.sourceIds,
+        actionRefTokens: draft.actionRefTokens,
+        sources: state.sources,
+        actions: state.actionsCatalog,
+      });
+      if (mismatch || draft.sourceIds.size === 0 || draft.actionRefTokens.size === 0) {
+        editor.error = mismatch ?? "请至少选择一个数据源和一个动作。";
+        refreshEnterpriseSurface();
+        return;
       }
     }
     editor.busy = true;
