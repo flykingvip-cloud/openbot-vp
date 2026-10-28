@@ -18,7 +18,6 @@
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
-import { listAgents } from "../agent-runtime-store.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   checkMemberDispatchReadiness,
@@ -35,6 +34,7 @@ import {
   TRUSTED_GROUP_LOCATOR_REQUIRED,
 } from "../collaboration-learning/team-resource-auth.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import { listAgentsForGateway } from "../session-utils.js";
 import { matchGrayGroupAllowlist } from "./gray-group-allowlist.js";
 import type { RuntimeAuthority } from "./runtime-authority.js";
 import {
@@ -1093,8 +1093,10 @@ export async function consumeWakeForRoundDispatch(
   }
 
   // Product wiring R1/R2: readiness + session ensure BEFORE final stop/auth/CAS take.
-  // Registration = tenant-authoritative agent registry ∩ active group bot member.
-  // OS unreadable → refuse (no global listAgentsForGateway / agent||activeBot fallback).
+  // Registration = gateway agents.list ∩ active group OS bot member (F4 SoT).
+  // Do NOT use agent-runtime-store (enterprise rt-* rows) — that is a different product
+  // surface and left live claimants like `bot` as not_registered after confirm+wake.
+  // OS unreadable → refuse (no agent||activeBot-only fallback that skips OS).
   // R2: readiness/session-ensure failure MUST release the unconsumed committed claim
   // on the same trusted root (never release taken claims).
   const releaseUnconsumedTaskClaimAfterReadinessFailure = async () => {
@@ -1164,14 +1166,13 @@ export async function consumeWakeForRoundDispatch(
               reused: false,
             };
           }
-          const tenantAgents = listAgents({
-            lifecycle: null,
-            health: null,
-            tenantId,
-            searchQuery: "",
-          });
-          const tenantAgentIds = new Set(
-            tenantAgents.map((row) => compact(row.runtimeAgentId)).filter(Boolean),
+          // Gateway config agents.list — the runtime that can actually own sessions /
+          // Mode B runs. Prefix-normalized so board claimant `bot` matches list id `bot`
+          // and OS memberId `bot:bot`.
+          const gatewayAgentIds = new Set(
+            listAgentsForGateway(params.cfg ?? {})
+              .agents.map((row) => compact(row.id))
+              .filter(Boolean),
           );
           const readiness = await checkMemberDispatchReadiness({
             members: memberIds.map((memberId) => ({ memberId })),
@@ -1195,17 +1196,25 @@ export async function consumeWakeForRoundDispatch(
                 osRow?.memberKind === "bot" &&
                 (osRow.status === "active" || osRow.status == null || osRow.status === "");
               const registryId =
-                [...tenantAgentIds].find((agentId) =>
+                [...gatewayAgentIds].find((agentId) =>
                   collaborationDispatchIdsMatch(agentId, needle),
                 ) ?? "";
-              // OS active bot ∩ gateway agents. Prefix form must not split the intersection.
+              // OS active bot ∩ gateway agents.list. Prefix form must not split the intersection.
               if (!activeBot || !registryId) {
+                const gapParts: string[] = [];
+                if (!activeBot) {
+                  gapParts.push("os_bot_inactive_or_missing");
+                }
+                if (!registryId) {
+                  gapParts.push("not_in_gateway_agents_list");
+                }
                 return {
                   memberId: id,
                   agentId: null,
                   displayName: null,
                   registration: "not_registered" as const,
                   sessionKey: null,
+                  detail: gapParts.join("+"),
                 };
               }
               return {
@@ -1218,12 +1227,15 @@ export async function consumeWakeForRoundDispatch(
             },
           });
           if (!readiness.allDispatchable) {
+            const gapSummary = readiness.gaps
+              .map((g) => (g.detail ? `${g.code}:${g.detail}` : g.code))
+              .join(",");
             const failed = await markWakeOpFailed({
               authority: params.authority,
               opKey: claimed.opKey,
               cfg: params.cfg,
               nowMs: params.nowMs,
-              detail: `dispatch_readiness_not_ready:${readiness.gaps.map((g) => g.code).join(",")}`,
+              detail: `dispatch_readiness_not_ready:${gapSummary}`,
             });
             noteNudgeNoExternal("dispatch_readiness_not_ready");
             await flushNudgeNoExternalReceipt();
@@ -1232,7 +1244,7 @@ export async function consumeWakeForRoundDispatch(
               outcome: "recorded",
               dispatched: false,
               gate: emptyGate(),
-              reason: "dispatch_readiness_not_ready",
+              reason: `dispatch_readiness_not_ready:${gapSummary}`,
               wakeEvent: undefined,
               roundId: undefined,
               dispatcherPresent: false,

@@ -31,3 +31,10 @@
 - 根因：`triggerPostPlanConfirmAdvance` 经 `buildCollaborationExecutionTaskBag` 用 **board claimantId**（实网 `bot`）做 owner 过滤加载 todolist，而 propose 写入的 ownerMemberId 为 `bot:bot`；严格相等失败 → `execution_bag_plan_not_confirmed`。即使修复 owner 别名，confirmer email 对 bag ACL 的 `human:<uuid>` 仍可能 `forbidden`。空 catch + RPC 只回 `autoAdvanceWired` 把 early-return 藏成「确认 OK」。
 - 修复：按 **todolistId** `loadExecutorTodolist` + `buildExecutionTaskBag`（确认后路径，不走 owner 过滤/bag viewer ACL）；`finishAdvance` 打日志；RPC 回传 `autoAdvance.{wakeRecorded,reason,...}`。
 - 不放宽 submit/self_advance/accept/finalize；NO_PROMOTE；不宣称 F4 PASS。
+
+
+## F4 R7 follow-up（wake consumed 但 dispatch_readiness_not_ready）
+
+- 现象：tip `ead9aa6` S2 PASS（UI confirm → `plan_confirmed_auto_advance`，wakeRecorded/Consumed=true），S3 FAIL：`dispatched:false reason=dispatch_readiness_not_ready`，`targetAgentIds=["bot"]`；group 已在 selfAdvance execute allowlist。
+- 根因：`consumeWakeForRoundDispatch` 把「注册表」当成 `agent-runtime-store.listAgents({tenantId})`（只有企业 `rt-001` 等），**不是**文档/注释所说的 gateway `agents.list`。实网 claimant `bot` 在 OS（`bot:bot` active）与 `openbot.json` agents.list 均存在，却因 runtime-store 无 `bot` 被标 `not_registered`。
+- 修复：wake 写路径 readiness 改为 `listAgentsForGateway(cfg).agents` ∩ OS active bot（保留 `bot:`/`agent:` 针归一）；gap detail 区分 `os_bot_inactive_or_missing` / `not_in_gateway_agents_list`；consume reason/wake-op detail 带上 gap。不放宽 submit/self_advance/accept/finalize；不引入平行派工机制；NO_PROMOTE；不宣称 F4 PASS 直至现场重跑。

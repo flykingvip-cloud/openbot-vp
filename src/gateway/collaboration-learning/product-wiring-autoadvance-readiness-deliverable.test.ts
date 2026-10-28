@@ -14,7 +14,6 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
-import { upsertAgent, type RuntimeAgent } from "../agent-runtime-store.js";
 import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
 import * as executorTodolist from "../collaboration-dispatch/executor-private-todolist.js";
 import { createRoundPolicySnapshot } from "../collaboration-dispatch/round-policy-snapshot.js";
@@ -91,10 +90,15 @@ function baseCfg(
     wakeContract?: boolean;
     wakeContractGroupAllowlist?: string[];
     profile?: "personal_local" | "managed_enterprise";
+    /** Gateway agents.list ids (wake readiness registry). */
+    agentsList?: Array<{ id: string; name?: string }>;
   },
 ): OpenBotConfig {
   return {
-    agents: { defaults: { workspace: path.join(root, "agent-ws") } },
+    agents: {
+      defaults: { workspace: path.join(root, "agent-ws") },
+      list: over?.agentsList ?? [],
+    },
     gateway: { security: { profile: over?.profile ?? "personal_local" } },
     collaboration: {
       defaults: { workspace: path.join(root, "collaboration") },
@@ -124,22 +128,6 @@ async function useRoot(over?: Parameters<typeof baseCfg>[1]) {
   setRuntimeConfigSnapshot(cfg, cfg);
   clearConfigCache();
   return { root, cfg };
-}
-
-function agentStub(id: string, tenantId: string): RuntimeAgent {
-  return {
-    runtimeAgentId: id,
-    name: id,
-    runtimeVersion: "1",
-    lifecycle: "deployed",
-    health: "healthy",
-    tenantCoverage: [tenantId],
-    boundCapabilityCount: 0,
-    activeSessionCount: 0,
-    resourceUsage: { cpuPercent: 0, memoryPercent: 0, tokenBudgetUsedPercent: 0 },
-    deployedAt: 1,
-    lastActiveAt: 1,
-  };
 }
 
 function seedAuthority(cfg: OpenBotConfig, groupId: string, tenantId: string | null) {
@@ -599,8 +587,8 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
   });
 });
 
-describe("R1 readiness — tenant registry ∩ active OS bot", () => {
-  it("global agent not in tenant coverage → dispatcher calls = 0", async () => {
+describe("R1 readiness — gateway agents.list ∩ active OS bot", () => {
+  it("OS-active bot missing from gateway agents.list → dispatcher calls = 0", async () => {
     const tenantId = "tenant-r1-a";
     const groupId = "grp_ready";
     const { cfg } = await useRoot({
@@ -608,8 +596,9 @@ describe("R1 readiness — tenant registry ∩ active OS bot", () => {
       selfAdvanceExecuteAllowlist: ["*"],
       wakeContract: true,
       profile: "managed_enterprise",
+      // Intentionally omit bot-global-only from agents.list
+      agentsList: [{ id: "other-bot", name: "other" }],
     });
-    upsertAgent(agentStub("bot-global-only", "other-tenant"));
 
     const groupLocator = resolveTrustedGroupLocator({
       groupId,
@@ -660,11 +649,12 @@ describe("R1 readiness — tenant registry ∩ active OS bot", () => {
         source: "nudge",
         taskId: "task_ready",
         itemId: "i1",
-        reason: "test:global_not_in_tenant",
+        reason: "test:not_in_gateway_agents_list",
       },
     });
     expect(result.dispatched).toBe(false);
-    expect(result.reason).toBe("dispatch_readiness_not_ready");
+    expect(String(result.reason).startsWith("dispatch_readiness_not_ready")).toBe(true);
+    expect(String(result.reason)).toContain("not_in_gateway_agents_list");
     expect(calls).toHaveLength(0);
   });
 
@@ -677,8 +667,8 @@ describe("R1 readiness — tenant registry ∩ active OS bot", () => {
       selfAdvanceExecuteAllowlist: ["*"],
       wakeContract: true,
       profile: "managed_enterprise",
+      agentsList: [{ id: "bot-ready", name: "ready" }],
     });
-    upsertAgent(agentStub("bot-ready", tenantId));
 
     const groupLocator = resolveTrustedGroupLocator({
       groupId,
@@ -770,9 +760,9 @@ describe("R2 readiness failure releases unconsumed claim", () => {
       wakeContract: true,
       wakeContractGroupAllowlist: [`${tenantId}/${groupId}`],
       profile: "managed_enterprise",
+      // First attempt: bot absent from gateway agents.list → readiness fails after eligibility commit.
+      agentsList: [{ id: "unrelated-bot", name: "x" }],
     });
-    // First attempt: bot not in tenant registry → readiness fails after eligibility commit.
-    upsertAgent(agentStub("bot-r2", "other-tenant"));
 
     const groupLocator = resolveTrustedGroupLocator({
       groupId,
@@ -835,7 +825,8 @@ describe("R2 readiness failure releases unconsumed claim", () => {
       },
     });
     expect(first.dispatched).toBe(false);
-    expect(first.reason).toBe("dispatch_readiness_not_ready");
+    expect(String(first.reason).startsWith("dispatch_readiness_not_ready")).toBe(true);
+    expect(String(first.reason)).toContain("not_in_gateway_agents_list");
     expect(calls).toHaveLength(0);
 
     const afterFail = asGovernedTask(
@@ -849,11 +840,23 @@ describe("R2 readiness failure releases unconsumed claim", () => {
     // Even if directory exists from factory, no task claim object for this group should appear
     // as the authoritative write — assert trusted task has no claim and second op works.
 
-    // Fix: register bot in tenant, then different op succeeds.
-    upsertAgent(agentStub("bot-r2", tenantId));
+    // Fix: put bot on gateway agents.list, then different op succeeds.
+    const fixedCfg = {
+      ...cfg,
+      agents: {
+        ...cfg.agents,
+        list: [{ id: "bot-r2", name: "r2" }],
+      },
+    } as typeof cfg;
+    const configPath = process.env.OPENBOT_CONFIG_PATH;
+    if (configPath) {
+      await fs.writeFile(configPath, `${JSON.stringify(fixedCfg, null, 2)}\n`, "utf8");
+    }
+    setRuntimeConfigSnapshot(fixedCfg, fixedCfg);
+    clearConfigCache();
     const second = await consumeWakeForRoundDispatch({
       authority,
-      cfg,
+      cfg: fixedCfg,
       roundDispatcher: async (req) => {
         calls.push({ reason: req.reason });
         return { ok: true, roundId: "r2-ok", detail: "dispatched" };
