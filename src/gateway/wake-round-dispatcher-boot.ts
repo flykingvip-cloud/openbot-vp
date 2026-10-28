@@ -13,6 +13,9 @@
  * Managed background auth uses service_execution only after active ownership SoT.
  * Space lookup is tenantId+groupId; lead bot has no bots[0] fallback.
  * R5: request/bag/binding scope must align; attempt must still be current wake-op attempt.
+ * R6: production wake receipt requires agent, injected op/attempt, and request plan
+ * binding (missing ≠ skip). runId must exactly match runIdFromWakeOpAttempt of
+ * the injected claim, before the model and again before formal write.
  */
 import { getReplyFromConfig } from "../auto-reply/reply.js";
 import type { ReplyPayload } from "../auto-reply/types.js";
@@ -39,6 +42,8 @@ import { finalizeMemberRunTeamDeliverable } from "./collaboration-learning/chat-
 import {
   executionBindingScopeMismatch,
   normalizeExecutionDeliverableBinding,
+  productionWakeDeliverableContractFailure,
+  type ExecutionDeliverableBinding,
 } from "./collaboration-learning/execution-deliverable-binding.js";
 import { resolveCollaborationGroupTenantId } from "./collaboration-learning/shared.js";
 import { listGatewayCollaborationSpaces } from "./collaboration-learning/space-store.js";
@@ -64,6 +69,49 @@ function replyTextFromResult(
     .map((entry) => (typeof entry?.text === "string" ? entry.text.trim() : ""))
     .filter(Boolean);
   return parts.length > 0 ? parts.join("\n\n") : undefined;
+}
+
+/**
+ * Scope failure for a normalized binding.
+ * wake_dispatch uses the strict production contract (no empty-side skip,
+ * runId recomputed from the injected claim). Other sources keep the loose compare.
+ */
+function deliverableBindingScopeFailure(params: {
+  binding: ExecutionDeliverableBinding;
+  request: WakeRoundDispatchRequest;
+  tenantId: string | null;
+  groupId: string;
+  agentId: string;
+  requireTenant: boolean;
+}): string | null {
+  const { binding, request } = params;
+  if (binding.source === "wake_dispatch") {
+    return productionWakeDeliverableContractFailure({
+      binding,
+      requireTenant: params.requireTenant,
+      tenantId: params.tenantId,
+      groupId: params.groupId,
+      taskId: request.taskId,
+      boardItemId: request.itemId,
+      agentId: params.agentId,
+      opKey: compact(request.wakeOpKey) || compact(request.opKey),
+      attemptId: request.wakeExecutionAttemptId,
+      planConfirmBinding: request.planConfirmBinding ?? null,
+    });
+  }
+  return executionBindingScopeMismatch({
+    binding,
+    tenantId: params.tenantId,
+    groupId: params.groupId,
+    taskId: request.taskId,
+    boardItemId: request.itemId,
+    todolistId: request.planConfirmBinding?.todolistId,
+    planVersion: request.planConfirmBinding?.confirmedVersion,
+    stepId: request.planConfirmBinding?.stepId,
+    agentId: params.agentId,
+    attemptId: request.wakeExecutionAttemptId,
+    opKey: request.wakeOpKey ?? request.opKey,
+  });
 }
 
 function buildWakeMessage(params: { request: WakeRoundDispatchRequest; leadName: string }): string {
@@ -94,6 +142,7 @@ export async function resolveModeBWakeRoundContext(
   }
 
   const profile = resolveSecurityProfile(cfg).profile;
+  const requireManagedTenant = profile === "managed_enterprise";
   const requestTenantId = compact(request.tenantId);
   // Managed background wake must carry a durable tenant; never guess from groupId alone.
   if (profile === "managed_enterprise" && !requestTenantId) {
@@ -187,18 +236,14 @@ export async function resolveModeBWakeRoundContext(
     return null;
   }
   if (bindingAtResolve) {
-    const scopeFail = executionBindingScopeMismatch({
+    // Before Mode B adopts binding.runId as roundId, and before the model.
+    const scopeFail = deliverableBindingScopeFailure({
       binding: bindingAtResolve,
+      request,
       tenantId,
       groupId,
-      taskId: request.taskId,
-      boardItemId: request.itemId,
-      todolistId: request.planConfirmBinding?.todolistId,
-      planVersion: request.planConfirmBinding?.confirmedVersion,
-      stepId: request.planConfirmBinding?.stepId,
       agentId: leadBot.agentId,
-      attemptId: request.wakeExecutionAttemptId,
-      opKey: request.wakeOpKey ?? request.opKey,
+      requireTenant: requireManagedTenant,
     });
     if (scopeFail) {
       return null;
@@ -238,6 +283,32 @@ export async function resolveModeBWakeRoundContext(
     message,
     runBot: async ({ bot }) => {
       try {
+        // Receipt gate before the model. A bad wake binding must not enter
+        // getReplyFromConfig, and Mode B must not keep a forged runId.
+        if (request.executionDeliverableBinding) {
+          const bindingGate = normalizeExecutionDeliverableBinding(
+            request.executionDeliverableBinding,
+          );
+          if (!bindingGate) {
+            return {
+              text: "团队成果未完成（execution_binding_required）。",
+            };
+          }
+          const gateFail = deliverableBindingScopeFailure({
+            binding: bindingGate,
+            request,
+            tenantId,
+            groupId,
+            agentId: bot.agentId,
+            requireTenant: requireManagedTenant,
+          });
+          if (gateFail) {
+            return {
+              text: `团队成果未完成（execution_binding_scope:${gateFail}）。`,
+            };
+          }
+        }
+
         const result = await getReplyFromConfig(
           {
             Body: message,
@@ -263,18 +334,13 @@ export async function resolveModeBWakeRoundContext(
               text: `${text.trim()}\n\n团队成果未完成（execution_binding_required）。`,
             };
           }
-          const preScope = executionBindingScopeMismatch({
+          const preScope = deliverableBindingScopeFailure({
             binding,
+            request,
             tenantId,
             groupId,
-            taskId: request.taskId,
-            boardItemId: request.itemId,
-            todolistId: request.planConfirmBinding?.todolistId,
-            planVersion: request.planConfirmBinding?.confirmedVersion,
-            stepId: request.planConfirmBinding?.stepId,
             agentId: bot.agentId,
-            attemptId: request.wakeExecutionAttemptId,
-            opKey: request.wakeOpKey ?? request.opKey,
+            requireTenant: requireManagedTenant,
           });
           if (preScope) {
             return {

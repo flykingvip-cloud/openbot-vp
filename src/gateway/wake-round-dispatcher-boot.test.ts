@@ -291,6 +291,76 @@ describe("R4/R5 managed boot composition root — ACL on, production runBot", ()
     });
   }
 
+  async function arrangeR6(cfg: OpenBotConfig, tag: string) {
+    const groupId = `grp_r6_${tag}`;
+    const tenantId = "tenant-a";
+    const agentId = "bot-exec";
+    const taskId = `task_${tag}`;
+    const boardItemId = `board_${tag}`;
+    const opKey = `op_${tag}`;
+    const attemptId = `attempt_${tag}`;
+    const seeded = await seedTenantGroup({ cfg, tenantId, groupId, agentId, taskId });
+    seedActiveOwnership({ tenantId, groupId });
+    listGatewayCollaborationSpaces.mockResolvedValue({
+      spaces: [spaceSnapshot({ groupId, tenantId, bots: [{ agentId }] })],
+    });
+    readWakeOpRecord.mockResolvedValue({
+      opKey,
+      executionAttemptId: attemptId,
+      status: "running",
+    });
+    const binding = wakeBinding({
+      tenantId,
+      groupId,
+      taskId,
+      boardItemId,
+      opKey,
+      attemptId,
+      agentId,
+    });
+    if (!binding) {
+      throw new Error("expected complete wake binding");
+    }
+    const request = {
+      groupId,
+      tenantId,
+      fromAgentId: "human:owner",
+      toAgentIds: [agentId],
+      source: "nudge" as const,
+      taskId,
+      itemId: boardItemId,
+      reason: tag,
+      wakeOpKey: opKey,
+      wakeExecutionAttemptId: attemptId,
+      opKey,
+      planConfirmBinding: {
+        todolistId: "todo-boot",
+        confirmedVersion: 3,
+        stepId: "step-1",
+      },
+      executionDeliverableBinding: binding,
+    };
+    return {
+      ...seeded,
+      groupId,
+      tenantId,
+      agentId,
+      taskId,
+      boardItemId,
+      opKey,
+      attemptId,
+      binding,
+      request,
+    };
+  }
+
+  async function expectNoDeliverableFiles(groupLocator: string) {
+    const listing = await fs
+      .readdir(path.join(groupLocator, "deliverables"))
+      .catch(() => [] as string[]);
+    expect(listing).toEqual([]);
+  }
+
   it("legal service principal writes deliverable via production boot runBot (ACL on)", async () => {
     const { cfg } = await useManagedRoot();
     const groupId = "grp_shared_boot";
@@ -956,5 +1026,131 @@ describe("R4/R5 managed boot composition root — ACL on, production runBot", ()
       cfg,
     );
     expect(context).toBeNull();
+  });
+
+  it("R6 complete wake binding resolves and enters the model with derived runId", async () => {
+    const { cfg } = await useManagedRoot();
+    const arranged = await arrangeR6(cfg, "ok");
+    getReplyFromConfig.mockResolvedValue({ text: "继续推进，无成果信封。" });
+    const preview = await resolveModeBWakeRoundContext(arranged.request, cfg);
+    expect(preview).toBeTruthy();
+    const dispatcher = createModeBWakeRoundDispatcher(async (request) =>
+      resolveModeBWakeRoundContext(request, cfg),
+    );
+    const result = await dispatcher(arranged.request);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+    expect(result.ok && result.roundId).toBe(arranged.binding.runId);
+    expect(arranged.binding.runId).toBe(
+      runIdFromWakeOpAttempt({ opKey: arranged.opKey, attemptId: arranged.attemptId }),
+    );
+    expect(getReplyFromConfig).toHaveBeenCalled();
+  });
+
+  it("R6 missing agent, plan, durable attempt, or managed tenant refuses before model", async () => {
+    const { cfg } = await useManagedRoot();
+    const arranged = await arrangeR6(cfg, "miss");
+    const cases = [
+      {
+        ...arranged.request,
+        executionDeliverableBinding: { ...arranged.binding, agentId: null },
+      },
+      {
+        ...arranged.request,
+        planConfirmBinding: undefined,
+      },
+      {
+        ...arranged.request,
+        wakeExecutionAttemptId: undefined,
+      },
+      {
+        ...arranged.request,
+        wakeOpKey: undefined,
+        opKey: undefined,
+      },
+      {
+        ...arranged.request,
+        executionDeliverableBinding: { ...arranged.binding, tenantId: null },
+      },
+    ];
+    for (const request of cases) {
+      getReplyFromConfig.mockClear();
+      const context = await resolveModeBWakeRoundContext(request, cfg);
+      expect(context).toBeNull();
+      const dispatcher = createModeBWakeRoundDispatcher(async (incoming) =>
+        resolveModeBWakeRoundContext(incoming, cfg),
+      );
+      const result = await dispatcher(request);
+      expect(result.ok).toBe(false);
+      expect(getReplyFromConfig).not.toHaveBeenCalled();
+    }
+    await expectNoDeliverableFiles(arranged.groupLocator);
+  });
+
+  it("R6 arbitrary, old-attempt, and case-variant runId refuse before model and before write", async () => {
+    const { cfg } = await useManagedRoot();
+    const arranged = await arrangeR6(cfg, "runid");
+    const oldRunId = runIdFromWakeOpAttempt({
+      opKey: arranged.opKey,
+      attemptId: `${arranged.attemptId}_old`,
+    });
+    const variants = [
+      "arbitrary-run-id",
+      oldRunId,
+      arranged.binding.runId.replace("wake_run:", "WAKE_RUN:"),
+    ];
+    for (const runId of variants) {
+      getReplyFromConfig.mockClear();
+      const request = {
+        ...arranged.request,
+        executionDeliverableBinding: { ...arranged.binding, runId },
+      };
+      const context = await resolveModeBWakeRoundContext(request, cfg);
+      expect(context, runId).toBeNull();
+      const dispatcher = createModeBWakeRoundDispatcher(async (incoming) =>
+        resolveModeBWakeRoundContext(incoming, cfg),
+      );
+      const result = await dispatcher(request);
+      expect(result.ok, runId).toBe(false);
+      expect(getReplyFromConfig, runId).not.toHaveBeenCalled();
+    }
+
+    // Inner gate: context was valid, then runId is forged before runBot.
+    const preview = await resolveModeBWakeRoundContext(arranged.request, cfg);
+    expect(preview).toBeTruthy();
+    for (const runId of variants) {
+      arranged.request.executionDeliverableBinding = { ...arranged.binding, runId };
+      getReplyFromConfig.mockClear();
+      const out = await preview!.runBot({
+        bot: preview!.leadBot,
+        role: "primary",
+        dispatchId: `d-${runId}`,
+        isWrapTurn: false,
+      });
+      expect(getReplyFromConfig, runId).not.toHaveBeenCalled();
+      expect(out?.text ?? "").not.toContain("DELIVERABLE");
+      expect(out?.text ?? "").toContain("run_mismatch");
+    }
+
+    // Write gate: model already ran, then runId is forged before formal submit.
+    arranged.request.executionDeliverableBinding = arranged.binding;
+    getReplyFromConfig.mockImplementation(async () => {
+      arranged.request.executionDeliverableBinding = {
+        ...arranged.binding,
+        runId: "forged-after-model",
+      };
+      return {
+        text: '<<DELIVERABLE title="Forged" file="forged.md">>\nforged-body\n<</DELIVERABLE>>',
+      };
+    });
+    const written = await preview!.runBot({
+      bot: preview!.leadBot,
+      role: "primary",
+      dispatchId: "d-after-model",
+      isWrapTurn: false,
+    });
+    expect(getReplyFromConfig).toHaveBeenCalled();
+    expect(written?.text ?? "").toContain("run_mismatch");
+    expect(written?.text ?? "").not.toContain("团队成果已提交");
+    await expectNoDeliverableFiles(arranged.groupLocator);
   });
 });

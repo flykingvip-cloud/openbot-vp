@@ -218,6 +218,18 @@ export async function finalizeMemberRunTeamDeliverable(params: {
 
   const bindingAgent = compact(binding.agentId);
   const actorId = compact(params.agentId);
+  // wake_dispatch must not skip the agent compare when either side is empty.
+  if (binding.source === "wake_dispatch" && (!bindingAgent || !actorId)) {
+    const outcome = {
+      ok: false as const,
+      reason: "execution_binding_agent_required",
+      detail: "wake_dispatch requires executing agent on binding and final",
+    };
+    return {
+      text: `${params.text.trim()}\n\n${formatTeamDeliverableUserMessage(outcome)}`,
+      outcome,
+    };
+  }
   if (bindingAgent && actorId && bindingAgent.toLowerCase() !== actorId.toLowerCase()) {
     const outcome = {
       ok: false as const,

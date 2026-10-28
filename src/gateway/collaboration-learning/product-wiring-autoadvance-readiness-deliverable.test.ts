@@ -36,6 +36,9 @@ import {
 import * as claimEntry from "./claim-contract-entry.js";
 import {
   buildExecutionDeliverableBinding,
+  executionBindingScopeMismatch,
+  normalizeExecutionDeliverableBinding,
+  productionWakeDeliverableContractFailure,
   runIdFromWakeOpAttempt,
   type ExecutionDeliverableBinding,
 } from "./execution-deliverable-binding.js";
@@ -1522,9 +1525,7 @@ describe("R4 note — managed boot composition root lives in wake-round-dispatch
 });
 
 describe("R5 durable attempt + request/binding scope", () => {
-  it("normalize wake_dispatch without opKey/stepId refuses", async () => {
-    const { normalizeExecutionDeliverableBinding } =
-      await import("./execution-deliverable-binding.js");
+  it("normalize wake_dispatch without opKey/stepId/agentId refuses", async () => {
     expect(
       normalizeExecutionDeliverableBinding({
         groupId: "g",
@@ -1550,7 +1551,22 @@ describe("R5 durable attempt + request/binding scope", () => {
         opKey: "op1",
         source: "wake_dispatch",
       }),
-    ).toMatchObject({ opKey: "op1", stepId: "s1", attemptId: "a1" });
+    ).toBeNull();
+    expect(
+      normalizeExecutionDeliverableBinding({
+        groupId: "g",
+        taskId: "t",
+        boardItemId: "b",
+        todolistId: "td",
+        planVersion: 1,
+        stepId: "s1",
+        runId: "run",
+        attemptId: "a1",
+        opKey: "op1",
+        agentId: "bot",
+        source: "wake_dispatch",
+      }),
+    ).toMatchObject({ opKey: "op1", stepId: "s1", attemptId: "a1", agentId: "bot" });
   });
 
   it("same-op retry binding uses new attempt; old runId differs", () => {
@@ -1644,6 +1660,158 @@ describe("R5 durable attempt + request/binding scope", () => {
     expect(out.outcome.ok).toBe(false);
     if (!out.outcome.ok) {
       expect(out.outcome.reason).toBe("execution_binding_agent_mismatch");
+    }
+  });
+
+  function fullWakeContractBinding(runId: string) {
+    return buildExecutionDeliverableBinding({
+      tenantId: "tenant-a",
+      groupId: "g",
+      taskId: "t",
+      boardItemId: "b",
+      todolistId: "td",
+      planVersion: 1,
+      stepId: "s1",
+      runId,
+      attemptId: "a1",
+      opKey: "op1",
+      agentId: "bot",
+      source: "wake_dispatch",
+    });
+  }
+
+  function fullWakeContractArgs(binding: NonNullable<ReturnType<typeof fullWakeContractBinding>>) {
+    return {
+      binding,
+      requireTenant: true as const,
+      tenantId: "tenant-a",
+      groupId: "g",
+      taskId: "t",
+      boardItemId: "b",
+      agentId: "bot",
+      opKey: "op1",
+      attemptId: "a1",
+      planConfirmBinding: {
+        todolistId: "td",
+        confirmedVersion: 1,
+        stepId: "s1",
+      },
+    };
+  }
+
+  it("production wake contract rejects missing agent, plan, op/attempt; complete binding passes", () => {
+    const runId = runIdFromWakeOpAttempt({ opKey: "op1", attemptId: "a1" });
+    const binding = fullWakeContractBinding(runId);
+    expect(binding).toBeTruthy();
+    if (!binding) {
+      return;
+    }
+    const okArgs = fullWakeContractArgs(binding);
+    expect(productionWakeDeliverableContractFailure(okArgs)).toBeNull();
+
+    // Loose compare still skips empty request sides — production contract must not.
+    expect(
+      executionBindingScopeMismatch({
+        binding,
+        groupId: "g",
+        taskId: "t",
+        boardItemId: "b",
+        agentId: "bot",
+      }),
+    ).toBeNull();
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        planConfirmBinding: null,
+      }),
+    ).toBe("plan_binding_required");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        attemptId: null,
+      }),
+    ).toBe("attempt_required");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        opKey: " ",
+      }),
+    ).toBe("op_required");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        agentId: "",
+      }),
+    ).toBe("agent_required");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        binding: { ...binding, tenantId: null },
+      }),
+    ).toBe("tenant_required");
+    expect(
+      normalizeExecutionDeliverableBinding({
+        ...binding,
+        agentId: null,
+      }),
+    ).toBeNull();
+  });
+
+  it("production wake contract rejects arbitrary, old-attempt, and case-variant runId", () => {
+    const opKey = "op1";
+    const attemptId = "a1";
+    const oldAttempt = "a0";
+    const exact = runIdFromWakeOpAttempt({ opKey, attemptId });
+    const binding = fullWakeContractBinding(exact);
+    expect(binding).toBeTruthy();
+    if (!binding) {
+      return;
+    }
+    const okArgs = fullWakeContractArgs(binding);
+    expect(productionWakeDeliverableContractFailure(okArgs)).toBeNull();
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        binding: { ...binding, runId: "not-a-derived-run" },
+      }),
+    ).toBe("run_mismatch");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        binding: {
+          ...binding,
+          runId: runIdFromWakeOpAttempt({ opKey, attemptId: oldAttempt }),
+        },
+      }),
+    ).toBe("run_mismatch");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        binding: { ...binding, runId: exact.replace("wake_run:", "WAKE_RUN:") },
+      }),
+    ).toBe("run_mismatch");
+    expect(
+      productionWakeDeliverableContractFailure({
+        ...okArgs,
+        binding: {
+          ...binding,
+          runId: runIdFromWakeOpAttempt({ opKey: opKey.toUpperCase(), attemptId }),
+        },
+      }),
+    ).toBe("run_mismatch");
+  });
+
+  it("wake_dispatch final refuses empty executing agent before submit", async () => {
+    const runId = runIdFromWakeOpAttempt({ opKey: "op1", attemptId: "a1" });
+    const binding = fullWakeContractBinding(runId);
+    const out = await finalizeMemberRunTeamDeliverable({
+      text: '<<DELIVERABLE title="A" file="notes/a.md">>\nbody\n<</DELIVERABLE>>',
+      agentId: "   ",
+      binding,
+    });
+    expect(out.outcome.ok).toBe(false);
+    if (!out.outcome.ok) {
+      expect(out.outcome.reason).toBe("execution_binding_agent_required");
     }
   });
 });
