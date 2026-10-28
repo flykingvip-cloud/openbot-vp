@@ -10037,6 +10037,10 @@ landingStreams:
       - src/gateway/collaboration-learning/chat-plan-confirm.test.ts
       - src/gateway/collaboration-learning/chat-plan-confirm-hook.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.test.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.test.ts
       - src/gateway/collaboration-learning/member-dispatch-readiness.ts
       - src/gateway/collaboration-learning/member-dispatch-readiness.test.ts
       - src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts

@@ -19,6 +19,10 @@ import path from "node:path";
 import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
+  actorMatchesAuthorizedConfirmer,
+  deliveryActorIdsEqual,
+} from "../collaboration-learning/delivery-actor-binding.js";
+import {
   boardItemGoal,
   isCollabTaskClaimContractEnabled,
   loadBoardClaimItem,
@@ -82,6 +86,11 @@ export type TodolistOptions = {
   authorizedConfirmerIds?: readonly string[];
   /** Optional coordinator bot that may confirm/revise / read. */
   coordinatorBotId?: string | null;
+  /**
+   * Handshake-stamped session subjects (platformUserId / user email / membership).
+   * Used only to treat Owner email as the same person as authorized `human:<uuid>`.
+   */
+  sessionActorSubjects?: readonly string[];
 };
 
 type TodolistLogLine = {
@@ -495,15 +504,31 @@ function isAuthorizedConfirmer(
   const owner = compact(ownerMemberId);
   const coordinator = compact(options?.coordinatorBotId ?? undefined);
   const list = (options?.authorizedConfirmerIds ?? []).map((id) => compact(id)).filter(Boolean);
+  const sessionSubjects = options?.sessionActorSubjects;
+  const matchesLead = (): boolean =>
+    actorMatchesAuthorizedConfirmer({
+      actor,
+      authorizedConfirmerIds: list,
+      sessionSubjects,
+    });
+  const matchesCoordinator = (): boolean =>
+    Boolean(coordinator) &&
+    actorMatchesAuthorizedConfirmer({
+      actor,
+      authorizedConfirmerIds: [coordinator],
+      sessionSubjects,
+    });
   // Owner may confirm only when explicitly listed as lead/coordinator (rare).
-  if (actor === owner) {
-    return list.includes(actor) || (coordinator !== "" && coordinator === actor);
+  // Compare with human:/bot: equivalence but do not use session email aliases to
+  // treat a different principal as the todolist owner.
+  if (deliveryActorIdsEqual(actor, owner)) {
+    return matchesLead() || matchesCoordinator();
   }
-  if (coordinator && actor === coordinator) {
+  if (matchesCoordinator()) {
     return true;
   }
   if (list.length > 0) {
-    return list.includes(actor);
+    return matchesLead();
   }
   // Empty trusted list must not promote an arbitrary non-owner into 主答.
   return false;

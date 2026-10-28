@@ -1810,6 +1810,11 @@ export async function confirmCollaborationTodolist(params: {
   /** Card plan version. See confirmTodolist. Does not widen who may confirm. */
   expectedVersion?: number;
   actor?: string;
+  /**
+   * Handshake-stamped session subjects from the RPC client. Lets Owner email
+   * match authorized `human:<uuid>` when they are the same authenticated person.
+   */
+  sessionActorSubjects?: readonly string[];
   /** Ignored. Confirmers are resolved from board publishedBy + operating state. */
   authorizedConfirmerIds?: string[];
   /** Ignored. Coordinator comes from operating-state governance, not the request. */
@@ -1862,7 +1867,13 @@ export async function confirmCollaborationTodolist(params: {
         confirmerId,
         expectedVersion: params.expectedVersion,
       },
-      { cfg, ...acl },
+      {
+        cfg,
+        ...acl,
+        ...(params.sessionActorSubjects && params.sessionActorSubjects.length > 0
+          ? { sessionActorSubjects: params.sessionActorSubjects }
+          : {}),
+      },
     ),
     "confirmTodolist",
   );
@@ -1889,6 +1900,8 @@ export async function reviseCollaborationTodolist(params: {
   /** Card plan version. See reviseTodolist. Does not widen who may revise. */
   expectedVersion?: number;
   actor?: string;
+  /** Same-person session subjects; see confirmCollaborationTodolist. */
+  sessionActorSubjects?: readonly string[];
   steps?: Array<{ title: string; detail?: string; stepId?: string }>;
   /** Ignored. See confirmCollaborationTodolist. */
   authorizedConfirmerIds?: string[];
@@ -1942,7 +1955,13 @@ export async function reviseCollaborationTodolist(params: {
         steps: params.steps,
         expectedVersion: params.expectedVersion,
       },
-      { cfg, ...acl },
+      {
+        cfg,
+        ...acl,
+        ...(params.sessionActorSubjects && params.sessionActorSubjects.length > 0
+          ? { sessionActorSubjects: params.sessionActorSubjects }
+          : {}),
+      },
     ),
     "reviseTodolist",
   );

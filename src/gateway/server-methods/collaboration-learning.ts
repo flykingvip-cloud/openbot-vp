@@ -59,7 +59,10 @@ import {
   transitionGroupMemoryCapsule,
 } from "../collaboration-learning/capsule-governance.js";
 import { promoteApprovedCapsuleIfEligible } from "../collaboration-learning/capsule-promotion.js";
-import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  authenticatedSessionSubjects,
+  resolveDeliveryAclActor,
+} from "../collaboration-learning/delivery-actor-binding.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
@@ -865,6 +868,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         todolistId: params.todolistId,
         expectedVersion: params.expectedVersion,
         actor: ctx.actor,
+        sessionActorSubjects: authenticatedSessionSubjects(client),
         tenant: ctx.tenant,
         auth: ctx.auth,
         stores: ctx.stores,
@@ -904,6 +908,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         steps: params.steps,
         expectedVersion: params.expectedVersion,
         actor: ctx.actor,
+        sessionActorSubjects: authenticatedSessionSubjects(client),
         tenant: ctx.tenant,
         auth: ctx.auth,
         stores: ctx.stores,
