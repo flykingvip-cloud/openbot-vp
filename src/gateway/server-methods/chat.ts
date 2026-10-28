@@ -271,6 +271,7 @@ import {
 } from "../collaboration-learning.js";
 import { finalizeMemberRunTeamDeliverable } from "../collaboration-learning/chat-deliverable-team-submit.js";
 import { maybeConfirmPlanFromChatSend } from "../collaboration-learning/chat-plan-confirm-hook.js";
+import { parseChatPlanConfirmIntent } from "../collaboration-learning/chat-plan-confirm.js";
 import {
   isGroupPublicTranscriptSessionFile,
   resolveGroupPublicTranscriptPath,
@@ -291,6 +292,7 @@ import { resolveCollaborationGroupOwnerEntitlementScope } from "../collaboration
 import {
   authorizeTeamGroupResourceAccess,
   createTrustedGroupStores,
+  resolveCompositionTrustedTeamContext,
 } from "../collaboration-learning/team-resource-auth.js";
 import {
   labelCollaborationIoTenant,
@@ -4828,50 +4830,62 @@ export const chatHandlers: GatewayRequestHandlers = {
         const explicitTodolist = readBound(p.planConfirmTodolistId);
         const explicitDecision = readBound(p.planConfirmDecisionId);
         const explicitVersion = readBoundNum(p.planConfirmExpectedVersion);
-        let confirmAuth: Awaited<ReturnType<typeof authorizeTeamGroupResourceAccess>> | null = null;
-        let confirmStores: ReturnType<typeof createTrustedGroupStores> | null = null;
-        if (confirmActor) {
-          confirmAuth = await authorizeTeamGroupResourceAccess({
-            groupId: scope.groupId,
-            actor: confirmActor,
-            client,
-            tenant,
-            action: "write",
-            cfg: policySnapshotCfg,
-          });
-          if (confirmAuth.ok) {
-            confirmStores = createTrustedGroupStores({
-              groupsRoot: confirmAuth.groupsRoot,
-              groupLocator: confirmAuth.groupLocator,
-            });
-          }
-        }
+        const confirmIntent = parseChatPlanConfirmIntent(mentionMessage);
+        const composed =
+          confirmIntent.kind === "not_confirm"
+            ? null
+            : await resolveCompositionTrustedTeamContext({
+                groupId: scope.groupId,
+                actor: confirmActor || "",
+                client,
+                tenant,
+                action: "write",
+                cfg: policySnapshotCfg,
+                stampedEnterpriseId: client?.sessionEnterpriseId,
+                identityAliases: [client?.user, client?.platformUserId, client?.sessionMembershipId]
+                  .map((value) => (typeof value === "string" ? value.trim() : ""))
+                  .filter(Boolean),
+              });
         let confirmHook: Awaited<ReturnType<typeof maybeConfirmPlanFromChatSend>>;
         try {
-          confirmHook = await maybeConfirmPlanFromChatSend({
-            groupId: scope.groupId,
-            message: mentionMessage,
-            actor: confirmActor,
-            // Prefer explicit card/reply binding; group currentTaskId alone is unreliable.
-            taskId: explicitTaskId || wakeTaskId,
-            boardItemId: explicitBoard,
-            todolistId: explicitTodolist,
-            decisionId: explicitDecision,
-            expectedVersion: explicitVersion,
-            taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
-            tenant,
-            cfg: policySnapshotCfg,
-            ...(confirmAuth && confirmAuth.ok
-              ? {
-                  auth: confirmAuth,
-                  stores: confirmStores,
-                  trusted: {
-                    groupsRoot: confirmAuth.groupsRoot,
-                    groupLocator: confirmAuth.groupLocator,
-                  },
-                }
-              : {}),
-          });
+          if (composed && !composed.ok) {
+            // Do not call list/confirm without a trusted locator. The previous
+            // fallthrough masked ACL failures as trusted_group_locator_required.
+            confirmHook = {
+              handled: true,
+              result: {
+                status: "blocked",
+                confirmed: false,
+                reason: composed.reason,
+                detail: composed.detail,
+              },
+              userMessage: `尚未确认：${composed.reason}${composed.detail ? `（${composed.detail}）` : ""}。`,
+              blockDependentExecution: true,
+              autoAdvanceWired: false,
+            };
+          } else {
+            confirmHook = await maybeConfirmPlanFromChatSend({
+              groupId: scope.groupId,
+              message: mentionMessage,
+              actor: confirmActor,
+              // Prefer explicit card/reply binding; group currentTaskId alone is unreliable.
+              taskId: explicitTaskId || wakeTaskId,
+              boardItemId: explicitBoard,
+              todolistId: explicitTodolist,
+              decisionId: explicitDecision,
+              expectedVersion: explicitVersion,
+              taskIdFromGroupCurrent: !explicitTaskId && Boolean(wakeTaskId),
+              tenant: composed?.ok ? composed.tenant : tenant,
+              cfg: policySnapshotCfg,
+              ...(composed?.ok
+                ? {
+                    auth: composed.auth,
+                    stores: composed.stores,
+                    trusted: composed.trusted,
+                  }
+                : {}),
+            });
+          }
         } catch (confirmError) {
           const errMsg = `尚未确认：确认入口异常（${
             confirmError instanceof Error ? confirmError.message : String(confirmError)
@@ -4947,10 +4961,10 @@ export const chatHandlers: GatewayRequestHandlers = {
               autoAdvanceWired: confirmHook.autoAdvanceWired,
               transcriptPersist,
               transcriptVisible: transcriptPersist.ok,
-              ...(confirmStores
+              ...(composed?.ok
                 ? {
-                    trustedGroupLocator: confirmStores.groupLocator,
-                    trustedGroupsRoot: confirmStores.groupsRoot,
+                    trustedGroupLocator: composed.stores.groupLocator,
+                    trustedGroupsRoot: composed.stores.groupsRoot,
                   }
                 : {}),
             },

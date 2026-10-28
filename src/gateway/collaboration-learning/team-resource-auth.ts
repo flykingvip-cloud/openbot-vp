@@ -2,7 +2,8 @@
  * TEAM-REAL review A / R2 包1 — resource ACL + trusted locator for team deliverables.
  *
  * Subject binding (resolveDeliveryAclActor) is not target authorization.
- * Reuses assertGroupMemberAccess + resolveTrustedGroupLocator + membership tenant.
+ * Reuses loadAuthoritativeGroupMembers (C5 repair when the actor is the employee)
+ * + resolveTrustedGroupLocator + membership tenant.
  * Write action requires active non-observer membership (not read ACL renamed).
  * Auth result carries groupLocator + groupsRoot so callers use ONE trusted root.
  * Does not remount formal-root twins or invent a parallel deliverable authority.
@@ -23,11 +24,12 @@ import { resolveStateDir } from "../../config/paths.js";
 import type { OpenBotConfig } from "../../config/types.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import type { GatewayClient } from "../server-methods/types.js";
-import { assertGroupMemberAccess, loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
+import { loadAuthoritativeGroupMembers } from "../workspace/group-acl.js";
 import { resolveTrustedGroupLocator } from "../workspace/group-locator.js";
 import { createGroupFileStore, createWorkspaceGroupStoreFunctions } from "./shared.js";
 import {
   isAclSafeTenantTrust,
+  resolveCollaborationTenantResolution,
   type CollaborationTenantResolution,
   resolveMembershipTenantIdForAcl,
 } from "./trusted-tenant.js";
@@ -286,6 +288,105 @@ export function resolveStoresFromGroupLocator(params: {
   });
 }
 
+
+function collectTeamAuthAliases(explicit: readonly string[] | undefined): string[] {
+  const out: string[] = [];
+  for (const alias of explicit ?? []) {
+    const id = compact(alias);
+    if (id && !out.some((row) => row.toLowerCase() === id.toLowerCase())) {
+      out.push(id);
+    }
+  }
+  return out;
+}
+
+function employeeMatchesActor(
+  employee: { userId?: string | null; userEmail?: string | null } | null,
+  actor: string,
+  aliases: readonly string[],
+): boolean {
+  if (!employee) {
+    return false;
+  }
+  const accepted = new Set(
+    [actor, ...aliases].map((entry) => compact(entry).toLowerCase()).filter(Boolean),
+  );
+  const userId = compact(employee.userId).toLowerCase();
+  const userEmail = compact(employee.userEmail).toLowerCase();
+  return (userId !== "" && accepted.has(userId)) || (userEmail !== "" && accepted.has(userEmail));
+}
+
+/**
+ * Session composition root for agent tools and chat confirm.
+ *
+ * Resolves authorizeTeamGroupResourceAccess + trusted stores from handler/session
+ * identity. `stampedEnterpriseId` is the gateway-frozen session enterprise
+ * (execution identity / sessionEnterpriseId), never a tool argument.
+ * Managed without an ACL-safe tenant still returns trusted_group_locator_required.
+ * Does not call createWorkspaceCollaborationStores.
+ */
+export async function resolveCompositionTrustedTeamContext(params: {
+  groupId: string;
+  actor: string;
+  action: "read" | "write";
+  client?: GatewayClient | null;
+  cfg?: OpenBotConfig;
+  identityAliases?: readonly string[];
+  /** Already-resolved ACL-safe tenant from the handler, when present. */
+  tenant?: CollaborationTenantResolution | null;
+  /** Gateway-stamped enterprise id. Not a model/tool argument. */
+  stampedEnterpriseId?: string | null;
+}): Promise<
+  | {
+      ok: true;
+      auth: TeamResourceAuthOk;
+      stores: TrustedGroupStores;
+      trusted: { groupsRoot: string; groupLocator: string };
+      tenant: CollaborationTenantResolution;
+    }
+  | { ok: false; reason: string; detail?: string }
+> {
+  const cfg = params.cfg ?? loadConfig();
+  let tenant: CollaborationTenantResolution | null = null;
+  if (params.tenant && isAclSafeTenantTrust(params.tenant.trust) && compact(params.tenant.tenantId)) {
+    tenant = { tenantId: compact(params.tenant.tenantId), trust: params.tenant.trust };
+  } else if (params.client) {
+    const resolved = await resolveCollaborationTenantResolution(params.client);
+    if (isAclSafeTenantTrust(resolved.trust) && compact(resolved.tenantId)) {
+      tenant = { tenantId: compact(resolved.tenantId), trust: resolved.trust };
+    }
+  }
+  if (!tenant) {
+    const stamped = compact(params.stampedEnterpriseId);
+    if (stamped) {
+      tenant = { tenantId: stamped, trust: "membership" };
+    }
+  }
+  const auth = await authorizeTeamGroupResourceAccess({
+    groupId: params.groupId,
+    actor: params.actor,
+    client: params.client,
+    tenant,
+    cfg,
+    identityAliases: params.identityAliases,
+    action: params.action,
+  });
+  if (!auth.ok) {
+    return { ok: false, reason: auth.reason, detail: auth.detail };
+  }
+  const stores = createTrustedGroupStores({
+    groupsRoot: auth.groupsRoot,
+    groupLocator: auth.groupLocator,
+  });
+  return {
+    ok: true,
+    auth,
+    stores,
+    trusted: { groupsRoot: auth.groupsRoot, groupLocator: auth.groupLocator },
+    tenant: tenant ?? { tenantId: auth.tenantId, trust: "membership" },
+  };
+}
+
 /**
  * Authorize actor for group resource action. Managed requires an ACL-safe tenant
  * (membership or service_execution). Never trusts client-supplied tenantId alone.
@@ -324,40 +425,51 @@ export async function authorizeTeamGroupResourceAccess(params: {
     };
   }
 
-  const denied = await assertGroupMemberAccess({
-    groupId,
-    userId: actor,
-    tenantId,
-    profile,
-    cfg,
-    identityAliases: params.identityAliases,
-  });
-  if (denied) {
-    return {
-      ok: false,
-      reason: params.action === "write" ? "write_acl_denied" : "read_acl_denied",
-      detail: denied,
-    };
+  // Same C5 repair chat.send already uses. Without it, email-only members.json
+  // rejects a UUID session actor and callers drop the locator — live confirm then
+  // surfaces trusted_group_locator_required instead of the real ACL result.
+  const identityAliases = collectTeamAuthAliases(params.identityAliases);
+  let employeeActor: import("../employee-workbench-scope.js").EmployeeWorkbenchActor | null = null;
+  if (params.client) {
+    try {
+      const { resolveEmployeeWorkbenchActor } = await import("../employee-workbench-scope.js");
+      employeeActor = await resolveEmployeeWorkbenchActor(params.client);
+    } catch {
+      employeeActor = null;
+    }
   }
-
+  const actorIsEmployee = employeeMatchesActor(employeeActor, actor, identityAliases);
+  if (actorIsEmployee && employeeActor) {
+    const userId = employeeActor.userId?.trim();
+    const userEmail = employeeActor.userEmail?.trim();
+    if (userId) {
+      identityAliases.push(userId);
+    }
+    if (userEmail) {
+      identityAliases.push(userEmail);
+    }
+  }
   const members = await loadAuthoritativeGroupMembers({
     groupId,
     tenantId,
     profile,
     cfg,
+    ...(actorIsEmployee && employeeActor ? { actor: employeeActor } : {}),
   });
-  const matched = members.find((row) =>
-    memberMatchesActor(row, actor, params.identityAliases ?? []),
+  const matched = members.find(
+    (row) =>
+      (row.status === "active" || row.status === "invited") &&
+      memberMatchesActor(row, actor, identityAliases),
   );
+  if (!matched) {
+    return {
+      ok: false,
+      reason: params.action === "write" ? "write_acl_denied" : "read_acl_denied",
+      detail: "not authorized to read group workspace file",
+    };
+  }
 
   if (params.action === "write") {
-    if (!matched) {
-      return {
-        ok: false,
-        reason: "write_acl_denied",
-        detail: "no authoritative membership row for write",
-      };
-    }
     if (matched.status !== "active") {
       return {
         ok: false,

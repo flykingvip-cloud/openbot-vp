@@ -18,6 +18,35 @@ function detailsOf(result: { details?: unknown }) {
   return result.details as Record<string, unknown>;
 }
 
+const FAKE_TRUSTED = {
+  ok: true as const,
+  auth: {
+    ok: true as const,
+    actor: "bot-2",
+    tenantId: "001",
+    profile: "managed_enterprise" as const,
+    groupLocator: "/tmp/fake-group",
+    groupsRoot: "/tmp/fake-groups",
+    governanceRole: "member" as const,
+    memberStatus: "active" as const,
+  },
+  stores: {
+    groupsRoot: "/tmp/fake-groups",
+    groupLocator: "/tmp/fake-group",
+    fileStore: {} as never,
+    objectStorage: { readObject: async () => null } as never,
+    groupStorage: {} as never,
+    learningStorage: {} as never,
+    memoryStorage: {} as never,
+    metadataStorage: {} as never,
+    usedLegacyWorkspaceFallback: false as const,
+  },
+  trusted: { groupsRoot: "/tmp/fake-groups", groupLocator: "/tmp/fake-group" },
+  tenant: { tenantId: "001", trust: "membership" as const },
+};
+
+const stubTrustedTeam: CollaborationBoardToolDeps["resolveTrustedTeam"] = async () => FAKE_TRUSTED;
+
 describe("shouldExposeCollaborationBoardTool", () => {
   it("hides the tool when claim contract / allowlist miss", () => {
     expect(
@@ -76,7 +105,8 @@ describe("collaboration_board tool", () => {
     const tool = createCollaborationBoardTool({
       requesterAgentIdOverride: "bot-2",
       agentSessionKey: SESSION,
-      deps: { isEnabled: () => true },
+      deps: {
+        resolveTrustedTeam: stubTrustedTeam, isEnabled: () => true },
     });
     expect(tool.name).toBe(COLLABORATION_BOARD_TOOL);
   });
@@ -88,6 +118,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => false,
         markInProgress: markInProgress as unknown as CollaborationBoardToolDeps["markInProgress"],
         resolveActor: async () => "bot-2",
@@ -110,6 +141,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         markInProgress: (async () => {
@@ -137,6 +169,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         submitForReview:
@@ -171,6 +204,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         markInProgress: markInProgress as unknown as CollaborationBoardToolDeps["markInProgress"],
@@ -210,6 +244,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         submitForReview:
@@ -269,6 +304,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         proposeTodolist:
@@ -306,6 +342,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         listItems: listItems as unknown as CollaborationBoardToolDeps["listItems"],
@@ -340,6 +377,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
         acceptSubmission:
@@ -378,6 +416,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
         acceptSubmission:
@@ -405,6 +444,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
         acceptSubmission:
@@ -439,6 +479,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
         returnSubmission:
@@ -471,6 +512,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
         returnSubmission:
@@ -496,6 +538,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-secretary",
         returnSubmission:
@@ -520,6 +563,7 @@ describe("collaboration_board tool", () => {
       agentSessionKey: SESSION,
       agentGroupId: GROUP,
       deps: {
+        resolveTrustedTeam: stubTrustedTeam,
         isEnabled: () => true,
         resolveActor: async () => "bot-2",
         markInProgress: vi.fn() as unknown as CollaborationBoardToolDeps["markInProgress"],

@@ -19,6 +19,30 @@ import {
 import type { OpenBotConfig } from "../../config/types.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
 
+/**
+ * Board claimants are often `bot:<agentId>` while gateway agents.list and some
+ * OS rows use the bare agent id. The wake intersection must treat them as one bot.
+ */
+export function collaborationDispatchAgentNeedle(value: string | null | undefined): string {
+  const id = value?.trim() ?? "";
+  if (id.startsWith("bot:")) {
+    return id.slice(4).trim();
+  }
+  if (id.startsWith("agent:")) {
+    return id.slice("agent:".length).trim();
+  }
+  return id;
+}
+
+export function collaborationDispatchIdsMatch(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const a = collaborationDispatchAgentNeedle(left);
+  const b = collaborationDispatchAgentNeedle(right);
+  return a !== "" && a === b;
+}
+
 export type MemberRegistrationStatus = "registered" | "not_registered";
 
 export type DispatchReadinessCode =
