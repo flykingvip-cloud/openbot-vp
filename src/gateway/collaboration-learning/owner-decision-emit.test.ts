@@ -149,12 +149,67 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
     expect(again.ok).toBe(true);
     if (again.ok) {
       expect(again.skipped).toBe(true);
-      expect(again).toMatchObject({ ok: false, reason: "idempotent_exists" });
+      expect(again).toMatchObject({ ok: true, reason: "idempotent_exists" });
     }
     const replayed = await fs.readFile(transcriptPath, "utf8");
     const idempotencyKey = result.delivery.idempotencyKey ?? "";
     expect(idempotencyKey.length).toBeGreaterThan(0);
     expect(replayed.split(idempotencyKey).length - 1).toBe(1);
+  });
+
+  test("emits when OS missing but members.json has an active human owner", async () => {
+    const { cfg, groupId } = await useConfig();
+    const { fileStore } = createWorkspaceCollaborationStores(cfg);
+    // No operating-state.json — managed F4 SoT shape.
+    await fileStore.writeGroupFile({
+      groupId,
+      filename: "members.json",
+      data: [
+        {
+          memberId: "human:90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+          memberKind: "human",
+          userId: "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+          name: "CEO",
+          governanceRole: "owner",
+          status: "active",
+        },
+        {
+          memberId: "bot:bot",
+          memberKind: "bot",
+          agentId: "bot",
+          name: "高级秘书",
+          governanceRole: "member",
+          status: "active",
+        },
+      ],
+    });
+
+    const todolist: ExecutorPrivateTodolist = {
+      todolistId: "td-emit-members-fallback",
+      boardItemId: "board-emit-members",
+      taskId: "task-emit-members",
+      groupId,
+      ownerMemberId: "bot:bot",
+      status: "proposed",
+      steps: [{ stepId: "s1", title: "产出摘要", status: "pending" }],
+      proposedBy: "bot:bot",
+      proposedAt: Date.now(),
+      version: 1,
+      visibility: "executor_private",
+    };
+
+    const result = await emitOwnerDecisionCardForProposedTodolist({
+      groupId,
+      todolist,
+      cfg,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.skipped) {
+      throw new Error(`expected emit ok with members fallback, got ${JSON.stringify(result)}`);
+    }
+    expect(result.card.mentionMemberIds).toContain("human:90fed19a-1c8b-4420-87e0-bcc6165e32fa");
+    expect(result.delivery.reason).not.toBe("no_active_confirmer");
+    expect(result.delivery.historyReloadable).toBe(true);
   });
 
   test("skips when no active confirmer is available", async () => {
@@ -189,7 +244,7 @@ describe("emitOwnerDecisionCardForProposedTodolist", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.skipped).toBe(true);
-      expect(result).toMatchObject({ ok: false, reason: "no_active_confirmer" });
+      expect(result).toMatchObject({ ok: true, reason: "no_active_confirmer" });
     }
     expect(result.delivery).toMatchObject({
       ok: true,

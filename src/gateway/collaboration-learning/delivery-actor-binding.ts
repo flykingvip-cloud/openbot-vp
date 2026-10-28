@@ -89,6 +89,152 @@ export function hasDeliveryMembershipSurface(state: DeliveryMembershipSource): b
   return (state.memberRoleMap?.length ?? 0) > 0;
 }
 
+/**
+ * Confirmer / membership id equality: exact, human:<id> ↔ <id>, and bot:/agent:
+ * needle forms used on boards vs OS rows.
+ */
+export function deliveryActorIdsEqual(
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean {
+  const a = (left ?? "").trim();
+  const b = (right ?? "").trim();
+  if (!a || !b) {
+    return false;
+  }
+  if (a === b) {
+    return true;
+  }
+  if (a.startsWith("human:") && a.slice("human:".length) === b) {
+    return true;
+  }
+  if (b.startsWith("human:") && b.slice("human:".length) === a) {
+    return true;
+  }
+  const needle = (value: string): string => {
+    if (value.startsWith("bot:")) {
+      return value.slice(4).trim();
+    }
+    if (value.startsWith("agent:")) {
+      return value.slice("agent:".length).trim();
+    }
+    return value;
+  };
+  const na = needle(a);
+  const nb = needle(b);
+  return na !== "" && na === nb;
+}
+
+/** Expand one id into confirmer-comparable aliases (bare / human: / bot needle). */
+export function expandDeliveryActorAliases(actorId: string | null | undefined): string[] {
+  const id = (actorId ?? "").trim();
+  if (!id) {
+    return [];
+  }
+  const out = new Set<string>([id]);
+  if (id.startsWith("human:")) {
+    const bare = id.slice("human:".length).trim();
+    if (bare) {
+      out.add(bare);
+    }
+  } else if (!id.includes("@") && !id.startsWith("bot:") && !id.startsWith("agent:")) {
+    out.add(`human:${id}`);
+  }
+  if (id.startsWith("bot:")) {
+    const bare = id.slice(4).trim();
+    if (bare) {
+      out.add(bare);
+    }
+  } else if (id.startsWith("agent:")) {
+    const bare = id.slice("agent:".length).trim();
+    if (bare) {
+      out.add(bare);
+      out.add(`bot:${bare}`);
+    }
+  } else if (!id.includes("@") && !id.startsWith("human:")) {
+    out.add(`bot:${id}`);
+  }
+  return [...out];
+}
+
+/**
+ * When `actor` is one of the handshake-stamped session subjects (email / uuid /
+ * membership id), every subject is the same person — expand all of them so
+ * Owner email can match authorized `human:<uuid>` (and vice versa).
+ */
+export function sessionConfirmerAliases(params: {
+  actor: string;
+  sessionSubjects?: readonly string[] | null;
+}): string[] {
+  const actor = params.actor.trim();
+  if (!actor) {
+    return [];
+  }
+  const subjects = (params.sessionSubjects ?? []).map((subject) => subject.trim()).filter(Boolean);
+  const linked = subjects.some((subject) => deliveryActorIdsEqual(subject, actor));
+  const seeds = linked ? [actor, ...subjects] : [actor];
+  const out = new Set<string>();
+  for (const seed of seeds) {
+    for (const alias of expandDeliveryActorAliases(seed)) {
+      out.add(alias);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * True when the RPC actor (optionally with session subjects) matches an
+ * authorized confirmer id. Does not invent email↔uuid links without session proof.
+ */
+export function actorMatchesAuthorizedConfirmer(params: {
+  actor: string;
+  authorizedConfirmerIds: readonly string[];
+  sessionSubjects?: readonly string[] | null;
+}): boolean {
+  const aliases = sessionConfirmerAliases({
+    actor: params.actor,
+    sessionSubjects: params.sessionSubjects,
+  });
+  if (aliases.length === 0) {
+    return false;
+  }
+  for (const allowed of params.authorizedConfirmerIds) {
+    const id = allowed.trim();
+    if (!id) {
+      continue;
+    }
+    if (aliases.some((alias) => deliveryActorIdsEqual(alias, id))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Canonical memberRoleMap / governance id matching any session subject, if any. */
+export function canonicalMappedDeliveryMemberId(
+  state: DeliveryMembershipSource,
+  subjects: readonly string[],
+  publisherId?: string | null,
+): string | undefined {
+  const candidates = [
+    (state?.governance?.coordinatorBotId ?? "").trim(),
+    (publisherId ?? "").trim(),
+    ...(state?.memberRoleMap ?? []).map((row) => (row.memberId ?? "").trim()),
+  ].filter(Boolean);
+  for (const subject of subjects) {
+    const s = subject.trim();
+    if (!s) {
+      continue;
+    }
+    for (const candidate of candidates) {
+      if (deliveryActorIdsEqual(candidate, s)) {
+        return candidate;
+      }
+    }
+  }
+  return undefined;
+}
+
 export function isMappedDeliveryIdentity(
   state: DeliveryMembershipSource,
   actorId: string,
@@ -98,13 +244,13 @@ export function isMappedDeliveryIdentity(
   if (!id) {
     return false;
   }
-  if ((state?.governance?.coordinatorBotId ?? "").trim() === id) {
+  if (deliveryActorIdsEqual(state?.governance?.coordinatorBotId, id)) {
     return true;
   }
-  if ((publisherId ?? "").trim() === id) {
+  if (deliveryActorIdsEqual(publisherId, id)) {
     return true;
   }
-  return (state?.memberRoleMap ?? []).some((row) => (row.memberId ?? "").trim() === id);
+  return (state?.memberRoleMap ?? []).some((row) => deliveryActorIdsEqual(row.memberId, id));
 }
 
 export function bindDeliveryActor(params: {
@@ -148,9 +294,9 @@ async function claimedDeliveryIdentityIsPrivileged(
 
 /**
  * When connect claimed a non-member label (e.g. "Chrome · Mac"), prefer the
- * stamped session email (`client.user`) over `platformUserId` UUID if that
- * email is already a mapped member/coordinator. authorizedConfirmerIds are
- * usually emails (publishedBy); picking the UUID makes lead confirm fail.
+ * OS-canonical mapped member id (often `human:<uuid>`) when a session subject
+ * maps to it. Fall back to stamped session email over `platformUserId` only
+ * when that email itself is the mapped member/coordinator (legacy publishedBy).
  */
 export function preferMappedSessionSubjects(params: {
   subjects: readonly string[];
@@ -158,6 +304,12 @@ export function preferMappedSessionSubjects(params: {
   state: DeliveryMembershipSource;
 }): string[] {
   const subjects = params.subjects.map((subject) => subject.trim()).filter(Boolean);
+  // Prefer OS-canonical member id (e.g. human:<uuid>) when a session subject maps,
+  // so confirmTodolist actors match authorizedConfirmerIds that use human: form.
+  const canonical = canonicalMappedDeliveryMemberId(params.state, subjects);
+  if (canonical) {
+    return [canonical, ...subjects.filter((subject) => subject !== canonical)];
+  }
   const email = normalize(params.stampedUser ?? undefined);
   if (!email || !subjects.includes(email)) {
     return subjects;

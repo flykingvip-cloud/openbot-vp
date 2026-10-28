@@ -24,9 +24,13 @@ import {
 import type { RuntimeAuthority } from "./runtime-authority.js";
 
 const DELIVERABLE_RE =
-  /交付|报告|PPT|稿件|方案|清单|纪要|调研|复盘|deliverable|report|deck|slide/iu;
-const DEADLINE_RE = /截止|今晚|明天|后天|本周|下周|小时内|今晚前|之前完成|due\b|deadline|by\s+\d/iu;
-const TASK_VERB_RE = /请|需要|负责|认领|完成|提交|整理|撰写|产出|跟进|落地|执行|研发|分析/u;
+  /交付|报告|PPT|稿件|方案|清单|纪要|调研|复盘|说明|成果|连通|charter|deliverables?\/|\.md\b|deliverable|report|deck|slide/iu;
+const DEADLINE_RE =
+  /截止|今晚|明天|后天|本周|下周|小时内|今晚前|之前完成|今日|今天|due\b|deadline|by\s+\d/iu;
+const TASK_VERB_RE =
+  /请|需要|负责|认领|完成|提交|整理|撰写|产出|跟进|落地|执行|研发|分析|写入|落盘|创建|写\s/u;
+/** Path-shaped short tasks (e.g. F4 charter.md → deliverables/) count as board-worthy. */
+const DELIVERABLE_PATH_RE = /deliverables?\/|\bcharter\.md\b|团队成果目录/iu;
 /** Soft platform reminders — never enough alone to pass Constraints quality. */
 const SOFT_CONSTRAINT_DEFAULTS = ["不得用口头派工代替看板事实", "外发/终裁仍须人确认"] as const;
 /** Generic Acceptance fillers that must not masquerade as a verified contract. */
@@ -136,13 +140,80 @@ export function detectBoardMaterializeCandidate(message: string): boolean {
   const hasDeliverable = DELIVERABLE_RE.test(text);
   const hasDeadline = DEADLINE_RE.test(text);
   const hasTaskVerb = TASK_VERB_RE.test(text);
+  const hasDeliverablePath = DELIVERABLE_PATH_RE.test(text);
   const longGoal = text.length >= 40 && hasTaskVerb;
-  return (hasDeliverable && hasDeadline) || (hasDeliverable && hasTaskVerb) || longGoal;
+  const pathTask = hasDeliverablePath && (hasTaskVerb || text.length >= 24);
+  return (hasDeliverable && hasDeadline) || (hasDeliverable && hasTaskVerb) || longGoal || pathTask;
+}
+
+/**
+ * Pull explicit Acceptance lines from the intent text when the caller omitted
+ * acceptanceCriteria. Never invents generic fillers (§C).
+ */
+export function extractExplicitAcceptanceFromMessage(message: string): string[] {
+  const text = compact(message);
+  if (!text) {
+    return [];
+  }
+  const out: string[] = [];
+  const push = (value: string) => {
+    const v = compact(value);
+    if (!v || GENERIC_ACCEPTANCE_RE.test(v) || out.includes(v)) {
+      return;
+    }
+    out.push(v);
+  };
+  for (const line of text.split(/\n+/)) {
+    const m = line.match(/(?:验收|Acceptance)\s*[：:]\s*(.+)$/iu);
+    if (m?.[1]) {
+      push(m[1]);
+    }
+  }
+  if (/writtenToGroupDir\s*=\s*true/iu.test(text)) {
+    push("charter/交付物落入团队成果目录且 writtenToGroupDir=true，可 sha 核对");
+  } else if (/可\s*sha\s*核对/iu.test(text) && DELIVERABLE_PATH_RE.test(text)) {
+    push("交付物落在团队成果目录（或正式 locator），可 sha 核对");
+  }
+  return out;
+}
+
+/** Soft constraint lines already stated in the intent (禁止… / Constraints：…). */
+export function extractExplicitConstraintsFromMessage(message: string): string[] {
+  const text = compact(message);
+  if (!text) {
+    return [];
+  }
+  const out: string[] = [];
+  const push = (value: string) => {
+    const v = compact(value);
+    if (!v || out.includes(v)) {
+      return;
+    }
+    out.push(v);
+  };
+  for (const line of text.split(/\n+/)) {
+    const labeled = line.match(/(?:Constraints|约束)\s*[：:]\s*(.+)$/iu);
+    if (labeled?.[1]) {
+      push(labeled[1]);
+      continue;
+    }
+    if (line.trim().startsWith("禁止") || /不扩权|不要外发|不要改无关/.test(line)) {
+      push(line.trim());
+    }
+  }
+  // Compact inline 禁止 A/B/C clauses.
+  const inline = text.match(/禁止[^。\n]{2,80}/gu);
+  if (inline) {
+    for (const clause of inline) {
+      push(clause);
+    }
+  }
+  return out;
 }
 
 function inferDueAtMs(message: string, nowMs: number): number | undefined {
   const text = message;
-  if (/今晚|今天晚上|tonight/iu.test(text)) {
+  if (/今晚|今天晚上|tonight|今日|今天(?!晚上)/iu.test(text)) {
     const d = new Date(nowMs);
     d.setHours(23, 59, 0, 0);
     return d.getTime();
@@ -254,7 +325,9 @@ export function buildBoardPublishDraftFromIntent(
   if (!message || !groupId || !taskId || !publishedBy) {
     return null;
   }
-  if (!detectBoardMaterializeCandidate(message)) {
+  const explicitContract =
+    Boolean(compact(input.goal)) && unique(input.acceptanceCriteria).length > 0;
+  if (!detectBoardMaterializeCandidate(message) && !explicitContract) {
     return null;
   }
   // Freeze: oral path never invents a board fact by itself.
@@ -263,8 +336,16 @@ export function buildBoardPublishDraftFromIntent(
   const explicitGoal = compact(input.goal);
   const goalFromRawChat = !explicitGoal;
   const goal = explicitGoal || message.replace(/\s+/g, " ").trim();
-  const acceptance = unique(input.acceptanceCriteria);
-  const explicitConstraints = unique(input.constraints);
+  const acceptance = unique(
+    (input.acceptanceCriteria?.length ?? 0) > 0
+      ? input.acceptanceCriteria
+      : extractExplicitAcceptanceFromMessage(message),
+  );
+  const explicitConstraints = unique(
+    (input.constraints?.length ?? 0) > 0
+      ? input.constraints
+      : extractExplicitConstraintsFromMessage(message),
+  );
   const constraints =
     explicitConstraints.length > 0 ? explicitConstraints : softConstraintDefaults(message);
   const explicitDue =
@@ -337,12 +418,36 @@ export async function materializeIntentToBoardItem(params: {
   input: BoardIntentMaterializeInput;
   cfg?: OpenBotConfig;
 }): Promise<MaterializeIntentResult> {
-  const draft = buildBoardPublishDraftFromIntent(params.input);
+  let draft = buildBoardPublishDraftFromIntent(params.input);
   if (!draft) {
     return { status: "skipped", reason: "not_a_board_candidate" };
   }
   const requireConfirm = draft.requiresHumanConfirm;
   const confirmed = params.input.humanConfirmed === true;
+  // humanConfirmed on activate means the board-publish contract (incl. fuzzy Due)
+  // was already accepted; promote suggested due so quality can pass without
+  // inventing Acceptance. Todolist card remains the human gate for execution.
+  if (
+    confirmed &&
+    draft.dueAtMs === undefined &&
+    typeof draft.dueSuggestedMs === "number" &&
+    Number.isFinite(draft.dueSuggestedMs)
+  ) {
+    draft = {
+      ...draft,
+      dueAtMs: draft.dueSuggestedMs,
+      duePendingConfirm: false,
+      quality: assessBoardContractQuality({
+        goal: draft.goal,
+        message: compact(params.input.message),
+        acceptanceCriteria: draft.acceptanceCriteria,
+        constraints: draft.constraints,
+        dueAtMs: draft.dueSuggestedMs,
+        duePendingConfirm: false,
+        goalFromRawChat: !compact(params.input.goal),
+      }),
+    };
+  }
   // Human confirm gate OR incomplete contract quality → needs_confirm (FINAL v3 §C).
   if ((requireConfirm && !confirmed) || !draft.quality.ok) {
     return {

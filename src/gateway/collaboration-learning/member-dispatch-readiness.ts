@@ -70,6 +70,8 @@ export type TrustedMemberResolution = {
   displayName: string | null;
   registration: MemberRegistrationStatus;
   sessionKey: string | null;
+  /** Optional structured gap hint from the trusted resolver (wake / RPC). */
+  detail?: string | null;
 };
 
 export type MemberDispatchReadiness = {
@@ -201,6 +203,7 @@ export async function checkMemberDispatchReadiness(
     let agentId = "";
     let displayName: string | null = null;
     let sessionKey = "";
+    let resolutionDetail: string | null = null;
 
     if (params.resolveMember) {
       const resolved = await params.resolveMember(requestedId);
@@ -223,6 +226,7 @@ export async function checkMemberDispatchReadiness(
       sessionKey =
         compact(resolved.sessionKey ?? undefined) ||
         (agentId ? defaultConversationSessionKey(agentId) : "");
+      resolutionDetail = compact(resolved.detail ?? undefined) || null;
     } else {
       // Test / internal path only — still refuse invented registration when omitted.
       registration = member.registration === "registered" ? "registered" : "not_registered";
@@ -241,7 +245,7 @@ export async function checkMemberDispatchReadiness(
         dispatchable: false,
         sessionKey: null,
         sessionEnsured: false,
-        detail: "not_registered cannot be dispatched",
+        detail: resolutionDetail || "not_registered cannot be dispatched",
       });
       continue;
     }

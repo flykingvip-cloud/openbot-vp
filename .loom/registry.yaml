@@ -10026,12 +10026,21 @@ landingStreams:
       - docs/notes/team-real-collab-activation-confirm-deliverable-2026-10-27.md
       - docs/notes/team-real-dual-root-cleanup-2026-10-27.md
       - docs/notes/team-real-r5-handlers-2026-10-27.md
+      - docs/notes/team-real-f4-board-confirmer-chain-2026-10-28.md
+      - src/gateway/collaboration-dispatch/intent-board-materialize.ts
+      - src/gateway/collaboration-dispatch/intent-board-materialize.test.ts
+      - src/gateway/collaboration-learning/owner-decision-emit.ts
+      - src/gateway/collaboration-learning/owner-decision-emit.test.ts
       - src/gateway/collaboration-learning/activate-collaboration-task.ts
       - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
       - src/gateway/collaboration-learning/chat-plan-confirm.ts
       - src/gateway/collaboration-learning/chat-plan-confirm.test.ts
       - src/gateway/collaboration-learning/chat-plan-confirm-hook.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.ts
+      - src/gateway/collaboration-learning/delivery-actor-binding.test.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.ts
+      - src/gateway/collaboration-dispatch/executor-private-todolist.test.ts
       - src/gateway/collaboration-learning/member-dispatch-readiness.ts
       - src/gateway/collaboration-learning/member-dispatch-readiness.test.ts
       - src/gateway/collaboration-learning/r5-handler-trusted-chain.gateway.test.ts

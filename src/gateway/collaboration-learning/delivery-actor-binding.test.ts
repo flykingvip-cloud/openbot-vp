@@ -1,8 +1,10 @@
 import { describe, expect, test } from "vitest";
 import {
+  actorMatchesAuthorizedConfirmer,
   authenticatedSessionSubjects,
   bindDeliveryActor,
   claimedConnectActorId,
+  deliveryActorIdsEqual,
   isMappedDeliveryIdentity,
   preferMappedSessionSubjects,
 } from "./delivery-actor-binding.js";
@@ -128,5 +130,76 @@ describe("delivery actor binding", () => {
         privileged: true,
       }),
     ).toThrow(/actor_not_authenticated/);
+  });
+
+  test("maps bare uuid to human:<uuid> membership rows", () => {
+    const humanOs = {
+      governance: { coordinatorBotId: "bot:bot" },
+      memberRoleMap: [
+        { memberId: "human:90fed19a-1c8b-4420-87e0-bcc6165e32fa" },
+        { memberId: "bot:bot" },
+      ],
+    };
+    expect(isMappedDeliveryIdentity(humanOs, "90fed19a-1c8b-4420-87e0-bcc6165e32fa")).toBe(true);
+    expect(
+      deliveryActorIdsEqual(
+        "human:90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+        "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+      ),
+    ).toBe(true);
+
+    const subjects = authenticatedSessionSubjects({
+      platformUserId: "90fed19a-1c8b-4420-87e0-bcc6165e32fa",
+      user: "daniel.hhd@gmail.com",
+    });
+    const preferred = preferMappedSessionSubjects({
+      subjects,
+      stampedUser: "daniel.hhd@gmail.com",
+      state: humanOs,
+    });
+    expect(preferred[0]).toBe("human:90fed19a-1c8b-4420-87e0-bcc6165e32fa");
+  });
+
+  test("Owner email matches authorized human:<uuid> via session subjects", () => {
+    const allowed = ["bot:bot", "human:90fed19a-1c8b-4420-87e0-bcc6165e32fa"];
+    const subjects = ["90fed19a-1c8b-4420-87e0-bcc6165e32fa", "daniel.hhd@gmail.com"];
+    expect(
+      actorMatchesAuthorizedConfirmer({
+        actor: "daniel.hhd@gmail.com",
+        authorizedConfirmerIds: allowed,
+        sessionSubjects: subjects,
+      }),
+    ).toBe(true);
+    expect(
+      actorMatchesAuthorizedConfirmer({
+        actor: "daniel.hhd@gmail.com",
+        authorizedConfirmerIds: allowed,
+      }),
+    ).toBe(false);
+  });
+
+  test("unrelated email does not match human:<uuid> even with its own session", () => {
+    expect(
+      actorMatchesAuthorizedConfirmer({
+        actor: "stranger@example.com",
+        authorizedConfirmerIds: ["bot:bot", "human:90fed19a-1c8b-4420-87e0-bcc6165e32fa"],
+        sessionSubjects: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "stranger@example.com"],
+      }),
+    ).toBe(false);
+  });
+
+  test("bot:bot still matches authorized confirmer list", () => {
+    expect(
+      actorMatchesAuthorizedConfirmer({
+        actor: "bot:bot",
+        authorizedConfirmerIds: ["bot:bot", "human:90fed19a-1c8b-4420-87e0-bcc6165e32fa"],
+      }),
+    ).toBe(true);
+    expect(
+      actorMatchesAuthorizedConfirmer({
+        actor: "bot",
+        authorizedConfirmerIds: ["bot:bot"],
+      }),
+    ).toBe(true);
   });
 });

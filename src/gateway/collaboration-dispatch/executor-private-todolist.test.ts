@@ -432,3 +432,127 @@ describe("P2 executor-private todolist", () => {
     expect(result.value.woke).toBe(false);
   });
 });
+
+describe("confirmTodolist confirmer identity aliases (F4)", () => {
+  const OWNER_UUID = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
+  const OWNER_EMAIL = "daniel.hhd@gmail.com";
+  const OWNER_HUMAN = `human:${OWNER_UUID}`;
+
+  async function seedProposedTodolist() {
+    const { cfg } = await useConfig({ claimContract: true });
+    const auth = authority(cfg);
+    const published = await publishBoardItem(
+      auth,
+      {
+        groupId: "grp_p2",
+        taskId: seedTask.taskId,
+        remainingWork: "F4 confirmer identity",
+        acceptanceCriteria: ["charter written"],
+        goal: "F4 confirmer identity",
+        intendedClaimantIds: ["bot:bot"],
+        publishedBy: "bot:bot",
+      },
+      { cfg },
+    );
+    expect(published.ok).toBe(true);
+    if (!published.ok) {
+      throw new Error("publish failed");
+    }
+    const itemId = published.value.itemId;
+    await claimBoardItem(auth, { taskId: seedTask.taskId, itemId, claimantId: "bot:bot" }, { cfg });
+    await applyClaim(auth, { taskId: seedTask.taskId, itemId }, seedTask, auth.policy.effective, {
+      cfg,
+    });
+    const proposed = await proposeTodolist(
+      auth,
+      {
+        boardItemId: itemId,
+        taskId: seedTask.taskId,
+        groupId: "grp_p2",
+        ownerMemberId: "bot:bot",
+        steps: [{ title: "write charter" }],
+      },
+      { cfg },
+    );
+    expect(proposed.ok).toBe(true);
+    if (!proposed.ok) {
+      throw new Error("propose failed");
+    }
+    return { cfg, auth, proposed: proposed.value };
+  }
+
+  test("Owner email matches authorized human:<uuid> with session subjects", async () => {
+    const { cfg, auth, proposed } = await seedProposedTodolist();
+    const confirmed = await confirmTodolist(
+      auth,
+      {
+        taskId: seedTask.taskId,
+        todolistId: proposed.todolistId,
+        confirmerId: OWNER_EMAIL,
+      },
+      {
+        cfg,
+        authorizedConfirmerIds: ["bot:bot", OWNER_HUMAN],
+        sessionActorSubjects: [OWNER_UUID, OWNER_EMAIL],
+      },
+    );
+    expect(confirmed.ok).toBe(true);
+    if (confirmed.ok) {
+      expect(confirmed.value.status).toBe("confirmed");
+      expect(confirmed.value.confirmedBy).toBe(OWNER_EMAIL);
+    }
+  });
+
+  test("unrelated email fails against human:<uuid> allowlist", async () => {
+    const { cfg, auth, proposed } = await seedProposedTodolist();
+    const denied = await confirmTodolist(
+      auth,
+      {
+        taskId: seedTask.taskId,
+        todolistId: proposed.todolistId,
+        confirmerId: "stranger@example.com",
+      },
+      {
+        cfg,
+        authorizedConfirmerIds: ["bot:bot", OWNER_HUMAN],
+        sessionActorSubjects: ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "stranger@example.com"],
+      },
+    );
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) {
+      expect(denied.reason).toBe("actor_not_confirmer");
+    }
+  });
+
+  test("bot:bot confirmer still works", async () => {
+    const { cfg, auth, proposed } = await seedProposedTodolist();
+    const confirmed = await confirmTodolist(
+      auth,
+      {
+        taskId: seedTask.taskId,
+        todolistId: proposed.todolistId,
+        confirmerId: "bot:bot",
+      },
+      { cfg, authorizedConfirmerIds: ["bot:bot", OWNER_HUMAN] },
+    );
+    expect(confirmed.ok).toBe(true);
+  });
+
+  test("executor self-confirm still fails when not in allowlist", async () => {
+    const { cfg, auth, proposed } = await seedProposedTodolist();
+    // Owner of todolist is bot:bot; a different executor must not confirm.
+    const denied = await confirmTodolist(
+      auth,
+      {
+        taskId: seedTask.taskId,
+        todolistId: proposed.todolistId,
+        confirmerId: "bot:executor-other",
+      },
+      { cfg, authorizedConfirmerIds: ["bot:bot", OWNER_HUMAN] },
+    );
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) {
+      expect(denied.reason).toBe("actor_not_confirmer");
+    }
+  });
+});

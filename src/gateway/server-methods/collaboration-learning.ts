@@ -59,7 +59,11 @@ import {
   transitionGroupMemoryCapsule,
 } from "../collaboration-learning/capsule-governance.js";
 import { promoteApprovedCapsuleIfEligible } from "../collaboration-learning/capsule-promotion.js";
-import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  authenticatedSessionSubjects,
+  resolveDeliveryAclActor,
+} from "../collaboration-learning/delivery-actor-binding.js";
+import { triggerPostPlanConfirmAdvance } from "../collaboration-learning/post-plan-confirm-advance.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
@@ -865,12 +869,75 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         todolistId: params.todolistId,
         expectedVersion: params.expectedVersion,
         actor: ctx.actor,
+        sessionActorSubjects: authenticatedSessionSubjects(client),
         tenant: ctx.tenant,
         auth: ctx.auth,
         stores: ctx.stores,
         trusted: ctx.trusted,
       });
-      respond(true, { todolist }, undefined);
+      // Same post-plan wake/autoAdvance path as chat-plan-confirm-hook (UI RPC was missing it).
+      // Surface wakeRecorded/reason so silent early-return cannot hide (F4 R5).
+      let autoAdvance: {
+        autoAdvanceWired: boolean;
+        wakeRecorded: boolean;
+        wakeConsumed: boolean;
+        dispatched: boolean;
+        reason: string;
+        targetAgentIds: string[];
+      } = {
+        autoAdvanceWired: false,
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "advance_not_attempted",
+        targetAgentIds: [],
+      };
+      try {
+        const confirmedStep =
+          todolist.steps.find((s) => s.status === "active" || s.status === "pending") ??
+          todolist.steps[0];
+        const advance = await triggerPostPlanConfirmAdvance({
+          groupId: params.groupId,
+          taskId: todolist.taskId || params.taskId,
+          boardItemId: todolist.boardItemId,
+          todolistId: todolist.todolistId,
+          confirmedVersion: todolist.version,
+          stepId: confirmedStep?.stepId ?? null,
+          confirmerId: ctx.actor,
+          tenant: ctx.tenant,
+          auth: ctx.auth,
+          trusted: ctx.trusted,
+          stores: ctx.stores,
+        });
+        autoAdvance = {
+          autoAdvanceWired: advance.autoAdvanceWired,
+          wakeRecorded: advance.wakeRecorded,
+          wakeConsumed: advance.wakeConsumed,
+          dispatched: advance.dispatched,
+          reason: advance.reason,
+          targetAgentIds: advance.targetAgentIds,
+        };
+      } catch (error) {
+        // Confirm already committed; match chat hook — mark attempted, never roll back.
+        const detail = error instanceof Error ? error.message : String(error);
+        autoAdvance = {
+          autoAdvanceWired: true,
+          wakeRecorded: false,
+          wakeConsumed: false,
+          dispatched: false,
+          reason: `advance_threw:${detail}`.slice(0, 240),
+          targetAgentIds: [],
+        };
+      }
+      respond(
+        true,
+        {
+          todolist,
+          autoAdvanceWired: autoAdvance.autoAdvanceWired,
+          autoAdvance,
+        },
+        undefined,
+      );
     } catch (error) {
       respond(false, undefined, collaborationEntryErrorShape(error));
     }
@@ -904,6 +971,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         steps: params.steps,
         expectedVersion: params.expectedVersion,
         actor: ctx.actor,
+        sessionActorSubjects: authenticatedSessionSubjects(client),
         tenant: ctx.tenant,
         auth: ctx.auth,
         stores: ctx.stores,

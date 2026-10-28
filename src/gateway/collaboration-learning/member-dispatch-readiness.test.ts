@@ -117,6 +117,24 @@ describe("checkMemberDispatchReadiness", () => {
     expect(result.members[0]?.code).toBe("session_ensure_failed");
     expect(result.members[0]?.dispatchable).toBe(false);
   });
+
+  it("surfaces resolver detail on not_registered gaps", async () => {
+    const result = await checkMemberDispatchReadiness({
+      members: [{ memberId: "bot" }],
+      resolveMember: async () => ({
+        memberId: "bot",
+        agentId: null,
+        displayName: null,
+        registration: "not_registered",
+        sessionKey: null,
+        detail: "not_in_gateway_agents_list",
+      }),
+      sessionExists: () => true,
+    });
+    expect(result.allDispatchable).toBe(false);
+    expect(result.gaps[0]?.code).toBe("not_registered");
+    expect(result.gaps[0]?.detail).toBe("not_in_gateway_agents_list");
+  });
 });
 
 describe("precheckDispatchReadiness", () => {
