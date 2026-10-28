@@ -1130,8 +1130,9 @@ export async function consumeWakeForRoundDispatch(
             const os = await readGroupOperatingState({
               fileStore: wakeStores.fileStore,
               groupId: request.groupId,
-              groupRootDir: wakeStores.groupRootDir,
-              cfg: params.cfg,
+              // Pin the read to the trusted groups root. readGroupOperatingState
+              // takes baseDir, not groupRootDir.
+              baseDir: wakeStores.groupRootDir,
             });
             osMembers = Array.isArray(os?.memberRoleMap) ? os.memberRoleMap : [];
           } catch {

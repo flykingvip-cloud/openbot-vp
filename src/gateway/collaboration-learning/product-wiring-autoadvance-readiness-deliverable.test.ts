@@ -130,7 +130,7 @@ function agentStub(id: string, tenantId: string): RuntimeAgent {
     runtimeAgentId: id,
     name: id,
     runtimeVersion: "1",
-    lifecycle: "active",
+    lifecycle: "deployed",
     health: "healthy",
     tenantCoverage: [tenantId],
     boundCapabilityCount: 0,
@@ -293,9 +293,7 @@ describe("R1 non-mock submit pipeline", () => {
 
     const read = await readTeamDeliverable({
       groupId,
-      taskId,
       deliverableId: submit.deliverableId,
-      version: submit.version,
       actor: "human:reviewer",
       cfg,
       enforceAcl: false,
@@ -557,7 +555,7 @@ describe("R1 readiness — tenant registry ∩ active OS bot", () => {
     await writeGroupOperatingState({
       fileStore: stores.fileStore,
       groupId,
-      groupRootDir: stores.groupRootDir,
+      groupRootDir: stores.groupsRoot,
       cfg,
       state: {
         ...makeOperatingState({ groupId }),
@@ -635,7 +633,7 @@ describe("R1 readiness — tenant registry ∩ active OS bot", () => {
     await writeGroupOperatingState({
       fileStore: stores.fileStore,
       groupId,
-      groupRootDir: stores.groupRootDir,
+      groupRootDir: stores.groupsRoot,
       cfg,
       state: {
         ...makeOperatingState({ groupId }),
@@ -728,7 +726,7 @@ describe("R2 readiness failure releases unconsumed claim", () => {
     await writeGroupOperatingState({
       fileStore: stores.fileStore,
       groupId,
-      groupRootDir: stores.groupRootDir,
+      groupRootDir: stores.groupsRoot,
       cfg,
       state: {
         ...makeOperatingState({ groupId }),
@@ -1231,9 +1229,7 @@ describe("R3 run binding — no Map; unconfusable context", () => {
 
     const readA = await readTeamDeliverable({
       groupId,
-      taskId: "task-a",
       deliverableId: outA.outcome.ok ? outA.outcome.deliverableId : "",
-      version: outA.outcome.ok ? outA.outcome.version : 1,
       actor: "human:peer",
       cfg,
       enforceAcl: false,
@@ -1241,9 +1237,7 @@ describe("R3 run binding — no Map; unconfusable context", () => {
     });
     const readB = await readTeamDeliverable({
       groupId,
-      taskId: "task-b",
       deliverableId: outB.outcome.ok ? outB.outcome.deliverableId : "",
-      version: outB.outcome.ok ? outB.outcome.version : 1,
       actor: "human:peer",
       cfg,
       enforceAcl: false,
@@ -1317,9 +1311,7 @@ describe("R3 run binding — no Map; unconfusable context", () => {
       if (out.outcome.ok) {
         const read = await readTeamDeliverable({
           groupId,
-          taskId,
           deliverableId: out.outcome.deliverableId,
-          version: out.outcome.version,
           actor: "human:peer",
           cfg,
           enforceAcl: false,
@@ -1486,19 +1478,21 @@ describe("R3 run binding — no Map; unconfusable context", () => {
     }
 
     // Mark task stopped
-    const stopped = asGovernedTask({
-      taskId,
-      groupId,
-      title: taskId,
-      status: "ready",
-      createdAtMs: now,
-      updatedAtMs: now,
+    const stopped = {
+      ...asGovernedTask({
+        taskId,
+        groupId,
+        title: taskId,
+        status: "ready",
+        createdAtMs: now,
+        updatedAtMs: now,
+      }),
       stopControl: buildAcceptedTaskStopControl({
         requestedBy: "human:owner",
         reason: "halt",
         requestedAtMs: now,
       }),
-    });
+    };
     await stores.objectStorage.writeObject(groupId, "task", taskId, stopped as never);
     const stoppedBind = await resolveActorDeliverableTaskBinding({
       groupId,

@@ -259,7 +259,14 @@ export async function buildClaimAuthority(params: {
   auth?: TeamResourceAuthOk | null;
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   stores?: TrustedGroupStores | null;
-}) {
+}): Promise<{
+  authority: RuntimeAuthority;
+  stores: TrustedGroupStores | ReturnType<typeof createWorkspaceCollaborationStores>;
+  operatingState: Awaited<ReturnType<typeof readGroupOperatingState>>;
+  groupRootDir: string | null;
+  groupLocator: string | null;
+  mode: "trusted" | "compat_workspace";
+}> {
   const resolved = await resolveClaimStores(params);
   const stores = resolved.stores;
   const operatingState = await readGroupOperatingState({

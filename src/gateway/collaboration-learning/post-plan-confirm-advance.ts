@@ -41,6 +41,19 @@ function compact(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
+/** Workspace compat stores are not TrustedGroupStores. Call sites only accept the latter. */
+function isTrustedGroupStores(
+  stores: TrustedGroupStores | { groupRootDir?: string } | null | undefined,
+): stores is TrustedGroupStores {
+  return (
+    !!stores &&
+    typeof stores === "object" &&
+    "groupsRoot" in stores &&
+    "groupLocator" in stores &&
+    "usedLegacyWorkspaceFallback" in stores
+  );
+}
+
 export type PostPlanConfirmAdvanceResult = {
   /** True when this path attempted the existing wake/schedule mechanism. */
   autoAdvanceWired: true;
@@ -140,6 +153,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
     trusted: params.trusted,
     stores: params.stores,
   });
+  const trustedStores = isTrustedGroupStores(stores) ? stores : (params.stores ?? null);
 
   const boardItems = await listCollaborationBoardItems({
     groupId,
@@ -147,7 +161,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
     cfg,
     auth: params.auth,
     trusted: params.trusted,
-    stores: stores ?? params.stores,
+    stores: trustedStores,
     tenant: params.tenant,
   });
 
@@ -221,7 +235,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
       actor: confirmerId,
       auth: params.auth,
       trusted: params.trusted,
-      stores: stores ?? params.stores,
+      stores: trustedStores,
       tenant: params.tenant,
       cfg,
     });
@@ -335,7 +349,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
         actor: confirmerId,
         auth: params.auth,
         trusted: params.trusted,
-        stores: stores ?? params.stores,
+        stores: trustedStores,
         tenant: params.tenant,
         cfg,
       });

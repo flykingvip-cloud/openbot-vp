@@ -22,6 +22,7 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { upsertAgent } from "../agent-runtime-store.js";
 import { makeOperatingState } from "../collaboration-dispatch/__fixtures__/policy-source-matrix.js";
 import { episodeIdForClientRun } from "../collaboration-dispatch/collaboration-event-key.js";
 import { resolveGroupPolicyInput } from "../collaboration-dispatch/resolve-effective-policy.js";
@@ -610,6 +611,23 @@ describe("R6 wake auth recheck uses authority-aligned stores (dual-root conflict
       objectStorage: seeded.stores.objectStorage,
     });
     expect(direct.ok).toBe(true);
+
+    // Readiness is tenant agent registry ∩ active OS bot. Register this bot in
+    // the tenant catalog so the auth-positive path can dispatch. Legacy revoke
+    // is still not the authorization source.
+    upsertAgent({
+      runtimeAgentId: bot,
+      name: bot,
+      runtimeVersion: "1",
+      lifecycle: "deployed",
+      health: "healthy",
+      tenantCoverage: [tenantId],
+      boundCapabilityCount: 0,
+      activeSessionCount: 0,
+      resourceUsage: { cpuPercent: 0, memoryPercent: 0, tokenBudgetUsedPercent: 0 },
+      deployedAt: 1,
+      lastActiveAt: 1,
+    });
 
     const authority = buildAuthority({
       cfg,
