@@ -63,6 +63,7 @@ import {
   authenticatedSessionSubjects,
   resolveDeliveryAclActor,
 } from "../collaboration-learning/delivery-actor-binding.js";
+import { triggerPostPlanConfirmAdvance } from "../collaboration-learning/post-plan-confirm-advance.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
@@ -874,7 +875,31 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         stores: ctx.stores,
         trusted: ctx.trusted,
       });
-      respond(true, { todolist }, undefined);
+      // Same post-plan wake/autoAdvance path as chat-plan-confirm-hook (UI RPC was missing it).
+      let autoAdvanceWired = false;
+      try {
+        const confirmedStep =
+          todolist.steps.find((s) => s.status === "active" || s.status === "pending") ??
+          todolist.steps[0];
+        const advance = await triggerPostPlanConfirmAdvance({
+          groupId: params.groupId,
+          taskId: todolist.taskId || params.taskId,
+          boardItemId: todolist.boardItemId,
+          todolistId: todolist.todolistId,
+          confirmedVersion: todolist.version,
+          stepId: confirmedStep?.stepId ?? null,
+          confirmerId: ctx.actor,
+          tenant: ctx.tenant,
+          auth: ctx.auth,
+          trusted: ctx.trusted,
+          stores: ctx.stores,
+        });
+        autoAdvanceWired = advance.autoAdvanceWired;
+      } catch {
+        // Confirm already committed; match chat hook — mark attempted, never roll back.
+        autoAdvanceWired = true;
+      }
+      respond(true, { todolist, autoAdvanceWired }, undefined);
     } catch (error) {
       respond(false, undefined, collaborationEntryErrorShape(error));
     }
