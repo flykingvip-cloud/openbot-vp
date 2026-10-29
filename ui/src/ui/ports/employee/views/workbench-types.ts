@@ -611,7 +611,7 @@ export type WorkbenchWorkspaceSelectorState = {
 
 export type WorkbenchCollaborationMemberGovernanceState = {
   activeGroupKey: string | null;
-  activeGroupRole?: "owner" | "member" | null;
+  activeGroupRole?: "owner" | "admin" | "member" | null;
   currentOwnerUserId?: string | null;
   title: string;
   prompt: string;
