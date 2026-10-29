@@ -79,6 +79,15 @@ const STEWARD_ACT_INTENT_RE =
 const STEWARD_RETRIEVE_INTENT_RE =
   /项目风险|本周项目|风险清单|project risk|collaboration\.directory|机器人列表|数字人列表|查(?:一下|询)?[^。！？\n]{0,24}(风险|项目进展)/iu;
 
+/**
+ * Explicit runtime tool/exec (or clear "call/run exec") intents. Chat-lane
+ * disableTools on these prompts empties the allow-list; models then emit body
+ * DSML `exec` and the protocol gate terminates as no_tools_available.
+ * Pure small-talk / "不要用工具" stall copy must stay chat.
+ */
+const EXPLICIT_TOOL_EXEC_RE =
+  /(?:用\s*exec(?:\s*工具)?(?:\s*(?:执行|调用))?|(?:立刻|必须|再次)(?:立刻|必须|调用|用)*\s*exec|(?:调用|执行)\s*exec\b|use (?:the )?exec(?: tool)?|(?:call|run|invoke)\s+(?:the )?exec(?: tool)?)/iu;
+
 export function shouldApplyChatLaneSkip(params: {
   routerEnabled: boolean;
   depth?: InboundDepth;
@@ -372,6 +381,9 @@ export function classifyInboundDepth(input: InboundDepthInput): InboundDepthDeci
     }
     if (channelTypesetOrPublish) {
       return decision("act", ["execution_typeset_or_channel_publish"], "strong");
+    }
+    if (EXPLICIT_TOOL_EXEC_RE.test(text)) {
+      return decision("act", ["explicit_tool_exec_intent"], "strong");
     }
     if (explicitKnowledge) {
       return decision("retrieve", ["explicit_knowledge_query"], "strong");

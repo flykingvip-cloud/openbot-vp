@@ -70,6 +70,7 @@ import {
   truncateMiddle,
   clampExecWorkdirToWorkspaceRoot,
 } from "./bash-tools.shared.js";
+import { enrichPathMissingToolError } from "./recoverable-tool-failure.js";
 import { assertSandboxPath } from "./sandbox-paths.js";
 import { assertSharedFsExecMutationAllowed } from "./shared-fs-resource-policy.js";
 
@@ -566,7 +567,13 @@ async function executeResolvedExecPolicy(params: {
   // mutation targets are denied here (policy owner shared-fs-resource) so
   // write-deny ⇒ exec-deny for the same path class. Not a workspace-root-guard wrap.
   if (defaults?.workspaceOnly && !desktopSaveRunsOnNode(host, toolParams.command)) {
-    const workspaceRoot = defaults.workspaceRoot?.trim() || defaults.cwd || workdir;
+    // Trusted root only — never treat model workdir as the authorization root.
+    const workspaceRoot = defaults.workspaceRoot?.trim() || defaults.cwd;
+    if (!workspaceRoot) {
+      throw new Error(
+        "exec workspaceOnly requires a server/session workspace root; model workdir alone is not trusted.",
+      );
+    }
     const clamped = clampExecWorkdirToWorkspaceRoot({
       workdir,
       workspaceRoot,
@@ -804,7 +811,13 @@ async function executeResolvedExecPolicy(params: {
           return;
         }
         if (outcome.status === "failed") {
-          reject(new Error(outcome.reason ?? "Command failed."));
+          // Prefer server/session workspaceRoot; never advertise raw model workdir.
+          const workspaceRoot = defaults?.workspaceRoot?.trim() || defaults?.cwd || undefined;
+          const reason = enrichPathMissingToolError({
+            errorText: outcome.reason ?? "Command failed.",
+            workspaceRoot,
+          });
+          reject(new Error(reason));
           return;
         }
         resolve({
@@ -829,6 +842,15 @@ async function executeResolvedExecPolicy(params: {
         }
         if (yielded || run.session.backgrounded) {
           return;
+        }
+        const workspaceRoot = defaults?.workspaceRoot?.trim() || defaults?.cwd || undefined;
+        const message = err instanceof Error ? err.message : String(err);
+        const enriched = enrichPathMissingToolError({
+          errorText: message,
+          workspaceRoot,
+        });
+        if (enriched !== message && err instanceof Error) {
+          err.message = enriched;
         }
         reject(err as Error);
       });

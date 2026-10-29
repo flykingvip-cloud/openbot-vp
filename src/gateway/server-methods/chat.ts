@@ -58,6 +58,7 @@ import {
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
+import { readSessionTaskBoard } from "../../conversation-task/session-task-board.js";
 import { shouldTaskParkAbortInFlight } from "../../conversation-task/turn-relation.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
@@ -405,6 +406,15 @@ import {
   raceChatRestoreWork,
   throwIfRestoreAborted,
 } from "./chat-restore-deadline.js";
+import {
+  applyChatFocusSwitchGateWithResumeRecheck,
+  authoritativeStopIdentityFromClient,
+  buildResumeTaskStopActive,
+  clearAuthoritativeTaskStop,
+  clientIdentityOkForResume,
+  recordAuthoritativeTaskStop,
+  sessionStopBarrierActive,
+} from "./chat-resume-parked-recheck.js";
 import {
   appendInjectedAssistantMessageToTranscript,
   appendInjectedPeerMessageToTranscript,
@@ -3053,6 +3063,8 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
   stopReason?: string;
   mode?: "stop" | "undo";
   client: GatewayClient | null;
+  /** Session transcript path — used to bind authoritative stop to board taskId. */
+  sessionFile?: string;
 }) {
   const snapshots = collectSessionAbortPartials({
     chatAbortControllers: params.context.chatAbortControllers,
@@ -3072,6 +3084,40 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
       snapshots,
       client: params.client,
     });
+  }
+  // Authoritative stop by original taskId (survives AbortController delete).
+  // task-park is not a user stop barrier — do not record.
+  const boardTaskId = (() => {
+    const file = params.sessionFile?.trim();
+    if (!file) {
+      return "";
+    }
+    try {
+      return readSessionTaskBoard(file).current?.taskId?.trim() ?? "";
+    } catch {
+      return "";
+    }
+  })();
+  if (boardTaskId) {
+    const identity = authoritativeStopIdentityFromClient(params.client);
+    if (params.mode === "undo") {
+      clearAuthoritativeTaskStop({
+        taskId: boardTaskId,
+        sessionKey: params.sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+      });
+    } else if (res.aborted && params.stopReason !== "task-park") {
+      recordAuthoritativeTaskStop({
+        taskId: boardTaskId,
+        sessionKey: params.sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+        reason: params.stopReason ?? params.abortOrigin,
+      });
+    }
   }
   return res;
 }
@@ -4340,6 +4386,12 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
 
     const ops = createChatAbortOps(context);
+    let abortSessionFile: string | undefined;
+    try {
+      abortSessionFile = (await loadSessionEntryForClient(sessionKey, client)).entry?.sessionFile;
+    } catch {
+      abortSessionFile = undefined;
+    }
 
     if (!runId) {
       const res = await abortChatRunsForSessionKeyWithPartials({
@@ -4350,6 +4402,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         stopReason: "rpc",
         mode,
         client,
+        sessionFile: abortSessionFile,
       });
       respond(true, {
         ok: true,
@@ -4369,6 +4422,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         stopReason: "rpc",
         mode,
         client,
+        sessionFile: abortSessionFile,
       });
       respond(true, {
         ok: true,
@@ -4421,6 +4475,35 @@ export const chatHandlers: GatewayRequestHandlers = {
         ],
         client,
       });
+    }
+    // Controller is already deleted by abortChatRunById — record durable task stop.
+    if (res.aborted) {
+      try {
+        const boardTaskId = readSessionTaskBoard(abortSessionFile).current?.taskId?.trim() ?? "";
+        if (boardTaskId) {
+          const identity = authoritativeStopIdentityFromClient(client);
+          if (mode === "undo") {
+            clearAuthoritativeTaskStop({
+              taskId: boardTaskId,
+              sessionKey,
+              scopeKind: identity.scopeKind,
+              tenantId: identity.tenantId,
+              userId: identity.userId,
+            });
+          } else {
+            recordAuthoritativeTaskStop({
+              taskId: boardTaskId,
+              sessionKey,
+              scopeKind: identity.scopeKind,
+              tenantId: identity.tenantId,
+              userId: identity.userId,
+              reason: "rpc",
+            });
+          }
+        }
+      } catch {
+        // Session entry unavailable — authoritative stop skipped (fail-open on record).
+      }
     }
     respond(true, {
       ok: true,
@@ -5600,6 +5683,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         abortOrigin: "stop-command",
         stopReason: "stop",
         client,
+        sessionFile: entry?.sessionFile,
       });
       respond(true, { ok: true, aborted: res.aborted, runIds: res.runIds });
       return;
@@ -5721,10 +5805,35 @@ export const chatHandlers: GatewayRequestHandlers = {
       };
       if (!p.growthBirthTurn) {
         try {
-          taskTracking = applyFocusSwitchGate({
+          // Always inject live ResumeParkedRecheck so resume revalidates auth + stop.
+          const stopIdentity = authoritativeStopIdentityFromClient(client);
+          taskTracking = applyChatFocusSwitchGateWithResumeRecheck({
             sessionFile: entry?.sessionFile,
             incomingText: mentionMessage.trim() || bodyTrimmed,
             workspacePaths: callerWorkspaceCwd ? [callerWorkspaceCwd] : [],
+            proceed: p.focusSwitchProceed === true,
+            recheckInputs: {
+              sendPolicy,
+              accessAuthorized: true,
+              clientIdentityOk: clientIdentityOkForResume(client),
+              // Session-wide live-controller scan is secondary only; scoped
+              // authoritative stop (tenant/user/session+taskId) survives abort→delete.
+              // Incomplete identity → unverifiable → fail closed (never "not stopped").
+              stopActive: sessionStopBarrierActive({
+                sessionKeys: [resolvedSessionKey, sessionKey],
+                chatAbortControllers: context.chatAbortControllers,
+                scopeKind: stopIdentity.scopeKind,
+                tenantId: stopIdentity.tenantId,
+                userId: stopIdentity.userId,
+              }),
+              isTaskStopActive: buildResumeTaskStopActive({
+                sessionKeys: [resolvedSessionKey, sessionKey],
+                chatAbortControllers: context.chatAbortControllers,
+                scopeKind: stopIdentity.scopeKind,
+                tenantId: stopIdentity.tenantId,
+                userId: stopIdentity.userId,
+              }),
+            },
           });
         } catch {
           recordFocusSwitchDecision("focus_state_unavailable");
@@ -5738,6 +5847,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           abortOrigin: "rpc",
           stopReason: "task-park",
           client,
+          sessionFile: entry?.sessionFile,
         });
       }
       if (taskTracking.action === "cancel_parked") {

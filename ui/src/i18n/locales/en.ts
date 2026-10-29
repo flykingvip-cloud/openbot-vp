@@ -4666,6 +4666,9 @@ export const en: TranslationMap = {
       "When the new task started, unfinished prior work was parked automatically. Choose: resume it, keep it paused in the park list, or close and remove it.",
     parkedTaskReminderDetailNamed:
       "Prior task “{title}” is still unfinished. Choose: resume it, keep it paused in the park list, or close and remove it.",
+    taskBoardFocusCurrent: "Current task: “{current}”; {count} parked",
+    taskBoardFocusIdle: "No active task; {count} parked",
+    parkedCountSignal: "{count} parked",
     parkedTaskResume: "Resume prior task",
     parkedTaskPause: "Pause prior task",
     parkedTaskClose: "Close prior task",
