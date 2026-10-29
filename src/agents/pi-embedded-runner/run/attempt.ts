@@ -7,6 +7,7 @@ import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-co
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { OpenBotConfig } from "../../../config/config.js";
+import { readSessionTaskBoard } from "../../../conversation-task/session-task-board.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
 import {
   compilerTelemetryToFaultRoundSnapshot,
@@ -2632,16 +2633,32 @@ export async function runEmbeddedAttempt(
           let silentExecContinues = 0;
           let recoverableContinues = 0;
           // Durable ≤2 progress-stall ledger (restart + concurrency safe via wx slots).
+          // Quota cycle binds to board taskId so same-task retry shares ≤2 and a
+          // new task in the same chat gets an independent quota (resume cannot
+          // swap ids: cycle comes from authoritative board current, not user text).
           const stallLedgerSessionKey = (
             params.sessionKey?.trim() ||
             params.sessionId?.trim() ||
             ""
           ).trim();
+          let stallQuotaCycleId = "";
+          try {
+            const boardTaskId = readSessionTaskBoard(params.sessionFile).current?.taskId?.trim();
+            if (boardTaskId) {
+              stallQuotaCycleId = boardTaskId;
+            }
+          } catch {
+            // Board unavailable — fall through to execution task id.
+          }
+          if (!stallQuotaCycleId) {
+            stallQuotaCycleId = (executionTaskId ?? "").trim();
+          }
           const stallLedger =
-            stallLedgerSessionKey && params.agentDir?.trim()
+            stallLedgerSessionKey && params.agentDir?.trim() && stallQuotaCycleId
               ? {
                   ledgerDir: path.join(params.agentDir.trim(), "stall-continue-ledger"),
                   sessionKey: stallLedgerSessionKey,
+                  quotaCycleId: stallQuotaCycleId,
                 }
               : undefined;
           const continueBudget =
