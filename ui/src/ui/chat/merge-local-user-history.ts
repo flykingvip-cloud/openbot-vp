@@ -94,11 +94,25 @@ export function mergeIncomingHistoryWithLocalUserTurn(
     return incoming;
   }
   const optimistic = local[optimisticIndex];
+  const optimisticId = messageId(optimistic);
+  // Prefer exact local-* id match (server echoes the same id). Text-only match
+  // against an *older* duplicate ("你好"/"ping") used to drop the in-flight
+  // bubble when a large group history page lagged the latest user turn.
+  if (optimisticId && incoming.some((message) => messageId(message) === optimisticId)) {
+    if (openingsShouldStay(local, incoming)) {
+      return prependLocalOpenings(local, incoming);
+    }
+    return incoming;
+  }
   const optimisticText = messageText(optimistic);
   if (
     optimisticText &&
     incoming.some(
-      (message) => roleOf(message) === "user" && messageText(message) === optimisticText,
+      (message) =>
+        roleOf(message) === "user" &&
+        messageId(message) &&
+        !messageId(message).startsWith("local-") &&
+        messageText(message) === optimisticText,
     )
   ) {
     if (openingsShouldStay(local, incoming)) {

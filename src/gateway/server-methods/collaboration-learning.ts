@@ -994,20 +994,36 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
-      const actor = await resolveDeliveryAclActor(client, params.groupId);
+      // Same trusted locator chain as confirm/listOwnerDecisionDeliveries.
+      // Without auth/stores, managed_enterprise refuses compat workspace stores
+      // and UI hydration cannot learn confirmed → ghost confirm buttons.
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const todolist = await getCollaborationTodolist({
         groupId: params.groupId,
         taskId: params.taskId,
         todolistId: params.todolistId,
-        actor,
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       const deliveries = await listCollaborationOwnerDecisionDeliveries({
         groupId: params.groupId,
         taskId: params.taskId,
-        actor,
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       const cardDelivery =
         deliveries.find(
@@ -1039,14 +1055,25 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const todolists = await listCollaborationTodolists({
         groupId: params.groupId,
         taskId: params.taskId,
         boardItemId: params.boardItemId,
         ownerMemberId: params.ownerMemberId,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { todolists }, undefined);
     } catch (error) {

@@ -1,70 +1,125 @@
 import { describe, expect, it } from "vitest";
 import {
+  isOptimisticLocalUserMessage,
   latestTurnHasAssistantReply,
   mergeIncomingHistoryWithLocalUserTurn,
 } from "./merge-local-user-history.ts";
 
 describe("mergeIncomingHistoryWithLocalUserTurn", () => {
-  it("keeps the local user instruction when history returns only assistant results", () => {
-    const local = [
-      { id: "old", role: "user", content: [{ type: "text", text: "earlier" }] },
-      {
-        id: "local-run-1",
-        role: "user",
-        content: [{ type: "text", text: "请检索订单参谋 MCP" }],
-      },
-    ];
-    const incoming = [{ role: "assistant", content: [{ type: "text", text: "检索情况" }] }];
-
-    expect(mergeIncomingHistoryWithLocalUserTurn(local, incoming)).toEqual([
-      local[0],
-      local[1],
-      incoming[0],
-    ]);
-  });
-
-  it("uses server history when it already contains the same user turn", () => {
+  it("keeps an in-flight local user row when history has not caught up", () => {
     const local = [
       {
         id: "local-run-1",
         role: "user",
-        content: [{ type: "text", text: "请检索订单参谋 MCP" }],
+        content: [{ type: "text", text: "build the report" }],
       },
     ];
     const incoming = [
-      { id: "persisted", role: "user", content: [{ type: "text", text: "请检索订单参谋 MCP" }] },
-      { role: "assistant", content: [{ type: "text", text: "检索情况" }] },
+      {
+        id: "asst-1",
+        role: "assistant",
+        content: [{ type: "text", text: "working" }],
+      },
     ];
+    expect(mergeIncomingHistoryWithLocalUserTurn(local, incoming)).toEqual([local[0], incoming[0]]);
+  });
 
+  it("drops the optimistic row once history contains the same user text", () => {
+    const local = [
+      {
+        id: "local-run-1",
+        role: "user",
+        content: [{ type: "text", text: "build the report" }],
+      },
+    ];
+    const incoming = [
+      {
+        id: "persisted-1",
+        role: "user",
+        content: [{ type: "text", text: "build the report" }],
+      },
+      {
+        id: "asst-1",
+        role: "assistant",
+        content: [{ type: "text", text: "done" }],
+      },
+    ];
     expect(mergeIncomingHistoryWithLocalUserTurn(local, incoming)).toEqual(incoming);
   });
 
-  it("keeps the local new-robot greeting until a model assistant reply arrives", () => {
-    const opening = {
-      id: "local-growth-opening-agent:helper:main",
-      role: "assistant",
-      content: [{ type: "text", text: "你好，我是邮件助理。" }],
-    };
-    const incomingUser = [{ role: "user", content: [{ type: "text", text: "\u200b" }] }];
-    expect(mergeIncomingHistoryWithLocalUserTurn([opening], incomingUser)).toEqual([
-      opening,
-      incomingUser[0],
-    ]);
-    const modelReply = [{ role: "assistant", content: [{ type: "text", text: "我是邮件助理。" }] }];
-    expect(mergeIncomingHistoryWithLocalUserTurn([opening], modelReply)).toEqual(modelReply);
-  });
-});
-
-describe("latestTurnHasAssistantReply", () => {
-  it("is false until an assistant lands after the latest user", () => {
+  it("recognizes optimistic local user ids", () => {
     expect(
-      latestTurnHasAssistantReply([{ role: "user", content: [{ type: "text", text: "task" }] }]),
+      isOptimisticLocalUserMessage({
+        id: "local-run-1",
+        role: "user",
+        content: [{ type: "text", text: "hi" }],
+      }),
+    ).toBe(true);
+    expect(
+      isOptimisticLocalUserMessage({
+        id: "persisted-1",
+        role: "user",
+        content: [{ type: "text", text: "hi" }],
+      }),
     ).toBe(false);
+  });
+
+  it("detects whether the latest user turn already has an assistant reply", () => {
     expect(
       latestTurnHasAssistantReply([
-        { role: "user", content: [{ type: "text", text: "task" }] },
-        { role: "assistant", content: [{ type: "text", text: "done" }] },
+        { role: "user", content: [{ type: "text", text: "a" }] },
+        { role: "assistant", content: [{ type: "text", text: "b" }] },
       ]),
     ).toBe(true);
+    expect(
+      latestTurnHasAssistantReply([{ role: "user", content: [{ type: "text", text: "a" }] }]),
+    ).toBe(false);
+  });
+
+  it("keeps local growth openings when history has no model assistant yet", () => {
+    const local = [
+      {
+        id: "local-growth-opening-agent:helper:main",
+        role: "assistant",
+        content: [{ type: "text", text: "opening" }],
+      },
+    ];
+    const incoming = [{ role: "user", content: [{ type: "text", text: "hi" }] }];
+    expect(mergeIncomingHistoryWithLocalUserTurn(local, incoming)).toEqual([local[0], incoming[0]]);
+  });
+
+  it("keeps in-flight local bubble when only older duplicate text exists in history", () => {
+    const local = [
+      {
+        id: "local-older",
+        role: "user",
+        content: [{ type: "text", text: "你好" }],
+      },
+      {
+        id: "asst-1",
+        role: "assistant",
+        content: [{ type: "text", text: "在" }],
+      },
+      {
+        id: "local-run-new",
+        role: "user",
+        content: [{ type: "text", text: "你好" }],
+      },
+    ];
+    const incoming = [
+      {
+        id: "local-older",
+        role: "user",
+        content: [{ type: "text", text: "你好" }],
+        senderLabel: "CEO",
+      },
+      {
+        id: "asst-1",
+        role: "assistant",
+        content: [{ type: "text", text: "在" }],
+      },
+    ];
+    const merged = mergeIncomingHistoryWithLocalUserTurn(local, incoming);
+    expect(merged.some((m) => (m as { id?: string }).id === "local-run-new")).toBe(true);
   });
 });
