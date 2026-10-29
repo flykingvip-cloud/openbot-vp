@@ -310,6 +310,7 @@ function createState(overrides: Partial<AppPortState> = {}): AppPortState {
     loadAssistantIdentity: vi.fn(async () => undefined),
     loadCollaborationLearningSnapshot: vi.fn(async () => undefined),
     loadCollaborationObservabilitySnapshot: vi.fn(async () => undefined),
+    resetCollaborationObservabilitySnapshot: vi.fn(),
     resetCollaborationLearningSnapshot: vi.fn(),
     transitionCollaborationGovernanceObject: vi.fn(async () => undefined),
     saveCollaborationDecisionDraft: vi.fn(async () => undefined),

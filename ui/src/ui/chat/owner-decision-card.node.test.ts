@@ -25,6 +25,7 @@ import {
   readOwnerDecisionRow,
   renderOwnerDecisionCards,
   selectLatestOwnerDecisionPerBoardItem,
+  selectHumanConfirmReceiptCards,
   selectStickyOwnerDecisionCards,
   isOwnerDecisionTodolistTerminal,
   setOwnerDecisionActionError,
@@ -806,5 +807,63 @@ describe("selectStickyOwnerDecisionCards", () => {
     const v2 = { ...v1, decisionId: "owner-decision-x-v2", todolistId: "todo-x2", version: 2 };
     const sticky = selectStickyOwnerDecisionCards([v1, v2]);
     expect(sticky.map((c) => c.decisionId)).toEqual(["owner-decision-x-v2"]);
+  });
+});
+
+describe("selectHumanConfirmReceiptCards", () => {
+  afterEach(() => {
+    clearOwnerDecisionDismissalsForTest();
+    clearOwnerDecisionDeliveryStateForTest();
+  });
+
+  const baseCard = {
+    kind: "todolist_confirm" as const,
+    decisionId: "owner-decision-receipt",
+    groupId: "grp-test",
+    taskId: "task-r",
+    boardItemId: "board-r",
+    todolistId: "todo-r",
+    title: "请确认执行计划",
+    summary: ["1. ship；"],
+    options: [
+      { id: "confirm" as const, label: "确认计划", style: "primary" as const },
+      { id: "revise" as const, label: "退回修订", style: "default" as const },
+      { id: "later" as const, label: "稍后", style: "ghost" as const },
+    ],
+    version: 1,
+    mentionMemberIds: ["ceo"],
+    mentionLabels: ["CEO"],
+  };
+
+  it("keeps compact human confirm receipts for consumed+confirmed (history, not sticky)", () => {
+    setOwnerDecisionTodolistStatus("todo-r", "confirmed");
+    noteOwnerDecisionDelivery("todo-r", "consumed");
+    const receipts = selectHumanConfirmReceiptCards([baseCard]);
+    expect(receipts.map((c) => c.decisionId)).toEqual(["owner-decision-receipt"]);
+    // Sticky must still drop consumed — todo clears card wall.
+    expect(selectStickyOwnerDecisionCards([baseCard])).toEqual([]);
+  });
+
+  it("excludes peer_confirmed from human receipt helper (peer has dedicated copy)", () => {
+    setOwnerDecisionTodolistStatus("todo-r", "confirmed");
+    noteOwnerDecisionDelivery("todo-r", "peer_confirmed");
+    expect(selectHumanConfirmReceiptCards([baseCard])).toEqual([]);
+  });
+
+  it("renderOwnerDecisionCards shows human receipt with confirm-source=human", () => {
+    setOwnerDecisionTodolistStatus(baseCard.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(baseCard.todolistId, "consumed", baseCard.version);
+    const container = document.createElement("div");
+    render(renderOwnerDecisionCards([{ role: "assistant", ownerDecision: baseCard }]), container);
+    const receipt = container.querySelector(".employee-workbench__owner-decision-human-receipt");
+    expect(receipt).not.toBeNull();
+    expect(receipt?.getAttribute("data-owner-decision-confirm-source")).toBe("human");
+    expect(receipt?.getAttribute("data-owner-decision-delivery")).toBe("consumed");
+    expect(container.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
+      "执行计划已确认",
+    );
+    // Sticky/todo cleared; no actionable confirm on receipt.
+    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+    expect(container.querySelector("[data-owner-decision-peer-ack]")).toBeNull();
   });
 });
