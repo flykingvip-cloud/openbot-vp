@@ -171,6 +171,42 @@ describe("classifyInboundDepth", () => {
         reason: "default_chat",
       },
       {
+        name: "explicit exec tool zh harness",
+        input: baseInput({
+          text: "立刻用 exec 工具执行相对 workspace 的脚本：pr143-local/always-enoent.sh",
+        }),
+        depth: "act",
+        reason: "explicit_tool_exec_intent",
+      },
+      {
+        name: "explicit bare 立刻 exec",
+        input: baseInput({ text: "立刻 exec pr143-local/sleep12.sh，等待它完成并报告输出" }),
+        depth: "act",
+        reason: "explicit_tool_exec_intent",
+      },
+      {
+        name: "explicit 必须立刻调用 exec",
+        input: baseInput({
+          text: "必须立刻调用 exec 工具执行：pr143-local/write-then-unknown.sh",
+        }),
+        depth: "act",
+        reason: "explicit_tool_exec_intent",
+      },
+      {
+        name: "explicit use exec tool en",
+        input: baseInput({ text: "use the exec tool to run workspace/script.sh" }),
+        depth: "act",
+        reason: "explicit_tool_exec_intent",
+      },
+      {
+        name: "stall copy without tools stays chat",
+        input: baseInput({
+          text: "新任务：生成今日销售日报。先只输出短句「请稍等，正在收尾排版。」不要写正文，不要提问，不要用工具。",
+        }),
+        depth: "chat",
+        reason: "default_chat",
+      },
+      {
         name: "fuzzy request",
         input: baseInput({ text: "帮我处理一下这个" }),
         depth: "chat",
@@ -295,6 +331,46 @@ describe("classifyInboundDepth", () => {
     const sorted = samples.toSorted((a, b) => a - b);
     const p99 = sorted[Math.floor(sorted.length * 0.99)] ?? 0;
     expect(p99).toBeLessThan(10);
+  });
+});
+
+describe("explicit tool/exec keeps tools on (chat-lane skip off)", () => {
+  it("enables tools for harness-like exec prompts and keeps greetings on chat-lane", () => {
+    const execPrompts = [
+      "立刻用 exec 工具执行相对 workspace 的脚本：pr143-local/always-enoent.sh",
+      "立刻 exec 相对 workspace 脚本 pr143-local/sleep12.sh",
+      "必须立刻调用 exec 工具执行：pr143-local/write-then-unknown.sh",
+      "再次 exec pr143-local/always-enoent.sh",
+      "用 exec 工具执行工作区脚本 pr143-local/write-then-unknown.sh",
+      "call the exec tool now",
+    ];
+    for (const text of execPrompts) {
+      const result = classifyInboundDepth(baseInput({ text }));
+      expect(result.depth, text).toBe("act");
+      expect(result.reasons, text).toContain("explicit_tool_exec_intent");
+      expect(result.ceiling.maxToolMode, text).toBe("write");
+      expect(
+        shouldApplyChatLaneSkip({
+          routerEnabled: false,
+          depth: result.depth,
+          stewardClassified: true,
+        }),
+        text,
+      ).toBe(false);
+    }
+
+    for (const text of ["晚上好", "good evening", "帮我处理一下这个"]) {
+      const result = classifyInboundDepth(baseInput({ text }));
+      expect(result.depth, text).toBe("chat");
+      expect(
+        shouldApplyChatLaneSkip({
+          routerEnabled: false,
+          depth: result.depth,
+          stewardClassified: true,
+        }),
+        text,
+      ).toBe(true);
+    }
   });
 });
 
