@@ -188,6 +188,7 @@ function createState(overrides: Partial<AppPortState> = {}): AppPortState {
     workbenchSpaceCreatorSelectedBotIds: [],
     workbenchSpaceCreatorCoordinatorBotId: "",
     sidebarOpen: false,
+    sidebarSurface: "artifact",
     sidebarPreviewMode: "markdown",
     sidebarContent: null,
     workbenchBrandLogoError: null,
@@ -2979,6 +2980,235 @@ describe("buildEmployeeWorkbenchProps", () => {
     expect(memberProps.collaborationMemberGovernance?.canReset).toBe(false);
   });
 
+  it("treats human:<uuid> memberRoleMap owner as owner so member governance stays writable", () => {
+    const ownerUuid = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
+    const state = createState({
+      hello: {
+        auth: {
+          provider: "trusted-proxy",
+          user: ownerUuid,
+          displayName: "Owner",
+          tenantId: "tenant-1",
+        },
+      } as never,
+      platformAuthState: {
+        session: {
+          user: ownerUuid,
+          displayName: "Owner",
+          tenantId: "tenant-1",
+        },
+        employeeAccess: {
+          employeeUserId: ownerUuid,
+          ownedAgentIds: [],
+          currentSeat: { seatId: "seat-1", title: "CEO" },
+        },
+      } as never,
+      workbenchMemberGovernanceDrawerOpen: true,
+      collaborationSpacesResult: {
+        spaces: [
+          {
+            id: "alpha",
+            groupId: "grp-digital-human-team",
+            title: "数字人战队",
+            // Digital-human teams often leave governance.ownerUserId null and
+            // only record the owner as human:<uuid> in memberRoleMap.
+            ownerUserId: null,
+            operatingState: {
+              governance: { ownerUserId: null },
+              memberRoleMap: [
+                {
+                  memberId: `human:${ownerUuid}`,
+                  memberKind: "human",
+                  governanceRole: "owner",
+                  label: "Owner",
+                },
+              ],
+            },
+            members: {
+              humans: [{ userId: ownerUuid, name: "Owner", status: "active" }],
+              bots: [],
+            },
+            invites: { humans: [], bots: [] },
+          },
+        ],
+      } as never,
+    });
+
+    const props = buildEmployeeWorkbenchProps({
+      state,
+      chatContent: html`
+        <div>chat</div>
+      `,
+      authPanel: null,
+    });
+
+    const governance = props.collaborationMemberGovernance;
+    expect(governance?.activeGroupRole).toBe("owner");
+    expect(governance?.currentOwnerUserId).toBe(ownerUuid);
+    expect(governance?.canReset).toBe(true);
+    // workbench-stage-collaboration: isReadOnly = activeGroupRole === "member" || isInvitee
+    expect(governance?.activeGroupRole === "member" || Boolean(governance?.selfPendingInvite)).toBe(
+      false,
+    );
+  });
+
+  it("treats memberRoleMap governanceRole=admin as writable (not readOnly)", () => {
+    const adminUuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const ownerUuid = "11111111-2222-3333-4444-555555555555";
+    const state = createState({
+      workbenchPrimaryModule: "collaboration",
+      workbenchTeamSelectedKey: "space:alpha",
+      sessionKey: "space:alpha",
+      platformAuthStatus: {
+        authenticated: true,
+        user: {
+          userId: adminUuid,
+          email: "admin@example.com",
+          displayName: "Admin",
+          tenantId: "tenant-1",
+        },
+      } as never,
+      platformAuthState: {
+        session: {
+          user: adminUuid,
+          displayName: "Admin",
+          tenantId: "tenant-1",
+        },
+        employeeAccess: {
+          employeeUserId: adminUuid,
+          ownedAgentIds: [],
+          currentSeat: { seatId: "seat-1", title: "Admin" },
+        },
+      } as never,
+      workbenchMemberGovernanceDrawerOpen: true,
+      collaborationSpacesResult: {
+        spaces: [
+          {
+            id: "alpha",
+            groupId: "grp-daniel-hhd-gmail-com-upbeyond",
+            title: "数字人战队",
+            ownerUserId: null,
+            operatingState: {
+              governance: {
+                ownerUserId: null,
+                adminUserIds: [`human:${adminUuid}`],
+              },
+              memberRoleMap: [
+                {
+                  memberId: `human:${ownerUuid}`,
+                  memberKind: "human",
+                  governanceRole: "owner",
+                  label: "CEO",
+                },
+                {
+                  memberId: `human:${adminUuid}`,
+                  memberKind: "human",
+                  governanceRole: "admin",
+                  label: "Admin",
+                },
+              ],
+            },
+            members: {
+              humans: [
+                { userId: ownerUuid, name: "CEO", status: "active" },
+                { userId: adminUuid, name: "Admin", status: "active" },
+              ],
+              bots: [],
+            },
+            invites: { humans: [], bots: [] },
+          },
+        ],
+      } as never,
+    });
+
+    const props = buildEmployeeWorkbenchProps({
+      state,
+      chatContent: html`
+        <div>chat</div>
+      `,
+      authPanel: null,
+    });
+
+    const governance = props.collaborationMemberGovernance;
+    expect(governance?.activeGroupRole).toBe("admin");
+    expect(governance?.activeGroupRole === "member" || Boolean(governance?.selfPendingInvite)).toBe(
+      false,
+    );
+  });
+
+  it("treats adminUserIds match as admin even without memberRoleMap row", () => {
+    const adminUuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    const ownerUuid = "11111111-2222-3333-4444-555555555555";
+    const state = createState({
+      workbenchPrimaryModule: "collaboration",
+      workbenchTeamSelectedKey: "space:alpha",
+      sessionKey: "space:alpha",
+      platformAuthStatus: {
+        authenticated: true,
+        user: {
+          userId: adminUuid,
+          email: "admin@example.com",
+          displayName: "Admin",
+          tenantId: "tenant-1",
+        },
+      } as never,
+      platformAuthState: {
+        session: {
+          user: adminUuid,
+          displayName: "Admin",
+          tenantId: "tenant-1",
+        },
+        employeeAccess: {
+          employeeUserId: adminUuid,
+          ownedAgentIds: [],
+          currentSeat: { seatId: "seat-1", title: "Admin" },
+        },
+      } as never,
+      workbenchMemberGovernanceDrawerOpen: true,
+      collaborationSpacesResult: {
+        spaces: [
+          {
+            id: "alpha",
+            groupId: "grp-admin-ids-only",
+            title: "Admin Ids Group",
+            ownerUserId: ownerUuid,
+            operatingState: {
+              governance: {
+                ownerUserId: ownerUuid,
+                adminUserIds: [adminUuid],
+              },
+              memberRoleMap: [
+                {
+                  memberId: ownerUuid,
+                  memberKind: "human",
+                  governanceRole: "owner",
+                },
+              ],
+            },
+            members: {
+              humans: [
+                { userId: ownerUuid, name: "Owner", status: "active" },
+                { userId: adminUuid, name: "Admin", status: "active" },
+              ],
+              bots: [],
+            },
+            invites: { humans: [], bots: [] },
+          },
+        ],
+      } as never,
+    });
+
+    const props = buildEmployeeWorkbenchProps({
+      state,
+      chatContent: html`
+        <div>chat</div>
+      `,
+      authPanel: null,
+    });
+
+    expect(props.collaborationMemberGovernance?.activeGroupRole).toBe("admin");
+  });
+
   it("resets collaboration data from member governance for the group owner", async () => {
     const request = vi.fn(async (method: string, params?: Record<string, unknown>) => {
       if (method === "collaboration.spaces.reset") {
@@ -4072,6 +4302,7 @@ describe("buildEmployeeWorkbenchProps", () => {
       sessionKey: "space:alpha",
       sidebarOpen: true,
       sidebarPreviewMode: "artifact",
+      sidebarSurface: "artifact",
       handleCloseSidebar,
       requestUpdate,
       collaborationSpacesResult: {
@@ -4090,6 +4321,9 @@ describe("buildEmployeeWorkbenchProps", () => {
         ],
       } as never,
     });
+    handleCloseSidebar.mockImplementation(() => {
+      state.sidebarOpen = false;
+    });
 
     const props = buildEmployeeWorkbenchProps({
       state,
@@ -4103,7 +4337,55 @@ describe("buildEmployeeWorkbenchProps", () => {
 
     expect(handleCloseSidebar).toHaveBeenCalledTimes(1);
     expect(state.workbenchMemberGovernanceDrawerOpen).toBe(true);
-    expect(state.sidebarOpen).toBe(true);
+    expect(state.sidebarOpen).toBe(false);
+  });
+
+  it("closes computer sidebar when opening member governance drawer", () => {
+    const handleCloseSidebar = vi.fn();
+    const requestUpdate = vi.fn();
+    const state = createState({
+      workbenchPrimaryModule: "collaboration",
+      workbenchTeamSelectedKey: "space:alpha",
+      sessionKey: "space:alpha",
+      sidebarOpen: true,
+      sidebarPreviewMode: "markdown",
+      sidebarSurface: "computer",
+      sidebarArtifactWorkspace: null,
+      handleCloseSidebar,
+      requestUpdate,
+      collaborationSpacesResult: {
+        spaces: [
+          {
+            id: "alpha",
+            groupId: "group-alpha",
+            title: "openbot市场部",
+            ownerUserId: "user-1",
+            members: {
+              humans: [{ userId: "user-1", name: "Owner", status: "active" }],
+              bots: [{ agentId: "bot-main", name: "Bot", status: "active" }],
+            },
+            invites: { humans: [], bots: [] },
+          },
+        ],
+      } as never,
+    });
+    handleCloseSidebar.mockImplementation(() => {
+      state.sidebarOpen = false;
+    });
+
+    const props = buildEmployeeWorkbenchProps({
+      state,
+      chatContent: html`
+        <div>chat</div>
+      `,
+      authPanel: null,
+    });
+
+    props.onOpenCollaborationMemberGovernance?.();
+
+    expect(handleCloseSidebar).toHaveBeenCalledTimes(1);
+    expect(state.workbenchMemberGovernanceDrawerOpen).toBe(true);
+    expect(state.sidebarOpen).toBe(false);
   });
 
   it("closes member governance drawer when opening artifact preview", () => {
