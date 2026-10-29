@@ -388,6 +388,33 @@ export function selectStickyOwnerDecisionCards(
   return [...active, ...terminalKeep];
 }
 
+/**
+ * History residual for human confirm (not sticky).
+ * Sticky/todo drops consumed (#137); chat history still shows a compact
+ * 「执行计划已确认」receipt. Peer uses dedicated「收到，并确认」via sticky
+ * peer_confirmed path — never this helper.
+ */
+export function selectHumanConfirmReceiptCards(
+  cards: OwnerDecisionCardView[],
+): OwnerDecisionCardView[] {
+  const latest = selectLatestOwnerDecisionPerBoardItem(cards);
+  const receipts: OwnerDecisionCardView[] = [];
+  for (const card of latest) {
+    const facing = getOwnerDecisionDelivery(card.todolistId, card.version);
+    if (facing !== "consumed") {
+      continue;
+    }
+    const status = String(getOwnerDecisionTodolistStatus(card.todolistId) ?? "")
+      .trim()
+      .toLowerCase();
+    if (status !== "confirmed") {
+      continue;
+    }
+    receipts.push(card);
+  }
+  return receipts;
+}
+
 export function setOwnerDecisionTodolistStatus(todolistId: string, status: string): void {
   const id = todolistId.trim();
   const value = status.trim().toLowerCase();
@@ -789,13 +816,44 @@ export function renderOwnerDecisionCards(
     opts.onHydrateStatuses?.(hydrateTargets);
   }
   const cards = selectStickyOwnerDecisionCards(allCards);
+  const stickyIds = new Set(cards.map((card) => card.decisionId));
+  const humanReceipts = selectHumanConfirmReceiptCards(allCards).filter(
+    (card) => !stickyIds.has(card.decisionId),
+  );
   const staleIds = staleOwnerDecisionDecisionIds(allCards);
   const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
-  if (cards.length === 0) {
+  if (cards.length === 0 && humanReceipts.length === 0) {
     return nothing;
   }
   const busy = Boolean(opts.busy);
+  const humanReceiptCopy = formatOwnerDecisionStatusCopy("confirmed");
   return html`
+    ${humanReceipts.map((card) => {
+      todolistIdByDecisionId.set(card.decisionId, card.todolistId);
+      boardItemIdByDecisionId.set(card.decisionId, card.boardItemId);
+      const authority = authorityById.get(card.decisionId) ?? "fence";
+      return html`
+        <div
+          class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card employee-workbench__owner-decision-human-receipt"
+          role="status"
+          aria-label=${humanReceiptCopy}
+          data-owner-decision=${card.decisionId}
+          data-todolist-id=${card.todolistId}
+          data-owner-decision-status="confirmed"
+          data-owner-decision-authority=${authority}
+          data-owner-decision-delivery="consumed"
+          data-owner-decision-terminal
+          data-owner-decision-confirm-source="human"
+        >
+          <div
+            class=${ownerDecisionStatusCalloutClass("confirmed")}
+            data-owner-decision-status-copy
+          >
+            ${humanReceiptCopy}
+          </div>
+        </div>
+      `;
+    })}
     ${cards.map((card) => {
       todolistIdByDecisionId.set(card.decisionId, card.todolistId);
       boardItemIdByDecisionId.set(card.decisionId, card.boardItemId);

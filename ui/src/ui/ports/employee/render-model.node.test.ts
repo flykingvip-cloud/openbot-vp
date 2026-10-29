@@ -309,6 +309,7 @@ function createState(overrides: Partial<AppPortState> = {}): AppPortState {
     logoutPlatformAuth: vi.fn(async () => undefined),
     loadAssistantIdentity: vi.fn(async () => undefined),
     loadCollaborationLearningSnapshot: vi.fn(async () => undefined),
+    loadCollaborationObservabilitySnapshot: vi.fn(async () => undefined),
     resetCollaborationLearningSnapshot: vi.fn(),
     transitionCollaborationGovernanceObject: vi.fn(async () => undefined),
     saveCollaborationDecisionDraft: vi.fn(async () => undefined),
@@ -3059,15 +3060,7 @@ describe("buildEmployeeWorkbenchProps", () => {
       workbenchPrimaryModule: "collaboration",
       workbenchTeamSelectedKey: "space:alpha",
       sessionKey: "space:alpha",
-      platformAuthStatus: {
-        authenticated: true,
-        user: {
-          userId: adminUuid,
-          email: "admin@example.com",
-          displayName: "Admin",
-          tenantId: "tenant-1",
-        },
-      } as never,
+
       platformAuthState: {
         session: {
           user: adminUuid,
@@ -3143,15 +3136,7 @@ describe("buildEmployeeWorkbenchProps", () => {
       workbenchPrimaryModule: "collaboration",
       workbenchTeamSelectedKey: "space:alpha",
       sessionKey: "space:alpha",
-      platformAuthStatus: {
-        authenticated: true,
-        user: {
-          userId: adminUuid,
-          email: "admin@example.com",
-          displayName: "Admin",
-          tenantId: "tenant-1",
-        },
-      } as never,
+
       platformAuthState: {
         session: {
           user: adminUuid,

@@ -852,8 +852,12 @@ describe("chat delivery bubble wiring", () => {
     expect((output.match(/chat-msg-actions/g) ?? []).length).toBe(1);
     expect((output.match(/chat-group-timestamp/g) ?? []).length).toBe(1);
     expect(output.indexOf("chat-group-timestamp")).toBeLessThan(output.indexOf("chat-copy-btn"));
-    expect(output.indexOf("我先查一下")).toBeGreaterThan(-1);
-    expect(output.indexOf("我先查一下")).toBeLessThan(output.indexOf("chat-msg-actions"));
+    // Chinese process opener「我先…」is scratchpad (assistant-scratchpad CHINESE_SCRATCHPAD_RE);
+    // showReasoning:false hides the pure-process bubble. Product answers stay visible in order.
+    // Parent 090dcff5 and tip share this omission — not a tip regression; expects track scratchpad SoT.
+    expect(output).not.toContain("我先查一下");
+    expect(output).toContain("我找到了相关文件");
+    expect(output.indexOf("我找到了相关文件")).toBeLessThan(output.indexOf("PDF 本身完好"));
     expect(output.indexOf("PDF 本身完好")).toBeLessThan(output.indexOf("chat-msg-actions"));
   });
 
@@ -894,8 +898,10 @@ describe("chat delivery bubble wiring", () => {
     expect(output).not.toContain("chat-turn-speaker");
     expect(output).not.toContain("chat-avatar--lead");
     expect(output).not.toContain("chat-group--solo");
-    expect(output.indexOf("chat-avatar assistant")).toBeLessThan(output.indexOf("我先查一下文档"));
-    expect(output.indexOf("我先查一下文档")).toBeLessThan(output.indexOf("明白了"));
+    // Process-only「我先查一下文档。」is scratchpad-stripped; avatar still leads the first
+    // visible product bubble「明白了…」(same omission on parent 090dcff5 baseline).
+    expect(output).not.toContain("我先查一下文档");
+    expect(output.indexOf("chat-avatar assistant")).toBeLessThan(output.indexOf("明白了"));
     expect(output.indexOf("明白了")).toBeLessThan(output.indexOf("chat-msg-actions"));
     expect((output.match(/class="chat-avatar assistant"/g) ?? []).length).toBe(1);
     expect((output.match(/chat-msg-actions/g) ?? []).length).toBe(1);

@@ -101,6 +101,7 @@ import {
 } from "../collaboration-dispatch/task-stop-control.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { deliveryActorIdsEqual } from "./delivery-actor-binding.js";
+import { ensureBoardActiveAfterConfirm } from "./ensure-board-active-after-confirm.js";
 import { collaborationDispatchIdsMatch } from "./member-dispatch-readiness.js";
 import {
   confirmationConsumedDelivery,
@@ -113,7 +114,6 @@ import {
   type OwnerDecisionCardDelivery,
 } from "./owner-decision-delivery.js";
 import { emitOwnerDecisionCardForProposedTodolist } from "./owner-decision-emit.js";
-import { ensureBoardActiveAfterConfirm } from "./ensure-board-active-after-confirm.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -124,6 +124,7 @@ import { assertPersistedTaskNotStopped } from "./task-stop-entry.js";
 import {
   resolveTeamDeliverableStores,
   type TeamResourceAuthOk,
+  isTrustedGroupStores,
   type TrustedGroupStores,
   TRUSTED_GROUP_LOCATOR_REQUIRED,
 } from "./team-resource-auth.js";
@@ -460,7 +461,6 @@ function humanGovernanceConfirmerIds(state: OperatingStateAclSource): string[] {
   }
   return out;
 }
-
 
 function isBotLikeMemberId(memberId: string | null | undefined): boolean {
   const id = (memberId ?? "").trim();
@@ -1719,7 +1719,7 @@ export async function proposeCollaborationTodolist(params: {
               authorizingActorId: (liveTodolist.confirmedBy ?? "").trim() || undefined,
               auth: params.auth,
               trusted: params.trusted,
-              stores: params.stores ?? stores,
+              stores: params.stores ?? (isTrustedGroupStores(stores) ? stores : null),
               tenant: params.tenant,
               cfg,
             });

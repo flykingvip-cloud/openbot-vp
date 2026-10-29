@@ -122,6 +122,29 @@ export function isHostLegacyCollaborationPath(
  * Build object/file/OS stores rooted at the trusted groupsRoot from auth.
  * Callers must NOT fall back to createWorkspaceCollaborationStores(cfg) after auth.
  */
+/**
+ * Runtime narrowing for TrustedGroupStores. Compat workspace stores from
+ * createWorkspaceCollaborationStores lack groupsRoot/groupLocator and must
+ * not be passed where team SoT is required — no force-cast.
+ */
+export function isTrustedGroupStores(value: unknown): value is TrustedGroupStores {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  const groupsRoot = typeof record.groupsRoot === "string" ? record.groupsRoot.trim() : "";
+  const groupLocator = typeof record.groupLocator === "string" ? record.groupLocator.trim() : "";
+  return (
+    Boolean(groupsRoot) &&
+    Boolean(groupLocator) &&
+    record.usedLegacyWorkspaceFallback === false &&
+    typeof record.fileStore === "object" &&
+    record.fileStore !== null &&
+    typeof record.objectStorage === "object" &&
+    record.objectStorage !== null
+  );
+}
+
 export function createTrustedGroupStores(params: {
   groupsRoot: string;
   groupLocator: string;
@@ -288,7 +311,6 @@ export function resolveStoresFromGroupLocator(params: {
   });
 }
 
-
 function collectTeamAuthAliases(explicit: readonly string[] | undefined): string[] {
   const out: string[] = [];
   for (const alias of explicit ?? []) {
@@ -348,7 +370,11 @@ export async function resolveCompositionTrustedTeamContext(params: {
 > {
   const cfg = params.cfg ?? loadConfig();
   let tenant: CollaborationTenantResolution | null = null;
-  if (params.tenant && isAclSafeTenantTrust(params.tenant.trust) && compact(params.tenant.tenantId)) {
+  if (
+    params.tenant &&
+    isAclSafeTenantTrust(params.tenant.trust) &&
+    compact(params.tenant.tenantId)
+  ) {
     tenant = { tenantId: compact(params.tenant.tenantId), trust: params.tenant.trust };
   } else if (params.client) {
     const resolved = await resolveCollaborationTenantResolution(params.client);

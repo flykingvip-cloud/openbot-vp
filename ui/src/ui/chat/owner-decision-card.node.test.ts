@@ -332,9 +332,13 @@ describe("owner-decision-card UI", () => {
     expect(root.hasAttribute("data-owner-decision-terminal")).toBe(true);
     expect(root.hasAttribute("data-owner-decision-peer-ack")).toBe(true);
     expect(root.getAttribute("data-owner-decision-confirm-source")).toBe("peer");
-    expect(container.querySelector("[data-owner-decision-peer-ack-copy], .employee-workbench__owner-decision-peer-ack-copy")?.textContent?.trim()).toBe(
-      OWNER_DECISION_PEER_ACK_COPY,
-    );
+    expect(
+      container
+        .querySelector(
+          "[data-owner-decision-peer-ack-copy], .employee-workbench__owner-decision-peer-ack-copy",
+        )
+        ?.textContent?.trim(),
+    ).toBe(OWNER_DECISION_PEER_ACK_COPY);
     // Peer confirmed: no plan body, no actions.
     expect(container.querySelectorAll("[role='listitem']").length).toBe(0);
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
@@ -471,7 +475,9 @@ describe("owner-decision-card UI", () => {
     );
     expect(container.querySelector("[data-owner-decision-peer-ack]")).not.toBeNull();
     expect(
-      container.querySelector(".employee-workbench__owner-decision-peer-ack-copy")?.textContent?.trim(),
+      container
+        .querySelector(".employee-workbench__owner-decision-peer-ack-copy")
+        ?.textContent?.trim(),
     ).toBe(OWNER_DECISION_PEER_ACK_COPY);
     expect(container.querySelectorAll("[role='listitem']").length).toBe(0);
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
@@ -534,7 +540,6 @@ describe("owner-decision-card UI", () => {
       }),
     ).toBeNull();
   });
-
 
   it("turns status-gate RPC errors into status copy / superseded collapse", () => {
     const message = {
@@ -735,6 +740,7 @@ describe("selectStickyOwnerDecisionCards", () => {
         { id: "later" as const, label: "稍后", style: "ghost" as const },
       ],
       version: 1,
+      mentionMemberIds: [],
     };
     const confirmedOlder = {
       ...proposed,
@@ -773,6 +779,7 @@ describe("selectStickyOwnerDecisionCards", () => {
         { id: "later" as const, label: "稍后", style: "ghost" as const },
       ],
       version: 1,
+      mentionMemberIds: [],
     };
     noteOwnerDecisionDelivery("todo-z", "consumed");
     expect(selectStickyOwnerDecisionCards([card])).toEqual([]);
@@ -794,6 +801,7 @@ describe("selectStickyOwnerDecisionCards", () => {
         { id: "later" as const, label: "稍后", style: "ghost" as const },
       ],
       version: 1,
+      mentionMemberIds: [],
     };
     const v2 = { ...v1, decisionId: "owner-decision-x-v2", todolistId: "todo-x2", version: 2 };
     const sticky = selectStickyOwnerDecisionCards([v1, v2]);
