@@ -788,20 +788,18 @@ export function renderOwnerDecisionCards(
   } = {},
 ): TemplateResult | typeof nothing {
   opts.onLoadRecoveries?.();
-  const pending = [...messages, ...recoveryCards.map((card) => ({ ownerDecision: card }))]
+  const readsRaw = [...messages, ...recoveryCards.map((card) => ({ ownerDecision: card }))]
     .map((message) => readOwnerDecisionRow(message))
-    .filter((row): row is OwnerDecisionRead => row !== null)
-    .filter((row) => {
-      todolistIdByDecisionId.set(row.card.decisionId, row.card.todolistId);
-      boardItemIdByDecisionId.set(row.card.decisionId, row.card.boardItemId);
-      if (isOwnerDecisionDismissed(row.card.decisionId)) {
-        return false;
-      }
-      return true;
-    });
+    .filter((row): row is OwnerDecisionRead => row !== null);
+  // Register id maps for every card (including dismissed) so confirm-fold can
+  // still emit history receipts from authoritative confirmed/consumed state.
+  for (const row of readsRaw) {
+    todolistIdByDecisionId.set(row.card.decisionId, row.card.todolistId);
+    boardItemIdByDecisionId.set(row.card.decisionId, row.card.boardItemId);
+  }
   // Deduplicate by decisionId. A structured field outranks a fence-only copy.
   const byId = new Map<string, OwnerDecisionRead>();
-  for (const row of pending) {
+  for (const row of readsRaw) {
     const prev = byId.get(row.card.decisionId);
     if (!prev || (prev.authority === "fence" && row.authority === "structured")) {
       byId.set(row.card.decisionId, row);
@@ -810,12 +808,16 @@ export function renderOwnerDecisionCards(
   const reads = [...byId.values()];
   const allCards = reads.map((row) => row.card);
   // Hydrate against the full set so terminal status is learned even for cards
-  // we are about to drop from the sticky pile.
+  // we are about to drop from the sticky pile (incl. dismissed confirmed).
   const hydrateTargets = collectOwnerDecisionHydrationTargets(allCards);
   if (hydrateTargets.length > 0) {
     opts.onHydrateStatuses?.(hydrateTargets);
   }
-  const cards = selectStickyOwnerDecisionCards(allCards);
+  // Sticky/todo/dialog: dismiss hides confirm chrome (稍后 or post-confirm fold).
+  // History compact receipts ignore dismiss — they require confirmed+consumed
+  // (ordinary 稍后 dismiss alone never becomes a receipt).
+  const stickyCandidates = allCards.filter((card) => !isOwnerDecisionDismissed(card.decisionId));
+  const cards = selectStickyOwnerDecisionCards(stickyCandidates);
   const stickyIds = new Set(cards.map((card) => card.decisionId));
   const humanReceipts = selectHumanConfirmReceiptCards(allCards).filter(
     (card) => !stickyIds.has(card.decisionId),

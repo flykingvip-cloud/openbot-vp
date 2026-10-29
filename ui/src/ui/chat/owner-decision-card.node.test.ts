@@ -867,3 +867,104 @@ describe("selectHumanConfirmReceiptCards", () => {
     expect(container.querySelector("[data-owner-decision-peer-ack]")).toBeNull();
   });
 });
+
+describe("confirm success continuous history receipt (dismiss kept)", () => {
+  afterEach(() => {
+    clearOwnerDecisionDismissalsForTest();
+    clearOwnerDecisionDeliveryStateForTest();
+  });
+
+  const mk = (decisionId: string, todolistId: string, version: number) => ({
+    kind: "todolist_confirm" as const,
+    decisionId,
+    groupId: "g",
+    taskId: "t",
+    boardItemId: "board-continuous",
+    todolistId,
+    title: "请确认执行计划",
+    summary: ["1. 起草；", "2. 核对；"],
+    version,
+    options: [
+      { id: "confirm" as const, label: "确认计划", style: "primary" as const },
+      { id: "revise" as const, label: "退回修订", style: "default" as const },
+      { id: "later" as const, label: "稍后", style: "ghost" as const },
+    ],
+    mentionMemberIds: ["ceo"],
+    mentionLabels: ["CEO"],
+  });
+
+  it("confirm success → without clearDismissals: sticky gone, history shows 执行计划已确认", () => {
+    const card = mk("dec-continuous", "td-continuous", 2);
+    // Warm maps the way a live render would.
+    renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }]);
+
+    // Mirror app-render confirm-success path (no clearDismissals / no refresh).
+    setOwnerDecisionTodolistStatus(card.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(card.todolistId, "consumed", card.version);
+    collapseOwnerDecisionCardsForBoardItem(card.boardItemId);
+    dismissOwnerDecisionCard(card.decisionId);
+
+    expect(isOwnerDecisionDismissed(card.decisionId)).toBe(true);
+    expect(getOwnerDecisionTodolistStatus(card.todolistId)).toBe("confirmed");
+
+    const container = document.createElement("div");
+    render(renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }]), container);
+
+    // Sticky/todo/dialog folded — no confirm buttons.
+    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+    expect(container.querySelector("[data-owner-decision-dialog]")).toBeNull();
+    expect(
+      container.querySelector(
+        ".employee-workbench__steward-confirm-card:not(.employee-workbench__owner-decision-human-receipt)",
+      ),
+    ).toBeNull();
+
+    // History compact receipt still present despite dismiss.
+    const receipt = container.querySelector(".employee-workbench__owner-decision-human-receipt");
+    expect(receipt).not.toBeNull();
+    expect(receipt?.getAttribute("data-owner-decision-confirm-source")).toBe("human");
+    expect(container.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
+      "执行计划已确认",
+    );
+    // Peer copy stays independent — not shown on human confirm path.
+    expect(container.querySelector("[data-owner-decision-peer-ack]")).toBeNull();
+  });
+
+  it("稍后 dismiss alone does not invent a confirm receipt", () => {
+    const card = mk("dec-later-only", "td-later-only", 1);
+    renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }]);
+    // Mirror app-render "later" path — dismiss only, no confirmed/consumed.
+    dismissOwnerDecisionCard(card.decisionId);
+
+    const container = document.createElement("div");
+    render(renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }]), container);
+    expect(container.querySelector(".employee-workbench__owner-decision-human-receipt")).toBeNull();
+    expect(container.textContent ?? "").not.toContain("执行计划已确认");
+    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+  });
+
+  it("peer_confirmed residual stays dedicated copy; advance-failure helper independent", () => {
+    const card = mk("dec-peer-cont", "td-peer-cont", 1);
+    setOwnerDecisionTodolistStatus(card.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(card.todolistId, "peer_confirmed", card.version);
+    // Peer residuals are not auto-dismissed; sticky shows compact ack.
+    const container = document.createElement("div");
+    render(renderOwnerDecisionCards([{ role: "assistant", ownerDecision: card }]), container);
+    expect(container.querySelector("[data-owner-decision-peer-ack]")).not.toBeNull();
+    expect(
+      container
+        .querySelector(".employee-workbench__owner-decision-peer-ack-copy")
+        ?.textContent?.trim(),
+    ).toBe(OWNER_DECISION_PEER_ACK_COPY);
+    expect(container.querySelector(".employee-workbench__owner-decision-human-receipt")).toBeNull();
+    // Advance-failure copy remains a separate surface (not folded into receipt/peer).
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: false,
+        reason: "dispatch_failed:execute_collaboration_round_failed",
+      }),
+    ).toMatch(/^计划已确认，但派发失败：/);
+  });
+});

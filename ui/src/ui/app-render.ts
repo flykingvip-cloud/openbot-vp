@@ -1421,9 +1421,17 @@ export function renderApp(state: AppViewState) {
                 ...(typeof card.version === "number" ? { expectedVersion: card.version } : {}),
               });
               setOwnerDecisionTodolistStatus(card.todolistId, "confirmed");
+              // Authoritative human confirm → consumed so history can emit compact
+              // 「执行计划已确认」even while the dialog is dismissed/folded.
+              noteOwnerDecisionDelivery(
+                card.todolistId,
+                "consumed",
+                typeof card.version === "number" ? card.version : undefined,
+              );
               clearOwnerDecisionActionError(card.decisionId);
-              // Confirm committed (never roll back). Fold the dialog away; peer residuals
-              // elsewhere render as「收到，并确认」. Surface advance failure separately.
+              // Confirm committed (never roll back). Fold sticky/todo/dialog away;
+              // history receipt stays (dismiss ≠ wipe confirmed/consumed). Peer
+              // residuals elsewhere render as「收到，并确认」. Advance failure separate.
               collapseOwnerDecisionCardsForBoardItem(card.boardItemId);
               dismissOwnerDecisionCard(card.decisionId);
               const advance = (

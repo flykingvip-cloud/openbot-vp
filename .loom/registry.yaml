@@ -10029,6 +10029,7 @@ tasks:
       - ui/src/ui/chat/owner-decision-card.ts
       - ui/src/ui/chat/owner-decision-card.node.test.ts
       - ui/src/ui/ports/employee/render-model.node.test.ts
+      - ui/src/ui/app-render.ts
       - .loom/registry.yaml
     state: active
     sessions: []
@@ -10084,6 +10085,7 @@ landingStreams:
       - ui/src/ui/chat/owner-decision-card.ts
       - ui/src/ui/chat/owner-decision-card.node.test.ts
       - ui/src/ui/ports/employee/render-model.node.test.ts
+      - ui/src/ui/app-render.ts
       - .loom/registry.yaml
     canLandWith:
       - fix-ab-ghost-confirm-chat-history-20261029
@@ -10091,6 +10093,7 @@ landingStreams:
       - fix-preview-member-mutex-20261029
       - fix-member-governance-owner-identity-20261029
       - team-real-collab-loop-f1f3
+      - batch11-s0-ogui-decision-lifecycle
     metadata:
       task: fix-main-integration-gate-followup-20261029
       owner: grok-bot
@@ -10482,7 +10485,8 @@ landingStreams:
       - ui/src/ui/ports/employee/workbench-session-transcript-cache.ts
       - ui/src/ui/ports/employee/workbench-session-transcript-cache.node.test.ts
       - ui/src/ui/ports/employee/render-actions.ts
-    canLandWith: []
+    canLandWith:
+      - fix-main-integration-gate-followup-20261029
     metadata:
       task: batch11-s0-ogui-decision-lifecycle
       owner: cursor-cloud
