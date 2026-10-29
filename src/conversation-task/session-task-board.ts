@@ -196,11 +196,19 @@ function continueResult(
   };
 }
 
+export type ResumeParkedRecheck = {
+  /** False when current auth/ownership no longer allows this session. */
+  authOk?: boolean;
+  /** True when a stop/abort barrier is active for the session or task. */
+  stopActive?: boolean;
+};
+
 export function applyIncomingUserMessage(params: {
   board: SessionTaskBoard;
   incomingText: string;
   nowMs?: number;
   workspacePaths?: string[];
+  recheck?: ResumeParkedRecheck;
 }): IncomingTurnResult {
   const nowMs = params.nowMs ?? Date.now();
   const paths = params.workspacePaths?.filter(Boolean) ?? [];
@@ -225,6 +233,7 @@ export function applyIncomingUserMessage(params: {
       taskId: resumeMatch[1] ?? "",
       nowMs,
       workspacePaths: paths,
+      recheck: params.recheck,
     });
   }
   const pauseMatch = incoming.match(/^暂停挂起\s+(\S+)/u);
@@ -298,12 +307,26 @@ export function resumeParkedTask(params: {
   taskId: string;
   nowMs?: number;
   workspacePaths?: string[];
+  /** Optional live auth + stop re-check at resume time (fail-closed when set). */
+  recheck?: ResumeParkedRecheck;
 }): IncomingTurnResult {
   const nowMs = params.nowMs ?? Date.now();
   const paths = params.workspacePaths?.filter(Boolean) ?? [];
   const parked = findParked(params.board, params.taskId);
   if (!parked) {
     return continueResult(params.board, params.board.current?.taskId ?? "");
+  }
+  if (params.recheck?.authOk === false) {
+    return {
+      ...continueResult(params.board, params.board.current?.taskId ?? ""),
+      statusLine: `恢复「${parked.title}」被拒绝：当前授权无效。`,
+    };
+  }
+  if (params.recheck?.stopActive === true) {
+    return {
+      ...continueResult(params.board, params.board.current?.taskId ?? ""),
+      statusLine: `恢复「${parked.title}」被拒绝：任务已停止。`,
+    };
   }
   let nextParked = params.board.parked.filter((row) => row.taskId !== parked.taskId);
   let dropped: TrackedTask | undefined;
@@ -581,6 +604,7 @@ export function evaluateFocusSwitch(params: {
   parked?: TrackedTask[];
   nowMs?: number;
   workspacePaths?: string[];
+  recheck?: ResumeParkedRecheck;
 }): FocusSwitchDecision {
   const currentText = params.currentFocusText?.trim() ?? "";
   const board: SessionTaskBoard = {
@@ -601,6 +625,7 @@ export function evaluateFocusSwitch(params: {
     incomingText: params.incomingText,
     nowMs: params.nowMs,
     workspacePaths: params.workspacePaths,
+    recheck: params.recheck,
   });
   if (result.action === "resume" && result.restoredPrompt) {
     return {
@@ -680,6 +705,7 @@ export function applyFocusSwitchGate(params: {
   incomingText: string;
   nowMs?: number;
   workspacePaths?: string[];
+  recheck?: ResumeParkedRecheck;
 }): FocusSwitchGateDecision {
   if (params.proceed) {
     const board = readSessionTaskBoard(params.sessionFile);
@@ -722,6 +748,7 @@ export function applyFocusSwitchGate(params: {
       incomingText: incoming,
       nowMs: params.nowMs,
       workspacePaths: params.workspacePaths,
+      recheck: params.recheck,
     });
     writeSessionTaskBoard(sessionFile, result.board);
     if (result.action === "switch" || result.action === "resume") {
