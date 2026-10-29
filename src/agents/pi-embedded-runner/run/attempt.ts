@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
@@ -113,6 +114,7 @@ import {
   lastAssistantStopText,
   latestUserText,
   shouldContinueAfterEmptyToolFinal,
+  claimStallContinue,
 } from "../../execution-stall-continue.js";
 import { isTimeoutError } from "../../failover-error.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
@@ -2629,6 +2631,19 @@ export async function runEmbeddedAttempt(
           let emptyAfterToolsContinues = 0;
           let silentExecContinues = 0;
           let recoverableContinues = 0;
+          // Durable ≤2 progress-stall ledger (restart + concurrency safe via wx slots).
+          const stallLedgerSessionKey = (
+            params.sessionKey?.trim() ||
+            params.sessionId?.trim() ||
+            ""
+          ).trim();
+          const stallLedger =
+            stallLedgerSessionKey && params.agentDir?.trim()
+              ? {
+                  ledgerDir: path.join(params.agentDir.trim(), "stall-continue-ledger"),
+                  sessionKey: stallLedgerSessionKey,
+                }
+              : undefined;
           const continueBudget =
             EXECUTION_STALL_CONTINUE_LIMIT +
             FALSE_CONFIRM_CONTINUE_LIMIT +
@@ -2655,6 +2670,7 @@ export async function runEmbeddedAttempt(
                 recoverableContinuesUsed: recoverableContinues,
                 tools: toolMetas,
                 visibleTexts: assistantTexts,
+                stallLedger,
               });
               const emptyContinue =
                 !kind &&
@@ -2668,6 +2684,13 @@ export async function runEmbeddedAttempt(
               return { kind, emptyContinue, stopText };
             },
             sendContinue: async ({ kind }) => {
+              if (kind === "progress-stall" && stallLedger) {
+                const claim = claimStallContinue(stallLedger);
+                if (!claim.allowed) {
+                  throw new Error(claim.stopReason ?? "execution_stall_continue_exhausted");
+                }
+                stallContinues = claim.continuesUsed;
+              }
               try {
                 await abortable(
                   activeSession.sendCustomMessage(
@@ -2696,7 +2719,10 @@ export async function runEmbeddedAttempt(
             },
             onContinued: (kind, stopText) => {
               if (kind === "progress-stall") {
-                stallContinues += 1;
+                // When durable ledger is active, claim already set stallContinues.
+                if (!stallLedger) {
+                  stallContinues += 1;
+                }
                 if (stopText) {
                   continuedStalls.push(stopText);
                 }

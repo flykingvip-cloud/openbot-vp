@@ -138,4 +138,70 @@ describe("private-run-bag", () => {
     ).toThrow(/transcript write/);
     expect(containsPrivateRunBagMarker('{"role":"assistant","text":"ok"}')).toBe(false);
   });
+
+  it("concurrency: overlapping scheduleDurableToolSideEffect cannot duplicate side effects", async () => {
+    const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-side-effect-race-"));
+    tempDirs.push(ledgerDir);
+    const fingerprint = {
+      taskId: "task-race",
+      boardItemId: "item-1",
+      stepId: "step-1",
+      toolName: "message",
+    };
+    let fires = 0;
+    const workers = 12;
+    const results = await Promise.all(
+      Array.from({ length: workers }, () =>
+        scheduleDurableToolSideEffect({
+          ledgerDir,
+          fingerprint,
+          run: async () => {
+            fires += 1;
+            return "sent";
+          },
+        }),
+      ),
+    );
+    const ran = results.filter((row) => !row.skipped);
+    const skipped = results.filter((row) => row.skipped);
+    expect(fires).toBe(1);
+    expect(ran).toHaveLength(1);
+    expect(skipped).toHaveLength(workers - 1);
+  });
+
+  it("unknown outcome after claim: failed run stays claimed — no blind rematerialize", async () => {
+    const ledgerDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-side-effect-unknown-"));
+    tempDirs.push(ledgerDir);
+    const fingerprint = {
+      taskId: "task-unknown",
+      boardItemId: "item-1",
+      stepId: "step-write",
+      toolName: "exec",
+    };
+    const fires: string[] = [];
+    await expect(
+      scheduleDurableToolSideEffect({
+        ledgerDir,
+        fingerprint,
+        run: async () => {
+          fires.push("first");
+          // Simulate result-unknown after write already claimed: throw without
+          // trusted receipt. Slot must remain claimed.
+          throw new Error("result unknown after write");
+        },
+      }),
+    ).rejects.toThrow(/result unknown/);
+    expect(fires).toEqual(["first"]);
+
+    const retry = await scheduleDurableToolSideEffect({
+      ledgerDir,
+      fingerprint,
+      run: async () => {
+        fires.push("blind-retry");
+        return "should-not-run";
+      },
+    });
+    expect(retry.skipped).toBe(true);
+    expect(fires).toEqual(["first"]);
+  });
 });
