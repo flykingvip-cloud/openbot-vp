@@ -20,7 +20,7 @@ HTML 已通过 `validate_wechat_html.py`，封面文件已生成（或已有可�
 - `identityId`（企业）或 `provider=wechat-official`（个人）
 - `title`
 - `content`：排版后的 HTML 片段，不是未排版 Markdown
-- 封面三选一：`thumbUrl`（http/https）、`thumbMediaId`、`thumbBase64`（≤64KB）
+- 封面三选一：`thumbUrl`（http/https）、`thumbMediaId`、`thumbBase64`（源图可大于 64KB；网关会压成 JPEG ≤64KB）。不要把本地路径字符串塞进 `thumbBase64`。
 
 不要把整张封面的 base64 塞进对话当 `imageBase64` 冒充封面。正文配图用 `upload_content_image` 的 `imageUrl` / `imageBase64`。
 

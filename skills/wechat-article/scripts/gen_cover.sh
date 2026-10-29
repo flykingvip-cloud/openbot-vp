@@ -6,7 +6,7 @@
 TITLE="${1:-AI时代}"
 SUBTITLE="${2:-你的工作还能撑几年}"
 TAG="${3:-市场助手 | 2026}"
-OUTPUT_PATH="${WECHAT_ARTICLE_COVER_OUT:-/tmp/cover.png}"
+OUTPUT_PATH="${WECHAT_ARTICLE_COVER_OUT:-/tmp/cover.jpg}"
 
 node --input-type=module -e "
 import sharp from 'sharp';
@@ -35,9 +35,23 @@ const svg = \`<svg width='\${width}' height='\${height}' xmlns='http://www.w3.or
   <text x='60' y='350' font-family='PingFang SC, Microsoft YaHei, sans-serif' font-size='16' fill='#6070a0'>$TAG</text>
 </svg>\`;
 
-sharp(Buffer.from(svg))
-  .png()
-  .toFile(outputPath)
-  .then(() => console.log(\`Cover saved: \${outputPath}\`))
-  .catch(e => console.error(e));
+async function writeCover() {
+  let quality = 85;
+  let buf;
+  while (quality >= 35) {
+    buf = await sharp(Buffer.from(svg)).jpeg({ quality, mozjpeg: true }).toBuffer();
+    if (buf.length <= 64 * 1024) break;
+    quality -= 10;
+  }
+  if (!buf || buf.length > 64 * 1024) {
+    buf = await sharp(Buffer.from(svg))
+      .resize({ width: 720, height: 306, fit: 'fill' })
+      .jpeg({ quality: 55, mozjpeg: true })
+      .toBuffer();
+  }
+  await sharp(buf).toFile(outputPath);
+  console.log('cover written', outputPath, buf.length, 'bytes');
+}
+await writeCover();
 "
+
