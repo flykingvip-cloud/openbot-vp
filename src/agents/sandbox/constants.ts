@@ -12,13 +12,15 @@ export const DEFAULT_SANDBOX_IMAGE = "openbot-sandbox:bookworm-slim";
  */
 export const LEGACY_SANDBOX_IMAGE_ALIAS = "openclaw-sandbox:bookworm-slim";
 
-export const DEFAULT_SANDBOX_BROWSER_IMAGE = "openbot-sandbox-browser:bookworm-slim";
+export const DEFAULT_SANDBOX_BROWSER_IMAGE = "openbot-sandbox-browser:trixie";
 /**
- * Temporary tag for deploys that still build or pin the previous browser image.
+ * Temporary openclaw peer of the canonical trixie browser image.
  * `scripts/sandbox-browser-setup.sh` tags both names. Runtime reuses whichever
  * one is already present. A missing browser image is not replaced with Debian.
+ * Do not point this alias at bookworm-slim content, and do not retag trixie
+ * content as :bookworm-slim — production should lock the image digest.
  */
-export const LEGACY_SANDBOX_BROWSER_IMAGE_ALIAS = "openclaw-sandbox-browser:bookworm-slim";
+export const LEGACY_SANDBOX_BROWSER_IMAGE_ALIAS = "openclaw-sandbox-browser:trixie";
 
 export type SandboxImageAliasPlan =
   | { kind: "use"; image: string }

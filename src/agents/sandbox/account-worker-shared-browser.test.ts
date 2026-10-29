@@ -91,7 +91,7 @@ function browserSpec(root: string, leaseId: string): RuntimeContainerSpec {
     runtimeLeaseId: leaseId,
     snapshotVersion: 1,
     image: "openbot-account-sandbox:p3",
-    browserImage: "openclaw-sandbox-browser:bookworm-slim",
+    browserImage: "openclaw-sandbox-browser:trixie",
     execMounts: [],
     browserMounts: [
       {
@@ -195,7 +195,7 @@ describe("shared account computer browser", () => {
     const lifecycle = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane,
       driver,

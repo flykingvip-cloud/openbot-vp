@@ -115,7 +115,7 @@ describe("embedded account worker handle", () => {
     const lifecycle = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane,
       driver,

@@ -89,7 +89,7 @@ describe("runtime controller", () => {
     process.env.OPENBOT_STATE_DIR = path.join(root, "operator-state");
     const created = new RuntimeController({
       image: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       cfg: managedCfg,
       now: () => Date.parse("2026-10-06T00:05:00.000Z"),
       onSpec: (spec) => onSpec?.(spec.image),
@@ -130,7 +130,7 @@ describe("runtime controller", () => {
     expect(again.spec).toBe(started.spec);
     expect(seen).toEqual(["openbot-account-sandbox:p2"]);
     expect(started.spec?.image).toBe("openbot-account-sandbox:p2");
-    expect(started.spec?.browserImage).toBe("openclaw-sandbox-browser:bookworm-slim");
+    expect(started.spec?.browserImage).toBe("openclaw-sandbox-browser:trixie");
     expect(started.spec?.snapshotVersion).toBe(2);
 
     const paths = resolveAccountExecutionPaths({ ctx, cfg: managedCfg, agentId: "bot" });
@@ -198,7 +198,7 @@ describe("runtime controller", () => {
     let nowMs = Date.parse("2026-10-06T00:05:00.000Z");
     const runtime = new RuntimeController({
       image: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       cfg: managedCfg,
       now: () => nowMs,
     });

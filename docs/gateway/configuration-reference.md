@@ -1148,7 +1148,7 @@ Optional **Docker sandboxing** for the embedded agent. See [Sandboxing](/gateway
         },
         browser: {
           enabled: false,
-          image: "openbot-sandbox-browser:bookworm-slim", // temporary alias: openclaw-sandbox-browser:bookworm-slim
+          image: "openbot-sandbox-browser:trixie", // temporary peer alias: openclaw-sandbox-browser:trixie; lock digest in production
           network: "openbot-sandbox-browser",
           cdpPort: 9222,
           cdpSourceRange: "172.21.0.1/32",

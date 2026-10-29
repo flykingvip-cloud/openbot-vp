@@ -2288,7 +2288,7 @@ Z.AI 模型可通过 `zai/<model>` 使用（例如 `zai/glm-4.7`），需要环�
         },
         browser: {
           enabled: false,
-          image: "openbot-sandbox-browser:bookworm-slim",
+          image: "openbot-sandbox-browser:trixie",
           containerPrefix: "openclaw-sbx-browser-",
           cdpPort: 9222,
           vncPort: 5900,

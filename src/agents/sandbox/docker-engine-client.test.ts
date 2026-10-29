@@ -500,7 +500,7 @@ describe("socket image alias on the account-worker start path", () => {
       runtimeLeaseId: "lease-socket-image",
       snapshotVersion: 1,
       image: DEFAULT_SANDBOX_IMAGE,
-      browserImage: "openbot-sandbox-browser:bookworm-slim",
+      browserImage: "openbot-sandbox-browser:trixie",
       execMounts: [
         {
           hostPath: path.join(root, "workspace"),

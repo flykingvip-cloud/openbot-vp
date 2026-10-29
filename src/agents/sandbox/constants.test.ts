@@ -14,8 +14,8 @@ describe("sandbox image alias", () => {
     expect(LEGACY_SANDBOX_IMAGE_ALIAS).toBe("openclaw-sandbox:bookworm-slim");
     expect(sandboxImageCompatPeer(DEFAULT_SANDBOX_IMAGE)).toBe(LEGACY_SANDBOX_IMAGE_ALIAS);
     expect(sandboxImageCompatPeer(LEGACY_SANDBOX_IMAGE_ALIAS)).toBe(DEFAULT_SANDBOX_IMAGE);
-    expect(DEFAULT_SANDBOX_BROWSER_IMAGE).toBe("openbot-sandbox-browser:bookworm-slim");
-    expect(LEGACY_SANDBOX_BROWSER_IMAGE_ALIAS).toBe("openclaw-sandbox-browser:bookworm-slim");
+    expect(DEFAULT_SANDBOX_BROWSER_IMAGE).toBe("openbot-sandbox-browser:trixie");
+    expect(LEGACY_SANDBOX_BROWSER_IMAGE_ALIAS).toBe("openclaw-sandbox-browser:trixie");
     expect(sandboxImageCompatPeer(DEFAULT_SANDBOX_BROWSER_IMAGE)).toBe(
       LEGACY_SANDBOX_BROWSER_IMAGE_ALIAS,
     );
