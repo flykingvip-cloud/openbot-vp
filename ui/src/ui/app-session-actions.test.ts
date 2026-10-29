@@ -122,6 +122,8 @@ describe("switchShellSession", () => {
         sessionSeenAt: {
           main: 1,
           "agent:main:space:alpha": 1000,
+          // Personal/pre-hello: no employee own steward → legacy unpartitioned space cursor.
+          "space:alpha": 1000,
         },
       }),
     );

@@ -168,6 +168,10 @@ export type WorkbenchHomeStateSnapshotInput = {
   activeSessionKey: string;
   /** Trusted current employee's steward key — scopes unread alias matching. */
   ownStewardSessionKey?: string | null;
+  /** Trusted tenant id — partitions collaboration space unread cursors. */
+  tenantId?: string | null;
+  /** managed vs personal space-cursor policy (see session-seen-at). */
+  spaceMode?: "managed" | "personal" | null;
   teamObjects: Record<string, WorkbenchTeamObject>;
   teamOrder: string[];
   channelsSnapshot: ChannelsStatusSnapshot | null;
@@ -356,6 +360,8 @@ function countUnreadSessions(
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
   ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ) {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return sessionKeys.reduce((count, key) => {
@@ -383,6 +389,8 @@ function countUnreadSessions(
     // badges after refresh.
     const seenAt = resolveSessionSeenAtMs(sessionSeenAt, key, {
       ownStewardSessionKey,
+      tenantId,
+      spaceMode: spaceMode ?? undefined,
     });
     return updatedAt > seenAt ? count + 1 : count;
   }, 0);
@@ -461,6 +469,8 @@ function buildAgentItems(
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
   ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ): WorkbenchSidebarItem[] {
   const sessionCounts = sessionsByAgent(sessionsResult);
   const sessionsByAgentId = new Map<string, SessionsListResult["sessions"][number][]>();
@@ -528,6 +538,8 @@ function buildAgentItems(
           sessionSeenAt,
           activeSessionKey,
           ownStewardSessionKey,
+          tenantId,
+          spaceMode,
         ),
         activity: resolveActivity(primarySession?.updatedAt ?? null),
         kind: "agent" as const,
@@ -541,6 +553,8 @@ function buildContactItems(
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
   ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ): WorkbenchSidebarItem[] {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return buildContactCards(sessionsResult).map((contact) => {
@@ -564,6 +578,8 @@ function buildContactItems(
         sessionSeenAt,
         activeSessionKey,
         ownStewardSessionKey,
+        tenantId,
+        spaceMode,
       ),
       activity: resolveActivity(contact.latestUpdatedAt),
       kind: "contact" as const,
@@ -576,6 +592,8 @@ function buildGroupItems(
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
   ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ): WorkbenchSidebarItem[] {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return buildGroupCards(sessionsResult).map((group) => {
@@ -599,6 +617,8 @@ function buildGroupItems(
         sessionSeenAt,
         activeSessionKey,
         ownStewardSessionKey,
+        tenantId,
+        spaceMode,
       ),
       activity: resolveActivity(group.latestUpdatedAt),
       kind: "group" as const,
@@ -676,18 +696,24 @@ export function buildWorkbenchHomeModelFromState(
     input.sessionSeenAt,
     input.activeSessionKey,
     input.ownStewardSessionKey,
+    input.tenantId,
+    input.spaceMode,
   );
   const contacts = buildContactItems(
     input.sessionsResult,
     input.sessionSeenAt,
     input.activeSessionKey,
     input.ownStewardSessionKey,
+    input.tenantId,
+    input.spaceMode,
   );
   const groups = buildGroupItems(
     input.sessionsResult,
     input.sessionSeenAt,
     input.activeSessionKey,
     input.ownStewardSessionKey,
+    input.tenantId,
+    input.spaceMode,
   );
   const teamAssistants = applyTeamObjectPreferences(
     toTeamEntries(agents, "assistant"),

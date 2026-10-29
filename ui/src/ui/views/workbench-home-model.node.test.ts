@@ -750,6 +750,132 @@ it("P1c: space:<id> sessionSeenAt clears collaboration mirror unread", async () 
   expect(space?.unreadCount).toBe(0);
 });
 
+it("R3 production: tenant switch same groupId must not inherit; return restores A", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const { bumpSessionSeenAt, resolveSessionSeenAliasOptionsFromTrustedSession } =
+    await import("../session-seen-at.ts");
+  const now = Date.now();
+  const U1 = "agent:main:employee:u1";
+  const spaceKey = "agent:main:space:shared-group";
+  const sessionsResult = {
+    count: 1,
+    sessions: [
+      {
+        key: spaceKey,
+        kind: "group",
+        label: "共享协作",
+        updatedAt: now - 2_000,
+        lastMessagePreview: "新消息",
+        groupId: "shared-group",
+      },
+    ],
+  } as SessionsListResult;
+  const baseInput = {
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult,
+    activeSessionKey: "agent:bot-2:main",
+    ownStewardSessionKey: U1,
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  };
+
+  // Production write path: options from trusted session (not ad-hoc tenantId).
+  const optsA = resolveSessionSeenAliasOptionsFromTrustedSession({
+    platformAuthState: { enabled: true, session: { tenantId: "tenant-a", user: "u1" } },
+    bootstrapDataSpace: { mode: "managed" },
+    ownStewardSessionKey: U1,
+  });
+  const sessionSeenAt = bumpSessionSeenAt({}, "space:shared-group", now, optsA);
+
+  const onA = buildWorkbenchHomeModelFromState({
+    ...baseInput,
+    sessionSeenAt,
+    tenantId: optsA.tenantId,
+    spaceMode: optsA.spaceMode,
+  });
+  expect(onA.groups.find((g) => g.sessionKeys.includes(spaceKey))?.unreadCount).toBe(0);
+
+  const optsB = resolveSessionSeenAliasOptionsFromTrustedSession({
+    platformAuthState: { enabled: true, session: { tenantId: "tenant-b", user: "u1" } },
+    bootstrapDataSpace: { mode: "managed" },
+    ownStewardSessionKey: U1,
+  });
+  const onB = buildWorkbenchHomeModelFromState({
+    ...baseInput,
+    sessionSeenAt,
+    tenantId: optsB.tenantId,
+    spaceMode: optsB.spaceMode,
+  });
+  // Same user, same groupId, refresh under tenant B — must not inherit A's cursor.
+  expect(onB.groups.find((g) => g.sessionKeys.includes(spaceKey))?.unreadCount).toBe(1);
+
+  const backA = buildWorkbenchHomeModelFromState({
+    ...baseInput,
+    sessionSeenAt,
+    tenantId: optsA.tenantId,
+    spaceMode: optsA.spaceMode,
+  });
+  expect(backA.groups.find((g) => g.sessionKeys.includes(spaceKey))?.unreadCount).toBe(0);
+});
+
+it("R3 production: managed identity not ready does not clear via bare/u-only space cursor", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const now = Date.now();
+  const U1 = "agent:main:employee:u1";
+  const spaceKey = "agent:main:space:shared-group";
+  const model = buildWorkbenchHomeModelFromState({
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult: {
+      count: 1,
+      sessions: [
+        {
+          key: spaceKey,
+          kind: "group",
+          label: "共享协作",
+          updatedAt: now - 2_000,
+          lastMessagePreview: "新消息",
+          groupId: "shared-group",
+        },
+      ],
+    } as SessionsListResult,
+    // Leftover bare + user-only cursors must not count as read in managed mode
+    // before tenant identity is ready.
+    sessionSeenAt: {
+      "space:shared-group": now,
+      "seen:u:u1:space:shared-group": now,
+    },
+    activeSessionKey: "agent:bot-2:main",
+    ownStewardSessionKey: U1,
+    tenantId: null,
+    spaceMode: "managed",
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  });
+  expect(model.groups.find((g) => g.sessionKeys.includes(spaceKey))?.unreadCount).toBe(1);
+});
+
 describe("formatCronMinutesLabel", () => {
   it("never falls back to the raw i18n key", async () => {
     const { formatCronMinutesLabel } =

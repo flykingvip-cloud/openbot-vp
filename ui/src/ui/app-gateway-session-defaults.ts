@@ -7,7 +7,10 @@ import {
 } from "./chat-session-key-match.ts";
 import type { GatewayHost } from "./gateway-host.ts";
 import { isForbiddenHumanProfileName } from "./ports/employee/resolve-human-profile-name.ts";
-import { scrubSessionSeenAtForOwnSteward } from "./session-seen-at.ts";
+import {
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+  scrubSessionSeenAtForOwnSteward,
+} from "./session-seen-at.ts";
 
 export type SessionDefaultsSnapshot = {
   defaultAgentId?: string;
@@ -59,9 +62,18 @@ export function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaul
     defaults,
   );
   const nextSessionKey = resolvedSessionKey || resolvedSettingsSessionKey || host.sessionKey;
+  const seenIdentity = resolveSessionSeenAliasOptionsFromTrustedSession({
+    hello: host.hello,
+    platformAuthState: host.platformAuthState,
+    bootstrapAuthSession: host.bootstrapAuthSession,
+    bootstrapDataSpace: (host as { bootstrapDataSpace?: { mode?: string | null } | null })
+      .bootstrapDataSpace,
+    ownStewardSessionKey: ownMainSessionKey,
+  });
   const scrubbedSeenAt = scrubSessionSeenAtForOwnSteward(
     host.settings.sessionSeenAt,
     ownMainSessionKey,
+    { tenantId: seenIdentity.tenantId, spaceMode: seenIdentity.spaceMode },
   );
   const nextSettings = {
     ...host.settings,

@@ -8,7 +8,10 @@ import {
 } from "./builtin-steward-selection.ts";
 import { DEFAULT_CHAT_CONTEXT_SCOPE } from "./chat/context-scope.ts";
 import type { Tab } from "./navigation.ts";
-import { bumpSessionSeenAt } from "./session-seen-at.ts";
+import {
+  bumpSessionSeenAt,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+} from "./session-seen-at.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "./views/account-computer-preview.ts";
 
 export type ShellSessionSwitchState = Pick<
@@ -100,11 +103,27 @@ export function switchShellSession(
     ...state.settings,
     sessionKey,
     lastActiveSessionKey: sessionKey,
-    sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, seenAt, {
-      ownStewardSessionKey: resolveBuiltinStewardSessionKey(
-        resolveStewardSessionDefaultsFromHello(state.hello),
-      ),
-    }),
+    sessionSeenAt: bumpSessionSeenAt(
+      state.settings.sessionSeenAt,
+      sessionKey,
+      seenAt,
+      resolveSessionSeenAliasOptionsFromTrustedSession({
+        hello: state.hello,
+        // Auth surfaces live on the Lit app host; ShellSessionSwitchState is a
+        // narrow Pick and may omit them — resolve once via trusted-session helper.
+        ...(state as {
+          platformAuthState?: {
+            enabled?: boolean | null;
+            session?: { tenantId?: string | null; user?: string | null } | null;
+          } | null;
+          bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+          bootstrapDataSpace?: { mode?: string | null } | null;
+        }),
+        ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+          resolveStewardSessionDefaultsFromHello(state.hello),
+        ),
+      }),
+    ),
   });
   if (options.syncUrl) {
     syncUrlWithSessionKey(adaptSettingsHost(state), sessionKey, options.replaceUrl ?? true);

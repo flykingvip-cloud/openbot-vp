@@ -10026,9 +10026,12 @@ landingStreams:
       - .loom/registry.yaml
       - ui/src/ui/session-seen-at.ts
       - ui/src/ui/session-seen-at.node.test.ts
+      - ui/src/ui/session-seen-at.production.node.test.ts
       - ui/src/ui/app-session-actions.ts
+      - ui/src/ui/app-session-actions.test.ts
       - ui/src/ui/app-settings.ts
       - ui/src/ui/app-gateway-session-defaults.ts
+      - ui/src/ui/app-gateway-session-defaults.node.test.ts
       - ui/src/ui/storage.ts
       - ui/src/ui/storage.node.test.ts
       - ui/src/ui/controllers/daibai.ts

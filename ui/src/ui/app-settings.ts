@@ -115,7 +115,10 @@ import {
 } from "./routing/openbot-subdomain-redirect.ts";
 import { canonicalPasswordResetLocation } from "./routing/password-reset-link.ts";
 import { resolveAuthorizedTab, type PermissionStateLike } from "./routing/port-permissions.ts";
-import { bumpSessionSeenAt } from "./session-seen-at.ts";
+import {
+  bumpSessionSeenAt,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+} from "./session-seen-at.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
@@ -230,7 +233,16 @@ async function loadEnterpriseOperationalIdentityOverview(host: SettingsHost) {
 type SessionSeenHost = {
   settings: UiSettings;
   applySettings: (next: UiSettings) => void;
-  hello?: { snapshot?: unknown } | null;
+  hello?: {
+    snapshot?: unknown;
+    auth?: { provider?: string | null; user?: string | null; tenantId?: string | null } | null;
+  } | null;
+  platformAuthState?: {
+    enabled?: boolean | null;
+    session?: { tenantId?: string | null; user?: string | null } | null;
+  } | null;
+  bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+  bootstrapDataSpace?: { mode?: string | null } | null;
 };
 
 function controlledLoginPathFromLocation(
@@ -311,9 +323,14 @@ export function markSessionSeen(host: SessionSeenHost, sessionKey: string, seenA
   const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
     resolveStewardSessionDefaultsFromHello(host.hello),
   );
-  const merged = bumpSessionSeenAt(host.settings.sessionSeenAt, key, seenAt, {
+  const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+    hello: host.hello,
+    platformAuthState: host.platformAuthState,
+    bootstrapAuthSession: host.bootstrapAuthSession,
+    bootstrapDataSpace: host.bootstrapDataSpace,
     ownStewardSessionKey,
   });
+  const merged = bumpSessionSeenAt(host.settings.sessionSeenAt, key, seenAt, seenOpts);
   if (merged === host.settings.sessionSeenAt) {
     return;
   }
@@ -349,13 +366,18 @@ function applyWorkbenchSessionKeyFromLocation(host: SettingsHost, search: string
   const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
     resolveStewardSessionDefaultsFromHello(host.hello),
   );
+  const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+    hello: host.hello,
+    platformAuthState: (host as SessionSeenHost).platformAuthState,
+    bootstrapAuthSession: (host as SessionSeenHost).bootstrapAuthSession,
+    bootstrapDataSpace: (host as SessionSeenHost).bootstrapDataSpace,
+    ownStewardSessionKey,
+  });
   applySettings(host, {
     ...host.settings,
     sessionKey: session,
     lastActiveSessionKey: session,
-    sessionSeenAt: bumpSessionSeenAt(host.settings.sessionSeenAt, session, seenAt, {
-      ownStewardSessionKey,
-    }),
+    sessionSeenAt: bumpSessionSeenAt(host.settings.sessionSeenAt, session, seenAt, seenOpts),
   });
 }
 

@@ -10,7 +10,10 @@ import {
 } from "../../builtin-steward-selection.ts";
 import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
 import { applyPendingChatFocusMessage } from "../../chat/focus-message.ts";
-import { bumpSessionSeenAt } from "../../session-seen-at.ts";
+import {
+  bumpSessionSeenAt,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+} from "../../session-seen-at.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "../../views/account-computer-preview.ts";
 import {
   maybeTriggerGrowthBirthTurn,
@@ -317,16 +320,25 @@ export function switchEmployeeWorkbenchSession(
     // Still persist the unread cursor — skipping applySettings here left
     // sessionSeenAt stale, so refresh resurrected badges for an already-open
     // steward/space surface.
-    const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
-      resolveStewardSessionDefaultsFromHello(state.hello),
-    );
+    const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+      hello: state.hello,
+      platformAuthState: state.platformAuthState,
+      bootstrapAuthSession: state.bootstrapAuthSession,
+      bootstrapDataSpace: state.bootstrapDataSpace,
+      ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+        resolveStewardSessionDefaultsFromHello(state.hello),
+      ),
+    });
     state.applySettings({
       ...state.settings,
       sessionKey,
       lastActiveSessionKey: sessionKey,
-      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now(), {
-        ownStewardSessionKey,
-      }),
+      sessionSeenAt: bumpSessionSeenAt(
+        state.settings.sessionSeenAt,
+        sessionKey,
+        Date.now(),
+        seenOpts,
+      ),
     });
     return;
   }
@@ -384,11 +396,20 @@ export function switchEmployeeWorkbenchSession(
     ...state.settings,
     sessionKey,
     lastActiveSessionKey: sessionKey,
-    sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now(), {
-      ownStewardSessionKey: resolveBuiltinStewardSessionKey(
-        resolveStewardSessionDefaultsFromHello(state.hello),
-      ),
-    }),
+    sessionSeenAt: bumpSessionSeenAt(
+      state.settings.sessionSeenAt,
+      sessionKey,
+      Date.now(),
+      resolveSessionSeenAliasOptionsFromTrustedSession({
+        hello: state.hello,
+        platformAuthState: state.platformAuthState,
+        bootstrapAuthSession: state.bootstrapAuthSession,
+        bootstrapDataSpace: state.bootstrapDataSpace,
+        ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+          resolveStewardSessionDefaultsFromHello(state.hello),
+        ),
+      }),
+    ),
   });
   void state.loadAssistantIdentity();
   syncComputerPreviewAfterSessionSwitch(

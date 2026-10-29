@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   bumpSessionSeenAt,
   partitionSessionSeenKey,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
   resolveSessionSeenAtMs,
   resolveSessionSeenPartitionId,
+  resolveSessionSeenSpaceMode,
+  resolveTrustedSessionTenantIdForSeen,
   scrubSessionSeenAtForOwnSteward,
   sessionSeenAliasKeys,
 } from "./session-seen-at.ts";
@@ -47,6 +50,34 @@ describe("sessionSeenAliasKeys", () => {
     expect(partition).toBe("u:u1");
     expect(aliases).toEqual([partitionSessionSeenKey(partition!, SPACE)]);
     expect(aliases).not.toEqual(expect.arrayContaining([SPACE]));
+  });
+
+  it("managed + tenant: space aliases use tenant+user partition", () => {
+    const opts = {
+      ownStewardSessionKey: U1,
+      tenantId: "tenant-a",
+      spaceMode: "managed" as const,
+    };
+    expect(resolveSessionSeenPartitionId(opts)).toBe("t:tenant-a|u:u1");
+    expect(sessionSeenAliasKeys(SPACE, opts)).toEqual([
+      partitionSessionSeenKey("t:tenant-a|u:u1", SPACE),
+    ]);
+  });
+
+  it("managed + identity not ready: no bare/user-only space aliases", () => {
+    expect(
+      sessionSeenAliasKeys(SPACE, {
+        ownStewardSessionKey: U1,
+        spaceMode: "managed",
+      }),
+    ).toEqual([]);
+    expect(
+      sessionSeenAliasKeys(SPACE, {
+        spaceMode: "managed",
+        tenantId: "tenant-a",
+      }),
+    ).toEqual([]);
+    expect(sessionSeenAliasKeys(SPACE, { spaceMode: "managed" })).toEqual([]);
   });
 });
 
@@ -116,18 +147,47 @@ describe("resolveSessionSeenAtMs / bumpSessionSeenAt", () => {
     expect(resolveSessionSeenAtMs(map, SPACE_MIRROR, { ownStewardSessionKey: U2 })).toBe(0);
   });
 
-  it("anti: different tenants sharing local groupId must not cross", () => {
+  it("anti: different tenants sharing local groupId must not cross; return restores original", () => {
     const seenAt = 1_700_000_000_300;
-    const tenantA = { ownStewardSessionKey: U1, tenantId: "tenant-a" };
-    const tenantB = { ownStewardSessionKey: U1, tenantId: "tenant-b" };
-    const map = bumpSessionSeenAt({}, SPACE, seenAt, tenantA);
+    const tenantA = {
+      ownStewardSessionKey: U1,
+      tenantId: "tenant-a",
+      spaceMode: "managed" as const,
+    };
+    const tenantB = {
+      ownStewardSessionKey: U1,
+      tenantId: "tenant-b",
+      spaceMode: "managed" as const,
+    };
+    let map = bumpSessionSeenAt({}, SPACE, seenAt, tenantA);
     expect(resolveSessionSeenAtMs(map, SPACE, tenantA)).toBe(seenAt);
     expect(resolveSessionSeenAtMs(map, SPACE, tenantB)).toBe(0);
     expect(resolveSessionSeenAtMs(map, SPACE_MIRROR, tenantB)).toBe(0);
 
-    const scrubbed = scrubSessionSeenAtForOwnSteward(map, U1, { tenantId: "tenant-b" });
-    expect(resolveSessionSeenAtMs(scrubbed, SPACE, tenantB)).toBe(0);
-    expect(Object.keys(scrubbed).some((k) => k.includes("tenant-a"))).toBe(false);
+    // Scrub on tenant switch keeps same-owner other-tenant partitions so
+    // returning to A is explicit — reads stay tenant-scoped (B still unread).
+    map = scrubSessionSeenAtForOwnSteward(map, U1, {
+      tenantId: "tenant-b",
+      spaceMode: "managed",
+    });
+    expect(resolveSessionSeenAtMs(map, SPACE, tenantB)).toBe(0);
+    expect(Object.keys(map).some((k) => k.includes("tenant-a"))).toBe(true);
+    expect(resolveSessionSeenAtMs(map, SPACE, tenantA)).toBe(seenAt);
+  });
+
+  it("managed: bump/resolve no-op when tenant identity not ready", () => {
+    const seenAt = 1_700_000_000_350;
+    const incomplete = { ownStewardSessionKey: U1, spaceMode: "managed" as const };
+    const map = bumpSessionSeenAt({}, SPACE, seenAt, incomplete);
+    expect(map).toEqual({});
+    expect(resolveSessionSeenAtMs({ [SPACE]: seenAt }, SPACE, incomplete)).toBe(0);
+    expect(
+      resolveSessionSeenAtMs(
+        { [partitionSessionSeenKey("u:u1", SPACE)]: seenAt },
+        SPACE,
+        incomplete,
+      ),
+    ).toBe(0);
   });
 
   it("anti: after switch + refresh must not resurrect prior user's space cursor", () => {
@@ -146,5 +206,68 @@ describe("resolveSessionSeenAtMs / bumpSessionSeenAt", () => {
     // A second scrub (refresh / re-hello) must not resurrect anything.
     map = scrubSessionSeenAtForOwnSteward(map, U2);
     expect(resolveSessionSeenAtMs(map, SPACE, { ownStewardSessionKey: U2 })).toBe(0);
+  });
+
+  it("managed scrub drops user-only partitions leftover from personal mode", () => {
+    const seenAt = 1_700_000_000_450;
+    const map = bumpSessionSeenAt({}, SPACE, seenAt, { ownStewardSessionKey: U1 });
+    const scrubbed = scrubSessionSeenAtForOwnSteward(map, U1, {
+      tenantId: "tenant-a",
+      spaceMode: "managed",
+    });
+    expect(Object.keys(scrubbed).some((k) => k.startsWith("seen:u:u1:"))).toBe(false);
+    expect(
+      resolveSessionSeenAtMs(scrubbed, SPACE, {
+        ownStewardSessionKey: U1,
+        tenantId: "tenant-a",
+        spaceMode: "managed",
+      }),
+    ).toBe(0);
+  });
+});
+
+describe("resolveSessionSeenAliasOptionsFromTrustedSession", () => {
+  it("resolves tenant once from platformAuth → trusted-proxy hello → bootstrap", () => {
+    expect(
+      resolveTrustedSessionTenantIdForSeen({
+        platformAuthState: { enabled: true, session: { tenantId: "t-platform", user: "u1" } },
+        hello: { auth: { provider: "trusted-proxy", user: "u1", tenantId: "t-hello" } },
+        bootstrapAuthSession: { tenantId: "t-boot", user: "u1" },
+      }),
+    ).toBe("t-platform");
+    expect(
+      resolveTrustedSessionTenantIdForSeen({
+        hello: { auth: { provider: "trusted-proxy", user: "u1", tenantId: "t-hello" } },
+        bootstrapAuthSession: { tenantId: "t-boot", user: "u1" },
+      }),
+    ).toBe("t-hello");
+    expect(
+      resolveTrustedSessionTenantIdForSeen({
+        bootstrapAuthSession: { tenantId: "t-boot", user: "u1" },
+      }),
+    ).toBe("t-boot");
+  });
+
+  it("managed mode from bootstrapDataSpace or platformAuth.enabled", () => {
+    expect(resolveSessionSeenSpaceMode({ bootstrapDataSpace: { mode: "managed" } })).toBe(
+      "managed",
+    );
+    expect(resolveSessionSeenSpaceMode({ bootstrapDataSpace: { mode: "local" } })).toBe("personal");
+    expect(resolveSessionSeenSpaceMode({ platformAuthState: { enabled: true } })).toBe("managed");
+    expect(resolveSessionSeenSpaceMode({})).toBe("personal");
+  });
+
+  it("production entrypoint threads tenantId + managed spaceMode", () => {
+    const opts = resolveSessionSeenAliasOptionsFromTrustedSession({
+      platformAuthState: { enabled: true, session: { tenantId: "tenant-a", user: "u1" } },
+      bootstrapDataSpace: { mode: "managed" },
+      ownStewardSessionKey: U1,
+    });
+    expect(opts).toEqual({
+      ownStewardSessionKey: U1,
+      tenantId: "tenant-a",
+      spaceMode: "managed",
+    });
+    expect(resolveSessionSeenPartitionId(opts)).toBe("t:tenant-a|u:u1");
   });
 });
