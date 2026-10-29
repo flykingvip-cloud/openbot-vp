@@ -86,6 +86,33 @@ function isSilentReplyStream(text: string): boolean {
   return SILENT_REPLY_PATTERN.test(text);
 }
 /** Client-side defense-in-depth: hide NO_REPLY and collaboration echo confirmations. */
+function readLocalUserDisplayName(state: object): string | null {
+  const row = state as Record<string, unknown>;
+  const direct = [row.localUserDisplayName, row.userDisplayName, row.platformUserDisplayName];
+  for (const value of direct) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  const hello = row.hello;
+  if (hello && typeof hello === "object" && !Array.isArray(hello)) {
+    const auth = (hello as { auth?: { displayName?: unknown; user?: unknown } }).auth;
+    const displayName = auth?.displayName;
+    if (typeof displayName === "string" && displayName.trim()) {
+      return displayName.trim();
+    }
+  }
+  const platform = row.platformAuthState;
+  if (platform && typeof platform === "object" && !Array.isArray(platform)) {
+    const session = (platform as { session?: { displayName?: unknown } }).session;
+    const displayName = session?.displayName;
+    if (typeof displayName === "string" && displayName.trim()) {
+      return displayName.trim();
+    }
+  }
+  return null;
+}
+
 function isAssistantSilentReply(message: unknown): boolean {
   return shouldHideCollaborationAssistantMessage(message);
 }
@@ -1702,6 +1729,10 @@ export async function sendChatMessage(
   }
 
   if (!suppressOptimisticUser) {
+    const spaceKey = state.sessionKey.trim() || String(state.workbenchTeamSelectedKey ?? "").trim();
+    const spaceSenderLabel = isGroupScopedSessionKey(spaceKey)
+      ? readLocalUserDisplayName(state)
+      : null;
     state.chatMessages = [
       ...state.chatMessages,
       {
@@ -1709,6 +1740,7 @@ export async function sendChatMessage(
         role: "user",
         content: contentBlocks,
         timestamp: now,
+        ...(spaceSenderLabel ? { senderLabel: spaceSenderLabel } : {}),
       },
     ];
   }

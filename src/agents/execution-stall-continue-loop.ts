@@ -6,6 +6,7 @@ import {
   EMPTY_AFTER_TOOLS_CONTINUE_PROMPT,
   EXECUTION_STALL_CONTINUE_PROMPT,
   FALSE_CONFIRM_CONTINUE_PROMPT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT,
   SILENT_EXEC_CONTINUE_PROMPT,
   type ExecutionContinueKind,
 } from "./execution-stall-continue.js";
@@ -38,6 +39,8 @@ function promptForContinue(kind: ExecutionContinueKind | "empty-after-tools"): s
       return FALSE_CONFIRM_CONTINUE_PROMPT;
     case "empty-after-tools":
       return EMPTY_AFTER_TOOLS_CONTINUE_PROMPT;
+    case "recoverable-tool-failure":
+      return RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT;
     case "progress-stall":
     default:
       return EXECUTION_STALL_CONTINUE_PROMPT;

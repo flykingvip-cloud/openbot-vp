@@ -33,6 +33,7 @@ export const OWNER_DECISION_DELIVERY_STAGES = [
   "push_completed",
   "client_presented",
   "confirmation_consumed",
+  "peer_confirmation_consumed",
   "delivery_failed",
   "skipped",
 ] as const;
@@ -44,6 +45,7 @@ export const OWNER_DECISION_USER_FACING = [
   "delivery_failed_retryable",
   "stale_version",
   "consumed",
+  "peer_confirmed",
   "skipped",
   "tracked",
 ] as const;
@@ -156,6 +158,9 @@ export function deriveOwnerDecisionUserFacing(input: {
     reason === "status_superseded"
   ) {
     return "stale_version";
+  }
+  if (input.stage === "peer_confirmation_consumed") {
+    return "peer_confirmed";
   }
   if (input.stage === "confirmation_consumed") {
     return "consumed";
@@ -275,6 +280,29 @@ export function confirmationConsumedDelivery(
     clientPresented: false,
     retryable: false,
     userFacing: "consumed",
+    groupId: todolist.groupId,
+    taskId: todolist.taskId,
+    boardItemId: todolist.boardItemId,
+    todolistId: todolist.todolistId,
+    version: todolist.version,
+  });
+}
+
+/** Bot↔bot peer auto-confirm residual for human UI (compact「收到，并确认」). */
+export function peerConfirmationConsumedDelivery(
+  todolist: Pick<
+    ExecutorPrivateTodolist,
+    "groupId" | "taskId" | "boardItemId" | "todolistId" | "version"
+  >,
+): OwnerDecisionCardDelivery {
+  return normalizeOwnerDecisionDelivery({
+    ok: true,
+    stage: "peer_confirmation_consumed",
+    historyReloadable: true,
+    deliveryTracked: false,
+    clientPresented: false,
+    retryable: false,
+    userFacing: "peer_confirmed",
     groupId: todolist.groupId,
     taskId: todolist.taskId,
     boardItemId: todolist.boardItemId,

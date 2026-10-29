@@ -561,6 +561,67 @@ describe("enforceProtocolTextNonExecutionInMessage", () => {
     expect(JSON.stringify(message.content)).not.toContain("DSML");
   });
 
+  it("empty allow-list classifies exec body DSML as no_tools_available", () => {
+    const execDsml = [
+      "<｜DSML｜tool_calls>",
+      '<｜DSML｜invoke name="exec">',
+      '<｜DSML｜parameter name="command" string="true">echo hi</｜DSML｜parameter>',
+      "</｜DSML｜invoke>",
+      "</｜DSML｜tool_calls>",
+    ].join("\n");
+    const message = {
+      role: "assistant",
+      content: [{ type: "text", text: execDsml }],
+      stopReason: "stop",
+    };
+    const boundaryState = createProtocolBoundaryState();
+    expect(
+      enforceProtocolTextNonExecutionInMessage(message, {
+        runId: "run-no-tools",
+        attemptOrTurnId: "run-no-tools:attempt",
+        allowedToolNames: new Set(),
+        boundaryState,
+      }),
+    ).toEqual({ status: "terminated", classification: "no_tools_available" });
+    expect(message.stopReason).toBe(PROTOCOL_VIOLATION_STOP_REASON);
+    expect(message.content).toEqual([{ type: "text", text: PROTOCOL_FAILURE_USER_TEXT }]);
+    expect(boundaryState.lastFact?.detectedToolNames).toEqual(["exec"]);
+    expect(boundaryState.lastFact?.allowedToolNames).toEqual([]);
+  });
+
+  it("native exec toolCall with tools present is not a false protocol_violation", () => {
+    const message = {
+      role: "assistant",
+      content: [
+        { type: "text", text: "running script" },
+        {
+          type: "toolCall",
+          id: "call_exec_1",
+          name: "exec",
+          arguments: { command: "bash pr143-local/always-enoent.sh" },
+        },
+      ],
+      stopReason: "toolUse",
+    };
+    const boundaryState = createProtocolBoundaryState();
+    expect(
+      enforceProtocolTextNonExecutionInMessage(message, {
+        runId: "run-native-exec",
+        attemptOrTurnId: "run-native-exec:attempt",
+        allowedToolNames: new Set(["exec", "read"]),
+        boundaryState,
+      }),
+    ).toEqual({ status: "none" });
+    expect(message.stopReason).toBe("toolUse");
+    expect(message.content).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "toolCall", id: "call_exec_1", name: "exec" }),
+      ]),
+    );
+    expect(boundaryState.terminated).not.toBe(true);
+    expect(boundaryState.lastFact).toBeFalsy();
+  });
+
   it("unknown tool name in body still terminates without execution", () => {
     const message = {
       role: "assistant",

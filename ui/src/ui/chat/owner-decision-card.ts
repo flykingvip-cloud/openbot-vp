@@ -23,6 +23,7 @@ export const OWNER_DECISION_USER_FACING = [
   "delivery_failed_retryable",
   "stale_version",
   "consumed",
+  "peer_confirmed",
   "skipped",
   "tracked",
 ] as const;
@@ -212,6 +213,65 @@ export function clearOwnerDecisionDeliveryStateForTest(): void {
 /** Statuses that may still call confirmTodolist / reviseTodolist. */
 export const OWNER_DECISION_ACTIONABLE_STATUSES = new Set(["proposed", "revise_requested"]);
 
+/** Human-side compact copy for bot↔bot peer confirmation (no plan body). */
+export const OWNER_DECISION_PEER_ACK_COPY = "收到，并确认";
+
+/** True when delivery marks bot↔bot peer auto-confirm (not human gate). */
+
+/** Format post-plan autoAdvance for UI — confirm stays; failures visible by stage. */
+export function formatPostPlanConfirmAdvanceUserMessage(
+  advance:
+    | {
+        wakeRecorded?: boolean;
+        wakeConsumed?: boolean;
+        dispatched?: boolean;
+        reason?: string;
+      }
+    | null
+    | undefined,
+): string | null {
+  if (!advance) {
+    return null;
+  }
+  const reason = String(advance.reason ?? "").trim();
+  if (!reason) {
+    return null;
+  }
+  if (advance.dispatched === true) {
+    return null;
+  }
+  const wakeRecorded = advance.wakeRecorded === true;
+  const wakeConsumed = advance.wakeConsumed === true;
+  if (!wakeRecorded) {
+    return `计划已确认，但自动推进未开始：${reason}`;
+  }
+  if (wakeRecorded && !wakeConsumed) {
+    return `计划已确认，推进已排队但未消费：${reason}`;
+  }
+  // wake recorded + consumed, not dispatched
+  const blockedLike =
+    /self_advance_not_execute|dispatch_readiness_not_ready|mode_b_dispatcher_unbound|gray|not_allowed|blocked/i.test(
+      reason,
+    );
+  const dispatchFailed =
+    /dispatch_failed|execute_collaboration_round_failed|plan_revised_before_dispatch|plan_revalidate/i.test(
+      reason,
+    );
+  if (dispatchFailed) {
+    return `计划已确认，但派发失败：${reason}`;
+  }
+  if (blockedLike) {
+    return `计划已确认，推进受阻：${reason}`;
+  }
+  return `计划已确认，推进未完成：${reason}`;
+}
+
+export function isOwnerDecisionPeerConfirmed(
+  userFacing: OwnerDecisionUserFacing | null | undefined,
+): boolean {
+  return userFacing === "peer_confirmed";
+}
+
 const OWNER_DECISION_STATUS_COPY: Record<string, string> = {
   confirmed: "执行计划已确认",
   superseded: "旧版本已失效",
@@ -279,6 +339,55 @@ export function isOwnerDecisionTodolistActionable(status: string | null | undefi
   return OWNER_DECISION_ACTIONABLE_STATUSES.has(String(status).trim().toLowerCase());
 }
 
+/** Terminal plan statuses — sticky pile should not keep these (ghost wall / bury chat). */
+export const OWNER_DECISION_TERMINAL_STATUSES = new Set([
+  "confirmed",
+  "superseded",
+  "accepted",
+  "closed",
+]);
+
+export function isOwnerDecisionTodolistTerminal(status: string | null | undefined): boolean {
+  if (status == null || !String(status).trim()) {
+    return false;
+  }
+  return OWNER_DECISION_TERMINAL_STATUSES.has(String(status).trim().toLowerCase());
+}
+
+/**
+ * Sticky owner-decision pile: one card per board item.
+ * - Actionable / unknown (pending hydrate) stay.
+ * - Terminal (confirmed/…) keep at most one review card so a long group
+ *   transcript cannot bury chat under dozens of ghosts.
+ * - confirmation_consumed / stale delivery rows are dropped entirely.
+ */
+export function selectStickyOwnerDecisionCards(
+  cards: OwnerDecisionCardView[],
+): OwnerDecisionCardView[] {
+  const latest = selectLatestOwnerDecisionPerBoardItem(cards);
+  const active: OwnerDecisionCardView[] = [];
+  const terminals: OwnerDecisionCardView[] = [];
+  for (const card of latest) {
+    const facing = getOwnerDecisionDelivery(card.todolistId, card.version);
+    if (facing === "consumed" || facing === "skipped") {
+      continue;
+    }
+    // stale_version delivery or version-gate refusal: keep as review chrome
+    // (「旧版本已失效」) inside the terminal budget — do not re-offer Confirm.
+    if (
+      facing === "stale_version" ||
+      isOwnerDecisionVersionStale(card.decisionId) ||
+      isOwnerDecisionTodolistTerminal(getOwnerDecisionTodolistStatus(card.todolistId))
+    ) {
+      terminals.push(card);
+      continue;
+    }
+    active.push(card);
+  }
+  const terminalKeep = terminals.length > 0 ? [terminals[terminals.length - 1]] : [];
+  return [...active, ...terminalKeep];
+}
+
 export function setOwnerDecisionTodolistStatus(todolistId: string, status: string): void {
   const id = todolistId.trim();
   const value = status.trim().toLowerCase();
@@ -297,11 +406,21 @@ export function clearOwnerDecisionTodolistStatus(todolistId: string): void {
 }
 
 /**
- * Stale cards stay visible with「旧版本已失效」.
- * Collapsing them hid the invalidation the user needs to see.
+ * Confirmed human cards fold away after success (SoT stays confirmed — never
+ * roll back to proposed). Stale/superseded stay visible with「旧版本已失效」.
  */
-export function shouldAutoCollapseOwnerDecisionStatus(_status: string | null | undefined): boolean {
-  return false;
+export function shouldAutoCollapseOwnerDecisionStatus(
+  status: string | null | undefined,
+  opts?: { peerConfirmed?: boolean },
+): boolean {
+  const key = String(status ?? "")
+    .trim()
+    .toLowerCase();
+  // Peer mutual-ack residuals stay visible as「收到，并确认」; human confirm folds away.
+  if (opts?.peerConfirmed) {
+    return false;
+  }
+  return key === "confirmed";
 }
 
 /** decisionId → boardItemId, filled while a card is rendered. */
@@ -538,6 +657,7 @@ export function setOwnerDecisionActionError(decisionId: string, message: string)
   if (versionRefusal === "confirmation_consumed") {
     if (todolistId) {
       setOwnerDecisionTodolistStatus(todolistId, "confirmed");
+      noteOwnerDecisionDelivery(todolistId, "consumed");
     }
     actionErrorsByDecisionId.delete(id);
     return;
@@ -661,13 +781,16 @@ export function renderOwnerDecisionCards(
     }
   }
   const reads = [...byId.values()];
-  const cards = reads.map((row) => row.card);
-  const staleIds = staleOwnerDecisionDecisionIds(cards);
-  const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
-  const hydrateTargets = collectOwnerDecisionHydrationTargets(cards);
+  const allCards = reads.map((row) => row.card);
+  // Hydrate against the full set so terminal status is learned even for cards
+  // we are about to drop from the sticky pile.
+  const hydrateTargets = collectOwnerDecisionHydrationTargets(allCards);
   if (hydrateTargets.length > 0) {
     opts.onHydrateStatuses?.(hydrateTargets);
   }
+  const cards = selectStickyOwnerDecisionCards(allCards);
+  const staleIds = staleOwnerDecisionDecisionIds(allCards);
+  const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
   if (cards.length === 0) {
     return nothing;
   }
@@ -685,7 +808,10 @@ export function renderOwnerDecisionCards(
         isOwnerDecisionVersionStale(card.decisionId) ||
         userFacing === "stale_version" ||
         todolistStatus === "superseded";
-      const actionable = !invalid && isOwnerDecisionTodolistActionable(todolistStatus);
+      const facingTerminal =
+        userFacing === "consumed" || userFacing === "stale_version" || userFacing === "skipped";
+      const actionable =
+        !invalid && !facingTerminal && isOwnerDecisionTodolistActionable(todolistStatus);
       const statusCopy = invalid
         ? ownerDecisionDeliveryStatusCopy("stale_version")
         : todolistStatus && !isOwnerDecisionTodolistActionable(todolistStatus)
@@ -707,7 +833,34 @@ export function renderOwnerDecisionCards(
       // Confirmed / stale / other terminal review: no action buttons (incl. 稍后).
       // 稍后 stays only while proposed|revise_requested.
       const visibleOptions = actionable ? card.options : [];
-      return html`
+      // Confirmed: peer mutual-ack →「收到，并确认」only; human confirm folds away
+      // (dismiss) and any human residual keeps「执行计划已确认」(never peer copy).
+      const isConfirmedTerminal =
+        !invalid &&
+        String(todolistStatus ?? "")
+          .trim()
+          .toLowerCase() === "confirmed";
+      const peerConfirmed = isOwnerDecisionPeerConfirmed(userFacing);
+      if (isConfirmedTerminal && peerConfirmed) {
+        return html`
+          <div
+            class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card employee-workbench__owner-decision-peer-ack"
+            role="status"
+            aria-label=${OWNER_DECISION_PEER_ACK_COPY}
+            data-owner-decision=${card.decisionId}
+            data-todolist-id=${card.todolistId}
+            data-owner-decision-status="confirmed"
+            data-owner-decision-authority=${authority}
+            data-owner-decision-delivery=${userFacing ?? nothing}
+            data-owner-decision-terminal
+            data-owner-decision-peer-ack
+            data-owner-decision-confirm-source="peer"
+          >
+            <div class="employee-workbench__owner-decision-peer-ack-copy">${OWNER_DECISION_PEER_ACK_COPY}</div>
+          </div>
+        `;
+      }
+      const cardInner = html`
         <div
           class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card"
           role="group"
@@ -899,6 +1052,21 @@ export function renderOwnerDecisionCards(
           }
         </div>
       `;
+      // Actionable human confirm card → modal/dialog chrome; terminal/stale stay inline.
+      if (actionable) {
+        return html`
+          <div
+            class="employee-workbench__owner-decision-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label=${card.title}
+            data-owner-decision-dialog=${card.decisionId}
+          >
+            <div class="employee-workbench__owner-decision-dialog">${cardInner}</div>
+          </div>
+        `;
+      }
+      return cardInner;
     })}
   `;
 }

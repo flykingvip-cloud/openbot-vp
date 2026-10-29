@@ -1,11 +1,13 @@
 import fs from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 import type { AgentMessage, StreamFn } from "@earendil-works/pi-agent-core";
 import { completeSimple, streamSimple } from "@earendil-works/pi-ai/compat";
 import { createAgentSession, DefaultResourceLoader } from "@earendil-works/pi-coding-agent";
 import { resolveHeartbeatPrompt } from "../../../auto-reply/heartbeat.js";
 import { resolveChannelCapabilities } from "../../../config/channel-capabilities.js";
 import type { OpenBotConfig } from "../../../config/config.js";
+import { readSessionTaskBoard } from "../../../conversation-task/session-task-board.js";
 import { emitChatInboundStage } from "../../../gateway/chat-inbound-stage-events.js";
 import {
   compilerTelemetryToFaultRoundSnapshot,
@@ -106,11 +108,14 @@ import {
   FALSE_CONFIRM_CONTINUE_LIMIT,
   FALSE_CONFIRM_CONTINUE_PROMPT,
   SILENT_EXEC_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT,
   SILENT_EXEC_CONTINUE_PROMPT,
   lastAssistantStopKind,
   lastAssistantStopText,
   latestUserText,
   shouldContinueAfterEmptyToolFinal,
+  claimStallContinue,
 } from "../../execution-stall-continue.js";
 import { isTimeoutError } from "../../failover-error.js";
 import { resolveImageSanitizationLimits } from "../../image-sanitization.js";
@@ -2626,11 +2631,42 @@ export async function runEmbeddedAttempt(
           let falseConfirmContinues = 0;
           let emptyAfterToolsContinues = 0;
           let silentExecContinues = 0;
+          let recoverableContinues = 0;
+          // Durable ≤2 progress-stall ledger (restart + concurrency safe via wx slots).
+          // Quota cycle binds to board taskId so same-task retry shares ≤2 and a
+          // new task in the same chat gets an independent quota (resume cannot
+          // swap ids: cycle comes from authoritative board current, not user text).
+          const stallLedgerSessionKey = (
+            params.sessionKey?.trim() ||
+            params.sessionId?.trim() ||
+            ""
+          ).trim();
+          let stallQuotaCycleId = "";
+          try {
+            const boardTaskId = readSessionTaskBoard(params.sessionFile).current?.taskId?.trim();
+            if (boardTaskId) {
+              stallQuotaCycleId = boardTaskId;
+            }
+          } catch {
+            // Board unavailable — fall through to execution task id.
+          }
+          if (!stallQuotaCycleId) {
+            stallQuotaCycleId = (executionTaskId ?? "").trim();
+          }
+          const stallLedger =
+            stallLedgerSessionKey && params.agentDir?.trim() && stallQuotaCycleId
+              ? {
+                  ledgerDir: path.join(params.agentDir.trim(), "stall-continue-ledger"),
+                  sessionKey: stallLedgerSessionKey,
+                  quotaCycleId: stallQuotaCycleId,
+                }
+              : undefined;
           const continueBudget =
             EXECUTION_STALL_CONTINUE_LIMIT +
             FALSE_CONFIRM_CONTINUE_LIMIT +
             EMPTY_AFTER_TOOLS_CONTINUE_LIMIT +
-            SILENT_EXEC_CONTINUE_LIMIT;
+            SILENT_EXEC_CONTINUE_LIMIT +
+            RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT;
           await runExecutionStallContinueLoop({
             continueBudget,
             isAbortedOrTimedOut: () => aborted || timedOut,
@@ -2648,6 +2684,10 @@ export async function runEmbeddedAttempt(
                 latestUserText: userText,
                 falseConfirmContinuesUsed: falseConfirmContinues,
                 silentExecContinuesUsed: silentExecContinues,
+                recoverableContinuesUsed: recoverableContinues,
+                tools: toolMetas,
+                visibleTexts: assistantTexts,
+                stallLedger,
               });
               const emptyContinue =
                 !kind &&
@@ -2661,6 +2701,13 @@ export async function runEmbeddedAttempt(
               return { kind, emptyContinue, stopText };
             },
             sendContinue: async ({ kind }) => {
+              if (kind === "progress-stall" && stallLedger) {
+                const claim = claimStallContinue(stallLedger);
+                if (!claim.allowed) {
+                  throw new Error(claim.stopReason ?? "execution_stall_continue_exhausted");
+                }
+                stallContinues = claim.continuesUsed;
+              }
               try {
                 await abortable(
                   activeSession.sendCustomMessage(
@@ -2673,7 +2720,9 @@ export async function runEmbeddedAttempt(
                             ? FALSE_CONFIRM_CONTINUE_PROMPT
                             : kind === "empty-after-tools"
                               ? EMPTY_AFTER_TOOLS_CONTINUE_PROMPT
-                              : EXECUTION_STALL_CONTINUE_PROMPT,
+                              : kind === "recoverable-tool-failure"
+                                ? RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT
+                                : EXECUTION_STALL_CONTINUE_PROMPT,
                       display: false,
                       details: { reason: kind },
                     },
@@ -2687,7 +2736,10 @@ export async function runEmbeddedAttempt(
             },
             onContinued: (kind, stopText) => {
               if (kind === "progress-stall") {
-                stallContinues += 1;
+                // When durable ledger is active, claim already set stallContinues.
+                if (!stallLedger) {
+                  stallContinues += 1;
+                }
                 if (stopText) {
                   continuedStalls.push(stopText);
                 }
@@ -2698,6 +2750,11 @@ export async function runEmbeddedAttempt(
                 }
               } else if (kind === "silent-exec") {
                 silentExecContinues += 1;
+                if (stopText) {
+                  continuedStalls.push(stopText);
+                }
+              } else if (kind === "recoverable-tool-failure") {
+                recoverableContinues += 1;
                 if (stopText) {
                   continuedStalls.push(stopText);
                 }

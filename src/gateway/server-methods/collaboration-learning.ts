@@ -181,6 +181,33 @@ async function resolveTrustedWriteContext(client: GatewayClient | null, groupId:
   };
 }
 
+/** Read path: same tenant/actor/locator checks as write, but action:"read" so observers can hydrate plans/cards. */
+async function resolveTrustedReadContext(client: GatewayClient | null, groupId: string) {
+  const tenant = await resolveCollaborationTenantResolution(client);
+  const actor = await resolveDeliveryAclActor(client, groupId);
+  if (!actor) {
+    return { ok: false as const, error: "actor_not_authenticated", tenant, actor: null };
+  }
+  const trusted = await resolveHandlerTrustedTeamContext({
+    groupId,
+    actor,
+    client,
+    tenant,
+    action: "read",
+  });
+  if (!trusted.ok) {
+    return { ok: false as const, error: trusted.reason, detail: trusted.detail, tenant, actor };
+  }
+  return {
+    ok: true as const,
+    tenant,
+    actor,
+    auth: trusted.auth,
+    stores: trusted.stores,
+    trusted: trusted.trusted,
+  };
+}
+
 export const collaborationLearningHandlers: GatewayRequestHandlers = {
   "collaboration.learning.snapshot": async ({ params, respond }) => {
     if (
@@ -994,20 +1021,35 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
-      const actor = await resolveDeliveryAclActor(client, params.groupId);
+      // Trusted locator chain with read action: observers may hydrate plans/cards;
+      // writes stay on resolveTrustedWriteContext (confirm/revise/etc.).
+      const ctx = await resolveTrustedReadContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const todolist = await getCollaborationTodolist({
         groupId: params.groupId,
         taskId: params.taskId,
         todolistId: params.todolistId,
-        actor,
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       const deliveries = await listCollaborationOwnerDecisionDeliveries({
         groupId: params.groupId,
         taskId: params.taskId,
-        actor,
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       const cardDelivery =
         deliveries.find(
@@ -1039,14 +1081,25 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
+      const ctx = await resolveTrustedReadContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
       const todolists = await listCollaborationTodolists({
         groupId: params.groupId,
         taskId: params.taskId,
         boardItemId: params.boardItemId,
         ownerMemberId: params.ownerMemberId,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
       respond(true, { todolists }, undefined);
     } catch (error) {

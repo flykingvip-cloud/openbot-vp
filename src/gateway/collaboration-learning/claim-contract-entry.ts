@@ -104,6 +104,7 @@ import { deliveryActorIdsEqual } from "./delivery-actor-binding.js";
 import { collaborationDispatchIdsMatch } from "./member-dispatch-readiness.js";
 import {
   confirmationConsumedDelivery,
+  peerConfirmationConsumedDelivery,
   normalizeOwnerDecisionDelivery,
   proposalCreatedDelivery,
   readOwnerDecisionDeliveries,
@@ -112,6 +113,7 @@ import {
   type OwnerDecisionCardDelivery,
 } from "./owner-decision-delivery.js";
 import { emitOwnerDecisionCardForProposedTodolist } from "./owner-decision-emit.js";
+import { ensureBoardActiveAfterConfirm } from "./ensure-board-active-after-confirm.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -1700,9 +1702,35 @@ export async function proposeCollaborationTodolist(params: {
     });
     if (peer.ok) {
       liveTodolist = peer.todolist;
+      // Peer auto-confirm also needs an active board + claimant for later advance.
+      try {
+        const boardItemId = (liveTodolist.boardItemId ?? "").trim();
+        if (boardItemId) {
+          const board = await loadBoardClaimItem(authority, {
+            taskId: liveTodolist.taskId,
+            itemId: boardItemId,
+          });
+          if (board) {
+            await ensureBoardActiveAfterConfirm({
+              groupId: params.groupId,
+              taskId: liveTodolist.taskId,
+              item: board,
+              planOwnerMemberId: liveTodolist.ownerMemberId,
+              authorizingActorId: (liveTodolist.confirmedBy ?? "").trim() || undefined,
+              auth: params.auth,
+              trusted: params.trusted,
+              stores: params.stores ?? stores,
+              tenant: params.tenant,
+              cfg,
+            });
+          }
+        }
+      } catch {
+        // Confirm stays; human UI shows compact peer ack only.
+      }
       cardDelivery = await rememberDelivery(
         params.groupId,
-        confirmationConsumedDelivery(peer.todolist),
+        peerConfirmationConsumedDelivery(peer.todolist),
         cfg,
         trustedLocator,
       );
@@ -1980,6 +2008,33 @@ export async function confirmCollaborationTodolist(params: {
     ),
     "confirmTodolist",
   );
+  // Confirm committed. Best-effort activate board (published→claimed→applied + claimantId)
+  // so post-plan advance does not early-return confirm_board_not_active. Never roll back.
+  try {
+    const boardItemId = (confirmed.boardItemId ?? "").trim();
+    if (boardItemId) {
+      const board = await loadBoardClaimItem(authority, {
+        taskId: params.taskId,
+        itemId: boardItemId,
+      });
+      if (board) {
+        await ensureBoardActiveAfterConfirm({
+          groupId: params.groupId,
+          taskId: params.taskId,
+          item: board,
+          planOwnerMemberId: confirmed.ownerMemberId,
+          authorizingActorId: confirmerId,
+          auth: params.auth,
+          trusted: params.trusted,
+          stores: params.stores,
+          tenant: params.tenant,
+          cfg,
+        });
+      }
+    }
+  } catch {
+    // Confirm stays committed; advance path will surface autoAdvance.reason.
+  }
   try {
     await recordOwnerDecisionDelivery({
       groupId: params.groupId,

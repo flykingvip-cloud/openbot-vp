@@ -2343,21 +2343,86 @@ function scopedSessionsResultForEmployeeWorkbench(
   });
 }
 
+/** Strip a leading `human:` so memberRoleMap / governance ids align with bare userIds. */
+function stripWorkbenchHumanActorPrefix(value: string | null | undefined): string | null {
+  const normalized = normalizeValue(value);
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.toLowerCase().startsWith("human:")) {
+    const bare = normalized.slice("human:".length).trim();
+    return bare || normalized;
+  }
+  return normalized;
+}
+
+/**
+ * Expand actor userId/email into matchable identities.
+ * Digital-human team OS rows often store owners as `human:<uuid>` while the
+ * signed-in actor only has the bare uuid / email — keep both forms.
+ */
+function addWorkbenchActorIdentityValue(
+  identities: Set<string>,
+  value: string | null | undefined,
+): void {
+  const normalized = normalizeValue(value)?.toLowerCase();
+  if (!normalized) {
+    return;
+  }
+  identities.add(normalized);
+  if (normalized.startsWith("human:")) {
+    const bare = normalized.slice("human:".length).trim();
+    if (bare) {
+      identities.add(bare);
+    }
+  } else if (!normalized.includes("@")) {
+    identities.add(`human:${normalized}`);
+  }
+}
+
 function buildWorkbenchActorIdentities(
   userId: string | null | undefined,
   userEmail: string | null | undefined,
 ): Set<string> {
-  return new Set(
-    [userId, userEmail].map((value) => normalizeValue(value)?.toLowerCase() ?? "").filter(Boolean),
-  );
+  const identities = new Set<string>();
+  addWorkbenchActorIdentityValue(identities, userId);
+  addWorkbenchActorIdentityValue(identities, userEmail);
+  return identities;
 }
 
+/** Prefer a real email over uuid/session handles for OS rows keyed by mailbox. */
+function resolveWorkbenchActorEmail(params: {
+  candidates: Array<string | null | undefined>;
+}): string | null {
+  for (const candidate of params.candidates) {
+    const normalized = normalizeValue(candidate);
+    if (normalized?.includes("@")) {
+      return normalized;
+    }
+  }
+  return null;
+}
+
+/** Exact match, plus `human:<id>` ↔ bare `<id>` (case-insensitive). */
 function matchesWorkbenchActorIdentity(
   subjectId: string | null | undefined,
   actorIdentities: ReadonlySet<string>,
 ): boolean {
   const normalized = normalizeValue(subjectId)?.toLowerCase() ?? "";
-  return Boolean(normalized && actorIdentities.has(normalized));
+  if (!normalized) {
+    return false;
+  }
+  if (actorIdentities.has(normalized)) {
+    return true;
+  }
+  if (normalized.startsWith("human:")) {
+    const bare = normalized.slice("human:".length).trim();
+    return Boolean(bare && actorIdentities.has(bare));
+  }
+  if (!normalized.includes("@") && actorIdentities.has(`human:${normalized}`)) {
+    return true;
+  }
+  return false;
 }
 
 function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
@@ -2371,7 +2436,7 @@ function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
     }> | null;
   } | null;
 }): string | null {
-  return (
+  const raw =
     normalizeValue(space.operatingState?.governance?.ownerUserId) ??
     normalizeValue(space.ownerUserId) ??
     normalizeValue(
@@ -2380,10 +2445,49 @@ function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
           normalizeValue(entry.memberKind) !== "bot" &&
           normalizeValue(entry.governanceRole) === "owner",
       )?.memberId,
-    )
-  );
+    );
+  // memberRoleMap owners are often `human:<uuid>`; strip so roster ids / actor match.
+  return stripWorkbenchHumanActorPrefix(raw);
 }
 
+function resolveWorkbenchActorGovernanceRole(params: {
+  ownerUserId: string | null;
+  actorIdentities: ReadonlySet<string>;
+  memberRoleMap?: Array<{
+    memberId: string;
+    memberKind?: string | null;
+    governanceRole?: string | null;
+  }> | null;
+  adminUserIds?: ReadonlyArray<string | null | undefined> | null;
+}): "owner" | "admin" | "member" {
+  // Prefer explicit roster / memberRoleMap governanceRole for the signed-in actor.
+  for (const entry of params.memberRoleMap ?? []) {
+    if (normalizeValue(entry.memberKind) === "bot") {
+      continue;
+    }
+    if (!matchesWorkbenchActorIdentity(entry.memberId, params.actorIdentities)) {
+      continue;
+    }
+    const role = normalizeValue(entry.governanceRole)?.toLowerCase();
+    if (role === "owner") {
+      return "owner";
+    }
+    if (role === "admin") {
+      return "admin";
+    }
+  }
+  if (matchesWorkbenchActorIdentity(params.ownerUserId, params.actorIdentities)) {
+    return "owner";
+  }
+  for (const adminId of params.adminUserIds ?? []) {
+    if (matchesWorkbenchActorIdentity(adminId, params.actorIdentities)) {
+      return "admin";
+    }
+  }
+  return "member";
+}
+
+/** @deprecated Prefer resolveWorkbenchActorGovernanceRole — kept for settings rows that only need owner|member. */
 function resolveWorkbenchSettingsGroupRole(params: {
   ownerUserId: string | null;
   actorIdentities: ReadonlySet<string>;
@@ -2817,10 +2921,9 @@ function buildBaseMemberGovernanceEntries(
   const managedSpace = groupSnapshot?.managedSpace ?? null;
   const ownedAgentsById = new Map(ownedAgents.map((entry) => [entry.id, entry] as const));
   const orgBotById = new Map(orgDirectory.map((entry) => [entry.agentId, entry] as const));
-  const actorIdentities = new Set(
-    [actor.currentUserId, actor.currentUserEmail]
-      .map((value) => normalizeIdentity(value))
-      .filter(Boolean),
+  const actorIdentities = buildWorkbenchActorIdentities(
+    actor.currentUserId,
+    actor.currentUserEmail,
   );
   const currentHumans: WorkbenchCollaborationMemberGovernanceRosterEntry[] = (
     managedSpace?.members.humans ?? []
@@ -3747,10 +3850,48 @@ export function buildEmployeeWorkbenchProps(input: {
     state.platformAuthState?.enterprise?.name?.trim() ||
     trustedProxySession?.tenantId?.trim() ||
     "";
+  // OS / memberRoleMap often keys humans by mailbox while employeeAccess and
+  // hello.auth may only carry the platform uuid. Prefer any @ candidate across
+  // platform session + hello + bootstrap — do not let hello.user (uuid) hide the
+  // email that platformAuthState.session.user still holds.
+  const platformSessionEmail =
+    platformAuthSession && "email" in platformAuthSession
+      ? ((platformAuthSession as { email?: string | null }).email ?? null)
+      : null;
+  const trustedSessionEmail =
+    trustedProxySession && "email" in trustedProxySession
+      ? ((trustedProxySession as { email?: string | null }).email ?? null)
+      : null;
+  const bootstrapSessionEmail =
+    state.bootstrapAuthSession && "email" in state.bootstrapAuthSession
+      ? ((state.bootstrapAuthSession as { email?: string | null }).email ?? null)
+      : null;
   const currentHumanUserEmail =
-    normalizeValue(trustedProxySession?.user) ?? currentHumanUserId ?? null;
+    resolveWorkbenchActorEmail({
+      candidates: [
+        platformSessionEmail,
+        trustedSessionEmail,
+        bootstrapSessionEmail,
+        platformAuthSession?.user,
+        state.bootstrapAuthSession?.user,
+        trustedProxySession?.user,
+        helloTrustedProxySession?.user,
+      ],
+    }) ?? null;
   const orgBotDirectory = state.workbenchCollaborationOrgBotDirectory ?? [];
   const actorIdentities = buildWorkbenchActorIdentities(currentHumanUserId, currentHumanUserEmail);
+  // Merge every session handle so uuid-only hello cannot drop the email identity.
+  for (const extra of [
+    platformAuthSession?.user,
+    platformSessionEmail,
+    state.bootstrapAuthSession?.user,
+    bootstrapSessionEmail,
+    trustedProxySession?.user,
+    trustedSessionEmail,
+    helloTrustedProxySession?.user,
+  ]) {
+    addWorkbenchActorIdentityValue(actorIdentities, extra);
+  }
   const trustedProxySessionScopes =
     trustedProxySession && "scopes" in trustedProxySession
       ? (trustedProxySession.scopes ?? [])
@@ -4078,9 +4219,11 @@ export function buildEmployeeWorkbenchProps(input: {
             ) ?? null;
           return {
             activeGroupKey: state.workbenchMemberGovernanceGroupKey,
-            activeGroupRole: resolveWorkbenchSettingsGroupRole({
+            activeGroupRole: resolveWorkbenchActorGovernanceRole({
               ownerUserId: currentOwnerUserId,
               actorIdentities,
+              memberRoleMap: managedSpace?.operatingState?.memberRoleMap ?? null,
+              adminUserIds: managedSpace?.operatingState?.governance?.adminUserIds ?? null,
             }),
             currentOwnerUserId,
             title: state.workbenchMemberGovernanceTitle ?? "",

@@ -10020,6 +10020,46 @@ tasks:
     since: 2026-10-27
     metadata: {}
 landingStreams:
+  - id: fix-preview-member-mutex-20261029
+    landingPolicy: serial
+    paths:
+      - docs/notes/fix-preview-member-mutex-20261029.md
+      - ui/src/ui/ports/employee/collaboration-stage-panel-coordination.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-collaboration.ts
+      - ui/src/ui/ports/employee/views/workbench-types.ts
+      - ui/src/ui/ports/employee/render-model.ts
+      - ui/src/ui/ports/employee/render-model.node.test.ts
+      - .loom/registry.yaml
+    metadata:
+      task: fix-preview-member-mutex-20261029
+      owner: daniel
+      purpose: Preview mutex (artifact/computer vs member drawer) + owner/admin writable via governanceRole
+  - id: fix-member-governance-owner-identity-20261029
+    landingPolicy: serial
+    paths:
+      - docs/notes/fix-member-governance-owner-identity-20261029.md
+      - ui/src/ui/ports/employee/render-model.ts
+      - ui/src/ui/ports/employee/render-model.node.test.ts
+      - .loom/registry.yaml
+    metadata:
+      task: fix-member-governance-owner-identity-20261029
+      owner: daniel
+      purpose: Member governance owner misclassified as member when OS owner is human:<uuid> (add/invite vanished)
+  - id: fix-ab-ghost-confirm-chat-history-20261029
+    landingPolicy: serial
+    paths:
+      - docs/notes/fix-ab-ghost-confirm-chat-history-20261029.md
+      - src/gateway/server-methods/collaboration-learning.ts
+      - ui/src/ui/chat/merge-local-user-history.ts
+      - ui/src/ui/chat/merge-local-user-history.node.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - .loom/registry.yaml
+    metadata:
+      task: fix-ab-ghost-confirm-chat-history-20261029
+      owner: ab
+      purpose: Ghost confirm cards + missing local user bubbles (trusted getTodolist + sticky filter + history merge)
   - id: ux-unread-badge-persist-20261029:grok-bot
     landingPolicy: serial
     paths:
@@ -22135,6 +22175,18 @@ landingStreams:
       legacyTitle: Deliverable preview path locator
       task: deliverable-path-locator
       owner: cursor-deliverable-path
+
+  - id: pr143-market-assistant-merge-notes
+    landingPolicy: parallel
+    paths:
+      - .loom/registry.yaml
+      - docs/PR143-MERGE-NOTES.md
+    canLandWith: []
+    metadata:
+      purpose: PR143 merge-prep audit notes (pointer to outside evidence; no DIGEST)
+      task: pr143-market-assistant-merge-notes
+      owner: grok-bot
+
 sharedPaths:
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
