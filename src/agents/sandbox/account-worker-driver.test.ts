@@ -263,6 +263,14 @@ describe("account worker docker driver (mocked CLI)", () => {
       }),
     );
     expect(driver.lastCreateArgs[0]?.some((arg) => arg.includes("docker.sock"))).toBe(false);
+    expect(driver.lastCreateArgs[0]?.[1]).toBe("--pull=never");
+    expect(
+      buildAccountWorkerContainerArgs({
+        spec,
+        kind: "browser",
+        name: "aw-browser-test",
+      }).slice(0, 2),
+    ).toEqual(["create", "--pull=never"]);
     expect(mock.calls.some((args) => args[0] === "start" && args[1] === exec.containerName)).toBe(
       true,
     );
