@@ -106,6 +106,8 @@ import {
   FALSE_CONFIRM_CONTINUE_LIMIT,
   FALSE_CONFIRM_CONTINUE_PROMPT,
   SILENT_EXEC_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT,
   SILENT_EXEC_CONTINUE_PROMPT,
   lastAssistantStopKind,
   lastAssistantStopText,
@@ -2626,11 +2628,13 @@ export async function runEmbeddedAttempt(
           let falseConfirmContinues = 0;
           let emptyAfterToolsContinues = 0;
           let silentExecContinues = 0;
+          let recoverableContinues = 0;
           const continueBudget =
             EXECUTION_STALL_CONTINUE_LIMIT +
             FALSE_CONFIRM_CONTINUE_LIMIT +
             EMPTY_AFTER_TOOLS_CONTINUE_LIMIT +
-            SILENT_EXEC_CONTINUE_LIMIT;
+            SILENT_EXEC_CONTINUE_LIMIT +
+            RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT;
           await runExecutionStallContinueLoop({
             continueBudget,
             isAbortedOrTimedOut: () => aborted || timedOut,
@@ -2648,6 +2652,9 @@ export async function runEmbeddedAttempt(
                 latestUserText: userText,
                 falseConfirmContinuesUsed: falseConfirmContinues,
                 silentExecContinuesUsed: silentExecContinues,
+                recoverableContinuesUsed: recoverableContinues,
+                tools: toolMetas,
+                visibleTexts: assistantTexts,
               });
               const emptyContinue =
                 !kind &&
@@ -2673,7 +2680,9 @@ export async function runEmbeddedAttempt(
                             ? FALSE_CONFIRM_CONTINUE_PROMPT
                             : kind === "empty-after-tools"
                               ? EMPTY_AFTER_TOOLS_CONTINUE_PROMPT
-                              : EXECUTION_STALL_CONTINUE_PROMPT,
+                              : kind === "recoverable-tool-failure"
+                                ? RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT
+                                : EXECUTION_STALL_CONTINUE_PROMPT,
                       display: false,
                       details: { reason: kind },
                     },
@@ -2698,6 +2707,11 @@ export async function runEmbeddedAttempt(
                 }
               } else if (kind === "silent-exec") {
                 silentExecContinues += 1;
+                if (stopText) {
+                  continuedStalls.push(stopText);
+                }
+              } else if (kind === "recoverable-tool-failure") {
+                recoverableContinues += 1;
                 if (stopText) {
                   continuedStalls.push(stopText);
                 }
