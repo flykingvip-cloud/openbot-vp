@@ -585,6 +585,100 @@ describe("R1 autoAdvance — no hardcode execute; strict binding", () => {
     expect(result.reason).toMatch(/confirm_board_not_active/);
     expect(result.dispatched).toBe(false);
   });
+
+  it("published board → ensure activates → advance does not early-exit not_active", async () => {
+    const { cfg } = await useRoot({ selfAdvanceMode: "dry_run" });
+    const published = {
+      itemId: "board-1",
+      taskId: "task-1",
+      groupId: "grp_adv",
+      status: "published",
+      intendedClaimantIds: ["bot-exec"],
+      title: "step",
+      remainingWork: "do",
+      acceptanceCriteria: ["ok"],
+      publishedBy: "bot-exec",
+      publishedAt: 1,
+      revision: 1,
+    };
+    const applied = {
+      ...published,
+      status: "applied",
+      claimantId: "bot-exec",
+      claimedAt: 2,
+      appliedAt: 3,
+      revision: 3,
+    };
+    vi.spyOn(claimEntry, "listCollaborationBoardItems").mockResolvedValue([published] as never);
+    vi.spyOn(claimEntry, "claimCollaborationBoardItem").mockResolvedValue({
+      ...published,
+      status: "claimed",
+      claimantId: "bot-exec",
+      claimedAt: 2,
+      revision: 2,
+    } as never);
+    vi.spyOn(claimEntry, "applyCollaborationBoardClaim").mockResolvedValue({
+      task: { taskId: "task-1" },
+      item: applied,
+    } as never);
+    vi.spyOn(claimEntry, "buildClaimAuthority").mockResolvedValue({
+      authority: seedAuthority(cfg, "grp_adv", null),
+      stores: null,
+      operatingState: null,
+    } as never);
+    vi.spyOn(executorTodolist, "loadExecutorTodolist").mockResolvedValue({
+      todolistId: "td-1",
+      taskId: "task-1",
+      boardItemId: "board-1",
+      groupId: "grp_adv",
+      ownerMemberId: "bot-exec",
+      status: "confirmed",
+      version: 1,
+      steps: [{ stepId: "s1", title: "step", status: "active" }],
+      visibility: "executor_private",
+    } as never);
+    vi.spyOn(executorTodolist, "buildExecutionTaskBag").mockReturnValue({
+      boardSummary: { itemId: "board-1", goal: "g" },
+      groupContextPointer: { groupId: "grp_adv", transcriptHint: "t" },
+      todolistCurrentStep: { stepId: "s1", version: 1, title: "step" },
+    } as never);
+    const wakeSpy = vi.spyOn(wakeContract, "recordNudgeWake").mockResolvedValue({ ok: true } as never);
+    vi.spyOn(wakeRound, "consumeWakeForRoundDispatch").mockResolvedValue({
+      outcome: "recorded",
+      dispatched: false,
+      reason: "self_advance_not_execute",
+      gate: {
+        allowed: false,
+        reason: "self_advance_not_execute",
+        wakeEnabled: true,
+        selfAdvanceWriteMode: "dry_run",
+        sourceEligible: true,
+      },
+      wakeEvent: undefined,
+      roundId: undefined,
+      dispatcherPresent: false,
+      opKey: "k",
+      wakeOp: undefined,
+      reused: false,
+    } as never);
+
+    const result = await triggerPostPlanConfirmAdvance({
+      groupId: "grp_adv",
+      taskId: "task-1",
+      boardItemId: "board-1",
+      todolistId: "td-1",
+      confirmedVersion: 1,
+      stepId: "s1",
+      confirmerId: "human:owner",
+      cfg,
+    });
+    expect(result.reason).not.toMatch(/confirm_board_not_active/);
+    expect(result.reason).not.toBe("confirm_board_no_claimant");
+    expect(claimEntry.claimCollaborationBoardItem).toHaveBeenCalled();
+    expect(claimEntry.applyCollaborationBoardClaim).toHaveBeenCalled();
+    expect(wakeSpy).toHaveBeenCalled();
+    expect(result.wakeRecorded).toBe(true);
+  });
 });
 
 describe("R1 readiness — gateway agents.list ∩ active OS bot", () => {

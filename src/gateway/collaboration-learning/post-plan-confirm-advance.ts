@@ -35,6 +35,7 @@ import {
   type WakeRoundDispatchRequest,
 } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { buildClaimAuthority, listCollaborationBoardItems } from "./claim-contract-entry.js";
+import { ensureBoardActiveAfterConfirm } from "./ensure-board-active-after-confirm.js";
 import {
   buildExecutionDeliverableBinding,
   runIdFromWakeOpAttempt,
@@ -178,7 +179,7 @@ export async function triggerPostPlanConfirmAdvance(params: {
   });
 
   // Strict bind: confirmed boardItemId must exist; never fall back to other items.
-  const item = boardItems.find((row) => row.itemId === boardItemId);
+  let item = boardItems.find((row) => row.itemId === boardItemId);
   if (!item) {
     return finishAdvance({
       autoAdvanceWired: true,
@@ -199,20 +200,52 @@ export async function triggerPostPlanConfirmAdvance(params: {
       targetAgentIds: [],
     });
   }
+  // Confirm may land while the board is still `published` (short loop: publish→card→confirm).
+  // Activate claim+apply for the intended claimant before the existing active gate so we do
+  // not early-return confirm_board_not_active / confirm_board_no_claimant. Confirm itself is
+  // already committed — activation is best-effort and never rolls it back.
   const activeStatuses = new Set<string>(SELF_ADVANCE_ACTIVE_BOARD_STATUSES);
-  if (!activeStatuses.has(compact(item.status))) {
+  let liveItem = item;
+  if (!activeStatuses.has(compact(liveItem.status)) || !compact(liveItem.claimantId)) {
+    const ensured = await ensureBoardActiveAfterConfirm({
+      groupId,
+      taskId,
+      item: liveItem,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores: params.stores,
+      tenant: params.tenant,
+      cfg,
+    });
+    liveItem = ensured.item;
+    if (ensured.activated) {
+      log.info("ensureBoardActiveAfterConfirm", {
+        reason: ensured.reason,
+        boardItemId,
+        status: compact(liveItem.status),
+        claimantId: compact(liveItem.claimantId),
+      });
+    } else if (ensured.reason !== "already_active") {
+      log.warn("ensureBoardActiveAfterConfirm", {
+        reason: ensured.reason,
+        boardItemId,
+        status: compact(liveItem.status),
+      });
+    }
+  }
+  if (!activeStatuses.has(compact(liveItem.status))) {
     return finishAdvance({
       autoAdvanceWired: true,
       wakeRecorded: false,
       wakeConsumed: false,
       dispatched: false,
-      reason: `confirm_board_not_active:${compact(item.status) || "unknown"}`,
+      reason: `confirm_board_not_active:${compact(liveItem.status) || "unknown"}`,
       targetAgentIds: [],
     });
   }
 
   // Current effective responsibility only (claimant), not intendedClaimant fan-out.
-  const claimant = compact(item.claimantId);
+  const claimant = compact(liveItem.claimantId);
   if (!claimant) {
     return finishAdvance({
       autoAdvanceWired: true,
@@ -223,6 +256,8 @@ export async function triggerPostPlanConfirmAdvance(params: {
       targetAgentIds: [],
     });
   }
+  // Keep `item` alias pointing at the post-ensure board row for any later reads.
+  item = liveItem;
   if (claimant === confirmerId) {
     return finishAdvance({
       autoAdvanceWired: true,

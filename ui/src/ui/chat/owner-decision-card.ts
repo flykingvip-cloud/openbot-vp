@@ -212,6 +212,9 @@ export function clearOwnerDecisionDeliveryStateForTest(): void {
 /** Statuses that may still call confirmTodolist / reviseTodolist. */
 export const OWNER_DECISION_ACTIONABLE_STATUSES = new Set(["proposed", "revise_requested"]);
 
+/** Human-side compact copy for bot↔bot peer confirmation (no plan body). */
+export const OWNER_DECISION_PEER_ACK_COPY = "收到，并确认";
+
 const OWNER_DECISION_STATUS_COPY: Record<string, string> = {
   confirmed: "执行计划已确认",
   superseded: "旧版本已失效",
@@ -297,11 +300,14 @@ export function clearOwnerDecisionTodolistStatus(todolistId: string): void {
 }
 
 /**
- * Stale cards stay visible with「旧版本已失效」.
- * Collapsing them hid the invalidation the user needs to see.
+ * Confirmed human cards fold away after success (SoT stays confirmed — never
+ * roll back to proposed). Stale/superseded stay visible with「旧版本已失效」.
  */
-export function shouldAutoCollapseOwnerDecisionStatus(_status: string | null | undefined): boolean {
-  return false;
+export function shouldAutoCollapseOwnerDecisionStatus(status: string | null | undefined): boolean {
+  const key = String(status ?? "")
+    .trim()
+    .toLowerCase();
+  return key === "confirmed";
 }
 
 /** decisionId → boardItemId, filled while a card is rendered. */
@@ -707,7 +713,32 @@ export function renderOwnerDecisionCards(
       // Confirmed / stale / other terminal review: no action buttons (incl. 稍后).
       // 稍后 stays only while proposed|revise_requested.
       const visibleOptions = actionable ? card.options : [];
-      return html`
+      // Confirmed: human confirm path dismisses the dialog; residual / peer-confirmed
+      // cards that remain in history show only「收到，并确认」(no plan body).
+      const isConfirmedTerminal =
+        !invalid &&
+        String(todolistStatus ?? "")
+          .trim()
+          .toLowerCase() === "confirmed";
+      if (isConfirmedTerminal) {
+        return html`
+          <div
+            class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card employee-workbench__owner-decision-peer-ack"
+            role="status"
+            aria-label=${OWNER_DECISION_PEER_ACK_COPY}
+            data-owner-decision=${card.decisionId}
+            data-todolist-id=${card.todolistId}
+            data-owner-decision-status="confirmed"
+            data-owner-decision-authority=${authority}
+            data-owner-decision-delivery=${userFacing ?? nothing}
+            data-owner-decision-terminal
+            data-owner-decision-peer-ack
+          >
+            <div class="employee-workbench__owner-decision-peer-ack-copy">${OWNER_DECISION_PEER_ACK_COPY}</div>
+          </div>
+        `;
+      }
+      const cardInner = html`
         <div
           class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card"
           role="group"
@@ -899,6 +930,21 @@ export function renderOwnerDecisionCards(
           }
         </div>
       `;
+      // Actionable human confirm card → modal/dialog chrome; terminal/stale stay inline.
+      if (actionable) {
+        return html`
+          <div
+            class="employee-workbench__owner-decision-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-label=${card.title}
+            data-owner-decision-dialog=${card.decisionId}
+          >
+            <div class="employee-workbench__owner-decision-dialog">${cardInner}</div>
+          </div>
+        `;
+      }
+      return cardInner;
     })}
   `;
 }
