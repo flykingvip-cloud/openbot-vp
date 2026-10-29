@@ -2341,21 +2341,67 @@ function scopedSessionsResultForEmployeeWorkbench(
   });
 }
 
+/** Strip a leading `human:` so memberRoleMap / governance ids align with bare userIds. */
+function stripWorkbenchHumanActorPrefix(value: string | null | undefined): string | null {
+  const normalized = normalizeValue(value);
+  if (!normalized) {
+    return null;
+  }
+  if (normalized.toLowerCase().startsWith("human:")) {
+    const bare = normalized.slice("human:".length).trim();
+    return bare || normalized;
+  }
+  return normalized;
+}
+
+/**
+ * Expand actor userId/email into matchable identities.
+ * Digital-human team OS rows often store owners as `human:<uuid>` while the
+ * signed-in actor only has the bare uuid / email — keep both forms.
+ */
 function buildWorkbenchActorIdentities(
   userId: string | null | undefined,
   userEmail: string | null | undefined,
 ): Set<string> {
-  return new Set(
-    [userId, userEmail].map((value) => normalizeValue(value)?.toLowerCase() ?? "").filter(Boolean),
-  );
+  const identities = new Set<string>();
+  for (const value of [userId, userEmail]) {
+    const normalized = normalizeValue(value)?.toLowerCase();
+    if (!normalized) {
+      continue;
+    }
+    identities.add(normalized);
+    if (normalized.startsWith("human:")) {
+      const bare = normalized.slice("human:".length).trim();
+      if (bare) {
+        identities.add(bare);
+      }
+    } else if (!normalized.includes("@")) {
+      identities.add(`human:${normalized}`);
+    }
+  }
+  return identities;
 }
 
+/** Exact match, plus `human:<id>` ↔ bare `<id>` (case-insensitive). */
 function matchesWorkbenchActorIdentity(
   subjectId: string | null | undefined,
   actorIdentities: ReadonlySet<string>,
 ): boolean {
   const normalized = normalizeValue(subjectId)?.toLowerCase() ?? "";
-  return Boolean(normalized && actorIdentities.has(normalized));
+  if (!normalized) {
+    return false;
+  }
+  if (actorIdentities.has(normalized)) {
+    return true;
+  }
+  if (normalized.startsWith("human:")) {
+    const bare = normalized.slice("human:".length).trim();
+    return Boolean(bare && actorIdentities.has(bare));
+  }
+  if (!normalized.includes("@") && actorIdentities.has(`human:${normalized}`)) {
+    return true;
+  }
+  return false;
 }
 
 function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
@@ -2369,7 +2415,7 @@ function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
     }> | null;
   } | null;
 }): string | null {
-  return (
+  const raw =
     normalizeValue(space.operatingState?.governance?.ownerUserId) ??
     normalizeValue(space.ownerUserId) ??
     normalizeValue(
@@ -2378,8 +2424,9 @@ function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
           normalizeValue(entry.memberKind) !== "bot" &&
           normalizeValue(entry.governanceRole) === "owner",
       )?.memberId,
-    )
-  );
+    );
+  // memberRoleMap owners are often `human:<uuid>`; strip so roster ids / actor match.
+  return stripWorkbenchHumanActorPrefix(raw);
 }
 
 function resolveWorkbenchSettingsGroupRole(params: {
@@ -2789,10 +2836,9 @@ function buildBaseMemberGovernanceEntries(
   const managedSpace = groupSnapshot?.managedSpace ?? null;
   const ownedAgentsById = new Map(ownedAgents.map((entry) => [entry.id, entry] as const));
   const orgBotById = new Map(orgDirectory.map((entry) => [entry.agentId, entry] as const));
-  const actorIdentities = new Set(
-    [actor.currentUserId, actor.currentUserEmail]
-      .map((value) => normalizeIdentity(value))
-      .filter(Boolean),
+  const actorIdentities = buildWorkbenchActorIdentities(
+    actor.currentUserId,
+    actor.currentUserEmail,
   );
   const currentHumans: WorkbenchCollaborationMemberGovernanceRosterEntry[] = (
     managedSpace?.members.humans ?? []

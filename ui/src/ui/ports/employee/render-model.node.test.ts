@@ -2979,6 +2979,78 @@ describe("buildEmployeeWorkbenchProps", () => {
     expect(memberProps.collaborationMemberGovernance?.canReset).toBe(false);
   });
 
+  it("treats human:<uuid> memberRoleMap owner as owner so member governance stays writable", () => {
+    const ownerUuid = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
+    const state = createState({
+      hello: {
+        auth: {
+          provider: "trusted-proxy",
+          user: ownerUuid,
+          displayName: "Owner",
+          tenantId: "tenant-1",
+        },
+      } as never,
+      platformAuthState: {
+        session: {
+          user: ownerUuid,
+          displayName: "Owner",
+          tenantId: "tenant-1",
+        },
+        employeeAccess: {
+          employeeUserId: ownerUuid,
+          ownedAgentIds: [],
+          currentSeat: { seatId: "seat-1", title: "CEO" },
+        },
+      } as never,
+      workbenchMemberGovernanceDrawerOpen: true,
+      collaborationSpacesResult: {
+        spaces: [
+          {
+            id: "alpha",
+            groupId: "grp-digital-human-team",
+            title: "数字人战队",
+            // Digital-human teams often leave governance.ownerUserId null and
+            // only record the owner as human:<uuid> in memberRoleMap.
+            ownerUserId: null,
+            operatingState: {
+              governance: { ownerUserId: null },
+              memberRoleMap: [
+                {
+                  memberId: `human:${ownerUuid}`,
+                  memberKind: "human",
+                  governanceRole: "owner",
+                  label: "Owner",
+                },
+              ],
+            },
+            members: {
+              humans: [{ userId: ownerUuid, name: "Owner", status: "active" }],
+              bots: [],
+            },
+            invites: { humans: [], bots: [] },
+          },
+        ],
+      } as never,
+    });
+
+    const props = buildEmployeeWorkbenchProps({
+      state,
+      chatContent: html`
+        <div>chat</div>
+      `,
+      authPanel: null,
+    });
+
+    const governance = props.collaborationMemberGovernance;
+    expect(governance?.activeGroupRole).toBe("owner");
+    expect(governance?.currentOwnerUserId).toBe(ownerUuid);
+    expect(governance?.canReset).toBe(true);
+    // workbench-stage-collaboration: isReadOnly = activeGroupRole === "member" || isInvitee
+    expect(governance?.activeGroupRole === "member" || Boolean(governance?.selfPendingInvite)).toBe(
+      false,
+    );
+  });
+
   it("resets collaboration data from member governance for the group owner", async () => {
     const request = vi.fn(async (method: string, params?: Record<string, unknown>) => {
       if (method === "collaboration.spaces.reset") {
