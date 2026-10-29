@@ -218,6 +218,26 @@ describe("recoverable-tool-failure continue", () => {
     ).toBe("recoverable-tool-failure");
   });
 
+  it("continues soft 「用这张」 cover-reuse even when assistant mentions 封面", () => {
+    const ask = "我打算改用你发来的那张 PNG 当封面再推一次，请回复「用这张」，我就立刻继续。";
+    expect(isSoftConfirmAfterAuthorizedGo(ask, "请发送")).toBe(true);
+    expect(
+      shouldContinueAfterExecutionStall({
+        text: ask,
+        toolsDisabled: false,
+        latestUserText: "请发送",
+      }),
+    ).toBe(true);
+    // 「请确认封面标题」 stays terminal (content-hard, no 用这张).
+    expect(
+      shouldContinueAfterExecutionStall({
+        text: "请确认封面标题后再写入草稿箱。",
+        toolsDisabled: false,
+        latestUserText: "开始排版和发布这篇文章到公众号",
+      }),
+    ).toBe(false);
+  });
+
   it("soft ask without waiting_confirmation continues after authorized go", () => {
     expect(isSoftConfirmAfterAuthorizedGo("要不要推草稿箱？", "开始排版并写进草稿箱")).toBe(true);
     expect(
