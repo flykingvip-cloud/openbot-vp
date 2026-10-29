@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { render } from "lit";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearOwnerDecisionDeliveryStateForTest,
   clearOwnerDecisionDismissalsForTest,
@@ -25,6 +25,8 @@ import {
   readOwnerDecisionRow,
   renderOwnerDecisionCards,
   selectLatestOwnerDecisionPerBoardItem,
+  selectStickyOwnerDecisionCards,
+  isOwnerDecisionTodolistTerminal,
   setOwnerDecisionActionError,
   setOwnerDecisionTodolistStatus,
   splitOwnerDecisionPlanStep,
@@ -407,14 +409,12 @@ describe("owner-decision-card UI", () => {
 
     const container = document.createElement("div");
     render(renderOwnerDecisionCards(messages), container);
-    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(3);
+    // Sticky pile keeps latest per board only (older versions stay in transcript
+    // history, not in the confirm stack — avoids ghost walls on long threads).
+    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(1);
     expect(container.querySelector("[data-owner-decision='dec-new']")).not.toBeNull();
-    expect(container.querySelector("[data-owner-decision='dec-old']")?.textContent).toContain(
-      "旧版本已失效",
-    );
-    expect(container.querySelector("[data-owner-decision='dec-mid']")?.textContent).toContain(
-      "旧版本已失效",
-    );
+    expect(container.querySelector("[data-owner-decision='dec-old']")).toBeNull();
+    expect(container.querySelector("[data-owner-decision='dec-mid']")).toBeNull();
     expect(
       container.querySelector(
         "[data-owner-decision='dec-old'] [data-owner-decision-action='confirm']",
@@ -710,5 +710,93 @@ describe("owner-decision-card UI", () => {
     retry.click();
     expect(onRetryDelivery).toHaveBeenCalledTimes(1);
     expect(onDecide).not.toHaveBeenCalled();
+  });
+});
+
+describe("selectStickyOwnerDecisionCards", () => {
+  beforeEach(() => {
+    clearOwnerDecisionDismissalsForTest();
+    clearOwnerDecisionDeliveryStateForTest();
+  });
+
+  it("keeps unknown-status cards and at most one terminal review card", () => {
+    const proposed = {
+      kind: "todolist_confirm" as const,
+      decisionId: "owner-decision-a-v1",
+      groupId: "grp-test",
+      taskId: "task-a",
+      boardItemId: "board-a",
+      todolistId: "todo-a",
+      title: "请确认执行计划",
+      summary: ["1. do a；"],
+      options: [
+        { id: "confirm" as const, label: "确认计划", style: "primary" as const },
+        { id: "revise" as const, label: "退回修订", style: "default" as const },
+        { id: "later" as const, label: "稍后", style: "ghost" as const },
+      ],
+      version: 1,
+    };
+    const confirmedOlder = {
+      ...proposed,
+      decisionId: "owner-decision-b-v2",
+      todolistId: "todo-b",
+      boardItemId: "board-b",
+      version: 2,
+    };
+    const confirmedNewer = {
+      ...proposed,
+      decisionId: "owner-decision-c-v1",
+      todolistId: "todo-c",
+      boardItemId: "board-c",
+      version: 1,
+    };
+    setOwnerDecisionTodolistStatus("todo-b", "confirmed");
+    setOwnerDecisionTodolistStatus("todo-c", "confirmed");
+    const sticky = selectStickyOwnerDecisionCards([proposed, confirmedOlder, confirmedNewer]);
+    expect(sticky.map((c) => c.decisionId)).toEqual(["owner-decision-a-v1", "owner-decision-c-v1"]);
+    expect(isOwnerDecisionTodolistTerminal("confirmed")).toBe(true);
+  });
+
+  it("drops confirmation_consumed delivery rows from the sticky pile", () => {
+    const card = {
+      kind: "todolist_confirm" as const,
+      decisionId: "owner-decision-consumed",
+      groupId: "grp-test",
+      taskId: "task-z",
+      boardItemId: "board-z",
+      todolistId: "todo-z",
+      title: "请确认执行计划",
+      summary: ["1. done；"],
+      options: [
+        { id: "confirm" as const, label: "确认计划", style: "primary" as const },
+        { id: "revise" as const, label: "退回修订", style: "default" as const },
+        { id: "later" as const, label: "稍后", style: "ghost" as const },
+      ],
+      version: 1,
+    };
+    noteOwnerDecisionDelivery("todo-z", "consumed");
+    expect(selectStickyOwnerDecisionCards([card])).toEqual([]);
+  });
+
+  it("dedupes to latest per board item before sticky filter", () => {
+    const v1 = {
+      kind: "todolist_confirm" as const,
+      decisionId: "owner-decision-x-v1",
+      groupId: "grp-test",
+      taskId: "task-x",
+      boardItemId: "board-x",
+      todolistId: "todo-x1",
+      title: "请确认执行计划",
+      summary: ["1. old；"],
+      options: [
+        { id: "confirm" as const, label: "确认计划", style: "primary" as const },
+        { id: "revise" as const, label: "退回修订", style: "default" as const },
+        { id: "later" as const, label: "稍后", style: "ghost" as const },
+      ],
+      version: 1,
+    };
+    const v2 = { ...v1, decisionId: "owner-decision-x-v2", todolistId: "todo-x2", version: 2 };
+    const sticky = selectStickyOwnerDecisionCards([v1, v2]);
+    expect(sticky.map((c) => c.decisionId)).toEqual(["owner-decision-x-v2"]);
   });
 });

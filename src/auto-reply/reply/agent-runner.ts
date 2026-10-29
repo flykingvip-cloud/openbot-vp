@@ -19,6 +19,10 @@ import {
   updateSessionStoreEntry,
 } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
+import {
+  isTaskBoardContinueInternalPrompt,
+  scheduleTaskBoardContinueWake,
+} from "../../conversation-task/task-board-continue.js";
 import { isEnterpriseRuntimeModelId } from "../../gateway/enterprise-model/ids.js";
 import { tryResolveCapabilityGapsFromUsage } from "../../gateway/evolution-control/capability-gap-ingest.js";
 import { emitAgentEvent } from "../../infra/agent-events.js";
@@ -298,6 +302,39 @@ export async function runReplyAgent(params: {
     defaultModel,
     agentCfgContextTokens,
   });
+
+  const maybeScheduleTaskBoardContinue = (payloads: ReplyPayload[] | undefined) => {
+    if (isHeartbeat) {
+      return;
+    }
+    if (isTaskBoardContinueInternalPrompt(commandBody)) {
+      return;
+    }
+    const assistantText = (payloads ?? [])
+      .map((payload) => (typeof payload.text === "string" ? payload.text.trim() : ""))
+      .filter(Boolean)
+      .join("\n\n");
+    scheduleTaskBoardContinueWake({
+      sessionFile: followupRun.run.sessionFile,
+      assistantText,
+      isHeartbeat,
+      toolsDisabled: followupRun.run.disableTools === true,
+      enqueue: (prompt, messageId) =>
+        enqueueFollowupRun(
+          queueKey,
+          {
+            ...followupRun,
+            prompt,
+            messageId,
+            summaryLine: "task_board_continue",
+            enqueuedAt: Date.now(),
+            followupItemId: undefined,
+          },
+          resolvedQueue,
+          "message-id",
+        ),
+    });
+  };
 
   let responseUsageLine: string | undefined;
   type SessionResetOptions = {
@@ -796,6 +833,7 @@ export async function runReplyAgent(params: {
       }
       // Process placeholder is not final delivery — leave incomplete (no evolution positive).
       void commitGrowthOutcome(true, { processPlaceholder: true });
+      maybeScheduleTaskBoardContinue([{ text: fallbackText }]);
       return finalizeWithFollowup({ text: fallbackText }, queueKey, runFollowupTurn);
     }
 
@@ -1047,6 +1085,7 @@ export async function runReplyAgent(params: {
       env: process.env,
     });
 
+    maybeScheduleTaskBoardContinue(finalPayloads);
     return finalizeWithFollowup(
       finalPayloads.length === 1 ? finalPayloads[0] : finalPayloads,
       queueKey,

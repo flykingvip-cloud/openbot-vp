@@ -3,8 +3,12 @@ import type { CronConfig, CronRetryOn } from "../../config/types.cron.js";
 import type { HeartbeatRunResult } from "../../infra/heartbeat-wake.js";
 import { DEFAULT_AGENT_ID } from "../../routing/session-key.js";
 import { resolveOrAllocateCronFireId } from "../../task-outcome/cron-fire-id.js";
-import { isCronCompletionScheduleHold } from "../completion-contract.js";
+import {
+  CRON_COMPLETION_EMPTY_PREFIX,
+  isCronCompletionScheduleHold,
+} from "../completion-contract.js";
 import { resolveCronDeliveryPlan } from "../delivery.js";
+import { isCronAccountMissingError } from "../sandbox-account-preflight.js";
 import { sweepCronRunSessions } from "../session-reaper.js";
 import type {
   CronDeliveryStatus,
@@ -366,9 +370,68 @@ export function applyJobResult(
         }
       }
     }
+    // Fail-closed: missing managed sandbox account must not hot-loop (~200ms).
+    if (isCronAccountMissingError(result.error) && job.enabled) {
+      job.enabled = false;
+      job.state.nextRunAtMs = undefined;
+      state.deps.log.warn(
+        {
+          jobId: job.id,
+          jobName: job.name,
+          error: result.error,
+        },
+        "cron: disabling job — managed sandbox account missing (cron_account:missing)",
+      );
+      const alertConfig = resolveFailureAlert(state, job);
+      if (alertConfig) {
+        emitFailureAlert(state, {
+          job,
+          error: result.error,
+          consecutiveErrors: job.state.consecutiveErrors ?? 1,
+          channel: alertConfig.channel,
+          to: alertConfig.to,
+          mode: alertConfig.mode,
+          accountId: alertConfig.accountId,
+        });
+        job.state.lastFailureAlertAtMs = state.deps.nowMs();
+      }
+    }
   } else {
+    // Soft-surface empty completion (still not transport failure / not ok).
+    if (
+      completionHold &&
+      typeof result.error === "string" &&
+      result.error.startsWith(CRON_COMPLETION_EMPTY_PREFIX)
+    ) {
+      const now = state.deps.nowMs();
+      const lastAlert = job.state.lastFailureAlertAtMs;
+      const alertConfig = resolveFailureAlert(state, job);
+      const cooldownMs = alertConfig?.cooldownMs ?? 60 * 60 * 1000;
+      const inCooldown = typeof lastAlert === "number" && now - lastAlert < Math.max(0, cooldownMs);
+      if (!inCooldown) {
+        const safeJobName = job.name || job.id;
+        const text = [
+          `Cron job "${safeJobName}" finished empty (cron_completion:empty)`,
+          `Detail: ${(result.error ?? "").slice(0, 200)}`,
+        ].join("\n");
+        state.deps.enqueueSystemEvent(text, { agentId: job.agentId });
+        if (alertConfig) {
+          emitFailureAlert(state, {
+            job,
+            error: result.error,
+            consecutiveErrors: 0,
+            channel: alertConfig.channel,
+            to: alertConfig.to,
+            mode: alertConfig.mode,
+            accountId: alertConfig.accountId,
+          });
+        }
+        job.state.lastFailureAlertAtMs = now;
+      }
+    } else {
+      job.state.lastFailureAlertAtMs = undefined;
+    }
     job.state.consecutiveErrors = 0;
-    job.state.lastFailureAlertAtMs = undefined;
   }
 
   const shouldDelete =
