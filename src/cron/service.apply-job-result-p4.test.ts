@@ -66,6 +66,50 @@ describe("applyJobResult P4 account-missing / empty soft-alert", () => {
     }
   });
 
+  it("disables job on raw managed sandbox server-derived account error", () => {
+    const startedAt = Date.parse("2026-10-29T08:30:00.000Z");
+    const endedAt = startedAt + 4200;
+    const enqueueSystemEvent = vi.fn();
+    const state = createCronServiceState({
+      cronEnabled: true,
+      storePath: "/tmp/cron-p4-raw-sandbox-account.json",
+      log: noopLogger as never,
+      nowMs: () => endedAt,
+      enqueueSystemEvent,
+      requestHeartbeatNow: vi.fn(),
+      runIsolatedAgentJob: vi.fn(),
+      cronConfig: {
+        failureAlert: {
+          enabled: true,
+          after: 1,
+          cooldownMs: 0,
+          channel: "last",
+        },
+      } as never,
+    });
+
+    const job = createIsolatedRegressionJob({
+      id: "p4-raw-sandbox-account",
+      name: "daily-update",
+      scheduledAt: startedAt,
+      schedule: { kind: "every", everyMs: 60_000, anchorMs: startedAt - 60_000 },
+      payload: { kind: "agentTurn", message: "daily update" },
+      state: { nextRunAtMs: startedAt - 1_000, runningAtMs: startedAt - 500 },
+    });
+
+    const shouldDelete = applyJobResult(state, job, {
+      status: "error",
+      error: "Managed multitenant sandbox requires a server-derived account (tenantId and userId).",
+      startedAt,
+      endedAt,
+    });
+
+    expect(shouldDelete).toBe(false);
+    expect(job.enabled).toBe(false);
+    expect(job.state.nextRunAtMs).toBeUndefined();
+    expect(job.state.consecutiveErrors).toBeGreaterThanOrEqual(1);
+  });
+
   it("records empty completion as non-success with deduped soft-alert", () => {
     const startedAt = Date.parse("2026-10-29T09:00:00.000Z");
     const endedAt = startedAt + 15;
