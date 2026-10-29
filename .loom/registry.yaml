@@ -10019,6 +10019,23 @@ tasks:
     ownerHistory: []
     since: 2026-10-27
     metadata: {}
+  - id: fix-main-integration-gate-followup-20261029
+    owner: grok-bot
+    intent: []
+    paths:
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/team-resource-auth.ts
+      - ui/src/ui/chat/grouped-render.node.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+      - ui/src/ui/ports/employee/render-model.node.test.ts
+      - ui/src/ui/app-render.ts
+      - .loom/registry.yaml
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-29
+    metadata: {}
 landingStreams:
   - id: fix-preview-member-mutex-20261029
     landingPolicy: serial
@@ -10030,10 +10047,17 @@ landingStreams:
       - ui/src/ui/ports/employee/render-model.ts
       - ui/src/ui/ports/employee/render-model.node.test.ts
       - .loom/registry.yaml
+    canLandWith:
+      - fix-main-integration-gate-followup-20261029
+      - fix-ab-ghost-confirm-chat-history-20261029
+      - ux-unread-badge-persist-20261029:grok-bot
+      - fix-member-governance-owner-identity-20261029
+      - team-real-collab-loop-f1f3
     metadata:
       task: fix-preview-member-mutex-20261029
       owner: daniel
-      purpose: Preview mutex (artifact/computer vs member drawer) + owner/admin writable via governanceRole
+      purpose: Preview mutex (artifact/computer vs member drawer) + owner/admin
+        writable via governanceRole
   - id: fix-member-governance-owner-identity-20261029
     landingPolicy: serial
     paths:
@@ -10041,10 +10065,40 @@ landingStreams:
       - ui/src/ui/ports/employee/render-model.ts
       - ui/src/ui/ports/employee/render-model.node.test.ts
       - .loom/registry.yaml
+    canLandWith:
+      - fix-main-integration-gate-followup-20261029
+      - fix-ab-ghost-confirm-chat-history-20261029
+      - ux-unread-badge-persist-20261029:grok-bot
+      - fix-preview-member-mutex-20261029
+      - team-real-collab-loop-f1f3
     metadata:
       task: fix-member-governance-owner-identity-20261029
       owner: daniel
-      purpose: Member governance owner misclassified as member when OS owner is human:<uuid> (add/invite vanished)
+      purpose: Member governance owner misclassified as member when OS owner is
+        human:<uuid> (add/invite vanished)
+  - id: fix-main-integration-gate-followup-20261029
+    landingPolicy: serial
+    paths:
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/team-resource-auth.ts
+      - ui/src/ui/chat/grouped-render.node.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+      - ui/src/ui/ports/employee/render-model.node.test.ts
+      - ui/src/ui/app-render.ts
+      - .loom/registry.yaml
+    canLandWith:
+      - fix-ab-ghost-confirm-chat-history-20261029
+      - ux-unread-badge-persist-20261029:grok-bot
+      - fix-preview-member-mutex-20261029
+      - fix-member-governance-owner-identity-20261029
+      - team-real-collab-loop-f1f3
+      - batch11-s0-ogui-decision-lifecycle
+    metadata:
+      task: fix-main-integration-gate-followup-20261029
+      owner: grok-bot
+      purpose: Main integration-gate follow-up — tsgo TrustedGroupStores, confirm-card
+        residual receipt, fixtures/stubs, grouped-render scratchpad expects
   - id: fix-ab-ghost-confirm-chat-history-20261029
     landingPolicy: serial
     paths:
@@ -10056,10 +10110,17 @@ landingStreams:
       - ui/src/ui/chat/owner-decision-card.node.test.ts
       - ui/src/ui/controllers/chat.ts
       - .loom/registry.yaml
+    canLandWith:
+      - fix-main-integration-gate-followup-20261029
+      - ux-unread-badge-persist-20261029:grok-bot
+      - fix-preview-member-mutex-20261029
+      - fix-member-governance-owner-identity-20261029
+      - team-real-collab-loop-f1f3
     metadata:
       task: fix-ab-ghost-confirm-chat-history-20261029
       owner: ab
-      purpose: Ghost confirm cards + missing local user bubbles (trusted getTodolist + sticky filter + history merge)
+      purpose: Ghost confirm cards + missing local user bubbles (trusted getTodolist +
+        sticky filter + history merge)
   - id: ux-unread-badge-persist-20261029:grok-bot
     landingPolicy: serial
     paths:
@@ -10082,7 +10143,12 @@ landingStreams:
       - ui/src/ui/ports/employee/render-model-shell-actions.ts
       - ui/src/ui/ports/employee/views/workbench-home-model.ts
       - ui/src/ui/views/workbench-home-model.node.test.ts
-    canLandWith: []
+    canLandWith:
+      - fix-main-integration-gate-followup-20261029
+      - fix-ab-ghost-confirm-chat-history-20261029
+      - fix-preview-member-mutex-20261029
+      - fix-member-governance-owner-identity-20261029
+      - team-real-collab-loop-f1f3
     metadata:
       legacyTitle: UX unread badge persist + cross-day chat timestamps
   - id: team-real-collab-loop-f1f3
@@ -10419,7 +10485,8 @@ landingStreams:
       - ui/src/ui/ports/employee/workbench-session-transcript-cache.ts
       - ui/src/ui/ports/employee/workbench-session-transcript-cache.node.test.ts
       - ui/src/ui/ports/employee/render-actions.ts
-    canLandWith: []
+    canLandWith:
+      - fix-main-integration-gate-followup-20261029
     metadata:
       task: batch11-s0-ogui-decision-lifecycle
       owner: cursor-cloud
@@ -22175,7 +22242,6 @@ landingStreams:
       legacyTitle: Deliverable preview path locator
       task: deliverable-path-locator
       owner: cursor-deliverable-path
-
   - id: pr143-market-assistant-merge-notes
     landingPolicy: parallel
     paths:
@@ -22186,7 +22252,6 @@ landingStreams:
       purpose: PR143 merge-prep audit notes (pointer to outside evidence; no DIGEST)
       task: pr143-market-assistant-merge-notes
       owner: grok-bot
-
 sharedPaths:
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
