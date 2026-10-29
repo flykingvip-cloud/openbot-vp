@@ -16,6 +16,21 @@ import {
   shouldContinueAfterRecoverableToolFailure,
   type RecoverableToolFailureTool,
 } from "./recoverable-tool-failure.js";
+import {
+  canStallContinue,
+  claimStallContinue,
+  readStallContinueUsed,
+  STALL_CONTINUE_EXHAUSTED_REASON,
+  type StallContinueClaimResult,
+} from "./skill-gates/stall-continue-ledger.js";
+
+export {
+  canStallContinue,
+  claimStallContinue,
+  readStallContinueUsed,
+  STALL_CONTINUE_EXHAUSTED_REASON,
+  type StallContinueClaimResult,
+};
 import { formatActiveSkillGlossary } from "./skill-gates/glossary.js";
 import { isSilentExecFishingStop } from "./turn-completion/contract.js";
 
@@ -230,6 +245,11 @@ export function isSoftConfirmAfterAuthorizedGo(
   return true;
 }
 
+export type StallContinueLedgerRef = {
+  ledgerDir: string;
+  sessionKey: string;
+};
+
 export function executionContinueKind(params: {
   text: string;
   toolsDisabled: boolean;
@@ -240,6 +260,8 @@ export function executionContinueKind(params: {
   recoverableContinuesUsed?: number;
   tools?: readonly RecoverableToolFailureTool[];
   visibleTexts?: readonly string[];
+  /** When set, progress-stall ≤2 is enforced from the durable FS ledger. */
+  stallLedger?: StallContinueLedgerRef;
 }): ExecutionContinueKind | null {
   if (params.toolsDisabled) {
     return null;
@@ -263,9 +285,17 @@ export function executionContinueKind(params: {
   ) {
     return "recoverable-tool-failure";
   }
-  const stallUsed = params.continuesUsed ?? 0;
-  if (stallUsed < EXECUTION_STALL_CONTINUE_LIMIT && isExecutionStallFinal(params.text)) {
-    return "progress-stall";
+  if (isExecutionStallFinal(params.text)) {
+    if (params.stallLedger) {
+      if (canStallContinue(params.stallLedger)) {
+        return "progress-stall";
+      }
+    } else {
+      const stallUsed = params.continuesUsed ?? 0;
+      if (stallUsed < EXECUTION_STALL_CONTINUE_LIMIT) {
+        return "progress-stall";
+      }
+    }
   }
   const confirmUsed = params.falseConfirmContinuesUsed ?? 0;
   if (
@@ -287,6 +317,7 @@ export function shouldContinueAfterExecutionStall(params: {
   recoverableContinuesUsed?: number;
   tools?: readonly RecoverableToolFailureTool[];
   visibleTexts?: readonly string[];
+  stallLedger?: StallContinueLedgerRef;
 }): boolean {
   return executionContinueKind(params) !== null;
 }
