@@ -58,6 +58,7 @@ import {
   transcriptEntriesForInboundTurn,
 } from "../../conversation-task/focus-switch.js";
 import { observeConversationTaskCancelPathConsult } from "../../conversation-task/reply-completion.js";
+import { readSessionTaskBoard } from "../../conversation-task/session-task-board.js";
 import { shouldTaskParkAbortInFlight } from "../../conversation-task/turn-relation.js";
 import { resolveConversationFlags } from "../../conversations/flags.js";
 import { pageHistoryMessages } from "../../conversations/history-cursor.js";
@@ -407,7 +408,10 @@ import {
 } from "./chat-restore-deadline.js";
 import {
   applyChatFocusSwitchGateWithResumeRecheck,
+  buildResumeTaskStopActive,
+  clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
+  recordAuthoritativeTaskStop,
   sessionStopBarrierActive,
 } from "./chat-resume-parked-recheck.js";
 import {
@@ -3058,6 +3062,8 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
   stopReason?: string;
   mode?: "stop" | "undo";
   client: GatewayClient | null;
+  /** Session transcript path — used to bind authoritative stop to board taskId. */
+  sessionFile?: string;
 }) {
   const snapshots = collectSessionAbortPartials({
     chatAbortControllers: params.context.chatAbortControllers,
@@ -3077,6 +3083,30 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
       snapshots,
       client: params.client,
     });
+  }
+  // Authoritative stop by original taskId (survives AbortController delete).
+  // task-park is not a user stop barrier — do not record.
+  const boardTaskId = (() => {
+    const file = params.sessionFile?.trim();
+    if (!file) {
+      return "";
+    }
+    try {
+      return readSessionTaskBoard(file).current?.taskId?.trim() ?? "";
+    } catch {
+      return "";
+    }
+  })();
+  if (boardTaskId) {
+    if (params.mode === "undo") {
+      clearAuthoritativeTaskStop(boardTaskId);
+    } else if (res.aborted && params.stopReason !== "task-park") {
+      recordAuthoritativeTaskStop({
+        taskId: boardTaskId,
+        sessionKey: params.sessionKey,
+        reason: params.stopReason ?? params.abortOrigin,
+      });
+    }
   }
   return res;
 }
@@ -4345,6 +4375,12 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
 
     const ops = createChatAbortOps(context);
+    let abortSessionFile: string | undefined;
+    try {
+      abortSessionFile = (await loadSessionEntryForClient(sessionKey, client)).entry?.sessionFile;
+    } catch {
+      abortSessionFile = undefined;
+    }
 
     if (!runId) {
       const res = await abortChatRunsForSessionKeyWithPartials({
@@ -4355,6 +4391,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         stopReason: "rpc",
         mode,
         client,
+        sessionFile: abortSessionFile,
       });
       respond(true, {
         ok: true,
@@ -4374,6 +4411,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         stopReason: "rpc",
         mode,
         client,
+        sessionFile: abortSessionFile,
       });
       respond(true, {
         ok: true,
@@ -4426,6 +4464,25 @@ export const chatHandlers: GatewayRequestHandlers = {
         ],
         client,
       });
+    }
+    // Controller is already deleted by abortChatRunById — record durable task stop.
+    if (res.aborted) {
+      try {
+        const boardTaskId = readSessionTaskBoard(abortSessionFile).current?.taskId?.trim() ?? "";
+        if (boardTaskId) {
+          if (mode === "undo") {
+            clearAuthoritativeTaskStop(boardTaskId);
+          } else {
+            recordAuthoritativeTaskStop({
+              taskId: boardTaskId,
+              sessionKey,
+              reason: "rpc",
+            });
+          }
+        }
+      } catch {
+        // Session entry unavailable — authoritative stop skipped (fail-open on record).
+      }
     }
     respond(true, {
       ok: true,
@@ -5605,6 +5662,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         abortOrigin: "stop-command",
         stopReason: "stop",
         client,
+        sessionFile: entry?.sessionFile,
       });
       respond(true, { ok: true, aborted: res.aborted, runIds: res.runIds });
       return;
@@ -5736,7 +5794,13 @@ export const chatHandlers: GatewayRequestHandlers = {
               sendPolicy,
               accessAuthorized: true,
               clientIdentityOk: clientIdentityOkForResume(client),
+              // Session-wide live-controller scan is secondary only; per-task
+              // authoritative stop is what survives abort→delete→resume.
               stopActive: sessionStopBarrierActive({
+                sessionKeys: [resolvedSessionKey, sessionKey],
+                chatAbortControllers: context.chatAbortControllers,
+              }),
+              isTaskStopActive: buildResumeTaskStopActive({
                 sessionKeys: [resolvedSessionKey, sessionKey],
                 chatAbortControllers: context.chatAbortControllers,
               }),
@@ -5754,6 +5818,7 @@ export const chatHandlers: GatewayRequestHandlers = {
           abortOrigin: "rpc",
           stopReason: "task-park",
           client,
+          sessionFile: entry?.sessionFile,
         });
       }
       if (taskTracking.action === "cancel_parked") {

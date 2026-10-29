@@ -9,7 +9,12 @@ import {
 } from "../../conversation-task/session-task-board.js";
 import {
   applyChatFocusSwitchGateWithResumeRecheck,
+  buildResumeTaskStopActive,
+  clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
+  isAuthoritativeTaskStopActive,
+  recordAuthoritativeTaskStop,
+  resetAuthoritativeTaskStopsForTest,
   resolveResumeParkedRecheck,
   sessionStopBarrierActive,
 } from "./chat-resume-parked-recheck.js";
@@ -20,6 +25,7 @@ const RESEARCH = "另外帮我做一份竞品研究提纲";
 const tempDirs: string[] = [];
 
 afterEach(() => {
+  resetAuthoritativeTaskStopsForTest();
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -87,7 +93,7 @@ describe("clientIdentityOkForResume", () => {
   });
 });
 
-describe("sessionStopBarrierActive", () => {
+describe("sessionStopBarrierActive + authoritative task stop", () => {
   it("is true only when a matching session controller has aborted", () => {
     const controllers = new Map<
       string,
@@ -110,6 +116,65 @@ describe("sessionStopBarrierActive", () => {
         ]),
       }),
     ).toBe(false);
+  });
+
+  it("anti-example: abort then delete controller — live scan false, authoritative still blocks resume", () => {
+    const sessionKey = "agent:main:main";
+    const taskId = "task-stopped-original";
+    const otherTaskId = "task-other-unrelated";
+
+    // Simulate abortChatRunById: abort signal was true, then the Map entry is deleted.
+    const controllers = new Map<
+      string,
+      { sessionKey: string; controller?: { signal?: { aborted?: boolean } } }
+    >([["run-dying", { sessionKey, controller: { signal: { aborted: true } } }]]);
+    expect(
+      sessionStopBarrierActive({
+        sessionKeys: [sessionKey],
+        chatAbortControllers: controllers,
+      }),
+    ).toBe(true);
+
+    controllers.delete("run-dying"); // record cleaned — ephemeral scan alone would lie
+    expect(
+      sessionStopBarrierActive({
+        sessionKeys: [sessionKey],
+        chatAbortControllers: controllers,
+      }),
+    ).toBe(false);
+
+    recordAuthoritativeTaskStop({
+      taskId,
+      sessionKey,
+      reason: "rpc",
+      nowMs: 9_001,
+    });
+    expect(isAuthoritativeTaskStopActive(taskId)).toBe(true);
+    expect(
+      sessionStopBarrierActive({
+        sessionKeys: [sessionKey],
+        chatAbortControllers: controllers, // empty after delete
+        taskId,
+      }),
+    ).toBe(true);
+    // Other taskIds in the same session are not blocked by that record.
+    expect(
+      sessionStopBarrierActive({
+        sessionKeys: [sessionKey],
+        chatAbortControllers: controllers,
+        taskId: otherTaskId,
+      }),
+    ).toBe(false);
+
+    const isTaskStopActive = buildResumeTaskStopActive({
+      sessionKeys: [sessionKey],
+      chatAbortControllers: controllers,
+    });
+    expect(isTaskStopActive(taskId)).toBe(true);
+    expect(isTaskStopActive(otherTaskId)).toBe(false);
+
+    clearAuthoritativeTaskStop(taskId); // undo / explicit clear
+    expect(isTaskStopActive(taskId)).toBe(false);
   });
 });
 
@@ -158,6 +223,66 @@ describe("applyChatFocusSwitchGateWithResumeRecheck (chat entry path)", () => {
         accessAuthorized: true,
         clientIdentityOk: true,
         stopActive: false,
+      },
+    });
+    expect(ok.action).toBe("resume");
+    expect(ok.cutContext).toBe(true);
+  });
+
+  it("anti-example: after abort deletes controllers, authoritative task stop still denies resume", () => {
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+    expect(parkedId).toBeTruthy();
+
+    // Controllers already cleaned (abortChatRunById deleted the aborted entry).
+    const emptyControllers = new Map<
+      string,
+      { sessionKey: string; controller?: { signal?: { aborted?: boolean } } }
+    >();
+    recordAuthoritativeTaskStop({
+      taskId: parkedId,
+      sessionKey: "agent:main:main",
+      reason: "user-stop",
+      nowMs: 2_500,
+    });
+
+    const denied = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        // Broad live scan is false after cleanup — must not be the sole signal.
+        stopActive: sessionStopBarrierActive({
+          sessionKeys: ["agent:main:main"],
+          chatAbortControllers: emptyControllers,
+        }),
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: ["agent:main:main"],
+          chatAbortControllers: emptyControllers,
+        }),
+      },
+    });
+    expect(denied.action).toBe("continue");
+    expect(denied.statusLine ?? "").toContain("已停止");
+    expect(denied.cutContext).toBe(false);
+
+    clearAuthoritativeTaskStop(parkedId);
+    const ok = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 4_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        stopActive: false,
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: ["agent:main:main"],
+          chatAbortControllers: emptyControllers,
+        }),
       },
     });
     expect(ok.action).toBe("resume");

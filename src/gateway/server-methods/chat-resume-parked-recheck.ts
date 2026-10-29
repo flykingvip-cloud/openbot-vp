@@ -4,6 +4,19 @@
  * applyFocusSwitchGate already fail-closes when authOk===false or stopActive===true.
  * chat.send must resolve those flags from real send-time signals before resume
  * proceeds — never call the gate without a recheck on the user resume path.
+ *
+ * ## Resume stop policy (authoritative by taskId)
+ *
+ * Ephemeral `chatAbortControllers` are NOT authoritative: `abortChatRunById`
+ * aborts then deletes the controller, so a later resume that only scans live
+ * aborted controllers can see false and wrongly allow resume.
+ *
+ * Authoritative stop is recorded by the **original taskId** when a user/RPC
+ * stop or abort is accepted for that task. Resume of that taskId is denied
+ * while the record exists — even after the AbortController entry is cleaned.
+ * Other taskIds in the same session are not blocked by that record.
+ * Undo clears the record for the task. Task-park aborts do not record a stop
+ * (park is not a user stop barrier).
  */
 import type { ResumeParkedRecheck } from "../../conversation-task/session-task-board.js";
 import {
@@ -24,8 +37,14 @@ export type ResolveResumeParkedRecheckParams = {
    * (user / platformUserId / pairedDeviceId / membership / connect role).
    */
   clientIdentityOk?: boolean;
-  /** True when a stop/abort barrier is active for this session. */
+  /** True when a session-wide stop/abort barrier is active (broad deny). */
   stopActive?: boolean;
+  /**
+   * Authoritative per-taskId stop lookup. When provided, resumeParkedTask
+   * queries this with the resume target taskId (wins over boolean stopActive
+   * for that task).
+   */
+  isTaskStopActive?: (taskId: string) => boolean;
 };
 
 /**
@@ -43,6 +62,9 @@ export function resolveResumeParkedRecheck(
   return {
     authOk,
     stopActive: params.stopActive === true,
+    ...(typeof params.isTaskStopActive === "function"
+      ? { isTaskStopActive: params.isTaskStopActive }
+      : {}),
   };
 }
 
@@ -51,11 +73,79 @@ export type SessionStopBarrierEntry = {
   controller?: { signal?: { aborted?: boolean } };
 };
 
-/** True when any live abort controller for the session has already aborted. */
+export type AuthoritativeTaskStopEntry = {
+  taskId: string;
+  sessionKey?: string;
+  stoppedAtMs: number;
+  reason?: string;
+};
+
+/** Process-local authoritative stop registry keyed by original taskId. */
+const authoritativeTaskStops = new Map<string, AuthoritativeTaskStopEntry>();
+
+export function resetAuthoritativeTaskStopsForTest(): void {
+  authoritativeTaskStops.clear();
+}
+
+export function recordAuthoritativeTaskStop(params: {
+  taskId: string;
+  sessionKey?: string;
+  reason?: string;
+  nowMs?: number;
+}): AuthoritativeTaskStopEntry | null {
+  const taskId = params.taskId.trim();
+  if (!taskId) {
+    return null;
+  }
+  const entry: AuthoritativeTaskStopEntry = {
+    taskId,
+    stoppedAtMs: params.nowMs ?? Date.now(),
+    ...(params.sessionKey?.trim() ? { sessionKey: params.sessionKey.trim() } : {}),
+    ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+  };
+  authoritativeTaskStops.set(taskId, entry);
+  return entry;
+}
+
+export function clearAuthoritativeTaskStop(taskId: string): boolean {
+  const trimmed = taskId.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return authoritativeTaskStops.delete(trimmed);
+}
+
+/** Authoritative stop for a taskId — survives AbortController cleanup. */
+export function isAuthoritativeTaskStopActive(taskId: string): boolean {
+  const trimmed = taskId.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return authoritativeTaskStops.has(trimmed);
+}
+
+/**
+ * True when stop should block resume.
+ *
+ * Prefer authoritative stop by `taskId` when provided. Live aborted controllers
+ * are only a secondary signal (they disappear after abortChatRun deletes them).
+ */
 export function sessionStopBarrierActive(params: {
   sessionKeys: Iterable<string>;
   chatAbortControllers: ReadonlyMap<string, SessionStopBarrierEntry>;
+  /** When set, query authoritative stop for this original taskId first. */
+  taskId?: string;
+  /** Optional external store; defaults to the module registry. */
+  authoritativeStops?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
 }): boolean {
+  const taskId = params.taskId?.trim() ?? "";
+  if (taskId) {
+    const store = params.authoritativeStops ?? authoritativeTaskStops;
+    if (store.has(taskId)) {
+      return true;
+    }
+  }
+
   const keys = new Set<string>();
   for (const key of params.sessionKeys) {
     const trimmed = key.trim();
@@ -76,6 +166,24 @@ export function sessionStopBarrierActive(params: {
     }
   }
   return false;
+}
+
+/**
+ * Build the resume-time per-taskId stop predicate used by chat.send.
+ * Combines authoritative task stops with any still-live aborted controllers.
+ */
+export function buildResumeTaskStopActive(params: {
+  sessionKeys: Iterable<string>;
+  chatAbortControllers: ReadonlyMap<string, SessionStopBarrierEntry>;
+}): (taskId: string) => boolean {
+  const sessionKeys = [...params.sessionKeys];
+  const controllers = params.chatAbortControllers;
+  return (taskId: string) =>
+    sessionStopBarrierActive({
+      sessionKeys,
+      chatAbortControllers: controllers,
+      taskId,
+    });
 }
 
 export function clientIdentityOkForResume(
