@@ -26,7 +26,7 @@ const PERMANENT_FAILURE_RE =
   /(?:permission denied|EACCES|EPERM|access denied|not authorized|unauthorized|forbidden|invalid argument|EINVAL|bad arguments?|unknown option|usage:|cron_account:missing|requires a server-derived account|Managed multitenant sandbox requires)/iu;
 
 const SANDBOX_RUNTIME_RE =
-  /(?:Sandbox mode requires Docker|docker not found|Docker.*not (?:found|available)|container (?:exited|not running)|Cannot connect to the Docker daemon|exec host=sandbox.*unavailable)/iu;
+  /(?:Sandbox mode requires Docker|docker not found|Docker.*not (?:found|available)|container (?:exited|not running)|Cannot connect to the Docker daemon|cannot connect to the docker daemon|exec host=sandbox.*unavailable|云电脑没有启动|docker create failed|docker start failed|AccountWorkerFailedError|DOCKER_CLI_MISSING|Unable to find image|pull access denied|Sandbox browser image not found|openbot-sandbox-browser|openclaw-sandbox)/iu;
 
 const PATH_MISSING_RE =
   /(?:No such file or directory|ENOENT|can't cd|cannot cd|cd: .*(?:No such|not a directory)|no such file|目录不存在|路径不存在)/iu;
