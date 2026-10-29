@@ -807,7 +807,9 @@ function renderMemberGovernancePanelForContract(
   }
   const selfPendingInvite = state.selfPendingInvite ?? null;
   const isInvitee = Boolean(selfPendingInvite);
-  const isReadOnly = state.activeGroupRole === "member" || isInvitee;
+  // Owner and admin can invite/edit; only plain members (or pending invitees) are read-only.
+  const canManageMembers = state.activeGroupRole === "owner" || state.activeGroupRole === "admin";
+  const isReadOnly = !canManageMembers || isInvitee;
   const selectedHumanIds = new Set(state.selectedHumanIds);
   const selectedBotIds = new Set(state.selectedBotIds);
   return renderGroupMemberGovernancePanel({
@@ -816,7 +818,7 @@ function renderMemberGovernancePanelForContract(
     groupTitle: state.title,
     readOnly: isReadOnly,
     // Invitees are not members yet — leave only after accepting.
-    showLeaveAction: state.activeGroupRole === "member" && !isInvitee,
+    showLeaveAction: !canManageMembers && !isInvitee,
     currentOwnerUserId: state.currentOwnerUserId ?? null,
     prompt: state.prompt,
     busy: state.busy,

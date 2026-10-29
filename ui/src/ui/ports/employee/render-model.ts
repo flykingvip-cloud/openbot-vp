@@ -2429,6 +2429,44 @@ function resolveWorkbenchCollaborationSpaceOwnerUserId(space: {
   return stripWorkbenchHumanActorPrefix(raw);
 }
 
+function resolveWorkbenchActorGovernanceRole(params: {
+  ownerUserId: string | null;
+  actorIdentities: ReadonlySet<string>;
+  memberRoleMap?: Array<{
+    memberId: string;
+    memberKind?: string | null;
+    governanceRole?: string | null;
+  }> | null;
+  adminUserIds?: ReadonlyArray<string | null | undefined> | null;
+}): "owner" | "admin" | "member" {
+  // Prefer explicit roster / memberRoleMap governanceRole for the signed-in actor.
+  for (const entry of params.memberRoleMap ?? []) {
+    if (normalizeValue(entry.memberKind) === "bot") {
+      continue;
+    }
+    if (!matchesWorkbenchActorIdentity(entry.memberId, params.actorIdentities)) {
+      continue;
+    }
+    const role = normalizeValue(entry.governanceRole)?.toLowerCase();
+    if (role === "owner") {
+      return "owner";
+    }
+    if (role === "admin") {
+      return "admin";
+    }
+  }
+  if (matchesWorkbenchActorIdentity(params.ownerUserId, params.actorIdentities)) {
+    return "owner";
+  }
+  for (const adminId of params.adminUserIds ?? []) {
+    if (matchesWorkbenchActorIdentity(adminId, params.actorIdentities)) {
+      return "admin";
+    }
+  }
+  return "member";
+}
+
+/** @deprecated Prefer resolveWorkbenchActorGovernanceRole — kept for settings rows that only need owner|member. */
 function resolveWorkbenchSettingsGroupRole(params: {
   ownerUserId: string | null;
   actorIdentities: ReadonlySet<string>;
@@ -4096,9 +4134,11 @@ export function buildEmployeeWorkbenchProps(input: {
             ) ?? null;
           return {
             activeGroupKey: state.workbenchMemberGovernanceGroupKey,
-            activeGroupRole: resolveWorkbenchSettingsGroupRole({
+            activeGroupRole: resolveWorkbenchActorGovernanceRole({
               ownerUserId: currentOwnerUserId,
               actorIdentities,
+              memberRoleMap: managedSpace?.operatingState?.memberRoleMap ?? null,
+              adminUserIds: managedSpace?.operatingState?.governance?.adminUserIds ?? null,
             }),
             currentOwnerUserId,
             title: state.workbenchMemberGovernanceTitle ?? "",

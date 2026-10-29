@@ -10020,6 +10020,20 @@ tasks:
     since: 2026-10-27
     metadata: {}
 landingStreams:
+  - id: fix-preview-member-mutex-20261029
+    landingPolicy: serial
+    paths:
+      - docs/notes/fix-preview-member-mutex-20261029.md
+      - ui/src/ui/ports/employee/collaboration-stage-panel-coordination.ts
+      - ui/src/ui/ports/employee/views/workbench-stage-collaboration.ts
+      - ui/src/ui/ports/employee/views/workbench-types.ts
+      - ui/src/ui/ports/employee/render-model.ts
+      - ui/src/ui/ports/employee/render-model.node.test.ts
+      - .loom/registry.yaml
+    metadata:
+      task: fix-preview-member-mutex-20261029
+      owner: daniel
+      purpose: Preview mutex (artifact/computer vs member drawer) + owner/admin writable via governanceRole
   - id: fix-member-governance-owner-identity-20261029
     landingPolicy: serial
     paths:
