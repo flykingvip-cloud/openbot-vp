@@ -122,7 +122,6 @@ import {
 import type { OguiDecisionStatusLookup } from "./chat/ogui-form-view.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
 import { resolveGroupIdFromSessionContext } from "./collaboration/resolve-group-scope.ts";
-import { isGroupScopedSessionKey } from "./collaboration/resolve-group-scope.ts";
 import { formatAdminActivationEmailReceipt } from "./controllers/admin-activation-email-receipt.ts";
 import {
   resetCollaborationGovernanceActionState,
@@ -4068,11 +4067,7 @@ export class OpenBotApp extends LitElement {
       return;
     }
     const sessionKey = resolveChatRestoreSessionKey(this);
-    // Product: checkpoint-restore is 1:1 employee/bot only — never collaboration groups.
-    if (isGroupScopedSessionKey(sessionKey)) {
-      this.chatCheckpoints = [];
-      return;
-    }
+    // Phase A: load checkpoints for collab/space sessions (恢复线).
     try {
       const result = await this.client.request<{ checkpoints?: ChatCheckpoint[] }>(
         "chat.checkpoints.list",

@@ -15,7 +15,6 @@ import {
   pruneSessionContinuityCheckpoints,
   resolveCheckpointBoundaryMessageId,
   resolveSessionContinuityWorkspaceDir,
-  restoreWorkspaceSnapshotForCheckpoint,
 } from "./session-continuity.js";
 
 let tempDir = "";
@@ -305,8 +304,8 @@ describe("checkpoint session identity", () => {
   });
 });
 
-describe("collaboration group checkpoint capture", () => {
-  it("captures a group workspace snapshot for a space session, lists it, and restores files", async () => {
+describe("collaboration group checkpoint capture (Phase A 恢复线)", () => {
+  it("lists a space-session checkpoint with transcript-only restorable and user-role boundary", async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-group-ckpt-"));
     const groupWorkspaceRoot = path.join(tempDir, "collab-root");
     const sessionFile = path.join(tempDir, "group-sess.jsonl");
@@ -362,22 +361,27 @@ describe("collaboration group checkpoint capture", () => {
       reason: "turn_completed",
     });
 
-    expect(checkpoint?.snapshot?.store).toBe("content-addressed");
-    expect(checkpoint?.snapshot?.fileCount).toBeGreaterThanOrEqual(1);
-    expect(checkpoint?.restorable).toEqual({ files: true, transcript: true });
+    // Phase A: no workspace snapshot for groups; transcript restore only.
+    expect(checkpoint?.snapshot?.store).toBe("none");
+    expect(checkpoint?.restorable).toEqual({ files: false, transcript: true });
     expect(checkpoint?.session_key).toBe("space:group-abc");
+    // Human-user boundary: message before the latest user turn (g1), not assistant tip.
     expect(checkpoint?.boundary_message_id).toBe("g0");
+    expect(
+      resolveCheckpointBoundaryMessageId([
+        { id: "g0", role: "assistant", text: "协作会话已就绪" },
+        { id: "g1", role: "user", text: "帮小组安排一下分工" },
+        { id: "g2", role: "assistant", text: "已给出分工建议" },
+      ]),
+    ).toBe("g0");
 
     const groupCheckpoints = await listSessionContinuityCheckpoints(scope);
+    expect(groupCheckpoints.length).toBeGreaterThan(0);
     expect(groupCheckpoints.map((c) => c.checkpointId)).toContain(checkpoint?.id);
-    expect(paths.workspacePath.startsWith(groupWorkspaceRoot)).toBe(true);
-
-    await fs.writeFile(deliverablePath, "draft v2 mutated", "utf8");
-    const restored = await restoreWorkspaceSnapshotForCheckpoint({
-      ...scope,
-      checkpoint: checkpoint!,
+    expect(groupCheckpoints.find((c) => c.checkpointId === checkpoint?.id)?.restorable).toEqual({
+      files: false,
+      transcript: true,
     });
-    expect(restored.restoredFiles).toBeGreaterThanOrEqual(1);
-    expect(await fs.readFile(deliverablePath, "utf8")).toBe("draft v1");
+    expect(paths.workspacePath.startsWith(groupWorkspaceRoot)).toBe(true);
   });
 });

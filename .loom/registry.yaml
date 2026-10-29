@@ -10036,7 +10036,35 @@ tasks:
     ownerHistory: []
     since: 2026-10-29
     metadata: {}
+  - id: collab-restore-line-phase-a:grok-bot
+    owner: grok-bot
+    intent: []
+    paths:
+      - ui/src/ui/app.chat-restore.node.test.ts
+      - src/gateway/server-methods/chat-checkpoints.d3.test.ts
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-29
+    metadata: {}
 landingStreams:
+  - id: collab-restore-line-phase-a
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - src/gateway/server-methods/chat-checkpoints.ts
+      - src/gateway/server-methods/chat-checkpoints.d3.test.ts
+      - src/auto-reply/reply/session-continuity.ts
+      - src/auto-reply/reply/session-continuity.checkpoint-rollback.test.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/app.chat-restore.node.test.ts
+    canLandWith: []
+    metadata:
+      task: collab-restore-line-phase-a:grok-bot
+      owner: grok-bot
+      purpose: Phase A re-enable chat checkpoint timeline (恢复线) for space/collab
+        sessions — human-user nodes only; transcript restore; no group workspace
+        snapshot (Phase B out); NO_PROMOTE
   - id: fix-preview-member-mutex-20261029
     landingPolicy: serial
     paths:
@@ -12822,8 +12850,8 @@ landingStreams:
     metadata:
       task: hide-checkpoint-restore-in-collab-groups
       owner: grok-bot
-      intent: Hide checkpoint list/restore/snapshot UI for collaboration group chats
-        (1:1 only)
+      intent: "Superseded by collab-restore-line-phase-a (Phase A 恢复线): list/UI
+        gates lifted for space sessions; transcript-only; no group snapshot yet" 
   - id: FRIENDLY_ENTITLEMENT_PRE_REPLY
     landingPolicy: serial
     paths:

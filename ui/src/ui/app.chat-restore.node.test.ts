@@ -136,6 +136,37 @@ describe("OpenBotApp chat restore", () => {
   });
 });
 
+describe("OpenBotApp loadChatCheckpoints Phase A 恢复线", () => {
+  it("fetches checkpoints for collaboration space session keys (no empty early-return)", async () => {
+    const app = new OpenBotApp();
+    app.connected = true;
+    app.sessionKey = "agent:main:main";
+    app.workbenchTeamSelectedKey = "agent:main:main:space:grp-demo";
+    app.workbenchPrimaryModule = "collaboration";
+    const checkpoints = [
+      {
+        checkpointId: "cp-space-1",
+        boundaryMessageId: "m0",
+        createdAt: "2026-07-07T00:00:00.000Z",
+        summary: "space turn",
+        restorable: { files: false, transcript: true },
+        externalEffects: { present: false, kinds: [] },
+      },
+    ];
+    const client = {
+      request: vi.fn().mockResolvedValue({ checkpoints }),
+    };
+    app.client = client as never;
+
+    await app.loadChatCheckpoints();
+
+    expect(client.request).toHaveBeenCalledWith("chat.checkpoints.list", {
+      sessionKey: "space:grp-demo",
+    });
+    expect(app.chatCheckpoints).toEqual(checkpoints);
+  });
+});
+
 describe("OpenBotApp restore concurrency UX", () => {
   it("ignores further restore clicks while a restore is in flight", async () => {
     setChatActionsTestHooks({ reloadShellChatHistory: async () => {} });
