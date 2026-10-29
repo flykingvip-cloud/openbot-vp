@@ -321,6 +321,36 @@ describe("parkReason / wakeSuppress", () => {
     expect(resumed.board.current?.parkReason).toBeUndefined();
   });
 
+  it("resume re-checks auth and stop state", () => {
+    const first = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(PRICE, 1_000),
+    });
+    const switched = applyIncomingUserMessage({
+      board: first.board,
+      ...turn(RESEARCH, 2_000),
+    });
+    const parkedId = switched.board.parked[0]?.taskId ?? "";
+    const deniedAuth = applyIncomingUserMessage({
+      board: switched.board,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheck: { authOk: false },
+    });
+    expect(deniedAuth.action).toBe("continue");
+    expect(deniedAuth.statusLine).toContain("授权无效");
+    expect(deniedAuth.board.parked.some((row) => row.taskId === parkedId)).toBe(true);
+
+    const deniedStop = applyIncomingUserMessage({
+      board: switched.board,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheck: { stopActive: true },
+    });
+    expect(deniedStop.action).toBe("continue");
+    expect(deniedStop.statusLine).toContain("已停止");
+  });
+
   it("formatTaskBoardFocusLine reports current and parked count", () => {
     const board = {
       current: {
