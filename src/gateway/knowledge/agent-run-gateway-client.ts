@@ -20,6 +20,8 @@ export type KnowledgeAgentRunGatewayClient = {
   user: string;
   platformUserId?: string;
   sessionDomain?: GatewayClient["sessionDomain"];
+  /** Enterprise/tenant id when resolved from session or cron ownership.tenantId. */
+  sessionEnterpriseId?: string;
   client: GatewayClient;
 };
 
@@ -103,6 +105,7 @@ function toResult(params: {
     user: params.email,
     ...(params.platformUserId ? { platformUserId: params.platformUserId } : {}),
     ...(params.sessionDomain ? { sessionDomain: params.sessionDomain } : {}),
+    ...(params.sessionEnterpriseId ? { sessionEnterpriseId: params.sessionEnterpriseId } : {}),
     client,
   };
 }
@@ -147,13 +150,29 @@ export async function resolveKnowledgeGatewayClientForAgentRun(
 
   const ownerUserId = params.ownerUserId?.trim();
   if (ownerUserId) {
-    const user = await lookupPlatformUserById(ownerUserId);
-    if (user) {
+    const userById = await lookupPlatformUserById(ownerUserId);
+    if (userById) {
       return toResult({
-        email: user.email,
-        platformUserId: user.id,
+        email: userById.email,
+        platformUserId: userById.id,
         sessionDomain: "employee",
+        sessionEnterpriseId,
+        sessionMembershipId,
       });
+    }
+    // Cron ownership may stamp login email as ownerId; map to platform uuid so
+    // managed sandbox inject gets a server-derived account key (not an email).
+    if (ownerUserId.includes("@")) {
+      const userByEmail = await lookupPlatformUserByEmail(ownerUserId);
+      if (userByEmail) {
+        return toResult({
+          email: userByEmail.email,
+          platformUserId: userByEmail.id,
+          sessionDomain: "employee",
+          sessionEnterpriseId,
+          sessionMembershipId,
+        });
+      }
     }
   }
 
@@ -169,6 +188,8 @@ export async function resolveKnowledgeGatewayClientForAgentRun(
         email: user.email,
         platformUserId: user.id,
         sessionDomain: "employee",
+        sessionEnterpriseId: sessionEnterpriseId || scope?.tenantId?.trim() || undefined,
+        sessionMembershipId,
       });
     }
   }
