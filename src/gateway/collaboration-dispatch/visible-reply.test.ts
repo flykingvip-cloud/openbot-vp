@@ -166,6 +166,25 @@ describe("classifyCollaborationAbortIntent", () => {
     expect(classifyCollaborationAbortIntent("随便问一句")).toBe("none");
     expect(classifyCollaborationAbortIntent(undefined)).toBe("none");
   });
+
+  it("prefers 云电脑 detail from an All models failed wrap over generic empty", () => {
+    const detail = collaborationInfraFailureDetail({
+      sinceMs: 1_780_000_000_000,
+      combinedReplyRaw:
+        "Embedded agent failed before reply: All models failed (2): api-proxy/deepseek: 云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally | ent/x: Unknown model",
+      messages: [],
+    });
+    expect(detail).toContain("云电脑没有启动");
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "crash",
+      errorMessage: detail ?? undefined,
+    });
+    expect(notice).toContain("云电脑没有启动");
+    expect(notice).not.toContain("未产出正文");
+    // Infra abort should lead with the 云电脑 reason, not only the generic empty shell.
+    expect(notice.startsWith("云电脑")).toBe(true);
+  });
 });
 
 describe("formatCollaborationRoundAbortNotice", () => {

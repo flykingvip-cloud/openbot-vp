@@ -1,4 +1,8 @@
-import { formatDockerCliMissingUserMessage } from "../../agents/sandbox/docker-engine-client.js";
+import {
+  extractSandboxInfraUserFacingDetail,
+  formatDockerCliMissingUserMessage,
+  isSandboxInfraPreReplyError,
+} from "../../agents/sandbox/docker-engine-client.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import {
   asMessageList,
@@ -107,11 +111,12 @@ export function collaborationSkipReasonForMissingReply(params: {
 }
 
 const INFRA_PRE_REPLY_RE =
-  /AccountWorkerFailedError|DOCKER_CLI_MISSING|OPENCLAW_INSTALL_DOCKER_CLI|docker command was not found|Sandbox mode requires Docker|云电脑没有启动|Embedded agent failed before reply|Agent failed before reply/i;
+  /AccountWorkerFailedError|DOCKER_CLI_MISSING|OPENCLAW_INSTALL_DOCKER_CLI|docker command was not found|Sandbox mode requires Docker|云电脑没有启动|Embedded agent failed before reply|Agent failed before reply|All models failed|docker create failed|pull access denied|Unable to find image/i;
 
 /**
  * A pre-reply sandbox failure is not an empty draft. Surface the operator
- * reason so the round abort is not skipReason=empty.
+ * reason so the round abort is not skipReason=empty — including when the
+ * error is wrapped as "All models failed (N): …云电脑…".
  */
 export function collaborationInfraFailureDetail(params: {
   combinedReplyRaw: string;
@@ -131,21 +136,25 @@ export function collaborationInfraFailureDetail(params: {
     }
   }
   const joined = chunks.join("\n");
-  if (!INFRA_PRE_REPLY_RE.test(joined)) {
+  if (!INFRA_PRE_REPLY_RE.test(joined) && !isSandboxInfraPreReplyError(joined)) {
     return null;
   }
+  for (const chunk of chunks) {
+    const extracted = extractSandboxInfraUserFacingDetail(chunk);
+    if (extracted) {
+      return extracted;
+    }
+  }
+  const extractedJoined = extractSandboxInfraUserFacingDetail(joined);
+  if (extractedJoined) {
+    return extractedJoined;
+  }
   if (
-    /AccountWorkerFailedError|DOCKER_CLI_MISSING|docker command was not found|Sandbox mode requires Docker|OPENCLAW_INSTALL_DOCKER_CLI/i.test(
+    /DOCKER_CLI_MISSING|docker command was not found|Sandbox mode requires Docker|OPENCLAW_INSTALL_DOCKER_CLI/i.test(
       joined,
     )
   ) {
     return formatDockerCliMissingUserMessage();
-  }
-  const direct = chunks
-    .map((chunk) => chunk.trim())
-    .find((chunk) => chunk.includes("云电脑没有启动"));
-  if (direct) {
-    return direct.slice(0, 400);
   }
   return "云电脑没有启动：账号沙箱未能创建容器。请确认网关镜像包含 docker 命令（OPENCLAW_INSTALL_DOCKER_CLI=1），或已挂载 docker.sock / podman.sock。";
 }
@@ -313,6 +322,16 @@ export function formatCollaborationRoundAbortNotice(params: {
   userText?: string;
 }): string {
   const who = params.agentName?.trim() || "数字人";
+  const detail = params.errorMessage?.trim();
+  // Infra (云电脑 / wrapped All models failed) already carries the operator reason —
+  // prefer that line over main's generic understanding shell.
+  if (
+    detail &&
+    (/云电脑没有启动|DOCKER_CLI_MISSING|docker create failed/i.test(detail) ||
+      isSandboxInfraPreReplyError(detail))
+  ) {
+    return `${detail}。可稍后重试，或 @其他成员接手。`;
+  }
   const named = Boolean(params.agentName?.trim());
   const intent = classifyCollaborationAbortIntent(params.userText);
   const understanding = collaborationAbortUnderstanding({ who, intent, named });
