@@ -28,6 +28,7 @@ import {
   resolveThinkingDefault,
 } from "../../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
+import { accountComputerObserverUserId } from "../../agents/sandbox/account-scope.js";
 import {
   countActiveDescendantRuns,
   listDescendantRunsForRequester,
@@ -103,7 +104,12 @@ import {
   extractRequestedKnowledgeSourceHints,
   parsePersonalTaskMetaFromDescription,
 } from "../personal-task-meta.js";
-import { preflightCronManagedSandboxAccount } from "../sandbox-account-preflight.js";
+import {
+  buildCronSandboxRunIdentityInject,
+  CRON_ACCOUNT_MISSING_PREFIX,
+  cronNeedsManagedSandboxAccount,
+  preflightCronManagedSandboxAccount,
+} from "../sandbox-account-preflight.js";
 import type { CronJob, CronRunOutcome, CronRunTelemetry } from "../types.js";
 import {
   dispatchCronDelivery,
@@ -661,6 +667,55 @@ export async function runCronIsolatedAgentTurn(params: {
     agentId,
     ownerUserId: params.job.ownership?.ownerId,
     tenantId: params.job.ownership?.tenantId,
+    gatewayClientSessionEnterpriseId:
+      cronSandboxAccountInject.gatewayClientSessionEnterpriseId ?? params.job.ownership?.tenantId,
+    gatewayClientPlatformUserId: cronSandboxAccountInject.gatewayClientPlatformUserId,
+  });
+  // Prefer knowledge-resolved platform uuid (email→id) over raw ownership; never
+  // pass an email as the managed sandbox account key.
+  const resolvedSandboxPlatformUserId =
+    accountComputerObserverUserId(knowledgeIdentity?.platformUserId) ??
+    accountComputerObserverUserId(cronSandboxAccountInject.gatewayClientPlatformUserId) ??
+    undefined;
+  const resolvedSandboxEnterpriseId =
+    knowledgeIdentity?.sessionEnterpriseId?.trim() ||
+    knowledgeIdentity?.client?.sessionEnterpriseId?.trim() ||
+    cronSandboxAccountInject.gatewayClientSessionEnterpriseId?.trim() ||
+    undefined;
+  if (
+    cronNeedsManagedSandboxAccount(params.cfg) &&
+    (!resolvedSandboxEnterpriseId || !resolvedSandboxPlatformUserId)
+  ) {
+    return {
+      status: "error" as const,
+      error: `${CRON_ACCOUNT_MISSING_PREFIX} Managed multitenant sandbox requires a server-derived account (tenantId and platform userId). Job ownership could not be resolved to a sandbox-safe account.`,
+    };
+  }
+  const cronSandboxAccountResolved = {
+    ...(resolvedSandboxEnterpriseId
+      ? { gatewayClientSessionEnterpriseId: resolvedSandboxEnterpriseId }
+      : {}),
+    ...(resolvedSandboxPlatformUserId
+      ? { gatewayClientPlatformUserId: resolvedSandboxPlatformUserId }
+      : {}),
+  };
+  // Freeze canonical executionIdentity so nested reconstruct / sessions_spawn
+  // inherit tenantId+userId on every sandbox create (not scalars alone).
+  const cronSandboxRunIdentity = buildCronSandboxRunIdentityInject({
+    preflight: {
+      ok: true,
+      binding: sandboxAccountPreflight.binding,
+      ...cronSandboxAccountResolved,
+    },
+    knowledge: knowledgeIdentity
+      ? {
+          user: knowledgeIdentity.user,
+          platformUserId: knowledgeIdentity.platformUserId,
+          sessionDomain: knowledgeIdentity.sessionDomain,
+        }
+      : null,
+    agentId,
+    sessionKey: agentSessionKey,
   });
   const knowledgeUniversePrompt = await buildKnowledgeUniverseSystemPrompt({
     message: params.message,
@@ -1192,24 +1247,8 @@ export async function runCronIsolatedAgentTurn(params: {
               // Cron jobs are trusted local automation, so isolated runs should
               // inherit owner-only tooling like local `openclaw agent` runs.
               senderIsOwner: true,
-              ...(knowledgeIdentity?.user ? { gatewayClientUser: knowledgeIdentity.user } : {}),
-              ...(knowledgeIdentity?.platformUserId
-                ? { gatewayClientPlatformUserId: knowledgeIdentity.platformUserId }
-                : cronSandboxAccountInject.gatewayClientPlatformUserId
-                  ? {
-                      gatewayClientPlatformUserId:
-                        cronSandboxAccountInject.gatewayClientPlatformUserId,
-                    }
-                  : {}),
-              ...(cronSandboxAccountInject.gatewayClientSessionEnterpriseId
-                ? {
-                    gatewayClientSessionEnterpriseId:
-                      cronSandboxAccountInject.gatewayClientSessionEnterpriseId,
-                  }
-                : {}),
-              ...(knowledgeIdentity?.sessionDomain
-                ? { gatewayClientSessionDomain: knowledgeIdentity.sessionDomain }
-                : {}),
+              // Ownership-resolved executionIdentity + trusted scalars for nested hops.
+              ...cronSandboxRunIdentity,
               messageChannel,
               agentAccountId: resolvedDelivery.accountId,
               sessionFile,
@@ -1335,7 +1374,14 @@ export async function runCronIsolatedAgentTurn(params: {
       }
     }
   } catch (err) {
-    return await completeRun(withRunSession({ status: "error", error: String(err) }));
+    const raw = String(err);
+    // Surface raw sandbox account failures as cron_account:missing so P4 soft-disable applies.
+    const error =
+      /requires a server-derived account/i.test(raw) &&
+      !raw.trim().startsWith(CRON_ACCOUNT_MISSING_PREFIX)
+        ? `${CRON_ACCOUNT_MISSING_PREFIX} ${raw}`
+        : raw;
+    return await completeRun(withRunSession({ status: "error", error }));
   }
 
   if (isAborted()) {
