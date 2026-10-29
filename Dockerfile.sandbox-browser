@@ -1,27 +1,47 @@
 # syntax=docker/dockerfile:1.7
 
-# Canonical tag: openbot-sandbox-browser:bookworm-slim
-# scripts/sandbox-browser-setup.sh also tags the previous browser image name.
+# Canonical tag: openbot-sandbox-browser:trixie
+# Temporary peer alias: openclaw-sandbox-browser:trixie
+# scripts/sandbox-browser-setup.sh tags both after build and records the
+# immutable image id/digest. Production configs should lock the digest.
+#
+# Do NOT retag trixie content as openbot-sandbox-browser:bookworm-slim.
+# Existing bookworm-slim tags on hosts may keep pointing at the prior
+# bookworm image for rollback until batched replace finishes.
+#
+# Base OS is Debian 13 (trixie). Node is installed via apt (compatibility
+# TARGET major 20 — measured in build + smoke, not assumed from distro).
+# Desktop stack (Xvfb/Openbox/noVNC/Thunar) stays; Chromium, poppler-utils,
+# and fonts-noto-cjk match the conversation sandbox toolchain (#13).
+#
+# UID CONTRACT: runtime user `sandbox` MUST be uid/gid 1000:1000 (same as
+# Dockerfile.sandbox / ensureSandboxRuntimeOwnership).
 
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN --mount=type=cache,id=openclaw-sandbox-bookworm-apt-cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,id=openclaw-sandbox-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
+# Trixie apt lists must not reuse the bookworm cache id.
+RUN --mount=type=cache,id=openclaw-sandbox-browser-trixie-apt-cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,id=openclaw-sandbox-browser-trixie-apt-lists,target=/var/lib/apt,sharing=locked \
   apt-get update \
   && apt-get install -y --no-install-recommends \
     bash \
     ca-certificates \
     chromium \
     curl \
+    fontconfig \
     fonts-liberation \
+    fonts-noto-cjk \
     fonts-noto-color-emoji \
     fonts-wqy-microhei \
     git \
     jq \
+    nodejs \
+    npm \
     novnc \
     openbox \
+    poppler-utils \
     python3 \
     python3-tk \
     socat \
@@ -59,7 +79,28 @@ RUN mkdir -p /etc/chromium/policies/managed /etc/chromium-browser/policies/manag
   && cp /etc/chromium/policies/managed/openbot-quiet.json /etc/chromium-browser/policies/managed/openbot-quiet.json \
   && chmod -R a+rX /usr/local/share/openbot
 
-RUN useradd --create-home --shell /bin/bash sandbox
+# Pin sandbox to 1000:1000. Fail closed if uid 1000 is taken, if apt nodejs
+# is below major 20, or if Chromium / poppler / Noto Sans CJK SC is missing.
+# Node 20 is a compatibility TARGET verified here and again in smoke — not
+# assumed merely because the base is trixie.
+RUN groupadd --gid 1000 sandbox \
+  && useradd --uid 1000 --gid 1000 --create-home --shell /bin/bash sandbox \
+  && test "$(id -u sandbox)" = "1000" \
+  && test "$(id -g sandbox)" = "1000" \
+  && node_major="$(node -p 'process.versions.node.split(".")[0]')" \
+  && test "$node_major" -ge 20 \
+  && command -v npm >/dev/null \
+  && command -v pdftotext >/dev/null \
+  && command -v pdfinfo >/dev/null \
+  && command -v pdftoppm >/dev/null \
+  && chromium_bin="$(command -v chromium || command -v chromium-browser || true)" \
+  && test -n "$chromium_bin" \
+  && test -x "$chromium_bin" \
+  && fc-cache -fs >/dev/null \
+  && fc-list | grep -q "Noto Sans CJK SC" \
+  && test -x /usr/local/bin/openbot-sandbox-browser \
+  && test -x /usr/local/bin/openbot-sandbox-desktop
+
 USER sandbox
 WORKDIR /home/sandbox
 

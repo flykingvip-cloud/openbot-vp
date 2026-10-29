@@ -177,7 +177,7 @@ describe("account worker lifecycle", () => {
     const lifecycle = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver,
@@ -202,7 +202,7 @@ describe("account worker lifecycle", () => {
     const lifecycle = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane: createAccountWorkerControlPlane(
         new AccountRuntimeSnapshotStore(path.join(root, "snapshots.json")),
@@ -413,7 +413,7 @@ describe("account worker lifecycle", () => {
     const crashed = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver: crashedDriver,
@@ -446,7 +446,7 @@ describe("account worker lifecycle", () => {
     const afterRevoke = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver: createMemoryAccountSandboxDriver(),
@@ -472,7 +472,7 @@ describe("account worker lifecycle", () => {
     const restarted = new AccountWorkerLifecycle({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p3",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane: createAccountWorkerControlPlane(store),
       now: () => nowMs,

@@ -161,9 +161,9 @@ Sandboxed browser image:
 scripts/sandbox-browser-setup.sh
 ```
 
-Default browser image: `openbot-sandbox-browser:bookworm-slim`
+Default browser image: `openbot-sandbox-browser:trixie`
 
-`openclaw-sandbox-browser:bookworm-slim` is a temporary alias of that image.
+`openclaw-sandbox-browser:trixie` is a temporary peer alias of that image. Do not retag trixie content as `:bookworm-slim`; production should lock the immutable digest.
 Builds tag both names, and a host that still has only the old tag is reused.
 A host with neither tag does not fall back to `debian:bookworm-slim`.
 

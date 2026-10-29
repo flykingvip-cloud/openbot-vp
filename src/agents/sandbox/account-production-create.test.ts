@@ -72,7 +72,7 @@ function baseSandboxConfig(binds: string[]): SandboxConfig {
     docker: dockerCfg(binds),
     browser: {
       enabled: false,
-      image: "openclaw-sandbox-browser:bookworm-slim",
+      image: "openclaw-sandbox-browser:trixie",
       containerPrefix: "openclaw-sbx-browser-",
       network: "openclaw-sandbox-browser",
       cdpPort: 9222,

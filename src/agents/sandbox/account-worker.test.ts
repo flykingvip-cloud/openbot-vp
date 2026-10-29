@@ -156,7 +156,7 @@ describe("account worker prototype", () => {
     const worker = new AccountWorker({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       statePath: path.join(root, "worker.json"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver,
@@ -343,7 +343,7 @@ describe("account worker prototype", () => {
     const restarted = new AccountWorker({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       statePath: path.join(root, "worker.json"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver: createMemoryAccountSandboxDriver(),
@@ -376,7 +376,7 @@ describe("account worker prototype", () => {
     const afterRevoke = new AccountWorker({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       statePath: path.join(root, "worker.json"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver: createMemoryAccountSandboxDriver(),
@@ -397,7 +397,7 @@ describe("account worker prototype", () => {
     const worker = new AccountWorker({
       cfg: managedCfg,
       operatorImage: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       statePath: path.join(root, "missing-worker.json"),
       controlPlane: createAccountWorkerControlPlane(store),
       now: () => nowMs,
@@ -680,7 +680,7 @@ describe("account worker prototype", () => {
       runtimeLeaseId: "lease-1",
       snapshotVersion: 1,
       image: "openbot-account-sandbox:p2",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       execMounts: [
         { hostPath: "/data/workspace", containerPath: "/account/workspace", access: "rw" as const },
         { hostPath: "/data/artifacts", containerPath: "/account/artifacts", access: "rw" as const },

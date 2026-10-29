@@ -14,7 +14,7 @@ Product path still requires `managed_enterprise` + shared tenant addressing. See
 | Role                             | Default tag                             | Dockerfile                   | Build                              |
 | -------------------------------- | --------------------------------------- | ---------------------------- | ---------------------------------- |
 | Exec / sleep                     | `openbot-sandbox:bookworm-slim`         | `Dockerfile.sandbox`         | `scripts/sandbox-setup.sh`         |
-| Browser (Chromium + CDP + noVNC) | `openbot-sandbox-browser:bookworm-slim` | `Dockerfile.sandbox-browser` | `scripts/sandbox-browser-setup.sh` |
+| Browser (Chromium + CDP + noVNC) | `openbot-sandbox-browser:trixie` | `Dockerfile.sandbox-browser` | `scripts/sandbox-browser-setup.sh` |
 
 Resolution order (`resolveAccountWorkerImages`):
 
@@ -51,9 +51,9 @@ Device-bound REAUTH (`device-bound` marker → `REAUTH_REQUIRED`) is unchanged.
 docker image inspect openbot-sandbox:bookworm-slim
 # temporary alias of the same image
 docker image inspect openclaw-sandbox:bookworm-slim
-docker image inspect openbot-sandbox-browser:bookworm-slim
+docker image inspect openbot-sandbox-browser:trixie
 # temporary alias of the same browser image
-docker image inspect openclaw-sandbox-browser:bookworm-slim
+docker image inspect openclaw-sandbox-browser:trixie
 ```
 
 ## Clean preview and dock desktop
@@ -66,7 +66,7 @@ out of the iframe. The VNC password stays on the relay grant. Fixing the page or
 the Control UI CSS does not require rebuilding the sandbox image.
 
 The dock desktop (light wallpaper, OpenBot logo, Chrome / files / terminal) is drawn
-inside `openbot-sandbox-browser:bookworm-slim` by
+inside `openbot-sandbox-browser:trixie` by
 `scripts/sandbox-browser-desktop.py`. The logo is the official mark
 `ui/public/openbot-logo.png`. There is no center open-browser button and no dock
 tray: the three glyphs sit on the wallpaper. Each glyph is its own click window
@@ -80,9 +80,9 @@ browser container is recreated:
 
 ```bash
 ./scripts/sandbox-browser-setup.sh
-docker image inspect openbot-sandbox-browser:bookworm-slim
+docker image inspect openbot-sandbox-browser:trixie
 # temporary alias of the same browser image
-docker image inspect openclaw-sandbox-browser:bookworm-slim
+docker image inspect openclaw-sandbox-browser:trixie
 ```
 
 Account Computer Files lists the container home and desktop logs under `/tmp`.

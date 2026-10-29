@@ -68,7 +68,7 @@ function sampleSpec(root: string): RuntimeContainerSpec {
     runtimeLeaseId: "lease-docker-1",
     snapshotVersion: 1,
     image: "openbot-account-sandbox:docker-cutover",
-    browserImage: "openclaw-sandbox-browser:bookworm-slim",
+    browserImage: "openclaw-sandbox-browser:trixie",
     execMounts: [
       {
         hostPath: path.join(root, "workspace"),
@@ -429,7 +429,7 @@ describe("account worker docker driver (mocked CLI)", () => {
       runtimeLeaseId: "lease-path-b",
       snapshotVersion: 1,
       image: "openbot-sandbox:bookworm-slim",
-      browserImage: "openbot-sandbox-browser:bookworm-slim",
+      browserImage: "openbot-sandbox-browser:trixie",
       execMounts: [],
       browserMounts: [
         { hostPath: containerProfile, containerPath: "/account/browser", access: "rw" },
@@ -463,7 +463,7 @@ describe("account worker docker driver (mocked CLI)", () => {
       runtimeLeaseId: "lease-operator",
       snapshotVersion: 1,
       image: "openbot-sandbox:bookworm-slim",
-      browserImage: "openbot-sandbox-browser:bookworm-slim",
+      browserImage: "openbot-sandbox-browser:trixie",
       execMounts: [],
       browserMounts: [
         { hostPath: containerProfile, containerPath: "/account/browser", access: "rw" },
@@ -694,7 +694,7 @@ describe("account worker docker driver lifecycle cutover (mocked CLI)", () => {
         },
       },
       operatorImage: "openbot-account-sandbox:docker-cutover",
-      browserImage: "openclaw-sandbox-browser:bookworm-slim",
+      browserImage: "openclaw-sandbox-browser:trixie",
       runtimeDir: path.join(root, "runtime"),
       controlPlane: createAccountWorkerControlPlane(store),
       driver,
