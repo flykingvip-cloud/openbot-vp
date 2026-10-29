@@ -27,6 +27,10 @@ export type TrackedTask = {
   stop: TaskStop;
   parkedAtMs?: number;
   createdAtMs: number;
+  /** Why this task was parked (automatic switch, cron surface, etc.). */
+  parkReason?: string;
+  /** When true, automatic task_board_continue wake stays suppressed until resume. */
+  wakeSuppress?: boolean;
 };
 
 export type SessionTaskBoard = {
@@ -94,8 +98,15 @@ function parkTask(
   parked: readonly TrackedTask[],
   task: TrackedTask,
   nowMs: number,
+  parkReason?: string,
 ): { parked: TrackedTask[]; dropped?: TrackedTask } {
-  const stamped: TrackedTask = { ...task, unfinished: true, parkedAtMs: nowMs };
+  const stamped: TrackedTask = {
+    ...task,
+    unfinished: true,
+    parkedAtMs: nowMs,
+    parkReason: parkReason ?? task.parkReason ?? "automatic_switch",
+    wakeSuppress: true,
+  };
   const newestFirst = [stamped, ...parked.filter((row) => row.taskId !== stamped.taskId)];
   if (newestFirst.length <= MAX_PARKED_TASKS) {
     return { parked: newestFirst };
@@ -117,10 +128,29 @@ function dropSentence(dropped: TrackedTask | undefined): string {
   });
 }
 
-function switchStatus(currentTitle: string, incomingTitle: string, dropped?: TrackedTask): string {
+function switchStatus(
+  currentTitle: string,
+  incomingTitle: string,
+  dropped?: TrackedTask,
+  parkedCount?: number,
+): string {
   const droppedText = dropSentence(dropped);
-  const line = `已挂起「${currentTitle}」，开始「${incomingTitle}」。`;
+  const count = typeof parkedCount === "number" ? parkedCount : 1;
+  const line = `已挂起「${currentTitle}」，开始「${incomingTitle}」。当前任务：「${incomingTitle}」；已挂起 ${count} 项。`;
   return droppedText ? `${line}${droppedText}` : line;
+}
+
+/** Compact focus line for UI / status: 当前任务 / 已挂起 N 项. */
+export function formatTaskBoardFocusLine(board: SessionTaskBoard): string {
+  const current = board.current?.title?.trim();
+  const n = board.parked.length;
+  if (current) {
+    return `当前任务：「${current}」；已挂起 ${n} 项`;
+  }
+  if (n > 0) {
+    return `当前无进行中任务；已挂起 ${n} 项`;
+  }
+  return "当前无进行中任务；已挂起 0 项";
 }
 
 export function formatParkedAt(ms?: number): string {
@@ -166,11 +196,27 @@ function continueResult(
   };
 }
 
+export type ResumeParkedRecheck = {
+  /** False when current auth/ownership no longer allows this session. */
+  authOk?: boolean;
+  /**
+   * Broad session-level stop barrier. Used when `isTaskStopActive` is absent.
+   * Prefer `isTaskStopActive` so resume checks the original taskId.
+   */
+  stopActive?: boolean;
+  /**
+   * Authoritative per-taskId stop lookup. When set, resume of task T is denied
+   * iff this returns true for T — even after AbortController records are deleted.
+   */
+  isTaskStopActive?: (taskId: string) => boolean;
+};
+
 export function applyIncomingUserMessage(params: {
   board: SessionTaskBoard;
   incomingText: string;
   nowMs?: number;
   workspacePaths?: string[];
+  recheck?: ResumeParkedRecheck;
 }): IncomingTurnResult {
   const nowMs = params.nowMs ?? Date.now();
   const paths = params.workspacePaths?.filter(Boolean) ?? [];
@@ -195,6 +241,7 @@ export function applyIncomingUserMessage(params: {
       taskId: resumeMatch[1] ?? "",
       nowMs,
       workspacePaths: paths,
+      recheck: params.recheck,
     });
   }
   const pauseMatch = incoming.match(/^暂停挂起\s+(\S+)/u);
@@ -244,7 +291,7 @@ export function applyIncomingUserMessage(params: {
       workspacePaths: current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
     },
   };
-  const parked = parkTask(board.parked, parkedCurrent, nowMs);
+  const parked = parkTask(board.parked, parkedCurrent, nowMs, "user_switch");
   const created = createTask(incoming, nowMs, paths);
   return {
     board: { current: created, parked: parked.parked },
@@ -253,7 +300,7 @@ export function applyIncomingUserMessage(params: {
     cutContext: true,
     currentTitle: current.title,
     incomingTitle: created.title,
-    statusLine: switchStatus(current.title, created.title, parked.dropped),
+    statusLine: switchStatus(current.title, created.title, parked.dropped, parked.parked.length),
     ...(parked.dropped
       ? {
           droppedTitle: parked.dropped.title,
@@ -268,12 +315,30 @@ export function resumeParkedTask(params: {
   taskId: string;
   nowMs?: number;
   workspacePaths?: string[];
+  /** Optional live auth + stop re-check at resume time (fail-closed when set). */
+  recheck?: ResumeParkedRecheck;
 }): IncomingTurnResult {
   const nowMs = params.nowMs ?? Date.now();
   const paths = params.workspacePaths?.filter(Boolean) ?? [];
   const parked = findParked(params.board, params.taskId);
   if (!parked) {
     return continueResult(params.board, params.board.current?.taskId ?? "");
+  }
+  if (params.recheck?.authOk === false) {
+    return {
+      ...continueResult(params.board, params.board.current?.taskId ?? ""),
+      statusLine: `恢复「${parked.title}」被拒绝：当前授权无效。`,
+    };
+  }
+  const stopBlocked =
+    typeof params.recheck?.isTaskStopActive === "function"
+      ? params.recheck.isTaskStopActive(parked.taskId)
+      : params.recheck?.stopActive === true;
+  if (stopBlocked) {
+    return {
+      ...continueResult(params.board, params.board.current?.taskId ?? ""),
+      statusLine: `恢复「${parked.title}」被拒绝：任务已停止。`,
+    };
   }
   let nextParked = params.board.parked.filter((row) => row.taskId !== parked.taskId);
   let dropped: TrackedTask | undefined;
@@ -287,7 +352,7 @@ export function resumeParkedTask(params: {
           current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
       },
     };
-    const parkedResult = parkTask(nextParked, parkedCurrent, nowMs);
+    const parkedResult = parkTask(nextParked, parkedCurrent, nowMs, "resume_swap");
     nextParked = parkedResult.parked;
     dropped = parkedResult.dropped;
   }
@@ -295,6 +360,8 @@ export function resumeParkedTask(params: {
     ...parked,
     unfinished: true,
     parkedAtMs: undefined,
+    parkReason: undefined,
+    wakeSuppress: false,
   };
   const restoredPrompt = buildResumePrompt(restored);
   const droppedText = dropSentence(dropped);
@@ -374,7 +441,7 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
     "",
     PARKED_TASK_REMINDER_SENTINEL,
     "",
-    "当前任务已完成，交付已核对。前面还有未结束的挂起任务，可以继续、先暂停，或关闭。",
+    `当前任务已完成，交付已核对。已挂起 ${parked.length} 项；可以继续、先暂停，或关闭。`,
     "",
     `前任务：「${primary.title}」`,
     `任务 ID：\`${primary.taskId}\``,
@@ -471,8 +538,10 @@ export function commitAutomaticPark(params: {
     unfinished: true,
     stop: { summary: `未完成：${incomingTaskId}`, workspacePaths: [] },
     createdAtMs: nowMs,
+    parkReason: "automatic_incoming",
+    wakeSuppress: true,
   };
-  const parked = parkTask(board.parked, incoming, nowMs);
+  const parked = parkTask(board.parked, incoming, nowMs, "automatic_incoming");
   writeSessionTaskBoard(file, { current: board.current, parked: parked.parked });
   return parked.dropped;
 }
@@ -547,6 +616,7 @@ export function evaluateFocusSwitch(params: {
   parked?: TrackedTask[];
   nowMs?: number;
   workspacePaths?: string[];
+  recheck?: ResumeParkedRecheck;
 }): FocusSwitchDecision {
   const currentText = params.currentFocusText?.trim() ?? "";
   const board: SessionTaskBoard = {
@@ -567,6 +637,7 @@ export function evaluateFocusSwitch(params: {
     incomingText: params.incomingText,
     nowMs: params.nowMs,
     workspacePaths: params.workspacePaths,
+    recheck: params.recheck,
   });
   if (result.action === "resume" && result.restoredPrompt) {
     return {
@@ -646,6 +717,7 @@ export function applyFocusSwitchGate(params: {
   incomingText: string;
   nowMs?: number;
   workspacePaths?: string[];
+  recheck?: ResumeParkedRecheck;
 }): FocusSwitchGateDecision {
   if (params.proceed) {
     const board = readSessionTaskBoard(params.sessionFile);
@@ -688,6 +760,7 @@ export function applyFocusSwitchGate(params: {
       incomingText: incoming,
       nowMs: params.nowMs,
       workspacePaths: params.workspacePaths,
+      recheck: params.recheck,
     });
     writeSessionTaskBoard(sessionFile, result.board);
     if (result.action === "switch" || result.action === "resume") {

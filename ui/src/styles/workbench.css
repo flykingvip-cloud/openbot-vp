@@ -20009,6 +20009,39 @@ button.knowledge-universe__search-hit.is-selected,
 }
 
 /* 确认卡片 */
+/* Owner plan-confirm: actionable card as modal dialog (human gate). */
+.employee-workbench__owner-decision-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--text-strong) 34%, transparent);
+}
+
+.employee-workbench__owner-decision-dialog {
+  width: min(560px, 100%);
+  max-height: min(80vh, 720px);
+  overflow: auto;
+}
+
+.employee-workbench__owner-decision-dialog .employee-workbench__steward-confirm-card {
+  margin: 0;
+  box-shadow: var(--wb-elevation-shadow-modal), var(--wb-inset-highlight);
+}
+
+.employee-workbench__owner-decision-peer-ack {
+  padding: 0.65rem 0.9rem;
+}
+
+.employee-workbench__owner-decision-peer-ack-copy {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
 .employee-workbench__steward-confirm-card {
   padding: var(--steward-space-card);
   border-radius: var(--steward-radius-card);

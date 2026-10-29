@@ -103,6 +103,7 @@ import {
   extractRequestedKnowledgeSourceHints,
   parsePersonalTaskMetaFromDescription,
 } from "../personal-task-meta.js";
+import { preflightCronManagedSandboxAccount } from "../sandbox-account-preflight.js";
 import type { CronJob, CronRunOutcome, CronRunTelemetry } from "../types.js";
 import {
   dispatchCronDelivery,
@@ -321,6 +322,33 @@ export async function runCronIsolatedAgentTurn(params: {
     ensureBootstrapFiles: !agentCfg?.skipBootstrap && !isFastTestEnv,
   });
   const workspaceDir = workspace.dir;
+
+  const sandboxAccountPreflight = preflightCronManagedSandboxAccount({
+    cfg: params.cfg,
+    ownership: params.job.ownership,
+  });
+  if (!sandboxAccountPreflight.ok) {
+    return {
+      status: "error" as const,
+      error: sandboxAccountPreflight.error,
+    };
+  }
+  const cronSandboxAccountInject: {
+    gatewayClientSessionEnterpriseId?: string;
+    gatewayClientPlatformUserId?: string;
+  } = {
+    ...(sandboxAccountPreflight.gatewayClientSessionEnterpriseId
+      ? {
+          gatewayClientSessionEnterpriseId:
+            sandboxAccountPreflight.gatewayClientSessionEnterpriseId,
+        }
+      : {}),
+    ...(sandboxAccountPreflight.gatewayClientPlatformUserId
+      ? {
+          gatewayClientPlatformUserId: sandboxAccountPreflight.gatewayClientPlatformUserId,
+        }
+      : {}),
+  };
 
   const resolvedDefault = resolveConfiguredModelRef({
     cfg: cfgWithAgentDefaults,
@@ -1167,6 +1195,17 @@ export async function runCronIsolatedAgentTurn(params: {
               ...(knowledgeIdentity?.user ? { gatewayClientUser: knowledgeIdentity.user } : {}),
               ...(knowledgeIdentity?.platformUserId
                 ? { gatewayClientPlatformUserId: knowledgeIdentity.platformUserId }
+                : cronSandboxAccountInject.gatewayClientPlatformUserId
+                  ? {
+                      gatewayClientPlatformUserId:
+                        cronSandboxAccountInject.gatewayClientPlatformUserId,
+                    }
+                  : {}),
+              ...(cronSandboxAccountInject.gatewayClientSessionEnterpriseId
+                ? {
+                    gatewayClientSessionEnterpriseId:
+                      cronSandboxAccountInject.gatewayClientSessionEnterpriseId,
+                  }
                 : {}),
               ...(knowledgeIdentity?.sessionDomain
                 ? { gatewayClientSessionDomain: knowledgeIdentity.sessionDomain }

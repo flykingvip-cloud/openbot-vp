@@ -42,6 +42,7 @@ import {
   type OwnerDecisionCardView,
   type OwnerDecisionDetail,
   type OwnerDecisionHydrationTarget,
+  formatPostPlanConfirmAdvanceUserMessage,
 } from "./chat/owner-decision-card.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
 import { labelForWorkProgressPhase } from "./chat/work-progress-phase.ts";
@@ -1413,7 +1414,7 @@ export function renderApp(state: AppViewState) {
           }
           try {
             if (action === "confirm") {
-              await client.request("collaboration.task.confirmTodolist", {
+              const result = await client.request("collaboration.task.confirmTodolist", {
                 groupId: card.groupId,
                 taskId: card.taskId,
                 todolistId: card.todolistId,
@@ -1421,8 +1422,23 @@ export function renderApp(state: AppViewState) {
               });
               setOwnerDecisionTodolistStatus(card.todolistId, "confirmed");
               clearOwnerDecisionActionError(card.decisionId);
-              // Keep older versions on screen as「旧版本已失效」. Do not dismiss them.
-              state.lastError = null;
+              // Confirm committed (never roll back). Fold the dialog away; peer residuals
+              // elsewhere render as「收到，并确认」. Surface advance failure separately.
+              collapseOwnerDecisionCardsForBoardItem(card.boardItemId);
+              dismissOwnerDecisionCard(card.decisionId);
+              const advance = (
+                result as {
+                  autoAdvance?: {
+                    wakeRecorded?: boolean;
+                    wakeConsumed?: boolean;
+                    dispatched?: boolean;
+                    reason?: string;
+                  };
+                } | null
+              )?.autoAdvance;
+              // Confirm committed (never roll back). Surface queue / blocked / dispatch
+              // failures even when wakeRecorded===true — not only wakeRecorded===false.
+              state.lastError = formatPostPlanConfirmAdvanceUserMessage(advance);
             } else if (action === "revise") {
               const reason = detail?.reason?.trim() || "退回修订（来自对话决策卡）";
               await client.request("collaboration.task.reviseTodolist", {

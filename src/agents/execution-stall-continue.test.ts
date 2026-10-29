@@ -7,7 +7,9 @@ import {
   lastAssistantStopText,
   shouldContinueAfterEmptyToolFinal,
   shouldContinueAfterExecutionStall,
+  isSoftConfirmAfterAuthorizedGo,
 } from "./execution-stall-continue.js";
+import { PROTOCOL_FAILURE_USER_TEXT } from "./model-output-boundary.js";
 
 const STALL = "正在收尾排版，稍等片刻。";
 
@@ -202,5 +204,27 @@ describe("execution stall continuation", () => {
     const texts = [STALL, "马上就好。"];
     dropSupersededStallTexts(texts, [STALL, "马上就好。"], "马上就好。");
     expect(texts).toEqual(["马上就好。"]);
+  });
+});
+
+describe("recoverable-tool-failure continue", () => {
+  it("classifies protocol failure after path_missing as recoverable-tool-failure", () => {
+    expect(
+      executionContinueKind({
+        text: PROTOCOL_FAILURE_USER_TEXT,
+        toolsDisabled: false,
+        tools: [{ toolName: "exec", success: false, meta: "cd: /x: No such file or directory" }],
+      }),
+    ).toBe("recoverable-tool-failure");
+  });
+
+  it("soft ask without waiting_confirmation continues after authorized go", () => {
+    expect(isSoftConfirmAfterAuthorizedGo("要不要推草稿箱？", "开始排版并写进草稿箱")).toBe(true);
+    expect(
+      isSoftConfirmAfterAuthorizedGo(
+        "状态：waiting_confirmation，请确认是否推送",
+        "开始排版并写进草稿箱",
+      ),
+    ).toBe(false);
   });
 });

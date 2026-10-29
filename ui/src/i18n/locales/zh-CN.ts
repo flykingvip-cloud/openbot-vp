@@ -4464,11 +4464,14 @@ export const zh_CN: TranslationMap = {
     heartbeatParkedNoticeDetailFull:
       "当前正忙，且挂起已满。最早的挂起任务已被放下，后台结果没有打进正在进行的工作。",
     parkedTaskReminderBadge: "挂起提醒",
-    parkedTaskReminderConclusion: "当前任务已完成；前面还有未结束的挂起任务。",
+    parkedTaskReminderConclusion: "当前任务已完成；已挂起任务仍可继续。",
     parkedTaskReminderDetail:
       "新任务开始时，系统已自动挂起未完成的前任务。可选：继续做前任务、先暂停留在挂起列表，或关闭并从挂起列表删除。",
     parkedTaskReminderDetailNamed:
       "前任务「{title}」仍未结束。可选：继续做它、先暂停留在挂起列表，或关闭并从挂起列表删除。",
+    taskBoardFocusCurrent: "当前任务：「{current}」；已挂起 {count} 项",
+    taskBoardFocusIdle: "当前无进行中任务；已挂起 {count} 项",
+    parkedCountSignal: "已挂起 {count} 项",
     parkedTaskResume: "继续前任务",
     parkedTaskPause: "暂停前任务",
     parkedTaskClose: "关闭前任务",
