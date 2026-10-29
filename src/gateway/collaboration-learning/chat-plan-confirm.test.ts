@@ -42,6 +42,15 @@ describe("parseChatPlanConfirmIntent", () => {
   it("marks mixed content ambiguous", () => {
     expect(parseChatPlanConfirmIntent("确认计划，另外把范围改成商业化").kind).toBe("ambiguous");
   });
+
+  it("does not intercept long @mention / 监管催促 / task payloads as planConfirm", () => {
+    const nudge =
+      "@bot @panda 监管催促：请合稿并刷新 ACCEPTANCE；NIGHT-20261028-ops-manual 已宿主合入，请确认页数。";
+    expect(parseChatPlanConfirmIntent(nudge).kind).toBe("not_confirm");
+    const taskPayload =
+      "任务：一夜交付 ops-manual。请各成员确认分工后写稿。taskId=NIGHT-20261028-ops-manual grp-daniel-hhd-gmail-com-upbeyond";
+    expect(parseChatPlanConfirmIntent(taskPayload).kind).toBe("not_confirm");
+  });
 });
 
 describe("tryConfirmPlanFromChat", () => {

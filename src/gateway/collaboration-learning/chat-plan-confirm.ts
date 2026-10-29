@@ -29,6 +29,34 @@ const CONFIRM_RE =
 
 const REJECT_RE = /^(?:拒绝|不同意|退回|作废|revise|reject)(?:计划|该计划|此计划)?\s*[。.!！]?$/iu;
 
+/**
+ * Long operational / supervisory messages that happen to contain「确认」must NOT
+ * be intercepted as planConfirm (NIGHT-20261028: task payloads + 合稿催促 stopped).
+ */
+export function isOperationalNonPlanConfirmMessage(message: string): boolean {
+  const text = message.trim();
+  if (!text) {
+    return false;
+  }
+  if (text.includes("@")) {
+    return true;
+  }
+  if (text.length > 120) {
+    return true;
+  }
+  if ((text.match(/\n/g) ?? []).length >= 2) {
+    return true;
+  }
+  if (
+    /监管催促|一夜任务|合稿催促|宿主合入|NIGHT-\d{8}|grp-[a-z0-9-]+|taskId|boardItem|todolist|ACCEPTANCE|交卷指令|请刷新/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function parseChatPlanConfirmIntent(message: string): ChatPlanConfirmIntent {
   const text = message.trim();
   if (!text) {
@@ -40,11 +68,18 @@ export function parseChatPlanConfirmIntent(message: string): ChatPlanConfirmInte
   if (CONFIRM_RE.test(text)) {
     return { kind: "confirm" };
   }
-  // Soft containments that are still ambiguous when mixed with other orders.
+  // Soft containments: only short mixed confirm attempts stay ambiguous.
+  // Long @mention / task / 监管催促 payloads are ordinary chat (not planConfirm).
   if (/确认/.test(text) && text.length > 24) {
+    if (isOperationalNonPlanConfirmMessage(text)) {
+      return { kind: "not_confirm" };
+    }
     return { kind: "ambiguous", reason: "confirm_word_mixed_with_other_content" };
   }
   if (/确认计划|确认执行|confirm plan/i.test(text) && !CONFIRM_RE.test(text)) {
+    if (isOperationalNonPlanConfirmMessage(text)) {
+      return { kind: "not_confirm" };
+    }
     return { kind: "ambiguous", reason: "confirm_phrase_not_standalone" };
   }
   return { kind: "not_confirm" };

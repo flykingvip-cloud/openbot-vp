@@ -567,7 +567,10 @@ export async function listExecutorTodolists(
   }
   const ownerMemberId = compact(params.ownerMemberId);
   if (ownerMemberId) {
-    items = items.filter((item) => item.ownerMemberId === ownerMemberId);
+    // Board claimant is often `bot` while propose writes ownerMemberId `bot:bot`
+    // (also human:<uuid> ↔ bare). Strict equality produced false plan_gate_unconfirmed
+    // after a real confirm (NIGHT-20261028 UX P0).
+    items = items.filter((item) => deliveryActorIdsEqual(item.ownerMemberId, ownerMemberId));
   }
   return items;
 }
@@ -602,6 +605,18 @@ export async function assertPlanGateAllowsDeliveryProgress(
 ): Promise<TodolistResult<ExecutorPrivateTodolist>> {
   const todolist = await loadLatestOwnerTodolistForBoardItem(authority, params);
   if (!todolist) {
+    // Prefer a precise projection mismatch over a false "please confirm again".
+    const anyForBoard = await listExecutorTodolists(authority, {
+      taskId: params.taskId,
+      boardItemId: params.boardItemId,
+    });
+    const confirmed = anyForBoard.find((item) => isTodolistConfirmedForDelivery(item));
+    if (confirmed) {
+      return fail(
+        "plan_gate_owner_projection_mismatch",
+        `confirmed Todolist ${confirmed.todolistId} (owner=${confirmed.ownerMemberId}, status=${confirmed.status}) exists for this board item but does not match claimant/owner projection ${params.ownerMemberId}; fix identity projection — do not ask human to re-confirm`,
+      );
+    }
     return fail(
       "plan_gate_unconfirmed",
       "no ExecutorPrivateTodolist for this board item; proposeTodolist → confirmTodolist before markInProgress",
@@ -610,9 +625,10 @@ export async function assertPlanGateAllowsDeliveryProgress(
   if (!isTodolistConfirmedForDelivery(todolist)) {
     return fail(
       "plan_gate_unconfirmed",
-      `todolist status is ${todolist.status}; confirmTodolist required before markInProgress delivery progress`,
+      `todolist status is ${todolist.status} (id=${todolist.todolistId}, owner=${todolist.ownerMemberId}); confirmTodolist required before markInProgress delivery progress`,
     );
   }
+  // Confirmed for this board+owner projection — never emit a false unconfirmed.
   return { ok: true, value: todolist };
 }
 
