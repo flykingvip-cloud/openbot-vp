@@ -104,6 +104,7 @@ import { deliveryActorIdsEqual } from "./delivery-actor-binding.js";
 import { collaborationDispatchIdsMatch } from "./member-dispatch-readiness.js";
 import {
   confirmationConsumedDelivery,
+  peerConfirmationConsumedDelivery,
   normalizeOwnerDecisionDelivery,
   proposalCreatedDelivery,
   readOwnerDecisionDeliveries,
@@ -1714,6 +1715,8 @@ export async function proposeCollaborationTodolist(params: {
               groupId: params.groupId,
               taskId: liveTodolist.taskId,
               item: board,
+              planOwnerMemberId: liveTodolist.ownerMemberId,
+              authorizingActorId: (liveTodolist.confirmedBy ?? "").trim() || undefined,
               auth: params.auth,
               trusted: params.trusted,
               stores: params.stores ?? stores,
@@ -1727,7 +1730,7 @@ export async function proposeCollaborationTodolist(params: {
       }
       cardDelivery = await rememberDelivery(
         params.groupId,
-        confirmationConsumedDelivery(peer.todolist),
+        peerConfirmationConsumedDelivery(peer.todolist),
         cfg,
         trustedLocator,
       );
@@ -2019,6 +2022,8 @@ export async function confirmCollaborationTodolist(params: {
           groupId: params.groupId,
           taskId: params.taskId,
           item: board,
+          planOwnerMemberId: confirmed.ownerMemberId,
+          authorizingActorId: confirmerId,
           auth: params.auth,
           trusted: params.trusted,
           stores: params.stores,

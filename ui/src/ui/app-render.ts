@@ -42,6 +42,7 @@ import {
   type OwnerDecisionCardView,
   type OwnerDecisionDetail,
   type OwnerDecisionHydrationTarget,
+  formatPostPlanConfirmAdvanceUserMessage,
 } from "./chat/owner-decision-card.ts";
 import type { ChatQuoteDraft } from "./chat/quote-draft.ts";
 import { labelForWorkProgressPhase } from "./chat/work-progress-phase.ts";
@@ -1425,13 +1426,19 @@ export function renderApp(state: AppViewState) {
               // elsewhere render as「收到，并确认」. Surface advance failure separately.
               collapseOwnerDecisionCardsForBoardItem(card.boardItemId);
               dismissOwnerDecisionCard(card.decisionId);
-              const advance = (result as { autoAdvance?: { wakeRecorded?: boolean; reason?: string } } | null)
-                ?.autoAdvance;
-              if (advance && advance.wakeRecorded === false && advance.reason) {
-                state.lastError = `计划已确认，但自动推进未开始：${advance.reason}`;
-              } else {
-                state.lastError = null;
-              }
+              const advance = (
+                result as {
+                  autoAdvance?: {
+                    wakeRecorded?: boolean;
+                    wakeConsumed?: boolean;
+                    dispatched?: boolean;
+                    reason?: string;
+                  };
+                } | null
+              )?.autoAdvance;
+              // Confirm committed (never roll back). Surface queue / blocked / dispatch
+              // failures even when wakeRecorded===true — not only wakeRecorded===false.
+              state.lastError = formatPostPlanConfirmAdvanceUserMessage(advance);
             } else if (action === "revise") {
               const reason = detail?.reason?.trim() || "退回修订（来自对话决策卡）";
               await client.request("collaboration.task.reviseTodolist", {

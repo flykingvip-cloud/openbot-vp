@@ -3,6 +3,12 @@
  * (`applied`|`in_progress`) with a claimantId so triggerPostPlanConfirmAdvance
  * does not early-return confirm_board_not_active / confirm_board_no_claimant.
  *
+ * Responsibility binding (who authorized / who executes / who is responsible):
+ * - authorizingActorId = confirmer / peer coordinator who authorized confirm
+ * - planOwnerMemberId  = confirmed plan executor (ownerMemberId)
+ * - claimantId         = board responsibility, resolved from plan owner ∩ intended
+ *
+ * Never blindly takes intendedClaimantIds[0] or uses claimantId as actor.
  * Best-effort only: never throws to roll back a committed confirm.
  * Uses existing claim → apply entry points (no new orchestrator).
  */
@@ -13,6 +19,7 @@ import {
   applyCollaborationBoardClaim,
   claimCollaborationBoardItem,
 } from "./claim-contract-entry.js";
+import { deliveryActorIdsEqual } from "./delivery-actor-binding.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
@@ -26,27 +33,83 @@ export type EnsureBoardActiveAfterConfirmResult = {
   item: GroupBoardClaimItem;
   activated: boolean;
   reason: string;
+  /** Board responsibility assignee when resolved (may equal plan owner alias form). */
+  executorId?: string;
+  /** Who authorized the confirm→activate path. */
+  authorizingActorId?: string;
 };
 
-function resolveClaimantCandidate(item: GroupBoardClaimItem): string {
-  const existing = compact(item.claimantId);
-  if (existing) {
-    return existing;
-  }
-  const intended = Array.isArray(item.intendedClaimantIds) ? item.intendedClaimantIds : [];
-  for (const raw of intended) {
-    const id = compact(raw);
-    if (id) {
-      return id;
+function intendedIds(item: GroupBoardClaimItem): string[] {
+  const raw = Array.isArray(item.intendedClaimantIds) ? item.intendedClaimantIds : [];
+  const out: string[] = [];
+  for (const entry of raw) {
+    const id = compact(entry);
+    if (id && !out.includes(id)) {
+      out.push(id);
     }
   }
-  return "";
+  return out;
+}
+
+/**
+ * Bind board claimant to the confirmed plan executor.
+ * Prefer an intended id form that matches planOwnerMemberId (bot ↔ bot:bot).
+ * Refuse when multi-intended / owner≠intended / no plan owner — never intended[0].
+ */
+export function resolveExecutorClaimantId(params: {
+  item: GroupBoardClaimItem;
+  planOwnerMemberId: string | null | undefined;
+}): { ok: true; claimantId: string } | { ok: false; reason: string } {
+  const planOwner = compact(params.planOwnerMemberId);
+  if (!planOwner) {
+    return { ok: false, reason: "plan_owner_required" };
+  }
+
+  const existing = compact(params.item.claimantId);
+  if (existing && deliveryActorIdsEqual(existing, planOwner)) {
+    return { ok: true, claimantId: existing };
+  }
+  if (existing && !deliveryActorIdsEqual(existing, planOwner)) {
+    // Already claimed by someone else — do not steal / rebind here.
+    return { ok: false, reason: `claimant_plan_owner_mismatch:claimant=${existing}` };
+  }
+
+  const intended = intendedIds(params.item);
+  if (intended.length === 0) {
+    return { ok: false, reason: "plan_owner_not_in_intended" };
+  }
+
+  const matches = intended.filter((id) => deliveryActorIdsEqual(id, planOwner));
+  if (matches.length === 0) {
+    return {
+      ok: false,
+      reason: `plan_owner_not_in_intended:owner=${planOwner}:intended=${intended.join(",")}`,
+    };
+  }
+
+  // Prefer exact string match to plan owner, else the matching intended form
+  // (so claimBoardItem intended-list check passes, e.g. owner bot:bot → intended "bot").
+  const exact = matches.find((id) => id === planOwner);
+  if (exact) {
+    return { ok: true, claimantId: exact };
+  }
+  if (matches.length > 1) {
+    return {
+      ok: false,
+      reason: `ambiguous_intended_for_plan_owner:owner=${planOwner}:matches=${matches.join(",")}`,
+    };
+  }
+  return { ok: true, claimantId: matches[0]! };
 }
 
 export async function ensureBoardActiveAfterConfirm(params: {
   groupId: string;
   taskId: string;
   item: GroupBoardClaimItem;
+  /** Confirmed plan executor (todolist.ownerMemberId). Required to activate. */
+  planOwnerMemberId?: string | null;
+  /** Confirmer / peer coordinator who authorized; recorded as apply actor, not claimant. */
+  authorizingActorId?: string | null;
   auth?: TeamResourceAuthOk | null;
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   stores?: TrustedGroupStores | null;
@@ -55,14 +118,42 @@ export async function ensureBoardActiveAfterConfirm(params: {
 }): Promise<EnsureBoardActiveAfterConfirmResult> {
   const status = compact(params.item.status);
   const claimantExisting = compact(params.item.claimantId);
+  const authorizingActorId = compact(params.authorizingActorId) || undefined;
+  const planOwner = compact(params.planOwnerMemberId);
+
   if (ACTIVE.has(status) && claimantExisting) {
-    return { item: params.item, activated: false, reason: "already_active" };
+    if (planOwner && !deliveryActorIdsEqual(claimantExisting, planOwner)) {
+      return {
+        item: params.item,
+        activated: false,
+        reason: `claimant_plan_owner_mismatch:claimant=${claimantExisting}`,
+        authorizingActorId,
+      };
+    }
+    return {
+      item: params.item,
+      activated: false,
+      reason: "already_active",
+      executorId: claimantExisting,
+      authorizingActorId,
+    };
   }
 
-  const claimantId = resolveClaimantCandidate(params.item);
-  if (!claimantId) {
-    return { item: params.item, activated: false, reason: "no_claimant_candidate" };
+  const resolved = resolveExecutorClaimantId({
+    item: params.item,
+    planOwnerMemberId: planOwner,
+  });
+  if (!resolved.ok) {
+    return {
+      item: params.item,
+      activated: false,
+      reason: resolved.reason,
+      authorizingActorId,
+    };
   }
+  const claimantId = resolved.claimantId;
+  // Actor = who authorized; never silently reuse claimant as the authorizer.
+  const actor = authorizingActorId || claimantId;
 
   const shared = {
     groupId: params.groupId,
@@ -75,7 +166,7 @@ export async function ensureBoardActiveAfterConfirm(params: {
     cfg: params.cfg,
   };
   if (!shared.itemId) {
-    return { item: params.item, activated: false, reason: "board_item_id_missing" };
+    return { item: params.item, activated: false, reason: "board_item_id_missing", authorizingActorId };
   }
 
   try {
@@ -84,16 +175,32 @@ export async function ensureBoardActiveAfterConfirm(params: {
       current = await claimCollaborationBoardItem({
         ...shared,
         claimantId,
-        actor: claimantId,
+        actor,
       });
     } else if (status === "claimed") {
-      // already claimed — apply below
       if (!compact(current.claimantId)) {
-        // claimed without claimant is corrupt; refuse silently
-        return { item: params.item, activated: false, reason: "claimed_without_claimant" };
+        return {
+          item: params.item,
+          activated: false,
+          reason: "claimed_without_claimant",
+          authorizingActorId,
+        };
+      }
+      if (!deliveryActorIdsEqual(compact(current.claimantId), planOwner || claimantId)) {
+        return {
+          item: params.item,
+          activated: false,
+          reason: `claimant_plan_owner_mismatch:claimant=${compact(current.claimantId)}`,
+          authorizingActorId,
+        };
       }
     } else if (!ACTIVE.has(status)) {
-      return { item: params.item, activated: false, reason: `not_activatable:${status || "unknown"}` };
+      return {
+        item: params.item,
+        activated: false,
+        reason: `not_activatable:${status || "unknown"}`,
+        authorizingActorId,
+      };
     }
 
     const afterStatus = compact(current.status);
@@ -101,25 +208,42 @@ export async function ensureBoardActiveAfterConfirm(params: {
       return {
         item: current,
         activated: afterStatus !== status || compact(current.claimantId) !== claimantExisting,
-        reason: afterStatus === "applied" || afterStatus === "in_progress" ? "already_active" : "claimed_only",
+        reason:
+          afterStatus === "applied" || afterStatus === "in_progress"
+            ? "already_active"
+            : "claimed_only",
+        executorId: compact(current.claimantId),
+        authorizingActorId,
       };
     }
 
     if (afterStatus === "claimed" || status === "published" || status === "claimed") {
       const applied = await applyCollaborationBoardClaim({
         ...shared,
-        actor: compact(current.claimantId) || claimantId,
+        actor,
       });
-      return { item: applied.item, activated: true, reason: "claimed_and_applied" };
+      return {
+        item: applied.item,
+        activated: true,
+        reason: "claimed_and_applied",
+        executorId: compact(applied.item.claimantId) || claimantId,
+        authorizingActorId,
+      };
     }
 
-    return { item: current, activated: false, reason: `unexpected_status:${afterStatus || "unknown"}` };
+    return {
+      item: current,
+      activated: false,
+      reason: `unexpected_status:${afterStatus || "unknown"}`,
+      authorizingActorId,
+    };
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return {
       item: params.item,
       activated: false,
       reason: `activate_failed:${detail}`.slice(0, 240),
+      authorizingActorId,
     };
   }
 }

@@ -1,6 +1,7 @@
 /**
  * Confirm → board active + claimant so post-plan advance does not early-exit.
  * Confirm stays committed when activation / advance fails.
+ * Claimant must bind confirmed plan owner (not intendedClaimantIds[0]).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GroupBoardClaimItem } from "../collaboration-dispatch/claim-contract.js";
@@ -19,7 +20,10 @@ vi.mock("./claim-contract-entry.js", async () => {
   };
 });
 
-import { ensureBoardActiveAfterConfirm } from "./ensure-board-active-after-confirm.js";
+import {
+  ensureBoardActiveAfterConfirm,
+  resolveExecutorClaimantId,
+} from "./ensure-board-active-after-confirm.js";
 
 function publishedItem(over?: Partial<GroupBoardClaimItem>): GroupBoardClaimItem {
   return {
@@ -39,13 +43,53 @@ function publishedItem(over?: Partial<GroupBoardClaimItem>): GroupBoardClaimItem
   } as GroupBoardClaimItem;
 }
 
+describe("resolveExecutorClaimantId", () => {
+  it("binds plan owner bot:bot to intended form bot (not first arbitrary)", () => {
+    const resolved = resolveExecutorClaimantId({
+      item: publishedItem({ intendedClaimantIds: ["other", "bot"] }),
+      planOwnerMemberId: "bot:bot",
+    });
+    expect(resolved).toEqual({ ok: true, claimantId: "bot" });
+  });
+
+  it("refuses when plan owner ≠ any intended (incl. first)", () => {
+    const resolved = resolveExecutorClaimantId({
+      item: publishedItem({ intendedClaimantIds: ["bot-a", "bot-b"] }),
+      planOwnerMemberId: "bot-c",
+    });
+    expect(resolved.ok).toBe(false);
+    if (!resolved.ok) {
+      expect(resolved.reason).toMatch(/plan_owner_not_in_intended/);
+    }
+  });
+
+  it("refuses without plan owner (no blind intended[0])", () => {
+    const resolved = resolveExecutorClaimantId({
+      item: publishedItem(),
+      planOwnerMemberId: "",
+    });
+    expect(resolved).toEqual({ ok: false, reason: "plan_owner_required" });
+  });
+
+  it("refuses when existing claimant ≠ plan owner", () => {
+    const resolved = resolveExecutorClaimantId({
+      item: publishedItem({ claimantId: "bot-other", status: "claimed" }),
+      planOwnerMemberId: "bot",
+    });
+    expect(resolved.ok).toBe(false);
+    if (!resolved.ok) {
+      expect(resolved.reason).toMatch(/claimant_plan_owner_mismatch/);
+    }
+  });
+});
+
 describe("ensureBoardActiveAfterConfirm", () => {
   beforeEach(() => {
     claimMock.mockReset();
     applyMock.mockReset();
   });
 
-  it("published + intended → claim then apply (active + claimantId)", async () => {
+  it("published + plan owner matched intended → claim then apply (actor≠claimant when authorizer set)", async () => {
     claimMock.mockResolvedValueOnce({
       ...publishedItem(),
       status: "claimed",
@@ -68,13 +112,75 @@ describe("ensureBoardActiveAfterConfirm", () => {
       groupId: "grp-1",
       taskId: "task-1",
       item: publishedItem(),
+      planOwnerMemberId: "bot:bot",
+      authorizingActorId: "human:owner",
     });
     expect(claimMock).toHaveBeenCalledTimes(1);
+    expect(claimMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        claimantId: "bot",
+        actor: "human:owner",
+      }),
+    );
     expect(applyMock).toHaveBeenCalledTimes(1);
+    expect(applyMock.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        actor: "human:owner",
+      }),
+    );
     expect(result.activated).toBe(true);
     expect(result.item.status).toBe("applied");
     expect(result.item.claimantId).toBe("bot");
     expect(result.reason).toBe("claimed_and_applied");
+    expect(result.executorId).toBe("bot");
+    expect(result.authorizingActorId).toBe("human:owner");
+  });
+
+  it("multi intended + owner≠first → binds matching owner, not intended[0]", async () => {
+    claimMock.mockResolvedValueOnce({
+      ...publishedItem({ intendedClaimantIds: ["bot-a", "bot-exec"] }),
+      status: "claimed",
+      claimantId: "bot-exec",
+      claimedAt: 2,
+      revision: 2,
+    });
+    applyMock.mockResolvedValueOnce({
+      task: { taskId: "task-1" },
+      item: {
+        ...publishedItem({ intendedClaimantIds: ["bot-a", "bot-exec"] }),
+        status: "applied",
+        claimantId: "bot-exec",
+        claimedAt: 2,
+        appliedAt: 3,
+        revision: 3,
+      },
+    });
+    const result = await ensureBoardActiveAfterConfirm({
+      groupId: "grp-1",
+      taskId: "task-1",
+      item: publishedItem({ intendedClaimantIds: ["bot-a", "bot-exec"] }),
+      planOwnerMemberId: "bot-exec",
+      authorizingActorId: "human:owner",
+    });
+    expect(claimMock.mock.calls[0]?.[0]?.claimantId).toBe("bot-exec");
+    expect(result.activated).toBe(true);
+    expect(result.item.claimantId).toBe("bot-exec");
+  });
+
+  it("multi intended + owner not in list → refuse, no claim (board unchanged)", async () => {
+    const item = publishedItem({ intendedClaimantIds: ["bot-a", "bot-b"] });
+    const result = await ensureBoardActiveAfterConfirm({
+      groupId: "grp-1",
+      taskId: "task-1",
+      item,
+      planOwnerMemberId: "bot-c",
+      authorizingActorId: "human:owner",
+    });
+    expect(claimMock).not.toHaveBeenCalled();
+    expect(applyMock).not.toHaveBeenCalled();
+    expect(result.activated).toBe(false);
+    expect(result.item.status).toBe("published");
+    expect(result.reason).toMatch(/plan_owner_not_in_intended/);
   });
 
   it("already applied + claimant → no-op", async () => {
@@ -87,6 +193,7 @@ describe("ensureBoardActiveAfterConfirm", () => {
       groupId: "grp-1",
       taskId: "task-1",
       item,
+      planOwnerMemberId: "bot:bot",
     });
     expect(claimMock).not.toHaveBeenCalled();
     expect(applyMock).not.toHaveBeenCalled();
@@ -94,16 +201,30 @@ describe("ensureBoardActiveAfterConfirm", () => {
     expect(result.reason).toBe("already_active");
   });
 
-  it("claim/apply failure does not throw (confirm must stay committed)", async () => {
+  it("concurrent claim failure does not throw (confirm must stay committed; board unchanged)", async () => {
     claimMock.mockRejectedValueOnce(new Error("claim_denied"));
     const item = publishedItem();
     const result = await ensureBoardActiveAfterConfirm({
       groupId: "grp-1",
       taskId: "task-1",
       item,
+      planOwnerMemberId: "bot",
+      authorizingActorId: "human:owner",
     });
     expect(result.activated).toBe(false);
     expect(result.item.status).toBe("published");
+    expect(result.item.claimantId).toBeUndefined();
     expect(result.reason).toMatch(/activate_failed:claim_denied/);
+  });
+
+  it("missing planOwner → refuse without claim", async () => {
+    const result = await ensureBoardActiveAfterConfirm({
+      groupId: "grp-1",
+      taskId: "task-1",
+      item: publishedItem(),
+    });
+    expect(claimMock).not.toHaveBeenCalled();
+    expect(result.activated).toBe(false);
+    expect(result.reason).toBe("plan_owner_required");
   });
 });

@@ -23,6 +23,7 @@ export const OWNER_DECISION_USER_FACING = [
   "delivery_failed_retryable",
   "stale_version",
   "consumed",
+  "peer_confirmed",
   "skipped",
   "tracked",
 ] as const;
@@ -215,6 +216,62 @@ export const OWNER_DECISION_ACTIONABLE_STATUSES = new Set(["proposed", "revise_r
 /** Human-side compact copy for bot↔bot peer confirmation (no plan body). */
 export const OWNER_DECISION_PEER_ACK_COPY = "收到，并确认";
 
+/** True when delivery marks bot↔bot peer auto-confirm (not human gate). */
+
+/** Format post-plan autoAdvance for UI — confirm stays; failures visible by stage. */
+export function formatPostPlanConfirmAdvanceUserMessage(
+  advance:
+    | {
+        wakeRecorded?: boolean;
+        wakeConsumed?: boolean;
+        dispatched?: boolean;
+        reason?: string;
+      }
+    | null
+    | undefined,
+): string | null {
+  if (!advance) {
+    return null;
+  }
+  const reason = String(advance.reason ?? "").trim();
+  if (!reason) {
+    return null;
+  }
+  if (advance.dispatched === true) {
+    return null;
+  }
+  const wakeRecorded = advance.wakeRecorded === true;
+  const wakeConsumed = advance.wakeConsumed === true;
+  if (!wakeRecorded) {
+    return `计划已确认，但自动推进未开始：${reason}`;
+  }
+  if (wakeRecorded && !wakeConsumed) {
+    return `计划已确认，推进已排队但未消费：${reason}`;
+  }
+  // wake recorded + consumed, not dispatched
+  const blockedLike =
+    /self_advance_not_execute|dispatch_readiness_not_ready|mode_b_dispatcher_unbound|gray|not_allowed|blocked/i.test(
+      reason,
+    );
+  const dispatchFailed =
+    /dispatch_failed|execute_collaboration_round_failed|plan_revised_before_dispatch|plan_revalidate/i.test(
+      reason,
+    );
+  if (dispatchFailed) {
+    return `计划已确认，但派发失败：${reason}`;
+  }
+  if (blockedLike) {
+    return `计划已确认，推进受阻：${reason}`;
+  }
+  return `计划已确认，推进未完成：${reason}`;
+}
+
+export function isOwnerDecisionPeerConfirmed(
+  userFacing: OwnerDecisionUserFacing | null | undefined,
+): boolean {
+  return userFacing === "peer_confirmed";
+}
+
 const OWNER_DECISION_STATUS_COPY: Record<string, string> = {
   confirmed: "执行计划已确认",
   superseded: "旧版本已失效",
@@ -303,10 +360,17 @@ export function clearOwnerDecisionTodolistStatus(todolistId: string): void {
  * Confirmed human cards fold away after success (SoT stays confirmed — never
  * roll back to proposed). Stale/superseded stay visible with「旧版本已失效」.
  */
-export function shouldAutoCollapseOwnerDecisionStatus(status: string | null | undefined): boolean {
+export function shouldAutoCollapseOwnerDecisionStatus(
+  status: string | null | undefined,
+  opts?: { peerConfirmed?: boolean },
+): boolean {
   const key = String(status ?? "")
     .trim()
     .toLowerCase();
+  // Peer mutual-ack residuals stay visible as「收到，并确认」; human confirm folds away.
+  if (opts?.peerConfirmed) {
+    return false;
+  }
   return key === "confirmed";
 }
 
@@ -713,14 +777,15 @@ export function renderOwnerDecisionCards(
       // Confirmed / stale / other terminal review: no action buttons (incl. 稍后).
       // 稍后 stays only while proposed|revise_requested.
       const visibleOptions = actionable ? card.options : [];
-      // Confirmed: human confirm path dismisses the dialog; residual / peer-confirmed
-      // cards that remain in history show only「收到，并确认」(no plan body).
+      // Confirmed: peer mutual-ack →「收到，并确认」only; human confirm folds away
+      // (dismiss) and any human residual keeps「执行计划已确认」(never peer copy).
       const isConfirmedTerminal =
         !invalid &&
         String(todolistStatus ?? "")
           .trim()
           .toLowerCase() === "confirmed";
-      if (isConfirmedTerminal) {
+      const peerConfirmed = isOwnerDecisionPeerConfirmed(userFacing);
+      if (isConfirmedTerminal && peerConfirmed) {
         return html`
           <div
             class="employee-workbench__assistant-prelude chat-bubble employee-workbench__assistant-prelude-bubble employee-workbench__steward-confirm-card employee-workbench__owner-decision-peer-ack"
@@ -733,6 +798,7 @@ export function renderOwnerDecisionCards(
             data-owner-decision-delivery=${userFacing ?? nothing}
             data-owner-decision-terminal
             data-owner-decision-peer-ack
+            data-owner-decision-confirm-source="peer"
           >
             <div class="employee-workbench__owner-decision-peer-ack-copy">${OWNER_DECISION_PEER_ACK_COPY}</div>
           </div>

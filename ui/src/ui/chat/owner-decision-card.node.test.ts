@@ -10,6 +10,7 @@ import {
   dismissOwnerDecisionCard,
   formatOwnerDecisionMentionHint,
   formatOwnerDecisionStatusCopy,
+  formatPostPlanConfirmAdvanceUserMessage,
   formatOwnerDecisionSummaryLine,
   getOwnerDecisionReviseDraft,
   getOwnerDecisionTodolistStatus,
@@ -322,15 +323,17 @@ describe("owner-decision-card UI", () => {
         mentionLabels: ["CEO"],
       },
     };
+    noteOwnerDecisionDelivery("td-terminal", "peer_confirmed", 1);
     render(renderOwnerDecisionCards([message], { onDecide, onUIChange }), container);
     const root = container.querySelector("[data-owner-decision]") as HTMLElement;
     expect(root.getAttribute("data-owner-decision-status")).toBe("confirmed");
     expect(root.hasAttribute("data-owner-decision-terminal")).toBe(true);
     expect(root.hasAttribute("data-owner-decision-peer-ack")).toBe(true);
+    expect(root.getAttribute("data-owner-decision-confirm-source")).toBe("peer");
     expect(container.querySelector("[data-owner-decision-peer-ack-copy], .employee-workbench__owner-decision-peer-ack-copy")?.textContent?.trim()).toBe(
       OWNER_DECISION_PEER_ACK_COPY,
     );
-    // Peer/residual confirmed: no plan body, no actions.
+    // Peer confirmed: no plan body, no actions.
     expect(container.querySelectorAll("[role='listitem']").length).toBe(0);
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
     expect(container.querySelector('[data-owner-decision-action="revise"]')).toBeNull();
@@ -457,9 +460,10 @@ describe("owner-decision-card UI", () => {
     expect(isOwnerDecisionDismissed("dec-old-keep")).toBe(true);
     expect(isOwnerDecisionDismissed("dec-confirmed-keep")).toBe(true);
 
-    // Undismissed confirmed residual (e.g. peer history) → compact「收到，并确认」only.
+    // Undismissed peer residual → compact「收到，并确认」only (not human confirm copy).
     clearOwnerDecisionDismissalsForTest();
     setOwnerDecisionTodolistStatus(confirmedCard.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(confirmedCard.todolistId, "peer_confirmed", confirmedCard.version);
     const container = document.createElement("div");
     render(
       renderOwnerDecisionCards([{ role: "assistant", ownerDecision: confirmedCard }]),
@@ -471,6 +475,64 @@ describe("owner-decision-card UI", () => {
     ).toBe(OWNER_DECISION_PEER_ACK_COPY);
     expect(container.querySelectorAll("[role='listitem']").length).toBe(0);
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+
+    // Human confirmed residual (consumed, not peer) →「执行计划已确认」, never peer ack.
+    clearOwnerDecisionDeliveryStateForTest();
+    clearOwnerDecisionDismissalsForTest();
+    setOwnerDecisionTodolistStatus(confirmedCard.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(confirmedCard.todolistId, "consumed", confirmedCard.version);
+    const humanBox = document.createElement("div");
+    render(
+      renderOwnerDecisionCards([{ role: "assistant", ownerDecision: confirmedCard }]),
+      humanBox,
+    );
+    expect(humanBox.querySelector("[data-owner-decision-peer-ack]")).toBeNull();
+    expect(humanBox.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
+      "执行计划已确认",
+    );
+  });
+
+  it("formatPostPlanConfirmAdvanceUserMessage separates queue/blocked/dispatch failures", () => {
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "confirm_board_not_active:published",
+      }),
+    ).toMatch(/^计划已确认，但自动推进未开始：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "wake_queued",
+      }),
+    ).toMatch(/^计划已确认，推进已排队但未消费：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: false,
+        reason: "self_advance_not_execute",
+      }),
+    ).toMatch(/^计划已确认，推进受阻：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: false,
+        reason: "dispatch_failed:execute_collaboration_round_failed",
+      }),
+    ).toMatch(/^计划已确认，但派发失败：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: true,
+        reason: "dispatched",
+      }),
+    ).toBeNull();
   });
 
 
