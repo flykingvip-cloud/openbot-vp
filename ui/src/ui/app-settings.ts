@@ -111,6 +111,7 @@ import {
 } from "./routing/openbot-subdomain-redirect.ts";
 import { canonicalPasswordResetLocation } from "./routing/password-reset-link.ts";
 import { resolveAuthorizedTab, type PermissionStateLike } from "./routing/port-permissions.ts";
+import { bumpSessionSeenAt } from "./session-seen-at.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
@@ -300,16 +301,13 @@ export function markSessionSeen(host: SessionSeenHost, sessionKey: string, seenA
   if (!key) {
     return;
   }
-  const previous = host.settings.sessionSeenAt[key] ?? 0;
-  if (previous >= seenAt) {
+  const merged = bumpSessionSeenAt(host.settings.sessionSeenAt, key, seenAt);
+  if (merged === host.settings.sessionSeenAt) {
     return;
   }
   host.applySettings({
     ...host.settings,
-    sessionSeenAt: {
-      ...host.settings.sessionSeenAt,
-      [key]: seenAt,
-    },
+    sessionSeenAt: merged,
   });
 }
 
@@ -335,14 +333,12 @@ function applyWorkbenchSessionKeyFromLocation(host: SettingsHost, search: string
   }
   host.sessionKey = session;
   host.workbenchTeamSelectedKey = session;
+  const seenAt = Date.now();
   applySettings(host, {
     ...host.settings,
     sessionKey: session,
     lastActiveSessionKey: session,
-    sessionSeenAt: {
-      ...host.settings.sessionSeenAt,
-      [session]: Date.now(),
-    },
+    sessionSeenAt: bumpSessionSeenAt(host.settings.sessionSeenAt, session, seenAt),
   });
 }
 

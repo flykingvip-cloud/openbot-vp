@@ -3,9 +3,14 @@ import {
   isCronSessionKey,
   isSubagentSessionKey,
   parseAgentSessionKey,
+  toCollaborationSpaceSessionKey,
 } from "../../../../../../src/sessions/session-key-utils.ts";
 import { i18n, t } from "../../../../i18n/index.ts";
 import { resolveSessionDisplayName } from "../../../app-render.helpers.ts";
+import {
+  extractEmployeeStewardOwnerFromSessionKey,
+  isGlobalStewardSessionAlias,
+} from "../../../chat-session-key-match.ts";
 import { isGroupScopedSessionKey } from "../../../collaboration/resolve-group-scope.ts";
 import type {
   FrontstageContactCard,
@@ -18,6 +23,7 @@ import {
   deriveSessionCards,
 } from "../../../data/frontstage-session-cards.ts";
 import { formatRelativeTimestamp } from "../../../format.ts";
+import { resolveSessionSeenAtMs } from "../../../session-seen-at.ts";
 import type {
   AgentsListResult,
   ChannelsStatusSnapshot,
@@ -284,6 +290,40 @@ function resolveActivity(updatedAt: number | null): WorkbenchActivity {
   return "idle";
 }
 
+function resolveUnreadSpaceSessionKey(sessionKey: string): string | null {
+  const raw = sessionKey.trim();
+  if (!raw) {
+    return null;
+  }
+  if (raw.toLowerCase().startsWith("space:")) {
+    return toCollaborationSpaceSessionKey(raw.slice("space:".length));
+  }
+  const match = raw.match(/:space:([^:]+)/i);
+  return match ? toCollaborationSpaceSessionKey(match[1]) : null;
+}
+
+function isActiveUnreadSessionKey(key: string, activeSessionKey: string): boolean {
+  const active = activeSessionKey.trim();
+  if (!active) {
+    return false;
+  }
+  if (key === active) {
+    return true;
+  }
+  // Steward aliases (main / agent:main:main / employee:<id>) share one inbox.
+  // Do NOT treat every agent:<id>:* row as active — that wrongly cleared
+  // telegram DM contact badges while the steward 1:1 was open.
+  if (
+    (isGlobalStewardSessionAlias(key) || extractEmployeeStewardOwnerFromSessionKey(key)) &&
+    (isGlobalStewardSessionAlias(active) || extractEmployeeStewardOwnerFromSessionKey(active))
+  ) {
+    return true;
+  }
+  const keySpace = resolveUnreadSpaceSessionKey(key);
+  const activeSpace = resolveUnreadSpaceSessionKey(active);
+  return Boolean(keySpace && activeSpace && keySpace === activeSpace);
+}
+
 function countUnreadSessions(
   sessionKeys: string[],
   sessionsResult: SessionsListResult | null,
@@ -292,7 +332,7 @@ function countUnreadSessions(
 ) {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return sessionKeys.reduce((count, key) => {
-    if (key === activeSessionKey) {
+    if (isActiveUnreadSessionKey(key, activeSessionKey)) {
       return count;
     }
     // P1（未读基于真实入站消息）：只有「承载真实对话消息」的会话才计入未读。
@@ -311,7 +351,10 @@ function countUnreadSessions(
     if (!hasRealMessage) {
       return count;
     }
-    const seenAt = sessionSeenAt[key] ?? 0;
+    // Alias-aware cursor: UI may persist under canonical/steward alias while
+    // sessions.list keeps employee:/space: mirror keys — exact lookup resurrects
+    // badges after refresh.
+    const seenAt = resolveSessionSeenAtMs(sessionSeenAt, key);
     return updatedAt > seenAt ? count + 1 : count;
   }, 0);
 }
@@ -432,7 +475,13 @@ function buildAgentItems(
         ? t("frontstage.me.primaryPersona")
         : t("frontstage.personas.secondaryPersona");
     const meta = t("frontstage.personas.sessions", { count: String(sessionCount) });
-    const sessionKeys = agentSessions.map((row) => row.key);
+    // Assistant badges must not inherit collaboration-space mirrors. Those rows
+    // belong to 协作空间 entries; bundling them into 大白管家/助手 sessionKeys
+    // made "open steward" batch-clear space badges in memory, then refresh
+    // resurrected both steward and space unread counts.
+    const sessionKeys = agentSessions
+      .map((row) => row.key)
+      .filter((key) => !isGroupScopedSessionKey(key));
     return [
       {
         key: primarySessionKey,

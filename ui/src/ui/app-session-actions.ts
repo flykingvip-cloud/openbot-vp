@@ -4,6 +4,7 @@ import { syncUrlWithSessionKey } from "./app-settings.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { DEFAULT_CHAT_CONTEXT_SCOPE } from "./chat/context-scope.ts";
 import type { Tab } from "./navigation.ts";
+import { bumpSessionSeenAt } from "./session-seen-at.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "./views/account-computer-preview.ts";
 
 export type ShellSessionSwitchState = Pick<
@@ -94,10 +95,7 @@ export function switchShellSession(
     ...state.settings,
     sessionKey,
     lastActiveSessionKey: sessionKey,
-    sessionSeenAt: {
-      ...state.settings.sessionSeenAt,
-      [sessionKey]: seenAt,
-    },
+    sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, seenAt),
   });
   if (options.syncUrl) {
     syncUrlWithSessionKey(adaptSettingsHost(state), sessionKey, options.replaceUrl ?? true);

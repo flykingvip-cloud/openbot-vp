@@ -10020,6 +10020,25 @@ tasks:
     since: 2026-10-27
     metadata: {}
 landingStreams:
+  - id: ux-unread-badge-persist-20261029:grok-bot
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - ui/src/ui/session-seen-at.ts
+      - ui/src/ui/session-seen-at.node.test.ts
+      - ui/src/ui/app-session-actions.ts
+      - ui/src/ui/app-settings.ts
+      - ui/src/ui/storage.ts
+      - ui/src/ui/controllers/daibai.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/chat/grouped-render.node.test.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+      - ui/src/ui/ports/employee/render-model-shell-actions.ts
+      - ui/src/ui/ports/employee/views/workbench-home-model.ts
+      - ui/src/ui/views/workbench-home-model.node.test.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: UX unread badge persist + cross-day chat timestamps
   - id: team-real-collab-loop-f1f3
     landingPolicy: parallel
     paths:

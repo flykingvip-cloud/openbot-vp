@@ -301,12 +301,14 @@ describe("buildWorkbenchHomeModelFromState", () => {
     });
 
     expect(model.teamAssistants).toHaveLength(7);
+    // Space mirrors stay on 协作空间; assistant sessionKeys keep the canonical
+    // primary key only (unread/sibling ack must not batch-clear space badges).
     expect(model.teamAssistants.find((entry) => entry.key === "agent:bot:main")).toMatchObject({
-      sessionKeys: ["agent:bot:main:space:space-aegis"],
+      sessionKeys: ["agent:bot:main"],
       updatedAt: now - 2_000,
     });
     expect(model.teamAssistants.find((entry) => entry.key === "agent:bot-2:main")).toMatchObject({
-      sessionKeys: ["agent:bot-2:main:space:space-market"],
+      sessionKeys: ["agent:bot-2:main"],
       updatedAt: now - 3_000,
     });
   });
@@ -526,6 +528,94 @@ describe("buildWorkbenchHomeModelFromState", () => {
     });
     expect(model.agents.find((entry) => entry.sessionKeys.includes("main"))?.unreadCount).toBe(1);
   });
+});
+
+it("P1b: steward alias sessionSeenAt clears employee-isolated unread after refresh shape", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const now = Date.now();
+  const model = buildWorkbenchHomeModelFromState({
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult: {
+      count: 2,
+      sessions: [
+        {
+          key: "agent:main:employee:u1",
+          kind: "global",
+          label: "大白管家",
+          updatedAt: now - 5_000,
+          lastMessagePreview: "已读过的消息",
+        },
+        {
+          key: "agent:main:space:grp-rd",
+          kind: "group",
+          label: "研发",
+          updatedAt: now - 1_000,
+          lastMessagePreview: "协作消息",
+          groupId: "grp-rd",
+        },
+      ],
+    } as SessionsListResult,
+    // Persisted under canonical alias (what switchEmployeeWorkbenchSession writes)
+    sessionSeenAt: { "agent:main:main": now },
+    activeSessionKey: "agent:bot-2:main",
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  });
+  const steward = model.agents.find((entry) =>
+    entry.sessionKeys.some((k) => k.includes("employee")),
+  );
+  expect(steward?.unreadCount).toBe(0);
+  // Space mirrors must not inflate the assistant badge (they belong to 协作空间).
+  expect(steward?.sessionKeys.some((k) => k.includes(":space:"))).toBe(false);
+});
+
+it("P1c: space:<id> sessionSeenAt clears collaboration mirror unread", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const now = Date.now();
+  const model = buildWorkbenchHomeModelFromState({
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult: {
+      count: 1,
+      sessions: [
+        {
+          key: "agent:main:space:grp-rd",
+          kind: "group",
+          label: "研发",
+          updatedAt: now - 2_000,
+          lastMessagePreview: "已读协作",
+          groupId: "grp-rd",
+        },
+      ],
+    } as SessionsListResult,
+    sessionSeenAt: { "space:grp-rd": now },
+    activeSessionKey: "agent:bot-2:main",
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  });
+  const space = model.groups.find((entry) => entry.sessionKeys.includes("agent:main:space:grp-rd"));
+  expect(space?.unreadCount).toBe(0);
 });
 
 describe("formatCronMinutesLabel", () => {

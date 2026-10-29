@@ -382,5 +382,37 @@ function persistSettings(next: UiSettings, options?: { navCompactLayoutApplied?:
       ? { workbenchProfileNote: sanitizeOptionalText(next.workbenchProfileNote) }
       : {}),
   };
-  localStorage.setItem(KEY, JSON.stringify(persisted));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(persisted));
+  } catch {
+    // QuotaExceeded or private-mode: drop bulky brand art first so unread
+    // cursors still survive refresh (false badges after reload).
+    try {
+      const { customBrandLogoDataUrl: _logo, ...withoutLogo } = persisted as PersistedUiSettings & {
+        customBrandLogoDataUrl?: string;
+      };
+      localStorage.setItem(KEY, JSON.stringify(withoutLogo));
+    } catch {
+      try {
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({
+            gatewayUrl: persisted.gatewayUrl,
+            sessionKey: persisted.sessionKey,
+            lastActiveSessionKey: persisted.lastActiveSessionKey,
+            sessionSeenAt: persisted.sessionSeenAt,
+            theme: persisted.theme,
+            chatFocusMode: persisted.chatFocusMode,
+            chatShowThinking: persisted.chatShowThinking,
+            splitRatio: persisted.splitRatio,
+            navCollapsed: persisted.navCollapsed,
+            navGroupsCollapsed: persisted.navGroupsCollapsed,
+            navCompactLayoutApplied: persisted.navCompactLayoutApplied,
+          } satisfies PersistedUiSettings),
+        );
+      } catch {
+        // Give up silently — next interaction retries.
+      }
+    }
+  }
 }

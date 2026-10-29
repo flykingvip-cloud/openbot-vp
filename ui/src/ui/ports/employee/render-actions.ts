@@ -6,6 +6,7 @@ import { reloadShellChatHistory } from "../../app-chat-actions.ts";
 import type { AppPortState } from "../../app-port-state.ts";
 import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
 import { applyPendingChatFocusMessage } from "../../chat/focus-message.ts";
+import { bumpSessionSeenAt } from "../../session-seen-at.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "../../views/account-computer-preview.ts";
 import {
   maybeTriggerGrowthBirthTurn,
@@ -309,6 +310,15 @@ export function switchEmployeeWorkbenchSession(
     ) {
       state.workbenchTeamSelectedKey = sessionKey;
     }
+    // Still persist the unread cursor — skipping applySettings here left
+    // sessionSeenAt stale, so refresh resurrected badges for an already-open
+    // steward/space surface.
+    state.applySettings({
+      ...state.settings,
+      sessionKey,
+      lastActiveSessionKey: sessionKey,
+      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now()),
+    });
     return;
   }
   state.workbenchPrimaryModule = primaryModule;
@@ -365,10 +375,7 @@ export function switchEmployeeWorkbenchSession(
     ...state.settings,
     sessionKey,
     lastActiveSessionKey: sessionKey,
-    sessionSeenAt: {
-      ...state.settings.sessionSeenAt,
-      [sessionKey]: Date.now(),
-    },
+    sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now()),
   });
   void state.loadAssistantIdentity();
   syncComputerPreviewAfterSessionSwitch(

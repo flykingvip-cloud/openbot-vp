@@ -16,6 +16,7 @@ import {
 } from "../builtin-steward-selection.ts";
 import { areChatSessionKeysEquivalent } from "../chat-session-key-match.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "../gateway.ts";
+import { bumpSessionSeenAt } from "../session-seen-at.ts";
 import { isDaibaiGuideAcknowledgedForUser } from "../storage.ts";
 
 const DEFAULT_DAIBAI_MESSAGE = "请帮我检查当前支持状态，并给出下一步建议。";
@@ -375,10 +376,7 @@ export async function openDaibaiHelpFromModule(
       ...state.settings,
       sessionKey: stewardKey,
       lastActiveSessionKey: stewardKey,
-      sessionSeenAt: {
-        ...state.settings.sessionSeenAt,
-        [stewardKey]: Date.now(),
-      },
+      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt ?? {}, stewardKey, Date.now()),
     });
   }
   void state.loadAssistantIdentity?.();

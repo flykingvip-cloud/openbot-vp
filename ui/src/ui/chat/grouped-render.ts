@@ -132,11 +132,46 @@ type GroupedMessageRenderOptions = {
   senderIdentityLookup?: ChatSenderIdentityLookup;
 };
 
-function formatGroupTimestamp(value: number): string {
-  return new Date(value).toLocaleTimeString([], {
+/** Chat bubble timestamps are always Asia/Shanghai for Owner UX consistency. */
+const CHAT_GROUP_TIMESTAMP_TIME_ZONE = "Asia/Shanghai";
+
+/**
+ * Same calendar day → `HH:mm` (locale may add 上午/下午).
+ * Cross-day → include month/day (and year when needed) so a thread that spans
+ * midnights does not look shuffled (`9:50 PM` then bare `9:22 AM`).
+ */
+export function formatGroupTimestamp(value: number, nowMs: number = Date.now()): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+  const tz = CHAT_GROUP_TIMESTAMP_TIME_ZONE;
+  const dayKey = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+  const sameDay = dayKey(value) === dayKey(nowMs);
+  const sameYear = dayKey(value).slice(0, 4) === dayKey(nowMs).slice(0, 4);
+  let locale: string | undefined;
+  try {
+    locale = i18n.getLocale() === "zh-CN" ? "zh-CN" : undefined;
+  } catch {
+    locale = undefined;
+  }
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: tz,
     hour: "numeric",
     minute: "2-digit",
-  });
+  };
+  if (!sameDay) {
+    options.month = "numeric";
+    options.day = "numeric";
+    if (!sameYear) {
+      options.year = "numeric";
+    }
+  }
+  try {
+    return date.toLocaleString(locale, options);
+  } catch {
+    return date.toLocaleString("en-US", options);
+  }
 }
 
 function readMessageTimestamp(message: unknown, fallback: number): number {
