@@ -166,6 +166,8 @@ export type WorkbenchHomeStateSnapshotInput = {
   sessionsResult: SessionsListResult | null;
   sessionSeenAt: Record<string, number>;
   activeSessionKey: string;
+  /** Trusted current employee's steward key — scopes unread alias matching. */
+  ownStewardSessionKey?: string | null;
   teamObjects: Record<string, WorkbenchTeamObject>;
   teamOrder: string[];
   channelsSnapshot: ChannelsStatusSnapshot | null;
@@ -302,7 +304,11 @@ function resolveUnreadSpaceSessionKey(sessionKey: string): string | null {
   return match ? toCollaborationSpaceSessionKey(match[1]) : null;
 }
 
-function isActiveUnreadSessionKey(key: string, activeSessionKey: string): boolean {
+function isActiveUnreadSessionKey(
+  key: string,
+  activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
+): boolean {
   const active = activeSessionKey.trim();
   if (!active) {
     return false;
@@ -310,14 +316,34 @@ function isActiveUnreadSessionKey(key: string, activeSessionKey: string): boolea
   if (key === active) {
     return true;
   }
-  // Steward aliases (main / agent:main:main / employee:<id>) share one inbox.
-  // Do NOT treat every agent:<id>:* row as active — that wrongly cleared
-  // telegram DM contact badges while the steward 1:1 was open.
-  if (
-    (isGlobalStewardSessionAlias(key) || extractEmployeeStewardOwnerFromSessionKey(key)) &&
-    (isGlobalStewardSessionAlias(active) || extractEmployeeStewardOwnerFromSessionKey(active))
-  ) {
-    return true;
+  // Steward aliases share one inbox only within the trusted current user.
+  // Different employee:<id> owners must not clear each other (account switch).
+  const own = ownStewardSessionKey?.trim() || "";
+  const keyOwner = extractEmployeeStewardOwnerFromSessionKey(key);
+  const activeOwner = extractEmployeeStewardOwnerFromSessionKey(active);
+  const keyIsSteward = isGlobalStewardSessionAlias(key) || Boolean(keyOwner);
+  const activeIsSteward = isGlobalStewardSessionAlias(active) || Boolean(activeOwner);
+  if (keyIsSteward && activeIsSteward) {
+    if (keyOwner && activeOwner) {
+      return keyOwner === activeOwner;
+    }
+    // One side is a public main alias: only treat as active for the trusted own steward.
+    const ownOwner = extractEmployeeStewardOwnerFromSessionKey(own);
+    if (keyOwner && ownOwner) {
+      return (
+        keyOwner === ownOwner && (isGlobalStewardSessionAlias(active) || activeOwner === ownOwner)
+      );
+    }
+    if (activeOwner && ownOwner) {
+      return (
+        activeOwner === ownOwner && (isGlobalStewardSessionAlias(key) || keyOwner === ownOwner)
+      );
+    }
+    // No employee ids and no trusted own — allow classic main↔main alias match only.
+    if (!keyOwner && !activeOwner) {
+      return isGlobalStewardSessionAlias(key) && isGlobalStewardSessionAlias(active);
+    }
+    return false;
   }
   const keySpace = resolveUnreadSpaceSessionKey(key);
   const activeSpace = resolveUnreadSpaceSessionKey(active);
@@ -329,10 +355,11 @@ function countUnreadSessions(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
 ) {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return sessionKeys.reduce((count, key) => {
-    if (isActiveUnreadSessionKey(key, activeSessionKey)) {
+    if (isActiveUnreadSessionKey(key, activeSessionKey, ownStewardSessionKey)) {
       return count;
     }
     // P1（未读基于真实入站消息）：只有「承载真实对话消息」的会话才计入未读。
@@ -354,7 +381,9 @@ function countUnreadSessions(
     // Alias-aware cursor: UI may persist under canonical/steward alias while
     // sessions.list keeps employee:/space: mirror keys — exact lookup resurrects
     // badges after refresh.
-    const seenAt = resolveSessionSeenAtMs(sessionSeenAt, key);
+    const seenAt = resolveSessionSeenAtMs(sessionSeenAt, key, {
+      ownStewardSessionKey,
+    });
     return updatedAt > seenAt ? count + 1 : count;
   }, 0);
 }
@@ -431,6 +460,7 @@ function buildAgentItems(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
 ): WorkbenchSidebarItem[] {
   const sessionCounts = sessionsByAgent(sessionsResult);
   const sessionsByAgentId = new Map<string, SessionsListResult["sessions"][number][]>();
@@ -497,6 +527,7 @@ function buildAgentItems(
           sessionsResult,
           sessionSeenAt,
           activeSessionKey,
+          ownStewardSessionKey,
         ),
         activity: resolveActivity(primarySession?.updatedAt ?? null),
         kind: "agent" as const,
@@ -509,6 +540,7 @@ function buildContactItems(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
 ): WorkbenchSidebarItem[] {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return buildContactCards(sessionsResult).map((contact) => {
@@ -531,6 +563,7 @@ function buildContactItems(
         sessionsResult,
         sessionSeenAt,
         activeSessionKey,
+        ownStewardSessionKey,
       ),
       activity: resolveActivity(contact.latestUpdatedAt),
       kind: "contact" as const,
@@ -542,6 +575,7 @@ function buildGroupItems(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
 ): WorkbenchSidebarItem[] {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return buildGroupCards(sessionsResult).map((group) => {
@@ -564,6 +598,7 @@ function buildGroupItems(
         sessionsResult,
         sessionSeenAt,
         activeSessionKey,
+        ownStewardSessionKey,
       ),
       activity: resolveActivity(group.latestUpdatedAt),
       kind: "group" as const,
@@ -640,13 +675,20 @@ export function buildWorkbenchHomeModelFromState(
     input.sessionsResult,
     input.sessionSeenAt,
     input.activeSessionKey,
+    input.ownStewardSessionKey,
   );
   const contacts = buildContactItems(
     input.sessionsResult,
     input.sessionSeenAt,
     input.activeSessionKey,
+    input.ownStewardSessionKey,
   );
-  const groups = buildGroupItems(input.sessionsResult, input.sessionSeenAt, input.activeSessionKey);
+  const groups = buildGroupItems(
+    input.sessionsResult,
+    input.sessionSeenAt,
+    input.activeSessionKey,
+    input.ownStewardSessionKey,
+  );
   const teamAssistants = applyTeamObjectPreferences(
     toTeamEntries(agents, "assistant"),
     input.teamObjects,

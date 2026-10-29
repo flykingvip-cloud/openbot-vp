@@ -1221,16 +1221,32 @@ describe("chat delivery bubble wiring", () => {
 });
 
 describe("formatGroupTimestamp", () => {
-  it("shows time-only for Asia/Shanghai today and date when cross-day", async () => {
-    const { formatGroupTimestamp } = await import("./grouped-render.ts");
+  it("uses the same explicit TZ for day boundary + display (Shanghai fixture)", async () => {
+    const { formatGroupTimestamp, resolveChatTimestampTimeZone } =
+      await import("./grouped-render.ts");
+    expect(resolveChatTimestampTimeZone("Asia/Shanghai")).toBe("Asia/Shanghai");
     const now = Date.parse("2026-10-29T08:00:00.000Z"); // 16:00 +08 same calendar day probe
     const todayMorning = Date.parse("2026-10-29T01:24:18.823Z"); // 09:24 +08
     const priorDay = Date.parse("2026-10-24T01:22:38.940Z"); // 09:22 +08 on 10/24
-    const todayLabel = formatGroupTimestamp(todayMorning, now);
-    const priorLabel = formatGroupTimestamp(priorDay, now);
+    const tz = "Asia/Shanghai";
+    const todayLabel = formatGroupTimestamp(todayMorning, now, tz);
+    const priorLabel = formatGroupTimestamp(priorDay, now, tz);
     expect(todayLabel).toMatch(/9:24|09:24/);
     expect(todayLabel).not.toMatch(/10\/24|24日|2026/);
     expect(priorLabel).toMatch(/9:22|09:22/);
     expect(priorLabel).toMatch(/10|24/);
+  });
+
+  it("does not hardcode Shanghai — UTC fixture crosses a different calendar day", async () => {
+    const { formatGroupTimestamp } = await import("./grouped-render.ts");
+    // 2026-10-29T01:24Z is still 10/28 evening in America/Los_Angeles.
+    const value = Date.parse("2026-10-29T01:24:18.823Z");
+    const now = Date.parse("2026-10-29T08:00:00.000Z"); // still 10/29 morning UTC
+    const shanghaiToday = formatGroupTimestamp(value, now, "Asia/Shanghai");
+    const laLabel = formatGroupTimestamp(value, now, "America/Los_Angeles");
+    expect(shanghaiToday).toMatch(/9:24|09:24/);
+    expect(shanghaiToday).not.toMatch(/10\/28|28/);
+    // LA: value is previous local calendar day vs now → must include a date component.
+    expect(laLabel).toMatch(/10|28/);
   });
 });

@@ -4,6 +4,10 @@ import {
 } from "../../../../../src/sessions/session-key-utils.ts";
 import { reloadShellChatHistory } from "../../app-chat-actions.ts";
 import type { AppPortState } from "../../app-port-state.ts";
+import {
+  resolveBuiltinStewardSessionKey,
+  resolveStewardSessionDefaultsFromHello,
+} from "../../builtin-steward-selection.ts";
 import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
 import { applyPendingChatFocusMessage } from "../../chat/focus-message.ts";
 import { bumpSessionSeenAt } from "../../session-seen-at.ts";
@@ -313,11 +317,16 @@ export function switchEmployeeWorkbenchSession(
     // Still persist the unread cursor — skipping applySettings here left
     // sessionSeenAt stale, so refresh resurrected badges for an already-open
     // steward/space surface.
+    const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+      resolveStewardSessionDefaultsFromHello(state.hello),
+    );
     state.applySettings({
       ...state.settings,
       sessionKey,
       lastActiveSessionKey: sessionKey,
-      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now()),
+      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now(), {
+        ownStewardSessionKey,
+      }),
     });
     return;
   }
@@ -375,7 +384,11 @@ export function switchEmployeeWorkbenchSession(
     ...state.settings,
     sessionKey,
     lastActiveSessionKey: sessionKey,
-    sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now()),
+    sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt, sessionKey, Date.now(), {
+      ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+        resolveStewardSessionDefaultsFromHello(state.hello),
+      ),
+    }),
   });
   void state.loadAssistantIdentity();
   syncComputerPreviewAfterSessionSwitch(

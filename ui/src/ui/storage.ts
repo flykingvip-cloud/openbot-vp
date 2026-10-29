@@ -394,9 +394,29 @@ function persistSettings(next: UiSettings, options?: { navCompactLayoutApplied?:
       localStorage.setItem(KEY, JSON.stringify(withoutLogo));
     } catch {
       try {
+        // Do NOT replace with a shrunk config — that would drop unrelated
+        // persisted fields (locale, profile, guide acks, …). Merge the
+        // critical unread/session cursor into whatever is already stored.
+        let existing: Record<string, unknown> = {};
+        try {
+          const raw = localStorage.getItem(KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw) as unknown;
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              existing = parsed as Record<string, unknown>;
+            }
+          }
+        } catch {
+          existing = {};
+        }
+        const { customBrandLogoDataUrl: _ignoredLogo, ...existingWithoutLogo } = existing as Record<
+          string,
+          unknown
+        > & { customBrandLogoDataUrl?: unknown };
         localStorage.setItem(
           KEY,
           JSON.stringify({
+            ...existingWithoutLogo,
             gatewayUrl: persisted.gatewayUrl,
             sessionKey: persisted.sessionKey,
             lastActiveSessionKey: persisted.lastActiveSessionKey,
@@ -407,8 +427,10 @@ function persistSettings(next: UiSettings, options?: { navCompactLayoutApplied?:
             splitRatio: persisted.splitRatio,
             navCollapsed: persisted.navCollapsed,
             navGroupsCollapsed: persisted.navGroupsCollapsed,
-            navCompactLayoutApplied: persisted.navCompactLayoutApplied,
-          } satisfies PersistedUiSettings),
+            ...(persisted.navCompactLayoutApplied
+              ? { navCompactLayoutApplied: persisted.navCompactLayoutApplied }
+              : {}),
+          }),
         );
       } catch {
         // Give up silently — next interaction retries.

@@ -96,6 +96,10 @@ async function refreshCapabilityGovernanceSnapshotLazy(
     await import("./ports/platform/capability-governance-gateway.ts");
   await refreshCapabilityGovernanceSnapshot(host);
 }
+import {
+  resolveBuiltinStewardSessionKey,
+  resolveStewardSessionDefaultsFromHello,
+} from "./builtin-steward-selection.ts";
 import { resolveWorkbenchSessionKeyFromUrlSearch } from "./chat-session-key-match.ts";
 import {
   consoleHostEmployeeHomeUrl,
@@ -125,6 +129,8 @@ export type SettingsHost = PermissionStateLike & {
   themeResolved: ResolvedTheme;
   applySessionKey: string;
   sessionKey: string;
+  /** Gateway hello — scopes sessionSeenAt aliases to the trusted steward. */
+  hello?: { snapshot?: unknown } | null;
   tab: Tab;
   connected: boolean;
   chatHasAutoScrolled: boolean;
@@ -224,6 +230,7 @@ async function loadEnterpriseOperationalIdentityOverview(host: SettingsHost) {
 type SessionSeenHost = {
   settings: UiSettings;
   applySettings: (next: UiSettings) => void;
+  hello?: { snapshot?: unknown } | null;
 };
 
 function controlledLoginPathFromLocation(
@@ -301,7 +308,12 @@ export function markSessionSeen(host: SessionSeenHost, sessionKey: string, seenA
   if (!key) {
     return;
   }
-  const merged = bumpSessionSeenAt(host.settings.sessionSeenAt, key, seenAt);
+  const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+    resolveStewardSessionDefaultsFromHello(host.hello),
+  );
+  const merged = bumpSessionSeenAt(host.settings.sessionSeenAt, key, seenAt, {
+    ownStewardSessionKey,
+  });
   if (merged === host.settings.sessionSeenAt) {
     return;
   }
@@ -334,11 +346,16 @@ function applyWorkbenchSessionKeyFromLocation(host: SettingsHost, search: string
   host.sessionKey = session;
   host.workbenchTeamSelectedKey = session;
   const seenAt = Date.now();
+  const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+    resolveStewardSessionDefaultsFromHello(host.hello),
+  );
   applySettings(host, {
     ...host.settings,
     sessionKey: session,
     lastActiveSessionKey: session,
-    sessionSeenAt: bumpSessionSeenAt(host.settings.sessionSeenAt, session, seenAt),
+    sessionSeenAt: bumpSessionSeenAt(host.settings.sessionSeenAt, session, seenAt, {
+      ownStewardSessionKey,
+    }),
   });
 }
 

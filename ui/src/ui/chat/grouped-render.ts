@@ -132,20 +132,44 @@ type GroupedMessageRenderOptions = {
   senderIdentityLookup?: ChatSenderIdentityLookup;
 };
 
-/** Chat bubble timestamps are always Asia/Shanghai for Owner UX consistency. */
-const CHAT_GROUP_TIMESTAMP_TIME_ZONE = "Asia/Shanghai";
+/**
+ * Resolve the IANA zone used for chat bubble day boundaries + display.
+ * Prefer an explicit user/tenant zone; otherwise the browser/runtime zone;
+ * never hardcode a product-wide city (multi-tenant employees are not all in Shanghai).
+ */
+export function resolveChatTimestampTimeZone(explicit?: string | null): string {
+  const trimmed = typeof explicit === "string" ? explicit.trim() : "";
+  if (trimmed) {
+    return trimmed;
+  }
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (typeof resolved === "string" && resolved.trim()) {
+      return resolved.trim();
+    }
+  } catch {
+    // Fall through.
+  }
+  return "UTC";
+}
 
 /**
  * Same calendar day → `HH:mm` (locale may add 上午/下午).
  * Cross-day → include month/day (and year when needed) so a thread that spans
  * midnights does not look shuffled (`9:50 PM` then bare `9:22 AM`).
+ *
+ * Day-boundary and clock use the **same** timezone.
  */
-export function formatGroupTimestamp(value: number, nowMs: number = Date.now()): string {
+export function formatGroupTimestamp(
+  value: number,
+  nowMs: number = Date.now(),
+  timeZone?: string | null,
+): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) {
     return "";
   }
-  const tz = CHAT_GROUP_TIMESTAMP_TIME_ZONE;
+  const tz = resolveChatTimestampTimeZone(timeZone);
   const dayKey = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
   const sameDay = dayKey(value) === dayKey(nowMs);
   const sameYear = dayKey(value).slice(0, 4) === dayKey(nowMs).slice(0, 4);

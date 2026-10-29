@@ -7,6 +7,7 @@ import {
 } from "./chat-session-key-match.ts";
 import type { GatewayHost } from "./gateway-host.ts";
 import { isForbiddenHumanProfileName } from "./ports/employee/resolve-human-profile-name.ts";
+import { scrubSessionSeenAtForOwnSteward } from "./session-seen-at.ts";
 
 export type SessionDefaultsSnapshot = {
   defaultAgentId?: string;
@@ -58,10 +59,15 @@ export function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaul
     defaults,
   );
   const nextSessionKey = resolvedSessionKey || resolvedSettingsSessionKey || host.sessionKey;
+  const scrubbedSeenAt = scrubSessionSeenAtForOwnSteward(
+    host.settings.sessionSeenAt,
+    ownMainSessionKey,
+  );
   const nextSettings = {
     ...host.settings,
     sessionKey: resolvedSettingsSessionKey || nextSessionKey,
     lastActiveSessionKey: resolvedLastActiveSessionKey || nextSessionKey,
+    sessionSeenAt: scrubbedSeenAt,
   };
   // Sticky local profile must not keep a digital-employee name (e.g. 大白管家)
   // after a human signs in — Account settings bind to the platform actor.
@@ -71,7 +77,8 @@ export function applySessionDefaults(host: GatewayHost, defaults?: SessionDefaul
   const shouldUpdateSettings =
     nextSettings.sessionKey !== host.settings.sessionKey ||
     nextSettings.lastActiveSessionKey !== host.settings.lastActiveSessionKey ||
-    nextSettings.workbenchProfileName !== host.settings.workbenchProfileName;
+    nextSettings.workbenchProfileName !== host.settings.workbenchProfileName ||
+    nextSettings.sessionSeenAt !== host.settings.sessionSeenAt;
   if (nextSessionKey !== host.sessionKey) {
     host.sessionKey = nextSessionKey;
   }

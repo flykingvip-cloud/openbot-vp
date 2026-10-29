@@ -7,6 +7,7 @@ import { resolveBundledBrandWordmarkSrc, resolveCustomBrandLogoSrc } from "../..
 import {
   BUILTIN_STEWARD_NAME,
   isBuiltinStewardAgent,
+  resolveBuiltinStewardSessionKey,
   resolveStewardSessionDefaultsFromHello,
 } from "../../builtin-steward-selection.ts";
 import { cronCapability } from "../../capability/cron/index.ts";
@@ -2550,11 +2551,15 @@ function buildWorkbenchSnapshot(state: AppPortState) {
   const collaborationSpacesSnapshot = scopedCollaborationSpacesSnapshotForEmployeeWorkbench(state);
   const visibleSpaceIds = expandVisibleCollaborationSpaceIds(collaborationSpacesSnapshot.spaces);
   const sessionsResult = scopedSessionsResultForEmployeeWorkbench(state, visibleSpaceIds);
+  const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+    resolveStewardSessionDefaultsFromHello(state.hello),
+  );
   return buildWorkbenchHomeModelFromState({
     agentsList: scopedAgentsListForEmployeeWorkbench(state),
     sessionsResult,
     sessionSeenAt: state.settings.sessionSeenAt,
     activeSessionKey: state.sessionKey,
+    ownStewardSessionKey,
     // Transitional rule: workbench state should come from runtime session and
     // collaboration data, not from deprecated local-only team ordering.
     teamObjects: teamState.teamObjects,
@@ -2589,11 +2594,15 @@ function buildSessionBackedTeamSpaces(
       : null) ??
     state.platformAuthState?.session ??
     state.bootstrapAuthSession;
+  const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+    resolveStewardSessionDefaultsFromHello(state.hello),
+  );
   return buildWorkbenchHomeModelFromState({
     agentsList: scopedAgentsListForEmployeeWorkbench(state),
     sessionsResult,
     sessionSeenAt: state.settings.sessionSeenAt,
     activeSessionKey: state.sessionKey,
+    ownStewardSessionKey,
     // Transitional rule: workbench spaces should be derived from runtime
     // sessions/collaboration data, not from locally saved ordering metadata.
     teamObjects: teamState.teamObjects,

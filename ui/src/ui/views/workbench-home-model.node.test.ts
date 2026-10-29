@@ -533,7 +533,11 @@ describe("buildWorkbenchHomeModelFromState", () => {
 it("P1b: steward alias sessionSeenAt clears employee-isolated unread after refresh shape", async () => {
   const { buildWorkbenchHomeModelFromState } =
     await import("../ports/employee/views/workbench-home-model.ts");
+  const { bumpSessionSeenAt } = await import("../session-seen-at.ts");
   const now = Date.now();
+  const ownStewardSessionKey = "agent:main:employee:u1";
+  // UI wrote under canonical alias with trusted own steward → mirrors onto employee key.
+  const sessionSeenAt = bumpSessionSeenAt({}, "agent:main:main", now, { ownStewardSessionKey });
   const model = buildWorkbenchHomeModelFromState({
     agentsList: {
       defaultId: "main",
@@ -561,8 +565,8 @@ it("P1b: steward alias sessionSeenAt clears employee-isolated unread after refre
         },
       ],
     } as SessionsListResult,
-    // Persisted under canonical alias (what switchEmployeeWorkbenchSession writes)
-    sessionSeenAt: { "agent:main:main": now },
+    sessionSeenAt,
+    ownStewardSessionKey,
     activeSessionKey: "agent:bot-2:main",
     teamObjects: {},
     teamOrder: [],
@@ -578,6 +582,134 @@ it("P1b: steward alias sessionSeenAt clears employee-isolated unread after refre
   expect(steward?.unreadCount).toBe(0);
   // Space mirrors must not inflate the assistant badge (they belong to 协作空间).
   expect(steward?.sessionKeys.some((k) => k.includes(":space:"))).toBe(false);
+});
+
+it("P1-identity: different employees do not clear each other's unread", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const { bumpSessionSeenAt } = await import("../session-seen-at.ts");
+  const now = Date.now();
+  const u1 = "agent:main:employee:u1";
+  const u2 = "agent:main:employee:u2";
+  // u1 marked read; u2 still has a newer message.
+  const sessionSeenAt = bumpSessionSeenAt({}, u1, now - 1_000, { ownStewardSessionKey: u1 });
+  const model = buildWorkbenchHomeModelFromState({
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult: {
+      count: 1,
+      sessions: [
+        {
+          key: u2,
+          kind: "global",
+          label: "大白管家",
+          updatedAt: now,
+          lastMessagePreview: "u2 未读消息",
+        },
+      ],
+    } as SessionsListResult,
+    sessionSeenAt,
+    ownStewardSessionKey: u2,
+    activeSessionKey: "agent:bot-2:main",
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  });
+  const steward = model.agents.find((entry) => entry.sessionKeys.includes(u2));
+  expect(steward?.unreadCount).toBe(1);
+});
+
+it("P1-identity: account switch does not inherit previous user's seen cursor", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const { bumpSessionSeenAt, scrubSessionSeenAtForOwnSteward } =
+    await import("../session-seen-at.ts");
+  const now = Date.now();
+  const u1 = "agent:main:employee:u1";
+  const u2 = "agent:main:employee:u2";
+  let sessionSeenAt = bumpSessionSeenAt({}, "main", now, { ownStewardSessionKey: u1 });
+  sessionSeenAt = scrubSessionSeenAtForOwnSteward(sessionSeenAt, u2);
+  const model = buildWorkbenchHomeModelFromState({
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult: {
+      count: 1,
+      sessions: [
+        {
+          key: u2,
+          kind: "global",
+          label: "大白管家",
+          updatedAt: now - 2_000,
+          lastMessagePreview: "切换账号后仍应未读",
+        },
+      ],
+    } as SessionsListResult,
+    sessionSeenAt,
+    ownStewardSessionKey: u2,
+    activeSessionKey: "agent:bot-2:main",
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  });
+  const steward = model.agents.find((entry) => entry.sessionKeys.includes(u2));
+  expect(steward?.unreadCount).toBe(1);
+});
+
+it("P1-identity: active steward for u1 does not suppress u2 employee unread row", async () => {
+  const { buildWorkbenchHomeModelFromState } =
+    await import("../ports/employee/views/workbench-home-model.ts");
+  const now = Date.now();
+  const u1 = "agent:main:employee:u1";
+  const u2 = "agent:main:employee:u2";
+  const model = buildWorkbenchHomeModelFromState({
+    agentsList: {
+      defaultId: "main",
+      mainKey: "main",
+      scope: "user",
+      agents: [{ id: "main", name: "大白管家" }],
+    } as AgentsListResult,
+    sessionsResult: {
+      count: 1,
+      sessions: [
+        {
+          key: u2,
+          kind: "global",
+          label: "大白管家",
+          updatedAt: now - 1_000,
+          lastMessagePreview: "不应因其它员工 active 而清零",
+        },
+      ],
+    } as SessionsListResult,
+    sessionSeenAt: {},
+    ownStewardSessionKey: u2,
+    // Active is a *different* employee's steward — must not treat as same inbox.
+    activeSessionKey: u1,
+    teamObjects: {},
+    teamOrder: [],
+    channelsSnapshot: null,
+    presenceEntries: [],
+    connected: true,
+    cronNext: null,
+    lastError: null,
+  });
+  const steward = model.agents.find((entry) => entry.sessionKeys.includes(u2));
+  expect(steward?.unreadCount).toBe(1);
 });
 
 it("P1c: space:<id> sessionSeenAt clears collaboration mirror unread", async () => {

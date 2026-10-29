@@ -376,7 +376,11 @@ export async function openDaibaiHelpFromModule(
       ...state.settings,
       sessionKey: stewardKey,
       lastActiveSessionKey: stewardKey,
-      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt ?? {}, stewardKey, Date.now()),
+      sessionSeenAt: bumpSessionSeenAt(state.settings.sessionSeenAt ?? {}, stewardKey, Date.now(), {
+        ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+          resolveStewardSessionDefaultsFromHello(state.hello),
+        ),
+      }),
     });
   }
   void state.loadAssistantIdentity?.();

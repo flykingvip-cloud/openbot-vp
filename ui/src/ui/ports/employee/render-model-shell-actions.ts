@@ -316,7 +316,12 @@ export function buildEmployeeWorkbenchShellActionProps({
         return;
       }
       const seenAt = Date.now();
-      const merged = bumpSessionSeenAtMany(state.settings.sessionSeenAt, sessionKeys, seenAt);
+      const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+        resolveStewardSessionDefaultsFromHello(state.hello),
+      );
+      const merged = bumpSessionSeenAtMany(state.settings.sessionSeenAt, sessionKeys, seenAt, {
+        ownStewardSessionKey,
+      });
       if (merged === state.settings.sessionSeenAt) {
         return;
       }
