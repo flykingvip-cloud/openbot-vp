@@ -165,4 +165,20 @@ describe("shouldContinueAfterRecoverableToolFailure", () => {
       }),
     ).toBe(false);
   });
+
+  it("does not continue on unknown_outcome after write/side-effect (no blind retry)", () => {
+    expect(
+      shouldContinueAfterRecoverableToolFailure({
+        stopText: PROTOCOL_FAILURE_USER_TEXT,
+        toolsDisabled: false,
+        tools: [
+          {
+            toolName: "message",
+            success: false,
+            meta: "unknown_outcome: timeout after write; result unknown",
+          },
+        ],
+      }),
+    ).toBe(false);
+  });
 });

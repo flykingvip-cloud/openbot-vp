@@ -406,6 +406,11 @@ import {
   throwIfRestoreAborted,
 } from "./chat-restore-deadline.js";
 import {
+  applyChatFocusSwitchGateWithResumeRecheck,
+  clientIdentityOkForResume,
+  sessionStopBarrierActive,
+} from "./chat-resume-parked-recheck.js";
+import {
   appendInjectedAssistantMessageToTranscript,
   appendInjectedPeerMessageToTranscript,
   appendInjectedPeerOutboundMessageToTranscript,
@@ -5721,10 +5726,21 @@ export const chatHandlers: GatewayRequestHandlers = {
       };
       if (!p.growthBirthTurn) {
         try {
-          taskTracking = applyFocusSwitchGate({
+          // Always inject live ResumeParkedRecheck so resume revalidates auth + stop.
+          taskTracking = applyChatFocusSwitchGateWithResumeRecheck({
             sessionFile: entry?.sessionFile,
             incomingText: mentionMessage.trim() || bodyTrimmed,
             workspacePaths: callerWorkspaceCwd ? [callerWorkspaceCwd] : [],
+            proceed: p.focusSwitchProceed === true,
+            recheckInputs: {
+              sendPolicy,
+              accessAuthorized: true,
+              clientIdentityOk: clientIdentityOkForResume(client),
+              stopActive: sessionStopBarrierActive({
+                sessionKeys: [resolvedSessionKey, sessionKey],
+                chatAbortControllers: context.chatAbortControllers,
+              }),
+            },
           });
         } catch {
           recordFocusSwitchDecision("focus_state_unavailable");

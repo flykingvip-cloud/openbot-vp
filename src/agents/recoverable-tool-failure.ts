@@ -6,6 +6,7 @@
  * Wired beside execution-stall-continue (same bounded loop in attempt.ts).
  */
 import { PROTOCOL_FAILURE_USER_TEXT } from "./model-output-boundary.js";
+import { shouldSuppressRecoverableContinueForUnknownWrite } from "./write-side-retry-gate.js";
 
 export const RECOVERABLE_TOOL_FAILURE_KINDS = [
   "sandbox_runtime",
@@ -128,6 +129,27 @@ export function shouldContinueAfterRecoverableToolFailure(params: {
   }
   const stop = params.stopText.trim();
   const tools = params.tools ?? [];
+  // Write/side-effect with unknown outcome: keep unknown, forbid auto-retry continue.
+  if (
+    shouldSuppressRecoverableContinueForUnknownWrite({
+      tools: tools.map((tool) => ({
+        toolName: tool.toolName,
+        success: tool.success,
+        meta: tool.meta,
+        // Default write-ish tools that are not explicitly read-only when meta says unknown.
+        sideEffectLevel:
+          tool.toolName === "read" ||
+          tool.toolName === "web_search" ||
+          tool.toolName === "web_fetch" ||
+          tool.toolName === "memory_search" ||
+          tool.toolName === "memory_get"
+            ? "none"
+            : "reversible",
+      })),
+    })
+  ) {
+    return false;
+  }
   const toolBlob = blobFromTools(tools);
   const visible = (params.visibleTexts ?? []).join("\n");
   const kindFromTools = classifyRecoverableToolFailure(toolBlob);
