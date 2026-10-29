@@ -279,6 +279,55 @@ export function isOwnerDecisionTodolistActionable(status: string | null | undefi
   return OWNER_DECISION_ACTIONABLE_STATUSES.has(String(status).trim().toLowerCase());
 }
 
+/** Terminal plan statuses — sticky pile should not keep these (ghost wall / bury chat). */
+export const OWNER_DECISION_TERMINAL_STATUSES = new Set([
+  "confirmed",
+  "superseded",
+  "accepted",
+  "closed",
+]);
+
+export function isOwnerDecisionTodolistTerminal(status: string | null | undefined): boolean {
+  if (status == null || !String(status).trim()) {
+    return false;
+  }
+  return OWNER_DECISION_TERMINAL_STATUSES.has(String(status).trim().toLowerCase());
+}
+
+/**
+ * Sticky owner-decision pile: one card per board item.
+ * - Actionable / unknown (pending hydrate) stay.
+ * - Terminal (confirmed/…) keep at most one review card so a long group
+ *   transcript cannot bury chat under dozens of ghosts.
+ * - confirmation_consumed / stale delivery rows are dropped entirely.
+ */
+export function selectStickyOwnerDecisionCards(
+  cards: OwnerDecisionCardView[],
+): OwnerDecisionCardView[] {
+  const latest = selectLatestOwnerDecisionPerBoardItem(cards);
+  const active: OwnerDecisionCardView[] = [];
+  const terminals: OwnerDecisionCardView[] = [];
+  for (const card of latest) {
+    const facing = getOwnerDecisionDelivery(card.todolistId, card.version);
+    if (facing === "consumed" || facing === "skipped") {
+      continue;
+    }
+    // stale_version delivery or version-gate refusal: keep as review chrome
+    // (「旧版本已失效」) inside the terminal budget — do not re-offer Confirm.
+    if (
+      facing === "stale_version" ||
+      isOwnerDecisionVersionStale(card.decisionId) ||
+      isOwnerDecisionTodolistTerminal(getOwnerDecisionTodolistStatus(card.todolistId))
+    ) {
+      terminals.push(card);
+      continue;
+    }
+    active.push(card);
+  }
+  const terminalKeep = terminals.length > 0 ? [terminals[terminals.length - 1]] : [];
+  return [...active, ...terminalKeep];
+}
+
 export function setOwnerDecisionTodolistStatus(todolistId: string, status: string): void {
   const id = todolistId.trim();
   const value = status.trim().toLowerCase();
@@ -538,6 +587,7 @@ export function setOwnerDecisionActionError(decisionId: string, message: string)
   if (versionRefusal === "confirmation_consumed") {
     if (todolistId) {
       setOwnerDecisionTodolistStatus(todolistId, "confirmed");
+      noteOwnerDecisionDelivery(todolistId, "consumed");
     }
     actionErrorsByDecisionId.delete(id);
     return;
@@ -661,13 +711,16 @@ export function renderOwnerDecisionCards(
     }
   }
   const reads = [...byId.values()];
-  const cards = reads.map((row) => row.card);
-  const staleIds = staleOwnerDecisionDecisionIds(cards);
-  const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
-  const hydrateTargets = collectOwnerDecisionHydrationTargets(cards);
+  const allCards = reads.map((row) => row.card);
+  // Hydrate against the full set so terminal status is learned even for cards
+  // we are about to drop from the sticky pile.
+  const hydrateTargets = collectOwnerDecisionHydrationTargets(allCards);
   if (hydrateTargets.length > 0) {
     opts.onHydrateStatuses?.(hydrateTargets);
   }
+  const cards = selectStickyOwnerDecisionCards(allCards);
+  const staleIds = staleOwnerDecisionDecisionIds(allCards);
+  const authorityById = new Map(reads.map((row) => [row.card.decisionId, row.authority]));
   if (cards.length === 0) {
     return nothing;
   }
@@ -685,7 +738,10 @@ export function renderOwnerDecisionCards(
         isOwnerDecisionVersionStale(card.decisionId) ||
         userFacing === "stale_version" ||
         todolistStatus === "superseded";
-      const actionable = !invalid && isOwnerDecisionTodolistActionable(todolistStatus);
+      const facingTerminal =
+        userFacing === "consumed" || userFacing === "stale_version" || userFacing === "skipped";
+      const actionable =
+        !invalid && !facingTerminal && isOwnerDecisionTodolistActionable(todolistStatus);
       const statusCopy = invalid
         ? ownerDecisionDeliveryStatusCopy("stale_version")
         : todolistStatus && !isOwnerDecisionTodolistActionable(todolistStatus)

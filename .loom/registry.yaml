@@ -10020,6 +10020,21 @@ tasks:
     since: 2026-10-27
     metadata: {}
 landingStreams:
+  - id: fix-ab-ghost-confirm-chat-history-20261029
+    landingPolicy: serial
+    paths:
+      - docs/notes/fix-ab-ghost-confirm-chat-history-20261029.md
+      - src/gateway/server-methods/collaboration-learning.ts
+      - ui/src/ui/chat/merge-local-user-history.ts
+      - ui/src/ui/chat/merge-local-user-history.node.test.ts
+      - ui/src/ui/chat/owner-decision-card.ts
+      - ui/src/ui/chat/owner-decision-card.node.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - .loom/registry.yaml
+    metadata:
+      task: fix-ab-ghost-confirm-chat-history-20261029
+      owner: ab
+      purpose: Ghost confirm cards + missing local user bubbles (trusted getTodolist + sticky filter + history merge)
   - id: team-real-collab-loop-f1f3
     landingPolicy: parallel
     paths:
