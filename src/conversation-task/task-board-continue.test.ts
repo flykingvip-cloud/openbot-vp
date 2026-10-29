@@ -1,0 +1,169 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { writeSessionTaskBoard, type SessionTaskBoard } from "./session-task-board.js";
+import {
+  decideTaskBoardContinue,
+  isExplicitHumanGateWait,
+  resetTaskBoardContinueLedgerForTest,
+  scheduleTaskBoardContinueWake,
+  TASK_BOARD_CONTINUE_MAX_PER_TASK,
+} from "./task-board-continue.js";
+
+function tempSessionFile(): string {
+  return path.join(
+    os.tmpdir(),
+    `task-board-continue-${Date.now()}-${Math.random().toString(16).slice(2)}.jsonl`,
+  );
+}
+
+function unfinishedBoard(taskId = "task-abc"): SessionTaskBoard {
+  return {
+    current: {
+      taskId,
+      title: "请给我pdf",
+      goalText: "请给我pdf，你要制作pdf",
+      unfinished: true,
+      stop: { summary: "未完成：请给我pdf", workspacePaths: ["/tmp/ws"] },
+      createdAtMs: 1,
+    },
+    parked: [],
+  };
+}
+
+afterEach(() => {
+  resetTaskBoardContinueLedgerForTest();
+});
+
+describe("isExplicitHumanGateWait", () => {
+  it("treats permanent_block and true_fork as gates", () => {
+    expect(
+      isExplicitHumanGateWait(
+        "[turn_completion state=permanent_block reason=need_pay degradation=none required_user_action=pay]",
+      ),
+    ).toBe(true);
+    expect(isExplicitHumanGateWait("[turn_completion state=true_fork options=A|B]")).toBe(true);
+  });
+
+  it("does not treat soft draft confirm as a gate", () => {
+    expect(isExplicitHumanGateWait("要不要推到草稿箱？请确认一下。")).toBe(false);
+  });
+
+  it("treats waiting_confirmation / payment as gates", () => {
+    expect(isExplicitHumanGateWait("状态：waiting_confirmation，请确认计划")).toBe(true);
+    expect(isExplicitHumanGateWait("请扫码支付后再继续")).toBe(true);
+  });
+});
+
+describe("decideTaskBoardContinue", () => {
+  it("schedules when unfinished and not a human gate", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, unfinishedBoard());
+    const decision = decideTaskBoardContinue({
+      sessionFile,
+      assistantText:
+        "[turn_completion state=delivered path=deliverables/turn-completion-degraded.md]",
+    });
+    expect(decision.action).toBe("schedule");
+    if (decision.action === "schedule") {
+      expect(decision.wakeRecorded).toBe(true);
+      expect(decision.reason).toBe("task_board_continue");
+      expect(decision.taskId).toBe("task-abc");
+      expect(decision.prompt).toContain("Internal task-board continue:");
+      expect(decision.prompt).toContain("task-abc");
+    }
+    try {
+      fs.unlinkSync(`${sessionFile}.task-board.json`);
+    } catch {
+      /* best-effort cleanup */
+    }
+  });
+
+  it("skips human gate even when unfinished", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, unfinishedBoard());
+    const decision = decideTaskBoardContinue({
+      sessionFile,
+      assistantText:
+        "[turn_completion state=permanent_block reason=x degradation=y required_user_action=z]",
+    });
+    expect(decision).toMatchObject({
+      action: "skip",
+      reason: "human_gate",
+      wakeRecorded: false,
+    });
+  });
+
+  it("skips when board has no unfinished current", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, { current: undefined, parked: [] });
+    expect(decideTaskBoardContinue({ sessionFile, assistantText: "done for now" })).toMatchObject({
+      action: "skip",
+      reason: "no_unfinished_current",
+    });
+  });
+
+  it("skips heartbeat and toolsDisabled", () => {
+    expect(
+      decideTaskBoardContinue({ isHeartbeat: true, sessionFile: "/x", assistantText: "a" }),
+    ).toMatchObject({ reason: "heartbeat" });
+    expect(
+      decideTaskBoardContinue({ toolsDisabled: true, sessionFile: "/x", assistantText: "a" }),
+    ).toMatchObject({ reason: "tools_disabled" });
+  });
+
+  it("caps chained continues per task", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-cap"));
+    const nowMs = 1_000_000;
+    for (let i = 0; i < TASK_BOARD_CONTINUE_MAX_PER_TASK; i += 1) {
+      const d = scheduleTaskBoardContinueWake({
+        sessionFile,
+        assistantText: "still working",
+        nowMs: nowMs + i,
+        armTimer: false,
+        enqueue: () => true,
+      });
+      expect(d.action).toBe("schedule");
+    }
+    const blocked = decideTaskBoardContinue({
+      sessionFile,
+      assistantText: "still working",
+      nowMs: nowMs + 10,
+    });
+    expect(blocked).toMatchObject({
+      action: "skip",
+      reason: "continue_cap",
+      taskId: "task-cap",
+    });
+  });
+});
+
+describe("scheduleTaskBoardContinueWake", () => {
+  it("arms a timer and enqueues with observability fields", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-timer"));
+    const enqueue = vi.fn(() => true);
+    const timers: Array<{ ms: number; fn: () => void }> = [];
+    const decision = scheduleTaskBoardContinueWake({
+      sessionFile,
+      assistantText: "empty shell pptx, degraded",
+      delayMs: 50,
+      enqueue,
+      setTimer: ((fn: () => void, ms: number) => {
+        timers.push({ ms, fn: fn as () => void });
+        return 0 as unknown as NodeJS.Timeout;
+      }) as typeof setTimeout,
+    });
+    expect(decision.action).toBe("schedule");
+    expect(decision.wakeRecorded).toBe(true);
+    expect(timers).toHaveLength(1);
+    expect(timers[0]?.ms).toBe(50);
+    timers[0]?.fn();
+    expect(enqueue).toHaveBeenCalledOnce();
+    const [prompt, messageId] = enqueue.mock.calls[0];
+    expect(prompt).toContain("Internal task-board continue:");
+    expect(messageId).toMatch(/^task-board-continue:task-timer:/);
+  });
+});
