@@ -176,7 +176,7 @@ describe("R3 production: applySessionDefaults threads trusted tenantId", () => {
       enabled: true,
       session: { tenantId, user: "u1" },
     };
-    (host as { bootstrapDataSpace: unknown }).bootstrapDataSpace = { mode: "managed" };
+    (host as unknown as { bootstrapDataSpace: unknown }).bootstrapDataSpace = { mode: "managed" };
     host.settings.sessionSeenAt = sessionSeenAt;
     return host;
   }

@@ -322,9 +322,16 @@ export function switchEmployeeWorkbenchSession(
     // steward/space surface.
     const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
       hello: state.hello,
-      platformAuthState: state.platformAuthState,
-      bootstrapAuthSession: state.bootstrapAuthSession,
-      bootstrapDataSpace: state.bootstrapDataSpace,
+      // Auth surfaces live on the Lit app host; EmployeeWorkbenchSessionState is a
+      // narrow Pick and may omit them — resolve once via trusted-session helper.
+      ...(state as {
+        platformAuthState?: {
+          enabled?: boolean | null;
+          session?: { tenantId?: string | null; user?: string | null } | null;
+        } | null;
+        bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+        bootstrapDataSpace?: { mode?: string | null } | null;
+      }),
       ownStewardSessionKey: resolveBuiltinStewardSessionKey(
         resolveStewardSessionDefaultsFromHello(state.hello),
       ),
@@ -402,9 +409,14 @@ export function switchEmployeeWorkbenchSession(
       Date.now(),
       resolveSessionSeenAliasOptionsFromTrustedSession({
         hello: state.hello,
-        platformAuthState: state.platformAuthState,
-        bootstrapAuthSession: state.bootstrapAuthSession,
-        bootstrapDataSpace: state.bootstrapDataSpace,
+        ...(state as {
+          platformAuthState?: {
+            enabled?: boolean | null;
+            session?: { tenantId?: string | null; user?: string | null } | null;
+          } | null;
+          bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+          bootstrapDataSpace?: { mode?: string | null } | null;
+        }),
         ownStewardSessionKey: resolveBuiltinStewardSessionKey(
           resolveStewardSessionDefaultsFromHello(state.hello),
         ),

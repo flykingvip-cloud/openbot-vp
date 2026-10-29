@@ -101,6 +101,7 @@ import {
   resolveStewardSessionDefaultsFromHello,
 } from "./builtin-steward-selection.ts";
 import { resolveWorkbenchSessionKeyFromUrlSearch } from "./chat-session-key-match.ts";
+import type { GatewayHelloOk } from "./gateway.ts";
 import {
   consoleHostEmployeeHomeUrl,
   shouldUsePublicHomepageForCurrentLocation,
@@ -118,6 +119,7 @@ import { resolveAuthorizedTab, type PermissionStateLike } from "./routing/port-p
 import {
   bumpSessionSeenAt,
   resolveSessionSeenAliasOptionsFromTrustedSession,
+  type SessionSeenTrustedSessionSource,
 } from "./session-seen-at.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
@@ -133,7 +135,7 @@ export type SettingsHost = PermissionStateLike & {
   applySessionKey: string;
   sessionKey: string;
   /** Gateway hello — scopes sessionSeenAt aliases to the trusted steward. */
-  hello?: { snapshot?: unknown } | null;
+  hello?: GatewayHelloOk | null;
   tab: Tab;
   connected: boolean;
   chatHasAutoScrolled: boolean;
@@ -366,11 +368,12 @@ function applyWorkbenchSessionKeyFromLocation(host: SettingsHost, search: string
   const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
     resolveStewardSessionDefaultsFromHello(host.hello),
   );
+  const seenSource = host as unknown as SessionSeenTrustedSessionSource;
   const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
-    hello: host.hello,
-    platformAuthState: (host as SessionSeenHost).platformAuthState,
-    bootstrapAuthSession: (host as SessionSeenHost).bootstrapAuthSession,
-    bootstrapDataSpace: (host as SessionSeenHost).bootstrapDataSpace,
+    hello: seenSource.hello ?? host.hello,
+    platformAuthState: seenSource.platformAuthState,
+    bootstrapAuthSession: seenSource.bootstrapAuthSession,
+    bootstrapDataSpace: seenSource.bootstrapDataSpace,
     ownStewardSessionKey,
   });
   applySettings(host, {

@@ -38,6 +38,7 @@ function createState(): ShellSessionSwitchState {
     navGroupsCollapsed: {},
   };
   const state = {
+    hello: null,
     workbenchTeamSelectedKey: "main",
     sessionKey: "main",
     chatMessage: "draft",
