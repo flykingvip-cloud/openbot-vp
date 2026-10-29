@@ -34,6 +34,7 @@ export type TaskBoardContinueSkipReason =
   | "no_session_file"
   | "no_unfinished_current"
   | "human_gate"
+  | "wake_suppress"
   | "internal_continue_prompt"
   | "continue_cap"
   | "missing_queue";
@@ -148,6 +149,14 @@ export function decideTaskBoardContinue(params: {
   const current = board.current;
   if (!current?.unfinished || !current.taskId) {
     return { action: "skip", reason: "no_unfinished_current", wakeRecorded: false };
+  }
+  if (current.wakeSuppress === true) {
+    return {
+      action: "skip",
+      reason: "wake_suppress",
+      wakeRecorded: false,
+      taskId: current.taskId,
+    };
   }
 
   const nowMs = params.nowMs ?? Date.now();

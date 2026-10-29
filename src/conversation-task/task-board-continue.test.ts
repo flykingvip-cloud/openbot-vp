@@ -113,6 +113,24 @@ describe("decideTaskBoardContinue", () => {
     ).toMatchObject({ reason: "tools_disabled" });
   });
 
+  it("skips when current.wakeSuppress is set", () => {
+    const sessionFile = tempSessionFile();
+    const board = unfinishedBoard("task-suppress");
+    board.current!.wakeSuppress = true;
+    writeSessionTaskBoard(sessionFile, board);
+    expect(
+      decideTaskBoardContinue({
+        sessionFile,
+        assistantText: "still unfinished, no human gate",
+      }),
+    ).toMatchObject({
+      action: "skip",
+      reason: "wake_suppress",
+      wakeRecorded: false,
+      taskId: "task-suppress",
+    });
+  });
+
   it("caps chained continues per task", () => {
     const sessionFile = tempSessionFile();
     writeSessionTaskBoard(sessionFile, unfinishedBoard("task-cap"));
@@ -162,8 +180,8 @@ describe("scheduleTaskBoardContinueWake", () => {
     expect(timers[0]?.ms).toBe(50);
     timers[0]?.fn();
     expect(enqueue).toHaveBeenCalledOnce();
-    const [prompt, messageId] = enqueue.mock.calls[0];
-    expect(prompt).toContain("Internal task-board continue:");
-    expect(messageId).toMatch(/^task-board-continue:task-timer:/);
+    const call = enqueue.mock.calls[0] as unknown as [string, string] | undefined;
+    expect(call?.[0]).toContain("Internal task-board continue:");
+    expect(call?.[1]).toMatch(/^task-board-continue:task-timer:/);
   });
 });
