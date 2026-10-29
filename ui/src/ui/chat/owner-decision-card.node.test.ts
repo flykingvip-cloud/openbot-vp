@@ -5,10 +5,12 @@ import {
   clearOwnerDecisionDeliveryStateForTest,
   clearOwnerDecisionDismissalsForTest,
   collapseOwnerDecisionCardsForBoardItem,
+  OWNER_DECISION_PEER_ACK_COPY,
   collectOwnerDecisionHydrationTargets,
   dismissOwnerDecisionCard,
   formatOwnerDecisionMentionHint,
   formatOwnerDecisionStatusCopy,
+  formatPostPlanConfirmAdvanceUserMessage,
   formatOwnerDecisionSummaryLine,
   getOwnerDecisionReviseDraft,
   getOwnerDecisionTodolistStatus,
@@ -323,17 +325,18 @@ describe("owner-decision-card UI", () => {
         mentionLabels: ["CEO"],
       },
     };
+    noteOwnerDecisionDelivery("td-terminal", "peer_confirmed", 1);
     render(renderOwnerDecisionCards([message], { onDecide, onUIChange }), container);
     const root = container.querySelector("[data-owner-decision]") as HTMLElement;
     expect(root.getAttribute("data-owner-decision-status")).toBe("confirmed");
     expect(root.hasAttribute("data-owner-decision-terminal")).toBe(true);
-    expect(container.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
-      "执行计划已确认",
+    expect(root.hasAttribute("data-owner-decision-peer-ack")).toBe(true);
+    expect(root.getAttribute("data-owner-decision-confirm-source")).toBe("peer");
+    expect(container.querySelector("[data-owner-decision-peer-ack-copy], .employee-workbench__owner-decision-peer-ack-copy")?.textContent?.trim()).toBe(
+      OWNER_DECISION_PEER_ACK_COPY,
     );
-    expect(
-      container.querySelector("[data-owner-decision-status-copy]")?.classList.contains("success"),
-    ).toBe(true);
-    expect(container.querySelectorAll("[role='listitem']").length).toBe(1);
+    // Peer confirmed: no plan body, no actions.
+    expect(container.querySelectorAll("[role='listitem']").length).toBe(0);
     expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
     expect(container.querySelector('[data-owner-decision-action="revise"]')).toBeNull();
     expect(container.querySelector('[data-owner-decision-action="later"]')).toBeNull();
@@ -425,7 +428,7 @@ describe("owner-decision-card UI", () => {
     ]);
   });
 
-  it("confirm success keeps card for review; only collapses other board lookalikes", () => {
+  it("confirm success folds dialog away; peer residual shows compact ack only", () => {
     const mk = (decisionId: string, todolistId: string, version: number) => ({
       kind: "todolist_confirm" as const,
       decisionId,
@@ -446,42 +449,92 @@ describe("owner-decision-card UI", () => {
     });
     const oldCard = mk("dec-old-keep", "td-old-keep", 1);
     const confirmedCard = mk("dec-confirmed-keep", "td-confirmed-keep", 2);
-    // Simulate render mapping boardItemId → decisionId (as renderOwnerDecisionCards does).
     renderOwnerDecisionCards([
       { role: "assistant", ownerDecision: oldCard },
       { role: "assistant", ownerDecision: confirmedCard },
     ]);
-    // App confirm-success path: mark confirmed, collapse others, do NOT dismiss this card.
+    // App confirm-success path: mark confirmed, fold dialog (dismiss), collapse siblings.
     setOwnerDecisionTodolistStatus(confirmedCard.todolistId, "confirmed");
-    collapseOwnerDecisionCardsForBoardItem(confirmedCard.boardItemId, {
-      keepDecisionId: confirmedCard.decisionId,
-    });
+    collapseOwnerDecisionCardsForBoardItem(confirmedCard.boardItemId);
+    dismissOwnerDecisionCard(confirmedCard.decisionId);
     expect(isOwnerDecisionDismissed("dec-old-keep")).toBe(true);
-    expect(isOwnerDecisionDismissed("dec-confirmed-keep")).toBe(false);
+    expect(isOwnerDecisionDismissed("dec-confirmed-keep")).toBe(true);
 
+    // Undismissed peer residual → compact「收到，并确认」only (not human confirm copy).
+    clearOwnerDecisionDismissalsForTest();
+    setOwnerDecisionTodolistStatus(confirmedCard.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(confirmedCard.todolistId, "peer_confirmed", confirmedCard.version);
     const container = document.createElement("div");
     render(
-      renderOwnerDecisionCards([
-        { role: "assistant", ownerDecision: oldCard },
-        { role: "assistant", ownerDecision: confirmedCard },
-      ]),
+      renderOwnerDecisionCards([{ role: "assistant", ownerDecision: confirmedCard }]),
       container,
     );
-    expect(container.querySelectorAll("[data-owner-decision]").length).toBe(1);
-    const root = container.querySelector(
-      "[data-owner-decision='dec-confirmed-keep']",
-    ) as HTMLElement;
-    expect(root).not.toBeNull();
-    expect(root.getAttribute("data-owner-decision-status")).toBe("confirmed");
-    expect(container.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
+    expect(container.querySelector("[data-owner-decision-peer-ack]")).not.toBeNull();
+    expect(
+      container.querySelector(".employee-workbench__owner-decision-peer-ack-copy")?.textContent?.trim(),
+    ).toBe(OWNER_DECISION_PEER_ACK_COPY);
+    expect(container.querySelectorAll("[role='listitem']").length).toBe(0);
+    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+
+    // Human confirmed residual (consumed, not peer) →「执行计划已确认」, never peer ack.
+    clearOwnerDecisionDeliveryStateForTest();
+    clearOwnerDecisionDismissalsForTest();
+    setOwnerDecisionTodolistStatus(confirmedCard.todolistId, "confirmed");
+    noteOwnerDecisionDelivery(confirmedCard.todolistId, "consumed", confirmedCard.version);
+    const humanBox = document.createElement("div");
+    render(
+      renderOwnerDecisionCards([{ role: "assistant", ownerDecision: confirmedCard }]),
+      humanBox,
+    );
+    expect(humanBox.querySelector("[data-owner-decision-peer-ack]")).toBeNull();
+    expect(humanBox.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
       "执行计划已确认",
     );
-    expect(container.querySelectorAll("[role='listitem']").length).toBe(2);
-    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
-    expect(container.querySelector('[data-owner-decision-action="revise"]')).toBeNull();
-    expect(container.querySelector('[data-owner-decision-action="later"]')).toBeNull();
-    expect(container.querySelector(".employee-workbench__assistant-prelude-toolbar")).toBeNull();
   });
+
+  it("formatPostPlanConfirmAdvanceUserMessage separates queue/blocked/dispatch failures", () => {
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "confirm_board_not_active:published",
+      }),
+    ).toMatch(/^计划已确认，但自动推进未开始：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: false,
+        dispatched: false,
+        reason: "wake_queued",
+      }),
+    ).toMatch(/^计划已确认，推进已排队但未消费：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: false,
+        reason: "self_advance_not_execute",
+      }),
+    ).toMatch(/^计划已确认，推进受阻：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: false,
+        reason: "dispatch_failed:execute_collaboration_round_failed",
+      }),
+    ).toMatch(/^计划已确认，但派发失败：/);
+    expect(
+      formatPostPlanConfirmAdvanceUserMessage({
+        wakeRecorded: true,
+        wakeConsumed: true,
+        dispatched: true,
+        reason: "dispatched",
+      }),
+    ).toBeNull();
+  });
+
 
   it("turns status-gate RPC errors into status copy / superseded collapse", () => {
     const message = {
@@ -512,12 +565,10 @@ describe("owner-decision-card UI", () => {
       "todolist status is confirmed; expected proposed|revise_requested",
     );
     expect(getOwnerDecisionTodolistStatus("td-gate")).toBe("confirmed");
+    // confirmed auto-collapses (dismisses) the actionable dialog — SoT stays confirmed.
+    expect(isOwnerDecisionDismissed("dec-gate")).toBe(true);
     render(renderOwnerDecisionCards([message]), container);
-    expect(container.querySelector("[data-owner-decision-status-copy]")?.textContent?.trim()).toBe(
-      "执行计划已确认",
-    );
-    expect(container.querySelector("[data-owner-decision-error]")).toBeNull();
-    expect(container.querySelector('[data-owner-decision-action="confirm"]')).toBeNull();
+    expect(container.querySelector("[data-owner-decision]")).toBeNull();
 
     clearOwnerDecisionDismissalsForTest();
     const message2 = {
