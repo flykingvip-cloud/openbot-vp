@@ -199,8 +199,16 @@ function continueResult(
 export type ResumeParkedRecheck = {
   /** False when current auth/ownership no longer allows this session. */
   authOk?: boolean;
-  /** True when a stop/abort barrier is active for the session or task. */
+  /**
+   * Broad session-level stop barrier. Used when `isTaskStopActive` is absent.
+   * Prefer `isTaskStopActive` so resume checks the original taskId.
+   */
   stopActive?: boolean;
+  /**
+   * Authoritative per-taskId stop lookup. When set, resume of task T is denied
+   * iff this returns true for T — even after AbortController records are deleted.
+   */
+  isTaskStopActive?: (taskId: string) => boolean;
 };
 
 export function applyIncomingUserMessage(params: {
@@ -322,7 +330,11 @@ export function resumeParkedTask(params: {
       statusLine: `恢复「${parked.title}」被拒绝：当前授权无效。`,
     };
   }
-  if (params.recheck?.stopActive === true) {
+  const stopBlocked =
+    typeof params.recheck?.isTaskStopActive === "function"
+      ? params.recheck.isTaskStopActive(parked.taskId)
+      : params.recheck?.stopActive === true;
+  if (stopBlocked) {
     return {
       ...continueResult(params.board, params.board.current?.taskId ?? ""),
       statusLine: `恢复「${parked.title}」被拒绝：任务已停止。`,
