@@ -45,6 +45,7 @@ import {
   productionWakeDeliverableContractFailure,
   type ExecutionDeliverableBinding,
 } from "./collaboration-learning/execution-deliverable-binding.js";
+import { scheduleContinueAfterDeliverableSettlement } from "./collaboration-learning/schedule-continue-after-deliverable.js";
 import { resolveCollaborationGroupTenantId } from "./collaboration-learning/shared.js";
 import { listGatewayCollaborationSpaces } from "./collaboration-learning/space-store.js";
 import {
@@ -330,6 +331,14 @@ export async function resolveModeBWakeRoundContext(
             request.executionDeliverableBinding ?? null,
           );
           if (!binding) {
+            void scheduleContinueAfterDeliverableSettlement({
+              authority,
+              roundId: `wake-dispatch:${groupId}:${request.source}`,
+              cfg,
+              agentId: bot.agentId,
+              deliverableOk: false,
+              reason: "wake_deliverable_binding_required",
+            });
             return {
               text: `${text.trim()}\n\n团队成果未完成（execution_binding_required）。`,
             };
@@ -409,6 +418,16 @@ export async function resolveModeBWakeRoundContext(
             enforceAcl: true,
           });
           text = finalized.text;
+          void scheduleContinueAfterDeliverableSettlement({
+            authority,
+            roundId: `wake-dispatch:${groupId}:${request.source}`,
+            cfg,
+            agentId: bot.agentId,
+            deliverableOk: finalized.outcome.ok,
+            reason: finalized.outcome.ok
+              ? "wake_deliverable_ok"
+              : `wake_deliverable_not_ok:${finalized.outcome.reason}`,
+          });
         }
         return text ? { text } : undefined;
       } catch {

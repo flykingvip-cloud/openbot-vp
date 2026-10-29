@@ -18,6 +18,7 @@
 import type { Task } from "@openbot/collaboration-core";
 import type { OpenBotConfig } from "../../config/types.js";
 import { defaultConversationSessionKey } from "../../conversation-task/conversation-handoff.js";
+import { attachWakeExecutionDeliverableBinding } from "../collaboration-learning/attach-wake-execution-deliverable-binding.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   checkMemberDispatchReadiness,
@@ -1614,12 +1615,18 @@ export async function consumeWakeForRoundDispatch(
         // bind to the claimed wake-op attempt — not a freshly minted UUID.
         const durableAttempt =
           compact(wakeOp?.executionAttemptId) || compact(claimed.record?.executionAttemptId) || "";
-        const dispatchRequest: WakeRoundDispatchRequest = {
+        let dispatchRequest: WakeRoundDispatchRequest = {
           ...request,
           wakeOpKey: claimed.opKey,
           wakeExecutionAttemptId: durableAttempt || request.wakeExecutionAttemptId || null,
           opKey: request.opKey ?? claimed.opKey,
         };
+        // Prefer a complete wake_dispatch binding before Mode B / formal deliverable.
+        dispatchRequest = await attachWakeExecutionDeliverableBinding({
+          request: dispatchRequest,
+          authority: params.authority,
+          cfg: params.cfg,
+        });
         const result = await dispatcher(dispatchRequest);
         if (result.ok && compact(result.roundId)) {
           // M3 order-3 seam: external sent, receipt not yet written.

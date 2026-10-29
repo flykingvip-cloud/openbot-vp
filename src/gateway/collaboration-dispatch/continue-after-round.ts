@@ -200,6 +200,12 @@ export async function maybeContinueAfterRoundComplete(params: {
   loadBoardItems?: () => Promise<readonly GroupBoardClaimItem[]>;
   skipSelfAdvance?: boolean;
   skipWake?: boolean;
+  /**
+   * After formal DELIVERABLE settle (ok or binding miss): keep multi-milestone
+   * auto-dispatch alive even when continueAfterRoundComplete is default OFF.
+   * Cooldown still applies. Chat task_board_continue skips group sessions.
+   */
+  forceForDeliverableSettlement?: boolean;
 }): Promise<MaybeContinueAfterRoundResult> {
   const at = params.nowMs ?? Date.now();
   const authority = params.authority;
@@ -225,7 +231,9 @@ export async function maybeContinueAfterRoundComplete(params: {
       return { skipped: true, decision };
     }
 
-    const enabled = isContinueAfterRoundCompleteEnabled(cfg, authority.groupId, authority.tenantId);
+    const enabled =
+      params.forceForDeliverableSettlement === true ||
+      isContinueAfterRoundCompleteEnabled(cfg, authority.groupId, authority.tenantId);
     if (!enabled) {
       const decision = baseDecision({ reason: "continue_after_round_disabled" });
       return { skipped: true, decision };

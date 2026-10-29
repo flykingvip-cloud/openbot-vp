@@ -66,6 +66,16 @@ function sleepMs(ms: number): void {
  * materialized into tip + version snapshot + outbox. Reopen replays unapplied commits.
  * Per-task exclusive lock (`locks/<taskId>.lock`) serializes cross-process CAS.
  */
+
+/** Cap URL-encoded path segments; hash when over max to avoid ENAMETOOLONG (CJK space ids). */
+export function boundedOutcomePathSegment(raw: string, maxEncodedLen = 160): string {
+  const encoded = encodeURIComponent(raw);
+  if (encoded.length > maxEncodedLen) {
+    return `h-${createHash("sha256").update(raw).digest("hex")}`;
+  }
+  return encoded;
+}
+
 export class DurableTaskOutcomeStore {
   readonly rootDir: string;
 
@@ -93,11 +103,15 @@ export class DurableTaskOutcomeStore {
   }
 
   tipPath(taskId: string): string {
-    return path.join(this.rootDir, "tips", `${encodeURIComponent(taskId)}.json`);
+    return path.join(this.rootDir, "tips", `${boundedOutcomePathSegment(taskId)}.json`);
   }
 
   versionPath(taskId: string, version: number): string {
-    return path.join(this.rootDir, "versions", `${encodeURIComponent(taskId)}__v${version}.json`);
+    return path.join(
+      this.rootDir,
+      "versions",
+      `${boundedOutcomePathSegment(taskId)}__v${version}.json`,
+    );
   }
 
   loadTask(taskId: string): TaskOutcomeRecord | undefined {
@@ -113,14 +127,25 @@ export class DurableTaskOutcomeStore {
     return fs
       .readdirSync(path.join(this.rootDir, "tips"))
       .filter((n) => n.endsWith(".json"))
-      .map((n) => decodeURIComponent(n.replace(/\.json$/, "")));
+      .map((n) => {
+        const stem = n.replace(/\.json$/, "");
+        // Hashed segments are opaque keys (not reversible); keep as-is.
+        if (stem.startsWith("h-") && /^h-[a-f0-9]{64}$/.test(stem)) {
+          return stem;
+        }
+        try {
+          return decodeURIComponent(stem);
+        } catch {
+          return stem;
+        }
+      });
   }
 
   /**
    * Cross-process exclusive lock for one task. Stale locks from dead pids are broken.
    */
   withTaskLock<T>(taskId: string, fn: () => T, opts?: { timeoutMs?: number }): T {
-    const lockPath = path.join(this.rootDir, "locks", `${encodeURIComponent(taskId)}.lock`);
+    const lockPath = path.join(this.rootDir, "locks", `${boundedOutcomePathSegment(taskId)}.lock`);
     const timeoutMs = opts?.timeoutMs ?? 10_000;
     const start = Date.now();
     let fd: number | undefined;
@@ -336,7 +361,7 @@ export class DurableTaskOutcomeStore {
     return path.join(
       this.rootDir,
       "consumers",
-      `${encodeURIComponent(consumerId)}__${encodeURIComponent(eventId)}.json`,
+      `${boundedOutcomePathSegment(consumerId)}__${boundedOutcomePathSegment(eventId)}.json`,
     );
   }
 
@@ -357,7 +382,7 @@ export class DurableTaskOutcomeStore {
     return path.join(
       this.rootDir,
       "contributions",
-      `${encodeURIComponent(scopeId)}__${encodeURIComponent(taskId)}.json`,
+      `${boundedOutcomePathSegment(scopeId)}__${boundedOutcomePathSegment(taskId)}.json`,
     );
   }
 
@@ -388,7 +413,7 @@ export class DurableTaskOutcomeStore {
   }
 
   projectionPath(consumerId: string): string {
-    return path.join(this.rootDir, "projections", `${encodeURIComponent(consumerId)}.json`);
+    return path.join(this.rootDir, "projections", `${boundedOutcomePathSegment(consumerId)}.json`);
   }
 
   loadProjection(consumerId: string): DurableProjection {
@@ -407,11 +432,8 @@ export class DurableTaskOutcomeStore {
   }
 
   commandLogPath(commandId: string): string {
-    // Avoid ENAMETOOLONG on macOS when commandId embeds long space session keys.
-    const encoded = encodeURIComponent(commandId);
-    const base =
-      encoded.length > 160 ? `h-${createHash("sha256").update(commandId).digest("hex")}` : encoded;
-    return path.join(this.rootDir, "command-log", `${base}.json`);
+    // Avoid ENAMETOOLONG on macOS when commandId embeds long / CJK space session keys.
+    return path.join(this.rootDir, "command-log", `${boundedOutcomePathSegment(commandId)}.json`);
   }
 
   loadCommand(

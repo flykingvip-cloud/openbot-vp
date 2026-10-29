@@ -10200,6 +10200,15 @@ landingStreams:
       - src/gateway/wake-round-dispatcher-boot.test.ts
       - src/gateway/collaboration-learning/trusted-tenant.ts
       - src/gateway/collaboration-learning/trusted-tenant.test.ts
+      - src/gateway/collaboration-learning/attach-wake-execution-deliverable-binding.ts
+      - src/gateway/collaboration-learning/try-build-chat-actor-deliverable-binding.ts
+      - src/gateway/collaboration-learning/schedule-continue-after-deliverable.ts
+      - src/gateway/collaboration-learning/attach-wake-and-chat-deliverable-binding.test.ts
+      - src/gateway/collaboration-dispatch/continue-after-round.ts
+      - src/gateway/server-methods/spaces.ts
+      - src/task-outcome/store.ts
+      - src/task-outcome/bounded-path-segment.test.ts
+      - docs/notes/team-real-f4-locator-chain-2026-10-28.md
       - .loom/registry.yaml
     canLandWith:
       - collab-p0-wake-dispatch:grok-bot

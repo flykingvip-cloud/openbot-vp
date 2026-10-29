@@ -572,14 +572,16 @@ async function handleCollaborationOrgBotDirectoryList({
   }
   const actor = await resolveEmployeeWorkbenchActor(client);
   if (!actor?.tenantId) {
+    // Soft-degrade: empty directory keeps UI online instead of TENANT_CONTEXT_REQUIRED
+    // reconnect/offline loops (incident 2026-10-29 NIGHT collab).
     respond(
-      false,
+      true,
+      {
+        bots: [],
+        degraded: true,
+        reasonCode: "TENANT_CONTEXT_REQUIRED",
+      },
       undefined,
-      errorShape(
-        ErrorCodes.INVALID_REQUEST,
-        "enterprise tenant context is required: reconnect from the employee workbench (www) while signed in to an enterprise membership, or refresh the session so sessionEnterpriseId is bound",
-        { reasonCode: "TENANT_CONTEXT_REQUIRED" },
-      ),
     );
     return;
   }
