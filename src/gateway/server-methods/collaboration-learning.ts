@@ -181,6 +181,33 @@ async function resolveTrustedWriteContext(client: GatewayClient | null, groupId:
   };
 }
 
+/** Read path: same tenant/actor/locator checks as write, but action:"read" so observers can hydrate plans/cards. */
+async function resolveTrustedReadContext(client: GatewayClient | null, groupId: string) {
+  const tenant = await resolveCollaborationTenantResolution(client);
+  const actor = await resolveDeliveryAclActor(client, groupId);
+  if (!actor) {
+    return { ok: false as const, error: "actor_not_authenticated", tenant, actor: null };
+  }
+  const trusted = await resolveHandlerTrustedTeamContext({
+    groupId,
+    actor,
+    client,
+    tenant,
+    action: "read",
+  });
+  if (!trusted.ok) {
+    return { ok: false as const, error: trusted.reason, detail: trusted.detail, tenant, actor };
+  }
+  return {
+    ok: true as const,
+    tenant,
+    actor,
+    auth: trusted.auth,
+    stores: trusted.stores,
+    trusted: trusted.trusted,
+  };
+}
+
 export const collaborationLearningHandlers: GatewayRequestHandlers = {
   "collaboration.learning.snapshot": async ({ params, respond }) => {
     if (
@@ -994,10 +1021,9 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      // Same trusted locator chain as confirm/listOwnerDecisionDeliveries.
-      // Without auth/stores, managed_enterprise refuses compat workspace stores
-      // and UI hydration cannot learn confirmed → ghost confirm buttons.
-      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      // Trusted locator chain with read action: observers may hydrate plans/cards;
+      // writes stay on resolveTrustedWriteContext (confirm/revise/etc.).
+      const ctx = await resolveTrustedReadContext(client, params.groupId);
       if (!ctx.ok) {
         respond(
           false,
@@ -1055,7 +1081,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      const ctx = await resolveTrustedReadContext(client, params.groupId);
       if (!ctx.ok) {
         respond(
           false,

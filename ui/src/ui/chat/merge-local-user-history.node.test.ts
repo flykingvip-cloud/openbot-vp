@@ -24,7 +24,7 @@ describe("mergeIncomingHistoryWithLocalUserTurn", () => {
     expect(mergeIncomingHistoryWithLocalUserTurn(local, incoming)).toEqual([local[0], incoming[0]]);
   });
 
-  it("drops the optimistic row once history contains the same user text", () => {
+  it("drops the optimistic row once history echoes the same local-* id", () => {
     const local = [
       {
         id: "local-run-1",
@@ -34,9 +34,10 @@ describe("mergeIncomingHistoryWithLocalUserTurn", () => {
     ];
     const incoming = [
       {
-        id: "persisted-1",
+        id: "local-run-1",
         role: "user",
         content: [{ type: "text", text: "build the report" }],
+        senderLabel: "CEO",
       },
       {
         id: "asst-1",
@@ -45,6 +46,30 @@ describe("mergeIncomingHistoryWithLocalUserTurn", () => {
       },
     ];
     expect(mergeIncomingHistoryWithLocalUserTurn(local, incoming)).toEqual(incoming);
+  });
+
+  it("keeps a new same-text send when history only has an older non-local duplicate", () => {
+    // Owner repro: history already has old "继续"; user sends new "继续";
+    // refresh returns only the old persisted row → must NOT drop the new bubble.
+    const local = [
+      {
+        id: "local-run-new",
+        role: "user",
+        content: [{ type: "text", text: "继续" }],
+      },
+    ];
+    const incoming = [
+      {
+        id: "persisted-old-继续",
+        role: "user",
+        content: [{ type: "text", text: "继续" }],
+        senderLabel: "CEO",
+      },
+    ];
+    const merged = mergeIncomingHistoryWithLocalUserTurn(local, incoming);
+    expect(merged.some((m) => (m as { id?: string }).id === "local-run-new")).toBe(true);
+    // Must not collapse to history-only (pre-fix dropped the optimistic row).
+    expect(merged).not.toEqual(incoming);
   });
 
   it("recognizes optimistic local user ids", () => {

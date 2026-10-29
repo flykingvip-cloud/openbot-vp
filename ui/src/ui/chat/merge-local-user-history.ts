@@ -95,31 +95,19 @@ export function mergeIncomingHistoryWithLocalUserTurn(
   }
   const optimistic = local[optimisticIndex];
   const optimisticId = messageId(optimistic);
-  // Prefer exact local-* id match (server echoes the same id). Text-only match
-  // against an *older* duplicate ("你好"/"ping") used to drop the in-flight
-  // bubble when a large group history page lagged the latest user turn.
+  // Only drop the optimistic bubble when THIS send's identity appears
+  // (server persists id `local-${runId}` / idempotencyKey = runId).
   if (optimisticId && incoming.some((message) => messageId(message) === optimisticId)) {
     if (openingsShouldStay(local, incoming)) {
       return prependLocalOpenings(local, incoming);
     }
     return incoming;
   }
-  const optimisticText = messageText(optimistic);
-  if (
-    optimisticText &&
-    incoming.some(
-      (message) =>
-        roleOf(message) === "user" &&
-        messageId(message) &&
-        !messageId(message).startsWith("local-") &&
-        messageText(message) === optimisticText,
-    )
-  ) {
-    if (openingsShouldStay(local, incoming)) {
-      return prependLocalOpenings(local, incoming);
-    }
-    return incoming;
-  }
+  // Do NOT treat same text alone as "this send persisted". An older
+  // non-local user row with identical text (e.g. a prior "继续") would
+  // delete a new in-flight local-* bubble when history lag returns only
+  // the old row. Persistence identity is local-${runId} (server echoes
+  // the same id / idempotencyKey as chat.send).
   const localHead = local.slice(0, optimisticIndex + 1);
   const extra = incoming.filter(
     (message) => !localHead.some((existing) => sameVisibleMessage(existing, message)),
