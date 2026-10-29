@@ -3209,6 +3209,78 @@ describe("buildEmployeeWorkbenchProps", () => {
     expect(props.collaborationMemberGovernance?.activeGroupRole).toBe("admin");
   });
 
+  it("treats email OS owner as owner when hello user is uuid but platform session user is email", () => {
+    const ownerUuid = "90fed19a-1c8b-4420-87e0-bcc6165e32fa";
+    const ownerEmail = "daniel.hhd@gmail.com";
+    const state = createState({
+      hello: {
+        auth: {
+          provider: "trusted-proxy",
+          // Device/hello can surface the platform uuid while OS stores the mailbox.
+          user: ownerUuid,
+          displayName: "CEO",
+          tenantId: "001",
+        },
+      } as never,
+      platformAuthState: {
+        session: {
+          provider: "trusted-proxy",
+          user: ownerEmail,
+          email: ownerEmail,
+          displayName: "CEO",
+          tenantId: "001",
+        },
+        employeeAccess: {
+          employeeUserId: ownerUuid,
+          ownedAgentIds: [],
+          currentSeat: { seatId: "seat-1", title: "CEO" },
+        },
+      } as never,
+      workbenchMemberGovernanceDrawerOpen: true,
+      collaborationSpacesResult: {
+        spaces: [
+          {
+            id: "alpha",
+            groupId: "grp-daniel-hhd-gmail-com-upbeyond",
+            title: "数字人战队",
+            ownerUserId: ownerEmail,
+            operatingState: {
+              governance: { ownerUserId: ownerEmail, adminUserIds: [] },
+              memberRoleMap: [
+                {
+                  memberId: ownerEmail,
+                  memberKind: "human",
+                  governanceRole: "owner",
+                  label: "CEO",
+                },
+              ],
+            },
+            members: {
+              humans: [{ userId: ownerEmail, name: "CEO", status: "active" }],
+              bots: [],
+            },
+            invites: { humans: [], bots: [] },
+          },
+        ],
+      } as never,
+    });
+
+    const props = buildEmployeeWorkbenchProps({
+      state,
+      chatContent: html`
+        <div>chat</div>
+      `,
+      authPanel: null,
+    });
+
+    const governance = props.collaborationMemberGovernance;
+    expect(governance?.activeGroupRole).toBe("owner");
+    expect(governance?.canReset).toBe(true);
+    expect(governance?.activeGroupRole === "member" || Boolean(governance?.selfPendingInvite)).toBe(
+      false,
+    );
+  });
+
   it("resets collaboration data from member governance for the group owner", async () => {
     const request = vi.fn(async (method: string, params?: Record<string, unknown>) => {
       if (method === "collaboration.spaces.reset") {

@@ -2359,27 +2359,46 @@ function stripWorkbenchHumanActorPrefix(value: string | null | undefined): strin
  * Digital-human team OS rows often store owners as `human:<uuid>` while the
  * signed-in actor only has the bare uuid / email — keep both forms.
  */
+function addWorkbenchActorIdentityValue(
+  identities: Set<string>,
+  value: string | null | undefined,
+): void {
+  const normalized = normalizeValue(value)?.toLowerCase();
+  if (!normalized) {
+    return;
+  }
+  identities.add(normalized);
+  if (normalized.startsWith("human:")) {
+    const bare = normalized.slice("human:".length).trim();
+    if (bare) {
+      identities.add(bare);
+    }
+  } else if (!normalized.includes("@")) {
+    identities.add(`human:${normalized}`);
+  }
+}
+
 function buildWorkbenchActorIdentities(
   userId: string | null | undefined,
   userEmail: string | null | undefined,
 ): Set<string> {
   const identities = new Set<string>();
-  for (const value of [userId, userEmail]) {
-    const normalized = normalizeValue(value)?.toLowerCase();
-    if (!normalized) {
-      continue;
-    }
-    identities.add(normalized);
-    if (normalized.startsWith("human:")) {
-      const bare = normalized.slice("human:".length).trim();
-      if (bare) {
-        identities.add(bare);
-      }
-    } else if (!normalized.includes("@")) {
-      identities.add(`human:${normalized}`);
+  addWorkbenchActorIdentityValue(identities, userId);
+  addWorkbenchActorIdentityValue(identities, userEmail);
+  return identities;
+}
+
+/** Prefer a real email over uuid/session handles for OS rows keyed by mailbox. */
+function resolveWorkbenchActorEmail(params: {
+  candidates: Array<string | null | undefined>;
+}): string | null {
+  for (const candidate of params.candidates) {
+    const normalized = normalizeValue(candidate);
+    if (normalized?.includes("@")) {
+      return normalized;
     }
   }
-  return identities;
+  return null;
 }
 
 /** Exact match, plus `human:<id>` ↔ bare `<id>` (case-insensitive). */
@@ -3803,10 +3822,48 @@ export function buildEmployeeWorkbenchProps(input: {
     state.platformAuthState?.enterprise?.name?.trim() ||
     trustedProxySession?.tenantId?.trim() ||
     "";
+  // OS / memberRoleMap often keys humans by mailbox while employeeAccess and
+  // hello.auth may only carry the platform uuid. Prefer any @ candidate across
+  // platform session + hello + bootstrap — do not let hello.user (uuid) hide the
+  // email that platformAuthState.session.user still holds.
+  const platformSessionEmail =
+    platformAuthSession && "email" in platformAuthSession
+      ? ((platformAuthSession as { email?: string | null }).email ?? null)
+      : null;
+  const trustedSessionEmail =
+    trustedProxySession && "email" in trustedProxySession
+      ? ((trustedProxySession as { email?: string | null }).email ?? null)
+      : null;
+  const bootstrapSessionEmail =
+    state.bootstrapAuthSession && "email" in state.bootstrapAuthSession
+      ? ((state.bootstrapAuthSession as { email?: string | null }).email ?? null)
+      : null;
   const currentHumanUserEmail =
-    normalizeValue(trustedProxySession?.user) ?? currentHumanUserId ?? null;
+    resolveWorkbenchActorEmail({
+      candidates: [
+        platformSessionEmail,
+        trustedSessionEmail,
+        bootstrapSessionEmail,
+        platformAuthSession?.user,
+        state.bootstrapAuthSession?.user,
+        trustedProxySession?.user,
+        helloTrustedProxySession?.user,
+      ],
+    }) ?? null;
   const orgBotDirectory = state.workbenchCollaborationOrgBotDirectory ?? [];
   const actorIdentities = buildWorkbenchActorIdentities(currentHumanUserId, currentHumanUserEmail);
+  // Merge every session handle so uuid-only hello cannot drop the email identity.
+  for (const extra of [
+    platformAuthSession?.user,
+    platformSessionEmail,
+    state.bootstrapAuthSession?.user,
+    bootstrapSessionEmail,
+    trustedProxySession?.user,
+    trustedSessionEmail,
+    helloTrustedProxySession?.user,
+  ]) {
+    addWorkbenchActorIdentityValue(actorIdentities, extra);
+  }
   const trustedProxySessionScopes =
     trustedProxySession && "scopes" in trustedProxySession
       ? (trustedProxySession.scopes ?? [])
