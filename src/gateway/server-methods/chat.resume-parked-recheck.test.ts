@@ -8,13 +8,18 @@ import {
   writeSessionTaskBoard,
 } from "../../conversation-task/session-task-board.js";
 import {
+  AUTHORITATIVE_STOP_INTERNAL_TENANT,
+  AUTHORITATIVE_STOP_INTERNAL_USER,
+  AUTHORITATIVE_STOP_PERSONAL_TENANT,
   applyChatFocusSwitchGateWithResumeRecheck,
   buildResumeTaskStopActive,
   clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
   isAuthoritativeTaskStopActive,
+  queryAuthoritativeTaskStop,
   recordAuthoritativeTaskStop,
   resetAuthoritativeTaskStopsForTest,
+  resolveAuthoritativeTaskStopScope,
   resolveResumeParkedRecheck,
   sessionStopBarrierActive,
 } from "./chat-resume-parked-recheck.js";
@@ -444,5 +449,273 @@ describe("authoritative stop scope isolation (cross-session / cross-tenant)", ()
         userId: "u1",
       }),
     ).toBeNull();
+  });
+});
+
+describe("authoritative stop incomplete scope refusal (P1)", () => {
+  const emptyControllers = new Map<
+    string,
+    { sessionKey: string; controller?: { signal?: { aborted?: boolean } } }
+  >();
+
+  it("managed: missing user refuses record; query is unverifiable; resume fails closed", () => {
+    const sessionKey = "agent:main:managed-missing-user";
+    const taskId = "task-managed-missing-user";
+
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        tenantId: "tenant-a",
+        userId: "",
+        sessionKey,
+        scopeKind: "managed",
+      }),
+    ).toBeNull();
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        tenantId: "tenant-a",
+        sessionKey,
+        scopeKind: "managed",
+      }),
+    ).toBeNull();
+    expect(
+      resolveAuthoritativeTaskStopScope({
+        tenantId: "tenant-a",
+        userId: null,
+        sessionKey,
+        scopeKind: "managed",
+      }),
+    ).toBeNull();
+
+    const query = queryAuthoritativeTaskStop({
+      taskId,
+      tenantId: "tenant-a",
+      userId: null,
+      sessionKey,
+      scopeKind: "managed",
+    });
+    expect(query).toEqual({ state: "unverifiable", reason: "incomplete_scope" });
+    // Boolean helper says "not active" — resume must NOT treat that as allow.
+    expect(
+      isAuthoritativeTaskStopActive({
+        taskId,
+        tenantId: "tenant-a",
+        userId: null,
+        sessionKey,
+        scopeKind: "managed",
+      }),
+    ).toBe(false);
+
+    const isTaskStopActive = buildResumeTaskStopActive({
+      sessionKeys: [sessionKey],
+      chatAbortControllers: emptyControllers,
+      tenantId: "tenant-a",
+      userId: null,
+      scopeKind: "managed",
+    });
+    expect(isTaskStopActive(taskId)).toBe(true); // fail closed
+  });
+
+  it("managed: missing tenant refuses — taskId+sessionKey alone cannot record or query-as-inactive", () => {
+    const sessionKey = "agent:main:managed-missing-tenant";
+    const taskId = "task-managed-missing-tenant";
+
+    // Reviewer anti-example: only taskId + sessionKey must NOT succeed.
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+      }),
+    ).toBeNull();
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        tenantId: "",
+        userId: "user-a",
+        sessionKey,
+        scopeKind: "managed",
+      }),
+    ).toBeNull();
+    expect(
+      resolveAuthoritativeTaskStopScope({
+        tenantId: "",
+        userId: "user-a",
+        sessionKey,
+        scopeKind: "managed",
+      }),
+    ).toBeNull();
+
+    expect(
+      queryAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+      }),
+    ).toEqual({ state: "unverifiable", reason: "incomplete_scope" });
+
+    expect(
+      buildResumeTaskStopActive({
+        sessionKeys: [sessionKey],
+        chatAbortControllers: emptyControllers,
+        // no tenant/user — identity not ready
+      })(taskId),
+    ).toBe(true);
+  });
+
+  it("personal: requires userId; never silently coerces missing user to empty string", () => {
+    const sessionKey = "agent:main:personal";
+    const taskId = "task-personal";
+
+    expect(
+      resolveAuthoritativeTaskStopScope({
+        sessionKey,
+        scopeKind: "personal",
+      }),
+    ).toBeNull();
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+        scopeKind: "personal",
+      }),
+    ).toBeNull();
+
+    const recorded = recordAuthoritativeTaskStop({
+      taskId,
+      userId: "user-personal",
+      sessionKey,
+      scopeKind: "personal",
+      reason: "rpc",
+      nowMs: 5_000,
+    });
+    expect(recorded).toMatchObject({
+      kind: "personal",
+      tenantId: AUTHORITATIVE_STOP_PERSONAL_TENANT,
+      userId: "user-personal",
+      sessionKey,
+      taskId,
+    });
+    expect(
+      isAuthoritativeTaskStopActive({
+        taskId,
+        userId: "user-personal",
+        sessionKey,
+        scopeKind: "personal",
+      }),
+    ).toBe(true);
+    // Different user must not see it.
+    expect(
+      isAuthoritativeTaskStopActive({
+        taskId,
+        userId: "user-other",
+        sessionKey,
+        scopeKind: "personal",
+      }),
+    ).toBe(false);
+  });
+
+  it("internal: only when scopeKind explicit — blank identity is not silently coerced", () => {
+    const sessionKey = "agent:main:internal";
+    const taskId = "task-internal";
+
+    // Without explicit internal kind, blank identity refuses.
+    expect(resolveAuthoritativeTaskStopScope({ sessionKey })).toBeNull();
+    expect(recordAuthoritativeTaskStop({ taskId, sessionKey })).toBeNull();
+
+    const recorded = recordAuthoritativeTaskStop({
+      taskId,
+      sessionKey,
+      scopeKind: "internal",
+      reason: "test",
+      nowMs: 6_000,
+    });
+    expect(recorded).toMatchObject({
+      kind: "internal",
+      tenantId: AUTHORITATIVE_STOP_INTERNAL_TENANT,
+      userId: AUTHORITATIVE_STOP_INTERNAL_USER,
+      sessionKey,
+      taskId,
+    });
+  });
+
+  it("production entry: identity-not-ready denies resume (missing user)", async () => {
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+    expect(parkedId).toBeTruthy();
+
+    const sessionKey = "agent:main:prod-missing-user";
+    const denied = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        stopActive: false,
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: [sessionKey],
+          chatAbortControllers: emptyControllers,
+          tenantId: "tenant-a",
+          userId: null,
+          scopeKind: "managed",
+        }),
+      },
+    });
+    expect(denied.action).toBe("continue");
+    expect(denied.statusLine ?? "").toContain("已停止");
+    expect(denied.cutContext).toBe(false);
+  });
+
+  it("production entry: identity-not-ready denies resume (missing tenant)", () => {
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+
+    const sessionKey = "agent:main:prod-missing-tenant";
+    const denied = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        stopActive: false,
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: [sessionKey],
+          chatAbortControllers: emptyControllers,
+          scopeKind: "managed",
+          tenantId: null,
+          userId: "user-a",
+        }),
+      },
+    });
+    expect(denied.action).toBe("continue");
+    expect(denied.statusLine ?? "").toContain("已停止");
+    expect(denied.cutContext).toBe(false);
+  });
+
+  it("production entry: identity-not-ready denies resume (no tenant/user at all)", () => {
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+
+    const denied = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        stopActive: false,
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: ["agent:main:prod-identity-blank"],
+          chatAbortControllers: emptyControllers,
+        }),
+      },
+    });
+    expect(denied.action).toBe("continue");
+    expect(denied.statusLine ?? "").toContain("已停止");
+    expect(denied.cutContext).toBe(false);
   });
 });

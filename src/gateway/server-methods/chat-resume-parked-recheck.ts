@@ -11,11 +11,18 @@
  * aborts then deletes the controller, so a later resume that only scans live
  * aborted controllers can see false and wrongly allow resume.
  *
- * Authoritative stop is recorded under a **trusted scope** (tenantId + userId +
- * sessionKey) plus the **original taskId**. taskId alone is never a registry
- * key — identical task text hashes to the same taskId across sessions/tenants,
- * and must not leak stop state. Missing scope refuses record/query/clear
- * (no global taskId fallback).
+ * Authoritative stop is recorded under a **trusted scope** plus the **original
+ * taskId**. Scope kind rules (never silently coerce missing identity to ""):
+ *
+ * - **managed**: trusted non-empty `tenantId` + `userId` + canonical `sessionKey`
+ * - **personal**: trusted non-empty `userId` + canonical `sessionKey`; tenant is
+ *   the explicit personal marker {@link AUTHORITATIVE_STOP_PERSONAL_TENANT}
+ * - **internal**: must pass `scopeKind: "internal"` explicitly; uses internal
+ *   markers — never inferred from blank identity
+ *
+ * Incomplete scope refuses record/clear. Resume query that cannot verify
+ * identity returns **unverifiable** and is treated as blocked (never as
+ * "not stopped"). taskId alone is never a registry key.
  *
  * Resume of that scoped taskId is denied while the record exists — even after
  * the AbortController entry is cleaned. Other taskIds in the same scope, and
@@ -85,13 +92,22 @@ export type SessionStopBarrierEntry = {
   controller?: { signal?: { aborted?: boolean } };
 };
 
+/** Explicit personal tenant marker — never silently coerce missing tenant to "". */
+export const AUTHORITATIVE_STOP_PERSONAL_TENANT = "__personal__";
+/** Explicit internal tenant/user markers — only when scopeKind is "internal". */
+export const AUTHORITATIVE_STOP_INTERNAL_TENANT = "__internal__";
+export const AUTHORITATIVE_STOP_INTERNAL_USER = "__internal__";
+
+export type AuthoritativeTaskStopScopeKind = "managed" | "personal" | "internal";
+
 /** Trusted scope dimensions that must bind with taskId — never taskId alone. */
 export type AuthoritativeTaskStopScope = {
-  /** Trusted tenant id; empty string for non-enterprise personal sessions. */
+  kind: AuthoritativeTaskStopScopeKind;
+  /** Trusted tenant id (managed) or explicit personal/internal marker. */
   tenantId: string;
-  /** Trusted user id (platformUserId / user); may be empty when identity absent. */
+  /** Trusted user id (managed/personal) or explicit internal marker. */
   userId: string;
-  /** Trusted session key — required; missing sessionKey = missing scope. */
+  /** Canonical trusted session key — required for every kind. */
   sessionKey: string;
 };
 
@@ -101,6 +117,25 @@ export type AuthoritativeTaskStopEntry = AuthoritativeTaskStopScope & {
   reason?: string;
 };
 
+export type AuthoritativeTaskStopScopeInput = {
+  tenantId?: string | null;
+  userId?: string | null;
+  sessionKey?: string | null;
+  /**
+   * Explicit scope kind. When omitted:
+   * - non-empty real tenantId → managed
+   * - else non-empty userId → personal
+   * - else → refuse (null); never silently coerce blank identity to ""
+   * Pass `internal` explicitly for tests / ACP / non-WS callers.
+   */
+  scopeKind?: AuthoritativeTaskStopScopeKind;
+};
+
+export type AuthoritativeTaskStopQueryResult =
+  | { state: "active" }
+  | { state: "inactive" }
+  | { state: "unverifiable"; reason: "incomplete_scope" | "missing_task_id" };
+
 /**
  * Process-local authoritative stop registry.
  * Key = tenantId + userId + sessionKey + taskId (see {@link authoritativeStopRegistryKey}).
@@ -108,26 +143,97 @@ export type AuthoritativeTaskStopEntry = AuthoritativeTaskStopScope & {
  */
 const authoritativeTaskStops = new Map<string, AuthoritativeTaskStopEntry>();
 
-function normalizeStopScopePart(value: string | null | undefined): string {
-  return typeof value === "string" ? value.trim() : "";
+function trimOrNull(value: string | null | undefined): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isRealManagedTenantId(tenantId: string): boolean {
+  return (
+    tenantId !== AUTHORITATIVE_STOP_PERSONAL_TENANT &&
+    tenantId !== AUTHORITATIVE_STOP_INTERNAL_TENANT
+  );
 }
 
 /**
- * Build a trusted stop scope. Requires non-empty sessionKey.
- * Missing sessionKey → null (callers must NOT fall back to taskId-only).
+ * Resolve trusted identity dimensions (without sessionKey).
+ * Returns null when identity is incomplete for the resolved kind —
+ * never silently coerces missing tenant/user to empty string.
  */
-export function resolveAuthoritativeTaskStopScope(params: {
-  tenantId?: string | null;
-  userId?: string | null;
-  sessionKey?: string | null;
-}): AuthoritativeTaskStopScope | null {
-  const sessionKey = normalizeStopScopePart(params.sessionKey);
-  if (!sessionKey) {
+export function resolveAuthoritativeTaskStopIdentity(
+  params: Omit<AuthoritativeTaskStopScopeInput, "sessionKey">,
+): { kind: AuthoritativeTaskStopScopeKind; tenantId: string; userId: string } | null {
+  const rawTenant = trimOrNull(params.tenantId);
+  const rawUser = trimOrNull(params.userId);
+  const explicitKind = params.scopeKind;
+
+  let kind: AuthoritativeTaskStopScopeKind | null = explicitKind ?? null;
+  if (!kind) {
+    if (rawTenant && isRealManagedTenantId(rawTenant)) {
+      kind = "managed";
+    } else if (rawUser) {
+      kind = "personal";
+    } else {
+      return null;
+    }
+  }
+
+  if (kind === "managed") {
+    if (!rawTenant || !isRealManagedTenantId(rawTenant) || !rawUser) {
+      return null;
+    }
+    return { kind, tenantId: rawTenant, userId: rawUser };
+  }
+
+  if (kind === "personal") {
+    if (!rawUser) {
+      return null;
+    }
+    // Personal never stores silent ""; use explicit marker. A real tenant with
+    // explicit personal kind is promoted to managed (same identity requirements).
+    if (rawTenant && isRealManagedTenantId(rawTenant)) {
+      return { kind: "managed", tenantId: rawTenant, userId: rawUser };
+    }
+    return {
+      kind: "personal",
+      tenantId: AUTHORITATIVE_STOP_PERSONAL_TENANT,
+      userId: rawUser,
+    };
+  }
+
+  // internal — only when explicitly requested; never inferred from blanks.
+  if (explicitKind !== "internal") {
     return null;
   }
   return {
-    tenantId: normalizeStopScopePart(params.tenantId),
-    userId: normalizeStopScopePart(params.userId),
+    kind: "internal",
+    tenantId: AUTHORITATIVE_STOP_INTERNAL_TENANT,
+    userId: rawUser ?? AUTHORITATIVE_STOP_INTERNAL_USER,
+  };
+}
+
+/**
+ * Build a trusted stop scope. Incomplete identity or missing sessionKey → null
+ * (callers must NOT fall back to taskId-only or coerce blanks to "").
+ */
+export function resolveAuthoritativeTaskStopScope(
+  params: AuthoritativeTaskStopScopeInput,
+): AuthoritativeTaskStopScope | null {
+  const sessionKey = trimOrNull(params.sessionKey);
+  if (!sessionKey) {
+    return null;
+  }
+  const identity = resolveAuthoritativeTaskStopIdentity(params);
+  if (!identity) {
+    return null;
+  }
+  return {
+    kind: identity.kind,
+    tenantId: identity.tenantId,
+    userId: identity.userId,
     sessionKey,
   };
 }
@@ -137,22 +243,21 @@ export function authoritativeStopRegistryKey(
   scope: AuthoritativeTaskStopScope,
   taskId: string,
 ): string {
-  return `t:${scope.tenantId}\0u:${scope.userId}\0s:${scope.sessionKey}\0task:${taskId}`;
+  return `k:${scope.kind}\0t:${scope.tenantId}\0u:${scope.userId}\0s:${scope.sessionKey}\0task:${taskId}`;
 }
 
 export function resetAuthoritativeTaskStopsForTest(): void {
   authoritativeTaskStops.clear();
 }
 
-export function recordAuthoritativeTaskStop(params: {
-  taskId: string;
-  tenantId?: string | null;
-  userId?: string | null;
-  sessionKey?: string | null;
-  reason?: string;
-  nowMs?: number;
-}): AuthoritativeTaskStopEntry | null {
-  const taskId = normalizeStopScopePart(params.taskId);
+export function recordAuthoritativeTaskStop(
+  params: AuthoritativeTaskStopScopeInput & {
+    taskId: string;
+    reason?: string;
+    nowMs?: number;
+  },
+): AuthoritativeTaskStopEntry | null {
+  const taskId = trimOrNull(params.taskId);
   const scope = resolveAuthoritativeTaskStopScope(params);
   // Missing scope or taskId — refuse. Do NOT fall back to global taskId keying.
   if (!taskId || !scope) {
@@ -168,13 +273,10 @@ export function recordAuthoritativeTaskStop(params: {
   return entry;
 }
 
-export function clearAuthoritativeTaskStop(params: {
-  taskId: string;
-  tenantId?: string | null;
-  userId?: string | null;
-  sessionKey?: string | null;
-}): boolean {
-  const taskId = normalizeStopScopePart(params.taskId);
+export function clearAuthoritativeTaskStop(
+  params: AuthoritativeTaskStopScopeInput & { taskId: string },
+): boolean {
+  const taskId = trimOrNull(params.taskId);
   const scope = resolveAuthoritativeTaskStopScope(params);
   // Missing scope — refuse. Do NOT clear every session that shares this taskId.
   if (!taskId || !scope) {
@@ -184,24 +286,43 @@ export function clearAuthoritativeTaskStop(params: {
 }
 
 /**
- * Authoritative stop for a scoped taskId — survives AbortController cleanup.
- * Missing scope → false (no global taskId lookup).
+ * Query authoritative stop. Incomplete scope / missing taskId → `unverifiable`
+ * (resume must treat this as blocked — never as "not stopped").
  */
-export function isAuthoritativeTaskStopActive(params: {
-  taskId: string;
-  tenantId?: string | null;
-  userId?: string | null;
-  sessionKey?: string | null;
-  /** Optional external store for tests. */
-  store?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
-}): boolean {
-  const taskId = normalizeStopScopePart(params.taskId);
+export function queryAuthoritativeTaskStop(
+  params: AuthoritativeTaskStopScopeInput & {
+    taskId: string;
+    /** Optional external store for tests. */
+    store?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
+  },
+): AuthoritativeTaskStopQueryResult {
+  const taskId = trimOrNull(params.taskId);
+  if (!taskId) {
+    return { state: "unverifiable", reason: "missing_task_id" };
+  }
   const scope = resolveAuthoritativeTaskStopScope(params);
-  if (!taskId || !scope) {
-    return false;
+  if (!scope) {
+    return { state: "unverifiable", reason: "incomplete_scope" };
   }
   const store = params.store ?? authoritativeTaskStops;
-  return store.has(authoritativeStopRegistryKey(scope, taskId));
+  return store.has(authoritativeStopRegistryKey(scope, taskId))
+    ? { state: "active" }
+    : { state: "inactive" };
+}
+
+/**
+ * True only when a stop record is actively present under a complete scope.
+ * Incomplete scope → false (not active). Resume paths must use
+ * {@link queryAuthoritativeTaskStop} / {@link buildResumeTaskStopActive} so
+ * unverifiable identity fails closed instead of meaning "not stopped".
+ */
+export function isAuthoritativeTaskStopActive(
+  params: AuthoritativeTaskStopScopeInput & {
+    taskId: string;
+    store?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
+  },
+): boolean {
+  return queryAuthoritativeTaskStop(params).state === "active";
 }
 
 /**
@@ -218,31 +339,55 @@ export function sessionStopBarrierActive(params: {
   taskId?: string;
   tenantId?: string | null;
   userId?: string | null;
+  scopeKind?: AuthoritativeTaskStopScopeKind;
   /** Optional external store; defaults to the module registry. */
   authoritativeStops?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
 }): boolean {
-  const taskId = params.taskId?.trim() ?? "";
+  const taskId = trimOrNull(params.taskId) ?? "";
   if (taskId) {
     const store = params.authoritativeStops ?? authoritativeTaskStops;
+    const sessionKeyList: string[] = [];
     for (const rawKey of params.sessionKeys) {
-      if (
-        isAuthoritativeTaskStopActive({
-          taskId,
-          tenantId: params.tenantId,
-          userId: params.userId,
-          sessionKey: rawKey,
-          store,
-        })
-      ) {
-        return true;
+      const trimmed = trimOrNull(rawKey);
+      if (trimmed) {
+        sessionKeyList.push(trimmed);
       }
     }
-    // Scoped miss: do NOT fall back to a global taskId lookup.
+
+    // Identity incomplete → unverifiable → fail closed (never "not stopped").
+    const identity = resolveAuthoritativeTaskStopIdentity({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      scopeKind: params.scopeKind,
+    });
+    if (!identity || sessionKeyList.length === 0) {
+      return true;
+    }
+
+    let sawCompleteInactive = false;
+    for (const sessionKey of sessionKeyList) {
+      const result = queryAuthoritativeTaskStop({
+        taskId,
+        tenantId: params.tenantId,
+        userId: params.userId,
+        scopeKind: params.scopeKind,
+        sessionKey,
+        store,
+      });
+      if (result.state === "active" || result.state === "unverifiable") {
+        return true;
+      }
+      if (result.state === "inactive") {
+        sawCompleteInactive = true;
+      }
+    }
+    // Complete scoped miss: do NOT fall back to a global taskId lookup.
+    void sawCompleteInactive;
   }
 
   const keys = new Set<string>();
   for (const key of params.sessionKeys) {
-    const trimmed = key.trim();
+    const trimmed = trimOrNull(key);
     if (trimmed) {
       keys.add(trimmed);
     }
@@ -251,7 +396,7 @@ export function sessionStopBarrierActive(params: {
     return false;
   }
   for (const entry of params.chatAbortControllers.values()) {
-    const sessionKey = entry.sessionKey.trim();
+    const sessionKey = trimOrNull(entry.sessionKey);
     if (!sessionKey || !keys.has(sessionKey)) {
       continue;
     }
@@ -265,17 +410,20 @@ export function sessionStopBarrierActive(params: {
 /**
  * Build the resume-time per-taskId stop predicate used by chat.send.
  * Combines scoped authoritative task stops with any still-live aborted controllers.
+ * Unverifiable identity fails closed (returns true → deny resume).
  */
 export function buildResumeTaskStopActive(params: {
   sessionKeys: Iterable<string>;
   chatAbortControllers: ReadonlyMap<string, SessionStopBarrierEntry>;
   tenantId?: string | null;
   userId?: string | null;
+  scopeKind?: AuthoritativeTaskStopScopeKind;
 }): (taskId: string) => boolean {
   const sessionKeys = [...params.sessionKeys];
   const controllers = params.chatAbortControllers;
   const tenantId = params.tenantId;
   const userId = params.userId;
+  const scopeKind = params.scopeKind;
   return (taskId: string) =>
     sessionStopBarrierActive({
       sessionKeys,
@@ -283,6 +431,7 @@ export function buildResumeTaskStopActive(params: {
       taskId,
       tenantId,
       userId,
+      scopeKind,
     });
 }
 

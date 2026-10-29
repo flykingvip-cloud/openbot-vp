@@ -413,6 +413,7 @@ import {
   clientIdentityOkForResume,
   recordAuthoritativeTaskStop,
   sessionStopBarrierActive,
+  type AuthoritativeTaskStopScopeKind,
 } from "./chat-resume-parked-recheck.js";
 import {
   appendInjectedAssistantMessageToTranscript,
@@ -3054,15 +3055,25 @@ function createChatAbortOps(context: GatewayRequestContext): ChatAbortOps {
   };
 }
 
-/** Trusted tenant/user identity for the authoritative stop registry (never client task text). */
+/**
+ * Trusted identity for the authoritative stop registry (never client task text).
+ * Does not coerce missing tenant/user to "". Callers pass scopeKind through so
+ * resolveAuthoritativeTaskStopScope can refuse incomplete managed/personal identity.
+ */
 function authoritativeStopIdentityFromClient(client: GatewayClient | null | undefined): {
-  tenantId: string;
-  userId: string;
+  scopeKind: AuthoritativeTaskStopScopeKind;
+  tenantId: string | null;
+  userId: string | null;
 } {
-  return {
-    tenantId: (client?.sessionEnterpriseId ?? client?.sessionTenantId ?? "").trim(),
-    userId: (client?.platformUserId ?? client?.user ?? "").trim(),
-  };
+  if (!client) {
+    return { scopeKind: "internal", tenantId: null, userId: null };
+  }
+  const tenantRaw = (client.sessionEnterpriseId ?? client.sessionTenantId)?.trim() || null;
+  const userRaw = (client.platformUserId ?? client.user)?.trim() || null;
+  if (tenantRaw) {
+    return { scopeKind: "managed", tenantId: tenantRaw, userId: userRaw };
+  }
+  return { scopeKind: "personal", tenantId: null, userId: userRaw };
 }
 
 async function abortChatRunsForSessionKeyWithPartials(params: {
@@ -3114,6 +3125,7 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
       clearAuthoritativeTaskStop({
         taskId: boardTaskId,
         sessionKey: params.sessionKey,
+        scopeKind: identity.scopeKind,
         tenantId: identity.tenantId,
         userId: identity.userId,
       });
@@ -3121,6 +3133,7 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
       recordAuthoritativeTaskStop({
         taskId: boardTaskId,
         sessionKey: params.sessionKey,
+        scopeKind: identity.scopeKind,
         tenantId: identity.tenantId,
         userId: identity.userId,
         reason: params.stopReason ?? params.abortOrigin,
@@ -4494,6 +4507,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             clearAuthoritativeTaskStop({
               taskId: boardTaskId,
               sessionKey,
+              scopeKind: identity.scopeKind,
               tenantId: identity.tenantId,
               userId: identity.userId,
             });
@@ -4501,6 +4515,7 @@ export const chatHandlers: GatewayRequestHandlers = {
             recordAuthoritativeTaskStop({
               taskId: boardTaskId,
               sessionKey,
+              scopeKind: identity.scopeKind,
               tenantId: identity.tenantId,
               userId: identity.userId,
               reason: "rpc",
@@ -5824,15 +5839,18 @@ export const chatHandlers: GatewayRequestHandlers = {
               clientIdentityOk: clientIdentityOkForResume(client),
               // Session-wide live-controller scan is secondary only; scoped
               // authoritative stop (tenant/user/session+taskId) survives abort→delete.
+              // Incomplete identity → unverifiable → fail closed (never "not stopped").
               stopActive: sessionStopBarrierActive({
                 sessionKeys: [resolvedSessionKey, sessionKey],
                 chatAbortControllers: context.chatAbortControllers,
+                scopeKind: stopIdentity.scopeKind,
                 tenantId: stopIdentity.tenantId,
                 userId: stopIdentity.userId,
               }),
               isTaskStopActive: buildResumeTaskStopActive({
                 sessionKeys: [resolvedSessionKey, sessionKey],
                 chatAbortControllers: context.chatAbortControllers,
+                scopeKind: stopIdentity.scopeKind,
                 tenantId: stopIdentity.tenantId,
                 userId: stopIdentity.userId,
               }),
