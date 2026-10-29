@@ -10060,6 +10060,31 @@ landingStreams:
       task: fix-ab-ghost-confirm-chat-history-20261029
       owner: ab
       purpose: Ghost confirm cards + missing local user bubbles (trusted getTodolist + sticky filter + history merge)
+  - id: ux-unread-badge-persist-20261029:grok-bot
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - ui/src/ui/session-seen-at.ts
+      - ui/src/ui/session-seen-at.node.test.ts
+      - ui/src/ui/session-seen-at.production.node.test.ts
+      - ui/src/ui/app-session-actions.ts
+      - ui/src/ui/app-session-actions.test.ts
+      - ui/src/ui/app-settings.ts
+      - ui/src/ui/app-gateway-session-defaults.ts
+      - ui/src/ui/app-gateway-session-defaults.node.test.ts
+      - ui/src/ui/storage.ts
+      - ui/src/ui/storage.node.test.ts
+      - ui/src/ui/controllers/daibai.ts
+      - ui/src/ui/chat/grouped-render.ts
+      - ui/src/ui/chat/grouped-render.node.test.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+      - ui/src/ui/ports/employee/render-model.ts
+      - ui/src/ui/ports/employee/render-model-shell-actions.ts
+      - ui/src/ui/ports/employee/views/workbench-home-model.ts
+      - ui/src/ui/views/workbench-home-model.node.test.ts
+    canLandWith: []
+    metadata:
+      legacyTitle: UX unread badge persist + cross-day chat timestamps
   - id: team-real-collab-loop-f1f3
     landingPolicy: parallel
     paths:

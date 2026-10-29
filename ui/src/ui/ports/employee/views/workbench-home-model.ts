@@ -3,9 +3,14 @@ import {
   isCronSessionKey,
   isSubagentSessionKey,
   parseAgentSessionKey,
+  toCollaborationSpaceSessionKey,
 } from "../../../../../../src/sessions/session-key-utils.ts";
 import { i18n, t } from "../../../../i18n/index.ts";
 import { resolveSessionDisplayName } from "../../../app-render.helpers.ts";
+import {
+  extractEmployeeStewardOwnerFromSessionKey,
+  isGlobalStewardSessionAlias,
+} from "../../../chat-session-key-match.ts";
 import { isGroupScopedSessionKey } from "../../../collaboration/resolve-group-scope.ts";
 import type {
   FrontstageContactCard,
@@ -18,6 +23,7 @@ import {
   deriveSessionCards,
 } from "../../../data/frontstage-session-cards.ts";
 import { formatRelativeTimestamp } from "../../../format.ts";
+import { resolveSessionSeenAtMs } from "../../../session-seen-at.ts";
 import type {
   AgentsListResult,
   ChannelsStatusSnapshot,
@@ -160,6 +166,12 @@ export type WorkbenchHomeStateSnapshotInput = {
   sessionsResult: SessionsListResult | null;
   sessionSeenAt: Record<string, number>;
   activeSessionKey: string;
+  /** Trusted current employee's steward key — scopes unread alias matching. */
+  ownStewardSessionKey?: string | null;
+  /** Trusted tenant id — partitions collaboration space unread cursors. */
+  tenantId?: string | null;
+  /** managed vs personal space-cursor policy (see session-seen-at). */
+  spaceMode?: "managed" | "personal" | null;
   teamObjects: Record<string, WorkbenchTeamObject>;
   teamOrder: string[];
   channelsSnapshot: ChannelsStatusSnapshot | null;
@@ -284,15 +296,76 @@ function resolveActivity(updatedAt: number | null): WorkbenchActivity {
   return "idle";
 }
 
+function resolveUnreadSpaceSessionKey(sessionKey: string): string | null {
+  const raw = sessionKey.trim();
+  if (!raw) {
+    return null;
+  }
+  if (raw.toLowerCase().startsWith("space:")) {
+    return toCollaborationSpaceSessionKey(raw.slice("space:".length));
+  }
+  const match = raw.match(/:space:([^:]+)/i);
+  return match ? toCollaborationSpaceSessionKey(match[1]) : null;
+}
+
+function isActiveUnreadSessionKey(
+  key: string,
+  activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
+): boolean {
+  const active = activeSessionKey.trim();
+  if (!active) {
+    return false;
+  }
+  if (key === active) {
+    return true;
+  }
+  // Steward aliases share one inbox only within the trusted current user.
+  // Different employee:<id> owners must not clear each other (account switch).
+  const own = ownStewardSessionKey?.trim() || "";
+  const keyOwner = extractEmployeeStewardOwnerFromSessionKey(key);
+  const activeOwner = extractEmployeeStewardOwnerFromSessionKey(active);
+  const keyIsSteward = isGlobalStewardSessionAlias(key) || Boolean(keyOwner);
+  const activeIsSteward = isGlobalStewardSessionAlias(active) || Boolean(activeOwner);
+  if (keyIsSteward && activeIsSteward) {
+    if (keyOwner && activeOwner) {
+      return keyOwner === activeOwner;
+    }
+    // One side is a public main alias: only treat as active for the trusted own steward.
+    const ownOwner = extractEmployeeStewardOwnerFromSessionKey(own);
+    if (keyOwner && ownOwner) {
+      return (
+        keyOwner === ownOwner && (isGlobalStewardSessionAlias(active) || activeOwner === ownOwner)
+      );
+    }
+    if (activeOwner && ownOwner) {
+      return (
+        activeOwner === ownOwner && (isGlobalStewardSessionAlias(key) || keyOwner === ownOwner)
+      );
+    }
+    // No employee ids and no trusted own — allow classic main↔main alias match only.
+    if (!keyOwner && !activeOwner) {
+      return isGlobalStewardSessionAlias(key) && isGlobalStewardSessionAlias(active);
+    }
+    return false;
+  }
+  const keySpace = resolveUnreadSpaceSessionKey(key);
+  const activeSpace = resolveUnreadSpaceSessionKey(active);
+  return Boolean(keySpace && activeSpace && keySpace === activeSpace);
+}
+
 function countUnreadSessions(
   sessionKeys: string[],
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ) {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return sessionKeys.reduce((count, key) => {
-    if (key === activeSessionKey) {
+    if (isActiveUnreadSessionKey(key, activeSessionKey, ownStewardSessionKey)) {
       return count;
     }
     // P1（未读基于真实入站消息）：只有「承载真实对话消息」的会话才计入未读。
@@ -311,7 +384,14 @@ function countUnreadSessions(
     if (!hasRealMessage) {
       return count;
     }
-    const seenAt = sessionSeenAt[key] ?? 0;
+    // Alias-aware cursor: UI may persist under canonical/steward alias while
+    // sessions.list keeps employee:/space: mirror keys — exact lookup resurrects
+    // badges after refresh.
+    const seenAt = resolveSessionSeenAtMs(sessionSeenAt, key, {
+      ownStewardSessionKey,
+      tenantId,
+      spaceMode: spaceMode ?? undefined,
+    });
     return updatedAt > seenAt ? count + 1 : count;
   }, 0);
 }
@@ -388,6 +468,9 @@ function buildAgentItems(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ): WorkbenchSidebarItem[] {
   const sessionCounts = sessionsByAgent(sessionsResult);
   const sessionsByAgentId = new Map<string, SessionsListResult["sessions"][number][]>();
@@ -432,7 +515,13 @@ function buildAgentItems(
         ? t("frontstage.me.primaryPersona")
         : t("frontstage.personas.secondaryPersona");
     const meta = t("frontstage.personas.sessions", { count: String(sessionCount) });
-    const sessionKeys = agentSessions.map((row) => row.key);
+    // Assistant badges must not inherit collaboration-space mirrors. Those rows
+    // belong to 协作空间 entries; bundling them into 大白管家/助手 sessionKeys
+    // made "open steward" batch-clear space badges in memory, then refresh
+    // resurrected both steward and space unread counts.
+    const sessionKeys = agentSessions
+      .map((row) => row.key)
+      .filter((key) => !isGroupScopedSessionKey(key));
     return [
       {
         key: primarySessionKey,
@@ -448,6 +537,9 @@ function buildAgentItems(
           sessionsResult,
           sessionSeenAt,
           activeSessionKey,
+          ownStewardSessionKey,
+          tenantId,
+          spaceMode,
         ),
         activity: resolveActivity(primarySession?.updatedAt ?? null),
         kind: "agent" as const,
@@ -460,6 +552,9 @@ function buildContactItems(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ): WorkbenchSidebarItem[] {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return buildContactCards(sessionsResult).map((contact) => {
@@ -482,6 +577,9 @@ function buildContactItems(
         sessionsResult,
         sessionSeenAt,
         activeSessionKey,
+        ownStewardSessionKey,
+        tenantId,
+        spaceMode,
       ),
       activity: resolveActivity(contact.latestUpdatedAt),
       kind: "contact" as const,
@@ -493,6 +591,9 @@ function buildGroupItems(
   sessionsResult: SessionsListResult | null,
   sessionSeenAt: Record<string, number>,
   activeSessionKey: string,
+  ownStewardSessionKey?: string | null,
+  tenantId?: string | null,
+  spaceMode?: "managed" | "personal" | null,
 ): WorkbenchSidebarItem[] {
   const rowsByKey = new Map((sessionsResult?.sessions ?? []).map((row) => [row.key, row] as const));
   return buildGroupCards(sessionsResult).map((group) => {
@@ -515,6 +616,9 @@ function buildGroupItems(
         sessionsResult,
         sessionSeenAt,
         activeSessionKey,
+        ownStewardSessionKey,
+        tenantId,
+        spaceMode,
       ),
       activity: resolveActivity(group.latestUpdatedAt),
       kind: "group" as const,
@@ -591,13 +695,26 @@ export function buildWorkbenchHomeModelFromState(
     input.sessionsResult,
     input.sessionSeenAt,
     input.activeSessionKey,
+    input.ownStewardSessionKey,
+    input.tenantId,
+    input.spaceMode,
   );
   const contacts = buildContactItems(
     input.sessionsResult,
     input.sessionSeenAt,
     input.activeSessionKey,
+    input.ownStewardSessionKey,
+    input.tenantId,
+    input.spaceMode,
   );
-  const groups = buildGroupItems(input.sessionsResult, input.sessionSeenAt, input.activeSessionKey);
+  const groups = buildGroupItems(
+    input.sessionsResult,
+    input.sessionSeenAt,
+    input.activeSessionKey,
+    input.ownStewardSessionKey,
+    input.tenantId,
+    input.spaceMode,
+  );
   const teamAssistants = applyTeamObjectPreferences(
     toTeamEntries(agents, "assistant"),
     input.teamObjects,

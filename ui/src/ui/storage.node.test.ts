@@ -564,3 +564,91 @@ describe("loadSettings default gateway URL derivation", () => {
     expect(loadSettings().customBrandLogoDataUrl).toBeUndefined();
   });
 });
+
+describe("persistSettings quota degrade", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubGlobal("localStorage", createStorageMock());
+    vi.stubGlobal("sessionStorage", createStorageMock());
+    vi.stubGlobal("navigator", { language: "en-US" } as Navigator);
+    localStorage.clear();
+    sessionStorage.clear();
+    setControlUiBasePath(undefined);
+    setTestLocation({
+      protocol: "https:",
+      host: "gateway.example:8443",
+      pathname: "/",
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    setControlUiBasePath(undefined);
+    vi.unstubAllGlobals();
+  });
+
+  it("quota degrade preserves unrelated settings while updating sessionSeenAt", async () => {
+    const { loadSettings, saveSettings } = await import("./storage.ts");
+    const SETTINGS_KEY = "openbot.control.settings.v1";
+    // Seed a full-looking config including locale + profile fields.
+    saveSettings({
+      ...loadSettings(),
+      sessionKey: "main",
+      lastActiveSessionKey: "main",
+      sessionSeenAt: { main: 1 },
+      locale: "zh-CN",
+      localePinnedByUser: true,
+      workbenchProfileName: "Alice",
+      workbenchProfileNote: "keep-me",
+      customBrandLogoDataUrl: `data:image/png;base64,${"A".repeat(200)}`,
+    });
+
+    expect(localStorage.getItem(SETTINGS_KEY)).toBeTruthy();
+
+    // Fail only the oversized write that carries the new logo — loadSettings may
+    // also rewrite on migrate and must not consume the degrade budget.
+    const hugeLogo = `data:image/png;base64,${"B".repeat(400)}`;
+    let oversizedWriteAttempts = 0;
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = ((key: string, value: string) => {
+      if (key === SETTINGS_KEY && value.includes(hugeLogo)) {
+        oversizedWriteAttempts += 1;
+        // Full persist with logo fails; without-logo path should not include hugeLogo.
+        throw new Error("QuotaExceededError");
+      }
+      if (
+        key === SETTINGS_KEY &&
+        value.includes('"agent:main:employee:u2"') &&
+        value.includes('"sessionSeenAt"')
+      ) {
+        // Allow without-logo / merge paths; count them but do not throw here.
+      }
+      return realSetItem(key, value);
+    }) as Storage["setItem"];
+
+    const next = {
+      ...loadSettings(),
+      sessionKey: "agent:main:employee:u2",
+      lastActiveSessionKey: "agent:main:employee:u2",
+      sessionSeenAt: { "agent:main:employee:u2": 99 },
+      locale: "zh-CN" as const,
+      localePinnedByUser: true,
+      workbenchProfileName: "Alice",
+      workbenchProfileNote: "keep-me",
+      customBrandLogoDataUrl: hugeLogo,
+    };
+    saveSettings(next);
+
+    expect(oversizedWriteAttempts).toBeGreaterThanOrEqual(1);
+    const parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    expect(parsed.sessionSeenAt).toEqual({ "agent:main:employee:u2": 99 });
+    expect(parsed.locale).toBe("zh-CN");
+    expect(parsed.workbenchProfileName).toBe("Alice");
+    expect(parsed.workbenchProfileNote).toBe("keep-me");
+    // Logo dropped on degrade; unrelated settings survive.
+    expect(parsed.customBrandLogoDataUrl).toBeUndefined();
+  });
+});

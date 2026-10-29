@@ -9,6 +9,10 @@ import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
 import { openKnowledgeUniverseGovernancePage } from "../../controllers/knowledge-universe.ts";
 import { cancelWorkbenchScheduleEntry, refreshWorkbenchSignals } from "../../controllers/spaces.ts";
 import { replaceLocationWithPublicHomepage } from "../../public-home.ts";
+import {
+  bumpSessionSeenAtMany,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+} from "../../session-seen-at.ts";
 import type { ThemeMode } from "../../theme.ts";
 import { openPersonalOperationalIdentitySection } from "./operational-identity-navigation.ts";
 import {
@@ -315,22 +319,22 @@ export function buildEmployeeWorkbenchShellActionProps({
         return;
       }
       const seenAt = Date.now();
-      const merged: Record<string, number> = {
-        ...state.settings.sessionSeenAt,
-      };
-      let mutated = false;
-      for (const rawKey of sessionKeys) {
-        const key = typeof rawKey === "string" ? rawKey.trim() : "";
-        if (!key) {
-          continue;
-        }
-        if ((merged[key] ?? 0) >= seenAt) {
-          continue;
-        }
-        merged[key] = seenAt;
-        mutated = true;
-      }
-      if (!mutated) {
+      const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+        hello: state.hello,
+        platformAuthState: state.platformAuthState,
+        bootstrapAuthSession: state.bootstrapAuthSession,
+        bootstrapDataSpace: state.bootstrapDataSpace,
+        ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+          resolveStewardSessionDefaultsFromHello(state.hello),
+        ),
+      });
+      const merged = bumpSessionSeenAtMany(
+        state.settings.sessionSeenAt,
+        sessionKeys,
+        seenAt,
+        seenOpts,
+      );
+      if (merged === state.settings.sessionSeenAt) {
         return;
       }
       state.applySettings({

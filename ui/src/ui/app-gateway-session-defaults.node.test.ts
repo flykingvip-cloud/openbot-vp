@@ -155,3 +155,68 @@ describe("applySessionDefaults foreign sticky steward reset", () => {
     expect(host.settings.workbenchProfileName).toBeUndefined();
   });
 });
+
+describe("R3 production: applySessionDefaults threads trusted tenantId", () => {
+  const U1 = "agent:main:employee:u1";
+  const SPACE = "space:shared-group";
+  const seenAt = 1_700_000_000_500;
+  const defaults = {
+    mainSessionKey: U1,
+    mainKey: "main",
+    defaultAgentId: "main",
+  };
+
+  function createManagedHost(tenantId: string, sessionSeenAt: Record<string, number>) {
+    const host = createHost({ sessionKey: U1, settingsSessionKey: U1, lastActiveSessionKey: U1 });
+    (host as { hello: unknown }).hello = {
+      auth: { provider: "trusted-proxy", user: "u1", tenantId },
+      snapshot: { sessionDefaults: defaults },
+    };
+    (host as { platformAuthState: unknown }).platformAuthState = {
+      enabled: true,
+      session: { tenantId, user: "u1" },
+    };
+    (host as unknown as { bootstrapDataSpace: unknown }).bootstrapDataSpace = { mode: "managed" };
+    host.settings.sessionSeenAt = sessionSeenAt;
+    return host;
+  }
+
+  it("same user switch tenant + same groupId: scrub keeps A, B does not inherit", async () => {
+    const {
+      bumpSessionSeenAt,
+      resolveSessionSeenAtMs,
+      resolveSessionSeenAliasOptionsFromTrustedSession,
+    } = await import("./session-seen-at.ts");
+
+    const optsA = resolveSessionSeenAliasOptionsFromTrustedSession({
+      platformAuthState: { enabled: true, session: { tenantId: "tenant-a", user: "u1" } },
+      bootstrapDataSpace: { mode: "managed" },
+      ownStewardSessionKey: U1,
+    });
+    const map = bumpSessionSeenAt({}, SPACE, seenAt, optsA);
+    expect(optsA.tenantId).toBe("tenant-a");
+    expect(optsA.spaceMode).toBe("managed");
+
+    const host = createManagedHost("tenant-b", map);
+    applySessionDefaults(host, defaults);
+
+    const optsB = resolveSessionSeenAliasOptionsFromTrustedSession({
+      hello: host.hello,
+      platformAuthState: (host as { platformAuthState?: unknown }).platformAuthState as never,
+      bootstrapDataSpace: { mode: "managed" },
+      ownStewardSessionKey: U1,
+    });
+    expect(optsB.tenantId).toBe("tenant-b");
+    // Refresh shape on tenant B: same groupId must not inherit A's cursor.
+    expect(resolveSessionSeenAtMs(host.settings.sessionSeenAt, SPACE, optsB)).toBe(0);
+    expect(
+      resolveSessionSeenAtMs(host.settings.sessionSeenAt, "agent:main:space:shared-group", optsB),
+    ).toBe(0);
+    // Returning to A remains explicit — partition kept.
+    expect(
+      resolveSessionSeenAtMs(host.settings.sessionSeenAt, SPACE, {
+        ...optsA,
+      }),
+    ).toBe(seenAt);
+  });
+});

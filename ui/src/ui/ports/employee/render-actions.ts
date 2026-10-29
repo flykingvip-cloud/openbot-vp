@@ -4,8 +4,16 @@ import {
 } from "../../../../../src/sessions/session-key-utils.ts";
 import { reloadShellChatHistory } from "../../app-chat-actions.ts";
 import type { AppPortState } from "../../app-port-state.ts";
+import {
+  resolveBuiltinStewardSessionKey,
+  resolveStewardSessionDefaultsFromHello,
+} from "../../builtin-steward-selection.ts";
 import { sessionKeysShareChatSurface } from "../../chat-session-key-match.ts";
 import { applyPendingChatFocusMessage } from "../../chat/focus-message.ts";
+import {
+  bumpSessionSeenAt,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+} from "../../session-seen-at.ts";
 import { syncComputerPreviewAfterSessionSwitch } from "../../views/account-computer-preview.ts";
 import {
   maybeTriggerGrowthBirthTurn,
@@ -309,6 +317,36 @@ export function switchEmployeeWorkbenchSession(
     ) {
       state.workbenchTeamSelectedKey = sessionKey;
     }
+    // Still persist the unread cursor — skipping applySettings here left
+    // sessionSeenAt stale, so refresh resurrected badges for an already-open
+    // steward/space surface.
+    const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+      hello: state.hello,
+      // Auth surfaces live on the Lit app host; EmployeeWorkbenchSessionState is a
+      // narrow Pick and may omit them — resolve once via trusted-session helper.
+      ...(state as {
+        platformAuthState?: {
+          enabled?: boolean | null;
+          session?: { tenantId?: string | null; user?: string | null } | null;
+        } | null;
+        bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+        bootstrapDataSpace?: { mode?: string | null } | null;
+      }),
+      ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+        resolveStewardSessionDefaultsFromHello(state.hello),
+      ),
+    });
+    state.applySettings({
+      ...state.settings,
+      sessionKey,
+      lastActiveSessionKey: sessionKey,
+      sessionSeenAt: bumpSessionSeenAt(
+        state.settings.sessionSeenAt,
+        sessionKey,
+        Date.now(),
+        seenOpts,
+      ),
+    });
     return;
   }
   state.workbenchPrimaryModule = primaryModule;
@@ -365,10 +403,25 @@ export function switchEmployeeWorkbenchSession(
     ...state.settings,
     sessionKey,
     lastActiveSessionKey: sessionKey,
-    sessionSeenAt: {
-      ...state.settings.sessionSeenAt,
-      [sessionKey]: Date.now(),
-    },
+    sessionSeenAt: bumpSessionSeenAt(
+      state.settings.sessionSeenAt,
+      sessionKey,
+      Date.now(),
+      resolveSessionSeenAliasOptionsFromTrustedSession({
+        hello: state.hello,
+        ...(state as {
+          platformAuthState?: {
+            enabled?: boolean | null;
+            session?: { tenantId?: string | null; user?: string | null } | null;
+          } | null;
+          bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+          bootstrapDataSpace?: { mode?: string | null } | null;
+        }),
+        ownStewardSessionKey: resolveBuiltinStewardSessionKey(
+          resolveStewardSessionDefaultsFromHello(state.hello),
+        ),
+      }),
+    ),
   });
   void state.loadAssistantIdentity();
   syncComputerPreviewAfterSessionSwitch(

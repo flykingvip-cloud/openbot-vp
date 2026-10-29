@@ -132,11 +132,89 @@ type GroupedMessageRenderOptions = {
   senderIdentityLookup?: ChatSenderIdentityLookup;
 };
 
-function formatGroupTimestamp(value: number): string {
-  return new Date(value).toLocaleTimeString([], {
+/**
+ * True when `zone` is a usable IANA time zone for `Intl` formatting.
+ * Invalid values throw `RangeError` when computing day boundaries — reject them
+ * at parse time instead.
+ */
+export function isValidIanaTimeZone(zone: string): boolean {
+  const trimmed = zone.trim();
+  if (!trimmed) {
+    return false;
+  }
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: trimmed }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Resolve the IANA zone used for chat bubble day boundaries + display.
+ * Prefer an explicit user/tenant zone; otherwise the browser/runtime zone;
+ * never hardcode a product-wide city (multi-tenant employees are not all in Shanghai).
+ * Illegal explicit IANA values fall back browser → UTC (never throw).
+ */
+export function resolveChatTimestampTimeZone(explicit?: string | null): string {
+  const trimmed = typeof explicit === "string" ? explicit.trim() : "";
+  if (trimmed && isValidIanaTimeZone(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (typeof resolved === "string" && resolved.trim() && isValidIanaTimeZone(resolved)) {
+      return resolved.trim();
+    }
+  } catch {
+    // Fall through.
+  }
+  return "UTC";
+}
+
+/**
+ * Same calendar day → `HH:mm` (locale may add 上午/下午).
+ * Cross-day → include month/day (and year when needed) so a thread that spans
+ * midnights does not look shuffled (`9:50 PM` then bare `9:22 AM`).
+ *
+ * Day-boundary and clock use the **same** timezone.
+ */
+export function formatGroupTimestamp(
+  value: number,
+  nowMs: number = Date.now(),
+  timeZone?: string | null,
+): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+  const tz = resolveChatTimestampTimeZone(timeZone);
+  const dayKey = (ms: number) => new Date(ms).toLocaleDateString("en-CA", { timeZone: tz }); // YYYY-MM-DD
+  const sameDay = dayKey(value) === dayKey(nowMs);
+  const sameYear = dayKey(value).slice(0, 4) === dayKey(nowMs).slice(0, 4);
+  let locale: string | undefined;
+  try {
+    locale = i18n.getLocale() === "zh-CN" ? "zh-CN" : undefined;
+  } catch {
+    locale = undefined;
+  }
+  const options: Intl.DateTimeFormatOptions = {
+    timeZone: tz,
     hour: "numeric",
     minute: "2-digit",
-  });
+  };
+  if (!sameDay) {
+    options.month = "numeric";
+    options.day = "numeric";
+    if (!sameYear) {
+      options.year = "numeric";
+    }
+  }
+  try {
+    return date.toLocaleString(locale, options);
+  } catch {
+    return date.toLocaleString("en-US", options);
+  }
 }
 
 function readMessageTimestamp(message: unknown, fallback: number): number {

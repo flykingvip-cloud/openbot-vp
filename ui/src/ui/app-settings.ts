@@ -96,7 +96,12 @@ async function refreshCapabilityGovernanceSnapshotLazy(
     await import("./ports/platform/capability-governance-gateway.ts");
   await refreshCapabilityGovernanceSnapshot(host);
 }
+import {
+  resolveBuiltinStewardSessionKey,
+  resolveStewardSessionDefaultsFromHello,
+} from "./builtin-steward-selection.ts";
 import { resolveWorkbenchSessionKeyFromUrlSearch } from "./chat-session-key-match.ts";
+import type { GatewayHelloOk } from "./gateway.ts";
 import {
   consoleHostEmployeeHomeUrl,
   shouldUsePublicHomepageForCurrentLocation,
@@ -111,6 +116,11 @@ import {
 } from "./routing/openbot-subdomain-redirect.ts";
 import { canonicalPasswordResetLocation } from "./routing/password-reset-link.ts";
 import { resolveAuthorizedTab, type PermissionStateLike } from "./routing/port-permissions.ts";
+import {
+  bumpSessionSeenAt,
+  resolveSessionSeenAliasOptionsFromTrustedSession,
+  type SessionSeenTrustedSessionSource,
+} from "./session-seen-at.ts";
 import { saveSettings, type UiSettings } from "./storage.ts";
 import { startThemeTransition, type ThemeTransitionContext } from "./theme-transition.ts";
 import { resolveTheme, type ResolvedTheme, type ThemeMode } from "./theme.ts";
@@ -124,6 +134,8 @@ export type SettingsHost = PermissionStateLike & {
   themeResolved: ResolvedTheme;
   applySessionKey: string;
   sessionKey: string;
+  /** Gateway hello — scopes sessionSeenAt aliases to the trusted steward. */
+  hello?: GatewayHelloOk | null;
   tab: Tab;
   connected: boolean;
   chatHasAutoScrolled: boolean;
@@ -223,6 +235,16 @@ async function loadEnterpriseOperationalIdentityOverview(host: SettingsHost) {
 type SessionSeenHost = {
   settings: UiSettings;
   applySettings: (next: UiSettings) => void;
+  hello?: {
+    snapshot?: unknown;
+    auth?: { provider?: string | null; user?: string | null; tenantId?: string | null } | null;
+  } | null;
+  platformAuthState?: {
+    enabled?: boolean | null;
+    session?: { tenantId?: string | null; user?: string | null } | null;
+  } | null;
+  bootstrapAuthSession?: { tenantId?: string | null; user?: string | null } | null;
+  bootstrapDataSpace?: { mode?: string | null } | null;
 };
 
 function controlledLoginPathFromLocation(
@@ -300,16 +322,23 @@ export function markSessionSeen(host: SessionSeenHost, sessionKey: string, seenA
   if (!key) {
     return;
   }
-  const previous = host.settings.sessionSeenAt[key] ?? 0;
-  if (previous >= seenAt) {
+  const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+    resolveStewardSessionDefaultsFromHello(host.hello),
+  );
+  const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+    hello: host.hello,
+    platformAuthState: host.platformAuthState,
+    bootstrapAuthSession: host.bootstrapAuthSession,
+    bootstrapDataSpace: host.bootstrapDataSpace,
+    ownStewardSessionKey,
+  });
+  const merged = bumpSessionSeenAt(host.settings.sessionSeenAt, key, seenAt, seenOpts);
+  if (merged === host.settings.sessionSeenAt) {
     return;
   }
   host.applySettings({
     ...host.settings,
-    sessionSeenAt: {
-      ...host.settings.sessionSeenAt,
-      [key]: seenAt,
-    },
+    sessionSeenAt: merged,
   });
 }
 
@@ -335,14 +364,23 @@ function applyWorkbenchSessionKeyFromLocation(host: SettingsHost, search: string
   }
   host.sessionKey = session;
   host.workbenchTeamSelectedKey = session;
+  const seenAt = Date.now();
+  const ownStewardSessionKey = resolveBuiltinStewardSessionKey(
+    resolveStewardSessionDefaultsFromHello(host.hello),
+  );
+  const seenSource = host as unknown as SessionSeenTrustedSessionSource;
+  const seenOpts = resolveSessionSeenAliasOptionsFromTrustedSession({
+    hello: seenSource.hello ?? host.hello,
+    platformAuthState: seenSource.platformAuthState,
+    bootstrapAuthSession: seenSource.bootstrapAuthSession,
+    bootstrapDataSpace: seenSource.bootstrapDataSpace,
+    ownStewardSessionKey,
+  });
   applySettings(host, {
     ...host.settings,
     sessionKey: session,
     lastActiveSessionKey: session,
-    sessionSeenAt: {
-      ...host.settings.sessionSeenAt,
-      [session]: Date.now(),
-    },
+    sessionSeenAt: bumpSessionSeenAt(host.settings.sessionSeenAt, session, seenAt, seenOpts),
   });
 }
 
