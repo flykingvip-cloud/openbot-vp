@@ -350,6 +350,17 @@ export type EmptyToolFinalTool = {
  * deliverable and no draft-box result. A turn that never called a tool stays
  * on the honest-empty reply.
  */
+function isComputerOrBrowserToolName(toolName: string | undefined): boolean {
+  const normalized = (toolName ?? "").trim().toLowerCase();
+  return (
+    normalized === "browser" ||
+    normalized === "computer" ||
+    normalized === "电脑" ||
+    normalized.includes("browser") ||
+    normalized.includes("computer")
+  );
+}
+
 export function shouldContinueAfterEmptyToolFinal(params: {
   stopKind: AssistantStopKind;
   toolsDisabled: boolean;
@@ -367,14 +378,20 @@ export function shouldContinueAfterEmptyToolFinal(params: {
     return false;
   }
   const succeeded = params.tools.filter((tool) => tool.success === true);
-  if (succeeded.length === 0) {
+  const failedComputerBrowser = params.tools.filter(
+    (tool) => tool.success === false && isComputerOrBrowserToolName(tool.toolName),
+  );
+  // Succeeded tools: classic empty-after-tools continue.
+  // Failed 电脑/browser: one continue so the model can surface 云电脑 instead of silent …
+  if (succeeded.length === 0 && failedComputerBrowser.length === 0) {
     return false;
   }
   const blob = [
     ...(params.visibleTexts ?? []),
     ...succeeded.map((tool) => `${tool.toolName ?? ""}\n${tool.meta ?? ""}`),
+    ...failedComputerBrowser.map((tool) => `${tool.toolName ?? ""}\n${tool.meta ?? ""}`),
   ].join("\n");
-  if (DELIVERABLE_OR_DRAFT_RE.test(blob)) {
+  if (succeeded.length > 0 && DELIVERABLE_OR_DRAFT_RE.test(blob)) {
     return false;
   }
   return true;
