@@ -100,6 +100,7 @@ import {
   isTaskStopAccepted,
 } from "../collaboration-dispatch/task-stop-control.js";
 import { resolveSecurityProfile } from "../security-profile.js";
+import { deliveryActorIdsEqual } from "./delivery-actor-binding.js";
 import { collaborationDispatchIdsMatch } from "./member-dispatch-readiness.js";
 import {
   confirmationConsumedDelivery,
@@ -456,6 +457,68 @@ function humanGovernanceConfirmerIds(state: OperatingStateAclSource): string[] {
     }
   }
   return out;
+}
+
+
+function isBotLikeMemberId(memberId: string | null | undefined): boolean {
+  const id = (memberId ?? "").trim();
+  if (!id || id.includes("@") || id.startsWith("human:")) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Agent↔agent peer plans (member bot owner, distinct coordinator bot): auto-confirm
+ * as coordinator and skip human Owner UI. Coordinator's own plan still needs Owner gate.
+ */
+async function maybeAutoConfirmAgentPeerTodolist(params: {
+  authority: RuntimeAuthority;
+  groupId: string;
+  todolist: ExecutorPrivateTodolist;
+  operatingState: OperatingStateAclSource;
+  cfg: OpenBotConfig;
+}): Promise<
+  | { ok: true; todolist: ExecutorPrivateTodolist; reason: "agent_peer_auto_confirmed" }
+  | { ok: false; reason: string; detail?: string }
+> {
+  const owner = params.todolist.ownerMemberId.trim();
+  const acl = await resolveTrustedTodolistAcl({
+    authority: params.authority,
+    operatingState: params.operatingState,
+    taskId: params.todolist.taskId,
+    boardItemId: params.todolist.boardItemId,
+  });
+  const coordinator = (acl.coordinatorBotId ?? "").trim();
+  if (!isBotLikeMemberId(owner) || !isBotLikeMemberId(coordinator)) {
+    return { ok: false, reason: "not_agent_peer_gate" };
+  }
+  if (deliveryActorIdsEqual(owner, coordinator)) {
+    // Coordinator's own plan → real Owner/human gate.
+    return { ok: false, reason: "coordinator_own_plan_needs_owner_gate" };
+  }
+  const confirmed = await confirmTodolist(
+    params.authority,
+    {
+      taskId: params.todolist.taskId,
+      todolistId: params.todolist.todolistId,
+      confirmerId: coordinator,
+      expectedVersion: params.todolist.version,
+    },
+    {
+      cfg: params.cfg,
+      authorizedConfirmerIds: acl.authorizedConfirmerIds,
+      coordinatorBotId: coordinator,
+    },
+  );
+  if (!confirmed.ok) {
+    return {
+      ok: false,
+      reason: "agent_peer_auto_confirm_failed",
+      detail: `${confirmed.reason}: ${confirmed.message}`,
+    };
+  }
+  return { ok: true, todolist: confirmed.value, reason: "agent_peer_auto_confirmed" };
 }
 
 async function resolveTrustedTodolistAcl(params: {
@@ -1620,8 +1683,48 @@ export async function proposeCollaborationTodolist(params: {
     "proposeTodolist",
   );
   // Plan creation already committed. Card delivery is a separate, retryable result.
+  let liveTodolist = todolist;
   let cardDelivery = proposalCreatedDelivery(todolist);
   try {
+    // Agent↔agent peer plans: auto-confirm as coordinator; do not push human Owner UI.
+    // Failures surface as delivery anomaly (not「请再点」).
+    const peer = await maybeAutoConfirmAgentPeerTodolist({
+      authority,
+      groupId: params.groupId,
+      todolist,
+      operatingState: (await readGroupOperatingState({
+        fileStore: stores.fileStore,
+        groupId: params.groupId,
+      })) as OperatingStateAclSource,
+      cfg,
+    });
+    if (peer.ok) {
+      liveTodolist = peer.todolist;
+      cardDelivery = await rememberDelivery(
+        params.groupId,
+        confirmationConsumedDelivery(peer.todolist),
+        cfg,
+        trustedLocator,
+      );
+      return { todolist: liveTodolist, cardDelivery };
+    }
+    if (peer.reason === "agent_peer_auto_confirm_failed") {
+      cardDelivery = await rememberDelivery(
+        params.groupId,
+        normalizeOwnerDecisionDelivery({
+          ...proposalCreatedDelivery(todolist),
+          ok: false,
+          stage: "delivery_failed",
+          reason: peer.reason,
+          message: peer.detail ?? "agent peer auto-confirm failed",
+          retryable: true,
+          userFacing: "delivery_failed_retryable",
+        }),
+        cfg,
+        trustedLocator,
+      );
+      return { todolist: liveTodolist, cardDelivery };
+    }
     const emitted = await emitOwnerDecisionCardForProposedTodolist({
       groupId: params.groupId,
       todolist,
@@ -1647,7 +1750,7 @@ export async function proposeCollaborationTodolist(params: {
       trustedLocator,
     );
   }
-  return { todolist, cardDelivery };
+  return { todolist: liveTodolist, cardDelivery };
 }
 
 /**

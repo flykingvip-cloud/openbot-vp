@@ -25,8 +25,18 @@ function compact(value: string | null | undefined): string {
 }
 
 function sameAgentId(a: string, b: string): boolean {
-  const left = normalizeAgentIdentifier(a) ?? compact(a).toLowerCase();
-  const right = normalizeAgentIdentifier(b) ?? compact(b).toLowerCase();
+  const needle = (value: string): string => {
+    const normalized = normalizeAgentIdentifier(value) ?? compact(value).toLowerCase();
+    if (normalized.startsWith("bot:")) {
+      return normalized.slice(4);
+    }
+    if (normalized.startsWith("agent:")) {
+      return normalized.slice("agent:".length);
+    }
+    return normalized;
+  };
+  const left = needle(a);
+  const right = needle(b);
   return Boolean(left && right && left === right);
 }
 

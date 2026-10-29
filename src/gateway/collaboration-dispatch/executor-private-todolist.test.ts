@@ -335,6 +335,78 @@ describe("P2 executor-private todolist", () => {
     expect(reproposed.value.status).toBe("proposed");
   });
 
+  test("claimant bot ≡ owner bot:bot projection: confirmed plan allows markInProgress", async () => {
+    const { cfg } = await useConfig({ claimContract: true });
+    const auth = authority(cfg);
+    const published = await publishBoardItem(
+      auth,
+      {
+        groupId: "grp_p2",
+        taskId: seedTask.taskId,
+        remainingWork: "claimant bot vs owner bot:bot",
+        acceptanceCriteria: ["mark_in_progress ok after confirm"],
+        goal: "投影归一",
+        constraints: [],
+        intendedClaimantIds: ["bot"],
+        publishedBy: "bot:bot",
+      },
+      { cfg },
+    );
+    expect(published.ok).toBe(true);
+    if (!published.ok) {
+      return;
+    }
+    const itemId = published.value.itemId;
+    await claimBoardItem(
+      auth,
+      { taskId: seedTask.taskId, itemId, claimantId: "bot" },
+      { cfg },
+    );
+    await applyClaim(auth, { taskId: seedTask.taskId, itemId }, seedTask, auth.policy.effective, {
+      cfg,
+    });
+
+    const proposed = await proposeTodolist(
+      auth,
+      {
+        boardItemId: itemId,
+        taskId: seedTask.taskId,
+        groupId: "grp_p2",
+        ownerMemberId: "bot:bot",
+        steps: [{ title: "写稿" }, { title: "交卷" }],
+      },
+      { cfg },
+    );
+    expect(proposed.ok).toBe(true);
+    if (!proposed.ok) {
+      return;
+    }
+    const confirmed = await confirmTodolist(
+      auth,
+      {
+        taskId: seedTask.taskId,
+        todolistId: proposed.value.todolistId,
+        confirmerId: "human:owner",
+        expectedVersion: proposed.value.version,
+      },
+      { cfg, authorizedConfirmerIds: ["human:owner", "bot:bot"] },
+    );
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) {
+      return;
+    }
+
+    const inProg = await markBoardItemInProgress(
+      auth,
+      { taskId: seedTask.taskId, itemId, actorId: "bot" },
+      { cfg },
+    );
+    expect(inProg.ok).toBe(true);
+    if (inProg.ok) {
+      expect(inProg.value.status).toBe("in_progress");
+    }
+  });
+
   test("empty confirmer list does not authorize a non-owner", async () => {
     const { cfg } = await useConfig({ claimContract: true });
     const auth = authority(cfg);

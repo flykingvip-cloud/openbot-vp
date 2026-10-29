@@ -1722,7 +1722,11 @@ export async function consumeWakeForRoundDispatch(
             }
           }
         } else {
-          reason = result.ok ? "dispatch_missing_round_id" : `dispatch_failed:${result.reason}`;
+          reason = result.ok
+            ? "dispatch_missing_round_id"
+            : `dispatch_failed:${result.reason}${
+                result.message ? `:${result.message.replace(/\s+/g, " ").slice(0, 160)}` : ""
+              }`;
           const failed = await markWakeOpFailed({
             authority: params.authority,
             opKey: claimed.opKey,

@@ -47,6 +47,10 @@ import {
   TaskStoppedError,
 } from "../../gateway/collaboration-learning/task-stop-entry.js";
 import {
+  readTeamDeliverable,
+  submitTeamDeliverable,
+} from "../../gateway/collaboration-learning/team-deliverable-submit.js";
+import {
   resolveCompositionTrustedTeamContext,
   type TeamResourceAuthOk,
   type TrustedGroupStores,
@@ -74,9 +78,16 @@ const WRITE_ACTIONS = [
   "submit_for_review",
   "accept_submission",
   "return_submission",
+  "submit_team_deliverable",
 ] as const;
 
-const READ_ACTIONS = ["list_items", "get_member_progress", "get_todolist", "list_todolists"] as const;
+const READ_ACTIONS = [
+  "list_items",
+  "get_member_progress",
+  "get_todolist",
+  "list_todolists",
+  "read_team_deliverable",
+] as const;
 
 const ALL_ACTIONS = [...READ_ACTIONS, ...WRITE_ACTIONS] as const;
 
@@ -184,6 +195,32 @@ const CollaborationBoardSchema = Type.Object({
     Type.String({
       description:
         "claim_item claimant. Defaults to the session agent id (gateway agents.list id).",
+    }),
+  ),
+  deliverableTitle: Type.Optional(
+    Type.String({
+      description: "submit_team_deliverable title (formal group deliverable).",
+    }),
+  ),
+  deliverableContent: Type.Optional(
+    Type.String({
+      description:
+        "submit_team_deliverable UTF-8 body. Gateway writes trusted group deliverables/ and returns sha256 receipt — do not claim managed path writes from the sandbox.",
+    }),
+  ),
+  deliverableRelativePath: Type.Optional(
+    Type.String({
+      description: "Optional relative path under deliverables/ for submit_team_deliverable.",
+    }),
+  ),
+  deliverableId: Type.Optional(
+    Type.String({
+      description: "read_team_deliverable id (from a prior submit receipt).",
+    }),
+  ),
+  previousDeliverableId: Type.Optional(
+    Type.String({
+      description: "submit_team_deliverable: revise this prior deliverable into a new version.",
     }),
   ),
 });
@@ -451,7 +488,7 @@ export function createCollaborationBoardTool(options?: {
     name: COLLABORATION_BOARD_TOOL,
     label: "Collaboration board",
     description:
-      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists (read); activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Human-gate card is propose_todolist. Claimant writes enforce claimant + plan gate + S3 inside the entry.",
+      "Collaboration board tools (Mode B). Actions: list_items, get_member_progress, get_todolist, list_todolists, read_team_deliverable (read); activate_task, claim_item, apply_claim, propose_todolist, mark_in_progress, submit_for_review, accept_submission, return_submission, submit_team_deliverable (write). Requires claimContract / claimContractGroupAllowlist for this group. Managed paths need a trusted group locator from the session (stamped enterprise id); never fall back to host ~/.openbot/collaboration. Formal team delivery is submit_team_deliverable (gateway receipt with contentSha256) — sandbox cannot see host managed paths. Human-gate card is propose_todolist (agent↔agent peer plans may auto-confirm). Claimant writes enforce claimant + plan gate + S3 inside the entry.",
     parameters: CollaborationBoardSchema,
     execute: async (_toolCallId, args) => {
       const params = asToolParams(args);
@@ -849,6 +886,77 @@ export function createCollaborationBoardTool(options?: {
             cfg,
           });
           return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
+        }
+
+        if (action === "submit_team_deliverable") {
+          if (!taskId) {
+            return failResult("invalid_input", "submit_team_deliverable requires taskId");
+          }
+          const deliverableTitle = readStringParam(params, "deliverableTitle", { required: true });
+          const deliverableContent = readStringParam(params, "deliverableContent", {
+            allowEmpty: true,
+          });
+          if (deliverableContent == null) {
+            return failResult("invalid_input", "submit_team_deliverable requires deliverableContent");
+          }
+          const relativePath = readStringParam(params, "deliverableRelativePath") || undefined;
+          const previousDeliverableId =
+            readStringParam(params, "previousDeliverableId") || undefined;
+          const receipt = await submitTeamDeliverable({
+            groupId,
+            taskId,
+            actor: actorId,
+            title: deliverableTitle,
+            content: deliverableContent,
+            relativePath,
+            previousDeliverableId,
+            client,
+            tenant: bound.tenant,
+            trusted: bound.trusted,
+            identityAliases: aliases,
+            cfg,
+          });
+          if (!receipt.ok) {
+            return failResult(receipt.reason, receipt.detail ?? receipt.reason);
+          }
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            receipt: {
+              ...receipt,
+              fingerprintSha16: receipt.contentSha256.slice(0, 16),
+            },
+            locatorBound: true,
+          });
+        }
+
+        if (action === "read_team_deliverable") {
+          const deliverableId = readStringParam(params, "deliverableId", { required: true });
+          const read = await readTeamDeliverable({
+            groupId,
+            deliverableId,
+            actor: actorId,
+            client,
+            tenant: bound.tenant,
+            trusted: bound.trusted,
+            identityAliases: aliases,
+            cfg,
+          });
+          if (!read.ok) {
+            return failResult(read.reason, read.detail ?? read.reason);
+          }
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            deliverable: {
+              ...read,
+              fingerprintSha16: read.contentSha256.slice(0, 16),
+            },
+            locatorBound: true,
+          });
         }
 
         return failResult("invalid_action", `unknown action: ${action}`);

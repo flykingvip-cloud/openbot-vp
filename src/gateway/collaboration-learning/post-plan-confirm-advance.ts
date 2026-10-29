@@ -49,13 +49,20 @@ function compact(value: string | null | undefined): string {
 const log = createSubsystemLogger("gateway/post-plan-confirm-advance");
 
 function finishAdvance(result: PostPlanConfirmAdvanceResult): PostPlanConfirmAdvanceResult {
-  const level = result.wakeRecorded ? "info" : "warn";
+  const failedDispatch =
+    result.wakeConsumed &&
+    !result.dispatched &&
+    (result.reason.startsWith("dispatch_failed") ||
+      result.reason.includes("execute_collaboration_round_failed") ||
+      result.reason.includes("mode_b_"));
+  const level = failedDispatch ? "error" : result.wakeRecorded ? "info" : "warn";
   log[level]("triggerPostPlanConfirmAdvance", {
     reason: result.reason,
     wakeRecorded: result.wakeRecorded,
     wakeConsumed: result.wakeConsumed,
     dispatched: result.dispatched,
     targetAgentIds: result.targetAgentIds,
+    anomaly: failedDispatch ? "plan_confirm_advance_dispatch_failed" : undefined,
   });
   return result;
 }

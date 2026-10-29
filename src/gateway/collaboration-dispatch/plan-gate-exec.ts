@@ -13,6 +13,7 @@
  *   confirmed current Todolist step); missing any → refuse delivery exec
  * - Unconfirmed / revise_requested → only plan_nudge (remind), never delivery_exec
  */
+import { deliveryActorIdsEqual } from "../collaboration-learning/delivery-actor-binding.js";
 import type { GroupBoardClaimItem } from "./claim-contract.js";
 import {
   assertPlanGateAllowsDeliveryProgress,
@@ -240,7 +241,7 @@ export function evaluateDeliveryExecGate(params: {
     };
   }
 
-  if (claimant && claimant !== owner) {
+  if (claimant && !deliveryActorIdsEqual(claimant, owner)) {
     return {
       mode: "blocked",
       reason: "owner_not_claimant",
@@ -251,11 +252,11 @@ export function evaluateDeliveryExecGate(params: {
     };
   }
 
-  if (todolist && compact(todolist.ownerMemberId) !== owner) {
+  if (todolist && !deliveryActorIdsEqual(todolist.ownerMemberId, owner)) {
     return {
       mode: "blocked",
       reason: "todolist_owner_mismatch",
-      message: "Todolist owner must match current claimant for delivery exec",
+      message: `Todolist owner ${todolist.ownerMemberId} must match current claimant/owner projection ${owner}`,
       mapping,
       todolist,
       taskBag: null,
