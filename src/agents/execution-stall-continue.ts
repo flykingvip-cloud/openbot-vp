@@ -10,8 +10,31 @@
  */
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../auto-reply/tokens.js";
 import { isExecutionStallFinal } from "../shared/text/plan-speak-final.js";
+import {
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT,
+  RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT,
+  shouldContinueAfterRecoverableToolFailure,
+  type RecoverableToolFailureTool,
+} from "./recoverable-tool-failure.js";
+import {
+  canStallContinue,
+  claimStallContinue,
+  readStallContinueUsed,
+  STALL_CONTINUE_EXHAUSTED_REASON,
+  type StallContinueClaimResult,
+} from "./skill-gates/stall-continue-ledger.js";
+
+export {
+  canStallContinue,
+  claimStallContinue,
+  readStallContinueUsed,
+  STALL_CONTINUE_EXHAUSTED_REASON,
+  type StallContinueClaimResult,
+};
 import { formatActiveSkillGlossary } from "./skill-gates/glossary.js";
 import { isSilentExecFishingStop } from "./turn-completion/contract.js";
+
+export { RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT, RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT };
 
 export const EXECUTION_STALL_CONTINUE_LIMIT = 2;
 export const FALSE_CONFIRM_CONTINUE_LIMIT = 1;
@@ -41,7 +64,11 @@ const INTERNAL_CONTINUE_PREFIX = "Internal execution continue:";
  * Soft 「请确认」 with no missing decision. Price, spec, payment, scan, and
  * authorization stay in the hard set so a real pause is not continued.
  */
-const SOFT_CONFIRM_RE = /请(?:你)?确认/u;
+const SOFT_CONFIRM_RE =
+  /请(?:你)?确认|要不要|是否(?:要|可以)|用这张|要我推|再确认一下|推(?:到|进)?草稿箱吗/u;
+/** Structured wait marker — soft asks without this must not freeze unfinished turns. */
+const WAITING_CONFIRMATION_RE =
+  /waiting_confirmation|\[WAITING_CONFIRMATION\]|等待(?:你)?确认|owner-decision|owner_decision/iu;
 const HARD_DECISION_RE =
   /(?:扫码|二维码|支付|付款|收银台|价格|规格|尺码|哪一单|选哪个|授权|登录|验证码|绑定|权限|封面|标题|[¥￥])/u;
 const MISSING_CHOICE_RE = /(?:哪个|哪一|选哪)/u;
@@ -58,7 +85,11 @@ type StopMessage = {
 
 export type AssistantStopKind = "text" | "empty" | "tool" | "error" | "none";
 
-export type ExecutionContinueKind = "progress-stall" | "false-confirm" | "silent-exec";
+export type ExecutionContinueKind =
+  | "progress-stall"
+  | "false-confirm"
+  | "silent-exec"
+  | "recoverable-tool-failure";
 
 type AssistantStop =
   | { kind: "text"; text: string }
@@ -201,6 +232,10 @@ export function isSoftConfirmAfterAuthorizedGo(
   if (!assistant || !user || !SOFT_CONFIRM_RE.test(assistant)) {
     return false;
   }
+  // Real gate: structured waiting_confirmation stays terminal (P1 soft-confirm discipline).
+  if (WAITING_CONFIRMATION_RE.test(assistant)) {
+    return false;
+  }
   if (HARD_DECISION_RE.test(assistant) || MISSING_CHOICE_RE.test(assistant)) {
     return false;
   }
@@ -210,6 +245,13 @@ export function isSoftConfirmAfterAuthorizedGo(
   return true;
 }
 
+export type StallContinueLedgerRef = {
+  ledgerDir: string;
+  sessionKey: string;
+  /** Task lifecycle quota cycle (board taskId). Same task shares; new task resets. */
+  quotaCycleId: string;
+};
+
 export function executionContinueKind(params: {
   text: string;
   toolsDisabled: boolean;
@@ -217,6 +259,11 @@ export function executionContinueKind(params: {
   latestUserText?: string;
   falseConfirmContinuesUsed?: number;
   silentExecContinuesUsed?: number;
+  recoverableContinuesUsed?: number;
+  tools?: readonly RecoverableToolFailureTool[];
+  visibleTexts?: readonly string[];
+  /** When set, progress-stall ≤2 is enforced from the durable FS ledger. */
+  stallLedger?: StallContinueLedgerRef;
 }): ExecutionContinueKind | null {
   if (params.toolsDisabled) {
     return null;
@@ -228,9 +275,29 @@ export function executionContinueKind(params: {
   ) {
     return "silent-exec";
   }
-  const stallUsed = params.continuesUsed ?? 0;
-  if (stallUsed < EXECUTION_STALL_CONTINUE_LIMIT && isExecutionStallFinal(params.text)) {
-    return "progress-stall";
+  const recoverableUsed = params.recoverableContinuesUsed ?? 0;
+  if (
+    shouldContinueAfterRecoverableToolFailure({
+      stopText: params.text,
+      toolsDisabled: params.toolsDisabled,
+      continuesUsed: recoverableUsed,
+      tools: params.tools,
+      visibleTexts: params.visibleTexts,
+    })
+  ) {
+    return "recoverable-tool-failure";
+  }
+  if (isExecutionStallFinal(params.text)) {
+    if (params.stallLedger) {
+      if (canStallContinue(params.stallLedger)) {
+        return "progress-stall";
+      }
+    } else {
+      const stallUsed = params.continuesUsed ?? 0;
+      if (stallUsed < EXECUTION_STALL_CONTINUE_LIMIT) {
+        return "progress-stall";
+      }
+    }
   }
   const confirmUsed = params.falseConfirmContinuesUsed ?? 0;
   if (
@@ -249,6 +316,10 @@ export function shouldContinueAfterExecutionStall(params: {
   latestUserText?: string;
   falseConfirmContinuesUsed?: number;
   silentExecContinuesUsed?: number;
+  recoverableContinuesUsed?: number;
+  tools?: readonly RecoverableToolFailureTool[];
+  visibleTexts?: readonly string[];
+  stallLedger?: StallContinueLedgerRef;
 }): boolean {
   return executionContinueKind(params) !== null;
 }
