@@ -70,6 +70,7 @@ import {
   truncateMiddle,
   clampExecWorkdirToWorkspaceRoot,
 } from "./bash-tools.shared.js";
+import { enrichPathMissingToolError } from "./recoverable-tool-failure.js";
 import { assertSandboxPath } from "./sandbox-paths.js";
 import { assertSharedFsExecMutationAllowed } from "./shared-fs-resource-policy.js";
 
@@ -804,7 +805,13 @@ async function executeResolvedExecPolicy(params: {
           return;
         }
         if (outcome.status === "failed") {
-          reject(new Error(outcome.reason ?? "Command failed."));
+          const workspaceRoot =
+            defaults?.workspaceRoot?.trim() || defaults?.cwd || workdir || undefined;
+          const reason = enrichPathMissingToolError({
+            errorText: outcome.reason ?? "Command failed.",
+            workspaceRoot,
+          });
+          reject(new Error(reason));
           return;
         }
         resolve({
@@ -829,6 +836,16 @@ async function executeResolvedExecPolicy(params: {
         }
         if (yielded || run.session.backgrounded) {
           return;
+        }
+        const workspaceRoot =
+          defaults?.workspaceRoot?.trim() || defaults?.cwd || workdir || undefined;
+        const message = err instanceof Error ? err.message : String(err);
+        const enriched = enrichPathMissingToolError({
+          errorText: message,
+          workspaceRoot,
+        });
+        if (enriched !== message && err instanceof Error) {
+          err.message = enriched;
         }
         reject(err as Error);
       });
