@@ -16,7 +16,7 @@ describe("classifyRecoverableToolFailure", () => {
     ).toBe("sandbox_runtime");
     expect(
       classifyRecoverableToolFailure(
-        "Managed multitenant sandbox requires a server-derived account (tenantId + userId).",
+        "Cannot connect to the Docker daemon at unix:///var/run/docker.sock",
       ),
     ).toBe("sandbox_runtime");
   });
@@ -39,6 +39,24 @@ describe("classifyRecoverableToolFailure", () => {
     expect(classifyRecoverableToolFailure("permission denied")).toBeNull();
     expect(classifyRecoverableToolFailure("")).toBeNull();
   });
+
+  it("returns null for permanent permission / args / account failures", () => {
+    expect(classifyRecoverableToolFailure("bash: /x: Permission denied")).toBeNull();
+    expect(classifyRecoverableToolFailure("EACCES: permission denied, open '/secret'")).toBeNull();
+    expect(classifyRecoverableToolFailure("Error: invalid argument: --foo")).toBeNull();
+    expect(
+      classifyRecoverableToolFailure(
+        "Managed multitenant sandbox requires a server-derived account (tenantId + userId).",
+      ),
+    ).toBeNull();
+    expect(
+      classifyRecoverableToolFailure("cron_account:missing Managed multitenant sandbox requires"),
+    ).toBeNull();
+    // Permanent phrase wins even when path_missing wording is also present.
+    expect(
+      classifyRecoverableToolFailure("Permission denied: No such file or directory"),
+    ).toBeNull();
+  });
 });
 
 describe("enrichPathMissingToolError", () => {
@@ -60,6 +78,21 @@ describe("enrichPathMissingToolError", () => {
       enrichPathMissingToolError({
         errorText: "cd: foo: No such file or directory",
         workspaceRoot: "  ",
+      }),
+    ).toBe("cd: foo: No such file or directory");
+  });
+
+  it("rejects relative or traversal workspace roots", () => {
+    expect(
+      enrichPathMissingToolError({
+        errorText: "cd: foo: No such file or directory",
+        workspaceRoot: "relative/ws",
+      }),
+    ).toBe("cd: foo: No such file or directory");
+    expect(
+      enrichPathMissingToolError({
+        errorText: "cd: foo: No such file or directory",
+        workspaceRoot: "/ws/../etc",
       }),
     ).toBe("cd: foo: No such file or directory");
   });
@@ -103,6 +136,32 @@ describe("shouldContinueAfterRecoverableToolFailure", () => {
         stopText: PROTOCOL_FAILURE_USER_TEXT,
         toolsDisabled: true,
         tools: [{ toolName: "exec", success: false, meta: "ENOENT" }],
+      }),
+    ).toBe(false);
+  });
+
+  it("does not continue from stop-text guess when tools ran without recoverable failure", () => {
+    expect(
+      shouldContinueAfterRecoverableToolFailure({
+        stopText: "Sandbox mode requires Docker, but the docker CLI was not found — 请重试",
+        toolsDisabled: false,
+        tools: [{ toolName: "exec", success: false, meta: "permission denied" }],
+      }),
+    ).toBe(false);
+  });
+
+  it("does not continue on permanent account-missing tool meta", () => {
+    expect(
+      shouldContinueAfterRecoverableToolFailure({
+        stopText: PROTOCOL_FAILURE_USER_TEXT,
+        toolsDisabled: false,
+        tools: [
+          {
+            toolName: "exec",
+            success: false,
+            meta: "Managed multitenant sandbox requires a server-derived account",
+          },
+        ],
       }),
     ).toBe(false);
   });

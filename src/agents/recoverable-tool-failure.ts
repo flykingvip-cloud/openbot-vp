@@ -20,8 +20,12 @@ export const RECOVERABLE_TOOL_FAILURE_CONTINUE_LIMIT = 2;
 export const RECOVERABLE_TOOL_FAILURE_CONTINUE_PROMPT =
   "Internal execution continue: a recoverable tool failure just occurred (sandbox runtime, missing path, or empty export). Do not stop with 「请重试」. Retry with a corrected path or fallback (for example HTML→print PDF). Use any workspace_root absolute path from the tool error. Stop only for a real permission, payment/scan, or a fact only the user knows.";
 
+/** Permanent / non-retryable failures — never classify as recoverable. */
+const PERMANENT_FAILURE_RE =
+  /(?:permission denied|EACCES|EPERM|access denied|not authorized|unauthorized|forbidden|invalid argument|EINVAL|bad arguments?|unknown option|usage:|cron_account:missing|requires a server-derived account|Managed multitenant sandbox requires)/iu;
+
 const SANDBOX_RUNTIME_RE =
-  /(?:Sandbox mode requires Docker|docker not found|Docker.*not (?:found|available)|Managed multitenant sandbox|container (?:exited|not running)|Cannot connect to the Docker daemon|exec host=sandbox.*unavailable)/iu;
+  /(?:Sandbox mode requires Docker|docker not found|Docker.*not (?:found|available)|container (?:exited|not running)|Cannot connect to the Docker daemon|exec host=sandbox.*unavailable)/iu;
 
 const PATH_MISSING_RE =
   /(?:No such file or directory|ENOENT|can't cd|cannot cd|cd: .*(?:No such|not a directory)|no such file|目录不存在|路径不存在)/iu;
@@ -42,6 +46,10 @@ export function classifyRecoverableToolFailure(
 ): RecoverableToolFailureKind | null {
   const blob = (text ?? "").trim();
   if (!blob) {
+    return null;
+  }
+  // Permanent failures win even when the blob also mentions a path/sandbox phrase.
+  if (PERMANENT_FAILURE_RE.test(blob)) {
     return null;
   }
   if (SANDBOX_RUNTIME_RE.test(blob)) {
@@ -69,7 +77,16 @@ export function enrichPathMissingToolError(params: {
   if (!text) {
     return text;
   }
-  if (!root) {
+  // Only attach a trusted absolute workspace root (server/session-derived).
+  // Reject relative paths, empties, and model-specified traversal attempts.
+  if (
+    !root ||
+    !root.startsWith("/") ||
+    root.includes("..") ||
+    root.includes("\r") ||
+    root.includes("\n") ||
+    root.includes(String.fromCharCode(0))
+  ) {
     return text;
   }
   if (/\bworkspace_root=/.test(text)) {
@@ -110,28 +127,27 @@ export function shouldContinueAfterRecoverableToolFailure(params: {
     return false;
   }
   const stop = params.stopText.trim();
-  const toolBlob = blobFromTools(params.tools ?? []);
+  const tools = params.tools ?? [];
+  const toolBlob = blobFromTools(tools);
   const visible = (params.visibleTexts ?? []).join("\n");
-  const combined = [stop, toolBlob, visible].filter(Boolean).join("\n");
-  const kind =
-    classifyRecoverableToolFailure(toolBlob) ||
-    classifyRecoverableToolFailure(combined) ||
-    classifyRecoverableToolFailure(stop);
-  if (!kind) {
+  const kindFromTools = classifyRecoverableToolFailure(toolBlob);
+  // When tools ran this turn, classification must come from failed tool results —
+  // not from guessed assistant stop text alone.
+  if (tools.length > 0) {
+    if (!kindFromTools) {
+      return false;
+    }
+    const failedTools = tools.some((tool) => tool.success === false);
+    return failedTools || stop === PROTOCOL_FAILURE_USER_TEXT || RETRY_ASK_RE.test(stop);
+  }
+  // No tool metas available: allow stop/visible text only when it classifies
+  // and the assistant asked to retry / emitted protocol-failure copy.
+  const kindFromText =
+    classifyRecoverableToolFailure(stop) || classifyRecoverableToolFailure(visible);
+  if (!kindFromText) {
     return false;
   }
-  // Prefer continuing when the model asked the user to retry, emitted the
-  // protocol-failure copy, or stopped right after a failed recoverable tool.
-  const failedTools = (params.tools ?? []).some((tool) => tool.success === false);
-  if (
-    stop === PROTOCOL_FAILURE_USER_TEXT ||
-    RETRY_ASK_RE.test(stop) ||
-    failedTools ||
-    classifyRecoverableToolFailure(stop)
-  ) {
-    return true;
-  }
-  return false;
+  return stop === PROTOCOL_FAILURE_USER_TEXT || RETRY_ASK_RE.test(stop);
 }
 
 export function recoverableToolFailureKindFromParams(params: {
@@ -139,13 +155,14 @@ export function recoverableToolFailureKindFromParams(params: {
   tools?: readonly RecoverableToolFailureTool[];
   visibleTexts?: readonly string[];
 }): RecoverableToolFailureKind | null {
-  const toolBlob = blobFromTools(params.tools ?? []);
-  const combined = [params.stopText, toolBlob, ...(params.visibleTexts ?? [])]
-    .filter(Boolean)
-    .join("\n");
+  const tools = params.tools ?? [];
+  const toolBlob = blobFromTools(tools);
+  const fromTools = classifyRecoverableToolFailure(toolBlob);
+  if (tools.length > 0) {
+    return fromTools;
+  }
   return (
-    classifyRecoverableToolFailure(toolBlob) ||
-    classifyRecoverableToolFailure(combined) ||
-    classifyRecoverableToolFailure(params.stopText)
+    classifyRecoverableToolFailure(params.stopText) ||
+    classifyRecoverableToolFailure((params.visibleTexts ?? []).join("\n"))
   );
 }
