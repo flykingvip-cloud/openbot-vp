@@ -24,6 +24,11 @@
  * identity returns **unverifiable** and is treated as blocked (never as
  * "not stopped"). taskId alone is never a registry key.
  *
+ * Production entry ({@link authoritativeStopIdentityFromClient}) picks managed
+ * vs personal from the trusted security profile — not from tenant presence.
+ * Managed with a missing tenant stays managed and fails closed on resume.
+ * A bare missing client never auto-gets internal.
+ *
  * Resume of that scoped taskId is denied while the record exists — even after
  * the AbortController entry is cleaned. Other taskIds in the same scope, and
  * the same taskId under another session/tenant/user, are unaffected. Undo
@@ -37,11 +42,14 @@
  * tests. It is **not** durable across process restart / multi-host; cross-
  * process stop authority remains separately unproven.
  */
+import { loadConfig } from "../../config/config.js";
+import type { OpenBotConfig } from "../../config/types.js";
 import type { ResumeParkedRecheck } from "../../conversation-task/session-task-board.js";
 import {
   applyFocusSwitchGate,
   type FocusSwitchGateDecision,
 } from "../../conversation-task/session-task-board.js";
+import { resolveSecurityProfile } from "../security-profile.js";
 
 export type ResolveResumeParkedRecheckParams = {
   /** Session send policy already resolved for this turn. */
@@ -433,6 +441,53 @@ export function buildResumeTaskStopActive(params: {
       userId,
       scopeKind,
     });
+}
+
+/**
+ * Production entry classifier for authoritative stop identity.
+ *
+ * Mode comes from the trusted security profile / auth deployment context
+ * (`resolveSecurityProfile` → managed_enterprise | personal_local) — NEVER from
+ * whether a tenant id happens to be present on the client.
+ *
+ * - managed_enterprise → scopeKind "managed" (missing tenant stays managed →
+ *   unverifiable → refuse resume)
+ * - personal_local → scopeKind "personal"
+ * - bare missing client does NOT auto-qualify as "internal" (internal is only
+ *   via explicit scopeKind on lower-level APIs)
+ */
+export function authoritativeStopIdentityFromClient(
+  client:
+    | {
+        sessionEnterpriseId?: string;
+        sessionTenantId?: string;
+        platformUserId?: string;
+        user?: string;
+      }
+    | null
+    | undefined,
+  options?: {
+    /** Trusted server config; defaults to loadConfig(). Never from client hints. */
+    cfg?: OpenBotConfig;
+    env?: NodeJS.ProcessEnv;
+  },
+): {
+  scopeKind: AuthoritativeTaskStopScopeKind;
+  tenantId: string | null;
+  userId: string | null;
+} {
+  const cfg = options?.cfg ?? loadConfig();
+  const env = options?.env ?? process.env;
+  const profile = resolveSecurityProfile(cfg, env);
+  const scopeKind: AuthoritativeTaskStopScopeKind =
+    profile.profile === "managed_enterprise" ? "managed" : "personal";
+
+  if (!client) {
+    return { scopeKind, tenantId: null, userId: null };
+  }
+  const tenantRaw = (client.sessionEnterpriseId ?? client.sessionTenantId)?.trim() || null;
+  const userRaw = (client.platformUserId ?? client.user)?.trim() || null;
+  return { scopeKind, tenantId: tenantRaw, userId: userRaw };
 }
 
 export function clientIdentityOkForResume(

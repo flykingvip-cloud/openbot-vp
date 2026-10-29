@@ -408,12 +408,12 @@ import {
 } from "./chat-restore-deadline.js";
 import {
   applyChatFocusSwitchGateWithResumeRecheck,
+  authoritativeStopIdentityFromClient,
   buildResumeTaskStopActive,
   clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
   recordAuthoritativeTaskStop,
   sessionStopBarrierActive,
-  type AuthoritativeTaskStopScopeKind,
 } from "./chat-resume-parked-recheck.js";
 import {
   appendInjectedAssistantMessageToTranscript,
@@ -3053,27 +3053,6 @@ function createChatAbortOps(context: GatewayRequestContext): ChatAbortOps {
     broadcastChat: context.broadcastChat,
     nodeSendToSession: context.nodeSendToSession,
   };
-}
-
-/**
- * Trusted identity for the authoritative stop registry (never client task text).
- * Does not coerce missing tenant/user to "". Callers pass scopeKind through so
- * resolveAuthoritativeTaskStopScope can refuse incomplete managed/personal identity.
- */
-function authoritativeStopIdentityFromClient(client: GatewayClient | null | undefined): {
-  scopeKind: AuthoritativeTaskStopScopeKind;
-  tenantId: string | null;
-  userId: string | null;
-} {
-  if (!client) {
-    return { scopeKind: "internal", tenantId: null, userId: null };
-  }
-  const tenantRaw = (client.sessionEnterpriseId ?? client.sessionTenantId)?.trim() || null;
-  const userRaw = (client.platformUserId ?? client.user)?.trim() || null;
-  if (tenantRaw) {
-    return { scopeKind: "managed", tenantId: tenantRaw, userId: userRaw };
-  }
-  return { scopeKind: "personal", tenantId: null, userId: userRaw };
 }
 
 async function abortChatRunsForSessionKeyWithPartials(params: {

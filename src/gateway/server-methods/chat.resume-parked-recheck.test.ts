@@ -12,6 +12,7 @@ import {
   AUTHORITATIVE_STOP_INTERNAL_USER,
   AUTHORITATIVE_STOP_PERSONAL_TENANT,
   applyChatFocusSwitchGateWithResumeRecheck,
+  authoritativeStopIdentityFromClient,
   buildResumeTaskStopActive,
   clearAuthoritativeTaskStop,
   clientIdentityOkForResume,
@@ -717,5 +718,224 @@ describe("authoritative stop incomplete scope refusal (P1)", () => {
     expect(denied.action).toBe("continue");
     expect(denied.statusLine ?? "").toContain("已停止");
     expect(denied.cutContext).toBe(false);
+  });
+});
+
+describe("authoritativeStopIdentityFromClient (production entry classifier)", () => {
+  const emptyControllers = new Map();
+  const managedCfg = { data: { mode: "managed" as const } };
+  const personalCfg = { data: { mode: "local" as const } };
+  const managedEnv = { OPENBOT_SECURITY_PROFILE: "managed_enterprise" };
+  const personalEnv = { OPENBOT_SECURITY_PROFILE: "personal_local" };
+
+  it("managed missing tenant stays managed and refuses resume (unverifiable)", () => {
+    const identity = authoritativeStopIdentityFromClient(
+      { platformUserId: "user-a" }, // user present, tenant not ready
+      { cfg: managedCfg, env: managedEnv },
+    );
+    expect(identity).toEqual({
+      scopeKind: "managed",
+      tenantId: null,
+      userId: "user-a",
+    });
+
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+    const sessionKey = "agent:main:prod-classifier-missing-tenant";
+    const denied = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        stopActive: false,
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: [sessionKey],
+          chatAbortControllers: emptyControllers,
+          scopeKind: identity.scopeKind,
+          tenantId: identity.tenantId,
+          userId: identity.userId,
+        }),
+      },
+    });
+    expect(denied.action).toBe("continue");
+    expect(denied.statusLine ?? "").toContain("已停止");
+    expect(denied.cutContext).toBe(false);
+
+    // Must not degrade to personal (which would allow query-as-inactive with user only).
+    const personalDegraded = buildResumeTaskStopActive({
+      sessionKeys: [sessionKey],
+      chatAbortControllers: emptyControllers,
+      scopeKind: "personal",
+      tenantId: null,
+      userId: "user-a",
+    });
+    // personal with userId is verifiable-inactive when nothing recorded — resume would pass.
+    // Classifier must NOT have chosen personal for managed-missing-tenant.
+    expect(identity.scopeKind).not.toBe("personal");
+    expect(personalDegraded(parkedId)).toBe(false);
+  });
+
+  it("managed full identity records and queries ok through classifier", () => {
+    const identity = authoritativeStopIdentityFromClient(
+      {
+        sessionEnterpriseId: "tenant-a",
+        platformUserId: "user-a",
+      },
+      { cfg: managedCfg, env: managedEnv },
+    );
+    expect(identity).toEqual({
+      scopeKind: "managed",
+      tenantId: "tenant-a",
+      userId: "user-a",
+    });
+
+    const sessionKey = "agent:main:prod-classifier-full";
+    const taskId = "task-prod-classifier-full";
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+        reason: "rpc",
+      }),
+    ).not.toBeNull();
+    expect(
+      queryAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+      }),
+    ).toEqual({ state: "active" });
+
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+    // Use the recorded taskId as parked target by writing board with that id — gate uses
+    // incoming resume text's parked id; stop predicate is consulted with parked taskId.
+    // Here we assert the stop predicate from classifier identity reports active for taskId.
+    const isStop = buildResumeTaskStopActive({
+      sessionKeys: [sessionKey],
+      chatAbortControllers: emptyControllers,
+      scopeKind: identity.scopeKind,
+      tenantId: identity.tenantId,
+      userId: identity.userId,
+    });
+    expect(isStop(taskId)).toBe(true);
+    void parkedId;
+  });
+
+  it("explicit personal (personal_local profile) classifies personal and works with userId", () => {
+    const identity = authoritativeStopIdentityFromClient(
+      { platformUserId: "user-personal" },
+      { cfg: personalCfg, env: personalEnv },
+    );
+    expect(identity).toEqual({
+      scopeKind: "personal",
+      tenantId: null,
+      userId: "user-personal",
+    });
+
+    const sessionKey = "agent:main:prod-classifier-personal";
+    const taskId = "task-prod-classifier-personal";
+    expect(
+      recordAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+        reason: "rpc",
+      }),
+    ).not.toBeNull();
+    expect(
+      queryAuthoritativeTaskStop({
+        taskId,
+        sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+      }),
+    ).toEqual({ state: "active" });
+    expect(
+      resolveAuthoritativeTaskStopScope({
+        sessionKey,
+        scopeKind: identity.scopeKind,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+      }),
+    ).toMatchObject({
+      kind: "personal",
+      tenantId: AUTHORITATIVE_STOP_PERSONAL_TENANT,
+      userId: "user-personal",
+    });
+  });
+
+  it("bare missing client must not auto-get internal", () => {
+    const managedMissing = authoritativeStopIdentityFromClient(null, {
+      cfg: managedCfg,
+      env: managedEnv,
+    });
+    expect(managedMissing.scopeKind).toBe("managed");
+    expect(managedMissing.scopeKind).not.toBe("internal");
+    expect(managedMissing).toEqual({
+      scopeKind: "managed",
+      tenantId: null,
+      userId: null,
+    });
+
+    const personalMissing = authoritativeStopIdentityFromClient(null, {
+      cfg: personalCfg,
+      env: personalEnv,
+    });
+    expect(personalMissing.scopeKind).toBe("personal");
+    expect(personalMissing.scopeKind).not.toBe("internal");
+    expect(personalMissing).toEqual({
+      scopeKind: "personal",
+      tenantId: null,
+      userId: null,
+    });
+
+    // Incomplete identity from bare client → unverifiable → resume refused.
+    const sessionFile = tempSessionFile();
+    const parkedId = parkOneTask(sessionFile);
+    const denied = applyChatFocusSwitchGateWithResumeRecheck({
+      sessionFile,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheckInputs: {
+        sendPolicy: "allow",
+        accessAuthorized: true,
+        clientIdentityOk: true,
+        stopActive: false,
+        isTaskStopActive: buildResumeTaskStopActive({
+          sessionKeys: ["agent:main:prod-classifier-bare-client"],
+          chatAbortControllers: emptyControllers,
+          scopeKind: managedMissing.scopeKind,
+          tenantId: managedMissing.tenantId,
+          userId: managedMissing.userId,
+        }),
+      },
+    });
+    expect(denied.action).toBe("continue");
+    expect(denied.statusLine ?? "").toContain("已停止");
+  });
+
+  it("mode is from security profile, not tenant presence (tenant present under personal_local stays personal unless promoted by scope resolve)", () => {
+    // Classifier itself stays personal when profile is personal_local even if tenant is set.
+    const identity = authoritativeStopIdentityFromClient(
+      {
+        sessionTenantId: "tenant-hint",
+        platformUserId: "user-a",
+      },
+      { cfg: personalCfg, env: personalEnv },
+    );
+    expect(identity.scopeKind).toBe("personal");
+    expect(identity.tenantId).toBe("tenant-hint");
   });
 });
