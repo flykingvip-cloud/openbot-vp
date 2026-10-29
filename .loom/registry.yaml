@@ -10020,6 +10020,17 @@ tasks:
     since: 2026-10-27
     metadata: {}
 landingStreams:
+  - id: fix-member-governance-owner-identity-20261029
+    landingPolicy: serial
+    paths:
+      - docs/notes/fix-member-governance-owner-identity-20261029.md
+      - ui/src/ui/ports/employee/render-model.ts
+      - ui/src/ui/ports/employee/render-model.node.test.ts
+      - .loom/registry.yaml
+    metadata:
+      task: fix-member-governance-owner-identity-20261029
+      owner: daniel
+      purpose: Member governance owner misclassified as member when OS owner is human:<uuid> (add/invite vanished)
   - id: team-real-collab-loop-f1f3
     landingPolicy: parallel
     paths:
