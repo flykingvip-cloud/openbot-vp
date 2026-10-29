@@ -248,6 +248,8 @@ export function isSoftConfirmAfterAuthorizedGo(
 export type StallContinueLedgerRef = {
   ledgerDir: string;
   sessionKey: string;
+  /** Task lifecycle quota cycle (board taskId). Same task shares; new task resets. */
+  quotaCycleId: string;
 };
 
 export function executionContinueKind(params: {
