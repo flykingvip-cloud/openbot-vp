@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { omitParkedPriorTurns } from "./focus-switch.js";
 import {
   applyIncomingUserMessage,
+  formatTaskBoardFocusLine,
   cancelParkedTask,
   emptySessionTaskBoard,
   evaluateCurrentTaskSend,
@@ -291,4 +292,89 @@ it("announces a real close and a fourth automatic park drops the oldest file", (
   const quiet = recordCheckedTaskCompletion({ closed: false });
   expect(quiet.notice).toBeUndefined();
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+describe("parkReason / wakeSuppress", () => {
+  it("stores parkReason and wakeSuppress on switch, clears on resume", () => {
+    const first = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(PRICE, 1_000),
+    });
+    const switched = applyIncomingUserMessage({
+      board: first.board,
+      ...turn(RESEARCH, 2_000),
+    });
+    expect(switched.action).toBe("switch");
+    expect(switched.board.parked[0]?.wakeSuppress).toBe(true);
+    expect(switched.board.parked[0]?.parkReason).toBe("user_switch");
+    expect(switched.statusLine).toContain("已挂起");
+    expect(switched.statusLine).toContain("当前任务");
+
+    const parkedId = switched.board.parked[0]?.taskId ?? "";
+    const resumed = applyIncomingUserMessage({
+      board: switched.board,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+    });
+    expect(resumed.action).toBe("resume");
+    expect(resumed.board.current?.wakeSuppress).toBe(false);
+    expect(resumed.board.current?.parkReason).toBeUndefined();
+  });
+
+  it("resume re-checks auth and stop state", () => {
+    const first = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(PRICE, 1_000),
+    });
+    const switched = applyIncomingUserMessage({
+      board: first.board,
+      ...turn(RESEARCH, 2_000),
+    });
+    const parkedId = switched.board.parked[0]?.taskId ?? "";
+    const deniedAuth = applyIncomingUserMessage({
+      board: switched.board,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheck: { authOk: false },
+    });
+    expect(deniedAuth.action).toBe("continue");
+    expect(deniedAuth.statusLine).toContain("授权无效");
+    expect(deniedAuth.board.parked.some((row) => row.taskId === parkedId)).toBe(true);
+
+    const deniedStop = applyIncomingUserMessage({
+      board: switched.board,
+      incomingText: `继续挂起 ${parkedId}`,
+      nowMs: 3_000,
+      recheck: { stopActive: true },
+    });
+    expect(deniedStop.action).toBe("continue");
+    expect(deniedStop.statusLine).toContain("已停止");
+  });
+
+  it("formatTaskBoardFocusLine reports current and parked count", () => {
+    const board = {
+      current: {
+        taskId: "task-a",
+        title: "A",
+        goalText: "A",
+        unfinished: true,
+        stop: { summary: "s", workspacePaths: [] },
+        createdAtMs: 1,
+      },
+      parked: [
+        {
+          taskId: "task-b",
+          title: "B",
+          goalText: "B",
+          unfinished: true,
+          stop: { summary: "s", workspacePaths: [] },
+          createdAtMs: 1,
+          parkedAtMs: 2,
+          wakeSuppress: true,
+          parkReason: "user_switch",
+        },
+      ],
+    };
+    expect(formatTaskBoardFocusLine(board)).toBe("当前任务：「A」；已挂起 1 项");
+  });
 });

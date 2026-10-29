@@ -22110,6 +22110,18 @@ landingStreams:
       legacyTitle: Deliverable preview path locator
       task: deliverable-path-locator
       owner: cursor-deliverable-path
+
+  - id: pr143-market-assistant-merge-notes
+    landingPolicy: parallel
+    paths:
+      - .loom/registry.yaml
+      - docs/PR143-MERGE-NOTES.md
+    canLandWith: []
+    metadata:
+      purpose: PR143 merge-prep audit notes (pointer to outside evidence; no DIGEST)
+      task: pr143-market-assistant-merge-notes
+      owner: grok-bot
+
 sharedPaths:
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
