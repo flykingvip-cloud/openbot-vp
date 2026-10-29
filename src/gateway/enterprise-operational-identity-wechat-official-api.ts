@@ -1,3 +1,4 @@
+import { resizeToJpeg } from "../media/image-ops.js";
 import { probeWechatOfficialCredentials } from "./wechat-official/credentials.js";
 
 type WechatApiPayload = Record<string, unknown> & {
@@ -6,7 +7,74 @@ type WechatApiPayload = Record<string, unknown> & {
 };
 
 export const WECHAT_OFFICIAL_THUMB_MAX_BYTES = 64 * 1024;
+/** Source may exceed thumb cap; we re-encode to JPEG ≤ THUMB_MAX before upload. */
+export const WECHAT_OFFICIAL_THUMB_SOURCE_MAX_BYTES = 5 * 1024 * 1024;
 export const WECHAT_OFFICIAL_CONTENT_IMAGE_MAX_BYTES = 1024 * 1024;
+
+const THUMB_JPEG_QUALITY_STEPS = [85, 75, 65, 55, 45, 35, 28] as const;
+const THUMB_JPEG_MAX_SIDE_STEPS = [900, 720, 640, 520, 420] as const;
+
+/** Agents often pass a workspace path as thumbBase64; that becomes garbage bytes. */
+export function looksLikeFilesystemImagePath(value: string): boolean {
+  const v = value.trim();
+  if (v.length < 3 || v.length > 512) {
+    return false;
+  }
+  if (v.includes("\n") || v.includes(";base64,")) {
+    return false;
+  }
+  if (!/\.(png|jpe?g|webp|gif|bmp)$/i.test(v)) {
+    return false;
+  }
+  return (
+    v.startsWith("/") || v.startsWith("./") || v.startsWith("../") || /^[A-Za-z]:[\\/]/.test(v)
+  );
+}
+
+/**
+ * Re-encode any decodable image to RGB JPEG under the WeChat thumb 64KB cap.
+ * Permanent thumb material rejects truncated / wrong-MIME bytes as
+ * "unsupported file type hint".
+ */
+export async function normalizeWechatOfficialThumbJpeg(data: Buffer): Promise<{
+  data: Buffer;
+  contentType: "image/jpeg";
+  filename: string;
+}> {
+  if (!data.length) {
+    throw new Error("封面图为空。");
+  }
+  let lastError: unknown;
+  for (const maxSide of THUMB_JPEG_MAX_SIDE_STEPS) {
+    for (const quality of THUMB_JPEG_QUALITY_STEPS) {
+      try {
+        const jpeg = await resizeToJpeg({
+          buffer: data,
+          maxSide,
+          quality,
+          withoutEnlargement: true,
+        });
+        if (jpeg.length > 0 && jpeg.length <= WECHAT_OFFICIAL_THUMB_MAX_BYTES) {
+          return { data: jpeg, contentType: "image/jpeg", filename: "thumb.jpg" };
+        }
+      } catch (err) {
+        lastError = err;
+        // Invalid image bytes — stop trying qualities.
+        break;
+      }
+    }
+  }
+  if (lastError) {
+    throw new Error(
+      `封面图无法解码为 JPEG（微信会返回 unsupported file type）。请提供标准 PNG/JPEG，勿传文件路径当 base64。原始错误：${
+        lastError instanceof Error ? lastError.message : "unknown decode error"
+      }`,
+    );
+  }
+  throw new Error(
+    `封面图压缩后仍超过 ${WECHAT_OFFICIAL_THUMB_MAX_BYTES} 字节上限。请缩小尺寸或降低画质后再传。`,
+  );
+}
 
 async function parseWechatApiResponse<T extends WechatApiPayload>(
   response: Response,
@@ -75,13 +143,18 @@ export async function loadWechatOfficialThumbImage(params: {
 }): Promise<{ data: Buffer; contentType: string; filename: string }> {
   const fromBase64 = params.thumbBase64?.trim();
   if (fromBase64) {
+    if (looksLikeFilesystemImagePath(fromBase64)) {
+      throw new Error(
+        "thumbBase64 看起来是本地文件路径。请传图片字节的 base64（或 data URL），或用可访问的 thumbUrl；不要把路径字符串当作 base64。",
+      );
+    }
     const parsed = parseDataUrlBase64(fromBase64);
     const data = parsed?.data ?? Buffer.from(fromBase64, "base64");
     if (!data.length) {
       throw new Error("thumbBase64 为空或无效。");
     }
-    if (data.length > WECHAT_OFFICIAL_THUMB_MAX_BYTES) {
-      throw new Error(`封面图超过 ${WECHAT_OFFICIAL_THUMB_MAX_BYTES} 字节上限。`);
+    if (data.length > WECHAT_OFFICIAL_THUMB_SOURCE_MAX_BYTES) {
+      throw new Error(`封面图源文件超过 ${WECHAT_OFFICIAL_THUMB_SOURCE_MAX_BYTES} 字节上限。`);
     }
     const contentType = params.thumbContentType?.trim() || parsed?.contentType || "image/jpeg";
     return {
@@ -112,8 +185,8 @@ export async function loadWechatOfficialThumbImage(params: {
   if (!data.length) {
     throw new Error("封面图为空。");
   }
-  if (data.length > WECHAT_OFFICIAL_THUMB_MAX_BYTES) {
-    throw new Error(`封面图超过 ${WECHAT_OFFICIAL_THUMB_MAX_BYTES} 字节上限。`);
+  if (data.length > WECHAT_OFFICIAL_THUMB_SOURCE_MAX_BYTES) {
+    throw new Error(`封面图源文件超过 ${WECHAT_OFFICIAL_THUMB_SOURCE_MAX_BYTES} 字节上限。`);
   }
   const contentType =
     params.thumbContentType?.trim() ||
@@ -345,7 +418,8 @@ export async function uploadWechatOfficialThumbFromSource(params: {
   thumbFilename?: string;
   thumbContentType?: string;
 }): Promise<{ mediaId: string; filename: string; bytes: number }> {
-  const image = await loadWechatOfficialThumbImage(params);
+  const loaded = await loadWechatOfficialThumbImage(params);
+  const image = await normalizeWechatOfficialThumbJpeg(loaded.data);
   const uploaded = await uploadWechatOfficialThumbMaterial({
     accessToken: params.accessToken,
     data: image.data,
