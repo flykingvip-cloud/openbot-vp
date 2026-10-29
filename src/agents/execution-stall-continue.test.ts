@@ -142,6 +142,30 @@ describe("execution stall continuation", () => {
     ).toBe(false);
   });
 
+  it("continues once after a failed browser/computer tool when the final is empty", () => {
+    expect(
+      shouldContinueAfterEmptyToolFinal({
+        stopKind: "empty",
+        toolsDisabled: false,
+        tools: [
+          {
+            toolName: "browser",
+            success: false,
+            meta: "云电脑没有启动：docker create failed",
+          },
+        ],
+      }),
+    ).toBe(true);
+    expect(
+      shouldContinueAfterEmptyToolFinal({
+        stopKind: "empty",
+        toolsDisabled: false,
+        continuesUsed: 1,
+        tools: [{ toolName: "browser", success: false, meta: "create failed" }],
+      }),
+    ).toBe(false);
+  });
+
   it("keeps honest-empty when no tool succeeded or a draft result already exists", () => {
     expect(
       shouldContinueAfterEmptyToolFinal({
