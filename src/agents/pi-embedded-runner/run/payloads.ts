@@ -18,6 +18,10 @@ import {
   extractAssistantThinking,
   formatReasoningMessage,
 } from "../../pi-embedded-utils.js";
+import {
+  extractSandboxInfraUserFacingDetail,
+  isSandboxInfraPreReplyError,
+} from "../../sandbox/docker-engine-client.js";
 import { isLikelyMutatingToolName } from "../../tool-mutation.js";
 
 type ToolMetaEntry = { toolName: string; meta?: string };
@@ -42,6 +46,17 @@ const RECOVERABLE_TOOL_ERROR_KEYWORDS = [
   "needs",
   "requires",
 ] as const;
+
+function isComputerOrBrowserToolName(toolName: string): boolean {
+  const normalized = toolName.trim().toLowerCase();
+  return (
+    normalized === "browser" ||
+    normalized === "computer" ||
+    normalized === "电脑" ||
+    normalized.includes("browser") ||
+    normalized.includes("computer")
+  );
+}
 
 function isRecoverableToolError(error: string | undefined): boolean {
   const errorLower = (error ?? "").toLowerCase();
@@ -292,19 +307,36 @@ export function buildEmbeddedRunPayloads(params: {
       verboseLevel: params.verboseLevel,
     });
 
+    const toolErrorText = params.lastToolError.error ?? "";
+    // Sandbox/电脑 create failures are infra, not "recoverable param" noise. When the
+    // assistant left the turn empty (probe … / 正在使用电脑), force a visible 云电脑
+    // notice so recoverable-keyword suppression cannot hide the stall.
+    const computerInfraFallback =
+      !hasUserFacingAssistantReply &&
+      !params.suppressToolErrorWarnings &&
+      isComputerOrBrowserToolName(params.lastToolError.toolName) &&
+      isSandboxInfraPreReplyError(toolErrorText);
+
     // Always surface mutating tool failures so we do not silently confirm actions that did not happen.
     // Otherwise, keep the previous behavior and only surface non-recoverable failures when no reply exists.
-    if (warningPolicy.showWarning) {
-      const toolSummary = formatToolAggregate(
-        params.lastToolError.toolName,
-        params.lastToolError.meta ? [params.lastToolError.meta] : undefined,
-        { markdown: useMarkdown },
-      );
-      const errorSuffix =
-        warningPolicy.includeDetails && params.lastToolError.error
-          ? `: ${params.lastToolError.error}`
-          : "";
-      const warningText = `⚠️ ${toolSummary} failed${errorSuffix}`;
+    if (computerInfraFallback || warningPolicy.showWarning) {
+      let warningText: string;
+      if (computerInfraFallback) {
+        warningText =
+          extractSandboxInfraUserFacingDetail(toolErrorText) ??
+          "云电脑没有启动：沙箱浏览器未能创建。请稍后重试，或联系管理员检查沙箱镜像与 docker。";
+      } else {
+        const toolSummary = formatToolAggregate(
+          params.lastToolError.toolName,
+          params.lastToolError.meta ? [params.lastToolError.meta] : undefined,
+          { markdown: useMarkdown },
+        );
+        const errorSuffix =
+          warningPolicy.includeDetails && params.lastToolError.error
+            ? `: ${params.lastToolError.error}`
+            : "";
+        warningText = `⚠️ ${toolSummary} failed${errorSuffix}`;
+      }
       const normalizedWarning = normalizeTextForComparison(warningText);
       const duplicateWarning = normalizedWarning
         ? replyItems.some((item) => {
