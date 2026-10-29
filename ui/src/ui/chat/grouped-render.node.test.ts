@@ -1249,4 +1249,20 @@ describe("formatGroupTimestamp", () => {
     // LA: value is previous local calendar day vs now → must include a date component.
     expect(laLabel).toMatch(/10|28/);
   });
+
+  it("invalid explicit IANA falls back browser → UTC without throwing", async () => {
+    const { formatGroupTimestamp, isValidIanaTimeZone, resolveChatTimestampTimeZone } =
+      await import("./grouped-render.ts");
+    expect(isValidIanaTimeZone("Not/AZone")).toBe(false);
+    expect(isValidIanaTimeZone("Asia/Shanghai")).toBe(true);
+    const resolved = resolveChatTimestampTimeZone("Not/AZone");
+    expect(resolved).toBeTruthy();
+    expect(isValidIanaTimeZone(resolved)).toBe(true);
+    // Must not throw when computing day boundaries with the illegal input.
+    const now = Date.parse("2026-10-29T08:00:00.000Z");
+    const value = Date.parse("2026-10-29T01:24:18.823Z");
+    expect(() => formatGroupTimestamp(value, now, "Not/AZone")).not.toThrow();
+    expect(formatGroupTimestamp(value, now, "Not/AZone").length).toBeGreaterThan(0);
+    expect(resolveChatTimestampTimeZone("")).toBe(resolveChatTimestampTimeZone(null));
+  });
 });

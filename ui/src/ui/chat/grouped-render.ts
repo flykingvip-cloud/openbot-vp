@@ -133,18 +133,37 @@ type GroupedMessageRenderOptions = {
 };
 
 /**
+ * True when `zone` is a usable IANA time zone for `Intl` formatting.
+ * Invalid values throw `RangeError` when computing day boundaries — reject them
+ * at parse time instead.
+ */
+export function isValidIanaTimeZone(zone: string): boolean {
+  const trimmed = zone.trim();
+  if (!trimmed) {
+    return false;
+  }
+  try {
+    Intl.DateTimeFormat("en-US", { timeZone: trimmed }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve the IANA zone used for chat bubble day boundaries + display.
  * Prefer an explicit user/tenant zone; otherwise the browser/runtime zone;
  * never hardcode a product-wide city (multi-tenant employees are not all in Shanghai).
+ * Illegal explicit IANA values fall back browser → UTC (never throw).
  */
 export function resolveChatTimestampTimeZone(explicit?: string | null): string {
   const trimmed = typeof explicit === "string" ? explicit.trim() : "";
-  if (trimmed) {
+  if (trimmed && isValidIanaTimeZone(trimmed)) {
     return trimmed;
   }
   try {
     const resolved = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (typeof resolved === "string" && resolved.trim()) {
+    if (typeof resolved === "string" && resolved.trim() && isValidIanaTimeZone(resolved)) {
       return resolved.trim();
     }
   } catch {

@@ -1,5 +1,6 @@
 import {
   canonicalizeWorkbenchChatSessionKey,
+  isCollaborationGroupChatSessionKey,
   toCollaborationSpaceSessionKey,
 } from "../../../src/sessions/session-key-utils.ts";
 import {
@@ -17,7 +18,16 @@ export type SessionSeenAliasOptions = {
    * (`hello.snapshot.sessionDefaults.mainSessionKey`).
    */
   ownStewardSessionKey?: string | null;
+  /**
+   * Optional trusted tenant id. When present, collaboration-space cursors are
+   * partitioned by tenant+user so two tenants that reuse a local groupId string
+   * cannot inherit each other's seenAt in the same browser profile.
+   */
+  tenantId?: string | null;
 };
+
+/** Flat-map prefix for identity-scoped collaboration-space cursors. */
+const SEEN_PARTITION_PREFIX = "seen:";
 
 function addKey(aliases: Set<string>, key: string | null | undefined) {
   const raw = typeof key === "string" ? key.trim() : "";
@@ -29,6 +39,57 @@ function addKey(aliases: Set<string>, key: string | null | undefined) {
   if (canonical) {
     aliases.add(canonical);
   }
+}
+
+/**
+ * Trusted identity partition for unscoped keys such as `space:<id>`.
+ * Returns null when the own steward is unknown (cannot safely scope).
+ */
+export function resolveSessionSeenPartitionId(options?: SessionSeenAliasOptions): string | null {
+  const own = options?.ownStewardSessionKey?.trim() || "";
+  const owner = extractEmployeeStewardOwnerFromSessionKey(own);
+  if (!owner) {
+    return null;
+  }
+  const tenant = options?.tenantId?.trim() || "";
+  return tenant ? `t:${tenant}|u:${owner}` : `u:${owner}`;
+}
+
+export function partitionSessionSeenKey(partitionId: string, sessionKey: string): string {
+  return `${SEEN_PARTITION_PREFIX}${partitionId}:${sessionKey}`;
+}
+
+function isPartitionedSessionSeenKey(key: string): boolean {
+  return key.startsWith(SEEN_PARTITION_PREFIX);
+}
+
+/** Extract `space:<id>` (or null) from a bare / mirror / already-partitioned key. */
+function collaborationSpaceCursorKey(sessionKey: string): string | null {
+  const raw = sessionKey.trim();
+  if (!raw) {
+    return null;
+  }
+  // Strip our partition wrapper if present: seen:<partition>:space:<id>
+  let candidate = raw;
+  if (isPartitionedSessionSeenKey(raw)) {
+    const body = raw.slice(SEEN_PARTITION_PREFIX.length);
+    const spaceIdx = body.toLowerCase().indexOf(":space:");
+    if (spaceIdx >= 0) {
+      candidate = body.slice(spaceIdx + 1); // "space:<id>"
+    } else if (body.toLowerCase().includes("space:")) {
+      const at = body.toLowerCase().indexOf("space:");
+      candidate = body.slice(at);
+    } else {
+      return null;
+    }
+  }
+  if (!isCollaborationGroupChatSessionKey(candidate)) {
+    return null;
+  }
+  const spaceId = candidate.toLowerCase().startsWith("space:")
+    ? candidate.slice("space:".length)
+    : candidate.match(/:space:([^:]+)/i)?.[1];
+  return toCollaborationSpaceSessionKey(spaceId) || null;
 }
 
 /**
@@ -47,6 +108,9 @@ function addKey(aliases: Set<string>, key: string | null | undefined) {
  *   employee **is** the trusted current user (via the main→own expansion above).
  *   Otherwise u1's read — or a prior account's leftover `main` cursor — would
  *   wipe u2's unread after an account switch.
+ * - Collaboration `space:<id>` cursors are written/read under an identity
+ *   partition (`seen:<user|tenant+user>:space:<id>`) whenever the trusted own
+ *   steward is known, so account switch / cross-tenant reuse cannot inherit.
  */
 export function sessionSeenAliasKeys(
   sessionKey: string,
@@ -57,6 +121,16 @@ export function sessionSeenAliasKeys(
     return [];
   }
   const aliases = new Set<string>();
+  const spaceCursor = collaborationSpaceCursorKey(raw);
+  const partitionId = resolveSessionSeenPartitionId(options);
+
+  // Space keys are identity-scoped when we know the trusted user. Do not also
+  // add the bare `space:<id>` alias in that case — that is the cross-user leak.
+  if (spaceCursor && partitionId) {
+    aliases.add(partitionSessionSeenKey(partitionId, spaceCursor));
+    return [...aliases];
+  }
+
   addKey(aliases, raw);
 
   const own = options?.ownStewardSessionKey?.trim() || "";
@@ -80,12 +154,10 @@ export function sessionSeenAliasKeys(
     }
   }
 
-  const spaceId = raw.toLowerCase().startsWith("space:")
-    ? raw.slice("space:".length)
-    : raw.match(/:space:([^:]+)/i)?.[1];
-  const spaceKey = toCollaborationSpaceSessionKey(spaceId);
-  if (spaceKey) {
-    aliases.add(spaceKey);
+  if (spaceCursor) {
+    // Trusted identity unknown — legacy unpartitioned write/read (tests +
+    // pre-hello). Scrub drops these as soon as an own steward is known.
+    aliases.add(spaceCursor);
   }
   return [...aliases];
 }
@@ -144,19 +216,27 @@ export function bumpSessionSeenAtMany(
 }
 
 /**
- * Drop shared steward aliases and foreign employee steward cursors so an
- * account switch cannot inherit the previous user's read state via bare `main`.
+ * Drop shared steward aliases, foreign employee steward cursors, and every
+ * previous-identity unpartitioned (or foreign-partition) collaboration-space
+ * cursor so an account switch cannot inherit the previous user's read state.
  * Call when the trusted own steward identity becomes known / changes.
  */
 export function scrubSessionSeenAtForOwnSteward(
   sessionSeenAt: Record<string, number>,
   ownStewardSessionKey: string | null | undefined,
+  options?: { tenantId?: string | null },
 ): Record<string, number> {
   const own = ownStewardSessionKey?.trim() || "";
   const ownOwner = extractEmployeeStewardOwnerFromSessionKey(own);
   if (!ownOwner) {
     return sessionSeenAt;
   }
+  const partitionId = resolveSessionSeenPartitionId({
+    ownStewardSessionKey: own,
+    tenantId: options?.tenantId,
+  });
+  const ownPartitionPrefix = partitionId ? `${SEEN_PARTITION_PREFIX}${partitionId}:` : null;
+
   let mutated = false;
   const next: Record<string, number> = {};
   for (const [key, value] of Object.entries(sessionSeenAt)) {
@@ -170,6 +250,21 @@ export function scrubSessionSeenAtForOwnSteward(
     }
     const keyOwner = extractEmployeeStewardOwnerFromSessionKey(key);
     if (keyOwner && keyOwner !== ownOwner) {
+      mutated = true;
+      continue;
+    }
+    // Unpartitioned space cursors (and foreign partitions) are previous-identity
+    // leftovers in the same browser settings key — never keep them for the new
+    // trusted user/tenant.
+    if (isPartitionedSessionSeenKey(key)) {
+      if (!ownPartitionPrefix || !key.startsWith(ownPartitionPrefix)) {
+        mutated = true;
+        continue;
+      }
+      next[key] = value;
+      continue;
+    }
+    if (collaborationSpaceCursorKey(key)) {
       mutated = true;
       continue;
     }
