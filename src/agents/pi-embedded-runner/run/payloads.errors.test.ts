@@ -132,6 +132,35 @@ describe("buildEmbeddedRunPayloads", () => {
     });
   });
 
+  it("surfaces 云电脑 infra when browser create fails and the assistant left the turn empty", () => {
+    const payloads = buildPayloads({
+      lastToolError: {
+        toolName: "browser",
+        error:
+          "云电脑没有启动：docker create failed: Unable to find image 'openbot-sandbox-browser:trixie' locally",
+      },
+    });
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]?.text).toContain("云电脑没有启动");
+    expect(payloads[0]?.isError).toBe(true);
+  });
+
+  it("still surfaces 云电脑 when the infra error also matches recoverable keywords (requires)", () => {
+    const payloads = buildPayloads({
+      lastToolError: {
+        toolName: "browser",
+        error:
+          "AccountWorkerFailedError: Sandbox mode requires Docker, but the docker command was not found in PATH.",
+      },
+    });
+    expect(payloads.length).toBeGreaterThanOrEqual(1);
+    expect(
+      payloads.some(
+        (p) => (p.text ?? "").includes("云电脑") || (p.text ?? "").includes("DOCKER_CLI_MISSING"),
+      ),
+    ).toBe(true);
+  });
+
   it("does not add tool error fallback when assistant output exists", () => {
     const payloads = buildPayloads({
       assistantTexts: ["All good"],
