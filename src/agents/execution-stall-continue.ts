@@ -69,10 +69,20 @@ const SOFT_CONFIRM_RE =
 /** Structured wait marker — soft asks without this must not freeze unfinished turns. */
 const WAITING_CONFIRMATION_RE =
   /waiting_confirmation|\[WAITING_CONFIRMATION\]|等待(?:你)?确认|owner-decision|owner_decision/iu;
+/** Always-hard: payment, scan, auth — never auto-continue. */
 const HARD_DECISION_RE =
-  /(?:扫码|二维码|支付|付款|收银台|价格|规格|尺码|哪一单|选哪个|授权|登录|验证码|绑定|权限|封面|标题|[¥￥])/u;
+  /(?:扫码|二维码|支付|付款|收银台|价格|规格|尺码|哪一单|选哪个|授权|登录|验证码|绑定|权限|[¥￥])/u;
+/**
+ * Content hard set (cover/title wording). Soft cover-reuse asks like 「用这张」
+ * mention 封面 in the same sentence; those must still continue after an
+ * authorized go. 「请确认封面标题」 stays terminal because it lacks 用这张.
+ */
+const CONTENT_HARD_DECISION_RE = /(?:封面|标题)/u;
+/** Soft cover-reuse confirm — bypasses CONTENT_HARD_DECISION_RE only. */
+const COVER_REUSE_SOFT_RE = /用这张|用它(?:张|的)?|就用这/u;
 const MISSING_CHOICE_RE = /(?:哪个|哪一|选哪)/u;
-const AUTHORIZED_GO_RE = /(?:开始|继续|接着|发布|\bGO\b|排版|草稿箱|调研|撰写|写完|写出来)/iu;
+const AUTHORIZED_GO_RE =
+  /(?:开始|继续|接着|发布|发送|请发|用这张|用它|\bGO\b|排版|草稿箱|调研|撰写|写完|写出来)/iu;
 
 const DELIVERABLE_OR_DRAFT_RE =
   /<<DELIVERABLE|mediaId\s*[=:]|草稿已写入|已写入草稿|已推(?:送|到|进)草稿|executed\s*[=:]\s*true|"executed"\s*:\s*true/iu;
@@ -237,6 +247,11 @@ export function isSoftConfirmAfterAuthorizedGo(
     return false;
   }
   if (HARD_DECISION_RE.test(assistant) || MISSING_CHOICE_RE.test(assistant)) {
+    return false;
+  }
+  // Cover-reuse soft asks ("请回复「用这张」") almost always mention 封面; that
+  // content-hard token must not freeze an already-authorized typeset/publish.
+  if (CONTENT_HARD_DECISION_RE.test(assistant) && !COVER_REUSE_SOFT_RE.test(assistant)) {
     return false;
   }
   if (!sameAuthorizedAct(user, assistant)) {
