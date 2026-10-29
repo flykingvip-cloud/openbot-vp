@@ -5,18 +5,30 @@
  * chat.send must resolve those flags from real send-time signals before resume
  * proceeds — never call the gate without a recheck on the user resume path.
  *
- * ## Resume stop policy (authoritative by taskId)
+ * ## Resume stop policy (authoritative by trusted scope + taskId)
  *
  * Ephemeral `chatAbortControllers` are NOT authoritative: `abortChatRunById`
  * aborts then deletes the controller, so a later resume that only scans live
  * aborted controllers can see false and wrongly allow resume.
  *
- * Authoritative stop is recorded by the **original taskId** when a user/RPC
- * stop or abort is accepted for that task. Resume of that taskId is denied
- * while the record exists — even after the AbortController entry is cleaned.
- * Other taskIds in the same session are not blocked by that record.
- * Undo clears the record for the task. Task-park aborts do not record a stop
+ * Authoritative stop is recorded under a **trusted scope** (tenantId + userId +
+ * sessionKey) plus the **original taskId**. taskId alone is never a registry
+ * key — identical task text hashes to the same taskId across sessions/tenants,
+ * and must not leak stop state. Missing scope refuses record/query/clear
+ * (no global taskId fallback).
+ *
+ * Resume of that scoped taskId is denied while the record exists — even after
+ * the AbortController entry is cleaned. Other taskIds in the same scope, and
+ * the same taskId under another session/tenant/user, are unaffected. Undo
+ * clears only the matching scope+taskId. Task-park aborts do not record a stop
  * (park is not a user stop barrier).
+ *
+ * ## Durability boundary (disclose)
+ *
+ * The registry is a **process-local Map**. It survives AbortController delete
+ * within one gateway process for single-gateway, no-mid-restart exploratory
+ * tests. It is **not** durable across process restart / multi-host; cross-
+ * process stop authority remains separately unproven.
  */
 import type { ResumeParkedRecheck } from "../../conversation-task/session-task-board.js";
 import {
@@ -73,15 +85,60 @@ export type SessionStopBarrierEntry = {
   controller?: { signal?: { aborted?: boolean } };
 };
 
-export type AuthoritativeTaskStopEntry = {
+/** Trusted scope dimensions that must bind with taskId — never taskId alone. */
+export type AuthoritativeTaskStopScope = {
+  /** Trusted tenant id; empty string for non-enterprise personal sessions. */
+  tenantId: string;
+  /** Trusted user id (platformUserId / user); may be empty when identity absent. */
+  userId: string;
+  /** Trusted session key — required; missing sessionKey = missing scope. */
+  sessionKey: string;
+};
+
+export type AuthoritativeTaskStopEntry = AuthoritativeTaskStopScope & {
   taskId: string;
-  sessionKey?: string;
   stoppedAtMs: number;
   reason?: string;
 };
 
-/** Process-local authoritative stop registry keyed by original taskId. */
+/**
+ * Process-local authoritative stop registry.
+ * Key = tenantId + userId + sessionKey + taskId (see {@link authoritativeStopRegistryKey}).
+ * NOT durable across gateway restart / multi-host.
+ */
 const authoritativeTaskStops = new Map<string, AuthoritativeTaskStopEntry>();
+
+function normalizeStopScopePart(value: string | null | undefined): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Build a trusted stop scope. Requires non-empty sessionKey.
+ * Missing sessionKey → null (callers must NOT fall back to taskId-only).
+ */
+export function resolveAuthoritativeTaskStopScope(params: {
+  tenantId?: string | null;
+  userId?: string | null;
+  sessionKey?: string | null;
+}): AuthoritativeTaskStopScope | null {
+  const sessionKey = normalizeStopScopePart(params.sessionKey);
+  if (!sessionKey) {
+    return null;
+  }
+  return {
+    tenantId: normalizeStopScopePart(params.tenantId),
+    userId: normalizeStopScopePart(params.userId),
+    sessionKey,
+  };
+}
+
+/** Stable Map key — all scope dimensions always present; never taskId alone. */
+export function authoritativeStopRegistryKey(
+  scope: AuthoritativeTaskStopScope,
+  taskId: string,
+): string {
+  return `t:${scope.tenantId}\0u:${scope.userId}\0s:${scope.sessionKey}\0task:${taskId}`;
+}
 
 export function resetAuthoritativeTaskStopsForTest(): void {
   authoritativeTaskStops.clear();
@@ -89,61 +146,98 @@ export function resetAuthoritativeTaskStopsForTest(): void {
 
 export function recordAuthoritativeTaskStop(params: {
   taskId: string;
-  sessionKey?: string;
+  tenantId?: string | null;
+  userId?: string | null;
+  sessionKey?: string | null;
   reason?: string;
   nowMs?: number;
 }): AuthoritativeTaskStopEntry | null {
-  const taskId = params.taskId.trim();
-  if (!taskId) {
+  const taskId = normalizeStopScopePart(params.taskId);
+  const scope = resolveAuthoritativeTaskStopScope(params);
+  // Missing scope or taskId — refuse. Do NOT fall back to global taskId keying.
+  if (!taskId || !scope) {
     return null;
   }
   const entry: AuthoritativeTaskStopEntry = {
+    ...scope,
     taskId,
     stoppedAtMs: params.nowMs ?? Date.now(),
-    ...(params.sessionKey?.trim() ? { sessionKey: params.sessionKey.trim() } : {}),
     ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
   };
-  authoritativeTaskStops.set(taskId, entry);
+  authoritativeTaskStops.set(authoritativeStopRegistryKey(scope, taskId), entry);
   return entry;
 }
 
-export function clearAuthoritativeTaskStop(taskId: string): boolean {
-  const trimmed = taskId.trim();
-  if (!trimmed) {
+export function clearAuthoritativeTaskStop(params: {
+  taskId: string;
+  tenantId?: string | null;
+  userId?: string | null;
+  sessionKey?: string | null;
+}): boolean {
+  const taskId = normalizeStopScopePart(params.taskId);
+  const scope = resolveAuthoritativeTaskStopScope(params);
+  // Missing scope — refuse. Do NOT clear every session that shares this taskId.
+  if (!taskId || !scope) {
     return false;
   }
-  return authoritativeTaskStops.delete(trimmed);
+  return authoritativeTaskStops.delete(authoritativeStopRegistryKey(scope, taskId));
 }
 
-/** Authoritative stop for a taskId — survives AbortController cleanup. */
-export function isAuthoritativeTaskStopActive(taskId: string): boolean {
-  const trimmed = taskId.trim();
-  if (!trimmed) {
+/**
+ * Authoritative stop for a scoped taskId — survives AbortController cleanup.
+ * Missing scope → false (no global taskId lookup).
+ */
+export function isAuthoritativeTaskStopActive(params: {
+  taskId: string;
+  tenantId?: string | null;
+  userId?: string | null;
+  sessionKey?: string | null;
+  /** Optional external store for tests. */
+  store?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
+}): boolean {
+  const taskId = normalizeStopScopePart(params.taskId);
+  const scope = resolveAuthoritativeTaskStopScope(params);
+  if (!taskId || !scope) {
     return false;
   }
-  return authoritativeTaskStops.has(trimmed);
+  const store = params.store ?? authoritativeTaskStops;
+  return store.has(authoritativeStopRegistryKey(scope, taskId));
 }
 
 /**
  * True when stop should block resume.
  *
- * Prefer authoritative stop by `taskId` when provided. Live aborted controllers
- * are only a secondary signal (they disappear after abortChatRun deletes them).
+ * Prefer authoritative stop by trusted scope + `taskId` when provided. Live
+ * aborted controllers are only a secondary signal (they disappear after
+ * abortChatRun deletes them). Missing scope never falls back to taskId-only.
  */
 export function sessionStopBarrierActive(params: {
   sessionKeys: Iterable<string>;
   chatAbortControllers: ReadonlyMap<string, SessionStopBarrierEntry>;
   /** When set, query authoritative stop for this original taskId first. */
   taskId?: string;
+  tenantId?: string | null;
+  userId?: string | null;
   /** Optional external store; defaults to the module registry. */
   authoritativeStops?: ReadonlyMap<string, AuthoritativeTaskStopEntry>;
 }): boolean {
   const taskId = params.taskId?.trim() ?? "";
   if (taskId) {
     const store = params.authoritativeStops ?? authoritativeTaskStops;
-    if (store.has(taskId)) {
-      return true;
+    for (const rawKey of params.sessionKeys) {
+      if (
+        isAuthoritativeTaskStopActive({
+          taskId,
+          tenantId: params.tenantId,
+          userId: params.userId,
+          sessionKey: rawKey,
+          store,
+        })
+      ) {
+        return true;
+      }
     }
+    // Scoped miss: do NOT fall back to a global taskId lookup.
   }
 
   const keys = new Set<string>();
@@ -170,19 +264,25 @@ export function sessionStopBarrierActive(params: {
 
 /**
  * Build the resume-time per-taskId stop predicate used by chat.send.
- * Combines authoritative task stops with any still-live aborted controllers.
+ * Combines scoped authoritative task stops with any still-live aborted controllers.
  */
 export function buildResumeTaskStopActive(params: {
   sessionKeys: Iterable<string>;
   chatAbortControllers: ReadonlyMap<string, SessionStopBarrierEntry>;
+  tenantId?: string | null;
+  userId?: string | null;
 }): (taskId: string) => boolean {
   const sessionKeys = [...params.sessionKeys];
   const controllers = params.chatAbortControllers;
+  const tenantId = params.tenantId;
+  const userId = params.userId;
   return (taskId: string) =>
     sessionStopBarrierActive({
       sessionKeys,
       chatAbortControllers: controllers,
       taskId,
+      tenantId,
+      userId,
     });
 }
 

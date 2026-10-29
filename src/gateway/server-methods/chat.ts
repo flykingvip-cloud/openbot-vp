@@ -3054,6 +3054,17 @@ function createChatAbortOps(context: GatewayRequestContext): ChatAbortOps {
   };
 }
 
+/** Trusted tenant/user identity for the authoritative stop registry (never client task text). */
+function authoritativeStopIdentityFromClient(client: GatewayClient | null | undefined): {
+  tenantId: string;
+  userId: string;
+} {
+  return {
+    tenantId: (client?.sessionEnterpriseId ?? client?.sessionTenantId ?? "").trim(),
+    userId: (client?.platformUserId ?? client?.user ?? "").trim(),
+  };
+}
+
 async function abortChatRunsForSessionKeyWithPartials(params: {
   context: GatewayRequestContext;
   ops: ChatAbortOps;
@@ -3098,12 +3109,20 @@ async function abortChatRunsForSessionKeyWithPartials(params: {
     }
   })();
   if (boardTaskId) {
+    const identity = authoritativeStopIdentityFromClient(params.client);
     if (params.mode === "undo") {
-      clearAuthoritativeTaskStop(boardTaskId);
+      clearAuthoritativeTaskStop({
+        taskId: boardTaskId,
+        sessionKey: params.sessionKey,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
+      });
     } else if (res.aborted && params.stopReason !== "task-park") {
       recordAuthoritativeTaskStop({
         taskId: boardTaskId,
         sessionKey: params.sessionKey,
+        tenantId: identity.tenantId,
+        userId: identity.userId,
         reason: params.stopReason ?? params.abortOrigin,
       });
     }
@@ -4470,12 +4489,20 @@ export const chatHandlers: GatewayRequestHandlers = {
       try {
         const boardTaskId = readSessionTaskBoard(abortSessionFile).current?.taskId?.trim() ?? "";
         if (boardTaskId) {
+          const identity = authoritativeStopIdentityFromClient(client);
           if (mode === "undo") {
-            clearAuthoritativeTaskStop(boardTaskId);
+            clearAuthoritativeTaskStop({
+              taskId: boardTaskId,
+              sessionKey,
+              tenantId: identity.tenantId,
+              userId: identity.userId,
+            });
           } else {
             recordAuthoritativeTaskStop({
               taskId: boardTaskId,
               sessionKey,
+              tenantId: identity.tenantId,
+              userId: identity.userId,
               reason: "rpc",
             });
           }
@@ -5785,6 +5812,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       if (!p.growthBirthTurn) {
         try {
           // Always inject live ResumeParkedRecheck so resume revalidates auth + stop.
+          const stopIdentity = authoritativeStopIdentityFromClient(client);
           taskTracking = applyChatFocusSwitchGateWithResumeRecheck({
             sessionFile: entry?.sessionFile,
             incomingText: mentionMessage.trim() || bodyTrimmed,
@@ -5794,15 +5822,19 @@ export const chatHandlers: GatewayRequestHandlers = {
               sendPolicy,
               accessAuthorized: true,
               clientIdentityOk: clientIdentityOkForResume(client),
-              // Session-wide live-controller scan is secondary only; per-task
-              // authoritative stop is what survives abort→delete→resume.
+              // Session-wide live-controller scan is secondary only; scoped
+              // authoritative stop (tenant/user/session+taskId) survives abort→delete.
               stopActive: sessionStopBarrierActive({
                 sessionKeys: [resolvedSessionKey, sessionKey],
                 chatAbortControllers: context.chatAbortControllers,
+                tenantId: stopIdentity.tenantId,
+                userId: stopIdentity.userId,
               }),
               isTaskStopActive: buildResumeTaskStopActive({
                 sessionKeys: [resolvedSessionKey, sessionKey],
                 chatAbortControllers: context.chatAbortControllers,
+                tenantId: stopIdentity.tenantId,
+                userId: stopIdentity.userId,
               }),
             },
           });
