@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Branch | `memory/safe-continuity-landing` |
-| Base SHA (branch tip before landing commits) | `d632f4627a158e079dc21810fdb15e17ac440119` |
+| Landing commit SHA | `913efc61` (on `d632f4627a158e079dc21810fdb15e17ac440119`) |
 | Backend under test | **builtin** (default). QMD not required for these loops. |
 | Constraints held | Did **not** flip `collaboration.learning.privateMemoryPromote` default; did **not** switch default `memory.backend` to qmd; capsule approval gates retained; retrieved / injected / outcome_verified distinction unchanged. |
 | Test command | `pnpm exec vitest run src/memory/memory-continuity-authz.test.ts src/memory/memory-continuity-acceptance.test.ts` |
