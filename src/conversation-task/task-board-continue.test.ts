@@ -104,7 +104,7 @@ describe("decideTaskBoardContinue", () => {
 
   it("skips when board has no unfinished current", () => {
     const sessionFile = tempSessionFile();
-    writeSessionTaskBoard(sessionFile, { current: undefined, parked: [] });
+    writeSessionTaskBoard(sessionFile, emptySessionTaskBoard());
     expect(decideTaskBoardContinue({ sessionFile, assistantText: "done for now" })).toMatchObject({
       action: "skip",
       reason: "no_unfinished_current",

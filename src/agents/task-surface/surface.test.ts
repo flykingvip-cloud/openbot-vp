@@ -2,7 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyIncomingUserMessage } from "../../conversation-task/session-task-board.js";
+import {
+  applyIncomingUserMessage,
+  emptySessionTaskBoard,
+} from "../../conversation-task/session-task-board.js";
 import { replyForTaskSurfaceUtterance } from "./apply.js";
 import {
   ghostInjectionShouldOmit,
@@ -276,7 +279,7 @@ describe("task surface keep-only", () => {
 
   it("does not turn a keep-only utterance into a new parked task", () => {
     const started = applyIncomingUserMessage({
-      board: { parked: [] },
+      board: emptySessionTaskBoard(),
       incomingText: "写审查记录并生成 PDF",
     });
     const kept = applyIncomingUserMessage({
