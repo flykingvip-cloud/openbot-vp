@@ -174,16 +174,25 @@ function applyKeepOnlyToBoard(board: SessionTaskBoard, plan: KeepOnlyPlan): Sess
   const keptCurrent =
     board.current && keptIds.has(board.current.taskId) ? board.current : undefined;
   const keptParked = board.parked.filter((row) => keptIds.has(row.taskId));
+  // Preserve focusRevision / tombstones / archived / scope from the input board (C1 shell).
+  const shell: SessionTaskBoard = {
+    parked: keptParked,
+    focusRevision: board.focusRevision ?? 0,
+    ...(board.tombstones ? { tombstones: board.tombstones } : {}),
+    ...(board.archived ? { archived: board.archived } : {}),
+    ...(board.scope ? { scope: board.scope } : {}),
+  };
   if (keptCurrent) {
-    return { current: keptCurrent, parked: keptParked };
+    return { ...shell, current: keptCurrent };
   }
   const promoted = keptParked[0];
   if (!promoted) {
-    return { parked: [] };
+    return { ...shell, parked: [] };
   }
   const nextCurrent: TrackedTask = { ...promoted, unfinished: true };
   delete nextCurrent.parkedAtMs;
   return {
+    ...shell,
     current: nextCurrent,
     parked: keptParked.filter((row) => row.taskId !== promoted.taskId),
   };
