@@ -66,4 +66,19 @@ describe("turn relation", () => {
     expect(classifyTurnRelation("请继续写《调律》小说第七章，六时启闸", snake)).toBe("new_work");
     expect(classifyTurnRelation("新任务：创作调律长篇小说并验收第一章", snake)).toBe("new_work");
   });
+
+  it("keeps same-goal appendix / next chapter / charts as amend (v2 wording)", () => {
+    const novel = "创作《调律》长篇小说并验收各章交付";
+    expect(classifyTurnRelation("请继续", novel)).toBe("amend");
+    expect(classifyTurnRelation("写下一章", novel)).toBe("amend");
+    expect(classifyTurnRelation("请继续写下一章", novel)).toBe("amend");
+    expect(classifyTurnRelation("补充附录", novel)).toBe("amend");
+    expect(classifyTurnRelation("加上图表", novel)).toBe("amend");
+    expect(classifyTurnRelation("补图表说明", novel)).toBe("amend");
+    // Explicit pause-and-do-B / sure distinct goal still inserts
+    expect(classifyTurnRelation("现在改做供应商合同审查", novel)).toBe("new_work");
+    expect(classifyTurnRelation("请继续写审查记录、完成绑定", "你帮我制作一个贪吃蛇的小游戏")).toBe(
+      "new_work",
+    );
+  });
 });
