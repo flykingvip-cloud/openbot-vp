@@ -10058,13 +10058,33 @@ landingStreams:
       - src/auto-reply/reply/session-continuity.checkpoint-rollback.test.ts
       - ui/src/ui/app.ts
       - ui/src/ui/app.chat-restore.node.test.ts
-    canLandWith: []
+    canLandWith:
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       task: collab-restore-line-phase-a:grok-bot
       owner: grok-bot
       purpose: Phase A re-enable chat checkpoint timeline (恢复线) for space/collab
         sessions — human-user nodes only; transcript restore; no group workspace
         snapshot (Phase B out); NO_PROMOTE
+  - id: memory-safe-continuity-live-gateway-20261030
+    landingPolicy: serial
+    paths:
+      - test/memory-continuity-gateway.e2e.test.ts
+      - .loom/registry.yaml
+      - src/memory/memory-continuity-gateway.http.integration.test.ts
+      - extensions/memory-core/index.ts
+      - docs/design/memory-continuity-acceptance.md
+    canLandWith:
+      - collab-restore-line-phase-a
+      - DDOC
+      - MRR
+      - H1H
+    metadata:
+      task: memory-safe-continuity-landing
+      owner: grok-bot
+      purpose: Multi-process HTTP/WS gateway live tests for memory continuity
+        (child spawn + acceptance evidence). Registry path listed so the stream
+        can land its own loom rule without mixing unrelated registry owners.
   - id: fix-preview-member-mutex-20261029
     landingPolicy: serial
     paths:
@@ -19767,6 +19787,7 @@ landingStreams:
       - CHAT_HISTORY_P0_IMAGE_OMIT
       - u1-unified-task-stop
       - DDOC
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
@@ -20892,7 +20913,8 @@ landingStreams:
     paths:
       - assets/chrome-extension/**
       - extensions/**
-    canLandWith: []
+    canLandWith:
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       legacyRuleId: isolate-openbot-channel-and-extension-surface
       legacyTitle: OpenBot Channel And Extension Surface
@@ -22079,6 +22101,7 @@ landingStreams:
     canLandWith:
       - CL
       - MRR
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       legacyRuleId: merge-design-docs
       legacyTitle: Design Documents (Straggler)
