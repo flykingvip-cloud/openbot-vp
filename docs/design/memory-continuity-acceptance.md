@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Branch | `memory/safe-continuity-landing-v2` (from `aa446d12927b374558cf104261949552a9e81e8d`) |
-| Candidate tip | `4844738ecf6291e5e27eb907c1cda7c3198a9b4e` |
+| Candidate tip | `13a09a97b69e3eed87d76b8c48b08b9323cca687` |
 | Base (PARTIAL prior) | `aa446d12927b374558cf104261949552a9e81e8d` — search flake / naming / ownership gaps |
 | Gateway WIP preserved on | `memory/safe-continuity-gateway-wip` @ `89df958c` (HTTP harness + multi-process e2e + memory-core user forward) — **not** mixed into this candidate |
 | Backend under test | **builtin** (default). QMD collections membership/tenant-filtered when enabled; default backend unchanged. |
