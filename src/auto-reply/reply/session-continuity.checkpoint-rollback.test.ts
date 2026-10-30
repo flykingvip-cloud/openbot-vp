@@ -14,6 +14,8 @@ import {
   listSessionContinuityCheckpoints,
   pruneSessionContinuityCheckpoints,
   resolveCheckpointBoundaryMessageId,
+  resolveContinuityGroupPaths,
+  resolveContinuityMemoryRoot,
   resolveSessionContinuityWorkspaceDir,
 } from "./session-continuity.js";
 
@@ -383,5 +385,119 @@ describe("collaboration group checkpoint capture (Phase A 恢复线)", () => {
       transcript: true,
     });
     expect(paths.workspacePath.startsWith(groupWorkspaceRoot)).toBe(true);
+  });
+
+  it("writes+lists space turn_completed under managed tenant group memoryDir (SoT)", async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-group-ckpt-tenant-"));
+    const tenantsRoot = path.join(tempDir, "tenants");
+    const hostCollabRoot = path.join(tempDir, "host-collab");
+    const prevTenants = process.env.OPENBOT_TENANTS_ROOT;
+    process.env.OPENBOT_TENANTS_ROOT = tenantsRoot;
+    try {
+      const sessionFile = path.join(tempDir, "tenant-group-sess.jsonl");
+      await fs.writeFile(
+        sessionFile,
+        `${[
+          JSON.stringify({ type: "session", version: 1, id: "tenant-group-sess" }),
+          JSON.stringify({
+            type: "message",
+            id: "t0",
+            message: { role: "assistant", content: "协作就绪" },
+          }),
+          JSON.stringify({
+            type: "message",
+            id: "t1",
+            message: { role: "user", content: "检测点写入验证" },
+          }),
+          JSON.stringify({
+            type: "message",
+            id: "t2",
+            message: { role: "assistant", content: "已完成一轮" },
+          }),
+        ].join("\n")}\n`,
+        "utf8",
+      );
+
+      const tenantId = "001";
+      const groupId = "grp-flykingvip-gmail-com-研发小组";
+      const spaceKey = `space:${groupId}`;
+      const cfg = { collaboration: { defaults: { workspace: hostCollabRoot } } };
+      const tenantPaths = resolveContinuityGroupPaths({ cfg, groupId, tenantId });
+      const hostPaths = resolveContinuityGroupPaths({ cfg, groupId, tenantId: null });
+
+      // SoT must be under tenants root, not the host dual-root collab workspace.
+      expect(tenantPaths.memoryDir.startsWith(tenantsRoot)).toBe(true);
+      expect(tenantPaths.memoryDir.includes(path.join("001", "collaboration", "groups"))).toBe(
+        true,
+      );
+      expect(tenantPaths.memoryDir).not.toBe(hostPaths.memoryDir);
+      expect(
+        resolveContinuityMemoryRoot({
+          cfg,
+          workspaceDir: path.join(tempDir, "agent-ws"),
+          scope: "group",
+          ownerId: groupId,
+          tenantId,
+        }),
+      ).toBe(tenantPaths.memoryDir);
+
+      const sessionEntry = {
+        sessionId: "tenant-group-sess",
+        updatedAt: Date.now(),
+        sessionFile,
+        groupId,
+      };
+      const scope = {
+        cfg,
+        workspaceDir: resolveSessionContinuityWorkspaceDir({
+          cfg,
+          sessionKey: spaceKey,
+          sessionEntry,
+          agentId: "main",
+          agentWorkspaceDir: path.join(tempDir, "agent-ws"),
+          tenantId,
+        }),
+        agentId: "main",
+        sessionKey: spaceKey,
+        sessionEntry,
+        tenantId,
+      };
+
+      expect(scope.workspaceDir).toBe(tenantPaths.workspacePath);
+
+      const checkpoint = await commitSessionContinuityForCurrentSession({
+        ...scope,
+        reason: "turn_completed",
+      });
+      expect(checkpoint?.restorable).toEqual({ files: false, transcript: true });
+      expect(checkpoint?.session_key).toBe(spaceKey);
+
+      const written = await fs.readdir(path.join(tenantPaths.memoryDir, "checkpoints"));
+      expect(written.some((name) => name.endsWith(".json"))).toBe(true);
+
+      // Host dual-root must stay empty for this tenant write.
+      await expect(fs.readdir(path.join(hostPaths.memoryDir, "checkpoints"))).rejects.toThrow();
+
+      const listed = await listSessionContinuityCheckpoints(scope);
+      expect(listed.map((c) => c.checkpointId)).toContain(checkpoint?.id);
+      expect(listed.find((c) => c.checkpointId === checkpoint?.id)?.restorable).toEqual({
+        files: false,
+        transcript: true,
+      });
+
+      // List without tenantId looks at host root → empty (write/list mismatch repro).
+      const listedHost = await listSessionContinuityCheckpoints({
+        ...scope,
+        tenantId: null,
+        workspaceDir: hostPaths.workspacePath,
+      });
+      expect(listedHost.map((c) => c.checkpointId)).not.toContain(checkpoint?.id);
+    } finally {
+      if (prevTenants === undefined) {
+        delete process.env.OPENBOT_TENANTS_ROOT;
+      } else {
+        process.env.OPENBOT_TENANTS_ROOT = prevTenants;
+      }
+    }
   });
 });

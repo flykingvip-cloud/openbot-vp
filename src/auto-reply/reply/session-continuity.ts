@@ -7,6 +7,7 @@ import { TURN_COMPLETION_CONTINUITY_LINE } from "../../agents/turn-completion/co
 import type { OpenBotConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { resolveGroupCollaborationPaths } from "../../gateway/collaboration-learning/collaboration-paths.js";
+import { resolveTrustedCollaborationGroupsRoot } from "../../gateway/workspace/group-locator.js";
 import { writeFileWithinRoot } from "../../infra/fs-safe.js";
 import { createContentAddressedSnapshotStore } from "../../infra/workspace-snapshot/content-addressed-store.js";
 import type { WorkspaceSnapshotRef } from "../../infra/workspace-snapshot/types.js";
@@ -404,14 +405,42 @@ const MAX_INJECTED_CONTINUITY_CHARS = 6000;
 const ARTIFACT_PATTERN =
   /([^\s"'<>`|\\/:]{1,80}\.(?:md|markdown|pdf|docx?|pptx?|xlsx?|csv|txt))/giu;
 
+/**
+ * Group continuity paths: when tenantId is present (managed LIVE SoT), resolve under
+ * the trusted tenant collaboration/groups root so write + list agree with the
+ * tenant group directory. Without tenantId, keep the host dual-root layout.
+ */
+export function resolveContinuityGroupPaths(params: {
+  cfg: OpenBotConfig;
+  groupId: string;
+  tenantId?: string | null;
+}) {
+  const tenantId = params.tenantId?.trim() || null;
+  if (tenantId) {
+    const groupRootDir = resolveTrustedCollaborationGroupsRoot({
+      tenantId,
+      profile: "managed_enterprise",
+      cfg: params.cfg,
+    });
+    return resolveGroupCollaborationPaths(params.groupId, params.cfg, { groupRootDir });
+  }
+  return resolveGroupCollaborationPaths(params.groupId, params.cfg);
+}
+
 export function resolveContinuityMemoryRoot(params: {
   cfg: OpenBotConfig;
   workspaceDir: string;
   scope: Extract<MemoryScope, "agent" | "group">;
   ownerId: string;
+  /** Managed tenant id — selects tenant collaboration groups SoT for group scope. */
+  tenantId?: string | null;
 }): string {
   if (params.scope === "group") {
-    return resolveGroupCollaborationPaths(params.ownerId, params.cfg).memoryDir;
+    return resolveContinuityGroupPaths({
+      cfg: params.cfg,
+      groupId: params.ownerId,
+      tenantId: params.tenantId,
+    }).memoryDir;
   }
   return path.join(params.workspaceDir, "memory");
 }
@@ -423,6 +452,7 @@ export function resolveSessionContinuityWorkspaceDir(params: {
   sessionEntry?: SessionEntry;
   agentId: string;
   agentWorkspaceDir: string;
+  tenantId?: string | null;
 }): string {
   const scopeInfo = resolveScope({
     sessionEntry: params.sessionEntry,
@@ -430,7 +460,11 @@ export function resolveSessionContinuityWorkspaceDir(params: {
     agentId: params.agentId,
   });
   if (scopeInfo.scope === "group") {
-    return resolveGroupCollaborationPaths(scopeInfo.ownerId, params.cfg).workspacePath;
+    return resolveContinuityGroupPaths({
+      cfg: params.cfg,
+      groupId: scopeInfo.ownerId,
+      tenantId: params.tenantId,
+    }).workspacePath;
   }
   return params.agentWorkspaceDir;
 }
@@ -677,6 +711,7 @@ export async function commitSessionContinuity(params: {
   sessionKey?: string;
   previousSessionEntry: SessionEntry;
   reason: "reset" | "deleted" | "rollover";
+  tenantId?: string | null;
 }): Promise<MemoryCheckpoint | undefined> {
   const sessionFile = params.previousSessionEntry.sessionFile;
   const sessionId = params.previousSessionEntry.sessionId;
@@ -699,6 +734,7 @@ export async function commitSessionContinuity(params: {
       workspaceDir: params.workspaceDir,
       scope: scopeInfo.scope,
       ownerId: scopeInfo.ownerId,
+      tenantId: params.tenantId,
     });
     await fs.mkdir(path.join(rootDir, CHECKPOINT_DIR), { recursive: true });
 
@@ -836,6 +872,7 @@ export async function loadLatestSessionContinuityCheckpoint(params: {
   agentId: string;
   sessionKey?: string;
   sessionEntry?: SessionEntry;
+  tenantId?: string | null;
 }): Promise<MemoryCheckpoint | undefined> {
   const scopeInfo = resolveScope({
     sessionEntry: params.sessionEntry,
@@ -847,6 +884,7 @@ export async function loadLatestSessionContinuityCheckpoint(params: {
     workspaceDir: params.workspaceDir,
     scope: scopeInfo.scope,
     ownerId: scopeInfo.ownerId,
+    tenantId: params.tenantId,
   });
   return await readLatestCheckpoint(rootDir);
 }
@@ -872,6 +910,7 @@ export async function listSessionContinuityCheckpoints(params: {
   agentId: string;
   sessionKey?: string;
   sessionEntry?: SessionEntry;
+  tenantId?: string | null;
 }): Promise<SessionCheckpointSummary[]> {
   const scopeInfo = resolveScope({
     sessionEntry: params.sessionEntry,
@@ -883,6 +922,7 @@ export async function listSessionContinuityCheckpoints(params: {
     workspaceDir: params.workspaceDir,
     scope: scopeInfo.scope,
     ownerId: scopeInfo.ownerId,
+    tenantId: params.tenantId,
   });
   const checkpointRoot = path.join(rootDir, CHECKPOINT_DIR);
   let files: string[];
@@ -929,6 +969,7 @@ export async function loadSessionContinuityCheckpointById(params: {
   sessionKey?: string;
   sessionEntry?: SessionEntry;
   checkpointId: string;
+  tenantId?: string | null;
 }): Promise<MemoryCheckpoint | undefined> {
   const scopeInfo = resolveScope({
     sessionEntry: params.sessionEntry,
@@ -940,6 +981,7 @@ export async function loadSessionContinuityCheckpointById(params: {
     workspaceDir: params.workspaceDir,
     scope: scopeInfo.scope,
     ownerId: scopeInfo.ownerId,
+    tenantId: params.tenantId,
   });
   const checkpointRoot = path.join(rootDir, CHECKPOINT_DIR);
   let files: string[];
@@ -1023,6 +1065,7 @@ export async function pruneSessionContinuityCheckpoints(params: {
   sessionKey?: string;
   sessionEntry?: SessionEntry;
   maxPerSession?: number;
+  tenantId?: string | null;
 }): Promise<void> {
   const max = params.maxPerSession ?? MAX_CHECKPOINTS_PER_SESSION;
   try {
@@ -1036,6 +1079,7 @@ export async function pruneSessionContinuityCheckpoints(params: {
       workspaceDir: params.workspaceDir,
       scope: scopeInfo.scope,
       ownerId: scopeInfo.ownerId,
+      tenantId: params.tenantId,
     });
     const entries = await loadScopeCheckpointEntries(path.join(rootDir, CHECKPOINT_DIR));
     if (entries.length === 0) {
@@ -1088,6 +1132,7 @@ export async function cleanupSessionContinuityCheckpoints(params: {
   agentId: string;
   sessionKey?: string;
   sessionEntry?: SessionEntry;
+  tenantId?: string | null;
 }): Promise<void> {
   try {
     const scopeInfo = resolveScope({
@@ -1100,6 +1145,7 @@ export async function cleanupSessionContinuityCheckpoints(params: {
       workspaceDir: params.workspaceDir,
       scope: scopeInfo.scope,
       ownerId: scopeInfo.ownerId,
+      tenantId: params.tenantId,
     });
     const entries = await loadScopeCheckpointEntries(path.join(rootDir, CHECKPOINT_DIR));
     if (entries.length === 0) {
@@ -1151,6 +1197,7 @@ export async function buildSessionContinuityPrompt(params: {
   sessionKey?: string;
   sessionEntry?: SessionEntry;
   isNewSession: boolean;
+  tenantId?: string | null;
 }): Promise<string> {
   const scopeInfo = resolveScope({
     sessionEntry: params.sessionEntry,
@@ -1166,6 +1213,7 @@ export async function buildSessionContinuityPrompt(params: {
     workspaceDir: params.workspaceDir,
     scope: scopeInfo.scope,
     ownerId: scopeInfo.ownerId,
+    tenantId: params.tenantId,
   });
   const taskLedger = await readLedger<TaskLedgerEntry>(rootDir, TASK_LEDGER_FILE);
   const artifactLedger = await readLedger<ArtifactLedgerEntry>(rootDir, ARTIFACT_LEDGER_FILE);
@@ -1251,6 +1299,7 @@ export async function loadRestoreTaskReconciliation(params: {
   sessionKey?: string;
   sessionEntry?: SessionEntry;
   checkpointOpenTasks: readonly string[];
+  tenantId?: string | null;
 }): Promise<RestoreTaskReconciliation> {
   const scopeInfo = resolveScope({
     sessionEntry: params.sessionEntry,
@@ -1262,6 +1311,7 @@ export async function loadRestoreTaskReconciliation(params: {
     workspaceDir: params.workspaceDir,
     scope: scopeInfo.scope,
     ownerId: scopeInfo.ownerId,
+    tenantId: params.tenantId,
   });
   const taskLedger = await readLedger<TaskLedgerEntry>(rootDir, TASK_LEDGER_FILE);
   const artifactLedger = await readLedger<ArtifactLedgerEntry>(rootDir, ARTIFACT_LEDGER_FILE);
@@ -1416,6 +1466,7 @@ export async function restoreWorkspaceSnapshotForCheckpoint(params: {
   checkpoint: MemoryCheckpoint;
   /** Aborts the snapshot walk/hash before workspace files are replaced. */
   signal?: AbortSignal;
+  tenantId?: string | null;
 }): Promise<{
   restoredFiles: number;
   removedFiles: number;
@@ -1437,6 +1488,7 @@ export async function restoreWorkspaceSnapshotForCheckpoint(params: {
     workspaceDir: params.workspaceDir,
     scope: scopeInfo.scope,
     ownerId: scopeInfo.ownerId,
+    tenantId: params.tenantId,
   });
   const store = createContentAddressedSnapshotStore({
     storeDir: path.join(rootDir, "snapshots"),
@@ -1458,6 +1510,8 @@ export async function commitSessionContinuityForCurrentSession(params: {
   reason: "turn_completed";
   /** Capture a workspace file snapshot for rollback (default true). */
   enableWorkspaceSnapshot?: boolean;
+  /** Managed tenant id — group memory writes go to tenant collaboration SoT. */
+  tenantId?: string | null;
 }): Promise<MemoryCheckpoint | undefined> {
   const sessionFile = params.sessionEntry?.sessionFile;
   const sessionId = params.sessionEntry?.sessionId;
@@ -1480,6 +1534,7 @@ export async function commitSessionContinuityForCurrentSession(params: {
       workspaceDir: params.workspaceDir,
       scope: scopeInfo.scope,
       ownerId: scopeInfo.ownerId,
+      tenantId: params.tenantId,
     });
     await fs.mkdir(path.join(rootDir, CHECKPOINT_DIR), { recursive: true });
 
@@ -1556,6 +1611,7 @@ export async function commitSessionContinuityForCurrentSession(params: {
       agentId: params.agentId,
       sessionKey: params.sessionKey,
       sessionEntry: params.sessionEntry,
+      tenantId: params.tenantId,
     });
     return checkpoint;
   } catch (err) {

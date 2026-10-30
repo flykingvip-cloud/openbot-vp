@@ -242,6 +242,7 @@ export async function listChatCheckpoints(
 ): Promise<SessionCheckpointSummary[]> {
   const keys = checkpointSessionKeys(sessionKey, rawSessionKey);
   const cfg = await loadCheckpointListingConfig(client, keys);
+  const tenantId = readTrustedTenantIdFromClient(client);
   const byId = new Map<string, SessionCheckpointSummary>();
   const allWorkspaceDirs: string[] = [];
   for (const key of keys) {
@@ -271,6 +272,7 @@ export async function listChatCheckpoints(
           agentId,
           sessionKey: key,
           sessionEntry: entry,
+          tenantId,
         });
       } catch {
         continue;
@@ -424,6 +426,7 @@ export async function loadChatCheckpointForRestore(params: {
         sessionKey,
         sessionEntry,
         checkpointId: params.checkpointId,
+        tenantId: readTrustedTenantIdFromClient(params.client),
       });
       if (checkpoint) {
         return { checkpoint, workspaceDir, sessionKey };
