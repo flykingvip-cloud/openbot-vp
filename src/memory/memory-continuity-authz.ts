@@ -42,7 +42,8 @@ export type MemoryContinuityPermissionSource =
   | "governance.tenantId+members.json"
   | "members.json"
   | "personal_workspace_only"
-  | "missing_caller_identity";
+  | "missing_caller_identity"
+  | "managed_missing_tenant";
 
 export type MemoryContinuityAuthzContext = {
   readonly tenantId: string | null;
@@ -140,9 +141,12 @@ export async function resolveMemoryContinuityAuthz(params: {
 }): Promise<MemoryContinuityAuthzContext> {
   const tenantId = params.governance?.tenantId?.trim() || null;
   const userId = extractUserIdFromGovernance(params.governance, params.authenticatedUserId);
-  const profile =
-    params.profile ??
-    (tenantId && tenantId !== "__local__" ? "managed_enterprise" : "personal_local");
+  // Trusted security mode must be passed explicitly (tool/search-manager entry).
+  // Do NOT infer managed_enterprise from tenant presence alone — that would let a
+  // tenant-bearing personal call fall into managed roots, and a managed call
+  // missing tenant fall through to personal roots. Default is personal_local;
+  // managed without tenant fails closed below.
+  const profile = params.profile ?? "personal_local";
 
   if (!userId) {
     // No caller identity → do not attach any collaboration roots (DM/personal
@@ -158,12 +162,13 @@ export async function resolveMemoryContinuityAuthz(params: {
   }
 
   if (profile === "managed_enterprise" && !tenantId) {
+    // Fail closed: managed mode without tenant must NOT fall through to personal roots.
     return {
       tenantId: null,
       userId,
       profile,
       authorizedGroupIds: new Set(),
-      permissionSource: "missing_caller_identity",
+      permissionSource: "managed_missing_tenant",
       roots: [],
     };
   }

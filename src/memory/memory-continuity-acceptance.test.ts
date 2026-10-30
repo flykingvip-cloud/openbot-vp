@@ -346,9 +346,15 @@ describe("memory continuity acceptance (builtin)", () => {
       const lessonMarker = `LESSON_${Date.now()}`;
 
       // Personal gated write path (does not open privateMemoryPromote).
+      const personalOwnership = {
+        ownerUserId: "operator-1",
+        ownerAgentId: "bot-main",
+        securityProfile: "personal_local" as const,
+      };
       const written = await writePersonalLearningCandidate({
         botId: "bot-main",
         actorId: "operator-1",
+        ownership: personalOwnership,
         reason: lessonMarker,
         detail: "personal gated write",
       });
@@ -365,6 +371,7 @@ describe("memory continuity acceptance (builtin)", () => {
         botId: "bot-main",
         capsuleId: written.capsuleId,
         actorId: "operator-1",
+        ownership: personalOwnership,
       });
       expect(approved.approved).toBe(true);
       // Hard personal path: approve → promote → active asset → recall inject.
@@ -381,6 +388,7 @@ describe("memory continuity acceptance (builtin)", () => {
         botId: "bot-main",
         assetId: approved.assetId!,
         actorId: "operator-1",
+        ownership: personalOwnership,
       });
       expect(revoked.ok).toBe(true);
       const stopped = await readPersonalLearningRecall({ botId: "bot-main" });

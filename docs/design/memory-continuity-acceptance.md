@@ -2,58 +2,78 @@
 
 | Field | Value |
 | --- | --- |
-| Branch | `memory/safe-continuity-landing` |
-| Landing commit SHA | `913efc61` (on `d632f4627a158e079dc21810fdb15e17ac440119`); continuity gap-close commits follow on this branch |
-| Backend under test | **builtin** (default). QMD collections are membership/tenant-filtered when enabled; default backend unchanged. |
-| Constraints held | Did **not** flip `collaboration.learning.privateMemoryPromote` default; did **not** switch default `memory.backend` to qmd; capsule approval gates retained; retrieved / injected / outcome_verified distinction unchanged. |
-| Test commands | `pnpm exec vitest run src/memory/memory-continuity-authz.test.ts src/memory/memory-continuity-acceptance.test.ts src/gateway/collaboration-learning/memory-index-paths.test.ts src/memory/memory-continuity-rpc.integration.test.ts` |
-| Result (Asia/Shanghai) | **13/13 passed** (2026-10-30 ~12:32 CST, re-run twice) — authz 4, index-paths/QMD 4, acceptance 3, RPC integration 2. RPC file must import `embedding.test-mocks` before `memory-tool`. |
+| Branch | `memory/safe-continuity-landing-v2` (from `aa446d12927b374558cf104261949552a9e81e8d`) |
+G514e95d39f7824f7656a42779e035de0bc9869` |
+| Base (PARTIAL prior) | `aa446d12927b374558cf104261949552a9e81e8d` — search flake / naming / ownership gaps |
+| Gateway WIP preserved on | `memory/safe-continuity-gateway-wip` @ `89df958c` (HTTP harness + multi-process e2e + memory-core user forward) — **not** mixed into this candidate |
+| Backend under test | **builtin** (default). QMD collections membership/tenant-filtered when enabled; default backend unchanged. |
+| Constraints held | Did **not** flip `collaboration.learning.privateMemoryPromote` default; did **not** switch default `memory.backend` to qmd; capsule approval gates retained. |
+| Test commands | See columns below. |
+| Result (Asia/Shanghai) | **RPC alone 2/2 ×2**; **suite 19/19 ×2** (authz 6, index-paths 4, acceptance 3, tool-layer 2, ownership 4). 2026-10-30 ~13:23 CST. |
+
+## Evidence columns (mocked vs real auth)
+
+| Column | What it exercises | Identity / auth | Command |
+| --- | --- | --- | --- |
+| **Tool-layer integration** | In-process `createMemorySearchTool` / `createMemoryGetTool` then `.execute()` — **not** gateway HTTP dispatch | `authenticatedUserId` + optional `governance` / explicit `securityProfile` passed into tool factories; embedding provider **mocked** via `embedding.test-mocks` (must import before `memory-tool`); membership via real `members.json` | `pnpm exec vitest run src/memory/memory-continuity-rpc.integration.test.ts` |
+| **HTTP-auth boundary** | Live HTTP `/tools/invoke` against a running gateway (session → `authenticatedUserId`) | Real gateway auth entry; **not** in this candidate — preserved on `memory/safe-continuity-gateway-wip` (`memory-continuity-gateway.http.integration.test.ts`) | (deferred; do not claim tool `.execute` is HTTP) |
+| **Full subprocess** | Child-process gateway continuity e2e | Real multi-process boundaries; **not** in this candidate — preserved on `memory/safe-continuity-gateway-wip` (`test/memory-continuity-gateway.e2e.test.ts`) | (deferred) |
+
+Supporting unit/acceptance (same candidate):
+
+```bash
+pnpm exec vitest run \
+  src/memory/memory-continuity-authz.test.ts \
+  src/memory/memory-continuity-acceptance.test.ts \
+  src/gateway/collaboration-learning/memory-index-paths.test.ts \
+  src/memory/memory-continuity-rpc.integration.test.ts \
+  src/memory/personal-learning-ownership.test.ts
+```
 
 ## Permission sources (what is checked)
 
 | Surface | Claim / context checked |
 | --- | --- |
-| Collaboration group markdown (`collaboration/<groupId>/memory/**`) | `members.json` via `assertGroupMemberAccess` / `loadAuthoritativeGroupMembers` (active\|invited). Managed: also `governance.tenantId` → tenant-scoped groups root. |
-| DM / personal agent memory | Separate agent workspace + index (`MemoryIndexManager` cache key / store path). No cross-workspace read. |
-| Learning recall inject | Active-only assets (`status === undefined \| "active"`). Candidate capsules never inject until approve→promote. |
-| QMD collab collections | Same `authorizedGroupIds` / tenant-scoped roots as builtin via `resolveCollaborationQmdCollections(Sync)`. Missing `authorizedGroupIds` → **default deny** (no all-groups dump). |
+| Collaboration group markdown (`collaboration/<groupId>/memory/**`) | `members.json` via `assertGroupMemberAccess`. Managed: requires **explicit** trusted `securityProfile` / `profile: managed_enterprise` **and** `governance.tenantId` — tenant presence alone does **not** flip mode; managed without tenant → `managed_missing_tenant` fail-closed (empty roots, no personal fallthrough). |
+| DM / personal agent memory | Separate agent workspace + index. No cross-workspace read. |
+| Learning recall inject | Active-only assets. Candidate capsules never inject until approve→promote. |
+| Personal approve / revoke | Trusted `PersonalLearningOwnerContext` (`ownerUserId` + `ownerAgentId`, optional tenant/securityProfile). Actor must equal ownerUserId; ownerAgentId must equal botId. Spoofed actor / cross-tenant same botId / managed-without-tenant refuse; revoke refuse leaves state unchanged. Nonempty `actorId` alone is **not** authorization. |
+| QMD collab collections | Same `authorizedGroupIds` / tenant-scoped roots; missing `authorizedGroupIds` → **default deny**. |
 
 Denial responses use reason `"not authorized"` / reasonCodes (`non_member`, `revoked_or_inactive`, `cross_tenant`, …) and **never** include file body or snippets.
 
-## Three-column matrix
+## Three-column matrix (continuity loops)
 
 | Loop / concern | Static wiring | Runtime loop | Permission isolation |
 | --- | --- | --- | --- |
-| **DM personal memory** | Builtin indexes `memory/**/*.md` under agent workspace; `isMemoryPath` unchanged for personal paths. Tool path: `createMemorySearchTool` / `createMemoryGetTool`. | Write unique marker → `sync({force})` → manager + `memory_search`/`memory_get` return path + body. | Second workspace/agent index: search misses marker; `readFile` empty (no shared index). **PASS** |
-| **Group collaboration memory** | Builtin `MemoryIndexManager` takes `collaborationMemoryRoots` from `resolveMemoryContinuityAuthz` → `discoverCollaborationMemoryIndexRoots({ authorizedGroupIds })`; sync uses `listCollaborationMemoryMarkdownDocs` only for those roots. QMD: same filter on collection resolve. | Member writes `groups/<id>/memory/*.md` → member sync/search/get OK (manager + tool RPC). Delete file → force sync purges stale snippets. | Non-member: no roots / search empty / get `not authorized` (no body). Revoked: `revoked_or_inactive`, no body. Cross-tenant same groupId: tenant-scoped roots / governance TenantContext, deny without leak. **PASS** |
-| **Learning approve→inject** | `writePersonalLearningCandidate` / `approvePersonalLearningCandidate` / `revokePersonalLearningAsset` under scope `agent:<botId>`; personal promote skips group charter policy and uses `targetBotId` from `agent:` scope. Group path reuses capsule governance + `promoteApprovedCapsuleIfEligible`. Recall via `buildLearningRecall` (active-only). | Candidate **not** in recall → approve (+promote) → injectable → revoke → recall empty. Acceptance hard-asserts **personal** post-approve inject and revoke-stops-inject (not only group). | Approval actor required; no silent promote; `privateMemoryPromote` left closed (default OFF). **PASS** |
+| **DM personal memory** | Builtin indexes `memory/**/*.md`; tool path tool-layer `.execute()`. Embedding mocks bound before manager/tool import. | Write unique marker → `sync({force})` → manager + tool search/get. On search miss, assert dumps index status / hit diagnostics (provider, files, chunks). | Second workspace misses marker. **PASS** (stable alone + suite ×2) |
+| **Group collaboration memory** | `resolveMemoryContinuityAuthz` + discovery filter; tool entry passes explicit security mode. | Member sync/search/get OK. | Non-member / revoked / cross-tenant (explicit managed + other tenant governance) deny without body. **PASS** |
+| **Learning approve→inject** | Personal scope `agent:<botId>` + ownership context; `privateMemoryPromote` left OFF. | Candidate → approve(+promote) → inject → revoke stops. Counterexamples: spoofed actor, cross-tenant same botId, revoke refuse unchanged. | **PASS** |
 
-## Gap close status (this follow-up)
+## Gap close status (this candidate vs PARTIAL)
 
 | Gap | Status | Evidence |
 | --- | --- | --- |
-| **1) QMD membership/tenant filter** | **CLOSED** | `resolveCollaborationQmdCollections` / Sync take `authorizedGroupIds` (default deny if omitted). `backend-config.ts` + `search-manager.ts` pass authz. Vitest: `memory-index-paths.test.ts` (authorized build, default-deny, non-member exclude, cross-tenant managed). |
-| **2) Personal approve→promote reliability** | **CLOSED** | Personal scope: `targetBotId` from `agent:<botId>`; skip group promotion policy. Acceptance asserts personal candidate → approve → inject → revoke stops inject. `privateMemoryPromote` default remains OFF. |
-| **3) Full gateway memory_tool RPC integration** | **CLOSED** | `src/memory/memory-continuity-rpc.integration.test.ts` exercises real `createMemorySearchTool` / `createMemoryGetTool` with membership + Item7 Stage C governance (TenantContext). Covers authorized DM, authorized group member, non-member / revoked / cross-tenant forbidden without body/snippet. |
+| **A) Positive search flake** | **CLOSED** | Root cause: `memory-tool` imported before `embedding.test-mocks` → `provider:"none"`, files:0/chunks:0. Fixed import order; miss diagnostics retained. RPC alone 2/2 ×2; suite ×2. |
+| **B1) Tool ≠ gateway RPC naming** | **CLOSED** | Describe/doc: tool-layer integration; HTTP/subprocess columns separate; gateway WIP parked on `memory/safe-continuity-gateway-wip`. |
+| **B2) Personal approve ownership** | **CLOSED** | `assertPersonalLearningOwnership`; tests in `personal-learning-ownership.test.ts`. |
+| **B3) Managed not inferred from tenant** | **CLOSED** | Default `personal_local`; managed without tenant → `managed_missing_tenant`; tool passes explicit `securityProfile` / `accessContext`. |
+| QMD default-deny | Remains closed | `memory-index-paths.test.ts` |
 
-## Files landed (this branch)
+## Files in this candidate
 
 | Area | Path |
 | --- | --- |
-| Authz module | `src/memory/memory-continuity-authz.ts` |
-| Authz unit tests | `src/memory/memory-continuity-authz.test.ts` |
-| Acceptance tests | `src/memory/memory-continuity-acceptance.test.ts` |
-| RPC / tool integration | `src/memory/memory-continuity-rpc.integration.test.ts` |
-| Personal gated write | `src/memory/personal-learning-write.ts` |
-| Capsule promote (personal) | `src/gateway/collaboration-learning/capsule-promotion.ts`, `capsule-governance.ts` |
-| Discovery filter (builtin + QMD) | `src/gateway/collaboration-learning/memory-index-paths.ts` (+ `.test.ts`) |
-| Backend / search wiring | `src/memory/backend-config.ts`, `src/memory/search-manager.ts` |
-| Builtin index/read/sync | `src/memory/manager.ts`, `src/memory/manager-sync-ops.ts`, `src/memory/internal.ts` |
-| Search manager + tool | `src/memory/search-manager.ts`, `src/agents/tools/memory-tool.ts` |
+| Authz (no tenant→managed inference) | `src/memory/memory-continuity-authz.ts` (+ `.test.ts`) |
+| Tool-layer + miss diagnostics | `src/memory/memory-continuity-rpc.integration.test.ts` |
+| Tool securityProfile wiring | `src/agents/tools/memory-tool.ts` |
+| Personal ownership gates | `src/memory/personal-learning-write.ts`, `src/memory/personal-learning-ownership.test.ts` |
+| Acceptance (ownership args) | `src/memory/memory-continuity-acceptance.test.ts` |
 | This doc | `docs/design/memory-continuity-acceptance.md` |
 
 ## Still-open / non-goals
 
-- Live multi-process gateway HTTP/WS harness against a running server is not required; tool-layer RPC path matches production `memory_search` / `memory_get` invocation.
-- Default `memory.backend` remains **builtin**; QMD filter is ready but unused unless operators opt in.
+- HTTP-auth boundary and full subprocess gateway evidence remain on `memory/safe-continuity-gateway-wip` until optionally rewritten onto v2 after this candidate is accepted — **do not** claim tool `.execute` is gateway RPC.
+- Default `memory.backend` remains **builtin**.
 - `privateMemoryPromote` remains default **OFF**.
+- No push / no PR until user acceptance of this candidate SHA.

@@ -19,6 +19,7 @@ import {
   filterMemorySearchResultsForAuthz,
   resolveMemoryContinuityAuthz,
 } from "../../memory/memory-continuity-authz.js";
+import type { MemoryIndexAccessContext } from "../../memory/memory-index-access-context.js";
 import type { MemorySearchResult } from "../../memory/types.js";
 import { parseAgentSessionKey } from "../../routing/session-key.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
@@ -79,6 +80,20 @@ async function resolveMemoryToolGovernance(options: {
   });
 }
 
+function resolveToolContinuityProfile(options: {
+  accessContext?: MemoryIndexAccessContext;
+  /** Trusted security mode from call entry when full accessContext is unavailable. */
+  securityProfile?: "personal_local" | "managed_enterprise";
+}): "personal_local" | "managed_enterprise" {
+  if (options.accessContext?.securityProfile === "managed_enterprise") {
+    return "managed_enterprise";
+  }
+  if (options.securityProfile === "managed_enterprise") {
+    return "managed_enterprise";
+  }
+  return "personal_local";
+}
+
 export function createMemorySearchTool(options: {
   config?: OpenBotConfig;
   agentSessionKey?: string;
@@ -86,6 +101,13 @@ export function createMemorySearchTool(options: {
   governance?: MemorySearchGovernance;
   /** Authenticated human for members.json checks (personal_local / explicit). */
   authenticatedUserId?: string | null;
+  /**
+   * Trusted security mode from call entry (Item7 Stage C). Required for managed;
+   * must not be inferred from tenant presence alone. Absent → personal_local.
+   */
+  accessContext?: MemoryIndexAccessContext;
+  /** Trusted security mode when full accessContext is not built (builtin path). */
+  securityProfile?: "personal_local" | "managed_enterprise";
   gatewayClientUser?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
 }): AnyAgentTool | null {
@@ -105,16 +127,19 @@ export function createMemorySearchTool(options: {
       const maxResults = readNumberParam(asToolParams(params), "maxResults");
       const minScore = readNumberParam(asToolParams(params), "minScore");
       const governance = await resolveMemoryToolGovernance(options);
+      const continuityProfile = resolveToolContinuityProfile(options);
       const continuityAuthz = await resolveMemoryContinuityAuthz({
         cfg,
         governance,
         authenticatedUserId: options.authenticatedUserId,
+        profile: continuityProfile,
       });
       const { manager, error } = await getMemorySearchManager({
         cfg,
         agentId,
         governance,
         authenticatedUserId: options.authenticatedUserId,
+        accessContext: options.accessContext,
         continuityAuthz,
       });
       if (!manager) {
@@ -184,6 +209,9 @@ export function createMemoryGetTool(options: {
   agentSessionKey?: string;
   governance?: MemorySearchGovernance;
   authenticatedUserId?: string | null;
+  /** Trusted security mode from call entry; absent → personal_local. */
+  accessContext?: MemoryIndexAccessContext;
+  securityProfile?: "personal_local" | "managed_enterprise";
   gatewayClientUser?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
 }): AnyAgentTool | null {
@@ -203,10 +231,12 @@ export function createMemoryGetTool(options: {
       const from = readNumberParam(asToolParams(params), "from", { integer: true });
       const lines = readNumberParam(asToolParams(params), "lines", { integer: true });
       const governance = await resolveMemoryToolGovernance(options);
+      const continuityProfile = resolveToolContinuityProfile(options);
       const continuityAuthz = await resolveMemoryContinuityAuthz({
         cfg,
         governance,
         authenticatedUserId: options.authenticatedUserId,
+        profile: continuityProfile,
       });
       const access = await assertMemoryContinuityPathAccess({
         relPath,
@@ -228,6 +258,7 @@ export function createMemoryGetTool(options: {
         agentId,
         governance,
         authenticatedUserId: options.authenticatedUserId,
+        accessContext: options.accessContext,
         continuityAuthz,
       });
       if (!manager) {

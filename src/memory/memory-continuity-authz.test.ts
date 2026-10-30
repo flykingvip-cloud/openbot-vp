@@ -253,4 +253,63 @@ describe("memory-continuity-authz", () => {
     ]);
     expect(filtered.every((r) => !r.snippet.includes("LEAK"))).toBe(true);
   });
+
+  it("does not infer managed from tenant presence alone; defaults personal_local", async () => {
+    await withIsolatedState(async ({ collabRoot }) => {
+      const groupId = "group-tenant-bearing";
+      const groupDir = path.join(collabRoot, "groups", encodeURIComponent(groupId));
+      await writeMembers(groupDir, [{ userId: "alice", status: "active" }]);
+      await fs.mkdir(path.join(groupDir, "memory"), { recursive: true });
+      const cfg = {
+        collaboration: { defaults: { workspace: collabRoot } },
+        agents: { list: [{ id: "main", default: true }] },
+      };
+      const authz = await resolveMemoryContinuityAuthz({
+        cfg,
+        governance: {
+          tenantId: "tenant-from-governance",
+          ownershipProof: ownershipProofFromTenantUser({
+            tenantId: "tenant-from-governance",
+            userId: "alice",
+          }),
+        },
+        authenticatedUserId: "alice",
+        // profile intentionally omitted — must NOT become managed_enterprise
+      });
+      expect(authz.profile).toBe("personal_local");
+      expect(authz.permissionSource).toBe("members.json");
+      expect(authz.authorizedGroupIds.has(groupId)).toBe(true);
+    });
+  });
+
+  it("managed without tenant fails closed (empty roots; no personal fallthrough)", async () => {
+    await withIsolatedState(async ({ collabRoot }) => {
+      const groupId = "group-should-not-leak";
+      const groupDir = path.join(collabRoot, "groups", encodeURIComponent(groupId));
+      await writeMembers(groupDir, [{ userId: "alice", status: "active" }]);
+      await fs.mkdir(path.join(groupDir, "memory"), { recursive: true });
+      await fs.writeFile(path.join(groupDir, "memory", "note.md"), "PERSONAL-ROOT-SECRET", "utf8");
+      const cfg = {
+        collaboration: { defaults: { workspace: collabRoot } },
+        agents: { list: [{ id: "main", default: true }] },
+      };
+      const authz = await resolveMemoryContinuityAuthz({
+        cfg,
+        authenticatedUserId: "alice",
+        profile: "managed_enterprise",
+        // no governance.tenantId
+      });
+      expect(authz.profile).toBe("managed_enterprise");
+      expect(authz.permissionSource).toBe("managed_missing_tenant");
+      expect(authz.authorizedGroupIds.size).toBe(0);
+      expect(authz.roots).toHaveLength(0);
+      const denied = await assertMemoryContinuityPathAccess({
+        relPath: `collaboration/${groupId}/memory/note.md`,
+        authz,
+        cfg,
+      });
+      expect(denied.ok).toBe(false);
+      expect(JSON.stringify(denied)).not.toContain("PERSONAL-ROOT-SECRET");
+    });
+  });
 });

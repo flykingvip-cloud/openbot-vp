@@ -6,16 +6,18 @@ import { createMemoryGetTool, createMemorySearchTool } from "../agents/tools/mem
 import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
 import type { OpenBotConfig } from "../config/config.js";
 /**
- * Integration: real memory_search / memory_get tool path with continuity authz.
+ * Tool-layer integration: createMemorySearchTool / createMemoryGetTool with
+ * continuity authz (Item7-style TenantContext, seat/user identity, membership).
  *
- * Exercises createMemorySearchTool / createMemoryGetTool the same way the
- * memory-core plugin / gateway tools invoke them, with Item7-style TenantContext
- * (governance from call entry), seat/user identity, and group membership.
+ * This is NOT a gateway HTTP/RPC harness — tools are constructed and .execute()
+ * is called in-process. HTTP-auth boundary and full subprocess evidence live in
+ * separate columns/files (see memory-continuity-acceptance.md).
  *
  * Backend: builtin (default). Does not flip privateMemoryPromote or memory.backend.
  *
- * Import embedding.test-mocks BEFORE memory-tool / manager so vi.mock bindings
- * apply before the import graph caches real embeddings.
+ * CRITICAL: import embedding.test-mocks BEFORE memory-tool / manager so vi.mock
+ * bindings apply before the import graph caches real embeddings. Alone-run
+ * failures previously showed provider:"none", files:0/chunks:0 after sync.
  */
 import { resetEmbeddingMocks } from "./embedding.test-mocks.js";
 import type { MemoryIndexManager as MemoryIndexManagerType } from "./index.js";
@@ -122,7 +124,7 @@ function parseToolDetails<T>(result: { details?: unknown }): T {
   return result.details as T;
 }
 
-describe("memory continuity RPC integration (memory_search / memory_get)", () => {
+describe("memory continuity tool-layer integration (memory_search / memory_get .execute)", () => {
   let managers: MemoryIndexManagerType[] = [];
 
   beforeEach(() => {
@@ -168,7 +170,20 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
     const alice = await getRequiredMemoryIndexManager({ cfg: aliceCfg, agentId: "main" });
     managers.push(alice);
     await alice.sync({ reason: "test", force: true });
+    const status = alice.status();
     const directHits = await alice.search(marker, { maxResults: 10, minScore: 0 });
+    if (!directHits.some((h) => h.path === relPath || h.snippet.includes(marker))) {
+      const diag = {
+        status,
+        hitCount: directHits.length,
+        hits: directHits.slice(0, 5),
+        relPath,
+        marker,
+        workspaceFiles: await fs.readdir(path.join(aliceWs, "memory")),
+      };
+      console.error("DM_SEARCH_MISS_DIAG", JSON.stringify(diag, null, 2));
+      expect.fail(`DM search miss; diag=${JSON.stringify(diag)}`);
+    }
     expect(directHits.some((h) => h.path === relPath || h.snippet.includes(marker))).toBe(true);
 
     const searchTool = createMemorySearchTool({
@@ -285,12 +300,24 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
       registerIsolatedTestV1Root(memberManager);
       managers.push(memberManager);
       await memberManager.sync({ reason: "test", force: true });
+      const memberStatus = memberManager.status();
       const memberDirect = await memberManager.search(marker, { maxResults: 10, minScore: 0 });
-      expect(
-        memberDirect.some(
-          (h) => h.path.includes(`collaboration/${groupId}/`) && h.snippet.includes(marker),
-        ),
-      ).toBe(true);
+      const memberHit = memberDirect.some(
+        (h) => h.path.includes(`collaboration/${groupId}/`) && h.snippet.includes(marker),
+      );
+      if (!memberHit) {
+        const diag = {
+          status: memberStatus,
+          hitCount: memberDirect.length,
+          hits: memberDirect.slice(0, 5),
+          groupId,
+          marker,
+          collabRel,
+        };
+        console.error("GROUP_SEARCH_MISS_DIAG", JSON.stringify(diag, null, 2));
+        expect.fail(`group search miss; diag=${JSON.stringify(diag)}`);
+      }
+      expect(memberHit).toBe(true);
 
       const memberSearch = createMemorySearchTool({
         config: cfg,
@@ -394,6 +421,8 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
         config: cfg,
         governance: governanceOther!,
         authenticatedUserId: "member-alice",
+        // Trusted mode must be explicit — tenant on governance alone does not imply managed.
+        securityProfile: "managed_enterprise",
       });
       const crossResult = await crossGet!.execute("rpc-cross-get", { path: collabRel });
       const crossGot = parseToolDetails<{
@@ -413,6 +442,7 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
         config: cfg,
         governance: governanceOther!,
         authenticatedUserId: "member-alice",
+        securityProfile: "managed_enterprise",
       });
       const crossSearchResult = await crossSearch!.execute("rpc-cross-search", {
         query: marker,
