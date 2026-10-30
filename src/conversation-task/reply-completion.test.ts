@@ -486,6 +486,7 @@ describe("session task completion notice", () => {
           createdAtMs: 1,
         },
       ],
+      focusRevision: 0,
     });
     const notice = await observeConversationTaskReplyCompleted({
       tenantId: "local",
