@@ -77,6 +77,49 @@ describe("selectModelOrderWithinEffectiveSet", () => {
     }
   });
 
+  it("P2-G: empty catalog must not claim cheapest / fake cost explanations", () => {
+    const ids = ["api-proxy-deepseek/premium", "api-proxy-deepseek/cheap", "openai/gpt-x"];
+    const res = selectModelOrderWithinEffectiveSet({
+      mode: "aor_enhanced",
+      effectiveModelIds: ids,
+      aorExecution: AOR,
+      catalog: [],
+    });
+    expect(res.strategy).toBe("native");
+    expect(res.catalogCoverage).toBe("synthetic_only");
+    expect(res.orderedModelIds).toEqual(ids);
+    expect(res.routingExplanation).toBeUndefined();
+    expect(res.syntheticModelIds?.toSorted()).toEqual(
+      ["api-proxy-deepseek/cheap", "api-proxy-deepseek/premium", "openai/gpt-x"].toSorted(),
+    );
+  });
+
+  it("P2-G: partial catalog still ranks on real costs; marks synthetic peers", () => {
+    const ids = ["api-proxy-deepseek/premium", "api-proxy-deepseek/cheap", "openai/gpt-x"];
+    const res = selectModelOrderWithinEffectiveSet({
+      mode: "aor_enhanced",
+      effectiveModelIds: ids,
+      aorExecution: { ...AOR, selectorStrategy: "cheapest" },
+      catalog: [
+        {
+          ref: { provider: "api-proxy-deepseek", id: "cheap" },
+          cost: { inputPerMtok: 0.1, outputPerMtok: 0.2 },
+          taskTypeScores: {},
+        },
+        {
+          ref: { provider: "api-proxy-deepseek", id: "premium" },
+          cost: { inputPerMtok: 10, outputPerMtok: 20 },
+          taskTypeScores: {},
+        },
+      ],
+    });
+    expect(res.strategy).toBe("cheapest");
+    expect(res.catalogCoverage).toBe("partial");
+    expect(res.orderedModelIds[0]).toBe("api-proxy-deepseek/cheap");
+    expect(res.syntheticModelIds).toEqual(["openai/gpt-x"]);
+    expect(sortedSet(res.orderedModelIds)).toEqual(sortedSet(ids));
+  });
+
   it("Property 4 + 7：任意授权集合下，native 与 aor_enhanced 候选集合恒等", () => {
     const arbId = fc.constantFrom(...CATALOG_IDS, "custom/x", "custom/y", "no-slash");
     fc.assert(

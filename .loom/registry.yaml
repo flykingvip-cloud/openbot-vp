@@ -10082,6 +10082,13 @@ tasks:
       - src/gateway/enterprise-data/connector-catalog.test.ts
       - src/gateway/server-methods/enterprise-data-m4.ts
       - src/gateway/server-methods/enterprise-data-m4.test.ts
+      - src/gateway/model-entitlement/aor-selection.ts
+      - src/gateway/model-entitlement/aor-selection.test.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/models/platform-models-config.p2g.test.ts
+      - src/agents/model-fallback.p2g-outbound.test.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10089,7 +10096,7 @@ tasks:
         ide: cursor
         agent: cursor-grok-default-capability
         status: active
-        lastSignalAt: 2026-10-30T09:24:49.741Z
+        lastSignalAt: 2026-10-30T09:35:00.000Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-30
@@ -10151,6 +10158,13 @@ landingStreams:
       - src/gateway/enterprise-data/connector-catalog.test.ts
       - src/gateway/server-methods/enterprise-data-m4.ts
       - src/gateway/server-methods/enterprise-data-m4.test.ts
+      - src/gateway/model-entitlement/aor-selection.ts
+      - src/gateway/model-entitlement/aor-selection.test.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/models/platform-models-config.p2g.test.ts
+      - src/agents/model-fallback.p2g-outbound.test.ts
     canLandWith:
       - CL
       - DDOC
@@ -10164,7 +10178,9 @@ landingStreams:
       purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
         learning skillDraft list/finalize + P1-E shadow intent authorize + P1-F
         knowledge materialization false-availability fix (event capability not
-        delivered). NO_PROMOTE; no auto-Apply system/runtime bindings.
+        delivered) + P2-G platform models smart config (synthetic-neutral must
+        not claim effect-verified). NO_PROMOTE; no auto-Apply system/runtime
+        bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22572,6 +22588,34 @@ sharedPaths:
   - glob: src/gateway/server-methods/enterprise-data-m4.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: "P1-F: RPC reject/migrate tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-selection.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: synthetic_only catalog must not claim cheapest/best_quality."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-selection.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: fail-before/pass-after synthetic + partial catalog tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-catalog-adapter.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: omit missing-cost profiles so selection can detect synthetic_only."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-catalog-adapter.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: missing-cost omit unit tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/employee-model-gate.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: claim selectorStrategy only when selection.strategy !== native."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/models/platform-models-config.p2g.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: resolvePlatformModelsMode default native + saved aor_enhanced."
+    reviewAfter: 2026-11-30
+  - glob: src/agents/model-fallback.p2g-outbound.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: preferredModelOrder changes outbound primary provider/model."
     reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

@@ -518,15 +518,26 @@ export async function resolveEmployeeModelGate(
       });
       if (selection.strategy !== "native") {
         preferredModelOrder = selection.orderedModelIds;
-      }
-      // Persist the strategy that actually drove selection (or the configured one).
-      if (
-        aorExecution.selectorStrategy === "cheapest" ||
-        aorExecution.selectorStrategy === "best_quality" ||
-        aorExecution.selectorStrategy === "balanced" ||
-        aorExecution.selectorStrategy === "bandit"
-      ) {
-        effectiveSelectorStrategy = aorExecution.selectorStrategy;
+        // Only claim the selector strategy when ranking used real catalog evidence.
+        // synthetic_only / ranking failure returns strategy "native" — keep balanced default.
+        if (
+          selection.strategy === "cheapest" ||
+          selection.strategy === "best_quality" ||
+          selection.strategy === "balanced" ||
+          selection.strategy === "bandit"
+        ) {
+          effectiveSelectorStrategy = selection.strategy;
+        }
+      } else if (selection.catalogCoverage === "synthetic_only") {
+        console.warn(
+          JSON.stringify({
+            component: "employee-model-gate",
+            event: "aor_synthetic_catalog_fallback",
+            mode,
+            reason: "all_profiles_synthetic_neutral",
+            sample: (selection.syntheticModelIds ?? []).slice(0, 5),
+          }),
+        );
       }
       const aorCfg = resolvePlatformModelsConfig(input.cfg ?? ({} as OpenBotConfig)).aor;
       if (aorCfg.enableBandit && aorCfg.banditStatePath) {

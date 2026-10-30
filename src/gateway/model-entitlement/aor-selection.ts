@@ -51,13 +51,20 @@ export type AorRoutingExplanation = {
   reason: string;
 };
 
+/** Whether ranked candidates used real catalog costs/scores or synthetic neutrals. */
+export type AorCatalogCoverage = "full" | "partial" | "synthetic_only";
+
 export type AorSelectionResult = {
   /** 保集合重排后的候选顺序（primary 在前）；集合恒等于 effectiveModelIds 去重后的集合。 */
   orderedModelIds: string[];
-  /** 实际生效的策略；native / 无 aorExecution 时为 "native"。 */
+  /** 实际生效的策略；native / 无 aorExecution / 全合成中性档案时为 "native"。 */
   strategy: SelectionStrategy | "native";
-  /** aor_enhanced 下的路由解释（可观测 / 回写投影用）。 */
+  /** aor_enhanced 下的路由解释（可观测 / 回写投影用）。全合成时不产出，避免冒充已验证优化。 */
   routingExplanation?: AorRoutingExplanation[];
+  /** Catalog evidence quality for this ranking. */
+  catalogCoverage?: AorCatalogCoverage;
+  /** Model ids ranked via synthetic neutral profiles (subset of ordered). */
+  syntheticModelIds?: string[];
 };
 
 const DEFAULT_COST_PROFILE: CostProfile = {
@@ -86,19 +93,29 @@ function sameRef(a: ModelRef, b: ModelRef): boolean {
   );
 }
 
+type ProfileResolution = {
+  profile: ModelProfile;
+  /** True when the profile was invented with neutral cost/scores (not from catalog). */
+  synthetic: boolean;
+};
+
 /**
  * 为某 modelRef 构造候选档案：优先取目录里的真实档案，否则合成一个中性默认档案
  * （保证集合内每个授权模型都可参与排序，从而不破坏 Property 4）。
+ * 调用方必须区分 synthetic：全合成时不得把结果标成经效果验证的智能优化。
  */
-function profileForRef(ref: ModelRef, catalog: readonly ModelProfile[]): ModelProfile {
+function profileForRef(ref: ModelRef, catalog: readonly ModelProfile[]): ProfileResolution {
   const found = catalog.find((profile) => sameRef(profile.ref, ref));
   if (found) {
-    return found;
+    return { profile: found, synthetic: false };
   }
   return {
-    ref,
-    cost: { inputPerMtok: 1, outputPerMtok: 1 },
-    taskTypeScores: {},
+    profile: {
+      ref,
+      cost: { inputPerMtok: 1, outputPerMtok: 1 },
+      taskTypeScores: {},
+    },
+    synthetic: true,
   };
 }
 
@@ -136,11 +153,39 @@ export function selectModelOrderWithinEffectiveSet(input: AorSelectionInput): Ao
   }
 
   if (parsed.length === 0) {
-    return { orderedModelIds: effective, strategy: input.aorExecution.selectorStrategy };
+    // Nothing rankable with real refs — keep set, do not claim selectorStrategy as verified.
+    return {
+      orderedModelIds: effective,
+      strategy: "native",
+      catalogCoverage: "synthetic_only",
+    };
   }
 
-  const candidates = parsed.map(({ ref }) => profileForRef(ref, catalog));
-  const allowedModels = parsed.map(({ ref }) => ref);
+  const resolved = parsed.map(({ modelId, ref }) => {
+    const { profile, synthetic } = profileForRef(ref, catalog);
+    return { modelId, ref, profile, synthetic };
+  });
+  const syntheticModelIds = resolved.filter((row) => row.synthetic).map((row) => row.modelId);
+  const catalogCoverage: AorCatalogCoverage =
+    syntheticModelIds.length === 0
+      ? "full"
+      : syntheticModelIds.length === resolved.length
+        ? "synthetic_only"
+        : "partial";
+
+  // All-neutral synthetic ranking is not effect-verified smart mode: fall back to original
+  // order and omit explanations that would claim "lowest estimated cost" etc.
+  if (catalogCoverage === "synthetic_only") {
+    return {
+      orderedModelIds: effective,
+      strategy: "native",
+      catalogCoverage,
+      syntheticModelIds,
+    };
+  }
+
+  const candidates = resolved.map((row) => row.profile);
+  const allowedModels = resolved.map((row) => row.ref);
 
   let ranked;
   try {
@@ -152,8 +197,13 @@ export function selectModelOrderWithinEffectiveSet(input: AorSelectionInput): Ao
       constraints: { allowedModels },
     });
   } catch {
-    // 选路异常（无满足约束的候选等）→ 退回原序，绝不缩减集合。
-    return { orderedModelIds: effective, strategy: input.aorExecution.selectorStrategy };
+    // 选路异常（无满足约束的候选等）→ 退回原序，绝不缩减集合；不冒充已验证策略。
+    return {
+      orderedModelIds: effective,
+      strategy: "native",
+      catalogCoverage,
+      ...(syntheticModelIds.length > 0 ? { syntheticModelIds } : {}),
+    };
   }
 
   const orderedModelIds: string[] = [];
@@ -188,5 +238,7 @@ export function selectModelOrderWithinEffectiveSet(input: AorSelectionInput): Ao
     orderedModelIds,
     strategy: input.aorExecution.selectorStrategy,
     routingExplanation: explanation,
+    catalogCoverage,
+    ...(syntheticModelIds.length > 0 ? { syntheticModelIds } : {}),
   };
 }

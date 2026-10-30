@@ -1,6 +1,6 @@
 # 默认能力矩阵与 P0 证据（2026-10-30）
 
-基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；事件物化未交付）。P2-G/H 仍只读未实现。
+基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；事件物化未交付）、**P2-G**（模型智能配置：native 合法默认；合成中性档案不得冒充已验证优化；策略改变可影响 outbound primary）。P2-H 仍只读。
 
 状态只使用：已验证 / 部分验证 / 未实现 / 合理受控关闭 / 缺证据。
 
@@ -15,7 +15,7 @@
 | 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` **新建拒绝**（unsupported+迁移）；存量可迁到 scheduled/on_demand | knowledge publication mode                                                                                                            | `knowledge-publication.ts` + `projection-bindings.upsert`                                             | on_demand / scheduled 有分发；event_driven **无执行器**（未交付）                                    | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                      | 授权与 SAR                                                          | 新建 event_driven → `MATERIALIZATION_MODE_UNSUPPORTED`；legacy 可 upsert 迁移                 | 见 P1-F。**虚假可用性已修复、事件能力未交付**；不记事件物化完成                              |
 | 数据资产物化  | 部分验证 | on_demand/scheduled 可物化；event_driven 不可再「成功但永不刷新」；生产探测禁 `mock_smoke_ok` | `EnterpriseKnowledgeProjectionMaterializationMode` + probe mode                                                                       | enterprise data gateway + `source-connection-probe.ts`                                                | connector + publication gate；生产无实时路径 → `unsupported_production_probe` / credential_required | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载                          | 凭证、grant、SAR；demo 可 mock 但须标注                                         | 无凭证/未知 handler/生产 mock 拒绝明确失败；demo 保持隔离标注                              | 见 P1-F。未实现全部连接器；事件总线仍只触发 Agent，未接物化                              |
 | 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`              | `cfg.cron`                                                                                                                            | `buildGatewayCronService`（`src/gateway/server-cron.ts`）                                                     | cron service timer                                                                             | cron store                                                                                    | 下次 wake                                                        | 目标身份与租户由 job 自身约束（本轮未重验）                         | 关闭时不调度                                                                               | 本轮只核对默认表达式，未跑创建→送达闭环。未见需要在本 PR 改动的新缺口                                   |
-| 模型智能配置  | 部分验证 | 未设置时为 `native`。`native` 是合法默认，不是缺陷                             | `gateway.platform.models.mode`                                                                                                        | `resolvePlatformModelsMode`                                                                                   | native 直出；`aor_enhanced` 另有 gate                                                          | 平台模型快照                                                                                  | 后续请求读同一 mode                                              | 不扩大授权集合                                                      | 缺 mode 时回到 native，不合成“已优化”                                                      | 本轮只读 `platform-models-config.ts`。未证明用户选择改变真实 outbound provider/model                    |
+| 模型智能配置  | 部分验证 | 未设置时为 `native`（合法默认，非缺陷）。产品/系统设置保存 `aor_enhanced` 后由 `resolvePlatformModelsMode` 读入 gate | `gateway.platform.models.mode`（UI `onSetPlatformModelsMode` → config.set） | `resolveEmployeeModelGate` ← chat / followup / cron-isolated / subagent（image/PDF 经 chat+capability plan modality） | native 直出；`aor_enhanced` + 真实目录成本 → AOR 保集合重排；**全合成中性档案 → strategy=native，不冒充已优化** | 平台模型快照 + effectiveRouting / preferredModelOrder | 后续请求读同一 mode；`runWithModelFallback` 消费 preferredModelOrder | 不扩大授权集合 | 缺 mode→native；缺档案→synthetic_only 回退原序且无假解释 | 见 P2-G。单元证明 preferredOrder 改变 outbound primary；**真实 HTTP/provider 未跑** → 部分验证 |
 
 `privateMemoryPromote` 仍记为 **合理受控关闭**（默认 unset/false）：`promotePrivateMemoryCapsuleToGroup` 只有显式 `true` 才写组学习资产。P1-C 已补生产 RPC `collaboration.learning.privateMemory.promote`（`private-memory-promote-entry.ts` + server-methods 注册）：要求 identified actor、个人 scope 按 capsuleId 加载、ownership 与目标组 trusted write 成员校验；flag OFF 返回 success-shaped `{promoted:false, reason:flag_off}`，不假装晋升成功。默认不打开 flag。本批未接线 UI（lander 冲突时 RPC+tests 足够）。撤销：个人 revoke 不自动撤销组侧副本；组侧走 `collaboration.capsule.transition` revoked。真实 HTTP/authz 子进程未跑 → 记忆行保持 **部分验证**。
 
@@ -116,7 +116,7 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 ## 已知限制与回滚
 
 - 不打开 `privateMemoryPromote` 默认（仅补 RPC 入口）。
-- 不实现 P2-G/H（P1-F 本批已做虚假可用性修复；事件物化未交付）。
+- 不实现 P2-H（P2-G 本批已做合成中性冒充修复 + outbound 决策一致性单元证明；真实 provider 未跑）。P1-F 事件物化仍未交付。
 - 工作区 memory 的 `**/*.md` watcher glob 在当前 chokidar 上仍可能不发事件。本 PR 只改了授权小组目录。
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
@@ -223,3 +223,41 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
 ```
 
 矩阵：**部分验证**（知识库/数据资产物化）；`event_driven` 执行能力 **未实现**。不自行宣告 Codex PASS。
+
+## P2-G 模型智能配置（合成中性不得冒充已验证优化，2026-10-30）
+
+触发：`aor_enhanced` + 空/缺成本目录时，`selectModelOrderWithinEffectiveSet` 仍用合成中性档案（cost 1/1）跑 `rankModels`，并把 `strategy` 标成 `cheapest`/`best_quality`，附带 “lowest estimated cost” 解释——冒充经效果验证的智能优化。矩阵此前只读 `platform-models-config.ts`，未证明用户选择改变真实 outbound provider/model。
+
+根因：`profileForRef` 为缺档模型合成中性档案后仍宣称配置策略；`resourceCatalogToAorProfiles` 把缺成本条目以中性价推入目录，掩盖 synthetic_only。
+
+修复（诚实批次；**不**把 embedding governance 从 shadow 改 enforced；**不**扩大授权集合；`native` 仍为合法默认）：
+
+- 全合成 → `strategy: "native"` + `catalogCoverage: "synthetic_only"`，**不**产出 routingExplanation。
+- 缺成本目录条目不再进入 profiles（仅记 `missingCostModelIds`），由 selection 合成并可检测。
+- gate 仅在 `selection.strategy !== "native"` 时声明 selectorStrategy / preferredModelOrder。
+- 单元证明：真实目录成本下 cheapest/best_quality 的 `preferredModelOrder` 成为 `runWithModelFallback` 的首个 outbound `provider/model`。
+
+调用点覆盖（接线已存在，本轮未改 hot-path 签名）：
+
+| 入口 | 是否经 employee-model-gate / preferredModelOrder | 备注 |
+| --- | --- | --- |
+| 普通聊天 | 是（`agent-runner-execution.ts`） | 含 images 选项走同一 fallback |
+| followup | 是（`followup-runner.ts`） | |
+| cron-isolated | 是（`cron/isolated-agent/run.ts`） | |
+| subagent | 是（`subagent-spawn.ts` + child-task AOR reorder） | 继承 parent snapshot mode |
+| image/PDF | 经 chat/capability-plan modality，非独立 gate | 附件字节估计见 child-spawn |
+
+产品保存路径：系统设置 `onSetPlatformModelsMode` → `gateway.platform.models.mode` → config.set；运行时 `resolvePlatformModelsMode` 读取。缺托管身份时 gate 早退（无 allowlist 强制），mode 仍写入 effectiveRouting，但不伪造 preferredModelOrder。
+
+失败然后通过：
+
+```text
+OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
+  src/gateway/model-entitlement/aor-selection.test.ts \
+  src/gateway/model-entitlement/aor-catalog-adapter.test.ts \
+  src/gateway/models/platform-models-config.p2g.test.ts \
+  src/agents/model-fallback.p2g-outbound.test.ts \
+  src/gateway/model-entitlement/employee-model-gate.aor.test.ts
+```
+
+矩阵：**部分验证**（模型智能配置）。真实 outbound provider HTTP 未跑。不自行宣告 Codex PASS。
