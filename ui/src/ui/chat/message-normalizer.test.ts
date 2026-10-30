@@ -242,4 +242,21 @@ describe("message-normalizer", () => {
       expect(isToolResultMessage({ role: null })).toBe(false);
     });
   });
+
+  it("strips turn_completion markers and hides internal continue prompts", () => {
+    const leaked = normalizeMessage({
+      role: "assistant",
+      content:
+        "[turn_completion state=true_fork options=option_a|option_b]\n请选 A 或 B。\n\n等待你确认下一步。",
+    });
+    const text = leaked.content.map((c) => ("text" in c ? c.text : "")).join("\n");
+    expect(text).not.toMatch(/turn_completion|state=true_fork/);
+    expect(text).toContain("请选 A 或 B");
+
+    const hidden = normalizeMessage({
+      role: "user",
+      content: "Internal task-board continue:\nContinue the same task now.",
+    });
+    expect(hidden.content).toEqual([]);
+  });
 });

@@ -1,5 +1,9 @@
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import {
+  TOOL_DIGEST_CLOSE_SENTINEL,
+  TOOL_DIGEST_OPEN_SENTINEL,
+} from "../../shared/text/control-channel-visibility.js";
+import {
   getToolResultText,
   isToolResultMessage,
 } from "../pi-embedded-runner/tool-result-char-estimator.js";
@@ -249,7 +253,10 @@ function formatToolDigest(call: ToolCallRef, result: AgentMessage): string {
   const args = summarizeKeyArgs(call.args);
   const head = args ? `[tool-digest] ${call.name} ${args}` : `[tool-digest] ${call.name}`;
   const preview = resultPreview(result);
-  return preview ? `${head}\n${preview}` : head;
+  const body = preview ? `${head}\n${preview}` : head;
+  // Sentinel wrap is the trusted unit boundary for history/display strip — blank
+  // lines inside the preview must not be treated as a real-reply separator.
+  return `${TOOL_DIGEST_OPEN_SENTINEL}\n${body}\n${TOOL_DIGEST_CLOSE_SENTINEL}`;
 }
 
 function digestMessage(call: ToolCallRef, result: AgentMessage): AgentMessage {
@@ -257,6 +264,8 @@ function digestMessage(call: ToolCallRef, result: AgentMessage): AgentMessage {
   return {
     role: "assistant",
     content: formatToolDigest(call, result),
+    // Provenance marker so history can drop the whole digest without parsing body.
+    openbotControlChannel: "tool-digest",
     ...(typeof timestamp === "number" ? { timestamp } : {}),
   } as unknown as AgentMessage;
 }

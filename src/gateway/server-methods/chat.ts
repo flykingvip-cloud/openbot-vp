@@ -17,6 +17,7 @@ import { settleTurnCompletion } from "../../agents/turn-completion/contract.js";
 import { dispatchInboundMessage } from "../../auto-reply/dispatch.js";
 import { isTranscriptStartBoundary } from "../../auto-reply/reply/chat-checkpoint-boundary.js";
 import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-error-escalation.js";
+import { isInternalContinueHistoryMessage } from "../../auto-reply/reply/internal-continue-prompt.js";
 import { isMemoryFlushHistoryMessage } from "../../auto-reply/reply/memory-flush-prompt.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import {
@@ -102,6 +103,10 @@ import {
   isHiddenToolUseScratchpadMessage,
   type VisibleReplyLanguage,
 } from "../../shared/text/assistant-scratchpad.js";
+import {
+  isControlChannelOnlyText,
+  stripControlChannelForDisplay,
+} from "../../shared/text/control-channel-visibility.js";
 import {
   extractMessageVisibleText,
   readTextBlock,
@@ -1687,12 +1692,13 @@ function sanitizeChatHistoryContentBlock(
   const entry = { ...(block as Record<string, unknown>) };
   let changed = false;
   if (typeof entry.text === "string") {
-    const visible = keepBody
+    const gated = keepBody
       ? entry.text
       : stripInlineDirectiveTagsForDisplay(
           gateChatHistoryText(entry.text, expectedLanguage),
           expectedLanguage,
         ).text;
+    const visible = keepBody ? gated : stripControlChannelForDisplay(gated);
     const res = truncateChatHistoryText(visible);
     changed ||= res.truncated || res.text !== entry.text;
     entry.text = res.text;
@@ -1758,12 +1764,13 @@ function sanitizeChatHistoryMessage(
   }
 
   const truncateField = (value: string): string => {
-    const visible = keepBody
+    const gated = keepBody
       ? value
       : stripInlineDirectiveTagsForDisplay(
           gateChatHistoryText(value, expectedLanguage),
           expectedLanguage,
         ).text;
+    const visible = keepBody ? gated : stripControlChannelForDisplay(gated);
     const res = truncateChatHistoryText(visible, truncateOpts);
     return appendToolResultExitFooter(res.text, exitFooter);
   };
@@ -1927,6 +1934,27 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
       changed = true;
       continue;
     }
+    // Decide control-channel / digest provenance on the ORIGINAL message before
+    // display strip removes the [tool-digest] header (which would otherwise leave
+    // the tool preview body looking like a normal assistant reply).
+    if (role === "assistant") {
+      const provenance =
+        message && typeof message === "object"
+          ? (message as { openbotControlChannel?: unknown }).openbotControlChannel
+          : undefined;
+      if (provenance === "tool-digest") {
+        changed = true;
+        continue;
+      }
+      const originalControlText = extractAssistantTextForSilentCheck(message);
+      if (
+        typeof originalControlText === "string" &&
+        isControlChannelOnlyText(originalControlText)
+      ) {
+        changed = true;
+        continue;
+      }
+    }
     const res = sanitizeChatHistoryMessage(message, expectedLanguage);
     if (
       expectedLanguage &&
@@ -1945,6 +1973,17 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
     changed ||= res.changed;
     // Drop internal pre-compaction memory-flush user prompts (not real user chat).
     if (isMemoryFlushHistoryMessage(res.message)) {
+      changed = true;
+      continue;
+    }
+    // Drop internal task-board / execution continue injectors (not real user chat).
+    if (isInternalContinueHistoryMessage(res.message)) {
+      changed = true;
+      continue;
+    }
+    // Drop assistant bubbles that are only tool-digest / control markers.
+    const controlText = extractAssistantTextForSilentCheck(res.message);
+    if (typeof controlText === "string" && isControlChannelOnlyText(controlText)) {
       changed = true;
       continue;
     }
@@ -3839,8 +3878,10 @@ async function runGroupBotDiscussionTurn(params: {
           // Chat settle/ledger only — not the team SoT task authority.
           taskId: null,
         });
+        // Keep tagged prepared.text for team formal submit; strip only for the
+        // user-visible reply bubble after that path returns.
         replyText = prepared.text;
-        if (params.scope.groupId && replyText.includes("DELIVERABLE") && prepared.structured) {
+        if (params.scope.groupId && prepared.structured) {
           // Unique formal team delivery via run binding only (R3 — no Map fallback).
           // Do not invent trust:membership from a bare tenantId string.
           const tenantResolution = await resolveCollaborationTenantResolution(params.client);
@@ -3892,7 +3933,7 @@ async function runGroupBotDiscussionTurn(params: {
             }
           }
           const finalized = await finalizeMemberRunTeamDeliverable({
-            text: replyText,
+            text: prepared.text,
             agentId: params.bot.agentId,
             binding,
             client: params.client,
@@ -3930,6 +3971,7 @@ async function runGroupBotDiscussionTurn(params: {
             });
           }
         }
+        replyText = stripControlChannelForDisplay(replyText);
       } catch (err) {
         params.context.logGateway.warn(
           `collaboration deliverable settle failed (${params.bot.agentId}): ${formatForLog(err)}`,
@@ -6233,7 +6275,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                 clientRunId,
                 taskId: null,
               });
-              const replyText = prepared.text;
+              const replyText = stripControlChannelForDisplay(prepared.text);
               const appended = await appendAssistantTranscriptMessage({
                 message: replyText,
                 sessionId,

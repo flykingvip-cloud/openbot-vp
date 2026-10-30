@@ -1,6 +1,7 @@
 import { stripInboundMetadata } from "../../../../src/auto-reply/reply/strip-inbound-meta.js";
 import { stripEnvelope } from "../../../../src/shared/chat-envelope.js";
 import type { VisibleReplyLanguage } from "../../../../src/shared/text/assistant-scratchpad.js";
+import { stripControlChannelForDisplay } from "../../../../src/shared/text/control-channel-visibility.js";
 import { readTextBlock } from "../../../../src/shared/text/visible-message-text.js";
 import { stripInlineDirectiveTagsForDisplay } from "../../../../src/utils/directive-tags.ts";
 import { stripThinkingTags } from "../format.ts";
@@ -20,11 +21,14 @@ export function stripClientAttachmentManifest(text: string): string {
 function processMessageText(text: string, role: string): string {
   const shouldStripInboundMetadata = role.toLowerCase() === "user";
   if (role === "assistant") {
-    return stripThinkingTags(text);
+    return stripControlChannelForDisplay(stripThinkingTags(text));
   }
-  return shouldStripInboundMetadata
-    ? stripClientAttachmentManifest(stripInboundMetadata(stripEnvelope(text)))
-    : stripEnvelope(text);
+  if (shouldStripInboundMetadata) {
+    return stripControlChannelForDisplay(
+      stripClientAttachmentManifest(stripInboundMetadata(stripEnvelope(text))),
+    );
+  }
+  return stripEnvelope(text);
 }
 
 export function extractText(message: unknown): string | null {

@@ -7,6 +7,7 @@ import {
   allocateTaskInstanceId,
   applyIncomingUserMessage,
   bindCurrentExecution,
+  buildResumePrompt,
   formatTaskBoardFocusLine,
   cancelParkedTask,
   closeParkedTask,
@@ -19,6 +20,7 @@ import {
   isTaskTombstoned,
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
+  sanitizeTaskBoardPathForPrompt,
   writeSessionTaskBoard,
   pauseParkedTask,
   resumeParkedTask,
@@ -175,7 +177,8 @@ describe("session task tracking", () => {
     expect(resumed.cutContext).toBe(true);
     expect(resumed.taskId).toBe(parked.taskId);
     expect(resumed.restoredPrompt).toContain("停在：");
-    expect(resumed.restoredPrompt).toContain("/tmp/price.md");
+    expect(resumed.restoredPrompt).toContain("price.md");
+    expect(resumed.restoredPrompt).not.toContain("/tmp/price.md");
     expect(resumed.restoredPrompt).not.toContain(RESEARCH);
     expect(resumed.board.current?.unfinished).toBe(true);
     expect(resumed.board.parked.some((row) => row.taskId === switched.taskId)).toBe(true);
@@ -706,5 +709,33 @@ describe("board-latest rules v2 C1–C6 / AC13–AC20", () => {
     expect(insertA.board.focusRevision).toBe(1);
     expect(startedB.board.focusRevision).toBe(0);
     expect(startedB.board.current?.taskId).toBe(startedB.taskId);
+  });
+});
+
+describe("buildResumePrompt path / task-id visibility", () => {
+  it("redacts absolute tenant paths and keeps task id on a machine line only", () => {
+    expect(
+      sanitizeTaskBoardPathForPrompt(
+        "/root/openbot-tenants/001/users/90fed/OpenBot/agents/bot-2/workspace/deliverables/a.md",
+      ),
+    ).toBe("deliverables/a.md");
+    const prompt = buildResumePrompt({
+      taskId: "task-abc",
+      title: "选 A",
+      goalText: "选 A",
+      unfinished: true,
+      createdAtMs: 1,
+      stop: {
+        summary: "未完成",
+        workspacePaths: [
+          "/root/openbot-tenants/001/users/90fed/OpenBot/agents/bot-2/workspace/x.md",
+        ],
+      },
+    });
+    expect(prompt).toContain("task_id: task-abc");
+    expect(prompt).toContain("继续任务「选 A」。");
+    expect(prompt).not.toMatch(/（task-abc）/);
+    expect(prompt).not.toContain("/root/openbot-tenants");
+    expect(prompt).toContain("文件：x.md");
   });
 });

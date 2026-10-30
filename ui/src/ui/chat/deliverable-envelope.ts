@@ -282,3 +282,21 @@ export function resolveDeliverableBody(text: string): string {
   }
   return text.trim();
 }
+
+/**
+ * Strip machine <<DELIVERABLE>> tags from assistant text for display.
+ * Replaces each tagged block with its body; drops orphan open/close tags.
+ */
+export function stripDeliverableEnvelopeTags(text: string): string {
+  if (!text || !text.includes("DELIVERABLE")) {
+    return text;
+  }
+  TAGGED_DELIVERABLE_RE.lastIndex = 0;
+  const withBodies = text.replace(TAGGED_DELIVERABLE_RE, (_full, _attrs: string, body: string) =>
+    normalizeEnvelopeBody(body ?? ""),
+  );
+  return withBodies
+    .replace(/<<\s*\/?\s*DELIVERABLE\b[^>]*>>?/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
