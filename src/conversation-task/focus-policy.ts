@@ -85,10 +85,11 @@ export function formatDroppedParkedTaskSentence(params: {
     return "";
   }
   const paths = (params.droppedPaths ?? []).map((item) => item.trim()).filter(Boolean);
+  // C6 / §3.6: capacity overflow → searchable archive + notify (not silent drop).
   if (paths.length === 0) {
-    return `已放下最早挂起的「${name}」。`;
+    return `已归档最早挂起的「${name}」（可追溯）。`;
   }
-  return `已放下最早挂起的「${name}」，文件仍在 ${paths.join("、")}。`;
+  return `已归档最早挂起的「${name}」（可追溯），文件仍在 ${paths.join("、")}。`;
 }
 
 function parkIncomingDroppingOldest(

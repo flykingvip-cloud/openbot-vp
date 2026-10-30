@@ -31,11 +31,49 @@ export type TrackedTask = {
   parkReason?: string;
   /** When true, automatic task_board_continue wake stays suppressed until resume. */
   wakeSuppress?: boolean;
+  /** Deliverable version stamp for late-complete isolation (C4). */
+  deliverableVersion?: string;
+  /** Execution attempt stamp for late-complete isolation (C4). */
+  executionAttempt?: string;
+};
+
+/** CLOSE tombstone — blocks wake / late results / resume resurrection (C5). */
+export type TaskTombstone = {
+  taskId: string;
+  closedAtMs: number;
+  title?: string;
+};
+
+/** Capacity overflow archive — searchable, not a continue target (C6 / §3.6). */
+export type ArchivedTask = TrackedTask & {
+  archivedAtMs: number;
+  archiveReason: string;
+};
+
+/**
+ * Focus scope: tenant + user + session. Boards are already per-session file;
+ * optional scope fields make isolation explicit for AC18.
+ */
+export type TaskBoardScope = {
+  tenantId?: string;
+  userId?: string;
+  sessionId?: string;
 };
 
 export type SessionTaskBoard = {
   current?: TrackedTask;
   parked: TrackedTask[];
+  /**
+   * Authoritative focus epoch (C1). Bumps only on successful atomic insert or
+   * legal resume — never from mtime / model time / message arrival time.
+   */
+  focusRevision: number;
+  /** CLOSE tombstones (C5). */
+  tombstones?: TaskTombstone[];
+  /** Searchable archive for parked>MAX overflow (C6). */
+  archived?: ArchivedTask[];
+  /** Optional tenant+user+session scope (C1 / AC18). */
+  scope?: TaskBoardScope;
 };
 
 export type IncomingTurnResult = {
@@ -49,16 +87,67 @@ export type IncomingTurnResult = {
   incomingTitle?: string;
   droppedTitle?: string;
   droppedPaths?: string[];
+  /** Focus revision after this mutation (C1). */
+  focusRevision?: number;
+  /**
+   * Resume success does NOT imply immediate auto-execute (C6).
+   * Callers must not schedule continue solely because action==="resume".
+   */
+  scheduleContinue?: boolean;
+  rejectedReason?: string;
 };
 
-export function emptySessionTaskBoard(): SessionTaskBoard {
-  return { parked: [] };
+export function emptySessionTaskBoard(scope?: TaskBoardScope): SessionTaskBoard {
+  return { parked: [], focusRevision: 0, ...(scope ? { scope } : {}) };
 }
 
+/** Legacy body-hash helper (not the sole identity source — see allocateTaskInstanceId). */
 export function taskIdForText(text: string): string {
   const normalized = text.replace(/\s+/g, " ").trim();
   const digest = createHash("sha256").update(normalized).digest("hex").slice(0, 12);
   return `task-${digest}`;
+}
+
+/**
+ * C3: independent instance IDs (not body-hash-only).
+ * - same body again without inboundRequestId → new id
+ * - same inbound request retry (same inboundRequestId) → idempotent same id
+ */
+export function allocateTaskInstanceId(params?: {
+  inboundRequestId?: string;
+  entropy?: string | number;
+}): string {
+  const inbound = params?.inboundRequestId?.trim();
+  if (inbound) {
+    const digest = createHash("sha256").update(`inbound-req:${inbound}`).digest("hex").slice(0, 12);
+    return `task-${digest}`;
+  }
+  const entropy = `${Date.now()}:${Math.random()}:${params?.entropy ?? ""}:${process.hrtime.bigint()}`;
+  const digest = createHash("sha256").update(entropy).digest("hex").slice(0, 12);
+  return `task-${digest}`;
+}
+
+export function isTaskTombstoned(board: SessionTaskBoard, taskId: string): boolean {
+  const id = taskId.trim();
+  if (!id) {
+    return false;
+  }
+  return (board.tombstones ?? []).some((row) => row.taskId === id);
+}
+
+function cloneBoardShell(board: SessionTaskBoard): SessionTaskBoard {
+  return {
+    current: board.current,
+    parked: [...board.parked],
+    focusRevision: board.focusRevision ?? 0,
+    ...(board.tombstones ? { tombstones: [...board.tombstones] } : {}),
+    ...(board.archived ? { archived: [...board.archived] } : {}),
+    ...(board.scope ? { scope: { ...board.scope } } : {}),
+  };
+}
+
+function bumpFocusRevision(board: SessionTaskBoard): number {
+  return (board.focusRevision ?? 0) + 1;
 }
 
 export function sessionTaskBoardPath(sessionFile: string): string {
@@ -79,10 +168,18 @@ export function isSureDistinctWork(incoming: string, currentGoal: string): boole
   return classifyTurnRelation(text, current) === "new_work";
 }
 
-function createTask(text: string, nowMs: number, workspacePaths: string[]): TrackedTask {
+function createTask(
+  text: string,
+  nowMs: number,
+  workspacePaths: string[],
+  opts?: { inboundRequestId?: string; entropy?: string | number },
+): TrackedTask {
   const title = titleFromGoal(text);
   return {
-    taskId: taskIdForText(text),
+    taskId: allocateTaskInstanceId({
+      inboundRequestId: opts?.inboundRequestId,
+      entropy: opts?.entropy ?? `${nowMs}:${title}`,
+    }),
     title,
     goalText: text.trim(),
     unfinished: true,
@@ -99,7 +196,7 @@ function parkTask(
   task: TrackedTask,
   nowMs: number,
   parkReason?: string,
-): { parked: TrackedTask[]; dropped?: TrackedTask } {
+): { parked: TrackedTask[]; archived?: ArchivedTask } {
   const stamped: TrackedTask = {
     ...task,
     unfinished: true,
@@ -111,33 +208,40 @@ function parkTask(
   if (newestFirst.length <= MAX_PARKED_TASKS) {
     return { parked: newestFirst };
   }
+  const overflow = newestFirst[newestFirst.length - 1];
   return {
     parked: newestFirst.slice(0, MAX_PARKED_TASKS),
-    dropped: newestFirst[newestFirst.length - 1],
+    archived: overflow
+      ? {
+          ...overflow,
+          archivedAtMs: nowMs,
+          archiveReason: "parked_capacity",
+        }
+      : undefined,
   };
 }
 
-function dropSentence(dropped: TrackedTask | undefined): string {
-  if (!dropped) {
+function dropSentence(archived: TrackedTask | undefined): string {
+  if (!archived) {
     return "";
   }
   return formatDroppedParkedTaskSentence({
-    droppedTaskId: dropped.taskId,
-    droppedTitle: dropped.title,
-    droppedPaths: dropped.stop.workspacePaths,
+    droppedTaskId: archived.taskId,
+    droppedTitle: archived.title,
+    droppedPaths: archived.stop.workspacePaths,
   });
 }
 
 function switchStatus(
   currentTitle: string,
   incomingTitle: string,
-  dropped?: TrackedTask,
+  archived?: TrackedTask,
   parkedCount?: number,
 ): string {
-  const droppedText = dropSentence(dropped);
+  const archivedText = dropSentence(archived);
   const count = typeof parkedCount === "number" ? parkedCount : 1;
   const line = `已挂起「${currentTitle}」，开始「${incomingTitle}」。当前任务：「${incomingTitle}」；已挂起 ${count} 项。`;
-  return droppedText ? `${line}${droppedText}` : line;
+  return archivedText ? `${line}${archivedText}` : line;
 }
 
 /** Compact focus line for UI / status: 当前任务 / 已挂起 N 项. */
@@ -209,7 +313,105 @@ export type ResumeParkedRecheck = {
    * iff this returns true for T — even after AbortController records are deleted.
    */
   isTaskStopActive?: (taskId: string) => boolean;
+  /** False when budget / quota no longer allows resume (C6). */
+  budgetOk?: boolean;
+  /** False when plan / policy no longer allows resume (C6). */
+  planOk?: boolean;
+  /** False when workspace binding is invalid for resume (C6). */
+  workspaceOk?: boolean;
 };
+
+/**
+ * Interrupt unfinished current (if any) and bind a NEW task as board.current.
+ * Prior unfinished work is deferred/parked with wakeSuppress — it must not own
+ * auto-continue, wake, or 「当前任务」. The inserted task is always LATEST.
+ */
+export function insertLatestTaskDeferringCurrent(params: {
+  board: SessionTaskBoard;
+  goalText: string;
+  nowMs?: number;
+  workspacePaths?: string[];
+  parkReason?: string;
+  inboundRequestId?: string;
+}): IncomingTurnResult {
+  const nowMs = params.nowMs ?? Date.now();
+  const paths = params.workspacePaths?.filter(Boolean) ?? [];
+  const goal = stripStamp(params.goalText);
+  const board = cloneBoardShell(params.board);
+  if (!goal) {
+    return continueResult(board, board.current?.taskId ?? "");
+  }
+  if (board.current?.unfinished && params.inboundRequestId) {
+    const idempotentId = allocateTaskInstanceId({ inboundRequestId: params.inboundRequestId });
+    if (board.current.taskId === idempotentId) {
+      return {
+        ...continueResult(board, board.current.taskId),
+        focusRevision: board.focusRevision,
+        scheduleContinue: false,
+      };
+    }
+  }
+  const created = createTask(goal, nowMs, paths, {
+    inboundRequestId: params.inboundRequestId,
+    entropy: nowMs,
+  });
+  const current = board.current;
+  const nextRevision = bumpFocusRevision(board);
+  if (!current?.unfinished) {
+    const nextBoard: SessionTaskBoard = {
+      ...board,
+      current: created,
+      focusRevision: nextRevision,
+    };
+    return {
+      board: nextBoard,
+      action: "switch",
+      taskId: created.taskId,
+      cutContext: true,
+      currentTitle: current?.title,
+      incomingTitle: created.title,
+      statusLine: `开始「${created.title}」。`,
+      focusRevision: nextRevision,
+      scheduleContinue: false,
+    };
+  }
+  const parkedCurrent: TrackedTask = {
+    ...current,
+    stop: {
+      summary: current.stop.summary || `未完成：${current.title}`,
+      workspacePaths: current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
+    },
+  };
+  const parked = parkTask(board.parked, parkedCurrent, nowMs, params.parkReason ?? "user_switch");
+  const archivedList = [...(board.archived ?? [])];
+  if (parked.archived) {
+    archivedList.unshift(parked.archived);
+  }
+  const nextBoard: SessionTaskBoard = {
+    ...board,
+    current: created,
+    parked: parked.parked,
+    focusRevision: nextRevision,
+    ...(archivedList.length > 0 ? { archived: archivedList } : {}),
+  };
+  return {
+    board: nextBoard,
+    action: "switch",
+    taskId: created.taskId,
+    cutContext: true,
+    currentTitle: current.title,
+    incomingTitle: created.title,
+    statusLine: switchStatus(current.title, created.title, parked.archived, parked.parked.length),
+    focusRevision: nextRevision,
+    scheduleContinue: false,
+    ...(parked.archived
+      ? {
+          droppedTitle: parked.archived.title,
+          droppedPaths: parked.archived.stop.workspacePaths,
+        }
+      : {}),
+  };
+}
 
 export function applyIncomingUserMessage(params: {
   board: SessionTaskBoard;
@@ -217,14 +419,12 @@ export function applyIncomingUserMessage(params: {
   nowMs?: number;
   workspacePaths?: string[];
   recheck?: ResumeParkedRecheck;
+  inboundRequestId?: string;
 }): IncomingTurnResult {
   const nowMs = params.nowMs ?? Date.now();
   const paths = params.workspacePaths?.filter(Boolean) ?? [];
   const incoming = stripStamp(params.incomingText);
-  const board = {
-    current: params.board.current,
-    parked: [...params.board.parked],
-  };
+  const board = cloneBoardShell(params.board);
   if (!incoming || incoming.startsWith("/")) {
     return continueResult(board, board.current?.taskId ?? "");
   }
@@ -234,7 +434,8 @@ export function applyIncomingUserMessage(params: {
     return continueResult(board, board.current?.taskId ?? "");
   }
 
-  const resumeMatch = incoming.match(/^继续挂起\s+(\S+)/u);
+  // CONTINUE resumes a deferred prior task (Owner: invite CONTINUE or CLOSE).
+  const resumeMatch = incoming.match(/^(?:继续挂起|CONTINUE)\s+(\S+)/iu);
   if (resumeMatch) {
     return resumeParkedTask({
       board,
@@ -248,30 +449,35 @@ export function applyIncomingUserMessage(params: {
   if (pauseMatch) {
     return pauseParkedTask({ board, taskId: pauseMatch[1] ?? "" });
   }
-  const cancelMatch = incoming.match(/^取消挂起\s+(\S+)/u);
+  // CLOSE / 关闭挂起 / 取消挂起 — remove deferred item from the board entirely.
+  const cancelMatch = incoming.match(/^(?:取消挂起|关闭挂起|CLOSE)\s+(\S+)/iu);
   if (cancelMatch) {
-    return cancelParkedTask({ board, taskId: cancelMatch[1] ?? "" });
+    return cancelParkedTask({ board, taskId: cancelMatch[1] ?? "", nowMs });
   }
 
   const current = board.current;
   if (!current) {
-    const created = createTask(incoming, nowMs, paths);
-    return continueResult({ current: created, parked: board.parked }, created.taskId);
+    const created = createTask(incoming, nowMs, paths, {
+      inboundRequestId: params.inboundRequestId,
+      entropy: nowMs,
+    });
+    return {
+      ...continueResult({ ...board, current: created }, created.taskId),
+      focusRevision: board.focusRevision,
+    };
   }
   if (!current.unfinished) {
     if (!isSureDistinctWork(incoming, current.goalText)) {
-      return continueResult(board, current.taskId);
+      return { ...continueResult(board, current.taskId), focusRevision: board.focusRevision };
     }
-    const created = createTask(incoming, nowMs, paths);
-    return {
-      board: { current: created, parked: board.parked },
-      action: "switch",
-      taskId: created.taskId,
-      cutContext: true,
-      currentTitle: current.title,
-      incomingTitle: created.title,
-      statusLine: `开始「${created.title}」。`,
-    };
+    return insertLatestTaskDeferringCurrent({
+      board,
+      goalText: incoming,
+      nowMs,
+      workspacePaths: paths,
+      parkReason: "user_switch",
+      inboundRequestId: params.inboundRequestId,
+    });
   }
   if (!isSureDistinctWork(incoming, current.goalText)) {
     const nextCurrent: TrackedTask = {
@@ -281,33 +487,20 @@ export function applyIncomingUserMessage(params: {
         workspacePaths: paths.length > 0 ? paths : current.stop.workspacePaths,
       },
     };
-    return continueResult({ current: nextCurrent, parked: board.parked }, current.taskId);
+    return {
+      ...continueResult({ ...board, current: nextCurrent }, current.taskId),
+      focusRevision: board.focusRevision,
+    };
   }
 
-  const parkedCurrent: TrackedTask = {
-    ...current,
-    stop: {
-      summary: current.stop.summary || `未完成：${current.title}`,
-      workspacePaths: current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
-    },
-  };
-  const parked = parkTask(board.parked, parkedCurrent, nowMs, "user_switch");
-  const created = createTask(incoming, nowMs, paths);
-  return {
-    board: { current: created, parked: parked.parked },
-    action: "switch",
-    taskId: created.taskId,
-    cutContext: true,
-    currentTitle: current.title,
-    incomingTitle: created.title,
-    statusLine: switchStatus(current.title, created.title, parked.dropped, parked.parked.length),
-    ...(parked.dropped
-      ? {
-          droppedTitle: parked.dropped.title,
-          droppedPaths: parked.dropped.stop.workspacePaths,
-        }
-      : {}),
-  };
+  return insertLatestTaskDeferringCurrent({
+    board,
+    goalText: incoming,
+    nowMs,
+    workspacePaths: paths,
+    parkReason: "user_switch",
+    inboundRequestId: params.inboundRequestId,
+  });
 }
 
 export function resumeParkedTask(params: {
@@ -320,13 +513,31 @@ export function resumeParkedTask(params: {
 }): IncomingTurnResult {
   const nowMs = params.nowMs ?? Date.now();
   const paths = params.workspacePaths?.filter(Boolean) ?? [];
-  const parked = findParked(params.board, params.taskId);
+  const board = cloneBoardShell(params.board);
+  const needle = params.taskId.trim();
+  if (needle && isTaskTombstoned(board, needle)) {
+    return {
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+      rejectedReason: "tombstoned",
+      statusLine: `恢复被拒绝：任务已关闭（墓碑）。`,
+    };
+  }
+  const parked = findParked(board, params.taskId);
   if (!parked) {
-    return continueResult(params.board, params.board.current?.taskId ?? "");
+    return {
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+    };
   }
   if (params.recheck?.authOk === false) {
     return {
-      ...continueResult(params.board, params.board.current?.taskId ?? ""),
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+      rejectedReason: "auth",
       statusLine: `恢复「${parked.title}」被拒绝：当前授权无效。`,
     };
   }
@@ -336,13 +547,43 @@ export function resumeParkedTask(params: {
       : params.recheck?.stopActive === true;
   if (stopBlocked) {
     return {
-      ...continueResult(params.board, params.board.current?.taskId ?? ""),
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+      rejectedReason: "stop",
       statusLine: `恢复「${parked.title}」被拒绝：任务已停止。`,
     };
   }
-  let nextParked = params.board.parked.filter((row) => row.taskId !== parked.taskId);
-  let dropped: TrackedTask | undefined;
-  const current = params.board.current;
+  if (params.recheck?.budgetOk === false) {
+    return {
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+      rejectedReason: "budget",
+      statusLine: `恢复「${parked.title}」被拒绝：预算不足。`,
+    };
+  }
+  if (params.recheck?.planOk === false) {
+    return {
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+      rejectedReason: "plan",
+      statusLine: `恢复「${parked.title}」被拒绝：计划不允许。`,
+    };
+  }
+  if (params.recheck?.workspaceOk === false) {
+    return {
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+      scheduleContinue: false,
+      rejectedReason: "workspace",
+      statusLine: `恢复「${parked.title}」被拒绝：工作区无效。`,
+    };
+  }
+  let nextParked = board.parked.filter((row) => row.taskId !== parked.taskId);
+  let archived: ArchivedTask | undefined;
+  const current = board.current;
   if (current?.unfinished) {
     const parkedCurrent: TrackedTask = {
       ...current,
@@ -354,7 +595,7 @@ export function resumeParkedTask(params: {
     };
     const parkedResult = parkTask(nextParked, parkedCurrent, nowMs, "resume_swap");
     nextParked = parkedResult.parked;
-    dropped = parkedResult.dropped;
+    archived = parkedResult.archived;
   }
   const restored: TrackedTask = {
     ...parked,
@@ -364,21 +605,38 @@ export function resumeParkedTask(params: {
     wakeSuppress: false,
   };
   const restoredPrompt = buildResumePrompt(restored);
-  const droppedText = dropSentence(dropped);
+  const archivedText = dropSentence(archived);
+  const nextRevision = bumpFocusRevision(board);
+  const archivedList = [...(board.archived ?? [])];
+  if (archived) {
+    archivedList.unshift(archived);
+  }
+  const nextBoard: SessionTaskBoard = {
+    ...board,
+    current: restored,
+    parked: nextParked,
+    focusRevision: nextRevision,
+    ...(archivedList.length > 0 ? { archived: archivedList } : {}),
+  };
   return {
-    board: { current: restored, parked: nextParked },
+    board: nextBoard,
     action: "resume",
     taskId: restored.taskId,
     cutContext: true,
     currentTitle: current?.title,
     incomingTitle: restored.title,
     restoredPrompt,
+    focusRevision: nextRevision,
+    // C6: resume success ≠ immediate auto-execute
+    scheduleContinue: false,
     statusLine: `继续「${restored.title}」。停在：${restored.stop.summary}${
       restored.stop.workspacePaths.length > 0
         ? `。文件：${restored.stop.workspacePaths.join("、")}`
         : ""
-    }。${droppedText}`,
-    ...(dropped ? { droppedTitle: dropped.title, droppedPaths: dropped.stop.workspacePaths } : {}),
+    }。${archivedText}`,
+    ...(archived
+      ? { droppedTitle: archived.title, droppedPaths: archived.stop.workspacePaths }
+      : {}),
   };
 }
 
@@ -404,23 +662,40 @@ export function pauseParkedTask(params: {
 export function cancelParkedTask(params: {
   board: SessionTaskBoard;
   taskId: string;
+  nowMs?: number;
 }): IncomingTurnResult {
-  const parked = findParked(params.board, params.taskId);
+  const board = cloneBoardShell(params.board);
+  const parked = findParked(board, params.taskId);
   if (!parked) {
-    return continueResult(params.board, params.board.current?.taskId ?? "");
+    return {
+      ...continueResult(board, board.current?.taskId ?? ""),
+      focusRevision: board.focusRevision,
+    };
   }
+  const closedAtMs = params.nowMs ?? Date.now();
+  const tombstones = [
+    { taskId: parked.taskId, closedAtMs, title: parked.title },
+    ...(board.tombstones ?? []).filter((row) => row.taskId !== parked.taskId),
+  ];
   return {
     board: {
-      current: params.board.current,
-      parked: params.board.parked.filter((row) => row.taskId !== parked.taskId),
+      ...board,
+      current: board.current,
+      parked: board.parked.filter((row) => row.taskId !== parked.taskId),
+      tombstones,
     },
     action: "cancel_parked",
-    taskId: params.board.current?.taskId ?? "",
+    taskId: board.current?.taskId ?? "",
     cutContext: false,
-    statusLine: `已取消挂起的「${parked.title}」。`,
+    focusRevision: board.focusRevision,
+    scheduleContinue: false,
+    statusLine: `已关闭「${parked.title}」，已移出任务板。`,
     incomingTitle: parked.title,
   };
 }
+
+/** Owner CLOSE — same as cancelParkedTask: item leaves the board and is not a continue target. */
+export const closeParkedTask = cancelParkedTask;
 
 /** Transcript / UI marker: current focus finished; remind about parked prior tasks. */
 export const PARKED_TASK_REMINDER_SENTINEL = "[PARKED_TASK_REMINDER]";
@@ -441,7 +716,7 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
     "",
     PARKED_TASK_REMINDER_SENTINEL,
     "",
-    `当前任务已完成，交付已核对。已挂起 ${parked.length} 项；可以继续、先暂停，或关闭。`,
+    `当前任务已完成，交付已核对。已挂起 ${parked.length} 项；可 CONTINUE 继续一项，或 CLOSE 关闭并移出任务板。`,
     "",
     `前任务：「${primary.title}」`,
     `任务 ID：\`${primary.taskId}\``,
@@ -458,8 +733,14 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
       .join("、");
     lines.push("", `另有 ${parked.length - 1} 个挂起任务：${others}。`);
   }
-  // Text fallbacks for non-UI / copy-paste clients.
-  lines.push("", `继续挂起 ${primary.taskId}`, `取消挂起 ${primary.taskId}`);
+  // Text fallbacks for non-UI / copy-paste clients (CONTINUE / CLOSE aliases accepted).
+  lines.push(
+    "",
+    `继续挂起 ${primary.taskId}`,
+    `取消挂起 ${primary.taskId}`,
+    `CONTINUE ${primary.taskId}`,
+    `CLOSE ${primary.taskId}`,
+  );
   return lines.join("\n");
 }
 
@@ -530,6 +811,9 @@ export function commitAutomaticPark(params: {
   if (board.parked.some((row) => row.taskId === incomingTaskId)) {
     return undefined;
   }
+  if (isTaskTombstoned(board, incomingTaskId)) {
+    return undefined;
+  }
   const nowMs = params.nowMs ?? Date.now();
   const incoming: TrackedTask = {
     taskId: incomingTaskId,
@@ -542,28 +826,113 @@ export function commitAutomaticPark(params: {
     wakeSuppress: true,
   };
   const parked = parkTask(board.parked, incoming, nowMs, "automatic_incoming");
-  writeSessionTaskBoard(file, { current: board.current, parked: parked.parked });
-  return parked.dropped;
+  const archived = [...(board.archived ?? [])];
+  if (parked.archived) {
+    archived.unshift(parked.archived);
+  }
+  writeSessionTaskBoard(file, {
+    ...board,
+    current: board.current,
+    parked: parked.parked,
+    ...(archived.length > 0 ? { archived } : {}),
+  });
+  return parked.archived;
 }
 
 export function finishCurrentTask(params: {
   board: SessionTaskBoard;
   deliverableChecked: boolean;
-}): { board: SessionTaskBoard; notice?: string } {
-  const current = params.board.current;
+  /** C4: complete must bind this taskId; mismatch → reject, board unchanged. */
+  taskId?: string;
+  /** C4: deliverable version stamp. */
+  deliverableVersion?: string;
+  /** C4: execution attempt stamp. */
+  executionAttempt?: string;
+}): {
+  board: SessionTaskBoard;
+  notice?: string;
+  rejected?: boolean;
+  reason?: string;
+} {
+  const board = cloneBoardShell(params.board);
+  const current = board.current;
   if (!current) {
-    return { board: params.board };
+    return { board };
+  }
+  const expectedTaskId = params.taskId?.trim();
+  if (expectedTaskId && expectedTaskId !== current.taskId) {
+    return {
+      board: params.board,
+      rejected: true,
+      reason: "task_id_mismatch",
+    };
+  }
+  if (isTaskTombstoned(board, current.taskId)) {
+    return {
+      board: params.board,
+      rejected: true,
+      reason: "tombstoned",
+    };
+  }
+  if (
+    params.deliverableVersion &&
+    current.deliverableVersion &&
+    params.deliverableVersion !== current.deliverableVersion
+  ) {
+    return {
+      board: params.board,
+      rejected: true,
+      reason: "deliverable_version_mismatch",
+    };
+  }
+  if (
+    params.executionAttempt &&
+    current.executionAttempt &&
+    params.executionAttempt !== current.executionAttempt
+  ) {
+    return {
+      board: params.board,
+      rejected: true,
+      reason: "execution_attempt_mismatch",
+    };
   }
   const nextCurrent: TrackedTask = {
     ...current,
     unfinished: false,
     deliverableChecked: params.deliverableChecked,
+    ...(params.deliverableVersion ? { deliverableVersion: params.deliverableVersion } : {}),
+    ...(params.executionAttempt ? { executionAttempt: params.executionAttempt } : {}),
   };
-  const board: SessionTaskBoard = { current: nextCurrent, parked: params.board.parked };
+  const nextBoard: SessionTaskBoard = { ...board, current: nextCurrent };
   if (!params.deliverableChecked) {
-    return { board };
+    return { board: nextBoard };
   }
-  return { board, notice: renderCompletionNotice(board.parked) };
+  return { board: nextBoard, notice: renderCompletionNotice(nextBoard.parked) };
+}
+
+/**
+ * Stamp the current focus with deliverable version + attempt before execution (C4).
+ * No-op when taskId does not match current.
+ */
+export function bindCurrentExecution(params: {
+  board: SessionTaskBoard;
+  taskId: string;
+  deliverableVersion: string;
+  executionAttempt: string;
+}): SessionTaskBoard {
+  const board = cloneBoardShell(params.board);
+  const current = board.current;
+  if (!current || current.taskId !== params.taskId.trim()) {
+    return params.board;
+  }
+  return {
+    ...board,
+    current: {
+      ...current,
+      deliverableVersion: params.deliverableVersion,
+      executionAttempt: params.executionAttempt,
+    },
+  };
 }
 
 export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
@@ -577,14 +946,47 @@ export function readSessionTaskBoard(sessionFile?: string): SessionTaskBoard {
     if (!parsed || !Array.isArray(parsed.parked)) {
       return emptySessionTaskBoard();
     }
-    return { current: parsed.current, parked: parsed.parked };
+    return {
+      current: parsed.current,
+      parked: parsed.parked,
+      focusRevision: typeof parsed.focusRevision === "number" ? parsed.focusRevision : 0,
+      ...(Array.isArray(parsed.tombstones) ? { tombstones: parsed.tombstones } : {}),
+      ...(Array.isArray(parsed.archived) ? { archived: parsed.archived } : {}),
+      ...(parsed.scope ? { scope: parsed.scope } : {}),
+    };
   } catch {
     return emptySessionTaskBoard();
   }
 }
 
 export function writeSessionTaskBoard(sessionFile: string, board: SessionTaskBoard): void {
-  fs.writeFileSync(sessionTaskBoardPath(sessionFile), `${JSON.stringify(board)}\n`, "utf8");
+  const normalized: SessionTaskBoard = {
+    ...board,
+    focusRevision: board.focusRevision ?? 0,
+    parked: board.parked ?? [],
+  };
+  fs.writeFileSync(sessionTaskBoardPath(sessionFile), `${JSON.stringify(normalized)}\n`, "utf8");
+}
+
+/**
+ * Atomic file-backed switch: read → apply → write only if focusRevision still matches (C6/AC16).
+ * Concurrent losers must retry; tasks are not silently dropped.
+ */
+export function commitBoardMutation(params: {
+  sessionFile: string;
+  expectedRevision: number;
+  mutate: (board: SessionTaskBoard) => IncomingTurnResult;
+}): IncomingTurnResult | { rejected: true; reason: "revision_mismatch"; board: SessionTaskBoard } {
+  const board = readSessionTaskBoard(params.sessionFile);
+  if ((board.focusRevision ?? 0) !== params.expectedRevision) {
+    return { rejected: true, reason: "revision_mismatch", board };
+  }
+  const result = params.mutate(board);
+  if ((board.focusRevision ?? 0) !== params.expectedRevision) {
+    return { rejected: true, reason: "revision_mismatch", board };
+  }
+  writeSessionTaskBoard(params.sessionFile, result.board);
+  return result;
 }
 
 export type FocusSwitchDecision =
@@ -624,6 +1026,7 @@ export function evaluateFocusSwitch(params: {
       ? createTask(currentText, params.nowMs ?? 0, params.workspacePaths ?? [])
       : undefined,
     parked: params.parked ? [...params.parked] : [],
+    focusRevision: 0,
   };
   if (params.proceed) {
     return {

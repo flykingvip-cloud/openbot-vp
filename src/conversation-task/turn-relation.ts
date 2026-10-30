@@ -30,6 +30,13 @@ export const PRIOR_UTTERANCE_CORRECTION_ANYWHERE_RE =
 const AMEND_CONSTRAINT_RE =
   /继续|接着|然后|再补|补一|补上|加上|补充|加一节|多写一节|交叉验证|在此基础上|同样按照|进度|做到哪|怎么样了|还差|约束|口径|改成|改为|改一下|不要超过|当前(?:你做的)?(?:这个|这份)?工作|刚才/u;
 
+/**
+ * Same-goal appendix / next chapter / charts — stay amend (v2 wording).
+ * Explicit pause-and-do-B / sure distinct goal still → new_work.
+ */
+const SAME_GOAL_APPENDIX_RE =
+  /下一章|下[一]?章|附录|加[上个]?图表|补充图表|加图|(?<!继)续写(?:本章|本节)?|下一节|多写一[章节]|加一[章节]|出图表|补图表/u;
+
 /** Explicit switch. Weak cues (输出 / 阅读 / 请先 / 调研) are not in this set. */
 const EXPLICIT_NEW_WORK_RE =
   /不要做刚才|别做刚才|先放下|换[一个]个?题|现在改做|新任务|请不要先问我|请使用\s*[\w.-]+|做一次|生成今日|先出|交接给|另外[帮再]|调研问题[:：]|任务目标[:：]/u;
@@ -146,7 +153,29 @@ export function classifyTurnRelation(incoming: string, currentGoal: string): Tur
   if (isPriorUtteranceCorrection(text)) {
     return "amend";
   }
+  // Same-goal appendix / next chapter / charts stay amend (v2); do not over-flip.
+  if (SAME_GOAL_APPENDIX_RE.test(text) && !LEAVE_CURRENT_RE.test(text)) {
+    return "amend";
+  }
+  // 「请继续」 alone amends the current focus. Continue + sure distinct goal
+  // (non-overlapping topic / explicit new work) may insert — not proven as the
+  // sole accident root cause; treat as product binding rule only.
   if (AMEND_CONSTRAINT_RE.test(text)) {
+    if (sharesDistinctivePhrase(text, currentGoal)) {
+      return "amend";
+    }
+    // Only escalate when the amend hit is a continue-family cue plus a distinct
+    // topic. Do not flip 「当前这个工作…交接给…」 (amend + explicit) into new_work.
+    const continueFamily = /(继续|接着|然后)/u.test(text);
+    if (continueFamily) {
+      if (EXPLICIT_NEW_WORK_RE.test(text) || DISTINCT_IMPERATIVE_RE.test(text)) {
+        return "new_work";
+      }
+      const afterContinue = text.replace(/^(请)?(继续|接着|然后)[，,、。.\s]*/u, "").trim();
+      if (afterContinue.length >= 8 && afterContinue !== text.trim()) {
+        return "new_work";
+      }
+    }
     return "amend";
   }
   if (EXPLICIT_NEW_WORK_RE.test(text) && !sharesDistinctivePhrase(text, currentGoal)) {

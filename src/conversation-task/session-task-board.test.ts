@@ -4,13 +4,19 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { omitParkedPriorTurns } from "./focus-switch.js";
 import {
+  allocateTaskInstanceId,
   applyIncomingUserMessage,
+  bindCurrentExecution,
   formatTaskBoardFocusLine,
   cancelParkedTask,
+  closeParkedTask,
+  commitBoardMutation,
   emptySessionTaskBoard,
   evaluateCurrentTaskSend,
   commitAutomaticPark,
   finishCurrentTask,
+  insertLatestTaskDeferringCurrent,
+  isTaskTombstoned,
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
   writeSessionTaskBoard,
@@ -120,7 +126,7 @@ describe("session task tracking", () => {
     expect(kept[0]).toMatchObject({ contextCut: true });
   });
 
-  it("drops the oldest parked task at the cap of 3 and names its files", () => {
+  it("archives the oldest parked task at the cap of 3 and names its files (AC10/AC20)", () => {
     const goals = [
       ["请先生成今日竞品价格检查结果", "/work/price.md"],
       ["现在改做：整理数字人记忆长文并写一百字总结", "/work/article.md"],
@@ -142,9 +148,11 @@ describe("session task tracking", () => {
     expect(last.action).toBe("switch");
     expect(last.board.parked).toHaveLength(3);
     expect(last.droppedTitle).toBeTruthy();
-    expect(last.statusLine).toContain(`已放下最早挂起的「${last.droppedTitle}」`);
+    expect(last.statusLine).toContain(`已归档最早挂起的「${last.droppedTitle}」`);
     expect(last.statusLine).toContain("/work/price.md");
     expect(last.board.parked.map((row) => row.title)).not.toContain(last.droppedTitle);
+    expect(last.board.archived?.some((row) => row.title === last.droppedTitle)).toBe(true);
+    expect(last.board.archived?.[0]?.archiveReason).toBe("parked_capacity");
   });
 
   it("resumes a parked task from its stop summary and paths, not the old transcript", () => {
@@ -265,6 +273,7 @@ it("announces a real close and a fourth automatic park drops the oldest file", (
       createdAtMs: 4,
     },
     parked: [...parked].toReversed(),
+    focusRevision: 0,
   };
   writeSessionTaskBoard(sessionFile, board);
   const dropped = commitAutomaticPark({
@@ -352,7 +361,7 @@ describe("parkReason / wakeSuppress", () => {
   });
 
   it("formatTaskBoardFocusLine reports current and parked count", () => {
-    const board = {
+    const board: SessionTaskBoard = {
       current: {
         taskId: "task-a",
         title: "A",
@@ -374,7 +383,328 @@ describe("parkReason / wakeSuppress", () => {
           parkReason: "user_switch",
         },
       ],
+      focusRevision: 1,
     };
     expect(formatTaskBoardFocusLine(board)).toBe("当前任务：「A」；已挂起 1 项");
+  });
+});
+
+describe("board-latest task binding", () => {
+  const SNAKE = "你帮我制作一个贪吃蛇的小游戏";
+  const NOVEL = "请继续写《调律》小说第七章，六时启闸，并验收交付";
+
+  it("interrupt + insert parks old unfinished and continues the LATEST task", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1, ["/tmp/snake.html"]),
+    });
+    expect(started.board.current?.unfinished).toBe(true);
+
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+      workspacePaths: ["/tmp/novel/ch07.md"],
+      parkReason: "interrupt_insert",
+    });
+    expect(inserted.action).toBe("switch");
+    expect(inserted.board.current?.goalText).toContain("调律");
+    expect(inserted.board.current?.taskId).toBe(inserted.taskId);
+    expect(inserted.board.current?.taskId).not.toBe(started.taskId);
+    expect(inserted.board.parked).toHaveLength(1);
+    expect(inserted.board.parked[0]?.taskId).toBe(started.taskId);
+    expect(inserted.board.parked[0]?.wakeSuppress).toBe(true);
+    expect(inserted.board.parked[0]?.parkReason).toBe("interrupt_insert");
+
+    // Natural-language insert with 继续 + distinct work also binds LATEST.
+    const viaMessage = applyIncomingUserMessage({
+      board: started.board,
+      ...turn(NOVEL, 3),
+    });
+    expect(viaMessage.action).toBe("switch");
+    expect(viaMessage.board.current?.taskId).toBe(viaMessage.taskId);
+    expect(viaMessage.board.current?.taskId).not.toBe(started.taskId);
+    expect(viaMessage.board.parked.some((row) => row.taskId === started.taskId)).toBe(true);
+  });
+
+  it("completing LATEST summarizes deferred unfinished and invites CONTINUE or CLOSE", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1, ["/tmp/snake.html"]),
+    });
+    const latest = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+      workspacePaths: ["/tmp/novel/ch07.md"],
+    });
+    const finished = finishCurrentTask({ board: latest.board, deliverableChecked: true });
+    expect(finished.board.current?.unfinished).toBe(false);
+    expect(finished.notice).toContain("[PARKED_TASK_REMINDER]");
+    expect(finished.notice).toContain("CONTINUE");
+    expect(finished.notice).toContain("CLOSE");
+    expect(finished.notice).toContain("贪吃蛇");
+    expect(finished.notice).toContain(started.taskId);
+  });
+
+  it("user CLOSE removes the deferred item from the board (not a continue target)", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    const latest = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    const parkedId = latest.board.parked[0]?.taskId ?? "";
+    expect(parkedId).toBe(started.taskId);
+
+    const closed = applyIncomingUserMessage({
+      board: latest.board,
+      incomingText: `CLOSE ${parkedId}`,
+      nowMs: 3,
+    });
+    expect(closed.action).toBe("cancel_parked");
+    expect(closed.board.parked.some((row) => row.taskId === parkedId)).toBe(false);
+    expect(closed.board.current?.taskId).toBe(latest.taskId);
+    expect(closed.statusLine).toContain("已移出任务板");
+
+    const viaAlias = closeParkedTask({
+      board: latest.board,
+      taskId: parkedId,
+    });
+    expect(viaAlias.board.parked.some((row) => row.taskId === parkedId)).toBe(false);
+
+    const viaZh = applyIncomingUserMessage({
+      board: latest.board,
+      incomingText: `关闭挂起 ${parkedId}`,
+      nowMs: 4,
+    });
+    expect(viaZh.action).toBe("cancel_parked");
+    expect(viaZh.board.parked).toHaveLength(0);
+  });
+});
+
+describe("board-latest rules v2 C1–C6 / AC13–AC20", () => {
+  const SNAKE = "你帮我制作一个贪吃蛇的小游戏";
+  const NOVEL = "请继续写《调律》小说第七章，六时启闸，并验收交付";
+  const RESEARCH =
+    "请使用 web-research 做一次标准深度联网调研。调研问题：2026 年开源智能体平台的产品形态。";
+
+  it("C1/AC1: insert bumps focusRevision; resume bumps; amend does not", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    expect(started.board.focusRevision).toBe(0);
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    expect(inserted.action).toBe("switch");
+    expect(inserted.board.focusRevision).toBe(1);
+    expect(inserted.focusRevision).toBe(1);
+    const amend = applyIncomingUserMessage({
+      board: inserted.board,
+      ...turn("补充一节", 3),
+    });
+    expect(amend.action).toBe("continue");
+    expect(amend.board.focusRevision).toBe(1);
+    const parkedId = inserted.board.parked[0]?.taskId ?? "";
+    const resumed = resumeParkedTask({
+      board: inserted.board,
+      taskId: parkedId,
+      nowMs: 4,
+    });
+    expect(resumed.action).toBe("resume");
+    expect(resumed.board.focusRevision).toBe(2);
+    expect(resumed.scheduleContinue).toBe(false);
+  });
+
+  it("C4/AC14: late A complete must not finish or overwrite B", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    const withAttempt = bindCurrentExecution({
+      board: started.board,
+      taskId: started.taskId,
+      deliverableVersion: "v1",
+      executionAttempt: "a1",
+    });
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: withAttempt,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    expect(inserted.board.current?.taskId).not.toBe(started.taskId);
+    const late = finishCurrentTask({
+      board: inserted.board,
+      deliverableChecked: true,
+      taskId: started.taskId,
+      deliverableVersion: "v1",
+      executionAttempt: "a1",
+    });
+    expect(late.rejected).toBe(true);
+    expect(late.reason).toBe("task_id_mismatch");
+    expect(late.board.current?.taskId).toBe(inserted.taskId);
+    expect(late.board.current?.unfinished).toBe(true);
+  });
+
+  it("C5/AC15: CLOSE tombstone blocks resume / wake resurrection", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    const parkedId = inserted.board.parked[0]?.taskId ?? "";
+    const closed = closeParkedTask({ board: inserted.board, taskId: parkedId, nowMs: 3 });
+    expect(closed.action).toBe("cancel_parked");
+    expect(isTaskTombstoned(closed.board, parkedId)).toBe(true);
+    expect(closed.board.tombstones?.some((row) => row.taskId === parkedId)).toBe(true);
+    const resurrect = resumeParkedTask({
+      board: closed.board,
+      taskId: parkedId,
+      nowMs: 4,
+    });
+    expect(resurrect.action).toBe("continue");
+    expect(resurrect.rejectedReason).toBe("tombstoned");
+    expect(resurrect.board.current?.taskId).toBe(inserted.taskId);
+    expect(resurrect.board.parked.some((row) => row.taskId === parkedId)).toBe(false);
+  });
+
+  it("C3/AC17: same body again = new id; same inbound retry = idempotent", () => {
+    const a = allocateTaskInstanceId({ entropy: "one" });
+    const b = allocateTaskInstanceId({ entropy: "two" });
+    expect(a).not.toBe(b);
+    const req = "inbound-req-abc";
+    const first = allocateTaskInstanceId({ inboundRequestId: req });
+    const retry = allocateTaskInstanceId({ inboundRequestId: req });
+    expect(first).toBe(retry);
+    const t1 = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      incomingText: SNAKE,
+      nowMs: 1,
+      inboundRequestId: "create-1",
+    });
+    const t2 = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      incomingText: SNAKE,
+      nowMs: 2,
+      inboundRequestId: "create-2",
+    });
+    expect(t1.taskId).not.toBe(t2.taskId);
+    const again = insertLatestTaskDeferringCurrent({
+      board: t1.board,
+      goalText: SNAKE,
+      nowMs: 3,
+      inboundRequestId: "create-1",
+    });
+    // same inbound against already-current with that id stays continue (idempotent)
+    expect(again.action).toBe("continue");
+    expect(again.taskId).toBe(t1.taskId);
+  });
+
+  it("C6/AC16: concurrent insert CAS — loser gets revision_mismatch, no silent loss", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "task-board-cas-"));
+    const sessionFile = path.join(dir, "session.jsonl");
+    fs.writeFileSync(sessionFile, "", "utf8");
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    writeSessionTaskBoard(sessionFile, started.board);
+    const rev = started.board.focusRevision;
+    const first = commitBoardMutation({
+      sessionFile,
+      expectedRevision: rev,
+      mutate: (board) =>
+        insertLatestTaskDeferringCurrent({
+          board,
+          goalText: NOVEL,
+          nowMs: 2,
+        }),
+    });
+    expect("rejected" in first && first.rejected).toBe(false);
+    if ("rejected" in first) {
+      throw new Error("unexpected reject");
+    }
+    expect(first.action).toBe("switch");
+    const second = commitBoardMutation({
+      sessionFile,
+      expectedRevision: rev,
+      mutate: (board) =>
+        insertLatestTaskDeferringCurrent({
+          board,
+          goalText: RESEARCH,
+          nowMs: 3,
+        }),
+    });
+    expect("rejected" in second && second.rejected).toBe(true);
+    if (!("rejected" in second) || !second.rejected) {
+      throw new Error("expected reject");
+    }
+    expect(second.reason).toBe("revision_mismatch");
+    const stored = readSessionTaskBoard(sessionFile);
+    expect(stored.current?.goalText).toContain("调律");
+    expect(stored.parked.some((row) => row.taskId === started.taskId)).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("C6/AC19: resume revoked auth/stop/budget/plan/workspace rejects; board unchanged", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    const parkedId = inserted.board.parked[0]?.taskId ?? "";
+    const before = inserted.board.focusRevision;
+    for (const recheck of [
+      { authOk: false as const },
+      { stopActive: true as const },
+      { budgetOk: false as const },
+      { planOk: false as const },
+      { workspaceOk: false as const },
+    ]) {
+      const denied = resumeParkedTask({
+        board: inserted.board,
+        taskId: parkedId,
+        nowMs: 3,
+        recheck,
+      });
+      expect(denied.action).toBe("continue");
+      expect(denied.board.focusRevision).toBe(before);
+      expect(denied.board.current?.taskId).toBe(inserted.taskId);
+      expect(denied.board.parked.some((row) => row.taskId === parkedId)).toBe(true);
+      expect(denied.scheduleContinue).toBe(false);
+    }
+  });
+
+  it("C1/AC18: boards with different scope do not share focus", () => {
+    const a = emptySessionTaskBoard({ tenantId: "t1", userId: "u1", sessionId: "s1" });
+    const b = emptySessionTaskBoard({ tenantId: "t2", userId: "u2", sessionId: "s2" });
+    const startedA = applyIncomingUserMessage({ board: a, ...turn(SNAKE, 1) });
+    const startedB = applyIncomingUserMessage({ board: b, ...turn(SNAKE, 1) });
+    expect(startedA.board.scope?.tenantId).toBe("t1");
+    expect(startedB.board.scope?.tenantId).toBe("t2");
+    expect(startedA.taskId).not.toBe(startedB.taskId);
+    const insertA = insertLatestTaskDeferringCurrent({
+      board: startedA.board,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    expect(insertA.board.focusRevision).toBe(1);
+    expect(startedB.board.focusRevision).toBe(0);
+    expect(startedB.board.current?.taskId).toBe(startedB.taskId);
   });
 });
