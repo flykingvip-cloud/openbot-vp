@@ -7,10 +7,12 @@ import {
   applyIncomingUserMessage,
   formatTaskBoardFocusLine,
   cancelParkedTask,
+  closeParkedTask,
   emptySessionTaskBoard,
   evaluateCurrentTaskSend,
   commitAutomaticPark,
   finishCurrentTask,
+  insertLatestTaskDeferringCurrent,
   readSessionTaskBoard,
   recordCheckedTaskCompletion,
   writeSessionTaskBoard,
@@ -376,5 +378,102 @@ describe("parkReason / wakeSuppress", () => {
       ],
     };
     expect(formatTaskBoardFocusLine(board)).toBe("当前任务：「A」；已挂起 1 项");
+  });
+});
+
+describe("board-latest task binding", () => {
+  const SNAKE = "你帮我制作一个贪吃蛇的小游戏";
+  const NOVEL = "请继续写《调律》小说第七章，六时启闸，并验收交付";
+
+  it("interrupt + insert parks old unfinished and continues the LATEST task", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1, ["/tmp/snake.html"]),
+    });
+    expect(started.board.current?.unfinished).toBe(true);
+
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+      workspacePaths: ["/tmp/novel/ch07.md"],
+      parkReason: "interrupt_insert",
+    });
+    expect(inserted.action).toBe("switch");
+    expect(inserted.board.current?.goalText).toContain("调律");
+    expect(inserted.board.current?.taskId).toBe(inserted.taskId);
+    expect(inserted.board.current?.taskId).not.toBe(started.taskId);
+    expect(inserted.board.parked).toHaveLength(1);
+    expect(inserted.board.parked[0]?.taskId).toBe(started.taskId);
+    expect(inserted.board.parked[0]?.wakeSuppress).toBe(true);
+    expect(inserted.board.parked[0]?.parkReason).toBe("interrupt_insert");
+
+    // Natural-language insert with 继续 + distinct work also binds LATEST.
+    const viaMessage = applyIncomingUserMessage({
+      board: started.board,
+      ...turn(NOVEL, 3),
+    });
+    expect(viaMessage.action).toBe("switch");
+    expect(viaMessage.board.current?.taskId).toBe(viaMessage.taskId);
+    expect(viaMessage.board.current?.taskId).not.toBe(started.taskId);
+    expect(viaMessage.board.parked.some((row) => row.taskId === started.taskId)).toBe(true);
+  });
+
+  it("completing LATEST summarizes deferred unfinished and invites CONTINUE or CLOSE", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1, ["/tmp/snake.html"]),
+    });
+    const latest = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+      workspacePaths: ["/tmp/novel/ch07.md"],
+    });
+    const finished = finishCurrentTask({ board: latest.board, deliverableChecked: true });
+    expect(finished.board.current?.unfinished).toBe(false);
+    expect(finished.notice).toContain("[PARKED_TASK_REMINDER]");
+    expect(finished.notice).toContain("CONTINUE");
+    expect(finished.notice).toContain("CLOSE");
+    expect(finished.notice).toContain("贪吃蛇");
+    expect(finished.notice).toContain(started.taskId);
+  });
+
+  it("user CLOSE removes the deferred item from the board (not a continue target)", () => {
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      ...turn(SNAKE, 1),
+    });
+    const latest = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: NOVEL,
+      nowMs: 2,
+    });
+    const parkedId = latest.board.parked[0]?.taskId ?? "";
+    expect(parkedId).toBe(started.taskId);
+
+    const closed = applyIncomingUserMessage({
+      board: latest.board,
+      incomingText: `CLOSE ${parkedId}`,
+      nowMs: 3,
+    });
+    expect(closed.action).toBe("cancel_parked");
+    expect(closed.board.parked.some((row) => row.taskId === parkedId)).toBe(false);
+    expect(closed.board.current?.taskId).toBe(latest.taskId);
+    expect(closed.statusLine).toContain("已移出任务板");
+
+    const viaAlias = closeParkedTask({
+      board: latest.board,
+      taskId: parkedId,
+    });
+    expect(viaAlias.board.parked.some((row) => row.taskId === parkedId)).toBe(false);
+
+    const viaZh = applyIncomingUserMessage({
+      board: latest.board,
+      incomingText: `关闭挂起 ${parkedId}`,
+      nowMs: 4,
+    });
+    expect(viaZh.action).toBe("cancel_parked");
+    expect(viaZh.board.parked).toHaveLength(0);
   });
 });

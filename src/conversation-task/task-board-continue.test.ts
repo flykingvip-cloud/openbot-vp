@@ -156,6 +156,49 @@ describe("decideTaskBoardContinue", () => {
       taskId: "task-cap",
     });
   });
+
+  it("schedules LATEST current and never the deferred parked prior", () => {
+    const sessionFile = tempSessionFile();
+    const board: SessionTaskBoard = {
+      current: {
+        taskId: "task-novel-latest",
+        title: "调律第七章",
+        goalText: "请继续写《调律》小说第七章",
+        unfinished: true,
+        stop: { summary: "未完成：调律第七章", workspacePaths: ["/tmp/ch07.md"] },
+        createdAtMs: 2,
+      },
+      parked: [
+        {
+          taskId: "task-c8d289281767",
+          title: "你帮我制作一个贪吃蛇的小游戏",
+          goalText: "你帮我制作一个贪吃蛇的小游戏",
+          unfinished: true,
+          stop: { summary: "未完成：贪吃蛇", workspacePaths: ["/tmp/snake.html"] },
+          createdAtMs: 1,
+          parkedAtMs: 2,
+          wakeSuppress: true,
+          parkReason: "interrupt_insert",
+        },
+      ],
+    };
+    writeSessionTaskBoard(sessionFile, board);
+    const decision = decideTaskBoardContinue({
+      sessionFile,
+      assistantText: "chapter draft ready for next beat",
+    });
+    expect(decision.action).toBe("schedule");
+    if (decision.action === "schedule") {
+      expect(decision.taskId).toBe("task-novel-latest");
+      expect(decision.prompt).toContain("task-novel-latest");
+      expect(decision.prompt).not.toContain("task-c8d289281767");
+    }
+    try {
+      fs.unlinkSync(`${sessionFile}.task-board.json`);
+    } catch {
+      /* best-effort cleanup */
+    }
+  });
 });
 
 describe("scheduleTaskBoardContinueWake", () => {
