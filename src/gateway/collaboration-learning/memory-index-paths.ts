@@ -40,24 +40,75 @@ async function listGroupIds(groupRootDir: string): Promise<string[]> {
   }
 }
 
+export type DiscoverCollaborationMemoryIndexRootsOptions = {
+  /** When set, only these group ids are returned (empty set → no roots). */
+  authorizedGroupIds?: ReadonlySet<string> | readonly string[];
+  tenantId?: string | null;
+  profile?: "personal_local" | "managed_enterprise";
+};
+
+function normalizeAuthorizedGroupIdSet(
+  value: ReadonlySet<string> | readonly string[] | undefined,
+): Set<string> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value instanceof Set) {
+    return value;
+  }
+  return new Set([...value].map((id) => id.trim()).filter(Boolean));
+}
+
+/**
+ * Discover collaboration memory roots.
+ *
+ * Pass `authorizedGroupIds` so callers (builtin index) never dump every group's
+ * markdown into every agent index. Managed tenants may pass tenantId+profile so
+ * roots resolve under `tenants/<tid>/collaboration/groups` instead of the
+ * personal collaboration workspace.
+ */
 export async function discoverCollaborationMemoryIndexRoots(
   cfg: OpenBotConfig,
+  options?: DiscoverCollaborationMemoryIndexRootsOptions,
 ): Promise<CollaborationMemoryIndexRoot[]> {
-  const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(cfg);
-  if (!collaborationRoot) {
+  const authorized = normalizeAuthorizedGroupIdSet(options?.authorizedGroupIds);
+  if (authorized && authorized.size === 0) {
     return [];
   }
-  const groupsRoot = path.join(collaborationRoot, "groups");
+
+  let groupsRoot: string;
+  const profile = options?.profile ?? "personal_local";
+  const tenantId = options?.tenantId?.trim() || null;
+  if (profile === "managed_enterprise") {
+    if (!tenantId) {
+      return [];
+    }
+    const { resolveTrustedCollaborationGroupsRoot } = await import("../workspace/group-locator.js");
+    groupsRoot = resolveTrustedCollaborationGroupsRoot({
+      tenantId,
+      profile: "managed_enterprise",
+      cfg,
+    });
+  } else {
+    const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(cfg);
+    if (!collaborationRoot) {
+      return [];
+    }
+    groupsRoot = path.join(collaborationRoot, "groups");
+  }
+
   const groupIds = await listGroupIds(groupsRoot);
-  return groupIds.map((groupId) => {
-    const groupDir = resolveGroupWorkspacePath(groupsRoot, groupId);
-    return {
-      groupId,
-      memoryDir: path.join(groupDir, "memory"),
-      indexPrefix: `collaboration/${groupId}/memory`,
-      sessionKey: `space:${groupId}`,
-    };
-  });
+  return groupIds
+    .filter((groupId) => (authorized ? authorized.has(groupId) : true))
+    .map((groupId) => {
+      const groupDir = resolveGroupWorkspacePath(groupsRoot, groupId);
+      return {
+        groupId,
+        memoryDir: path.join(groupDir, "memory"),
+        indexPrefix: `collaboration/${groupId}/memory`,
+        sessionKey: `space:${groupId}`,
+      };
+    });
 }
 
 export async function listCollaborationMemoryMarkdownDocs(
@@ -103,8 +154,9 @@ export async function listCollaborationMemoryMarkdownDocs(
 
 export async function listAllCollaborationMemoryMarkdownDocs(
   cfg: OpenBotConfig,
+  options?: DiscoverCollaborationMemoryIndexRootsOptions,
 ): Promise<CollaborationMemoryIndexDoc[]> {
-  const roots = await discoverCollaborationMemoryIndexRoots(cfg);
+  const roots = await discoverCollaborationMemoryIndexRoots(cfg, options);
   const docs = await Promise.all(roots.map((root) => listCollaborationMemoryMarkdownDocs(root)));
   return docs.flat();
 }

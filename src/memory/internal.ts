@@ -53,7 +53,12 @@ export function isMemoryPath(relPath: string): boolean {
   if (normalized === "MEMORY.md" || normalized === "memory.md") {
     return true;
   }
-  return normalized.startsWith("memory/");
+  if (normalized.startsWith("memory/")) {
+    return true;
+  }
+  // Builtin collaboration memory uses synthetic relPaths from
+  // memory-index-paths (collaboration/<groupId>/memory/**/*.md).
+  return /^collaboration\/[^/]+\/memory(?:\/|$)/i.test(normalized);
 }
 
 async function walkDir(dir: string, files: string[]) {

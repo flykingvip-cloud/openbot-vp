@@ -30,11 +30,13 @@ import { isFileMissingError } from "./fs-utils.js";
 import {
   buildFileEntry,
   ensureDir,
+  hashText,
   listMemoryFiles,
   normalizeExtraMemoryPaths,
   runWithConcurrency,
 } from "./internal.js";
 import { type MemoryFileEntry } from "./internal.js";
+import { listCollaborationMemoryMarkdownDocs } from "../gateway/collaboration-learning/memory-index-paths.js";
 import { ensureMemoryIndexSchema } from "./memory-schema.js";
 import type { SessionFileEntry } from "./session-files.js";
 import {
@@ -112,6 +114,13 @@ export abstract class MemoryManagerSyncOps {
   protected abstract readonly agentId: string;
   protected abstract readonly workspaceDir: string;
   protected abstract readonly settings: ResolvedMemorySearchConfig;
+  /** Authorized collaboration memory roots; empty = no collab indexing. */
+  protected abstract readonly collaborationMemoryRoots: readonly {
+    groupId: string;
+    memoryDir: string;
+    indexPrefix: string;
+    sessionKey: string;
+  }[];
   protected provider: EmbeddingProvider | null = null;
   protected fallbackFrom?: "openai" | "local" | "gemini" | "voyage" | "mistral" | "ollama";
   protected openAi?: OpenAiEmbeddingClient;
@@ -799,11 +808,35 @@ export abstract class MemoryManagerSyncOps {
     }
 
     const files = await listMemoryFiles(this.workspaceDir, this.settings.extraPaths);
-    const fileEntries = (
+    const workspaceEntries = (
       await Promise.all(files.map(async (file) => buildFileEntry(file, this.workspaceDir)))
     ).filter((entry): entry is MemoryFileEntry => entry !== null);
+
+    // Builtin: index only *authorized* collaboration memory markdown (never all groups).
+    const collabEntries: MemoryFileEntry[] = [];
+    for (const root of this.collaborationMemoryRoots) {
+      const docs = await listCollaborationMemoryMarkdownDocs(root);
+      for (const doc of docs) {
+        let stat;
+        try {
+          stat = await fs.stat(doc.absPath);
+        } catch {
+          continue;
+        }
+        collabEntries.push({
+          path: doc.relPath,
+          absPath: doc.absPath,
+          mtimeMs: stat.mtimeMs,
+          size: stat.size,
+          hash: hashText(doc.text),
+        });
+      }
+    }
+
+    const fileEntries = [...workspaceEntries, ...collabEntries];
     log.debug("memory sync: indexing memory files", {
       files: fileEntries.length,
+      collaborationFiles: collabEntries.length,
       needsFullReindex: params.needsFullReindex,
       batch: this.batch.enabled,
       concurrency: this.getIndexConcurrency(),

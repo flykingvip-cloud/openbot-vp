@@ -5,6 +5,10 @@ import type { ResolvedCogniWeaveConfig } from "./backend-config.js";
 import type { ResolvedQmdConfig } from "./backend-config.js";
 import { resolveMemoryBackendConfig } from "./backend-config.js";
 import {
+  resolveMemoryContinuityAuthz,
+  type MemoryContinuityAuthzContext,
+} from "./memory-continuity-authz.js";
+import {
   memoryIndexAccessCacheComponent,
   type MemoryIndexAccessContext,
   resolveMemoryIndexAccess,
@@ -76,6 +80,14 @@ export type MemorySearchManagerParams = {
    * keeps the legacy resolveAgentWorkspaceDir path unchanged.
    */
   accessContext?: MemoryIndexAccessContext;
+  /**
+   * Authenticated human user id for collaboration membership checks
+   * (members.json). Prefer governance ownershipProof when present; this is the
+   * personal_local / explicit fallback.
+   */
+  authenticatedUserId?: string | null;
+  /** Optional pre-resolved continuity authz (tests / callers that already computed it). */
+  continuityAuthz?: MemoryContinuityAuthzContext;
 } & MemorySearchDataPlaneFields;
 
 /** Effective memory index/store root: explicit plane `dataRoot` wins over `resolveDataRoot(cfg)`. */
@@ -122,6 +134,24 @@ function withRecallDeny(
   dataRoot: string,
 ): MemorySearchManager | null {
   return wrapMemorySearchManagerWithRecallDeny(manager, dataRoot);
+}
+
+async function resolveBuiltinCollaborationRoots(
+  params: MemorySearchManagerParams,
+): Promise<MemoryContinuityAuthzContext> {
+  if (params.continuityAuthz) {
+    return params.continuityAuthz;
+  }
+  const profile =
+    params.accessContext?.securityProfile === "managed_enterprise"
+      ? "managed_enterprise"
+      : "personal_local";
+  return resolveMemoryContinuityAuthz({
+    cfg: params.cfg,
+    governance: params.governance,
+    authenticatedUserId: params.authenticatedUserId,
+    profile,
+  });
 }
 
 export async function getMemorySearchManager(
@@ -261,7 +291,11 @@ export async function getMemorySearchManager(
             primary,
             fallbackFactory: async () => {
               const { MemoryIndexManager } = await loadManagerRuntime();
-              return await MemoryIndexManager.get(bound);
+              const authz = await resolveBuiltinCollaborationRoots(params);
+              return await MemoryIndexManager.get({
+                ...bound,
+                collaborationMemoryRoots: authz.roots,
+              });
             },
           },
           () => {
@@ -284,7 +318,11 @@ export async function getMemorySearchManager(
 
   try {
     const { MemoryIndexManager } = await loadManagerRuntime();
-    const manager = await MemoryIndexManager.get(bound);
+    const authz = await resolveBuiltinCollaborationRoots(params);
+    const manager = await MemoryIndexManager.get({
+      ...bound,
+      collaborationMemoryRoots: authz.roots,
+    });
     return { manager: withRecallDeny(manager, dataRoot) };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
