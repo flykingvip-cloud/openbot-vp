@@ -813,6 +813,7 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "enterprise-data.approval.requests.create",
     "enterprise-data.approval.requests.decide",
     "enterprise-data.events.ingest",
+    "enterprise-data.events.rematerialize",
     "enterprise-data.event-subscriptions.upsert",
     "enterprise-data.event-subscriptions.delete",
     "enterprise-capability.push-to-positions",

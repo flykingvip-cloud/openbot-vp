@@ -9,6 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { normalizeEnterpriseDataEventStore } from "../enterprise-data/enterprise-data-event-store.js";
+import { normalizeMaterializationFailureLedgerStore } from "../enterprise-data/event-driven-materialization-failure-ledger.js";
 import { listKnowledgeFeedItems } from "../enterprise-data/knowledge-feed-item-store.js";
 import { normalizeEnterpriseDataStore } from "../enterprise-data/store.js";
 import type { GatewayRequestHandlerOptions } from "./types.js";
@@ -67,6 +68,32 @@ async function invokeIngest(
   let response: InvokeResult | null = null;
   await handler({
     req: { type: "req", id: "test", method: "enterprise-data.events.ingest", params },
+    params,
+    client: { connect: {} as never, user: "admin" },
+    isWebchatConnect: () => false,
+    respond: (ok, payload, error) => {
+      response = {
+        ok,
+        payload: payload as Record<string, unknown> | undefined,
+        error: error as { message?: string; code?: string } | undefined,
+      };
+    },
+    context: {} as GatewayRequestHandlerOptions["context"],
+  });
+  if (!response) {
+    throw new Error("handler did not respond");
+  }
+  return response;
+}
+
+async function invokeRematerialize(
+  handlers: ReturnType<typeof createEnterpriseDataEventHandlers>,
+  params: Record<string, unknown>,
+): Promise<InvokeResult> {
+  const handler = handlers["enterprise-data.events.rematerialize"];
+  let response: InvokeResult | null = null;
+  await handler({
+    req: { type: "req", id: "test", method: "enterprise-data.events.rematerialize", params },
     params,
     client: { connect: {} as never, user: "admin" },
     isWebchatConnect: () => false,
@@ -307,5 +334,108 @@ describe("P1-F events.ingest real tenant file path (binding → ingest → feed)
     // Consume surface: feed list from reloaded tenant store (may be empty without SAR seed).
     const feed = listKnowledgeFeedItems({ store: reloaded, tenantId: "tenant-acme" });
     expect(feed.every((item) => item.tenantId === "tenant-acme")).toBe(true);
+  });
+});
+
+describe("P1-F events.rematerialize after durable failure", () => {
+  beforeEach(() => {
+    mocks.load.mockReset();
+    mocks.save.mockReset();
+    mocks.save.mockResolvedValue(undefined);
+    mocks.resolve.mockReset();
+    mocks.resolve.mockResolvedValue("/tenant-acme/enterprise-data.json");
+  });
+
+  it("load/save fail on ingest then rematerialize by eventId succeeds (externalId resend does not)", async () => {
+    const eventStore = normalizeEnterpriseDataEventStore(null);
+    const failureLedger = normalizeMaterializationFailureLedgerStore(null);
+    const handlers = createEnterpriseDataEventHandlers({
+      loadStore: async () => eventStore,
+      withStore: async (run) => run(eventStore),
+      withFailureLedger: async (run) => run(failureLedger),
+      now: () => "2026-10-30T12:00:00.000Z",
+    });
+
+    // 1) Ingest with store load failure — event recorded, materialization failed, ledger open.
+    mocks.load.mockRejectedValueOnce(new Error("EIO load"));
+    const failedIngest = await invokeIngest(handlers, {
+      sourceId: "src-a",
+      externalId: "e-retry-1",
+      eventType: "created",
+      objectKind: "order",
+      title: "retry-me",
+    });
+    expect(failedIngest.ok).toBe(true);
+    expect(failedIngest.payload?.deduped).toBe(false);
+    const failedMat = failedIngest.payload?.materialization as {
+      failed: number;
+      errorCode?: string;
+      retryHint?: string;
+    };
+    expect(failedMat.failed).toBe(1);
+    expect(failedMat.errorCode).toBe("store_load_failed");
+    expect(failedMat.retryHint).toBe("deduped_external_id_will_not_rematerialize");
+    const event = failedIngest.payload?.event as { eventId: string; externalId?: string };
+    expect(event.eventId).toBeTruthy();
+    const ledgerAfterFail = failedIngest.payload?.failureLedger as {
+      status: string;
+      attemptCount: number;
+      eventId: string;
+    };
+    expect(ledgerAfterFail.status).toBe("open");
+    expect(ledgerAfterFail.attemptCount).toBe(1);
+    expect(ledgerAfterFail.eventId).toBe(event.eventId);
+
+    // 2) Same externalId resend is deduped — no materialization recovery.
+    mocks.load.mockResolvedValue(normalizeEnterpriseDataStore(null));
+    const deduped = await invokeIngest(handlers, {
+      sourceId: "src-a",
+      externalId: "e-retry-1",
+      eventType: "created",
+      objectKind: "order",
+      title: "retry-me",
+    });
+    expect(deduped.payload?.deduped).toBe(true);
+    expect(deduped.payload?.materialization).toBeUndefined();
+
+    // 3) Manual rematerialize by eventId succeeds when store is healthy.
+    mocks.load.mockResolvedValue(normalizeEnterpriseDataStore(null));
+    mocks.save.mockResolvedValue(undefined);
+    const rematerialized = await invokeRematerialize(handlers, { eventId: event.eventId });
+    expect(rematerialized.ok).toBe(true);
+    expect(rematerialized.payload?.rematerialized).toBe(true);
+    const limits = rematerialized.payload?.limits as {
+      orderedDurableQueue: boolean;
+      externalIdResendRematerializes: boolean;
+    };
+    expect(limits.orderedDurableQueue).toBe(false);
+    expect(limits.externalIdResendRematerializes).toBe(false);
+    const okMat = rematerialized.payload?.materialization as {
+      failed: number;
+      errorCode?: string;
+    };
+    expect(okMat.errorCode).toBeUndefined();
+    expect(okMat.failed).toBe(0);
+    // No matching bindings → zeros without stage; ledger resolves (no open failure).
+    const ledgerAfterOk = rematerialized.payload?.failureLedger as { status: string } | undefined;
+    // resolve returns the resolved entry when one existed
+    expect(ledgerAfterOk?.status).toBe("resolved");
+  });
+
+  it("rematerialize requires eventId and rejects unknown events", async () => {
+    const eventStore = normalizeEnterpriseDataEventStore(null);
+    const handlers = createEnterpriseDataEventHandlers({
+      loadStore: async () => eventStore,
+      withStore: async (run) => run(eventStore),
+      withFailureLedger: async (run) => run(normalizeMaterializationFailureLedgerStore(null)),
+      now: () => "2026-10-30T12:00:00.000Z",
+    });
+    const missing = await invokeRematerialize(handlers, {});
+    expect(missing.ok).toBe(false);
+    expect(missing.error?.message ?? "").toMatch(/eventId/i);
+
+    const unknown = await invokeRematerialize(handlers, { eventId: "no-such-event" });
+    expect(unknown.ok).toBe(false);
+    expect(unknown.error?.message ?? "").toMatch(/not found/i);
   });
 });

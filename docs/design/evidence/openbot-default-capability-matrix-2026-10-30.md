@@ -6,16 +6,16 @@
 
 ## 八类能力
 
-| 能力          | 状态     | 产品声明与默认                                                                 | 配置来源                                                                                                                              | 生产入口                                                                                                      | 实际执行器                                                                                     | 结果存储                                                                                      | 下次消费                                                         | 权限边界                                                            | 失败/跳过                                                                                  | 本轮测试证据                                                                                            |
-| ------------- | -------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| 记忆          | 部分验证 | builtin 索引授权小组记忆；个人经验需审批；`privateMemoryPromote` 默认关        | `memory.backend`（默认 builtin）、`memorySearch`、`collaboration.learning.privateMemoryPromote`                                       | `extensions/memory-core` 工具；`getMemorySearchManager`                                                       | `MemoryIndexManager` / QMD / CogniWeave                                                        | 授权范围内的 sqlite；本 PR 起非空小组根使用 `authz-scopes/<fingerprint>/`                     | 同 caller 的后续 `search`                                        | 成员 + 租户根；managed 非 CogniWeave fail-closed                    | 无 embedding → FTS-only `embedding_unavailable`；撤权后旧 manager 返回空且不带 snippet     | 见 P0-B。既有 `memory-continuity-acceptance` 本轮重跑通过。真实 HTTP 监听与真实 embedding provider 未跑 |
-| 技能/资产进化 | 部分验证 | `outcome_verified` 后生成 **draft**（非启用）；须 finalize+install 才可调用    | 学习资产阈值；既有 skill lifecycle；无新自动发布开关                                                                                  | `learning-skill-curation` + `collaboration.learning.skillDraft.list/finalize` + `robot-skills.install/remove` | 策展写 draft（owner 戳记、`autoInstallEnabled:false`）；finalize→private；install 物化 binding | `CONFIG_DIR/skill-assets` + learning `curatedSkillId`                                         | finalize+install 后 identity tool **execute** + 归因事件；remove 后停止归因    | 保留人工 finalize，不自动审批/发布；无 owner 草稿不可见于 list（覆盖边界）      | 未达阈值不策展；非 owner finalize 拒绝；draft 强制 install 仍无 identity tools；ownerless 组草稿仍不可见             | 见 P1-D（含 execute+归因）。真实 HTTP/provider 未跑 → 部分验证                                                             |
-| 系统进化      | 部分验证 | 控制平面可观察；assist-shadow 默认只到 DISCOVERED（observe-only）；人工 authorize 后可实验/Apply | evolution governance / kill switch；`evolution.proposals.authorize`                                                                   | `authorize-shadow-intent.ts` + `evolution.proposals.authorize`；既有 experiments/apply/rollback                                       | shadow registrar（DISCOVERED）；authorize 入口；skill-installation adapter                     | proposal/ledger；skill install binding                                                        | authorize→experiment→canary Apply 后 runtime 消费；rollback 恢复 | delegation、payload hash、verifier、kill switch 保留                | 拒绝/缺 grant/observe-only 表面不改现状；runtime-binding 仍 observe-only                   | 见 P1-E（含重放绑定修复已推送待复验）。真实 HTTP/authz 子进程未跑 → 部分验证。已推送≠验收通过；不自称 Codex PASS                                       |
-| 上下文        | 部分验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config               | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine`                                                        | `assembleMessagesWithBudget`；`refreshConversationProjection`                                  | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition` | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过 | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config` | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A                                     |
-| 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` 有**最小** ingest 物化；完整 KB 目标未宣称；仍可迁到 scheduled/on_demand | knowledge publication mode                                                                                                            | `knowledge-publication.ts` + `projection-bindings.upsert` + `runEventDrivenProjectionsForEvent`                                             | on_demand / scheduled / **最小 event_driven**（非 clock；无 durable restart queue）                                    | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                      | 授权与 SAR                                                          | 错 source / 非 event 调度不物化；deduped ingest 跳过物化                 | 见 P1-F（含租户路径+存储失败可见性补修）。**已推送待复验 / 部分验证**；不记完整知识库目标完成；Live HTTP 未跑                              |
-| 数据资产物化  | 部分验证 | on_demand/scheduled 可物化；event_driven 经 ingest 最小物化；生产探测禁 `mock_smoke_ok` | `EnterpriseKnowledgeProjectionMaterializationMode` + probe mode                                                                       | enterprise data gateway + `source-connection-probe.ts` + events.ingest                                                | connector + publication gate；event 路径复用 `runProjectionMaterialization` | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载；event 走 ingest                          | 凭证、grant、SAR；demo 可 mock 但须标注                                         | 无凭证/未知 handler/生产 mock 拒绝明确失败；demo 保持隔离标注；durable replay/限流未宣称                              | 见 P1-F（含租户路径+存储失败可见性补修）。未实现全部连接器；Agent 触发与物化并行；**已推送待复验 / 部分验证**；Live HTTP 未跑                              |
-| 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`；长周期 `createCronLedgerSession` **不**依赖默认关闭的全局 ledger 开关 | `cfg.cron`；ledger 资格看任务文本，不看 `OPENBOT_PROGRESS_LEDGER_ENABLED` | `buildGatewayCronService` + `CronService` + isolated-agent / webhook announce | timer due fire → `runIsolatedAgentJob` / systemEvent；outbound `deliverOutboundPayloads` | cron store（`lastDelivered` / `lastDeliveryStatus` / `nextRunAtMs`）+ run log | 下次 `nextRunAtMs` wake；完成 ledger 后续 tick 带诚实 summary 记 ok | ownership ownerId/tenantId + personal scope 交叉；系统 retention 可共存 | `OPENCLAW_SKIP_CRON=1` / `enabled:false` 不调度；空完成仍非成功；完成 ledger 不再空完成误报 | 见 P2-H。单元+adapter 证据 create→persist→due→`deliverOutboundPayloads`→persist status；**真实 HTTP 送达未跑** → 部分验证 |
-| 模型智能配置  | 部分验证 | 未设置时为 `native`（合法默认，非缺陷）。产品/系统设置保存 `aor_enhanced` 后由 `resolvePlatformModelsMode` 读入 gate | `gateway.platform.models.mode`（UI `onSetPlatformModelsMode` → config.set） | `resolveEmployeeModelGate` ← chat / followup / cron-isolated / subagent（image/PDF 经 chat+capability plan modality） | native 直出；`aor_enhanced` + 真实目录成本 → AOR 保集合重排；**全合成 → native**；**partial 合成项不进 rankModels** | 平台模型快照 + effectiveRouting / preferredModelOrder | 后续请求读同一 mode；`runWithModelFallback` 消费 preferredModelOrder | 不扩大授权集合 | 缺 mode→native；缺档案→synthetic_only 回退原序且无假解释；合成中性不得赢 cheapest | 见 P2-G。单元证明 preferredOrder 改变 outbound primary；**真实 HTTP/provider 未跑** → 部分验证 |
+| 能力          | 状态     | 产品声明与默认                                                                                                                           | 配置来源                                                                                                                              | 生产入口                                                                                                              | 实际执行器                                                                                                          | 结果存储                                                                                      | 下次消费                                                                    | 权限边界                                                                   | 失败/跳过                                                                                                                  | 本轮测试证据                                                                                                           |
+| ------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 记忆          | 部分验证 | builtin 索引授权小组记忆；个人经验需审批；`privateMemoryPromote` 默认关                                                                  | `memory.backend`（默认 builtin）、`memorySearch`、`collaboration.learning.privateMemoryPromote`                                       | `extensions/memory-core` 工具；`getMemorySearchManager`                                                               | `MemoryIndexManager` / QMD / CogniWeave                                                                             | 授权范围内的 sqlite；本 PR 起非空小组根使用 `authz-scopes/<fingerprint>/`                     | 同 caller 的后续 `search`                                                   | 成员 + 租户根；managed 非 CogniWeave fail-closed                           | 无 embedding → FTS-only `embedding_unavailable`；撤权后旧 manager 返回空且不带 snippet                                     | 见 P0-B。既有 `memory-continuity-acceptance` 本轮重跑通过。真实 HTTP 监听与真实 embedding provider 未跑                |
+| 技能/资产进化 | 部分验证 | `outcome_verified` 后生成 **draft**（非启用）；须 finalize+install 才可调用                                                              | 学习资产阈值；既有 skill lifecycle；无新自动发布开关                                                                                  | `learning-skill-curation` + `collaboration.learning.skillDraft.list/finalize` + `robot-skills.install/remove`         | 策展写 draft（owner 戳记、`autoInstallEnabled:false`）；finalize→private；install 物化 binding                      | `CONFIG_DIR/skill-assets` + learning `curatedSkillId`                                         | finalize+install 后 identity tool **execute** + 归因事件；remove 后停止归因 | 保留人工 finalize，不自动审批/发布；无 owner 草稿不可见于 list（覆盖边界） | 未达阈值不策展；非 owner finalize 拒绝；draft 强制 install 仍无 identity tools；ownerless 组草稿仍不可见                   | 见 P1-D（含 execute+归因）。真实 HTTP/provider 未跑 → 部分验证                                                         |
+| 系统进化      | 部分验证 | 控制平面可观察；assist-shadow 默认只到 DISCOVERED（observe-only）；人工 authorize 后可实验/Apply                                         | evolution governance / kill switch；`evolution.proposals.authorize`                                                                   | `authorize-shadow-intent.ts` + `evolution.proposals.authorize`；既有 experiments/apply/rollback                       | shadow registrar（DISCOVERED）；authorize 入口；skill-installation adapter                                          | proposal/ledger；skill install binding                                                        | authorize→experiment→canary Apply 后 runtime 消费；rollback 恢复            | delegation、payload hash、verifier、kill switch 保留                       | 拒绝/缺 grant/observe-only 表面不改现状；runtime-binding 仍 observe-only                                                   | 见 P1-E（含重放绑定修复已推送待复验）。真实 HTTP/authz 子进程未跑 → 部分验证。已推送≠验收通过；不自称 Codex PASS       |
+| 上下文        | 部分验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config                                                                         | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine`                                                                | `assembleMessagesWithBudget`；`refreshConversationProjection`                                                       | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition`            | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过        | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config`                                 | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A                                                    |
+| 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` 有**最小** ingest 物化；完整 KB 目标未宣称；仍可迁到 scheduled/on_demand     | knowledge publication mode                                                                                                            | `knowledge-publication.ts` + `projection-bindings.upsert` + `runEventDrivenProjectionsForEvent`                       | on_demand / scheduled / **最小 event_driven**（非 clock；无 durable restart queue）                                 | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                                 | 授权与 SAR                                                                 | 错 source / 非 event 调度不物化；deduped ingest 跳过物化；失败后须 `events.rematerialize`（eventId）                       | 见 P1-F（含 rematerialize+failure ledger）。**已推送待复验 / 部分验证**；不记完整知识库目标完成；生产 Live HTTP 未宣称 |
+| 数据资产物化  | 部分验证 | on_demand/scheduled 可物化；event_driven 经 ingest 最小物化；生产探测禁 `mock_smoke_ok`                                                  | `EnterpriseKnowledgeProjectionMaterializationMode` + probe mode                                                                       | enterprise data gateway + `source-connection-probe.ts` + events.ingest                                                | connector + publication gate；event 路径复用 `runProjectionMaterialization`                                         | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载；event 走 ingest                    | 凭证、grant、SAR；demo 可 mock 但须标注                                    | 无凭证/未知 handler/生产 mock 拒绝明确失败；demo 保持隔离标注；有序 durable replay/限流未宣称；manual rematerialize 非队列 | 见 P1-F（含 rematerialize+failure ledger）。未实现全部连接器；**已推送待复验 / 部分验证**；生产 Live HTTP 未宣称       |
+| 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`；长周期 `createCronLedgerSession` **不**依赖默认关闭的全局 ledger 开关 | `cfg.cron`；ledger 资格看任务文本，不看 `OPENBOT_PROGRESS_LEDGER_ENABLED`                                                             | `buildGatewayCronService` + `CronService` + isolated-agent / webhook announce                                         | timer due fire → `runIsolatedAgentJob` / systemEvent；outbound `deliverOutboundPayloads`                            | cron store（`lastDelivered` / `lastDeliveryStatus` / `nextRunAtMs`）+ run log                 | 下次 `nextRunAtMs` wake；完成 ledger 后续 tick 带诚实 summary 记 ok         | ownership ownerId/tenantId + personal scope 交叉；系统 retention 可共存    | `OPENCLAW_SKIP_CRON=1` / `enabled:false` 不调度；空完成仍非成功；完成 ledger 不再空完成误报                                | 见 P2-H。单元+adapter + **loopback HTTP channel-adapter** 证据；**生产 Live webhook/真网未宣称** → 部分验证            |
+| 模型智能配置  | 部分验证 | 未设置时为 `native`（合法默认，非缺陷）。产品/系统设置保存 `aor_enhanced` 后由 `resolvePlatformModelsMode` 读入 gate                     | `gateway.platform.models.mode`（UI `onSetPlatformModelsMode` → config.set）                                                           | `resolveEmployeeModelGate` ← chat / followup / cron-isolated / subagent（image/PDF 经 chat+capability plan modality） | native 直出；`aor_enhanced` + 真实目录成本 → AOR 保集合重排；**全合成 → native**；**partial 合成项不进 rankModels** | 平台模型快照 + effectiveRouting / preferredModelOrder                                         | 后续请求读同一 mode；`runWithModelFallback` 消费 preferredModelOrder        | 不扩大授权集合                                                             | 缺 mode→native；缺档案→synthetic_only 回退原序且无假解释；合成中性不得赢 cheapest                                          | 见 P2-G。单元 + **loopback HTTP** 证明 preferredOrder→首跳 outbound；**生产 Live provider 未宣称** → 部分验证          |
 
 `privateMemoryPromote` 仍记为 **合理受控关闭**（默认 unset/false）：`promotePrivateMemoryCapsuleToGroup` 只有显式 `true` 才写组学习资产。P1-C 已补生产 RPC `collaboration.learning.privateMemory.promote`（`private-memory-promote-entry.ts` + server-methods 注册）：要求 identified actor、个人 scope 按 capsuleId 加载、ownership 与目标组 trusted write 成员校验；flag OFF 返回 success-shaped `{promoted:false, reason:flag_off}`，不假装晋升成功。默认不打开 flag。验收复跑后补齐五修复：①策略拒绝前不写目标组正文；②projection/asset 稳定幂等 id；③RPC 可信 tenant/stores 传入执行层（managed 缺可信上下文 fail-closed）；④重试不覆盖资产生命周期（revoked/reuseCount 保留）；⑤源读取与目标策略绑定同一可信 stores/locator（fileStore/groupStorage，禁止 silent default reopen）。本批未接线 UI。撤销：个人 revoke 不自动撤销组侧副本；组侧走 `collaboration.capsule.transition` revoked。真实跨租户 HTTP/authz 子进程未跑 → 记忆行 / P1-C **仍部分验证**（已推送≠验收通过）。
 
@@ -116,7 +116,7 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 ## 已知限制与回滚
 
 - 不打开 `privateMemoryPromote` 默认（仅补 RPC 入口）。
-- P2-H 已交单元闭环 + adapter 送达证据（`deliverOutboundPayloads`→persist）。**真实 HTTP 送达 / 真 gateway 长跑未跑** → 定时任务保持部分验证。P1-F 最小事件物化已接，且 ingest 已对齐租户 store 路径并暴露 load/save 失败；durable restart queue / 完整 KB 目标 / Live HTTP 未宣称。
+- P2-H 已交单元闭环 + adapter + **loopback HTTP channel-adapter** 证据。**生产 Live webhook / 真网通道 / 真 gateway 长跑未宣称** → 定时任务保持部分验证。P1-F 最小事件物化 + rematerialize(eventId) + failure ledger 已接；**有序 durable restart queue / 完整 KB / 生产 Live HTTP 未宣称**。
 - 工作区 memory 的 `**/*.md` watcher glob 在当前 chokidar 上仍可能不发事件。本 PR 只改了授权小组目录。
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
@@ -150,34 +150,34 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 
 ## P1-C 私有经验显式分享入口（2026-10-30）
 
-| 项       | 说明                                                                                                                     |
-| -------- | ------------------------------------------------------------------------------------------------------------------------ |
-| RPC      | `collaboration.learning.privateMemory.promote`（WRITE scope，与 capsule.approve 同族）                                   |
-| Flag     | `collaboration.learning.privateMemoryPromote` 默认 **OFF**；ON 才写组资产+audit                                          |
-| 加载     | 仅从 `agent:<botId>` `readCapsules` 按 `capsuleId`；不接受客户端胶囊正文                                                 |
-| 校验     | identified actor；`assertPersonalLearningOwnership`；目标组 `resolveTrustedWriteContext`；仅 `approved` 胶囊             |
-| 策略顺序 | 目标组 policy/lifecycle **先于** `appendCapsule`/projection/asset；拒绝时仅 audit，目标组无正文副本（回归：lifecycle_blocked PoC） |
-| 幂等     | 稳定 `proj:`/`asset:` id；已存在同 id 资产时返回原回执且**不**重建 `status`/`reuseCount`/`createdAt`/`version`（撤销不因重试复活） |
-| 可信上下文 | RPC 传入 `tenantId`/`securityProfile`/`stores`；**源 capsule 读取**、**目标 policy（fileStore/groupStorage）**与 learning 写入同绑定；managed 缺可信上下文 fail-closed；禁止 silent default reopen |
-| 测试     | entry + RPC + promote；含 policy-denial 零正文、repeat 幂等、**lifecycle-preserve**、**stores-binding**（源读/策略 archived 零写入）、跨租户拒绝 |
-| UI       | 本批未接（避免 lander 冲突）                                                                                             |
-| 撤销缺口 | 个人 revoke ≠ 组侧自动 revoke；组侧 transition revoked 后 recall 停注入仍待独立验证；FLOOR `promotion-audit` 默认路径未改（本流用 trusted helper）；behavior-buffer 旁路仍可能读默认 root（已知边界） |
-| 状态     | **已推送待复验 / 部分验证**：五修复已推送（含 lifecycle-preserve + stores-binding）；**已推送≠验收通过**；无真实跨租户 HTTP、无 UI；默认仍 **合理受控关闭** |
+| 项         | 说明                                                                                                                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RPC        | `collaboration.learning.privateMemory.promote`（WRITE scope，与 capsule.approve 同族）                                                                                                                |
+| Flag       | `collaboration.learning.privateMemoryPromote` 默认 **OFF**；ON 才写组资产+audit                                                                                                                       |
+| 加载       | 仅从 `agent:<botId>` `readCapsules` 按 `capsuleId`；不接受客户端胶囊正文                                                                                                                              |
+| 校验       | identified actor；`assertPersonalLearningOwnership`；目标组 `resolveTrustedWriteContext`；仅 `approved` 胶囊                                                                                          |
+| 策略顺序   | 目标组 policy/lifecycle **先于** `appendCapsule`/projection/asset；拒绝时仅 audit，目标组无正文副本（回归：lifecycle_blocked PoC）                                                                    |
+| 幂等       | 稳定 `proj:`/`asset:` id；已存在同 id 资产时返回原回执且**不**重建 `status`/`reuseCount`/`createdAt`/`version`（撤销不因重试复活）                                                                    |
+| 可信上下文 | RPC 传入 `tenantId`/`securityProfile`/`stores`；**源 capsule 读取**、**目标 policy（fileStore/groupStorage）**与 learning 写入同绑定；managed 缺可信上下文 fail-closed；禁止 silent default reopen    |
+| 测试       | entry + RPC + promote；含 policy-denial 零正文、repeat 幂等、**lifecycle-preserve**、**stores-binding**（源读/策略 archived 零写入）、跨租户拒绝                                                      |
+| UI         | 本批未接（避免 lander 冲突）                                                                                                                                                                          |
+| 撤销缺口   | 个人 revoke ≠ 组侧自动 revoke；组侧 transition revoked 后 recall 停注入仍待独立验证；FLOOR `promotion-audit` 默认路径未改（本流用 trusted helper）；behavior-buffer 旁路仍可能读默认 root（已知边界） |
+| 状态       | **已推送待复验 / 部分验证**：五修复已推送（含 lifecycle-preserve + stores-binding）；**已推送≠验收通过**；无真实跨租户 HTTP、无 UI；默认仍 **合理受控关闭**                                           |
 
 ## P1-D 技能/资产进化最后一段（2026-10-30）
 
-| 项           | 说明                                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 缺口         | 策展写 draft **不带 ownerUserId**，且默认 `autoInstall` 建 relation → 假“已装”；`personal-skills.*` / 我的资产 ACL 看不见草稿，finalize/install 人工门不可达 |
-| 修复         | `curateLearningSkillDrafts` 从资产 `metadata.personalOwnerUserId`（可 override）戳 owner；`autoInstallEnabled:false`；`sourceLineageId=learning:<scope>`     |
-| 生产入口     | `collaboration.learning.skillDraft.list`（READ）/ `.finalize`（WRITE，draft→private，**不** install）                                                        |
-| 安装/撤销    | 沿用 `robot-skills.install` / `remove`（+ SkillExecutionBinding hooks）                                                                                      |
-| 真实调用证据 | 闭环测：finalize+install 后 identity tool **`execute`**（注入 openbotSkillId）+ `recordLifecycleSkillToolStart/Result` 归因；remove 后 resolve/attribution 停止 |
-| 幂等         | `curatedSkillId` 写回学习资产；同簇不再策展                                                                                                                  |
-| 人工门       | finalize 可达；**不** auto-approve / auto-install                                                                                                            |
-| UI           | 本批未接（RPC+tests）                                                                                                                                        |
-| 已知缺口 / 覆盖边界 | 无 `personalOwnerUserId` 的组侧资产策展草稿仍无 owner（list 不可见）— **本轮明确为覆盖边界**；真实 HTTP gateway 子进程未跑 |
-| 状态         | **已推送待复验 / 部分验证**（已推送≠验收通过）                                                                                                                                                 |
+| 项                  | 说明                                                                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 缺口                | 策展写 draft **不带 ownerUserId**，且默认 `autoInstall` 建 relation → 假“已装”；`personal-skills.*` / 我的资产 ACL 看不见草稿，finalize/install 人工门不可达    |
+| 修复                | `curateLearningSkillDrafts` 从资产 `metadata.personalOwnerUserId`（可 override）戳 owner；`autoInstallEnabled:false`；`sourceLineageId=learning:<scope>`        |
+| 生产入口            | `collaboration.learning.skillDraft.list`（READ）/ `.finalize`（WRITE，draft→private，**不** install）                                                           |
+| 安装/撤销           | 沿用 `robot-skills.install` / `remove`（+ SkillExecutionBinding hooks）                                                                                         |
+| 真实调用证据        | 闭环测：finalize+install 后 identity tool **`execute`**（注入 openbotSkillId）+ `recordLifecycleSkillToolStart/Result` 归因；remove 后 resolve/attribution 停止 |
+| 幂等                | `curatedSkillId` 写回学习资产；同簇不再策展                                                                                                                     |
+| 人工门              | finalize 可达；**不** auto-approve / auto-install                                                                                                               |
+| UI                  | 本批未接（RPC+tests）                                                                                                                                           |
+| 已知缺口 / 覆盖边界 | 无 `personalOwnerUserId` 的组侧资产策展草稿仍无 owner（list 不可见）— **本轮明确为覆盖边界**；真实 HTTP gateway 子进程未跑                                      |
+| 状态                | **已推送待复验 / 部分验证**（已推送≠验收通过）                                                                                                                  |
 
 ## P1-E 系统进化闭环（shadow intent authorize）
 
@@ -230,7 +230,11 @@ Codex tip `d6a48880` 指出：`existingEvent` 早退在核对 trustedTenantId / 
 - **P1-F 验收阻断补修（相对 9b127fb9）**：
   1. `events.ingest` 的 `withDataStore` 改为与 binding API 相同：`resolveControlPlaneStorePathForClient(client, TENANT_ENTERPRISE_DATA_FILE)` 后 load/save 同一租户路径；并行 ingest 经 async lock 串行化 RMW。
   2. load/save 失败不再伪装为全零 `failed=0`；返回 `stage`/`errorCode`（`store_load_failed` / `store_save_failed`）与 `retryHint: deduped_external_id_will_not_rematerialize`；保存失败时 `succeeded=0`（不宣称已持久化）。
-- **不宣称**：durable restart queue、有序多消费者 replay、生产限流、完整知识库目标、demo→prod 隔离深化、真实 source auth 扩面、Live HTTP/provider/通道。
+- **Durable rematerialization（本轮）**：
+  1. RPC `enterprise-data.events.rematerialize`：对**已记录** event 按 `eventId` 重跑 `runEventDrivenProjectionsForEvent`；**明确**同 `externalId` 重发仍 dedupe、不会物化。
+  2. Durable failure ledger（独立 JSON）：ingest/rematerialize 失败写入 `open`；成功 rematerialize 标 `resolved`；有 attemptCount；**不是**有序 restart queue / 多消费者 replay。
+  3. ingest 响应附 `recovery: { method, by: eventId }` 与可选 `failureLedger`。
+- **不宣称**：有序 durable restart queue、多消费者 replay、生产限流、完整知识库目标、demo→prod 隔离深化、真实 source auth 扩面、生产 Live HTTP/provider/通道。
 
 失败然后通过：
 
@@ -238,12 +242,13 @@ Codex tip `d6a48880` 指出：`existingEvent` 早退在核对 trustedTenantId / 
 OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
   src/gateway/enterprise-data/knowledge-publication.test.ts \
   src/gateway/enterprise-data/event-driven-projection-materializer.test.ts \
+  src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts \
   src/gateway/server-methods/enterprise-data-events.test.ts \
   src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts \
   src/gateway/server-methods/enterprise-data-m4.test.ts
 ```
 
-矩阵：**已推送待复验 / 部分验证**（知识库/数据资产物化）。最小事件物化 + 租户路径/存储失败可见性已补；完整 KB 目标未宣称；Live HTTP/provider/通道仍缺。**已推送≠验收通过**；不自行宣告 Codex PASS。
+矩阵：**已推送待复验 / 部分验证**（知识库/数据资产物化）。最小事件物化 + 租户路径/I-O 可见 + rematerialize/failure ledger 已补；完整 KB / 有序 durable queue 未宣称；生产 Live HTTP/provider/通道仍缺。**已推送≠验收通过**；不自行宣告 Codex PASS。
 
 ## P2-G 模型智能配置（合成中性不得冒充已验证优化，2026-10-30）
 
@@ -261,13 +266,13 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
 
 调用点覆盖（接线已存在，本轮未改 hot-path 签名）：
 
-| 入口 | 是否经 employee-model-gate / preferredModelOrder | 备注 |
-| --- | --- | --- |
-| 普通聊天 | 是（`agent-runner-execution.ts`） | 含 images 选项走同一 fallback |
-| followup | 是（`followup-runner.ts`） | |
-| cron-isolated | 是（`cron/isolated-agent/run.ts`） | |
-| subagent | 是（`subagent-spawn.ts` + child-task AOR reorder） | 继承 parent snapshot mode |
-| image/PDF | 经 chat/capability-plan modality，非独立 gate | 附件字节估计见 child-spawn |
+| 入口          | 是否经 employee-model-gate / preferredModelOrder   | 备注                          |
+| ------------- | -------------------------------------------------- | ----------------------------- |
+| 普通聊天      | 是（`agent-runner-execution.ts`）                  | 含 images 选项走同一 fallback |
+| followup      | 是（`followup-runner.ts`）                         |                               |
+| cron-isolated | 是（`cron/isolated-agent/run.ts`）                 |                               |
+| subagent      | 是（`subagent-spawn.ts` + child-task AOR reorder） | 继承 parent snapshot mode     |
+| image/PDF     | 经 chat/capability-plan modality，非独立 gate      | 附件字节估计见 child-spawn    |
 
 产品保存路径：系统设置 `onSetPlatformModelsMode` → `gateway.platform.models.mode` → config.set；运行时 `resolvePlatformModelsMode` 读取。缺托管身份时 gate 早退（无 allowlist 强制），mode 仍写入 effectiveRouting，但不伪造 preferredModelOrder。
 
@@ -282,7 +287,7 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
   src/gateway/model-entitlement/employee-model-gate.aor.test.ts
 ```
 
-矩阵：**已推送待复验 / 部分验证**（模型智能配置）。真实 outbound provider HTTP 未跑。**已推送≠验收通过**；不自行宣告 Codex PASS。
+矩阵：**已推送待复验 / 部分验证**（模型智能配置）。已补 **loopback HTTP**（labeled）证明 selection→outbound 首跳；生产 Live provider 公网未宣称。**已推送≠验收通过**；不自行宣告 Codex PASS。
 
 ## P2-H 定时任务（创建→持久化→到期→送达状态→下次调度，2026-10-30）
 
@@ -292,22 +297,22 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
 
 可测层已有大量既有覆盖，本轮先复跑再找真实缺口：
 
-| 验收点 | 既有证据 | 本轮 |
-| --- | --- | --- |
-| 默认开启（`enabled !== false` 且非 `OPENCLAW_SKIP_CRON=1`） | `buildGatewayCronService` 表达式；gateway 测设 skip=0 | 核对表达式，无重复开关 |
-| create → persist | `owner-scheduled-task.chain`（默认 `Asia/Shanghai` 08:00）；`CronService.add` | 通过 |
-| due fire → next schedule | `service.persists-delivered-status`（推进 `nextRunAtMs`）；`restart-catchup` | 通过 |
-| delivered / not-delivered / not-requested | `service.persists-delivered-status`（含 finished 事件） | 通过 |
-| announce 多通道 outbound | `isolated-agent.direct-delivery-core-channels`（Slack/Discord/WhatsApp/iMessage，`delivered:true`） | 通过 |
-| webhook 送达路径 | `gateway/server.cron.test` posts webhooks… | 通过 |
-| restart / missed | `service.restart-catchup` | 通过 |
-| Asia/Shanghai | `schedule.test` + owner-scheduled-task 默认 tz | 通过 |
-| concurrency | `issue-regressions` `maxConcurrentRuns`；`prevents-duplicate-timers` | 通过 |
-| failure retry | `issue-regressions` #24355 one-shot retry | 通过 |
-| delete/disable | CRUD patch `enabled:false`；one-shot disable | 通过 |
-| model selection | `run.cron-model-override` | 通过 |
-| target identity / tenant | `cron.personal-scope`（personal ∩ tenant；跨租户拒绝） | 通过 |
-| ledger 独立于全局开关 | `progress-ledger/feature.ts` 注释 + `cron-binding`「flag unset 仍 bind」+ long-horizon 测 | 通过 |
+| 验收点                                                      | 既有证据                                                                                            | 本轮                   |
+| ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------------------- |
+| 默认开启（`enabled !== false` 且非 `OPENCLAW_SKIP_CRON=1`） | `buildGatewayCronService` 表达式；gateway 测设 skip=0                                               | 核对表达式，无重复开关 |
+| create → persist                                            | `owner-scheduled-task.chain`（默认 `Asia/Shanghai` 08:00）；`CronService.add`                       | 通过                   |
+| due fire → next schedule                                    | `service.persists-delivered-status`（推进 `nextRunAtMs`）；`restart-catchup`                        | 通过                   |
+| delivered / not-delivered / not-requested                   | `service.persists-delivered-status`（含 finished 事件）                                             | 通过                   |
+| announce 多通道 outbound                                    | `isolated-agent.direct-delivery-core-channels`（Slack/Discord/WhatsApp/iMessage，`delivered:true`） | 通过                   |
+| webhook 送达路径                                            | `gateway/server.cron.test` posts webhooks…                                                          | 通过                   |
+| restart / missed                                            | `service.restart-catchup`                                                                           | 通过                   |
+| Asia/Shanghai                                               | `schedule.test` + owner-scheduled-task 默认 tz                                                      | 通过                   |
+| concurrency                                                 | `issue-regressions` `maxConcurrentRuns`；`prevents-duplicate-timers`                                | 通过                   |
+| failure retry                                               | `issue-regressions` #24355 one-shot retry                                                           | 通过                   |
+| delete/disable                                              | CRUD patch `enabled:false`；one-shot disable                                                        | 通过                   |
+| model selection                                             | `run.cron-model-override`                                                                           | 通过                   |
+| target identity / tenant                                    | `cron.personal-scope`（personal ∩ tenant；跨租户拒绝）                                              | 通过                   |
+| ledger 独立于全局开关                                       | `progress-ledger/feature.ts` 注释 + `cron-binding`「flag unset 仍 bind」+ long-horizon 测           | 通过                   |
 
 计时器注册、ledger seed、执行日志**单独**均不记为送达；送达以 `delivered`/`deliveryStatus` 持久化与 outbound/webhook 调用为准。
 
@@ -330,11 +335,12 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
 ### 本轮加强（adapter 证据，仍非 live）
 
 - `service.delivery-adapter-evidence.p2h.test.ts`：`dispatchCronDelivery` → mocked `deliverOutboundPayloads`（断言 channel/to）→ `delivered` 仅在 outbound 有结果时为 true → CronService 持久化 `lastDeliveryStatus=delivered`。
-- **不**宣称 live webhook/HTTP；矩阵保持 **部分验证**。
+- 已补 `service.delivery-loopback-http.p2h.test.ts`：`deliverOutboundPayloads`→send dep→**真实 loopback HTTP POST**（labeled；非生产 Live webhook；cron SSRF 仍拦私网 webhook）。
+- **不**宣称生产 live webhook/真网通道；矩阵保持 **部分验证**。
 
 ### 未做 / 已知限制
 
-- **真实 HTTP 通道送达**（Telegram/Slack 真网、真 webhook 对端）未跑 → 矩阵保持 **部分验证**。
+- **生产 Live HTTP 通道送达**（Telegram/Slack 真网、公网 webhook 对端）未跑；仅有 loopback labeled 证据 → 矩阵保持 **部分验证**。
 - 不新增重复 `cron.enabled` feature flag；不把全局 progress-ledger 默认打开。
 - 不合并、不部署、不自称 Codex PASS。
 
@@ -360,3 +366,13 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
 
 矩阵：**已推送待复验 / 部分验证**（定时任务）。**已推送≠验收通过**；不自行宣告 Codex PASS。
 
+## 独立 build/check + Live/rematerialize 缺口轮（2026-10-30）
+
+| 项                   | 结果                              | 说明                                                                                                                 |
+| -------------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `CI=true pnpm build` | 通过（本轮 Mac 执行）             | 含 plugin-sdk dts + ui:build；既有 dynamic-import 警告非本轮引入                                                     |
+| `pnpm check`         | **未绿**（`format:check` exit 1） | 本轮触达已 oxfmt；全仓既有 14 个未改路径 format 债挡门（含未跟踪 agent-instructions）。**不**发明 PASS；未改他人路径 |
+| P1-F rematerialize   | 单测通过                          | load/save fail → rematerialize by eventId 成功；externalId 重发仍 dedupe                                             |
+| P2-G loopback HTTP   | 单测通过                          | labeled；非生产 Live provider                                                                                        |
+| P2-H loopback HTTP   | 单测通过                          | labeled channel-adapter；非生产 Live webhook                                                                         |
+| 整批状态             | **部分验证**                      | **已推送≠验收通过**；不自行宣告 Codex PASS / 不 merge                                                                |

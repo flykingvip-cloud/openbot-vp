@@ -54,8 +54,9 @@ export type EventDrivenMaterializationResult = {
   errorCode?: EventDrivenMaterializationErrorCode;
   /**
    * Stable hint: ingest already recorded + deduped by externalId, so resending
-   * the same externalId will not rematerialize. Manual re-ingest needs a new
-   * externalId (or a future durable retry path — not claimed here).
+   * the same externalId will not rematerialize. Recovery is
+   * `enterprise-data.events.rematerialize` by eventId (not externalId resend).
+   * Not a claim of ordered durable restart queue / multi-consumer replay.
    */
   retryHint?: "deduped_external_id_will_not_rematerialize";
 };

@@ -3,7 +3,7 @@
 //
 // Read RPCs (READ scope): events.list / event-subscriptions.list.
 // Write RPCs (WRITE scope + in-handler enterprise-admin gate): events.ingest /
-// event-subscriptions.upsert / event-subscriptions.delete. Tenant is resolved
+// events.rematerialize / event-subscriptions.upsert / event-subscriptions.delete. Tenant is resolved
 // server-side (never client-forged). Kept in a dedicated file (not the enterprise-data.ts
 // core / m6) to avoid attribution conflicts on owned/shared files.
 
@@ -19,6 +19,7 @@ import {
 } from "../enterprise-data/enterprise-data-event-bus.js";
 import {
   deleteEventSubscription,
+  findEnterpriseDataEvent,
   type EnterpriseDataEventSubscriptionInput,
   listEnterpriseDataEvents,
   listEventSubscriptions,
@@ -31,6 +32,13 @@ import type {
   EnterpriseDataEventType,
 } from "../enterprise-data/enterprise-data-event-types.js";
 import { requireResolvedEnterpriseAdminTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
+import {
+  recordMaterializationFailure,
+  resolveMaterializationFailure,
+  withMaterializationFailureLedgerWriteLock,
+  type MaterializationFailureLedgerEntry,
+  type MaterializationFailureLedgerStore,
+} from "../enterprise-data/event-driven-materialization-failure-ledger.js";
 import {
   runEventDrivenProjectionsForEvent,
   type EventDrivenMaterializationResult,
@@ -182,12 +190,20 @@ export function createEnterpriseDataEventHandlers(deps?: {
    * `TENANT_ENTERPRISE_DATA_FILE`).
    */
   withDataStore?: WithDataStoreRunner;
+  /** Injectable failure-ledger lock (tests). */
+  withFailureLedger?: <T>(
+    run: (store: MaterializationFailureLedgerStore) => Promise<T> | T,
+  ) => Promise<T>;
 }): GatewayRequestHandlers {
   const loadStore = deps?.loadStore ?? (() => loadEnterpriseDataEventStore());
   const withStore =
     deps?.withStore ??
     (<T>(run: (store: EnterpriseDataEventStore) => Promise<T> | T) =>
       withEnterpriseDataEventStoreWriteLock(run));
+  const withFailureLedger =
+    deps?.withFailureLedger ??
+    (<T>(run: (store: MaterializationFailureLedgerStore) => Promise<T> | T) =>
+      withMaterializationFailureLedgerWriteLock(run));
   const withDataStore: WithDataStoreRunner =
     deps?.withDataStore ??
     (async <_T>(ctx, run) => {
@@ -224,6 +240,51 @@ export function createEnterpriseDataEventHandlers(deps?: {
     });
   const triggerAgent = deps?.triggerAgent ?? defaultTriggerAgent;
   const now = deps?.now ?? (() => new Date().toISOString());
+
+  async function persistMaterializationOutcome(params: {
+    tenantId: string;
+    eventId: string;
+    sourceId: string;
+    externalId?: string;
+    materialization: EventDrivenMaterializationResult;
+    nowIso: string;
+  }): Promise<MaterializationFailureLedgerEntry | undefined> {
+    const failed =
+      Boolean(params.materialization.errorCode) ||
+      params.materialization.failed > 0 ||
+      (params.materialization.stage != null && params.materialization.succeeded === 0);
+    if (!failed) {
+      // Successful rematerialize clears any open ledger row; ingest success with
+      // no prior failure is a no-op.
+      return withFailureLedger((ledger) => {
+        const resolved = resolveMaterializationFailure({
+          store: ledger,
+          tenantId: params.tenantId,
+          eventId: params.eventId,
+          nowIso: params.nowIso,
+        });
+        return resolved ?? undefined;
+      });
+    }
+    const stage = params.materialization.stage ?? "run";
+    const errorCode = params.materialization.errorCode ?? "materialization_failed";
+    const lastError =
+      params.materialization.attempts.find((a) => a.status === "failed")?.error ??
+      params.materialization.errorCode;
+    return withFailureLedger((ledger) =>
+      recordMaterializationFailure({
+        store: ledger,
+        tenantId: params.tenantId,
+        eventId: params.eventId,
+        sourceId: params.sourceId,
+        externalId: params.externalId,
+        stage,
+        errorCode,
+        nowIso: params.nowIso,
+        lastError,
+      }),
+    );
+  }
 
   return {
     "enterprise-data.events.list": async ({ client, params, respond }) => {
@@ -331,12 +392,110 @@ export function createEnterpriseDataEventHandlers(deps?: {
             }
           }
         }
+        let failureLedger: MaterializationFailureLedgerEntry | undefined;
+        if (materialization) {
+          try {
+            failureLedger = await persistMaterializationOutcome({
+              tenantId,
+              eventId: recorded.event.eventId,
+              sourceId: recorded.event.sourceId,
+              externalId: recorded.event.externalId,
+              materialization,
+              nowIso,
+            });
+          } catch {
+            // Ledger persistence must not flip ingest ack; materialization stats remain.
+            failureLedger = undefined;
+          }
+        }
         respond(true, {
           tenantId,
           event: recorded.event,
           deduped: recorded.deduped,
           dispatch,
           ...(materialization ? { materialization } : {}),
+          ...(failureLedger ? { failureLedger } : {}),
+          recovery: {
+            method: "enterprise-data.events.rematerialize",
+            by: "eventId",
+            note: "Same externalId resend is deduped and will not rematerialize.",
+          },
+        });
+      } catch (error) {
+        respondEnterpriseError(respond, error);
+      }
+    },
+
+    /**
+     * Manual rematerialize/retry for an already-recorded event.
+     * Does NOT claim that resending the same externalId recovers materialization;
+     * callers must pass eventId from a prior ingest. Not a full ordered durable queue.
+     */
+    "enterprise-data.events.rematerialize": async ({ client, params, respond }) => {
+      const tenantId = await requireResolvedEnterpriseAdminTenantId({ client, params, respond });
+      if (!tenantId) {
+        return;
+      }
+      const eventId = stringValue(params.eventId);
+      if (!eventId) {
+        respondInvalid(
+          respond,
+          "eventId is required (use rematerialize by eventId; externalId resend will not rematerialize)",
+        );
+        return;
+      }
+      try {
+        const nowIso = now();
+        const store = await loadStore();
+        const event = findEnterpriseDataEvent(store, tenantId, eventId);
+        if (!event) {
+          respondInvalid(respond, "event not found for tenant");
+          return;
+        }
+        let materialization: EventDrivenMaterializationResult;
+        try {
+          materialization = await withDataStore({ client, tenantId }, (dataStore) =>
+            runEventDrivenProjectionsForEvent({
+              store: dataStore,
+              tenantId,
+              event,
+              nowIso,
+            }),
+          );
+        } catch (error) {
+          if (error instanceof EventDrivenStoreAccessError) {
+            materialization = materializationStoreFailure({
+              stage: error.stage,
+              partial: error.partialResult,
+            });
+          } else {
+            materialization = materializationStoreFailure({ stage: "run" });
+          }
+        }
+        let failureLedger: MaterializationFailureLedgerEntry | undefined;
+        try {
+          failureLedger = await persistMaterializationOutcome({
+            tenantId,
+            eventId: event.eventId,
+            sourceId: event.sourceId,
+            externalId: event.externalId,
+            materialization,
+            nowIso,
+          });
+        } catch {
+          failureLedger = undefined;
+        }
+        respond(true, {
+          tenantId,
+          event,
+          rematerialized: true,
+          materialization,
+          ...(failureLedger ? { failureLedger } : {}),
+          limits: {
+            orderedDurableQueue: false,
+            externalIdResendRematerializes: false,
+            note: "Manual rematerialize by eventId only; not a multi-consumer replay claim.",
+          },
         });
       } catch (error) {
         respondEnterpriseError(respond, error);

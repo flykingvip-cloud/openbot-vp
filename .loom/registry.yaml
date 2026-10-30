@@ -10096,10 +10096,15 @@ tasks:
       - src/gateway/collaboration-learning/private-memory-promote.ts
       - src/gateway/collaboration-learning/private-memory-promote.test.ts
       - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/gateway/enterprise-data/enterprise-data-event-store.ts
       - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
       - src/gateway/server-methods/enterprise-data-events.ts
       - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
       - src/cron/service.delivery-adapter-evidence.p2h.test.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts
+      - src/cron/service.delivery-loopback-http.p2h.test.ts
+      - src/agents/model-fallback.p2g-loopback-http.test.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10173,10 +10178,15 @@ landingStreams:
       - src/gateway/server-methods/enterprise-data-m4.ts
       - src/gateway/server-methods/enterprise-data-m4.test.ts
       - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/gateway/enterprise-data/enterprise-data-event-store.ts
       - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
       - src/gateway/server-methods/enterprise-data-events.ts
       - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
       - src/cron/service.delivery-adapter-evidence.p2h.test.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts
+      - src/cron/service.delivery-loopback-http.p2h.test.ts
+      - src/agents/model-fallback.p2g-loopback-http.test.ts
       - src/gateway/model-entitlement/aor-selection.ts
       - src/gateway/model-entitlement/aor-selection.test.ts
       - src/gateway/model-entitlement/aor-catalog-adapter.ts
@@ -10200,11 +10210,13 @@ landingStreams:
       purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
         learning skillDraft execute+attribution + P1-E shadow intent authorize +
         P1-F knowledge materialization (false-availability fix + minimal
-        event-driven path + tenant-store locator/I-O failure visibility;
-        full KB not claimed) + P2-G platform models smart
-        config (synthetic-neutral / partial-catalog must not fake ranking) +
-        P2-H cron closed-loop (adapter delivery evidence; no real HTTP).
-        NO_PROMOTE; no auto-Apply system/runtime bindings.
+        event-driven path + tenant-store locator/I-O visibility +
+        events.rematerialize by eventId + durable failure ledger; not ordered
+        restart queue; full KB not claimed) + P2-G platform models smart
+        config (synthetic-neutral / partial-catalog must not fake ranking;
+        loopback HTTP selection→outbound labeled) + P2-H cron closed-loop
+        (adapter + loopback HTTP channel-adapter evidence; no production Live
+        webhook claim). NO_PROMOTE; no auto-Apply system/runtime bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22663,6 +22675,21 @@ sharedPaths:
   - glob: src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: "P1-F: tenant store path + storage failure visibility acceptance tests."
+  - glob: src/gateway/enterprise-data/enterprise-data-event-store.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: findEnterpriseDataEvent for rematerialize by eventId."
+  - glob: src/gateway/enterprise-data/event-driven-materialization-failure-ledger.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: durable materialization failure ledger (not ordered queue)."
+  - glob: src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: failure ledger persist/resolve tests."
+  - glob: src/cron/service.delivery-loopback-http.p2h.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-H: loopback HTTP channel-adapter delivery evidence (labeled)."
+  - glob: src/agents/model-fallback.p2g-loopback-http.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: loopback HTTP selection→outbound evidence (labeled)."
     reviewAfter: 2026-11-30
   - glob: src/cron/service.delivery-adapter-evidence.p2h.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

@@ -459,6 +459,7 @@ const BASE_METHODS = [
   "enterprise-data.planner.context",
   "enterprise-data.events.list",
   "enterprise-data.events.ingest",
+  "enterprise-data.events.rematerialize",
   "enterprise-data.event-subscriptions.list",
   "enterprise-data.event-subscriptions.upsert",
   "enterprise-data.event-subscriptions.delete",

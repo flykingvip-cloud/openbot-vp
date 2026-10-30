@@ -201,6 +201,18 @@ export function listEnterpriseDataEvents(params: {
   return events;
 }
 
+export function findEnterpriseDataEvent(
+  store: EnterpriseDataEventStore,
+  tenantId: string,
+  eventId: string,
+): EnterpriseDataEvent | null {
+  const event = store.events[eventId];
+  if (!event || event.tenantId !== tenantId) {
+    return null;
+  }
+  return event;
+}
+
 export function findEnterpriseDataEventByExternalId(
   store: EnterpriseDataEventStore,
   tenantId: string,
