@@ -17,7 +17,7 @@ import {
   type LoopbackHttpReceiver,
 } from "../test-utils/loopback-http-receiver.js";
 
-describe("P2-H loopback HTTP channel adapter delivery (labeled, not live prod)", () => {
+describe("P2-H loopback HTTP channel adapter delivery (labeled; MockAgent≠Live TCP)", () => {
   let receiver: LoopbackHttpReceiver | null = null;
 
   afterEach(async () => {
@@ -29,7 +29,7 @@ describe("P2-H loopback HTTP channel adapter delivery (labeled, not live prod)",
     await closing.close();
   });
 
-  it("deliverOutboundPayloads posts real HTTP to loopback receiver via send dep", async () => {
+  it("deliverOutboundPayloads posts HTTP via send dep (mode=listen|mock-agent fallback; not Live)", async () => {
     receiver = await startLoopbackHttpReceiver({
       responseJson: { ok: true },
     });
@@ -75,7 +75,7 @@ describe("P2-H loopback HTTP channel adapter delivery (labeled, not live prod)",
     expect(body.labeled).toBe("loopback-http-mock-not-production-live");
   });
 
-  it("MockAgent fallback still proves dispatch→HTTP when listen is forced off", async () => {
+  it("mode=mock-agent: dispatch→HTTP when listen forced off (not Live TCP)", async () => {
     receiver = await startLoopbackHttpReceiver({
       forceMockAgent: true,
       responseJson: { ok: true },

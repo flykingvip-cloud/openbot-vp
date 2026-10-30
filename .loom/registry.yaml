@@ -10107,6 +10107,7 @@ tasks:
       - src/agents/model-fallback.p2g-loopback-http.test.ts
       - src/test-utils/loopback-http-receiver.ts
       - src/test-utils/loopback-http-receiver.test.ts
+      - scripts/evidence/prove-loopback-http.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10191,6 +10192,7 @@ landingStreams:
       - src/agents/model-fallback.p2g-loopback-http.test.ts
       - src/test-utils/loopback-http-receiver.ts
       - src/test-utils/loopback-http-receiver.test.ts
+      - scripts/evidence/prove-loopback-http.ts
       - src/gateway/model-entitlement/aor-selection.ts
       - src/gateway/model-entitlement/aor-selection.test.ts
       - src/gateway/model-entitlement/aor-catalog-adapter.ts
@@ -22523,6 +22525,8 @@ sharedPaths:
   - glob: src/test-utils/loopback-http-receiver.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
   - glob: src/test-utils/loopback-http-receiver.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: scripts/evidence/prove-loopback-http.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: Eight-capability matrix and P0 evidence for this batch.
     reviewAfter: 2026-11-30

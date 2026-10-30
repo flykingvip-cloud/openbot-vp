@@ -16,7 +16,7 @@ import {
 } from "../test-utils/loopback-http-receiver.js";
 import { runWithModelFallback } from "./model-fallback.js";
 
-describe("P2-G selection→outbound loopback HTTP (labeled network mock)", () => {
+describe("P2-G selection→outbound loopback HTTP (labeled; MockAgent≠Live TCP)", () => {
   let receiver: LoopbackHttpReceiver | null = null;
 
   afterEach(async () => {
@@ -28,7 +28,7 @@ describe("P2-G selection→outbound loopback HTTP (labeled network mock)", () =>
     await closing.close();
   });
 
-  it("cheapest primary hits loopback provider stub first", async () => {
+  it("cheapest primary hits loopback provider stub first (mode=listen|mock-agent fallback; not Live)", async () => {
     receiver = await startLoopbackHttpReceiver({
       responseJson: { ok: true, labeled: "loopback-provider-mock" },
     });
@@ -114,7 +114,7 @@ describe("P2-G selection→outbound loopback HTTP (labeled network mock)", () =>
     ).toBe(true);
   });
 
-  it("MockAgent fallback still proves selection→HTTP when listen is forced off", async () => {
+  it("mode=mock-agent: selection→HTTP when listen forced off (not Live TCP)", async () => {
     receiver = await startLoopbackHttpReceiver({
       forceMockAgent: true,
       responseJson: { ok: true, labeled: "loopback-provider-mock" },

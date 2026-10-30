@@ -5,6 +5,10 @@
  * OPENBOT_LOOPBACK_HTTP_FORCE_MOCK=1, falls back to undici MockAgent so the
  * suite never hangs on a listen promise without error handling, and never
  * silently claims pass when bind is forbidden.
+ *
+ * Real TCP/Live listen evidence is separate: use tryProveRealLoopbackHttp() or
+ * scripts/evidence/prove-loopback-http.ts. MockAgent proves fetch/dispatcher
+ * only — never unify MockAgent with mode=listen as "HTTP PASS".
  */
 import http from "node:http";
 import type { AddressInfo } from "node:net";
@@ -24,11 +28,30 @@ export type LoopbackHttpReceiver = {
   close: () => Promise<void>;
 };
 
+/** Structured real-listen evidence (never pretends MockAgent is TCP/Live). */
+export type RealLoopbackHttpEvidence =
+  | {
+      ok: true;
+      mode: "listen";
+      port: number;
+      roundTrip: { status: number; body: string };
+    }
+  | {
+      ok: false;
+      code: string;
+      skipped: true;
+      reason: string;
+    };
+
 const LISTEN_FORBIDDEN = new Set(["EPERM", "EACCES", "EADDRNOTAVAIL"]);
 
 export function isListenForbiddenError(err: unknown): boolean {
   const code = (err as NodeJS.ErrnoException | undefined)?.code;
   return typeof code === "string" && LISTEN_FORBIDDEN.has(code);
+}
+
+export function isLoopbackListenRequired(): boolean {
+  return process.env.OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN === "1";
 }
 
 /**
@@ -146,6 +169,7 @@ function startMockAgentReceiver(params: {
 /**
  * Start a labeled loopback receiver. Prefer real listen; fall back to MockAgent
  * when bind is forbidden so dispatch→HTTP evidence can still be asserted.
+ * MockAgent fallback is NOT real TCP / Live evidence.
  */
 export async function startLoopbackHttpReceiver(options?: {
   listenTimeoutMs?: number;
@@ -205,5 +229,64 @@ export async function startLoopbackHttpReceiver(options?: {
     }
     // EPERM/EACCES: prove dispatch→HTTP via MockAgent without privileged listen.
     return startMockAgentReceiver({ received, responseJson });
+  }
+}
+
+/**
+ * Independently verifiable real loopback TCP HTTP evidence.
+ * Never falls back to MockAgent. On bind forbidden, returns skipped (not PASS).
+ * When requireListen / OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN=1, throws instead.
+ */
+export async function tryProveRealLoopbackHttp(options?: {
+  listenTimeoutMs?: number;
+  requireListen?: boolean;
+}): Promise<RealLoopbackHttpEvidence> {
+  const requireListen = options?.requireListen === true || isLoopbackListenRequired();
+  const server = http.createServer((_req, res) => {
+    res.statusCode = 200;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ ok: true, labeled: "real-loopback-http-listen-evidence" }));
+  });
+
+  let addr: AddressInfo;
+  try {
+    addr = await listenOnLoopback(server, "127.0.0.1", options?.listenTimeoutMs ?? 2_000);
+  } catch (err) {
+    await closeServerQuietly(server);
+    const code =
+      (err as NodeJS.ErrnoException | undefined)?.code ??
+      (err instanceof Error && /timed out/.test(err.message) ? "ETIMEDOUT" : "LISTEN_FAILED");
+    const reason = isListenForbiddenError(err)
+      ? `mode=listen unavailable (${code}): Codex/restricted sandbox cannot bind 127.0.0.1; not counted as PASS. Run on USER/unrestricted or set OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN=1 there.`
+      : `mode=listen failed (${code}): ${err instanceof Error ? err.message : String(err)}`;
+    if (requireListen) {
+      throw new Error(
+        `OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN: real loopback listen required but unavailable (${code}). ${reason}`,
+        { cause: err },
+      );
+    }
+    return {
+      ok: false,
+      code: String(code),
+      skipped: true,
+      reason,
+    };
+  }
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${addr.port}/prove-real-loopback`, {
+      method: "GET",
+    });
+    const body = await res.text();
+    return {
+      ok: true,
+      mode: "listen",
+      port: addr.port,
+      roundTrip: { status: res.status, body },
+    };
+  } finally {
+    await new Promise<void>((resolve, reject) => {
+      server.close((closeErr) => (closeErr ? reject(closeErr) : resolve()));
+    });
   }
 }
