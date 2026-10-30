@@ -230,6 +230,7 @@ import {
   executeCollaborationRound,
 } from "../collaboration-dispatch/round-runtime.js";
 import { buildGroupRuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
+import type { RuntimeAuthority } from "../collaboration-dispatch/runtime-authority.js";
 import {
   buildSameRoundContext,
   type SameRoundContext,
@@ -284,6 +285,7 @@ import {
   dropDivergentGroupTranscriptMirrors,
 } from "../collaboration-learning/group-public-transcript.js";
 import { assertNoPrivateMemoryDirtyWriteToGroupPublic } from "../collaboration-learning/private-memory-promote.js";
+import { scheduleContinueAfterDeliverableSettlement } from "../collaboration-learning/schedule-continue-after-deliverable.js";
 import { resolveCollaborationSpaceSessionId } from "../collaboration-learning/session-id.js";
 import {
   resolveSessionParticipationGroupId,
@@ -299,6 +301,7 @@ import {
   labelCollaborationIoTenant,
   resolveCollaborationTenantResolution,
 } from "../collaboration-learning/trusted-tenant.js";
+import { tryBuildChatActorExecutionDeliverableBinding } from "../collaboration-learning/try-build-chat-actor-deliverable-binding.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import type { CollaborationExecutionRecord } from "../collaboration-ledger/types.js";
 import {
@@ -3384,6 +3387,8 @@ async function runGroupBotDiscussionTurn(params: {
    * Missing → refuse formal team submit (no Map / no latest-member fallback).
    */
   executionDeliverableBinding?: ExecutionDeliverableBinding | null;
+  /** Group runtime authority — used to resolve actor board binding + continue. */
+  authority?: RuntimeAuthority | null;
 }): Promise<SameRoundReply | null> {
   return await groupBotQueue.enqueue(params.bot.sessionKey, async () => {
     const {
@@ -3868,10 +3873,28 @@ async function runGroupBotDiscussionTurn(params: {
               `collaboration team deliverable auth failed (${params.bot.agentId}): ${formatForLog(authErr)}`,
             );
           }
+          let binding = params.executionDeliverableBinding ?? null;
+          // Prefer attaching a complete binding from this actor's unique active claim
+          // before formal submit (discussion turns often lack wake_dispatch binding).
+          if (!binding && params.authority) {
+            try {
+              binding = await tryBuildChatActorExecutionDeliverableBinding({
+                authority: params.authority,
+                agentId: params.bot.agentId,
+                runId,
+                taskIdHint: groupCurrentTaskId,
+                cfg,
+              });
+            } catch (bindErr) {
+              params.context.logGateway.warn(
+                `collaboration deliverable binding attach failed (${params.bot.agentId}): ${formatForLog(bindErr)}`,
+              );
+            }
+          }
           const finalized = await finalizeMemberRunTeamDeliverable({
             text: replyText,
             agentId: params.bot.agentId,
-            binding: params.executionDeliverableBinding ?? null,
+            binding,
             client: params.client,
             tenant,
             auth: deliverAuth && deliverAuth.ok ? deliverAuth : null,
@@ -3891,6 +3914,20 @@ async function runGroupBotDiscussionTurn(params: {
             params.context.logGateway.warn(
               `collaboration team deliverable not ok (${params.bot.agentId}): ${finalized.outcome.reason}; unused groupCurrentTaskId=${groupCurrentTaskId ?? "none"}`,
             );
+          }
+          // Keep multi-milestone auto-chain alive after formal settle (ok or reject).
+          // task_board_continue skips group sessions; collaboration continue must run.
+          if (params.authority) {
+            void scheduleContinueAfterDeliverableSettlement({
+              authority: params.authority,
+              roundId: params.collaborationRoundId || runId,
+              cfg,
+              agentId: params.bot.agentId,
+              deliverableOk: finalized.outcome.ok,
+              reason: finalized.outcome.ok
+                ? "deliverable_ok"
+                : `deliverable_not_ok:${finalized.outcome.reason}`,
+            });
           }
         }
       } catch (err) {
@@ -5364,6 +5401,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                     }
                   },
                   ...(v1RollCallExtraLines?.length ? { v1RollCallExtraLines } : {}),
+                  authority,
                 });
                 if (reply) {
                   sameRoundReplies.push(reply);

@@ -32,3 +32,19 @@
 ## 留给现场 F4
 
 切到本 PR 的构建并重跑 S1–S6（18789，NO_PROMOTE）之后才可能记 PASS。协调者需要 `activate_task(humanConfirmed=true)` → `claim_item` → `apply_claim` → `propose_todolist`，人闸确认后再由 wake 派工提交。claimant 必须同时是 OS 活跃 bot 和 `agents.list` 里的 runtime id。本组 selfAdvance 已是 execute+allowlist；若 readiness 仍返回 `dispatch_readiness_not_ready`，那是交集未命中，不是 dry_run 门控。
+
+## 2026-10-30 follow-up — multi-milestone auto-continue after M1 DELIVERABLE
+
+Incident (HK LIVE UTC 2026-10-29 16:32): discussion-path `execution_binding_required` + same-second `task_board_continue skip` → no further wake; session idle hours. Also ENAMETOOLONG on task-outcomes paths with URL-encoded CJK space ids; `collaboration.directory.bots.list` TENANT_CONTEXT_REQUIRED reconnect UI.
+
+Code fixes (same PR family):
+
+1. Prefer attaching complete `executionDeliverableBinding` on wake consume (`attachWakeExecutionDeliverableBinding`) and on chat discussion when the actor has exactly one active board claim (`tryBuildChatActorExecutionDeliverableBinding`, source=`explicit_run`).
+2. After formal DELIVERABLE settle (ok or reject), `scheduleContinueAfterDeliverableSettlement` forces inventory-first collaboration continue (bypasses default-OFF `continueAfterRoundComplete`; cooldown still applies). Private `task_board_continue` skip alone must not kill the chain.
+3. `boundedOutcomePathSegment` hashes long tip/version/lock/contribution/consumer/projection/command-log segments (CJK space ids).
+4. `collaboration.directory.bots.list` soft-degrades to `{ bots: [], degraded: true }` when enterprise tenant context is missing (no hard TENANT_CONTEXT_REQUIRED error that drives reconnect/offline UI).
+
+5. After gateway restart, `scheduleResumeIncompleteBoardsAfterGatewayRestart` (wired in group-task-heartbeat boot) scans durable board inventory and force-schedules the next incomplete milestone via the same continue-after-round path — no blind mid-LLM wake-op redo.
+6. L2 MVP UI helpers: `ui/src/ui/long-task-incident-state.ts` (binding fail / gateway reconnect|offline / computer occupied / sandbox stuck) and `long-task-board-progress.ts` (done / blocker / last persist from SessionTaskBoard or group board claims); chat optional strip props `longTaskIncidentLabel` / `longTaskBoardProgressLine`.
+
+Future NIGHT-style multi-milestone tasks: after M1 DELIVERABLE the group should auto-wake/self-advance the next active board inventory without a human CEO nudge, as long as board inventory remains and continue cooldown has elapsed.
