@@ -4,14 +4,17 @@ import fs from "node:fs/promises";
  *
  * Opens a real loopback socket, mounts the production handleToolsInvokeHttpRequest,
  * and exercises memory_search / memory_get with continuity authz (DM + group
- * member / non-member / revoked / cross-tenant). Auth is injected at the
- * gateway connect boundary (same shape production trusted sessions provide);
- * tools and memory path are real (builtin backend, embedding mocks).
+ * member / non-member / revoked / cross-tenant). Auth is **injected identity**
+ * at the gateway connect boundary (same `{ ok, user }` shape production trusted
+ * sessions provide); tools and memory path are real (builtin backend, embedding
+ * mocks). memory-core forwards that user as authenticatedUserId.
+ *
+ * Column contrast (see docs/design/memory-continuity-acceptance.md):
+ * - This file = injected identity (authorizeHttpGatewayConnect mocked).
+ * - test/memory-continuity-gateway.e2e.test.ts = real authentication passed
+ *   (unmocked token auth in a child gateway process; DM only).
  *
  * Does not flip privateMemoryPromote or memory.backend→qmd.
- *
- * True multi-process child gateway is covered by
- * test/memory-continuity-gateway.e2e.test.ts (pnpm test:e2e).
  */
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -32,7 +35,28 @@ const TEST_GATEWAY_TOKEN = "mem-cont-gw-token-live-http-001";
 
 const { gatewayAuthResult, resolveEmployeeWorkbenchActorMock } = vi.hoisted(() => ({
   gatewayAuthResult: {
-    current: { ok: true as const, user: undefined as string | undefined },
+    current: {
+      ok: true as const,
+      user: undefined as string | undefined,
+      method: undefined as
+        | "none"
+        | "token"
+        | "password"
+        | "tailscale"
+        | "device-token"
+        | "trusted-proxy"
+        | undefined,
+      trustedProxy: undefined as
+        | {
+            provider: "trusted-proxy";
+            user: string;
+            domain?: "platform" | "enterprise" | "employee";
+            enterpriseId?: string;
+            membershipId?: string;
+            tenantId?: string;
+          }
+        | undefined,
+    },
   },
   resolveEmployeeWorkbenchActorMock: vi.fn(
     async () =>
@@ -196,6 +220,28 @@ function toolDetails(body: Record<string, unknown>): Record<string, unknown> {
   return result?.details ?? {};
 }
 
+/** Deny responses must not leak marker body or search snippets. */
+function assertNoBodyOrSnippetLeak(
+  details: Record<string, unknown>,
+  secrets: string[],
+  label: string,
+): void {
+  const blob = JSON.stringify(details);
+  for (const secret of secrets) {
+    expect(blob.includes(secret), `${label} leaked ${secret}: ${blob}`).toBe(false);
+  }
+  const results = (details.results ?? []) as Array<{ snippet?: string; text?: string }>;
+  for (const hit of results) {
+    for (const secret of secrets) {
+      expect((hit.snippet ?? "").includes(secret), `${label} snippet leak`).toBe(false);
+      expect((hit.text ?? "").includes(secret), `${label} text leak`).toBe(false);
+    }
+  }
+  if (details.disabled === true) {
+    expect(details.text === "" || details.text == null, `${label} disabled text`).toBe(true);
+  }
+}
+
 beforeAll(async () => {
   sharedServer = createServer((req, res) => {
     void (async () => {
@@ -229,7 +275,12 @@ beforeEach(() => {
   resetEmbeddingMocks();
   resolveEmployeeWorkbenchActorMock.mockReset();
   resolveEmployeeWorkbenchActorMock.mockResolvedValue(null);
-  gatewayAuthResult.current = { ok: true, user: undefined };
+  gatewayAuthResult.current = {
+    ok: true,
+    user: undefined,
+    method: undefined,
+    trustedProxy: undefined,
+  };
   cfg = {} as OpenBotConfig;
 });
 
@@ -361,7 +412,9 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     expect(memberGot.disabled).not.toBe(true);
     expect(JSON.stringify(memberGot)).toContain(marker);
 
-    // Non-member
+    const leakSecrets = [marker, "CROSS_TENANT_SECRET"];
+
+    // Non-member (injected identity: user present, not in members.json)
     gatewayAuthResult.current = { ok: true, user: "non-member-carol" };
     const carolSearch = await invokeMemoryTool({
       tool: "memory_search",
@@ -369,9 +422,7 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     });
     expect(carolSearch.status).toBe(200);
     const carolHits = toolDetails(carolSearch.body);
-    const carolResults = (carolHits.results ?? []) as Array<{ snippet?: string }>;
-    expect(carolResults.every((h) => !(h.snippet ?? "").includes(marker))).toBe(true);
-    expect(JSON.stringify(carolHits)).not.toContain(marker);
+    assertNoBodyOrSnippetLeak(carolHits, leakSecrets, "non-member search");
 
     const carolGet = await invokeMemoryTool({
       tool: "memory_get",
@@ -380,14 +431,19 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     expect(carolGet.status).toBe(200);
     const carolGot = toolDetails(carolGet.body);
     expect(carolGot.disabled).toBe(true);
-    expect(carolGot.text).toBe("");
     expect(carolGot.error).toBe("not authorized");
     expect(carolGot.reasonCode).toBe("non_member");
-    expect(JSON.stringify(carolGot)).not.toContain(marker);
+    assertNoBodyOrSnippetLeak(carolGot, leakSecrets, "non-member get");
 
-    // Revoked
+    // Revoked (same user id, status revoked) — search + get, no leak
     await writeMembers(groupDir, [{ userId: "member-alice", status: "revoked" }]);
     gatewayAuthResult.current = { ok: true, user: "member-alice" };
+    const revokedSearch = await invokeMemoryTool({
+      tool: "memory_search",
+      args: { query: marker, maxResults: 10, minScore: 0 },
+    });
+    expect(revokedSearch.status).toBe(200);
+    assertNoBodyOrSnippetLeak(toolDetails(revokedSearch.body), leakSecrets, "revoked search");
     const revokedGet = await invokeMemoryTool({
       tool: "memory_get",
       args: { path: collabRel },
@@ -395,14 +451,29 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     expect(revokedGet.status).toBe(200);
     const revokedGot = toolDetails(revokedGet.body);
     expect(revokedGot.disabled).toBe(true);
-    expect(revokedGot.text).toBe("");
     expect(revokedGot.error).toBe("not authorized");
     expect(revokedGot.reasonCode).toBe("revoked_or_inactive");
-    expect(JSON.stringify(revokedGot)).not.toContain(marker);
+    assertNoBodyOrSnippetLeak(revokedGot, leakSecrets, "revoked get");
 
-    // Cross-tenant: restore membership, inject other-tenant governance via workbench actor
+    // Cross-tenant (injected identity + explicit managed session domain):
+    // #156 B3 — tenant alone does not imply managed; pin enterprise domain so
+    // memory-core forwards securityProfile=managed_enterprise, and workbench
+    // actor supplies other-tenant governance (same shape as a pinned employee
+    // session whose tenant does not own the personal collab group root).
     await writeMembers(groupDir, [{ userId: "member-alice", status: "active" }]);
-    gatewayAuthResult.current = { ok: true, user: "member-alice" };
+    gatewayAuthResult.current = {
+      ok: true,
+      user: "member-alice",
+      method: "trusted-proxy",
+      trustedProxy: {
+        provider: "trusted-proxy",
+        user: "member-alice",
+        domain: "enterprise",
+        // createExecutionIdentityFromGatewayAuth reads enterpriseId (not tenantId).
+        enterpriseId: crossTenant,
+        membershipId: "seat-other",
+      },
+    } as typeof gatewayAuthResult.current;
     resolveEmployeeWorkbenchActorMock.mockResolvedValue({
       tenantId: crossTenant,
       userId: "member-alice",
@@ -417,6 +488,13 @@ describe("memory continuity live HTTP /tools/invoke", () => {
       }),
     ).toBeTruthy();
 
+    const crossSearch = await invokeMemoryTool({
+      tool: "memory_search",
+      args: { query: marker, maxResults: 10, minScore: 0 },
+    });
+    expect(crossSearch.status).toBe(200);
+    assertNoBodyOrSnippetLeak(toolDetails(crossSearch.body), leakSecrets, "cross-tenant search");
+
     const crossGet = await invokeMemoryTool({
       tool: "memory_get",
       args: { path: collabRel },
@@ -424,13 +502,11 @@ describe("memory continuity live HTTP /tools/invoke", () => {
     expect(crossGet.status).toBe(200);
     const crossGot = toolDetails(crossGet.body);
     expect(crossGot.disabled).toBe(true);
-    expect(crossGot.text).toBe("");
     expect(crossGot.error).toBe("not authorized");
     expect(["cross_tenant", "non_member", "not_authorized"]).toContain(
       typeof crossGot.reasonCode === "string" ? crossGot.reasonCode : "not_authorized",
     );
-    expect(JSON.stringify(crossGot)).not.toContain(marker);
-    expect(JSON.stringify(crossGot)).not.toContain("CROSS_TENANT_SECRET");
+    assertNoBodyOrSnippetLeak(crossGot, leakSecrets, "cross-tenant get");
 
     delete process.env.OPENBOT_TENANTS_ROOT;
     delete process.env.OPENBOT_STATE_DIR;

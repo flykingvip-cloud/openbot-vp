@@ -3,14 +3,17 @@
  * for memory_search / memory_get over a live loopback socket.
  *
  * Prefer tip source via `node --import tsx src/entry.ts` so memory continuity
- * landing code is exercised without requiring a full dist rebuild. Falls back
- * documentation in acceptance.md if spawn is blocked by env.
+ * landing code is exercised without requiring a full dist rebuild.
  *
- * Covers authorized DM marker round-trip. Group authz denials are covered by
- * the live HTTP listen harness (src/memory/memory-continuity-gateway.http.integration.test.ts)
- * which injects session identity at the auth boundary; full child-process
- * trusted-proxy identity for group membership remains a documented gap when
- * platform auth store is unavailable in minimal gateway mode.
+ * Auth column: **real authentication passed** — unmocked Bearer token auth via
+ * production authorizeHttpGatewayConnect (`method: "token"`). No identity-injection
+ * mock. Covers authorized DM marker round-trip.
+ *
+ * Group member / non-member / revoked / cross-tenant deny (no body/snippet leak)
+ * under injected connect-boundary identity is covered by
+ * src/memory/memory-continuity-gateway.http.integration.test.ts. Full child-process
+ * trusted-proxy / platform-auth group membership remains a documented gap in
+ * minimal gateway mode (OPENCLAW_TEST_MINIMAL_GATEWAY=1).
  */
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";

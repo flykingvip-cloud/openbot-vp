@@ -14,10 +14,19 @@ const memoryCorePlugin = {
         // Prefer the gateway session user; fall back to trusted inbound sender.
         const authenticatedUserId =
           ctx.gatewayClientUser?.trim() || ctx.requesterSenderId?.trim() || undefined;
+        // Trusted security mode must be explicit (see #156 B3). Map pinned
+        // enterprise/employee session domains to managed_enterprise; do not
+        // infer managed from tenant presence alone.
+        const sessionDomain = ctx.gatewayClientSessionDomain;
+        const securityProfile =
+          sessionDomain === "enterprise" || sessionDomain === "employee"
+            ? ("managed_enterprise" as const)
+            : undefined;
         const memorySearchTool = api.runtime.tools.createMemorySearchTool({
           config: ctx.config,
           agentSessionKey: ctx.sessionKey,
           authenticatedUserId,
+          securityProfile,
           gatewayClientUser: ctx.gatewayClientUser,
           gatewayClientSessionDomain: ctx.gatewayClientSessionDomain,
         });
@@ -25,6 +34,7 @@ const memoryCorePlugin = {
           config: ctx.config,
           agentSessionKey: ctx.sessionKey,
           authenticatedUserId,
+          securityProfile,
           gatewayClientUser: ctx.gatewayClientUser,
           gatewayClientSessionDomain: ctx.gatewayClientSessionDomain,
         });

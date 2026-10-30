@@ -10071,6 +10071,9 @@ landingStreams:
     paths:
       - test/memory-continuity-gateway.e2e.test.ts
       - .loom/registry.yaml
+      - src/memory/memory-continuity-gateway.http.integration.test.ts
+      - extensions/memory-core/index.ts
+      - docs/design/memory-continuity-acceptance.md
     canLandWith:
       - collab-restore-line-phase-a
       - DDOC
@@ -19784,6 +19787,7 @@ landingStreams:
       - CHAT_HISTORY_P0_IMAGE_OMIT
       - u1-unified-task-stop
       - DDOC
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       legacyTitle: Main Recovery Routing (dangling refs)
       legacyDisposition: MERGE
@@ -20909,7 +20913,8 @@ landingStreams:
     paths:
       - assets/chrome-extension/**
       - extensions/**
-    canLandWith: []
+    canLandWith:
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       legacyRuleId: isolate-openbot-channel-and-extension-surface
       legacyTitle: OpenBot Channel And Extension Surface
@@ -22096,6 +22101,7 @@ landingStreams:
     canLandWith:
       - CL
       - MRR
+      - memory-safe-continuity-live-gateway-20261030
     metadata:
       legacyRuleId: merge-design-docs
       legacyTitle: Design Documents (Straggler)

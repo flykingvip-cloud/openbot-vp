@@ -64,7 +64,7 @@ Denial responses use reason `"not authorized"` / reasonCodes (`non_member`, `rev
 | **B1) Tool ≠ gateway RPC naming** | **CLOSED** | Tool-layer column on #156; HTTP/subprocess columns in this gateway PR (table above). |
 | **B2) Personal approve ownership** | **CLOSED** (#156) | `assertPersonalLearningOwnership`; `personal-learning-ownership.test.ts`. |
 | **B3) Managed not inferred from tenant** | **CLOSED** (#156) | Default `personal_local`; managed without tenant → `managed_missing_tenant`. |
-| **G1) memory-core user forward** | **CLOSED** (this PR) | `extensions/memory-core/index.ts` sets `authenticatedUserId` from `gatewayClientUser` / `requesterSenderId`. |
+| **G1) memory-core user forward** | **CLOSED** (this PR) | `extensions/memory-core/index.ts` sets `authenticatedUserId` from `gatewayClientUser` / `requesterSenderId`, and maps enterprise/employee `sessionDomain` → `securityProfile=managed_enterprise` (no tenant-alone inference). |
 | **G2) Live HTTP group deny matrix** | **CLOSED** (this PR) | HTTP listen: member OK; non-member / revoked / cross-tenant deny, no leak. |
 | **G3) Multi-process DM e2e** | **CLOSED** (this PR) | Child gateway DM marker via real token auth. |
 | QMD default-deny | Remains closed (#156) | `memory-index-paths.test.ts` |
@@ -73,7 +73,7 @@ Denial responses use reason `"not authorized"` / reasonCodes (`non_member`, `rev
 
 | Area | Path |
 | --- | --- |
-| memory-core identity wiring | `extensions/memory-core/index.ts` (`authenticatedUserId` from session user) |
+| memory-core identity wiring | `extensions/memory-core/index.ts` (`authenticatedUserId` from session user; `securityProfile=managed_enterprise` when sessionDomain is enterprise/employee — #156 B3) |
 | Live HTTP listen harness | `src/memory/memory-continuity-gateway.http.integration.test.ts` |
 | Multi-process gateway e2e | `test/memory-continuity-gateway.e2e.test.ts` |
 | Loom registry (e2e entry) | `.loom/registry.yaml` |
@@ -85,8 +85,8 @@ Landing files already on main via #156 (authz, tool-layer RPC, FTS, personal own
 
 | Harness | How to run | What it proves | Result (Asia/Shanghai) |
 | --- | --- | --- | --- |
-| Live HTTP listen | `pnpm exec vitest run src/memory/memory-continuity-gateway.http.integration.test.ts` | Real TCP listen + production `POST /tools/invoke`. Authorized DM; group member OK; non-member / revoked / cross-tenant deny with **no** body/snippet leak. Auth: **injected identity** at connect boundary. | *(fill after local green)* |
-| Multi-process child | `pnpm exec vitest run --config vitest.e2e.config.ts test/memory-continuity-gateway.e2e.test.ts` | Spawns gateway child with isolated temp HOME/config/state; **real token authentication**; DM `memory_search` / `memory_get`. | *(fill after local green)* |
+| Live HTTP listen | `pnpm exec vitest run src/memory/memory-continuity-gateway.http.integration.test.ts` | Real TCP listen + production `POST /tools/invoke`. Authorized DM; group member OK; non-member / revoked / cross-tenant deny with **no** body/snippet leak. Auth: **injected identity** at connect boundary. | **PASS** 2026-10-30 13:57 Asia/Shanghai — 2/2 (~17s) |
+| Multi-process child | `pnpm exec vitest run --config vitest.e2e.config.ts test/memory-continuity-gateway.e2e.test.ts` | Spawns gateway child with isolated temp HOME/config/state; **real token authentication**; DM `memory_search` / `memory_get`. | **PASS** 2026-10-30 13:58 Asia/Shanghai — 1/1 (~47s) |
 
 **Remaining gap (child process):** Group membership identity over a minimal child gateway still needs a platform-auth / trusted-proxy user store (or equivalent). The live HTTP listen harness covers those authz denials by injecting the same `auth.user` shape production sessions provide at the connect boundary. WS `tools.invoke` is not a tenant surface (operator HTTP / agent-turn tools only).
 
