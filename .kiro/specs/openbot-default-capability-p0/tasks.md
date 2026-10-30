@@ -4,7 +4,7 @@
 
 ## Agents
 
-- cursor-grok-default-capability · role: owner · scope: P0 context/memory + P1-C privateMemory promote RPC · paths: src/conversations/flags.ts, src/conversations/flags.test.ts, src/context-engine/legacy.ts, src/context-engine/types.ts, src/context-engine/registry.ts, src/context-engine/legacy.default-capability.test.ts, src/memory/collaboration-index-scope.ts, src/memory/collaboration-index-scope.test.ts, src/memory/manager.ts, src/memory/manager-sync-ops.ts, src/memory/search-manager.ts, src/memory/manager.collab-continuity.test.ts, src/memory/search-manager.managed-tool-profile.test.ts, src/gateway/collaboration-learning/private-memory-promote-entry.ts, src/gateway/collaboration-learning/private-memory-promote-entry.test.ts, src/gateway/server-methods/collaboration-learning.ts, src/gateway/server-methods/collaboration-private-memory-promote.test.ts, src/gateway/server-methods-list.ts, src/gateway/method-scopes.ts, docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md, docs/design/collab-context-p3-private-memory-promote-2026-10-14.md, .kiro/specs/openbot-default-capability-p0/** · since: 2026-10-30
+- cursor-grok-default-capability · role: owner · scope: P0 context/memory + P1-C privateMemory promote RPC + P1-D learning skill draft closed loop · paths: src/conversations/flags.ts, src/conversations/flags.test.ts, src/context-engine/legacy.ts, src/context-engine/types.ts, src/context-engine/registry.ts, src/context-engine/legacy.default-capability.test.ts, src/memory/collaboration-index-scope.ts, src/memory/collaboration-index-scope.test.ts, src/memory/manager.ts, src/memory/manager-sync-ops.ts, src/memory/search-manager.ts, src/memory/manager.collab-continuity.test.ts, src/memory/search-manager.managed-tool-profile.test.ts, src/gateway/collaboration-learning/private-memory-promote-entry.ts, src/gateway/collaboration-learning/private-memory-promote-entry.test.ts, src/gateway/server-methods/collaboration-learning.ts, src/gateway/server-methods/collaboration-private-memory-promote.test.ts, src/gateway/server-methods-list.ts, src/gateway/method-scopes.ts, src/auto-reply/reply/learning-skill-curation.ts, src/gateway/collaboration-learning/learning-skill-draft-entry.ts, src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts, src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts, src/gateway/server-methods/collaboration-learning-skill-draft.test.ts, docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md, docs/design/collab-context-p3-private-memory-promote-2026-10-14.md, .kiro/specs/openbot-default-capability-p0/\*\* · since: 2026-10-30
 
 ## Takeover note
 
@@ -18,7 +18,8 @@
 - [x] P0-A：无 env + 默认配置产生 budgetTrace；显式开关；env 覆盖 config；afterTurn 投影被下一轮消费并在新引擎实例中仍在 — cursor-grok-default-capability
 - [x] P0-B：小组文件 add/modify/delete 不强制 sync；跨租户同名组隔离；撤权后旧 manager 无 snippet；FTS-only 降级报告；managed 工具路径 fail-closed — cursor-grok-default-capability
 - [x] P1-C：`collaboration.learning.privateMemory.promote` 生产入口（flag 默认仍 OFF；RPC+tests；无 UI）— cursor-grok-default-capability
-- [ ] P1-D 至 P2-H：后续批次
+- [x] P1-D：学习策展 draft owner 戳记 + skillDraft.list/finalize + install/remove 闭环测（不自动审批）— cursor-grok-default-capability
+- [ ] P1-E 至 P2-H：后续批次
 
 ## 验收回退修复（A/B）
 

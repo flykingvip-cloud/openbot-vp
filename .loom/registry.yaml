@@ -10053,6 +10053,11 @@ tasks:
     paths:
       - src/gateway/collaboration-learning/private-memory-promote-entry.ts
       - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/auto-reply/reply/learning-skill-curation.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts
+      - src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
       - src/gateway/server-methods/collaboration-learning.ts
       - src/gateway/server-methods/collaboration-private-memory-promote.test.ts
       - src/gateway/server-methods-list.ts
@@ -10104,6 +10109,11 @@ landingStreams:
       - src/memory/embedding-error.ts
       - src/gateway/collaboration-learning/private-memory-promote-entry.ts
       - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/auto-reply/reply/learning-skill-curation.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts
+      - src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
       - src/gateway/server-methods/collaboration-learning.ts
       - src/gateway/server-methods/collaboration-private-memory-promote.test.ts
       - src/gateway/server-methods-list.ts
@@ -10119,8 +10129,8 @@ landingStreams:
     metadata:
       task: openbot-default-capability-p0:cursor-grok-default-capability
       owner: cursor-grok-default-capability
-      purpose: P0 default-capability closure + P1-C privateMemory.promote RPC entry.
-        NO_PROMOTE; no privateMemoryPromote default flip.
+      purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D learning
+        skillDraft list/finalize closed loop. NO_PROMOTE; no auto-approve skills.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22441,6 +22451,26 @@ sharedPaths:
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: P1-C authorized promote entry (load personal capsule + ownership + flag
       gate).
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/learning-skill-curation.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-D: stamp owner + disable draft auto-install on learning curation."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/learning-skill-draft-entry.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-D: list/finalize human gate for learning-curated drafts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-D entry unit tests.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-D closed-loop curate→finalize→install→tool→remove.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-D skillDraft RPC registration/auth tests.
     reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

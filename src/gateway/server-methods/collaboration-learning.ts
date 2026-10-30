@@ -64,12 +64,17 @@ import {
   authenticatedSessionSubjects,
   resolveDeliveryAclActor,
 } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  finalizeLearningCuratedSkillDraft,
+  listLearningCuratedSkillDrafts,
+} from "../collaboration-learning/learning-skill-draft-entry.js";
 import { triggerPostPlanConfirmAdvance } from "../collaboration-learning/post-plan-confirm-advance.js";
 import { promotePrivateMemoryCapsuleAuthorized } from "../collaboration-learning/private-memory-promote-entry.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import { COLLABORATION_LEDGER_KINDS } from "../collaboration-ledger/types.js";
+import { resolvePersonalAssetOwnerIdentities } from "../personal-skill-asset-scope.js";
 import {
   ErrorCodes,
   errorShape,
@@ -2110,6 +2115,60 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
         return;
       }
+      respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
+  },
+
+  "collaboration.learning.skillDraft.list": async ({ respond, client }) => {
+    try {
+      const ownerIds = await resolvePersonalAssetOwnerIdentities(client);
+      if (ownerIds.length === 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "authenticated user required"),
+        );
+        return;
+      }
+      respond(true, { skills: listLearningCuratedSkillDrafts(ownerIds) }, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
+  },
+
+  "collaboration.learning.skillDraft.finalize": async ({ params, respond, client }) => {
+    const skillId = typeof params.skillId === "string" ? params.skillId.trim() : "";
+    if (!skillId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "skillId is required"));
+      return;
+    }
+    try {
+      const ownerIds = await resolvePersonalAssetOwnerIdentities(client);
+      if (ownerIds.length === 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "authenticated user required"),
+        );
+        return;
+      }
+      const result = finalizeLearningCuratedSkillDraft({ skillId, ownerIds });
       respond(true, result, undefined);
     } catch (error) {
       respond(

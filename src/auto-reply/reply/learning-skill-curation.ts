@@ -4,6 +4,9 @@
  * W4 触发时机：TaskOutcome closed+eligible 后记 outcome_verified（不是提示词注入）。
  * 幂等：策展后把 `curatedSkillId` 写回参与的资产，同一簇不会重复生成技能。
  * 普通偏好/事实更新不走此路径；技能发布仍走既有 lifecycle（draft→review→approved）。
+ *
+ * P1-D：草稿必须带 ownerUserId（从学习资产 metadata.personalOwnerUserId 继承），
+ * 且 autoInstallEnabled=false —— draft 不能假装已安装；人工 finalize + install 后才投影。
  */
 
 import type { AgentLearningAsset } from "@openbot/collaboration-core";
@@ -24,6 +27,8 @@ export type CuratedSkillDraft = {
   trigger: SkillDraftCandidate["trigger"];
   totalReuse: number;
   occurrences: number;
+  /** Owner stamped onto the draft for personal-skills / learning.skillDraft gates. */
+  ownerUserId: string | null;
 };
 
 export type CurateLearningSkillDraftsParams = {
@@ -32,7 +37,39 @@ export type CurateLearningSkillDraftsParams = {
   reuseThreshold?: number;
   occurrenceThreshold?: number;
   atMs?: number;
+  /**
+   * Optional override when the caller already resolved a trusted owner
+   * (e.g. personal learning path). Otherwise read from asset metadata.
+   */
+  ownerUserId?: string | null;
 };
+
+/** Lineage prefix written as skill sourceLineageId (`learning:<scopeId>`). */
+export const LEARNING_SKILL_LINEAGE_PREFIX = "learning:";
+
+/**
+ * Prefer newest asset's personalOwnerUserId so personal-gated learning
+ * assets remain claimable via personal-skills / skillDraft RPCs.
+ */
+export function resolveOwnerUserIdFromLearningAssets(
+  assets: AgentLearningAsset[],
+  override?: string | null,
+): string | null {
+  const fromOverride = typeof override === "string" ? override.trim() : "";
+  if (fromOverride) {
+    return fromOverride;
+  }
+  const newestFirst = [...assets].toSorted(
+    (left, right) => (right.updatedAt ?? 0) - (left.updatedAt ?? 0),
+  );
+  for (const asset of newestFirst) {
+    const raw = asset.metadata?.personalOwnerUserId;
+    if (typeof raw === "string" && raw.trim()) {
+      return raw.trim();
+    }
+  }
+  return null;
+}
 
 /**
  * 扫描某作用域下的学习资产，把达到 outcome_verified 阈值的经验沉淀为技能草稿。
@@ -77,11 +114,19 @@ async function curateLearningSkillDraftsLocked(
 
   for (const candidate of candidates) {
     try {
-      // draft 状态：只沉淀，不发布。审核走既有 skill lifecycle（submit → reviewing → approved）。
+      const clusterAssets = scopedAssets.filter((asset) =>
+        candidate.assetIds.includes(asset.assetId),
+      );
+      const ownerUserId = resolveOwnerUserIdFromLearningAssets(clusterAssets, params.ownerUserId);
+      // draft 状态：只沉淀，不发布、不装机。审核走既有 skill lifecycle
+      // （finalize-draft → private，再 robot-skills.install / skillDraft.finalize）。
       const { skillId } = saveSkillAsset({
         sourceAgentId: candidate.botId,
-        contextId: `learning:${scopeId}`,
+        contextId: `${LEARNING_SKILL_LINEAGE_PREFIX}${scopeId}`,
         lifecycle: "draft",
+        // P1-D: never auto-link as installed while still draft.
+        autoInstallEnabled: false,
+        ...(ownerUserId ? { ownerUserId } : {}),
         profile: buildSkillDraftProfile(candidate),
         runtimeDefinition: {
           prompts: [candidate.lesson],
@@ -95,6 +140,7 @@ async function curateLearningSkillDraftsLocked(
         trigger: candidate.trigger,
         totalReuse: candidate.totalReuse,
         occurrences: candidate.occurrences,
+        ownerUserId,
       });
       for (const assetId of candidate.assetIds) {
         curatedByAssetId.set(assetId, skillId);
@@ -132,7 +178,8 @@ export function curateLearningSkillDraftsSafely(params: CurateLearningSkillDraft
       for (const draft of drafts) {
         logVerbose(
           `skill draft curated: skill=${draft.skillId} cluster=${draft.clusterKey} ` +
-            `trigger=${draft.trigger} reuse=${draft.totalReuse} occurrences=${draft.occurrences}`,
+            `trigger=${draft.trigger} reuse=${draft.totalReuse} occurrences=${draft.occurrences}` +
+            (draft.ownerUserId ? ` owner=${draft.ownerUserId}` : " owner=unset"),
         );
       }
     })
