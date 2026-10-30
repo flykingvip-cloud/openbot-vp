@@ -117,7 +117,34 @@ describe("selectModelOrderWithinEffectiveSet", () => {
     expect(res.catalogCoverage).toBe("partial");
     expect(res.orderedModelIds[0]).toBe("api-proxy-deepseek/cheap");
     expect(res.syntheticModelIds).toEqual(["openai/gpt-x"]);
+    // Synthetic peers are appended after real-ranked models (do not enter rankModels).
+    expect(res.orderedModelIds.at(-1)).toBe("openai/gpt-x");
     expect(sortedSet(res.orderedModelIds)).toEqual(sortedSet(ids));
+  });
+
+  it("P2-G: synthetic neutral cost must not win cheapest over real expensive catalog peers", () => {
+    // Real premium is expensive; synthetic gpt-x would invent cost 1/1 and falsely win
+    // cheapest if allowed into rankModels. Gate synthetics out of ranking claims.
+    const ids = ["api-proxy-deepseek/premium", "openai/gpt-x"];
+    const res = selectModelOrderWithinEffectiveSet({
+      mode: "aor_enhanced",
+      effectiveModelIds: ids,
+      aorExecution: { ...AOR, selectorStrategy: "cheapest" },
+      catalog: [
+        {
+          ref: { provider: "api-proxy-deepseek", id: "premium" },
+          cost: { inputPerMtok: 10, outputPerMtok: 20 },
+          taskTypeScores: {},
+        },
+      ],
+    });
+    expect(res.catalogCoverage).toBe("partial");
+    expect(res.strategy).toBe("cheapest");
+    expect(res.orderedModelIds[0]).toBe("api-proxy-deepseek/premium");
+    expect(res.orderedModelIds[1]).toBe("openai/gpt-x");
+    expect(res.syntheticModelIds).toEqual(["openai/gpt-x"]);
+    // Explanations must only cover real-ranked models (no fake synthetic cost claim).
+    expect(res.routingExplanation?.map((e) => e.modelId)).toEqual(["api-proxy-deepseek/premium"]);
   });
 
   it("Property 4 + 7：任意授权集合下，native 与 aor_enhanced 候选集合恒等", () => {

@@ -184,8 +184,11 @@ export function selectModelOrderWithinEffectiveSet(input: AorSelectionInput): Ao
     };
   }
 
-  const candidates = resolved.map((row) => row.profile);
-  const allowedModels = resolved.map((row) => row.ref);
+  // Partial catalog: rank ONLY real (non-synthetic) profiles so neutral cost 1/1 peers
+  // cannot fake cheapest/best_quality. Synthetics stay in the set, appended in original order.
+  const realRows = resolved.filter((row) => !row.synthetic);
+  const candidates = realRows.map((row) => row.profile);
+  const allowedModels = realRows.map((row) => row.ref);
 
   let ranked;
   try {
@@ -226,7 +229,7 @@ export function selectModelOrderWithinEffectiveSet(input: AorSelectionInput): Ao
       reason: entry.reason,
     });
   }
-  // 兜底：任何未被 rank 覆盖的授权模型按原序补齐（保集合）。
+  // 兜底：任何未被 rank 覆盖的授权模型按原序补齐（含 synthetic peers；保集合）。
   for (const modelId of effective) {
     if (!seen.has(modelId)) {
       seen.add(modelId);
