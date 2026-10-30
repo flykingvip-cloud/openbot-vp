@@ -5513,31 +5513,35 @@ export const chatHandlers: GatewayRequestHandlers = {
                 }),
             });
 
-            // chat-checkpoint-rollback: snapshot the shared group workspace so
-            // collaboration turns can roll back deliverables/drafts in place.
+            // chat-checkpoint-rollback: write group continuity into the same
+            // tenant/host group memory root list uses. Group scope ignores agent
+            // cwd for memoryDir, so do not skip when resolveCallerWorkspaceCwd
+            // returns null (LIVE space sessions often have no agent workspace).
             const fallbackAgentWorkspaceDir = await resolveCallerWorkspaceCwd({
               cfg: groupCfg,
               sessionKey: rawSessionKey,
               agentId: groupSourceAgentId,
               client,
             });
-            if (fallbackAgentWorkspaceDir) {
-              const groupWorkspaceDir = resolveSessionContinuityWorkspaceDir({
-                cfg: groupCfg,
-                sessionKey: rawSessionKey,
-                sessionEntry: groupSession.entry,
-                agentId: groupSourceAgentId,
-                agentWorkspaceDir: fallbackAgentWorkspaceDir,
-              });
-              void commitSessionContinuityForCurrentSession({
-                cfg: groupCfg,
-                workspaceDir: groupWorkspaceDir,
-                agentId: groupSourceAgentId,
-                sessionKey: rawSessionKey,
-                sessionEntry: groupSession.entry,
-                reason: "turn_completed",
-              }).catch(() => undefined);
-            }
+            const collabContinuityTenantId =
+              authority.tenantId?.trim() || client?.sessionEnterpriseId?.trim() || null;
+            const groupWorkspaceDir = resolveSessionContinuityWorkspaceDir({
+              cfg: groupCfg,
+              sessionKey: rawSessionKey,
+              sessionEntry: groupSession.entry,
+              agentId: groupSourceAgentId,
+              agentWorkspaceDir: fallbackAgentWorkspaceDir ?? process.cwd(),
+              tenantId: collabContinuityTenantId,
+            });
+            void commitSessionContinuityForCurrentSession({
+              cfg: groupCfg,
+              workspaceDir: groupWorkspaceDir,
+              agentId: groupSourceAgentId,
+              sessionKey: rawSessionKey,
+              sessionEntry: groupSession.entry,
+              reason: "turn_completed",
+              tenantId: collabContinuityTenantId,
+            }).catch(() => undefined);
             if (parentAbortController.signal.aborted) {
               return;
             }
@@ -6264,14 +6268,30 @@ export const chatHandlers: GatewayRequestHandlers = {
                   client,
                   resolvePrimaryWorkspaceDir: resolveCallerWorkspaceCwd,
                 });
-                if (turnWorkspaceDir) {
+                const continuityTenantId =
+                  client?.sessionEnterpriseId?.trim() ||
+                  chatCheckpointStore.readTrustedTenantIdFromGatewayClient(client) ||
+                  null;
+                const spaceGroupId = extractGroupIdFromChatSessionKey(sessionKey);
+                if (turnWorkspaceDir || spaceGroupId) {
+                  const continuityWorkspaceDir =
+                    turnWorkspaceDir ??
+                    resolveSessionContinuityWorkspaceDir({
+                      cfg,
+                      sessionKey,
+                      sessionEntry: latestEntry,
+                      agentId,
+                      agentWorkspaceDir: process.cwd(),
+                      tenantId: continuityTenantId,
+                    });
                   void commitSessionContinuityForCurrentSession({
                     cfg,
-                    workspaceDir: turnWorkspaceDir,
+                    workspaceDir: continuityWorkspaceDir,
                     agentId,
                     sessionKey,
                     sessionEntry: latestEntry,
                     reason: "turn_completed",
+                    tenantId: continuityTenantId,
                   }).catch(() => undefined);
                 }
               } else {
@@ -6312,14 +6332,30 @@ export const chatHandlers: GatewayRequestHandlers = {
               client,
               resolvePrimaryWorkspaceDir: resolveCallerWorkspaceCwd,
             });
-            if (turnWorkspaceDir) {
+            const continuityTenantId =
+              client?.sessionEnterpriseId?.trim() ||
+              chatCheckpointStore.readTrustedTenantIdFromGatewayClient(client) ||
+              null;
+            const spaceGroupId = extractGroupIdFromChatSessionKey(sessionKey);
+            if (turnWorkspaceDir || spaceGroupId) {
+              const continuityWorkspaceDir =
+                turnWorkspaceDir ??
+                resolveSessionContinuityWorkspaceDir({
+                  cfg,
+                  sessionKey,
+                  sessionEntry: latestEntry ?? entry,
+                  agentId,
+                  agentWorkspaceDir: process.cwd(),
+                  tenantId: continuityTenantId,
+                });
               void commitSessionContinuityForCurrentSession({
                 cfg,
-                workspaceDir: turnWorkspaceDir,
+                workspaceDir: continuityWorkspaceDir,
                 agentId,
                 sessionKey,
                 sessionEntry: latestEntry ?? entry,
                 reason: "turn_completed",
+                tenantId: continuityTenantId,
               }).catch(() => undefined);
             }
           }
@@ -6858,12 +6894,17 @@ export const chatHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    const restoreContinuityTenantId =
+      client?.sessionEnterpriseId?.trim() ||
+      chatCheckpointStore.readTrustedTenantIdFromGatewayClient(client) ||
+      null;
     let restoreWorkspaceDir = resolveSessionContinuityWorkspaceDir({
       cfg,
       sessionKey,
       sessionEntry: entry,
       agentId: restoreAgentId,
       agentWorkspaceDir: fallbackAgentWorkspaceDir,
+      tenantId: restoreContinuityTenantId,
     });
     let restoreSessionKey = sessionKey;
     const restoreCheckpointScope = {
@@ -6872,6 +6913,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       agentId: restoreAgentId,
       sessionKey: restoreSessionKey,
       sessionEntry: entry,
+      tenantId: restoreContinuityTenantId,
     };
     // Target a specific checkpoint when provided (chat-checkpoint-rollback);
     // otherwise fall back to the latest checkpoint (backward compatible).
