@@ -307,6 +307,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
       "evolution.ledger.query",
       "evolution.diagnosis.status",
       "evolution.proposals.transition",
+      "evolution.proposals.authorize",
       "evolution.experiments.create",
       "evolution.experiments.evaluate",
       "evolution.applications.apply",
@@ -331,6 +332,7 @@ export const GATEWAY_METHOD_PACK_MANIFEST: readonly PackManifest[] = [
       ],
       "operator.approvals": [
         "evolution.proposals.transition",
+        "evolution.proposals.authorize",
         "evolution.experiments.create",
         "evolution.experiments.evaluate",
         "evolution.applications.apply",

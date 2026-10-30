@@ -1,6 +1,6 @@
 # 默认能力矩阵与 P0 证据（2026-10-30）
 
-基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）。P1-E 至 P2-H 仍只读未实现。
+基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）。P1-F 至 P2-H 仍只读未实现。
 
 状态只使用：已验证 / 部分验证 / 未实现 / 合理受控关闭 / 缺证据。
 
@@ -10,7 +10,7 @@
 | ------------- | -------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | 记忆          | 部分验证 | builtin 索引授权小组记忆；个人经验需审批；`privateMemoryPromote` 默认关        | `memory.backend`（默认 builtin）、`memorySearch`、`collaboration.learning.privateMemoryPromote`                                       | `extensions/memory-core` 工具；`getMemorySearchManager`                                                       | `MemoryIndexManager` / QMD / CogniWeave                                                        | 授权范围内的 sqlite；本 PR 起非空小组根使用 `authz-scopes/<fingerprint>/`                     | 同 caller 的后续 `search`                                        | 成员 + 租户根；managed 非 CogniWeave fail-closed                    | 无 embedding → FTS-only `embedding_unavailable`；撤权后旧 manager 返回空且不带 snippet     | 见 P0-B。既有 `memory-continuity-acceptance` 本轮重跑通过。真实 HTTP 监听与真实 embedding provider 未跑 |
 | 技能/资产进化 | 部分验证 | `outcome_verified` 后生成 **draft**（非启用）；须 finalize+install 才可调用    | 学习资产阈值；既有 skill lifecycle；无新自动发布开关                                                                                  | `learning-skill-curation` + `collaboration.learning.skillDraft.list/finalize` + `robot-skills.install/remove` | 策展写 draft（owner 戳记、`autoInstallEnabled:false`）；finalize→private；install 物化 binding | `CONFIG_DIR/skill-assets` + learning `curatedSkillId`                                         | finalize+install 后 identity tool / loader；remove 后不再暴露    | 保留人工 finalize，不自动审批/发布；无 owner 草稿不可见于 list      | 未达阈值不策展；非 owner finalize 拒绝；draft 强制 install 仍无 identity tools             | 见 P1-D。真实 HTTP/provider 未跑 → 部分验证                                                             |
-| 系统进化      | 部分验证 | 控制平面可观察；shadow intent 只到 DISCOVERED，不自动 Apply                    | evolution governance / kill switch                                                                                                    | `src/gateway/evolution-control/shadow-intent-proposal.ts`                                                     | proposal registrar；diagnosis 为只读观察                                                       | proposal 状态                                                                                 | 授权 Apply 之后才改变运行绑定（本轮未证明）                      | delegation、payload hash、verifier 保留                             | 拒绝不改现状                                                                               | 本轮只读。`shadow-intent-proposal.ts` 明确 never authorize/Apply。未做 P1-E                             |
+| 系统进化      | 部分验证 | 控制平面可观察；assist-shadow 默认只到 DISCOVERED（observe-only）；人工 authorize 后可实验/Apply | evolution governance / kill switch；`evolution.proposals.authorize`                                                                   | `authorize-shadow-intent.ts` + `evolution.proposals.authorize`；既有 experiments/apply/rollback                                       | shadow registrar（DISCOVERED）；authorize 入口；skill-installation adapter                     | proposal/ledger；skill install binding                                                        | authorize→experiment→canary Apply 后 runtime 消费；rollback 恢复 | delegation、payload hash、verifier、kill switch 保留                | 拒绝/缺 grant/observe-only 表面不改现状；runtime-binding 仍 observe-only                   | 见 P1-E。真实 HTTP/authz 子进程未跑 → 部分验证。不自称 Codex PASS                                       |
 | 上下文        | 部分验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config               | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine`                                                        | `assembleMessagesWithBudget`；`refreshConversationProjection`                                  | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition` | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过 | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config` | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A                                     |
 | 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` 不能当成已生效调度 | knowledge publication mode                                                                                                            | `src/gateway/enterprise-data/knowledge-publication.ts`                                                        | on_demand / scheduled 有分发；event_driven 不分发                                              | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                      | 授权与 SAR                                                          | `isImplementedMaterializationMode("event_driven") === false`                               | 本轮只读代码与既有测试名。未重跑知识库套件。事件物化记为未实现，不记为完成                              |
 | 数据资产物化  | 部分验证 | on_demand 与 scheduled 可物化；event_driven 可保存但永不刷新                   | `EnterpriseKnowledgeProjectionMaterializationMode`                                                                                    | enterprise data gateway                                                                                       | connector + publication gate                                                                   | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载                          | 凭证、grant、SAR                                                    | 无凭证、未知 handler、demo `mock_smoke_ok` 不得当成生产事实                                | 本轮只读 `source-connection-probe.ts` 与 publication 注释。未重跑连接器。未实现所有连接器               |
@@ -116,7 +116,7 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 ## 已知限制与回滚
 
 - 不打开 `privateMemoryPromote` 默认（仅补 RPC 入口）。
-- 不实现 P1-E 至 P2-H（P1-D 本批已做）。
+- 不实现 P1-F 至 P2-H（P1-E 本批已做）。
 - 工作区 memory 的 `**/*.md` watcher glob 在当前 chokidar 上仍可能不发事件。本 PR 只改了授权小组目录。
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
@@ -176,3 +176,26 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 | UI           | 本批未接（RPC+tests）                                                                                                                                        |
 | 已知缺口     | 无 `personalOwnerUserId` 的组侧资产策展草稿仍无 owner（list 不可见）；真实 HTTP gateway 子进程未跑                                                           |
 | 状态         | **部分验证**                                                                                                                                                 |
+
+## P1-E 系统进化闭环（shadow intent authorize）
+
+触发：bootstrap 注册的 assist-shadow registrar 只产 `DISCOVERED`；`evolution.proposals.transition` 仅 reject/promote/hold，DISCOVERED 无后续入口。diagnosis preview 仍不自动 Apply。
+
+根因：`shadow-intent-proposal.ts` 明确 never authorize/Apply；缺少与 `evolution.diagnosis.submit` 对等的人工确认入口。
+
+修复：
+
+- 新增 `authorize-shadow-intent.ts`：对 `assist-shadow:` + `capability.skill-installation` 的 DISCOVERED 提案，在 `confirmedByUser` + 有效 grant 下进入 `APPROVED_FOR_EXPERIMENT`（不自动 Apply）。
+- `system.runtime-binding-governance` 标注 observe-only，authorize 拒绝。
+- RPC `evolution.proposals.authorize`（operator.approvals）；list/get 投影 `observeOnly` / `nextAction`。
+- 既有 `experiments.create` / `applications.apply` / `rollback` 继续作为后续入口；delegation、kill switch、payload hash、verifier 未削弱。
+
+失败然后通过：
+
+```text
+OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/gateway/evolution-control/authorize-shadow-intent.test.ts
+```
+
+覆盖：observe-only 标注；runtime-binding 拒绝；DISCOVERED 无法开实验；缺确认/缺 grant 不改现状；authorize→experiment→canary Apply→rollback 恢复未安装；reject 无 application；RPC 注册与 scope。
+
+已知限制：真实 HTTP/authz 未跑；runtime-binding 仍无专用治理入口；矩阵保持 **部分验证**，不自行宣告 Codex PASS。

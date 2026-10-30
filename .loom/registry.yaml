@@ -10066,6 +10066,12 @@ tasks:
       - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
       - .kiro/specs/openbot-default-capability-p0/tasks.md
       - .loom/registry.yaml
+      - src/gateway/evolution-control/authorize-shadow-intent.ts
+      - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/server-methods/evolution-control.ts
+      - src/gateway/server-methods/evolution-control.pack.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/evolution-control/index.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10073,7 +10079,7 @@ tasks:
         ide: cursor
         agent: cursor-grok-default-capability
         status: active
-        lastSignalAt: 2026-10-30T08:49:51.620Z
+        lastSignalAt: 2026-10-30T09:16:46.571Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-30
@@ -10119,6 +10125,12 @@ landingStreams:
       - src/gateway/server-methods-list.ts
       - src/gateway/method-scopes.ts
       - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+      - src/gateway/evolution-control/authorize-shadow-intent.ts
+      - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/evolution-control/index.ts
+      - src/gateway/server-methods/evolution-control.ts
+      - src/gateway/server-methods/evolution-control.pack.ts
+      - src/gateway/server-methods/packs/manifest.ts
     canLandWith:
       - CL
       - DDOC
@@ -10129,8 +10141,9 @@ landingStreams:
     metadata:
       task: openbot-default-capability-p0:cursor-grok-default-capability
       owner: cursor-grok-default-capability
-      purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D learning
-        skillDraft list/finalize closed loop. NO_PROMOTE; no auto-approve skills.
+      purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
+        learning skillDraft list/finalize + P1-E shadow intent authorize.
+        NO_PROMOTE; no auto-Apply system/runtime bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22471,6 +22484,33 @@ sharedPaths:
   - glob: src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: P1-D skillDraft RPC registration/auth tests.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/authorize-shadow-intent.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: reachable human authorize for DISCOVERED assist-shadow skill-install
+      (no auto-Apply). Exact-file land; prior evolution-unification /** stays for
+      other files."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/authorize-shadow-intent.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: fail-before/pass-after authorize→Apply→rollback tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/index.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: export authorize-shadow-intent entry."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/evolution-control.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: evolution.proposals.authorize RPC + observeOnly/nextAction
+      projection. Exact-file land over stale evolution-unification."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/evolution-control.pack.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: pack method registration for proposals.authorize."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/packs/manifest.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: pack manifest scopes for proposals.authorize."
     reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
