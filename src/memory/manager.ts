@@ -53,9 +53,14 @@ const BATCH_FAILURE_LIMIT = 2;
 const log = createSubsystemLogger("memory");
 
 const INDEX_CACHE = new Map<string, MemoryIndexManager>();
-const INDEX_CACHE_PENDING = new Map<string, Promise<MemoryIndexManager>>();
+const INDEX_CACHE_PENDING = new Map<string, Promise<MemoryIndexManager | null>>();
 /** Bumped when a caller scope revokes a key so in-flight creates cannot publish. */
 const INDEX_CACHE_EPOCH = new Map<string, number>();
+/**
+ * Managers that were constructed then continuity-revoked without ever publishing
+ * to INDEX_CACHE. closeAll must still close their db/watchers.
+ */
+const INDEX_CACHE_ORPHANS = new Set<MemoryIndexManager>();
 
 function memoryIndexEpoch(key: string): number {
   return INDEX_CACHE_EPOCH.get(key) ?? 0;
@@ -65,16 +70,22 @@ function bumpMemoryIndexEpoch(key: string): void {
   INDEX_CACHE_EPOCH.set(key, memoryIndexEpoch(key) + 1);
 }
 
+function trackOrphanMemoryIndexManager(manager: MemoryIndexManager): void {
+  INDEX_CACHE_ORPHANS.add(manager);
+}
+
 export async function closeAllMemoryIndexManagers(): Promise<void> {
   const pending = Array.from(INDEX_CACHE_PENDING.values());
   if (pending.length > 0) {
     await Promise.allSettled(pending);
   }
   const managers = Array.from(INDEX_CACHE.values());
+  const orphans = Array.from(INDEX_CACHE_ORPHANS);
   INDEX_CACHE.clear();
   INDEX_CACHE_PENDING.clear();
   INDEX_CACHE_EPOCH.clear();
-  for (const manager of managers) {
+  INDEX_CACHE_ORPHANS.clear();
+  for (const manager of [...managers, ...orphans]) {
     try {
       await manager.close();
     } catch (err) {
@@ -250,7 +261,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       return pending;
     }
     const epochAtStart = memoryIndexEpoch(key);
-    const createPromise = (async () => {
+    const createPromise = (async (): Promise<MemoryIndexManager | null> => {
       const providerResult = await createEmbeddingProvider({
         config: cfg,
         agentDir: resolveAgentDir(cfg, agentId),
@@ -264,6 +275,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       if (refreshed) {
         return refreshed;
       }
+      // Even when revoked during embedding wait, construct then fail-closed so
+      // awaiters get a manager whose search/sync are empty; track as orphan so
+      // closeAllMemoryIndexManagers still closes db/watchers (not in INDEX_CACHE).
       const manager = new MemoryIndexManager({
         cacheKey: key,
         cfg,
@@ -274,11 +288,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         purpose: params.purpose,
         collaborationMemoryRoots,
       });
-      // Revoked while embedding init was pending: fail closed, do not publish.
-      // Keep the instance marked revoked (search/sync no-op) without racing close()
-      // against in-flight awaiters that still hold the promise result.
       if (memoryIndexEpoch(key) !== epochAtStart) {
         manager.markContinuityAccessRevoked();
+        trackOrphanMemoryIndexManager(manager);
         return manager;
       }
       INDEX_CACHE.set(key, manager);
@@ -1018,7 +1030,16 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         await pendingSync;
       } catch {}
     }
-    this.db.close();
-    INDEX_CACHE.delete(this.cacheKey);
+    try {
+      this.db.close();
+    } catch {
+      // already closed
+    }
+    // Only drop cache when this instance is still the published generation.
+    if (INDEX_CACHE.get(this.cacheKey) === this) {
+      INDEX_CACHE.delete(this.cacheKey);
+    }
+    INDEX_CACHE_ORPHANS.delete(this);
   }
 }
+

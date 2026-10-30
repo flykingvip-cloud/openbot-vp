@@ -10073,6 +10073,9 @@ landingStreams:
       - src/memory/pending-revocation-repro.test.ts
       - src/agents/pi-embedded-runner/run/attempt.ts
       - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
+      - src/memory/pending-dispose-repro.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/memory/embedding-error.ts
     canLandWith:
       - CL
       - DDOC
@@ -12909,7 +12912,7 @@ landingStreams:
       task: hide-checkpoint-restore-in-collab-groups
       owner: grok-bot
       intent: "Superseded by collab-restore-line-phase-a (Phase A 恢复线): list/UI
-        gates lifted for space sessions; transcript-only; no group snapshot yet" 
+        gates lifted for space sessions; transcript-only; no group snapshot yet"
   - id: FRIENDLY_ENTITLEMENT_PRE_REPLY
     landingPolicy: serial
     paths:
@@ -22397,6 +22400,12 @@ sharedPaths:
   - glob: src/memory/pending-revocation-repro.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
   - glob: src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/memory/pending-dispose-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/memory/embedding-error.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: Signed WIP/tasks for the default-capability P0 batch.
     reviewAfter: 2026-11-30

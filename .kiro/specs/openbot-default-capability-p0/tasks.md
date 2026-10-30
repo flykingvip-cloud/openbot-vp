@@ -4,7 +4,7 @@
 
 ## Agents
 
-- cursor-grok-default-capability · role: owner · scope: P0 context flags/engine and builtin memory continuity gaps · paths: src/conversations/flags.ts, src/conversations/flags.test.ts, src/context-engine/legacy.ts, src/context-engine/types.ts, src/context-engine/registry.ts, src/context-engine/legacy.default-capability.test.ts, src/memory/collaboration-index-scope.ts, src/memory/collaboration-index-scope.test.ts, src/memory/manager.ts, src/memory/manager-sync-ops.ts, src/memory/search-manager.ts, src/memory/manager.collab-continuity.test.ts, src/memory/search-manager.managed-tool-profile.test.ts, docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md, .kiro/specs/openbot-default-capability-p0/** · since: 2026-10-30
+- cursor-grok-default-capability · role: owner · scope: P0 context flags/engine and builtin memory continuity gaps · paths: src/conversations/flags.ts, src/conversations/flags.test.ts, src/context-engine/legacy.ts, src/context-engine/types.ts, src/context-engine/registry.ts, src/context-engine/legacy.default-capability.test.ts, src/memory/collaboration-index-scope.ts, src/memory/collaboration-index-scope.test.ts, src/memory/manager.ts, src/memory/manager-sync-ops.ts, src/memory/search-manager.ts, src/memory/manager.collab-continuity.test.ts, src/memory/search-manager.managed-tool-profile.test.ts, docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md, .kiro/specs/openbot-default-capability-p0/\*\* · since: 2026-10-30
 
 ## Takeover note
 
@@ -24,3 +24,9 @@
 - [x] A: toolCall/toolResult 单元裁剪 + assemble 后 sanitize（context-assemble / legacy / attempt）
 - [x] B: INDEX_CACHE_PENDING epoch 撤权，过期 pending 不发布
 - 状态：部分验证；交新 SHA 由验收方复验，不自行宣告 P0 通过
+
+## 第二轮回退
+
+- [x] 过期 pending orphan 跟踪 + closeAll 释放 SQLite
+- [x] runEmbeddedAttempt 真实边界配对测试
+- check/build 证据随本轮提交
