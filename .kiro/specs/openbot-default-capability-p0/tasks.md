@@ -35,3 +35,10 @@
 - [x] 过期 pending orphan 跟踪 + closeAll 释放 SQLite
 - [x] runEmbeddedAttempt 真实边界配对测试
 - check/build 证据随本轮提交
+
+## 验收回退修复（P1-C / P1-E）
+
+- [x] P1-C：policy-before-write；稳定 `proj:`/`asset:` 幂等 id；RPC 可信 tenant/stores → entry（managed fail-closed）— 已推送待复验 / 部分验证（已推送≠验收通过）
+- [x] P1-E：authorize `existingEvent` / APPROVED 早退前校验 trusted tenant+principal+grant；撤销/过期 fail-closed；拒绝不泄漏越权正文；replay 正负矩阵 — 已推送待复验 / 部分验证
+- 仍已知缺口（本轮不扩改）：P1-D execute+归因；P1-F 事件物化；P2-G partial catalog；P2-H 真实通道送达
+- 状态：已推送待复验；交新 SHA 由验收方复验，不自行宣告通过

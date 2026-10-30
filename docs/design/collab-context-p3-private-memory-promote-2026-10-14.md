@@ -85,3 +85,6 @@ Gateway method: `collaboration.learning.privateMemory.promote`
 2. **Idempotent projection/asset** — stable ids `proj:privprom:…` / `asset:privprom:…` from source scope + capsule version + tenant/group/bot; storage upserts by id on retry.
 3. **Trusted tenant/stores** — RPC passes `tenantId`, `securityProfile`, and `stores` from `resolveTrustedWriteContext` into the authorized entry / promote deps. Managed without trusted context fail-closes (`managed_requires_trusted_context`). Default flag remains OFF.
 
+## Status note (2026-10-30 tip)
+
+P1-C 三修复已推送 tip，状态记 **已推送待复验 / 部分验证**（已推送≠验收通过）。默认 `privateMemoryPromote` 仍 OFF。

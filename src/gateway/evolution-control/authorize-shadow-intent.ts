@@ -15,6 +15,7 @@ import type { EvolutionProposal } from "@openbot/evolution-core";
 import {
   createDelegationEvolutionInspector,
   type EvolutionAuthorizationInspector,
+  type EvolutionAuthorizationView,
 } from "../../diagnosis/evolution-proposal.js";
 import { checkEvolutionAuthority } from "./authority-gate.js";
 import type { EvolutionControlPlane } from "./control-plane.js";
@@ -135,8 +136,97 @@ export function projectShadowIntentOperatorHints(
 }
 
 /**
+ * Deny without leaking proposal body (cross-tenant / rebound / inactive grant).
+ * Same-tenant eligibility denials may still attach proposal for operator UX.
+ */
+function denyAuthorize(
+  code: AuthorizeShadowIntentDenial,
+  proposal?: EvolutionProposal,
+): AuthorizeShadowIntentResult {
+  if (
+    code === "cross_tenant" ||
+    code === "command_rebind" ||
+    code === "grant_missing" ||
+    code === "grant_inactive"
+  ) {
+    return { ok: false, code };
+  }
+  return proposal ? { ok: false, code, proposal } : { ok: false, code };
+}
+
+/**
+ * commandId ledger binding: tenantScope + principalRef + proposalId + grantId.
+ * Rebound any of these → refuse (idempotent success only for the original subject).
+ */
+function replayBindingDenial(
+  existingEvent: {
+    proposalId: string;
+    tenantScope: string | null;
+    principalRef: string;
+    grantId: string;
+  },
+  input: {
+    proposalId: string;
+    grantId: string;
+    principalRef: string;
+    trustedTenantId: string | null;
+  },
+): AuthorizeShadowIntentDenial | null {
+  if (existingEvent.proposalId !== input.proposalId) {
+    return "command_rebind";
+  }
+  if (existingEvent.principalRef !== input.principalRef) {
+    return "command_rebind";
+  }
+  if (existingEvent.grantId !== input.grantId) {
+    return "command_rebind";
+  }
+  if (
+    input.trustedTenantId != null &&
+    existingEvent.tenantScope != null &&
+    existingEvent.tenantScope !== input.trustedTenantId
+  ) {
+    return "cross_tenant";
+  }
+  return null;
+}
+
+type GrantViewWithLifecycle = EvolutionAuthorizationView & {
+  expired?: boolean;
+  revoked?: boolean;
+};
+
+/**
+ * Current grant must still be readable/active for idempotent success.
+ * Policy: revoked or expired grant → grant_inactive (no replay receipt).
+ */
+function inspectGrantForAuthorize(
+  inspector: EvolutionAuthorizationInspector,
+  grantId: string,
+  trustedTenantId: string | null,
+): AuthorizeShadowIntentDenial | { ok: true; viewed: GrantViewWithLifecycle } {
+  const viewed = inspector.inspect(grantId) as GrantViewWithLifecycle | { status: "missing" };
+  if (viewed.status === "missing" || !("grantId" in viewed)) {
+    return "grant_missing";
+  }
+  if (viewed.status !== "APPROVED" || viewed.expired || viewed.revoked) {
+    return "grant_inactive";
+  }
+  if (
+    trustedTenantId != null &&
+    viewed.tenantScope != null &&
+    viewed.tenantScope !== trustedTenantId
+  ) {
+    return "cross_tenant";
+  }
+  return { ok: true, viewed };
+}
+
+/**
  * Authorize a DISCOVERED assist-shadow proposal for experiment (not Apply).
- * Idempotent on commandId. Reject/fault leaves the proposal unchanged.
+ * Idempotent on commandId **only when** the current trusted tenant/principal/grant
+ * still match the original authorization binding and the grant remains active.
+ * Reject/fault leaves the proposal unchanged. Denials never leak other-tenant bodies.
  */
 export function authorizeShadowIntentProposal(
   plane: EvolutionControlPlane,
@@ -157,13 +247,33 @@ export function authorizeShadowIntentProposal(
   const eventId = `led:${commandId}:authorized`;
   const existingEvent = plane.ledger.list().find((row) => row.eventId === eventId);
   if (existingEvent) {
-    if (existingEvent.proposalId !== proposalId) {
-      return { ok: false, code: "command_rebind" };
+    // Verify current trusted subject can access BEFORE idempotent success.
+    // Binding: commandId → tenant + principal + proposal + grant (+ request summary on ledger).
+    const bindingDeny = replayBindingDenial(existingEvent, {
+      proposalId,
+      grantId,
+      principalRef,
+      trustedTenantId: input.trustedTenantId,
+    });
+    if (bindingDeny) {
+      return denyAuthorize(bindingDeny);
     }
+
     const existing = plane.getProposal(proposalId);
     if (!existing) {
       return { ok: false, code: "proposal_missing" };
     }
+    // Current read permission: caller tenant must still match proposal tenant.
+    if (input.trustedTenantId != null && existing.tenantScope !== input.trustedTenantId) {
+      return denyAuthorize("cross_tenant");
+    }
+
+    // Revoked/expired grant: refuse replay success (explicit fail-closed policy).
+    const grantCheck = inspectGrantForAuthorize(inspector, grantId, input.trustedTenantId);
+    if (typeof grantCheck === "string") {
+      return denyAuthorize(grantCheck);
+    }
+
     return {
       ok: true,
       proposal: existing,
@@ -177,7 +287,8 @@ export function authorizeShadowIntentProposal(
     return { ok: false, code: "proposal_missing" };
   }
   if (input.trustedTenantId != null && proposal.tenantScope !== input.trustedTenantId) {
-    return { ok: false, code: "cross_tenant", proposal };
+    // Do not attach other-tenant proposal body on cross_tenant denial.
+    return denyAuthorize("cross_tenant");
   }
   if (!isAssistShadowProposal(proposal)) {
     return { ok: false, code: "not_shadow_intent", proposal };
@@ -188,15 +299,33 @@ export function authorizeShadowIntentProposal(
   if (!SHADOW_INTENT_AUTHORIZE_SURFACES.has(proposal.surfaceId)) {
     return { ok: false, code: "unsupported_surface", proposal };
   }
-  if (proposal.status === "APPROVED_FOR_EXPERIMENT" && proposal.grantId === grantId) {
+
+  // Same-grant already-approved early return: still require current tenant access
+  // and an active grant (do not skip grant inspect / tenant check).
+  if (proposal.status === "APPROVED_FOR_EXPERIMENT") {
+    if (proposal.grantId !== grantId) {
+      return denyAuthorize("command_rebind");
+    }
+    const grantCheck = inspectGrantForAuthorize(inspector, grantId, input.trustedTenantId);
+    if (typeof grantCheck === "string") {
+      return denyAuthorize(grantCheck);
+    }
+    const priorEventId =
+      plane.ledger
+        .list({ proposalId: proposal.proposalId })
+        .find((row) => row.type === "proposal.authorized")?.eventId ?? eventId;
+    // If a prior auth event exists, principal must match that binding for this commandId path.
+    const priorAuth = plane.ledger
+      .list({ proposalId: proposal.proposalId })
+      .find((row) => row.type === "proposal.authorized");
+    if (priorAuth && priorAuth.principalRef !== principalRef) {
+      return denyAuthorize("command_rebind");
+    }
     return {
       ok: true,
       proposal,
       alreadyAuthorized: true,
-      eventId:
-        plane.ledger
-          .list({ proposalId: proposal.proposalId })
-          .find((row) => row.type === "proposal.authorized")?.eventId ?? eventId,
+      eventId: priorEventId,
     };
   }
   if (proposal.status !== "DISCOVERED") {
@@ -208,20 +337,11 @@ export function authorizeShadowIntentProposal(
     return { ok: false, code: "proposal_expired", proposal };
   }
 
-  const viewed = inspector.inspect(grantId);
-  if (viewed.status === "missing" || !("grantId" in viewed)) {
-    return { ok: false, code: "grant_missing", proposal };
+  const grantCheck = inspectGrantForAuthorize(inspector, grantId, input.trustedTenantId);
+  if (typeof grantCheck === "string") {
+    return denyAuthorize(grantCheck, proposal);
   }
-  if (viewed.status !== "APPROVED" || viewed.expired || viewed.revoked) {
-    return { ok: false, code: "grant_inactive", proposal };
-  }
-  if (
-    input.trustedTenantId != null &&
-    viewed.tenantScope != null &&
-    viewed.tenantScope !== input.trustedTenantId
-  ) {
-    return { ok: false, code: "cross_tenant", proposal };
-  }
+  const viewed = grantCheck.viewed;
 
   // Shadow sourceEvidenceRefs are system observation markers (shadow:commandId).
   // Human authorize rebinds to the grant's allowedEvidence so experiment/Apply
@@ -250,6 +370,7 @@ export function authorizeShadowIntentProposal(
     sourceEvidenceRefs: authorizedEvidence,
   };
   plane.stageDiagnosisProposal(next);
+  // Bind commandId → tenant/principal/proposal/grant (+ evidence as request summary).
   plane.ledger.append({
     eventId,
     type: "proposal.authorized",

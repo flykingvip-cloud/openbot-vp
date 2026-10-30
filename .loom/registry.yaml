@@ -10068,6 +10068,7 @@ tasks:
       - .loom/registry.yaml
       - src/gateway/evolution-control/authorize-shadow-intent.ts
       - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/evolution-control/authorize-replay-repro.test.ts
       - src/gateway/server-methods/evolution-control.ts
       - src/gateway/server-methods/evolution-control.pack.ts
       - src/gateway/server-methods/packs/manifest.ts
@@ -10151,6 +10152,7 @@ landingStreams:
       - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
       - src/gateway/evolution-control/authorize-shadow-intent.ts
       - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/evolution-control/authorize-replay-repro.test.ts
       - src/gateway/evolution-control/index.ts
       - src/gateway/server-methods/evolution-control.ts
       - src/gateway/server-methods/evolution-control.pack.ts
@@ -22546,6 +22548,10 @@ sharedPaths:
   - glob: src/gateway/evolution-control/authorize-shadow-intent.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: "P1-E: fail-before/pass-after authorize→Apply→rollback tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/authorize-replay-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: authorize replay binding matrix (cross-tenant/principal/grant/rebind)."
     reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/index.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
