@@ -178,21 +178,27 @@ describe("promotePrivateMemoryCapsuleAuthorized", () => {
     expect(result).toMatchObject({ promoted: false, reason: "capsule_not_approved" });
   });
 
-  it("repeat promote is upsert-safe (same capsuleId, no throw)", async () => {
+  it("repeat promote is upsert-safe (same capsuleId + stable projection/asset ids)", async () => {
     const store = new Map<string, GroupMemoryCapsule>();
-    const assets: unknown[] = [];
+    const projections = new Map<string, { projectionId: string }>();
+    const assets = new Map<string, { assetId: string }>();
     const appendCapsule = vi.fn(async (_groupId: string, capsule: GroupMemoryCapsule) => {
       store.set(capsule.capsuleId, capsule);
     });
-    const appendLearningAsset = vi.fn(async (_groupId: string, asset: unknown) => {
-      assets.push(asset);
+    const appendProjection = vi.fn(
+      async (_groupId: string, projection: { projectionId: string }) => {
+        projections.set(projection.projectionId, projection);
+      },
+    );
+    const appendLearningAsset = vi.fn(async (_groupId: string, asset: { assetId: string }) => {
+      assets.set(asset.assetId, asset);
     });
     const capsule = approvedPersonalCapsule();
     const deps = {
       readCapsules: async () => [capsule],
       learningStorage: {
         appendCapsule,
-        appendProjection: vi.fn(async () => undefined),
+        appendProjection,
         appendLearningAsset,
       } as never,
       recordAudit: vi.fn(async () => undefined),
@@ -210,6 +216,7 @@ describe("promotePrivateMemoryCapsuleAuthorized", () => {
       groupId: "group-1",
       capsuleId: "cap-private-1",
       actorId: "owner-user",
+      tenantId: null,
       cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
       deps,
     });
@@ -218,13 +225,163 @@ describe("promotePrivateMemoryCapsuleAuthorized", () => {
       groupId: "group-1",
       capsuleId: "cap-private-1",
       actorId: "owner-user",
+      tenantId: null,
       cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
       deps,
     });
 
     expect(first.promoted).toBe(true);
     expect(second.promoted).toBe(true);
+    expect(second.assetId).toBe(first.assetId);
+    expect(second.projectionId).toBe(first.projectionId);
     expect(store.size).toBe(1);
     expect(store.has("cap-private-1")).toBe(true);
+    expect(projections.size).toBe(1);
+    expect(assets.size).toBe(1);
+    expect(assets.has(String(first.assetId))).toBe(true);
+  });
+
+  it("independent: policy denial must not copy private body to target", async () => {
+    const appendCapsule = vi.fn(async () => undefined);
+    const appendProjection = vi.fn(async () => undefined);
+    const appendLearningAsset = vi.fn(async () => undefined);
+    const result = await promotePrivateMemoryCapsuleAuthorized({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsuleId: "cap-private-1",
+      actorId: "owner-user",
+      cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
+      deps: {
+        readCapsules: async () => [approvedPersonalCapsule()],
+        learningStorage: {
+          appendCapsule,
+          appendProjection,
+          appendLearningAsset,
+        } as never,
+        recordAudit: vi.fn(async () => undefined) as never,
+        evaluatePolicy: async () =>
+          ({
+            allowed: false,
+            reason: "lifecycle_blocked",
+            policy: {} as never,
+            lifecycleStatus: "ARCHIVED",
+          }) as never,
+      },
+    });
+    expect(result.promoted).toBe(false);
+    expect(result.reason).toBe("lifecycle_blocked");
+    expect(appendCapsule).not.toHaveBeenCalled();
+    expect(appendProjection).not.toHaveBeenCalled();
+    expect(appendLearningAsset).not.toHaveBeenCalled();
+    // Denial result must not echo private body.
+    expect(JSON.stringify(result)).not.toMatch(/stay private/);
+  });
+
+  it("uses caller stores + tenantId (trusted context, not capsule self-compare)", async () => {
+    const appendCapsule = vi.fn(async () => undefined);
+    const appendProjection = vi.fn(async () => undefined);
+    const appendLearningAsset = vi.fn(async () => undefined);
+    const evaluatePolicy = vi.fn(async (args: { tenantId?: string | null }) => {
+      expect(args.tenantId).toBeNull();
+      return {
+        allowed: true,
+        reason: "allowed",
+        policy: {} as never,
+        lifecycleStatus: "ACTIVE",
+      };
+    });
+    const callerStores = {
+      learningStorage: {
+        appendCapsule,
+        appendProjection,
+        appendLearningAsset,
+      } as never,
+    };
+
+    const result = await promotePrivateMemoryCapsuleAuthorized({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsuleId: "cap-private-1",
+      actorId: "owner-user",
+      tenantId: null,
+      securityProfile: "personal_local",
+      stores: callerStores,
+      cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
+      deps: {
+        readCapsules: async () => [approvedPersonalCapsule()],
+        // Intentionally omit deps.learningStorage — stores from caller must be used.
+        recordAudit: vi.fn(async () => undefined),
+        evaluatePolicy: evaluatePolicy as never,
+      },
+    });
+
+    expect(result.promoted).toBe(true);
+    expect(appendCapsule).toHaveBeenCalledTimes(1);
+    expect(appendLearningAsset).toHaveBeenCalledTimes(1);
+    expect(evaluatePolicy).toHaveBeenCalledWith(
+      expect.objectContaining({ groupId: "group-1", tenantId: null }),
+    );
+  });
+
+  it("rejects trusted tenant mismatch vs capsule recorded tenant", async () => {
+    const appendCapsule = vi.fn();
+    const capsule = approvedPersonalCapsule({
+      metadata: {
+        personalOwnerUserId: "owner-user",
+        personalOwnerAgentId: "bot-a",
+        personalOwnerTenantId: "tenant-a",
+        personalSecurityProfile: "managed_enterprise",
+      },
+    });
+    const result = await promotePrivateMemoryCapsuleAuthorized({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsuleId: "cap-private-1",
+      actorId: "owner-user",
+      tenantId: "tenant-b",
+      securityProfile: "managed_enterprise",
+      stores: {
+        learningStorage: {
+          appendCapsule,
+          appendProjection: vi.fn(),
+          appendLearningAsset: vi.fn(),
+        } as never,
+      },
+      cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
+      deps: {
+        readCapsules: async () => [capsule],
+      },
+    });
+    expect(result).toMatchObject({
+      promoted: false,
+      reason: "cross_tenant_ownership",
+    });
+    expect(appendCapsule).not.toHaveBeenCalled();
+  });
+
+  it("fail-closes managed without trusted stores/tenant (no default reopen)", async () => {
+    const capsule = approvedPersonalCapsule({
+      metadata: {
+        personalOwnerUserId: "owner-user",
+        personalOwnerAgentId: "bot-a",
+        personalOwnerTenantId: "tenant-a",
+        personalSecurityProfile: "managed_enterprise",
+      },
+    });
+    const result = await promotePrivateMemoryCapsuleAuthorized({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsuleId: "cap-private-1",
+      actorId: "owner-user",
+      // missing tenantId + stores on purpose
+      cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
+      deps: {
+        readCapsules: async () => [capsule],
+      },
+    });
+    expect(result).toMatchObject({
+      promoted: false,
+      reason: "managed_requires_trusted_context",
+    });
   });
 });

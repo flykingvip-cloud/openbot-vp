@@ -151,9 +151,9 @@ beforeEach(() => {
   });
   resolveHandlerTrustedTeamContext.mockResolvedValue({
     ok: true,
-    auth: {},
-    stores: {},
-    trusted: {},
+    auth: { profile: "personal_local", tenantId: null },
+    stores: { learningStorage: { marker: "trusted-stores" } },
+    trusted: { groupsRoot: "/tmp/groups", groupLocator: "/tmp/groups/group-1" },
   });
   loadConfig.mockReturnValue({
     collaboration: { learning: { privateMemoryPromote: true } },
@@ -200,6 +200,11 @@ describe("collaboration.learning.privateMemory.promote", () => {
         groupId: "group-1",
         capsuleId: "cap-1",
         actorId: "owner-user",
+        tenantId: null,
+        securityProfile: "personal_local",
+        stores: expect.objectContaining({
+          learningStorage: expect.anything(),
+        }),
         cfg: expect.objectContaining({
           collaboration: { learning: { privateMemoryPromote: true } },
         }),

@@ -10092,6 +10092,8 @@ tasks:
       - src/cron/isolated-agent/run.ts
       - src/cron/isolated-agent/run.long-horizon-ledger.test.ts
       - src/gateway/server.cron.test.ts
+      - src/gateway/collaboration-learning/private-memory-promote.ts
+      - src/gateway/collaboration-learning/private-memory-promote.test.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10099,7 +10101,7 @@ tasks:
         ide: cursor
         agent: cursor-grok-default-capability
         status: active
-        lastSignalAt: 2026-10-30T09:40:00.000Z
+        lastSignalAt: 2026-10-30T09:52:42.503Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-30
@@ -10135,6 +10137,8 @@ landingStreams:
       - src/memory/embedding-error.ts
       - src/gateway/collaboration-learning/private-memory-promote-entry.ts
       - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/gateway/collaboration-learning/private-memory-promote.ts
+      - src/gateway/collaboration-learning/private-memory-promote.test.ts
       - src/auto-reply/reply/learning-skill-curation.ts
       - src/gateway/collaboration-learning/learning-skill-draft-entry.ts
       - src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
@@ -22506,6 +22510,10 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/gateway/collaboration-learning/private-memory-promote-entry.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/gateway/collaboration-learning/private-memory-promote.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/gateway/collaboration-learning/private-memory-promote.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: P1-C authorized promote entry (load personal capsule + ownership + flag
       gate).
     reviewAfter: 2026-11-30
@@ -22531,9 +22539,9 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/authorize-shadow-intent.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
-    reason: "P1-E: reachable human authorize for DISCOVERED assist-shadow skill-install
-      (no auto-Apply). Exact-file land; prior evolution-unification /** stays for
-      other files."
+    reason: "P1-E: reachable human authorize for DISCOVERED assist-shadow
+      skill-install (no auto-Apply). Exact-file land; prior
+      evolution-unification /** stays for other files."
     reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/authorize-shadow-intent.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

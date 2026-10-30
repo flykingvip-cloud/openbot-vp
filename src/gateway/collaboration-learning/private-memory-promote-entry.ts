@@ -5,10 +5,15 @@
  * another owner's capsule payload), applies personal-learning ownership gates,
  * then calls `promotePrivateMemoryCapsuleToGroup`.
  *
- * Idempotency: learning storage `appendCapsule` / `appendProjection` /
- * `appendLearningAsset` upsert by id. Repeat promote with the same capsuleId
- * rewrites the same rows rather than creating duplicates; audit may append
- * again. Does not corrupt prior assets.
+ * Idempotency: promote derives stable projectionId/assetId from source scope +
+ * capsule version + target tenant/group/bot. Learning storage upserts by those
+ * ids, so repeat promote rewrites the same capsule/projection/asset rows rather
+ * than minting new UUIDs. Audit may append again. Does not corrupt prior assets.
+ *
+ * Trusted context: RPC must pass target-group `stores` + `tenantId` from
+ * `resolveTrustedWriteContext`. Ownership compares capsule-stamped tenant to the
+ * caller-trusted tenant (not capsule labels against themselves). Managed
+ * enterprise without trusted stores/tenant fail-closes (no default-store reopen).
  *
  * Revoke limitation: personal `revokePersonalLearningAsset` does not revoke the
  * group-side clone. Group revoke uses `collaboration.capsule.transition`
@@ -40,6 +45,20 @@ export type AuthorizedPrivateMemoryPromoteParams = {
   actorId: string;
   cfg?: OpenBotConfig | null;
   confidentialityTier?: string;
+  /**
+   * Trusted tenant from `resolveTrustedWriteContext` / authz — compared to the
+   * capsule-stamped recorded tenant. Do not invent from capsule metadata alone.
+   */
+  tenantId?: string | null;
+  /** Trusted security profile from authz context when available. */
+  securityProfile?: "personal_local" | "managed_enterprise";
+  /**
+   * Trusted target-group stores from authz. Target learning writes use
+   * `stores.learningStorage` when provided (RPC production path).
+   */
+  stores?: {
+    learningStorage: PromotePrivateMemoryDeps["learningStorage"];
+  };
   deps?: PromotePrivateMemoryDeps & {
     readCapsules?: (scopeId: string) => Promise<GroupMemoryCapsule[]>;
   };
@@ -150,11 +169,49 @@ export async function promotePrivateMemoryCapsuleAuthorized(
     };
   }
 
-  const ownership = readStampedOwnership(capsule, botId);
+  const stamped = readStampedOwnership(capsule, botId);
+  if (!stamped) {
+    return {
+      capsuleId,
+      promoted: false,
+      reason: "ownership_context_required",
+      sourceScopeId,
+      groupId,
+    };
+  }
+
+  const callerProfile = params.securityProfile ?? stamped.securityProfile ?? "personal_local";
+  const trustedTenantProvided = params.tenantId !== undefined;
+  // Subject tenant comes from authorized caller when provided — never synthesize
+  // "current subject" solely from the capsule label that is also the recorded tenant.
+  const subjectTenantId = trustedTenantProvided ? params.tenantId : stamped.tenantId;
+
+  // Managed enterprise must carry trusted tenant + target stores from authz.
+  // Do not reopen default local stores for managed writes.
+  const targetLearningStorage =
+    params.stores?.learningStorage ?? params.deps?.learningStorage ?? undefined;
+  if (callerProfile === "managed_enterprise" || stamped.securityProfile === "managed_enterprise") {
+    const trustedTenant = typeof subjectTenantId === "string" ? subjectTenantId.trim() : "";
+    if (!trustedTenantProvided || !trustedTenant || !targetLearningStorage) {
+      return {
+        capsuleId,
+        promoted: false,
+        reason: "managed_requires_trusted_context",
+        sourceScopeId,
+        groupId,
+      };
+    }
+  }
+
   const ownershipGate = assertPersonalLearningOwnership({
     botId,
     actorId,
-    ownership,
+    ownership: {
+      ownerUserId: stamped.ownerUserId,
+      ownerAgentId: stamped.ownerAgentId,
+      securityProfile: callerProfile,
+      tenantId: subjectTenantId,
+    },
     recordedTenantId: recordedTenantFromCapsule(capsule),
   });
   if (!ownershipGate.ok) {
@@ -175,9 +232,14 @@ export async function promotePrivateMemoryCapsuleAuthorized(
     ...(params.confidentialityTier ? { confidentialityTier: params.confidentialityTier } : {}),
     deps: {
       cfg: params.cfg ?? params.deps?.cfg ?? null,
-      ...(params.deps?.learningStorage ? { learningStorage: params.deps.learningStorage } : {}),
+      ...(targetLearningStorage ? { learningStorage: targetLearningStorage } : {}),
       ...(params.deps?.recordAudit ? { recordAudit: params.deps.recordAudit } : {}),
       ...(params.deps?.evaluatePolicy ? { evaluatePolicy: params.deps.evaluatePolicy } : {}),
+      ...(trustedTenantProvided ? { tenantId: params.tenantId } : {}),
+      ...(params.deps?.createProjectionId
+        ? { createProjectionId: params.deps.createProjectionId }
+        : {}),
+      ...(params.deps?.createAssetId ? { createAssetId: params.deps.createAssetId } : {}),
     },
   });
 

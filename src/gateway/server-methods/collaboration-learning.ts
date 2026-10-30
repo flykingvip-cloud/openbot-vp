@@ -2095,6 +2095,10 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         capsuleId,
         actorId,
         cfg: loadConfig(),
+        // Thread authorized target-group tenant/stores — do not reopen defaults in entry.
+        tenantId: ctx.tenant.tenantId,
+        securityProfile: ctx.auth.profile,
+        stores: ctx.stores,
         ...(confidentialityTier ? { confidentialityTier } : {}),
       });
       // Flag-off and policy denials are success-shaped results (promoted:false), not RPC errors.
@@ -2109,6 +2113,7 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
         "agent_ownership_mismatch",
         "managed_tenant_required",
         "cross_tenant_ownership",
+        "managed_requires_trusted_context",
         "botId_groupId_capsuleId_actorId_required",
       ]);
       if (!result.promoted && hardReject.has(result.reason)) {

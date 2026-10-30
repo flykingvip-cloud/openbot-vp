@@ -78,3 +78,10 @@ Gateway method: `collaboration.learning.privateMemory.promote`
 - Flag OFF → `{ promoted: false, reason: "flag_off" }` (no learning writes)
 - Default flag remains OFF; this entry does not flip the default
 - Revoke: group-side revoke is separate from personal asset revoke
+
+## P1-C acceptance fixes (2026-10-30 follow-up)
+
+1. **Policy before body copy** — `evaluateGroupPromotionPolicy` runs before `appendCapsule` / projection / asset. Denials (`lifecycle_blocked`, etc.) audit-only; target group has no private body.
+2. **Idempotent projection/asset** — stable ids `proj:privprom:…` / `asset:privprom:…` from source scope + capsule version + tenant/group/bot; storage upserts by id on retry.
+3. **Trusted tenant/stores** — RPC passes `tenantId`, `securityProfile`, and `stores` from `resolveTrustedWriteContext` into the authorized entry / promote deps. Managed without trusted context fail-closes (`managed_requires_trusted_context`). Default flag remains OFF.
+

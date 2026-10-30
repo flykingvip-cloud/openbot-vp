@@ -249,7 +249,37 @@ export type PromotePrivateMemoryDeps = {
   learningStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["learningStorage"];
   recordAudit?: typeof recordPromotionAudit;
   evaluatePolicy?: typeof evaluateGroupPromotionPolicy;
+  /** Trusted tenant from authorized caller (RPC ctx); preferred over group-id resolution. */
+  tenantId?: string | null;
+  createProjectionId?: () => string;
+  createAssetId?: () => string;
 };
+
+/** Idempotency key: source scope + capsule version + target tenant/group + bot. */
+export function buildPrivateMemoryPromoteIdempotencyKey(params: {
+  sourceScopeId: string;
+  capsuleId: string;
+  capsuleVersion: string | number;
+  groupId: string;
+  botId: string;
+  tenantId?: string | null;
+}): string {
+  const tenant = (params.tenantId?.trim() || "personal").replace(/[^a-zA-Z0-9._:-]/g, "_");
+  const scope = params.sourceScopeId.trim() || "unknown-scope";
+  const capsuleId = params.capsuleId.trim() || "unknown-capsule";
+  const version = String(params.capsuleVersion ?? 0);
+  const groupId = params.groupId.trim() || "unknown-group";
+  const botId = params.botId.trim() || "unknown-bot";
+  return `privprom:${tenant}:${scope}:${capsuleId}:v${version}:${groupId}:${botId}`;
+}
+
+export function stablePrivatePromoteProjectionId(idempotencyKey: string): string {
+  return `proj:${idempotencyKey}`;
+}
+
+export function stablePrivatePromoteAssetId(idempotencyKey: string): string {
+  return `asset:${idempotencyKey}`;
+}
 
 /**
  * Explicit promote: private LTM capsule (personal scope) → group learning asset.
@@ -290,7 +320,11 @@ export async function promotePrivateMemoryCapsuleToGroup(params: {
     params.deps?.learningStorage ?? createWorkspaceCollaborationStores().learningStorage;
   const recordAudit = params.deps?.recordAudit ?? recordPromotionAudit;
   const evaluatePolicy = params.deps?.evaluatePolicy ?? evaluateGroupPromotionPolicy;
-  const tenantIdForLedger = resolveCollaborationGroupTenantId(groupId);
+  // Prefer trusted tenant from authorized caller; fall back to group-derived ledger tenant.
+  const tenantIdForLedger =
+    params.deps?.tenantId !== undefined
+      ? params.deps.tenantId
+      : resolveCollaborationGroupTenantId(groupId);
   const actorId = params.actor?.trim() || botId;
 
   const groupCapsule = preparePrivateCapsuleForGroupPromote({
@@ -301,10 +335,57 @@ export async function promotePrivateMemoryCapsuleToGroup(params: {
     actorId,
   });
 
+  // Gates BEFORE any target persistence: policy/lifecycle/sensitivity must not
+  // leave a capsule body in the target group on deny (audit-only on reject).
+  const promotionPolicy = await evaluatePolicy({
+    groupId,
+    // Preserve explicit null from trusted caller (do not drop via truthy spread).
+    ...(params.deps?.tenantId !== undefined || tenantIdForLedger
+      ? { tenantId: tenantIdForLedger ?? null }
+      : {}),
+    confidentialityTier,
+  });
+  if (!promotionPolicy.allowed) {
+    await recordAudit({
+      groupId,
+      ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
+      sourceGroupId: sourceScopeId,
+      botId,
+      capsuleId: groupCapsule.capsuleId,
+      promoted: false,
+      reason: promotionPolicy.reason,
+      targetScope: "group",
+    }).catch(() => undefined);
+    return {
+      promoted: false,
+      reason: promotionPolicy.reason,
+      sourceScopeId,
+      groupId,
+      confidentialityTier,
+    };
+  }
+
+  const capsuleVersion =
+    params.capsule.updatedAt ?? params.capsule.approvedAt ?? params.capsule.createdAt ?? 0;
+  const idempotencyKey = buildPrivateMemoryPromoteIdempotencyKey({
+    sourceScopeId,
+    capsuleId: groupCapsule.capsuleId,
+    capsuleVersion,
+    groupId,
+    botId,
+    tenantId: tenantIdForLedger,
+  });
+  const createProjectionId =
+    params.deps?.createProjectionId ?? (() => stablePrivatePromoteProjectionId(idempotencyKey));
+  const createAssetId =
+    params.deps?.createAssetId ?? (() => stablePrivatePromoteAssetId(idempotencyKey));
+
   // Persist approved clone into group capsule store (learning pathway), not transcript.
   await learningStorage.appendCapsule(groupId, groupCapsule);
 
   const promotionService = new DefaultLearningPromotionService({
+    createProjectionId,
+    createAssetId,
     saveProjection: async (projection) => {
       await learningStorage.appendProjection(groupId, projection);
     },
@@ -335,33 +416,6 @@ export async function promotePrivateMemoryCapsuleToGroup(params: {
     return {
       promoted: false,
       reason: projectionResult.reason,
-      sourceScopeId,
-      groupId,
-      confidentialityTier,
-    };
-  }
-
-  const promotionPolicy = await evaluatePolicy({
-    groupId,
-    ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
-    confidentialityTier,
-  });
-  if (!promotionPolicy.allowed) {
-    await recordAudit({
-      groupId,
-      ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
-      sourceGroupId: sourceScopeId,
-      botId,
-      capsuleId: groupCapsule.capsuleId,
-      projectionId: projectionResult.projection.projectionId,
-      promoted: false,
-      reason: promotionPolicy.reason,
-      targetScope: "group",
-    }).catch(() => undefined);
-    return {
-      promoted: false,
-      reason: promotionPolicy.reason,
-      projectionId: projectionResult.projection.projectionId,
       sourceScopeId,
       groupId,
       confidentialityTier,
