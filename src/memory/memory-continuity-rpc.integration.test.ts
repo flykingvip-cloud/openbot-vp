@@ -13,6 +13,9 @@ import type { OpenBotConfig } from "../config/config.js";
  * (governance from call entry), seat/user identity, and group membership.
  *
  * Backend: builtin (default). Does not flip privateMemoryPromote or memory.backend.
+ *
+ * Import embedding.test-mocks BEFORE memory-tool / manager so vi.mock bindings
+ * apply before the import graph caches real embeddings.
  */
 import { resetEmbeddingMocks } from "./embedding.test-mocks.js";
 import type { MemoryIndexManager as MemoryIndexManagerType } from "./index.js";

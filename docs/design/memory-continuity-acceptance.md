@@ -7,7 +7,7 @@
 | Backend under test | **builtin** (default). QMD collections are membership/tenant-filtered when enabled; default backend unchanged. |
 | Constraints held | Did **not** flip `collaboration.learning.privateMemoryPromote` default; did **not** switch default `memory.backend` to qmd; capsule approval gates retained; retrieved / injected / outcome_verified distinction unchanged. |
 | Test commands | `pnpm exec vitest run src/memory/memory-continuity-authz.test.ts src/memory/memory-continuity-acceptance.test.ts src/gateway/collaboration-learning/memory-index-paths.test.ts src/memory/memory-continuity-rpc.integration.test.ts` |
-| Result (Asia/Shanghai) | **13/13 passed** (2026-10-30 ~12:28 CST) — authz 4, index-paths/QMD 4, acceptance 3, RPC integration 2 |
+| Result (Asia/Shanghai) | **13/13 passed** (2026-10-30 ~12:32 CST, re-run twice) — authz 4, index-paths/QMD 4, acceptance 3, RPC integration 2. RPC file must import `embedding.test-mocks` before `memory-tool`. |
 
 ## Permission sources (what is checked)
 
