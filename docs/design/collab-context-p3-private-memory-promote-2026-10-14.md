@@ -87,4 +87,6 @@ Gateway method: `collaboration.learning.privateMemory.promote`
 
 ## Status note (2026-10-30 tip)
 
-P1-C 三修复已推送 tip，状态记 **已推送待复验 / 部分验证**（已推送≠验收通过）。默认 `privateMemoryPromote` 仍 OFF。
+P1-C 三修复已推送 tip，状态记 **已推送待复验 / 部分验证**（已推送≠验收通过；已推送≠合入开启）。默认 `privateMemoryPromote` 仍 OFF。
+
+**Honesty:** RPC `collaboration.learning.privateMemory.promote` and promote implementation **are in this PR** as P1-C closed-loop plumbing. Flag stays default OFF — plumbing present ≠ production opened.

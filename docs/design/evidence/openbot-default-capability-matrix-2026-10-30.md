@@ -1,6 +1,8 @@
-# 默认能力矩阵与 P0 证据（2026-10-30）
+# 默认能力矩阵与 P0–P2 证据（2026-10-30）
 
-基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；最小事件物化路径已接；完整 KB 目标未宣称）、**P2-G**（模型智能配置：native 合法默认；合成中性档案不得冒充已验证优化；partial catalog 合成项不进 ranking；策略改变可影响 outbound primary）、**P2-H**（定时任务闭环：默认可调度；完成 ledger 不得空完成误报；create→persist→due→adapter 送达证据→下次调度；真实 HTTP 未跑）。
+基线：本分支已 rebase 到含 #161 tip `b31c1e12` 的 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；最小事件物化路径已接；完整 KB 目标未宣称）、**P2-G**（模型智能配置：native 合法默认；合成中性档案不得冒充已验证优化；partial catalog 合成项不进 ranking；策略改变可影响 outbound primary）、**P2-H**（定时任务闭环：默认可调度；完成 ledger 不得空完成误报；create→persist→due→adapter 送达证据→下次调度；真实 HTTP 未跑）。
+
+**诚实声明（对齐代码，非仅矩阵）：** P1–P2 **不是** matrix-only——本 PR diff **含**对应实现与测试（含 P1-C `collaboration.learning.privateMemory.promote` RPC / `private-memory-promote-entry` / server-methods 注册）。`collaboration.learning.privateMemoryPromote` 仍默认 **OFF**（unset/false；仅 `=== true` 才写组资产）。**已推送 / 部分验证 ≠ 合入开启 / 生产打开 flag**；不 merge、不 DIGEST/LIVE cutover、不宣称 Codex PASS。
 
 状态只使用：已验证 / 部分验证 / 未实现 / 合理受控关闭 / 缺证据。
 
