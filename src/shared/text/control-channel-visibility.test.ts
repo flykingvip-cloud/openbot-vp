@@ -8,6 +8,8 @@ import {
   stripDeliverableEnvelopeTags,
   stripToolDigestLines,
   stripTurnCompletionMarkers,
+  TOOL_DIGEST_CLOSE_SENTINEL,
+  TOOL_DIGEST_OPEN_SENTINEL,
 } from "./control-channel-visibility.js";
 
 describe("control-channel-visibility", () => {
@@ -22,10 +24,20 @@ describe("control-channel-visibility", () => {
   });
 
   it("strips tool-digest units including preview body", () => {
-    const raw = "稍等。\n[tool-digest] exec ls -l\nNO 10-30 DIR\n\n好了。";
+    const raw = [
+      "稍等。",
+      TOOL_DIGEST_OPEN_SENTINEL,
+      "[tool-digest] exec ls -l",
+      "NO 10-30 DIR",
+      "",
+      "extra para inside digest",
+      TOOL_DIGEST_CLOSE_SENTINEL,
+      "好了。",
+    ].join("\n");
     const out = stripToolDigestLines(raw);
     expect(out).not.toContain("[tool-digest]");
     expect(out).not.toContain("NO 10-30 DIR");
+    expect(out).not.toContain("extra para inside digest");
     expect(out).toContain("稍等。");
     expect(out).toContain("好了。");
   });
@@ -35,6 +47,13 @@ describe("control-channel-visibility", () => {
     const out = stripToolDigestLines(raw);
     expect(out).toBe("");
     expect(out).not.toContain("PRIVATE_DIGEST_OUTPUT");
+  });
+
+  it("strips multi-paragraph legacy digest through end of text", () => {
+    const raw =
+      "[tool-digest] exec command=cat\n工具输出第一段\n\n内部工具第二段：PRIVATE_SECOND_PARAGRAPH";
+    expect(stripToolDigestLines(raw)).toBe("");
+    expect(isControlChannelOnlyText(raw)).toBe(true);
   });
 
   it("strips DELIVERABLE tags and keeps body", () => {
@@ -98,13 +117,18 @@ describe("control-channel-visibility", () => {
     expect(isControlChannelOnlyText("[tool-digest] exec ls -l\nNO 10-30 DIR")).toBe(true);
   });
 
-  it("does not hide mixed digest + real reply", () => {
-    expect(
-      isControlChannelOnlyText("[tool-digest] exec ls\n工具结果\n\n最终答复：已经处理完成。"),
-    ).toBe(false);
-    expect(
-      stripControlChannelForDisplay("[tool-digest] exec ls\n工具结果\n\n最终答复：已经处理完成。"),
-    ).toBe("最终答复：已经处理完成。");
+  it("does not hide mixed digest + real reply when sentinel-bounded", () => {
+    const mixed = [
+      TOOL_DIGEST_OPEN_SENTINEL,
+      "[tool-digest] exec ls",
+      "工具结果",
+      "",
+      "digest second para",
+      TOOL_DIGEST_CLOSE_SENTINEL,
+      "最终答复：已经处理完成。",
+    ].join("\n");
+    expect(isControlChannelOnlyText(mixed)).toBe(false);
+    expect(stripControlChannelForDisplay(mixed)).toBe("最终答复：已经处理完成。");
   });
 
   it("combined strip keeps PLAN_SPEAK CTA while removing markers", () => {
@@ -124,5 +148,20 @@ describe("control-channel-visibility", () => {
       }),
     ).toBe("处理完成。");
     expect(holdBackIncompleteControlSuffix('正文\n<<DELIVERABLE title="x')).toBe("正文\n");
+  });
+
+  it("streaming hold-back drops proper prefixes mid-line and at line-start", () => {
+    expect(holdBackIncompleteControlSuffix("处理完成。\n[turn_")).toBe("处理完成。\n");
+    expect(holdBackIncompleteControlSuffix("处理完成。\n[turn_completio")).toBe("处理完成。\n");
+    expect(holdBackIncompleteControlSuffix("正文<<DELIV")).toBe("正文");
+    expect(holdBackIncompleteControlSuffix("body<</DELIVERABL")).toBe("body");
+    expect(holdBackIncompleteControlSuffix("x<<deliv")).toBe("x");
+    expect(holdBackIncompleteControlSuffix("Hi\nInternal task-board cont")).toBe("Hi\n");
+    // Ordinary Markdown / comparison text is not swallowed.
+    expect(holdBackIncompleteControlSuffix("报告：[打开报告](/tmp/report.md)")).toBe(
+      "报告：[打开报告](/tmp/report.md)",
+    );
+    expect(holdBackIncompleteControlSuffix("a << b")).toBe("a << b");
+    expect(holdBackIncompleteControlSuffix("见 <div>ok</div>")).toBe("见 <div>ok</div>");
   });
 });

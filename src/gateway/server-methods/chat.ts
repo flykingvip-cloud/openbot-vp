@@ -1938,6 +1938,14 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
     // display strip removes the [tool-digest] header (which would otherwise leave
     // the tool preview body looking like a normal assistant reply).
     if (role === "assistant") {
+      const provenance =
+        message && typeof message === "object"
+          ? (message as { openbotControlChannel?: unknown }).openbotControlChannel
+          : undefined;
+      if (provenance === "tool-digest") {
+        changed = true;
+        continue;
+      }
       const originalControlText = extractAssistantTextForSilentCheck(message);
       if (
         typeof originalControlText === "string" &&

@@ -8,7 +8,16 @@
  *
  * Wire deltas must sanitize complete AND incomplete control tokens while leaving
  * the raw/model buffer intact for structured settle / formal submit.
+ *
+ * Tool digests produced by context-compiler are wrapped in OPENBOT_TOOL_DIGEST
+ * sentinels so blank lines inside the preview cannot be mistaken for a reply
+ * boundary. Legacy unwrapped `[tool-digest]…` units are consumed to end-of-text
+ * (whole-message provenance); mixed real replies must use the sentinel wrap.
  */
+
+/** Structural wrap written by formatToolDigest — trusted digest unit boundary. */
+export const TOOL_DIGEST_OPEN_SENTINEL = "<<OPENBOT_TOOL_DIGEST>>";
+export const TOOL_DIGEST_CLOSE_SENTINEL = "<</OPENBOT_TOOL_DIGEST>>";
 
 /** Bracket turn_completion control lines (delivered / permanent_block / true_fork). */
 const TURN_COMPLETION_LINE_RE = /^\s*\[turn_completion\b[^\]]*\]\s*$/gim;
@@ -20,11 +29,19 @@ const TURN_COMPLETION_INCOMPLETE_RE = /\[turn_completion\b[^\]]*$/i;
 const INTERNAL_CONTINUE_PREFIX_RE = /^\s*Internal (?:task-board|execution) continue:\s*$/im;
 
 /**
- * Tool-digest units from context-compiler shrink (formatToolDigest = head + \n + preview).
- * Header line plus contiguous preview lines; a blank-line paragraph break ends the unit
- * so a following real reply is preserved.
+ * Sentinel-wrapped tool-digest units (header + preview, may contain blank lines).
  */
-const TOOL_DIGEST_UNIT_RE = /^[ \t]*\[tool-digest\][^\n]*(?:\n(?![ \t]*\n)[^\n]*)*/gim;
+const TOOL_DIGEST_WRAPPED_RE =
+  /<<\s*OPENBOT_TOOL_DIGEST\s*>>\s*[\s\S]*?<<\s*\/\s*OPENBOT_TOOL_DIGEST\s*>>/gi;
+/** Open sentinel present but close missing — consume through end of text. */
+const TOOL_DIGEST_WRAPPED_INCOMPLETE_RE = /<<\s*OPENBOT_TOOL_DIGEST\b[^>]*>[\s\S]*$/i;
+
+/**
+ * Legacy unwrapped `[tool-digest]` units: consume from header through end of
+ * string. Blank lines are NOT a reply boundary (preview may contain them).
+ * Mixed “digest then real answer” must use TOOL_DIGEST_*_SENTINEL wrappers.
+ */
+const TOOL_DIGEST_LEGACY_TO_END_RE = /[ \t]*\[tool-digest\][\s\S]*$/gi;
 /** Incomplete trailing tool-digest open (streaming). */
 const TOOL_DIGEST_INCOMPLETE_RE = /\[tool-digest\b[^\]]*$/i;
 
@@ -40,6 +57,13 @@ const UNCLOSED_DELIVERABLE_OPEN_RE = /<<\s*\/?\s*DELIVERABLE\b[^<]*$/i;
 /** Absolute tenant locators that must not appear in user-facing copy. */
 const ABSOLUTE_TENANT_PATH_RE = /\/(?:root|var)\/[^\s，。；;、]*openbot-tenants\/[^\s，。；;、]*/gi;
 
+const BRACKET_CONTROL_KEYWORDS = ["turn_completion", "tool-digest"] as const;
+const ANGLE_CONTROL_TAGS = ["DELIVERABLE", "OPENBOT_TOOL_DIGEST"] as const;
+const INTERNAL_CONTINUE_OPENERS = [
+  "Internal task-board continue:",
+  "Internal execution continue:",
+] as const;
+
 export function stripTurnCompletionMarkers(text: string): string {
   if (!text || !/\[turn_completion\b/i.test(text)) {
     return text;
@@ -53,15 +77,21 @@ export function stripTurnCompletionMarkers(text: string): string {
 }
 
 /**
- * Remove tool-digest units (header + preview body). Stops at a blank-line
- * paragraph so mixed “digest then real answer” keeps the answer.
+ * Remove tool-digest units (sentinel-wrapped or legacy header→EOF).
+ * Does not use blank lines as a preview/reply boundary.
  */
 export function stripToolDigestLines(text: string): string {
-  if (!text || !/\[tool-digest\]/i.test(text)) {
+  if (!text) {
+    return text;
+  }
+  const hasDigest = /\[tool-digest\]/i.test(text) || /OPENBOT_TOOL_DIGEST/i.test(text);
+  if (!hasDigest) {
     return text;
   }
   return text
-    .replace(TOOL_DIGEST_UNIT_RE, "")
+    .replace(TOOL_DIGEST_WRAPPED_RE, "")
+    .replace(TOOL_DIGEST_WRAPPED_INCOMPLETE_RE, "")
+    .replace(TOOL_DIGEST_LEGACY_TO_END_RE, "")
     .replace(TOOL_DIGEST_INCOMPLETE_RE, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -110,32 +140,124 @@ export function stripAbsoluteWorkspacePaths(text: string): string {
   return text.replace(ABSOLUTE_TENANT_PATH_RE, "workspace");
 }
 
+function isIncompleteBracketControl(suffix: string): boolean {
+  if (!suffix.startsWith("[")) {
+    return false;
+  }
+  // A completed bracket token belongs to strip*, not hold-back.
+  if (suffix.includes("]")) {
+    return false;
+  }
+  const inner = suffix.slice(1);
+  for (const keyword of BRACKET_CONTROL_KEYWORDS) {
+    const lowerInner = inner.toLowerCase();
+    const lowerKw = keyword.toLowerCase();
+    // Proper prefix of the keyword (including bare "[").
+    if (lowerKw.startsWith(lowerInner) && lowerInner.length < lowerKw.length) {
+      return true;
+    }
+    // Full keyword + optional attrs, still missing "]".
+    if (lowerInner.startsWith(lowerKw)) {
+      const afterKw = inner.slice(keyword.length);
+      if (afterKw.length === 0) {
+        return true;
+      }
+      // Reject lookalikes like [turn_completionX…
+      if (/^[a-zA-Z0-9_]/.test(afterKw)) {
+        continue;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+function isIncompleteAngleControl(suffix: string): boolean {
+  if (!suffix.startsWith("<<")) {
+    return false;
+  }
+  let i = 2;
+  while (i < suffix.length && /[ \t]/.test(suffix[i]!)) {
+    i += 1;
+  }
+  if (i < suffix.length && suffix[i] === "/") {
+    i += 1;
+  }
+  while (i < suffix.length && /[ \t]/.test(suffix[i]!)) {
+    i += 1;
+  }
+  const rest = suffix.slice(i);
+  // `<<` / `<< ` / `<</` / `<</ ` — still a proper prefix of a control tag.
+  if (rest.length === 0) {
+    return true;
+  }
+  for (const tag of ANGLE_CONTROL_TAGS) {
+    const lowerRest = rest.toLowerCase();
+    const lowerTag = tag.toLowerCase();
+    if (lowerTag.startsWith(lowerRest) && lowerRest.length < lowerTag.length) {
+      return true;
+    }
+    if (lowerRest.startsWith(lowerTag)) {
+      const after = rest.slice(tag.length);
+      if (after.length > 0 && /^[a-zA-Z0-9_]/.test(after)) {
+        continue;
+      }
+      // Full tag keyword matched; hold until `>` so strip/orphan can take over.
+      return !after.includes(">");
+    }
+  }
+  return false;
+}
+
+function isIncompleteInternalContinueLine(line: string): boolean {
+  if (!line) {
+    return false;
+  }
+  const lower = line.toLowerCase();
+  for (const opener of INTERNAL_CONTINUE_OPENERS) {
+    const lowerOpener = opener.toLowerCase();
+    if (lowerOpener.startsWith(lower) && lower.length > 0 && lower.length < lowerOpener.length) {
+      return true;
+    }
+    if (lower.startsWith(lowerOpener)) {
+      // Complete opener — whole-message path hides via isInternalContinuePromptText.
+      return false;
+    }
+  }
+  // Shared proper prefix of both openers ("I" … "Internal ").
+  if ("internal ".startsWith(lower) && lower.length > 0) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Hold back a trailing suffix that looks like the start of a control token but
- * is not yet a complete marker (char-split streaming). Safe no-op when the
- * suffix is ordinary prose.
+ * is not yet a complete marker (char-split streaming). Holds ANY proper prefix
+ * of known control tokens (line-start or mid-line). Safe no-op when the suffix
+ * is ordinary prose (Markdown links, HTML, comparisons).
  */
 export function holdBackIncompleteControlSuffix(text: string): string {
   if (!text) {
     return text;
   }
-  let next = text;
-  // Trailing incomplete bracket control open: [turn_completion… / [tool-digest…
-  next = next.replace(/(?:\n|^)\[(?:turn_completion|tool-digest)\b[^\]]*$/i, (m) =>
-    m.startsWith("\n") ? "\n" : "",
-  );
-  // Trailing incomplete DELIVERABLE open (no closing >> / body yet).
-  next = next.replace(/(?:\n|^)<<\s*\/?\s*DELIVERABLE\b[^<]*$/i, (m) =>
-    m.startsWith("\n") ? "\n" : "",
-  );
-  // Trailing incomplete Internal continue line.
-  next = next.replace(/(?:\n|^)Internal (?:task-board|execution) continue:[^\n]*$/i, (m) =>
-    m.startsWith("\n") ? "\n" : "",
-  );
-  // Bare "[" / "<<" that may be the first char of a control token — only when
-  // the whole remainder after the last newline is exactly that opener.
-  next = next.replace(/(?:\n|^)(?:\[|<<)$/u, (m) => (m.startsWith("\n") ? "\n" : ""));
-  return next.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/g, "");
+  let holdFrom = -1;
+  for (let i = 0; i < text.length; i++) {
+    const suffix = text.slice(i);
+    if (isIncompleteBracketControl(suffix) || isIncompleteAngleControl(suffix)) {
+      holdFrom = i;
+      continue;
+    }
+    // Internal continue injectors are line-oriented in production.
+    if (i === 0 || text[i - 1] === "\n") {
+      const firstLine = suffix.split("\n", 1)[0] ?? "";
+      if (isIncompleteInternalContinueLine(firstLine)) {
+        holdFrom = i;
+      }
+    }
+  }
+  const kept = holdFrom < 0 ? text : text.slice(0, holdFrom);
+  return kept.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+$/g, "");
 }
 
 /**
@@ -169,7 +291,7 @@ export function stripControlChannelForDisplay(
 /**
  * True when an entire message is only control-channel noise (hide the bubble).
  * Uses structural strip (including full digest units) rather than startsWith, so
- * a digest header followed by a real answer after a paragraph break is kept.
+ * a sentinel-wrapped digest followed by a real answer keeps the answer.
  */
 export function isControlChannelOnlyText(text: string): boolean {
   const trimmed = text.trim();

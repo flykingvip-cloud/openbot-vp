@@ -126,6 +126,7 @@ describe("server-chat control-channel streaming wire", () => {
     }
     expect(allBroadcastJson(h.broadcastChat)).not.toContain("[turn_completion");
     expect(allBroadcastJson(h.broadcastChat)).not.toMatch(/turn_completion/);
+    expect(allBroadcastJson(h.broadcastChat)).not.toContain("[turn_");
     h.nowSpy?.mockRestore();
   });
 
@@ -140,6 +141,7 @@ describe("server-chat control-channel streaming wire", () => {
       emitAssistantText(h, acc, seq++);
     }
     expect(allBroadcastJson(h.broadcastChat)).not.toContain("<<DELIVERABLE");
+    expect(allBroadcastJson(h.broadcastChat)).not.toContain("<<DELIV");
     expect(allBroadcastJson(h.broadcastChat)).not.toContain("<</DELIVERABLE");
     h.nowSpy?.mockRestore();
   });
