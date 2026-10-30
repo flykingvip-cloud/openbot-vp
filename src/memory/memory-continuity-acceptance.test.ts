@@ -367,20 +367,24 @@ describe("memory continuity acceptance (builtin)", () => {
         actorId: "operator-1",
       });
       expect(approved.approved).toBe(true);
+      // Hard personal path: approve → promote → active asset → recall inject.
+      // privateMemoryPromote stays default OFF; this uses agent:<botId> scope only.
+      expect(approved.promoted).toBe(true);
+      expect(approved.assetId).toBeTruthy();
+      expect(approved.reason).toBe("promoted");
 
-      if (approved.promoted && approved.assetId) {
-        const after = await readPersonalLearningRecall({ botId: "bot-main" });
-        expect(after.lessons.some((l) => l.assetId === approved.assetId)).toBe(true);
+      const after = await readPersonalLearningRecall({ botId: "bot-main" });
+      expect(after.lessons.some((l) => l.assetId === approved.assetId)).toBe(true);
+      expect(after.lessons.some((l) => l.lesson.includes(lessonMarker))).toBe(true);
 
-        const revoked = await revokePersonalLearningAsset({
-          botId: "bot-main",
-          assetId: approved.assetId,
-          actorId: "operator-1",
-        });
-        expect(revoked.ok).toBe(true);
-        const stopped = await readPersonalLearningRecall({ botId: "bot-main" });
-        expect(stopped.lessons.every((l) => l.assetId !== approved.assetId)).toBe(true);
-      }
+      const revoked = await revokePersonalLearningAsset({
+        botId: "bot-main",
+        assetId: approved.assetId!,
+        actorId: "operator-1",
+      });
+      expect(revoked.ok).toBe(true);
+      const stopped = await readPersonalLearningRecall({ botId: "bot-main" });
+      expect(stopped.lessons.every((l) => l.assetId !== approved.assetId)).toBe(true);
 
       // Group path (same gates): candidate → approve → asset → revoke.
       const groupId = "learn-group-1";

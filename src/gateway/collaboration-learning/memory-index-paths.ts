@@ -2,6 +2,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenBotConfig } from "../../config/config.js";
+import { resolveTrustedCollaborationGroupsRoot } from "../workspace/group-locator.js";
 import {
   resolveConfiguredCollaborationWorkspaceRoot,
   resolveGroupWorkspacePath,
@@ -83,7 +84,6 @@ export async function discoverCollaborationMemoryIndexRoots(
     if (!tenantId) {
       return [];
     }
-    const { resolveTrustedCollaborationGroupsRoot } = await import("../workspace/group-locator.js");
     groupsRoot = resolveTrustedCollaborationGroupsRoot({
       tenantId,
       profile: "managed_enterprise",
@@ -168,14 +168,37 @@ export type CollaborationQmdCollection = {
   kind: "memory";
 };
 
-export async function resolveCollaborationQmdCollections(params: {
+export type ResolveCollaborationQmdCollectionsParams = {
   cfg: OpenBotConfig;
   agentId: string;
   existingNames: Set<string>;
   scopeCollectionBase: (base: string, agentId: string) => string;
   ensureUniqueName: (base: string, existing: Set<string>) => string;
-}): Promise<CollaborationQmdCollection[]> {
-  const roots = await discoverCollaborationMemoryIndexRoots(params.cfg);
+  /**
+   * Membership / tenant filter. When omitted, default deny (no all-groups dump).
+   * Pass an empty set to explicitly index no collaboration collections.
+   */
+  authorizedGroupIds?: ReadonlySet<string> | readonly string[];
+  tenantId?: string | null;
+  profile?: "personal_local" | "managed_enterprise";
+};
+
+/**
+ * QMD collaboration collections — same authorizedGroupIds / tenant-scoped roots
+ * filter as builtin. Missing authz context → no collections (fail closed).
+ */
+export async function resolveCollaborationQmdCollections(
+  params: ResolveCollaborationQmdCollectionsParams,
+): Promise<CollaborationQmdCollection[]> {
+  // Default deny: never dump every group's memory into every agent QMD index.
+  if (params.authorizedGroupIds === undefined) {
+    return [];
+  }
+  const roots = await discoverCollaborationMemoryIndexRoots(params.cfg, {
+    authorizedGroupIds: params.authorizedGroupIds,
+    tenantId: params.tenantId,
+    profile: params.profile,
+  });
   const collections: CollaborationQmdCollection[] = [];
   for (const root of roots) {
     const base = params.scopeCollectionBase(`collab-${root.groupId}`, params.agentId);
@@ -191,18 +214,38 @@ export async function resolveCollaborationQmdCollections(params: {
   return collections;
 }
 
-export function resolveCollaborationQmdCollectionsSync(params: {
-  cfg: OpenBotConfig;
-  agentId: string;
-  existingNames: Set<string>;
-  scopeCollectionBase: (base: string, agentId: string) => string;
-  ensureUniqueName: (base: string, existing: Set<string>) => string;
-}): CollaborationQmdCollection[] {
-  const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(params.cfg);
-  if (!collaborationRoot) {
+export function resolveCollaborationQmdCollectionsSync(
+  params: ResolveCollaborationQmdCollectionsParams,
+): CollaborationQmdCollection[] {
+  // Default deny: missing authz context must not enumerate all groups.
+  if (params.authorizedGroupIds === undefined) {
     return [];
   }
-  const groupsRoot = path.join(collaborationRoot, "groups");
+  const authorized = normalizeAuthorizedGroupIdSet(params.authorizedGroupIds);
+  if (!authorized || authorized.size === 0) {
+    return [];
+  }
+
+  const profile = params.profile ?? "personal_local";
+  const tenantId = params.tenantId?.trim() || null;
+  let groupsRoot: string;
+  if (profile === "managed_enterprise") {
+    if (!tenantId) {
+      return [];
+    }
+    groupsRoot = resolveTrustedCollaborationGroupsRoot({
+      tenantId,
+      profile: "managed_enterprise",
+      cfg: params.cfg,
+    });
+  } else {
+    const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(params.cfg);
+    if (!collaborationRoot) {
+      return [];
+    }
+    groupsRoot = path.join(collaborationRoot, "groups");
+  }
+
   let entries: fsSync.Dirent[];
   try {
     entries = fsSync.readdirSync(groupsRoot, { withFileTypes: true });
@@ -221,6 +264,9 @@ export function resolveCollaborationQmdCollectionsSync(params: {
         return entry.name;
       }
     })();
+    if (!authorized.has(groupId)) {
+      continue;
+    }
     const memoryDir = path.join(groupsRoot, entry.name, "memory");
     if (!fsSync.existsSync(memoryDir)) {
       continue;

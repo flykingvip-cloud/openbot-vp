@@ -107,6 +107,9 @@ export async function approvePersonalLearningCandidate(
     groupId: scopeId,
     capsuleId: params.capsuleId,
     actorId: params.actorId,
+    // Stable personal path: scope already names the bot; do not rely solely on
+    // agents.list discovery inside promoteApprovedCapsuleIfEligible.
+    targetBotId: botId,
   });
   return { ...result, scopeId };
 }

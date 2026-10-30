@@ -188,7 +188,22 @@ export async function getMemorySearchManager(
     }
     indexAccess = access.access;
   }
-  const resolved = resolveMemoryBackendConfig(bound);
+  // QMD collab collections need the same membership/tenant filter as builtin.
+  // Resolve authz before backend config so we never dump all groups into QMD.
+  let continuityAuthzForBackend: MemoryContinuityAuthzContext | undefined;
+  if ((bound.cfg.memory?.backend ?? "builtin") === "qmd") {
+    continuityAuthzForBackend = await resolveBuiltinCollaborationRoots(params);
+  }
+  const resolved = resolveMemoryBackendConfig({
+    ...bound,
+    ...(continuityAuthzForBackend
+      ? {
+          authorizedGroupIds: continuityAuthzForBackend.authorizedGroupIds,
+          tenantId: continuityAuthzForBackend.tenantId,
+          profile: continuityAuthzForBackend.profile,
+        }
+      : {}),
+  });
   if (resolved.backend === "cogniweave" && resolved.cogniweave) {
     const statusOnly = params.purpose === "status";
     const cloudTenant = resolved.cogniweave.cloudSync?.tenantId?.trim() || null;
@@ -291,7 +306,8 @@ export async function getMemorySearchManager(
             primary,
             fallbackFactory: async () => {
               const { MemoryIndexManager } = await loadManagerRuntime();
-              const authz = await resolveBuiltinCollaborationRoots(params);
+              const authz =
+                continuityAuthzForBackend ?? (await resolveBuiltinCollaborationRoots(params));
               return await MemoryIndexManager.get({
                 ...bound,
                 collaborationMemoryRoots: authz.roots,
@@ -318,7 +334,7 @@ export async function getMemorySearchManager(
 
   try {
     const { MemoryIndexManager } = await loadManagerRuntime();
-    const authz = await resolveBuiltinCollaborationRoots(params);
+    const authz = continuityAuthzForBackend ?? (await resolveBuiltinCollaborationRoots(params));
     const manager = await MemoryIndexManager.get({
       ...bound,
       collaborationMemoryRoots: authz.roots,

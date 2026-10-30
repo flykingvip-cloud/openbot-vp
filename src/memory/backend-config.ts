@@ -409,6 +409,13 @@ function resolveDefaultCollections(
 export function resolveMemoryBackendConfig(params: {
   cfg: OpenBotConfig;
   agentId: string;
+  /**
+   * Collaboration QMD membership filter. When omitted, collab collections are
+   * denied (no all-groups dump). Pass authorized ids from continuity authz.
+   */
+  authorizedGroupIds?: ReadonlySet<string> | readonly string[];
+  tenantId?: string | null;
+  profile?: "personal_local" | "managed_enterprise";
 }): ResolvedMemoryBackendConfig {
   const backend = params.cfg.memory?.backend ?? DEFAULT_BACKEND;
   const citations = params.cfg.memory?.citations ?? DEFAULT_CITATIONS;
@@ -454,6 +461,9 @@ export function resolveMemoryBackendConfig(params: {
       existingNames: nameSet,
       scopeCollectionBase,
       ensureUniqueName,
+      authorizedGroupIds: params.authorizedGroupIds,
+      tenantId: params.tenantId,
+      profile: params.profile,
     }),
   ];
 
