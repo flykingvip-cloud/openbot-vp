@@ -10095,6 +10095,10 @@ tasks:
       - src/gateway/server.cron.test.ts
       - src/gateway/collaboration-learning/private-memory-promote.ts
       - src/gateway/collaboration-learning/private-memory-promote.test.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
+      - src/gateway/server-methods/enterprise-data-events.ts
+      - src/cron/service.delivery-adapter-evidence.p2h.test.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10167,6 +10171,10 @@ landingStreams:
       - src/gateway/enterprise-data/connector-catalog.test.ts
       - src/gateway/server-methods/enterprise-data-m4.ts
       - src/gateway/server-methods/enterprise-data-m4.test.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
+      - src/gateway/server-methods/enterprise-data-events.ts
+      - src/cron/service.delivery-adapter-evidence.p2h.test.ts
       - src/gateway/model-entitlement/aor-selection.ts
       - src/gateway/model-entitlement/aor-selection.test.ts
       - src/gateway/model-entitlement/aor-catalog-adapter.ts
@@ -10188,12 +10196,12 @@ landingStreams:
       task: openbot-default-capability-p0:cursor-grok-default-capability
       owner: cursor-grok-default-capability
       purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
-        learning skillDraft list/finalize + P1-E shadow intent authorize + P1-F
-        knowledge materialization false-availability fix (event capability not
-        delivered) + P2-G platform models smart config (synthetic-neutral must
-        not claim effect-verified) + P2-H cron closed-loop (completed-ledger
-        empty-misclassify fix; retention-aware CRUD evidence; no real HTTP
-        delivery). NO_PROMOTE; no auto-Apply system/runtime bindings.
+        learning skillDraft execute+attribution + P1-E shadow intent authorize +
+        P1-F knowledge materialization (false-availability fix + minimal
+        event-driven path; full KB not claimed) + P2-G platform models smart
+        config (synthetic-neutral / partial-catalog must not fake ranking) +
+        P2-H cron closed-loop (adapter delivery evidence; no real HTTP).
+        NO_PROMOTE; no auto-Apply system/runtime bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22572,7 +22580,7 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/gateway/enterprise-data/knowledge-publication.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
-    reason: "P1-F: reject event_driven writes; migration helpers; not event executor."
+    reason: "P1-F: materialization mode helpers; event_driven now implemented (minimal)."
     reviewAfter: 2026-11-30
   - glob: src/gateway/enterprise-data/knowledge-publication.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
@@ -22637,6 +22645,21 @@ sharedPaths:
   - glob: src/agents/model-fallback.p2g-outbound.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: "P2-G: preferredModelOrder changes outbound primary provider/model."
+  - glob: src/gateway/enterprise-data/event-driven-projection-materializer.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: minimal event_driven projection materializer (not full KB)."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: event materializer unit tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-events.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: events.ingest wires event-driven materialization."
+    reviewAfter: 2026-11-30
+  - glob: src/cron/service.delivery-adapter-evidence.p2h.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-H: adapter delivery evidence (no live HTTP claim)."
     reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
