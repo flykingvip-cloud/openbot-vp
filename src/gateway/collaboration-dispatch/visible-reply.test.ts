@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyCollaborationAbortIntent,
   collaborationInfraFailureDetail,
   collaborationSkipReasonForMissingReply,
   formatCollaborationDispatchFailure,
@@ -140,31 +141,104 @@ describe("collaborationInfraFailureDetail", () => {
         skipReason: "crash",
         errorMessage: detail ?? undefined,
       }),
-    ).not.toContain("未产出正文");
+    ).not.toMatch(/没能交上正文|未产出正文/);
     expect(
       formatCollaborationRoundAbortNotice({
         agentName: "高密度分析",
         skipReason: "empty",
       }),
-    ).toContain("未产出正文");
+    ).toContain("没能交上正文");
+    expect(
+      formatCollaborationRoundAbortNotice({
+        agentName: "高密度分析",
+        skipReason: "empty",
+      }),
+    ).not.toContain("本轮没有形成可见回复");
+  });
+});
+
+describe("classifyCollaborationAbortIntent", () => {
+  it("classifies continue, nudge, deliver, and divert heuristics", () => {
+    expect(classifyCollaborationAbortIntent("请继续写下一章")).toBe("continue");
+    expect(classifyCollaborationAbortIntent("催办立刻续跑")).toBe("nudge");
+    expect(classifyCollaborationAbortIntent("请交付 binding 成果")).toBe("deliver");
+    expect(classifyCollaborationAbortIntent("电脑占用请 divert")).toBe("divert");
+    expect(classifyCollaborationAbortIntent("随便问一句")).toBe("none");
+    expect(classifyCollaborationAbortIntent(undefined)).toBe("none");
   });
 });
 
 describe("formatCollaborationRoundAbortNotice", () => {
-  it("explains silent, timeout, and crash outcomes in user-facing Chinese", () => {
+  it("uses assistant tone without the rigid brand-header prefix", () => {
+    const notice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "empty",
+    });
+    expect(notice).not.toContain("本轮没有形成可见回复");
+    expect(notice).toMatch(/^我理解/);
+    expect(notice).toContain("没能交上正文");
+  });
+
+  it("explains silent, timeout, crash, duplicate, and empty outcomes", () => {
+    expect(
+      formatCollaborationRoundAbortNotice({ agentName: "熊猫学习", skipReason: "silent" }),
+    ).toContain("静默回执");
     expect(
       formatCollaborationRoundAbortNotice({ agentName: "熊猫学习", skipReason: "silent" }),
     ).toContain("换个更具体的问题");
     expect(formatCollaborationRoundAbortNotice({ skipReason: "timeout" })).toContain("@备用成员");
+    expect(formatCollaborationRoundAbortNotice({ skipReason: "timeout" })).toContain("超时");
     expect(
       formatCollaborationRoundAbortNotice({
         skipReason: "crash",
         errorMessage: "数字人执行中断，请再试一次",
       }),
     ).toContain("@其他成员接手");
+    expect(
+      formatCollaborationRoundAbortNotice({
+        skipReason: "crash",
+        errorMessage: "数字人执行中断，请再试一次",
+      }),
+    ).toContain("执行中断");
     expect(formatCollaborationRoundAbortNotice({ skipReason: "duplicate" })).toContain(
       "补充新角度",
     );
+    expect(
+      formatCollaborationRoundAbortNotice({ agentName: "高密度分析", skipReason: "empty" }),
+    ).toContain("没能交上正文");
+  });
+
+  it("uses the generic shell when there is no intent signal", () => {
+    const notice = formatCollaborationRoundAbortNotice({
+      userText: "你好，在吗",
+    });
+    expect(notice).not.toContain("本轮没有形成可见回复");
+    expect(notice).toContain("稍后再发或缩短问题重试");
+    expect(notice).toContain("@其他成员接手");
+    expect(notice).toContain("补充目标/约束后重发");
+    expect(notice).toContain("续写、催办还是交付");
+  });
+
+  it("branches for continue and deliver intents while naming the agent", () => {
+    const continueNotice = formatCollaborationRoundAbortNotice({
+      agentName: "熊猫学习",
+      skipReason: "empty",
+      userText: "请继续写下一章",
+    });
+    expect(continueNotice).toContain("熊猫学习");
+    expect(continueNotice).toContain("续写");
+    expect(continueNotice).toContain("请继续");
+    expect(continueNotice).not.toContain("本轮没有形成可见回复");
+
+    const deliverNotice = formatCollaborationRoundAbortNotice({
+      agentName: "CEO助理",
+      skipReason: "empty",
+      userText: "请交付本周成果 binding",
+    });
+    expect(deliverNotice).toContain("CEO助理");
+    expect(deliverNotice).toMatch(/交付|成果/);
+    expect(deliverNotice).toContain("binding");
+    expect(deliverNotice).not.toContain("本轮没有形成可见回复");
   });
 });
 
@@ -174,7 +248,19 @@ describe("formatCollaborationDispatchFailure", () => {
       formatCollaborationDispatchFailure(
         new Error("Cannot find module '/tmp/dist/auth-profiles-x.js': code=ERR_MODULE_NOT_FOUND"),
       ),
-    ).toBe("数字人执行中断，请再试一次");
+    ).toContain("请再试一次");
+  });
+
+  it("maps common failures and never returns bare 协作回合执行失败", () => {
+    expect(
+      formatCollaborationDispatchFailure(new Error("workspace_authorization_failed")),
+    ).toContain("工作区未授权");
+    expect(formatCollaborationDispatchFailure(new Error("ETIMEDOUT waiting"))).toContain("超时");
+    expect(formatCollaborationDispatchFailure(new Error("AbortError"))).toContain("中断");
+    const unknown = formatCollaborationDispatchFailure(new Error("some-weird-infra-xyz"));
+    expect(unknown).not.toBe("协作回合执行失败");
+    expect(unknown).not.toContain("协作回合执行失败");
+    expect(unknown).toMatch(/重试|接手/);
   });
 });
 

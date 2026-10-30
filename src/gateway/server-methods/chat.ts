@@ -5569,6 +5569,7 @@ export const chatHandlers: GatewayRequestHandlers = {
                       lastSkipReason ??
                       (completedRound?.state === "ROUND_ABORTED" ? "timeout" : "crash"),
                     errorMessage: roundFailed ? roundFailureMessage : lastSkipDetail,
+                    userText: bodyTrimmed,
                   })
               : null;
             const abortNoticeMessage = abortNotice
