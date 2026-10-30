@@ -203,11 +203,9 @@ export function formatPermanentBlock(params: {
   return `[turn_completion state=permanent_block reason=${field(params.reason)} degradation=${field(params.degradation)} required_user_action=${field(params.requiredUserAction)}]`;
 }
 
+/** Human-facing delivered copy (no bracket control marker). */
 export function formatDeliveredLine(openablePath: string, receipt?: string): string {
-  const lines = [
-    `[turn_completion state=delivered path=${field(openablePath)}]`,
-    `可打开：${openablePath}`,
-  ];
+  const lines = [`可打开：${openablePath}`];
   if (receipt) {
     lines.push(receipt);
   }
@@ -640,6 +638,21 @@ function deliveredResult(params: {
   };
 }
 
+function formatPermanentBlockVisible(params: {
+  reason: string;
+  requiredUserAction: string;
+  receipt?: string;
+}): string {
+  // Human speech only. Include 等待你确认 so task-board human-gate detection
+  // still fires without embedding a [turn_completion …] control marker.
+  const action = params.requiredUserAction.trim() || "确认后回复继续";
+  const lines = [`等待你确认：${action}`];
+  if (params.receipt?.trim()) {
+    lines.push(params.receipt.trim());
+  }
+  return lines.join("\n");
+}
+
 function permanentResult(params: {
   reason: string;
   degradation: string;
@@ -647,8 +660,8 @@ function permanentResult(params: {
   receipt?: string;
   hardStopPrevented: TurnCompletionHardStop | null;
 }): TurnCompletionSettlement {
-  const line = formatPermanentBlock(params);
-  const visible = params.receipt ? `${line}\n${params.receipt}` : line;
+  // formatPermanentBlock remains exported for structured/logging callers; visible
+  // chat must not include the bracket marker line.
   return {
     contract: {
       state: "permanent_block",
@@ -657,7 +670,7 @@ function permanentResult(params: {
       requiredUserAction: field(params.requiredUserAction),
       ...(params.receipt ? { sidePathReceipt: params.receipt } : {}),
     },
-    visibleText: visible,
+    visibleText: formatPermanentBlockVisible(params),
     continueExecution: false,
     hardStopPrevented: params.hardStopPrevented,
   };
@@ -843,10 +856,17 @@ export function settleTurnCompletion(input: TurnCompletionInput): TurnCompletion
       input.forkOptions && input.forkOptions.length >= 2
         ? [...input.forkOptions]
         : ["option_a", "option_b"];
-    const line = formatTrueFork(options);
+    // formatTrueFork remains exported for structured consumers; never put the
+    // bracket marker into visibleText (end-user chat).
+    const speech = assistantText.trim();
+    const hasGate =
+      /等待你确认|等待确认后|waiting_confirmation|owner-decision|owner_decision|请扫码|请支付|二维码|验证码|授权登录/iu.test(
+        speech,
+      );
+    const visibleText = hasGate ? speech : speech ? `${speech}\n\n等待你确认下一步。` : "等待你确认下一步。";
     return {
       contract: { state: "true_fork", options },
-      visibleText: `${line}\n${assistantText.trim()}`,
+      visibleText,
       continueExecution: false,
       hardStopPrevented: null,
     };

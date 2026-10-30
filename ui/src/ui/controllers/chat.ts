@@ -1,3 +1,4 @@
+import { isInternalContinueHistoryMessage } from "../../../../src/auto-reply/reply/internal-continue-prompt.js";
 import { isMemoryFlushHistoryMessage } from "../../../../src/auto-reply/reply/memory-flush-prompt.js";
 import { isRestoreTaskIsolationMessage } from "../../../../src/auto-reply/reply/restore-task-isolation.js";
 import type { MentionMetadata } from "../../../../src/organization/mention-types.js";
@@ -122,6 +123,7 @@ function shouldHideChatHistoryMessage(message: unknown): boolean {
   return (
     isAssistantSilentReply(message) ||
     isMemoryFlushHistoryMessage(message) ||
+    isInternalContinueHistoryMessage(message) ||
     isRestoreTaskIsolationMessage(message)
   );
 }
@@ -1332,7 +1334,7 @@ function appendChatMessage(
 ) {
   // Defense-in-depth: never append internal memory-flush prompts or isolated
   // checkpoint-restore receipts as current-task chat bubbles.
-  if (isMemoryFlushHistoryMessage(message) || isRestoreTaskIsolationMessage(message)) {
+  if (isMemoryFlushHistoryMessage(message) || isInternalContinueHistoryMessage(message) || isRestoreTaskIsolationMessage(message)) {
     return;
   }
   const messageId = typeof message.id === "string" ? message.id : "";

@@ -2,7 +2,12 @@
  * Message normalization utilities for chat rendering.
  */
 
+import { isInternalContinueHistoryMessage } from "../../../../src/auto-reply/reply/internal-continue-prompt.js";
 import { stripInboundMetadata } from "../../../../src/auto-reply/reply/strip-inbound-meta.js";
+import {
+  isControlChannelOnlyText,
+  stripControlChannelForDisplay,
+} from "../../../../src/shared/text/control-channel-visibility.js";
 import type { NormalizedMessage, MessageContentItem } from "../types/chat-types.ts";
 import { stripClientAttachmentManifest } from "./message-extract.ts";
 import { readPeerSentTargets } from "./peer-exchange.ts";
@@ -114,14 +119,38 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
     typeof m.senderLabel === "string" && m.senderLabel.trim() ? m.senderLabel.trim() : null;
   const agentId = typeof m.agentId === "string" && m.agentId.trim() ? m.agentId.trim() : null;
 
+  // Hide internal continue injectors before display stripping mutates the text.
+  const rawVisible = messageText(content);
+  const hideControlOnly =
+    isInternalContinueHistoryMessage({ role, content }) || isControlChannelOnlyText(rawVisible);
+
   // Strip AI-injected metadata prefix blocks from user messages before display.
   if (role === "user" || role === "User" || role === "peer") {
     content = content.map((item) => {
       if (item.type === "text" && typeof item.text === "string") {
-        return { ...item, text: stripClientAttachmentManifest(stripInboundMetadata(item.text)) };
+        return {
+          ...item,
+          text: stripControlChannelForDisplay(
+            stripClientAttachmentManifest(stripInboundMetadata(item.text)),
+          ),
+        };
       }
       return item;
     });
+  }
+
+  // Defense: strip control-channel markers from assistant bubbles too.
+  if (role === "assistant") {
+    content = content.map((item) => {
+      if (item.type === "text" && typeof item.text === "string") {
+        return { ...item, text: stripControlChannelForDisplay(item.text) };
+      }
+      return item;
+    });
+  }
+
+  if (hideControlOnly) {
+    content = [];
   }
 
   const sentTo = role === "toolResult" ? [] : readPeerSentTargets(m);

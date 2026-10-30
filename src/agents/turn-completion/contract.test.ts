@@ -99,7 +99,10 @@ describe("turn completion contract", () => {
     expect(fork.contract?.state).toBe("true_fork");
     expect(fork.contract?.options).toEqual(["规格A", "规格B"]);
     expect(fork.continueExecution).toBe(false);
-    expect(fork.visibleText).toContain("state=true_fork");
+    expect(fork.visibleText).not.toContain("state=true_fork");
+    expect(fork.visibleText).not.toMatch(/\[turn_completion/);
+    expect(fork.visibleText).toContain("规格");
+    expect(fork.visibleText).toMatch(/等待你确认/);
     expect(isSilentExecFishingStop(fork.visibleText, "请继续")).toBe(false);
 
     const workspaceDir = tempWorkspace();
@@ -155,8 +158,10 @@ describe("turn completion contract", () => {
       slaMs: 1_000,
     });
     expect(blocked.contract?.state).toBe("permanent_block");
-    expect(blocked.visibleText).toContain("state=permanent_block");
-    expect(blocked.visibleText).toContain("reason=skill_smoke_sla");
+    expect(blocked.contract?.reason).toBe("skill_smoke_sla");
+    expect(blocked.visibleText).not.toContain("state=permanent_block");
+    expect(blocked.visibleText).not.toMatch(/\[turn_completion|reason=skill_smoke_sla/);
+    expect(blocked.visibleText).toMatch(/等待你确认/);
     expect(blocked.visibleText.split("\n")).toHaveLength(1);
     expect(blocked.visibleText).not.toMatch(/评审对象|微信|接下来我会/);
   });

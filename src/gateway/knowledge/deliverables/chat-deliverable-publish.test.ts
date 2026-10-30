@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
 import { settleCollaborationDeclaredDeliverable } from "../../workspace-resolver/settle-declared-deliverable.js";
 import {
   buildChatDeliverableIdempotencyKey,
@@ -12,6 +11,7 @@ import {
   scrubFalseDeliveryClaims,
 } from "./chat-deliverable-publish.js";
 import { readGroupDeliverableManifest } from "./group-manifest.js";
+import { extractDeliverableEnvelope } from "../../../shared/preview-artifact/deliverable-envelope.js";
 
 const tempDirs: string[] = [];
 

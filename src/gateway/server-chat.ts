@@ -1,6 +1,7 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { applyUserVisibleOutputGate } from "../agents/model-output-boundary.js";
 import { settleTurnCompletion } from "../agents/turn-completion/contract.js";
+import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { DEFAULT_HEARTBEAT_ACK_MAX_CHARS, stripHeartbeatToken } from "../auto-reply/heartbeat.js";
 import { noteUnresolvedChatRunError } from "../auto-reply/reply/chat-run-error-escalation.js";
 import { normalizeVerboseLevel } from "../auto-reply/thinking.js";
@@ -808,7 +809,11 @@ export function createAgentEventHandler({
           clientRunId,
           taskId: null,
         });
-        visibleText = prepared.text;
+        // prepareChatDeliverablePublish already strips <<DELIVERABLE>> tags from
+        // outgoing text; still strip turn_completion / tool-digest leftovers.
+        visibleText = stripControlChannelForDisplay(prepared.text);
+      } else if (visibleText) {
+        visibleText = stripControlChannelForDisplay(visibleText);
       }
       const payload = {
         runId: clientRunId,

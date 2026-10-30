@@ -5,6 +5,7 @@ import {
   extractQuotedDeliverableEnvelopes,
   parseDeliverableAttributes,
   resolveDeliverableBody,
+  stripDeliverableEnvelopeTags,
 } from "./deliverable-envelope.ts";
 
 describe("deliverable-envelope", () => {
@@ -125,4 +126,18 @@ describe("deliverable-envelope", () => {
     expect(parseDeliverableAttributes('file="../../secret.docx"').file).toBeUndefined();
     expect(parseDeliverableAttributes('url="javascript:alert(1)"').url).toBeUndefined();
   });
+
+  it("strips raw DELIVERABLE tags for chat display", () => {
+    const sample = [
+      "完成啦！",
+      '<<DELIVERABLE title="简报" file="deliverables/brief.html">>',
+      "正文",
+      "<</DELIVERABLE>>",
+    ].join("\n");
+    const stripped = stripDeliverableEnvelopeTags(sample);
+    expect(stripped).not.toMatch(/<<\s*DELIVERABLE/i);
+    expect(stripped).toContain("完成啦！");
+    expect(stripped).toContain("正文");
+  });
+
 });

@@ -272,10 +272,39 @@ export function formatParkedAt(ms?: number): string {
   }).format(new Date(ms));
 }
 
+/** Redact absolute tenant/workspace paths before any prompt or UI copy. */
+export function sanitizeTaskBoardPathForPrompt(raw: string): string {
+  const value = raw.trim();
+  if (!value) {
+    return value;
+  }
+  const tenant = value.match(
+    /\/openbot-tenants\/[^/]+\/users\/[^/]+\/OpenBot\/agents\/[^/]+\/workspace\/?(.*)$/,
+  );
+  if (tenant) {
+    const rest = (tenant[1] ?? "").replace(/^\/+/, "");
+    return rest || "workspace";
+  }
+  if (/^\/(?:root|var|tmp)\//.test(value) || /^\/Users\//.test(value)) {
+    const base = value.replace(/\/+$/, "").split("/").pop();
+    return base || "workspace";
+  }
+  return value;
+}
+
 export function buildResumePrompt(task: TrackedTask): string {
-  const paths = task.stop.workspacePaths.filter(Boolean);
+  const paths = task.stop.workspacePaths
+    .filter(Boolean)
+    .map((entry) => sanitizeTaskBoardPathForPrompt(entry))
+    .filter(Boolean);
   const pathLine = paths.length > 0 ? `\n文件：${paths.join("、")}` : "";
-  return `继续任务「${task.title}」（${task.taskId}）。\n停在：${task.stop.summary}${pathLine}`;
+  // Keep taskId on a machine line for the model; never echo raw ids in the
+  // human-facing 「继续任务」 sentence (that line previously leaked into chat).
+  return [
+    `task_id: ${task.taskId}`,
+    `继续任务「${task.title}」。`,
+    `停在：${task.stop.summary}${pathLine}`,
+  ].join("\n");
 }
 
 function findParked(board: SessionTaskBoard, token: string): TrackedTask | undefined {

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { extractDeliverableEnvelope } from "./deliverable-envelope.ts";
+import {
+  extractDeliverableEnvelope,
+  stripDeliverableEnvelopeTags,
+} from "./deliverable-envelope.ts";
 
 describe("shared deliverable-envelope quoted coverage gate", () => {
   const body =
@@ -75,4 +78,18 @@ ${body}
 <</DELIVERABLE>>`;
     expect(extractDeliverableEnvelope(conflict)?.settle).toBe("conflict");
   });
+
+  it("strips raw DELIVERABLE tags for chat display", () => {
+    const sample = [
+      "完成啦！",
+      '<<DELIVERABLE title="简报" file="deliverables/brief.html">>',
+      "正文",
+      "<</DELIVERABLE>>",
+    ].join("\n");
+    const stripped = stripDeliverableEnvelopeTags(sample);
+    expect(stripped).not.toMatch(/<<\s*DELIVERABLE/i);
+    expect(stripped).toContain("完成啦！");
+    expect(stripped).toContain("正文");
+  });
+
 });
