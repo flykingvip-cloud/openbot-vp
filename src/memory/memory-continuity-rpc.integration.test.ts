@@ -1,10 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createMemoryGetTool, createMemorySearchTool } from "../agents/tools/memory-tool.js";
-import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
-import type { OpenBotConfig } from "../config/config.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Tool-layer integration: createMemorySearchTool / createMemoryGetTool with
  * continuity authz (Item7-style TenantContext, seat/user identity, membership).
@@ -15,11 +12,46 @@ import type { OpenBotConfig } from "../config/config.js";
  *
  * Backend: builtin (default). Does not flip privateMemoryPromote or memory.backend.
  *
- * CRITICAL: import embedding.test-mocks BEFORE memory-tool / manager so vi.mock
- * bindings apply before the import graph caches real embeddings. Alone-run
- * failures previously showed provider:"none", files:0/chunks:0 after sync.
+ * CRITICAL: vi.mock("./embeddings.js") must live in THIS file (vitest hoists it)
+ * so alone-run does not hit real openai (provider:"none", files:0/chunks:0).
+ * Import-order lint may place memory-tool above helpers; in-file mock still wins.
+ * FTS-only sync also indexes markdown when no provider is available.
  */
-import { resetEmbeddingMocks } from "./embedding.test-mocks.js";
+const embeddingMocks = vi.hoisted(() => {
+  const embedBatch = vi.fn(async (texts: string[]) => texts.map(() => [0, 1, 0]));
+  const embedQuery = vi.fn(async () => [0, 1, 0]);
+  return {
+    embedBatch,
+    embedQuery,
+    resetEmbeddingMocks: () => {
+      embedBatch.mockReset();
+      embedQuery.mockReset();
+      embedBatch.mockImplementation(async (texts: string[]) => texts.map(() => [0, 1, 0]));
+      embedQuery.mockImplementation(async () => [0, 1, 0]);
+    },
+  };
+});
+
+function resetEmbeddingMocks(): void {
+  embeddingMocks.resetEmbeddingMocks();
+}
+
+vi.mock("./embeddings.js", () => ({
+  createEmbeddingProvider: async () => ({
+    requestedProvider: "openai",
+    provider: {
+      id: "mock",
+      model: "mock-embed",
+      maxInputTokens: 8192,
+      embedQuery: embeddingMocks.embedQuery,
+      embedBatch: embeddingMocks.embedBatch,
+    },
+  }),
+}));
+
+import { createMemoryGetTool, createMemorySearchTool } from "../agents/tools/memory-tool.js";
+import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
+import type { OpenBotConfig } from "../config/config.js";
 import type { MemoryIndexManager as MemoryIndexManagerType } from "./index.js";
 import { closeAllMemoryIndexManagers } from "./manager-runtime.js";
 import { MemoryIndexManager } from "./manager.js";

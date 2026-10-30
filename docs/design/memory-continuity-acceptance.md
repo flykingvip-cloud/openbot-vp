@@ -3,19 +3,19 @@
 | Field | Value |
 | --- | --- |
 | Branch | `memory/safe-continuity-landing-v2` (from `aa446d12927b374558cf104261949552a9e81e8d`) |
-G514e95d39f7824f7656a42779e035de0bc9869` |
+| Candidate tip | `4844738ecf6291e5e27eb907c1cda7c3198a9b4e` |
 | Base (PARTIAL prior) | `aa446d12927b374558cf104261949552a9e81e8d` — search flake / naming / ownership gaps |
 | Gateway WIP preserved on | `memory/safe-continuity-gateway-wip` @ `89df958c` (HTTP harness + multi-process e2e + memory-core user forward) — **not** mixed into this candidate |
 | Backend under test | **builtin** (default). QMD collections membership/tenant-filtered when enabled; default backend unchanged. |
 | Constraints held | Did **not** flip `collaboration.learning.privateMemoryPromote` default; did **not** switch default `memory.backend` to qmd; capsule approval gates retained. |
 | Test commands | See columns below. |
-| Result (Asia/Shanghai) | **RPC alone 2/2 ×2**; **suite 19/19 ×2** (authz 6, index-paths 4, acceptance 3, tool-layer 2, ownership 4). 2026-10-30 ~13:23 CST. |
+| Result (Asia/Shanghai) | **RPC alone 2/2 ×2**; **suite 15/15 ×2** (authz 6, index-paths 4, acceptance 3, tool-layer 2) + ownership 4/4. 2026-10-30 ~13:45 CST (Asia/Shanghai). |
 
 ## Evidence columns (mocked vs real auth)
 
 | Column | What it exercises | Identity / auth | Command |
 | --- | --- | --- | --- |
-| **Tool-layer integration** | In-process `createMemorySearchTool` / `createMemoryGetTool` then `.execute()` — **not** gateway HTTP dispatch | `authenticatedUserId` + optional `governance` / explicit `securityProfile` passed into tool factories; embedding provider **mocked** via `embedding.test-mocks` (must import before `memory-tool`); membership via real `members.json` | `pnpm exec vitest run src/memory/memory-continuity-rpc.integration.test.ts` |
+| **Tool-layer integration** | In-process `createMemorySearchTool` / `createMemoryGetTool` then `.execute()` — **not** gateway HTTP dispatch | `authenticatedUserId` + optional `governance` / explicit `securityProfile` passed into tool factories; embedding provider **mocked** via in-file hoisted `vi.mock("./embeddings.js")` (survives import-sort); membership via real `members.json` | `pnpm exec vitest run src/memory/memory-continuity-rpc.integration.test.ts` |
 | **HTTP-auth boundary** | Live HTTP `/tools/invoke` against a running gateway (session → `authenticatedUserId`) | Real gateway auth entry; **not** in this candidate — preserved on `memory/safe-continuity-gateway-wip` (`memory-continuity-gateway.http.integration.test.ts`) | (deferred; do not claim tool `.execute` is HTTP) |
 | **Full subprocess** | Child-process gateway continuity e2e | Real multi-process boundaries; **not** in this candidate — preserved on `memory/safe-continuity-gateway-wip` (`test/memory-continuity-gateway.e2e.test.ts`) | (deferred) |
 
@@ -54,7 +54,7 @@ Denial responses use reason `"not authorized"` / reasonCodes (`non_member`, `rev
 
 | Gap | Status | Evidence |
 | --- | --- | --- |
-| **A) Positive search flake** | **CLOSED** | Root cause: `memory-tool` imported before `embedding.test-mocks` → `provider:"none"`, files:0/chunks:0. Fixed import order; miss diagnostics retained. RPC alone 2/2 ×2; suite ×2. |
+| **A) Positive search flake** | **CLOSED** | Root cause: alone-run loaded real embeddings (`provider:"none"`, files:0/chunks:0) and FTS-only sync skipped indexing. Fixed with in-file hoisted `vi.mock` + FTS-only chunk/FTS index path. RPC alone 2/2 ×2; suite ×2. |
 | **B1) Tool ≠ gateway RPC naming** | **CLOSED** | Describe/doc: tool-layer integration; HTTP/subprocess columns separate; gateway WIP parked on `memory/safe-continuity-gateway-wip`. |
 | **B2) Personal approve ownership** | **CLOSED** | `assertPersonalLearningOwnership`; tests in `personal-learning-ownership.test.ts`. |
 | **B3) Managed not inferred from tenant** | **CLOSED** | Default `personal_local`; managed without tenant → `managed_missing_tenant`; tool passes explicit `securityProfile` / `accessContext`. |
@@ -69,6 +69,7 @@ Denial responses use reason `"not authorized"` / reasonCodes (`non_member`, `rev
 | Tool securityProfile wiring | `src/agents/tools/memory-tool.ts` |
 | Personal ownership gates | `src/memory/personal-learning-write.ts`, `src/memory/personal-learning-ownership.test.ts` |
 | Acceptance (ownership args) | `src/memory/memory-continuity-acceptance.test.ts` |
+| FTS-only index path | `src/memory/manager-embedding-ops.ts`, `src/memory/manager-sync-ops.ts` |
 | This doc | `docs/design/memory-continuity-acceptance.md` |
 
 ## Still-open / non-goals
@@ -76,4 +77,4 @@ Denial responses use reason `"not authorized"` / reasonCodes (`non_member`, `rev
 - HTTP-auth boundary and full subprocess gateway evidence remain on `memory/safe-continuity-gateway-wip` until optionally rewritten onto v2 after this candidate is accepted — **do not** claim tool `.execute` is gateway RPC.
 - Default `memory.backend` remains **builtin**.
 - `privateMemoryPromote` remains default **OFF**.
-- No push / no PR until user acceptance of this candidate SHA.
+- HTTP/subprocess columns remain deferred on gateway-wip (not in this PR).
