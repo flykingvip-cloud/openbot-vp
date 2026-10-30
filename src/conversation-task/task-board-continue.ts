@@ -7,7 +7,13 @@
  * out of scope — do not widen those semantics here.
  */
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import { buildResumePrompt, readSessionTaskBoard, type TrackedTask } from "./session-task-board.js";
+import {
+  buildResumePrompt,
+  isTaskTombstoned,
+  readSessionTaskBoard,
+  type SessionTaskBoard,
+  type TrackedTask,
+} from "./session-task-board.js";
 
 const log = createSubsystemLogger("conversation-task/task-board-continue");
 
@@ -37,7 +43,17 @@ export type TaskBoardContinueSkipReason =
   | "wake_suppress"
   | "internal_continue_prompt"
   | "continue_cap"
-  | "missing_queue";
+  | "missing_queue"
+  | "revision_mismatch"
+  | "task_id_mismatch"
+  | "tombstoned";
+
+/** Continue ticket carrying taskId + focus revision (C2). */
+export type TaskBoardContinueTicket = {
+  taskId: string;
+  focusRevision: number;
+  prompt: string;
+};
 
 export type TaskBoardContinueDecision =
   | {
@@ -45,14 +61,17 @@ export type TaskBoardContinueDecision =
       reason: TaskBoardContinueSkipReason;
       wakeRecorded: false;
       taskId?: string;
+      focusRevision?: number;
     }
   | {
       action: "schedule";
       reason: "task_board_continue";
       wakeRecorded: true;
       taskId: string;
+      focusRevision: number;
       prompt: string;
       delayMs: number;
+      ticket: TaskBoardContinueTicket;
     };
 
 type ContinueLedgerEntry = { taskId: string; atMs: number };
@@ -107,6 +126,71 @@ export function buildTaskBoardContinuePrompt(task: TrackedTask): string {
     "Do not ask soft confirmation such as whether to push a draft or reuse an asset — produce the deliverable and report.",
     buildResumePrompt(task),
   ].join("\n");
+}
+
+/**
+ * C2: revalidate taskId + focusRevision against the live board (enqueue and claim).
+ */
+export function revalidateContinueTicket(params: {
+  board: SessionTaskBoard;
+  taskId: string;
+  focusRevision: number;
+}): { ok: true; task: TrackedTask } | { ok: false; reason: TaskBoardContinueSkipReason } {
+  const taskId = params.taskId.trim();
+  if (!taskId) {
+    return { ok: false, reason: "task_id_mismatch" };
+  }
+  if (isTaskTombstoned(params.board, taskId)) {
+    return { ok: false, reason: "tombstoned" };
+  }
+  const current = params.board.current;
+  if (!current?.unfinished || !current.taskId) {
+    return { ok: false, reason: "no_unfinished_current" };
+  }
+  if (current.taskId !== taskId) {
+    return { ok: false, reason: "task_id_mismatch" };
+  }
+  if ((params.board.focusRevision ?? 0) !== params.focusRevision) {
+    return { ok: false, reason: "revision_mismatch" };
+  }
+  if (current.wakeSuppress === true) {
+    return { ok: false, reason: "wake_suppress" };
+  }
+  return { ok: true, task: current };
+}
+
+/** Claim-time revalidation (C2). A queued then insert B → claim A rejects. */
+export function claimTaskBoardContinue(params: {
+  sessionFile?: string | null;
+  taskId: string;
+  focusRevision: number;
+}):
+  | { ok: true; task: TrackedTask; focusRevision: number; prompt: string }
+  | { ok: false; reason: TaskBoardContinueSkipReason } {
+  const sessionFile = typeof params.sessionFile === "string" ? params.sessionFile.trim() : "";
+  if (!sessionFile) {
+    return { ok: false, reason: "no_session_file" };
+  }
+  let board: SessionTaskBoard;
+  try {
+    board = readSessionTaskBoard(sessionFile);
+  } catch {
+    return { ok: false, reason: "no_session_file" };
+  }
+  const checked = revalidateContinueTicket({
+    board,
+    taskId: params.taskId,
+    focusRevision: params.focusRevision,
+  });
+  if (!checked.ok) {
+    return checked;
+  }
+  return {
+    ok: true,
+    task: checked.task,
+    focusRevision: board.focusRevision ?? 0,
+    prompt: buildTaskBoardContinuePrompt(checked.task),
+  };
 }
 
 export function decideTaskBoardContinue(params: {
@@ -166,6 +250,35 @@ export function decideTaskBoardContinue(params: {
       reason: "continue_cap",
       wakeRecorded: false,
       taskId: current.taskId,
+      focusRevision: board.focusRevision ?? 0,
+    };
+  }
+
+  if (isTaskTombstoned(board, current.taskId)) {
+    return {
+      action: "skip",
+      reason: "tombstoned",
+      wakeRecorded: false,
+      taskId: current.taskId,
+      focusRevision: board.focusRevision ?? 0,
+    };
+  }
+
+  const focusRevision = board.focusRevision ?? 0;
+  const prompt = buildTaskBoardContinuePrompt(current);
+  // C2 enqueue-time revalidation of the ticket we are about to arm.
+  const enqueueCheck = revalidateContinueTicket({
+    board,
+    taskId: current.taskId,
+    focusRevision,
+  });
+  if (!enqueueCheck.ok) {
+    return {
+      action: "skip",
+      reason: enqueueCheck.reason,
+      wakeRecorded: false,
+      taskId: current.taskId,
+      focusRevision,
     };
   }
 
@@ -174,8 +287,10 @@ export function decideTaskBoardContinue(params: {
     reason: "task_board_continue",
     wakeRecorded: true,
     taskId: current.taskId,
-    prompt: buildTaskBoardContinuePrompt(current),
+    focusRevision,
+    prompt,
     delayMs: params.delayMs ?? TASK_BOARD_CONTINUE_DELAY_MS,
+    ticket: { taskId: current.taskId, focusRevision, prompt },
   };
 }
 
@@ -210,7 +325,7 @@ export function scheduleTaskBoardContinueWake(params: {
 
   const nowMs = params.nowMs ?? Date.now();
   rememberContinue(decision.taskId, nowMs);
-  const messageId = `task-board-continue:${decision.taskId}:${nowMs}`;
+  const messageId = `task-board-continue:${decision.taskId}:r${decision.focusRevision}:${nowMs}`;
   log.info("task_board_continue wakeRecorded", {
     reason: decision.reason,
     wakeRecorded: true,
@@ -225,10 +340,29 @@ export function scheduleTaskBoardContinueWake(params: {
   }
 
   const setTimer = params.setTimer ?? setTimeout;
+  const ticket = decision.ticket;
+  const sessionFile = typeof params.sessionFile === "string" ? params.sessionFile.trim() : "";
   setTimer(() => {
     let dispatched = false;
     try {
-      dispatched = params.enqueue(decision.prompt, messageId);
+      // C2 claim-time revalidation: A queued then insert B → reject A.
+      const claimed = claimTaskBoardContinue({
+        sessionFile,
+        taskId: ticket.taskId,
+        focusRevision: ticket.focusRevision,
+      });
+      if (!claimed.ok) {
+        log.info("task_board_continue claim rejected", {
+          reason: claimed.reason,
+          wakeRecorded: true,
+          dispatched: false,
+          taskId: ticket.taskId,
+          focusRevision: ticket.focusRevision,
+          messageId,
+        });
+        return;
+      }
+      dispatched = params.enqueue(claimed.prompt, messageId);
     } catch (err) {
       log.warn("task_board_continue enqueue failed", {
         reason: decision.reason,
@@ -244,6 +378,7 @@ export function scheduleTaskBoardContinueWake(params: {
       wakeRecorded: true,
       dispatched,
       taskId: decision.taskId,
+      focusRevision: decision.focusRevision,
       messageId,
     });
   }, decision.delayMs);

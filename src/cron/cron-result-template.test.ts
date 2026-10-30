@@ -47,7 +47,7 @@ describe("formatCronResultSurfaceMessage template", () => {
       droppedTitle: "最早的报告",
       droppedPaths: ["/tmp/oldest.md"],
     });
-    expect(text).toContain("已放下最早挂起的「最早的报告」");
+    expect(text).toContain("已归档最早挂起的「最早的报告」");
     expect(text).toContain("/tmp/oldest.md");
     expect(text).not.toContain("挂起已满");
   });

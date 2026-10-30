@@ -4,6 +4,12 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { writeSessionTaskBoard, type SessionTaskBoard } from "./session-task-board.js";
 import {
+  insertLatestTaskDeferringCurrent,
+  emptySessionTaskBoard,
+  applyIncomingUserMessage,
+} from "./session-task-board.js";
+import {
+  claimTaskBoardContinue,
   decideTaskBoardContinue,
   isExplicitHumanGateWait,
   resetTaskBoardContinueLedgerForTest,
@@ -18,7 +24,7 @@ function tempSessionFile(): string {
   );
 }
 
-function unfinishedBoard(taskId = "task-abc"): SessionTaskBoard {
+function unfinishedBoard(taskId = "task-abc", focusRevision = 1): SessionTaskBoard {
   return {
     current: {
       taskId,
@@ -29,6 +35,7 @@ function unfinishedBoard(taskId = "task-abc"): SessionTaskBoard {
       createdAtMs: 1,
     },
     parked: [],
+    focusRevision,
   };
 }
 
@@ -181,6 +188,7 @@ describe("decideTaskBoardContinue", () => {
           parkReason: "interrupt_insert",
         },
       ],
+      focusRevision: 2,
     };
     writeSessionTaskBoard(sessionFile, board);
     const decision = decideTaskBoardContinue({
@@ -225,6 +233,106 @@ describe("scheduleTaskBoardContinueWake", () => {
     expect(enqueue).toHaveBeenCalledOnce();
     const call = enqueue.mock.calls[0] as unknown as [string, string] | undefined;
     expect(call?.[0]).toContain("Internal task-board continue:");
-    expect(call?.[1]).toMatch(/^task-board-continue:task-timer:/);
+    expect(call?.[1]).toMatch(/^task-board-continue:task-timer:r\d+:/);
+  });
+});
+
+describe("board-latest v2 C2 continue ticket / AC13", () => {
+  it("schedules with taskId + focusRevision ticket", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-rev", 5));
+    const decision = decideTaskBoardContinue({
+      sessionFile,
+      assistantText: "still working",
+    });
+    expect(decision.action).toBe("schedule");
+    if (decision.action === "schedule") {
+      expect(decision.focusRevision).toBe(5);
+      expect(decision.ticket).toEqual({
+        taskId: "task-rev",
+        focusRevision: 5,
+        prompt: decision.prompt,
+      });
+    }
+  });
+
+  it("AC13: A queued then insert B → claim A rejects", () => {
+    const sessionFile = tempSessionFile();
+    const started = applyIncomingUserMessage({
+      board: emptySessionTaskBoard(),
+      incomingText: "你帮我制作一个贪吃蛇的小游戏",
+      nowMs: 1,
+    });
+    writeSessionTaskBoard(sessionFile, started.board);
+    const decision = decideTaskBoardContinue({
+      sessionFile,
+      assistantText: "snake draft in progress",
+    });
+    expect(decision.action).toBe("schedule");
+    if (decision.action !== "schedule") {
+      throw new Error("expected schedule");
+    }
+    const ticket = decision.ticket;
+    const inserted = insertLatestTaskDeferringCurrent({
+      board: started.board,
+      goalText: "请继续写《调律》小说第七章，六时启闸，并验收交付",
+      nowMs: 2,
+    });
+    writeSessionTaskBoard(sessionFile, inserted.board);
+    expect(inserted.board.focusRevision).toBeGreaterThan(ticket.focusRevision);
+    const claimed = claimTaskBoardContinue({
+      sessionFile,
+      taskId: ticket.taskId,
+      focusRevision: ticket.focusRevision,
+    });
+    expect(claimed.ok).toBe(false);
+    if (!claimed.ok) {
+      expect(["revision_mismatch", "task_id_mismatch"]).toContain(claimed.reason);
+    }
+    expect(inserted.board.current?.taskId).toBe(inserted.taskId);
+    expect(inserted.board.current?.unfinished).toBe(true);
+  });
+
+  it("claim rejects tombstoned taskId", () => {
+    const sessionFile = tempSessionFile();
+    const board = unfinishedBoard("task-dead", 3);
+    board.tombstones = [{ taskId: "task-dead", closedAtMs: 1, title: "dead" }];
+    writeSessionTaskBoard(sessionFile, board);
+    const claimed = claimTaskBoardContinue({
+      sessionFile,
+      taskId: "task-dead",
+      focusRevision: 3,
+    });
+    expect(claimed.ok).toBe(false);
+    if (!claimed.ok) {
+      expect(claimed.reason).toBe("tombstoned");
+    }
+  });
+
+  it("AC13 timer path: claim rejects stale ticket and does not enqueue", () => {
+    const sessionFile = tempSessionFile();
+    writeSessionTaskBoard(sessionFile, unfinishedBoard("task-stale", 1));
+    const enqueue = vi.fn(() => true);
+    const timers: Array<{ ms: number; fn: () => void }> = [];
+    const decision = scheduleTaskBoardContinueWake({
+      sessionFile,
+      assistantText: "working",
+      delayMs: 10,
+      enqueue,
+      setTimer: ((fn: () => void, ms: number) => {
+        timers.push({ ms, fn: fn as () => void });
+        return 0 as unknown as NodeJS.Timeout;
+      }) as typeof setTimeout,
+    });
+    expect(decision.action).toBe("schedule");
+    // Switch focus before timer fires
+    const switched = insertLatestTaskDeferringCurrent({
+      board: unfinishedBoard("task-stale", 1),
+      goalText: "现在改做供应商合同审查",
+      nowMs: 9,
+    });
+    writeSessionTaskBoard(sessionFile, switched.board);
+    timers[0]?.fn();
+    expect(enqueue).not.toHaveBeenCalled();
   });
 });
