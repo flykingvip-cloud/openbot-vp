@@ -124,6 +124,8 @@ export async function approveCandidateCapsule(params: {
   groupId: string;
   capsuleId: string;
   actorId: string;
+  /** Explicit promote target (personal scope / fixture wiring). */
+  targetBotId?: string;
 }): Promise<ApproveCandidateCapsuleResult> {
   const groupId = params.groupId.trim();
   const capsuleId = params.capsuleId.trim();
@@ -157,6 +159,7 @@ export async function approveCandidateCapsule(params: {
       capsule,
       actor: actorId,
       approvalMode: "approved",
+      ...(params.targetBotId?.trim() ? { targetBotId: params.targetBotId.trim() } : {}),
     });
     return {
       capsuleId,

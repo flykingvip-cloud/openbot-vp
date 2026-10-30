@@ -2,6 +2,7 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { OpenBotConfig } from "../../config/config.js";
+import { resolveTrustedCollaborationGroupsRoot } from "../workspace/group-locator.js";
 import {
   resolveConfiguredCollaborationWorkspaceRoot,
   resolveGroupWorkspacePath,
@@ -40,24 +41,74 @@ async function listGroupIds(groupRootDir: string): Promise<string[]> {
   }
 }
 
+export type DiscoverCollaborationMemoryIndexRootsOptions = {
+  /** When set, only these group ids are returned (empty set → no roots). */
+  authorizedGroupIds?: ReadonlySet<string> | readonly string[];
+  tenantId?: string | null;
+  profile?: "personal_local" | "managed_enterprise";
+};
+
+function normalizeAuthorizedGroupIdSet(
+  value: ReadonlySet<string> | readonly string[] | undefined,
+): Set<string> | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value instanceof Set) {
+    return value;
+  }
+  return new Set([...value].map((id) => id.trim()).filter(Boolean));
+}
+
+/**
+ * Discover collaboration memory roots.
+ *
+ * Pass `authorizedGroupIds` so callers (builtin index) never dump every group's
+ * markdown into every agent index. Managed tenants may pass tenantId+profile so
+ * roots resolve under `tenants/<tid>/collaboration/groups` instead of the
+ * personal collaboration workspace.
+ */
 export async function discoverCollaborationMemoryIndexRoots(
   cfg: OpenBotConfig,
+  options?: DiscoverCollaborationMemoryIndexRootsOptions,
 ): Promise<CollaborationMemoryIndexRoot[]> {
-  const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(cfg);
-  if (!collaborationRoot) {
+  const authorized = normalizeAuthorizedGroupIdSet(options?.authorizedGroupIds);
+  if (authorized && authorized.size === 0) {
     return [];
   }
-  const groupsRoot = path.join(collaborationRoot, "groups");
+
+  let groupsRoot: string;
+  const profile = options?.profile ?? "personal_local";
+  const tenantId = options?.tenantId?.trim() || null;
+  if (profile === "managed_enterprise") {
+    if (!tenantId) {
+      return [];
+    }
+    groupsRoot = resolveTrustedCollaborationGroupsRoot({
+      tenantId,
+      profile: "managed_enterprise",
+      cfg,
+    });
+  } else {
+    const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(cfg);
+    if (!collaborationRoot) {
+      return [];
+    }
+    groupsRoot = path.join(collaborationRoot, "groups");
+  }
+
   const groupIds = await listGroupIds(groupsRoot);
-  return groupIds.map((groupId) => {
-    const groupDir = resolveGroupWorkspacePath(groupsRoot, groupId);
-    return {
-      groupId,
-      memoryDir: path.join(groupDir, "memory"),
-      indexPrefix: `collaboration/${groupId}/memory`,
-      sessionKey: `space:${groupId}`,
-    };
-  });
+  return groupIds
+    .filter((groupId) => (authorized ? authorized.has(groupId) : true))
+    .map((groupId) => {
+      const groupDir = resolveGroupWorkspacePath(groupsRoot, groupId);
+      return {
+        groupId,
+        memoryDir: path.join(groupDir, "memory"),
+        indexPrefix: `collaboration/${groupId}/memory`,
+        sessionKey: `space:${groupId}`,
+      };
+    });
 }
 
 export async function listCollaborationMemoryMarkdownDocs(
@@ -103,8 +154,9 @@ export async function listCollaborationMemoryMarkdownDocs(
 
 export async function listAllCollaborationMemoryMarkdownDocs(
   cfg: OpenBotConfig,
+  options?: DiscoverCollaborationMemoryIndexRootsOptions,
 ): Promise<CollaborationMemoryIndexDoc[]> {
-  const roots = await discoverCollaborationMemoryIndexRoots(cfg);
+  const roots = await discoverCollaborationMemoryIndexRoots(cfg, options);
   const docs = await Promise.all(roots.map((root) => listCollaborationMemoryMarkdownDocs(root)));
   return docs.flat();
 }
@@ -116,14 +168,37 @@ export type CollaborationQmdCollection = {
   kind: "memory";
 };
 
-export async function resolveCollaborationQmdCollections(params: {
+export type ResolveCollaborationQmdCollectionsParams = {
   cfg: OpenBotConfig;
   agentId: string;
   existingNames: Set<string>;
   scopeCollectionBase: (base: string, agentId: string) => string;
   ensureUniqueName: (base: string, existing: Set<string>) => string;
-}): Promise<CollaborationQmdCollection[]> {
-  const roots = await discoverCollaborationMemoryIndexRoots(params.cfg);
+  /**
+   * Membership / tenant filter. When omitted, default deny (no all-groups dump).
+   * Pass an empty set to explicitly index no collaboration collections.
+   */
+  authorizedGroupIds?: ReadonlySet<string> | readonly string[];
+  tenantId?: string | null;
+  profile?: "personal_local" | "managed_enterprise";
+};
+
+/**
+ * QMD collaboration collections — same authorizedGroupIds / tenant-scoped roots
+ * filter as builtin. Missing authz context → no collections (fail closed).
+ */
+export async function resolveCollaborationQmdCollections(
+  params: ResolveCollaborationQmdCollectionsParams,
+): Promise<CollaborationQmdCollection[]> {
+  // Default deny: never dump every group's memory into every agent QMD index.
+  if (params.authorizedGroupIds === undefined) {
+    return [];
+  }
+  const roots = await discoverCollaborationMemoryIndexRoots(params.cfg, {
+    authorizedGroupIds: params.authorizedGroupIds,
+    tenantId: params.tenantId,
+    profile: params.profile,
+  });
   const collections: CollaborationQmdCollection[] = [];
   for (const root of roots) {
     const base = params.scopeCollectionBase(`collab-${root.groupId}`, params.agentId);
@@ -139,18 +214,38 @@ export async function resolveCollaborationQmdCollections(params: {
   return collections;
 }
 
-export function resolveCollaborationQmdCollectionsSync(params: {
-  cfg: OpenBotConfig;
-  agentId: string;
-  existingNames: Set<string>;
-  scopeCollectionBase: (base: string, agentId: string) => string;
-  ensureUniqueName: (base: string, existing: Set<string>) => string;
-}): CollaborationQmdCollection[] {
-  const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(params.cfg);
-  if (!collaborationRoot) {
+export function resolveCollaborationQmdCollectionsSync(
+  params: ResolveCollaborationQmdCollectionsParams,
+): CollaborationQmdCollection[] {
+  // Default deny: missing authz context must not enumerate all groups.
+  if (params.authorizedGroupIds === undefined) {
     return [];
   }
-  const groupsRoot = path.join(collaborationRoot, "groups");
+  const authorized = normalizeAuthorizedGroupIdSet(params.authorizedGroupIds);
+  if (!authorized || authorized.size === 0) {
+    return [];
+  }
+
+  const profile = params.profile ?? "personal_local";
+  const tenantId = params.tenantId?.trim() || null;
+  let groupsRoot: string;
+  if (profile === "managed_enterprise") {
+    if (!tenantId) {
+      return [];
+    }
+    groupsRoot = resolveTrustedCollaborationGroupsRoot({
+      tenantId,
+      profile: "managed_enterprise",
+      cfg: params.cfg,
+    });
+  } else {
+    const collaborationRoot = resolveConfiguredCollaborationWorkspaceRoot(params.cfg);
+    if (!collaborationRoot) {
+      return [];
+    }
+    groupsRoot = path.join(collaborationRoot, "groups");
+  }
+
   let entries: fsSync.Dirent[];
   try {
     entries = fsSync.readdirSync(groupsRoot, { withFileTypes: true });
@@ -169,6 +264,9 @@ export function resolveCollaborationQmdCollectionsSync(params: {
         return entry.name;
       }
     })();
+    if (!authorized.has(groupId)) {
+      continue;
+    }
     const memoryDir = path.join(groupsRoot, entry.name, "memory");
     if (!fsSync.existsSync(memoryDir)) {
       continue;

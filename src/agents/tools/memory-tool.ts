@@ -14,6 +14,12 @@ import {
   getMemorySearchManager,
   type MemorySearchGovernance,
 } from "../../memory/index.js";
+import {
+  assertMemoryContinuityPathAccess,
+  filterMemorySearchResultsForAuthz,
+  resolveMemoryContinuityAuthz,
+} from "../../memory/memory-continuity-authz.js";
+import type { MemoryIndexAccessContext } from "../../memory/memory-index-access-context.js";
 import type { MemorySearchResult } from "../../memory/types.js";
 import { parseAgentSessionKey } from "../../routing/session-key.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
@@ -74,11 +80,34 @@ async function resolveMemoryToolGovernance(options: {
   });
 }
 
+function resolveToolContinuityProfile(options: {
+  accessContext?: MemoryIndexAccessContext;
+  /** Trusted security mode from call entry when full accessContext is unavailable. */
+  securityProfile?: "personal_local" | "managed_enterprise";
+}): "personal_local" | "managed_enterprise" {
+  if (options.accessContext?.securityProfile === "managed_enterprise") {
+    return "managed_enterprise";
+  }
+  if (options.securityProfile === "managed_enterprise") {
+    return "managed_enterprise";
+  }
+  return "personal_local";
+}
+
 export function createMemorySearchTool(options: {
   config?: OpenBotConfig;
   agentSessionKey?: string;
   /** Trusted governance from authenticated call entry. */
   governance?: MemorySearchGovernance;
+  /** Authenticated human for members.json checks (personal_local / explicit). */
+  authenticatedUserId?: string | null;
+  /**
+   * Trusted security mode from call entry (Item7 Stage C). Required for managed;
+   * must not be inferred from tenant presence alone. Absent → personal_local.
+   */
+  accessContext?: MemoryIndexAccessContext;
+  /** Trusted security mode when full accessContext is not built (builtin path). */
+  securityProfile?: "personal_local" | "managed_enterprise";
   gatewayClientUser?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
 }): AnyAgentTool | null {
@@ -98,10 +127,20 @@ export function createMemorySearchTool(options: {
       const maxResults = readNumberParam(asToolParams(params), "maxResults");
       const minScore = readNumberParam(asToolParams(params), "minScore");
       const governance = await resolveMemoryToolGovernance(options);
+      const continuityProfile = resolveToolContinuityProfile(options);
+      const continuityAuthz = await resolveMemoryContinuityAuthz({
+        cfg,
+        governance,
+        authenticatedUserId: options.authenticatedUserId,
+        profile: continuityProfile,
+      });
       const { manager, error } = await getMemorySearchManager({
         cfg,
         agentId,
         governance,
+        authenticatedUserId: options.authenticatedUserId,
+        accessContext: options.accessContext,
+        continuityAuthz,
       });
       if (!manager) {
         return jsonResult(buildMemorySearchUnavailableResult(error));
@@ -112,10 +151,15 @@ export function createMemorySearchTool(options: {
           mode: citationsMode,
           sessionKey: options.agentSessionKey,
         });
-        const rawResults = await manager.search(query, {
+        const searched = await manager.search(query, {
           maxResults,
           minScore,
           sessionKey: options.agentSessionKey,
+        });
+        // Defense-in-depth: drop unauthorized collab hits (no snippet rewrite).
+        const rawResults = filterMemorySearchResultsForAuthz({
+          results: searched,
+          authz: continuityAuthz,
         });
         const status = manager.status();
         const decorated = decorateCitations(rawResults, includeCitations);
@@ -164,6 +208,10 @@ export function createMemoryGetTool(options: {
   config?: OpenBotConfig;
   agentSessionKey?: string;
   governance?: MemorySearchGovernance;
+  authenticatedUserId?: string | null;
+  /** Trusted security mode from call entry; absent → personal_local. */
+  accessContext?: MemoryIndexAccessContext;
+  securityProfile?: "personal_local" | "managed_enterprise";
   gatewayClientUser?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
 }): AnyAgentTool | null {
@@ -183,10 +231,35 @@ export function createMemoryGetTool(options: {
       const from = readNumberParam(asToolParams(params), "from", { integer: true });
       const lines = readNumberParam(asToolParams(params), "lines", { integer: true });
       const governance = await resolveMemoryToolGovernance(options);
+      const continuityProfile = resolveToolContinuityProfile(options);
+      const continuityAuthz = await resolveMemoryContinuityAuthz({
+        cfg,
+        governance,
+        authenticatedUserId: options.authenticatedUserId,
+        profile: continuityProfile,
+      });
+      const access = await assertMemoryContinuityPathAccess({
+        relPath,
+        authz: continuityAuthz,
+        cfg,
+      });
+      if (!access.ok) {
+        // Fail closed: no body/snippet leak on deny.
+        return jsonResult({
+          path: relPath,
+          text: "",
+          disabled: true,
+          error: access.reason,
+          reasonCode: access.reasonCode,
+        });
+      }
       const { manager, error } = await getMemorySearchManager({
         cfg,
         agentId,
         governance,
+        authenticatedUserId: options.authenticatedUserId,
+        accessContext: options.accessContext,
+        continuityAuthz,
       });
       if (!manager) {
         return jsonResult({ path: relPath, text: "", disabled: true, error });

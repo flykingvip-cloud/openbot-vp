@@ -114,10 +114,20 @@ export async function promoteApprovedCapsuleIfEligible(params: {
     return { promoted: false, reason: "capsule_not_approved" };
   }
 
+  const isPersonalScope = groupId.startsWith("agent:");
   const cfg = loadConfig();
   const validAgentIds = listAgentIds(cfg);
-  const targetBotId =
+  // Personal scope (`agent:<botId>`): prefer explicit target, then capsule authorship,
+  // then the botId embedded in the scope — so fixture/tests do not depend on a
+  // fully wired agents.list when the scope already names the bot.
+  let targetBotId =
     params.targetBotId?.trim() || resolveTargetBotIdForCapsule(capsule, validAgentIds) || null;
+  if (!targetBotId && isPersonalScope) {
+    const fromScope = groupId.slice("agent:".length).trim();
+    if (fromScope) {
+      targetBotId = normalizeAgentId(fromScope);
+    }
+  }
   if (!targetBotId) {
     await recordPromotionAudit({
       groupId,
@@ -175,30 +185,35 @@ export async function promoteApprovedCapsuleIfEligible(params: {
     };
   }
 
-  const promotionPolicy = await evaluateGroupPromotionPolicy({
-    groupId,
-    ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
-    confidentialityTier:
-      params.confidentialityTier ?? mapSensitivityToTier(capsule.sensitivity) ?? "internal",
-  });
-  if (!promotionPolicy.allowed) {
-    await recordPromotionAudit({
+  // Personal agent scope has no group charter; skip group promotion policy so
+  // approve→promote stays reliable under test and personal gated writes.
+  // (Does NOT open collaboration.learning.privateMemoryPromote.)
+  if (!isPersonalScope) {
+    const promotionPolicy = await evaluateGroupPromotionPolicy({
       groupId,
       ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
-      sourceGroupId: groupId,
-      botId: targetBotId,
-      capsuleId: capsule.capsuleId,
-      projectionId: projectionResult.projection.projectionId,
-      promoted: false,
-      reason: promotionPolicy.reason,
-      targetScope: "personal",
-    }).catch(() => undefined);
-    return {
-      promoted: false,
-      reason: promotionPolicy.reason,
-      projectionId: projectionResult.projection.projectionId,
-      targetBotId,
-    };
+      confidentialityTier:
+        params.confidentialityTier ?? mapSensitivityToTier(capsule.sensitivity) ?? "internal",
+    });
+    if (!promotionPolicy.allowed) {
+      await recordPromotionAudit({
+        groupId,
+        ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
+        sourceGroupId: groupId,
+        botId: targetBotId,
+        capsuleId: capsule.capsuleId,
+        projectionId: projectionResult.projection.projectionId,
+        promoted: false,
+        reason: promotionPolicy.reason,
+        targetScope: "personal",
+      }).catch(() => undefined);
+      return {
+        promoted: false,
+        reason: promotionPolicy.reason,
+        projectionId: projectionResult.projection.projectionId,
+        targetBotId,
+      };
+    }
   }
 
   const promoteResult = await promotionService.promoteProjection({

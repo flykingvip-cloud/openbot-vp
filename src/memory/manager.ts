@@ -20,7 +20,12 @@ import {
 } from "./embeddings.js";
 import { isFileMissingError, statRegularFile } from "./fs-utils.js";
 import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "./hybrid.js";
-import { isMemoryPath, normalizeExtraMemoryPaths } from "./internal.js";
+import type { CollaborationMemoryIndexRoot } from "../gateway/collaboration-learning/memory-index-paths.js";
+import { isMemoryPath, normalizeExtraMemoryPaths, normalizeRelPath } from "./internal.js";
+import {
+  parseCollaborationMemoryGroupId,
+  resolveAuthorizedCollaborationAbsPath,
+} from "./memory-continuity-authz.js";
 import { MemoryManagerEmbeddingOps } from "./manager-embedding-ops.js";
 import { searchKeyword, searchVector } from "./manager-search.js";
 import { extractKeywords } from "./query-expansion.js";
@@ -65,6 +70,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
   protected readonly agentId: string;
   protected readonly workspaceDir: string;
   protected readonly settings: ResolvedMemorySearchConfig;
+  /** Authorized collaboration memory roots (builtin). Empty = no collab indexing. */
+  protected readonly collaborationMemoryRoots: readonly CollaborationMemoryIndexRoot[];
   protected provider: EmbeddingProvider | null;
   private readonly requestedProvider:
     | "openai"
@@ -143,6 +150,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     cfg: OpenBotConfig;
     agentId: string;
     purpose?: "default" | "status";
+    /** Builtin: only index these authorized collaboration memory roots. */
+    collaborationMemoryRoots?: readonly CollaborationMemoryIndexRoot[];
   }): Promise<MemoryIndexManager | null> {
     const { cfg, agentId } = params;
     const settings = resolveMemorySearchConfig(cfg, agentId);
@@ -150,10 +159,15 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       return null;
     }
     const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
+    const collaborationMemoryRoots = params.collaborationMemoryRoots ?? [];
     void import("./item7-w5-index-shadow.js").then((m) =>
       m.scheduleItem7W5IndexShadow({ ledgerId: "S36", handleResourceId: null }),
     );
-    const key = `${agentId}:${workspaceDir}:${JSON.stringify(settings)}`;
+    const collabKey = collaborationMemoryRoots
+      .map((root) => root.groupId)
+      .toSorted()
+      .join(",");
+    const key = `${agentId}:${workspaceDir}:${JSON.stringify(settings)}:collab:${collabKey || "-"}`;
     const existing = INDEX_CACHE.get(key);
     if (existing) {
       return existing;
@@ -184,6 +198,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         settings,
         providerResult,
         purpose: params.purpose,
+        collaborationMemoryRoots,
       });
       INDEX_CACHE.set(key, manager);
       return manager;
@@ -206,6 +221,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     settings: ResolvedMemorySearchConfig;
     providerResult: EmbeddingProviderResult;
     purpose?: "default" | "status";
+    collaborationMemoryRoots?: readonly CollaborationMemoryIndexRoot[];
   }) {
     super();
     this.cacheKey = params.cacheKey;
@@ -213,6 +229,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     this.agentId = params.agentId;
     this.workspaceDir = params.workspaceDir;
     this.settings = params.settings;
+    this.collaborationMemoryRoots = params.collaborationMemoryRoots ?? [];
     this.provider = params.providerResult.provider;
     this.requestedProvider = params.providerResult.requestedProvider;
     this.fallbackFrom = params.providerResult.fallbackFrom;
@@ -610,6 +627,44 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     if (!rawPath) {
       throw new Error("path required");
     }
+
+    const collabGroupId = parseCollaborationMemoryGroupId(rawPath);
+    if (collabGroupId) {
+      const normalized = normalizeRelPath(rawPath);
+      if (!this.collaborationMemoryRoots.some((root) => root.groupId === collabGroupId)) {
+        // Fail closed: do not leak whether the file exists or its body.
+        throw new Error("not authorized");
+      }
+      const absCollab = resolveAuthorizedCollaborationAbsPath({
+        relPath: normalized,
+        roots: this.collaborationMemoryRoots,
+      });
+      if (!absCollab || !absCollab.endsWith(".md")) {
+        throw new Error("not authorized");
+      }
+      const statResult = await statRegularFile(absCollab);
+      if (statResult.missing) {
+        return { text: "", path: normalized };
+      }
+      let content: string;
+      try {
+        content = await fs.readFile(absCollab, "utf-8");
+      } catch (err) {
+        if (isFileMissingError(err)) {
+          return { text: "", path: normalized };
+        }
+        throw err;
+      }
+      if (!params.from && !params.lines) {
+        return { text: content, path: normalized };
+      }
+      const lines = content.split("\n");
+      const start = Math.max(1, params.from ?? 1);
+      const count = Math.max(1, params.lines ?? lines.length);
+      const slice = lines.slice(start - 1, start - 1 + count);
+      return { text: slice.join("\n"), path: normalized };
+    }
+
     const absPath = path.isAbsolute(rawPath)
       ? path.resolve(rawPath)
       : path.resolve(this.workspaceDir, rawPath);
@@ -668,9 +723,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       return { text: content, path: relPath };
     }
     const lines = content.split("\n");
-    const start = Math.max(1, params.from ?? 1);
+    const startLine = Math.max(1, params.from ?? 1);
     const count = Math.max(1, params.lines ?? lines.length);
-    const slice = lines.slice(start - 1, start - 1 + count);
+    const slice = lines.slice(startLine - 1, startLine - 1 + count);
     return { text: slice.join("\n"), path: relPath };
   }
 

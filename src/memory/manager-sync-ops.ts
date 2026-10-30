@@ -30,11 +30,13 @@ import { isFileMissingError } from "./fs-utils.js";
 import {
   buildFileEntry,
   ensureDir,
+  hashText,
   listMemoryFiles,
   normalizeExtraMemoryPaths,
   runWithConcurrency,
 } from "./internal.js";
 import { type MemoryFileEntry } from "./internal.js";
+import { listCollaborationMemoryMarkdownDocs } from "../gateway/collaboration-learning/memory-index-paths.js";
 import { ensureMemoryIndexSchema } from "./memory-schema.js";
 import type { SessionFileEntry } from "./session-files.js";
 import {
@@ -112,6 +114,13 @@ export abstract class MemoryManagerSyncOps {
   protected abstract readonly agentId: string;
   protected abstract readonly workspaceDir: string;
   protected abstract readonly settings: ResolvedMemorySearchConfig;
+  /** Authorized collaboration memory roots; empty = no collab indexing. */
+  protected abstract readonly collaborationMemoryRoots: readonly {
+    groupId: string;
+    memoryDir: string;
+    indexPrefix: string;
+    sessionKey: string;
+  }[];
   protected provider: EmbeddingProvider | null = null;
   protected fallbackFrom?: "openai" | "local" | "gemini" | "voyage" | "mistral" | "ollama";
   protected openAi?: OpenAiEmbeddingClient;
@@ -792,18 +801,37 @@ export abstract class MemoryManagerSyncOps {
     needsFullReindex: boolean;
     progress?: MemorySyncProgressState;
   }) {
-    // FTS-only mode: skip embedding sync (no provider)
-    if (!this.provider) {
-      log.debug("Skipping memory file sync in FTS-only mode (no embedding provider)");
-      return;
-    }
-
+    // FTS-only (no provider): still list/index markdown into chunks + FTS.
     const files = await listMemoryFiles(this.workspaceDir, this.settings.extraPaths);
-    const fileEntries = (
+    const workspaceEntries = (
       await Promise.all(files.map(async (file) => buildFileEntry(file, this.workspaceDir)))
     ).filter((entry): entry is MemoryFileEntry => entry !== null);
+
+    // Builtin: index only *authorized* collaboration memory markdown (never all groups).
+    const collabEntries: MemoryFileEntry[] = [];
+    for (const root of this.collaborationMemoryRoots) {
+      const docs = await listCollaborationMemoryMarkdownDocs(root);
+      for (const doc of docs) {
+        let stat;
+        try {
+          stat = await fs.stat(doc.absPath);
+        } catch {
+          continue;
+        }
+        collabEntries.push({
+          path: doc.relPath,
+          absPath: doc.absPath,
+          mtimeMs: stat.mtimeMs,
+          size: stat.size,
+          hash: hashText(doc.text),
+        });
+      }
+    }
+
+    const fileEntries = [...workspaceEntries, ...collabEntries];
     log.debug("memory sync: indexing memory files", {
       files: fileEntries.length,
+      collaborationFiles: collabEntries.length,
       needsFullReindex: params.needsFullReindex,
       batch: this.batch.enabled,
       concurrency: this.getIndexConcurrency(),
@@ -864,7 +892,7 @@ export abstract class MemoryManagerSyncOps {
         try {
           this.db
             .prepare(`DELETE FROM ${FTS_TABLE} WHERE path = ? AND source = ? AND model = ?`)
-            .run(stale.path, "memory", this.provider.model);
+            .run(stale.path, "memory", this.provider?.model ?? "fts-only");
         } catch {}
       }
     }
@@ -874,12 +902,7 @@ export abstract class MemoryManagerSyncOps {
     needsFullReindex: boolean;
     progress?: MemorySyncProgressState;
   }) {
-    // FTS-only mode: skip embedding sync (no provider)
-    if (!this.provider) {
-      log.debug("Skipping session file sync in FTS-only mode (no embedding provider)");
-      return;
-    }
-
+    // FTS-only (no provider): still index session text into chunks + FTS.
     const files = await listSessionFilesForAgent(this.agentId);
     const activePaths = new Set(files.map((file) => sessionPathForFile(file)));
     const indexAll = params.needsFullReindex || this.sessionsDirtyFiles.size === 0;
@@ -972,7 +995,7 @@ export abstract class MemoryManagerSyncOps {
         try {
           this.db
             .prepare(`DELETE FROM ${FTS_TABLE} WHERE path = ? AND source = ? AND model = ?`)
-            .run(stale.path, "sessions", this.provider.model);
+            .run(stale.path, "sessions", this.provider?.model ?? "fts-only");
         } catch {}
       }
     }
