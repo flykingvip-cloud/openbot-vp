@@ -6,14 +6,18 @@
  * then calls `promotePrivateMemoryCapsuleToGroup`.
  *
  * Idempotency: promote derives stable projectionId/assetId from source scope +
- * capsule version + target tenant/group/bot. Learning storage upserts by those
- * ids, so repeat promote rewrites the same capsule/projection/asset rows rather
- * than minting new UUIDs. Audit may append again. Does not corrupt prior assets.
+ * capsule version + target tenant/group/bot. When the stable asset already
+ * exists, retry returns the same ids without mutating status/reuseCount/
+ * createdAt/version (network retry must not resurrect revoked assets). Audit
+ * may append again.
  *
  * Trusted context: RPC must pass target-group `stores` + `tenantId` from
- * `resolveTrustedWriteContext`. Ownership compares capsule-stamped tenant to the
- * caller-trusted tenant (not capsule labels against themselves). Managed
- * enterprise without trusted stores/tenant fail-closes (no default-store reopen).
+ * `resolveTrustedWriteContext`. Source capsule reads, target policy
+ * (fileStore/groupStorage), and learning writes all bind to those trusted
+ * stores/locator — not a silent default-store reopen. Ownership compares
+ * capsule-stamped tenant to the caller-trusted tenant (not capsule labels
+ * against themselves). Managed enterprise without trusted stores/tenant
+ * fail-closes.
  *
  * Revoke limitation: personal `revokePersonalLearningAsset` does not revoke the
  * group-side clone. Group revoke uses `collaboration.capsule.transition`
@@ -53,10 +57,21 @@ export type AuthorizedPrivateMemoryPromoteParams = {
   /** Trusted security profile from authz context when available. */
   securityProfile?: "personal_local" | "managed_enterprise";
   /**
-   * Trusted target-group stores from authz. Target learning writes use
-   * `stores.learningStorage` when provided (RPC production path).
+   * Trusted target-group stores from authz. Source capsule reads, target
+   * policy (fileStore/groupStorage), and learning writes bind here when
+   * provided (RPC production path).
    */
   stores?: {
+    learningStorage: PromotePrivateMemoryDeps["learningStorage"];
+    fileStore?: PromotePrivateMemoryDeps["fileStore"];
+    groupStorage?: PromotePrivateMemoryDeps["groupStorage"];
+  };
+  /**
+   * Optional explicit source-scope stores. When omitted, source reads use
+   * `stores.learningStorage` (same trusted locator) rather than reopening
+   * default workspace stores.
+   */
+  sourceStores?: {
     learningStorage: PromotePrivateMemoryDeps["learningStorage"];
   };
   deps?: PromotePrivateMemoryDeps & {
@@ -129,9 +144,36 @@ export async function promotePrivateMemoryCapsuleAuthorized(
     };
   }
 
+  // Bind source reads to trusted stores when provided — never reopen default
+  // workspace stores on the managed / RPC path just to load agent:<botId>.
+  const sourceLearningStorage =
+    params.sourceStores?.learningStorage ??
+    params.stores?.learningStorage ??
+    params.deps?.learningStorage ??
+    undefined;
+  const targetLearningStorage =
+    params.stores?.learningStorage ?? params.deps?.learningStorage ?? undefined;
+
+  // Managed enterprise must carry trusted tenant + stores before any store reopen.
+  if (params.securityProfile === "managed_enterprise") {
+    const trustedTenant = typeof params.tenantId === "string" ? params.tenantId.trim() : "";
+    if (params.tenantId === undefined || !trustedTenant || !targetLearningStorage) {
+      return {
+        capsuleId,
+        promoted: false,
+        reason: "managed_requires_trusted_context",
+        sourceScopeId,
+        groupId,
+      };
+    }
+  }
+
   const readCapsules =
     params.deps?.readCapsules ??
     (async (scopeId: string) => {
+      if (sourceLearningStorage) {
+        return sourceLearningStorage.readCapsules(scopeId);
+      }
       const { learningStorage } = createWorkspaceCollaborationStores();
       return learningStorage.readCapsules(scopeId);
     });
@@ -186,10 +228,8 @@ export async function promotePrivateMemoryCapsuleAuthorized(
   // "current subject" solely from the capsule label that is also the recorded tenant.
   const subjectTenantId = trustedTenantProvided ? params.tenantId : stamped.tenantId;
 
-  // Managed enterprise must carry trusted tenant + target stores from authz.
+  // Managed enterprise (capsule-stamped) must carry trusted tenant + target stores.
   // Do not reopen default local stores for managed writes.
-  const targetLearningStorage =
-    params.stores?.learningStorage ?? params.deps?.learningStorage ?? undefined;
   if (callerProfile === "managed_enterprise" || stamped.securityProfile === "managed_enterprise") {
     const trustedTenant = typeof subjectTenantId === "string" ? subjectTenantId.trim() : "";
     if (!trustedTenantProvided || !trustedTenant || !targetLearningStorage) {
@@ -224,6 +264,9 @@ export async function promotePrivateMemoryCapsuleAuthorized(
     };
   }
 
+  const targetFileStore = params.stores?.fileStore ?? params.deps?.fileStore;
+  const targetGroupStorage = params.stores?.groupStorage ?? params.deps?.groupStorage;
+
   const result = await promotePrivateMemoryCapsuleToGroup({
     botId,
     groupId,
@@ -233,6 +276,8 @@ export async function promotePrivateMemoryCapsuleAuthorized(
     deps: {
       cfg: params.cfg ?? params.deps?.cfg ?? null,
       ...(targetLearningStorage ? { learningStorage: targetLearningStorage } : {}),
+      ...(targetFileStore ? { fileStore: targetFileStore } : {}),
+      ...(targetGroupStorage ? { groupStorage: targetGroupStorage } : {}),
       ...(params.deps?.recordAudit ? { recordAudit: params.deps.recordAudit } : {}),
       ...(params.deps?.evaluatePolicy ? { evaluatePolicy: params.deps.evaluatePolicy } : {}),
       ...(trustedTenantProvided ? { tenantId: params.tenantId } : {}),

@@ -17,7 +17,7 @@
 | 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`；长周期 `createCronLedgerSession` **不**依赖默认关闭的全局 ledger 开关 | `cfg.cron`；ledger 资格看任务文本，不看 `OPENBOT_PROGRESS_LEDGER_ENABLED` | `buildGatewayCronService` + `CronService` + isolated-agent / webhook announce | timer due fire → `runIsolatedAgentJob` / systemEvent；outbound `deliverOutboundPayloads` | cron store（`lastDelivered` / `lastDeliveryStatus` / `nextRunAtMs`）+ run log | 下次 `nextRunAtMs` wake；完成 ledger 后续 tick 带诚实 summary 记 ok | ownership ownerId/tenantId + personal scope 交叉；系统 retention 可共存 | `OPENCLAW_SKIP_CRON=1` / `enabled:false` 不调度；空完成仍非成功；完成 ledger 不再空完成误报 | 见 P2-H。单元+adapter 证据 create→persist→due→`deliverOutboundPayloads`→persist status；**真实 HTTP 送达未跑** → 部分验证 |
 | 模型智能配置  | 部分验证 | 未设置时为 `native`（合法默认，非缺陷）。产品/系统设置保存 `aor_enhanced` 后由 `resolvePlatformModelsMode` 读入 gate | `gateway.platform.models.mode`（UI `onSetPlatformModelsMode` → config.set） | `resolveEmployeeModelGate` ← chat / followup / cron-isolated / subagent（image/PDF 经 chat+capability plan modality） | native 直出；`aor_enhanced` + 真实目录成本 → AOR 保集合重排；**全合成 → native**；**partial 合成项不进 rankModels** | 平台模型快照 + effectiveRouting / preferredModelOrder | 后续请求读同一 mode；`runWithModelFallback` 消费 preferredModelOrder | 不扩大授权集合 | 缺 mode→native；缺档案→synthetic_only 回退原序且无假解释；合成中性不得赢 cheapest | 见 P2-G。单元证明 preferredOrder 改变 outbound primary；**真实 HTTP/provider 未跑** → 部分验证 |
 
-`privateMemoryPromote` 仍记为 **合理受控关闭**（默认 unset/false）：`promotePrivateMemoryCapsuleToGroup` 只有显式 `true` 才写组学习资产。P1-C 已补生产 RPC `collaboration.learning.privateMemory.promote`（`private-memory-promote-entry.ts` + server-methods 注册）：要求 identified actor、个人 scope 按 capsuleId 加载、ownership 与目标组 trusted write 成员校验；flag OFF 返回 success-shaped `{promoted:false, reason:flag_off}`，不假装晋升成功。默认不打开 flag。验收复跑后补齐三修复：①策略拒绝前不写目标组正文；②projection/asset 稳定幂等 id；③RPC 可信 tenant/stores 传入执行层（managed 缺可信上下文 fail-closed）。本批未接线 UI。撤销：个人 revoke 不自动撤销组侧副本；组侧走 `collaboration.capsule.transition` revoked。真实跨租户 HTTP/authz 子进程未跑 → 记忆行 / P1-C **仍部分验证**。
+`privateMemoryPromote` 仍记为 **合理受控关闭**（默认 unset/false）：`promotePrivateMemoryCapsuleToGroup` 只有显式 `true` 才写组学习资产。P1-C 已补生产 RPC `collaboration.learning.privateMemory.promote`（`private-memory-promote-entry.ts` + server-methods 注册）：要求 identified actor、个人 scope 按 capsuleId 加载、ownership 与目标组 trusted write 成员校验；flag OFF 返回 success-shaped `{promoted:false, reason:flag_off}`，不假装晋升成功。默认不打开 flag。验收复跑后补齐五修复：①策略拒绝前不写目标组正文；②projection/asset 稳定幂等 id；③RPC 可信 tenant/stores 传入执行层（managed 缺可信上下文 fail-closed）；④重试不覆盖资产生命周期（revoked/reuseCount 保留）；⑤源读取与目标策略绑定同一可信 stores/locator（fileStore/groupStorage，禁止 silent default reopen）。本批未接线 UI。撤销：个人 revoke 不自动撤销组侧副本；组侧走 `collaboration.capsule.transition` revoked。真实跨租户 HTTP/authz 子进程未跑 → 记忆行 / P1-C **仍部分验证**（已推送≠验收通过）。
 
 ## 受支持记忆后端
 
@@ -157,12 +157,12 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 | 加载     | 仅从 `agent:<botId>` `readCapsules` 按 `capsuleId`；不接受客户端胶囊正文                                                 |
 | 校验     | identified actor；`assertPersonalLearningOwnership`；目标组 `resolveTrustedWriteContext`；仅 `approved` 胶囊             |
 | 策略顺序 | 目标组 policy/lifecycle **先于** `appendCapsule`/projection/asset；拒绝时仅 audit，目标组无正文副本（回归：lifecycle_blocked PoC） |
-| 幂等     | 稳定 `proj:`/`asset:` id（source scope+capsule version+tenant/group/bot）；upsert 三类集合；重复请求不 mint 新 UUID     |
-| 可信上下文 | RPC 传入 `tenantId`/`securityProfile`/`stores`；执行层使用 caller stores，禁止 managed 无可信上下文时默认本地 reopen   |
-| 测试     | entry + RPC + promote 单测；含 policy-denial 零正文、repeat projection/asset 幂等、stores/tenant 线程与跨租户拒绝           |
+| 幂等     | 稳定 `proj:`/`asset:` id；已存在同 id 资产时返回原回执且**不**重建 `status`/`reuseCount`/`createdAt`/`version`（撤销不因重试复活） |
+| 可信上下文 | RPC 传入 `tenantId`/`securityProfile`/`stores`；**源 capsule 读取**、**目标 policy（fileStore/groupStorage）**与 learning 写入同绑定；managed 缺可信上下文 fail-closed；禁止 silent default reopen |
+| 测试     | entry + RPC + promote；含 policy-denial 零正文、repeat 幂等、**lifecycle-preserve**、**stores-binding**（源读/策略 archived 零写入）、跨租户拒绝 |
 | UI       | 本批未接（避免 lander 冲突）                                                                                             |
-| 撤销缺口 | 个人 revoke ≠ 组侧自动 revoke；组侧 transition revoked 后 recall 停注入仍待独立验证                                     |
-| 状态     | **已推送待复验 / 部分验证**：三修复已推送 tip（policy-before-write、稳定 proj/asset id、可信 tenant/stores）；**已推送≠验收通过**；无真实跨租户 HTTP、无 UI；默认仍 **合理受控关闭** |
+| 撤销缺口 | 个人 revoke ≠ 组侧自动 revoke；组侧 transition revoked 后 recall 停注入仍待独立验证；FLOOR `promotion-audit` 默认路径未改（本流用 trusted helper）；behavior-buffer 旁路仍可能读默认 root（已知边界） |
+| 状态     | **已推送待复验 / 部分验证**：五修复已推送（含 lifecycle-preserve + stores-binding）；**已推送≠验收通过**；无真实跨租户 HTTP、无 UI；默认仍 **合理受控关闭** |
 
 ## P1-D 技能/资产进化最后一段（2026-10-30）
 

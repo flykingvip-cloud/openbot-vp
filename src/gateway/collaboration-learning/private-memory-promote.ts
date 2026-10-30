@@ -17,7 +17,15 @@ import type { CapsuleSensitivity, GroupMemoryCapsule } from "@openbot/collaborat
 import { DefaultLearningPromotionService } from "@openbot/collaboration-runtime";
 import { resolvePersonalLearningScopeId } from "../../auto-reply/reply/learning-recall.js";
 import type { OpenBotConfig } from "../../config/config.js";
-import { evaluateGroupPromotionPolicy, recordPromotionAudit } from "./promotion-audit.js";
+import { readCollaborationBehaviorBuffer } from "./behavior-buffer.js";
+import { readGroupCharter } from "./group-charter.js";
+import {
+  evaluateGroupPromotionPolicy,
+  recordPromotionAudit,
+  resolvePromotionPolicyFromCharter,
+  type PromotionAuditDecision,
+} from "./promotion-audit.js";
+import { DEFAULT_GROUP_PROMOTION_POLICY } from "./promotion-policy.js";
 import { createWorkspaceCollaborationStores, resolveCollaborationGroupTenantId } from "./shared.js";
 
 /** Marker on private LTM payloads — must never serialize into GROUP_PUBLIC. */
@@ -244,9 +252,88 @@ export function preparePrivateCapsuleForGroupPromote(params: {
   };
 }
 
+/**
+ * Evaluate target-group promotion policy against an explicit trusted locator.
+ * Kept in this landing stream so privateMemory.promote does not reopen default
+ * workspace stores for charter/profile (FLOOR promotion-audit stays untouched).
+ */
+export async function evaluatePrivateMemoryTargetPromotionPolicy(params: {
+  groupId: string;
+  confidentialityTier?: string | null;
+  tenantId?: string | null;
+  fileStore: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  groupStorage: ReturnType<typeof createWorkspaceCollaborationStores>["groupStorage"];
+}): Promise<PromotionAuditDecision> {
+  const [charter, behaviorBuffer, profile] = await Promise.all([
+    readGroupCharter({ fileStore: params.fileStore, groupId: params.groupId }),
+    readCollaborationBehaviorBuffer(params.groupId, params.tenantId),
+    params.groupStorage.readProfile(params.groupId),
+  ]);
+  if (!charter && !profile) {
+    return {
+      allowed: true,
+      reason: "default_allowed",
+      policy: DEFAULT_GROUP_PROMOTION_POLICY,
+      lifecycleStatus: "ACTIVE",
+    };
+  }
+  const lifecycleStatus = charter?.lifecycleStatus ?? "ACTIVE";
+  const policy = charter
+    ? resolvePromotionPolicyFromCharter(charter)
+    : DEFAULT_GROUP_PROMOTION_POLICY;
+  if (policy.requireLifecycleActive && lifecycleStatus !== "ACTIVE") {
+    return {
+      allowed: false,
+      reason: "lifecycle_blocked",
+      policy,
+      lifecycleStatus,
+    };
+  }
+  if (!policy.allowAutoPromote) {
+    return {
+      allowed: false,
+      reason: "auto_promote_disabled",
+      policy,
+      lifecycleStatus,
+    };
+  }
+  if (policy.blockSecretAutoPromote && params.confidentialityTier === "secret") {
+    return {
+      allowed: false,
+      reason: "secret_requires_review",
+      policy,
+      lifecycleStatus,
+    };
+  }
+  const minRate = policy.minGroupParticipationRate;
+  const aggregateParticipationRate = behaviorBuffer?.aggregateParticipationRate;
+  if (
+    typeof minRate === "number" &&
+    typeof aggregateParticipationRate === "number" &&
+    aggregateParticipationRate < minRate
+  ) {
+    return {
+      allowed: false,
+      reason: "low_group_participation",
+      policy,
+      lifecycleStatus,
+    };
+  }
+  return {
+    allowed: true,
+    reason: "allowed",
+    policy,
+    lifecycleStatus,
+  };
+}
+
 export type PromotePrivateMemoryDeps = {
   cfg?: OpenBotConfig | null;
   learningStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["learningStorage"];
+  /** Trusted target fileStore for policy/charter reads (same locator as writes). */
+  fileStore?: ReturnType<typeof createWorkspaceCollaborationStores>["fileStore"];
+  /** Trusted target groupStorage for policy/profile reads (same locator as writes). */
+  groupStorage?: ReturnType<typeof createWorkspaceCollaborationStores>["groupStorage"];
   recordAudit?: typeof recordPromotionAudit;
   evaluatePolicy?: typeof evaluateGroupPromotionPolicy;
   /** Trusted tenant from authorized caller (RPC ctx); preferred over group-id resolution. */
@@ -319,7 +406,6 @@ export async function promotePrivateMemoryCapsuleToGroup(params: {
   const learningStorage =
     params.deps?.learningStorage ?? createWorkspaceCollaborationStores().learningStorage;
   const recordAudit = params.deps?.recordAudit ?? recordPromotionAudit;
-  const evaluatePolicy = params.deps?.evaluatePolicy ?? evaluateGroupPromotionPolicy;
   // Prefer trusted tenant from authorized caller; fall back to group-derived ledger tenant.
   const tenantIdForLedger =
     params.deps?.tenantId !== undefined
@@ -337,14 +423,44 @@ export async function promotePrivateMemoryCapsuleToGroup(params: {
 
   // Gates BEFORE any target persistence: policy/lifecycle/sensitivity must not
   // leave a capsule body in the target group on deny (audit-only on reject).
-  const promotionPolicy = await evaluatePolicy({
+  const hasTrustedFile = params.deps?.fileStore != null;
+  const hasTrustedGroup = params.deps?.groupStorage != null;
+  if (hasTrustedFile !== hasTrustedGroup) {
+    return {
+      promoted: false,
+      reason: "trusted_policy_stores_incomplete",
+      sourceScopeId,
+      groupId,
+      confidentialityTier,
+    };
+  }
+
+  const policyArgs = {
     groupId,
     // Preserve explicit null from trusted caller (do not drop via truthy spread).
     ...(params.deps?.tenantId !== undefined || tenantIdForLedger
       ? { tenantId: tenantIdForLedger ?? null }
       : {}),
     confidentialityTier,
-  });
+  };
+
+  let promotionPolicy: PromotionAuditDecision;
+  if (params.deps?.evaluatePolicy) {
+    promotionPolicy = await params.deps.evaluatePolicy({
+      ...policyArgs,
+      ...(params.deps.fileStore ? { fileStore: params.deps.fileStore } : {}),
+      ...(params.deps.groupStorage ? { groupStorage: params.deps.groupStorage } : {}),
+    } as Parameters<typeof evaluateGroupPromotionPolicy>[0]);
+  } else if (hasTrustedFile && params.deps?.fileStore && params.deps?.groupStorage) {
+    // Bind charter/profile to the same trusted locator as writes — do not reopen defaults.
+    promotionPolicy = await evaluatePrivateMemoryTargetPromotionPolicy({
+      ...policyArgs,
+      fileStore: params.deps.fileStore,
+      groupStorage: params.deps.groupStorage,
+    });
+  } else {
+    promotionPolicy = await evaluateGroupPromotionPolicy(policyArgs);
+  }
   if (!promotionPolicy.allowed) {
     await recordAudit({
       groupId,
@@ -375,21 +491,67 @@ export async function promotePrivateMemoryCapsuleToGroup(params: {
     botId,
     tenantId: tenantIdForLedger,
   });
-  const createProjectionId =
-    params.deps?.createProjectionId ?? (() => stablePrivatePromoteProjectionId(idempotencyKey));
-  const createAssetId =
-    params.deps?.createAssetId ?? (() => stablePrivatePromoteAssetId(idempotencyKey));
+  const projectionId =
+    params.deps?.createProjectionId?.() ?? stablePrivatePromoteProjectionId(idempotencyKey);
+  const assetId = params.deps?.createAssetId?.() ?? stablePrivatePromoteAssetId(idempotencyKey);
+
+  // Operational idempotency: if the stable asset already exists, return the same
+  // receipt without rebuilding status/reuseCount/createdAt/version (network retry
+  // must not resurrect revoked assets or clear counters).
+  if (typeof learningStorage.readLearningAssets === "function") {
+    const existingAssets = await learningStorage.readLearningAssets(groupId, botId);
+    const existingAsset = existingAssets.find((entry) => entry.assetId === assetId);
+    if (existingAsset) {
+      const existingProjectionId = existingAsset.sourceProjectionId?.trim() || projectionId;
+      await recordAudit({
+        groupId,
+        ...(tenantIdForLedger ? { tenantId: tenantIdForLedger } : {}),
+        sourceGroupId: sourceScopeId,
+        botId,
+        capsuleId: groupCapsule.capsuleId,
+        projectionId: existingProjectionId,
+        assetId: existingAsset.assetId,
+        promoted: true,
+        reason: "promoted",
+        targetScope: "group",
+      }).catch(() => undefined);
+      return {
+        promoted: true,
+        reason: "promoted",
+        projectionId: existingProjectionId,
+        assetId: existingAsset.assetId,
+        sourceScopeId,
+        groupId,
+        confidentialityTier,
+      };
+    }
+  }
 
   // Persist approved clone into group capsule store (learning pathway), not transcript.
   await learningStorage.appendCapsule(groupId, groupCapsule);
 
   const promotionService = new DefaultLearningPromotionService({
-    createProjectionId,
-    createAssetId,
+    createProjectionId: () => projectionId,
+    createAssetId: () => assetId,
     saveProjection: async (projection) => {
+      // Preserve an already-persisted projection row (partial-retry no-op).
+      if (typeof learningStorage.readProjections === "function") {
+        const existing = await learningStorage.readProjections(groupId);
+        if (existing.some((entry) => entry.projectionId === projection.projectionId)) {
+          return;
+        }
+      }
       await learningStorage.appendProjection(groupId, projection);
     },
     saveLearningAsset: async (asset) => {
+      // Belt-and-suspenders: never overwrite lifecycle/counters on stable id hit.
+      if (typeof learningStorage.readLearningAssets === "function") {
+        const existing = await learningStorage.readLearningAssets(groupId);
+        const prior = existing.find((entry) => entry.assetId === asset.assetId);
+        if (prior) {
+          return;
+        }
+      }
       await learningStorage.appendLearningAsset(groupId, asset);
     },
   });
