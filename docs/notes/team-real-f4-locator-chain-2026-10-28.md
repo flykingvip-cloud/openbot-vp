@@ -44,4 +44,7 @@ Code fixes (same PR family):
 3. `boundedOutcomePathSegment` hashes long tip/version/lock/contribution/consumer/projection/command-log segments (CJK space ids).
 4. `collaboration.directory.bots.list` soft-degrades to `{ bots: [], degraded: true }` when enterprise tenant context is missing (no hard TENANT_CONTEXT_REQUIRED error that drives reconnect/offline UI).
 
+5. After gateway restart, `scheduleResumeIncompleteBoardsAfterGatewayRestart` (wired in group-task-heartbeat boot) scans durable board inventory and force-schedules the next incomplete milestone via the same continue-after-round path — no blind mid-LLM wake-op redo.
+6. L2 MVP UI helpers: `ui/src/ui/long-task-incident-state.ts` (binding fail / gateway reconnect|offline / computer occupied / sandbox stuck) and `long-task-board-progress.ts` (done / blocker / last persist from SessionTaskBoard or group board claims); chat optional strip props `longTaskIncidentLabel` / `longTaskBoardProgressLine`.
+
 Future NIGHT-style multi-milestone tasks: after M1 DELIVERABLE the group should auto-wake/self-advance the next active board inventory without a human CEO nudge, as long as board inventory remains and continue cooldown has elapsed.

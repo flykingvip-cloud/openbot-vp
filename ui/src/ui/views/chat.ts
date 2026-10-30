@@ -204,6 +204,16 @@ export type ChatProps = {
   gatewayConnectionPhase?: GatewayConnectionPhase;
   /** Shown with the unreachable banner. Resets the reconnect budget. */
   onRetryGatewayConnection?: () => void;
+  /**
+   * L2 long-task incident strip (binding fail / gateway reconnect / occupied / stuck).
+   * Host builds via resolveLongTaskIncidentState + formatLongTaskIncidentLabel.
+   */
+  longTaskIncidentLabel?: string | null;
+  /**
+   * L2 board progress beside long task (done / blocker / last persist).
+   * Host builds via summarizeLongTaskBoardProgress + formatLongTaskBoardProgressLine.
+   */
+  longTaskBoardProgressLine?: string | null;
   error: string | null;
   sessions: SessionsListResult | null;
   // Focus mode
@@ -1949,6 +1959,28 @@ export function renderChatContent(
                   >
                     ${t("chat.retryConnection")}
                   </button>`
+                : nothing
+            }
+          </div>`
+        : nothing
+    }
+
+    ${
+      props.longTaskIncidentLabel || props.longTaskBoardProgressLine
+        ? html`<div
+            class="callout"
+            role="status"
+            data-long-task-incident=${props.longTaskIncidentLabel ? "1" : "0"}
+            data-long-task-board-progress=${props.longTaskBoardProgressLine ? "1" : "0"}
+          >
+            ${
+              props.longTaskIncidentLabel
+                ? html`<div class="chat-long-task-incident">${props.longTaskIncidentLabel}</div>`
+                : nothing
+            }
+            ${
+              props.longTaskBoardProgressLine
+                ? html`<div class="chat-long-task-board-progress">${props.longTaskBoardProgressLine}</div>`
                 : nothing
             }
           </div>`

@@ -10204,6 +10204,13 @@ landingStreams:
       - src/gateway/collaboration-learning/try-build-chat-actor-deliverable-binding.ts
       - src/gateway/collaboration-learning/schedule-continue-after-deliverable.ts
       - src/gateway/collaboration-learning/attach-wake-and-chat-deliverable-binding.test.ts
+      - src/gateway/collaboration-learning/resume-incomplete-board-after-restart.ts
+      - src/gateway/collaboration-learning/resume-incomplete-board-after-restart.test.ts
+      - src/gateway/group-task-heartbeat-scheduler-boot.ts
+      - ui/src/ui/long-task-incident-state.ts
+      - ui/src/ui/long-task-incident-state.node.test.ts
+      - ui/src/ui/long-task-board-progress.ts
+      - ui/src/ui/views/chat.ts
       - src/gateway/collaboration-dispatch/continue-after-round.ts
       - src/gateway/server-methods/spaces.ts
       - src/task-outcome/store.ts

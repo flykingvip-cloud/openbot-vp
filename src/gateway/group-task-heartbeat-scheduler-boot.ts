@@ -9,6 +9,7 @@ import {
   type GroupTaskHeartbeatScheduler,
   type StartGroupTaskHeartbeatSchedulerOpts,
 } from "./collaboration-dispatch/group-task-heartbeat-scheduler.js";
+import { scheduleResumeIncompleteBoardsAfterGatewayRestart } from "./collaboration-learning/resume-incomplete-board-after-restart.js";
 import { runCollaborationGroupTaskHeartbeat } from "./collaboration-learning/wake-contract-entry.js";
 import {
   bindGatewayWakeRoundDispatcher,
@@ -22,6 +23,9 @@ export function startGatewayGroupTaskHeartbeatScheduler(
   // self_advance/nudge/escalate can open 真回合 (unbound → recorded).
   // Gray execute allowlist still gates; no second orchestrator.
   bindGatewayWakeRoundDispatcher({ cfg: opts.cfg });
+  // L1: after restart, scan durable board inventory and force next incomplete milestone
+  // (inventory-first; no blind mid-LLM wake-op redo).
+  scheduleResumeIncompleteBoardsAfterGatewayRestart({ cfg: opts.cfg });
   const scheduler = startGroupTaskHeartbeatScheduler({
     ...opts,
     runGroup: async (target, options) =>
