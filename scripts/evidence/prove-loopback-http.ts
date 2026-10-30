@@ -10,8 +10,8 @@
  *   OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN=1 node --import tsx scripts/evidence/prove-loopback-http.ts
  *
  * Exit codes:
- *   0  — ok:true (listen evidence) OR ok:false skipped when REQUIRE unset
- *   1  — REQUIRE=1 and listen unavailable, or unexpected failure
+ *   0  — ok:true (listen evidence) OR ok:false + skipped:true (permission/sandbox only)
+ *   1  — ok:false + skipped:false (EADDRINUSE / timeout / other), REQUIRE=1 hard-fail, or throw
  */
 import { tryProveRealLoopbackHttp } from "../../src/test-utils/loopback-http-receiver.ts";
 
@@ -26,8 +26,8 @@ async function main(): Promise<number> {
     if (evidence.ok) {
       return 0;
     }
-    // skipped: honest non-PASS; exit 0 unless REQUIRE forces hard-fail (thrown above)
-    return 0;
+    // Permission/sandbox skip: honest non-PASS, exit 0. Hard fail (not skipped) → 1.
+    return evidence.skipped ? 0 : 1;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const code = (err as NodeJS.ErrnoException | undefined)?.code;

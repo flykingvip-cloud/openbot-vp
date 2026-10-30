@@ -13,16 +13,20 @@ import {
 } from "./loopback-http-receiver.js";
 
 describe("loopback-http-receiver", () => {
-  it("classifies EPERM/EACCES as listen-forbidden", () => {
+  it("classifies only permission/sandbox codes as listen-forbidden (not EADDRINUSE)", () => {
     expect(isListenForbiddenError(Object.assign(new Error("denied"), { code: "EPERM" }))).toBe(
       true,
     );
     expect(isListenForbiddenError(Object.assign(new Error("denied"), { code: "EACCES" }))).toBe(
       true,
     );
+    expect(
+      isListenForbiddenError(Object.assign(new Error("no addr"), { code: "EADDRNOTAVAIL" })),
+    ).toBe(true);
     expect(isListenForbiddenError(Object.assign(new Error("busy"), { code: "EADDRINUSE" }))).toBe(
       false,
     );
+    expect(isListenForbiddenError(new Error("loopback listen timed out after 80ms"))).toBe(false);
   });
 
   it("mode=mock-agent forceMockAgent path starts and closes without hang (not Live TCP)", async () => {
@@ -69,12 +73,16 @@ describe("loopback-http-receiver", () => {
     );
   });
 
-  it("tryProveRealLoopbackHttp returns mode=listen evidence or skipped (never MockAgent PASS)", async (ctx) => {
+  it("tryProveRealLoopbackHttp returns mode=listen evidence or permission-skipped (never MockAgent PASS)", async (ctx) => {
     const evidence = await tryProveRealLoopbackHttp({ listenTimeoutMs: 2_000 });
     if (!evidence.ok) {
-      expect(evidence.skipped).toBe(true);
       expect(evidence.code.length).toBeGreaterThan(0);
       expect(evidence.reason).toMatch(/mode=listen/);
+      if (!evidence.skipped) {
+        throw new Error(
+          `tryProveRealLoopbackHttp hard-failed (not skip): ${evidence.code} — ${evidence.reason}`,
+        );
+      }
       ctx.skip(true, `tryProveRealLoopbackHttp skipped: ${evidence.code} — ${evidence.reason}`);
       return;
     }
@@ -82,6 +90,51 @@ describe("loopback-http-receiver", () => {
     expect(evidence.port).toBeGreaterThan(0);
     expect(evidence.roundTrip.status).toBe(200);
     expect(evidence.roundTrip.body).toContain("real-loopback-http-listen-evidence");
+  });
+
+  it("tryProveRealLoopbackHttp EADDRINUSE is hard fail (skipped:false)", async () => {
+    const evidence = await tryProveRealLoopbackHttp({
+      listen: async () => {
+        throw Object.assign(new Error("listen EADDRINUSE"), { code: "EADDRINUSE" });
+      },
+    });
+    expect(evidence.ok).toBe(false);
+    if (evidence.ok) {
+      return;
+    }
+    expect(evidence.skipped).toBe(false);
+    expect(evidence.code).toBe("EADDRINUSE");
+    expect(evidence.reason).toMatch(/mode=listen failed/);
+  });
+
+  it("tryProveRealLoopbackHttp listen timeout is hard fail (skipped:false)", async () => {
+    const evidence = await tryProveRealLoopbackHttp({
+      listen: async () => {
+        throw new Error("loopback listen timed out after 80ms");
+      },
+    });
+    expect(evidence.ok).toBe(false);
+    if (evidence.ok) {
+      return;
+    }
+    expect(evidence.skipped).toBe(false);
+    expect(evidence.code).toBe("ETIMEDOUT");
+    expect(evidence.reason).toMatch(/timed out/);
+  });
+
+  it("tryProveRealLoopbackHttp EPERM is skipped:true (permission limit)", async () => {
+    const evidence = await tryProveRealLoopbackHttp({
+      listen: async () => {
+        throw Object.assign(new Error("bind denied"), { code: "EPERM" });
+      },
+    });
+    expect(evidence.ok).toBe(false);
+    if (evidence.ok) {
+      return;
+    }
+    expect(evidence.skipped).toBe(true);
+    expect(evidence.code).toBe("EPERM");
+    expect(evidence.reason).toMatch(/unavailable/);
   });
 
   it("listenOnLoopback times out when listening never fires (no hang)", async () => {

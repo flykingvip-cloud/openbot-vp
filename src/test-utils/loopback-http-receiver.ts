@@ -1,10 +1,11 @@
 /**
  * Loopback HTTP receiver for labeled network-mock evidence (P2-G/H).
  *
- * Prefers a real 127.0.0.1 listen. On EPERM/EACCES (Codex sandbox etc.) or
- * OPENBOT_LOOPBACK_HTTP_FORCE_MOCK=1, falls back to undici MockAgent so the
- * suite never hangs on a listen promise without error handling, and never
- * silently claims pass when bind is forbidden.
+ * Prefers a real 127.0.0.1 listen. On EPERM/EACCES/EADDRNOTAVAIL (Codex sandbox
+ * etc.) or OPENBOT_LOOPBACK_HTTP_FORCE_MOCK=1, falls back to undici MockAgent so
+ * the suite never hangs on a listen promise without error handling, and never
+ * silently claims pass when bind is forbidden. EADDRINUSE / listen timeout are
+ * hard failures (not skip).
  *
  * Real TCP/Live listen evidence is separate: use tryProveRealLoopbackHttp() or
  * scripts/evidence/prove-loopback-http.ts. MockAgent proves fetch/dispatcher
@@ -39,10 +40,16 @@ export type RealLoopbackHttpEvidence =
   | {
       ok: false;
       code: string;
-      skipped: true;
+      /** Only permission/sandbox limits may skip; EADDRINUSE / timeout / other → false. */
+      skipped: boolean;
       reason: string;
     };
 
+/**
+ * Permission-style listen limits eligible for honest skip (not PASS).
+ * EPERM/EACCES: sandbox/privilege. EADDRNOTAVAIL: sandbox/no usable bind addr.
+ * Do NOT include EADDRINUSE or listen timeout — those are hard failures.
+ */
 const LISTEN_FORBIDDEN = new Set(["EPERM", "EACCES", "EADDRNOTAVAIL"]);
 
 export function isListenForbiddenError(err: unknown): boolean {
@@ -234,14 +241,19 @@ export async function startLoopbackHttpReceiver(options?: {
 
 /**
  * Independently verifiable real loopback TCP HTTP evidence.
- * Never falls back to MockAgent. On bind forbidden, returns skipped (not PASS).
- * When requireListen / OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN=1, throws instead.
+ * Never falls back to MockAgent. On permission/sandbox bind limits, returns
+ * skipped:true (not PASS). EADDRINUSE, listen timeout, and other errors return
+ * skipped:false (hard fail). When requireListen / OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN=1,
+ * throws instead of returning ok:false.
  */
 export async function tryProveRealLoopbackHttp(options?: {
   listenTimeoutMs?: number;
   requireListen?: boolean;
+  /** Test-only: replace listenOnLoopback (inject EADDRINUSE / timeout / EPERM). */
+  listen?: (server: http.Server, host?: string, timeoutMs?: number) => Promise<AddressInfo>;
 }): Promise<RealLoopbackHttpEvidence> {
   const requireListen = options?.requireListen === true || isLoopbackListenRequired();
+  const listen = options?.listen ?? listenOnLoopback;
   const server = http.createServer((_req, res) => {
     res.statusCode = 200;
     res.setHeader("Content-Type", "application/json");
@@ -250,13 +262,14 @@ export async function tryProveRealLoopbackHttp(options?: {
 
   let addr: AddressInfo;
   try {
-    addr = await listenOnLoopback(server, "127.0.0.1", options?.listenTimeoutMs ?? 2_000);
+    addr = await listen(server, "127.0.0.1", options?.listenTimeoutMs ?? 2_000);
   } catch (err) {
     await closeServerQuietly(server);
     const code =
       (err as NodeJS.ErrnoException | undefined)?.code ??
       (err instanceof Error && /timed out/.test(err.message) ? "ETIMEDOUT" : "LISTEN_FAILED");
-    const reason = isListenForbiddenError(err)
+    const permissionSkip = isListenForbiddenError(err);
+    const reason = permissionSkip
       ? `mode=listen unavailable (${code}): Codex/restricted sandbox cannot bind 127.0.0.1; not counted as PASS. Run on USER/unrestricted or set OPENBOT_LOOPBACK_HTTP_REQUIRE_LISTEN=1 there.`
       : `mode=listen failed (${code}): ${err instanceof Error ? err.message : String(err)}`;
     if (requireListen) {
@@ -268,7 +281,7 @@ export async function tryProveRealLoopbackHttp(options?: {
     return {
       ok: false,
       code: String(code),
-      skipped: true,
+      skipped: permissionSkip,
       reason,
     };
   }
