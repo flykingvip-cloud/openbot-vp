@@ -146,7 +146,25 @@ export function classifyTurnRelation(incoming: string, currentGoal: string): Tur
   if (isPriorUtteranceCorrection(text)) {
     return "amend";
   }
+  // 「请继续」 alone amends the current task. 「请继续写《调律》…」 (continue cue +
+  // a non-overlapping topic) must bind the LATEST task — Owner 2026-10-30
+  // board-latest policy (snake stall: novel stay unbound while continue pinned old).
   if (AMEND_CONSTRAINT_RE.test(text)) {
+    if (sharesDistinctivePhrase(text, currentGoal)) {
+      return "amend";
+    }
+    // Only escalate when the amend hit is a continue-family cue plus a distinct
+    // topic. Do not flip 「当前这个工作…交接给…」 (amend + explicit) into new_work.
+    const continueFamily = /(继续|接着|然后)/u.test(text);
+    if (continueFamily) {
+      if (EXPLICIT_NEW_WORK_RE.test(text) || DISTINCT_IMPERATIVE_RE.test(text)) {
+        return "new_work";
+      }
+      const afterContinue = text.replace(/^(请)?(继续|接着|然后)[，,、。.\s]*/u, "").trim();
+      if (afterContinue.length >= 8 && afterContinue !== text.trim()) {
+        return "new_work";
+      }
+    }
     return "amend";
   }
   if (EXPLICIT_NEW_WORK_RE.test(text) && !sharesDistinctivePhrase(text, currentGoal)) {

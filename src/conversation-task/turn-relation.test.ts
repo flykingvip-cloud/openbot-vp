@@ -58,4 +58,12 @@ describe("turn relation", () => {
     expect(classifyTurnRelation("那我们开始新任务：做竞品分析", CURRENT)).toBe("new_work");
     expect(classifyTurnRelation("另外帮我做一份竞品表", CURRENT)).toBe("new_work");
   });
+
+  it("binds distinct new work even when the message contains 继续 (board-latest)", () => {
+    const snake = "你帮我制作一个贪吃蛇的小游戏";
+    expect(classifyTurnRelation("请继续", snake)).toBe("amend");
+    expect(classifyTurnRelation("请继续写审查记录、完成绑定", snake)).toBe("new_work");
+    expect(classifyTurnRelation("请继续写《调律》小说第七章，六时启闸", snake)).toBe("new_work");
+    expect(classifyTurnRelation("新任务：创作调律长篇小说并验收第一章", snake)).toBe("new_work");
+  });
 });
