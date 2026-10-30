@@ -1,4 +1,5 @@
 import type { CapsuleReusability } from "@openbot/collaboration-core";
+import { loadConfig } from "../../config/config.js";
 import { isCollabRuntimeNamespaceEnabled } from "../collaboration-dispatch/runtime-namespace.js";
 import {
   acceptCollaborationTaskHandoffContract,
@@ -64,6 +65,7 @@ import {
   resolveDeliveryAclActor,
 } from "../collaboration-learning/delivery-actor-binding.js";
 import { triggerPostPlanConfirmAdvance } from "../collaboration-learning/post-plan-confirm-advance.js";
+import { promotePrivateMemoryCapsuleAuthorized } from "../collaboration-learning/private-memory-promote-entry.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
@@ -2044,5 +2046,80 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, result, undefined);
+  },
+
+  "collaboration.learning.privateMemory.promote": async ({ params, respond, client }) => {
+    const botId = typeof params.botId === "string" ? params.botId.trim() : "";
+    const groupId = typeof params.groupId === "string" ? params.groupId.trim() : "";
+    const capsuleId = typeof params.capsuleId === "string" ? params.capsuleId.trim() : "";
+    const confidentialityTier =
+      typeof params.confidentialityTier === "string" && params.confidentialityTier.trim()
+        ? params.confidentialityTier.trim()
+        : undefined;
+    if (!botId || !groupId || !capsuleId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "botId, groupId, and capsuleId are required"),
+      );
+      return;
+    }
+    const actorId = await resolveDeliveryAclActor(client, groupId);
+    if (!actorId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "identified actor is required"),
+      );
+      return;
+    }
+    // Target group membership / write role (same trusted write path as board mutations).
+    const ctx = await resolveTrustedWriteContext(client, groupId);
+    if (!ctx.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+      );
+      return;
+    }
+    try {
+      const result = await promotePrivateMemoryCapsuleAuthorized({
+        botId,
+        groupId,
+        capsuleId,
+        actorId,
+        cfg: loadConfig(),
+        ...(confidentialityTier ? { confidentialityTier } : {}),
+      });
+      // Flag-off and policy denials are success-shaped results (promoted:false), not RPC errors.
+      // Authz / missing capsule reasons that must not look like a promotion success:
+      const hardReject = new Set([
+        "capsule_not_found",
+        "capsule_revoked",
+        "capsule_not_approved",
+        "ownership_context_required",
+        "ownership_fields_required",
+        "actor_not_owner",
+        "agent_ownership_mismatch",
+        "managed_tenant_required",
+        "cross_tenant_ownership",
+        "botId_groupId_capsuleId_actorId_required",
+      ]);
+      if (!result.promoted && hardReject.has(result.reason)) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
   },
 };

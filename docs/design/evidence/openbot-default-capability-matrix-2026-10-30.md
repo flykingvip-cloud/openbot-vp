@@ -1,6 +1,6 @@
 # 默认能力矩阵与 P0 证据（2026-10-30）
 
-基线：`3a391742f2603bc80d42ad3d4258e047224da352`（fetch 后仍是 `origin/main`）。本文件只覆盖第一批：八类能力判定，以及 P0-A / P0-B。P1-C 至 P2-H 只读，未在本 PR 实现。
+基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B 与 **P1-C**（私有记忆显式进组 RPC）。P1-D 至 P2-H 仍只读未实现。
 
 状态只使用：已验证 / 部分验证 / 未实现 / 合理受控关闭 / 缺证据。
 
@@ -17,7 +17,7 @@
 | 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`              | `cfg.cron`                                                                                                                            | `buildGatewayCronService`（`src/gateway/server-cron.ts`） | cron service timer                                            | cron store                                                                                    | 下次 wake                                                        | 目标身份与租户由 job 自身约束（本轮未重验）                         | 关闭时不调度                                                                               | 本轮只核对默认表达式，未跑创建→送达闭环。未见需要在本 PR 改动的新缺口                                   |
 | 模型智能配置  | 部分验证 | 未设置时为 `native`。`native` 是合法默认，不是缺陷                             | `gateway.platform.models.mode`                                                                                                        | `resolvePlatformModelsMode`                               | native 直出；`aor_enhanced` 另有 gate                         | 平台模型快照                                                                                  | 后续请求读同一 mode                                              | 不扩大授权集合                                                      | 缺 mode 时回到 native，不合成“已优化”                                                      | 本轮只读 `platform-models-config.ts`。未证明用户选择改变真实 outbound provider/model                    |
 
-`privateMemoryPromote` 单独记为 **合理受控关闭**：`src/gateway/collaboration-learning/private-memory-promote.ts` 只有显式 `true` 才开启。本 PR 不打开它。
+`privateMemoryPromote` 仍记为 **合理受控关闭**（默认 unset/false）：`promotePrivateMemoryCapsuleToGroup` 只有显式 `true` 才写组学习资产。P1-C 已补生产 RPC `collaboration.learning.privateMemory.promote`（`private-memory-promote-entry.ts` + server-methods 注册）：要求 identified actor、个人 scope 按 capsuleId 加载、ownership 与目标组 trusted write 成员校验；flag OFF 返回 success-shaped `{promoted:false, reason:flag_off}`，不假装晋升成功。默认不打开 flag。本批未接线 UI（lander 冲突时 RPC+tests 足够）。撤销：个人 revoke 不自动撤销组侧副本；组侧走 `collaboration.capsule.transition` revoked。真实 HTTP/authz 子进程未跑 → 记忆行保持 **部分验证**。
 
 ## 受支持记忆后端
 
@@ -115,8 +115,8 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 
 ## 已知限制与回滚
 
-- 不打开 `privateMemoryPromote`。
-- 不实现 P1-C 至 P2-H。
+- 不打开 `privateMemoryPromote` 默认（仅补 RPC 入口）。
+- 不实现 P1-D 至 P2-H。
 - 工作区 memory 的 `**/*.md` watcher glob 在当前 chokidar 上仍可能不发事件。本 PR 只改了授权小组目录。
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
@@ -147,3 +147,18 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 - 本 PR 触达文件 `oxfmt --check` 通过；全仓 `pnpm check` 的 `format:check` 仍会扫到其他未改文件的既有格式问题（未动他人路径）。
 - `CI=true pnpm build` 通过（含 `build:plugin-sdk:dts`、`ui:build`）。动态导入 ineffective 警告为既有，非本轮引入。
 - 为通过 `tsc -p tsconfig.plugin-sdk.dts.json`，将 `embedding_unavailable` 补入 `MemoryEmbeddingErrorReason`（与既有 FTS-only 状态字段一致）。
+
+
+## P1-C 私有经验显式分享入口（2026-10-30）
+
+| 项 | 说明 |
+| --- | --- |
+| RPC | `collaboration.learning.privateMemory.promote`（WRITE scope，与 capsule.approve 同族） |
+| Flag | `collaboration.learning.privateMemoryPromote` 默认 **OFF**；ON 才写组资产+audit |
+| 加载 | 仅从 `agent:<botId>` `readCapsules` 按 `capsuleId`；不接受客户端胶囊正文 |
+| 校验 | identified actor；`assertPersonalLearningOwnership`；目标组 `resolveTrustedWriteContext`；仅 `approved` 胶囊 |
+| 幂等 | storage upsert by id；重复 promote 不产生重复 capsuleId 行；audit 可再记 |
+| 测试 | `private-memory-promote-entry.test.ts` + `collaboration-private-memory-promote.test.ts`（注册/flag_off/非成员/非 owner） |
+| UI | 本批未接（避免 lander 冲突） |
+| 撤销缺口 | 个人 revoke ≠ 组侧自动 revoke |
+| 状态 | 入口存在；默认仍 **合理受控关闭**；套件级 **部分验证**（无真实 HTTP） |

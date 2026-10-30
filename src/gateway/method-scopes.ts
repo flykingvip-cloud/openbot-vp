@@ -924,6 +924,7 @@ const BASE_METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "collaboration.capsule.transition",
     "collaboration.learning.capsule.approve",
     "collaboration.learning.capsule.reject",
+    "collaboration.learning.privateMemory.promote",
     "collaboration.spaces.members.update",
     "collaboration.spaces.reset",
     "collaboration.spaces.dissolve",

@@ -69,6 +69,7 @@ const BASE_METHODS = [
   "collaboration.learning.capsule-candidates.list",
   "collaboration.learning.capsule.approve",
   "collaboration.learning.capsule.reject",
+  "collaboration.learning.privateMemory.promote",
   "collaboration.spaces.list",
   "collaboration.directory.bots.list",
   "collaboration.spaces.charter.get",

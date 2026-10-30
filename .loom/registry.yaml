@@ -10047,6 +10047,32 @@ tasks:
     ownerHistory: []
     since: 2026-10-29
     metadata: {}
+  - id: openbot-default-capability-p0:cursor-grok-default-capability
+    owner: cursor-grok-default-capability
+    intent: []
+    paths:
+      - src/gateway/collaboration-learning/private-memory-promote-entry.ts
+      - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods/collaboration-private-memory-promote.test.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md
+      - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+      - .kiro/specs/openbot-default-capability-p0/tasks.md
+      - .loom/registry.yaml
+    state: active
+    sessions:
+      - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
+        taskId: openbot-default-capability-p0:cursor-grok-default-capability
+        ide: cursor
+        agent: cursor-grok-default-capability
+        status: active
+        lastSignalAt: 2026-10-30T08:49:51.620Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-30
+    metadata: {}
 landingStreams:
   - id: openbot-default-capability-p0-20261030
     landingPolicy: serial
@@ -10076,6 +10102,13 @@ landingStreams:
       - src/memory/pending-dispose-repro.test.ts
       - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
       - src/memory/embedding-error.ts
+      - src/gateway/collaboration-learning/private-memory-promote-entry.ts
+      - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods/collaboration-private-memory-promote.test.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
     canLandWith:
       - CL
       - DDOC
@@ -10086,9 +10119,8 @@ landingStreams:
     metadata:
       task: openbot-default-capability-p0:cursor-grok-default-capability
       owner: cursor-grok-default-capability
-      purpose: P0 default-capability closure — unify context flags into legacy
-        engine; collaboration memory watcher/authz cache; eight-capability
-        matrix. NO_PROMOTE; no privateMemoryPromote default flip.
+      purpose: P0 default-capability closure + P1-C privateMemory.promote RPC entry.
+        NO_PROMOTE; no privateMemoryPromote default flip.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -10123,9 +10155,9 @@ landingStreams:
     metadata:
       task: memory-safe-continuity-landing
       owner: grok-bot
-      purpose: Multi-process HTTP/WS gateway live tests for memory continuity
-        (child spawn + acceptance evidence). Registry path listed so the stream
-        can land its own loom rule without mixing unrelated registry owners.
+      purpose: Multi-process HTTP/WS gateway live tests for memory continuity (child
+        spawn + acceptance evidence). Registry path listed so the stream can
+        land its own loom rule without mixing unrelated registry owners.
   - id: fix-preview-member-mutex-20261029
     landingPolicy: serial
     paths:
@@ -12911,8 +12943,8 @@ landingStreams:
     metadata:
       task: hide-checkpoint-restore-in-collab-groups
       owner: grok-bot
-      intent: "Superseded by collab-restore-line-phase-a (Phase A 恢复线): list/UI
-        gates lifted for space sessions; transcript-only; no group snapshot yet"
+      intent: "Superseded by collab-restore-line-phase-a (Phase A 恢复线): list/UI gates
+        lifted for space sessions; transcript-only; no group snapshot yet"
   - id: FRIENDLY_ENTITLEMENT_PRE_REPLY
     landingPolicy: serial
     paths:
@@ -22389,6 +22421,27 @@ sharedPaths:
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: Eight-capability matrix and P0 evidence for this batch.
     reviewAfter: 2026-11-30
+  - glob: docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-C note: production RPC entry; flag default still OFF."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/collaboration-learning.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C append-only handler collaboration.learning.privateMemory.promote.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/collaboration-private-memory-promote.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C RPC registration and authz handler tests.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C entry unit tests (flag_off, ownership, upsert idempotency).
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/private-memory-promote-entry.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C authorized promote entry (load personal capsule + ownership + flag
+      gate).
+    reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
   - glob: src/conversations/context-assemble.ts
@@ -22425,13 +22478,13 @@ sharedPaths:
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: Verified takeover of the legacy engine flag gate from stale
       openbot-conversation-lifecycle (lastSignalAt 2026-07-16, no dirty WIP).
-      Default config now reaches assemble/afterTurn. Does not transfer the
-      rest of the conversation-lifecycle path list.
+      Default config now reaches assemble/afterTurn. Does not transfer the rest
+      of the conversation-lifecycle path list.
     reviewAfter: 2026-11-30
   - glob: src/context-engine/types.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
-    reason: Optional assemble runtimeContext and capabilityDecisions for the
-      same P0-A takeover. Does not transfer other context-engine files.
+    reason: Optional assemble runtimeContext and capabilityDecisions for the same
+      P0-A takeover. Does not transfer other context-engine files.
     reviewAfter: 2026-11-30
   - glob: src/memory/manager.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
@@ -22945,9 +22998,9 @@ sharedPaths:
     reason: Verified exact-file takeover from stale
       conversation-lifecycle-memory-search-dataplane (lastSignalAt 2026-08-25,
       no dirty WIP). P0-B passes continuity identity into builtin managers and
-      fail-closes managed_enterprise when the tool has continuity profile but
-      no full accessContext. Earlier data-plane claims stay on the task; this
-      slice is the lander. Does not transfer src/memory/**.
+      fail-closes managed_enterprise when the tool has continuity profile but no
+      full accessContext. Earlier data-plane claims stay on the task; this slice
+      is the lander. Does not transfer src/memory/**.
   - glob: src/memory/index.ts
     landerTask: conversation-lifecycle-memory-search-dataplane:cursor-conversation-lifecycle
     reason: Re-exports MemorySearchManagerParams /
@@ -23304,13 +23357,13 @@ sharedPaths:
       guidance.progress registration (does not claim unrelated WIP).
     reviewAfter: 2026-10-03
   - glob: src/gateway/server-methods-list.ts
-    landerTask: guidance-orchestrator:codex-guidance-orchestrator
-    reason: P1 append-only method list entries for guidance.progress.*.
-    reviewAfter: 2026-10-03
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C append-only method list entry for privateMemory.promote.
+    reviewAfter: 2026-11-30
   - glob: src/gateway/method-scopes.ts
-    landerTask: guidance-orchestrator:codex-guidance-orchestrator
-    reason: P1 append-only operator.read scope entries for guidance.progress.*.
-    reviewAfter: 2026-10-03
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C append-only WRITE scope for privateMemory.promote.
+    reviewAfter: 2026-11-30
   - glob: packages/evolution-core/**
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Evolution core package; sole lander cursor-evolution.
