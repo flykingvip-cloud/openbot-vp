@@ -10048,6 +10048,38 @@ tasks:
     since: 2026-10-29
     metadata: {}
 landingStreams:
+  - id: openbot-default-capability-p0-20261030
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/openbot-default-capability-p0/tasks.md
+      - docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md
+      - src/context-engine/types.ts
+      - src/context-engine/registry.ts
+      - src/context-engine/legacy.ts
+      - src/context-engine/legacy.default-capability.test.ts
+      - src/conversations/flags.ts
+      - src/conversations/flags.test.ts
+      - src/memory/collaboration-index-scope.ts
+      - src/memory/collaboration-index-scope.test.ts
+      - src/memory/manager-sync-ops.ts
+      - src/memory/manager.ts
+      - src/memory/manager.collab-continuity.test.ts
+      - src/memory/search-manager.ts
+      - src/memory/search-manager.managed-tool-profile.test.ts
+    canLandWith:
+      - CL
+      - DDOC
+      - F
+      - MRR
+      - memory-safe-continuity-live-gateway-20261030
+      - collab-restore-line-phase-a
+    metadata:
+      task: openbot-default-capability-p0:cursor-grok-default-capability
+      owner: cursor-grok-default-capability
+      purpose: P0 default-capability closure — unify context flags into legacy
+        engine; collaboration memory watcher/authz cache; eight-capability
+        matrix. NO_PROMOTE; no privateMemoryPromote default flip.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22320,6 +22352,73 @@ landingStreams:
       task: pr143-market-assistant-merge-notes
       owner: grok-bot
 sharedPaths:
+  - glob: src/context-engine/registry.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Companion P0-A registry wiring for optional assemble runtimeContext.
+    reviewAfter: 2026-11-30
+  - glob: src/context-engine/legacy.default-capability.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P0-A fail-before/pass-after regressions for default planner/projection.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/collaboration-index-scope.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P0-B helpers for authorized collaboration memory roots / cache keys.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/collaboration-index-scope.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Companion tests for collaboration index scope helpers.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/manager.collab-continuity.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P0-B watcher add/modify/delete continuity regressions.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/search-manager.managed-tool-profile.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Managed-enterprise tool profile fail-closed regressions for P0-B.
+    reviewAfter: 2026-11-30
+  - glob: docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Eight-capability matrix and P0 evidence for this batch.
+    reviewAfter: 2026-11-30
+  - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Signed WIP/tasks for the default-capability P0 batch.
+    reviewAfter: 2026-11-30
+  - glob: src/conversations/flags.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Verified takeover of the exact flags resolver from stale
+      openbot-conversation-lifecycle (lastSignalAt 2026-07-16, clean tree, no
+      WIP). Env override over config for the context planner and projection.
+      Does not transfer src/conversations/**.
+    reviewAfter: 2026-11-30
+  - glob: src/conversations/flags.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Companion test for the flags precedence takeover. Does not transfer
+      src/conversations/**.
+    reviewAfter: 2026-11-30
+  - glob: src/context-engine/legacy.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Verified takeover of the legacy engine flag gate from stale
+      openbot-conversation-lifecycle (lastSignalAt 2026-07-16, no dirty WIP).
+      Default config now reaches assemble/afterTurn. Does not transfer the
+      rest of the conversation-lifecycle path list.
+    reviewAfter: 2026-11-30
+  - glob: src/context-engine/types.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Optional assemble runtimeContext and capabilityDecisions for the
+      same P0-A takeover. Does not transfer other context-engine files.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/manager.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Exact-file P0-B land for authz-scoped cache, sqlite isolation, and
+      revoked-manager search. Prior memory-workspace and data-governance claims
+      stay; this slice is the lander. No dirty WIP from those tasks was present.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/manager-sync-ops.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Exact-file P0-B land for watching authorized collaboration memory
+      directories. Does not transfer other sync-ops owners' remaining scope.
+    reviewAfter: 2026-11-30
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
     reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with
@@ -22817,11 +22916,13 @@ sharedPaths:
       memory-workspace-platform-remediation globs. kiro-data-governance is the
       sole owner of the Stage D readiness assessment CR.
   - glob: src/memory/search-manager.ts
-    landerTask: conversation-lifecycle-memory-search-dataplane:cursor-conversation-lifecycle
-    reason: Data-plane contract fix wires tenantId/dataPlaneId/dataRoot through
-      getMemorySearchManager without touching Phase 0 freeze locators. This
-      slice is the lander; conversation-lifecycle and cogniweave-v2 keep their
-      claims. Orthogonal to PR
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Verified exact-file takeover from stale
+      conversation-lifecycle-memory-search-dataplane (lastSignalAt 2026-08-25,
+      no dirty WIP). P0-B passes continuity identity into builtin managers and
+      fail-closes managed_enterprise when the tool has continuity profile but
+      no full accessContext. Earlier data-plane claims stay on the task; this
+      slice is the lander. Does not transfer src/memory/**.
   - glob: src/memory/index.ts
     landerTask: conversation-lifecycle-memory-search-dataplane:cursor-conversation-lifecycle
     reason: Re-exports MemorySearchManagerParams /

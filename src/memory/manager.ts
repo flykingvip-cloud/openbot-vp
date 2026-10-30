@@ -21,6 +21,13 @@ import {
 import { isFileMissingError, statRegularFile } from "./fs-utils.js";
 import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "./hybrid.js";
 import type { CollaborationMemoryIndexRoot } from "../gateway/collaboration-learning/memory-index-paths.js";
+import {
+  collaborationCacheKey,
+  collaborationCachePrefix,
+  collaborationIdentityActive,
+  type CollaborationIndexIdentity,
+  withIsolatedCollaborationStore,
+} from "./collaboration-index-scope.js";
 import { isMemoryPath, normalizeExtraMemoryPaths, normalizeRelPath } from "./internal.js";
 import {
   parseCollaborationMemoryGroupId,
@@ -137,6 +144,31 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
   private readonlyRecoverySuccesses = 0;
   private readonlyRecoveryFailures = 0;
   private readonlyRecoveryLastError?: string;
+  /** Closed by a newer authz snapshot for the same caller. Search must not leak. */
+  private continuityAccessRevoked = false;
+
+  /** Fail closed before any snippet or body is read. */
+  markContinuityAccessRevoked(): void {
+    this.continuityAccessRevoked = true;
+  }
+
+  private continuityClosed(): boolean {
+    return this.closed || this.continuityAccessRevoked;
+  }
+
+  private authorizeHits<T extends { path: string }>(hits: T[]): T[] {
+    if (this.continuityClosed()) {
+      return [];
+    }
+    return hits.filter((hit) => {
+      const groupId = parseCollaborationMemoryGroupId(hit.path);
+      if (!groupId) {
+        return true;
+      }
+      return this.collaborationMemoryRoots.some((root) => root.groupId === groupId);
+    });
+  }
+
   /** Set by the most recent search() call for tool/status surfacing. */
   private lastSearchMeta?: {
     searchMode: "hybrid" | "fts-only" | "vector";
@@ -152,6 +184,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     purpose?: "default" | "status";
     /** Builtin: only index these authorized collaboration memory roots. */
     collaborationMemoryRoots?: readonly CollaborationMemoryIndexRoot[];
+    /** When set, a newer root set for this caller revokes the previous manager. */
+    continuityIdentity?: CollaborationIndexIdentity | null;
   }): Promise<MemoryIndexManager | null> {
     const { cfg, agentId } = params;
     const settings = resolveMemorySearchConfig(cfg, agentId);
@@ -163,11 +197,25 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     void import("./item7-w5-index-shadow.js").then((m) =>
       m.scheduleItem7W5IndexShadow({ ledgerId: "S36", handleResourceId: null }),
     );
-    const collabKey = collaborationMemoryRoots
-      .map((root) => root.groupId)
-      .toSorted()
-      .join(",");
-    const key = `${agentId}:${workspaceDir}:${JSON.stringify(settings)}:collab:${collabKey || "-"}`;
+    const key = collaborationCacheKey({
+      agentId,
+      workspaceDir,
+      settingsJson: JSON.stringify(settings),
+      roots: collaborationMemoryRoots,
+      identity: params.continuityIdentity,
+    });
+    const identityActive = collaborationIdentityActive(params.continuityIdentity);
+    if (identityActive) {
+      const prefix = collaborationCachePrefix(key);
+      for (const [cachedKey, cached] of INDEX_CACHE) {
+        if (cachedKey === key || !cachedKey.startsWith(prefix)) {
+          continue;
+        }
+        INDEX_CACHE.delete(cachedKey);
+        cached.markContinuityAccessRevoked();
+        void cached.close();
+      }
+    }
     const existing = INDEX_CACHE.get(key);
     if (existing) {
       return existing;
@@ -228,8 +276,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     this.cfg = params.cfg;
     this.agentId = params.agentId;
     this.workspaceDir = params.workspaceDir;
-    this.settings = params.settings;
     this.collaborationMemoryRoots = params.collaborationMemoryRoots ?? [];
+    this.settings = withIsolatedCollaborationStore(params.settings, this.collaborationMemoryRoots);
     this.provider = params.providerResult.provider;
     this.requestedProvider = params.providerResult.requestedProvider;
     this.fallbackFrom = params.providerResult.fallbackFrom;
@@ -293,6 +341,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       reset?: unknown;
     },
   ): Promise<MemorySearchResult[]> {
+    if (this.continuityClosed()) {
+      return [];
+    }
     void this.warmSession(opts?.sessionKey);
     if (this.settings.sync.onSearch && (this.dirty || this.sessionsDirty)) {
       this.scheduleAuthorizedSearchSync(opts);
@@ -342,7 +393,15 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         .filter((entry) => entry.score >= minScore)
         .slice(0, maxResults);
 
-      return merged;
+      // No embedding provider: this is lexical FTS, not semantic search.
+      this.lastSearchMeta = {
+        searchMode: "fts-only",
+        degraded: true,
+        reason: "embedding_unavailable",
+        retryable: false,
+        error: "embedding provider unavailable; FTS-only",
+      };
+      return this.authorizeHits(merged);
     }
 
     // If FTS isn't available, hybrid mode cannot use keyword search; degrade to vector-only.
@@ -375,10 +434,12 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
           error: classification.message,
         };
         const relaxedMinScore = Math.min(minScore, hybrid.textWeight);
-        return keywordResults
-          .filter((entry) => entry.score >= relaxedMinScore)
-          .toSorted((a, b) => b.score - a.score)
-          .slice(0, maxResults);
+        return this.authorizeHits(
+          keywordResults
+            .filter((entry) => entry.score >= relaxedMinScore)
+            .toSorted((a, b) => b.score - a.score)
+            .slice(0, maxResults),
+        );
       }
       this.lastSearchMeta = {
         searchMode: "vector",
@@ -396,7 +457,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       : [];
 
     if (!hybrid.enabled || !this.fts.enabled || !this.fts.available) {
-      return vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      return this.authorizeHits(
+        vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults),
+      );
     }
 
     const merged = await this.mergeHybridResults({
@@ -409,7 +472,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     });
     const strict = merged.filter((entry) => entry.score >= minScore);
     if (strict.length > 0 || keywordResults.length === 0) {
-      return strict.slice(0, maxResults);
+      return this.authorizeHits(strict.slice(0, maxResults));
     }
 
     // Hybrid defaults can produce keyword-only matches with max score equal to
@@ -422,13 +485,15 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         (entry) => `${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`,
       ),
     );
-    return merged
-      .filter(
-        (entry) =>
-          keywordKeys.has(`${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`) &&
-          entry.score >= relaxedMinScore,
-      )
-      .slice(0, maxResults);
+    return this.authorizeHits(
+      merged
+        .filter(
+          (entry) =>
+            keywordKeys.has(`${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`) &&
+            entry.score >= relaxedMinScore,
+        )
+        .slice(0, maxResults),
+    );
   }
 
   private async searchVector(
@@ -623,6 +688,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     from?: number;
     lines?: number;
   }): Promise<{ text: string; path: string }> {
+    if (this.continuityClosed()) {
+      throw new Error("not authorized");
+    }
     const rawPath = params.relPath.trim();
     if (!rawPath) {
       throw new Error("path required");

@@ -2,11 +2,13 @@ import { createHash } from "node:crypto";
 /**
  * Conversation lifecycle feature flags (plan §14.4).
  *
- * Resolution order (highest wins):
- * 1. Env var override (OPENBOT_CONVERSATION_*)
- * 2. Config conversation.* (global)
- * 3. Rollout gate (tenant/seat/principal allowlist + percent)
- * 4. Safe production defaults
+ * Resolution order for env-backed booleans (highest wins):
+ * 1. Env var override (`OPENBOT_CONVERSATION_*` = 1/0/true/false/yes/no/on/off)
+ * 2. Config `conversation.*` when the boolean is set
+ * 3. Safe production default
+ * Invalid or empty env does not override config. Rollout can still freeze
+ * product-surface flags (UI, semantic search, retention enforce). Projection
+ * and the context planner stay at the resolved boolean when rollout is inactive.
  *
  * When a subject is outside the rollout gate, product-facing / irreversible
  * features stay off (UI, semantic search, retention enforce) while catalog
@@ -77,16 +79,33 @@ function resolveBool(raw: boolean | undefined, defaultValue: boolean): boolean {
   return typeof raw === "boolean" ? raw : defaultValue;
 }
 
-function resolveEnvBool(key: string, defaultValue: boolean): boolean {
+/** Explicit env override. Empty or unrecognized values fall through. */
+export function readEnvBoolOverride(key: string): boolean | undefined {
   const raw = process.env[key]?.trim().toLowerCase();
   if (!raw) {
-    return defaultValue;
+    return undefined;
   }
   if (raw === "1" || raw === "true" || raw === "yes" || raw === "on") {
     return true;
   }
   if (raw === "0" || raw === "false" || raw === "no" || raw === "off") {
     return false;
+  }
+  return undefined;
+}
+
+/** Env override, then explicit config, then default. */
+export function resolveLayeredBool(
+  envKey: string,
+  configValue: boolean | undefined,
+  defaultValue: boolean,
+): boolean {
+  const override = readEnvBoolOverride(envKey);
+  if (typeof override === "boolean") {
+    return override;
+  }
+  if (typeof configValue === "boolean") {
+    return configValue;
   }
   return defaultValue;
 }
@@ -223,27 +242,32 @@ export function resolveConversationFlags(
     catalogEnabled: resolveBool(c?.catalog?.enabled, true),
     lazyBackfill: resolveBool(c?.catalog?.lazyBackfill, true),
     uiEnabled: resolveBool(c?.ui?.enabled, false),
-    historyCursorEnabled: resolveBool(
+    historyCursorEnabled: resolveLayeredBool(
+      "OPENBOT_CONVERSATION_HISTORY_CURSOR",
       c?.history?.cursorEnabled,
-      resolveEnvBool("OPENBOT_CONVERSATION_HISTORY_CURSOR", true),
+      true,
     ),
     sourceIdentityEnabled: resolveBool(c?.sourceIdentity?.enabled, true),
     sourceLifecycleEnabled: resolveBool(c?.sourceLifecycle?.enabled, true),
-    projectionEnabled: resolveBool(
+    projectionEnabled: resolveLayeredBool(
+      "OPENBOT_CONVERSATION_PROJECTION",
       c?.projection?.enabled,
-      resolveEnvBool("OPENBOT_CONVERSATION_PROJECTION", true),
+      true,
     ),
-    contextPlannerEnabled: resolveBool(
+    contextPlannerEnabled: resolveLayeredBool(
+      "OPENBOT_CONVERSATION_CONTEXT_PLANNER",
       c?.contextPlanner?.enabled,
-      resolveEnvBool("OPENBOT_CONVERSATION_CONTEXT_PLANNER", true),
+      true,
     ),
-    searchSemanticEnabled: resolveBool(
+    searchSemanticEnabled: resolveLayeredBool(
+      "OPENBOT_CONVERSATION_SEMANTIC_SEARCH",
       c?.search?.semanticEnabled,
-      resolveEnvBool("OPENBOT_CONVERSATION_SEMANTIC_SEARCH", false),
+      false,
     ),
-    retentionEnforceEnabled: resolveBool(
+    retentionEnforceEnabled: resolveLayeredBool(
+      "OPENBOT_CONVERSATION_RETENTION_ENFORCE",
       c?.retention?.enforceEnabled,
-      resolveEnvBool("OPENBOT_CONVERSATION_RETENTION_ENFORCE", false),
+      false,
     ),
     rolloutActive: rollout.active,
     rolloutReason: rollout.reason,

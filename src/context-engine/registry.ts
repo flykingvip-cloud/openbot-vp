@@ -6,7 +6,10 @@ import type { ContextEngine } from "./types.js";
  * A factory that creates a ContextEngine instance.
  * Supports async creation for engines that need DB connections etc.
  */
-export type ContextEngineFactory = () => ContextEngine | Promise<ContextEngine>;
+/** Factories may ignore config. The resolver passes the request config through. */
+export type ContextEngineFactory = (
+  config?: OpenBotConfig,
+) => ContextEngine | Promise<ContextEngine>;
 
 // ---------------------------------------------------------------------------
 // Registry (module-level singleton)
@@ -81,5 +84,5 @@ export async function resolveContextEngine(config?: OpenBotConfig): Promise<Cont
     );
   }
 
-  return factory();
+  return await factory(config);
 }
