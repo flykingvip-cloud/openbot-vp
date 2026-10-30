@@ -19,10 +19,6 @@ import { isTranscriptStartBoundary } from "../../auto-reply/reply/chat-checkpoin
 import { noteUnresolvedChatRunError } from "../../auto-reply/reply/chat-run-error-escalation.js";
 import { isInternalContinueHistoryMessage } from "../../auto-reply/reply/internal-continue-prompt.js";
 import { isMemoryFlushHistoryMessage } from "../../auto-reply/reply/memory-flush-prompt.js";
-import {
-  isControlChannelOnlyText,
-  stripControlChannelForDisplay,
-} from "../../shared/text/control-channel-visibility.js";
 import { createReplyDispatcher } from "../../auto-reply/reply/reply-dispatcher.js";
 import {
   emptyRestoreTaskReconciliation,
@@ -107,6 +103,10 @@ import {
   isHiddenToolUseScratchpadMessage,
   type VisibleReplyLanguage,
 } from "../../shared/text/assistant-scratchpad.js";
+import {
+  isControlChannelOnlyText,
+  stripControlChannelForDisplay,
+} from "../../shared/text/control-channel-visibility.js";
 import {
   extractMessageVisibleText,
   readTextBlock,
@@ -1933,6 +1933,19 @@ function sanitizeChatHistoryMessages(messages: unknown[]): unknown[] {
     if (isHiddenToolUseScratchpadMessage(message, expectedLanguage)) {
       changed = true;
       continue;
+    }
+    // Decide control-channel / digest provenance on the ORIGINAL message before
+    // display strip removes the [tool-digest] header (which would otherwise leave
+    // the tool preview body looking like a normal assistant reply).
+    if (role === "assistant") {
+      const originalControlText = extractAssistantTextForSilentCheck(message);
+      if (
+        typeof originalControlText === "string" &&
+        isControlChannelOnlyText(originalControlText)
+      ) {
+        changed = true;
+        continue;
+      }
     }
     const res = sanitizeChatHistoryMessage(message, expectedLanguage);
     if (

@@ -91,5 +91,4 @@ ${body}
     expect(stripped).toContain("完成啦！");
     expect(stripped).toContain("正文");
   });
-
 });

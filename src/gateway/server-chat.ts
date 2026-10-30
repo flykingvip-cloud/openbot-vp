@@ -1,7 +1,6 @@
 import { resolveSessionAgentId } from "../agents/agent-scope.js";
 import { applyUserVisibleOutputGate } from "../agents/model-output-boundary.js";
 import { settleTurnCompletion } from "../agents/turn-completion/contract.js";
-import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { DEFAULT_HEARTBEAT_ACK_MAX_CHARS, stripHeartbeatToken } from "../auto-reply/heartbeat.js";
 import { noteUnresolvedChatRunError } from "../auto-reply/reply/chat-run-error-escalation.js";
 import { normalizeVerboseLevel } from "../auto-reply/thinking.js";
@@ -15,6 +14,7 @@ import {
 import { resolveHeartbeatVisibility } from "../infra/heartbeat-visibility.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { stripAssistantScratchpadFromText } from "../shared/text/assistant-scratchpad.js";
+import { stripControlChannelForDisplay } from "../shared/text/control-channel-visibility.js";
 import { getRunReplyLanguage } from "../shared/text/run-reply-language.js";
 import { deriveThinkingProgress } from "../shared/text/thinking-progress.js";
 import {
@@ -572,25 +572,28 @@ export function createAgentEventHandler({
     // Keep raw merge in the buffer for subsequent deltas; strip only for the wire.
     chatRunState.buffers.set(clientRunId, mergedText);
     const deliveryText = stripAssistantScratchpadFromText(mergedText, replyLanguage);
-    if (!deliveryText) {
-      // Process channel: show structure + progress while Layer C delivery is empty.
-      // Never broadcast raw English CoT / scratchpad as chat.delta message text.
+    // Wire-boundary only: keep mergedText/raw buffer intact for settle / formal submit.
+    const wireText = stripControlChannelForDisplay(deliveryText, { streaming: true });
+    if (!wireText) {
+      // Process channel: show structure + progress while Layer C delivery is empty
+      // (or while only incomplete/complete control tokens remain on the wire).
+      // Never broadcast raw English CoT / scratchpad / control markers as chat.delta.
       emitThinkingProgress(sessionKey, clientRunId, seq, mergedText || text, sourceRunId);
       return;
     }
     // Delivery started — clear process-channel throttle bookkeeping for this run.
     chatRunState.thinkingSentAt.delete(clientRunId);
     chatRunState.thinkingLastFingerprint.delete(clientRunId);
-    if (isSilentReplyText(deliveryText, SILENT_REPLY_TOKEN)) {
+    if (isSilentReplyText(wireText, SILENT_REPLY_TOKEN)) {
       return;
     }
-    if (isSilentReplyLeadFragment(deliveryText)) {
+    if (isSilentReplyLeadFragment(wireText)) {
       return;
     }
     if (shouldHideHeartbeatChatOutput(clientRunId, sourceRunId)) {
       return;
     }
-    if (!shouldBroadcastShorterDelivery(clientRunId, deliveryText)) {
+    if (!shouldBroadcastShorterDelivery(clientRunId, wireText)) {
       return;
     }
     const now = Date.now();
@@ -599,8 +602,8 @@ export function createAgentEventHandler({
       return;
     }
     chatRunState.deltaSentAt.set(clientRunId, now);
-    chatRunState.deltaLastBroadcastLen.set(clientRunId, deliveryText.length);
-    chatRunState.deltaLastBroadcastText.set(clientRunId, deliveryText);
+    chatRunState.deltaLastBroadcastLen.set(clientRunId, wireText.length);
+    chatRunState.deltaLastBroadcastText.set(clientRunId, wireText);
     const payload = {
       runId: clientRunId,
       sessionKey,
@@ -608,7 +611,7 @@ export function createAgentEventHandler({
       state: "delta" as const,
       message: {
         role: "assistant",
-        content: [{ type: "text", text: deliveryText }],
+        content: [{ type: "text", text: wireText }],
         timestamp: now,
         ...(replyLanguage ? { replyLanguage } : {}),
       },
@@ -633,10 +636,12 @@ export function createAgentEventHandler({
       sourceRunId,
       text: bufferedText,
     });
-    const text = stripAssistantScratchpadFromText(
+    const scratchpadStripped = stripAssistantScratchpadFromText(
       normalizedHeartbeatText.text,
       replyLanguage,
     ).trim();
+    // Wire-boundary strip for throttle flush; buffer stays raw for final settle.
+    const text = stripControlChannelForDisplay(scratchpadStripped, { streaming: true }).trim();
     const shouldSuppressSilent =
       normalizedHeartbeatText.suppress || isSilentReplyText(text, SILENT_REPLY_TOKEN);
     const shouldSuppressSilentLeadFragment = isSilentReplyLeadFragment(text);
@@ -645,7 +650,10 @@ export function createAgentEventHandler({
       sourceRunId,
     );
     if (!text) {
-      chatRunState.buffers.set(clientRunId, "");
+      // Do not clear the raw buffer here — final still needs model text / markers.
+      if (!scratchpadStripped) {
+        chatRunState.buffers.set(clientRunId, "");
+      }
       return;
     }
     if (

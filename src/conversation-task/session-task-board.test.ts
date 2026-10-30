@@ -739,4 +739,3 @@ describe("buildResumePrompt path / task-id visibility", () => {
     expect(prompt).toContain("文件：x.md");
   });
 });
-

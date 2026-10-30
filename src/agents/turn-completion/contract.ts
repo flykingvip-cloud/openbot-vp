@@ -863,7 +863,11 @@ export function settleTurnCompletion(input: TurnCompletionInput): TurnCompletion
       /等待你确认|等待确认后|waiting_confirmation|owner-decision|owner_decision|请扫码|请支付|二维码|验证码|授权登录/iu.test(
         speech,
       );
-    const visibleText = hasGate ? speech : speech ? `${speech}\n\n等待你确认下一步。` : "等待你确认下一步。";
+    const visibleText = hasGate
+      ? speech
+      : speech
+        ? `${speech}\n\n等待你确认下一步。`
+        : "等待你确认下一步。";
     return {
       contract: { state: "true_fork", options },
       visibleText,

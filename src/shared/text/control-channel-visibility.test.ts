@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  holdBackIncompleteControlSuffix,
   isControlChannelOnlyText,
   isInternalContinuePromptText,
   stripAbsoluteWorkspacePaths,
@@ -20,12 +21,20 @@ describe("control-channel-visibility", () => {
     expect(out).not.toMatch(/turn_completion|state=true_fork/);
   });
 
-  it("strips tool-digest lines", () => {
-    const raw = "稍等。\n[tool-digest] exec ls -l\nNO 10-30 DIR\n好了。";
+  it("strips tool-digest units including preview body", () => {
+    const raw = "稍等。\n[tool-digest] exec ls -l\nNO 10-30 DIR\n\n好了。";
     const out = stripToolDigestLines(raw);
     expect(out).not.toContain("[tool-digest]");
+    expect(out).not.toContain("NO 10-30 DIR");
     expect(out).toContain("稍等。");
     expect(out).toContain("好了。");
+  });
+
+  it("strips pure digest header+preview with no leftover body", () => {
+    const raw = "[tool-digest] exec command=ls\n内部工具返回：PRIVATE_DIGEST_OUTPUT";
+    const out = stripToolDigestLines(raw);
+    expect(out).toBe("");
+    expect(out).not.toContain("PRIVATE_DIGEST_OUTPUT");
   });
 
   it("strips DELIVERABLE tags and keeps body", () => {
@@ -43,18 +52,39 @@ describe("control-channel-visibility", () => {
     expect(out).toContain("还需要补充吗？");
   });
 
+  it("hides unclosed DELIVERABLE fragments while streaming", () => {
+    const raw = '已完成。\n<<DELIVERABLE title="内部路径';
+    const out = stripControlChannelForDisplay(raw);
+    expect(out).not.toContain("<<DELIVERABLE");
+    expect(out).toContain("已完成。");
+  });
+
   it("detects internal continue prompts", () => {
     expect(isInternalContinuePromptText("Internal task-board continue:\nContinue")).toBe(true);
     expect(isInternalContinuePromptText("Internal execution continue:\nx")).toBe(true);
     expect(isInternalContinuePromptText("请继续任务")).toBe(false);
   });
 
-  it("redacts absolute tenant paths", () => {
+  it("redacts absolute tenant paths only", () => {
     const raw =
       "文件：/root/openbot-tenants/001/users/90fed19a/OpenBot/agents/bot-2/workspace/a.md";
     const out = stripAbsoluteWorkspacePaths(raw);
     expect(out).not.toContain("/root/openbot-tenants");
     expect(out).toContain("workspace");
+  });
+
+  it("preserves ordinary user-facing file links under /tmp and /Users", () => {
+    expect(stripControlChannelForDisplay("报告：[打开报告](/tmp/report.md)")).toBe(
+      "报告：[打开报告](/tmp/report.md)",
+    );
+    expect(
+      stripControlChannelForDisplay(
+        "见附件：[/Users/daniel/Documents/notes.md](/Users/daniel/Documents/notes.md)",
+      ),
+    ).toContain("/Users/daniel/Documents/notes.md");
+    expect(stripControlChannelForDisplay("示例路径 `/tmp/cache.bin` 不要改")).toContain(
+      "/tmp/cache.bin",
+    );
   });
 
   it("marks control-only bubbles as hideable", () => {
@@ -68,6 +98,15 @@ describe("control-channel-visibility", () => {
     expect(isControlChannelOnlyText("[tool-digest] exec ls -l\nNO 10-30 DIR")).toBe(true);
   });
 
+  it("does not hide mixed digest + real reply", () => {
+    expect(
+      isControlChannelOnlyText("[tool-digest] exec ls\n工具结果\n\n最终答复：已经处理完成。"),
+    ).toBe(false);
+    expect(
+      stripControlChannelForDisplay("[tool-digest] exec ls\n工具结果\n\n最终答复：已经处理完成。"),
+    ).toBe("最终答复：已经处理完成。");
+  });
+
   it("combined strip keeps PLAN_SPEAK CTA while removing markers", () => {
     const raw = [
       "[turn_completion state=true_fork options=option_a|option_b]",
@@ -76,5 +115,14 @@ describe("control-channel-visibility", () => {
     const out = stripControlChannelForDisplay(raw);
     expect(out).toContain("任务还没做完");
     expect(out).not.toMatch(/turn_completion|state=true_fork/);
+  });
+
+  it("streaming hold-back drops incomplete control suffixes", () => {
+    expect(
+      stripControlChannelForDisplay("处理完成。\n[turn_completion state=delivered path=x", {
+        streaming: true,
+      }),
+    ).toBe("处理完成。");
+    expect(holdBackIncompleteControlSuffix('正文\n<<DELIVERABLE title="x')).toBe("正文\n");
   });
 });

@@ -1334,7 +1334,11 @@ function appendChatMessage(
 ) {
   // Defense-in-depth: never append internal memory-flush prompts or isolated
   // checkpoint-restore receipts as current-task chat bubbles.
-  if (isMemoryFlushHistoryMessage(message) || isInternalContinueHistoryMessage(message) || isRestoreTaskIsolationMessage(message)) {
+  if (
+    isMemoryFlushHistoryMessage(message) ||
+    isInternalContinueHistoryMessage(message) ||
+    isRestoreTaskIsolationMessage(message)
+  ) {
     return;
   }
   const messageId = typeof message.id === "string" ? message.id : "";

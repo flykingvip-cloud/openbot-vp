@@ -259,5 +259,4 @@ describe("message-normalizer", () => {
     });
     expect(hidden.content).toEqual([]);
   });
-
 });
