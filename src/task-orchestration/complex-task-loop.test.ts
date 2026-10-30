@@ -9,6 +9,7 @@ import { DEFAULT_SUBAGENT_MAX_SPAWN_DEPTH } from "../config/agent-limits.js";
 import type { OpenBotConfig } from "../config/config.js";
 import {
   applyIncomingUserMessage,
+  emptySessionTaskBoard,
   readSessionTaskBoard,
   writeSessionTaskBoard,
 } from "../conversation-task/session-task-board.js";
@@ -207,7 +208,7 @@ describe("P3 complex task loop", () => {
     const sessionFile = path.join(dir, "session.jsonl");
     fs.writeFileSync(sessionFile, "");
     const started = applyIncomingUserMessage({
-      board: { parked: [] },
+      board: emptySessionTaskBoard(),
       incomingText: "请分步骤做竞品分析",
       nowMs: 1,
     });
@@ -250,7 +251,7 @@ describe("P3 complex task loop", () => {
     const sessionFile = path.join(dir, "session.jsonl");
     fs.writeFileSync(sessionFile, "");
     const started = applyIncomingUserMessage({
-      board: { parked: [] },
+      board: emptySessionTaskBoard(),
       incomingText: "请分步骤做竞品分析",
       nowMs: 1,
     });
