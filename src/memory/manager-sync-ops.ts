@@ -801,12 +801,7 @@ export abstract class MemoryManagerSyncOps {
     needsFullReindex: boolean;
     progress?: MemorySyncProgressState;
   }) {
-    // FTS-only mode: skip embedding sync (no provider)
-    if (!this.provider) {
-      log.debug("Skipping memory file sync in FTS-only mode (no embedding provider)");
-      return;
-    }
-
+    // FTS-only (no provider): still list/index markdown into chunks + FTS.
     const files = await listMemoryFiles(this.workspaceDir, this.settings.extraPaths);
     const workspaceEntries = (
       await Promise.all(files.map(async (file) => buildFileEntry(file, this.workspaceDir)))
@@ -897,7 +892,7 @@ export abstract class MemoryManagerSyncOps {
         try {
           this.db
             .prepare(`DELETE FROM ${FTS_TABLE} WHERE path = ? AND source = ? AND model = ?`)
-            .run(stale.path, "memory", this.provider.model);
+            .run(stale.path, "memory", this.provider?.model ?? "fts-only");
         } catch {}
       }
     }
@@ -907,12 +902,7 @@ export abstract class MemoryManagerSyncOps {
     needsFullReindex: boolean;
     progress?: MemorySyncProgressState;
   }) {
-    // FTS-only mode: skip embedding sync (no provider)
-    if (!this.provider) {
-      log.debug("Skipping session file sync in FTS-only mode (no embedding provider)");
-      return;
-    }
-
+    // FTS-only (no provider): still index session text into chunks + FTS.
     const files = await listSessionFilesForAgent(this.agentId);
     const activePaths = new Set(files.map((file) => sessionPathForFile(file)));
     const indexAll = params.needsFullReindex || this.sessionsDirtyFiles.size === 0;
@@ -1005,7 +995,7 @@ export abstract class MemoryManagerSyncOps {
         try {
           this.db
             .prepare(`DELETE FROM ${FTS_TABLE} WHERE path = ? AND source = ? AND model = ?`)
-            .run(stale.path, "sessions", this.provider.model);
+            .run(stale.path, "sessions", this.provider?.model ?? "fts-only");
         } catch {}
       }
     }
