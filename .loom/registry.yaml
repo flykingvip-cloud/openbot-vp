@@ -10072,6 +10072,16 @@ tasks:
       - src/gateway/server-methods/evolution-control.pack.ts
       - src/gateway/server-methods/packs/manifest.ts
       - src/gateway/evolution-control/index.ts
+      - src/gateway/enterprise-data/knowledge-publication.ts
+      - src/gateway/enterprise-data/knowledge-publication.test.ts
+      - src/gateway/enterprise-data/enterprise-knowledge-projection-binding-store.ts
+      - src/gateway/enterprise-data/types.ts
+      - src/gateway/enterprise-data/source-connection-probe.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.test.ts
+      - src/gateway/enterprise-data/connector-catalog.test.ts
+      - src/gateway/server-methods/enterprise-data-m4.ts
+      - src/gateway/server-methods/enterprise-data-m4.test.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10079,7 +10089,7 @@ tasks:
         ide: cursor
         agent: cursor-grok-default-capability
         status: active
-        lastSignalAt: 2026-10-30T09:16:46.571Z
+        lastSignalAt: 2026-10-30T09:24:49.741Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-30
@@ -10131,6 +10141,16 @@ landingStreams:
       - src/gateway/server-methods/evolution-control.ts
       - src/gateway/server-methods/evolution-control.pack.ts
       - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/enterprise-data/knowledge-publication.ts
+      - src/gateway/enterprise-data/knowledge-publication.test.ts
+      - src/gateway/enterprise-data/enterprise-knowledge-projection-binding-store.ts
+      - src/gateway/enterprise-data/types.ts
+      - src/gateway/enterprise-data/source-connection-probe.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.test.ts
+      - src/gateway/enterprise-data/connector-catalog.test.ts
+      - src/gateway/server-methods/enterprise-data-m4.ts
+      - src/gateway/server-methods/enterprise-data-m4.test.ts
     canLandWith:
       - CL
       - DDOC
@@ -10142,8 +10162,9 @@ landingStreams:
       task: openbot-default-capability-p0:cursor-grok-default-capability
       owner: cursor-grok-default-capability
       purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
-        learning skillDraft list/finalize + P1-E shadow intent authorize.
-        NO_PROMOTE; no auto-Apply system/runtime bindings.
+        learning skillDraft list/finalize + P1-E shadow intent authorize + P1-F
+        knowledge materialization false-availability fix (event capability not
+        delivered). NO_PROMOTE; no auto-Apply system/runtime bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22511,6 +22532,46 @@ sharedPaths:
   - glob: src/gateway/server-methods/packs/manifest.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: "P1-E: pack manifest scopes for proposals.authorize."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/knowledge-publication.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: reject event_driven writes; migration helpers; not event executor."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/knowledge-publication.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: fail-before/pass-after unsupported + migrate tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/enterprise-knowledge-projection-binding-store.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: assertWritableMaterializationMode on upsert."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/types.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: materialization mode comment (legacy event_driven)."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/source-connection-probe.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production refuse mock_smoke_ok."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/connector-handler-runtime.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production refuse mock fallback."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/connector-handler-runtime.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production mock refusal unit tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/connector-catalog.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production probe not mock_smoke_ok."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-m4.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: projection-bindings.upsert unsupported event_driven + migrate."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-m4.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: RPC reject/migrate tests."
     reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

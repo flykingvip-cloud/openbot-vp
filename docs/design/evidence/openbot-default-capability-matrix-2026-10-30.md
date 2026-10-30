@@ -1,6 +1,6 @@
 # 默认能力矩阵与 P0 证据（2026-10-30）
 
-基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）。P1-F 至 P2-H 仍只读未实现。
+基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；事件物化未交付）。P2-G/H 仍只读未实现。
 
 状态只使用：已验证 / 部分验证 / 未实现 / 合理受控关闭 / 缺证据。
 
@@ -12,8 +12,8 @@
 | 技能/资产进化 | 部分验证 | `outcome_verified` 后生成 **draft**（非启用）；须 finalize+install 才可调用    | 学习资产阈值；既有 skill lifecycle；无新自动发布开关                                                                                  | `learning-skill-curation` + `collaboration.learning.skillDraft.list/finalize` + `robot-skills.install/remove` | 策展写 draft（owner 戳记、`autoInstallEnabled:false`）；finalize→private；install 物化 binding | `CONFIG_DIR/skill-assets` + learning `curatedSkillId`                                         | finalize+install 后 identity tool / loader；remove 后不再暴露    | 保留人工 finalize，不自动审批/发布；无 owner 草稿不可见于 list      | 未达阈值不策展；非 owner finalize 拒绝；draft 强制 install 仍无 identity tools             | 见 P1-D。真实 HTTP/provider 未跑 → 部分验证                                                             |
 | 系统进化      | 部分验证 | 控制平面可观察；assist-shadow 默认只到 DISCOVERED（observe-only）；人工 authorize 后可实验/Apply | evolution governance / kill switch；`evolution.proposals.authorize`                                                                   | `authorize-shadow-intent.ts` + `evolution.proposals.authorize`；既有 experiments/apply/rollback                                       | shadow registrar（DISCOVERED）；authorize 入口；skill-installation adapter                     | proposal/ledger；skill install binding                                                        | authorize→experiment→canary Apply 后 runtime 消费；rollback 恢复 | delegation、payload hash、verifier、kill switch 保留                | 拒绝/缺 grant/observe-only 表面不改现状；runtime-binding 仍 observe-only                   | 见 P1-E。真实 HTTP/authz 子进程未跑 → 部分验证。不自称 Codex PASS                                       |
 | 上下文        | 部分验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config               | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine`                                                        | `assembleMessagesWithBudget`；`refreshConversationProjection`                                  | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition` | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过 | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config` | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A                                     |
-| 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` 不能当成已生效调度 | knowledge publication mode                                                                                                            | `src/gateway/enterprise-data/knowledge-publication.ts`                                                        | on_demand / scheduled 有分发；event_driven 不分发                                              | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                      | 授权与 SAR                                                          | `isImplementedMaterializationMode("event_driven") === false`                               | 本轮只读代码与既有测试名。未重跑知识库套件。事件物化记为未实现，不记为完成                              |
-| 数据资产物化  | 部分验证 | on_demand 与 scheduled 可物化；event_driven 可保存但永不刷新                   | `EnterpriseKnowledgeProjectionMaterializationMode`                                                                                    | enterprise data gateway                                                                                       | connector + publication gate                                                                   | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载                          | 凭证、grant、SAR                                                    | 无凭证、未知 handler、demo `mock_smoke_ok` 不得当成生产事实                                | 本轮只读 `source-connection-probe.ts` 与 publication 注释。未重跑连接器。未实现所有连接器               |
+| 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` **新建拒绝**（unsupported+迁移）；存量可迁到 scheduled/on_demand | knowledge publication mode                                                                                                            | `knowledge-publication.ts` + `projection-bindings.upsert`                                             | on_demand / scheduled 有分发；event_driven **无执行器**（未交付）                                    | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                      | 授权与 SAR                                                          | 新建 event_driven → `MATERIALIZATION_MODE_UNSUPPORTED`；legacy 可 upsert 迁移                 | 见 P1-F。**虚假可用性已修复、事件能力未交付**；不记事件物化完成                              |
+| 数据资产物化  | 部分验证 | on_demand/scheduled 可物化；event_driven 不可再「成功但永不刷新」；生产探测禁 `mock_smoke_ok` | `EnterpriseKnowledgeProjectionMaterializationMode` + probe mode                                                                       | enterprise data gateway + `source-connection-probe.ts`                                                | connector + publication gate；生产无实时路径 → `unsupported_production_probe` / credential_required | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载                          | 凭证、grant、SAR；demo 可 mock 但须标注                                         | 无凭证/未知 handler/生产 mock 拒绝明确失败；demo 保持隔离标注                              | 见 P1-F。未实现全部连接器；事件总线仍只触发 Agent，未接物化                              |
 | 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`              | `cfg.cron`                                                                                                                            | `buildGatewayCronService`（`src/gateway/server-cron.ts`）                                                     | cron service timer                                                                             | cron store                                                                                    | 下次 wake                                                        | 目标身份与租户由 job 自身约束（本轮未重验）                         | 关闭时不调度                                                                               | 本轮只核对默认表达式，未跑创建→送达闭环。未见需要在本 PR 改动的新缺口                                   |
 | 模型智能配置  | 部分验证 | 未设置时为 `native`。`native` 是合法默认，不是缺陷                             | `gateway.platform.models.mode`                                                                                                        | `resolvePlatformModelsMode`                                                                                   | native 直出；`aor_enhanced` 另有 gate                                                          | 平台模型快照                                                                                  | 后续请求读同一 mode                                              | 不扩大授权集合                                                      | 缺 mode 时回到 native，不合成“已优化”                                                      | 本轮只读 `platform-models-config.ts`。未证明用户选择改变真实 outbound provider/model                    |
 
@@ -116,7 +116,7 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 ## 已知限制与回滚
 
 - 不打开 `privateMemoryPromote` 默认（仅补 RPC 入口）。
-- 不实现 P1-F 至 P2-H（P1-E 本批已做）。
+- 不实现 P2-G/H（P1-F 本批已做虚假可用性修复；事件物化未交付）。
 - 工作区 memory 的 `**/*.md` watcher glob 在当前 chokidar 上仍可能不发事件。本 PR 只改了授权小组目录。
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
@@ -199,3 +199,27 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/gateway/evolution-control/auth
 覆盖：observe-only 标注；runtime-binding 拒绝；DISCOVERED 无法开实验；缺确认/缺 grant 不改现状；authorize→experiment→canary Apply→rollback 恢复未安装；reject 无 application；RPC 注册与 scope。
 
 已知限制：真实 HTTP/authz 未跑；runtime-binding 仍无专用治理入口；矩阵保持 **部分验证**，不自行宣告 Codex PASS。
+
+## P1-F 知识库与数据资产物化（虚假可用性修复，2026-10-30）
+
+触发：`event_driven` 在 `knowledge-publication.ts` 明确未实现调度，但 API/`upsertEnterpriseKnowledgeProjectionBinding` 仍可保存为“成功”；生产连接器探测路径在缺实时适配时可能落到 `mock_smoke_ok`。
+
+根因：枚举保留 + 写入未拒；事件总线（`enterprise-data-event-bus`）只触发 Agent（元数据），**未**接 projection materialization 的 register/consume/幂等/乱序/重放/重启/限流。
+
+修复（诚实批次，**不**计事件物化完成）：
+
+- 新建/重写 `event_driven` → `MATERIALIZATION_MODE_UNSUPPORTED`（RPC + store）；消息含迁到 `scheduled`/`on_demand` 的可操作 upsert 路径。
+- 存量 legacy 行可 `projection-bindings.upsert`（带 `bindingId`）迁到实现模式；on_demand/scheduled 调度器不重建。
+- 生产探测：过实时分支后的 mock 落点改为 `unsupported_production_probe`；`connector-handler-runtime` 生产连接器拒绝 mock fallback。Demo 仍可 `mock_smoke_ok` 且须保持标注。
+
+失败然后通过：
+
+```text
+OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
+  src/gateway/enterprise-data/knowledge-publication.test.ts \
+  src/gateway/enterprise-data/connector-handler-runtime.test.ts \
+  src/gateway/enterprise-data/connector-catalog.test.ts \
+  src/gateway/server-methods/enterprise-data-m4.test.ts
+```
+
+矩阵：**部分验证**（知识库/数据资产物化）；`event_driven` 执行能力 **未实现**。不自行宣告 Codex PASS。

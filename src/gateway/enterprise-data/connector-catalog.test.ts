@@ -72,6 +72,26 @@ describe("connector-catalog", () => {
     expect(probe.mode).toBe("mock_smoke_ok");
   });
 
+  it("refuses mock_smoke_ok for production connectors without a live probe path", async () => {
+    const store = normalizeEnterpriseDataStore({});
+    // Install notion package so actions/handlers exist, but omit credentials so live probe
+    // cannot run — clear failure (credential_required), never mock_smoke_ok success.
+    ensureConnectorPackage({
+      store,
+      tenantId,
+      connectorId: "notion",
+      nowIso,
+    });
+    const probe = await probeDataSourceConnection({
+      store,
+      tenantId,
+      connectorId: "notion",
+    });
+    expect(probe.ok).toBe(false);
+    expect(probe.mode).toBe("credential_required");
+    expect(probe.mode).not.toBe("mock_smoke_ok");
+  });
+
   it("rejects unknown connector probe", async () => {
     const store = normalizeEnterpriseDataStore({});
     const probe = await probeDataSourceConnection({

@@ -18,10 +18,13 @@ import {
 import { upsertEnterpriseKnowledgeProjectionBinding } from "./enterprise-knowledge-projection-binding-store.js";
 import { listKnowledgeFeedItems } from "./knowledge-feed-item-store.js";
 import {
+  assertWritableMaterializationMode,
   decideKnowledgePublication,
+  eventDrivenMaterializationUnsupportedMessage,
   isImplementedMaterializationMode,
   lineageRecordsVerifiedSar,
   materializationModeHasScheduler,
+  materializationModeSupportStatus,
 } from "./knowledge-publication.js";
 import { upsertKnowledgeVisibilityPolicy } from "./knowledge-visibility-policy-store.js";
 import { ensureOnDemandProjectionsMaterialized } from "./on-demand-projection-materializer.js";
@@ -236,13 +239,28 @@ function projectionFor(
 }
 
 describe("E4 knowledge publication", () => {
-  it("keeps event_driven stored and undispatched", () => {
+  it("rejects creating event_driven as false-available success", () => {
     expect(isImplementedMaterializationMode("on_demand")).toBe(true);
     expect(isImplementedMaterializationMode("scheduled")).toBe(true);
     expect(isImplementedMaterializationMode("event_driven")).toBe(false);
+    expect(materializationModeSupportStatus("event_driven")).toBe("unsupported");
     expect(materializationModeHasScheduler("scheduled")).toBe(true);
     expect(materializationModeHasScheduler("event_driven")).toBe(false);
     expect(materializationModeHasScheduler("on_demand")).toBe(false);
+    expect(() => assertWritableMaterializationMode("event_driven")).toThrow(
+      /MATERIALIZATION_MODE_UNSUPPORTED|unsupported/,
+    );
+    try {
+      assertWritableMaterializationMode("event_driven");
+      expect.unreachable("expected unsupported");
+    } catch (error) {
+      expect(error).toBeInstanceOf(EnterpriseDataStoreError);
+      expect((error as EnterpriseDataStoreError).code).toBe("MATERIALIZATION_MODE_UNSUPPORTED");
+      expect((error as EnterpriseDataStoreError).message).toContain("Migrate existing bindings");
+      expect((error as EnterpriseDataStoreError).message).toBe(
+        eventDrivenMaterializationUnsupportedMessage(),
+      );
+    }
 
     const store = normalizeEnterpriseDataStore(null);
     seedEnterpriseDataCatalog({ store, tenantId, nowIso });
@@ -261,30 +279,104 @@ describe("E4 knowledge publication", () => {
         sourceActions: capability.actionRefs.slice(0, 1),
         objectKind: "data",
         templateKey: "NormalizeTemplate",
-        description: "stored only",
+        description: "must not create",
         outputSchema: { type: "object" },
         lifecycle: "active",
       },
     });
-    const binding = upsertEnterpriseKnowledgeProjectionBinding({
-      store,
-      tenantId,
-      nowIso,
-      binding: {
-        projectionId: spec.projectionId,
-        capabilityId: capability.capabilityId,
-        materializationMode: "event_driven",
-        materializationTeamLabel: "华北销售",
-        enabled: true,
-        generatorVersion: "e4-test",
-      },
-    });
-    expect(binding.materializationMode).toBe("event_driven");
+    expect(() =>
+      upsertEnterpriseKnowledgeProjectionBinding({
+        store,
+        tenantId,
+        nowIso,
+        binding: {
+          projectionId: spec.projectionId,
+          capabilityId: capability.capabilityId,
+          materializationMode: "event_driven",
+          materializationTeamLabel: "华北销售",
+          enabled: true,
+          generatorVersion: "e4-test",
+        },
+      }),
+    ).toThrow(/unsupported/);
     expect(
       listKnowledgeFeedItems({ store, tenantId }).some(
         (item) => item.projectionId === spec.projectionId,
       ),
     ).toBe(false);
+  });
+
+  it("migrates legacy event_driven rows to scheduled or on_demand", () => {
+    const store = normalizeEnterpriseDataStore(null);
+    seedEnterpriseDataCatalog({ store, tenantId, nowIso });
+    const capability = Object.values(store.dataCapabilities).find(
+      (item) => item.capabilityKey === "customer.profile",
+    )!;
+    const spec = upsertEnterpriseKnowledgeProjectionSpec({
+      store,
+      tenantId,
+      nowIso,
+      spec: {
+        projectionKey: "customer.event-migrate",
+        displayName: "事件迁移",
+        category: "customer",
+        capabilityId: capability.capabilityId,
+        sourceActions: capability.actionRefs.slice(0, 1),
+        objectKind: "data",
+        templateKey: "NormalizeTemplate",
+        description: "legacy row",
+        outputSchema: { type: "object" },
+        lifecycle: "active",
+      },
+    });
+    const legacyId = "binding-event-driven-legacy";
+    store.enterpriseKnowledgeProjectionBindings[legacyId] = {
+      bindingId: legacyId,
+      tenantId,
+      projectionId: spec.projectionId,
+      capabilityId: capability.capabilityId,
+      materializationMode: "event_driven",
+      materializationTeamLabel: "华北销售",
+      enabled: true,
+      generatorVersion: "e4-test",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    expect(materializationModeSupportStatus("event_driven")).toBe("unsupported");
+
+    const migrated = upsertEnterpriseKnowledgeProjectionBinding({
+      store,
+      tenantId,
+      nowIso: "2026-10-30T09:00:00.000Z",
+      binding: {
+        bindingId: legacyId,
+        projectionId: spec.projectionId,
+        capabilityId: capability.capabilityId,
+        materializationMode: "scheduled",
+        materializationTeamLabel: "华北销售",
+        enabled: true,
+        generatorVersion: "e4-test",
+      },
+    });
+    expect(migrated.materializationMode).toBe("scheduled");
+    expect(migrated.bindingId).toBe(legacyId);
+    expect(isImplementedMaterializationMode(migrated.materializationMode)).toBe(true);
+
+    const toOnDemand = upsertEnterpriseKnowledgeProjectionBinding({
+      store,
+      tenantId,
+      nowIso: "2026-10-30T09:01:00.000Z",
+      binding: {
+        bindingId: legacyId,
+        projectionId: spec.projectionId,
+        capabilityId: capability.capabilityId,
+        materializationMode: "on_demand",
+        materializationTeamLabel: "华北销售",
+        enabled: true,
+        generatorVersion: "e4-test",
+      },
+    });
+    expect(toOnDemand.materializationMode).toBe("on_demand");
   });
 
   it("does not materialize an event_driven binding from on-demand or scheduled dispatch", async () => {
@@ -310,18 +402,18 @@ describe("E4 knowledge publication", () => {
         lifecycle: "active",
       },
     });
-    upsertEnterpriseKnowledgeProjectionBinding({
-      store,
+    // Legacy row planted outside upsert (upsert now rejects event_driven creates).
+    store.enterpriseKnowledgeProjectionBindings["binding-event-skip"] = {
+      bindingId: "binding-event-skip",
       tenantId,
-      nowIso,
-      binding: {
-        projectionId: spec.projectionId,
-        materializationMode: "event_driven",
-        materializationTeamLabel: "华东销售",
-        enabled: true,
-        generatorVersion: "e4-test",
-      },
-    });
+      projectionId: spec.projectionId,
+      materializationMode: "event_driven",
+      materializationTeamLabel: "华东销售",
+      enabled: true,
+      generatorVersion: "e4-test",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
     await ensureOnDemandProjectionsMaterialized({
       store,
       context: {

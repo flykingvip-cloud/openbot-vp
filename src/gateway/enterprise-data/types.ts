@@ -236,8 +236,9 @@ export type EnterpriseKnowledgeProjectionCategory =
 export type EnterpriseKnowledgeObjectKind = "data" | "metric" | "insight";
 
 /**
- * `on_demand` and `scheduled` have dispatchers.
- * `event_driven` can be stored. It has no scheduler and must not be reported as implemented.
+ * `on_demand` and `scheduled` have dispatchers and are the only writable modes.
+ * `event_driven` remains in the enum for legacy rows; new upserts reject it as unsupported.
+ * It has no event register/consume executor and must not be reported as implemented.
  */
 export type EnterpriseKnowledgeProjectionMaterializationMode =
   | "on_demand"

@@ -9,6 +9,10 @@ import {
   findKnowledgeFeedItem,
   listKnowledgeFeedItems,
 } from "../enterprise-data/knowledge-feed-item-store.js";
+import {
+  assertWritableMaterializationMode,
+  eventDrivenMaterializationUnsupportedMessage,
+} from "../enterprise-data/knowledge-publication.js";
 import { resolveKnowledgeSupplyOverview } from "../enterprise-data/knowledge-supply-store.js";
 import {
   findKnowledgeVisibilityPolicy,
@@ -95,7 +99,8 @@ const PROJECTION_LIFECYCLES = new Set<EnterpriseKnowledgeProjectionLifecycle>([
 const MATERIALIZATION_MODES = new Set<EnterpriseKnowledgeProjectionMaterializationMode>([
   "on_demand",
   "scheduled",
-  // Stored only. on-demand and scheduled dispatchers do not run this mode.
+  // Recognized only so RPC can return MATERIALIZATION_MODE_UNSUPPORTED (not "invalid").
+  // New writes are rejected; migrate legacy rows to on_demand|scheduled.
   "event_driven",
 ]);
 
@@ -214,6 +219,22 @@ export function createEnterpriseDataM4Handlers(
       }
       if (!MATERIALIZATION_MODES.has(materializationMode)) {
         respondInvalid(respond, "materializationMode is invalid");
+        return;
+      }
+      if (materializationMode === "event_driven") {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, eventDrivenMaterializationUnsupportedMessage(), {
+            details: { code: "MATERIALIZATION_MODE_UNSUPPORTED" },
+          }),
+        );
+        return;
+      }
+      try {
+        assertWritableMaterializationMode(materializationMode);
+      } catch (error) {
+        respond(false, undefined, toEnterpriseDataErrorShape(error));
         return;
       }
       const materializationTeamLabel = stringValue(params.materializationTeamLabel);

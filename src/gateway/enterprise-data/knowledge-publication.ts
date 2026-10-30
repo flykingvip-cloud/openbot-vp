@@ -2,7 +2,9 @@
  * E4 knowledge publication gate.
  *
  * on_demand and scheduled are the only implemented materialization paths.
- * event_driven stays in the enum and is not dispatched.
+ * event_driven remains in the enum for legacy rows only: new writes are rejected
+ * as MATERIALIZATION_MODE_UNSUPPORTED. There is no event register/consume executor
+ * wired to projection materialization (idempotency/replay/restart not delivered).
  * Failed, unverified, and incomplete output is not a complete knowledge object.
  * Partial output is stored only when the projection names publish_marked.
  */
@@ -25,6 +27,10 @@ import type {
   SarGatewayCorrelation,
 } from "./types.js";
 
+export const IMPLEMENTED_MATERIALIZATION_MODES = ["on_demand", "scheduled"] as const;
+
+export type ImplementedMaterializationMode = (typeof IMPLEMENTED_MATERIALIZATION_MODES)[number];
+
 export function isImplementedMaterializationMode(
   mode: EnterpriseKnowledgeProjectionMaterializationMode,
 ): boolean {
@@ -36,6 +42,43 @@ export function materializationModeHasScheduler(
   mode: EnterpriseKnowledgeProjectionMaterializationMode,
 ): boolean {
   return mode === "scheduled";
+}
+
+/**
+ * Operable migration copy for false-available event_driven configs.
+ * Event materialization itself is not delivered in this batch.
+ */
+export function eventDrivenMaterializationUnsupportedMessage(params?: {
+  targetMode?: ImplementedMaterializationMode;
+}): string {
+  const target = params?.targetMode ?? "scheduled";
+  const alternate = target === "scheduled" ? "on_demand" : "scheduled";
+  return (
+    `materializationMode "event_driven" is unsupported (no event register/consume executor). ` +
+    `Migrate existing bindings via enterprise-data.projection-bindings.upsert with bindingId ` +
+    `and materializationMode "${target}" or "${alternate}". ` +
+    `False availability removed; event capability not delivered.`
+  );
+}
+
+/** Reject creating or keeping event_driven as a writable materialization mode. */
+export function assertWritableMaterializationMode(
+  mode: EnterpriseKnowledgeProjectionMaterializationMode,
+): void {
+  if (isImplementedMaterializationMode(mode)) {
+    return;
+  }
+  throw new EnterpriseDataStoreError(
+    "MATERIALIZATION_MODE_UNSUPPORTED",
+    eventDrivenMaterializationUnsupportedMessage(),
+  );
+}
+
+/** Status helper: implemented | unsupported (legacy enum value, not an executor). */
+export function materializationModeSupportStatus(
+  mode: EnterpriseKnowledgeProjectionMaterializationMode,
+): "implemented" | "unsupported" {
+  return isImplementedMaterializationMode(mode) ? "implemented" : "unsupported";
 }
 
 export type KnowledgePublicationDecision =
