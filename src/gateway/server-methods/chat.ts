@@ -6751,21 +6751,11 @@ export const chatHandlers: GatewayRequestHandlers = {
     await webchatIdentity.hydrateWebchatGatewayClientPlatformIdentity({ client });
     await webchatIdentity.ensureGatewayClientUserFromPlatformIdentity({ client });
     const sessionKey = await resolveEmployeeScopedChatSessionKey(client, rawSessionKey);
-    // Product: checkpoint-restore is 1:1 employee/bot only — never collaboration groups.
-    if (
+    // Phase A: collab/space sessions may restore transcript-only (truncate to boundary).
+    // File/workspace snapshot restore stays skipped for groups until Phase B.
+    const collabSpaceSession =
       isCollaborationGroupChatSessionKey(rawSessionKey) ||
-      isCollaborationGroupChatSessionKey(sessionKey)
-    ) {
-      respond(
-        false,
-        undefined,
-        errorShape(
-          ErrorCodes.INVALID_REQUEST,
-          "Checkpoint restore is not available in collaboration group chats.",
-        ),
-      );
-      return;
-    }
+      isCollaborationGroupChatSessionKey(sessionKey);
     if (denyEmployeeGlobalStewardTranscript({ client, sessionKey, respond })) {
       return;
     }
@@ -6965,11 +6955,14 @@ export const chatHandlers: GatewayRequestHandlers = {
         try {
           throwIfRestoreAborted(restoreDeadline.signal);
           // 1) Roll back workspace files to the checkpoint snapshot (within root).
-          const fileResult = await restoreWorkspaceSnapshotForCheckpoint({
-            ...restoreCheckpointScope,
-            checkpoint,
-            signal: restoreDeadline.signal,
-          });
+          // Phase A collab/space: skip file restore (no group workspace snapshots).
+          const fileResult = collabSpaceSession
+            ? { restoredFiles: 0, removedFiles: 0, unchangedFiles: 0 }
+            : await restoreWorkspaceSnapshotForCheckpoint({
+                ...restoreCheckpointScope,
+                checkpoint,
+                signal: restoreDeadline.signal,
+              });
           throwIfRestoreAborted(restoreDeadline.signal);
           // 2) Truncate the transcript the UI paints, not only the sessions-dir
           // fallback the model path resolver returns.

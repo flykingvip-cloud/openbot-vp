@@ -22,6 +22,25 @@ const state = vi.hoisted(() => ({
   taskContextId: "",
 }));
 
+const listSpacesMock = vi.hoisted(() =>
+  vi.fn(async () => ({
+    spaces: [] as Array<{
+      id: string;
+      groupId: string;
+      ownerUserId: string | null;
+      members: { humans: Array<{ userId: string; name: string; status?: string }> };
+    }>,
+  })),
+);
+
+vi.mock("../collaboration-learning.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../collaboration-learning.js")>();
+  return {
+    ...original,
+    listGatewayCollaborationSpaces: (...args: unknown[]) => listSpacesMock(...args),
+  };
+});
+
 vi.mock("../session-utils.js", async (importOriginal) => {
   const original = await importOriginal<typeof import("../session-utils.js")>();
   return {
@@ -174,6 +193,8 @@ afterEach(async () => {
   state.decoyWorkspaceDir = "";
   state.groupId = "";
   state.taskContextId = "";
+  listSpacesMock.mockReset();
+  listSpacesMock.mockResolvedValue({ spaces: [] });
 });
 
 describe("chat.restore", () => {
@@ -804,6 +825,133 @@ describe("chat.restore targeted rollback (P3)", () => {
       expect(respond).toHaveBeenCalledWith(
         true,
         expect.objectContaining({ ok: true, checkpointId: checkpoint.id }),
+      );
+    } finally {
+      if (previousStateDir === undefined) {
+        delete process.env.OPENBOT_STATE_DIR;
+      } else {
+        process.env.OPENBOT_STATE_DIR = previousStateDir;
+      }
+      state.groupId = "";
+      state.transcriptPath = path.join(stateDir, "keep.jsonl");
+    }
+  });
+
+  it("transcript-only restores a collaboration space session key (Phase A; no hard reject)", async () => {
+    const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), "openbot-space-restore-"));
+    const previousStateDir = process.env.OPENBOT_STATE_DIR;
+    process.env.OPENBOT_STATE_DIR = stateDir;
+    const groupId = "grp-phase-a";
+    const sessionKey = `space:${groupId}`;
+    const sessionId = "sess-space-phase-a";
+    const shared = resolveGroupPublicTranscriptPath(groupId, {});
+    const workspaceRoot = path.dirname(path.dirname(shared));
+    const deliverablePath = path.join(workspaceRoot, "notes.md");
+    state.transcriptPath = path.join(stateDir, "keep.jsonl");
+    state.sessionId = sessionId;
+    state.groupId = groupId;
+    state.memoryDir = path.join(workspaceRoot, "memory");
+    listSpacesMock.mockResolvedValue({
+      spaces: [
+        {
+          id: sessionKey,
+          groupId,
+          ownerUserId: "owner-1",
+          members: { humans: [{ userId: "owner-1", name: "Owner", status: "active" }] },
+        },
+      ],
+    });
+    try {
+      await fs.mkdir(workspaceRoot, { recursive: true });
+      await fs.writeFile(deliverablePath, "v1-before", "utf8");
+      await fs.mkdir(path.dirname(shared), { recursive: true });
+      await fs.writeFile(
+        shared,
+        `${[
+          JSON.stringify({ type: "session", version: 1, id: sessionId }),
+          JSON.stringify({
+            type: "message",
+            id: "m0",
+            message: { role: "assistant", content: "协作会话已就绪" },
+          }),
+          JSON.stringify({
+            type: "message",
+            id: "m1",
+            message: { role: "user", content: "帮小组安排一下分工" },
+          }),
+          JSON.stringify({
+            type: "message",
+            id: "m2",
+            message: { role: "assistant", content: "已给出分工建议" },
+          }),
+        ].join("\n")}\n`,
+        "utf8",
+      );
+      const checkpoint = await commitSessionContinuityForCurrentSession({
+        cfg: {},
+        workspaceDir: workspaceRoot,
+        agentId: "main",
+        sessionKey,
+        sessionEntry: {
+          sessionId,
+          updatedAt: Date.now(),
+          sessionFile: shared,
+          groupId,
+          space: groupId,
+        },
+        reason: "turn_completed",
+      });
+      if (!checkpoint) {
+        throw new Error("fixture failed to create space checkpoint");
+      }
+      expect(checkpoint.restorable).toEqual({ files: false, transcript: true });
+      expect(checkpoint.snapshot?.store === "content-addressed").toBe(false);
+
+      await fs.writeFile(deliverablePath, "v2-mutated-after-checkpoint", "utf8");
+      await fs.appendFile(
+        shared,
+        `${JSON.stringify({
+          type: "message",
+          id: "m3",
+          message: { role: "user", content: "撤回刚才那句" },
+        })}\n`,
+        "utf8",
+      );
+      state.transcriptPath = shared;
+
+      const respond = vi.fn();
+      await chatHandlers["chat.restore"]({
+        params: { sessionKey, checkpointId: checkpoint.id },
+        respond: respond as never,
+        context: {
+          broadcast: vi.fn(),
+          nodeSendToSession: vi.fn(),
+          chatAbortControllers: new Map(),
+          logGateway: { info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
+        } as never,
+        req: {} as never,
+        client: null,
+        isWebchatConnect: () => false,
+      });
+
+      const body = await fs.readFile(shared, "utf8");
+      expect(body).toContain("协作会话已就绪");
+      expect(body).not.toContain("撤回刚才那句");
+      const ids = await transcriptIds(shared);
+      expect(ids.at(-1)).toBe("m0");
+      // Phase A: workspace files must not roll back for space keys.
+      expect(await fs.readFile(deliverablePath, "utf8")).toBe("v2-mutated-after-checkpoint");
+      expect(respond).toHaveBeenCalledWith(
+        true,
+        expect.objectContaining({
+          ok: true,
+          checkpointId: checkpoint.id,
+          truncatedFrom: expect.any(Number),
+        }),
+      );
+      const errArg = respond.mock.calls[0]?.[2];
+      expect(JSON.stringify(errArg ?? null)).not.toContain(
+        "Checkpoint restore is not available in collaboration group chats.",
       );
     } finally {
       if (previousStateDir === undefined) {

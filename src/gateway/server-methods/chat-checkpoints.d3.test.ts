@@ -74,6 +74,31 @@ describe("chat.checkpoints.list D3 hardening (T3)", () => {
     );
   });
 
+  it("lists checkpoints for collaboration space session keys (Phase A 恢复线)", async () => {
+    const respond = vi.fn();
+    const client = { connect: {} as never, user: "a@acme.com", sessionDomain: "employee" };
+    await chatCheckpointHandlers["chat.checkpoints.list"]({
+      params: { sessionKey: "space:group-abc" },
+      respond: respond as never,
+      context: {} as never,
+      req: {} as never,
+      client: client as never,
+      isWebchatConnect: () => false,
+    });
+    expect(resolveEmployeeScopedChatSessionKeyMock).toHaveBeenCalledWith(client, "space:group-abc");
+    expect(listChatCheckpointsMock).toHaveBeenCalledWith(
+      "space:group-abc",
+      client,
+      "space:group-abc",
+    );
+    expect(respond).toHaveBeenCalledWith(
+      true,
+      expect.objectContaining({
+        checkpoints: [expect.objectContaining({ checkpointId: "cp-d3" })],
+      }),
+    );
+  });
+
   it("rejects empty sessionKey (negative)", async () => {
     const respond = vi.fn();
     await chatCheckpointHandlers["chat.checkpoints.list"]({

@@ -2,7 +2,6 @@
  * chat.checkpoints.list — checkpoint metadata listing (chat-checkpoint-rollback).
  */
 
-import { isCollaborationGroupChatSessionKey } from "../../sessions/session-key-utils.js";
 import { listChatCheckpoints } from "../checkpoint-store.js";
 import {
   employeeGlobalStewardTranscriptBlocked,
@@ -33,14 +32,7 @@ export const chatCheckpointHandlers: GatewayRequestHandlers = {
     const p = params as { sessionKey: string };
     const rawSessionKey = p.sessionKey;
     const sessionKey = await resolveEmployeeScopedChatSessionKey(client, rawSessionKey);
-    // Product: checkpoint-restore is 1:1 employee/bot only — never collaboration groups.
-    if (
-      isCollaborationGroupChatSessionKey(rawSessionKey) ||
-      isCollaborationGroupChatSessionKey(sessionKey)
-    ) {
-      respond(true, { checkpoints: [] });
-      return;
-    }
+    // Phase A: list checkpoints for collab/space keys too (恢复线). Steward/authz unchanged.
     if (employeeGlobalStewardTranscriptBlocked(client, sessionKey)) {
       respond(
         false,

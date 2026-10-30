@@ -1508,17 +1508,15 @@ export async function commitSessionContinuityForCurrentSession(params: {
     // chat-checkpoint-rollback: attach rollback metadata + workspace snapshot.
     // Capture failure degrades gracefully (files not restorable) and never
     // blocks the turn; the transcript boundary alone still enables truncation.
-    // Collaboration groups: keep continuity memory, but do not expose rollback UI
-    // or capture workspace snapshots (product: 1:1 bot chats only).
+    // Phase A collab/space: transcript restore enabled (恢复线); files/snapshot stay
+    // off until Phase B. Boundary remains human-user-role only.
     const collabGroup = scopeInfo.scope === "group";
     checkpoint.session_key = params.sessionKey;
     checkpoint.boundary_message_id = resolveCheckpointBoundaryMessageId(messages);
     checkpoint.external_effects = collabGroup
       ? { present: false, kinds: [] }
       : await detectExternalEffectsFromTranscript(sessionFile);
-    checkpoint.restorable = collabGroup
-      ? { files: false, transcript: false }
-      : { files: false, transcript: true };
+    checkpoint.restorable = { files: false, transcript: true };
     if (!collabGroup && params.enableWorkspaceSnapshot !== false) {
       try {
         const snapshot = await captureWorkspaceSnapshotForCheckpoint({
