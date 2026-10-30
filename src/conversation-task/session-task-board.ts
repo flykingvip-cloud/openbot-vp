@@ -211,6 +211,66 @@ export type ResumeParkedRecheck = {
   isTaskStopActive?: (taskId: string) => boolean;
 };
 
+/**
+ * Interrupt unfinished current (if any) and bind a NEW task as board.current.
+ * Prior unfinished work is deferred/parked with wakeSuppress — it must not own
+ * auto-continue, wake, or 「当前任务」. The inserted task is always LATEST.
+ */
+export function insertLatestTaskDeferringCurrent(params: {
+  board: SessionTaskBoard;
+  goalText: string;
+  nowMs?: number;
+  workspacePaths?: string[];
+  parkReason?: string;
+}): IncomingTurnResult {
+  const nowMs = params.nowMs ?? Date.now();
+  const paths = params.workspacePaths?.filter(Boolean) ?? [];
+  const goal = stripStamp(params.goalText);
+  const board = {
+    current: params.board.current,
+    parked: [...params.board.parked],
+  };
+  if (!goal) {
+    return continueResult(board, board.current?.taskId ?? "");
+  }
+  const created = createTask(goal, nowMs, paths);
+  const current = board.current;
+  if (!current?.unfinished) {
+    return {
+      board: { current: created, parked: board.parked },
+      action: "switch",
+      taskId: created.taskId,
+      cutContext: true,
+      currentTitle: current?.title,
+      incomingTitle: created.title,
+      statusLine: `开始「${created.title}」。`,
+    };
+  }
+  const parkedCurrent: TrackedTask = {
+    ...current,
+    stop: {
+      summary: current.stop.summary || `未完成：${current.title}`,
+      workspacePaths: current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
+    },
+  };
+  const parked = parkTask(board.parked, parkedCurrent, nowMs, params.parkReason ?? "user_switch");
+  return {
+    board: { current: created, parked: parked.parked },
+    action: "switch",
+    taskId: created.taskId,
+    cutContext: true,
+    currentTitle: current.title,
+    incomingTitle: created.title,
+    statusLine: switchStatus(current.title, created.title, parked.dropped, parked.parked.length),
+    ...(parked.dropped
+      ? {
+          droppedTitle: parked.dropped.title,
+          droppedPaths: parked.dropped.stop.workspacePaths,
+        }
+      : {}),
+  };
+}
+
 export function applyIncomingUserMessage(params: {
   board: SessionTaskBoard;
   incomingText: string;
@@ -234,7 +294,8 @@ export function applyIncomingUserMessage(params: {
     return continueResult(board, board.current?.taskId ?? "");
   }
 
-  const resumeMatch = incoming.match(/^继续挂起\s+(\S+)/u);
+  // CONTINUE resumes a deferred prior task (Owner: invite CONTINUE or CLOSE).
+  const resumeMatch = incoming.match(/^(?:继续挂起|CONTINUE)\s+(\S+)/iu);
   if (resumeMatch) {
     return resumeParkedTask({
       board,
@@ -248,7 +309,8 @@ export function applyIncomingUserMessage(params: {
   if (pauseMatch) {
     return pauseParkedTask({ board, taskId: pauseMatch[1] ?? "" });
   }
-  const cancelMatch = incoming.match(/^取消挂起\s+(\S+)/u);
+  // CLOSE / 关闭挂起 / 取消挂起 — remove deferred item from the board entirely.
+  const cancelMatch = incoming.match(/^(?:取消挂起|关闭挂起|CLOSE)\s+(\S+)/iu);
   if (cancelMatch) {
     return cancelParkedTask({ board, taskId: cancelMatch[1] ?? "" });
   }
@@ -262,16 +324,13 @@ export function applyIncomingUserMessage(params: {
     if (!isSureDistinctWork(incoming, current.goalText)) {
       return continueResult(board, current.taskId);
     }
-    const created = createTask(incoming, nowMs, paths);
-    return {
-      board: { current: created, parked: board.parked },
-      action: "switch",
-      taskId: created.taskId,
-      cutContext: true,
-      currentTitle: current.title,
-      incomingTitle: created.title,
-      statusLine: `开始「${created.title}」。`,
-    };
+    return insertLatestTaskDeferringCurrent({
+      board,
+      goalText: incoming,
+      nowMs,
+      workspacePaths: paths,
+      parkReason: "user_switch",
+    });
   }
   if (!isSureDistinctWork(incoming, current.goalText)) {
     const nextCurrent: TrackedTask = {
@@ -284,30 +343,13 @@ export function applyIncomingUserMessage(params: {
     return continueResult({ current: nextCurrent, parked: board.parked }, current.taskId);
   }
 
-  const parkedCurrent: TrackedTask = {
-    ...current,
-    stop: {
-      summary: current.stop.summary || `未完成：${current.title}`,
-      workspacePaths: current.stop.workspacePaths.length > 0 ? current.stop.workspacePaths : paths,
-    },
-  };
-  const parked = parkTask(board.parked, parkedCurrent, nowMs, "user_switch");
-  const created = createTask(incoming, nowMs, paths);
-  return {
-    board: { current: created, parked: parked.parked },
-    action: "switch",
-    taskId: created.taskId,
-    cutContext: true,
-    currentTitle: current.title,
-    incomingTitle: created.title,
-    statusLine: switchStatus(current.title, created.title, parked.dropped, parked.parked.length),
-    ...(parked.dropped
-      ? {
-          droppedTitle: parked.dropped.title,
-          droppedPaths: parked.dropped.stop.workspacePaths,
-        }
-      : {}),
-  };
+  return insertLatestTaskDeferringCurrent({
+    board,
+    goalText: incoming,
+    nowMs,
+    workspacePaths: paths,
+    parkReason: "user_switch",
+  });
 }
 
 export function resumeParkedTask(params: {
@@ -417,10 +459,13 @@ export function cancelParkedTask(params: {
     action: "cancel_parked",
     taskId: params.board.current?.taskId ?? "",
     cutContext: false,
-    statusLine: `已取消挂起的「${parked.title}」。`,
+    statusLine: `已关闭「${parked.title}」，已移出任务板。`,
     incomingTitle: parked.title,
   };
 }
+
+/** Owner CLOSE — same as cancelParkedTask: item leaves the board and is not a continue target. */
+export const closeParkedTask = cancelParkedTask;
 
 /** Transcript / UI marker: current focus finished; remind about parked prior tasks. */
 export const PARKED_TASK_REMINDER_SENTINEL = "[PARKED_TASK_REMINDER]";
@@ -441,7 +486,7 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
     "",
     PARKED_TASK_REMINDER_SENTINEL,
     "",
-    `当前任务已完成，交付已核对。已挂起 ${parked.length} 项；可以继续、先暂停，或关闭。`,
+    `当前任务已完成，交付已核对。已挂起 ${parked.length} 项；可 CONTINUE 继续一项，或 CLOSE 关闭并移出任务板。`,
     "",
     `前任务：「${primary.title}」`,
     `任务 ID：\`${primary.taskId}\``,
@@ -458,8 +503,14 @@ function renderCompletionNotice(parked: readonly TrackedTask[]): string {
       .join("、");
     lines.push("", `另有 ${parked.length - 1} 个挂起任务：${others}。`);
   }
-  // Text fallbacks for non-UI / copy-paste clients.
-  lines.push("", `继续挂起 ${primary.taskId}`, `取消挂起 ${primary.taskId}`);
+  // Text fallbacks for non-UI / copy-paste clients (CONTINUE / CLOSE aliases accepted).
+  lines.push(
+    "",
+    `继续挂起 ${primary.taskId}`,
+    `取消挂起 ${primary.taskId}`,
+    `CONTINUE ${primary.taskId}`,
+    `CLOSE ${primary.taskId}`,
+  );
   return lines.join("\n");
 }
 
