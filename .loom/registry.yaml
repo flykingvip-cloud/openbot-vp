@@ -10089,6 +10089,9 @@ tasks:
       - src/gateway/model-entitlement/employee-model-gate.ts
       - src/gateway/models/platform-models-config.p2g.test.ts
       - src/agents/model-fallback.p2g-outbound.test.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/isolated-agent/run.long-horizon-ledger.test.ts
+      - src/gateway/server.cron.test.ts
     state: active
     sessions:
       - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
@@ -10096,7 +10099,7 @@ tasks:
         ide: cursor
         agent: cursor-grok-default-capability
         status: active
-        lastSignalAt: 2026-10-30T09:35:00.000Z
+        lastSignalAt: 2026-10-30T09:40:00.000Z
         metadata: {}
     ownerHistory: []
     since: 2026-10-30
@@ -10165,6 +10168,9 @@ landingStreams:
       - src/gateway/model-entitlement/employee-model-gate.ts
       - src/gateway/models/platform-models-config.p2g.test.ts
       - src/agents/model-fallback.p2g-outbound.test.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/isolated-agent/run.long-horizon-ledger.test.ts
+      - src/gateway/server.cron.test.ts
     canLandWith:
       - CL
       - DDOC
@@ -10179,8 +10185,9 @@ landingStreams:
         learning skillDraft list/finalize + P1-E shadow intent authorize + P1-F
         knowledge materialization false-availability fix (event capability not
         delivered) + P2-G platform models smart config (synthetic-neutral must
-        not claim effect-verified). NO_PROMOTE; no auto-Apply system/runtime
-        bindings.
+        not claim effect-verified) + P2-H cron closed-loop (completed-ledger
+        empty-misclassify fix; retention-aware CRUD evidence; no real HTTP
+        delivery). NO_PROMOTE; no auto-Apply system/runtime bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:

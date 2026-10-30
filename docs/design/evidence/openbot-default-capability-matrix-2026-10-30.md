@@ -1,6 +1,6 @@
 # 默认能力矩阵与 P0 证据（2026-10-30）
 
-基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；事件物化未交付）、**P2-G**（模型智能配置：native 合法默认；合成中性档案不得冒充已验证优化；策略改变可影响 outbound primary）。P2-H 仍只读。
+基线：本分支 rebase 后相对 `origin/main`（见提交祖先）。覆盖 P0-A / P0-B、**P1-C**（私有记忆显式进组 RPC）、**P1-D**（学习策展 draft→finalize→install 可达闭环）、**P1-E**（shadow intent 人工 authorize→experiment→Apply→rollback 可达入口）、**P1-F**（event_driven 虚假可用性修复 + 生产探测禁 mock；事件物化未交付）、**P2-G**（模型智能配置：native 合法默认；合成中性档案不得冒充已验证优化；策略改变可影响 outbound primary）、**P2-H**（定时任务闭环：默认可调度；完成 ledger 不得空完成误报；创建→持久化→到期→送达状态→下次调度有单元证据）。
 
 状态只使用：已验证 / 部分验证 / 未实现 / 合理受控关闭 / 缺证据。
 
@@ -14,7 +14,7 @@
 | 上下文        | 部分验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config               | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine`                                                        | `assembleMessagesWithBudget`；`refreshConversationProjection`                                  | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition` | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过 | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config` | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A                                     |
 | 知识库        | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` **新建拒绝**（unsupported+迁移）；存量可迁到 scheduled/on_demand | knowledge publication mode                                                                                                            | `knowledge-publication.ts` + `projection-bindings.upsert`                                             | on_demand / scheduled 有分发；event_driven **无执行器**（未交付）                                    | publication / projection 存储                                                                 | 已验证 publication 才能被消费（本轮未重跑）                      | 授权与 SAR                                                          | 新建 event_driven → `MATERIALIZATION_MODE_UNSUPPORTED`；legacy 可 upsert 迁移                 | 见 P1-F。**虚假可用性已修复、事件能力未交付**；不记事件物化完成                              |
 | 数据资产物化  | 部分验证 | on_demand/scheduled 可物化；event_driven 不可再「成功但永不刷新」；生产探测禁 `mock_smoke_ok` | `EnterpriseKnowledgeProjectionMaterializationMode` + probe mode                                                                       | enterprise data gateway + `source-connection-probe.ts`                                                | connector + publication gate；生产无实时路径 → `unsupported_production_probe` / credential_required | knowledge object / lineage                                                                    | scheduled 走维护 tick；on_demand 走加载                          | 凭证、grant、SAR；demo 可 mock 但须标注                                         | 无凭证/未知 handler/生产 mock 拒绝明确失败；demo 保持隔离标注                              | 见 P1-F。未实现全部连接器；事件总线仍只触发 Agent，未接物化                              |
-| 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`              | `cfg.cron`                                                                                                                            | `buildGatewayCronService`（`src/gateway/server-cron.ts`）                                                     | cron service timer                                                                             | cron store                                                                                    | 下次 wake                                                        | 目标身份与租户由 job 自身约束（本轮未重验）                         | 关闭时不调度                                                                               | 本轮只核对默认表达式，未跑创建→送达闭环。未见需要在本 PR 改动的新缺口                                   |
+| 定时任务      | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1`；长周期 `createCronLedgerSession` **不**依赖默认关闭的全局 ledger 开关 | `cfg.cron`；ledger 资格看任务文本，不看 `OPENBOT_PROGRESS_LEDGER_ENABLED` | `buildGatewayCronService` + `CronService` + isolated-agent / webhook announce | timer due fire → `runIsolatedAgentJob` / systemEvent；outbound `deliverOutboundPayloads` | cron store（`lastDelivered` / `lastDeliveryStatus` / `nextRunAtMs`）+ run log | 下次 `nextRunAtMs` wake；完成 ledger 后续 tick 带诚实 summary 记 ok | ownership ownerId/tenantId + personal scope 交叉；系统 retention 可共存 | `OPENCLAW_SKIP_CRON=1` / `enabled:false` 不调度；空完成仍非成功；完成 ledger 不再空完成误报 | 见 P2-H。单元证明 create→persist→due→delivered 状态→下次调度；**真实 HTTP 送达未跑** → 部分验证 |
 | 模型智能配置  | 部分验证 | 未设置时为 `native`（合法默认，非缺陷）。产品/系统设置保存 `aor_enhanced` 后由 `resolvePlatformModelsMode` 读入 gate | `gateway.platform.models.mode`（UI `onSetPlatformModelsMode` → config.set） | `resolveEmployeeModelGate` ← chat / followup / cron-isolated / subagent（image/PDF 经 chat+capability plan modality） | native 直出；`aor_enhanced` + 真实目录成本 → AOR 保集合重排；**全合成中性档案 → strategy=native，不冒充已优化** | 平台模型快照 + effectiveRouting / preferredModelOrder | 后续请求读同一 mode；`runWithModelFallback` 消费 preferredModelOrder | 不扩大授权集合 | 缺 mode→native；缺档案→synthetic_only 回退原序且无假解释 | 见 P2-G。单元证明 preferredOrder 改变 outbound primary；**真实 HTTP/provider 未跑** → 部分验证 |
 
 `privateMemoryPromote` 仍记为 **合理受控关闭**（默认 unset/false）：`promotePrivateMemoryCapsuleToGroup` 只有显式 `true` 才写组学习资产。P1-C 已补生产 RPC `collaboration.learning.privateMemory.promote`（`private-memory-promote-entry.ts` + server-methods 注册）：要求 identified actor、个人 scope 按 capsuleId 加载、ownership 与目标组 trusted write 成员校验；flag OFF 返回 success-shaped `{promoted:false, reason:flag_off}`，不假装晋升成功。默认不打开 flag。本批未接线 UI（lander 冲突时 RPC+tests 足够）。撤销：个人 revoke 不自动撤销组侧副本；组侧走 `collaboration.capsule.transition` revoked。真实 HTTP/authz 子进程未跑 → 记忆行保持 **部分验证**。
@@ -116,7 +116,7 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 ## 已知限制与回滚
 
 - 不打开 `privateMemoryPromote` 默认（仅补 RPC 入口）。
-- 不实现 P2-H（P2-G 本批已做合成中性冒充修复 + outbound 决策一致性单元证明；真实 provider 未跑）。P1-F 事件物化仍未交付。
+- P2-H 已交单元闭环证据 + 两处真实缺口修复（完成 ledger 空完成误报；gateway CRUD 容忍 retention 系统任务）。**真实 HTTP 送达 / 真 gateway 长跑未跑** → 定时任务保持部分验证。P1-F 事件物化仍未交付。
 - 工作区 memory 的 `**/*.md` watcher glob 在当前 chokidar 上仍可能不发事件。本 PR 只改了授权小组目录。
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
@@ -261,3 +261,75 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
 ```
 
 矩阵：**部分验证**（模型智能配置）。真实 outbound provider HTTP 未跑。不自行宣告 Codex PASS。
+
+## P2-H 定时任务（创建→持久化→到期→送达状态→下次调度，2026-10-30）
+
+目标：Cron 默认开启；长周期 `createCronLedgerSession` 已独立于默认关闭的全局 progress-ledger 开关（保留）。验收创建→持久化→到期执行→**送达**→下次调度；不能把计时器注册、ledger 创建或执行日志单独当成送达。
+
+### 调查结论
+
+可测层已有大量既有覆盖，本轮先复跑再找真实缺口：
+
+| 验收点 | 既有证据 | 本轮 |
+| --- | --- | --- |
+| 默认开启（`enabled !== false` 且非 `OPENCLAW_SKIP_CRON=1`） | `buildGatewayCronService` 表达式；gateway 测设 skip=0 | 核对表达式，无重复开关 |
+| create → persist | `owner-scheduled-task.chain`（默认 `Asia/Shanghai` 08:00）；`CronService.add` | 通过 |
+| due fire → next schedule | `service.persists-delivered-status`（推进 `nextRunAtMs`）；`restart-catchup` | 通过 |
+| delivered / not-delivered / not-requested | `service.persists-delivered-status`（含 finished 事件） | 通过 |
+| announce 多通道 outbound | `isolated-agent.direct-delivery-core-channels`（Slack/Discord/WhatsApp/iMessage，`delivered:true`） | 通过 |
+| webhook 送达路径 | `gateway/server.cron.test` posts webhooks… | 通过 |
+| restart / missed | `service.restart-catchup` | 通过 |
+| Asia/Shanghai | `schedule.test` + owner-scheduled-task 默认 tz | 通过 |
+| concurrency | `issue-regressions` `maxConcurrentRuns`；`prevents-duplicate-timers` | 通过 |
+| failure retry | `issue-regressions` #24355 one-shot retry | 通过 |
+| delete/disable | CRUD patch `enabled:false`；one-shot disable | 通过 |
+| model selection | `run.cron-model-override` | 通过 |
+| target identity / tenant | `cron.personal-scope`（personal ∩ tenant；跨租户拒绝） | 通过 |
+| ledger 独立于全局开关 | `progress-ledger/feature.ts` 注释 + `cron-binding`「flag unset 仍 bind」+ long-horizon 测 | 通过 |
+
+计时器注册、ledger seed、执行日志**单独**均不记为送达；送达以 `delivered`/`deliveryStatus` 持久化与 outbound/webhook 调用为准。
+
+### 真实缺口（修复前失败 → 修复后通过）
+
+1. **完成 ledger 空完成误报**  
+   触发：长周期 job 验收已全部 met 后再次 due；`ledgerHasNoWritableStep` 早退 `status:"ok"` 且无 summary。  
+   症状：`classifyCronCompletion` 把裸 ok 判为 `empty`→`error`（`cron_completion:empty`），模型虽未跑但调度记失败。  
+   根因：`src/cron/isolated-agent/run.ts` 早退未携带真实摘要，与 Batch 8 空完成禁令冲突。  
+   修复：早退附 summary `Ledger already complete; no remaining writable step.`（仍不跑模型；不绕过空完成禁令）。  
+   证据：`run.long-horizon-ledger.test.ts`「does not run a model when the ledger has no writable step」修复前 `expected 'ok' / received 'error'`，修复后通过。
+
+2. **gateway CRUD list 与 retention 系统任务**  
+   触发：非 minimal gateway + `catalogEnabled` 默认 true 时，`ensureConversationRetentionCronJob` 在 `cron.start()` 后写入 `openbot.conversation.retention`。  
+   症状：`server.cron.test`「handles cron CRUD…」在 `cron.add(daily)` 后断言 `jobs.length === 1` 失败（实际 2）。  
+   根因：测试未承认系统任务共存；非产品禁止用户任务。  
+   修复：按 name 查找 `daily` 并断言 delivery；允许 `length >= 1`。  
+   证据：同测修复前失败、修复后通过。
+
+### 未做 / 已知限制
+
+- **真实 HTTP 通道送达**（Telegram/Slack 真网、真 webhook 对端）未跑 → 矩阵保持 **部分验证**。
+- 不新增重复 `cron.enabled` feature flag；不把全局 progress-ledger 默认打开。
+- 不合并、不部署、不自称 Codex PASS。
+
+### 复跑命令
+
+```text
+OPENBOT_TEST_PROFILE=low pnpm exec vitest run \
+  src/cron/isolated-agent/run.long-horizon-ledger.test.ts \
+  src/gateway/server.cron.test.ts \
+  src/cron/service.persists-delivered-status.test.ts \
+  src/cron/service.restart-catchup.test.ts \
+  src/cron/schedule.test.ts \
+  src/cron/owner-scheduled-task.chain.test.ts \
+  src/gateway/server-methods/cron.personal-scope.test.ts \
+  src/progress-ledger/cron-binding.test.ts \
+  src/cron/isolated-agent.direct-delivery-core-channels.test.ts \
+  src/cron/isolated-agent/run.cron-model-override.test.ts \
+  src/cron/service.prevents-duplicate-timers.test.ts \
+  src/cron/service.issue-regressions.test.ts \
+  src/gateway/server-cron.test.ts \
+  src/cron/completion-contract.test.ts
+```
+
+矩阵：**部分验证**（定时任务）。不自行宣告 Codex PASS。
+

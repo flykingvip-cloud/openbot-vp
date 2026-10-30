@@ -247,11 +247,12 @@ describe("gateway server cron", () => {
       expect(listRes.ok).toBe(true);
       const jobs = (listRes.payload as { jobs?: unknown } | null)?.jobs;
       expect(Array.isArray(jobs)).toBe(true);
-      expect((jobs as unknown[]).length).toBe(1);
-      expect(((jobs as Array<{ name?: unknown }>)[0]?.name as string) ?? "").toBe("daily");
-      expect(
-        ((jobs as Array<{ delivery?: { mode?: unknown } }>)[0]?.delivery?.mode as string) ?? "",
-      ).toBe("webhook");
+      const jobList = jobs as Array<{ name?: unknown; delivery?: { mode?: unknown } }>;
+      // Gateway may also seed openbot.conversation.retention after cron.start().
+      const daily = jobList.find((job) => job.name === "daily");
+      expect(daily).toBeDefined();
+      expect((daily?.delivery?.mode as string) ?? "").toBe("webhook");
+      expect(jobList.length).toBeGreaterThanOrEqual(1);
 
       const routeAtMs = Date.now() - 1;
       const routeRes = await rpcReq(ws, "cron.add", {
