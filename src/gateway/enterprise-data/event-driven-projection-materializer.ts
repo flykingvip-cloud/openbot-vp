@@ -32,12 +32,32 @@ export type EventDrivenMaterializationAttempt = {
   result?: ProjectionMaterializationResult;
 };
 
+export type EventDrivenMaterializationStage = "load" | "run" | "save";
+
+export type EventDrivenMaterializationErrorCode =
+  | "store_load_failed"
+  | "store_save_failed"
+  | "materialization_failed";
+
 export type EventDrivenMaterializationResult = {
   attempted: number;
   succeeded: number;
   failed: number;
   skipped: number;
   attempts: EventDrivenMaterializationAttempt[];
+  /**
+   * Present when store I/O or an unexpected runner failure prevented honest
+   * materialization. Distinguishes "no matching bindings" (all zeros, no stage)
+   * from load/save/run failures. Save failure never reports persisted success.
+   */
+  stage?: EventDrivenMaterializationStage;
+  errorCode?: EventDrivenMaterializationErrorCode;
+  /**
+   * Stable hint: ingest already recorded + deduped by externalId, so resending
+   * the same externalId will not rematerialize. Manual re-ingest needs a new
+   * externalId (or a future durable retry path — not claimed here).
+   */
+  retryHint?: "deduped_external_id_will_not_rematerialize";
 };
 
 function bindingMatchesEventSource(params: {

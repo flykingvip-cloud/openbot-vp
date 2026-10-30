@@ -10098,6 +10098,7 @@ tasks:
       - src/gateway/enterprise-data/event-driven-projection-materializer.ts
       - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
       - src/gateway/server-methods/enterprise-data-events.ts
+      - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
       - src/cron/service.delivery-adapter-evidence.p2h.test.ts
     state: active
     sessions:
@@ -10174,6 +10175,7 @@ landingStreams:
       - src/gateway/enterprise-data/event-driven-projection-materializer.ts
       - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
       - src/gateway/server-methods/enterprise-data-events.ts
+      - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
       - src/cron/service.delivery-adapter-evidence.p2h.test.ts
       - src/gateway/model-entitlement/aor-selection.ts
       - src/gateway/model-entitlement/aor-selection.test.ts
@@ -10198,7 +10200,8 @@ landingStreams:
       purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
         learning skillDraft execute+attribution + P1-E shadow intent authorize +
         P1-F knowledge materialization (false-availability fix + minimal
-        event-driven path; full KB not claimed) + P2-G platform models smart
+        event-driven path + tenant-store locator/I-O failure visibility;
+        full KB not claimed) + P2-G platform models smart
         config (synthetic-neutral / partial-catalog must not fake ranking) +
         P2-H cron closed-loop (adapter delivery evidence; no real HTTP).
         NO_PROMOTE; no auto-Apply system/runtime bindings.
@@ -22656,6 +22659,10 @@ sharedPaths:
   - glob: src/gateway/server-methods/enterprise-data-events.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: "P1-F: events.ingest wires event-driven materialization."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: tenant store path + storage failure visibility acceptance tests."
     reviewAfter: 2026-11-30
   - glob: src/cron/service.delivery-adapter-evidence.p2h.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

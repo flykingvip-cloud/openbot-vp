@@ -7,6 +7,7 @@
 // server-side (never client-forged). Kept in a dedicated file (not the enterprise-data.ts
 // core / m6) to avoid attribution conflicts on owned/shared files.
 
+import { createAsyncLock } from "../../infra/json-files.js";
 import { EnterpriseDataStoreError } from "../enterprise-data/connector-action-store.js";
 import {
   dispatchEnterpriseDataEvent,
@@ -30,12 +31,17 @@ import type {
   EnterpriseDataEventType,
 } from "../enterprise-data/enterprise-data-event-types.js";
 import { requireResolvedEnterpriseAdminTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
-import { runEventDrivenProjectionsForEvent } from "../enterprise-data/event-driven-projection-materializer.js";
+import {
+  runEventDrivenProjectionsForEvent,
+  type EventDrivenMaterializationResult,
+} from "../enterprise-data/event-driven-projection-materializer.js";
 import type { SemanticObjectKind } from "../enterprise-data/semantic-object-types.js";
 import { loadEnterpriseDataStore, saveEnterpriseDataStore } from "../enterprise-data/store.js";
 import type { EnterpriseDataStore } from "../enterprise-data/types.js";
+import { resolveControlPlaneStorePathForClient } from "../tenant-context.js";
+import { TENANT_ENTERPRISE_DATA_FILE } from "../tenant-store-paths.js";
 import { respondInvalid, respondUnavailable, stringValue } from "./billing-helpers.js";
-import type { GatewayRequestHandlers } from "./types.js";
+import type { GatewayClient, GatewayRequestHandlers } from "./types.js";
 
 const EVENT_TYPES: ReadonlySet<EnterpriseDataEventType> = new Set([
   "created",
@@ -43,6 +49,84 @@ const EVENT_TYPES: ReadonlySet<EnterpriseDataEventType> = new Set([
   "deleted",
   "custom",
 ]);
+
+type WithDataStoreContext = {
+  client: GatewayClient | null | undefined;
+  tenantId: string;
+};
+
+type WithDataStoreRunner = <T>(
+  ctx: WithDataStoreContext,
+  run: (store: EnterpriseDataStore) => Promise<T> | T,
+) => Promise<T>;
+
+/** Distinguishes store I/O failure from empty materialization (no matching bindings). */
+class EventDrivenStoreAccessError extends Error {
+  readonly stage: "load" | "save";
+  readonly partialResult?: EventDrivenMaterializationResult;
+
+  constructor(
+    stage: "load" | "save",
+    cause: unknown,
+    partialResult?: EventDrivenMaterializationResult,
+  ) {
+    // Public message stays non-sensitive (no paths / store contents).
+    super(
+      stage === "load" ? "enterprise data store load failed" : "enterprise data store save failed",
+    );
+    this.name = "EventDrivenStoreAccessError";
+    this.stage = stage;
+    this.partialResult = partialResult;
+    this.cause = cause;
+  }
+}
+
+const defaultDataStoreLock = createAsyncLock();
+
+function materializationStoreFailure(params: {
+  stage: "load" | "run" | "save";
+  partial?: EventDrivenMaterializationResult;
+}): EventDrivenMaterializationResult {
+  const errorCode =
+    params.stage === "load"
+      ? "store_load_failed"
+      : params.stage === "save"
+        ? "store_save_failed"
+        : "materialization_failed";
+  const partial = params.partial;
+  if (params.stage === "save" && partial) {
+    // In-memory attempts may have succeeded, but nothing was persisted.
+    return {
+      attempted: partial.attempted,
+      succeeded: 0,
+      failed: Math.max(1, partial.failed, partial.attempted),
+      skipped: partial.skipped,
+      attempts: partial.attempts.map((attempt) =>
+        attempt.status === "succeeded"
+          ? {
+              ...attempt,
+              status: "failed" as const,
+              error: "store_save_failed",
+              result: undefined,
+            }
+          : attempt,
+      ),
+      stage: "save",
+      errorCode,
+      retryHint: "deduped_external_id_will_not_rematerialize",
+    };
+  }
+  return {
+    attempted: partial?.attempted ?? 0,
+    succeeded: 0,
+    failed: Math.max(1, partial?.failed ?? 0),
+    skipped: partial?.skipped ?? 0,
+    attempts: partial?.attempts ?? [],
+    stage: params.stage,
+    errorCode,
+    retryHint: "deduped_external_id_will_not_rematerialize",
+  };
+}
 
 const SEMANTIC_OBJECT_KINDS: ReadonlySet<SemanticObjectKind> = new Set([
   "customer",
@@ -91,21 +175,52 @@ export function createEnterpriseDataEventHandlers(deps?: {
   withStore?: <T>(run: (store: EnterpriseDataEventStore) => Promise<T> | T) => Promise<T>;
   triggerAgent?: TriggerAgentFn;
   now?: () => string;
-  /** Optional: load enterprise data store for event_driven projection materialization. */
-  withDataStore?: <T>(run: (store: EnterpriseDataStore) => Promise<T> | T) => Promise<T>;
+  /**
+   * Optional: load/save enterprise data store for event_driven projection
+   * materialization. Must use the same trusted tenant control-plane locator as
+   * projection binding APIs (`resolveControlPlaneStorePathForClient` +
+   * `TENANT_ENTERPRISE_DATA_FILE`).
+   */
+  withDataStore?: WithDataStoreRunner;
 }): GatewayRequestHandlers {
   const loadStore = deps?.loadStore ?? (() => loadEnterpriseDataEventStore());
   const withStore =
     deps?.withStore ??
     (<T>(run: (store: EnterpriseDataEventStore) => Promise<T> | T) =>
       withEnterpriseDataEventStoreWriteLock(run));
-  const withDataStore =
+  const withDataStore: WithDataStoreRunner =
     deps?.withDataStore ??
-    (async <T>(run: (store: EnterpriseDataStore) => Promise<T> | T) => {
-      const store = await loadEnterpriseDataStore();
-      const result = await run(store);
-      await saveEnterpriseDataStore(store);
-      return result;
+    (async <_T>(ctx, run) => {
+      // Same trusted locator as enterprise-data.ts withEnterpriseDataStore.
+      const storePath = await resolveControlPlaneStorePathForClient(
+        ctx.client ?? null,
+        TENANT_ENTERPRISE_DATA_FILE,
+      );
+      // Serialize read-modify-save for parallel ingest against the same store
+      // (mirrors event-store write lock; binding API RMW is unchanged).
+      return defaultDataStoreLock(async () => {
+        let store: EnterpriseDataStore;
+        try {
+          store = await loadEnterpriseDataStore(storePath);
+        } catch (error) {
+          throw new EventDrivenStoreAccessError("load", error);
+        }
+        const result = await run(store);
+        try {
+          await saveEnterpriseDataStore(store, storePath);
+        } catch (error) {
+          const partial =
+            result &&
+            typeof result === "object" &&
+            "attempted" in result &&
+            "failed" in result &&
+            "attempts" in result
+              ? (result as EventDrivenMaterializationResult)
+              : undefined;
+          throw new EventDrivenStoreAccessError("save", error, partial);
+        }
+        return result;
+      });
     });
   const triggerAgent = deps?.triggerAgent ?? defaultTriggerAgent;
   const now = deps?.now ?? (() => new Date().toISOString());
@@ -192,13 +307,12 @@ export function createEnterpriseDataEventHandlers(deps?: {
               triggerAgent,
             });
         // Step 3: minimal event_driven projection materialization (skip deduped).
-        // Failures are captured in materialization result; do not fail the ingest ack.
-        let materialization:
-          | Awaited<ReturnType<typeof runEventDrivenProjectionsForEvent>>
-          | undefined;
+        // Ingest ack stays ok; materialization must surface load/save/run failures
+        // (not all-zero stats) because externalId dedupe blocks silent resend recovery.
+        let materialization: EventDrivenMaterializationResult | undefined;
         if (!recorded.deduped) {
           try {
-            materialization = await withDataStore((dataStore) =>
+            materialization = await withDataStore({ client, tenantId }, (dataStore) =>
               runEventDrivenProjectionsForEvent({
                 store: dataStore,
                 tenantId,
@@ -206,14 +320,15 @@ export function createEnterpriseDataEventHandlers(deps?: {
                 nowIso,
               }),
             );
-          } catch {
-            materialization = {
-              attempted: 0,
-              succeeded: 0,
-              failed: 0,
-              skipped: 0,
-              attempts: [],
-            };
+          } catch (error) {
+            if (error instanceof EventDrivenStoreAccessError) {
+              materialization = materializationStoreFailure({
+                stage: error.stage,
+                partial: error.partialResult,
+              });
+            } else {
+              materialization = materializationStoreFailure({ stage: "run" });
+            }
           }
         }
         respond(true, {
