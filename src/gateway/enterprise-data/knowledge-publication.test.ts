@@ -239,28 +239,17 @@ function projectionFor(
 }
 
 describe("E4 knowledge publication", () => {
-  it("rejects creating event_driven as false-available success", () => {
+  it("treats event_driven as implemented (writable) but not a clock scheduler", () => {
     expect(isImplementedMaterializationMode("on_demand")).toBe(true);
     expect(isImplementedMaterializationMode("scheduled")).toBe(true);
-    expect(isImplementedMaterializationMode("event_driven")).toBe(false);
-    expect(materializationModeSupportStatus("event_driven")).toBe("unsupported");
+    expect(isImplementedMaterializationMode("event_driven")).toBe(true);
+    expect(materializationModeSupportStatus("event_driven")).toBe("implemented");
     expect(materializationModeHasScheduler("scheduled")).toBe(true);
     expect(materializationModeHasScheduler("event_driven")).toBe(false);
     expect(materializationModeHasScheduler("on_demand")).toBe(false);
-    expect(() => assertWritableMaterializationMode("event_driven")).toThrow(
-      /MATERIALIZATION_MODE_UNSUPPORTED|unsupported/,
-    );
-    try {
-      assertWritableMaterializationMode("event_driven");
-      expect.unreachable("expected unsupported");
-    } catch (error) {
-      expect(error).toBeInstanceOf(EnterpriseDataStoreError);
-      expect((error as EnterpriseDataStoreError).code).toBe("MATERIALIZATION_MODE_UNSUPPORTED");
-      expect((error as EnterpriseDataStoreError).message).toContain("Migrate existing bindings");
-      expect((error as EnterpriseDataStoreError).message).toBe(
-        eventDrivenMaterializationUnsupportedMessage(),
-      );
-    }
+    expect(() => assertWritableMaterializationMode("event_driven")).not.toThrow();
+    // Migration helper copy remains available for operators who prefer scheduled/on_demand.
+    expect(eventDrivenMaterializationUnsupportedMessage()).toContain("projection-bindings.upsert");
 
     const store = normalizeEnterpriseDataStore(null);
     seedEnterpriseDataCatalog({ store, tenantId, nowIso });
@@ -279,26 +268,26 @@ describe("E4 knowledge publication", () => {
         sourceActions: capability.actionRefs.slice(0, 1),
         objectKind: "data",
         templateKey: "NormalizeTemplate",
-        description: "must not create",
+        description: "event-driven writable",
         outputSchema: { type: "object" },
         lifecycle: "active",
       },
     });
-    expect(() =>
-      upsertEnterpriseKnowledgeProjectionBinding({
-        store,
-        tenantId,
-        nowIso,
-        binding: {
-          projectionId: spec.projectionId,
-          capabilityId: capability.capabilityId,
-          materializationMode: "event_driven",
-          materializationTeamLabel: "华北销售",
-          enabled: true,
-          generatorVersion: "e4-test",
-        },
-      }),
-    ).toThrow(/unsupported/);
+    const binding = upsertEnterpriseKnowledgeProjectionBinding({
+      store,
+      tenantId,
+      nowIso,
+      binding: {
+        projectionId: spec.projectionId,
+        capabilityId: capability.capabilityId,
+        materializationMode: "event_driven",
+        materializationTeamLabel: "华北销售",
+        enabled: true,
+        generatorVersion: "e4-test",
+      },
+    });
+    expect(binding.materializationMode).toBe("event_driven");
+    // Creating the binding alone must not invent feed items (no fake availability).
     expect(
       listKnowledgeFeedItems({ store, tenantId }).some(
         (item) => item.projectionId === spec.projectionId,
@@ -342,7 +331,7 @@ describe("E4 knowledge publication", () => {
       createdAt: nowIso,
       updatedAt: nowIso,
     };
-    expect(materializationModeSupportStatus("event_driven")).toBe("unsupported");
+    expect(materializationModeSupportStatus("event_driven")).toBe("implemented");
 
     const migrated = upsertEnterpriseKnowledgeProjectionBinding({
       store,
@@ -402,7 +391,7 @@ describe("E4 knowledge publication", () => {
         lifecycle: "active",
       },
     });
-    // Legacy row planted outside upsert (upsert now rejects event_driven creates).
+    // Binding may also be created via upsert now that event_driven is implemented.
     store.enterpriseKnowledgeProjectionBindings["binding-event-skip"] = {
       bindingId: "binding-event-skip",
       tenantId,

@@ -30,7 +30,10 @@ import type {
   EnterpriseDataEventType,
 } from "../enterprise-data/enterprise-data-event-types.js";
 import { requireResolvedEnterpriseAdminTenantId } from "../enterprise-data/enterprise-data-seat-context.js";
+import { runEventDrivenProjectionsForEvent } from "../enterprise-data/event-driven-projection-materializer.js";
 import type { SemanticObjectKind } from "../enterprise-data/semantic-object-types.js";
+import { loadEnterpriseDataStore, saveEnterpriseDataStore } from "../enterprise-data/store.js";
+import type { EnterpriseDataStore } from "../enterprise-data/types.js";
 import { respondInvalid, respondUnavailable, stringValue } from "./billing-helpers.js";
 import type { GatewayRequestHandlers } from "./types.js";
 
@@ -88,12 +91,22 @@ export function createEnterpriseDataEventHandlers(deps?: {
   withStore?: <T>(run: (store: EnterpriseDataEventStore) => Promise<T> | T) => Promise<T>;
   triggerAgent?: TriggerAgentFn;
   now?: () => string;
+  /** Optional: load enterprise data store for event_driven projection materialization. */
+  withDataStore?: <T>(run: (store: EnterpriseDataStore) => Promise<T> | T) => Promise<T>;
 }): GatewayRequestHandlers {
   const loadStore = deps?.loadStore ?? (() => loadEnterpriseDataEventStore());
   const withStore =
     deps?.withStore ??
     (<T>(run: (store: EnterpriseDataEventStore) => Promise<T> | T) =>
       withEnterpriseDataEventStoreWriteLock(run));
+  const withDataStore =
+    deps?.withDataStore ??
+    (async <T>(run: (store: EnterpriseDataStore) => Promise<T> | T) => {
+      const store = await loadEnterpriseDataStore();
+      const result = await run(store);
+      await saveEnterpriseDataStore(store);
+      return result;
+    });
   const triggerAgent = deps?.triggerAgent ?? defaultTriggerAgent;
   const now = deps?.now ?? (() => new Date().toISOString());
 
@@ -178,11 +191,37 @@ export function createEnterpriseDataEventHandlers(deps?: {
               subscriptions: recorded.subscriptions,
               triggerAgent,
             });
+        // Step 3: minimal event_driven projection materialization (skip deduped).
+        // Failures are captured in materialization result; do not fail the ingest ack.
+        let materialization:
+          | Awaited<ReturnType<typeof runEventDrivenProjectionsForEvent>>
+          | undefined;
+        if (!recorded.deduped) {
+          try {
+            materialization = await withDataStore((dataStore) =>
+              runEventDrivenProjectionsForEvent({
+                store: dataStore,
+                tenantId,
+                event: recorded.event,
+                nowIso,
+              }),
+            );
+          } catch {
+            materialization = {
+              attempted: 0,
+              succeeded: 0,
+              failed: 0,
+              skipped: 0,
+              attempts: [],
+            };
+          }
+        }
         respond(true, {
           tenantId,
           event: recorded.event,
           deduped: recorded.deduped,
           dispatch,
+          ...(materialization ? { materialization } : {}),
         });
       } catch (error) {
         respondEnterpriseError(respond, error);

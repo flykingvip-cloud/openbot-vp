@@ -286,7 +286,7 @@ describe("enterprise-data M4 gateway handlers", () => {
     expect(byWrongId.error?.message).toContain("agentType");
   });
 
-  it("rejects event_driven binding upsert as unsupported with migration hint", async () => {
+  it("allows event_driven binding upsert once the event materializer path is implemented", async () => {
     const store = await loadEnterpriseDataStore();
     const projection = Object.values(store.enterpriseKnowledgeProjectionSpecs).find(
       (item) => item.tenantId === tenantId,
@@ -300,8 +300,9 @@ describe("enterprise-data M4 gateway handlers", () => {
       generatorVersion: "p1f-test",
       enabled: true,
     });
-    expect(response.ok).toBe(false);
-    expect(response.error?.message ?? "").toMatch(/unsupported|Migrate existing bindings/i);
+    expect(response.ok).toBe(true);
+    const binding = (response.payload as { binding?: { materializationMode?: string } })?.binding;
+    expect(binding?.materializationMode).toBe("event_driven");
   });
 
   it("migrates a legacy event_driven binding to scheduled via upsert", async () => {
