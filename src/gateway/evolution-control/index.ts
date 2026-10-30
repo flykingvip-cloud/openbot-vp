@@ -52,6 +52,14 @@ export { createCapsuleEligibilityReader } from "./adapters/capsule.js";
 export { createGatewayEvolutionControlPlane } from "./gateway-plane.js";
 export { createShadowIntentProposalRegistrar } from "./shadow-intent-proposal.js";
 export {
+  authorizeShadowIntentProposal,
+  projectShadowIntentOperatorHints,
+  resolveAuthorizeShadowIntentInspector,
+  setAuthorizeShadowIntentInspectorForTests,
+  SHADOW_INTENT_AUTHORIZE_SURFACES,
+  SHADOW_INTENT_OBSERVE_ONLY_SURFACES,
+} from "./authorize-shadow-intent.js";
+export {
   ensureEvolutionControlPlaneStarted,
   getDefaultEvolutionControlPlane,
   persistSurfaceSnapshot,

@@ -2,6 +2,24 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 
 // Result types
 
+/**
+ * Why a context capability ran or was skipped.
+ * `reason === null` only when `applied` is true. Skip reasons are not errors.
+ */
+export type ContextCapabilityDecision = {
+  capability: "context_planner" | "conversation_projection";
+  enabled: boolean;
+  applied: boolean;
+  reason:
+    | null
+    | "disabled_by_env"
+    | "disabled_by_config"
+    | "disabled"
+    | "missing_token_budget"
+    | "missing_conversation_id"
+    | "projection_not_found";
+};
+
 export type AssembleResult = {
   /** Ordered messages to use as model context */
   messages: AgentMessage[];
@@ -17,6 +35,11 @@ export type AssembleResult = {
     overflowReason: string | null;
     [key: string]: unknown;
   };
+  /**
+   * Planner / projection decisions for this assemble.
+   * Missing budget or conversation id is a skip, not a thrown error.
+   */
+  capabilityDecisions?: ContextCapabilityDecision[];
 };
 
 export type CompactResult = {
@@ -131,6 +154,11 @@ export interface ContextEngine {
     sessionId: string;
     messages: AgentMessage[];
     tokenBudget?: number;
+    /**
+     * Optional runtime-owned context. Legacy engine reads `config`, `sessionKey`,
+     * and `subject` when the caller has them. Bound engine config is the fallback.
+     */
+    runtimeContext?: ContextEngineRuntimeContext;
   }): Promise<AssembleResult>;
 
   /**

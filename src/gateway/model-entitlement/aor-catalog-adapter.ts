@@ -2,6 +2,8 @@
  * ResourceModelCatalogEntry → AOR ModelProfile adapter.
  *
  * Production AOR must not use SEED_MODEL_CATALOG prices when a platform entry exists.
+ * Missing-cost entries are omitted from profiles (listed in missingCostModelIds) so
+ * aor-selection can detect synthetic_only and must not claim effect-verified ranking.
  */
 
 import type { ModelProfile, ModelRef as AorModelRef } from "@openbot/aor-core";
@@ -73,8 +75,9 @@ export function resourceCatalogToAorProfiles(entries: readonly ResourceModelCata
       !Number.isFinite(profile.cost.outputPerMtok)
     ) {
       missingCostModelIds.push(entry.modelId);
-      // Explicit degrade: neutral rank cost so set conservation holds without demo seed prices.
-      profile.cost = { inputPerMtok: 1, outputPerMtok: 1 };
+      // Omit from catalog profiles so aor-selection synthesizes neutrals and can detect
+      // synthetic_only (must not claim effect-verified cheapest/best_quality).
+      continue;
     }
     profiles.push(profile);
   }

@@ -1,10 +1,13 @@
 /**
  * E4 knowledge publication gate.
  *
- * on_demand and scheduled are the only implemented materialization paths.
- * event_driven stays in the enum and is not dispatched.
- * Failed, unverified, and incomplete output is not a complete knowledge object.
- * Partial output is stored only when the projection names publish_marked.
+ * Implemented materialization paths: on_demand, scheduled, and event_driven
+ * (minimal: `runEventDrivenProjectionsForEvent` on non-deduped ingest).
+ * event_driven is not a clock scheduler; durable restart queues / ordered
+ * multi-consumer replay / production rate limits beyond per-event bounds are
+ * not claimed. Failed, unverified, and incomplete output is not a complete
+ * knowledge object. Partial output is stored only when the projection names
+ * publish_marked.
  */
 
 import { EnterpriseDataStoreError } from "./connector-action-store.js";
@@ -25,17 +28,62 @@ import type {
   SarGatewayCorrelation,
 } from "./types.js";
 
+export const IMPLEMENTED_MATERIALIZATION_MODES = [
+  "on_demand",
+  "scheduled",
+  "event_driven",
+] as const;
+
+export type ImplementedMaterializationMode = (typeof IMPLEMENTED_MATERIALIZATION_MODES)[number];
+
 export function isImplementedMaterializationMode(
   mode: EnterpriseKnowledgeProjectionMaterializationMode,
 ): boolean {
-  return mode === "on_demand" || mode === "scheduled";
+  return mode === "on_demand" || mode === "scheduled" || mode === "event_driven";
 }
 
-/** Scheduled refresh only. event_driven has no scheduler. on_demand is a load path, not a clock. */
+/** Scheduled refresh only. event_driven is event ingest, not a clock. on_demand is a load path. */
 export function materializationModeHasScheduler(
   mode: EnterpriseKnowledgeProjectionMaterializationMode,
 ): boolean {
   return mode === "scheduled";
+}
+
+/**
+ * Legacy helper kept for callers that still surface migration copy.
+ * Prefer scheduled/on_demand when event ingest is unavailable; event_driven itself
+ * is implemented via runEventDrivenProjectionsForEvent (minimal path).
+ */
+export function eventDrivenMaterializationUnsupportedMessage(params?: {
+  targetMode?: Exclude<ImplementedMaterializationMode, "event_driven">;
+}): string {
+  const target = params?.targetMode ?? "scheduled";
+  const alternate = target === "scheduled" ? "on_demand" : "scheduled";
+  return (
+    `materializationMode "event_driven" requires the event-driven materializer path. ` +
+    `Prefer migrating via enterprise-data.projection-bindings.upsert with bindingId ` +
+    `and materializationMode "${target}" or "${alternate}" when event ingest is not used.`
+  );
+}
+
+/** Reject modes that have no executor (none currently beyond the implemented set). */
+export function assertWritableMaterializationMode(
+  mode: EnterpriseKnowledgeProjectionMaterializationMode,
+): void {
+  if (isImplementedMaterializationMode(mode)) {
+    return;
+  }
+  throw new EnterpriseDataStoreError(
+    "MATERIALIZATION_MODE_UNSUPPORTED",
+    eventDrivenMaterializationUnsupportedMessage(),
+  );
+}
+
+/** Status helper: implemented | unsupported (legacy enum value, not an executor). */
+export function materializationModeSupportStatus(
+  mode: EnterpriseKnowledgeProjectionMaterializationMode,
+): "implemented" | "unsupported" {
+  return isImplementedMaterializationMode(mode) ? "implemented" : "unsupported";
 }
 
 export type KnowledgePublicationDecision =

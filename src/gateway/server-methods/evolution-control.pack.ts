@@ -13,6 +13,7 @@ const READ_METHODS = [
 
 const WRITE_METHODS = [
   "evolution.proposals.transition",
+  "evolution.proposals.authorize",
   "evolution.experiments.create",
   "evolution.experiments.evaluate",
   "evolution.applications.apply",

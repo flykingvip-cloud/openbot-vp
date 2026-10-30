@@ -286,6 +286,62 @@ describe("enterprise-data M4 gateway handlers", () => {
     expect(byWrongId.error?.message).toContain("agentType");
   });
 
+  it("allows event_driven binding upsert once the event materializer path is implemented", async () => {
+    const store = await loadEnterpriseDataStore();
+    const projection = Object.values(store.enterpriseKnowledgeProjectionSpecs).find(
+      (item) => item.tenantId === tenantId,
+    );
+    expect(projection).toBeTruthy();
+    const response = await invoke("enterprise-data.projection-bindings.upsert", {
+      tenantId,
+      projectionId: projection!.projectionId,
+      materializationMode: "event_driven",
+      materializationTeamLabel: "华北销售",
+      generatorVersion: "p1f-test",
+      enabled: true,
+    });
+    expect(response.ok).toBe(true);
+    const binding = (response.payload as { binding?: { materializationMode?: string } })?.binding;
+    expect(binding?.materializationMode).toBe("event_driven");
+  });
+
+  it("migrates a legacy event_driven binding to scheduled via upsert", async () => {
+    const store = await loadEnterpriseDataStore();
+    const projection = Object.values(store.enterpriseKnowledgeProjectionSpecs).find(
+      (item) => item.tenantId === tenantId,
+    );
+    expect(projection).toBeTruthy();
+    const legacyId = "m4-legacy-event-driven";
+    store.enterpriseKnowledgeProjectionBindings[legacyId] = {
+      bindingId: legacyId,
+      tenantId,
+      projectionId: projection!.projectionId,
+      materializationMode: "event_driven",
+      materializationTeamLabel: "华北销售",
+      enabled: true,
+      generatorVersion: "legacy",
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+    await saveEnterpriseDataStore(store);
+
+    const response = await invoke("enterprise-data.projection-bindings.upsert", {
+      tenantId,
+      bindingId: legacyId,
+      projectionId: projection!.projectionId,
+      materializationMode: "scheduled",
+      materializationTeamLabel: "华北销售",
+      generatorVersion: "p1f-migrate",
+      enabled: true,
+    });
+    expect(response.ok).toBe(true);
+    const binding = (
+      response.payload as { binding?: { materializationMode?: string; bindingId?: string } }
+    )?.binding;
+    expect(binding?.bindingId).toBe(legacyId);
+    expect(binding?.materializationMode).toBe("scheduled");
+  });
+
   it("rejects multi-source projection upsert", async () => {
     const response = await invoke("enterprise-data.projection-specs.upsert", {
       tenantId,

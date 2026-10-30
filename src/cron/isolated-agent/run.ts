@@ -1275,7 +1275,13 @@ export async function runCronIsolatedAgentTurn(params: {
 
     if (ledgerHasNoWritableStep) {
       // Nothing left to execute. Do not run a wrap-up model turn.
-      return await completeRun(withRunSession({ status: "ok" }));
+      // Must carry a real summary: classifyCronCompletion treats bare ok as empty→error.
+      return await completeRun(
+        withRunSession({
+          status: "ok",
+          summary: "Ledger already complete; no remaining writable step.",
+        }),
+      );
     }
     const runCommandBody = [commandBody, ledgerStepPrompt, readonlyPrompt]
       .filter((part) => part.trim())

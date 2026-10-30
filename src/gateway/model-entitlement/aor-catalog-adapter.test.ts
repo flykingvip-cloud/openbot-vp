@@ -55,7 +55,7 @@ describe("aor catalog adapter", () => {
     expect(result.orderedModelIds[0]).toBe("openai/cheap");
   });
 
-  it("degrades missing cost without using seed prices", () => {
+  it("omits missing-cost entries from profiles (synthetic path; no seed prices)", () => {
     const profile = resourceCatalogEntryToAorProfile(
       entry({
         modelId: "openai/unknown-cost",
@@ -65,7 +65,7 @@ describe("aor catalog adapter", () => {
       }),
     );
     expect(profile).toBeTruthy();
-    const { missingCostModelIds } = resourceCatalogToAorProfiles([
+    const { profiles, missingCostModelIds } = resourceCatalogToAorProfiles([
       entry({
         modelId: "openai/unknown-cost",
         tier: "tier_b",
@@ -74,6 +74,7 @@ describe("aor catalog adapter", () => {
       }),
     ]);
     expect(missingCostModelIds).toContain("openai/unknown-cost");
+    expect(profiles).toHaveLength(0);
   });
 
   it("does not invent models outside the effective set", () => {

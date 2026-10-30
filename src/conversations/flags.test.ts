@@ -120,6 +120,33 @@ describe("conversation flags + rollout", () => {
     expect(no.uiEnabled).toBe(false);
   });
 
+  it("env override beats explicit config for planner and projection", () => {
+    stashEnv();
+    const enabled = {
+      conversation: {
+        projection: { enabled: true },
+        contextPlanner: { enabled: true },
+      },
+    };
+    process.env.OPENBOT_CONVERSATION_CONTEXT_PLANNER = "0";
+    process.env.OPENBOT_CONVERSATION_PROJECTION = "false";
+    const forcedOff = resolveConversationFlags(enabled as never);
+    expect(forcedOff.contextPlannerEnabled).toBe(false);
+    expect(forcedOff.projectionEnabled).toBe(false);
+
+    const disabled = {
+      conversation: {
+        projection: { enabled: false },
+        contextPlanner: { enabled: false },
+      },
+    };
+    process.env.OPENBOT_CONVERSATION_CONTEXT_PLANNER = "1";
+    process.env.OPENBOT_CONVERSATION_PROJECTION = "on";
+    const forcedOn = resolveConversationFlags(disabled as never);
+    expect(forcedOn.contextPlannerEnabled).toBe(true);
+    expect(forcedOn.projectionEnabled).toBe(true);
+  });
+
   it("production defaults keep enforce and ui off", () => {
     expect(CONVERSATION_PRODUCTION_DEFAULTS.ui?.enabled).toBe(false);
     expect(CONVERSATION_PRODUCTION_DEFAULTS.retention?.enforceEnabled).toBe(false);

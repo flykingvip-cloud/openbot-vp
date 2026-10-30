@@ -162,6 +162,14 @@ export async function getMemorySearchManager(
   // Item 7 Stage C identity thread: resolve the index workspace access ONCE,
   // fail-closed for managed_enterprise, before any manager / scan / index-write.
   let indexAccess: ResolvedMemoryIndexAccess = { profile: "personal_local" };
+  // Tool entry often has continuityAuthz.profile and no full accessContext.
+  // Both must fail closed on builtin/qmd. Do not treat that as personal_local.
+  const managedEnterprise =
+    params.accessContext?.securityProfile === "managed_enterprise" ||
+    params.continuityAuthz?.profile === "managed_enterprise";
+  if (managedEnterprise && bound.cfg.memory?.backend !== "cogniweave") {
+    return { manager: null, error: "managed_backend_not_cogniweave" };
+  }
   if (params.accessContext?.securityProfile === "managed_enterprise") {
     // Item 7 Stage C: a managed binding is honored only through the canonical
     // CogniWeave handle path below. The qmd/builtin local index roots
@@ -170,9 +178,6 @@ export async function getMemorySearchManager(
     // managed tenant on a non-cogniweave backend fails closed here — it never
     // shares the legacy local root. Isolating those roots in place is deferred to
     // their retirement (which updates the CODEOWNERS-pinned freeze baseline).
-    if (bound.cfg.memory?.backend !== "cogniweave") {
-      return { manager: null, error: "managed_backend_not_cogniweave" };
-    }
     const access = await resolveMemoryIndexAccess(params.accessContext, {
       agentId: params.agentId,
       ledgerId: "S32",
@@ -311,6 +316,10 @@ export async function getMemorySearchManager(
               return await MemoryIndexManager.get({
                 ...bound,
                 collaborationMemoryRoots: authz.roots,
+                continuityIdentity: {
+                  userId: authz.userId,
+                  tenantId: authz.tenantId,
+                },
               });
             },
           },
@@ -338,6 +347,10 @@ export async function getMemorySearchManager(
     const manager = await MemoryIndexManager.get({
       ...bound,
       collaborationMemoryRoots: authz.roots,
+      continuityIdentity: {
+        userId: authz.userId,
+        tenantId: authz.tenantId,
+      },
     });
     return { manager: withRecallDeny(manager, dataRoot) };
   } catch (err) {

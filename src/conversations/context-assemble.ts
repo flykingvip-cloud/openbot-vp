@@ -9,6 +9,7 @@
  * - Emit structured trace without user content.
  */
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+import { sanitizeToolUseResultPairing } from "../agents/session-transcript-repair.js";
 import {
   estimateTokensFromText,
   planContextBudget,
@@ -115,6 +116,94 @@ function partitionMessages(messages: AgentMessage[]): {
   return { system, summary, history, currentUserTail };
 }
 
+function isToolResultMessage(message: AgentMessage): boolean {
+  const role = (message as { role?: string }).role;
+  return role === "toolResult" || role === "tool";
+}
+
+function toolResultCallId(message: AgentMessage): string | null {
+  const rec = message as {
+    toolCallId?: unknown;
+    tool_call_id?: unknown;
+    toolUseId?: unknown;
+    id?: unknown;
+  };
+  for (const value of [rec.toolCallId, rec.tool_call_id, rec.toolUseId, rec.id]) {
+    if (typeof value === "string" && value) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function assistantToolCallIds(message: AgentMessage): string[] {
+  const content = (message as { content?: unknown }).content;
+  if (!Array.isArray(content)) {
+    return [];
+  }
+  const ids: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    const rec = block as { type?: unknown; id?: unknown };
+    if (typeof rec.id !== "string" || !rec.id) {
+      continue;
+    }
+    if (
+      typeof rec.type === "string" &&
+      (rec.type === "toolCall" || rec.type === "toolUse" || rec.type === "functionCall")
+    ) {
+      ids.push(rec.id);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Group history into droppable units so toolCall + matching toolResult stay together.
+ * An assistant with tool calls absorbs following toolResults that match its ids.
+ */
+export function groupHistoryIntoToolUnits(history: AgentMessage[]): AgentMessage[][] {
+  const units: AgentMessage[][] = [];
+  let i = 0;
+  while (i < history.length) {
+    const msg = history[i];
+    if (!msg) {
+      i += 1;
+      continue;
+    }
+    const callIds = assistantToolCallIds(msg);
+    if ((msg as { role?: string }).role === "assistant" && callIds.length > 0) {
+      const idSet = new Set(callIds);
+      const unit: AgentMessage[] = [msg];
+      let j = i + 1;
+      while (j < history.length) {
+        const next = history[j];
+        if (!next || !isToolResultMessage(next)) {
+          break;
+        }
+        const tid = toolResultCallId(next);
+        if (tid && !idSet.has(tid)) {
+          break;
+        }
+        unit.push(next);
+        j += 1;
+      }
+      units.push(unit);
+      i = j;
+      continue;
+    }
+    units.push([msg]);
+    i += 1;
+  }
+  return units;
+}
+
+function estimateUnitTokens(unit: AgentMessage[]): number {
+  return unit.reduce((sum, m) => sum + estimateMessageTokensRough(m), 0);
+}
+
 export type ApplyBudgetOptions = {
   tokenBudget: number;
   /** Tokens already reserved for system prompt outside message array. */
@@ -191,25 +280,42 @@ export function assembleMessagesWithBudget(
     }
   }
 
-  // Keep newest history messages within historyBudget.
-  const keptHistory: AgentMessage[] = [];
-  for (let i = parts.history.length - 1; i >= 0; i--) {
-    const msg = parts.history[i];
-    const cost = estimateMessageTokensRough(msg);
+  // Keep newest history *units* (assistant toolCall + matching toolResults) within budget.
+  // Dropping by single message can orphan toolResult after a large assistant is skipped.
+  const historyUnits = groupHistoryIntoToolUnits(parts.history);
+  const keptUnits: AgentMessage[][] = [];
+  for (let i = historyUnits.length - 1; i >= 0; i--) {
+    const unit = historyUnits[i];
+    if (!unit) {
+      continue;
+    }
+    const cost = estimateUnitTokens(unit);
     if (cost <= historyBudget) {
-      keptHistory.unshift(msg);
+      keptUnits.unshift(unit);
       historyBudget -= cost;
     }
+    // Skip oversized units without taking a partial pair; continue looking at older units
+    // only when nothing has been kept yet would reintroduce orphans, so stop once we have
+    // kept anything newer — prefer contiguous newest suffix of units.
+    else if (keptUnits.length > 0) {
+      break;
+    }
   }
+  const keptHistory = keptUnits.flat();
 
-  const next = [...parts.system, ...keptSummary, ...keptHistory, ...parts.currentUserTail];
+  const assembled = [...parts.system, ...keptSummary, ...keptHistory, ...parts.currentUserTail];
+  // Safety net after unit trim: drop orphan toolResults / repair pairing for strict providers.
+  const next = sanitizeToolUseResultPairing(assembled);
 
   const droppedMessageCount = messages.length - next.length;
+  const trimmed = droppedMessageCount > 0;
   return {
-    messages: droppedMessageCount > 0 ? next : messages,
+    // Always return the post-sanitize sequence under enforce so orphan toolResults
+    // cannot survive even when the raw message count is unchanged.
+    messages: next,
     estimatedTokens: estimateMessagesTokensRough(next),
     plan,
-    trimmed: droppedMessageCount > 0,
+    trimmed,
     droppedMessageCount,
   };
 }

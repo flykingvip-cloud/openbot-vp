@@ -21,6 +21,13 @@ import {
 import { isFileMissingError, statRegularFile } from "./fs-utils.js";
 import { bm25RankToScore, buildFtsQuery, mergeHybridResults } from "./hybrid.js";
 import type { CollaborationMemoryIndexRoot } from "../gateway/collaboration-learning/memory-index-paths.js";
+import {
+  collaborationCacheKey,
+  collaborationCachePrefix,
+  collaborationIdentityActive,
+  type CollaborationIndexIdentity,
+  withIsolatedCollaborationStore,
+} from "./collaboration-index-scope.js";
 import { isMemoryPath, normalizeExtraMemoryPaths, normalizeRelPath } from "./internal.js";
 import {
   parseCollaborationMemoryGroupId,
@@ -46,7 +53,26 @@ const BATCH_FAILURE_LIMIT = 2;
 const log = createSubsystemLogger("memory");
 
 const INDEX_CACHE = new Map<string, MemoryIndexManager>();
-const INDEX_CACHE_PENDING = new Map<string, Promise<MemoryIndexManager>>();
+const INDEX_CACHE_PENDING = new Map<string, Promise<MemoryIndexManager | null>>();
+/** Bumped when a caller scope revokes a key so in-flight creates cannot publish. */
+const INDEX_CACHE_EPOCH = new Map<string, number>();
+/**
+ * Managers that were constructed then continuity-revoked without ever publishing
+ * to INDEX_CACHE. closeAll must still close their db/watchers.
+ */
+const INDEX_CACHE_ORPHANS = new Set<MemoryIndexManager>();
+
+function memoryIndexEpoch(key: string): number {
+  return INDEX_CACHE_EPOCH.get(key) ?? 0;
+}
+
+function bumpMemoryIndexEpoch(key: string): void {
+  INDEX_CACHE_EPOCH.set(key, memoryIndexEpoch(key) + 1);
+}
+
+function trackOrphanMemoryIndexManager(manager: MemoryIndexManager): void {
+  INDEX_CACHE_ORPHANS.add(manager);
+}
 
 export async function closeAllMemoryIndexManagers(): Promise<void> {
   const pending = Array.from(INDEX_CACHE_PENDING.values());
@@ -54,8 +80,12 @@ export async function closeAllMemoryIndexManagers(): Promise<void> {
     await Promise.allSettled(pending);
   }
   const managers = Array.from(INDEX_CACHE.values());
+  const orphans = Array.from(INDEX_CACHE_ORPHANS);
   INDEX_CACHE.clear();
-  for (const manager of managers) {
+  INDEX_CACHE_PENDING.clear();
+  INDEX_CACHE_EPOCH.clear();
+  INDEX_CACHE_ORPHANS.clear();
+  for (const manager of [...managers, ...orphans]) {
     try {
       await manager.close();
     } catch (err) {
@@ -137,6 +167,31 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
   private readonlyRecoverySuccesses = 0;
   private readonlyRecoveryFailures = 0;
   private readonlyRecoveryLastError?: string;
+  /** Closed by a newer authz snapshot for the same caller. Search must not leak. */
+  private continuityAccessRevoked = false;
+
+  /** Fail closed before any snippet or body is read. */
+  markContinuityAccessRevoked(): void {
+    this.continuityAccessRevoked = true;
+  }
+
+  private continuityClosed(): boolean {
+    return this.closed || this.continuityAccessRevoked;
+  }
+
+  private authorizeHits<T extends { path: string }>(hits: T[]): T[] {
+    if (this.continuityClosed()) {
+      return [];
+    }
+    return hits.filter((hit) => {
+      const groupId = parseCollaborationMemoryGroupId(hit.path);
+      if (!groupId) {
+        return true;
+      }
+      return this.collaborationMemoryRoots.some((root) => root.groupId === groupId);
+    });
+  }
+
   /** Set by the most recent search() call for tool/status surfacing. */
   private lastSearchMeta?: {
     searchMode: "hybrid" | "fts-only" | "vector";
@@ -152,6 +207,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     purpose?: "default" | "status";
     /** Builtin: only index these authorized collaboration memory roots. */
     collaborationMemoryRoots?: readonly CollaborationMemoryIndexRoot[];
+    /** When set, a newer root set for this caller revokes the previous manager. */
+    continuityIdentity?: CollaborationIndexIdentity | null;
   }): Promise<MemoryIndexManager | null> {
     const { cfg, agentId } = params;
     const settings = resolveMemorySearchConfig(cfg, agentId);
@@ -163,11 +220,38 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     void import("./item7-w5-index-shadow.js").then((m) =>
       m.scheduleItem7W5IndexShadow({ ledgerId: "S36", handleResourceId: null }),
     );
-    const collabKey = collaborationMemoryRoots
-      .map((root) => root.groupId)
-      .toSorted()
-      .join(",");
-    const key = `${agentId}:${workspaceDir}:${JSON.stringify(settings)}:collab:${collabKey || "-"}`;
+    const key = collaborationCacheKey({
+      agentId,
+      workspaceDir,
+      settingsJson: JSON.stringify(settings),
+      roots: collaborationMemoryRoots,
+      identity: params.continuityIdentity,
+    });
+    const identityActive = collaborationIdentityActive(params.continuityIdentity);
+    if (identityActive) {
+      const prefix = collaborationCachePrefix(key);
+      for (const [cachedKey, cached] of INDEX_CACHE) {
+        if (cachedKey === key || !cachedKey.startsWith(prefix)) {
+          continue;
+        }
+        bumpMemoryIndexEpoch(cachedKey);
+        INDEX_CACHE.delete(cachedKey);
+        cached.markContinuityAccessRevoked();
+        void cached.close();
+      }
+      // Pending creates for a prior root set must not publish after revoke.
+      const pendingKeysToRevoke: string[] = [];
+      for (const pendingKey of INDEX_CACHE_PENDING.keys()) {
+        if (pendingKey === key || !pendingKey.startsWith(prefix)) {
+          continue;
+        }
+        pendingKeysToRevoke.push(pendingKey);
+      }
+      for (const pendingKey of pendingKeysToRevoke) {
+        bumpMemoryIndexEpoch(pendingKey);
+        INDEX_CACHE_PENDING.delete(pendingKey);
+      }
+    }
     const existing = INDEX_CACHE.get(key);
     if (existing) {
       return existing;
@@ -176,7 +260,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     if (pending) {
       return pending;
     }
-    const createPromise = (async () => {
+    const epochAtStart = memoryIndexEpoch(key);
+    const createPromise = (async (): Promise<MemoryIndexManager | null> => {
       const providerResult = await createEmbeddingProvider({
         config: cfg,
         agentDir: resolveAgentDir(cfg, agentId),
@@ -190,6 +275,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       if (refreshed) {
         return refreshed;
       }
+      // Even when revoked during embedding wait, construct then fail-closed so
+      // awaiters get a manager whose search/sync are empty; track as orphan so
+      // closeAllMemoryIndexManagers still closes db/watchers (not in INDEX_CACHE).
       const manager = new MemoryIndexManager({
         cacheKey: key,
         cfg,
@@ -200,6 +288,11 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         purpose: params.purpose,
         collaborationMemoryRoots,
       });
+      if (memoryIndexEpoch(key) !== epochAtStart) {
+        manager.markContinuityAccessRevoked();
+        trackOrphanMemoryIndexManager(manager);
+        return manager;
+      }
       INDEX_CACHE.set(key, manager);
       return manager;
     })();
@@ -228,8 +321,8 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     this.cfg = params.cfg;
     this.agentId = params.agentId;
     this.workspaceDir = params.workspaceDir;
-    this.settings = params.settings;
     this.collaborationMemoryRoots = params.collaborationMemoryRoots ?? [];
+    this.settings = withIsolatedCollaborationStore(params.settings, this.collaborationMemoryRoots);
     this.provider = params.providerResult.provider;
     this.requestedProvider = params.providerResult.requestedProvider;
     this.fallbackFrom = params.providerResult.fallbackFrom;
@@ -293,6 +386,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       reset?: unknown;
     },
   ): Promise<MemorySearchResult[]> {
+    if (this.continuityClosed()) {
+      return [];
+    }
     void this.warmSession(opts?.sessionKey);
     if (this.settings.sync.onSearch && (this.dirty || this.sessionsDirty)) {
       this.scheduleAuthorizedSearchSync(opts);
@@ -342,7 +438,15 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         .filter((entry) => entry.score >= minScore)
         .slice(0, maxResults);
 
-      return merged;
+      // No embedding provider: this is lexical FTS, not semantic search.
+      this.lastSearchMeta = {
+        searchMode: "fts-only",
+        degraded: true,
+        reason: "embedding_unavailable",
+        retryable: false,
+        error: "embedding provider unavailable; FTS-only",
+      };
+      return this.authorizeHits(merged);
     }
 
     // If FTS isn't available, hybrid mode cannot use keyword search; degrade to vector-only.
@@ -375,10 +479,12 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
           error: classification.message,
         };
         const relaxedMinScore = Math.min(minScore, hybrid.textWeight);
-        return keywordResults
-          .filter((entry) => entry.score >= relaxedMinScore)
-          .toSorted((a, b) => b.score - a.score)
-          .slice(0, maxResults);
+        return this.authorizeHits(
+          keywordResults
+            .filter((entry) => entry.score >= relaxedMinScore)
+            .toSorted((a, b) => b.score - a.score)
+            .slice(0, maxResults),
+        );
       }
       this.lastSearchMeta = {
         searchMode: "vector",
@@ -396,7 +502,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
       : [];
 
     if (!hybrid.enabled || !this.fts.enabled || !this.fts.available) {
-      return vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      return this.authorizeHits(
+        vectorResults.filter((entry) => entry.score >= minScore).slice(0, maxResults),
+      );
     }
 
     const merged = await this.mergeHybridResults({
@@ -409,7 +517,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     });
     const strict = merged.filter((entry) => entry.score >= minScore);
     if (strict.length > 0 || keywordResults.length === 0) {
-      return strict.slice(0, maxResults);
+      return this.authorizeHits(strict.slice(0, maxResults));
     }
 
     // Hybrid defaults can produce keyword-only matches with max score equal to
@@ -422,13 +530,15 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         (entry) => `${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`,
       ),
     );
-    return merged
-      .filter(
-        (entry) =>
-          keywordKeys.has(`${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`) &&
-          entry.score >= relaxedMinScore,
-      )
-      .slice(0, maxResults);
+    return this.authorizeHits(
+      merged
+        .filter(
+          (entry) =>
+            keywordKeys.has(`${entry.source}:${entry.path}:${entry.startLine}:${entry.endLine}`) &&
+            entry.score >= relaxedMinScore,
+        )
+        .slice(0, maxResults),
+    );
   }
 
   private async searchVector(
@@ -521,7 +631,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     force?: boolean;
     progress?: (update: MemorySyncProgressUpdate) => void;
   }): Promise<void> {
-    if (this.closed) {
+    if (this.closed || this.continuityAccessRevoked) {
       return;
     }
     if (this.syncing) {
@@ -623,6 +733,9 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     from?: number;
     lines?: number;
   }): Promise<{ text: string; path: string }> {
+    if (this.continuityClosed()) {
+      throw new Error("not authorized");
+    }
     const rawPath = params.relPath.trim();
     if (!rawPath) {
       throw new Error("path required");
@@ -917,7 +1030,16 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         await pendingSync;
       } catch {}
     }
-    this.db.close();
-    INDEX_CACHE.delete(this.cacheKey);
+    try {
+      this.db.close();
+    } catch {
+      // already closed
+    }
+    // Only drop cache when this instance is still the published generation.
+    if (INDEX_CACHE.get(this.cacheKey) === this) {
+      INDEX_CACHE.delete(this.cacheKey);
+    }
+    INDEX_CACHE_ORPHANS.delete(this);
   }
 }
+

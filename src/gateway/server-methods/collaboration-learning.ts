@@ -1,4 +1,5 @@
 import type { CapsuleReusability } from "@openbot/collaboration-core";
+import { loadConfig } from "../../config/config.js";
 import { isCollabRuntimeNamespaceEnabled } from "../collaboration-dispatch/runtime-namespace.js";
 import {
   acceptCollaborationTaskHandoffContract,
@@ -63,11 +64,17 @@ import {
   authenticatedSessionSubjects,
   resolveDeliveryAclActor,
 } from "../collaboration-learning/delivery-actor-binding.js";
+import {
+  finalizeLearningCuratedSkillDraft,
+  listLearningCuratedSkillDrafts,
+} from "../collaboration-learning/learning-skill-draft-entry.js";
 import { triggerPostPlanConfirmAdvance } from "../collaboration-learning/post-plan-confirm-advance.js";
+import { promotePrivateMemoryCapsuleAuthorized } from "../collaboration-learning/private-memory-promote-entry.js";
 import { resolveHandlerTrustedTeamContext } from "../collaboration-learning/team-resource-auth.js";
 import { resolveCollaborationTenantResolution } from "../collaboration-learning/trusted-tenant.js";
 import { readCollaborationLedgerArchive } from "../collaboration-ledger/reader.js";
 import { COLLABORATION_LEDGER_KINDS } from "../collaboration-ledger/types.js";
+import { resolvePersonalAssetOwnerIdentities } from "../personal-skill-asset-scope.js";
 import {
   ErrorCodes,
   errorShape,
@@ -2044,5 +2051,139 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     respond(true, result, undefined);
+  },
+
+  "collaboration.learning.privateMemory.promote": async ({ params, respond, client }) => {
+    const botId = typeof params.botId === "string" ? params.botId.trim() : "";
+    const groupId = typeof params.groupId === "string" ? params.groupId.trim() : "";
+    const capsuleId = typeof params.capsuleId === "string" ? params.capsuleId.trim() : "";
+    const confidentialityTier =
+      typeof params.confidentialityTier === "string" && params.confidentialityTier.trim()
+        ? params.confidentialityTier.trim()
+        : undefined;
+    if (!botId || !groupId || !capsuleId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "botId, groupId, and capsuleId are required"),
+      );
+      return;
+    }
+    const actorId = await resolveDeliveryAclActor(client, groupId);
+    if (!actorId) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, "identified actor is required"),
+      );
+      return;
+    }
+    // Target group membership / write role (same trusted write path as board mutations).
+    const ctx = await resolveTrustedWriteContext(client, groupId);
+    if (!ctx.ok) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+      );
+      return;
+    }
+    try {
+      const result = await promotePrivateMemoryCapsuleAuthorized({
+        botId,
+        groupId,
+        capsuleId,
+        actorId,
+        cfg: loadConfig(),
+        // Thread authorized target-group tenant/stores — do not reopen defaults in entry.
+        tenantId: ctx.tenant.tenantId,
+        securityProfile: ctx.auth.profile,
+        stores: ctx.stores,
+        ...(confidentialityTier ? { confidentialityTier } : {}),
+      });
+      // Flag-off and policy denials are success-shaped results (promoted:false), not RPC errors.
+      // Authz / missing capsule reasons that must not look like a promotion success:
+      const hardReject = new Set([
+        "capsule_not_found",
+        "capsule_revoked",
+        "capsule_not_approved",
+        "ownership_context_required",
+        "ownership_fields_required",
+        "actor_not_owner",
+        "agent_ownership_mismatch",
+        "managed_tenant_required",
+        "cross_tenant_ownership",
+        "managed_requires_trusted_context",
+        "botId_groupId_capsuleId_actorId_required",
+      ]);
+      if (!result.promoted && hardReject.has(result.reason)) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, result.reason));
+        return;
+      }
+      respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
+  },
+
+  "collaboration.learning.skillDraft.list": async ({ respond, client }) => {
+    try {
+      const ownerIds = await resolvePersonalAssetOwnerIdentities(client);
+      if (ownerIds.length === 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "authenticated user required"),
+        );
+        return;
+      }
+      respond(true, { skills: listLearningCuratedSkillDrafts(ownerIds) }, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
+  },
+
+  "collaboration.learning.skillDraft.finalize": async ({ params, respond, client }) => {
+    const skillId = typeof params.skillId === "string" ? params.skillId.trim() : "";
+    if (!skillId) {
+      respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "skillId is required"));
+      return;
+    }
+    try {
+      const ownerIds = await resolvePersonalAssetOwnerIdentities(client);
+      if (ownerIds.length === 0) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "authenticated user required"),
+        );
+        return;
+      }
+      const result = finalizeLearningCuratedSkillDraft({ skillId, ownerIds });
+      respond(true, result, undefined);
+    } catch (error) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          error instanceof Error ? error.message : String(error),
+        ),
+      );
+    }
   },
 };

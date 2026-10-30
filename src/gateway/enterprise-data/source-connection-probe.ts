@@ -22,7 +22,9 @@ export type SourceConnectionProbeMode =
   | "credential_required"
   | "unknown_connector"
   | "handler_error"
-  | "website_session_not_verified";
+  | "website_session_not_verified"
+  /** Production connector reached mock fallthrough — refuse silent demo success. */
+  | "unsupported_production_probe";
 
 export type SourceConnectionProbeResult = {
   ok: boolean;
@@ -244,6 +246,22 @@ export async function probeDataSourceConnection(params: {
       mode: "website_session_not_verified",
       message:
         "网站会话不使用 mock 探测成功。缺账户绑定或已验证制品时拒绝，mock_smoke_ok 不是生产成功。",
+      actionCount: actions.length,
+      handlerCount: handlers.length,
+    };
+  }
+
+  // Production must not silently become mock_smoke_ok "complete knowledge".
+  // Demo tier may keep labeled mock smoke when actions/handlers are installed.
+  if (definition.integrationTier === "production") {
+    return {
+      ok: false,
+      connectorId: definition.connectorId,
+      integrationTier: definition.integrationTier,
+      mode: "unsupported_production_probe",
+      message:
+        "生产级连接器无可用实时探测路径，禁止以 mock_smoke_ok 冒充连通成功。" +
+        "请绑定有效凭证并使用受支持的实时适配器；演示连接器须保持 demo 标注且不得发布为生产事实。",
       actionCount: actions.length,
       handlerCount: handlers.length,
     };

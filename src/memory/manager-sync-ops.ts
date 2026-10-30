@@ -533,6 +533,24 @@ export abstract class MemoryManagerSyncOps {
       path.join(this.workspaceDir, "memory", "**", "*.md"),
     ]);
     const additionalPaths = normalizeExtraMemoryPaths(this.workspaceDir, this.settings.extraPaths);
+    for (const root of this.collaborationMemoryRoots) {
+      const memoryDir = root.memoryDir?.trim();
+      if (!memoryDir) {
+        continue;
+      }
+      try {
+        const stat = fsSync.lstatSync(memoryDir);
+        if (stat.isSymbolicLink() || !stat.isDirectory()) {
+          continue;
+        }
+      } catch {
+        // Missing dirs are still registered so a later create can mark dirty.
+      }
+      // Watch the directory itself. A `**/*.md` glob does not emit add/change
+      // events on the chokidar version this process uses, so new group files
+      // would never mark the index dirty.
+      watchPaths.add(memoryDir);
+    }
     for (const entry of additionalPaths) {
       try {
         const stat = fsSync.lstatSync(entry);

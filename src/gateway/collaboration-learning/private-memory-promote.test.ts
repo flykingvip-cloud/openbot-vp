@@ -226,7 +226,8 @@ describe("promotePrivateMemoryCapsuleToGroup", () => {
     const appendLearningAsset = vi.fn(async (_groupId: string, _asset?: unknown) => undefined);
     const audits: Array<Record<string, unknown>> = [];
 
-    // Use internal sensitivity so projection eligibility passes; policy still blocks.
+    // Use internal sensitivity so projection eligibility would pass; policy still blocks
+    // BEFORE any target persistence (no capsule/projection/asset body copy on deny).
     const result = await promotePrivateMemoryCapsuleToGroup({
       botId: "bot-a",
       groupId: "group-1",
@@ -254,6 +255,8 @@ describe("promotePrivateMemoryCapsuleToGroup", () => {
 
     expect(result.promoted).toBe(false);
     expect(result.reason).toBe("auto_promote_disabled");
+    expect(appendCapsule).not.toHaveBeenCalled();
+    expect(appendProjection).not.toHaveBeenCalled();
     expect(appendLearningAsset).not.toHaveBeenCalled();
     expect(audits[0]).toMatchObject({
       promoted: false,
@@ -261,5 +264,123 @@ describe("promotePrivateMemoryCapsuleToGroup", () => {
       sourceGroupId: "agent:bot-a",
       targetScope: "group",
     });
+  });
+
+  it("repeat promote keeps stable projection/asset ids", async () => {
+    const assets = new Map<string, { assetId: string; status?: string; reuseCount?: number }>();
+    const projections = new Map<string, { projectionId: string }>();
+    const appendCapsule = vi.fn(async () => undefined);
+    const appendProjection = vi.fn(async (_g: string, projection: { projectionId: string }) => {
+      projections.set(projection.projectionId, projection);
+    });
+    const appendLearningAsset = vi.fn(
+      async (_g: string, asset: { assetId: string; status?: string; reuseCount?: number }) => {
+        assets.set(asset.assetId, { ...asset });
+      },
+    );
+    const deps = {
+      cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
+      learningStorage: {
+        appendCapsule,
+        appendProjection,
+        appendLearningAsset,
+        readLearningAssets: async () => [...assets.values()],
+        readProjections: async () => [...projections.values()],
+      } as never,
+      recordAudit: vi.fn(async () => undefined) as never,
+      evaluatePolicy: async () =>
+        ({
+          allowed: true,
+          reason: "allowed",
+          policy: {} as never,
+          lifecycleStatus: "ACTIVE",
+        }) as never,
+      tenantId: null as string | null,
+    };
+    const first = await promotePrivateMemoryCapsuleToGroup({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsule: personalCapsule(),
+      deps,
+    });
+    const second = await promotePrivateMemoryCapsuleToGroup({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsule: personalCapsule(),
+      deps,
+    });
+    expect(first.promoted).toBe(true);
+    expect(second.promoted).toBe(true);
+    expect(second.projectionId).toBe(first.projectionId);
+    expect(second.assetId).toBe(first.assetId);
+    expect(String(first.projectionId)).toContain("proj:privprom:");
+    expect(String(first.assetId)).toContain("asset:privprom:");
+  });
+
+  it("retry after revoke preserves asset lifecycle (status/reuseCount)", async () => {
+    const assets = new Map<
+      string,
+      { assetId: string; status?: string; reuseCount?: number; sourceProjectionId?: string }
+    >();
+    const projections = new Map<string, { projectionId: string }>();
+    const appendCapsule = vi.fn(async () => undefined);
+    const appendProjection = vi.fn(async (_g: string, projection: { projectionId: string }) => {
+      projections.set(projection.projectionId, projection);
+    });
+    const appendLearningAsset = vi.fn(
+      async (
+        _g: string,
+        asset: {
+          assetId: string;
+          status?: string;
+          reuseCount?: number;
+          sourceProjectionId?: string;
+        },
+      ) => {
+        assets.set(asset.assetId, { ...asset });
+      },
+    );
+    const deps = {
+      cfg: { collaboration: { learning: { privateMemoryPromote: true } } } as never,
+      learningStorage: {
+        appendCapsule,
+        appendProjection,
+        appendLearningAsset,
+        readLearningAssets: async () => [...assets.values()],
+        readProjections: async () => [...projections.values()],
+      } as never,
+      recordAudit: vi.fn(async () => undefined) as never,
+      evaluatePolicy: async () =>
+        ({
+          allowed: true,
+          reason: "allowed",
+          policy: {} as never,
+          lifecycleStatus: "ACTIVE",
+        }) as never,
+      tenantId: null as string | null,
+    };
+    const first = await promotePrivateMemoryCapsuleToGroup({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsule: personalCapsule(),
+      deps,
+    });
+    const prior = assets.get(String(first.assetId));
+    expect(prior).toBeTruthy();
+    Object.assign(prior!, { status: "revoked", reuseCount: 7 });
+    const callsBefore = appendLearningAsset.mock.calls.length;
+    const second = await promotePrivateMemoryCapsuleToGroup({
+      botId: "bot-a",
+      groupId: "group-1",
+      capsule: personalCapsule(),
+      deps,
+    });
+    expect(second.promoted).toBe(true);
+    expect(second.assetId).toBe(first.assetId);
+    expect(assets.get(String(first.assetId))).toMatchObject({
+      status: "revoked",
+      reuseCount: 7,
+    });
+    expect(appendLearningAsset.mock.calls.length).toBe(callsBefore);
   });
 });

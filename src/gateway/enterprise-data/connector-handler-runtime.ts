@@ -1,3 +1,4 @@
+import { findDataConnectorDefinition } from "./connector-catalog.js";
 import {
   executeMockHandler,
   type MockHandlerInput,
@@ -29,6 +30,20 @@ function assertWebsiteSessionDoesNotMock(
   }
 }
 
+/** Production connectors must fail closed — never silently become demo/mock knowledge. */
+function assertProductionDoesNotMock(handlerRef: string, options?: ConnectorHandlerOptions): void {
+  const connectorId = options?.connectorId?.trim();
+  if (!connectorId) {
+    return;
+  }
+  const definition = findDataConnectorDefinition(connectorId);
+  if (definition?.integrationTier === "production") {
+    throw new Error(
+      `Production connector "${definition.connectorId}" has no live adapter for ${handlerRef}; refusing mock fallback.`,
+    );
+  }
+}
+
 /** Synchronous mock handler execution (Data Gateway invoke path). */
 export function executeConnectorHandler(
   handlerRef: string,
@@ -39,6 +54,7 @@ export function executeConnectorHandler(
     throw new Error(`Production adapter not implemented: ${normalized}`);
   }
   assertWebsiteSessionDoesNotMock(normalized);
+  // Sync path has no connector options; production adapter prefix already throws above.
   return executeMockHandler(normalized, input);
 }
 
@@ -86,5 +102,6 @@ export async function executeConnectorHandlerAsync(
   }
 
   assertWebsiteSessionDoesNotMock(normalized, options);
+  assertProductionDoesNotMock(normalized, options);
   return executeMockHandler(normalized, input);
 }

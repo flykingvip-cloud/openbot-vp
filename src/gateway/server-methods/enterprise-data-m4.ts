@@ -9,6 +9,7 @@ import {
   findKnowledgeFeedItem,
   listKnowledgeFeedItems,
 } from "../enterprise-data/knowledge-feed-item-store.js";
+import { assertWritableMaterializationMode } from "../enterprise-data/knowledge-publication.js";
 import { resolveKnowledgeSupplyOverview } from "../enterprise-data/knowledge-supply-store.js";
 import {
   findKnowledgeVisibilityPolicy,
@@ -95,7 +96,7 @@ const PROJECTION_LIFECYCLES = new Set<EnterpriseKnowledgeProjectionLifecycle>([
 const MATERIALIZATION_MODES = new Set<EnterpriseKnowledgeProjectionMaterializationMode>([
   "on_demand",
   "scheduled",
-  // Stored only. on-demand and scheduled dispatchers do not run this mode.
+  // Minimal event ingest path via runEventDrivenProjectionsForEvent (not a clock scheduler).
   "event_driven",
 ]);
 
@@ -214,6 +215,12 @@ export function createEnterpriseDataM4Handlers(
       }
       if (!MATERIALIZATION_MODES.has(materializationMode)) {
         respondInvalid(respond, "materializationMode is invalid");
+        return;
+      }
+      try {
+        assertWritableMaterializationMode(materializationMode);
+      } catch (error) {
+        respond(false, undefined, toEnterpriseDataErrorShape(error));
         return;
       }
       const materializationTeamLabel = stringValue(params.materializationTeamLabel);

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EnterpriseDataStoreError } from "./connector-action-store.js";
 import { findDataCapability } from "./data-capability-store.js";
+import { assertWritableMaterializationMode } from "./knowledge-publication.js";
 import { findEnterpriseKnowledgeProjectionSpec } from "./projection-spec-store.js";
 import type { EnterpriseDataStore, EnterpriseKnowledgeProjectionBinding } from "./types.js";
 
@@ -82,6 +83,9 @@ export function upsertEnterpriseKnowledgeProjectionBinding(params: {
       "materializationTeamLabel is required on projection bindings.",
     );
   }
+  // event_driven may remain on legacy rows; new writes / re-saves must use an implemented mode.
+  // Migrating legacy event_driven → on_demand|scheduled is the operable path (upsert with bindingId).
+  assertWritableMaterializationMode(params.binding.materializationMode);
   const existing =
     params.binding.bindingId != null
       ? findEnterpriseKnowledgeProjectionBinding(

@@ -21,7 +21,9 @@ export type MemoryEmbeddingErrorReason =
   | "auth"
   | "timeout"
   | "overloaded"
-  | "provider_error";
+  | "provider_error"
+  /** Provider missing/unavailable; FTS-only degrade (not a transient HTTP failure). */
+  | "embedding_unavailable";
 
 export type MemoryEmbeddingErrorClassification = {
   reason: MemoryEmbeddingErrorReason;

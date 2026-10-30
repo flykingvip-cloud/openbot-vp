@@ -10047,7 +10047,183 @@ tasks:
     ownerHistory: []
     since: 2026-10-29
     metadata: {}
+  - id: openbot-default-capability-p0:cursor-grok-default-capability
+    owner: cursor-grok-default-capability
+    intent: []
+    paths:
+      - src/gateway/collaboration-learning/private-memory-promote-entry.ts
+      - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/auto-reply/reply/learning-skill-curation.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts
+      - src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods/collaboration-private-memory-promote.test.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md
+      - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+      - .kiro/specs/openbot-default-capability-p0/tasks.md
+      - .loom/registry.yaml
+      - src/gateway/evolution-control/authorize-shadow-intent.ts
+      - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/evolution-control/authorize-replay-repro.test.ts
+      - src/gateway/server-methods/evolution-control.ts
+      - src/gateway/server-methods/evolution-control.pack.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/evolution-control/index.ts
+      - src/gateway/enterprise-data/knowledge-publication.ts
+      - src/gateway/enterprise-data/knowledge-publication.test.ts
+      - src/gateway/enterprise-data/enterprise-knowledge-projection-binding-store.ts
+      - src/gateway/enterprise-data/types.ts
+      - src/gateway/enterprise-data/source-connection-probe.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.test.ts
+      - src/gateway/enterprise-data/connector-catalog.test.ts
+      - src/gateway/server-methods/enterprise-data-m4.ts
+      - src/gateway/server-methods/enterprise-data-m4.test.ts
+      - src/gateway/model-entitlement/aor-selection.ts
+      - src/gateway/model-entitlement/aor-selection.test.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/models/platform-models-config.p2g.test.ts
+      - src/agents/model-fallback.p2g-outbound.test.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/isolated-agent/run.long-horizon-ledger.test.ts
+      - src/gateway/server.cron.test.ts
+      - src/gateway/collaboration-learning/private-memory-promote.ts
+      - src/gateway/collaboration-learning/private-memory-promote.test.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/gateway/enterprise-data/enterprise-data-event-store.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
+      - src/gateway/server-methods/enterprise-data-events.ts
+      - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
+      - src/cron/service.delivery-adapter-evidence.p2h.test.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts
+      - src/cron/service.delivery-loopback-http.p2h.test.ts
+      - src/agents/model-fallback.p2g-loopback-http.test.ts
+      - src/test-utils/loopback-http-receiver.ts
+      - src/test-utils/loopback-http-receiver.test.ts
+      - scripts/evidence/prove-loopback-http.ts
+    state: active
+    sessions:
+      - id: 12C5D347-78A3-4DCC-9210-83FB942BA607
+        taskId: openbot-default-capability-p0:cursor-grok-default-capability
+        ide: cursor
+        agent: cursor-grok-default-capability
+        status: active
+        lastSignalAt: 2026-10-30T09:52:42.503Z
+        metadata: {}
+    ownerHistory: []
+    since: 2026-10-30
+    metadata: {}
 landingStreams:
+  - id: openbot-default-capability-p0-20261030
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - .kiro/specs/openbot-default-capability-p0/tasks.md
+      - docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md
+      - src/context-engine/types.ts
+      - src/context-engine/registry.ts
+      - src/context-engine/legacy.ts
+      - src/context-engine/legacy.default-capability.test.ts
+      - src/conversations/flags.ts
+      - src/conversations/flags.test.ts
+      - src/memory/collaboration-index-scope.ts
+      - src/memory/collaboration-index-scope.test.ts
+      - src/memory/manager-sync-ops.ts
+      - src/memory/manager.ts
+      - src/memory/manager.collab-continuity.test.ts
+      - src/memory/search-manager.ts
+      - src/memory/search-manager.managed-tool-profile.test.ts
+      - src/conversations/context-assemble.ts
+      - src/conversations/context-assemble.test.ts
+      - src/context-engine/tool-pair-repro.test.ts
+      - src/memory/pending-revocation-repro.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
+      - src/memory/pending-dispose-repro.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+      - src/memory/embedding-error.ts
+      - src/gateway/collaboration-learning/private-memory-promote-entry.ts
+      - src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+      - src/gateway/collaboration-learning/private-memory-promote.ts
+      - src/gateway/collaboration-learning/private-memory-promote.test.ts
+      - src/auto-reply/reply/learning-skill-curation.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
+      - src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts
+      - src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - src/gateway/server-methods/collaboration-private-memory-promote.test.ts
+      - src/gateway/server-methods-list.ts
+      - src/gateway/method-scopes.ts
+      - docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+      - src/gateway/evolution-control/authorize-shadow-intent.ts
+      - src/gateway/evolution-control/authorize-shadow-intent.test.ts
+      - src/gateway/evolution-control/authorize-replay-repro.test.ts
+      - src/gateway/evolution-control/index.ts
+      - src/gateway/server-methods/evolution-control.ts
+      - src/gateway/server-methods/evolution-control.pack.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/enterprise-data/knowledge-publication.ts
+      - src/gateway/enterprise-data/knowledge-publication.test.ts
+      - src/gateway/enterprise-data/enterprise-knowledge-projection-binding-store.ts
+      - src/gateway/enterprise-data/types.ts
+      - src/gateway/enterprise-data/source-connection-probe.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.ts
+      - src/gateway/enterprise-data/connector-handler-runtime.test.ts
+      - src/gateway/enterprise-data/connector-catalog.test.ts
+      - src/gateway/server-methods/enterprise-data-m4.ts
+      - src/gateway/server-methods/enterprise-data-m4.test.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.ts
+      - src/gateway/enterprise-data/enterprise-data-event-store.ts
+      - src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
+      - src/gateway/server-methods/enterprise-data-events.ts
+      - src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
+      - src/cron/service.delivery-adapter-evidence.p2h.test.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.ts
+      - src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts
+      - src/cron/service.delivery-loopback-http.p2h.test.ts
+      - src/agents/model-fallback.p2g-loopback-http.test.ts
+      - src/test-utils/loopback-http-receiver.ts
+      - src/test-utils/loopback-http-receiver.test.ts
+      - scripts/evidence/prove-loopback-http.ts
+      - src/gateway/model-entitlement/aor-selection.ts
+      - src/gateway/model-entitlement/aor-selection.test.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.ts
+      - src/gateway/model-entitlement/aor-catalog-adapter.test.ts
+      - src/gateway/model-entitlement/employee-model-gate.ts
+      - src/gateway/models/platform-models-config.p2g.test.ts
+      - src/agents/model-fallback.p2g-outbound.test.ts
+      - src/cron/isolated-agent/run.ts
+      - src/cron/isolated-agent/run.long-horizon-ledger.test.ts
+      - src/gateway/server.cron.test.ts
+    canLandWith:
+      - CL
+      - DDOC
+      - F
+      - MRR
+      - memory-safe-continuity-live-gateway-20261030
+      - collab-restore-line-phase-a
+    metadata:
+      task: openbot-default-capability-p0:cursor-grok-default-capability
+      owner: cursor-grok-default-capability
+      purpose: P0 default-capability closure + P1-C privateMemory.promote + P1-D
+        learning skillDraft execute+attribution + P1-E shadow intent authorize +
+        P1-F knowledge materialization (false-availability fix + minimal
+        event-driven path + tenant-store locator/I-O visibility +
+        events.rematerialize by eventId + durable failure ledger; not ordered
+        restart queue; full KB not claimed) + P2-G platform models smart
+        config (synthetic-neutral / partial-catalog must not fake ranking;
+        loopback HTTP selection→outbound labeled; listen error/timeout
+        cleanup + EPERM MockAgent fallback) + P2-H cron closed-loop
+        (adapter + loopback HTTP channel-adapter evidence; listen cleanup +
+        MockAgent fallback; no production Live webhook claim). NO_PROMOTE; no auto-Apply system/runtime bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -10082,9 +10258,9 @@ landingStreams:
     metadata:
       task: memory-safe-continuity-landing
       owner: grok-bot
-      purpose: Multi-process HTTP/WS gateway live tests for memory continuity
-        (child spawn + acceptance evidence). Registry path listed so the stream
-        can land its own loom rule without mixing unrelated registry owners.
+      purpose: Multi-process HTTP/WS gateway live tests for memory continuity (child
+        spawn + acceptance evidence). Registry path listed so the stream can
+        land its own loom rule without mixing unrelated registry owners.
   - id: fix-preview-member-mutex-20261029
     landingPolicy: serial
     paths:
@@ -12870,8 +13046,8 @@ landingStreams:
     metadata:
       task: hide-checkpoint-restore-in-collab-groups
       owner: grok-bot
-      intent: "Superseded by collab-restore-line-phase-a (Phase A 恢复线): list/UI
-        gates lifted for space sessions; transcript-only; no group snapshot yet" 
+      intent: "Superseded by collab-restore-line-phase-a (Phase A 恢复线): list/UI gates
+        lifted for space sessions; transcript-only; no group snapshot yet"
   - id: FRIENDLY_ENTITLEMENT_PRE_REPLY
     landingPolicy: serial
     paths:
@@ -22320,6 +22496,273 @@ landingStreams:
       task: pr143-market-assistant-merge-notes
       owner: grok-bot
 sharedPaths:
+  - glob: src/context-engine/registry.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Companion P0-A registry wiring for optional assemble runtimeContext.
+    reviewAfter: 2026-11-30
+  - glob: src/context-engine/legacy.default-capability.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P0-A fail-before/pass-after regressions for default planner/projection.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/collaboration-index-scope.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P0-B helpers for authorized collaboration memory roots / cache keys.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/collaboration-index-scope.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Companion tests for collaboration index scope helpers.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/manager.collab-continuity.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P0-B watcher add/modify/delete continuity regressions.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/search-manager.managed-tool-profile.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Managed-enterprise tool profile fail-closed regressions for P0-B.
+    reviewAfter: 2026-11-30
+  - glob: docs/design/evidence/openbot-default-capability-matrix-2026-10-30.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/test-utils/loopback-http-receiver.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/test-utils/loopback-http-receiver.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: scripts/evidence/prove-loopback-http.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Eight-capability matrix and P0 evidence for this batch.
+    reviewAfter: 2026-11-30
+  - glob: docs/design/collab-context-p3-private-memory-promote-2026-10-14.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-C note: production RPC entry; flag default still OFF."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/collaboration-learning.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C append-only handler collaboration.learning.privateMemory.promote.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/collaboration-private-memory-promote.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C RPC registration and authz handler tests.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/private-memory-promote-entry.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C entry unit tests (flag_off, ownership, upsert idempotency).
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/private-memory-promote-entry.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/gateway/collaboration-learning/private-memory-promote.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/gateway/collaboration-learning/private-memory-promote.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C authorized promote entry (load personal capsule + ownership + flag
+      gate).
+    reviewAfter: 2026-11-30
+  - glob: src/auto-reply/reply/learning-skill-curation.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-D: stamp owner + disable draft auto-install on learning curation."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/learning-skill-draft-entry.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-D: list/finalize human gate for learning-curated drafts."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/learning-skill-draft-entry.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-D entry unit tests.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/collaboration-learning/learning-skill-draft-closed-loop.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-D closed-loop curate→finalize→install→tool→remove.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/collaboration-learning-skill-draft.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-D skillDraft RPC registration/auth tests.
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/authorize-shadow-intent.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: reachable human authorize for DISCOVERED assist-shadow
+      skill-install (no auto-Apply). Exact-file land; prior
+      evolution-unification /** stays for other files."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/authorize-shadow-intent.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: fail-before/pass-after authorize→Apply→rollback tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/authorize-replay-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: authorize replay binding matrix (cross-tenant/principal/grant/rebind)."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/evolution-control/index.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: export authorize-shadow-intent entry."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/evolution-control.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: evolution.proposals.authorize RPC + observeOnly/nextAction
+      projection. Exact-file land over stale evolution-unification."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/evolution-control.pack.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: pack method registration for proposals.authorize."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/packs/manifest.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-E: pack manifest scopes for proposals.authorize."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/knowledge-publication.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: materialization mode helpers; event_driven now implemented (minimal)."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/knowledge-publication.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: fail-before/pass-after unsupported + migrate tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/enterprise-knowledge-projection-binding-store.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: assertWritableMaterializationMode on upsert."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/types.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: materialization mode comment (legacy event_driven)."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/source-connection-probe.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production refuse mock_smoke_ok."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/connector-handler-runtime.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production refuse mock fallback."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/connector-handler-runtime.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production mock refusal unit tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/connector-catalog.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: production probe not mock_smoke_ok."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-m4.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: projection-bindings.upsert unsupported event_driven + migrate."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-m4.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: RPC reject/migrate tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-selection.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: synthetic_only catalog must not claim cheapest/best_quality."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-selection.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: fail-before/pass-after synthetic + partial catalog tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-catalog-adapter.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: omit missing-cost profiles so selection can detect synthetic_only."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/aor-catalog-adapter.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: missing-cost omit unit tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/model-entitlement/employee-model-gate.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: claim selectorStrategy only when selection.strategy !== native."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/models/platform-models-config.p2g.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: resolvePlatformModelsMode default native + saved aor_enhanced."
+    reviewAfter: 2026-11-30
+  - glob: src/agents/model-fallback.p2g-outbound.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: preferredModelOrder changes outbound primary provider/model."
+  - glob: src/gateway/enterprise-data/event-driven-projection-materializer.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: minimal event_driven projection materializer (not full KB)."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/enterprise-data/event-driven-projection-materializer.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: event materializer unit tests."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-events.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: events.ingest wires event-driven materialization."
+    reviewAfter: 2026-11-30
+  - glob: src/gateway/server-methods/enterprise-data-events.tenant-store.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: tenant store path + storage failure visibility acceptance tests."
+  - glob: src/gateway/enterprise-data/enterprise-data-event-store.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: findEnterpriseDataEvent for rematerialize by eventId."
+  - glob: src/gateway/enterprise-data/event-driven-materialization-failure-ledger.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: durable materialization failure ledger (not ordered queue)."
+  - glob: src/gateway/enterprise-data/event-driven-materialization-failure-ledger.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P1-F: failure ledger persist/resolve tests."
+  - glob: src/cron/service.delivery-loopback-http.p2h.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-H: loopback HTTP channel-adapter delivery evidence (labeled)."
+  - glob: src/agents/model-fallback.p2g-loopback-http.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-G: loopback HTTP selection→outbound evidence (labeled)."
+    reviewAfter: 2026-11-30
+  - glob: src/cron/service.delivery-adapter-evidence.p2h.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: "P2-H: adapter delivery evidence (no live HTTP claim)."
+    reviewAfter: 2026-11-30
+  - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/conversations/context-assemble.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/conversations/context-assemble.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/context-engine/tool-pair-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/memory/pending-revocation-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/memory/pending-dispose-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/memory/embedding-error.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.runner.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Signed WIP/tasks for the default-capability P0 batch.
+    reviewAfter: 2026-11-30
+  - glob: src/conversations/flags.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Verified takeover of the exact flags resolver from stale
+      openbot-conversation-lifecycle (lastSignalAt 2026-07-16, clean tree, no
+      WIP). Env override over config for the context planner and projection.
+      Does not transfer src/conversations/**.
+    reviewAfter: 2026-11-30
+  - glob: src/conversations/flags.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Companion test for the flags precedence takeover. Does not transfer
+      src/conversations/**.
+    reviewAfter: 2026-11-30
+  - glob: src/context-engine/legacy.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Verified takeover of the legacy engine flag gate from stale
+      openbot-conversation-lifecycle (lastSignalAt 2026-07-16, no dirty WIP).
+      Default config now reaches assemble/afterTurn. Does not transfer the rest
+      of the conversation-lifecycle path list.
+    reviewAfter: 2026-11-30
+  - glob: src/context-engine/types.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Optional assemble runtimeContext and capabilityDecisions for the same
+      P0-A takeover. Does not transfer other context-engine files.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/manager.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Exact-file P0-B land for authz-scoped cache, sqlite isolation, and
+      revoked-manager search. Prior memory-workspace and data-governance claims
+      stay; this slice is the lander. No dirty WIP from those tasks was present.
+    reviewAfter: 2026-11-30
+  - glob: src/memory/manager-sync-ops.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Exact-file P0-B land for watching authorized collaboration memory
+      directories. Does not transfer other sync-ops owners' remaining scope.
+    reviewAfter: 2026-11-30
   - glob: src/task-outcome/**
     landerTask: askOutcome-p0-task-outcome-contract
     reason: askOutcome P0 unified TaskOutcome module; resolves src/** overlap with
@@ -22817,11 +23260,13 @@ sharedPaths:
       memory-workspace-platform-remediation globs. kiro-data-governance is the
       sole owner of the Stage D readiness assessment CR.
   - glob: src/memory/search-manager.ts
-    landerTask: conversation-lifecycle-memory-search-dataplane:cursor-conversation-lifecycle
-    reason: Data-plane contract fix wires tenantId/dataPlaneId/dataRoot through
-      getMemorySearchManager without touching Phase 0 freeze locators. This
-      slice is the lander; conversation-lifecycle and cogniweave-v2 keep their
-      claims. Orthogonal to PR
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: Verified exact-file takeover from stale
+      conversation-lifecycle-memory-search-dataplane (lastSignalAt 2026-08-25,
+      no dirty WIP). P0-B passes continuity identity into builtin managers and
+      fail-closes managed_enterprise when the tool has continuity profile but no
+      full accessContext. Earlier data-plane claims stay on the task; this slice
+      is the lander. Does not transfer src/memory/**.
   - glob: src/memory/index.ts
     landerTask: conversation-lifecycle-memory-search-dataplane:cursor-conversation-lifecycle
     reason: Re-exports MemorySearchManagerParams /
@@ -23178,13 +23623,13 @@ sharedPaths:
       guidance.progress registration (does not claim unrelated WIP).
     reviewAfter: 2026-10-03
   - glob: src/gateway/server-methods-list.ts
-    landerTask: guidance-orchestrator:codex-guidance-orchestrator
-    reason: P1 append-only method list entries for guidance.progress.*.
-    reviewAfter: 2026-10-03
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C append-only method list entry for privateMemory.promote.
+    reviewAfter: 2026-11-30
   - glob: src/gateway/method-scopes.ts
-    landerTask: guidance-orchestrator:codex-guidance-orchestrator
-    reason: P1 append-only operator.read scope entries for guidance.progress.*.
-    reviewAfter: 2026-10-03
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+    reason: P1-C append-only WRITE scope for privateMemory.promote.
+    reviewAfter: 2026-11-30
   - glob: packages/evolution-core/**
     landerTask: openbot-evolution-unification:cursor-evolution
     reason: Evolution core package; sole lander cursor-evolution.

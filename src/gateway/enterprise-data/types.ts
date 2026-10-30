@@ -236,8 +236,9 @@ export type EnterpriseKnowledgeProjectionCategory =
 export type EnterpriseKnowledgeObjectKind = "data" | "metric" | "insight";
 
 /**
- * `on_demand` and `scheduled` have dispatchers.
- * `event_driven` can be stored. It has no scheduler and must not be reported as implemented.
+ * Writable modes with executors: `on_demand`, `scheduled`, and `event_driven`
+ * (minimal ingest path via runEventDrivenProjectionsForEvent). event_driven is
+ * not a clock scheduler; durable restart queues / ordered replay are not claimed.
  */
 export type EnterpriseKnowledgeProjectionMaterializationMode =
   | "on_demand"

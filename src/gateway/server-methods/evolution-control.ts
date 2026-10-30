@@ -20,6 +20,11 @@ import {
 } from "../evolution-control/apply-authorization.js";
 import { approveApplicationAuthority } from "../evolution-control/approve-application.js";
 import {
+  authorizeShadowIntentProposal,
+  projectShadowIntentOperatorHints,
+  resolveAuthorizeShadowIntentInspector,
+} from "../evolution-control/authorize-shadow-intent.js";
+import {
   ensureEvolutionControlPlaneStarted,
   resetEvolutionControlPlaneForTests,
 } from "../evolution-control/bootstrap.js";
@@ -322,6 +327,9 @@ function projectProposalForOperator(
   proposal: EvolutionProposal,
 ): EvolutionProposal & {
   triageTag: string | null;
+  observeOnly: boolean;
+  nextAction: "authorize" | "request_experiment" | "reject" | "observe" | null;
+  nextActionHint: string | null;
   capabilityGap: {
     category: string | null;
     lifecycle: string | null;
@@ -340,9 +348,13 @@ function projectProposalForOperator(
     typeof payload?.triageTag === "string" && payload.triageTag.trim()
       ? payload.triageTag.trim()
       : null;
+  const shadowHints = projectShadowIntentOperatorHints(proposal);
   return {
     ...proposal,
     triageTag,
+    observeOnly: shadowHints.observeOnly,
+    nextAction: shadowHints.nextAction,
+    nextActionHint: shadowHints.nextActionHint,
     capabilityGap: isGap
       ? {
           category: typeof payload?.category === "string" ? payload.category : null,
@@ -446,6 +458,59 @@ export function createEvolutionControlHandlers(resolve = resolvePlane): GatewayR
           ),
         );
       }
+    },
+    "evolution.proposals.authorize": async ({ params, respond, client }) => {
+      if (rejectForbiddenClientWrites(params, respond)) {
+        return;
+      }
+      const commandId = requireCommandId(params, respond);
+      const proposalId = requiredString(params, "proposalId", respond);
+      const grantId = requiredString(params, "grantId", respond);
+      if (!commandId || !proposalId || !grantId) {
+        return;
+      }
+      const scopes = client?.connect?.scopes;
+      if (!Array.isArray(scopes) || !scopes.includes("operator.approvals")) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "missing scope: operator.approvals"),
+        );
+        return;
+      }
+      applyEvolutionRpcTestIdentity(client);
+      const principalRef = client?.user?.trim() || "";
+      if (!principalRef) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "operator identity is required"),
+        );
+        return;
+      }
+      const plane = resolve();
+      const result = authorizeShadowIntentProposal(plane, resolveAuthorizeShadowIntentInspector(), {
+        commandId,
+        proposalId,
+        grantId,
+        principalRef,
+        trustedTenantId: trustedTenantId(client),
+        confirmedByUser: true,
+      });
+      if (!result.ok) {
+        respond(false, { code: result.code }, errorShape(ErrorCodes.INVALID_REQUEST, result.code));
+        return;
+      }
+      respond(true, {
+        proposal: projectProposalForOperator(plane, result.proposal),
+        alreadyAuthorized: result.alreadyAuthorized,
+        eventId: result.eventId,
+        receipt: {
+          commandId,
+          proposalId,
+          status: result.proposal.status,
+        },
+      });
     },
     "evolution.experiments.create": async ({ params, respond, client }) => {
       if (rejectForbiddenClientWrites(params, respond)) {
