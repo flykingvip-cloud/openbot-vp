@@ -10067,6 +10067,12 @@ landingStreams:
       - src/memory/manager.collab-continuity.test.ts
       - src/memory/search-manager.ts
       - src/memory/search-manager.managed-tool-profile.test.ts
+      - src/conversations/context-assemble.ts
+      - src/conversations/context-assemble.test.ts
+      - src/context-engine/tool-pair-repro.test.ts
+      - src/memory/pending-revocation-repro.test.ts
+      - src/agents/pi-embedded-runner/run/attempt.ts
+      - src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
     canLandWith:
       - CL
       - DDOC
@@ -22381,6 +22387,16 @@ sharedPaths:
     reason: Eight-capability matrix and P0 evidence for this batch.
     reviewAfter: 2026-11-30
   - glob: .kiro/specs/openbot-default-capability-p0/tasks.md
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/conversations/context-assemble.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/conversations/context-assemble.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/context-engine/tool-pair-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/memory/pending-revocation-repro.test.ts
+    landerTask: openbot-default-capability-p0:cursor-grok-default-capability
+  - glob: src/agents/pi-embedded-runner/run/attempt.context-assemble-pairing.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
     reason: Signed WIP/tasks for the default-capability P0 batch.
     reviewAfter: 2026-11-30

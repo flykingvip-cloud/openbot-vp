@@ -18,3 +18,9 @@
 - [x] P0-A：无 env + 默认配置产生 budgetTrace；显式开关；env 覆盖 config；afterTurn 投影被下一轮消费并在新引擎实例中仍在 — cursor-grok-default-capability
 - [x] P0-B：小组文件 add/modify/delete 不强制 sync；跨租户同名组隔离；撤权后旧 manager 无 snippet；FTS-only 降级报告；managed 工具路径 fail-closed — cursor-grok-default-capability
 - [ ] P1-C 至 P2-H：本批不做
+
+## 验收回退修复（A/B）
+
+- [x] A: toolCall/toolResult 单元裁剪 + assemble 后 sanitize（context-assemble / legacy / attempt）
+- [x] B: INDEX_CACHE_PENDING epoch 撤权，过期 pending 不发布
+- 状态：部分验证；交新 SHA 由验收方复验，不自行宣告 P0 通过

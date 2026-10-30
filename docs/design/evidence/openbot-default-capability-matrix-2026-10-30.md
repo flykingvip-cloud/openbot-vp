@@ -11,7 +11,7 @@
 | 记忆 | 部分验证 | builtin 索引授权小组记忆；个人经验需审批；`privateMemoryPromote` 默认关 | `memory.backend`（默认 builtin）、`memorySearch`、`collaboration.learning.privateMemoryPromote` | `extensions/memory-core` 工具；`getMemorySearchManager` | `MemoryIndexManager` / QMD / CogniWeave | 授权范围内的 sqlite；本 PR 起非空小组根使用 `authz-scopes/<fingerprint>/` | 同 caller 的后续 `search` | 成员 + 租户根；managed 非 CogniWeave fail-closed | 无 embedding → FTS-only `embedding_unavailable`；撤权后旧 manager 返回空且不带 snippet | 见 P0-B。既有 `memory-continuity-acceptance` 本轮重跑通过。真实 HTTP 监听与真实 embedding provider 未跑 |
 | 技能/资产进化 | 部分验证 | `outcome_verified` 后生成 draft，不能算已启用技能 | 学习资产阈值与技能生命周期配置 | `src/auto-reply/reply/learning-skill-curation.ts` | 策展器写草稿，安装/分配另有生命周期 | draft 技能文件与生命周期存储 | 审批安装后的真实工具调用（本轮未打通证据） | 保留现有审批，不自动发布 | 未达阈值不策展 | 本轮只读。未做 P1-D |
 | 系统进化 | 部分验证 | 控制平面可观察；shadow intent 只到 DISCOVERED，不自动 Apply | evolution governance / kill switch | `src/gateway/evolution-control/shadow-intent-proposal.ts` | proposal registrar；diagnosis 为只读观察 | proposal 状态 | 授权 Apply 之后才改变运行绑定（本轮未证明） | delegation、payload hash、verifier 保留 | 拒绝不改现状 | 本轮只读。`shadow-intent-proposal.ts` 明确 never authorize/Apply。未做 P1-E |
-| 上下文 | 已验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine` | `assembleMessagesWithBudget`；`refreshConversationProjection` | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition` | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过 | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config` | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A |
+| 上下文 | 部分验证 | 默认开启 planner 与 projection；显式 false 关闭；env 覆盖 config | `conversation.contextPlanner` / `conversation.projection`；`OPENBOT_CONVERSATION_CONTEXT_PLANNER` / `OPENBOT_CONVERSATION_PROJECTION` | `resolveContextEngine(config)` → `LegacyContextEngine` | `assembleMessagesWithBudget`；`refreshConversationProjection` | projection JSON + session→conversation 绑定，位于 data root `.meta/conversations/projections` | 同一 `sessionId` 的下一次 `assemble` 写入 `systemPromptAddition` | rollout 不冻结这两项（既有策略）。无预算、无 conversation id 是跳过 | `missing_token_budget`、`missing_conversation_id`、`disabled_by_env`、`disabled_by_config` | `legacy.default-capability.test.ts` 修复前失败、修复后通过。见 P0-A |
 | 知识库 | 部分验证 | 检索/注入/引用与 publication 不是同一条链路。`event_driven` 不能当成已生效调度 | knowledge publication mode | `src/gateway/enterprise-data/knowledge-publication.ts` | on_demand / scheduled 有分发；event_driven 不分发 | publication / projection 存储 | 已验证 publication 才能被消费（本轮未重跑） | 授权与 SAR | `isImplementedMaterializationMode("event_driven") === false` | 本轮只读代码与既有测试名。未重跑知识库套件。事件物化记为未实现，不记为完成 |
 | 数据资产物化 | 部分验证 | on_demand 与 scheduled 可物化；event_driven 可保存但永不刷新 | `EnterpriseKnowledgeProjectionMaterializationMode` | enterprise data gateway | connector + publication gate | knowledge object / lineage | scheduled 走维护 tick；on_demand 走加载 | 凭证、grant、SAR | 无凭证、未知 handler、demo `mock_smoke_ok` 不得当成生产事实 | 本轮只读 `source-connection-probe.ts` 与 publication 注释。未重跑连接器。未实现所有连接器 |
 | 定时任务 | 部分验证 | 默认开启，除非 `cron.enabled === false` 或 `OPENCLAW_SKIP_CRON=1` | `cfg.cron` | `buildGatewayCronService`（`src/gateway/server-cron.ts`） | cron service timer | cron store | 下次 wake | 目标身份与租户由 job 自身约束（本轮未重验） | 关闭时不调度 | 本轮只核对默认表达式，未跑创建→送达闭环。未见需要在本 PR 改动的新缺口 |
@@ -121,3 +121,14 @@ OPENBOT_TEST_PROFILE=low pnpm exec vitest run src/context-engine/legacy.default-
 - 持有小组根的索引写到 `authz-scopes/<fingerprint>/`。空根仍用原来的 `store.path`。回滚后新目录可以留下，旧库不会被删除。
 - 语义向量质量、真实 HTTP、真实认证子进程、真实 embedding provider 都还没有本轮证据。
 - 回滚：还原本 PR。没有配置迁移。没有生产 gateway 重启。
+
+## P0 验收回退修复（tool pairing + pending revoke）
+
+独立验收对 `e15c19d2` 指出两项未过，本轮修复后仍记 **部分验证**（不自行宣告 P0 通过）：
+
+| ID | 问题 | 修复 | 证据 |
+| --- | --- | --- | --- |
+| A | 默认 planner 按单条消息裁剪，长 assistant `toolCall` 被丢掉而 `toolResult` 保留；runner 在 assemble 后未再 sanitize | `groupHistoryIntoToolUnits` 整单元裁剪；`assembleMessagesWithBudget` / `LegacyContextEngine.assemble` / `attempt.ts` 在 assemble 后再 `sanitizeToolUseResultPairing` | `tool-pair-repro.test.ts`（验收 PoC）；`context-assemble.test.ts` 并行/连续/预算；`attempt.context-assemble-pairing.test.ts` |
+| B | 撤权只扫 `INDEX_CACHE`，`INDEX_CACHE_PENDING` 初始化中的旧 scope 仍可发布并返回旧小组 snippet | 同 caller prefix 的 epoch bump；过期 pending 不入库且 `markContinuityAccessRevoked`；`sync` 尊重撤权 | `pending-revocation-repro.test.ts`（含 review pending / re-auth / out-of-order） |
+
+条件：真实 HTTP 监听、真实 embedding、全量 type/lint/build、远端最新同步仍未作为本轮通过依据。watcher 用例需 `CHOKIDAR_USEPOLLING`（原生 EMFILE），不记产品缺陷。

@@ -54,6 +54,16 @@ const log = createSubsystemLogger("memory");
 
 const INDEX_CACHE = new Map<string, MemoryIndexManager>();
 const INDEX_CACHE_PENDING = new Map<string, Promise<MemoryIndexManager>>();
+/** Bumped when a caller scope revokes a key so in-flight creates cannot publish. */
+const INDEX_CACHE_EPOCH = new Map<string, number>();
+
+function memoryIndexEpoch(key: string): number {
+  return INDEX_CACHE_EPOCH.get(key) ?? 0;
+}
+
+function bumpMemoryIndexEpoch(key: string): void {
+  INDEX_CACHE_EPOCH.set(key, memoryIndexEpoch(key) + 1);
+}
 
 export async function closeAllMemoryIndexManagers(): Promise<void> {
   const pending = Array.from(INDEX_CACHE_PENDING.values());
@@ -62,6 +72,8 @@ export async function closeAllMemoryIndexManagers(): Promise<void> {
   }
   const managers = Array.from(INDEX_CACHE.values());
   INDEX_CACHE.clear();
+  INDEX_CACHE_PENDING.clear();
+  INDEX_CACHE_EPOCH.clear();
   for (const manager of managers) {
     try {
       await manager.close();
@@ -211,9 +223,22 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         if (cachedKey === key || !cachedKey.startsWith(prefix)) {
           continue;
         }
+        bumpMemoryIndexEpoch(cachedKey);
         INDEX_CACHE.delete(cachedKey);
         cached.markContinuityAccessRevoked();
         void cached.close();
+      }
+      // Pending creates for a prior root set must not publish after revoke.
+      const pendingKeysToRevoke: string[] = [];
+      for (const pendingKey of INDEX_CACHE_PENDING.keys()) {
+        if (pendingKey === key || !pendingKey.startsWith(prefix)) {
+          continue;
+        }
+        pendingKeysToRevoke.push(pendingKey);
+      }
+      for (const pendingKey of pendingKeysToRevoke) {
+        bumpMemoryIndexEpoch(pendingKey);
+        INDEX_CACHE_PENDING.delete(pendingKey);
       }
     }
     const existing = INDEX_CACHE.get(key);
@@ -224,6 +249,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     if (pending) {
       return pending;
     }
+    const epochAtStart = memoryIndexEpoch(key);
     const createPromise = (async () => {
       const providerResult = await createEmbeddingProvider({
         config: cfg,
@@ -248,6 +274,13 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
         purpose: params.purpose,
         collaborationMemoryRoots,
       });
+      // Revoked while embedding init was pending: fail closed, do not publish.
+      // Keep the instance marked revoked (search/sync no-op) without racing close()
+      // against in-flight awaiters that still hold the promise result.
+      if (memoryIndexEpoch(key) !== epochAtStart) {
+        manager.markContinuityAccessRevoked();
+        return manager;
+      }
       INDEX_CACHE.set(key, manager);
       return manager;
     })();
@@ -586,7 +619,7 @@ export class MemoryIndexManager extends MemoryManagerEmbeddingOps implements Mem
     force?: boolean;
     progress?: (update: MemorySyncProgressUpdate) => void;
   }): Promise<void> {
-    if (this.closed) {
+    if (this.closed || this.continuityAccessRevoked) {
       return;
     }
     if (this.syncing) {

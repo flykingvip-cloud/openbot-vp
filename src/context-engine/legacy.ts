@@ -209,10 +209,13 @@ export class LegacyContextEngine implements ContextEngine {
       });
     } else {
       const { assembleMessagesWithBudget } = await import("../conversations/context-assemble.js");
+      const { sanitizeToolUseResultPairing } =
+        await import("../agents/session-transcript-repair.js");
       const result = assembleMessagesWithBudget(params.messages, {
         tokenBudget: params.tokenBudget,
       });
-      messages = result.messages;
+      // Re-sanitize after planner trim (assemble also sanitizes; keep runner-level belt).
+      messages = sanitizeToolUseResultPairing(result.messages);
       estimatedTokens = result.estimatedTokens;
       budgetTrace = result.plan.trace;
       decisions.push({

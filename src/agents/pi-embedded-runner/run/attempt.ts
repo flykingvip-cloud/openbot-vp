@@ -2185,7 +2185,12 @@ export async function runEmbeddedAttempt(
               tokenBudget: params.contextTokenBudget,
             });
             if (assembled.messages !== activeSession.messages) {
-              activeSession.agent.state.messages = assembled.messages;
+              // Planner trim can re-break toolCall/toolResult pairing; repair again
+              // before the provider request (mirrors post-limitHistoryTurns sanitize).
+              const repaired = transcriptPolicy.repairToolUseResultPairing
+                ? sanitizeToolUseResultPairing(assembled.messages)
+                : assembled.messages;
+              activeSession.agent.state.messages = repaired;
             }
             if (assembled.systemPromptAddition) {
               systemPromptText = prependSystemPromptAddition({

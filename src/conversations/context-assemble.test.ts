@@ -9,6 +9,55 @@ function assistant(text: string): AgentMessage {
   return { role: "assistant", content: text, timestamp: Date.now() } as unknown as AgentMessage;
 }
 
+function assistantWithTool(id: string, text: string): AgentMessage {
+  return {
+    role: "assistant",
+    content: [
+      { type: "text", text },
+      { type: "toolCall", id, name: "read", arguments: { path: "x" } },
+    ],
+    timestamp: Date.now(),
+  } as unknown as AgentMessage;
+}
+
+function toolResultMsg(id: string, text = "ok"): AgentMessage {
+  return {
+    role: "toolResult",
+    toolCallId: id,
+    toolName: "read",
+    content: [{ type: "text", text }],
+    isError: false,
+    timestamp: Date.now(),
+  } as unknown as AgentMessage;
+}
+
+function hasToolCall(messages: AgentMessage[], id: string): boolean {
+  return messages.some((m) => {
+    if ((m as { role?: string }).role !== "assistant") {
+      return false;
+    }
+    const content = (m as { content?: unknown }).content;
+    return (
+      Array.isArray(content) &&
+      content.some(
+        (part) =>
+          part &&
+          typeof part === "object" &&
+          (part as { type?: string; id?: string }).type === "toolCall" &&
+          (part as { id?: string }).id === id,
+      )
+    );
+  });
+}
+
+function hasToolResult(messages: AgentMessage[], id: string): boolean {
+  return messages.some(
+    (m) =>
+      (m as { role?: string }).role === "toolResult" &&
+      (m as { toolCallId?: string }).toolCallId === id,
+  );
+}
+
 describe("assembleMessagesWithBudget", () => {
   it("keeps the latest user turn even under tight budget", () => {
     const messages = [
@@ -82,5 +131,74 @@ describe("assembleMessagesWithBudget", () => {
     });
     expect(result.plan.trace.memoryAllocated).toBeGreaterThan(0);
     expect(result.plan.trace.memoryAllocated).toBeLessThanOrEqual(3_000);
+  });
+  it("preserves toolCall/toolResult units under tight budget", () => {
+    const messages = [
+      user("old"),
+      assistantWithTool("call_1", "x".repeat(40_000)),
+      toolResultMsg("call_1"),
+      user("continue"),
+    ];
+    const result = assembleMessagesWithBudget(messages, {
+      tokenBudget: 4_000,
+      enforce: true,
+      outputReserveTokens: 400,
+      toolProtocolReserveTokens: 200,
+      mandatoryPolicyTokens: 100,
+    });
+    expect(
+      hasToolResult(result.messages, "call_1") && !hasToolCall(result.messages, "call_1"),
+    ).toBe(false);
+    const last = result.messages[result.messages.length - 1] as { content?: string };
+    expect(String(last?.content ?? "")).toContain("continue");
+  });
+
+  it("keeps parallel tool calls with matching results as one unit", () => {
+    const parallelAssistant = {
+      role: "assistant",
+      content: [
+        { type: "text", text: "parallel" },
+        { type: "toolCall", id: "a", name: "read", arguments: {} },
+        { type: "toolCall", id: "b", name: "read", arguments: {} },
+      ],
+      timestamp: Date.now(),
+    } as unknown as AgentMessage;
+    const messages = [
+      user("start"),
+      parallelAssistant,
+      toolResultMsg("a", "ra"),
+      toolResultMsg("b", "rb"),
+      user("next"),
+    ];
+    const result = assembleMessagesWithBudget(messages, {
+      tokenBudget: 50_000,
+      enforce: true,
+    });
+    expect(hasToolCall(result.messages, "a")).toBe(true);
+    expect(hasToolCall(result.messages, "b")).toBe(true);
+    expect(hasToolResult(result.messages, "a")).toBe(true);
+    expect(hasToolResult(result.messages, "b")).toBe(true);
+  });
+
+  it("does not leave orphan results from consecutive tool rounds", () => {
+    const messages = [
+      user("u0"),
+      assistantWithTool("c0", "small"),
+      toolResultMsg("c0"),
+      assistantWithTool("c1", "y".repeat(40_000)),
+      toolResultMsg("c1"),
+      user("latest"),
+    ];
+    const result = assembleMessagesWithBudget(messages, {
+      tokenBudget: 4_000,
+      enforce: true,
+      outputReserveTokens: 400,
+      toolProtocolReserveTokens: 200,
+      mandatoryPolicyTokens: 100,
+    });
+    expect(hasToolResult(result.messages, "c1") && !hasToolCall(result.messages, "c1")).toBe(false);
+    expect(String((result.messages.at(-1) as { content?: string })?.content ?? "")).toContain(
+      "latest",
+    );
   });
 });
