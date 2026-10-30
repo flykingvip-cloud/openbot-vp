@@ -17,12 +17,15 @@ import type { OpenBotConfig } from "../config/config.js";
 import { resetEmbeddingMocks } from "./embedding.test-mocks.js";
 import type { MemoryIndexManager as MemoryIndexManagerType } from "./index.js";
 import { closeAllMemoryIndexManagers } from "./manager-runtime.js";
+import { MemoryIndexManager } from "./manager.js";
 import { buildMemorySearchGovernanceFromCallEntry } from "./memory-search-governance.js";
 import { getMemorySearchManager } from "./search-manager.js";
 import {
   getRequiredMemoryIndexManager,
   registerIsolatedTestV1Root,
 } from "./test-manager-helpers.js";
+
+void MemoryIndexManager;
 
 const cleanup: string[] = [];
 const envKeys = [
@@ -236,7 +239,6 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
     );
     await fs.mkdir(path.join(workspaceDir, "memory"), { recursive: true });
 
-    // Cross-tenant fixture: same groupId under another tenant with a secret body.
     const crossTenant = "tenant-other";
     const crossMem = path.join(
       tenantsRoot,
@@ -270,7 +272,6 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
       });
       const collabRel = `collaboration/${groupId}/memory/group-note.md`;
 
-      // Warm authorized member index (same roots the tool will use).
       const memberAuthzResult = await getMemorySearchManager({
         cfg,
         agentId: "main",
@@ -317,7 +318,6 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
       expect(memberGot.disabled).not.toBe(true);
       expect(memberGot.text).toContain(marker);
 
-      // Non-member: warm empty/authorized-only index, then tool path must not leak.
       const carolResult = await getMemorySearchManager({
         cfg,
         agentId: "main",
@@ -361,7 +361,6 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
       expect(carolGot.reasonCode).toBe("non_member");
       expect(JSON.stringify(carolGot)).not.toContain(marker);
 
-      // Revoked member
       await writeMembers(groupDir, [{ userId: "member-alice", status: "revoked" }]);
       const revokedGet = createMemoryGetTool({
         config: cfg,
@@ -382,7 +381,6 @@ describe("memory continuity RPC integration (memory_search / memory_get)", () =>
 
       await writeMembers(groupDir, [{ userId: "member-alice", status: "active" }]);
 
-      // Cross-tenant via Item7 Stage C governance (TenantContext on call entry)
       const governanceOther = buildMemorySearchGovernanceFromCallEntry({
         tenantId: crossTenant,
         userId: "member-alice",
