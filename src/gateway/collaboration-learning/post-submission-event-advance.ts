@@ -35,6 +35,7 @@ import {
   markWakeOpFailed,
   readWakeOpRecord,
   readWakeOpRecordDetailed,
+  type WakeOpRecord,
 } from "../collaboration-dispatch/wake-op-ledger.js";
 import {
   classifyDispatchSideEffect,
@@ -1428,6 +1429,8 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
  *    the wake is already failed/unknown/completed (safe not to overwrite).
  *    P2 R9: unverifiable cleanup (read/CAS/clear throw) retains binding and
  *    stops automatic recovery — exception ≠ safe reject.
+ *    P2 R10: CAS null (corrupt/missing mid-race) is also unverifiable; immediate
+ *    invalidate cleanup shares the same result判定 as deferred.
  * 5) Never convert unknown/started → failed solely because executor process died.
  * Do NOT call from heartbeat alone.
  */
@@ -1489,25 +1492,35 @@ export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
   }
 
   // Board won (proven not-started). Conditional wake fail: exact attempt + running.
+  // P2 R10: same CAS result判定 as deferred — null/corrupt/missing is unverifiable
+  // and must NOT clear binding (do not treat as determined_no_change_needed).
   if (opKey && boundWakeAttemptId) {
     try {
-      await markWakeOpFailed({
+      const after = await markWakeOpFailed({
         authority: params.authority,
         opKey,
         cfg: params.cfg,
         detail: "permit_attempt_invalidated_executor_proven_dead",
         expectedExecutionAttemptId: boundWakeAttemptId,
       });
-      // Success or safe reject (attempt/status mismatch): clear binding so
-      // recover may re-dispatch only when wake claim/reconcile allows.
-      await clearBoundWakeExecutionAttemptAfterCleanup({
-        authority: params.authority,
-        taskId: params.taskId,
-        itemId: params.itemId,
-        expectedOpKey: opKey,
-        expectedBoundWakeAttemptId: boundWakeAttemptId,
-        cfg: params.cfg,
+      const classified = classifyConditionalWakeFailCasResult({
+        after,
+        expectedAttemptId: boundWakeAttemptId,
       });
+      if (
+        classified.outcome === "completed" ||
+        classified.outcome === "determined_no_change_needed"
+      ) {
+        await clearBoundWakeExecutionAttemptAfterCleanup({
+          authority: params.authority,
+          taskId: params.taskId,
+          itemId: params.itemId,
+          expectedOpKey: opKey,
+          expectedBoundWakeAttemptId: boundWakeAttemptId,
+          cfg: params.cfg,
+        });
+      }
+      // unverifiable: retain boundWakeExecutionAttemptId for deferred recovery.
     } catch {
       // Crash/throw between board write and wake CAS: binding retained on board.
       // Recover must finish wake conditional fail (or prove safe) before re-dispatch.
@@ -1550,7 +1563,7 @@ async function clearBoundWakeExecutionAttemptAfterCleanup(params: {
 }
 
 /**
- * P2 R9 — deferred wake cleanup outcome for two-write recovery.
+ * P2 R9/R10 — deferred wake cleanup outcome for two-write recovery.
  * Only `completed` and `determined_no_change_needed` may clear the board binding
  * and allow redispatch. `unverifiable` retains binding and stops auto-recovery.
  */
@@ -1574,18 +1587,59 @@ export type DeferredWakeFailCleanupFault =
   | "clear_binding_throw";
 
 /**
- * P2 R8/R9 two-write recovery: if a prior invalidate left boundWakeExecutionAttemptId
+ * P2 R10 — shared CAS result判定 for immediate invalidate cleanup and deferred
+ * recovery. `markWakeOpFailed` / `updateWakeOp` return null when the durable
+ * file is corrupt or missing under the lock; that must never be archived as
+ * determined_no_change_needed.
+ *
+ * - completed: explicit record showing failed for the expected attempt
+ * - determined_no_change_needed: explicit successful read of a determined reject
+ *   state (new attempt / unknown / completed / already-failed mismatch, etc.)
+ * - unverifiable: null (corrupt / missing / empty) — retain binding, do not advance
+ */
+export function classifyConditionalWakeFailCasResult(params: {
+  after: WakeOpRecord | null;
+  expectedAttemptId: string;
+}): {
+  outcome: "completed" | "determined_no_change_needed" | "unverifiable";
+  wakeStatus?: string;
+  reason?: string;
+} {
+  const expected = compact(params.expectedAttemptId);
+  const after = params.after;
+  if (!after) {
+    return {
+      outcome: "unverifiable",
+      reason: "wake_cas_null_corrupt_or_missing",
+    };
+  }
+  const afterAttempt = compact(after.executionAttemptId);
+  if (after.status === "failed" && afterAttempt === expected) {
+    return { outcome: "completed", wakeStatus: after.status };
+  }
+  // Explicit durable record proving we must not / need not fail-overwrite.
+  return {
+    outcome: "determined_no_change_needed",
+    wakeStatus: after.status,
+  };
+}
+
+/**
+ * P2 R8/R9/R10 two-write recovery: if a prior invalidate left boundWakeExecutionAttemptId
  * on a pending relay, finish the wake conditional fail (exact attempt + running)
  * before allowing re-dispatch.
  *
- * Classification (P2 R9):
- * - completed: wake fail CAS applied successfully
- * - determined_no_change_needed: safe reject (unknown/completed/new attempt /
- *   already failed for that attempt) — proven we must not / need not modify
- * - unverifiable: read/write/CAS throw, corrupt/unexplained missing, clear failure
+ * Classification (P2 R9/R10):
+ * - completed: wake fail CAS applied successfully (explicit failed for bound attempt)
+ * - determined_no_change_needed: safe reject from an **explicit successful read**
+ *   (unknown/completed/new attempt / already failed for that attempt) — proven we
+ *   must not / need not modify
+ * - unverifiable: read/write/CAS throw, CAS null (corrupt/missing mid-race),
+ *   clear failure — retain binding
  *
  * Only completed | determined_no_change_needed may clear the binding. Exception
- * is never treated as safe reject.
+ * and CAS null are never treated as safe reject. Immediate invalidate cleanup
+ * reuses classifyConditionalWakeFailCasResult (one口径).
  */
 export async function finishDeferredWakeFailBeforeRedispatch(params: {
   authority: RuntimeAuthority;
@@ -1593,6 +1647,11 @@ export async function finishDeferredWakeFailBeforeRedispatch(params: {
   cfg?: OpenBotConfig;
   /** Test-only: inject I/O faults for deferred cleanup contract. */
   _testDeferredCleanupFault?: DeferredWakeFailCleanupFault;
+  /**
+   * Test-only P2 R10: after the successful pre-CAS wake read (running+bound),
+   * before markWakeOpFailed. Used to delete/corrupt the wake file mid-race.
+   */
+  _testAfterWakeReadBeforeCas?: () => Promise<void>;
 }): Promise<DeferredWakeFailCleanupResult> {
   const pending = params.item.pendingEventRelay;
   if (!pending || pending.status !== "pending") {
@@ -1639,12 +1698,15 @@ export async function finishDeferredWakeFailBeforeRedispatch(params: {
     wakeStatus = wake.status;
     const wakeAttempt = compact(wake.executionAttemptId);
     if (wakeAttempt !== bound || wake.status !== "running") {
-      // Safe reject: new attempt / unknown / completed / already failed / mismatch.
+      // Explicit successful read of a determined reject state.
       outcome = "determined_no_change_needed";
     } else {
       try {
         if (fault === "wake_cas_throw") {
           throw new Error("test_deferred_wake_cas_throw");
+        }
+        if (params._testAfterWakeReadBeforeCas) {
+          await params._testAfterWakeReadBeforeCas();
         }
         const after = await markWakeOpFailed({
           authority: params.authority,
@@ -1653,14 +1715,22 @@ export async function finishDeferredWakeFailBeforeRedispatch(params: {
           detail: "deferred_permit_invalidate_wake_fail",
           expectedExecutionAttemptId: bound,
         });
-        if (after && after.status === "failed" && compact(after.executionAttemptId) === bound) {
-          wakeStatus = after.status;
-          outcome = "completed";
-        } else {
-          // Race under lock: status/attempt changed — proven safe not to overwrite.
-          wakeStatus = after?.status ?? wakeStatus;
-          outcome = "determined_no_change_needed";
+        const classified = classifyConditionalWakeFailCasResult({
+          after,
+          expectedAttemptId: bound,
+        });
+        wakeStatus = classified.wakeStatus ?? wakeStatus;
+        if (classified.outcome === "unverifiable") {
+          // P2 R10: CAS null (corrupt/missing after successful pre-read) ≠ safe reject.
+          return {
+            outcome: "unverifiable",
+            attempted: true,
+            wakeStatus,
+            clearedBinding: false,
+            reason: classified.reason ?? "wake_cas_null_corrupt_or_missing",
+          };
         }
+        outcome = classified.outcome;
       } catch (error) {
         return {
           outcome: "unverifiable",
