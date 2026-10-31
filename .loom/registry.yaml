@@ -10173,6 +10173,19 @@ landingStreams:
       task: infrastructure-audit:p1-object-recovery
       owner: infra-audit
       purpose: Evidence-only P1 object recovery and historical ERROR reclassification; no releases.jsonl or RELEASE_RECORD edits; no acknowledge.
+  - id: infrastructure-audit-ledger-integrity-20261031
+    landingPolicy: serial
+    paths:
+      - .loom/registry.yaml
+      - deploy/production/releases.jsonl
+      - deploy/production/RELEASE_RECORD.md
+      - docs/notes/infrastructure-audit-2026-10-31/**
+    canLandWith:
+      - strip-ohbe-from-openbot-vp
+    metadata:
+      task: infrastructure-audit:ledger-integrity
+      owner: infra-audit
+      purpose: Close seq127 dual-open liveTo with successor-StartedAt attestation; sync RELEASE_RECORD L3 from machine tip; classify ledger ERROR without bulk acknowledge.
   - id: controlled-collab-p2-event-dispatch-20261031
     landingPolicy: serial
     paths:
