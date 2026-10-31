@@ -61,6 +61,31 @@ import { createUserOperationalIdentityTool } from "./tools/user-operational-iden
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
+/** Map composition-root turn options → discuss_to_task inbound columns (never model-filled). */
+export function resolveDiscussToTaskInboundInjection(options?: {
+  currentMessageId?: string | number;
+  agentRunId?: string;
+  requesterSenderId?: string | null;
+  gatewayClientUser?: string;
+  gatewayClientPlatformUserId?: string;
+}): {
+  inboundSourceMessageId: string | null;
+  inboundPrincipalActor: string | null;
+  executionRunId: string | null;
+} {
+  return {
+    // Trusted inbound message id — never agentRunId (execution run ≠ message).
+    inboundSourceMessageId:
+      options?.currentMessageId != null ? String(options.currentMessageId) : null,
+    inboundPrincipalActor:
+      options?.requesterSenderId ??
+      options?.gatewayClientUser ??
+      options?.gatewayClientPlatformUserId ??
+      null,
+    executionRunId: options?.agentRunId ?? null,
+  };
+}
+
 export function createOpenClawTools(
   options?: {
     sandboxBrowserBridgeUrl?: string;
@@ -432,15 +457,7 @@ export function createOpenClawTools(
               options?.gatewayClientSessionEnterpriseId ??
               options?.tenantId ??
               null,
-            // Trusted inbound message id — never agentRunId (execution run ≠ message).
-            inboundSourceMessageId:
-              options?.currentMessageId != null ? String(options.currentMessageId) : null,
-            inboundPrincipalActor:
-              options?.requesterSenderId ??
-              options?.gatewayClientUser ??
-              options?.gatewayClientPlatformUserId ??
-              null,
-            executionRunId: options?.agentRunId ?? null,
+            ...resolveDiscussToTaskInboundInjection(options),
             gatewayClientUser: identityFields.gatewayClientUser,
             gatewayClientPlatformUserId: identityFields.gatewayClientPlatformUserId,
             gatewayClientSessionDomain: identityFields.gatewayClientSessionDomain,

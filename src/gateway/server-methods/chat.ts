@@ -284,7 +284,10 @@ import {
   resolveGroupPublicTranscriptPath,
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
-import { runControlledDiscussToTaskChatTurn } from "../collaboration-learning/discuss-to-task-chat-turn.js";
+import {
+  applyDiscussToTaskChatTurnToChatHandler,
+  runControlledDiscussToTaskChatTurn,
+} from "../collaboration-learning/discuss-to-task-chat-turn.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   bindGroupPublicTranscript,
@@ -5541,15 +5544,18 @@ export const chatHandlers: GatewayRequestHandlers = {
                   }
                 },
               });
-              if (d2tTurn.formalTaskEstablish) {
-                formalTaskEstablish = d2tTurn.formalTaskEstablish;
+              const d2tApplied = applyDiscussToTaskChatTurnToChatHandler(d2tTurn);
+              if (d2tApplied.formalTaskEstablish) {
+                formalTaskEstablish = d2tApplied.formalTaskEstablish;
               }
-              if (d2tTurn.coordinatorBindingText) {
-                discussToTaskCoordinatorBinding = d2tTurn.coordinatorBindingText;
+              if (d2tApplied.coordinatorBindingText) {
+                discussToTaskCoordinatorBinding = d2tApplied.coordinatorBindingText;
               }
-              if (d2tTurn.transcriptPersist && !d2tTurn.transcriptPersist.ok) {
+              // Deterministic client feedback rides formalTaskEstablish + coordinator
+              // binding (and transcript persist inside the turn). Logs are secondary.
+              if (d2tApplied.transcriptPersist && !d2tApplied.transcriptPersist.ok) {
                 context.logGateway.warn(
-                  `discuss-to-task receipt transcript persist failed: ${d2tTurn.transcriptPersist.error ?? "unknown"}`,
+                  `discuss-to-task receipt transcript persist failed: ${d2tApplied.transcriptPersist.error ?? "unknown"}`,
                 );
               }
               if (d2tTurn.error) {

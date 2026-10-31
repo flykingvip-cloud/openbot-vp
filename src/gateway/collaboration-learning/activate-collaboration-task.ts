@@ -31,6 +31,10 @@ import { buildRuntimeNamespace } from "../collaboration-dispatch/runtime-namespa
 import { withTaskControlLock } from "../collaboration-dispatch/task-control-cas.js";
 import { resolveSecurityProfile } from "../security-profile.js";
 import { ClaimContractEntryError } from "./claim-contract-entry.js";
+import {
+  adjudicateDiscussToTaskTagsUnderLock,
+  isDiscussToTaskMetaTag,
+} from "./discuss-to-task-stages.js";
 import { readGroupOperatingState, syncGroupOperatingState } from "./shared.js";
 import {
   resolveTeamDeliverableStores,
@@ -278,10 +282,24 @@ function mergeExtraTags(
     if (!compactTag) {
       continue;
     }
-    // Replace prior tags with the same prefix (text before last ':' or whole).
+    // Replace prior tags with the same prefix (text before first ':' or whole).
     const prefix = compactTag.includes(":")
       ? compactTag.slice(0, compactTag.indexOf(":") + 1)
       : compactTag;
+    // Discuss-to-task ownership / claim tags are not generically replaceable.
+    // Lock-held adjudication decides create/replay/conflict before this merge.
+    if (isDiscussToTaskMetaTag(compactTag)) {
+      const prior = out.find((row) => row.startsWith(prefix));
+      if (prior && prior !== compactTag) {
+        // Keep first-accepted value; caller should have conflicted already.
+        continue;
+      }
+      if (prior && prior === compactTag) {
+        continue;
+      }
+      out.push(compactTag);
+      continue;
+    }
     for (let i = out.length - 1; i >= 0; i -= 1) {
       if (prefix && out[i].startsWith(prefix)) {
         out.splice(i, 1);
@@ -312,6 +330,26 @@ async function mutateCollaborationTaskObject(params: {
     "task",
     params.taskId,
   );
+  // Lock-held discuss-to-task source owner / kind / claim adjudication.
+  const adjudication = adjudicateDiscussToTaskTagsUnderLock({
+    existingTags: existing?.tags,
+    proposedExtraTags: params.extraTags,
+  });
+  if (adjudication.action === "conflict") {
+    return {
+      ok: false,
+      reason: adjudication.reason,
+      detail: adjudication.detail,
+    };
+  }
+  const effectiveExtraTags = ((): readonly string[] | undefined => {
+    if (adjudication.action === "passthrough") {
+      return params.extraTags;
+    }
+    const nonD2t = [...(params.extraTags ?? [])].filter((tag) => !isDiscussToTaskMetaTag(tag));
+    return [...nonD2t, ...adjudication.tags];
+  })();
+
   if (existing) {
     if (TERMINAL_TASK_STATUSES.has(existing.status)) {
       return {
@@ -324,7 +362,7 @@ async function mutateCollaborationTaskObject(params: {
       params.readyRequested && existing.status === "draft" ? "ready" : existing.status;
     const tags = mergeExtraTags(
       mergeActivationTag(existing.tags, params.activationKey),
-      params.extraTags,
+      effectiveExtraTags,
     );
     const touched: Task = {
       ...existing,
@@ -344,7 +382,7 @@ async function mutateCollaborationTaskObject(params: {
     status: params.readyRequested ? "ready" : "draft",
     ownerMemberId: compact(params.actor) || undefined,
     assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
-    tags: mergeExtraTags(mergeActivationTag(undefined, params.activationKey), params.extraTags),
+    tags: mergeExtraTags(mergeActivationTag(undefined, params.activationKey), effectiveExtraTags),
     createdBy: compact(params.actor) || undefined,
     updatedBy: compact(params.actor) || undefined,
     createdAtMs: now,

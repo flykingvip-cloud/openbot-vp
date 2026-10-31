@@ -35,6 +35,95 @@ export type DiscussToTaskChatTurnResult = {
   error?: string;
 };
 
+const RECEIPT_PERSIST_FAIL_SUFFIX = "（展示写入失败，请刷新后重试。）";
+
+type PersistReceiptFn = (args: {
+  message: string;
+  idempotencyKey: string;
+}) => Promise<{ ok: boolean; error?: string }>;
+
+/**
+ * Map chat-turn result onto the chat.send handler fields the client already consumes
+ * (formalTaskEstablish + coordinator binding). Always prefers deterministic
+ * userVisibleMessage over model paraphrase / logs alone.
+ */
+export function applyDiscussToTaskChatTurnToChatHandler(turn: DiscussToTaskChatTurnResult): {
+  formalTaskEstablish?: DiscussToTaskChatTurnFormalEstablish;
+  coordinatorBindingText?: string;
+  clientFeedbackMessage?: string;
+  transcriptPersist?: { ok: boolean; error?: string };
+} {
+  const clientFeedbackMessage =
+    (turn.userVisibleMessage && turn.userVisibleMessage.trim()) ||
+    turn.formalTaskEstablish?.userMessage ||
+    undefined;
+  if (!turn.formalTaskEstablish && !clientFeedbackMessage && !turn.coordinatorBindingText) {
+    return {
+      transcriptPersist: turn.transcriptPersist,
+    };
+  }
+  const formalTaskEstablish = turn.formalTaskEstablish
+    ? {
+        ...turn.formalTaskEstablish,
+        ...(clientFeedbackMessage ? { userMessage: clientFeedbackMessage } : {}),
+      }
+    : clientFeedbackMessage
+      ? {
+          attempted: true,
+          status: "blocked",
+          taskId: null,
+          reason: turn.error ? "discuss_to_task_hook_failed" : "discuss_to_task_feedback",
+          userMessage: clientFeedbackMessage,
+        }
+      : undefined;
+  let coordinatorBindingText = turn.coordinatorBindingText;
+  if (clientFeedbackMessage) {
+    if (!coordinatorBindingText) {
+      coordinatorBindingText = `[正式任务入口回执 — 必须绑定] ${clientFeedbackMessage}`;
+    } else if (!coordinatorBindingText.includes(clientFeedbackMessage)) {
+      coordinatorBindingText = `${coordinatorBindingText}\n${clientFeedbackMessage}`;
+    }
+  }
+  return {
+    formalTaskEstablish,
+    coordinatorBindingText,
+    clientFeedbackMessage,
+    transcriptPersist: turn.transcriptPersist,
+  };
+}
+
+async function persistUserVisibleReceipt(params: {
+  message: string;
+  sourceMessageId: string;
+  persistReceipt?: PersistReceiptFn;
+}): Promise<{
+  userVisibleMessage: string;
+  transcriptPersist?: { ok: boolean; error?: string };
+}> {
+  const safeMessage = params.message.trim();
+  if (!params.persistReceipt || !safeMessage) {
+    return { userVisibleMessage: safeMessage };
+  }
+  let transcriptPersist: { ok: boolean; error?: string };
+  try {
+    transcriptPersist = await params.persistReceipt({
+      message: safeMessage,
+      idempotencyKey: `${params.sourceMessageId}:discuss-to-task-receipt`,
+    });
+  } catch (persistErr) {
+    transcriptPersist = {
+      ok: false,
+      error: persistErr instanceof Error ? persistErr.message : String(persistErr),
+    };
+  }
+  // Never paste raw internal persist errors into the user-visible string.
+  const userVisibleMessage =
+    transcriptPersist && !transcriptPersist.ok
+      ? `${safeMessage}${RECEIPT_PERSIST_FAIL_SUFFIX}`
+      : safeMessage;
+  return { userVisibleMessage, transcriptPersist };
+}
+
 export async function runControlledDiscussToTaskChatTurn(params: {
   groupId: string;
   /** Trusted inbound message id (clientRunId) — never an agent run id. */
@@ -49,10 +138,7 @@ export async function runControlledDiscussToTaskChatTurn(params: {
   identityAliases?: string[];
   suggestedClaimantIds?: readonly string[];
   /** Persist receipt into chat transcript; failures must surface. */
-  persistReceipt?: (args: {
-    message: string;
-    idempotencyKey: string;
-  }) => Promise<{ ok: boolean; error?: string }>;
+  persistReceipt?: PersistReceiptFn;
 }): Promise<DiscussToTaskChatTurnResult> {
   const sourceMessageId = params.sourceMessageId.trim();
   const principalActor = params.principalActor.trim();
@@ -72,6 +158,11 @@ export async function runControlledDiscussToTaskChatTurn(params: {
       });
       if (!bindingRegister.ok) {
         const userMessage = "正式任务来源归属冲突，无法借用他人消息身份建立任务。";
+        const persisted = await persistUserVisibleReceipt({
+          message: userMessage,
+          sourceMessageId,
+          persistReceipt: params.persistReceipt,
+        });
         return {
           d2tResult: null,
           formalTaskEstablish: {
@@ -79,15 +170,22 @@ export async function runControlledDiscussToTaskChatTurn(params: {
             status: "blocked",
             taskId: null,
             reason: "source_owner_conflict",
-            userMessage,
+            userMessage: persisted.userVisibleMessage,
           },
           coordinatorBindingText:
             "[正式任务入口回执 — 必须绑定] status=source_owner_conflict；禁止口头宣称已派工。",
-          userVisibleMessage: userMessage,
+          userVisibleMessage: persisted.userVisibleMessage,
+          transcriptPersist: persisted.transcriptPersist,
           bindingRegister,
         };
       }
     } catch (err) {
+      const userMessage = "正式任务建立受阻，尚未建立正式任务。";
+      const persisted = await persistUserVisibleReceipt({
+        message: userMessage,
+        sourceMessageId: sourceMessageId || "unknown",
+        persistReceipt: params.persistReceipt,
+      });
       return {
         d2tResult: null,
         formalTaskEstablish: {
@@ -95,11 +193,12 @@ export async function runControlledDiscussToTaskChatTurn(params: {
           status: "blocked",
           taskId: null,
           reason: "source_binding_register_failed",
-          userMessage: "正式任务建立受阻，尚未建立正式任务。",
+          userMessage: persisted.userVisibleMessage,
         },
         coordinatorBindingText:
           "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。",
-        userVisibleMessage: "正式任务建立受阻，尚未建立正式任务。",
+        userVisibleMessage: persisted.userVisibleMessage,
+        transcriptPersist: persisted.transcriptPersist,
         error: err instanceof Error ? err.message : String(err),
       };
     }
@@ -122,25 +221,12 @@ export async function runControlledDiscussToTaskChatTurn(params: {
       return { d2tResult: null, bindingRegister };
     }
     const receipt = buildDiscussToTaskChatReceipt(d2tResult);
-    const userVisibleMessage = formatDiscussToTaskUserVisibleStatus(d2tResult);
-    let transcriptPersist: { ok: boolean; error?: string } | undefined;
-    if (params.persistReceipt) {
-      try {
-        transcriptPersist = await params.persistReceipt({
-          message: userVisibleMessage,
-          idempotencyKey: `${sourceMessageId}:discuss-to-task-receipt`,
-        });
-      } catch (persistErr) {
-        transcriptPersist = {
-          ok: false,
-          error: persistErr instanceof Error ? persistErr.message : String(persistErr),
-        };
-      }
-    }
-    const visible =
-      transcriptPersist && !transcriptPersist.ok
-        ? `${userVisibleMessage}（展示写入失败：${transcriptPersist.error ?? "unknown"}）`
-        : userVisibleMessage;
+    const baseVisible = formatDiscussToTaskUserVisibleStatus(d2tResult);
+    const persisted = await persistUserVisibleReceipt({
+      message: baseVisible,
+      sourceMessageId,
+      persistReceipt: params.persistReceipt,
+    });
     return {
       d2tResult,
       formalTaskEstablish: {
@@ -148,16 +234,21 @@ export async function runControlledDiscussToTaskChatTurn(params: {
         status: d2tResult.statusCode,
         taskId: d2tResult.taskId,
         reason: d2tResult.internalReason,
-        userMessage: receipt.userMessage,
+        userMessage: persisted.userVisibleMessage || receipt.userMessage,
         stagesSummary: receipt.stagesSummary,
       },
       coordinatorBindingText: receipt.coordinatorBindingText,
-      userVisibleMessage: visible,
-      transcriptPersist,
+      userVisibleMessage: persisted.userVisibleMessage,
+      transcriptPersist: persisted.transcriptPersist,
       bindingRegister,
     };
   } catch (d2tErr) {
     const userMessage = "正式任务建立受阻，尚未建立正式任务。";
+    const persisted = await persistUserVisibleReceipt({
+      message: userMessage,
+      sourceMessageId: sourceMessageId || "unknown",
+      persistReceipt: params.persistReceipt,
+    });
     return {
       d2tResult: null,
       formalTaskEstablish: {
@@ -165,10 +256,11 @@ export async function runControlledDiscussToTaskChatTurn(params: {
         status: "blocked",
         taskId: null,
         reason: "discuss_to_task_hook_failed",
-        userMessage,
+        userMessage: persisted.userVisibleMessage,
       },
       coordinatorBindingText: "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。",
-      userVisibleMessage: userMessage,
+      userVisibleMessage: persisted.userVisibleMessage,
+      transcriptPersist: persisted.transcriptPersist,
       bindingRegister,
       error: d2tErr instanceof Error ? d2tErr.message : String(d2tErr),
     };
