@@ -1399,9 +1399,12 @@ export async function reconcilePermitAcquiredBoardEventRelays(params: {
  */
 
 /**
- * P2 R6 - proven-dead take-over: fail wake-op (if running) + same-conditional
- * invalidate of the permit attempt so the old executor cannot mark/start and
- * recovery may re-dispatch from pending. Do NOT call from heartbeat alone.
+ * P2 R7 — proven-dead take-over (order-safe):
+ * 1) Board CAS invalidate first. If rejected → wake AND board unchanged.
+ * 2) Only after board wins: attempt-scoped wake update (bind executionAttemptId).
+ * 3) Never convert unknown/started → failed solely because executor process died
+ *    (death ≠ proof of no external side effects; keep pending-verification).
+ * Do NOT call from heartbeat alone.
  */
 export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
   authority: RuntimeAuthority;
@@ -1412,22 +1415,26 @@ export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
   cfg?: OpenBotConfig;
 }): Promise<ClaimResult<GroupBoardClaimItem>> {
   const opKey = compact(params.expectedOpKey);
+
+  // Read-only guard: unknown means pending-verification — do not release/retry.
   if (opKey) {
     try {
-      const wake = await readWakeOpRecord({ authority: params.authority, opKey });
-      if (wake?.status === "running" || wake?.status === "unknown") {
-        await markWakeOpFailed({
-          authority: params.authority,
-          opKey,
-          cfg: params.cfg,
-          detail: "permit_attempt_invalidated_executor_proven_dead",
-        });
+      const wakeBefore = await readWakeOpRecord({ authority: params.authority, opKey });
+      if (wakeBefore?.status === "unknown") {
+        return {
+          ok: false,
+          reason: "invalidate_wake_unknown_pending_verification",
+          message:
+            "wake-op is unknown; process death does not prove absence of side effects — keep pending-verification",
+        };
       }
     } catch {
-      // best-effort wake fail; board invalidate below is authoritative for attempt
+      // Missing/unreadable wake: proceed to board adjudication.
     }
   }
-  return invalidateBoardDispatchPermitAttempt(
+
+  // Board adjudication FIRST — rejection leaves wake untouched.
+  const boardResult = await invalidateBoardDispatchPermitAttempt(
     params.authority,
     {
       taskId: params.taskId,
@@ -1437,6 +1444,33 @@ export async function invalidatePermitAttemptForProvenDeadExecutor(params: {
     },
     { cfg: params.cfg },
   );
+  if (!boardResult.ok) {
+    return boardResult;
+  }
+
+  // Board won (proven not-started). Attempt-scoped wake fail for running only.
+  // Must bind durable executionAttemptId — never mutate by opKey alone.
+  if (opKey) {
+    try {
+      const wake = await readWakeOpRecord({ authority: params.authority, opKey });
+      if (wake?.status === "running") {
+        const wakeAttemptId = compact(wake.executionAttemptId);
+        if (wakeAttemptId) {
+          await markWakeOpFailed({
+            authority: params.authority,
+            opKey,
+            cfg: params.cfg,
+            detail: "permit_attempt_invalidated_executor_proven_dead",
+            expectedExecutionAttemptId: wakeAttemptId,
+          });
+        }
+      }
+      // unknown / other: leave unchanged (should have been refused above; belt-and-suspenders).
+    } catch {
+      // best-effort wake fail after successful board invalidate
+    }
+  }
+  return boardResult;
 }
 
 export { invalidateBoardDispatchPermitAttempt };

@@ -457,10 +457,20 @@ export async function markWakeOpFailed(params: {
   cfg?: OpenBotConfig;
   nowMs?: number;
   detail?: string;
+  /**
+   * P2 R7: when set, only mutate if durable executionAttemptId still matches.
+   * Prevents late cleanup from failing a newer attempt on the same opKey.
+   */
+  expectedExecutionAttemptId?: string;
 }): Promise<WakeOpRecord | null> {
   const nowMs = params.nowMs ?? Date.now();
+  const expectedAttempt = compact(params.expectedExecutionAttemptId);
   return updateWakeOp(params, (current) => {
     if (!current) {
+      return null;
+    }
+    if (expectedAttempt && compact(current.executionAttemptId) !== expectedAttempt) {
+      // Refuse: another attempt already owns this opKey.
       return null;
     }
     return {

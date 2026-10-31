@@ -23,6 +23,7 @@ import {
   boardClaimsDir,
   claimBoardItem,
   loadBoardClaimItem,
+  markBoardDispatchInvokeStarted,
   markBoardItemInProgress,
   publishBoardItem,
   returnBoardItemSubmission,
@@ -33,7 +34,7 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
-import { readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
+import { markWakeOpUnknown, readWakeOpRecord } from "../collaboration-dispatch/wake-op-ledger.js";
 import type {
   WakeRoundDispatchRequest,
   WakeRoundDispatcher,
@@ -2288,6 +2289,447 @@ describe("P2 R6 — mark-success gate + attempt validity races", () => {
     expect(totalDispatch).toBe(1);
     const recoveryDispatched = recovered.some((r) => r.dispatched);
     expect(recoveryDispatched).toBe(true);
+  });
+});
+
+describe("P2 R7 — invalidate order: board first, wake attempt-scoped", () => {
+  test("counterexample: mark wins first → invalidate reject → wake+board unchanged", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r7-mark-wins";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+
+    const liveRun = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => ({ ok: true, roundId: "r7-mark-wins" }),
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+
+    const mid = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = mid?.pendingEventRelay?.opKey;
+    expect(attemptId).toBeTruthy();
+    expect(opKey).toBeTruthy();
+
+    const wakeBefore = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wakeBefore?.status).toBe("running");
+    const wakeAttemptBefore = wakeBefore?.executionAttemptId;
+
+    // Mark wins first (invoke started) — durable store.
+    const marked = await markBoardDispatchInvokeStarted(
+      auth,
+      {
+        taskId,
+        itemId: item.itemId,
+        expectedOpKey: opKey!,
+        expectedAttemptId: attemptId!,
+      },
+      { cfg },
+    );
+    expect(marked.ok).toBe(true);
+
+    const beforeInv = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(beforeInv?.pendingEventRelay?.dispatchInvokeStarted).toBe(true);
+    expect(beforeInv?.pendingEventRelay?.status).toBe("dispatched");
+    expect(beforeInv?.pendingEventRelay?.dispatchAttemptId).toBe(attemptId);
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: opKey!,
+      expectedAttemptId: attemptId!,
+      cfg,
+    });
+    expect(inv.ok).toBe(false);
+    if (inv.ok) {
+      throw new Error("expected invalidate reject after mark won");
+    }
+    expect(inv.reason).toBe("invalidate_invoke_already_started");
+
+    const afterBoard = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterBoard?.pendingEventRelay?.status).toBe("dispatched");
+    expect(afterBoard?.pendingEventRelay?.dispatchInvokeStarted).toBe(true);
+    expect(afterBoard?.pendingEventRelay?.dispatchAttemptId).toBe(attemptId);
+
+    const wakeAfter = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wakeAfter?.status).toBe("running");
+    expect(wakeAfter?.executionAttemptId).toBe(wakeAttemptBefore);
+
+    releasePause();
+    await liveRun;
+  });
+
+  test("counterexample: stale/old attempt cleanup late → reject → unchanged", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r7-stale-attempt";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    // Attempt A: permit then proven-dead invalidate (positive not-started path).
+    let releaseA!: () => void;
+    const pauseA = new Promise<void>((resolve) => {
+      releaseA = resolve;
+    });
+    let reachedA = false;
+    const runA = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => ({ ok: true, roundId: "r7-stale-a" }),
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedA = true;
+        await pauseA;
+      },
+    });
+    for (let i = 0; i < 200 && !reachedA; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedA).toBe(true);
+    const midA = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    const attemptA = midA?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = midA?.pendingEventRelay?.opKey;
+    expect(attemptA).toBeTruthy();
+    expect(opKey).toBeTruthy();
+
+    const invA = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: opKey!,
+      expectedAttemptId: attemptA!,
+      cfg,
+    });
+    expect(invA.ok).toBe(true);
+    releaseA();
+    await runA;
+
+    const afterA = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterA?.pendingEventRelay?.status).toBe("pending");
+
+    // Attempt B: new permit on same opKey.
+    let releaseB!: () => void;
+    const pauseB = new Promise<void>((resolve) => {
+      releaseB = resolve;
+    });
+    let reachedB = false;
+    let dispatchB = 0;
+    const runB = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => {
+        dispatchB += 1;
+        return { ok: true, roundId: "r7-stale-b" };
+      },
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedB = true;
+        await pauseB;
+      },
+    });
+    for (let i = 0; i < 200 && !reachedB; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedB).toBe(true);
+
+    const midB = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    const attemptB = midB?.pendingEventRelay?.dispatchAttemptId;
+    expect(attemptB).toBeTruthy();
+    expect(attemptB).not.toBe(attemptA);
+    expect(midB?.pendingEventRelay?.status).toBe("dispatched");
+
+    const wakeBefore = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wakeBefore?.status).toBe("running");
+    const wakeAttemptB = wakeBefore?.executionAttemptId;
+    expect(wakeAttemptB).toBeTruthy();
+
+    // Late cleanup for OLD attempt A must reject; persistent state unchanged.
+    const late = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: opKey!,
+      expectedAttemptId: attemptA!,
+      cfg,
+    });
+    expect(late.ok).toBe(false);
+    if (late.ok) {
+      throw new Error("expected stale attempt invalidate reject");
+    }
+    expect(late.reason).toBe("invalidate_attempt_mismatch");
+
+    const afterLate = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterLate?.pendingEventRelay?.status).toBe("dispatched");
+    expect(afterLate?.pendingEventRelay?.dispatchAttemptId).toBe(attemptB);
+    expect(afterLate?.pendingEventRelay?.dispatchInvokeStarted).not.toBe(true);
+
+    const wakeAfter = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wakeAfter?.status).toBe("running");
+    expect(wakeAfter?.executionAttemptId).toBe(wakeAttemptB);
+
+    releaseB();
+    const finishedB = await runB;
+    expect(finishedB.dispatched).toBe(true);
+    expect(dispatchB).toBe(1);
+  });
+
+  test("counterexample: unknown wake → reject → unchanged pending-verification", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r7-unknown-wake";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+    const liveRun = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => ({ ok: true, roundId: "r7-unknown" }),
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+
+    const mid = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = mid?.pendingEventRelay?.opKey;
+    expect(attemptId).toBeTruthy();
+    expect(opKey).toBeTruthy();
+
+    const unknowned = await markWakeOpUnknown({
+      authority: auth,
+      opKey: opKey!,
+      cfg,
+      detail: "r7_manual_unknown_pending_verification",
+    });
+    expect(unknowned?.status).toBe("unknown");
+    const wakeAttempt = unknowned?.executionAttemptId;
+
+    // Ensure board shows pendingVerification (heartbeat-style) without release.
+    const reconciled = await reconcilePermitAcquiredBoardEventRelays({
+      authority: auth,
+      items: mid ? [mid] : [],
+      cfg,
+    });
+    expect(reconciled.some((r) => r.pendingVerification)).toBe(true);
+
+    const beforeInv = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(beforeInv?.pendingEventRelay?.status).toBe("dispatched");
+    expect(beforeInv?.pendingEventRelay?.pendingVerification).toBe(true);
+    expect(beforeInv?.pendingEventRelay?.dispatchAttemptId).toBe(attemptId);
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: opKey!,
+      expectedAttemptId: attemptId!,
+      cfg,
+    });
+    expect(inv.ok).toBe(false);
+    if (inv.ok) {
+      throw new Error("expected unknown-wake invalidate reject");
+    }
+    expect(inv.reason).toBe("invalidate_wake_unknown_pending_verification");
+
+    const afterBoard = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(afterBoard?.pendingEventRelay?.status).toBe("dispatched");
+    expect(afterBoard?.pendingEventRelay?.pendingVerification).toBe(true);
+    expect(afterBoard?.pendingEventRelay?.dispatchAttemptId).toBe(attemptId);
+
+    const wakeAfter = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wakeAfter?.status).toBe("unknown");
+    expect(wakeAfter?.executionAttemptId).toBe(wakeAttempt);
+
+    releasePause();
+    await liveRun;
+  });
+
+  test("positive: permit not-started + proven-dead invalidate → recover once", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r7-positive-recover";
+    const { item } = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      submissionId: randomUUID(),
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+
+    let releasePause!: () => void;
+    const pause = new Promise<void>((resolve) => {
+      releasePause = resolve;
+    });
+    let reachedPause = false;
+    const oldRun = triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: item.itemId,
+      actorId: "bot-b",
+      cfg,
+      trusted: trustedLocatorFromAuthority(auth),
+      roundDispatcher: async () => ({ ok: true, roundId: "r7-old-must-not" }),
+      _testAfterPermitCommitBeforeDispatcher: async () => {
+        reachedPause = true;
+        await pause;
+      },
+    });
+    for (let i = 0; i < 200 && !reachedPause; i += 1) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(reachedPause).toBe(true);
+
+    const mid = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    const attemptId = mid?.pendingEventRelay?.dispatchAttemptId;
+    const opKey = mid?.pendingEventRelay?.opKey;
+    expect(attemptId).toBeTruthy();
+    expect(opKey).toBeTruthy();
+    expect(mid?.pendingEventRelay?.dispatchInvokeStarted).not.toBe(true);
+
+    const inv = await invalidatePermitAttemptForProvenDeadExecutor({
+      authority: auth,
+      taskId,
+      itemId: item.itemId,
+      expectedOpKey: opKey!,
+      expectedAttemptId: attemptId!,
+      cfg,
+    });
+    expect(inv.ok).toBe(true);
+
+    const wakeAfterInv = await readWakeOpRecord({ authority: auth, opKey: opKey! });
+    expect(wakeAfterInv?.status).toBe("failed");
+
+    const pending = await loadBoardClaimItem(auth, { taskId, itemId: item.itemId });
+    expect(pending?.pendingEventRelay?.status).toBe("pending");
+
+    releasePause();
+    const oldResult = await oldRun;
+    expect(oldResult.dispatched).toBe(false);
+
+    let dispatchCount = 0;
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: pending ? [pending] : [],
+      cfg,
+      roundDispatcher: async () => {
+        dispatchCount += 1;
+        return { ok: true, roundId: `r7-recover-${dispatchCount}` };
+      },
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(recovered.some((r) => r.dispatched)).toBe(true);
+    expect(dispatchCount).toBe(1);
   });
 });
 
