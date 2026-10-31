@@ -147,3 +147,19 @@ export {
   WakeOpGatewayRecoveryFlagOffError,
   WakeOpGatewayRecoveryEntryError,
 } from "./collaboration-learning/wake-op-gateway-recovery-entry.js";
+
+export {
+  controlledDiscussToTask,
+  FORMAL_TASK_FLAG_OFF_USER_MESSAGE,
+} from "./collaboration-learning/controlled-discuss-to-task.js";
+export { classifyDiscussToTaskIntent } from "./collaboration-learning/discuss-to-task-classify.js";
+export {
+  mintDiscussToTaskId,
+  DISCUSS_TO_TASK_ID_VERSION,
+  DISCUSS_TO_TASK_OPERATION_SLOT,
+} from "./collaboration-learning/discuss-to-task-id.js";
+export {
+  deriveFormalTaskUserStatus,
+  userMessageForFormalTaskStatus,
+} from "./collaboration-learning/discuss-to-task-receipt.js";
+export { maybeControlledDiscussToTaskBeforeDiscussion } from "./collaboration-learning/discuss-to-task-chat-hook.js";

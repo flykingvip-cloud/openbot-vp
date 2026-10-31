@@ -10173,6 +10173,41 @@ landingStreams:
       - .loom/registry.yaml
     canLandWith: []
     metadata: {}
+  - id: controlled-discuss-to-task-p1-20261031
+    landingPolicy: serial
+    paths:
+      - src/gateway/collaboration-learning/controlled-discuss-to-task.ts
+      - src/gateway/collaboration-learning/controlled-discuss-to-task.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-id.ts
+      - src/gateway/collaboration-learning/discuss-to-task-id.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-classify.ts
+      - src/gateway/collaboration-learning/discuss-to-task-classify.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-receipt.ts
+      - src/gateway/collaboration-learning/discuss-to-task-receipt.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-stages.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-hook.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/supplement-denial-diagnosis.ts
+      - src/gateway/collaboration-dispatch/supplement-denial-diagnosis.test.ts
+      - src/gateway/collaboration-dispatch/discussion-turn-prompt.ts
+      - src/gateway/collaboration-dispatch/discussion-turn-prompt.test.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/round-runtime.ts
+      - src/gateway/collaboration-dispatch/runtime-authority.ts
+      - src/gateway/server-methods/collaboration-task-activation.ts
+      - src/gateway/server-methods/collaboration-task-activation.pack.ts
+      - src/gateway/server-methods/collaboration-task-activation.pack.test.ts
+      - src/gateway/server-methods/collaboration-task-discuss-to-task.auth-boundary.test.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/server-methods/chat.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
+      - .loom/registry.yaml
+    canLandWith: []
+    metadata:
+      task: controlled-discuss-to-task-p1-20261031
+      owner: cursor-grok
+      purpose: P1 controlled discuss-to-formal-task entry
   - id: openbot-default-capability-p0-20261030
     landingPolicy: serial
     paths:
@@ -22548,6 +22583,46 @@ landingStreams:
       purpose: PR143 merge-prep audit notes (pointer to outside evidence; no DIGEST)
       task: pr143-market-assistant-merge-notes
       owner: grok-bot
+  - id: controlled-discuss-to-task-p1-20261031
+    owner: cursor-grok
+    intent:
+      - P1 controlled discuss-to-formal-task entry, stable taskId mint, diagnosis, receipt semantics
+    paths:
+      - src/gateway/collaboration-learning/controlled-discuss-to-task.ts
+      - src/gateway/collaboration-learning/controlled-discuss-to-task.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-id.ts
+      - src/gateway/collaboration-learning/discuss-to-task-id.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-classify.ts
+      - src/gateway/collaboration-learning/discuss-to-task-classify.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-receipt.ts
+      - src/gateway/collaboration-learning/discuss-to-task-receipt.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-stages.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-hook.ts
+      - src/gateway/collaboration-learning.ts
+      - src/gateway/collaboration-dispatch/supplement-denial-diagnosis.ts
+      - src/gateway/collaboration-dispatch/supplement-denial-diagnosis.test.ts
+      - src/gateway/collaboration-dispatch/discussion-turn-prompt.ts
+      - src/gateway/collaboration-dispatch/discussion-turn-prompt.test.ts
+      - src/gateway/collaboration-dispatch/effective-policy.ts
+      - src/gateway/collaboration-dispatch/round-runtime.ts
+      - src/gateway/collaboration-dispatch/runtime-authority.ts
+      - src/gateway/server-methods/collaboration-task-activation.ts
+      - src/gateway/server-methods/collaboration-task-activation.pack.ts
+      - src/gateway/server-methods/collaboration-task-activation.pack.test.ts
+      - src/gateway/server-methods/collaboration-task-discuss-to-task.auth-boundary.test.ts
+      - src/gateway/server-methods/packs/manifest.ts
+      - src/gateway/server-methods/chat.ts
+      - src/agents/tools/collaboration-board-tool.ts
+      - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
+      - .loom/registry.yaml
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: "2026-10-31"
+    metadata:
+      provisionId: a8d23812-36a4-498e-a962-712f0734cd16
+      branch: cursor-grok/controlled-discuss-to-task-p1-20261031
+
 sharedPaths:
   - glob: src/context-engine/registry.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

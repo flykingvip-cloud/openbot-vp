@@ -258,6 +258,11 @@ export type PolicyDecisionRecord = {
   };
   /** Per-candidate Cheap Gate verdicts, including drop reasons. */
   supplementGate?: SupplementGateEntry[];
+  /**
+   * Optional compatible diagnosis (phase-1 discuss→task). Legacy rounds omit it
+   * and must still load. Does not change budget rules.
+   */
+  supplementDenialDiagnosis?: import("./supplement-denial-diagnosis.js").SupplementDenialDiagnosis;
   /** P0.0b: CollaborationEventKey (only appended; legacy records may omit). */
   key?: CollaborationEventKey;
 };
