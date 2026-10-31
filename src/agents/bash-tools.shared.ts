@@ -92,10 +92,15 @@ export async function resolveSandboxWorkdir(params: {
   warnings: string[];
 }) {
   const fallback = params.sandbox.workspaceDir;
-  const mappedHostWorkdir = mapContainerWorkdirToHost({
-    workdir: params.workdir,
-    sandbox: params.sandbox,
-  });
+  const mappedHostWorkdir =
+    mapContainerWorkdirToHost({
+      workdir: params.workdir,
+      sandbox: params.sandbox,
+    }) ??
+    mapGatewayAbsoluteHostWorkdir({
+      workdir: params.workdir,
+      sandbox: params.sandbox,
+    });
   const candidateWorkdir = mappedHostWorkdir ?? params.workdir;
   try {
     const resolved = await assertSandboxPath({
@@ -145,6 +150,28 @@ function mapContainerWorkdirToHost(params: {
     .split("/")
     .filter(Boolean);
   return path.resolve(params.sandbox.workspaceDir, ...rel);
+}
+
+/**
+ * Models often pass gateway-absolute workspace paths (`/root/.openbot/operators/.../workspace`).
+ * Those are the same host tree bound at `/account/workspace` (or `/workspace`) in the
+ * sandbox. Map them onto the sandbox workspace root so docker exec uses the
+ * container mount, not a gateway cwd.
+ */
+function mapGatewayAbsoluteHostWorkdir(params: {
+  workdir: string;
+  sandbox: BashSandboxConfig;
+}): string | undefined {
+  const raw = params.workdir.trim();
+  if (!raw || !path.isAbsolute(raw)) {
+    return undefined;
+  }
+  const workspaceRoot = path.resolve(params.sandbox.workspaceDir);
+  const resolved = path.resolve(raw);
+  if (resolved === workspaceRoot || resolved.startsWith(`${workspaceRoot}${path.sep}`)) {
+    return resolved;
+  }
+  return undefined;
 }
 
 function normalizeContainerPath(input: string): string {

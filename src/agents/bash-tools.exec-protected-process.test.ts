@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertProtectedGatewayProcessCommandAllowed,
+  preferBoundSandboxExecHost,
   resolveConfiguredExecHost,
 } from "./bash-tools.exec-protected-process.js";
 import { createExecTool } from "./bash-tools.exec.js";
@@ -26,6 +27,63 @@ describe("exec host default", () => {
     await expect(
       tool.execute("default-host-regression", { command: "echo must-not-run" }),
     ).rejects.toThrow(/exec denied/i);
+  });
+});
+
+describe("preferBoundSandboxExecHost", () => {
+  it("keeps agent host=gateway on sandbox when a session sandbox is bound", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "gateway",
+        sandboxAvailable: true,
+        requestedHost: null,
+        elevatedRequested: false,
+      }),
+    ).toBe("sandbox");
+  });
+
+  it("does not remap when no sandbox is bound", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "gateway",
+        sandboxAvailable: false,
+        requestedHost: null,
+        elevatedRequested: false,
+      }),
+    ).toBe("gateway");
+  });
+
+  it("keeps elevated break-glass on gateway", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "gateway",
+        sandboxAvailable: true,
+        requestedHost: null,
+        elevatedRequested: true,
+      }),
+    ).toBe("gateway");
+  });
+
+  it("keeps an explicit model-requested gateway host", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "gateway",
+        sandboxAvailable: true,
+        requestedHost: "gateway",
+        elevatedRequested: false,
+      }),
+    ).toBe("gateway");
+  });
+
+  it("leaves sandbox host unchanged", () => {
+    expect(
+      preferBoundSandboxExecHost({
+        host: "sandbox",
+        sandboxAvailable: true,
+        requestedHost: null,
+        elevatedRequested: false,
+      }),
+    ).toBe("sandbox");
   });
 });
 

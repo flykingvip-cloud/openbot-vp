@@ -37,6 +37,7 @@ import {
   clampWithDefault,
   readEnvInt,
 } from "./bash-tools.shared.js";
+import { resolveDockerSpawnInvocation } from "./sandbox/docker.js";
 import { buildCursorPositionResponse, stripDsrRequests } from "./pty-dsr.js";
 import { getShellConfig, sanitizeBinaryOutput } from "./shell-utils.js";
 
@@ -418,18 +419,19 @@ export async function runExecProcess(opts: {
         stdinMode: "pipe-open";
       } = (() => {
     if (opts.sandbox) {
+      // Honor OPENBOT_DOCKER_BIN / OPENCLAW_DOCKER_BIN the same way fs-bridge
+      // and account-worker do — do not hardcode "docker" on PATH.
+      const dockerArgs = buildDockerExecArgs({
+        containerName: opts.sandbox.containerName,
+        command: execCommand,
+        workdir: opts.containerWorkdir ?? opts.sandbox.containerWorkdir,
+        env: shellRuntimeEnv,
+        tty: opts.usePty,
+      });
+      const invocation = resolveDockerSpawnInvocation(dockerArgs);
       return {
         mode: "child" as const,
-        argv: [
-          "docker",
-          ...buildDockerExecArgs({
-            containerName: opts.sandbox.containerName,
-            command: execCommand,
-            workdir: opts.containerWorkdir ?? opts.sandbox.containerWorkdir,
-            env: shellRuntimeEnv,
-            tty: opts.usePty,
-          }),
-        ],
+        argv: [invocation.command, ...invocation.args],
         env: process.env,
         stdinMode: opts.usePty ? ("pipe-open" as const) : ("pipe-closed" as const),
       };
