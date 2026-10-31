@@ -1,0 +1,33 @@
+{
+  "method": "donor_primary; audit_fallback_only_when_donor_missing_object",
+  "timezone_label": "Asia/Shanghai (UTC+8)",
+  "origin_main": "0e4d269615e26909bbac606f1dfb755b3511400c",
+  "pr171_head": "e049e76bf41aed231828dc2c276a97cb31171580",
+  "pr172_head_ledger_under_audit": "d189e74f85ff2838b0df0b469ca5eeae39bf9724",
+  "audit_worktree": "/Users/daniel/AI VP/openbot-infrastructure-audit",
+  "audit_shallow": true,
+  "shallow_boundary": "9a8e91d19e893fc5d963103538cdbd35f315ac30",
+  "donor": "/Users/daniel/AI项目/openbot",
+  "prior_narrative": {
+    "missing_object": 145,
+    "proven_dag_break": 1,
+    "forward_only": 0
+  },
+  "counts_after_donor_primary": {
+    "forward-only": 141,
+    "proven_dag_break": 5,
+    "missing_object_dual_repo": 0,
+    "incomplete_graph": 0
+  },
+  "proven_break_seqs": [52, 100, 121, 140, 145],
+  "recovered_tips_into_audit_refs": 137,
+  "github_commit_api_sample_all_422": true,
+  "origin_fetch_not_our_ref": true,
+  "provenance_tags_on_origin": 0,
+  "no_acknowledge_written": true,
+  "no_releases_jsonl_change": true,
+  "no_release_record_change": true,
+  "caveat": "proven_dag_break = DAG/SoT discontinuity only; NOT functional content rollback",
+  "historical_audit_still_fail_closed": true,
+  "ledger_audit_exit": 30
+}
