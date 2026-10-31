@@ -3603,6 +3603,190 @@ describe("P2 R10 — CAS null/corrupt must not be safe reject (shared判定)", (
   });
 });
 
+describe("P2 final — isolated entry closed loop (submit→review→return→revise→accept)", () => {
+  test("entry loop: review dispatch, return-revise, formal resubmit, accept then no further advance", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-final-closed-loop";
+    const seeded = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+
+    // 1) submit → review dispatch
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft v1\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    let reviewCalls = 0;
+    let reviewPrompt = "";
+    const reviewAdvance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      cfg,
+      roundDispatcher: async (req) => {
+        reviewCalls += 1;
+        reviewPrompt = req.dispatchPrompt ?? "";
+        return { ok: true, roundId: "final-loop-review" };
+      },
+      trusted: trustedLocatorFromAuthority(auth),
+    });
+    expect(reviewAdvance.dispatched).toBe(true);
+    expect(reviewCalls).toBe(1);
+    expect(reviewPrompt).toContain("intent=review_submission");
+
+    // 2) return → return-revise dispatch
+    const ret = await returnCollaborationBoardItemSubmission({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      expectedSubmissionId: submissionId,
+      reason: "revise for closed-loop proof",
+      actor: "bot-b",
+      cfg,
+      relayAdvance: false,
+    });
+    expect(ret.item.status).toBe("returned");
+    let returnCalls = 0;
+    let returnPrompt = "";
+    const returnAdvance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      cfg,
+      roundDispatcher: async (req) => {
+        returnCalls += 1;
+        returnPrompt = req.dispatchPrompt ?? "";
+        return { ok: true, roundId: "final-loop-return" };
+      },
+      trusted: trustedLocatorFromAuthority(auth),
+    });
+    expect(returnAdvance.dispatched).toBe(true);
+    expect(returnCalls).toBe(1);
+    expect(returnPrompt).toContain("intent=return_revise");
+    expect(returnPrompt).not.toContain("intent=review_submission");
+
+    // 3) revise formal submit (board resubmit with new linked deliverable fixture)
+    const resumed = await markBoardItemInProgress(
+      auth,
+      { taskId, itemId: seeded.item.itemId, actorId: "bot-a" },
+      { cfg },
+    );
+    expect(resumed.ok).toBe(true);
+    const linkV2 = await seedLink(auth, taskId, {
+      deliverableId: "del-final-loop-v2",
+      version: 2,
+      content: "# Draft v2\nrevised closed-loop body\n",
+    });
+    const submissionId2 = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      submissionId: submissionId2,
+      artifactVersion: "art-v2",
+      submissionSummary: "# Draft v2\nrevised closed-loop body",
+      ...linkV2,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    const afterResubmit = await loadBoardClaimItem(auth, {
+      taskId,
+      itemId: seeded.item.itemId,
+    });
+    expect(afterResubmit?.status).toBe("submitted_for_review");
+    expect(afterResubmit?.pendingEventRelay?.businessEvent).toBe("submitted_for_review");
+    const staleAfterResubmit = afterResubmit?.pendingEventRelay ?? null;
+
+    // 4) accept
+    const accepted = await acceptCollaborationBoardItemSubmission({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      expectedSubmissionId: submissionId2,
+      reason: "closed-loop accept",
+      checkedAcceptanceCriteria: ["has title", "has body"],
+      actor: "bot-b",
+      cfg,
+      relayAdvance: false,
+    });
+    expect(accepted.item.status).toBe("accepted");
+    expect(accepted.item.pendingEventRelay).toBeNull();
+
+    // 5) after accept: no further advance / redispatch (fresh + stale pending)
+    let postAcceptCalls = 0;
+    const postAccept: WakeRoundDispatcher = async () => {
+      postAcceptCalls += 1;
+      return { ok: true, roundId: "must-not-run" };
+    };
+    const afterAcceptAdvance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      cfg,
+      roundDispatcher: postAccept,
+      trusted: trustedLocatorFromAuthority(auth),
+    });
+    expect(afterAcceptAdvance.dispatched).toBe(false);
+    expect(postAcceptCalls).toBe(0);
+
+    const staleAdvance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      pending: staleAfterResubmit ?? undefined,
+      cfg,
+      roundDispatcher: postAccept,
+      trusted: trustedLocatorFromAuthority(auth),
+    });
+    expect(staleAdvance.dispatched).toBe(false);
+    expect(postAcceptCalls).toBe(0);
+    expect(
+      staleAdvance.reason === "accepted_no_further_exec_schedule" ||
+        staleAdvance.reason === "pending_opkey_stale_or_superseded" ||
+        staleAdvance.reason === "no_pending_event_relay" ||
+        afterAcceptAdvance.reason === "accepted_no_further_exec_schedule" ||
+        afterAcceptAdvance.reason === "no_pending_event_relay",
+    ).toBe(true);
+
+    const acceptedItem = await loadBoardClaimItem(auth, {
+      taskId,
+      itemId: seeded.item.itemId,
+    });
+    const recovered = await recoverPendingBoardEventRelays({
+      groupId: auth.groupId,
+      taskId,
+      actorId: "bot-b",
+      items: acceptedItem ? [acceptedItem] : [],
+      cfg,
+      roundDispatcher: postAccept,
+      trusted: trustedLocatorFromAuthority(auth),
+      authority: auth,
+    });
+    expect(recovered).toHaveLength(0);
+    expect(postAcceptCalls).toBe(0);
+  });
+});
+
 function viRespond() {
   const calls: unknown[][] = [];
   const fn = (...args: unknown[]) => {

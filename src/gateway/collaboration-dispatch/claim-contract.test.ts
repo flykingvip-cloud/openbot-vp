@@ -921,12 +921,8 @@ describe("C1 claim progress states", () => {
   });
 
   test("flag-on: apply → in_progress → submit(submission_id) → accept; illegal jumps refused", async () => {
-    const {
-      markBoardItemInProgress,
-      submitBoardItemForReview,
-      returnBoardItemSubmission,
-      isBoardClaimSubmissionId,
-    } = await import("./claim-contract.js");
+    const { markBoardItemInProgress, returnBoardItemSubmission, isBoardClaimSubmissionId } =
+      await import("./claim-contract.js");
     const { cfg } = await useConfig(true);
     const auth = authority(cfg);
 
