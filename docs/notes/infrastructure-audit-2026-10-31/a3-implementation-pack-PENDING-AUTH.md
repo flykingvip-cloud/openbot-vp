@@ -1,6 +1,6 @@
 # A3 implementation pack — PENDING AUTH — 2026-10-31
 
-**Status: reviewable pack only. Not authorized. Not executed. Do not merge YAML to default. Do not `workflow_dispatch` / `gh workflow run`.**
+**Status: merge-prep ready (workflow_dispatch-only; merge does not auto-run). Run still PENDING AUTH. Not executed. Do not `workflow_dispatch` / `gh workflow run` without separate owner run auth.**
 
 Based on the Codex-accepted corrected plan at #172 tip `d189e74f`
 (`docs/notes/infrastructure-audit-2026-10-31/a3-control-experiment-plan-PENDING-AUTH.md`)
@@ -69,14 +69,25 @@ After **explicit owner authorization to land YAML on default**:
 
 1. Merge **only** `.github/workflows/audit-a3-runner-probe.yml` (plus this docs pack if desired) onto the repository default branch (`main`).
 2. Confirm registration: `gh workflow list --repo flykingvip-cloud/openbot-vp` shows `Audit A3 runner probe` / `audit-a3-runner-probe.yml` as active on default.
-3. Record workflow file SHA256 on default:
+3. Record the workflow file **Git blob SHA** on default (Contents API `.sha` is the **git blob OID**, **not** a content SHA256):
    `gh api repos/flykingvip-cloud/openbot-vp/contents/.github/workflows/audit-a3-runner-probe.yml?ref=main --jq .sha`
-4. Choose exact full commit SHA for run checkout (not “latest main” loosely). Write it to evidence `dispatch-ref.txt` **before** dispatch.
-5. Only after a **second** explicit owner authorization to **run**:
-   `gh workflow run audit-a3-runner-probe.yml --ref <exact-full-SHA>`
-6. Capture run id immediately; do not spam retries.
+   Optional content integrity (separate from `.sha`): `git hash-object` / `sha256sum` of the file bytes — label clearly if recorded.
+4. **Stop here for merge-registration evidence.** Do **not** dispatch yet. Write `merge-registration.txt` (see below).
+5. Choose exact full commit SHA for run checkout (not “latest main” loosely). Write it to evidence `dispatch-ref.txt` **before** dispatch — only after a **second** explicit owner authorization to **run**.
+6. `gh workflow run audit-a3-runner-probe.yml --ref <exact-full-SHA>`
+7. Capture run id immediately; do not spam retries.
 
 **If YAML exists only on a feature branch:** do **not** expect `gh workflow run … --ref <feature>` to work. That is not a substitute for default-branch registration.
+
+## Merge registration vs actual run (keep separate ledgers)
+
+| Record | When | Must include | Must NOT include |
+|---|---|---|---|
+| `merge-registration.txt` | Immediately after YAML lands on default and `gh workflow list` shows it | merge commit SHA; Contents API **Git blob SHA** (`.sha`); workflow list snippet; merge-auth quote; Asia/Shanghai timestamp | any `workflow_dispatch` / run id / job conclusion |
+| `dispatch-ref.txt` + `a3-evidence/<run_id>/` | Only after **separate** owner **run** auth | `--ref` full SHA; blob SHA at dispatch; run id; classification | rewriting merge-registration as if a run happened |
+
+Merging this PR **registers** `workflow_dispatch` on default; it does **not** start a run. Treat “landed on main” and “probe executed” as different events with different evidence files.
+
 
 ## Expected permissions, pinned ref, evidence fields
 
@@ -99,7 +110,9 @@ After **explicit owner authorization to land YAML on default**:
 | `run.json` | `gh api repos/flykingvip-cloud/openbot-vp/actions/runs/<id>` |
 | `jobs.json` | jobs + steps (`runner_name` / `runner_id`) |
 | `attempt-log.txt` | `gh run view --log` or note of log 404 |
-| `dispatch-ref.txt` | full `--ref` SHA + workflow file SHA256 + default-branch registration confirmation |
+| `merge-registration.txt` | **merge-only:** merge commit SHA, Contents API Git **blob** SHA (`.sha`), `gh workflow list` proof, Asia/Shanghai time, merge-auth quote — **no run id** |
+| `dispatch-ref.txt` | **run-only (after separate run auth):** full `--ref` SHA + Contents API Git blob SHA + operator + run-auth quote |
+| `content-sha256.txt` (optional) | file bytes SHA256 via `sha256sum` / `git hash-object` — **must not** be labeled as Contents API `.sha` |
 | `classification.txt` | one of the failure/success classes below |
 
 ## Cost ceiling and stop conditions
@@ -156,7 +169,7 @@ After owner confirms evidence is retained:
 | Branch | `audit/a3-implementation-pack-PENDING-AUTH-20261031` |
 | Related open PRs (do not stack) | #171, #172, #173, #174 |
 | Executed? | **No** |
-| Merged to default? | **No** (must not, without owner auth) |
+| Merged to default? | **No yet** (merge-prep ready; merge auth ≠ run auth) |
 
 ## Files in this pack
 
