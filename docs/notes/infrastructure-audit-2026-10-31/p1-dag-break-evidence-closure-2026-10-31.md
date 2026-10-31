@@ -39,7 +39,7 @@ Machine-readable: `p1-dag-break-evidence-closure-2026-10-31.json`, `p1-dag-break
 
 ## Authoritative current classification
 
-**唯一当前有效分类表**：`p1-current-classification-2026-10-31.json`  
+**唯一当前有效分类表**：`p1-current-classification-2026-10-31.json`
 （`p1-reclassification-summary.json` 仅保留 HISTORICAL donor_primary 快照；勿把其顶层旧字段当现行口径。）
 
 ## Count口径 (141＋5＝146 → 调整视图 145＋1)
