@@ -432,6 +432,9 @@ export function createOpenClawTools(
               options?.gatewayClientSessionEnterpriseId ??
               options?.tenantId ??
               null,
+            inboundSourceMessageId:
+              options?.agentRunId ??
+              (options?.currentMessageId != null ? String(options.currentMessageId) : null),
             gatewayClientUser: identityFields.gatewayClientUser,
             gatewayClientPlatformUserId: identityFields.gatewayClientPlatformUserId,
             gatewayClientSessionDomain: identityFields.gatewayClientSessionDomain,

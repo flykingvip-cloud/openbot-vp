@@ -43,6 +43,7 @@ import {
   resolveDeliveryAclActor,
   type DeliveryActorClient,
 } from "../../gateway/collaboration-learning/delivery-actor-binding.js";
+import { assertDiscussToTaskSourceBinding } from "../../gateway/collaboration-learning/discuss-to-task-source-binding.js";
 import {
   assertPersistedTaskNotStopped,
   TaskStoppedError,
@@ -172,13 +173,12 @@ const CollaborationBoardSchema = Type.Object({
   sourceMessageId: Type.Optional(
     Type.String({
       description:
-        "discuss_to_task: authenticated inbound message id (required for discuss_to_task; stable across retries).",
+        "IGNORED for discuss_to_task — sourceMessageId is injected from trusted execution context; model must not fill or override.",
     }),
   ),
   forceExplicit: Type.Optional(
     Type.Boolean({
-      description:
-        "discuss_to_task: skip classifier when server already validated explicit delegation.",
+      description: "IGNORED for discuss_to_task — model cannot force explicit classification.",
     }),
   ),
   title: Type.Optional(
@@ -203,7 +203,7 @@ const CollaborationBoardSchema = Type.Object({
   humanConfirmed: Type.Optional(
     Type.Boolean({
       description:
-        "activate_task: true publishes the board item. The human gate is the later todolist card, not this flag.",
+        "activate_task only: true publishes the board item. FORBIDDEN for discuss_to_task (phase-1 rejects model-set confirm).",
     }),
   ),
   dueAtMs: Type.Optional(Type.Number({ description: "activate_task due time in epoch ms." })),
@@ -474,6 +474,11 @@ export function createCollaborationBoardTool(options?: {
    * Distinct from allowlist tenant normalization, which drops UUIDs.
    */
   stampedEnterpriseId?: string | null;
+  /**
+   * Authenticated inbound message id for this turn (clientRunId / MessageSid).
+   * Injected by composition root — discuss_to_task must not read model args.
+   */
+  inboundSourceMessageId?: string | null;
   gatewayClientUser?: string;
   gatewayClientPlatformUserId?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
@@ -499,6 +504,7 @@ export function createCollaborationBoardTool(options?: {
   const listTodolists = deps.listTodolists ?? listCollaborationTodolists;
   const resolveTrustedTeam = deps.resolveTrustedTeam ?? resolveCompositionTrustedTeamContext;
   const stampedEnterpriseId = compact(options?.stampedEnterpriseId);
+  const inboundSourceMessageId = compact(options?.inboundSourceMessageId);
 
   return {
     name: COLLABORATION_BOARD_TOOL,
@@ -621,13 +627,51 @@ export function createCollaborationBoardTool(options?: {
         }
 
         if (action === "discuss_to_task") {
-          const sourceMessageId = readStringParam(params, "sourceMessageId", { required: true });
+          // Model must not fill/override sourceMessageId, humanConfirmed, or forceExplicit.
+          if (params.humanConfirmed === true) {
+            return failResult(
+              "discuss_to_task_confirm_forbidden",
+              "discuss_to_task rejects model-set humanConfirmed; phase-1 requires server confirm path",
+            );
+          }
+          if (params.requireHumanConfirm === false) {
+            return failResult(
+              "discuss_to_task_confirm_bypass_forbidden",
+              "discuss_to_task rejects requireHumanConfirm=false",
+            );
+          }
+          const modelSource = readStringParam(params, "sourceMessageId");
+          const sourceMessageId = inboundSourceMessageId;
+          if (!sourceMessageId) {
+            return failResult(
+              "discuss_to_task_source_unbound",
+              "discuss_to_task requires trusted inbound sourceMessageId from execution context",
+            );
+          }
+          if (modelSource && modelSource !== sourceMessageId) {
+            return failResult(
+              "discuss_to_task_source_override_forbidden",
+              "model must not override trusted sourceMessageId",
+            );
+          }
           const title = readStringParam(params, "title");
           const message = readStringParam(params, "message", { required: true });
           const suggested = readStringList(params.suggestedClaimantIds) ?? [
             bareCollaborationAgentId(agentId),
           ];
           const tenantId = team.auth?.tenantId?.trim() || team.tenant?.tenantId?.trim() || "_local";
+          const binding = assertDiscussToTaskSourceBinding({
+            sourceMessageId,
+            tenantId,
+            groupId,
+            actor: actorId,
+          });
+          if (!binding.ok) {
+            return failResult(
+              binding.reason,
+              binding.detail ?? "sourceMessageId is not bound to this authenticated inbound",
+            );
+          }
           const result = await controlledDiscussToTask({
             groupId,
             sourceMessageId,
@@ -640,21 +684,21 @@ export function createCollaborationBoardTool(options?: {
             constraints: readStringList(params.constraints),
             suggestedClaimantIds: suggested,
             dueAtMs: typeof params.dueAtMs === "number" ? params.dueAtMs : undefined,
-            humanConfirmed: params.humanConfirmed === true,
-            forceExplicit: params.forceExplicit === true,
+            humanConfirmed: false,
+            forceExplicit: false,
             auth: bound.auth,
             trusted: bound.trusted,
             tenant: bound.tenant,
             cfg,
           });
           return jsonResult({
-            ok: result.attempted && result.stages.taskEstablished,
+            ok: result.attempted && result.stages.taskEstablished === true,
             action,
             groupId,
             locatorBound: true,
             discussToTask: result,
             // suggestedClaimantIds are never actual claimants
-            responsibilityAccepted: false,
+            responsibilityAccepted: result.stages.responsibilityAccepted === true,
           });
         }
 

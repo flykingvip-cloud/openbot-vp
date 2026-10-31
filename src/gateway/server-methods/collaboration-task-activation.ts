@@ -12,6 +12,11 @@ import { tryConfirmPlanFromChat } from "../collaboration-learning/chat-plan-conf
 import { controlledDiscussToTask } from "../collaboration-learning/controlled-discuss-to-task.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import {
+  assertDiscussToTaskSourceBinding,
+  registerDiscussToTaskSourceBinding,
+} from "../collaboration-learning/discuss-to-task-source-binding.js";
+import { stagesFromActivation } from "../collaboration-learning/discuss-to-task-stages.js";
+import {
   checkMemberDispatchReadiness,
   ensureRegisteredMemberMainSession,
   type TrustedMemberResolution,
@@ -286,6 +291,32 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
       );
       return;
     }
+    // Phase-1: forbid client confirm / confirm-bypass.
+    if (readBoolean(params?.humanConfirmed) === true) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          "humanConfirmed must not be set by client for discussToTask (phase-1)",
+        ),
+      );
+      return;
+    }
+    if (
+      params?.requireHumanConfirm === false ||
+      readBoolean(params?.requireHumanConfirm) === false
+    ) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          "requireHumanConfirm=false is forbidden for discussToTask (phase-1)",
+        ),
+      );
+      return;
+    }
     try {
       const tenant = await resolveCollaborationTenantResolution(client);
       const actor = await resolveDeliveryAclActor(client, groupId);
@@ -304,6 +335,13 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         tenant,
         action: "write",
       });
+      const emptyStages = stagesFromActivation({
+        taskEnsured: false,
+        boardPublished: false,
+        responsibilityAccepted: false,
+        planProposed: false,
+        planConfirmed: false,
+      });
       if (!auth.ok) {
         respond(
           true,
@@ -314,13 +352,7 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
             taskId: null,
             activationKey: null,
             activation: null,
-            stages: {
-              taskEstablished: false,
-              boardPublished: false,
-              responsibilityAccepted: false,
-              planProposed: false,
-              planConfirmed: false,
-            },
+            stages: emptyStages,
             statusCode: "formal_task_blocked_auth",
             userMessage: "无权在该组建立正式任务。",
             internalReason: auth.reason,
@@ -343,13 +375,7 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
             taskId: null,
             activationKey: null,
             activation: null,
-            stages: {
-              taskEstablished: false,
-              boardPublished: false,
-              responsibilityAccepted: false,
-              planProposed: false,
-              planConfirmed: false,
-            },
+            stages: emptyStages,
             statusCode: "formal_task_blocked_auth",
             userMessage: "无权在该组建立正式任务。",
             internalReason: "tenant_required",
@@ -357,6 +383,37 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
           undefined,
         );
         return;
+      }
+      // Source/idempotency key ownership: existing binding must match actor
+      // (no cross-user borrow). Unbound ids may be first-claimed by this
+      // authenticated RPC actor only — model/tool cannot invent outside context.
+      const existing = assertDiscussToTaskSourceBinding({
+        sourceMessageId,
+        tenantId,
+        groupId,
+        actor,
+      });
+      if (!existing.ok) {
+        if (
+          existing.reason === "source_message_actor_mismatch" ||
+          existing.reason === "source_message_binding_expired"
+        ) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.INVALID_REQUEST,
+              `${existing.reason}: ${existing.detail ?? "cannot borrow or reuse foreign sourceMessageId"}`,
+            ),
+          );
+          return;
+        }
+        registerDiscussToTaskSourceBinding({
+          sourceMessageId,
+          tenantId,
+          groupId,
+          actor,
+        });
       }
       const result = await controlledDiscussToTask({
         groupId,
@@ -371,9 +428,8 @@ export const collaborationTaskActivationHandlers: GatewayRequestHandlers = {
         suggestedClaimantIds: readStringArray(params?.suggestedClaimantIds),
         suggestedRole: readString(params?.suggestedRole),
         dueAtMs: readNumber(params?.dueAtMs),
-        // Classification / RPC must not mint humanConfirmed by default.
-        humanConfirmed: readBoolean(params?.humanConfirmed) === true,
-        requireHumanConfirm: readBoolean(params?.requireHumanConfirm),
+        humanConfirmed: false,
+        requireHumanConfirm: true,
         forceExplicit: readBoolean(params?.forceExplicit) === true,
         tenant,
         auth,

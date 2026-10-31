@@ -10201,6 +10201,14 @@ landingStreams:
       - src/gateway/server-methods/packs/manifest.ts
       - src/gateway/server-methods/chat.ts
       - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/collaboration-learning/discuss-to-task-source-binding.ts
+      - src/gateway/collaboration-learning/discuss-to-task-source-binding.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-entry.test.ts
+      - src/gateway/collaboration-learning/activate-collaboration-task.ts
+      - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
+      - src/agents/openclaw-tools.ts
       - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
       - .loom/registry.yaml
     canLandWith: []
@@ -22613,6 +22621,14 @@ landingStreams:
       - src/gateway/server-methods/packs/manifest.ts
       - src/gateway/server-methods/chat.ts
       - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/collaboration-learning/discuss-to-task-source-binding.ts
+      - src/gateway/collaboration-learning/discuss-to-task-source-binding.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-receipt.test.ts
+      - src/gateway/collaboration-learning/discuss-to-task-chat-entry.test.ts
+      - src/gateway/collaboration-learning/activate-collaboration-task.ts
+      - src/gateway/collaboration-learning/activate-collaboration-task.test.ts
+      - src/agents/openclaw-tools.ts
       - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
       - .loom/registry.yaml
     state: active
