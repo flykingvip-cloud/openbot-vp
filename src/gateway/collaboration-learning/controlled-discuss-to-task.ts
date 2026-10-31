@@ -3,7 +3,7 @@
  *
  * Authenticated inbound → classify → mint stable taskId → reuse
  * activateCollaborationTask / materialize / publish. No second task store.
- * humanConfirmed defaults false (needs_confirm). Flag-off keeps precise internal
+ * humanConfirmed forced false (needs_confirm); meta tags commit inside activate lock. Flag-off keeps precise internal
  * codes and a unified user message. Recovery uses first-accepted contract +
  * activation fingerprint; same request with different goal/acceptance conflicts.
  */
@@ -28,7 +28,8 @@ import {
 } from "./discuss-to-task-receipt.js";
 import type { FormalTaskStageSnapshot } from "./discuss-to-task-receipt.js";
 import {
-  mergeDiscussToTaskTags,
+  buildDiscussToTaskTags,
+  readAuthoritativeDiscussToTaskStages,
   readDiscussToTaskMetaFromTags,
   stagesFromActivation,
 } from "./discuss-to-task-stages.js";
@@ -56,10 +57,12 @@ export type ControlledDiscussToTaskInput = {
   suggestedRole?: string;
   dueAtMs?: number;
   /**
-   * Default false. Pre-auth must be server-validated elsewhere; classification
-   * alone must not mint humanConfirmed.
+   * Phase-1: ignored. Client/model cannot set humanConfirmed or bypass
+   * requireHumanConfirm; no preauth shortcut in this PR.
+   * @deprecated Accepted for type compat only — always forced false/true.
    */
   humanConfirmed?: boolean;
+  /** @deprecated Phase-1 always forces true. */
   requireHumanConfirm?: boolean;
   skipChallengeWindow?: boolean;
   roundId?: string;
@@ -147,52 +150,6 @@ async function readExistingTask(params: {
   } catch {
     return null;
   }
-}
-
-async function stampDiscussToTaskMeta(params: {
-  groupId: string;
-  taskId: string;
-  sourceMessageId: string;
-  contractFingerprint: string;
-  operationSlot: string;
-  cfg: OpenBotConfig;
-  auth?: TeamResourceAuthOk | null;
-  trusted?: { groupsRoot: string; groupLocator: string } | null;
-  tenant?: CollaborationTenantResolution | null;
-  actor: string;
-  nowMs?: number;
-}): Promise<void> {
-  const resolved = resolveTeamDeliverableStores({
-    auth: params.auth,
-    trusted: params.trusted,
-    groupId: params.groupId,
-    cfg: params.cfg,
-    tenantId: params.auth?.tenantId ?? params.tenant?.tenantId ?? null,
-  });
-  if (!resolved.ok) {
-    return;
-  }
-  const existing = await resolved.objectStorage.readObject<Task>(
-    params.groupId,
-    "task",
-    params.taskId,
-  );
-  if (!existing) {
-    return;
-  }
-  const tags = mergeDiscussToTaskTags(existing.tags, {
-    sourceMessageId: params.sourceMessageId,
-    contractFingerprint: params.contractFingerprint,
-    operationSlot: params.operationSlot,
-  });
-  const now = params.nowMs ?? Date.now();
-  const updated: Task = {
-    ...existing,
-    tags,
-    updatedBy: compact(params.actor) || existing.updatedBy,
-    updatedAtMs: now,
-  };
-  await resolved.objectStorage.writeObject(params.groupId, "task", params.taskId, updated);
 }
 
 function finish(params: {
@@ -365,6 +322,23 @@ export async function controlledDiscussToTask(
   if (existing) {
     const meta = readDiscussToTaskMetaFromTags(existing.tags);
     if (meta && meta.contractFingerprint && meta.contractFingerprint !== fp) {
+      const conflictStages = input.cfg
+        ? await readAuthoritativeDiscussToTaskStages({
+            groupId,
+            taskId,
+            cfg: input.cfg,
+            auth: input.auth,
+            trusted: input.trusted,
+            tenant: input.tenant,
+            activationHints: { taskEnsured: true },
+          })
+        : stagesFromActivation({
+            taskEnsured: true,
+            boardPublished: "unknown",
+            responsibilityAccepted: "unknown",
+            planProposed: "unknown",
+            planConfirmed: "unknown",
+          });
       return finish({
         classification,
         attempted: true,
@@ -377,21 +351,24 @@ export async function controlledDiscussToTask(
           reason: "discuss_to_task_contract_conflict",
           detail: `firstAccepted=${meta.contractFingerprint} requested=${fp}`,
           taskEnsured: true,
-          boardPublished: false,
+          boardPublished: conflictStages.boardPublished === true,
           dispatched: false,
         },
-        stages: stagesFromActivation({
-          taskEnsured: true,
-          boardPublished: false,
-        }),
+        stages: conflictStages,
         internalReason: "discuss_to_task_contract_conflict",
         contractConflict: true,
       });
     }
   }
 
-  // Default: do NOT set humanConfirmed from classification.
-  const humanConfirmed = input.humanConfirmed === true;
+  // Phase-1: never accept client/model humanConfirmed or requireHumanConfirm=false.
+  const humanConfirmed = false;
+  const requireHumanConfirm = true;
+  const d2tExtraTags = buildDiscussToTaskTags({
+    sourceMessageId,
+    contractFingerprint: fp,
+    operationSlot,
+  });
   const activateInput: ActivateCollaborationTaskInput = {
     groupId,
     taskId,
@@ -405,52 +382,68 @@ export async function controlledDiscussToTask(
     suggestedRole: input.suggestedRole,
     dueAtMs: input.dueAtMs,
     humanConfirmed,
-    requireHumanConfirm: input.requireHumanConfirm ?? true,
+    requireHumanConfirm,
     skipChallengeWindow: input.skipChallengeWindow,
     tenant: input.tenant,
     auth: input.auth,
     trusted: input.trusted,
     cfg: input.cfg,
     nowMs: input.nowMs,
+    // Source + contract fingerprint commit inside withTaskControlLock with first accept.
+    extraTags: d2tExtraTags,
   };
 
   const activation = await activateCollaborationTask(activateInput);
 
-  if (input.cfg && (activation.taskEnsured || activation.status !== "blocked")) {
-    try {
-      await stampDiscussToTaskMeta({
+  // If activate claimed taskEnsured/idempotent but meta tags missing → incomplete, not closed.
+  let metaPersistFailed = false;
+  if (activation.taskEnsured && input.cfg) {
+    const after = await readExistingTask({
+      groupId,
+      taskId,
+      cfg: input.cfg,
+      auth: input.auth,
+      trusted: input.trusted,
+      tenant: input.tenant,
+    });
+    const meta = readDiscussToTaskMetaFromTags(after?.tags);
+    if (!meta || meta.sourceMessageId !== sourceMessageId || meta.contractFingerprint !== fp) {
+      metaPersistFailed = true;
+    }
+  }
+
+  const stages = input.cfg
+    ? await readAuthoritativeDiscussToTaskStages({
         groupId,
         taskId,
-        sourceMessageId,
-        contractFingerprint: fp,
-        operationSlot,
         cfg: input.cfg,
         auth: input.auth,
         trusted: input.trusted,
         tenant: input.tenant,
-        actor,
-        nowMs: input.nowMs,
+        activationHints: {
+          taskEnsured: activation.taskEnsured,
+          boardPublished: activation.boardPublished,
+        },
+      })
+    : stagesFromActivation({
+        taskEnsured: activation.taskEnsured,
+        boardPublished: activation.boardPublished,
+        responsibilityAccepted: "unknown",
+        planProposed: "unknown",
+        planConfirmed: "unknown",
       });
-    } catch {
-      // Meta stamp failure must not hide the activation result.
-    }
-  }
 
-  const stages = stagesFromActivation({
-    taskEnsured: activation.taskEnsured,
-    boardPublished: activation.boardPublished,
-    // suggestedClaimantIds are never actual claimants.
-    responsibilityAccepted: false,
-    planProposed: false,
-    planConfirmed: false,
-  });
-
-  const internalReason =
-    activation.status === "blocked"
+  const internalReason = metaPersistFailed
+    ? "discuss_to_task_meta_persist_incomplete"
+    : activation.status === "blocked"
       ? activation.reason
       : activation.status === "needs_confirm"
         ? activation.reason
         : undefined;
+
+  // Meta incomplete: do not claim idempotent/recovery closed.
+  const idempotentReplay =
+    !metaPersistFailed && activation.status === "activated" ? activation.idempotentReplay : false;
 
   // Flag-off: keep precise code; user message unified via deriveFormalTaskUserStatus.
   return finish({
@@ -458,10 +451,22 @@ export async function controlledDiscussToTask(
     attempted: true,
     taskId,
     activationKey: activation.activationKey || activationKey,
-    activation,
+    activation:
+      metaPersistFailed && activation.status !== "blocked"
+        ? {
+            status: "partial_success" as const,
+            taskId: activation.taskId,
+            activationKey: activation.activationKey || activationKey,
+            reason: "discuss_to_task_meta_persist_incomplete",
+            detail: "source/contract tags missing after activate lock write",
+            taskEnsured: activation.taskEnsured,
+            boardPublished: activation.boardPublished,
+            dispatched: false,
+          }
+        : activation,
     stages,
     internalReason,
-    idempotentReplay: activation.status === "activated" ? activation.idempotentReplay : false,
+    idempotentReplay,
     contractConflict:
       activation.status === "blocked" &&
       (activation.reason === "activation_contract_conflict" ||

@@ -66,6 +66,8 @@ export type ActivateCollaborationTaskInput = {
   trusted?: { groupsRoot: string; groupLocator: string } | null;
   cfg?: OpenBotConfig;
   nowMs?: number;
+  /** Extra tags merged under withTaskControlLock (e.g. discuss-to-task source/contract). */
+  extraTags?: readonly string[];
 };
 
 export type ActivateCollaborationTaskResult =
@@ -263,12 +265,40 @@ function taskActivationKey(task: Task | null | undefined): string {
   return tag ? tag.slice(ACTIVATION_TAG_PREFIX.length) : "";
 }
 
+function mergeExtraTags(
+  existing: readonly string[] | undefined,
+  extraTags: readonly string[] | undefined,
+): string[] | undefined {
+  if (!extraTags || extraTags.length === 0) {
+    return existing ? [...existing] : undefined;
+  }
+  const out = [...(existing ?? [])];
+  for (const tag of extraTags) {
+    const compactTag = compact(tag);
+    if (!compactTag) {
+      continue;
+    }
+    // Replace prior tags with the same prefix (text before last ':' or whole).
+    const prefix = compactTag.includes(":")
+      ? compactTag.slice(0, compactTag.indexOf(":") + 1)
+      : compactTag;
+    for (let i = out.length - 1; i >= 0; i -= 1) {
+      if (prefix && out[i].startsWith(prefix)) {
+        out.splice(i, 1);
+      }
+    }
+    out.push(compactTag);
+  }
+  return out;
+}
+
 async function mutateCollaborationTaskObject(params: {
   groupId: string;
   taskId: string;
   title: string;
   actor: string;
   activationKey?: string;
+  extraTags?: readonly string[];
   /** When true, new or draft tasks become ready; terminal still refused. */
   readyRequested: boolean;
   cfg: OpenBotConfig;
@@ -292,7 +322,10 @@ async function mutateCollaborationTaskObject(params: {
     }
     const nextStatus =
       params.readyRequested && existing.status === "draft" ? "ready" : existing.status;
-    const tags = mergeActivationTag(existing.tags, params.activationKey);
+    const tags = mergeExtraTags(
+      mergeActivationTag(existing.tags, params.activationKey),
+      params.extraTags,
+    );
     const touched: Task = {
       ...existing,
       title: compact(params.title) || existing.title,
@@ -311,7 +344,7 @@ async function mutateCollaborationTaskObject(params: {
     status: params.readyRequested ? "ready" : "draft",
     ownerMemberId: compact(params.actor) || undefined,
     assignedMemberIds: compact(params.actor) ? [compact(params.actor)] : [],
-    tags: mergeActivationTag(undefined, params.activationKey),
+    tags: mergeExtraTags(mergeActivationTag(undefined, params.activationKey), params.extraTags),
     createdBy: compact(params.actor) || undefined,
     updatedBy: compact(params.actor) || undefined,
     createdAtMs: now,
@@ -327,6 +360,7 @@ async function ensureCollaborationTaskObject(params: {
   title: string;
   actor: string;
   activationKey?: string;
+  extraTags?: readonly string[];
   readyRequested: boolean;
   cfg?: OpenBotConfig;
   nowMs?: number;
@@ -343,6 +377,7 @@ async function ensureCollaborationTaskObject(params: {
       title: params.title,
       actor: params.actor,
       activationKey: params.activationKey,
+      extraTags: params.extraTags,
       readyRequested: params.readyRequested,
       cfg,
       nowMs: params.nowMs,
@@ -718,6 +753,7 @@ ${message}`
       title,
       actor,
       activationKey,
+      extraTags: params.extraTags,
       readyRequested: false,
       cfg,
       stores: teamStores,
@@ -834,6 +870,7 @@ ${message}`
           title,
           actor,
           activationKey,
+          extraTags: params.extraTags,
           readyRequested: false,
           cfg,
           stores: teamStores,
@@ -908,6 +945,7 @@ ${message}`
           title,
           actor,
           activationKey,
+          extraTags: params.extraTags,
           readyRequested: true,
           cfg,
           stores: teamStores,

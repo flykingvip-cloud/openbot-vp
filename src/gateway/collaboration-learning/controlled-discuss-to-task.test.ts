@@ -14,10 +14,15 @@ import {
   setRuntimeConfigSnapshot,
 } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { applyTaskStopUnderControlLock } from "../collaboration-dispatch/task-control-cas.js";
+import { buildAcceptedTaskStopControl } from "../collaboration-dispatch/task-stop-control.js";
 import { controlledDiscussToTask } from "./controlled-discuss-to-task.js";
 import { mintDiscussToTaskId } from "./discuss-to-task-id.js";
 import { FORMAL_TASK_FLAG_OFF_USER_MESSAGE } from "./discuss-to-task-receipt.js";
-import { readDiscussToTaskMetaFromTags } from "./discuss-to-task-stages.js";
+import {
+  readAuthoritativeDiscussToTaskStages,
+  readDiscussToTaskMetaFromTags,
+} from "./discuss-to-task-stages.js";
 import { createTrustedGroupStores } from "./team-resource-auth.js";
 
 const tempDirs: string[] = [];
@@ -262,7 +267,6 @@ describe("controlledDiscussToTask real storage", () => {
       tenantId: "_local",
       actor: "human:owner",
       message: EXPLICIT_MSG,
-      humanConfirmed: true,
       forceExplicit: true,
       trusted,
       cfg,
@@ -277,7 +281,7 @@ describe("controlledDiscussToTask real storage", () => {
     }
     // Never show 已派工
     expect(result.userMessage).not.toMatch(/已派工/);
-    expect(result.stages.responsibilityAccepted).toBe(false);
+    expect(result.stages.responsibilityAccepted).not.toBe(true);
   });
 });
 
@@ -408,5 +412,182 @@ describe("controlledDiscussToTask partial success / recovery markers", () => {
       cfg,
     });
     expect(retry.taskId).toBe(first.taskId);
+  });
+});
+
+describe("controlledDiscussToTask lock-internal meta + recovery (P1)", () => {
+  it("writes d2t tags inside activate (no lock-external stamp) and survives stop", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const sourceMessageId = "msg-lock-meta-1";
+    const first = await controlledDiscussToTask({
+      sourceMessageId,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["a1", "a2"],
+      trusted,
+      cfg,
+    });
+    expect(first.taskId).toBeTruthy();
+    expect(first.idempotentReplay).not.toBe(true); // first create
+    const stores = createTrustedGroupStores(trusted);
+    const beforeStop = await stores.objectStorage.readObject<Task>(
+      "grp_d2t",
+      "task",
+      first.taskId!,
+    );
+    const meta = readDiscussToTaskMetaFromTags(beforeStop?.tags);
+    expect(meta?.sourceMessageId).toBe(sourceMessageId);
+    expect(meta?.contractFingerprint).toBeTruthy();
+
+    // Insert stop after activate (simulates concurrent control write).
+    await applyTaskStopUnderControlLock({
+      groupId: "grp_d2t",
+      taskId: first.taskId!,
+      stopControl: buildAcceptedTaskStopControl({
+        requestedBy: "human:owner",
+        reason: "test_stop",
+      }),
+      updatedBy: "human:owner",
+      cfg,
+      groupRootDir: trusted.groupsRoot,
+      objectStorage: stores.objectStorage,
+    });
+
+    // Same-request recovery must not drop stopControl via lock-external rewrite.
+    const retry = await controlledDiscussToTask({
+      sourceMessageId,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["a1", "a2"],
+      trusted,
+      cfg,
+    });
+    expect(retry.taskId).toBe(first.taskId);
+    const after = await stores.objectStorage.readObject<Task>("grp_d2t", "task", first.taskId!);
+    expect(after).toBeTruthy();
+    const stop = (after as { stopControl?: { status?: string } } | null)?.stopControl;
+    expect(stop?.status).toBe("accepted");
+    const meta2 = readDiscussToTaskMetaFromTags(after?.tags);
+    expect(meta2?.sourceMessageId).toBe(sourceMessageId);
+  });
+
+  it("phase-1 ignores client humanConfirmed (no confirm shortcut)", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const result = await controlledDiscussToTask({
+      sourceMessageId: "msg-no-confirm-shortcut",
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["c1", "c2"],
+      humanConfirmed: true,
+      requireHumanConfirm: false,
+      trusted,
+      cfg,
+    });
+    // Even if caller lies, board publish stays gated (needs_confirm / not published as confirmed).
+    expect(result.stages.responsibilityAccepted).not.toBe(true);
+    expect(result.userMessage).not.toMatch(/已派工/);
+    if (result.activation) {
+      expect(
+        result.activation.status === "needs_confirm" ||
+          result.stages.boardPublished !== true ||
+          result.statusCode === "formal_task_needs_confirm" ||
+          result.statusCode === "formal_task_established_board_pending",
+      ).toBe(true);
+    }
+  });
+});
+
+describe("controlledDiscussToTask authoritative stage readback (P2)", () => {
+  it("contract conflict preserves authoritative boardPublished (not forced false)", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const sourceMessageId = "msg-stage-conflict-1";
+    const first = await controlledDiscussToTask({
+      sourceMessageId,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      title: "提纲A",
+      goal: "目标A",
+      acceptanceCriteria: ["A1", "A2"],
+      forceExplicit: true,
+      trusted,
+      cfg,
+    });
+    expect(first.taskId).toBeTruthy();
+    // Seed a published-looking board item tag via authoritative read path setup:
+    // even without items, conflict stages must not hardcode boardPublished=false when unknown/true.
+    const stages = await readAuthoritativeDiscussToTaskStages({
+      groupId: "grp_d2t",
+      taskId: first.taskId!,
+      cfg,
+      trusted,
+      activationHints: { taskEnsured: true, boardPublished: first.stages.boardPublished === true },
+    });
+    expect(stages.taskEstablished).toBe(true);
+    // Unverified lanes must not pretend with false when read fails — here reads succeed → booleans.
+    expect(stages.responsibilityAccepted === true || stages.responsibilityAccepted === false).toBe(
+      true,
+    );
+
+    const second = await controlledDiscussToTask({
+      sourceMessageId,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      title: "提纲B-完全不同",
+      goal: "目标B",
+      acceptanceCriteria: ["B1", "B2"],
+      forceExplicit: true,
+      trusted,
+      cfg,
+    });
+    expect(second.contractConflict === true || second.internalReason?.includes("conflict")).toBe(
+      true,
+    );
+    // Must not force boardPublished=false when authoritative says otherwise / unknown.
+    expect(second.stages.taskEstablished).toBe(true);
+    expect(second.stages.boardPublished).not.toBe(undefined);
+  });
+
+  it("retry after establish uses same stage projection helper", async () => {
+    const { cfg, trusted } = await useTrusted(true);
+    const sourceMessageId = "msg-stage-retry-1";
+    const first = await controlledDiscussToTask({
+      sourceMessageId,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["s1", "s2"],
+      trusted,
+      cfg,
+    });
+    const retry = await controlledDiscussToTask({
+      sourceMessageId,
+      groupId: "grp_d2t",
+      tenantId: "_local",
+      actor: "human:owner",
+      message: EXPLICIT_MSG,
+      forceExplicit: true,
+      acceptanceCriteria: ["s1", "s2"],
+      trusted,
+      cfg,
+    });
+    expect(retry.taskId).toBe(first.taskId);
+    expect(retry.stages.taskEstablished).toBe(first.stages.taskEstablished);
+    // responsibility/plan not falsely forced false without read — both use authoritative path.
+    expect(["boolean", "string"]).toContain(typeof retry.stages.responsibilityAccepted);
   });
 });

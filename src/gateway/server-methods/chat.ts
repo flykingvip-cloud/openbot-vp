@@ -285,6 +285,11 @@ import {
 } from "../collaboration-learning/collaboration-paths.js";
 import { resolveDeliveryAclActor } from "../collaboration-learning/delivery-actor-binding.js";
 import { maybeControlledDiscussToTaskBeforeDiscussion } from "../collaboration-learning/discuss-to-task-chat-hook.js";
+import {
+  buildDiscussToTaskChatReceipt,
+  formatDiscussToTaskUserVisibleStatus,
+} from "../collaboration-learning/discuss-to-task-chat-receipt.js";
+import { registerDiscussToTaskSourceBinding } from "../collaboration-learning/discuss-to-task-source-binding.js";
 import type { ExecutionDeliverableBinding } from "../collaboration-learning/execution-deliverable-binding.js";
 import {
   bindGroupPublicTranscript,
@@ -5495,17 +5500,35 @@ export const chatHandlers: GatewayRequestHandlers = {
 
             // Phase-1 controlled discuss→task: classify authenticated inbound before primary discussion.
             // Failures stay structured; never open production flags or invent claimants.
+            // Persist authoritative receipt for user + bind coordinator context (not diagnosis-only).
             let formalTaskEstablish:
               | {
                   attempted: boolean;
                   status?: string;
                   taskId?: string | null;
                   reason?: string;
+                  userMessage?: string;
+                  stagesSummary?: string;
                 }
               | undefined;
+            let discussToTaskCoordinatorBinding: string | undefined;
             try {
               const d2tActor =
                 (await resolveDeliveryAclActor(client, scope.groupId)) || wakeFromAgentId || "";
+              const d2tTenantId =
+                collabTenant?.tenantId?.trim() || client?.sessionEnterpriseId?.trim() || "_local";
+              if (d2tActor && clientRunId) {
+                try {
+                  registerDiscussToTaskSourceBinding({
+                    sourceMessageId: clientRunId,
+                    tenantId: d2tTenantId,
+                    groupId: scope.groupId,
+                    actor: d2tActor,
+                  });
+                } catch {
+                  // Binding registration must not block the turn.
+                }
+              }
               const d2tResult = await maybeControlledDiscussToTaskBeforeDiscussion({
                 groupId: scope.groupId,
                 sourceMessageId: clientRunId,
@@ -5520,12 +5543,34 @@ export const chatHandlers: GatewayRequestHandlers = {
                   .filter(Boolean),
               });
               if (d2tResult) {
+                const receipt = buildDiscussToTaskChatReceipt(d2tResult);
                 formalTaskEstablish = {
                   attempted: d2tResult.attempted,
                   status: d2tResult.statusCode,
                   taskId: d2tResult.taskId,
                   reason: d2tResult.internalReason,
+                  userMessage: receipt.userMessage,
+                  stagesSummary: receipt.stagesSummary,
                 };
+                discussToTaskCoordinatorBinding = receipt.coordinatorBindingText;
+                // Persist user-visible system status into the group transcript.
+                if (groupSession.entry.sessionId && groupSession.storePath) {
+                  try {
+                    const visible = formatDiscussToTaskUserVisibleStatus(d2tResult);
+                    await appendAssistantTranscriptMessage({
+                      message: visible,
+                      sessionId: groupSession.entry.sessionId,
+                      storePath: groupSession.storePath,
+                      sessionFile: groupSession.entry.sessionFile,
+                      createIfMissing: true,
+                      idempotencyKey: `${clientRunId}:discuss-to-task-receipt`,
+                    });
+                  } catch (persistErr) {
+                    context.logGateway.warn(
+                      `discuss-to-task receipt transcript persist failed: ${formatForLog(persistErr)}`,
+                    );
+                  }
+                }
               }
             } catch (d2tErr) {
               context.logGateway.warn(
@@ -5536,7 +5581,10 @@ export const chatHandlers: GatewayRequestHandlers = {
                 status: "blocked",
                 taskId: null,
                 reason: "discuss_to_task_hook_failed",
+                userMessage: "正式任务建立受阻，尚未建立正式任务。",
               };
+              discussToTaskCoordinatorBinding =
+                "[正式任务入口回执 — 必须绑定] status=blocked；禁止口头宣称已派工。";
             }
 
             const completedRound = await runSingleBeatEpisodeAroundRound({
@@ -5556,7 +5604,9 @@ export const chatHandlers: GatewayRequestHandlers = {
               executeRound: () =>
                 executeCollaborationRound(authority, facts, {
                   decision,
-                  message: transcriptMessage,
+                  message: discussToTaskCoordinatorBinding
+                    ? `${discussToTaskCoordinatorBinding}\n\n${transcriptMessage}`
+                    : transcriptMessage,
                   productionExecutor: resolveProductionCollaborationExecutor(policySnapshotCfg),
                   sessionKey: rawSessionKey,
                   skipRoundIds: [clientRunId, ...context.chatAbortControllers.keys()],

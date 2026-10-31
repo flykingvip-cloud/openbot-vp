@@ -39,6 +39,9 @@ export type FormalTaskEstablishDiagnosis = {
   status?: string;
   taskId?: string | null;
   reason?: string;
+  /** Authoritative user-visible receipt (not diagnosis-only). */
+  userMessage?: string;
+  stagesSummary?: string;
 };
 
 export type SupplementDenialDiagnosis = {

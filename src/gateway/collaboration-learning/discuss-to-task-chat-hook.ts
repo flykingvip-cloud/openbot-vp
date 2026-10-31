@@ -1,6 +1,7 @@
 /**
  * Composition-root helper: classify + controlledDiscussToTask before primary discussion.
  * Failures are returned as structured results — never throw into the chat loop.
+ * Registers authenticated inbound sourceMessageId so tool/RPC cannot borrow foreign ids.
  */
 import type { OpenBotConfig } from "../../config/types.js";
 import {
@@ -8,8 +9,19 @@ import {
   type ControlledDiscussToTaskResult,
 } from "./controlled-discuss-to-task.js";
 import { classifyDiscussToTaskIntent } from "./discuss-to-task-classify.js";
+import { registerDiscussToTaskSourceBinding } from "./discuss-to-task-source-binding.js";
+import { stagesFromActivation } from "./discuss-to-task-stages.js";
 import { resolveCompositionTrustedTeamContext } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
+
+const emptyStages = () =>
+  stagesFromActivation({
+    taskEnsured: false,
+    boardPublished: false,
+    responsibilityAccepted: false,
+    planProposed: false,
+    planConfirmed: false,
+  });
 
 export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
   groupId: string;
@@ -30,6 +42,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
   if (!message || !sourceMessageId || !actor || !groupId) {
     return null;
   }
+
   const classification = classifyDiscussToTaskIntent(message);
   if (classification.kind !== "explicit_delegation") {
     // Still return a lightweight result for diagnosis when clarification needed.
@@ -41,13 +54,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
         taskId: null,
         activationKey: null,
         activation: null,
-        stages: {
-          taskEstablished: false,
-          boardPublished: false,
-          responsibilityAccepted: false,
-          planProposed: false,
-          planConfirmed: false,
-        },
+        stages: emptyStages(),
         statusCode: "needs_clarification",
         userMessage: "委托意图尚不明确或缺少验收条件，请补充后再建立正式任务。",
         internalReason: classification.reason,
@@ -74,13 +81,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
       taskId: null,
       activationKey: null,
       activation: null,
-      stages: {
-        taskEstablished: false,
-        boardPublished: false,
-        responsibilityAccepted: false,
-        planProposed: false,
-        planConfirmed: false,
-      },
+      stages: emptyStages(),
       statusCode: "formal_task_blocked_auth",
       userMessage: "无权在该组建立正式任务。",
       internalReason: bound.reason,
@@ -99,18 +100,20 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
       taskId: null,
       activationKey: null,
       activation: null,
-      stages: {
-        taskEstablished: false,
-        boardPublished: false,
-        responsibilityAccepted: false,
-        planProposed: false,
-        planConfirmed: false,
-      },
+      stages: emptyStages(),
       statusCode: "formal_task_blocked_auth",
       userMessage: "无权在该组建立正式任务。",
       internalReason: "tenant_required",
     };
   }
+
+  // Bind authenticated inbound so later tool/RPC cannot borrow another actor's id.
+  registerDiscussToTaskSourceBinding({
+    sourceMessageId,
+    tenantId,
+    groupId,
+    actor,
+  });
 
   return controlledDiscussToTask({
     sourceMessageId,
@@ -122,6 +125,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
     goal: classification.goalHint,
     acceptanceCriteria: classification.acceptanceHints,
     suggestedClaimantIds: params.suggestedClaimantIds,
+    // Phase-1: chat path never pre-confirms.
     humanConfirmed: false,
     auth: bound.auth,
     trusted: { groupsRoot: bound.groupsRoot, groupLocator: bound.groupLocator },

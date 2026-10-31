@@ -1,9 +1,16 @@
 /**
  * Partial-success stage snapshot for controlled discuss→task recovery.
  * Stages are recorded separately — never collapse into a single "established".
+ * Unverified fields use "unknown" — never false-as-not-yet.
  */
 import type { Task } from "@openbot/collaboration-core";
-import type { FormalTaskStageSnapshot } from "./discuss-to-task-receipt.js";
+import type { OpenBotConfig } from "../../config/types.js";
+import type { GroupBoardClaimItem } from "../collaboration-dispatch/claim-contract.js";
+import { listCollaborationTodolists } from "./claim-contract-entry.js";
+import type { FormalTaskStageSnapshot, StageTriState } from "./discuss-to-task-receipt.js";
+import type { TeamResourceAuthOk } from "./team-resource-auth.js";
+import { resolveTeamDeliverableStores, type TrustedGroupStores } from "./team-resource-auth.js";
+import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 
 export const DISCUSS_TO_TASK_SOURCE_TAG = "d2tSourceMessageId:";
 export const DISCUSS_TO_TASK_CONTRACT_TAG = "d2tContractFp:";
@@ -54,20 +61,21 @@ export function mergeDiscussToTaskTags(
 }
 
 export function stagesFromActivation(params: {
-  taskEnsured: boolean;
-  boardPublished: boolean;
-  responsibilityAccepted?: boolean;
-  planProposed?: boolean;
-  planConfirmed?: boolean;
+  taskEnsured: boolean | "unknown";
+  boardPublished: boolean | "unknown";
+  responsibilityAccepted?: boolean | "unknown";
+  planProposed?: boolean | "unknown";
+  planConfirmed?: boolean | "unknown";
   divisionSuggestionOnly?: boolean;
   roundComplete?: boolean;
 }): FormalTaskStageSnapshot {
   return {
     taskEstablished: params.taskEnsured,
     boardPublished: params.boardPublished,
-    responsibilityAccepted: params.responsibilityAccepted === true,
-    planProposed: params.planProposed === true,
-    planConfirmed: params.planConfirmed === true,
+    responsibilityAccepted:
+      params.responsibilityAccepted === undefined ? "unknown" : params.responsibilityAccepted,
+    planProposed: params.planProposed === undefined ? "unknown" : params.planProposed,
+    planConfirmed: params.planConfirmed === undefined ? "unknown" : params.planConfirmed,
     ...(params.divisionSuggestionOnly ? { divisionSuggestionOnly: true } : {}),
     ...(params.roundComplete ? { roundComplete: true } : {}),
   };
@@ -82,4 +90,170 @@ export function applyRoundCompleteToStages(
 
 export function taskHasDiscussToTaskMeta(task: Task | null | undefined): boolean {
   return Boolean(readDiscussToTaskMetaFromTags(task?.tags));
+}
+
+function responsibilityFromItems(items: readonly GroupBoardClaimItem[]): boolean {
+  return items.some(
+    (item) =>
+      item.status === "claimed" ||
+      item.status === "applied" ||
+      item.status === "in_progress" ||
+      item.status === "submitted_for_review",
+  );
+}
+
+function boardPublishedFromItems(items: readonly GroupBoardClaimItem[]): boolean {
+  return items.some(
+    (item) =>
+      item.status === "published" ||
+      item.status === "claimed" ||
+      item.status === "applied" ||
+      item.status === "in_progress" ||
+      item.status === "submitted_for_review",
+  );
+}
+
+/**
+ * Read authoritative stage projection from task/board/plan stores.
+ * On read failure for a lane, that lane is "unknown" (not false).
+ */
+export async function readAuthoritativeDiscussToTaskStages(params: {
+  groupId: string;
+  taskId: string;
+  cfg: OpenBotConfig;
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  tenant?: CollaborationTenantResolution | null;
+  /** Optional already-resolved stores. */
+  stores?: TrustedGroupStores | null;
+  /** Seed from activation result when available. */
+  activationHints?: {
+    taskEnsured?: boolean;
+    boardPublished?: boolean;
+  };
+}): Promise<FormalTaskStageSnapshot> {
+  const resolved =
+    params.stores ??
+    (() => {
+      const r = resolveTeamDeliverableStores({
+        auth: params.auth,
+        trusted: params.trusted,
+        groupId: params.groupId,
+        cfg: params.cfg,
+        tenantId: params.auth?.tenantId ?? params.tenant?.tenantId ?? null,
+      });
+      return r.ok ? r : null;
+    })();
+
+  let taskEstablished: StageTriState = params.activationHints?.taskEnsured ?? "unknown";
+  let boardPublished: StageTriState = params.activationHints?.boardPublished ?? "unknown";
+  let responsibilityAccepted: StageTriState = "unknown";
+  let planProposed: StageTriState = "unknown";
+  let planConfirmed: StageTriState = "unknown";
+
+  if (!resolved) {
+    return stagesFromActivation({
+      taskEnsured: taskEstablished,
+      boardPublished,
+      responsibilityAccepted,
+      planProposed,
+      planConfirmed,
+    });
+  }
+
+  try {
+    const task = await resolved.objectStorage.readObject<Task>(
+      params.groupId,
+      "task",
+      params.taskId,
+    );
+    taskEstablished = Boolean(task);
+  } catch {
+    taskEstablished = "unknown";
+  }
+
+  // Use claim-contract-entry list helpers which share trusted stores.
+  try {
+    const { listCollaborationBoardItems } = await import("./claim-contract-entry.js");
+    const items = await listCollaborationBoardItems({
+      groupId: params.groupId,
+      taskId: params.taskId,
+      auth: params.auth,
+      trusted: params.trusted,
+      stores: resolved,
+      tenant: params.tenant,
+      cfg: params.cfg,
+    });
+    boardPublished = boardPublishedFromItems(items);
+    responsibilityAccepted = responsibilityFromItems(items);
+    const publishedIds = items
+      .filter((item) => boardPublishedFromItems([item]))
+      .map((item) => item.itemId);
+    if (publishedIds.length === 0) {
+      planProposed = false;
+      planConfirmed = false;
+    } else {
+      let anyProposed = false;
+      let anyConfirmed = false;
+      let planReadFailed = false;
+      for (const boardItemId of publishedIds.slice(0, 3)) {
+        try {
+          const lists = await listCollaborationTodolists({
+            groupId: params.groupId,
+            taskId: params.taskId,
+            boardItemId,
+            actor: "system:discuss-to-task-stage-read",
+            viewerId: "system:discuss-to-task-stage-read",
+            auth: params.auth,
+            trusted: params.trusted,
+            stores: resolved,
+            tenant: params.tenant,
+            cfg: params.cfg,
+          });
+          if (lists.length > 0) {
+            anyProposed = true;
+          }
+          if (lists.some((row) => row.status === "confirmed")) {
+            anyConfirmed = true;
+          }
+        } catch {
+          planReadFailed = true;
+        }
+      }
+      if (planReadFailed && !anyProposed) {
+        planProposed = "unknown";
+        planConfirmed = "unknown";
+      } else {
+        planProposed = anyProposed;
+        planConfirmed = anyConfirmed;
+      }
+    }
+  } catch {
+    // Keep activation hints if present; otherwise unknown.
+    if (params.activationHints?.boardPublished === undefined) {
+      boardPublished = "unknown";
+    }
+    responsibilityAccepted = "unknown";
+    planProposed = "unknown";
+    planConfirmed = "unknown";
+  }
+
+  return stagesFromActivation({
+    taskEnsured: taskEstablished,
+    boardPublished,
+    responsibilityAccepted,
+    planProposed,
+    planConfirmed,
+  });
+}
+
+export function formatStagesForUser(stages: FormalTaskStageSnapshot): string {
+  const fmt = (v: StageTriState) => (v === "unknown" ? "未知" : v ? "是" : "否");
+  return [
+    `任务已建立=${fmt(stages.taskEstablished)}`,
+    `工作项已发布=${fmt(stages.boardPublished)}`,
+    `责任已接受=${fmt(stages.responsibilityAccepted)}`,
+    `计划已提出=${fmt(stages.planProposed)}`,
+    `计划已确认=${fmt(stages.planConfirmed)}`,
+  ].join("；");
 }

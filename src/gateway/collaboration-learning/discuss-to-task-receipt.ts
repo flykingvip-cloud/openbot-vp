@@ -5,12 +5,14 @@
 
 export const FORMAL_TASK_FLAG_OFF_USER_MESSAGE = "当前组未启用正式任务能力，尚未建立正式任务。";
 
+export type StageTriState = boolean | "unknown";
+
 export type FormalTaskStageSnapshot = {
-  taskEstablished: boolean;
-  boardPublished: boolean;
-  responsibilityAccepted: boolean;
-  planProposed: boolean;
-  planConfirmed: boolean;
+  taskEstablished: StageTriState;
+  boardPublished: StageTriState;
+  responsibilityAccepted: StageTriState;
+  planProposed: StageTriState;
+  planConfirmed: StageTriState;
   roundComplete?: boolean;
   divisionSuggestionOnly?: boolean;
 };
@@ -127,37 +129,41 @@ export function deriveFormalTaskUserStatus(params: {
     };
   }
   // ROUND_COMPLETE is a reply-boundary fact — never implies task completion.
-  if (stages?.roundComplete && stages.taskEstablished && !stages.planConfirmed) {
+  if (stages?.roundComplete && stages.taskEstablished === true && stages.planConfirmed !== true) {
     return {
       code: "round_complete_task_incomplete",
       userMessage: userMessageForFormalTaskStatus("round_complete_task_incomplete"),
     };
   }
-  if (stages?.planConfirmed) {
+  if (stages?.planConfirmed === true) {
     return {
       code: "plan_confirmed",
       userMessage: userMessageForFormalTaskStatus("plan_confirmed"),
     };
   }
-  if (stages?.planProposed && !stages.planConfirmed) {
+  if (stages?.planProposed === true && stages.planConfirmed !== true) {
     return {
       code: "plan_pending_confirm",
       userMessage: userMessageForFormalTaskStatus("plan_pending_confirm"),
     };
   }
-  if (stages?.boardPublished && !stages.responsibilityAccepted) {
+  if (stages?.boardPublished === true && stages.responsibilityAccepted !== true) {
     return {
       code: "formal_task_board_published_awaiting_claim",
       userMessage: userMessageForFormalTaskStatus("formal_task_board_published_awaiting_claim"),
     };
   }
-  if (stages?.boardPublished && stages.responsibilityAccepted && !stages.planProposed) {
+  if (
+    stages?.boardPublished === true &&
+    stages.responsibilityAccepted === true &&
+    stages.planProposed !== true
+  ) {
     return {
       code: "formal_task_awaiting_plan",
       userMessage: userMessageForFormalTaskStatus("formal_task_awaiting_plan"),
     };
   }
-  if (stages?.taskEstablished && !stages.boardPublished) {
+  if (stages?.taskEstablished === true && stages.boardPublished !== true) {
     return {
       code: "formal_task_established_board_pending",
       userMessage: userMessageForFormalTaskStatus("formal_task_established_board_pending"),
@@ -169,7 +175,7 @@ export function deriveFormalTaskUserStatus(params: {
       userMessage: userMessageForFormalTaskStatus("formal_task_blocked"),
     };
   }
-  if (stages?.taskEstablished) {
+  if (stages?.taskEstablished === true) {
     return {
       code: "formal_task_established_board_pending",
       userMessage: userMessageForFormalTaskStatus("formal_task_established_board_pending"),
