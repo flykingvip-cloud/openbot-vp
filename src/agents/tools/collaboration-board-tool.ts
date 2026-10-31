@@ -610,8 +610,9 @@ export function createCollaborationBoardTool(options?: {
           }
           const title = readStringParam(params, "title", { required: true });
           const message = readStringParam(params, "message", { required: true });
-          const suggested =
-            readStringList(params.suggestedClaimantIds) ?? [bareCollaborationAgentId(agentId)];
+          const suggested = readStringList(params.suggestedClaimantIds) ?? [
+            bareCollaborationAgentId(agentId),
+          ];
           const activated = await activateTask({
             groupId,
             taskId,
@@ -771,7 +772,7 @@ export function createCollaborationBoardTool(options?: {
           const steps = stepsRaw.map((row) => {
             const rec = row as Record<string, unknown>;
             return {
-              title: String(rec.title ?? ""),
+              title: typeof rec.title === "string" ? rec.title : "",
               ...(typeof rec.detail === "string" ? { detail: rec.detail } : {}),
               ...(typeof rec.stepId === "string" ? { stepId: rec.stepId } : {}),
             };
@@ -826,18 +827,39 @@ export function createCollaborationBoardTool(options?: {
           if (!submissionSummary) {
             return failResult("empty_submission", "submissionSummary must be non-empty");
           }
-          const item = await submitForReview({
+          const linkedDeliverableId = readStringParam(params, "linkedDeliverableId") || undefined;
+          const linkedContentSha256 = readStringParam(params, "linkedContentSha256") || undefined;
+          const linkedVersionRaw = readStringParam(params, "linkedDeliverableVersion");
+          const linkedDeliverableVersion =
+            linkedVersionRaw != null && linkedVersionRaw !== ""
+              ? Number(linkedVersionRaw)
+              : undefined;
+          const result = await submitForReview({
             groupId,
             taskId,
             itemId,
             submissionId,
             artifactVersion,
             submissionSummary,
+            linkedDeliverableId,
+            linkedDeliverableVersion:
+              linkedDeliverableVersion != null && Number.isFinite(linkedDeliverableVersion)
+                ? linkedDeliverableVersion
+                : undefined,
+            linkedContentSha256,
             actor: actorId,
             ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            item: result.item,
+            eventRelay: result.eventRelay,
+            locatorBound: true,
+          });
         }
 
         if (action === "accept_submission") {
@@ -851,7 +873,7 @@ export function createCollaborationBoardTool(options?: {
           const checked = readStringList(params.checkedAcceptanceCriteria) ?? [];
           const proxyForActorId = readStringParam(params, "proxyForActorId");
           const proxyBasis = readStringParam(params, "proxyBasis");
-          const item = await acceptSubmission({
+          const result = await acceptSubmission({
             groupId,
             taskId,
             itemId,
@@ -861,10 +883,18 @@ export function createCollaborationBoardTool(options?: {
             proxyForActorId,
             proxyBasis,
             actor: actorId,
-            tenant: bound.tenant,
+            ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            item: result.item,
+            eventRelay: result.eventRelay,
+            locatorBound: true,
+          });
         }
 
         if (action === "return_submission") {
@@ -875,7 +905,7 @@ export function createCollaborationBoardTool(options?: {
             required: true,
           });
           const reason = readStringParam(params, "reason", { required: true });
-          const item = await returnSubmission({
+          const result = await returnSubmission({
             groupId,
             taskId,
             itemId,
@@ -885,7 +915,15 @@ export function createCollaborationBoardTool(options?: {
             ...bound,
             cfg,
           });
-          return jsonResult({ ok: true, action, groupId, taskId, item, locatorBound: true });
+          return jsonResult({
+            ok: true,
+            action,
+            groupId,
+            taskId,
+            item: result.item,
+            eventRelay: result.eventRelay,
+            locatorBound: true,
+          });
         }
 
         if (action === "submit_team_deliverable") {
@@ -897,7 +935,10 @@ export function createCollaborationBoardTool(options?: {
             allowEmpty: true,
           });
           if (deliverableContent == null) {
-            return failResult("invalid_input", "submit_team_deliverable requires deliverableContent");
+            return failResult(
+              "invalid_input",
+              "submit_team_deliverable requires deliverableContent",
+            );
           }
           const relativePath = readStringParam(params, "deliverableRelativePath") || undefined;
           const previousDeliverableId =
@@ -959,7 +1000,7 @@ export function createCollaborationBoardTool(options?: {
           });
         }
 
-        return failResult("invalid_action", `unknown action: ${action}`);
+        return failResult("invalid_action", `unknown action: ${String(action)}`);
       } catch (error) {
         return mapEntryError(error);
       }

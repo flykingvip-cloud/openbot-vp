@@ -475,6 +475,10 @@ export type CollaborationTaskSubmitForReviewParams = {
   /** FINAL v3 S3: product/artifact version bound to this submission. */
   artifactVersion: string;
   submissionSummary?: string;
+  /** P2 dual-track link (optional on submit; required for accept). */
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
 };
 
 export const CollaborationTaskSubmitForReviewParamsSchema = Type.Object(
@@ -485,6 +489,9 @@ export const CollaborationTaskSubmitForReviewParamsSchema = Type.Object(
     submissionId: NonEmptyString,
     artifactVersion: NonEmptyString,
     submissionSummary: Type.Optional(Type.String()),
+    linkedDeliverableId: Type.Optional(NonEmptyString),
+    linkedDeliverableVersion: Type.Optional(Type.Integer({ minimum: 1 })),
+    linkedContentSha256: Type.Optional(NonEmptyString),
   },
   { additionalProperties: false },
 );

@@ -1226,13 +1226,24 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
-      const item = await submitCollaborationBoardItemForReview({
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const result = await submitCollaborationBoardItemForReview({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
-      respond(true, { item }, undefined);
+      respond(true, { item: result.item, eventRelay: result.eventRelay }, undefined);
     } catch (error) {
       respond(
         false,
@@ -1256,13 +1267,24 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
-      const item = await acceptCollaborationBoardItemSubmission({
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const result = await acceptCollaborationBoardItemSubmission({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
-      respond(true, { item }, undefined);
+      respond(true, { item: result.item, eventRelay: result.eventRelay }, undefined);
     } catch (error) {
       respond(
         false,
@@ -1286,13 +1308,24 @@ export const collaborationLearningHandlers: GatewayRequestHandlers = {
       return;
     }
     try {
-      const tenant = await resolveCollaborationTenantResolution(client);
-      const item = await returnCollaborationBoardItemSubmission({
+      const ctx = await resolveTrustedWriteContext(client, params.groupId);
+      if (!ctx.ok) {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, ctx.error + (ctx.detail ? `: ${ctx.detail}` : "")),
+        );
+        return;
+      }
+      const result = await returnCollaborationBoardItemSubmission({
         ...params,
-        actor: await resolveDeliveryAclActor(client, params.groupId),
-        tenant,
+        actor: ctx.actor,
+        tenant: ctx.tenant,
+        auth: ctx.auth,
+        stores: ctx.stores,
+        trusted: ctx.trusted,
       });
-      respond(true, { item }, undefined);
+      respond(true, { item: result.item, eventRelay: result.eventRelay }, undefined);
     } catch (error) {
       respond(
         false,

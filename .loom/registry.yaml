@@ -10120,7 +10120,59 @@ tasks:
     ownerHistory: []
     since: 2026-10-30
     metadata: {}
+  - id: controlled-collab-p2-event-dispatch-20261031
+    owner: cursor-grok
+    intent: []
+    paths:
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/collaboration-dispatch/blocked-recovery.test.ts
+      - src/gateway/collaboration-dispatch/claim-contract.test.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/collab-s3-submit-review-versioning.test.ts
+      - src/gateway/collaboration-dispatch/continue-after-round.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/peer-review-gate.test.ts
+      - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
+      - src/gateway/collaboration-dispatch/wake-op-ledger.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p2-mode-b-boot-acl.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p3-two-member-md-loop.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p4-gate-repros.test.ts
+      - src/gateway/collaboration-learning/post-submission-event-advance.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - .loom/registry.yaml
+    state: active
+    sessions: []
+    ownerHistory: []
+    since: 2026-10-31
+    metadata: {}
 landingStreams:
+  - id: controlled-collab-p2-event-dispatch-20261031
+    landingPolicy: serial
+    paths:
+      - src/agents/tools/collaboration-board-tool.ts
+      - src/gateway/collaboration-dispatch/blocked-recovery.test.ts
+      - src/gateway/collaboration-dispatch/claim-contract.test.ts
+      - src/gateway/collaboration-dispatch/claim-contract.ts
+      - src/gateway/collaboration-dispatch/collab-s3-submit-review-versioning.test.ts
+      - src/gateway/collaboration-dispatch/continue-after-round.ts
+      - src/gateway/collaboration-dispatch/group-task-heartbeat.ts
+      - src/gateway/collaboration-dispatch/peer-review-gate.test.ts
+      - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
+      - src/gateway/collaboration-dispatch/wake-op-ledger.ts
+      - src/gateway/collaboration-learning/claim-contract-entry.ts
+      - src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p2-mode-b-boot-acl.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p3-two-member-md-loop.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p4-gate-repros.test.ts
+      - src/gateway/collaboration-learning/post-submission-event-advance.ts
+      - src/gateway/protocol/schema/collaboration.ts
+      - src/gateway/server-methods/collaboration-learning.ts
+      - .loom/registry.yaml
+    canLandWith: []
+    metadata: {}
   - id: openbot-default-capability-p0-20261030
     landingPolicy: serial
     paths:
@@ -10218,12 +10270,13 @@ landingStreams:
         P1-F knowledge materialization (false-availability fix + minimal
         event-driven path + tenant-store locator/I-O visibility +
         events.rematerialize by eventId + durable failure ledger; not ordered
-        restart queue; full KB not claimed) + P2-G platform models smart
-        config (synthetic-neutral / partial-catalog must not fake ranking;
-        loopback HTTP selection→outbound labeled; listen error/timeout
-        cleanup + EPERM MockAgent fallback) + P2-H cron closed-loop
-        (adapter + loopback HTTP channel-adapter evidence; listen cleanup +
-        MockAgent fallback; no production Live webhook claim). NO_PROMOTE; no auto-Apply system/runtime bindings.
+        restart queue; full KB not claimed) + P2-G platform models smart config
+        (synthetic-neutral / partial-catalog must not fake ranking; loopback
+        HTTP selection→outbound labeled; listen error/timeout cleanup + EPERM
+        MockAgent fallback) + P2-H cron closed-loop (adapter + loopback HTTP
+        channel-adapter evidence; listen cleanup + MockAgent fallback; no
+        production Live webhook claim). NO_PROMOTE; no auto-Apply system/runtime
+        bindings.
   - id: collab-restore-line-phase-a
     landingPolicy: serial
     paths:
@@ -22587,7 +22640,8 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/authorize-replay-repro.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
-    reason: "P1-E: authorize replay binding matrix (cross-tenant/principal/grant/rebind)."
+    reason: "P1-E: authorize replay binding matrix
+      (cross-tenant/principal/grant/rebind)."
     reviewAfter: 2026-11-30
   - glob: src/gateway/evolution-control/index.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
@@ -22608,7 +22662,8 @@ sharedPaths:
     reviewAfter: 2026-11-30
   - glob: src/gateway/enterprise-data/knowledge-publication.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability
-    reason: "P1-F: materialization mode helpers; event_driven now implemented (minimal)."
+    reason: "P1-F: materialization mode helpers; event_driven now implemented
+      (minimal)."
     reviewAfter: 2026-11-30
   - glob: src/gateway/enterprise-data/knowledge-publication.test.ts
     landerTask: openbot-default-capability-p0:cursor-grok-default-capability

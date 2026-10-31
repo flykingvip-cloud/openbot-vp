@@ -46,6 +46,7 @@ import path from "node:path";
 import type { Task } from "@openbot/collaboration-core";
 import { loadConfig } from "../../config/config.js";
 import type { OpenBotConfig } from "../../config/types.js";
+import { verifyLinkedTeamDeliverableForAuthority } from "../collaboration-learning/verify-linked-team-deliverable.js";
 import { assertChallengeWindowForPublish } from "./challenge-window.js";
 import type { EffectiveCollaborationPolicy, TaskResponsibility } from "./effective-policy.js";
 import type { GovernanceMemberRoleLike } from "./governance-gate.js";
@@ -90,6 +91,63 @@ export const BOARD_CLAIM_PROGRESS_STATUSES = [
   "returned",
   "blocked",
 ] as const satisfies readonly BoardClaimStatus[];
+
+/** P2 business event identity retained when consume uses source=nudge. */
+export type BoardPendingEventRelayStatus = "pending" | "dispatched" | "blocked" | "unknown";
+
+export type BoardPendingEventRelay = Readonly<{
+  businessEvent: "submitted_for_review" | "returned" | "accepted";
+  /** Original source id (submissionId / acceptedSubmissionId). */
+  sourceId: string;
+  artifactVersion: string;
+  /** Return round (returnCount) — new round may legally re-dispatch. */
+  returnRevision?: number;
+  targetAgentIds: readonly string[];
+  /** Idempotency key bound to business event + version (+ returnRevision). */
+  opKey: string;
+  recordedAt: number;
+  /**
+   * pending = recoverable (auto-retry OK);
+   * dispatched = permit acquired (NOT proof of dispatcher completion — R4/R5);
+   * blocked = permanent refuse (stop/revoke/terminal);
+   * unknown = side-effect unproven (do not auto-retry; may set pendingVerification).
+   */
+  status: BoardPendingEventRelayStatus;
+  /**
+   * P2 R5/R6: set true only after durable mark succeeds, immediately before baseDispatcher.
+   * Absent/false after status=dispatched is a normal permit→mark gap — NOT proof the
+   * executor is dead. Heartbeat must not auto-release from this alone.
+   */
+  dispatchInvokeStarted?: boolean;
+  /**
+   * P2 R6: minted at permit commit. Same-conditional invalidation + mark/dispatch gate
+   * bind to this id so an invalidated attempt cannot start after recovery takes over.
+   */
+  dispatchAttemptId?: string;
+  /**
+   * P2 R8: wake executionAttemptId bound at permit commit. Cleanup MUST use this
+   * original binding — never re-read the wake ledger's current attempt id.
+   * Kept across board invalidate until wake conditional fail completes (or
+   * reconcile proves safe), so the two-write crash window can finish cleanup.
+   */
+  boundWakeExecutionAttemptId?: string;
+  /**
+   * P2 R5/R6: pending-verification signal when outcome/executor liveness cannot be proven.
+   * Recovery must NOT timeout-then-blindly-retry / auto-release while this is set.
+   */
+  pendingVerification?: boolean;
+  /** Exact execution binding at record time (especially for returned → member revise). */
+  claimantId?: string;
+  todolistId?: string;
+  planVersion?: number;
+  stepId?: string;
+  /** Board item revision when the pending relay was recorded. */
+  boardRevision?: number;
+  /** Linked deliverable version at return/submit (member revise must target this). */
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
+}>;
 
 export type GroupBoardClaimItem = Readonly<{
   itemId: string;
@@ -189,6 +247,18 @@ export type GroupBoardClaimItem = Readonly<{
   cancelledAt?: number;
   cancelledBy?: string;
   cancelledReason?: string;
+  /**
+   * P2: minimal dual-track link — board submission ↔ team deliverable receipt.
+   * Review/return/accept target this exact binding (no third deliverable format).
+   */
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
+  /**
+   * P2: durable pending relay after state commit when wake/consume has not yet
+   * succeeded. Identifiable by existing recovery/heartbeat; same opKey is idempotent.
+   */
+  pendingEventRelay?: BoardPendingEventRelay | null;
 }>;
 
 export type ClaimResult<T> =
@@ -1015,6 +1085,10 @@ export type SubmitForReviewInput = {
    */
   artifactVersion: string;
   submissionSummary?: string;
+  /** P4/S2: required dual-track link at submit (also required for accept). */
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
 };
 
 export type AcceptSubmissionInput = {
@@ -1209,7 +1283,7 @@ export async function submitBoardItemForReview(
   const submitted = await mutateBoardClaimItem(
     authority,
     { taskId, itemId },
-    (current) => {
+    async (current) => {
       if (
         current.status === "submitted_for_review" &&
         compact(current.submissionId) === submissionId
@@ -1262,6 +1336,70 @@ export async function submitBoardItemForReview(
       if (!actor.ok) {
         return actor;
       }
+      const linkedDeliverableId = compact(input.linkedDeliverableId) || undefined;
+      const linkedContentSha256 = compact(input.linkedContentSha256) || undefined;
+      const linkedDeliverableVersion =
+        typeof input.linkedDeliverableVersion === "number" &&
+        Number.isFinite(input.linkedDeliverableVersion)
+          ? input.linkedDeliverableVersion
+          : undefined;
+      // P4/S2: verifiable deliverable link required at submit — no review without it.
+      // Partial link still refused as incomplete; missing all three = explicit block.
+      const linkAny = Boolean(
+        linkedDeliverableId || linkedContentSha256 || linkedDeliverableVersion != null,
+      );
+      if (!linkedDeliverableId || !linkedContentSha256 || linkedDeliverableVersion == null) {
+        return fail(
+          linkAny ? "deliverable_link_incomplete" : "deliverable_link_required",
+          linkAny
+            ? "linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256 must be provided together"
+            : "submit requires linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256; without a verifiable deliverable link the item must not enter review dispatch",
+        );
+      }
+      if (linkedDeliverableId && linkedContentSha256 && linkedDeliverableVersion != null) {
+        const verified = await verifyLinkedTeamDeliverableForAuthority({
+          authority,
+          taskId,
+          actor: compact(input.actorId) || compact(current.claimantId) || "unknown",
+          linked: {
+            deliverableId: linkedDeliverableId,
+            version: linkedDeliverableVersion,
+            contentSha256: linkedContentSha256,
+          },
+          cfg: options?.cfg,
+        });
+        if (!verified.ok) {
+          return fail(verified.reason, verified.message);
+        }
+      }
+      const reviewer = compact(options?.coordinatorBotId) || compact(current.publishedBy);
+      const fromAgentId = compact(input.actorId) || compact(current.claimantId);
+      const opKey = [
+        "board_event_relay",
+        "submitted_for_review",
+        authority.groupId || current.groupId,
+        taskId,
+        itemId,
+        submissionId,
+        artifactVersion,
+      ].join("|");
+      const pendingEventRelay =
+        reviewer && fromAgentId
+          ? ({
+              businessEvent: "submitted_for_review",
+              sourceId: submissionId,
+              artifactVersion,
+              targetAgentIds: [reviewer],
+              opKey,
+              recordedAt: nowOf(options),
+              status: "pending",
+              claimantId: compact(current.claimantId) || undefined,
+              boardRevision: nextBoardClaimRevision(current),
+              linkedDeliverableId,
+              linkedDeliverableVersion,
+              linkedContentSha256,
+            } satisfies BoardPendingEventRelay)
+          : undefined;
       wrote = true;
       const next: GroupBoardClaimItem = {
         ...current,
@@ -1270,6 +1408,10 @@ export async function submitBoardItemForReview(
         artifactVersion,
         submittedAt: nowOf(options),
         submissionSummary: summaryBody,
+        linkedDeliverableId,
+        linkedDeliverableVersion,
+        linkedContentSha256,
+        pendingEventRelay: pendingEventRelay ?? current.pendingEventRelay ?? null,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
@@ -1279,9 +1421,8 @@ export async function submitBoardItemForReview(
   if (!submitted.ok) {
     return submitted;
   }
-  // P1: best-effort wake 主答/coordinator after a real submit transition (outside lock).
-  // Prefer options.coordinatorBotId (entry loads operating-state); fallback publishedBy.
-  // Never intendedClaimant. Source "insight" = wake 主答 (no WAKE_SOURCES "submit").
+  // Ledger-only insight wake retained for audit (insight ∉ WAKE_ROUND_DISPATCH_SOURCES).
+  // P2 product relay is pendingEventRelay + consume(source=nudge) outside this mutate.
   // Fail-open: wake miss must not flip the submit Result. Skip on idempotent no-write.
   if (wrote) {
     const reviewer = compact(options?.coordinatorBotId) || compact(submitted.value.publishedBy);
@@ -1297,7 +1438,7 @@ export async function submitBoardItemForReview(
           outcome: "recorded",
           taskId,
           itemId,
-          reason: "submit_for_review",
+          reason: `submitted_for_review:submission=${submissionId}:artifact=${artifactVersion}`,
           relatedId: submissionId,
         },
         options,
@@ -1370,6 +1511,32 @@ export async function acceptBoardItemSubmission(
           "pending submission has no artifactVersion; cannot accept unbound version",
         );
       }
+      // P2: accept targets the exact submission↔deliverable link; no legal artifact → refuse.
+      if (
+        !compact(current.linkedDeliverableId) ||
+        !compact(current.linkedContentSha256) ||
+        typeof current.linkedDeliverableVersion !== "number" ||
+        !Number.isFinite(current.linkedDeliverableVersion)
+      ) {
+        return fail(
+          "deliverable_link_required",
+          "accept requires linkedDeliverableId + linkedDeliverableVersion + linkedContentSha256 bound to this submission",
+        );
+      }
+      const acceptLinkVerify = await verifyLinkedTeamDeliverableForAuthority({
+        authority,
+        taskId,
+        actor: actorId,
+        linked: {
+          deliverableId: compact(current.linkedDeliverableId),
+          version: current.linkedDeliverableVersion,
+          contentSha256: compact(current.linkedContentSha256),
+        },
+        cfg: options?.cfg,
+      });
+      if (!acceptLinkVerify.ok) {
+        return fail(acceptLinkVerify.reason, acceptLinkVerify.message);
+      }
       const criteriaGate = acceptanceCriteriaFullyChecked({
         boardCriteria: current.acceptanceCriteria,
         checkedCriteria: input.checkedAcceptanceCriteria,
@@ -1408,6 +1575,8 @@ export async function acceptBoardItemSubmission(
         acceptanceVerdict: "pass",
         acceptanceProxyForActorId: compact(input.proxyForActorId) || undefined,
         acceptanceProxyBasis: compact(input.proxyBasis) || undefined,
+        // Accepted items must not keep pending exec/review relays.
+        pendingEventRelay: null,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
@@ -1440,7 +1609,7 @@ export async function returnBoardItemSubmission(
   const returned = await mutateBoardClaimItem(
     authority,
     { taskId, itemId },
-    (current) => {
+    async (current) => {
       if (current.status !== "submitted_for_review") {
         return fail(
           "invalid_status",
@@ -1455,9 +1624,53 @@ export async function returnBoardItemSubmission(
         return fail(versionGate.reason, versionGate.message);
       }
       const priorCount = typeof current.returnCount === "number" ? current.returnCount : 0;
+      // P4/O4: already at/over acceptance-loop cap → refuse further return-revise.
+      if (priorCount >= maxReturns) {
+        return fail(
+          "acceptance_loop_exceeded",
+          `returnCount ${priorCount} already reached acceptanceLoopMaxReturns ${maxReturns}; escalate only — no further return-revise`,
+        );
+      }
       const nextCount = priorCount + 1;
       const pendingSubmissionId = compact(current.submissionId);
       const pendingArtifactVersion = normalizeArtifactVersion(current.artifactVersion);
+      const claimantIdForRelay = compact(current.claimantId);
+      const opKey = [
+        "board_event_relay",
+        "returned",
+        authority.groupId || current.groupId,
+        taskId,
+        itemId,
+        pendingSubmissionId || "none",
+        pendingArtifactVersion || "none",
+        `r${nextCount}`,
+      ].join("|");
+      // Claimant + deliverable bound here; exact todolist/version/step resolved +
+      // re-validated at dispatch (post-submission-event-advance) against live plan.
+      // P4/O4: when this return hits the cap, escalate only — do not arm return-revise relay.
+      const hitsCap = nextCount >= maxReturns;
+      const pendingEventRelay =
+        claimantIdForRelay && !hitsCap
+          ? ({
+              businessEvent: "returned",
+              sourceId: pendingSubmissionId || `return-${nextCount}`,
+              artifactVersion: pendingArtifactVersion || "none",
+              returnRevision: nextCount,
+              targetAgentIds: [claimantIdForRelay],
+              opKey,
+              recordedAt: nowOf(options),
+              status: "pending",
+              claimantId: claimantIdForRelay,
+              boardRevision: nextBoardClaimRevision(current),
+              linkedDeliverableId: compact(current.linkedDeliverableId) || undefined,
+              linkedDeliverableVersion:
+                typeof current.linkedDeliverableVersion === "number" &&
+                Number.isFinite(current.linkedDeliverableVersion)
+                  ? current.linkedDeliverableVersion
+                  : undefined,
+              linkedContentSha256: compact(current.linkedContentSha256) || undefined,
+            } satisfies BoardPendingEventRelay)
+          : null;
       const next: GroupBoardClaimItem = {
         ...current,
         status: "returned",
@@ -1474,6 +1687,7 @@ export async function returnBoardItemSubmission(
         submissionId: undefined,
         artifactVersion: undefined,
         submittedAt: undefined,
+        pendingEventRelay,
         revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
@@ -1488,6 +1702,8 @@ export async function returnBoardItemSubmission(
   // Wake / escalate outside lock, only after durable success.
   const claimantId = compact(next.claimantId);
   if (claimantId) {
+    const returnedSubmissionId = compact(next.lastReturnedSubmissionId);
+    const returnedArtifact = normalizeArtifactVersion(next.lastReturnedArtifactVersion);
     await recordWakeEventBestEffort(
       authority,
       {
@@ -1498,7 +1714,8 @@ export async function returnBoardItemSubmission(
         outcome: "recorded",
         taskId,
         itemId,
-        reason,
+        reason: `returned:submission=${returnedSubmissionId}:artifact=${returnedArtifact}:r${nextCount}:${reason}`,
+        relatedId: returnedSubmissionId || undefined,
       },
       options,
     );
@@ -1531,6 +1748,513 @@ export async function returnBoardItemSubmission(
     );
   }
   return returned;
+}
+
+/** P2: clear durable pendingEventRelay after successful consume/idempotent reuse. */
+export async function clearBoardPendingEventRelay(
+  authority: RuntimeAuthority,
+  input: { taskId: string; itemId: string; expectedOpKey: string },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  if (!taskId || !itemId || !expectedOpKey) {
+    return fail(
+      "invalid_input",
+      "clearBoardPendingEventRelay requires taskId, itemId, expectedOpKey",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      // Clear pending / dispatched / unknown / blocked when expectedOpKey matches.
+      // "dispatched" is the dispatch-permit marker; successful consume still clears it.
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "pending_relay_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey; refuse blind clear",
+        );
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: null,
+        revision: nextBoardClaimRevision(current),
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R4 — atomic dispatch-permit linearization point.
+ *
+ * Under withRoundLock (mutateBoardClaimItem): re-check board pending/status/revision/
+ * claimant, then CAS pendingEventRelay.status pending → dispatched (permit acquired).
+ * "dispatched" here means permit held — NOT dispatcher completion (R5).
+ * This is the linearization vs accept / new submit / reassign. Model execution stays
+ * outside the lock; post-permit board changes are in-flight (no instantaneous revoke).
+ */
+export async function commitBoardDispatchPermit(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    expectedBusinessEvent: BoardPendingEventRelay["businessEvent"];
+    expectedReturnRevision?: number;
+    expectedBoardRevision?: number;
+    expectedClaimantId?: string;
+    /**
+     * P2 R8: durable wake executionAttemptId at permit time. Persisted as
+     * boundWakeExecutionAttemptId so later invalidate cleanup binds the original
+     * attempt (not a re-read of the wake ledger).
+     */
+    wakeExecutionAttemptId: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  const wakeExecutionAttemptId = compact(input.wakeExecutionAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !wakeExecutionAttemptId) {
+    return fail(
+      "invalid_input",
+      "commitBoardDispatchPermit requires taskId, itemId, expectedOpKey, wakeExecutionAttemptId",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return fail("commit_pending_missing", "pendingEventRelay missing at permit commit");
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "commit_pending_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at permit commit",
+        );
+      }
+      if (pending.status === "dispatched") {
+        // Idempotent: same opKey already holds the permit.
+        return { ok: true, value: current, skipAppend: true };
+      }
+      if (pending.status !== "pending") {
+        return fail(
+          `commit_pending_status:${pending.status}`,
+          `pendingEventRelay.status is ${pending.status}; expected pending`,
+        );
+      }
+      if (pending.businessEvent !== input.expectedBusinessEvent) {
+        return fail(
+          `commit_business_event_mismatch:${pending.businessEvent}`,
+          "pendingEventRelay.businessEvent mismatch at permit commit",
+        );
+      }
+      if (input.expectedBusinessEvent === "returned" && current.status !== "returned") {
+        return fail(
+          `commit_status_not_returned:${current.status}`,
+          `board status is ${current.status}; expected returned`,
+        );
+      }
+      if (
+        input.expectedBusinessEvent === "submitted_for_review" &&
+        current.status !== "submitted_for_review"
+      ) {
+        return fail(
+          `commit_status_not_submitted:${current.status}`,
+          `board status is ${current.status}; expected submitted_for_review`,
+        );
+      }
+      if (
+        typeof input.expectedReturnRevision === "number" &&
+        typeof pending.returnRevision === "number" &&
+        input.expectedReturnRevision !== pending.returnRevision
+      ) {
+        return fail(
+          "commit_return_revision_superseded",
+          "returnRevision superseded at permit commit",
+        );
+      }
+      if (
+        typeof input.expectedReturnRevision === "number" &&
+        typeof current.returnCount === "number" &&
+        input.expectedReturnRevision !== current.returnCount
+      ) {
+        return fail("commit_return_count_superseded", "returnCount superseded at permit commit");
+      }
+      if (
+        typeof input.expectedBoardRevision === "number" &&
+        typeof current.revision === "number" &&
+        input.expectedBoardRevision !== current.revision
+      ) {
+        return fail(
+          "commit_board_revision_superseded",
+          "board revision superseded at permit commit",
+        );
+      }
+      if (
+        typeof input.expectedBoardRevision === "number" &&
+        typeof pending.boardRevision === "number" &&
+        input.expectedBoardRevision !== pending.boardRevision
+      ) {
+        return fail(
+          "commit_pending_board_revision_mismatch",
+          "pending boardRevision mismatch at permit commit",
+        );
+      }
+      const claimantId = compact(pending.claimantId) || compact(current.claimantId);
+      if (!claimantId) {
+        return fail("commit_claimant_missing", "claimant missing at permit commit");
+      }
+      if (input.expectedClaimantId && !sameClaimantActorId(claimantId, input.expectedClaimantId)) {
+        return fail(
+          `commit_claimant_reassigned:live=${claimantId}:expected=${input.expectedClaimantId}`,
+          "claimant reassigned at permit commit",
+        );
+      }
+      // Status-only: do NOT bump board revision — permit must not look like accept/submit supersession.
+      // Mint dispatchAttemptId; bind wake executionAttemptId; dispatchInvokeStarted unset until mark.
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: {
+          ...pending,
+          status: "dispatched",
+          dispatchInvokeStarted: false,
+          pendingVerification: false,
+          dispatchAttemptId: randomUUID(),
+          boundWakeExecutionAttemptId: wakeExecutionAttemptId,
+        },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R5/R6 — durable marker immediately before baseDispatcher invoke.
+ * Success is a necessary condition before calling the dispatcher.
+ * Binds expectedAttemptId so an invalidated permit attempt cannot mark/start.
+ */
+export async function markBoardDispatchInvokeStarted(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    /** Required: must match live pendingEventRelay.dispatchAttemptId. */
+    expectedAttemptId: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  const expectedAttemptId = compact(input.expectedAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !expectedAttemptId) {
+    return fail(
+      "invalid_input",
+      "markBoardDispatchInvokeStarted requires taskId, itemId, expectedOpKey, expectedAttemptId",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return fail("invoke_pending_missing", "pendingEventRelay missing at invoke-start mark");
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "invoke_pending_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at invoke-start mark",
+        );
+      }
+      if (pending.status !== "dispatched") {
+        return fail(
+          `invoke_pending_status:${pending.status}`,
+          `pendingEventRelay.status is ${pending.status}; expected dispatched (permit acquired)`,
+        );
+      }
+      if (compact(pending.dispatchAttemptId) !== expectedAttemptId) {
+        return fail(
+          "invoke_attempt_invalidated",
+          "pendingEventRelay.dispatchAttemptId does not match expectedAttemptId; refuse mark",
+        );
+      }
+      if (pending.dispatchInvokeStarted === true) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: { ...pending, dispatchInvokeStarted: true },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R6 — same-conditional invalidation of a permit-acquired attempt that has not
+ * yet marked invoke-started. Clears the attempt id and releases to pending so
+ * recovery may retry; the old executor bound to expectedAttemptId cannot mark/start.
+ * Refuses when invoke already started (cannot prove clean) — caller must leave
+ * pending-verification / manual verify.
+ */
+export async function invalidateBoardDispatchPermitAttempt(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    expectedAttemptId: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  const expectedAttemptId = compact(input.expectedAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !expectedAttemptId) {
+    return fail(
+      "invalid_input",
+      "invalidateBoardDispatchPermitAttempt requires taskId, itemId, expectedOpKey, expectedAttemptId",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return fail("invalidate_pending_missing", "pendingEventRelay missing at invalidate");
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "invalidate_pending_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at invalidate",
+        );
+      }
+      if (pending.status !== "dispatched") {
+        return fail(
+          `invalidate_pending_status:${pending.status}`,
+          `pendingEventRelay.status is ${pending.status}; expected dispatched`,
+        );
+      }
+      if (compact(pending.dispatchAttemptId) !== expectedAttemptId) {
+        return fail(
+          "invalidate_attempt_mismatch",
+          "dispatchAttemptId mismatch at invalidate — another attempt already owns the permit",
+        );
+      }
+      if (pending.dispatchInvokeStarted === true) {
+        return fail(
+          "invalidate_invoke_already_started",
+          "dispatchInvokeStarted is true; cannot safely invalidate for retry",
+        );
+      }
+      // Clear board attempt so the old executor cannot mark/start. Keep
+      // boundWakeExecutionAttemptId until wake conditional fail completes (P2 R8
+      // two-write recovery): re-dispatch is gated by wake claim while that binding
+      // remains, or after wake CAS / reconcile proves safe.
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: {
+          ...pending,
+          status: "pending",
+          dispatchInvokeStarted: false,
+          pendingVerification: false,
+          dispatchAttemptId: undefined,
+          // Retain boundWakeExecutionAttemptId for wake cleanup / crash recovery.
+        },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R8: clear boundWakeExecutionAttemptId after wake conditional cleanup.
+ * Status-preserving; refuses if opKey or bound id no longer match.
+ */
+export async function clearBoundWakeExecutionAttemptId(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    expectedBoundWakeAttemptId: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  const expectedBound = compact(input.expectedBoundWakeAttemptId);
+  if (!taskId || !itemId || !expectedOpKey || !expectedBound) {
+    return fail(
+      "invalid_input",
+      "clearBoundWakeExecutionAttemptId requires taskId, itemId, expectedOpKey, expectedBoundWakeAttemptId",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "clear_bound_wake_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at bound-wake clear",
+        );
+      }
+      if (compact(pending.boundWakeExecutionAttemptId) !== expectedBound) {
+        return fail(
+          "clear_bound_wake_attempt_mismatch",
+          "boundWakeExecutionAttemptId mismatch at clear — leave binding alone",
+        );
+      }
+      if (!pending.boundWakeExecutionAttemptId) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: {
+          ...pending,
+          boundWakeExecutionAttemptId: undefined,
+        },
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/** P2 R2: mark durable pending relay lifecycle without inventing a new queue. */
+export async function updateBoardPendingEventRelayStatus(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    status: BoardPendingEventRelayStatus;
+    /** When releasing to pending, clear invoke/verification meta. */
+    clearDispatchMeta?: boolean;
+    pendingVerification?: boolean;
+    dispatchInvokeStarted?: boolean;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  if (!taskId || !itemId || !expectedOpKey) {
+    return fail(
+      "invalid_input",
+      "updateBoardPendingEventRelayStatus requires taskId, itemId, expectedOpKey",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "pending_relay_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey; refuse blind status update",
+        );
+      }
+      let nextPending: BoardPendingEventRelay = {
+        ...pending,
+        status: input.status,
+      };
+      if (input.clearDispatchMeta || input.status === "pending") {
+        nextPending = {
+          ...nextPending,
+          dispatchInvokeStarted: false,
+          pendingVerification: false,
+          dispatchAttemptId: undefined,
+          // Ordinary pending release (not proven-dead invalidate) drops wake binding.
+          boundWakeExecutionAttemptId: undefined,
+        };
+      } else {
+        if (typeof input.dispatchInvokeStarted === "boolean") {
+          nextPending = {
+            ...nextPending,
+            dispatchInvokeStarted: input.dispatchInvokeStarted,
+          };
+        }
+        if (typeof input.pendingVerification === "boolean") {
+          nextPending = {
+            ...nextPending,
+            pendingVerification: input.pendingVerification,
+          };
+        }
+      }
+      const sameStatus = pending.status === nextPending.status;
+      const sameInvoke =
+        Boolean(pending.dispatchInvokeStarted) === Boolean(nextPending.dispatchInvokeStarted);
+      const sameVerify =
+        Boolean(pending.pendingVerification) === Boolean(nextPending.pendingVerification);
+      const sameBoundWake =
+        compact(pending.boundWakeExecutionAttemptId) ===
+        compact(nextPending.boundWakeExecutionAttemptId);
+      if (sameStatus && sameInvoke && sameVerify && sameBoundWake) {
+        return { ok: true, value: current, skipAppend: true };
+      }
+      // Status-only lifecycle marker — keep board revision stable for permit linearization.
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: nextPending,
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
 }
 
 /** in_progress|submitted_for_review → blocked. */

@@ -164,13 +164,20 @@ export async function executeModeBWakeRound(params: {
       isAborted: () => false,
     });
     const settledId = compact(round.roundId) || roundId;
-    return { ok: true, roundId: settledId, detail: `mode_b:${request.source}` };
+    return {
+      ok: true,
+      roundId: settledId,
+      detail: `mode_b:${request.source}`,
+      sideEffectClass: "completed_with_receipt",
+    };
   } catch (error) {
     const messageText = error instanceof Error ? error.message : String(error);
+    // Exception may occur AFTER model/tools/formal write started — not "no side effects".
     return {
       ok: false,
       reason: "execute_collaboration_round_failed",
       message: messageText.slice(0, 240),
+      sideEffectClass: "started_or_unknown",
     };
   }
 }
@@ -186,7 +193,11 @@ export function createModeBWakeRoundDispatcher(
   return async (request) => {
     const context = await resolveContext(request);
     if (!context) {
-      return { ok: false, reason: "mode_b_context_unavailable" };
+      return {
+        ok: false,
+        reason: "mode_b_context_unavailable",
+        sideEffectClass: "not_started",
+      };
     }
     const leadFromRequest = resolveWakeLeadBot({
       toAgentIds: request.toAgentIds,
@@ -194,7 +205,11 @@ export function createModeBWakeRoundDispatcher(
     });
     const leadBot = leadFromRequest ?? context.leadBot;
     if (!leadBot) {
-      return { ok: false, reason: "mode_b_lead_unresolved" };
+      return {
+        ok: false,
+        reason: "mode_b_lead_unresolved",
+        sideEffectClass: "not_started",
+      };
     }
     return executeModeBWakeRound({
       request,

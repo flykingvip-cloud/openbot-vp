@@ -114,6 +114,7 @@ import {
   type OwnerDecisionCardDelivery,
 } from "./owner-decision-delivery.js";
 import { emitOwnerDecisionCardForProposedTodolist } from "./owner-decision-emit.js";
+import type { PostSubmissionEventAdvanceResult } from "./post-submission-event-advance.js";
 import {
   createWorkspaceCollaborationStores,
   readGroupOperatingState,
@@ -1227,6 +1228,9 @@ export async function submitCollaborationBoardItemForReview(params: {
   /** FINAL v3 S3: product/artifact version bound to this submission. */
   artifactVersion: string;
   submissionSummary?: string;
+  linkedDeliverableId?: string;
+  linkedDeliverableVersion?: number;
+  linkedContentSha256?: string;
   actor?: string;
   /** Trusted tenant SoT — preferred over host createWorkspaceCollaborationStores. */
   auth?: TeamResourceAuthOk | null;
@@ -1234,7 +1238,9 @@ export async function submitCollaborationBoardItemForReview(params: {
   stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
-}): Promise<GroupBoardClaimItem> {
+  /** When false, skip nudge consume (tests that only need durable state). Default true. */
+  relayAdvance?: boolean;
+}): Promise<{ item: GroupBoardClaimItem; eventRelay: PostSubmissionEventAdvanceResult | null }> {
   const actorId = params.actor?.trim();
   if (!actorId) {
     throw new ClaimContractEntryError("actor_required", "actor is required");
@@ -1258,7 +1264,7 @@ export async function submitCollaborationBoardItemForReview(params: {
     stores: params.stores,
   });
   const coordinatorBotId = trustedCoordinatorBotId(operatingState);
-  return unwrap(
+  const item = unwrap(
     await submitBoardItemForReview(
       authority,
       {
@@ -1268,13 +1274,57 @@ export async function submitCollaborationBoardItemForReview(params: {
         submissionId: params.submissionId,
         artifactVersion: params.artifactVersion,
         submissionSummary: params.submissionSummary,
+        linkedDeliverableId: params.linkedDeliverableId,
+        linkedDeliverableVersion: params.linkedDeliverableVersion,
+        linkedContentSha256: params.linkedContentSha256,
       },
       { cfg, coordinatorBotId },
     ),
     "submitBoardItemForReview",
   );
+  let eventRelay: PostSubmissionEventAdvanceResult | null = null;
+  if (params.relayAdvance !== false) {
+    try {
+      const { triggerPostSubmissionEventAdvance } =
+        await import("./post-submission-event-advance.js");
+      eventRelay = await triggerPostSubmissionEventAdvance({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        itemId: params.itemId,
+        actorId,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        tenant: params.tenant,
+        cfg,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      eventRelay = {
+        autoAdvanceWired: true,
+        businessEvent: "submitted_for_review",
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        pendingRelay: true,
+        reason: `advance_threw:${detail}`.slice(0, 240),
+        targetAgentIds: [],
+        opKey: item.pendingEventRelay?.opKey ?? null,
+      };
+    }
+  }
+  const liveItems = await listCollaborationBoardItems({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
+    tenant: params.tenant,
+  });
+  const live = liveItems.find((row) => row.itemId === params.itemId) ?? item;
+  return { item: live, eventRelay };
 }
-
 export async function acceptCollaborationBoardItemSubmission(params: {
   groupId: string;
   taskId: string;
@@ -1288,14 +1338,19 @@ export async function acceptCollaborationBoardItemSubmission(params: {
   proxyForActorId?: string;
   proxyBasis?: string;
   actor?: string;
+  /** Trusted tenant SoT — same permission root as confirm/submit/tool. */
+  auth?: TeamResourceAuthOk | null;
+  trusted?: { groupsRoot: string; groupLocator: string } | null;
+  stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
-}): Promise<GroupBoardClaimItem> {
+  relayAdvance?: boolean;
+}): Promise<{ item: GroupBoardClaimItem; eventRelay: PostSubmissionEventAdvanceResult | null }> {
   const actorId = params.actor?.trim();
   if (!actorId) {
     throw new ClaimContractEntryError("actor_required", "actor is required");
   }
-  return mutateProgress("acceptBoardItemSubmission", params, (authority, cfg) =>
+  const item = await mutateProgress("acceptBoardItemSubmission", params, (authority, cfg) =>
     acceptBoardItemSubmission(
       authority,
       {
@@ -1311,8 +1366,39 @@ export async function acceptCollaborationBoardItemSubmission(params: {
       { cfg },
     ),
   );
+  let eventRelay: PostSubmissionEventAdvanceResult | null = null;
+  if (params.relayAdvance !== false) {
+    try {
+      const { triggerPostSubmissionEventAdvance } =
+        await import("./post-submission-event-advance.js");
+      eventRelay = await triggerPostSubmissionEventAdvance({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        itemId: params.itemId,
+        actorId,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        tenant: params.tenant,
+        cfg: params.cfg,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      eventRelay = {
+        autoAdvanceWired: true,
+        businessEvent: "accepted",
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        pendingRelay: false,
+        reason: `advance_threw:${detail}`.slice(0, 240),
+        targetAgentIds: [],
+        opKey: null,
+      };
+    }
+  }
+  return { item, eventRelay };
 }
-
 export async function returnCollaborationBoardItemSubmission(params: {
   groupId: string;
   taskId: string;
@@ -1327,12 +1413,13 @@ export async function returnCollaborationBoardItemSubmission(params: {
   stores?: TrustedGroupStores | null;
   tenant?: CollaborationTenantResolution | null;
   cfg?: OpenBotConfig;
-}): Promise<GroupBoardClaimItem> {
+  relayAdvance?: boolean;
+}): Promise<{ item: GroupBoardClaimItem; eventRelay: PostSubmissionEventAdvanceResult | null }> {
   const actorId = params.actor?.trim();
   if (!actorId) {
     throw new ClaimContractEntryError("actor_required", "actor is required");
   }
-  return mutateProgress("returnBoardItemSubmission", params, (authority, cfg) =>
+  const item = await mutateProgress("returnBoardItemSubmission", params, (authority, cfg) =>
     returnBoardItemSubmission(
       authority,
       {
@@ -1345,8 +1432,50 @@ export async function returnCollaborationBoardItemSubmission(params: {
       { cfg },
     ),
   );
+  let eventRelay: PostSubmissionEventAdvanceResult | null = null;
+  if (params.relayAdvance !== false) {
+    try {
+      const { triggerPostSubmissionEventAdvance } =
+        await import("./post-submission-event-advance.js");
+      eventRelay = await triggerPostSubmissionEventAdvance({
+        groupId: params.groupId,
+        taskId: params.taskId,
+        itemId: params.itemId,
+        actorId,
+        auth: params.auth,
+        trusted: params.trusted,
+        stores: params.stores,
+        tenant: params.tenant,
+        cfg: params.cfg,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      eventRelay = {
+        autoAdvanceWired: true,
+        businessEvent: "returned",
+        wakeRecorded: false,
+        wakeConsumed: false,
+        dispatched: false,
+        pendingRelay: true,
+        reason: `advance_threw:${detail}`.slice(0, 240),
+        targetAgentIds: [],
+        opKey: item.pendingEventRelay?.opKey ?? null,
+      };
+    }
+  }
+  const cfg = params.cfg ?? loadConfig();
+  const liveItems = await listCollaborationBoardItems({
+    groupId: params.groupId,
+    taskId: params.taskId,
+    cfg,
+    auth: params.auth,
+    trusted: params.trusted,
+    stores: params.stores,
+    tenant: params.tenant,
+  });
+  const live = liveItems.find((row) => row.itemId === params.itemId) ?? item;
+  return { item: live, eventRelay };
 }
-
 export async function blockCollaborationBoardItem(params: {
   groupId: string;
   taskId: string;

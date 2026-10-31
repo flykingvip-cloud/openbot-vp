@@ -156,9 +156,71 @@ export type WakeRoundDispatchRequest = Readonly<{
   executionDeliverableBinding?: ExecutionDeliverableBinding | null;
 }>;
 
+/**
+ * Side-effect class for dispatcher outcomes (P2 R5 permit recovery).
+ * ok:false MUST NOT be treated as "no side effects" — Mode B may catch after writes.
+ */
+export type DispatchSideEffectClass =
+  | "not_started"
+  | "started_or_unknown"
+  | "completed_with_receipt";
+
 export type WakeRoundDispatchResult =
-  | { ok: true; roundId: string; detail?: string }
-  | { ok: false; reason: string; message?: string };
+  | { ok: true; roundId: string; detail?: string; sideEffectClass?: "completed_with_receipt" }
+  | {
+      ok: false;
+      reason: string;
+      message?: string;
+      /** Explicit class wins; otherwise classifyDispatchSideEffect maps known reasons. */
+      sideEffectClass?: DispatchSideEffectClass;
+    };
+
+const NOT_STARTED_DISPATCH_REASONS = new Set([
+  "mode_b_context_unavailable",
+  "mode_b_lead_unresolved",
+  "mode_b_dispatcher_unbound",
+  "wake_execution_attempt_required",
+  "execution_deliverable_plan_required",
+  "execution_deliverable_binding_incomplete",
+  "dispatch_missing_round_id",
+  "no_consumer",
+  "wake_contract_off",
+  "self_advance_not_execute",
+  "dispatch_readiness_not_ready",
+]);
+
+/**
+ * Classify whether a dispatcher result proves side effects did not start.
+ * Safe default for ok:false without an explicit class: started_or_unknown
+ * (Mode B may have written before returning execute_collaboration_round_failed).
+ */
+export function classifyDispatchSideEffect(
+  result: WakeRoundDispatchResult,
+): DispatchSideEffectClass {
+  if (result.sideEffectClass) {
+    return result.sideEffectClass;
+  }
+  if (result.ok) {
+    return "completed_with_receipt";
+  }
+  const reason = (result.reason ?? "").trim();
+  if (!reason) {
+    return "started_or_unknown";
+  }
+  if (NOT_STARTED_DISPATCH_REASONS.has(reason)) {
+    return "not_started";
+  }
+  // Adjudication / permit commit refusals happen before invoke.
+  if (
+    reason.startsWith("commit_") ||
+    reason.startsWith("return_") ||
+    reason === "execution_binding_required"
+  ) {
+    return "not_started";
+  }
+  // Mode B catch-all and any ambiguous failure: do not auto-release for retry.
+  return "started_or_unknown";
+}
 
 /**
  * Composition-root port. Production binds a Mode B dispatcher that calls

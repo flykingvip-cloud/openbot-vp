@@ -36,6 +36,7 @@ import {
 import { resolveSecurityProfile } from "../security-profile.js";
 import {
   boardClaimsDir,
+  resolveAcceptanceLoopMaxReturns,
   type BoardClaimStatus,
   type GroupBoardClaimItem,
 } from "./claim-contract.js";
@@ -385,6 +386,8 @@ export type HeartbeatBoardItemLike = {
   taskId: string;
   title?: string;
   status: string;
+  /** S3: return cycles; used to stop post-cap revise nudges (O4). */
+  returnCount?: number;
   claimantId?: string;
   publishedBy?: string;
   intendedClaimantIds?: readonly string[];
@@ -411,6 +414,8 @@ export function planHeartbeatActionForItem(params: {
   nowMs: number;
   escalateAfter: number;
   escalateTo: readonly string[];
+  /** When set, returned items at/over this cap never revise-nudge the claimant (O4). */
+  acceptanceLoopMaxReturns?: number;
 }): HeartbeatItemDecision {
   const item = params.item;
   const fingerprint = progressFingerprint(item);
@@ -443,6 +448,54 @@ export function planHeartbeatActionForItem(params: {
       toAgentIds: [],
       consecutiveNoResponse: consecutive,
     };
+  }
+
+  // P4/O4: after acceptance-loop cap, do not revise-nudge the original executor.
+  // Upgrade/escalation handling only (coordinator); skip if already escalated on same fingerprint.
+  if (item.status === "returned") {
+    const maxReturns =
+      typeof params.acceptanceLoopMaxReturns === "number" &&
+      Number.isFinite(params.acceptanceLoopMaxReturns) &&
+      params.acceptanceLoopMaxReturns > 0
+        ? Math.floor(params.acceptanceLoopMaxReturns)
+        : undefined;
+    const returnCount = typeof item.returnCount === "number" ? item.returnCount : 0;
+    if (maxReturns !== undefined && returnCount >= maxReturns) {
+      if (sameAsPrior && prior?.lastEscalateAt) {
+        return {
+          itemId: item.itemId,
+          taskId: item.taskId,
+          groupId: item.groupId,
+          status: item.status,
+          action: "skip",
+          toAgentIds: [],
+          reason: "acceptance_loop_exceeded_awaiting_upgrade",
+          consecutiveNoResponse: consecutive,
+        };
+      }
+      if (params.escalateTo.length > 0) {
+        return {
+          itemId: item.itemId,
+          taskId: item.taskId,
+          groupId: item.groupId,
+          status: item.status,
+          action: "escalate",
+          toAgentIds: uniqueIds(params.escalateTo),
+          reason: `acceptance_loop_exceeded_escalate_only:${returnCount}/${maxReturns}`,
+          consecutiveNoResponse: consecutive,
+        };
+      }
+      return {
+        itemId: item.itemId,
+        taskId: item.taskId,
+        groupId: item.groupId,
+        status: item.status,
+        action: "skip",
+        toAgentIds: [],
+        reason: `acceptance_loop_exceeded_no_revise:${returnCount}/${maxReturns}`,
+        consecutiveNoResponse: consecutive,
+      };
+    }
   }
 
   const overdue = isOverdue(item, params.nowMs);
@@ -552,6 +605,7 @@ function toHeartbeatItem(raw: {
   taskId: string;
   title?: string;
   status: string;
+  returnCount?: number;
   claimantId?: string;
   publishedBy?: string;
   intendedClaimantIds?: readonly string[];
@@ -571,6 +625,7 @@ function toHeartbeatItem(raw: {
     taskId: raw.taskId,
     title: raw.title,
     status: raw.status,
+    returnCount: raw.returnCount,
     claimantId: raw.claimantId,
     publishedBy: raw.publishedBy,
     intendedClaimantIds: raw.intendedClaimantIds,
@@ -609,6 +664,7 @@ export async function loadGroupBoardItemsForHeartbeat(
         taskId: row.taskId,
         title: row.title,
         status: row.status,
+        returnCount: (row as { returnCount?: number }).returnCount,
         claimantId: row.claimantId,
         publishedBy: row.publishedBy,
         // Exported type may omit intendedClaimantIds / dueAtMs — re-read not required for nudge
@@ -922,7 +978,109 @@ export async function runGroupTaskHeartbeat(
   const wakeEvents: WakeEvent[] = [];
   const nextItems: Record<string, GroupTaskHeartbeatItemState> = { ...priorState.items };
 
+  // P2: durable pendingEventRelay recovery via existing heartbeat path (same opKey; no new queue).
+  // Reload FULL board claim rows (not HeartbeatBoardItemLike) so pendingEventRelay is visible.
+  // P4/O14: items with pendingEventRelay (or recovered/dispatched this tick) must not also
+  // get heartbeat nudge/escalate execute — same work-item side-effect count, not opKey-only.
+  const relayGuardedItemIds = new Set<string>();
+  if (!dryRun && !unattendedTarget) {
+    try {
+      const { recoverPendingBoardEventRelays } =
+        await import("../collaboration-learning/post-submission-event-advance.js");
+      const { loadBoardClaimItem } = await import("./claim-contract.js");
+      const groupLocator = compact(authority.namespace?.groupLocator);
+      const trusted =
+        groupLocator.length > 0
+          ? {
+              groupLocator,
+              groupsRoot: path.dirname(groupLocator),
+            }
+          : null;
+      const tenantId = compact(options?.tenantId) || compact(authority.tenantId) || null;
+      const byTask = new Map<string, string[]>();
+      for (const item of items) {
+        const list = byTask.get(item.taskId) ?? [];
+        list.push(item.itemId);
+        byTask.set(item.taskId, list);
+      }
+      for (const [taskId, itemIds] of byTask) {
+        const fullItems = [];
+        for (const itemId of itemIds) {
+          const full = await loadBoardClaimItem(authority, { taskId, itemId });
+          if (full) {
+            fullItems.push(full);
+            if (full.pendingEventRelay) {
+              relayGuardedItemIds.add(full.itemId);
+            }
+          }
+        }
+        if (fullItems.length === 0) {
+          continue;
+        }
+        // Same tenant + store root as this heartbeat's verified authority — never null/legacy.
+        const recovered = await recoverPendingBoardEventRelays({
+          groupId,
+          taskId,
+          actorId,
+          items: fullItems,
+          tenant: tenantId ? { tenantId, trust: "none" } : null,
+          trusted,
+          cfg,
+          roundDispatcher: options?.roundDispatcher,
+          requireTrustedScope: true,
+          authority,
+        });
+        for (const row of recovered) {
+          if (row.dispatched || row.wakeConsumed || row.wakeRecorded) {
+            for (const full of fullItems) {
+              if (full.pendingEventRelay?.opKey && row.opKey === full.pendingEventRelay.opKey) {
+                relayGuardedItemIds.add(full.itemId);
+              }
+            }
+            // Also guard by matching any recovered item that still maps to this task's set.
+            for (const itemId of itemIds) {
+              // Prefer explicit: if this recover batch ran for these items, keep prior guards.
+              void itemId;
+            }
+          }
+        }
+        // After recover, re-check live pending and keep guard for any still-pending or just-cleared.
+        for (const itemId of itemIds) {
+          if (relayGuardedItemIds.has(itemId)) {
+            continue;
+          }
+          const live = await loadBoardClaimItem(authority, { taskId, itemId });
+          if (live?.pendingEventRelay) {
+            relayGuardedItemIds.add(itemId);
+          }
+        }
+      }
+    } catch {
+      // Recovery is best-effort; pending markers remain durable for the next scan.
+    }
+  }
+
   for (const item of items) {
+    if (relayGuardedItemIds.has(item.itemId)) {
+      decisions.push({
+        itemId: item.itemId,
+        taskId: item.taskId,
+        groupId: item.groupId,
+        status: item.status,
+        action: "skip",
+        toAgentIds: [],
+        reason: "pending_event_relay_guard",
+        consecutiveNoResponse: priorState.items[item.itemId]?.consecutiveNoResponse ?? 0,
+      });
+      nextItems[item.itemId] = {
+        consecutiveNoResponse: priorState.items[item.itemId]?.consecutiveNoResponse ?? 0,
+        lastFingerprint: progressFingerprint(item),
+        lastStatus: item.status,
+        lastNudgeAt: priorState.items[item.itemId]?.lastNudgeAt,
+        lastEscalateAt: priorState.items[item.itemId]?.lastEscalateAt,
+      };
+      continue;
+    }
     const prior = priorState.items[item.itemId];
     const decision = planHeartbeatActionForItem({
       item,
@@ -930,6 +1088,7 @@ export async function runGroupTaskHeartbeat(
       nowMs,
       escalateAfter,
       escalateTo,
+      acceptanceLoopMaxReturns: resolveAcceptanceLoopMaxReturns(cfg),
     });
     decisions.push(decision);
 

@@ -50,6 +50,31 @@ import {
   s3DoesNotTouchLiveOrDefaultFlagsOn,
 } from "./submit-review-versioning.js";
 
+async function submitBoardItemForReviewSeeded(
+  auth: RuntimeAuthority,
+  input: Parameters<typeof submitBoardItemForReview>[1],
+  options?: Parameters<typeof submitBoardItemForReview>[2],
+) {
+  let next = input;
+  if (input.linkedDeliverableId) {
+    const { seedLinkedTeamDeliverableFixture, P2_LINKED_DELIVERABLE_FIXTURE_BODY } =
+      await import("../collaboration-learning/verify-linked-team-deliverable.js");
+    const seeded = await seedLinkedTeamDeliverableFixture({
+      authority: auth,
+      taskId: input.taskId,
+      deliverableId: input.linkedDeliverableId,
+      version:
+        typeof input.linkedDeliverableVersion === "number" ? input.linkedDeliverableVersion : 1,
+      content: P2_LINKED_DELIVERABLE_FIXTURE_BODY,
+    });
+    if (!seeded.ok) {
+      throw new Error(`seed linked deliverable failed: ${seeded.reason}`);
+    }
+    next = { ...input, linkedContentSha256: seeded.contentSha256 };
+  }
+  return submitBoardItemForReview(auth, next, options);
+}
+
 const tempDirs: string[] = [];
 const savedStateDir = process.env.OPENBOT_STATE_DIR;
 const savedOpenbotConfigPath = process.env.OPENBOT_CONFIG_PATH;
@@ -277,7 +302,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     const { cfg } = await useConfig({ claimContract: false });
     expect(isCollabTaskClaimContractEnabled(cfg, "grp_s3", "001")).toBe(false);
     const auth = authority(cfg);
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -285,6 +310,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V1,
         artifactVersion: "v1",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "body",
       },
       { cfg },
@@ -300,7 +329,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     const auth = authority(cfg);
     const { itemId } = await reachInProgress(auth, cfg);
 
-    const noVersion = await submitBoardItemForReview(
+    const noVersion = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -308,6 +337,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V1,
         artifactVersion: "  ",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "chapter v1",
       },
       { cfg },
@@ -317,7 +350,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
       expect(noVersion.reason).toBe("invalid_artifact_version");
     }
 
-    const empty = await submitBoardItemForReview(
+    const empty = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -325,6 +358,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V1,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "   ",
       },
       { cfg },
@@ -334,7 +371,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
       expect(empty.reason).toBe("empty_submission");
     }
 
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -342,6 +379,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V1,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "chapter v1 draft",
       },
       { cfg },
@@ -378,7 +419,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
       { taskId: seedTask.taskId, itemId, actorId: "bot-analyst" },
       { cfg },
     );
-    const restated = await submitBoardItemForReview(
+    const restated = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -386,6 +427,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V2,
         artifactVersion: "v1.0.1",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "chapter v1 draft",
       },
       { cfg },
@@ -401,7 +446,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     const auth = authority(cfg);
     const { itemId } = await reachInProgress(auth, cfg, ["sources", "format"]);
 
-    const submitted = await submitBoardItemForReview(
+    const submitted = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -409,6 +454,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V1,
         artifactVersion: "v2.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "deliverable with sources and format",
       },
       { cfg },
@@ -535,7 +584,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     const auth = authority(cfg);
     const { itemId } = await reachInProgress(auth, cfg);
 
-    await submitBoardItemForReview(
+    await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -543,6 +592,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V1,
         artifactVersion: "v1.0.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "first cut",
       },
       { cfg },
@@ -584,7 +637,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
       { taskId: seedTask.taskId, itemId, actorId: "bot-analyst" },
       { cfg },
     );
-    await submitBoardItemForReview(
+    await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -592,6 +645,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V2,
         artifactVersion: "v1.1.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "second cut with sources",
       },
       { cfg },
@@ -633,7 +690,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     }
 
     // Idempotent same submit
-    const again = await submitBoardItemForReview(
+    const again = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -641,6 +698,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V2,
         artifactVersion: "v1.1.0",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "second cut with sources",
       },
       { cfg },
@@ -648,7 +709,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     expect(again.ok).toBe(true);
 
     // Same id different artifactVersion clash
-    const clash = await submitBoardItemForReview(
+    const clash = await submitBoardItemForReviewSeeded(
       auth,
       {
         taskId: seedTask.taskId,
@@ -656,6 +717,10 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         actorId: "bot-analyst",
         submissionId: SID_V2,
         artifactVersion: "v9.9.9",
+        linkedDeliverableId: "del-p2-test",
+        linkedDeliverableVersion: 1,
+        linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
+
         submissionSummary: "second cut with sources",
       },
       { cfg },
@@ -698,7 +763,7 @@ describe("FINAL v3 S3 submit/review versioning", () => {
         );
       }
       const sid = i === 0 ? SID_V1 : SID_V3;
-      const submitted = await submitBoardItemForReview(
+      const submitted = await submitBoardItemForReviewSeeded(
         auth,
         {
           taskId: seedTask.taskId,
@@ -707,6 +772,9 @@ describe("FINAL v3 S3 submit/review versioning", () => {
           submissionId: sid,
           artifactVersion: `v1.${i}.0`,
           submissionSummary: `draft increment ${i}`,
+          linkedDeliverableId: "del-p2-test",
+          linkedDeliverableVersion: 1,
+          linkedContentSha256: "17fc254db0bd795757990fa86f50dca9c823b519536f3628873b9c2e751fb0f4",
         },
         { cfg },
       );
@@ -731,6 +799,8 @@ describe("FINAL v3 S3 submit/review versioning", () => {
     const loaded = await loadBoardClaimItem(auth, { taskId: seedTask.taskId, itemId });
     expect(loaded?.returnCount).toBe(2);
     expect(loaded?.status).toBe("returned");
+    // P4/O4: cap hit clears return-revise relay (escalate-only).
+    expect(loaded?.pendingEventRelay).toBeNull();
     expect(boardSubmissionStateContract("returned").acceptsLatePriorVersion).toBe(false);
   });
 });

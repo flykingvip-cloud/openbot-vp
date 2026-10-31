@@ -3968,6 +3968,8 @@ async function runGroupBotDiscussionTurn(params: {
               reason: finalized.outcome.ok
                 ? "deliverable_ok"
                 : `deliverable_not_ok:${finalized.outcome.reason}`,
+              taskId: binding?.taskId ?? groupCurrentTaskId,
+              itemId: binding?.boardItemId,
             });
           }
         }
