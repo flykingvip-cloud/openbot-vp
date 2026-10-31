@@ -107,19 +107,36 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
     };
   }
 
-  // Bind authenticated inbound so later tool/RPC cannot borrow another actor's id.
-  registerDiscussToTaskSourceBinding({
+  // Bind trusted inbound (first-write-wins). Different principal → conflict.
+  const registered = registerDiscussToTaskSourceBinding({
     sourceMessageId,
     tenantId,
     groupId,
-    actor,
+    principalActor: actor,
+    kind: "trusted_inbound",
   });
+  if (!registered.ok) {
+    return {
+      classification: "explicit_delegation",
+      classificationReason: "explicit_team_task",
+      attempted: true,
+      taskId: null,
+      activationKey: null,
+      activation: null,
+      stages: emptyStages(),
+      statusCode: "formal_task_blocked",
+      userMessage: "正式任务来源归属冲突，无法借用他人消息身份建立任务。",
+      internalReason: "source_owner_conflict",
+    };
+  }
 
   return controlledDiscussToTask({
     sourceMessageId,
+    sourceKind: "trusted_inbound",
     groupId,
     tenantId,
     actor,
+    principalActor: actor,
     message,
     title: classification.titleHint,
     goal: classification.goalHint,
@@ -128,7 +145,7 @@ export async function maybeControlledDiscussToTaskBeforeDiscussion(params: {
     // Phase-1: chat path never pre-confirms.
     humanConfirmed: false,
     auth: bound.auth,
-    trusted: { groupsRoot: bound.groupsRoot, groupLocator: bound.groupLocator },
+    trusted: bound.trusted,
     tenant: params.tenant ?? null,
     cfg: params.cfg,
   });

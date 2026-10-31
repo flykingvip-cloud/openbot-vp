@@ -7,6 +7,10 @@ export const FORMAL_TASK_FLAG_OFF_USER_MESSAGE = "当前组未启用正式任务
 
 export type StageTriState = boolean | "unknown";
 
+function stageIsTrue(value: StageTriState | undefined): boolean {
+  return value === true;
+}
+
 export type FormalTaskStageSnapshot = {
   taskEstablished: StageTriState;
   boardPublished: StageTriState;
@@ -135,13 +139,13 @@ export function deriveFormalTaskUserStatus(params: {
       userMessage: userMessageForFormalTaskStatus("round_complete_task_incomplete"),
     };
   }
-  if (stages?.planConfirmed === true) {
+  if (stageIsTrue(stages?.planConfirmed)) {
     return {
       code: "plan_confirmed",
       userMessage: userMessageForFormalTaskStatus("plan_confirmed"),
     };
   }
-  if (stages?.planProposed === true && stages.planConfirmed !== true) {
+  if (stageIsTrue(stages?.planProposed) && !stageIsTrue(stages?.planConfirmed)) {
     return {
       code: "plan_pending_confirm",
       userMessage: userMessageForFormalTaskStatus("plan_pending_confirm"),

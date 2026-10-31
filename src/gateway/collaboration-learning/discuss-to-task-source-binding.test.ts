@@ -1,10 +1,11 @@
 /**
- * Source binding ownership for discuss→task (phase-1 review checkpoints).
+ * Persistent-intent source binding: first-write-wins, no cross-principal overwrite.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertDiscussToTaskSourceBinding,
   clearDiscussToTaskSourceBindingsForTests,
+  peekDiscussToTaskSourceBinding,
   registerDiscussToTaskSourceBinding,
 } from "./discuss-to-task-source-binding.js";
 
@@ -12,13 +13,13 @@ afterEach(() => {
   clearDiscussToTaskSourceBindingsForTests();
 });
 
-describe("discuss-to-task-source-binding", () => {
+describe("discuss-to-task-source-binding (R3 non-overwrite)", () => {
   it("rejects unbound (forged) sourceMessageId", () => {
     const r = assertDiscussToTaskSourceBinding({
       sourceMessageId: "forged-msg",
       tenantId: "t1",
       groupId: "g1",
-      actor: "human:a",
+      principalActor: "human:a",
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
@@ -26,39 +27,71 @@ describe("discuss-to-task-source-binding", () => {
     }
   });
 
-  it("rejects cross-user reuse of a bound sourceMessageId", () => {
-    registerDiscussToTaskSourceBinding({
+  it("Alice then Bob same sourceMessageId → conflict, Alice remains owner", () => {
+    const a = registerDiscussToTaskSourceBinding({
       sourceMessageId: "msg-1",
       tenantId: "t1",
       groupId: "g1",
-      actor: "human:owner",
+      principalActor: "human:alice",
+      kind: "trusted_inbound",
     });
-    const r = assertDiscussToTaskSourceBinding({
+    expect(a.ok).toBe(true);
+    const b = registerDiscussToTaskSourceBinding({
       sourceMessageId: "msg-1",
       tenantId: "t1",
       groupId: "g1",
-      actor: "human:other",
+      principalActor: "human:bob",
+      kind: "trusted_inbound",
     });
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.reason).toBe("source_message_actor_mismatch");
+    expect(b.ok).toBe(false);
+    if (!b.ok) {
+      expect(b.reason).toBe("source_owner_conflict");
+    }
+    const peek = peekDiscussToTaskSourceBinding({
+      sourceMessageId: "msg-1",
+      tenantId: "t1",
+      groupId: "g1",
+    });
+    expect(peek?.principalActor).toBe("human:alice");
+    const stolen = assertDiscussToTaskSourceBinding({
+      sourceMessageId: "msg-1",
+      tenantId: "t1",
+      groupId: "g1",
+      principalActor: "human:bob",
+    });
+    expect(stolen.ok).toBe(false);
+  });
+
+  it("same principal re-register is idempotent (no overwrite gap)", () => {
+    const first = registerDiscussToTaskSourceBinding({
+      sourceMessageId: "msg-2",
+      tenantId: "t1",
+      groupId: "g1",
+      principalActor: "human:owner",
+    });
+    const second = registerDiscussToTaskSourceBinding({
+      sourceMessageId: "msg-2",
+      tenantId: "t1",
+      groupId: "g1",
+      principalActor: "human:owner",
+    });
+    expect(first.ok && second.ok).toBe(true);
+    if (first.ok && second.ok) {
+      expect(second.created).toBe(false);
+      expect(second.binding.principalActor).toBe("human:owner");
     }
   });
 
-  it("accepts same actor retry", () => {
-    registerDiscussToTaskSourceBinding({
-      sourceMessageId: "msg-2",
-      tenantId: "t1",
-      groupId: "g1",
-      actor: "human:owner",
-    });
-    const r = assertDiscussToTaskSourceBinding({
-      sourceMessageId: "msg-2",
-      tenantId: "t1",
-      groupId: "g1",
-      actor: "human:owner",
-    });
-    expect(r.ok).toBe(true);
+  it("refuses registering client_idempotency_key as trusted inbound", () => {
+    expect(() =>
+      registerDiscussToTaskSourceBinding({
+        sourceMessageId: "rpc-key",
+        tenantId: "t1",
+        groupId: "g1",
+        principalActor: "human:owner",
+        kind: "client_idempotency_key",
+      }),
+    ).toThrow(/trusted_inbound/);
   });
 
   it("isolates tenant/group namespace", () => {
@@ -66,21 +99,15 @@ describe("discuss-to-task-source-binding", () => {
       sourceMessageId: "msg-ns",
       tenantId: "t1",
       groupId: "g1",
-      actor: "human:owner",
+      principalActor: "human:owner",
     });
-    const crossTenant = assertDiscussToTaskSourceBinding({
-      sourceMessageId: "msg-ns",
-      tenantId: "t2",
-      groupId: "g1",
-      actor: "human:owner",
-    });
-    expect(crossTenant.ok).toBe(false);
-    const crossGroup = assertDiscussToTaskSourceBinding({
-      sourceMessageId: "msg-ns",
-      tenantId: "t1",
-      groupId: "g2",
-      actor: "human:owner",
-    });
-    expect(crossGroup.ok).toBe(false);
+    expect(
+      assertDiscussToTaskSourceBinding({
+        sourceMessageId: "msg-ns",
+        tenantId: "t2",
+        groupId: "g1",
+        principalActor: "human:owner",
+      }).ok,
+    ).toBe(false);
   });
 });

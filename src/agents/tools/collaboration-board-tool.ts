@@ -475,10 +475,17 @@ export function createCollaborationBoardTool(options?: {
    */
   stampedEnterpriseId?: string | null;
   /**
-   * Authenticated inbound message id for this turn (clientRunId / MessageSid).
-   * Injected by composition root — discuss_to_task must not read model args.
+   * Trusted inbound message id for this turn (clientRunId / MessageSid).
+   * Injected by composition root — NEVER an agentRunId. Model must not fill.
    */
   inboundSourceMessageId?: string | null;
+  /**
+   * Original inbound principal (human). Source ownership is checked against this,
+   * not the executing bot actorId.
+   */
+  inboundPrincipalActor?: string | null;
+  /** Executing agent run id (diagnostics only — never used as sourceMessageId). */
+  executionRunId?: string | null;
   gatewayClientUser?: string;
   gatewayClientPlatformUserId?: string;
   gatewayClientSessionDomain?: GatewayClient["sessionDomain"];
@@ -505,6 +512,8 @@ export function createCollaborationBoardTool(options?: {
   const resolveTrustedTeam = deps.resolveTrustedTeam ?? resolveCompositionTrustedTeamContext;
   const stampedEnterpriseId = compact(options?.stampedEnterpriseId);
   const inboundSourceMessageId = compact(options?.inboundSourceMessageId);
+  const inboundPrincipalActor = compact(options?.inboundPrincipalActor);
+  const executionRunId = compact(options?.executionRunId);
 
   return {
     name: COLLABORATION_BOARD_TOOL,
@@ -660,23 +669,38 @@ export function createCollaborationBoardTool(options?: {
             bareCollaborationAgentId(agentId),
           ];
           const tenantId = team.auth?.tenantId?.trim() || team.tenant?.tenantId?.trim() || "_local";
+          // Columns: principal (owner) ≠ executing agent ≠ execution run.
+          const principalActor =
+            inboundPrincipalActor ||
+            compact(options?.gatewayClientUser) ||
+            compact(options?.gatewayClientPlatformUserId) ||
+            "";
+          if (!principalActor) {
+            return failResult(
+              "discuss_to_task_principal_required",
+              "discuss_to_task requires inbound principal actor from trusted turn context",
+            );
+          }
           const binding = assertDiscussToTaskSourceBinding({
             sourceMessageId,
             tenantId,
             groupId,
-            actor: actorId,
+            principalActor,
           });
           if (!binding.ok) {
             return failResult(
               binding.reason,
-              binding.detail ?? "sourceMessageId is not bound to this authenticated inbound",
+              binding.detail ??
+                "sourceMessageId is not bound to this authenticated inbound principal",
             );
           }
           const result = await controlledDiscussToTask({
             groupId,
             sourceMessageId,
+            sourceKind: "trusted_inbound",
             tenantId,
             actor: actorId,
+            principalActor,
             message,
             title,
             goal: readStringParam(params, "goal"),
@@ -691,12 +715,19 @@ export function createCollaborationBoardTool(options?: {
             tenant: bound.tenant,
             cfg,
           });
+          void executionRunId; // diagnostics only — never used as sourceMessageId
           return jsonResult({
             ok: result.attempted && result.stages.taskEstablished === true,
             action,
             groupId,
             locatorBound: true,
             discussToTask: result,
+            identity: {
+              principalActor,
+              executingAgent: actorId,
+              sourceMessageId,
+              executionRunId: executionRunId || null,
+            },
             // suggestedClaimantIds are never actual claimants
             responsibilityAccepted: result.stages.responsibilityAccepted === true,
           });

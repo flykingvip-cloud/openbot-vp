@@ -40,12 +40,30 @@ import type { CollaborationTenantResolution } from "./trusted-tenant.js";
 export { FORMAL_TASK_FLAG_OFF_USER_MESSAGE };
 
 export type ControlledDiscussToTaskInput = {
-  /** Authenticated inbound message id — stable across retries; never model-filled. */
+  /**
+   * Source id for this request. Kind decides whether it is a trusted inbound
+   * message id or a client-supplied idempotency key — they are not interchangeable.
+   */
   sourceMessageId: string;
+  /**
+   * trusted_inbound = authenticated chat inbound; client_idempotency_key = RPC key.
+   * Default trusted_inbound for chat/tool; RPC must set client_idempotency_key when
+   * the id was not previously bound as trusted inbound.
+   */
+  sourceKind?: "trusted_inbound" | "client_idempotency_key";
   groupId: string;
   /** Trusted tenant id (managed) or synthetic personal scope id. */
   tenantId: string;
+  /**
+   * Acting identity for ACL / writes. For tool turns this may be the bot;
+   * durable source ownership uses principalActor.
+   */
   actor: string;
+  /**
+   * Original principal who owns the source (inbound user). Defaults to actor.
+   * Immutable once accepted into task tags — different principal → conflict.
+   */
+  principalActor?: string;
   /** Raw authenticated user message (or structured extraction already validated). */
   message: string;
   title?: string;
@@ -197,6 +215,9 @@ export async function controlledDiscussToTask(
   const groupId = compact(input.groupId);
   const tenantId = compact(input.tenantId);
   const actor = compact(input.actor);
+  const principalActor = compact(input.principalActor) || actor;
+  const sourceKind =
+    input.sourceKind === "client_idempotency_key" ? "client_idempotency_key" : "trusted_inbound";
   const message = compact(input.message);
   const operationSlot = compact(input.operationSlot) || DISCUSS_TO_TASK_OPERATION_SLOT;
 
@@ -321,6 +342,46 @@ export async function controlledDiscussToTask(
   });
   if (existing) {
     const meta = readDiscussToTaskMetaFromTags(existing.tags);
+    if (meta?.sourceOwner && meta.sourceOwner !== principalActor) {
+      const ownerStages = input.cfg
+        ? await readAuthoritativeDiscussToTaskStages({
+            groupId,
+            taskId,
+            cfg: input.cfg,
+            auth: input.auth,
+            trusted: input.trusted,
+            tenant: input.tenant,
+            viewerActor: principalActor,
+            activationHints: { taskEnsured: true },
+          })
+        : stagesFromActivation({
+            taskEnsured: true,
+            boardPublished: "unknown",
+            responsibilityAccepted: "unknown",
+            planProposed: "unknown",
+            planConfirmed: "unknown",
+          });
+      return finish({
+        classification,
+        attempted: true,
+        taskId,
+        activationKey,
+        activation: {
+          status: "blocked",
+          taskId,
+          activationKey,
+          reason: "discuss_to_task_source_owner_conflict",
+          detail: `firstOwner=${meta.sourceOwner} requested=${principalActor}`,
+          taskEnsured: true,
+          // Activate blocked variant requires literal false; authoritative value lives on stages.
+          boardPublished: false,
+          dispatched: false,
+        },
+        stages: ownerStages,
+        internalReason: "discuss_to_task_source_owner_conflict",
+        contractConflict: true,
+      });
+    }
     if (meta && meta.contractFingerprint && meta.contractFingerprint !== fp) {
       const conflictStages = input.cfg
         ? await readAuthoritativeDiscussToTaskStages({
@@ -330,6 +391,7 @@ export async function controlledDiscussToTask(
             auth: input.auth,
             trusted: input.trusted,
             tenant: input.tenant,
+            viewerActor: principalActor,
             activationHints: { taskEnsured: true },
           })
         : stagesFromActivation({
@@ -351,7 +413,8 @@ export async function controlledDiscussToTask(
           reason: "discuss_to_task_contract_conflict",
           detail: `firstAccepted=${meta.contractFingerprint} requested=${fp}`,
           taskEnsured: true,
-          boardPublished: conflictStages.boardPublished === true,
+          // Activate blocked variant requires literal false; authoritative value lives on stages.
+          boardPublished: false,
           dispatched: false,
         },
         stages: conflictStages,
@@ -368,6 +431,8 @@ export async function controlledDiscussToTask(
     sourceMessageId,
     contractFingerprint: fp,
     operationSlot,
+    sourceOwner: principalActor,
+    sourceKind,
   });
   const activateInput: ActivateCollaborationTaskInput = {
     groupId,
@@ -407,7 +472,12 @@ export async function controlledDiscussToTask(
       tenant: input.tenant,
     });
     const meta = readDiscussToTaskMetaFromTags(after?.tags);
-    if (!meta || meta.sourceMessageId !== sourceMessageId || meta.contractFingerprint !== fp) {
+    if (
+      !meta ||
+      meta.sourceMessageId !== sourceMessageId ||
+      meta.contractFingerprint !== fp ||
+      meta.sourceOwner !== principalActor
+    ) {
       metaPersistFailed = true;
     }
   }
@@ -420,6 +490,7 @@ export async function controlledDiscussToTask(
         auth: input.auth,
         trusted: input.trusted,
         tenant: input.tenant,
+        viewerActor: principalActor,
         activationHints: {
           taskEnsured: activation.taskEnsured,
           boardPublished: activation.boardPublished,
@@ -453,16 +524,16 @@ export async function controlledDiscussToTask(
     activationKey: activation.activationKey || activationKey,
     activation:
       metaPersistFailed && activation.status !== "blocked"
-        ? {
-            status: "partial_success" as const,
+        ? ({
+            status: "blocked" as const,
             taskId: activation.taskId,
             activationKey: activation.activationKey || activationKey,
             reason: "discuss_to_task_meta_persist_incomplete",
             detail: "source/contract tags missing after activate lock write",
-            taskEnsured: activation.taskEnsured,
-            boardPublished: activation.boardPublished,
+            taskEnsured: Boolean(activation.taskEnsured),
+            boardPublished: false,
             dispatched: false,
-          }
+          } satisfies ActivateCollaborationTaskResult)
         : activation,
     stages,
     internalReason,
@@ -470,6 +541,7 @@ export async function controlledDiscussToTask(
     contractConflict:
       activation.status === "blocked" &&
       (activation.reason === "activation_contract_conflict" ||
-        activation.reason === "discuss_to_task_contract_conflict"),
+        activation.reason === "discuss_to_task_contract_conflict" ||
+        activation.reason === "discuss_to_task_source_owner_conflict"),
   });
 }
