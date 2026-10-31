@@ -1326,11 +1326,11 @@ describe("P2 R3 — return executionDeliverableBinding + Mode B submit", () => {
   });
 });
 
-describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
-  test("accept AFTER live check BEFORE dispatch blocks stale return at commit boundary", async () => {
+describe("P2 R4 — post-adjudication / pre-permit-commit adversarial races", () => {
+  test("accept AFTER adjudication read BEFORE permit commit blocks stale return", async () => {
     const { cfg } = await useConfig();
     const auth = authority(cfg);
-    const taskId = "task-p2-r3-race-accept";
+    const taskId = "task-p2-r4-race-accept";
     const seeded = await seedInProgress({
       auth,
       cfg,
@@ -1387,7 +1387,7 @@ describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
       cfg,
       roundDispatcher: dispatcher,
       trusted: trustedLocatorFromAuthority(auth),
-      _testAfterLiveCheckBeforeConsumeBarrier: async () => {
+      _testAfterAdjudicationReadBeforePermitCommit: async () => {
         // Post-check race: member revises and reviewer accepts before dispatch.
         await markBoardItemInProgress(
           auth,
@@ -1447,10 +1447,10 @@ describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
     }
   });
 
-  test("new submit AFTER live check BEFORE dispatch blocks stale return at commit", async () => {
+  test("new submit AFTER adjudication read BEFORE permit commit blocks stale return", async () => {
     const { cfg } = await useConfig();
     const auth = authority(cfg);
-    const taskId = "task-p2-r3-race-submit";
+    const taskId = "task-p2-r4-race-submit";
     const seeded = await seedInProgress({
       auth,
       cfg,
@@ -1502,7 +1502,7 @@ describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
       cfg,
       roundDispatcher: dispatcher,
       trusted: trustedLocatorFromAuthority(auth),
-      _testAfterLiveCheckBeforeConsumeBarrier: async () => {
+      _testAfterAdjudicationReadBeforePermitCommit: async () => {
         await markBoardItemInProgress(
           auth,
           { taskId, itemId: seeded.item.itemId, actorId: "bot-a" },
@@ -1552,10 +1552,10 @@ describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
     }
   });
 
-  test("reassign claimant AFTER live check BEFORE dispatch blocks at commit boundary", async () => {
+  test("reassign claimant AFTER adjudication read BEFORE permit commit blocks", async () => {
     const { cfg } = await useConfig();
     const auth = authority(cfg);
-    const taskId = "task-p2-r3-race-reassign";
+    const taskId = "task-p2-r4-race-reassign";
     const seeded = await seedInProgress({
       auth,
       cfg,
@@ -1605,7 +1605,7 @@ describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
       cfg,
       roundDispatcher: dispatcher,
       trusted: trustedLocatorFromAuthority(auth),
-      _testAfterLiveCheckBeforeConsumeBarrier: async () => {
+      _testAfterAdjudicationReadBeforePermitCommit: async () => {
         // Durable reassign after check: same pending opKey, claimant moved to bot-c.
         const live = await loadBoardClaimItem(auth, {
           taskId,

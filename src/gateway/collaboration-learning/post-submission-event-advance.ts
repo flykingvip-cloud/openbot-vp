@@ -14,6 +14,7 @@ import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   clearBoardPendingEventRelay,
+  commitBoardDispatchPermit,
   loadBoardClaimItem,
   updateBoardPendingEventRelayStatus,
   type BoardPendingEventRelay,
@@ -283,9 +284,11 @@ type CommitBoundaryAdjudication =
   | { ok: false; reason: string; markBlocked?: boolean };
 
 /**
- * Claim/dispatch commit-boundary adjudication (after CAS take, before external dispatch).
+ * Pre-permit adjudication read (after wake CAS take, before dispatch-permit commit).
  * Order: live item → pending opKey → pending status → board status → returnRevision →
  * boardRevision → effective claimant → plan version/step (returned).
+ * Board conditions are re-checked atomically inside commitBoardDispatchPermit
+ * (pending → dispatched) — that CAS is the dispatch-permit linearization point.
  */
 async function adjudicatePendingAtDispatchCommit(params: {
   authority: RuntimeAuthority;
@@ -505,9 +508,15 @@ export async function triggerPostSubmissionEventAdvance(params: {
   requireTrustedScope?: boolean;
   /**
    * Test-only: after live pending/opKey/revision checks (+ plan gate for return),
-   * before consumeWakeForRoundDispatch. Proves post-check / pre-dispatch races.
+   * before consumeWakeForRoundDispatch. Legacy earlier window (still useful).
    */
   _testAfterLiveCheckBeforeConsumeBarrier?: () => Promise<void>;
+  /**
+   * Test-only: after adjudication read inside the dispatcher wrapper,
+   * before commitBoardDispatchPermit (pending→dispatched CAS).
+   * Proves the post-adjudication / pre-permit-commit race window is closed.
+   */
+  _testAfterAdjudicationReadBeforePermitCommit?: () => Promise<void>;
   /** Forwarded to consumeWakeForRoundDispatch (post-readiness, pre-CAS take). */
   _testAfterReadinessBarrier?: () => Promise<void>;
   /** Forwarded to consumeWakeForRoundDispatch (post-eligibility, pre-CAS take). */
@@ -797,8 +806,9 @@ export async function triggerPostSubmissionEventAdvance(params: {
   const baseDispatcher: WakeRoundDispatcher | null =
     params.roundDispatcher !== undefined ? params.roundDispatcher : getWakeRoundDispatcher();
 
-  // Reuse plan-confirm pattern: enrich at claim/dispatch commit (after CAS take)
-  // with FULL executionDeliverableBinding from durable wake op/attempt.
+  // After wake CAS take: adjudicate (read) → atomic dispatch-permit CAS → external dispatch.
+  // Permit linearization = commitBoardDispatchPermit (pending → dispatched under withRoundLock).
+  // Model / Mode B execution stays outside the board lock; post-permit board changes are in-flight.
   const finalDispatcher: WakeRoundDispatcher = async (req: WakeRoundDispatchRequest) => {
     const gate = await adjudicatePendingAtDispatchCommit({
       authority,
@@ -828,6 +838,59 @@ export async function triggerPostSubmissionEventAdvance(params: {
       return { ok: false, reason: gate.reason };
     }
 
+    if (params._testAfterAdjudicationReadBeforePermitCommit) {
+      await params._testAfterAdjudicationReadBeforePermitCommit();
+    }
+
+    // Linearization point: conditional pending → dispatched under board lock/version.
+    const permit = await commitBoardDispatchPermit(
+      authority,
+      {
+        taskId,
+        itemId,
+        expectedOpKey: opKey,
+        expectedBusinessEvent: businessEvent,
+        expectedReturnRevision,
+        expectedBoardRevision,
+        expectedClaimantId,
+      },
+      { cfg },
+    );
+    if (!permit.ok) {
+      const permitReason = compact(permit.reason) || "commit_dispatch_permit_failed";
+      if (
+        permitReason.startsWith("commit_status_") ||
+        permitReason.startsWith("commit_claimant_") ||
+        permitReason.startsWith("commit_return_") ||
+        permitReason.startsWith("commit_board_") ||
+        permitReason.startsWith("commit_pending_") ||
+        permitReason.startsWith("commit_business_")
+      ) {
+        try {
+          await updateBoardPendingEventRelayStatus(
+            authority,
+            { taskId, itemId, expectedOpKey: opKey, status: "blocked" },
+            { cfg },
+          );
+        } catch {
+          // best-effort
+        }
+      }
+      return { ok: false, reason: permitReason };
+    }
+
+    const releaseDispatchPermitBestEffort = async (): Promise<void> => {
+      try {
+        await updateBoardPendingEventRelayStatus(
+          authority,
+          { taskId, itemId, expectedOpKey: opKey, status: "pending" },
+          { cfg },
+        );
+      } catch {
+        // best-effort
+      }
+    };
+
     let executionDeliverableBinding = req.executionDeliverableBinding ?? null;
     let enrichedPlan = planConfirmBinding;
     let dispatchPrompt = req.dispatchPrompt;
@@ -836,6 +899,7 @@ export async function triggerPostSubmissionEventAdvance(params: {
       const wakeOpKey = compact(req.wakeOpKey) || compact(req.opKey) || opKey;
       const attemptId = compact(req.wakeExecutionAttemptId);
       if (!wakeOpKey || !attemptId) {
+        await releaseDispatchPermitBestEffort();
         return { ok: false, reason: "wake_execution_attempt_required" };
       }
       const todolistId = compact(gate.todolistId) || compact(planConfirmBinding?.todolistId);
@@ -845,6 +909,7 @@ export async function triggerPostSubmissionEventAdvance(params: {
           : planConfirmBinding?.confirmedVersion;
       const stepId = compact(gate.stepId) || compact(planConfirmBinding?.stepId);
       if (!todolistId || typeof planVersion !== "number" || !stepId) {
+        await releaseDispatchPermitBestEffort();
         return { ok: false, reason: "execution_deliverable_plan_required" };
       }
       const runId = runIdFromWakeOpAttempt({ opKey: wakeOpKey, attemptId });
@@ -868,6 +933,7 @@ export async function triggerPostSubmissionEventAdvance(params: {
         source: "wake_dispatch",
       });
       if (!executionDeliverableBinding) {
+        await releaseDispatchPermitBestEffort();
         return { ok: false, reason: "execution_deliverable_binding_incomplete" };
       }
       enrichedPlan = {
@@ -890,6 +956,8 @@ export async function triggerPostSubmissionEventAdvance(params: {
     }
 
     if (!baseDispatcher) {
+      // Permit held but execution never started — release for recoverable retry.
+      await releaseDispatchPermitBestEffort();
       return { ok: false, reason: "mode_b_dispatcher_unbound" };
     }
     const enriched: WakeRoundDispatchRequest = {
@@ -899,7 +967,14 @@ export async function triggerPostSubmissionEventAdvance(params: {
       ...(executionDeliverableBinding ? { executionDeliverableBinding } : {}),
       reason,
     };
-    return baseDispatcher(enriched);
+    const dispatched = await baseDispatcher(enriched);
+    if (!dispatched.ok) {
+      // Pre-side-effect / soft fail: release permit so recovery can retry same opKey.
+      // Post-permit board accept/reassign is still in-flight semantics (no revoke here).
+      // If baseDispatcher throws, leave permit as dispatched (side-effect unproven / unknown).
+      await releaseDispatchPermitBestEffort();
+    }
+    return dispatched;
   };
 
   let consume: Awaited<ReturnType<typeof consumeWakeForRoundDispatch>>;

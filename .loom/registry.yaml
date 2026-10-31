@@ -10134,6 +10134,7 @@ tasks:
       - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p2-mode-b-boot-acl.test.ts
       - src/gateway/collaboration-learning/post-submission-event-advance.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/server-methods/collaboration-learning.ts
@@ -10157,6 +10158,7 @@ landingStreams:
       - src/gateway/collaboration-dispatch/single-group-unattended.test.ts
       - src/gateway/collaboration-learning/claim-contract-entry.ts
       - src/gateway/collaboration-learning/controlled-collab-p2-event-dispatch.test.ts
+      - src/gateway/collaboration-learning/controlled-collab-p2-mode-b-boot-acl.test.ts
       - src/gateway/collaboration-learning/post-submission-event-advance.ts
       - src/gateway/protocol/schema/collaboration.ts
       - src/gateway/server-methods/collaboration-learning.ts

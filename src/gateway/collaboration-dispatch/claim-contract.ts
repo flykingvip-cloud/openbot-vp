@@ -1742,10 +1742,8 @@ export async function clearBoardPendingEventRelay(
       if (!pending) {
         return { ok: true, value: current, skipAppend: true };
       }
-      // Allow clear of pending / unknown / blocked when expectedOpKey matches.
-      if (pending.status === "dispatched") {
-        return { ok: true, value: current, skipAppend: true };
-      }
+      // Clear pending / dispatched / unknown / blocked when expectedOpKey matches.
+      // "dispatched" is the dispatch-permit marker; successful consume still clears it.
       if (compact(pending.opKey) !== expectedOpKey) {
         return fail(
           "pending_relay_opkey_mismatch",
@@ -1756,6 +1754,143 @@ export async function clearBoardPendingEventRelay(
         ...current,
         pendingEventRelay: null,
         revision: nextBoardClaimRevision(current),
+      };
+      return { ok: true, value: next };
+    },
+    options,
+  );
+}
+
+/**
+ * P2 R4 — atomic dispatch-permit linearization point.
+ *
+ * Under withRoundLock (mutateBoardClaimItem): re-check board pending/status/revision/
+ * claimant, then CAS pendingEventRelay.status pending → dispatched.
+ * This is the linearization vs accept / new submit / reassign. Model execution stays
+ * outside the lock; post-permit board changes are in-flight (no instantaneous revoke).
+ */
+export async function commitBoardDispatchPermit(
+  authority: RuntimeAuthority,
+  input: {
+    taskId: string;
+    itemId: string;
+    expectedOpKey: string;
+    expectedBusinessEvent: BoardPendingEventRelay["businessEvent"];
+    expectedReturnRevision?: number;
+    expectedBoardRevision?: number;
+    expectedClaimantId?: string;
+  },
+  options?: ClaimContractOptions,
+): Promise<ClaimResult<GroupBoardClaimItem>> {
+  const cfg = options?.cfg;
+  if (!isCollabTaskClaimContractEnabled(cfg, authority.groupId, authority.tenantId)) {
+    return flagOff();
+  }
+  const taskId = compact(input.taskId);
+  const itemId = compact(input.itemId);
+  const expectedOpKey = compact(input.expectedOpKey);
+  if (!taskId || !itemId || !expectedOpKey) {
+    return fail(
+      "invalid_input",
+      "commitBoardDispatchPermit requires taskId, itemId, expectedOpKey",
+    );
+  }
+  return mutateBoardClaimItem(
+    authority,
+    { taskId, itemId },
+    (current) => {
+      const pending = current.pendingEventRelay;
+      if (!pending) {
+        return fail("commit_pending_missing", "pendingEventRelay missing at permit commit");
+      }
+      if (compact(pending.opKey) !== expectedOpKey) {
+        return fail(
+          "commit_pending_opkey_mismatch",
+          "pendingEventRelay.opKey does not match expectedOpKey at permit commit",
+        );
+      }
+      if (pending.status === "dispatched") {
+        // Idempotent: same opKey already holds the permit.
+        return { ok: true, value: current, skipAppend: true };
+      }
+      if (pending.status !== "pending") {
+        return fail(
+          `commit_pending_status:${pending.status}`,
+          `pendingEventRelay.status is ${pending.status}; expected pending`,
+        );
+      }
+      if (pending.businessEvent !== input.expectedBusinessEvent) {
+        return fail(
+          `commit_business_event_mismatch:${pending.businessEvent}`,
+          "pendingEventRelay.businessEvent mismatch at permit commit",
+        );
+      }
+      if (input.expectedBusinessEvent === "returned" && current.status !== "returned") {
+        return fail(
+          `commit_status_not_returned:${current.status}`,
+          `board status is ${current.status}; expected returned`,
+        );
+      }
+      if (
+        input.expectedBusinessEvent === "submitted_for_review" &&
+        current.status !== "submitted_for_review"
+      ) {
+        return fail(
+          `commit_status_not_submitted:${current.status}`,
+          `board status is ${current.status}; expected submitted_for_review`,
+        );
+      }
+      if (
+        typeof input.expectedReturnRevision === "number" &&
+        typeof pending.returnRevision === "number" &&
+        input.expectedReturnRevision !== pending.returnRevision
+      ) {
+        return fail(
+          "commit_return_revision_superseded",
+          "returnRevision superseded at permit commit",
+        );
+      }
+      if (
+        typeof input.expectedReturnRevision === "number" &&
+        typeof current.returnCount === "number" &&
+        input.expectedReturnRevision !== current.returnCount
+      ) {
+        return fail("commit_return_count_superseded", "returnCount superseded at permit commit");
+      }
+      if (
+        typeof input.expectedBoardRevision === "number" &&
+        typeof current.revision === "number" &&
+        input.expectedBoardRevision !== current.revision
+      ) {
+        return fail(
+          "commit_board_revision_superseded",
+          "board revision superseded at permit commit",
+        );
+      }
+      if (
+        typeof input.expectedBoardRevision === "number" &&
+        typeof pending.boardRevision === "number" &&
+        input.expectedBoardRevision !== pending.boardRevision
+      ) {
+        return fail(
+          "commit_pending_board_revision_mismatch",
+          "pending boardRevision mismatch at permit commit",
+        );
+      }
+      const claimantId = compact(pending.claimantId) || compact(current.claimantId);
+      if (!claimantId) {
+        return fail("commit_claimant_missing", "claimant missing at permit commit");
+      }
+      if (input.expectedClaimantId && !sameClaimantActorId(claimantId, input.expectedClaimantId)) {
+        return fail(
+          `commit_claimant_reassigned:live=${claimantId}:expected=${input.expectedClaimantId}`,
+          "claimant reassigned at permit commit",
+        );
+      }
+      // Status-only: do NOT bump board revision — permit must not look like accept/submit supersession.
+      const next: GroupBoardClaimItem = {
+        ...current,
+        pendingEventRelay: { ...pending, status: "dispatched" },
       };
       return { ok: true, value: next };
     },
@@ -1804,10 +1939,10 @@ export async function updateBoardPendingEventRelayStatus(
       if (pending.status === input.status) {
         return { ok: true, value: current, skipAppend: true };
       }
+      // Status-only lifecycle marker — keep board revision stable for permit linearization.
       const next: GroupBoardClaimItem = {
         ...current,
         pendingEventRelay: { ...pending, status: input.status },
-        revision: nextBoardClaimRevision(current),
       };
       return { ok: true, value: next };
     },
