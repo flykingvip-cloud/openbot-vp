@@ -53,7 +53,11 @@ export type DiscussToTaskChatEgressPayload = {
   runId: string;
   sessionKey: string;
   seq: number;
-  state: "final";
+  /**
+   * Non-terminal status/progress event. Must NOT be "final"/"error"/"aborted":
+   * the establish-task receipt must not end the parent chat run.
+   */
+  state: "status";
   message: Record<string, unknown>;
 };
 
@@ -113,8 +117,9 @@ export function applyDiscussToTaskChatTurnToChatHandler(
 
 /**
  * Send deterministic discuss→task status through the existing chat event egress
- * (broadcastChat + nodeSendToSession). Used by the real chat.send handler so the
- * client receives content even when transcript persist fails (no model paraphrase).
+ * (broadcastChat + nodeSendToSession) as a **non-terminal** `state:"status"` event.
+ * Used by the real chat.send handler so the client receives content even when
+ * transcript persist fails (no model paraphrase), without ending the parent run.
  * Never includes raw internal persist errors — only the safe clientFeedbackMessage.
  */
 export function emitDiscussToTaskClientFeedback(params: {
@@ -137,9 +142,23 @@ export function emitDiscussToTaskClientFeedback(params: {
     params.applied.transcriptPersist?.ok && params.applied.transcriptPersist.message
       ? params.applied.transcriptPersist.message
       : undefined;
+  const receiptRunId = `${params.runId}:discuss-to-task-receipt`;
+  const receiptMessageId =
+    typeof persistedMessage?.id === "string" && persistedMessage.id.trim()
+      ? persistedMessage.id.trim()
+      : `discuss-to-task-receipt:${params.runId}`;
   const message: Record<string, unknown> = persistedMessage
-    ? { ...persistedMessage }
+    ? {
+        ...persistedMessage,
+        id: receiptMessageId,
+        discussToTaskReceipt: true,
+        collaborationRoundId:
+          typeof persistedMessage.collaborationRoundId === "string"
+            ? persistedMessage.collaborationRoundId
+            : params.runId,
+      }
     : {
+        id: receiptMessageId,
         role: "assistant",
         content: [{ type: "text", text }],
         timestamp: Date.now(),
@@ -150,11 +169,14 @@ export function emitDiscussToTaskClientFeedback(params: {
           ? { formalTaskEstablish: params.applied.formalTaskEstablish }
           : {}),
       };
+  // Explicit non-terminal status: appendable receipt that must not clear the parent run.
+  // Do not use state:"final" — frontend isSameChatTurnRunId treats the :receipt suffix as
+  // the same turn and handleFinalChatEvent would clearActiveChatRunState too early.
   const payload: DiscussToTaskChatEgressPayload = {
-    runId: `${params.runId}:discuss-to-task-receipt`,
+    runId: receiptRunId,
     sessionKey: params.sessionKey,
     seq: 0,
-    state: "final",
+    state: "status",
     message,
   };
   params.broadcastChat(params.sessionKey, payload, {

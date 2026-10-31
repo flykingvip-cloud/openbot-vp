@@ -10159,6 +10159,9 @@ landingStreams:
       - src/agents/openclaw-tools.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.test.ts
+      - ui/src/ui/chat/work-progress-phase.ts
       - src/agents/tools/collaboration-board-discuss-to-task.turn.test.ts
       - src/agents/tools/collaboration-board-discuss-to-task.injection.test.ts
       - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
@@ -22582,6 +22585,9 @@ landingStreams:
       - src/agents/openclaw-tools.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.ts
       - src/gateway/collaboration-learning/discuss-to-task-chat-turn.test.ts
+      - ui/src/ui/controllers/chat.ts
+      - ui/src/ui/controllers/chat.test.ts
+      - ui/src/ui/chat/work-progress-phase.ts
       - src/agents/tools/collaboration-board-discuss-to-task.turn.test.ts
       - src/agents/tools/collaboration-board-discuss-to-task.injection.test.ts
       - docs/notes/controlled-discuss-to-task-p1-2026-10-31.md
