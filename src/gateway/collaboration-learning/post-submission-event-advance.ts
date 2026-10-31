@@ -14,6 +14,7 @@ import type { OpenBotConfig } from "../../config/types.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   clearBoardPendingEventRelay,
+  loadBoardClaimItem,
   updateBoardPendingEventRelayStatus,
   type BoardPendingEventRelay,
   type GroupBoardClaimItem,
@@ -30,8 +31,14 @@ import {
   getWakeRoundDispatcher,
   type ConsumeWakeRoundDispatchResult,
   type WakeRoundDispatcher,
+  type WakeRoundDispatchRequest,
 } from "../collaboration-dispatch/wake-round-dispatch.js";
 import { buildClaimAuthority, listCollaborationBoardItems } from "./claim-contract-entry.js";
+import { deliveryActorIdsEqual } from "./delivery-actor-binding.js";
+import {
+  buildExecutionDeliverableBinding,
+  runIdFromWakeOpAttempt,
+} from "./execution-deliverable-binding.js";
 import type { TeamResourceAuthOk, TrustedGroupStores } from "./team-resource-auth.js";
 import { TRUSTED_GROUP_LOCATOR_REQUIRED } from "./team-resource-auth.js";
 import type { CollaborationTenantResolution } from "./trusted-tenant.js";
@@ -222,6 +229,258 @@ async function resolveReturnExecutionBinding(params: {
 }
 
 /**
+ * Distinct dispatch intents — review vs return-revise — not a generic "continue advance".
+ */
+function buildBoardEventDispatchPrompt(params: {
+  businessEvent: BoardPendingEventRelay["businessEvent"];
+  claimantName: string;
+  reason: string;
+  bag?: ReturnType<typeof buildExecutionTaskBag> | null;
+}): string {
+  if (params.businessEvent === "returned") {
+    const header = [
+      "【Mode B 退回修订】来源=board_event=returned",
+      `请按审查意见修订你认领的看板项（责任人 ${params.claimantName}），完成后正式提交成果。`,
+      params.reason,
+    ];
+    const step = params.bag?.todolistCurrentStep;
+    return [
+      ...header,
+      params.bag?.boardSummary?.itemId ? `board=${params.bag.boardSummary.itemId}` : null,
+      params.bag?.boardSummary?.goal ? `goal=${params.bag.boardSummary.goal}` : null,
+      step ? `step=${step.stepId}:v${step.version}:${step.title ?? ""}` : null,
+      "intent=return_revise",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (params.businessEvent === "submitted_for_review") {
+    return [
+      "【Mode B 审查派发】来源=board_event=submitted_for_review",
+      `请审查责任人 ${params.claimantName} 的交卷并给出接受/退回裁决。`,
+      params.reason,
+      "intent=review_submission",
+    ].join("\n");
+  }
+  return [
+    `【Mode B 事件中继】来源=board_event=${params.businessEvent}`,
+    params.reason,
+    `intent=board_event_${params.businessEvent}`,
+  ].join("\n");
+}
+
+type CommitBoundaryAdjudication =
+  | {
+      ok: true;
+      liveItem: GroupBoardClaimItem;
+      livePending: BoardPendingEventRelay;
+      todolistId?: string;
+      planVersion?: number;
+      stepId?: string;
+      claimantId: string;
+      bag?: ReturnType<typeof buildExecutionTaskBag>;
+    }
+  | { ok: false; reason: string; markBlocked?: boolean };
+
+/**
+ * Claim/dispatch commit-boundary adjudication (after CAS take, before external dispatch).
+ * Order: live item → pending opKey → pending status → board status → returnRevision →
+ * boardRevision → effective claimant → plan version/step (returned).
+ */
+async function adjudicatePendingAtDispatchCommit(params: {
+  authority: RuntimeAuthority;
+  taskId: string;
+  itemId: string;
+  expectedOpKey: string;
+  expectedBusinessEvent: BoardPendingEventRelay["businessEvent"];
+  expectedReturnRevision?: number;
+  expectedBoardRevision?: number;
+  expectedClaimantId?: string;
+  expectedTodolistId?: string;
+  expectedPlanVersion?: number;
+  expectedStepId?: string;
+}): Promise<CommitBoundaryAdjudication> {
+  const liveItem = await loadBoardClaimItem(params.authority, {
+    taskId: params.taskId,
+    itemId: params.itemId,
+  });
+  if (!liveItem) {
+    return { ok: false, reason: "commit_board_item_missing", markBlocked: true };
+  }
+  const livePending = liveItem.pendingEventRelay;
+  if (!livePending) {
+    return { ok: false, reason: "commit_pending_missing", markBlocked: true };
+  }
+  if (compact(livePending.opKey) !== compact(params.expectedOpKey)) {
+    return { ok: false, reason: "commit_pending_opkey_mismatch", markBlocked: true };
+  }
+  if (livePending.status !== "pending") {
+    return {
+      ok: false,
+      reason: `commit_pending_status:${livePending.status}`,
+      markBlocked: true,
+    };
+  }
+  if (livePending.businessEvent !== params.expectedBusinessEvent) {
+    return {
+      ok: false,
+      reason: `commit_business_event_mismatch:${livePending.businessEvent}`,
+      markBlocked: true,
+    };
+  }
+  if (params.expectedBusinessEvent === "returned" && liveItem.status !== "returned") {
+    return {
+      ok: false,
+      reason: `commit_status_not_returned:${liveItem.status}`,
+      markBlocked: true,
+    };
+  }
+  if (
+    params.expectedBusinessEvent === "submitted_for_review" &&
+    liveItem.status !== "submitted_for_review"
+  ) {
+    return {
+      ok: false,
+      reason: `commit_status_not_submitted:${liveItem.status}`,
+      markBlocked: true,
+    };
+  }
+  if (
+    typeof params.expectedReturnRevision === "number" &&
+    typeof livePending.returnRevision === "number" &&
+    params.expectedReturnRevision !== livePending.returnRevision
+  ) {
+    return { ok: false, reason: "commit_return_revision_superseded", markBlocked: true };
+  }
+  if (
+    typeof params.expectedReturnRevision === "number" &&
+    typeof liveItem.returnCount === "number" &&
+    params.expectedReturnRevision !== liveItem.returnCount
+  ) {
+    return { ok: false, reason: "commit_return_count_superseded", markBlocked: true };
+  }
+  if (
+    typeof params.expectedBoardRevision === "number" &&
+    typeof liveItem.revision === "number" &&
+    params.expectedBoardRevision !== liveItem.revision
+  ) {
+    return { ok: false, reason: "commit_board_revision_superseded", markBlocked: true };
+  }
+  if (
+    typeof params.expectedBoardRevision === "number" &&
+    typeof livePending.boardRevision === "number" &&
+    params.expectedBoardRevision !== livePending.boardRevision
+  ) {
+    return { ok: false, reason: "commit_pending_board_revision_mismatch", markBlocked: true };
+  }
+
+  const claimantId = compact(livePending.claimantId) || compact(liveItem.claimantId) || "";
+  if (!claimantId) {
+    return { ok: false, reason: "commit_claimant_missing", markBlocked: true };
+  }
+  if (params.expectedClaimantId && !deliveryActorIdsEqual(claimantId, params.expectedClaimantId)) {
+    return {
+      ok: false,
+      reason: `commit_claimant_reassigned:live=${claimantId}:expected=${params.expectedClaimantId}`,
+      markBlocked: true,
+    };
+  }
+  const targets = (livePending.targetAgentIds ?? []).map(compact).filter(Boolean);
+  if (
+    targets.length > 0 &&
+    !targets.some((id) => deliveryActorIdsEqual(id, claimantId)) &&
+    params.expectedBusinessEvent === "returned"
+  ) {
+    // Return revise targets the claimant; mismatch means responsibility moved.
+    return {
+      ok: false,
+      reason: `commit_target_claimant_mismatch:claimant=${claimantId}`,
+      markBlocked: true,
+    };
+  }
+
+  if (params.expectedBusinessEvent !== "returned") {
+    return {
+      ok: true,
+      liveItem,
+      livePending,
+      claimantId,
+    };
+  }
+
+  // Returned: re-validate exact plan version at commit (same order as plan-confirm).
+  try {
+    const todolist = await loadLatestOwnerTodolistForBoardItem(params.authority, {
+      taskId: params.taskId,
+      boardItemId: params.itemId,
+      ownerMemberId: claimantId,
+    });
+    if (!todolist || todolist.status !== "confirmed") {
+      return { ok: false, reason: "commit_plan_not_confirmed", markBlocked: false };
+    }
+    const live = await loadExecutorTodolist(params.authority, {
+      taskId: params.taskId,
+      todolistId: todolist.todolistId,
+    });
+    if (!live || live.status !== "confirmed") {
+      return { ok: false, reason: "commit_plan_stale_or_revised", markBlocked: false };
+    }
+    const expectedTodolistId =
+      compact(params.expectedTodolistId) || compact(livePending.todolistId);
+    if (expectedTodolistId && expectedTodolistId !== compact(live.todolistId)) {
+      return { ok: false, reason: "commit_plan_todolist_mismatch", markBlocked: false };
+    }
+    const expectedPlanVersion =
+      typeof params.expectedPlanVersion === "number"
+        ? params.expectedPlanVersion
+        : typeof livePending.planVersion === "number"
+          ? livePending.planVersion
+          : undefined;
+    if (
+      typeof expectedPlanVersion === "number" &&
+      Number.isFinite(expectedPlanVersion) &&
+      expectedPlanVersion !== live.version
+    ) {
+      return {
+        ok: false,
+        reason: `commit_plan_version_mismatch:live=${live.version}:expected=${expectedPlanVersion}`,
+        markBlocked: false,
+      };
+    }
+    const bag = buildExecutionTaskBag({ boardItem: liveItem, todolist: live });
+    const step = bag.todolistCurrentStep;
+    const stepId =
+      compact(params.expectedStepId) ||
+      compact(livePending.stepId) ||
+      compact(step?.stepId) ||
+      undefined;
+    if (params.expectedStepId && stepId && compact(params.expectedStepId) !== stepId) {
+      return { ok: false, reason: "commit_plan_step_mismatch", markBlocked: false };
+    }
+    if (!bag.planGate.confirmed || !stepId) {
+      return { ok: false, reason: "commit_plan_gate_or_step_required", markBlocked: false };
+    }
+    return {
+      ok: true,
+      liveItem,
+      livePending,
+      todolistId: compact(live.todolistId),
+      planVersion: live.version,
+      stepId,
+      claimantId,
+      bag,
+    };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      reason: `commit_plan_unavailable:${detail}`.slice(0, 200),
+      markBlocked: false,
+    };
+  }
+}
+
+/**
  * After durable board submit/return/accept, attempt existing nudge consume.
  * Clears pendingEventRelay only on explicit completed / terminal outcomes.
  * Leaves pending when consume cannot finish the relay — recovery rescans same opKey.
@@ -244,6 +503,15 @@ export async function triggerPostSubmissionEventAdvance(params: {
    * never fall back to legacy/compat root.
    */
   requireTrustedScope?: boolean;
+  /**
+   * Test-only: after live pending/opKey/revision checks (+ plan gate for return),
+   * before consumeWakeForRoundDispatch. Proves post-check / pre-dispatch races.
+   */
+  _testAfterLiveCheckBeforeConsumeBarrier?: () => Promise<void>;
+  /** Forwarded to consumeWakeForRoundDispatch (post-readiness, pre-CAS take). */
+  _testAfterReadinessBarrier?: () => Promise<void>;
+  /** Forwarded to consumeWakeForRoundDispatch (post-eligibility, pre-CAS take). */
+  _testAfterEligibilityBarrier?: () => Promise<void>;
 }): Promise<PostSubmissionEventAdvanceResult> {
   const cfg = params.cfg ?? loadConfig();
   const groupId = compact(params.groupId);
@@ -455,6 +723,7 @@ export async function triggerPostSubmissionEventAdvance(params: {
   let planConfirmBinding:
     | { todolistId: string; confirmedVersion: number; stepId?: string | null }
     | undefined;
+  let returnClaimantId: string | undefined;
   if (businessEvent === "returned") {
     const planGate = await resolveReturnExecutionBinding({
       authority,
@@ -483,6 +752,7 @@ export async function triggerPostSubmissionEventAdvance(params: {
       confirmedVersion: planGate.planVersion,
       stepId: planGate.stepId ?? null,
     };
+    returnClaimantId = planGate.claimantId;
     void SELF_ADVANCE_ACTIVE_BOARD_STATUSES;
   }
 
@@ -499,19 +769,145 @@ export async function triggerPostSubmissionEventAdvance(params: {
       ? `deliverable=${pending.linkedDeliverableId}@v${pending.linkedDeliverableVersion ?? "?"}`
       : null,
     `item=${itemId}`,
+    businessEvent === "returned"
+      ? "intent=return_revise"
+      : businessEvent === "submitted_for_review"
+        ? "intent=review_submission"
+        : `intent=board_event_${businessEvent}`,
   ]
     .filter(Boolean)
     .join(":");
 
-  const roundDispatcher =
+  // Snapshot versions for commit-boundary adjudication (post-CAS).
+  const expectedReturnRevision =
+    typeof pending.returnRevision === "number" ? pending.returnRevision : undefined;
+  const expectedBoardRevision =
+    typeof pending.boardRevision === "number"
+      ? pending.boardRevision
+      : typeof item.revision === "number"
+        ? item.revision
+        : undefined;
+  const expectedClaimantId =
+    returnClaimantId || compact(pending.claimantId) || compact(item.claimantId) || undefined;
+
+  if (params._testAfterLiveCheckBeforeConsumeBarrier) {
+    await params._testAfterLiveCheckBeforeConsumeBarrier();
+  }
+
+  const baseDispatcher: WakeRoundDispatcher | null =
     params.roundDispatcher !== undefined ? params.roundDispatcher : getWakeRoundDispatcher();
+
+  // Reuse plan-confirm pattern: enrich at claim/dispatch commit (after CAS take)
+  // with FULL executionDeliverableBinding from durable wake op/attempt.
+  const finalDispatcher: WakeRoundDispatcher = async (req: WakeRoundDispatchRequest) => {
+    const gate = await adjudicatePendingAtDispatchCommit({
+      authority,
+      taskId,
+      itemId,
+      expectedOpKey: opKey,
+      expectedBusinessEvent: businessEvent,
+      expectedReturnRevision,
+      expectedBoardRevision,
+      expectedClaimantId,
+      expectedTodolistId: planConfirmBinding?.todolistId,
+      expectedPlanVersion: planConfirmBinding?.confirmedVersion,
+      expectedStepId: planConfirmBinding?.stepId ?? undefined,
+    });
+    if (!gate.ok) {
+      if (gate.markBlocked) {
+        try {
+          await updateBoardPendingEventRelayStatus(
+            authority,
+            { taskId, itemId, expectedOpKey: opKey, status: "blocked" },
+            { cfg },
+          );
+        } catch {
+          // best-effort; consume still records dispatch_failed
+        }
+      }
+      return { ok: false, reason: gate.reason };
+    }
+
+    let executionDeliverableBinding = req.executionDeliverableBinding ?? null;
+    let enrichedPlan = planConfirmBinding;
+    let dispatchPrompt = req.dispatchPrompt;
+
+    if (businessEvent === "returned") {
+      const wakeOpKey = compact(req.wakeOpKey) || compact(req.opKey) || opKey;
+      const attemptId = compact(req.wakeExecutionAttemptId);
+      if (!wakeOpKey || !attemptId) {
+        return { ok: false, reason: "wake_execution_attempt_required" };
+      }
+      const todolistId = compact(gate.todolistId) || compact(planConfirmBinding?.todolistId);
+      const planVersion =
+        typeof gate.planVersion === "number"
+          ? gate.planVersion
+          : planConfirmBinding?.confirmedVersion;
+      const stepId = compact(gate.stepId) || compact(planConfirmBinding?.stepId);
+      if (!todolistId || typeof planVersion !== "number" || !stepId) {
+        return { ok: false, reason: "execution_deliverable_plan_required" };
+      }
+      const runId = runIdFromWakeOpAttempt({ opKey: wakeOpKey, attemptId });
+      executionDeliverableBinding = buildExecutionDeliverableBinding({
+        tenantId:
+          params.tenant?.tenantId ??
+          params.auth?.tenantId ??
+          req.tenantId ??
+          authority.tenantId ??
+          null,
+        groupId,
+        taskId,
+        boardItemId: itemId,
+        todolistId,
+        planVersion,
+        stepId,
+        runId,
+        attemptId,
+        opKey: wakeOpKey,
+        agentId: gate.claimantId,
+        source: "wake_dispatch",
+      });
+      if (!executionDeliverableBinding) {
+        return { ok: false, reason: "execution_deliverable_binding_incomplete" };
+      }
+      enrichedPlan = {
+        todolistId,
+        confirmedVersion: planVersion,
+        stepId,
+      };
+      dispatchPrompt = buildBoardEventDispatchPrompt({
+        businessEvent,
+        claimantName: gate.claimantId,
+        reason,
+        bag: gate.bag,
+      });
+    } else if (businessEvent === "submitted_for_review") {
+      dispatchPrompt = buildBoardEventDispatchPrompt({
+        businessEvent,
+        claimantName: expectedClaimantId || "claimant",
+        reason,
+      });
+    }
+
+    if (!baseDispatcher) {
+      return { ok: false, reason: "mode_b_dispatcher_unbound" };
+    }
+    const enriched: WakeRoundDispatchRequest = {
+      ...req,
+      ...(enrichedPlan ? { planConfirmBinding: enrichedPlan } : {}),
+      ...(dispatchPrompt ? { dispatchPrompt } : {}),
+      ...(executionDeliverableBinding ? { executionDeliverableBinding } : {}),
+      reason,
+    };
+    return baseDispatcher(enriched);
+  };
 
   let consume: Awaited<ReturnType<typeof consumeWakeForRoundDispatch>>;
   try {
     consume = await consumeWakeForRoundDispatch({
       authority,
       cfg,
-      roundDispatcher,
+      roundDispatcher: finalDispatcher,
       request: {
         groupId,
         tenantId: params.tenant?.tenantId ?? params.auth?.tenantId ?? authority.tenantId ?? null,
@@ -524,7 +920,22 @@ export async function triggerPostSubmissionEventAdvance(params: {
         reason,
         opKey,
         ...(planConfirmBinding ? { planConfirmBinding } : {}),
+        ...(businessEvent === "returned" || businessEvent === "submitted_for_review"
+          ? {
+              dispatchPrompt: buildBoardEventDispatchPrompt({
+                businessEvent,
+                claimantName: expectedClaimantId || targetAgentIds[0] || "member",
+                reason,
+              }),
+            }
+          : {}),
       },
+      ...(params._testAfterReadinessBarrier
+        ? { _testAfterReadinessBarrier: params._testAfterReadinessBarrier }
+        : {}),
+      ...(params._testAfterEligibilityBarrier
+        ? { _testAfterEligibilityBarrier: params._testAfterEligibilityBarrier }
+        : {}),
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);

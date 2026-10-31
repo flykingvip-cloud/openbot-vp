@@ -18,6 +18,8 @@ import type { OpenBotConfig } from "../../config/types.js";
 import {
   acceptBoardItemSubmission,
   applyClaim,
+  boardClaimLogPath,
+  boardClaimsDir,
   claimBoardItem,
   loadBoardClaimItem,
   markBoardItemInProgress,
@@ -30,20 +32,31 @@ import {
   createRuntimeAuthority,
   type RuntimeAuthority,
 } from "../collaboration-dispatch/runtime-authority.js";
-import type { WakeRoundDispatcher } from "../collaboration-dispatch/wake-round-dispatch.js";
+import type {
+  WakeRoundDispatchRequest,
+  WakeRoundDispatcher,
+} from "../collaboration-dispatch/wake-round-dispatch.js";
+import { finalizeMemberRunTeamDeliverable } from "./chat-deliverable-team-submit.js";
 import {
   acceptCollaborationBoardItemSubmission,
   returnCollaborationBoardItemSubmission,
   submitCollaborationBoardItemForReview,
 } from "./claim-contract-entry.js";
 import {
+  normalizeExecutionDeliverableBinding,
+  productionWakeDeliverableContractFailure,
+  runIdFromWakeOpAttempt,
+} from "./execution-deliverable-binding.js";
+import {
   classifyConsumePendingLifecycle,
   listPendingBoardEventRelays,
   recoverPendingBoardEventRelays,
   triggerPostSubmissionEventAdvance,
 } from "./post-submission-event-advance.js";
+import { readTeamDeliverable } from "./team-deliverable-submit.js";
 import {
   P2_LINKED_DELIVERABLE_FIXTURE_BODY,
+  resolveTrustedStoresForAuthority,
   seedLinkedTeamDeliverableFixture,
   trustedLocatorFromAuthority,
 } from "./verify-linked-team-deliverable.js";
@@ -644,18 +657,45 @@ describe("P2 R2 — return binding + supersede barriers", () => {
     // Exact todolist/version are resolved at dispatch from live confirmed plan.
 
     let calls = 0;
-    const seenBindings: Array<{ todolistId?: string; version?: number }> = [];
+    const seenBindings: Array<{
+      todolistId?: string;
+      version?: number;
+      hasExecutionBinding?: boolean;
+      intent?: string;
+    }> = [];
     const dispatcher: WakeRoundDispatcher = async (req) => {
       calls += 1;
+      const exec = normalizeExecutionDeliverableBinding(req.executionDeliverableBinding);
       seenBindings.push({
         todolistId: req.planConfirmBinding?.todolistId,
         version: req.planConfirmBinding?.confirmedVersion,
+        hasExecutionBinding: Boolean(exec),
+        intent: req.dispatchPrompt?.includes("intent=return_revise")
+          ? "return_revise"
+          : req.reason?.includes("intent=return_revise")
+            ? "return_revise"
+            : undefined,
       });
       expect(req.toAgentIds).toContain("bot-a");
       expect(req.planConfirmBinding?.todolistId).toBe(seeded.todolistId);
       expect(req.planConfirmBinding?.confirmedVersion).toBe(seeded.planVersion);
+      // P1-A: full wake_dispatch executionDeliverableBinding from durable op/attempt.
+      expect(exec).toBeTruthy();
+      expect(exec?.source).toBe("wake_dispatch");
+      expect(exec?.todolistId).toBe(seeded.todolistId);
+      expect(exec?.planVersion).toBe(seeded.planVersion);
+      expect(exec?.agentId).toBe("bot-a");
+      expect(compact(exec?.opKey)).toBeTruthy();
+      expect(compact(exec?.attemptId)).toBeTruthy();
+      expect(exec?.runId).toBe(
+        runIdFromWakeOpAttempt({ opKey: exec!.opKey!, attemptId: exec!.attemptId! }),
+      );
+      expect(req.dispatchPrompt ?? "").toContain("intent=return_revise");
       return { ok: true, roundId: `ret-round-${calls}` };
     };
+    function compact(value: string | null | undefined): string {
+      return value?.trim() ?? "";
+    }
     const first = await triggerPostSubmissionEventAdvance({
       groupId: auth.groupId,
       taskId,
@@ -1119,6 +1159,503 @@ describe("P2 matrix — handler-integration (trusted write surface)", () => {
     });
     expect(respond.calls.length).toBe(1);
     expect(respond.calls[0]?.[0]).toBe(false);
+  });
+});
+
+describe("P2 R3 — return executionDeliverableBinding + Mode B submit", () => {
+  test("return-revise builds full binding from durable op/attempt; Mode B formal submit accepts revise", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r3-return-bind-submit";
+    const seeded = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# Draft v1\nbody",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    const ret = await returnCollaborationBoardItemSubmission({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      expectedSubmissionId: submissionId,
+      reason: "revise section 2 for clarity",
+      actor: "bot-b",
+      cfg,
+      relayAdvance: false,
+    });
+    expect(ret.item.status).toBe("returned");
+
+    let captured: WakeRoundDispatchRequest | null = null;
+    const dispatcher: WakeRoundDispatcher = async (req) => {
+      captured = req;
+      return { ok: true, roundId: "r3-return-revise-round" };
+    };
+    const advance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      cfg,
+      roundDispatcher: dispatcher,
+      trusted: trustedLocatorFromAuthority(auth),
+    });
+    expect(advance.dispatched).toBe(true);
+    expect(captured).toBeTruthy();
+    const binding = normalizeExecutionDeliverableBinding(captured!.executionDeliverableBinding);
+    expect(binding).toBeTruthy();
+    if (!binding) {
+      throw new Error("expected executionDeliverableBinding on return dispatch");
+    }
+    expect(binding.source).toBe("wake_dispatch");
+    expect(binding.todolistId).toBe(seeded.todolistId);
+    expect(binding.planVersion).toBe(seeded.planVersion);
+    expect(binding.agentId).toBe("bot-a");
+    expect(binding.opKey).toBeTruthy();
+    expect(binding.attemptId).toBeTruthy();
+    expect(binding.runId).toBe(
+      runIdFromWakeOpAttempt({ opKey: binding.opKey!, attemptId: binding.attemptId! }),
+    );
+    expect(captured!.planConfirmBinding?.todolistId).toBe(seeded.todolistId);
+    expect(captured!.planConfirmBinding?.confirmedVersion).toBe(seeded.planVersion);
+    expect(captured!.dispatchPrompt ?? "").toContain("intent=return_revise");
+    expect(captured!.dispatchPrompt ?? "").toContain("退回修订");
+    // Distinct from review intent
+    expect(captured!.dispatchPrompt ?? "").not.toContain("intent=review_submission");
+
+    // Production wake contract (same gate Mode B boot uses before formal write).
+    expect(
+      productionWakeDeliverableContractFailure({
+        binding,
+        requireTenant: false,
+        tenantId: binding.tenantId,
+        groupId: binding.groupId,
+        taskId: binding.taskId,
+        boardItemId: binding.boardItemId,
+        agentId: binding.agentId,
+        opKey: binding.opKey,
+        attemptId: binding.attemptId,
+        planConfirmBinding: captured!.planConfirmBinding,
+      }),
+    ).toBeNull();
+
+    // Seed durable task SoT (formal submit asserts task belongs to group).
+    const stores = resolveTrustedStoresForAuthority(auth);
+    expect(stores).toBeTruthy();
+    await stores!.objectStorage.writeObject(
+      auth.groupId,
+      "task",
+      taskId,
+      makeSeedTask(auth.groupId, taskId),
+    );
+
+    // Member resume after return-revise wake (Mode B run marks in_progress before DELIVERABLE).
+    const resumed = await markBoardItemInProgress(
+      auth,
+      { taskId, itemId: seeded.item.itemId, actorId: "bot-a" },
+      { cfg },
+    );
+    expect(resumed.ok).toBe(true);
+
+    // Without binding, Mode B formal path refuses (execution_binding_required).
+    const missing = await finalizeMemberRunTeamDeliverable({
+      text: '<<DELIVERABLE title="Revise" file="revise-r3.md">>\nrevised body\n<</DELIVERABLE>>',
+      agentId: "bot-a",
+      binding: null,
+      trusted: trustedLocatorFromAuthority(auth),
+      cfg,
+      enforceAcl: false,
+    });
+    expect(missing.outcome.ok).toBe(false);
+    if (!missing.outcome.ok) {
+      expect(missing.outcome.reason).toBe("execution_binding_required");
+    }
+
+    // Real deliverable submit path with the return-revise binding (model mocked as text).
+    const submitted = await finalizeMemberRunTeamDeliverable({
+      text: '<<DELIVERABLE title="ReviseR3" file="revise-r3.md">>\n# revised section 2\nbody after return\n<</DELIVERABLE>>',
+      agentId: "bot-a",
+      binding,
+      trusted: trustedLocatorFromAuthority(auth),
+      cfg,
+      enforceAcl: false,
+    });
+    if (!submitted.outcome.ok) {
+      throw new Error(
+        `formal submit failed: ${submitted.outcome.reason}${
+          "detail" in submitted.outcome && submitted.outcome.detail
+            ? ` detail=${submitted.outcome.detail}`
+            : ""
+        } text=${submitted.text.slice(0, 240)}`,
+      );
+    }
+    expect(submitted.outcome.ok).toBe(true);
+    const deliverableId =
+      "deliverableId" in submitted.outcome ? submitted.outcome.deliverableId : null;
+    const version = "version" in submitted.outcome ? submitted.outcome.version : null;
+    expect(deliverableId).toBeTruthy();
+    expect(typeof version).toBe("number");
+    const readBack = await readTeamDeliverable({
+      groupId: auth.groupId,
+      deliverableId: String(deliverableId),
+      actor: "bot-a",
+      trusted: trustedLocatorFromAuthority(auth),
+      cfg,
+      enforceAcl: false,
+    });
+    expect(readBack.ok).toBe(true);
+    if (readBack.ok) {
+      expect(readBack.content).toContain("revised section 2");
+      expect(readBack.taskId).toBe(taskId);
+      expect(readBack.version).toBe(Number(version));
+    }
+  });
+});
+
+describe("P2 R3 — post-check / pre-dispatch adversarial races", () => {
+  test("accept AFTER live check BEFORE dispatch blocks stale return at commit boundary", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r3-race-accept";
+    const seeded = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# race accept",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    // Force returned pending, then we will accept a re-submit inside the barrier.
+    // Simpler: return, mark in progress, re-submit, then start advance with barrier
+    // that accepts AFTER check. Here: return first; barrier accepts by mutating via
+    // accept on a fresh submit path is awkward mid-flight. Instead: return, then in
+    // barrier call acceptCollaboration after a new submit? Board is returned — accept
+    // needs submitted_for_review. Flow: return → barrier does mark+submit+accept.
+    const ret = await returnCollaborationBoardItemSubmission({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      expectedSubmissionId: submissionId,
+      reason: "race",
+      actor: "bot-b",
+      cfg,
+      relayAdvance: false,
+    });
+    const oldPending = ret.item.pendingEventRelay;
+    expect(oldPending?.opKey).toBeTruthy();
+    const oldOpKey = oldPending!.opKey;
+
+    let dispatcherCalls = 0;
+    const dispatcher: WakeRoundDispatcher = async () => {
+      dispatcherCalls += 1;
+      return { ok: true, roundId: "should-not-fire" };
+    };
+
+    const advance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      pending: oldPending,
+      cfg,
+      roundDispatcher: dispatcher,
+      trusted: trustedLocatorFromAuthority(auth),
+      _testAfterLiveCheckBeforeConsumeBarrier: async () => {
+        // Post-check race: member revises and reviewer accepts before dispatch.
+        await markBoardItemInProgress(
+          auth,
+          { taskId, itemId: seeded.item.itemId, actorId: "bot-a" },
+          { cfg },
+        );
+        const link2 = await seedLink(auth, taskId, {
+          deliverableId: "del-race-accept",
+          version: 2,
+          content: "# accepted mid-flight\n",
+        });
+        const submissionId2 = randomUUID();
+        await submitCollaborationBoardItemForReview({
+          groupId: auth.groupId,
+          taskId,
+          itemId: seeded.item.itemId,
+          submissionId: submissionId2,
+          artifactVersion: "art-v2",
+          submissionSummary: "# v2",
+          ...link2,
+          actor: "bot-a",
+          cfg,
+          relayAdvance: false,
+        });
+        await acceptCollaborationBoardItemSubmission({
+          groupId: auth.groupId,
+          taskId,
+          itemId: seeded.item.itemId,
+          expectedSubmissionId: submissionId2,
+          reason: "ok mid-flight",
+          checkedAcceptanceCriteria: ["has title", "has body"],
+          actor: "bot-b",
+          cfg,
+          relayAdvance: false,
+        });
+      },
+    });
+
+    expect(advance.dispatched).toBe(false);
+    expect(dispatcherCalls).toBe(0);
+    expect(
+      advance.reason.includes("commit_") ||
+        advance.reason.includes("accepted") ||
+        advance.reason.includes("superseded") ||
+        advance.reason.includes("status_not_returned") ||
+        advance.reason.startsWith("dispatch_failed:"),
+    ).toBe(true);
+
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: seeded.item.itemId });
+    expect(live?.status).toBe("accepted");
+    // Durable: old return pending must not remain actionable.
+    const pending = live?.pendingEventRelay;
+    if (pending && pending.opKey === oldOpKey) {
+      expect(["blocked", "unknown"].includes(pending.status) || pending.status !== "pending").toBe(
+        true,
+      );
+    }
+  });
+
+  test("new submit AFTER live check BEFORE dispatch blocks stale return at commit", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r3-race-submit";
+    const seeded = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# race submit",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    const ret = await returnCollaborationBoardItemSubmission({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      expectedSubmissionId: submissionId,
+      reason: "needs revise",
+      actor: "bot-b",
+      cfg,
+      relayAdvance: false,
+    });
+    const oldPending = ret.item.pendingEventRelay!;
+    const oldOpKey = oldPending.opKey;
+    const oldBoardRevision = oldPending.boardRevision;
+
+    let dispatcherCalls = 0;
+    let sawCommitReject = false;
+    const dispatcher: WakeRoundDispatcher = async () => {
+      dispatcherCalls += 1;
+      return { ok: true, roundId: "stale-should-not" };
+    };
+
+    const advance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      pending: oldPending,
+      cfg,
+      roundDispatcher: dispatcher,
+      trusted: trustedLocatorFromAuthority(auth),
+      _testAfterLiveCheckBeforeConsumeBarrier: async () => {
+        await markBoardItemInProgress(
+          auth,
+          { taskId, itemId: seeded.item.itemId, actorId: "bot-a" },
+          { cfg },
+        );
+        const link2 = await seedLink(auth, taskId, {
+          deliverableId: "del-race-submit",
+          version: 2,
+          content: "# new submit mid-flight\n",
+        });
+        await submitCollaborationBoardItemForReview({
+          groupId: auth.groupId,
+          taskId,
+          itemId: seeded.item.itemId,
+          submissionId: randomUUID(),
+          artifactVersion: "art-v2",
+          submissionSummary: "# superseding submit",
+          ...link2,
+          actor: "bot-a",
+          cfg,
+          relayAdvance: false,
+        });
+      },
+    });
+
+    expect(advance.dispatched).toBe(false);
+    // Either refused before consume completed, or dispatcher wrapper rejected at commit.
+    expect(dispatcherCalls).toBe(0);
+    const reason = advance.reason;
+    if (reason.includes("commit_") || reason.startsWith("dispatch_failed:commit_")) {
+      sawCommitReject = true;
+    }
+    expect(
+      sawCommitReject ||
+        reason.includes("superseded") ||
+        reason.includes("status_not_returned") ||
+        reason.includes("pending_opkey"),
+    ).toBe(true);
+
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: seeded.item.itemId });
+    expect(live?.status).toBe("submitted_for_review");
+    // New submit owns a different pending opKey / higher board revision.
+    const livePending = live?.pendingEventRelay;
+    expect(livePending?.opKey === oldOpKey).toBe(false);
+    if (typeof oldBoardRevision === "number" && typeof live?.revision === "number") {
+      expect(live.revision).toBeGreaterThan(oldBoardRevision);
+    }
+  });
+
+  test("reassign claimant AFTER live check BEFORE dispatch blocks at commit boundary", async () => {
+    const { cfg } = await useConfig();
+    const auth = authority(cfg);
+    const taskId = "task-p2-r3-race-reassign";
+    const seeded = await seedInProgress({
+      auth,
+      cfg,
+      taskId,
+      claimant: "bot-a",
+      reviewer: "bot-b",
+    });
+    const link = await seedLink(auth, taskId);
+    const submissionId = randomUUID();
+    await submitCollaborationBoardItemForReview({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      submissionId,
+      artifactVersion: "art-v1",
+      submissionSummary: "# race reassign",
+      ...link,
+      actor: "bot-a",
+      cfg,
+      relayAdvance: false,
+    });
+    const ret = await returnCollaborationBoardItemSubmission({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      expectedSubmissionId: submissionId,
+      reason: "reassign race",
+      actor: "bot-b",
+      cfg,
+      relayAdvance: false,
+    });
+    const oldPending = ret.item.pendingEventRelay!;
+    expect(oldPending.claimantId).toBe("bot-a");
+
+    let dispatcherCalls = 0;
+    const dispatcher: WakeRoundDispatcher = async () => {
+      dispatcherCalls += 1;
+      return { ok: true, roundId: "reassign-should-not" };
+    };
+
+    const advance = await triggerPostSubmissionEventAdvance({
+      groupId: auth.groupId,
+      taskId,
+      itemId: seeded.item.itemId,
+      actorId: "bot-b",
+      pending: oldPending,
+      cfg,
+      roundDispatcher: dispatcher,
+      trusted: trustedLocatorFromAuthority(auth),
+      _testAfterLiveCheckBeforeConsumeBarrier: async () => {
+        // Durable reassign after check: same pending opKey, claimant moved to bot-c.
+        const live = await loadBoardClaimItem(auth, {
+          taskId,
+          itemId: seeded.item.itemId,
+        });
+        if (!live?.pendingEventRelay) {
+          throw new Error("expected pending before reassign append");
+        }
+        const claimsDir = boardClaimsDir(auth);
+        const logPath = boardClaimLogPath(claimsDir, taskId);
+        const nextRevision = (typeof live.revision === "number" ? live.revision : 0) + 1;
+        const reassigned = {
+          ...live,
+          claimantId: "bot-c",
+          revision: nextRevision,
+          pendingEventRelay: {
+            ...live.pendingEventRelay,
+            claimantId: "bot-c",
+            // Keep opKey so this is a true post-check race on the same event.
+            targetAgentIds: ["bot-c"],
+          },
+        };
+        await fs.mkdir(claimsDir, { recursive: true });
+        await fs.appendFile(
+          logPath,
+          `${JSON.stringify({ kind: "board_claim", at: Date.now(), item: reassigned })}\n`,
+          "utf8",
+        );
+      },
+    });
+
+    expect(advance.dispatched).toBe(false);
+    expect(dispatcherCalls).toBe(0);
+    expect(
+      advance.reason.includes("commit_claimant") ||
+        advance.reason.includes("commit_target_claimant") ||
+        advance.reason.includes("commit_") ||
+        advance.reason.startsWith("dispatch_failed:"),
+    ).toBe(true);
+
+    const live = await loadBoardClaimItem(auth, { taskId, itemId: seeded.item.itemId });
+    expect(live?.claimantId).toBe("bot-c");
+    // Same opKey still present or blocked — stale return must not have dispatched.
+    if (live?.pendingEventRelay?.opKey === oldPending.opKey) {
+      if (live.pendingEventRelay.status === "pending") {
+        expect(advance.dispatched).toBe(false);
+      } else {
+        expect(["blocked", "unknown"]).toContain(live.pendingEventRelay.status);
+      }
+    }
   });
 });
 
