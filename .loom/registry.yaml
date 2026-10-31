@@ -10038,10 +10038,20 @@ tasks:
     metadata: {}
   - id: collab-restore-line-phase-a:grok-bot
     owner: grok-bot
-    intent: []
+    intent:
+      - P0 checkpoint restore-line load observability (empty≠error; request isolation; diagnostics)
     paths:
       - ui/src/ui/app.chat-restore.node.test.ts
       - src/gateway/server-methods/chat-checkpoints.d3.test.ts
+      - ui/src/ui/app.ts
+      - ui/src/ui/capability/app-view-state-slices.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+      - ui/src/ui/ports/employee/render-actions.node.test.ts
+      - ui/src/ui/chat/checkpoint-load-state.ts
+      - ui/src/ui/chat/checkpoint-load-state.node.test.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.node.test.ts
+      - .loom/registry.yaml
     state: active
     sessions: []
     ownerHistory: []
@@ -10461,14 +10471,22 @@ landingStreams:
       - src/auto-reply/reply/session-continuity.checkpoint-rollback.test.ts
       - ui/src/ui/app.ts
       - ui/src/ui/app.chat-restore.node.test.ts
+      - ui/src/ui/capability/app-view-state-slices.ts
+      - ui/src/ui/ports/employee/render-actions.ts
+      - ui/src/ui/ports/employee/render-actions.node.test.ts
+      - ui/src/ui/chat/checkpoint-load-state.ts
+      - ui/src/ui/chat/checkpoint-load-state.node.test.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.ts
+      - ui/src/ui/chat/checkpoint-visibility-diagnostics.node.test.ts
     canLandWith:
       - memory-safe-continuity-live-gateway-20261030
+      - openbot-default-capability-p0-20261030
     metadata:
       task: collab-restore-line-phase-a:grok-bot
       owner: grok-bot
-      purpose: Phase A re-enable chat checkpoint timeline (恢复线) for space/collab
-        sessions — human-user nodes only; transcript restore; no group workspace
-        snapshot (Phase B out); NO_PROMOTE
+      purpose: Phase A 恢复线 + P0 load observability (idle/loading/ready/error/stale/empty;
+        sessionKey+generation isolation; diagnostic reason codes). Does NOT change
+        restore RPC/placement/fallback/restorable. P1+ deferred. NO_PROMOTE
   - id: memory-safe-continuity-live-gateway-20261030
     landingPolicy: serial
     paths:

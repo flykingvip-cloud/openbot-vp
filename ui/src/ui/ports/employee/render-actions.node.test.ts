@@ -707,5 +707,7 @@ describe("employee render actions", () => {
     expect(state.sidebarOpen).toBe(true);
     expect(state.chatCheckpoints).toEqual([]);
     expect(state.pendingRestoreCheckpointId).toBeNull();
+    expect(state.chatCheckpointLoadState?.checkpoints ?? []).toEqual([]);
+    expect(state.chatCheckpointDiagnostics ?? []).toEqual([]);
   });
 });

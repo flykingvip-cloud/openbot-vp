@@ -388,3 +388,140 @@ describe("OpenBotApp restore concurrency UX", () => {
     }
   });
 });
+
+describe("OpenBotApp loadChatCheckpoints P0 observability", () => {
+  it("treats successful empty list as empty, not error", async () => {
+    const app = new OpenBotApp();
+    app.connected = true;
+    app.sessionKey = "agent:main:main";
+    app.client = {
+      request: vi.fn().mockResolvedValue({ checkpoints: [] }),
+    } as never;
+
+    await app.loadChatCheckpoints();
+
+    expect(app.chatCheckpointLoadState.status).toBe("empty");
+    expect(app.chatCheckpoints).toEqual([]);
+    expect(app.chatCheckpointLoadState.reasonCode).toBeUndefined();
+  });
+
+  it("treats list failure with no last-good as error, not empty", async () => {
+    const app = new OpenBotApp();
+    app.connected = true;
+    app.sessionKey = "agent:main:main";
+    app.client = {
+      request: vi.fn().mockRejectedValue(new Error("boom")),
+    } as never;
+
+    await app.loadChatCheckpoints();
+
+    expect(app.chatCheckpointLoadState.status).toBe("error");
+    expect(app.chatCheckpoints).toEqual([]);
+    expect(app.chatCheckpointLoadState.reasonCode).toBe("load_error");
+  });
+
+  it("ignores a late list response after a newer generation starts", async () => {
+    const app = new OpenBotApp();
+    app.connected = true;
+    app.sessionKey = "agent:main:main";
+
+    let resolveFirst!: (value: unknown) => void;
+    const firstRequest = new Promise((resolve) => {
+      resolveFirst = resolve;
+    });
+    const request = vi
+      .fn()
+      .mockImplementationOnce(() => firstRequest)
+      .mockResolvedValueOnce({
+        checkpoints: [
+          {
+            checkpointId: "cp-new",
+            createdAt: "2026-10-31T00:00:00.000Z",
+            boundaryMessageId: "m0",
+            summary: "n",
+            restorable: { files: true, transcript: true },
+            externalEffects: { present: false, kinds: [] },
+          },
+        ],
+      });
+    app.client = { request } as never;
+
+    const first = app.loadChatCheckpoints();
+    await Promise.resolve();
+    const second = app.loadChatCheckpoints();
+    await second;
+
+    resolveFirst({
+      checkpoints: [
+        {
+          checkpointId: "cp-late",
+          createdAt: "2026-10-31T00:00:00.000Z",
+          boundaryMessageId: "m0",
+          summary: "late",
+          restorable: { files: true, transcript: true },
+          externalEffects: { present: false, kinds: [] },
+        },
+      ],
+    });
+    await first;
+
+    expect(app.chatCheckpoints.map((c) => c.checkpointId)).toEqual(["cp-new"]);
+    expect(app.chatCheckpointLoadState.status).toBe("ready");
+  });
+
+  it("keeps last-good and marks stale when a same-session reload fails", async () => {
+    const app = new OpenBotApp();
+    app.connected = true;
+    app.sessionKey = "agent:main:main";
+    const good = [
+      {
+        checkpointId: "cp-good",
+        createdAt: "2026-10-31T00:00:00.000Z",
+        boundaryMessageId: "m0",
+        summary: "g",
+        restorable: { files: true, transcript: true },
+        externalEffects: { present: false, kinds: [] },
+      },
+    ];
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce({ checkpoints: good })
+      .mockRejectedValueOnce(new Error("reload failed"));
+    app.client = { request } as never;
+
+    await app.loadChatCheckpoints();
+    expect(app.chatCheckpointLoadState.status).toBe("ready");
+
+    await app.loadChatCheckpoints();
+    expect(app.chatCheckpointLoadState.status).toBe("stale");
+    expect(app.chatCheckpoints.map((c) => c.checkpointId)).toEqual(["cp-good"]);
+    expect(app.chatCheckpointLoadState.reasonCode).toBe("load_error");
+  });
+
+  it("isolates checkpoints immediately when the restore session switches", async () => {
+    const app = new OpenBotApp();
+    app.connected = true;
+    app.sessionKey = "agent:main:main";
+    app.client = {
+      request: vi.fn().mockResolvedValue({
+        checkpoints: [
+          {
+            checkpointId: "cp-a",
+            createdAt: "2026-10-31T00:00:00.000Z",
+            boundaryMessageId: "m0",
+            summary: "a",
+            restorable: { files: true, transcript: true },
+            externalEffects: { present: false, kinds: [] },
+          },
+        ],
+      }),
+    } as never;
+    await app.loadChatCheckpoints();
+    expect(app.chatCheckpoints).toHaveLength(1);
+
+    app.isolateChatCheckpointLoadForSession("agent:other:main");
+    expect(app.chatCheckpoints).toEqual([]);
+    expect(app.chatCheckpointLoadState.status).toBe("idle");
+    expect(app.chatCheckpointDiagnostics).toEqual([]);
+  });
+});

@@ -113,6 +113,19 @@ import {
   adaptSpacesLoadCapabilityState,
 } from "./capability/view-state.ts";
 import { sessionKeysShareChatSurface } from "./chat-session-key-match.ts";
+import {
+  applyChatCheckpointLoadFailure,
+  applyChatCheckpointLoadSuccess,
+  beginChatCheckpointLoad,
+  createChatCheckpointLoadState,
+  isolateChatCheckpointLoad,
+  type ChatCheckpointLoadState,
+  checkpointsFromLoadState,
+} from "./chat/checkpoint-load-state.ts";
+import {
+  diagnoseCheckpointListVisibility,
+  type ChatCheckpointVisibilityDiagnostic,
+} from "./chat/checkpoint-visibility-diagnostics.ts";
 import type { ChatContextExpansionSuggestion } from "./chat/context-expansion.ts";
 import {
   DEFAULT_CHAT_CONTEXT_SCOPE,
@@ -1024,6 +1037,10 @@ export class OpenBotApp extends LitElement {
   @state() chatManualRefreshInFlight = false;
   // Per-turn checkpoint rollback (chat-checkpoint-rollback).
   @state() chatCheckpoints: ChatCheckpoint[] = [];
+  /** P0 load observability: idle/loading/ready/error/stale/empty (empty ≠ error). */
+  @state() chatCheckpointLoadState: ChatCheckpointLoadState = createChatCheckpointLoadState();
+  /** P0 visibility diagnostics (ids + reason codes only; no chat bodies). */
+  @state() chatCheckpointDiagnostics: ChatCheckpointVisibilityDiagnostic[] = [];
   @state() pendingRestoreCheckpointId: string | null = null;
   @state() restoreInFlightCheckpointId: string | null = null;
   /** One-shot flag consumed by the history reload after a confirmed restore. */
@@ -4063,20 +4080,59 @@ export class OpenBotApp extends LitElement {
   /** Fetch the active session's restorable checkpoints for the inline dividers. */
   async loadChatCheckpoints() {
     if (!this.client || !this.connected) {
-      this.chatCheckpoints = [];
+      // P0: do not wipe last-good on disconnect; leave load state as-is.
       return;
     }
     const sessionKey = resolveChatRestoreSessionKey(this);
+    const began = beginChatCheckpointLoad(this.chatCheckpointLoadState, sessionKey);
+    this.chatCheckpointLoadState = began.state;
+    this.chatCheckpoints = checkpointsFromLoadState(began.state);
     // Phase A: load checkpoints for collab/space sessions (恢复线).
+    // P0: bind request to sessionKey + generation; ignore late / cross-session replies.
     try {
       const result = await this.client.request<{ checkpoints?: ChatCheckpoint[] }>(
         "chat.checkpoints.list",
-        { sessionKey },
+        { sessionKey: began.sessionKey },
       );
-      this.chatCheckpoints = Array.isArray(result.checkpoints) ? result.checkpoints : [];
+      const applied = applyChatCheckpointLoadSuccess(this.chatCheckpointLoadState, {
+        sessionKey: began.sessionKey,
+        generation: began.generation,
+        checkpoints: result.checkpoints,
+      });
+      this.chatCheckpointLoadState = applied.state;
+      if (!applied.ignored) {
+        this.chatCheckpoints = checkpointsFromLoadState(applied.state);
+        this.chatCheckpointDiagnostics = diagnoseCheckpointListVisibility(
+          applied.state.checkpoints,
+          this.chatMessages,
+        );
+      }
     } catch {
-      this.chatCheckpoints = [];
+      const applied = applyChatCheckpointLoadFailure(this.chatCheckpointLoadState, {
+        sessionKey: began.sessionKey,
+        generation: began.generation,
+        errorToken: "list_failed",
+      });
+      this.chatCheckpointLoadState = applied.state;
+      if (!applied.ignored) {
+        this.chatCheckpoints = checkpointsFromLoadState(applied.state);
+        // Keep prior diagnostics when stale; clear when hard error with no data.
+        if (applied.state.status === "error") {
+          this.chatCheckpointDiagnostics = [];
+        }
+      }
     }
+  }
+
+  /** P0: clear checkpoints + load state when the restore session surface changes. */
+  isolateChatCheckpointLoadForSession(nextSessionKey: string | null) {
+    this.chatCheckpointLoadState = isolateChatCheckpointLoad(
+      this.chatCheckpointLoadState,
+      nextSessionKey,
+    );
+    this.chatCheckpoints = [];
+    this.chatCheckpointDiagnostics = [];
+    this.pendingRestoreCheckpointId = null;
   }
 
   requestRestoreCheckpoint(checkpointId: string) {

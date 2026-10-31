@@ -1,5 +1,7 @@
 import type { EventLogEntry } from "../app-events.ts";
 import type { CompactionStatus, FallbackStatus } from "../app-tool-stream.ts";
+import type { ChatCheckpointLoadState } from "../chat/checkpoint-load-state.ts";
+import type { ChatCheckpointVisibilityDiagnostic } from "../chat/checkpoint-visibility-diagnostics.ts";
 import type { ChannelsLoadState, ChannelsWhatsAppAuthState } from "../controllers/channels.ts";
 import type { ChatState } from "../controllers/chat.ts";
 import type { ConfigState } from "../controllers/config.ts";
@@ -99,6 +101,8 @@ export type AppViewChatCapabilityState = Omit<ChatState, "workbenchSystemSetting
   chatNewMessagesBelow: boolean;
   // chat-checkpoint-rollback: per-turn checkpoint dividers + restore state.
   chatCheckpoints: ChatCheckpoint[];
+  chatCheckpointLoadState: ChatCheckpointLoadState;
+  chatCheckpointDiagnostics: ChatCheckpointVisibilityDiagnostic[];
   pendingRestoreCheckpointId: string | null;
   restoreInFlightCheckpointId: string | null;
 };
